@@ -26,6 +26,14 @@ let listCreated=false;
 let holdLinkdingPatch = null;
 // gate.linkding puts a Cloudflare Access-shaped gateway in front of /linkding/.
 const gate={linkding:false}, acceptedKeys=new Set(['fixture-key']);
+// linkding on PostgreSQL: Tag.name holds 64 characters (models.py; varchar
+// counts characters). A longer tag (parse_tag_string splits at commas) fails
+// the write, and Django with DEBUG off answers with its stock page
+// (django/views/defaults.py server_error; linkding ships no 500.html).
+// down: every linkding write meets the same page, whatever its tags.
+const postgres={linkding:false}, down={linkding:false};
+const tooLongForPostgres=names=>postgres.linkding&&(names||[]).some(name=>String(name).split(',').some(part=>Array.from(part.trim()).length>64));
+const DJANGO_500='\n<!doctype html>\n<html lang="en">\n<head>\n  <title>Server Error (500)</title>\n</head>\n<body>\n  <h1>Server Error (500)</h1><p></p>\n</body>\n</html>\n';
 const server=createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');
   wire.push({method:req.method,path:url.pathname,hasCookie:!!req.headers.cookie});
@@ -55,6 +63,7 @@ const server=createServer(async(req,res)=>{
   let data;try{data=body?JSON.parse(body):{};}catch{res.writeHead(400).end();return;}
   requests.push({service,path,query:url.search,method:req.method,data});
   const reply=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(status===204?'':JSON.stringify(value));};
+  const serverError=()=>{res.writeHead(500,{'Content-Type':'text/html; charset=utf-8'});res.end(DJANGO_500);};
   const scheme=service==='linkding'?'Token ':'Bearer ';
   if(![...acceptedKeys].some(key=>req.headers.authorization===scheme+key)){reply(401,{});return;}
   const store=records[service];
@@ -95,15 +104,22 @@ const server=createServer(async(req,res)=>{
       // has disable_scraping, the server then fills an empty title and an
       // empty Description from the page it fetches itself.
       const now=serverNow(),found=[...store.values()].find(b=>b.url===data.url);
+      // services/bookmarks.py: merging into an existing URL fails in
+      // update_bookmark before anything is saved; a new bookmark is saved
+      // before its tags, outside a transaction, and stays without them.
+      const tagError=tooLongForPostgres(data.tag_names);
+      if(down.linkding||tagError&&found)return serverError();
       const row=found||{id:Math.max(0,...[...store.keys()].map(Number).filter(Number.isFinite))+1,url:data.url,web_archive_snapshot_url:null,is_archived:false,date_added:now};
       Object.assign(row,{title:data.title===undefined?'':data.title,description:data.description===undefined?'':data.description,notes:data.notes===undefined?'':data.notes,
-        unread:data.unread===undefined?false:data.unread,shared:data.shared===undefined?false:data.shared,tag_names:data.tag_names===undefined?[]:data.tag_names,date_modified:now});
+        unread:data.unread===undefined?false:data.unread,shared:data.shared===undefined?false:data.shared,tag_names:tagError||data.tag_names===undefined?[]:data.tag_names,date_modified:now});
       if(!url.searchParams.has('disable_scraping')){
         const meta=scrapeMetadata(row.url);
         if(!row.title)row.title=meta.title||'';
         if(!row.description)row.description=meta.description||'';
       }
-      store.set(String(row.id),row);return reply(201,serialize(row));
+      store.set(String(row.id),row);
+      if(tagError)return serverError();
+      return reply(201,serialize(row));
     }
     const id='b'+(store.size+1);
     // Hand-authored API record schema, independently filled from HTTP input.
@@ -120,6 +136,7 @@ const server=createServer(async(req,res)=>{
   if(req.method==='DELETE'){store.delete(id);return reply(204);}
   if(req.method==='PATCH'&&service==='linkding'&&holdLinkdingPatch) await holdLinkdingPatch;
   if(req.method==='PATCH'&&service==='linkding'){
+    if(down.linkding||tooLongForPostgres(data.tag_names))return serverError();
     // serializers.py update(): only the writable fields that were sent change
     // (tags are kept when omitted); update_bookmark() stamps date_modified.
     for(const key of ['url','title','description','notes','is_archived','unread','shared','tag_names'])if(data[key]!==undefined)row[key]=data[key];
@@ -581,6 +598,51 @@ try{
   }
   records.linkding.delete(multiId);await article.goto(origin+'/article');
   console.log('linkding multi-line Description: tag-only popup updates keep it, also after a change elsewhere; a reopened title draft shows and keeps the current one; a title-only reader update keeps it; an edit writes its one line');
+  // A tag longer than PostgreSQL's 64-character column, typed in the popup:
+  // the error names it, nothing is queued or offered for a retry, and the
+  // form keeps the tag and the bookmark the create left behind, so a shorter
+  // tag of 64 code points (128 UTF-16 units) updates that bookmark.
+  {
+    postgres.linkding=true;
+    const tagUrl=origin+'/article-tag-limit', long='research-'+'x'.repeat(56), fits='\u{1F600}'.repeat(64);
+    const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
+    const expected=en.bookmarkErrTagTooLong.message.replace('$TAG$',[...long].slice(0,40).join('')+'…').replace('$MAX$','64');
+    await article.goto(tagUrl);await article.bringToFront();
+    const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
+    await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
+    await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
+    await popup.locator('#tags-input').fill(long);await popup.locator('#tags-input').press('Enter');
+    await popup.locator('#submit-btn').click();
+    const card=popup.locator('.feedback-card .fc-message').filter({hasText:'64'});
+    await card.waitFor({timeout:10000}).catch(async error=>{console.error({body:(await popup.locator('body').innerText()).slice(0,800),errors});throw error;});
+    assert.equal((await card.textContent()).trim(),expected);
+    const errorCard=popup.locator('.feedback-card',{has:popup.locator('.fc-message',{hasText:'64'})});
+    assert.equal(await errorCard.count(),1,JSON.stringify(await popup.locator('.feedback-card').allInnerTexts()));
+    assert.equal(await errorCard.locator('.fc-actions button').count(),0,'an over-long tag offered a Retry that fails the same way: '+JSON.stringify(await popup.locator('.feedback-card').allInnerTexts()));
+    assert.deepEqual(await worker.evaluate(async()=>(await chrome.storage.local.get('offlineQueue')).offlineQueue||[]),[],'an over-long tag was queued for replay');
+    const kept=[...records.linkding.values()].find(row=>row.url===tagUrl);
+    assert(kept,'the PostgreSQL create left no bookmark');assert.deepEqual(kept.tag_names,[]);
+    await popup.waitForFunction(()=>!document.getElementById('existing-banner').classList.contains('hidden'));
+    assert.deepEqual(await popup.locator('#tags-display .tag-item').allTextContents(),[long],'the form lost the tag to shorten');
+    await popup.locator('#tags-input').press('Backspace');
+    await popup.locator('#tags-input').fill(fits);await popup.locator('#tags-input').press('Enter');
+    const before=requests.length;await popup.locator('#submit-btn').click();
+    await until(()=>JSON.stringify(kept.tag_names)===JSON.stringify([fits]),'the shortened tag updated the kept bookmark');
+    assert.deepEqual(requests.slice(before).filter(r=>r.service==='linkding'&&r.method!=='GET').map(r=>[r.method,r.path]),[['PATCH','bookmarks/'+kept.id+'/']],'the shortened save did not update the kept bookmark once');
+    // The same server page with tags that fit is an outage: queued for retry.
+    down.linkding=true;
+    await popup.locator('#tags-input').fill('work');await popup.locator('#tags-input').press('Enter');
+    await popup.locator('#submit-btn').click();
+    const queuedCard=popup.locator('.feedback-card[data-variant="warning"] .fc-message');
+    await queuedCard.waitFor({timeout:10000});
+    assert.equal((await queuedCard.textContent()).trim(),en.saveQueuedServer.message);
+    const queue=await worker.evaluate(async()=>(await chrome.storage.local.get('offlineQueue')).offlineQueue||[]);
+    assert.deepEqual(queue.map(item=>[item.url,item.tags]),[[tagUrl,fits+' work']],'a server error without an over-long tag was not queued');
+    await worker.evaluate(()=>chrome.storage.local.set({offlineQueue:[]}));down.linkding=false;
+    await popup.close();records.linkding.delete(String(kept.id));postgres.linkding=false;
+    await worker.evaluate(()=>statusCache.clear());await article.goto(origin+'/article');
+    console.log('linkding over-long tag on PostgreSQL: the 500 names the tag, nothing is queued or offered for retry, the form updates the kept bookmark with a 64-code-point tag, and the same 500 without an over-long tag is queued');
+  }
   // A page the extension may not read (the localhost name was never granted)
   // leaves the popup nothing to vouch for: the create sends no Description
   // and no disable_scraping, and linkding fills in the page's own meta

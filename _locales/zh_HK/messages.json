@@ -543,6 +543,20 @@
       }
     }
   },
+  "batchTagTooLong": {
+    "message": "。另有 $COUNT$ 個未能儲存：標籤「$TAG$」超出 linkding 的 $MAX$ 個字元上限。請縮短後重新批量儲存。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "tag": {
+        "content": "$2"
+      },
+      "max": {
+        "content": "$3"
+      }
+    }
+  },
   "batchAiFailed": {
     "message": "，AI 處理失敗 $COUNT$ 個",
     "placeholders": {
@@ -5059,6 +5073,17 @@
   },
   "bookmarkErrAuth": {
     "message": "伺服器拒絕了 API Token。請在設定中檢查 Token，然後重新連線。"
+  },
+  "bookmarkErrTagTooLong": {
+    "message": "linkding 未能儲存標籤「$TAG$」：標籤最多 $MAX$ 個字元。請縮短後重新儲存。",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
   },
   "bookmarkConnectErrAuth": {
     "message": "伺服器拒絕了 API Token。請檢查上方的 Token，然後重新連線。"

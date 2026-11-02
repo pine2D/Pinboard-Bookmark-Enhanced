@@ -9,6 +9,9 @@
   let state = { known: false };
   let statusKey = "readerBookmarkChecking";
   let editorStatusKey = "";
+  // Placeholder values for a failure key whose copy names something (the tag
+  // linkding could not store); set together with that key.
+  let failureArgs = [];
   let editor = null;
   let editorSource = null;
   let sharedExplicit = false;
@@ -71,6 +74,9 @@
         if (statusKey === "saveMergedExisting") {
           el.removeAttribute("data-i18n");
           el.textContent = pbpBookmarkMergedText(pbpBookmarkAccountService(context?.account), text);
+        } else if (statusKey === "bookmarkErrTagTooLong") {
+          el.removeAttribute("data-i18n");
+          el.textContent = text(statusKey, ...failureArgs);
         }
       }
     }
@@ -86,8 +92,11 @@
       if (editorStatusKey === "titleTooLong") {
         id("editor-status").removeAttribute("data-i18n");
         id("editor-status").textContent = text("titleTooLong", String(pbpBookmarkLimits(pbpBookmarkAccountService(context?.account)).title));
+      } else if (editorStatusKey === "bookmarkErrTagTooLong") {
+        id("editor-status").removeAttribute("data-i18n");
+        id("editor-status").textContent = text(editorStatusKey, ...failureArgs);
       }
-      id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "readerBookmarkTagsQuoteError", "titleTooLong", "submitUriTooLong"].includes(editorStatusKey) ? "error" : "";
+      id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "readerBookmarkTagsQuoteError", "titleTooLong", "submitUriTooLong", "bookmarkErrTagTooLong"].includes(editorStatusKey) ? "error" : "";
     }
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) input.disabled = deleting;
   }
@@ -344,6 +353,14 @@
       await refresh(gen);
       if (gen !== generation) return;
       statusKey = "bookmarkPartialSave";
+    } else if (result?.reason === "tag_too_long") {
+      // linkding writes a new bookmark before its tags, so read it again. An
+      // open editor stays open to shorten the tag the copy names.
+      await refresh(gen);
+      if (gen !== generation) return;
+      failureArgs = typeof pbpBookmarkFailureArgs === "function" ? pbpBookmarkFailureArgs(result) : [];
+      statusKey = failureKey(result) || "readerBookmarkFailed";
+      if (action === "edit") editorStatusKey = statusKey;
     } else if (action === "edit" && state.quotedTags === true && result?.reason === "invalid") {
       editorStatusKey = "readerBookmarkTagsQuoteError";
       statusKey = "readerBookmarkFailed";

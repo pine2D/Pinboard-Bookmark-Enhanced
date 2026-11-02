@@ -675,7 +675,7 @@ async function pbpBookmarkTagCounts(auth) {
   return resp.json();
 }
 function pbpBookmarkFailure(error) {
-  return pbpSaveFailure(error?.code === "auth" ? "not_logged_in" : error?.code || "network", {httpStatus:error?.status});
+  return pbpSaveFailure(error?.code === "auth" ? "not_logged_in" : error?.code || "network", {httpStatus:error?.status, tag:error?.tag});
 }
 // A vocabulary cache is advisory. Never use another owner's or an old device
 // snapshot to choose a spelling at dispatch time.
@@ -726,6 +726,9 @@ async function pbpDeliverSelfHosted(intent, auth, settings) {
     }
     return {result:{status:"saved", mutation:result.mutation}, persisted:{...plan.fields, private:result.bookmark.private, toread:result.bookmark.toread}, retryable:false};
   } catch (error) {
+    // linkding writes a new bookmark before its tags, so a tag the server
+    // could not store may have left the bookmark behind without them.
+    if (error?.code === "tag_too_long") statusCache.delete(intent.url);
     return {result:pbpBookmarkFailure(error), persisted:null, retryable:["network","timeout","rate_limited","server"].includes(error?.code)};
   }
 }
@@ -738,7 +741,9 @@ function pbpSkippedPersisted(plan, lookup) {
   return typeof notes === "string" ? { ...plan.fields, notes } : plan.fields;
 }
 
-function pbpSaveFailure(reason, { detail, httpStatus } = {}) {
+// tag: the tag a self-hosted server could not store (tag_too_long). The error
+// copy names it, so it travels to the outlets but is never logged.
+function pbpSaveFailure(reason, { detail, httpStatus, tag } = {}) {
   const result = { status: "failed", reason };
   if (detail) {
     result.detail = String(detail)
@@ -746,6 +751,7 @@ function pbpSaveFailure(reason, { detail, httpStatus } = {}) {
       .slice(0, 160);
   }
   if (Number.isInteger(httpStatus)) result.httpStatus = httpStatus;
+  if (typeof tag === "string" && tag) result.tag = tag;
   return result;
 }
 
@@ -1881,7 +1887,7 @@ function notifySaveFailure(notifyId, result, service) {
   // the Pinboard login copy below.
   const key = pbpBookmarkFailureKey(result, service);
   if (key) {
-    showNotification(notifyId + "-error", t("bgSaveFailed"), t(key), "error");
+    showNotification(notifyId + "-error", t("bgSaveFailed"), t(key, ...pbpBookmarkFailureArgs(result)), "error");
   } else if (result.reason === "not_logged_in") {
     showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("bgSetToken"), "error");
   } else if (result.reason === "too_long") {
@@ -4977,7 +4983,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       await _writeBatchProgress({
         running: false, done: true, error: "account_changed",
         runId, account, total: tabs.length, i: 0,
-        saved: 0, queued: 0, failed: 0, aiFailed: 0, skipped: 0, tooLong: 0
+        saved: 0, queued: 0, failed: 0, aiFailed: 0, skipped: 0, tooLong: 0, tagTooLong: 0
       });
     }
     // A resumed run landing here means the account changed while the batch
@@ -4993,10 +4999,14 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
   const rc = (resumeState && resumeState.counts) || {};
   let processed = Number(rc.processed) || 0;
   let saved = Number(rc.saved) || 0, queued = Number(rc.queued) || 0, failed = Number(rc.failed) || 0,
-      aiFailed = Number(rc.aiFailed) || 0, skipped = Number(rc.skipped) || 0, tooLong = Number(rc.tooLong) || 0;
+      aiFailed = Number(rc.aiFailed) || 0, skipped = Number(rc.skipped) || 0, tooLong = Number(rc.tooLong) || 0,
+      tagTooLong = Number(rc.tagTooLong) || 0;
+  // The first tag linkding could not store, as the summary names it. It rides
+  // with the counts so a resumed run can still name it.
+  let longTag = typeof rc.longTag === "string" ? rc.longTag : "";
   const startIndex = resumeState ? Math.max(0, Number(resumeState.startIndex) || 0) : 0;
   const resumeCount = Number(resumeState?.resumeCount) || 0;
-  const base = () => ({ runId, resumeCount, account, total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong });
+  const base = () => ({ runId, resumeCount, account, total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, longTag });
   // Persist the job snapshot BEFORE the first item: everything a resume needs
   // (public tab identity + cursor + counts), never a token. The per-item
   // checkpoint below rewrites cursor+counts; every terminal path removes it.
@@ -5005,7 +5015,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     account,
     tabs: tabs.map((tb) => ({ id: tb.id, url: tb.url, title: tb.title, incognito: !!tb.incognito })),
     next: processed,
-    counts: { processed, saved, queued, failed, aiFailed, skipped, tooLong },
+    counts: { processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, longTag },
     resumeCount,
     ts: Date.now(),
   });
@@ -5225,6 +5235,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         else if (result.status === "queued") queued++;
         else if (result.status === "skipped") skipped++;
         else if (result.reason === "too_long") tooLong++;
+        else if (result.reason === "tag_too_long") { tagTooLong++; longTag ||= pbpBookmarkFailureArgs(result)[0]; }
         else failed++;
       } catch (e) {
         if (e?.code === "account_changed" || PBP_BOOKMARK_GATEWAY_CODES.includes(e?.code)) throw e;
@@ -5249,8 +5260,11 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     const skippedMsg = skipped > 0 ? t("batchSkipped", String(skipped)) : "";
     const tooLongMsg = tooLong > 0 ? t("batchTooLong", String(tooLong)) : "";
     const queuedMsg = queued > 0 ? ` · ${t("offlineQueued", String(queued))}` : "";
-    if (saved > 0 || queued > 0 || failed > 0 || tooLong > 0) {
-      const message = t("batchDone", String(saved), String(failed)) + skippedMsg + tooLongMsg + queuedMsg + tagsSuffix;
+    // A sentence of its own after the summary: which tag, the limit, what to do.
+    const tagTooLongMsg = tagTooLong > 0
+      ? t("batchTagTooLong", String(tagTooLong), ...pbpBookmarkFailureArgs({ reason: "tag_too_long", tag: longTag })) : "";
+    if (saved > 0 || queued > 0 || failed > 0 || tooLong > 0 || tagTooLong > 0) {
+      const message = t("batchDone", String(saved), String(failed)) + skippedMsg + tooLongMsg + queuedMsg + tagsSuffix + tagTooLongMsg;
       if (saved > 0 || queued > 0) {
         const title = saved > 0 ? t("bgBatchSaved") : t("bgQueuedOffline");
         showNotification("batch-saved", title, message, "batchSave");

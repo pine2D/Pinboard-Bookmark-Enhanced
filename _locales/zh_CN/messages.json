@@ -543,6 +543,20 @@
       }
     }
   },
+  "batchTagTooLong": {
+    "message": "。另有 $COUNT$ 个未保存：标签「$TAG$」超过 linkding 的 $MAX$ 个字符上限。请缩短后重新批量保存。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "tag": {
+        "content": "$2"
+      },
+      "max": {
+        "content": "$3"
+      }
+    }
+  },
   "batchAiFailed": {
     "message": "，AI 处理失败 $COUNT$ 个",
     "placeholders": {
@@ -5053,6 +5067,17 @@
   },
   "bookmarkErrAuth": {
     "message": "服务器拒绝了 API Token。请在设置中检查 Token，然后重新连接。"
+  },
+  "bookmarkErrTagTooLong": {
+    "message": "linkding 无法保存标签「$TAG$」：标签最多 $MAX$ 个字符。请缩短后重新保存。",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
   },
   "bookmarkConnectErrAuth": {
     "message": "服务器拒绝了 API Token。请检查上方的 Token，然后重新连接。"

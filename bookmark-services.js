@@ -235,8 +235,17 @@ function pbpCreateBookmarkServiceClient(config) {
         ...(typeof fields.toread === "boolean" ? {unread:fields.toread} : {}),
         ...(!existing ? {shared:config.sharingEnabled === true && fields.sharedExplicit === true && fields.private === false}
           : config.sharingEnabled === true && fields.sharedExplicit === true && typeof fields.private === "boolean" && fields.private !== existing.private ? {shared:!fields.private} : {})};
-      const {data} = await request(existing ? "bookmarks/" + pbpBookmarkRecordId(existing.id) + "/"
-        : described ? "bookmarks/?disable_scraping" : "bookmarks/", existing ? "PATCH" : "POST", body);
+      let data;
+      try {
+        ({data} = await request(existing ? "bookmarks/" + pbpBookmarkRecordId(existing.id) + "/"
+          : described ? "bookmarks/?disable_scraping" : "bookmarks/", existing ? "PATCH" : "POST", body));
+      } catch (error) {
+        // A server error while a tag is longer than linkding's column is the
+        // PostgreSQL rejection: name the tag, and nothing will retry it.
+        const tag = error?.code === "server" ? pbpLinkdingOverlongTag(tags) : "";
+        if (tag) throw Object.assign(pbpBookmarkServiceError("tag_too_long", error.status), {tag});
+        throw error;
+      }
       const bookmark = pbpBookmarkNormalize(service,data);
       const added = Date.parse(data.date_added), modified = Date.parse(data.date_modified);
       // linkding also returns 201 when POST merges an existing URL. Compare

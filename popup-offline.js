@@ -157,7 +157,7 @@
   function retryFailureMessage(result, service) {
     const reason = result && typeof result === "object" ? result.reason : "";
     const failureKey = pbpBookmarkFailureKey(result, service);
-    if (failureKey) return t(failureKey);
+    if (failureKey) return t(failureKey, ...pbpBookmarkFailureArgs(result));
     if (reason === "account_mismatch") return t("offlineRetryWrongAccount");
     if (reason === "not_logged_in") return t("batchNotLoggedIn");
     if (reason === "account_changed") return t("offlineRetryAccountChanged");

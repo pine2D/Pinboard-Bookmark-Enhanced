@@ -543,6 +543,20 @@
       }
     }
   },
+  "batchTagTooLong": {
+    "message": ". Не сохранено: $COUNT$ — метка «$TAG$» длиннее $MAX$ символов (предел linkding). Сократите её и снова запустите пакетное сохранение.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "tag": {
+        "content": "$2"
+      },
+      "max": {
+        "content": "$3"
+      }
+    }
+  },
   "batchAiFailed": {
     "message": ", ошибка AI: $COUNT$",
     "placeholders": {
@@ -5059,6 +5073,17 @@
   },
   "bookmarkErrAuth": {
     "message": "Сервер отклонил токен API. Проверьте токен в настройках и подключитесь снова."
+  },
+  "bookmarkErrTagTooLong": {
+    "message": "Не удалось сохранить метку «$TAG$» в linkding: допускается не более $MAX$ символов. Сократите её и сохраните снова.",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
   },
   "bookmarkConnectErrAuth": {
     "message": "Сервер отклонил токен API. Проверьте токен выше и подключитесь снова."

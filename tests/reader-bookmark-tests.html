@@ -63,6 +63,7 @@ async function pipelineHarness(options = {}) {
     pbpStatusCacheSet: (url, auth, state) => { (env.cacheWrites ||= []).push({ url, account: auth.account, ...state }); return auth.account === env.account && auth.epoch === env.epoch; }, pbpStatusCacheGet: () => null,
     pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { account, token: env.token, epoch: env.epoch, service: env.service, ...sharing() } : null,
     pbpWaybackArchive: async () => {}, updateBadge: async () => {}, setIcon: () => {},
+    statusCache: (env.statusCache ||= new Map()),
     pinboardFetch: async raw => {
       const url = new URL(raw); env.calls.push(url);
       if (env.networkDown) throw new Error("offline");
@@ -94,8 +95,15 @@ async function pipelineHarness(options = {}) {
 // 503 a proxy in front of the server gives while it is down. clientFor builds
 // the adapter with the worker's own sharing setting (background.js
 // pbpBookmarkClient), so a test exercises the setting the worker passes.
-function selfHostedServer(service, row) {
+// postgres: linkding on PostgreSQL, whose Tag.name column holds 64 characters.
+// A longer tag (parse_tag_string splits at commas) fails the write with
+// Django's stock 500 page; a create has already stored the bookmark by then
+// (create_bookmark saves it before its tags, outside a transaction).
+function selfHostedServer(service, row, { postgres = false } = {}) {
   const requests = [], failures = [];
+  const overlong = names => postgres && (names || []).some(name => String(name).split(",").some(part => Array.from(part.trim()).length > 64));
+  const serverError = () => new Response("\n<!doctype html>\n<html lang=\"en\">\n<head>\n  <title>Server Error (500)</title>\n</head>\n<body>\n  <h1>Server Error (500)</h1><p></p>\n</body>\n</html>\n",
+    { status: 500, headers: { "Content-Type": "text/html; charset=utf-8" } });
   const json = (status, value) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
   const linkdingRecord = () => ({ id: row.id, url: row.url, title: row.title, description: row.description, notes: row.notes,
     web_archive_snapshot_url: null, favicon_url: null, preview_image_url: null, is_archived: row.is_archived, unread: row.unread,
@@ -120,10 +128,12 @@ function selfHostedServer(service, row) {
         const now = new Date().toISOString();
         row = { id: 21, url: body.url, title: body.title ?? "", description: body.description ?? "", notes: body.notes ?? "",
           is_archived: body.is_archived ?? false, unread: body.unread ?? false, shared: body.shared ?? false,
-          tag_names: [...(body.tag_names ?? [])], date_added: now, date_modified: now };
+          tag_names: overlong(body.tag_names) ? [] : [...(body.tag_names ?? [])], date_added: now, date_modified: now };
+        if (overlong(body.tag_names)) return serverError();
         return json(201, linkdingRecord());
       }
       if (method === "PATCH" && row && url.pathname === "/api/bookmarks/" + row.id + "/") {
+        if (overlong(body.tag_names)) return serverError();
         for (const key of ["url", "title", "description", "notes", "is_archived", "unread", "shared", "tag_names"]) if (body[key] !== undefined) row[key] = body[key];
         row.date_modified = new Date().toISOString();
         return json(200, linkdingRecord());
@@ -430,6 +440,51 @@ await test("reader editor shares a new linkding bookmark only when its own Share
       equal(create.body.shared, clicks === 1); equal(server.row.shared, clicks === 1);
     } finally { frame.remove(); }
   }
+});
+await test("the reader names a linkding tag the server cannot store, queues nothing and keeps the editor open to shorten it", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  const account = "linkding:https://links.example/:conn-1";
+  const long = "x".repeat(65), shown = "x".repeat(40) + "\u2026", fits = "\u{1F600}".repeat(64);
+  const same = (actual, expected) => equal(JSON.stringify(actual), JSON.stringify(expected));
+  const bookmarkDraft = { title: "Popup title", tags: long, notes: "", private: true, toread: false };
+  const server = selfHostedServer("linkding", null, { postgres: true });
+  const h = await pipelineHarness({ account, token: "linkding-token", service: "linkding", post: null,
+    slot: { account, bookmarkDraft }, clientFor: server.clientFor, settings: { bookmarkService: "linkding" } });
+  const frame = document.createElement("iframe"); document.body.append(frame);
+  try {
+    const w = frame.contentWindow, pending = [];
+    w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+    w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
+      sendMessage: msg => { const request = h.pbpReaderBookmarkRequest(msg, SENDER); pending.push(request); return request; },
+      onMessage: { addListener: () => {} } } };
+    w.eval(await (await fetch("../shared.js")).text());
+    w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; w.eval(runtime);
+    w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "", draft: bookmarkDraft } } }));
+    await settle(pending);
+    await w.pbpReaderBookmarkAction("save"); await settle(pending);
+    const status = w.document.getElementById("reader-bookmark-status");
+    equal(status.textContent, "bookmarkErrTagTooLong:" + shown + ":64");
+    assert(!status.hasAttribute("data-i18n"), "a language re-apply would drop the tag from the status");
+    same(h.env.queue, []);
+    // PostgreSQL kept the bookmark without its tags; the reader shows it saved.
+    same(server.row.tag_names, []);
+    equal(w.document.getElementById("reader-bookmark-save").dataset.saved, "true");
+    await w.pbpReaderBookmarkAction("edit"); await settle(pending);
+    const editor = w.document.getElementById("reader-bookmark-editor"), tags = w.document.getElementById("reader-bookmark-tags");
+    const apply = async value => {
+      tags.value = value; tags.dispatchEvent(new w.Event("input", { bubbles: true }));
+      w.document.getElementById("reader-bookmark-apply").click(); await settle(pending);
+    };
+    await apply(long);
+    assert(editor.matches(":popover-open"), "the editor closed on a tag the user still has to shorten");
+    const editorStatus = w.document.getElementById("reader-bookmark-editor-status");
+    same([editorStatus.textContent, editorStatus.dataset.state, editorStatus.hidden], ["bookmarkErrTagTooLong:" + shown + ":64", "error", false]);
+    same(h.env.queue, []);
+    await apply(fits);
+    assert(!editor.matches(":popover-open"), "the shortened tag did not save");
+    same(server.row.tag_names, [fits]);
+    same(server.requests.filter(r => r.method === "PATCH").map(r => r.body.tag_names), [[long], [fits]]);
+  } finally { frame.remove(); }
 });
 await test("Pinboard and Karakeep reader bookmarks keep the popup's privacy draft and carry no sharing intent", async () => {
   for (const service of ["pinboard", "karakeep"]) for (const isPrivate of [false, true]) {

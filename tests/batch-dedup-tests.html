@@ -663,6 +663,18 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     equal(early.elements["batch-bookmark-btn"].focused, true, "hidden progress kept keyboard focus");
   });
 
+  await test("over-long linkding tags name the tag after the summary and render as an error", async () => {
+    const shown = "x".repeat(40) + "\u2026";
+    const h = await createUiHarness(null, 5000);
+    h.renderBatchProgress({ running: false, done: true, total: 3, saved: 1, queued: 0, failed: 0, skipped: 0, tooLong: 0, tagTooLong: 2, longTag: shown });
+    equal(h.statuses[0].kind, "error");
+    assert(h.statuses[0].message.startsWith("batchDone:1:0"), "tag failures leaked into the failed count: " + h.statuses[0].message);
+    assert(h.statuses[0].message.endsWith("batchTagTooLong:2:" + shown + ":64"), "tag sentence missing: " + h.statuses[0].message);
+    const plain = await createUiHarness(null, 5000);
+    plain.renderBatchProgress({ running: false, done: true, total: 1, saved: 1, queued: 0, failed: 0, skipped: 0, tooLong: 0 });
+    assert(!plain.statuses[0].message.includes("batchTagTooLong"), "a run without tag failures mentions them");
+  });
+
   await test("completion copy is localized and names an account switch (B33/B51)", async () => {
     const ai = await createUiHarness(null, 5000);
     ai.renderBatchProgress({ running: false, done: true, total: 2, saved: 2, queued: 0, failed: 0, skipped: 0, tooLong: 0, aiFailed: 3 });

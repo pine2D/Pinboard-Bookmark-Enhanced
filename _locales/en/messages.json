@@ -547,6 +547,21 @@
       }
     }
   },
+  "batchTagTooLong": {
+    "message": ". $COUNT$ not saved because the tag \"$TAG$\" is longer than linkding's $MAX$-character limit. Shorten it, then run Batch Save again.",
+    "description": "Sentence appended after the Batch Save summary; it starts with its own separator. $COUNT$ pages were not saved because of an over-long linkding tag, $TAG$ is the first such tag, $MAX$ the limit.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "tag": {
+        "content": "$2"
+      },
+      "max": {
+        "content": "$3"
+      }
+    }
+  },
   "batchAiFailed": {
     "message": ", AI failed for $COUNT$",
     "description": "Appended to the batch-done status when AI tags or summaries failed.",
@@ -5067,6 +5082,18 @@
   },
   "bookmarkErrAuth": {
     "message": "The server rejected the API token. Check the token in Settings, then reconnect."
+  },
+  "bookmarkErrTagTooLong": {
+    "message": "linkding couldn't save the tag \"$TAG$\": tags can have at most $MAX$ characters. Shorten it, then save again.",
+    "description": "linkding on PostgreSQL rejected a save because a tag is longer than its tag column allows. $TAG$ is that tag (cut with an ellipsis when long), $MAX$ the limit.",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
   },
   "bookmarkConnectErrAuth": {
     "message": "The server rejected the API token. Check the token above, then connect again."

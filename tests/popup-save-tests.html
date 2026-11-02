@@ -615,6 +615,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const remote = view({ reason: "remote" });
       assert(remote.message === "saveFailedGeneric" && remote.retry === true, JSON.stringify(remote));
     });
+    test("a linkding tag the server cannot store is named with its limit and offers no retry", () => {
+      const view = bookmarkErrorView("linkding");
+      for (const [tag, shown] of [["x".repeat(65), "x".repeat(40) + "\u2026"], ["\u{1F600}".repeat(70), "\u{1F600}".repeat(40) + "\u2026"]]) {
+        const got = view({ status: "failed", reason: "tag_too_long", tag, httpStatus: 500 });
+        assert(got.message === "bookmarkErrTagTooLong(" + shown + ",64)" && got.retry === false, JSON.stringify(got));
+      }
+      // The English copy is complete once both values are in.
+      const filled = enMessages.bookmarkErrTagTooLong.message.replace("$TAG$", "x").replace("$MAX$", "64");
+      assert(!/\$[A-Z_]+\$/.test(filled) && filled.includes('"x"') && filled.includes("64"), filled);
+    });
     // Behaviour, not shape: run the real delete handlers against the service
     // worker's self-hosted failure shape (status + error code, no data).
     async function runDeleteHandlers(service, resp) {
@@ -675,6 +685,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(message({ reason: "not_logged_in", httpStatus: 401 }, "linkding") === "bookmarkErrAuth", "linkding auth failure not named");
       assert(message({ reason: "gateway_basic" }, "linkding") === "bookmarkErrGatewayBasic", "gateway failure not named");
       assert(message({ reason: "not_logged_in" }, "pinboard") === "batchNotLoggedIn", "pinboard copy changed");
+      assert(message({ reason: "tag_too_long", tag: "y".repeat(65), httpStatus: 500 }, "linkding") === "bookmarkErrTagTooLong:" + "y".repeat(40) + "\u2026:64", "the over-long tag is not named");
     });
 
     await testAsync("the queue bar shows the pause cause", async () => {
@@ -1410,7 +1421,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     test("queued refreshes the queue bar without saved side effects", () => {
       const queuedStart = submit.indexOf('if (result.status === "queued")');
-      const queuedEnd = submit.indexOf('if (result.status === "failed" && result.reason === "partial")', queuedStart);
+      const queuedEnd = submit.indexOf('if (result.status === "failed" && (result.reason === "partial"', queuedStart);
       const queued = submit.slice(queuedStart, queuedEnd);
       assert(queued.includes("showSaveQueued(result)") && queued.includes("window.PPOffline.refresh()"), "queued UI or queue refresh missing");
       assert(queued.includes('setSubmitState("idle")'), "queued submit does not leave loading state");

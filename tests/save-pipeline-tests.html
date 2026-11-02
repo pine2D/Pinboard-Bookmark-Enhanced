@@ -360,6 +360,7 @@ async function createBatchSaveHarness(options) {
   const extractionCalls = [];
   const cacheWrites = [];
   const removed = [];
+  const jobs = [];
   const outcomes = opts.outcomes || [{ status: "saved", mutation: "created" }];
   let outcomeIndex = 0;
   const deps = {
@@ -382,7 +383,8 @@ async function createBatchSaveHarness(options) {
     buildTagPrompt: () => "tags",
     parseAITags: () => ["ai-tag"],
     refineTags: (tags) => tags,
-    chrome: { storage: { local: { get: opts.storageGet || (async () => ({})) } } },
+    chrome: { storage: { local: { get: opts.storageGet || (async () => ({})),
+      set: async (value) => { if (value.batch_job) jobs.push(JSON.parse(JSON.stringify(value.batch_job))); } } } },
     buildTagCaseMap: () => ({}),
     pbpReadTagVocab: async () => opts.tagVocabIndex || null,
     pbpCanonicalTagName, pbpTagGroupKey,
@@ -408,6 +410,7 @@ async function createBatchSaveHarness(options) {
     notifications,
     badgeCalls,
     removed,
+    jobs,
     extractionCalls,
     cacheWrites,
   };
@@ -2090,6 +2093,18 @@ await suite("unified save pipeline", async () => {
     }
   });
 
+  await test("a linkding tag the server cannot store is named in the failure notification", async () => {
+    for (const [tag, shown] of [["x".repeat(65), "x".repeat(40) + "\u2026"], ["\u{1F600}".repeat(65), "\u{1F600}".repeat(40) + "\u2026"]]) {
+      const h = await createBackgroundSaveHarness({ auth: SELF_HOSTED_AUTH.linkding, result: { status: "failed", reason: "tag_too_long", tag, httpStatus: 500 } });
+      await runBackgroundSave(h);
+      equal(h.notifications.length, 1, "tag_too_long notification count");
+      equal(h.notifications[0][0], "qs-error");
+      equal(h.notifications[0][1], "bgSaveFailed");
+      equal(h.notifications[0][2], "bookmarkErrTagTooLong:" + shown + ":64", "the notification must name the tag and the limit");
+      equal(h.notifications[0][3], "error");
+    }
+  });
+
   await test("unknown and internal reasons notify generic copy", async () => {
     const services = [{ service: "pinboard" }, ...Object.values(SELF_HOSTED_AUTH)];
     for (const auth of services) {
@@ -2352,6 +2367,40 @@ await suite("unified save pipeline", async () => {
     equal(tooLong.notifications[0][0], "batch-error");
     equal(tooLong.notifications[0][1], "bgSaveFailed", "an all-too-long Batch must not be headlined as a saved batch");
     assert(tooLong.notifications[0][2].includes("batchTooLong:2"), "too-long count missing from the notification");
+  });
+
+  await test("Batch counts saves stopped by an over-long linkding tag on their own and names the first tag", async () => {
+    const shown = "\u6a19".repeat(40) + "\u2026";
+    const h = await createBatchSaveHarness({ outcomes: [
+      { status: "saved", mutation: "created" },
+      { status: "failed", reason: "tag_too_long", tag: "\u6a19".repeat(65), httpStatus: 500 },
+      { status: "failed", reason: "tag_too_long", tag: "y".repeat(70), httpStatus: 500 },
+      { status: "failed", reason: "api" },
+    ] });
+    await h.handleBatchSave(batchTabs(4));
+    const done = h.progress[h.progress.length - 1];
+    equal(done.tagTooLong, 2); equal(done.failed, 1); equal(done.saved, 1); equal(done.longTag, shown);
+    equal(h.jobs[h.jobs.length - 1].counts.tagTooLong, 2, "the checkpoint a resume reads lost the count");
+    equal(h.jobs[h.jobs.length - 1].counts.longTag, shown, "the checkpoint a resume reads lost the tag");
+    equal(h.notifications.length, 1);
+    equal(h.notifications[0][1], "bgBatchSaved");
+    assert(h.notifications[0][2].startsWith("batchDone:1:1"), "the summary counted tag failures as failed: " + h.notifications[0][2]);
+    assert(h.notifications[0][2].endsWith("batchTagTooLong:2:" + shown + ":64"), "tag sentence missing: " + h.notifications[0][2]);
+
+    const all = await createBatchSaveHarness({ outcomes: [{ status: "failed", reason: "tag_too_long", tag: "\u6a19".repeat(65), httpStatus: 500 }] });
+    await all.handleBatchSave(batchTabs(2));
+    equal(all.notifications.length, 1, "an all-tag-too-long Batch must not finish silently");
+    equal(all.notifications[0][0], "batch-error");
+    equal(all.notifications[0][1], "bgSaveFailed");
+    assert(all.notifications[0][2].endsWith("batchTagTooLong:2:" + shown + ":64"), all.notifications[0][2]);
+
+    // A run resumed from its checkpoint still names the tag it met before.
+    const resumed = await createBatchSaveHarness({ outcomes: [{ status: "saved", mutation: "created" }] });
+    await resumed.handleBatchSave(batchTabs(3), "alice", false, { runId: "test-batch-run", startIndex: 2, resumeCount: 1,
+      counts: { processed: 2, saved: 1, queued: 0, failed: 0, aiFailed: 0, skipped: 0, tooLong: 0, tagTooLong: 1, longTag: shown } });
+    const last = resumed.progress[resumed.progress.length - 1];
+    equal(last.saved, 2); equal(last.tagTooLong, 1); equal(last.longTag, shown);
+    assert(resumed.notifications[0][2].endsWith("batchTagTooLong:1:" + shown + ":64"), resumed.notifications[0][2]);
   });
 
   await test("first gateway failure stops the batch and records the code", async () => {

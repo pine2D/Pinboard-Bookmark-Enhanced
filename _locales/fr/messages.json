@@ -543,6 +543,20 @@
       }
     }
   },
+  "batchTagTooLong": {
+    "message": ". Signets non enregistrés ($COUNT$) : le tag « $TAG$ » dépasse la limite de $MAX$ caractères de linkding. Raccourcissez-le, puis relancez l’enregistrement groupé.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "tag": {
+        "content": "$2"
+      },
+      "max": {
+        "content": "$3"
+      }
+    }
+  },
   "batchAiFailed": {
     "message": ", échec de l'IA pour $COUNT$",
     "placeholders": {
@@ -5059,6 +5073,17 @@
   },
   "bookmarkErrAuth": {
     "message": "Le serveur a refusé le jeton API. Vérifiez le jeton dans les paramètres, puis reconnectez-vous."
+  },
+  "bookmarkErrTagTooLong": {
+    "message": "linkding n’a pas pu enregistrer le tag « $TAG$ » : un tag ne doit pas dépasser $MAX$ caractères. Raccourcissez-le, puis enregistrez à nouveau.",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
   },
   "bookmarkConnectErrAuth": {
     "message": "Le serveur a refusé le jeton API. Vérifiez le jeton ci-dessus, puis reconnectez-vous."

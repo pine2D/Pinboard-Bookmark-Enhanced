@@ -2107,7 +2107,36 @@ const PBP_BOOKMARK_GATEWAY_CODES = Object.freeze(["gateway_redirect", "gateway_c
 const PBP_BOOKMARK_FAILURE_KEYS = Object.freeze({
   gateway_redirect:"bookmarkErrGatewayRedirect", gateway_challenge:"bookmarkErrGatewayChallenge",
   gateway_basic:"bookmarkErrGatewayBasic", gateway_denied:"bookmarkErrGatewayDenied",
-  not_api:"bookmarkErrNotApi", auth:"bookmarkErrAuth"});
+  not_api:"bookmarkErrNotApi", auth:"bookmarkErrAuth", tag_too_long:"bookmarkErrTagTooLong"});
+// linkding keeps a tag name in a 64-character column (models.py Tag.name).
+// SQLite stores a longer one anyway; PostgreSQL rejects the write and linkding
+// answers with a server error. This only names the cause of such an error:
+// tag input is never limited or cut.
+const PBP_LINKDING_TAG_MAX = 64;
+// First tag in a linkding tag_names list that the column cannot hold, or "".
+// linkding splits each name at commas and trims the parts (parse_tag_string);
+// a varchar length counts code points, not UTF-16 units.
+function pbpLinkdingOverlongTag(names) {
+  for (const name of Array.isArray(names) ? names : []) {
+    for (const part of String(name ?? "").split(",")) {
+      const tag = part.trim();
+      if ([...tag].length > PBP_LINKDING_TAG_MAX) return tag;
+    }
+  }
+  return "";
+}
+// The over-long tag as error copy names it: enough to recognise it, short
+// enough that the limit after it still shows in a notification.
+function pbpBookmarkTagShown(tag) {
+  const chars = [...String(tag ?? "")];
+  return chars.length > 40 ? chars.slice(0, 40).join("") + "…" : chars.join("");
+}
+// Placeholder values for the key pbpBookmarkFailureKey returned: [tag, limit]
+// for tag_too_long, none for every other cause.
+function pbpBookmarkFailureArgs(result) {
+  if (result?.reason !== "tag_too_long") return [];
+  return [typeof result.tag === "string" && result.tag ? pbpBookmarkTagShown(result.tag) : "?", String(PBP_LINKDING_TAG_MAX)];
+}
 // Service named by a non-secret owner string: self-hosted owners carry their
 // service prefix, any other non-empty owner is a Pinboard username.
 function pbpBookmarkAccountService(account) {

@@ -543,6 +543,20 @@
       }
     }
   },
+  "batchTagTooLong": {
+    "message": "。ほかに $COUNT$ 件は、タグ「$TAG$」が linkding の上限（$MAX$ 文字）を超えているため保存できませんでした。短くしてから、もう一度一括保存してください。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "tag": {
+        "content": "$2"
+      },
+      "max": {
+        "content": "$3"
+      }
+    }
+  },
   "batchAiFailed": {
     "message": "、$COUNT$ 件は AI 処理に失敗",
     "placeholders": {
@@ -5059,6 +5073,17 @@
   },
   "bookmarkErrAuth": {
     "message": "サーバーがAPIトークンを拒否しました。設定でトークンを確認し、再接続してください。"
+  },
+  "bookmarkErrTagTooLong": {
+    "message": "linkdingはタグ「$TAG$」を保存できませんでした。タグは$MAX$文字までです。短くしてから、もう一度保存してください。",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
   },
   "bookmarkConnectErrAuth": {
     "message": "サーバーがAPIトークンを拒否しました。上のトークンを確認して、もう一度接続してください。"

@@ -2128,7 +2128,10 @@ function setupSubmit(token) {
         return;
       }
 
-      if (result.status === "failed" && result.reason === "partial") {
+      // A linkding create stopped by a tag the server cannot store has written
+      // the bookmark before its tags, so it may be left behind like a partial
+      // save: the user shortens the tag and saves again from this form.
+      if (result.status === "failed" && (result.reason === "partial" || result.reason === "tag_too_long")) {
         // Keep the user's intended edits, but obtain the ID/time of the remote
         // bookmark so Retry updates it instead of repeating a create or skip.
         Object.keys(fieldDirtyFlags).forEach(id => { fieldDirtyFlags[id] = true; });
@@ -2776,7 +2779,8 @@ function pbpSaveErrorView(result) {
   if (reason === "permission") return {message:t("bookmarkPermissionDenied"), retry:false};
   if (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard") {
     const key = pbpBookmarkFailureKey(result, pbpBookmarkServiceId(settings));
-    if (key) return {message:t(key), retry:!PBP_BOOKMARK_GATEWAY_CODES.includes(reason) && key !== "bookmarkErrAuth" && key !== "bgSetToken"};
+    // The same over-long tag would fail again: the copy asks to shorten it.
+    if (key) return {message:t(key, ...pbpBookmarkFailureArgs(result)), retry:!PBP_BOOKMARK_GATEWAY_CODES.includes(reason) && !["bookmarkErrAuth", "bgSetToken", "bookmarkErrTagTooLong"].includes(key)};
     return {message:t(["account_changed","not_logged_in"].includes(reason) ? "bookmarkConnectFailed" : "saveFailedGeneric"), retry:!["account_changed","not_logged_in"].includes(reason)};
   }
   if (reason === "too_long") {

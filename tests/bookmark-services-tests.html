@@ -15,6 +15,16 @@ const ld = {id:7, url:pageUrl, title:"Saved title", description:"Website summary
 // linkding 1.47 POST serializer (T7): an existing URL keeps date_added.
 const ldMergedPost = {id:11,url:pageUrl,title:"T",description:"",notes:"",web_archive_snapshot_url:"https://web.archive.org/web/20261030030122/https://example.com/article",favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:["pbp-research","second"],date_added:"2026-10-30T03:01:22.656384Z",date_modified:"2026-10-30T04:01:22.656384Z",website_title:null,website_description:null};
 const kk = {id:"bk1", createdAt:"2026-10-01T10:00:00Z", modifiedAt:null, title:"Saved title", archived:true, favourited:false, note:"My note", summary:null, userId:"user1", tags:[{id:"tag1",name:"work",attachedBy:"human"}], content:{type:"link",url:pageUrl,title:"Crawled title",description:"Website summary"}, assets:[]};
+// Django 6.0 with DEBUG off answers an unhandled database error with its stock
+// page (django/views/defaults.py server_error; linkding v1.47 ships no
+// 500.html). linkding on PostgreSQL meets a tag longer than Tag.name's
+// max_length=64 this way; on SQLite the same save succeeds.
+const djangoServerError = () => new Response("\n<!doctype html>\n<html lang=\"en\">\n<head>\n  <title>Server Error (500)</title>\n</head>\n<body>\n  <h1>Server Error (500)</h1><p></p>\n</body>\n</html>\n",
+  {status:500, headers:{"Content-Type":"text/html; charset=utf-8"}});
+// 65 code points in three scripts (the emoji one is 130 UTF-16 units), and
+// tags of exactly 64 that PostgreSQL stores.
+const overlongTags = ["x".repeat(65), "標".repeat(65), "😀".repeat(65)];
+const fittingTags = ["x".repeat(64), "😀".repeat(64), "re-" + "😀".repeat(61)];
 function harness(service, replies, extra = {}) {
   const calls = [];
   const client = pbpCreateBookmarkServiceClient({service, baseUrl:"https://bookmarks.example/base/", token:"fixture-token", beforeRequest:async()=>({token:"fixture-token"}),
@@ -295,7 +305,7 @@ async function workerHarness(service, replies, options = {}) {
   const end = workerSource.indexOf("// ---- P1: Shared save function ----", start);
   const settings = {...SETTINGS_DEFAULTS, bookmarkService:service, pinboardToken:"", offlineQueueEnabled:true,
     [service + "Url"]:"https://bookmarks.example/base/", [service + "Token"]:JSON.stringify({v:1,baseUrl:"https://bookmarks.example/base/",token:"fixture-secret",connectionId:"connection1",userId:"user1"})};
-  const state = {settings, epoch:0, permitted:true, calls:[], queue:[], local:{}, sends:0, cache:new Map(), sideEffects:[], ...options};
+  const state = {settings, epoch:0, permitted:true, calls:[], queue:[], local:{}, sends:0, cache:new Map(), sideEffects:[], notifications:[], ...options};
   const auth = async () => ({...pbpBookmarkConnection(settings), epoch:state.epoch});
   const deps = {
     console, t:key=>key, statusCache:state.cache,
@@ -349,7 +359,8 @@ async function producers(h, {autoNotes, summary, settings: overrides = {}}) {
     hasAIKey:()=>true, getPageInfoFromTab:async()=>({pageText:"article body"}), buildAutoNotes:()=>autoNotes,
     getAICache:async()=>null, setAICache:async()=>{}, callAI:async()=>summary, buildSummaryPrompt:()=>"summary prompt",
     pbpReadTagVocab:async()=>null, pbpServiceEffectivePrivate:()=>true, pbpNotesDescription:()=>"",
-    showNotification:()=>{}, t:key=>key, pbpI18nReady:async()=>{}, processOfflineQueue:async()=>{}, updateBadge:async()=>{},
+    showNotification:(...args)=>h.state.notifications.push(args), t:(key,...args)=>args.length?key+":"+args.join(":"):key,
+    pbpI18nReady:async()=>{}, processOfflineQueue:async()=>{}, updateBadge:async()=>{},
     _newBatchRunId:()=>"run-1", _removeBatchRecordIfOwned:async()=>true, _writeBatchProgress:async()=>{},
     buildTagCaseMap:()=>({}), chrome:{storage:{local:{get:async()=>({}),set:async()=>{}}}},
   };
@@ -1018,6 +1029,101 @@ test("failure keys apply only to self-hosted services",()=>{
     for(const reason of ["remote","network","permission","made_up","","toString","__proto__","constructor"])equal(pbpBookmarkFailureKey({reason},service),"");
     equal(pbpBookmarkFailureKey(null,service),"");
   }
+});
+test("a linkding server error names a tag longer than 64 characters, and only such a tag",async()=>{
+  for(const tag of overlongTags)for(const existing of [undefined,{id:"7",url:pageUrl,private:true,summary:""}])for(const status of [500,502,503]){
+    const reply=status===500?djangoServerError():new Response("<html><body><h1>"+status+"</h1></body></html>",{status,headers:{"Content-Type":"text/html"}});
+    const h=harness("linkding",[reply]);
+    let error;
+    try{await h.client.save({url:pageUrl,title:"T",notes:"",tags:["work",tag]},existing);}catch(e){error=e;}
+    equal([error?.code,error?.status,error?.tag],["tag_too_long",status,tag]);
+    // The request carried the tag as typed: nothing is cut or held back.
+    equal([h.calls[0].method,h.calls[0].body.tag_names],[existing?"PATCH":"POST",["work",tag]]);
+  }
+  // linkding splits a name at commas and trims the parts (parse_tag_string).
+  const long="y".repeat(65), comma=harness("linkding",[djangoServerError()]);
+  let error;try{await comma.client.save({url:pageUrl,title:"T",notes:"",tags:["short, "+long+" "]});}catch(e){error=e;}
+  equal([error?.code,error?.tag],["tag_too_long",long]);
+  // Tags that fit (counted in code points), or none, leave a server error
+  // retryable; other statuses and Karakeep keep their own codes.
+  for(const tags of [[],["work"],fittingTags,["a,"+"z".repeat(64)]])await rejects(()=>harness("linkding",[djangoServerError()]).client.save({url:pageUrl,title:"T",notes:"",tags}),"server");
+  await rejects(()=>harness("linkding",[[429,{detail:"Request was throttled."}]]).client.save({url:pageUrl,title:"T",notes:"",tags:[overlongTags[0]]}),"rate_limited");
+  await rejects(()=>harness("linkding",[[400,{url:["This field is required."]}]]).client.save({url:pageUrl,title:"T",notes:"",tags:[overlongTags[0]]}),"remote");
+  await rejects(()=>harness("karakeep",[new Response("Internal Server Error",{status:500,headers:{"Content-Type":"text/plain"}})]).client.save({url:pageUrl,title:"T",notes:"",tags:[overlongTags[0]]}),"server");
+});
+test("linkding receives a tag of any length whole and a 201 saves it",async()=>{
+  for(const tag of [...fittingTags,...overlongTags]){
+    const h=harness("linkding",[[201,{...ldUnscraped,tag_names:["work",tag]}]]);
+    const result=await h.client.save({url:pageUrl,title:"T",notes:"",tags:["work",tag]});
+    equal([result.status,result.bookmark.tags,h.calls[0].body.tag_names],["saved",["work",tag],["work",tag]]);
+  }
+});
+test("failure copy names the tag by whole code points and the 64-character limit",()=>{
+  equal(pbpBookmarkFailureArgs({reason:"tag_too_long",tag:"x".repeat(65)}),["x".repeat(40)+"…","64"]);
+  const shown=pbpBookmarkFailureArgs({reason:"tag_too_long",tag:"😀".repeat(65)})[0];
+  equal(shown,"😀".repeat(40)+"…");ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(shown));
+  equal(pbpBookmarkFailureArgs({reason:"tag_too_long",tag:"短い"}),["短い","64"]);
+  equal(pbpBookmarkFailureArgs({reason:"tag_too_long"}),["?","64"]);
+  for(const reason of [...PBP_BOOKMARK_GATEWAY_CODES,"auth","not_logged_in","server","partial",undefined])equal(pbpBookmarkFailureArgs({reason,tag:"x".repeat(65)}),[]);
+  equal(pbpBookmarkFailureArgs(null),[]);
+});
+test("the worker never queues a save stopped by an over-long linkding tag and drops the page's cached status",async()=>{
+  const tag=overlongTags[2];
+  for(const submit of ["submitSaveIntent","submitPopupSaveIntent"]){
+    const h=await workerHarness("linkding",[[200,{bookmark:null}],djangoServerError()]);
+    const account=(await h.auth()).account;
+    const result=submit==="submitSaveIntent"?await h.submitSaveIntent({...saveIntent,tags:"work "+tag}):await h.submitPopupSaveIntent({...saveIntent,tags:"work "+tag},account);
+    equal([result.status,result.reason,result.tag,result.httpStatus],["failed","tag_too_long",tag,500]);
+    equal(h.state.queue,[]);ok(!h.state.cache.has(pageUrl));
+  }
+  // The same server error with tags that fit is retried later, as before.
+  const queued=await workerHarness("linkding",[[200,{bookmark:null}],djangoServerError()]);
+  const later=await queued.submitSaveIntent({...saveIntent,tags:"work "+fittingTags[1]});
+  equal([later.status,later.cause,queued.state.queue.length],["queued","server",1]);
+});
+test("an over-long tag already in the offline queue stays queued on replay and is named on a manual retry",async()=>{
+  const tag=overlongTags[0];
+  const h=await workerHarness("linkding",[new TypeError("offline"),[200,{bookmark:null}],djangoServerError(),[200,{bookmark:null}],djangoServerError()]);
+  equal((await h.submitSaveIntent({...saveIntent,tags:"work "+tag})).status,"queued");
+  const queueId=h.state.queue[0].queueId;
+  await h.processOfflineQueue();
+  equal([h.state.calls.map(c=>c.method),h.state.queue.map(item=>item.queueId)],[["GET","GET","POST"],[queueId]]);
+  const retried=await h.retryOfflineItem(queueId);
+  equal([retried.ok,retried.result.reason,retried.result.tag],[false,"tag_too_long",tag]);
+  equal([h.state.calls.length,h.state.queue.map(item=>item.queueId)],[5,[queueId]]);
+});
+test("quick save and Batch notify which linkding tag is too long and queue nothing",async()=>{
+  const tag=overlongTags[1], shown="標".repeat(40)+"…";
+  for(const run of ["quickSave","batchSave"]){
+    const h=await workerHarness("linkding",[[200,{bookmark:null}],djangoServerError()]);
+    await (await producers(h,{autoNotes:"",summary:"",settings:{_aiSummary:false,batchAiSummary:false,_defaultTags:tag,optBatchTagEnabled:true,optBatchTag:tag}}))[run]();
+    equal([run,h.state.calls.map(c=>c.method),h.state.calls[1]?.body?.tag_names],[run,["GET","POST"],[tag]]);
+    equal(h.state.queue,[]);
+    const [, title, body]=h.state.notifications.at(-1)||[];
+    equal(title,"bgSaveFailed");
+    if(run==="quickSave")equal(body,"bookmarkErrTagTooLong:"+shown+":64");
+    else ok(body.startsWith("batchDone:0:0")&&body.endsWith("batchTagTooLong:1:"+shown+":64"));
+  }
+});
+test("every placeholder the save failure copy fills keeps its name and order in all nine locales",async()=>{
+  // The keys whose values come from pbpBookmarkFailureArgs, plus the Batch
+  // sentence that reuses them after its count.
+  const keys=[...new Set([...Object.values(PBP_BOOKMARK_FAILURE_KEYS),"batchTagTooLong"])];
+  const en=await (await fetch("../_locales/en/messages.json")).json();
+  const contract=entry=>JSON.stringify(Object.entries(entry?.placeholders||{}).map(([name,value])=>[name.toLowerCase(),value.content]));
+  for(const loc of ["de","en","fr","ja","pl","ru","zh_CN","zh_HK","zh_TW"]){
+    const messages=await (await fetch(`../_locales/${loc}/messages.json`)).json();
+    for(const key of keys){
+      const entry=messages[key];
+      if(typeof entry?.message!=="string"||!entry.message.trim())throw new Error(`${loc} lacks ${key}`);
+      if(contract(entry)!==contract(en[key]))throw new Error(`${loc} ${key} placeholders ${contract(entry)} differ from en ${contract(en[key])}`);
+      const used=(entry.message.match(/\$[A-Za-z_]+\$/g)||[]).map(token=>token.slice(1,-1).toLowerCase());
+      const declared=Object.keys(entry.placeholders||{}).map(name=>name.toLowerCase());
+      if(JSON.stringify([...used].sort())!==JSON.stringify([...declared].sort()))throw new Error(`${loc} ${key} uses ${used} but declares ${declared}`);
+    }
+  }
+  equal(contract(en.bookmarkErrTagTooLong),JSON.stringify([["tag","$1"],["max","$2"]]));
+  equal(contract(en.batchTagTooLong),JSON.stringify([["count","$1"],["tag","$2"],["max","$3"]]));
 });
 (async()=>{let pass=0,fail=0;for(const item of cases){const row=document.createElement("div");try{await item.run();row.className="pass";row.textContent="PASS "+item.name;pass++;}catch(e){row.className="fail";row.textContent="FAIL "+item.name+": "+e.message;fail++;}document.getElementById("results").appendChild(row);}document.getElementById("summary").textContent=`${pass} passed, ${fail} failed`;})();
 </script></body></html>
