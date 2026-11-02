@@ -223,9 +223,11 @@ export function gitState(dir, git = (args, cwd) => spawnSync('git', ['-C', cwd, 
   try { topReal = realpathSync(top.stdout.trim()); dirReal = realpathSync(String(dir)); } catch { /* compared below */ }
   if (top.status !== 0 || !topReal || topReal !== dirReal) { out.reason = 'not_toplevel'; return out; }
   if (git(['ls-files', '--error-unmatch', '--', 'manifest.json'], dir).status !== 0) { out.reason = 'manifest_untracked'; return out; }
-  const status = git(['status', '--porcelain'], dir);
+  // --untracked-files=normal: status.showUntrackedFiles=no would otherwise
+  // hide untracked and ignored files and pass a tree that is no commit.
+  const status = git(['status', '--porcelain', '--untracked-files=normal'], dir);
   if (status.status !== 0 || status.stdout.trim() !== '') { out.reason = 'uncommitted'; return out; }
-  const ignored = git(['status', '--porcelain', '--ignored', '-z'], dir);
+  const ignored = git(['status', '--porcelain', '--untracked-files=normal', '--ignored', '-z'], dir);
   if (ignored.status !== 0) { out.reason = 'uncommitted'; return out; }
   const loaded = ignored.stdout.split('\0').filter(e => e.startsWith('!! ')).map(e => e.slice(3).replace(/\/$/, '')).filter(isProductRuntimeFile);
   if (loaded.length) { out.reason = 'ignored_product_files'; return out; }

@@ -2424,7 +2424,15 @@ try {
       assert.equal(ignoredDir.report.productClean, false);
       writeFileSync(join(ext, 'local-debug.js'), '// ignored but loadable\n');
       assert.deepEqual([live.gitState(realpathSync(ext) + '/').clean, live.gitState(realpathSync(ext) + '/').reason], [false, 'ignored_product_files']);
+      // status.showUntrackedFiles=no hides untracked and ignored files from
+      // a plain git status; the check must not depend on that setting.
+      git('config', 'status.showUntrackedFiles', 'no');
+      assert.deepEqual([live.gitState(realpathSync(ext) + '/').clean, live.gitState(realpathSync(ext) + '/').reason], [false, 'ignored_product_files'], 'showUntrackedFiles=no still sees ignored product files');
       rmSync(join(ext, 'local-debug.js'));
+      writeFileSync(join(ext, 'other.js'), '// untracked\n');
+      assert.deepEqual([live.gitState(realpathSync(ext) + '/').clean, live.gitState(realpathSync(ext) + '/').reason], [false, 'uncommitted'], 'showUntrackedFiles=no still sees untracked files');
+      rmSync(join(ext, 'other.js'));
+      git('config', '--unset', 'status.showUntrackedFiles');
       // manifest.json itself untracked (ignored) in a clean tree.
       const loose = join(dir, 'ext-loose');
       mkdirSync(loose);
