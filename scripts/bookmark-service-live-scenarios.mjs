@@ -1143,6 +1143,10 @@ export const SELFHOSTED_MODULES = [
           const hint = await hintOf(form.popup);
           t.note('readableHint_' + label, { empty: !value, hint });
           if (label === 'filled') t.expectEq(value, META_DESCRIPTION, 'readable_filled_prefill');
+          // Decision 14: a readable page without a meta description leaves
+          // the box empty and shows no hint. The box must be empty here, or
+          // a product that hints on any empty box would pass both halves.
+          else t.expectEq(value, '', 'readable_no_meta_prefilled');
           t.expect(!hint.any, 'readable_' + label + '_hint');
           await form.close();
           served.clear();
