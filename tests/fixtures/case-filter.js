@@ -4,7 +4,8 @@
 // parts (case-insensitive). Without the parameter every case runs and nothing
 // else changes. The counters tell the runner when a filtered page is finished:
 // every call counts as seen (run or not), and a started case counts as pending
-// until its done callback is called.
+// until its done callback is called. A harness-setup failure row passes
+// { always: true } so a filter can never swallow it.
 (function () {
   let parts = [];
   try {
@@ -13,9 +14,9 @@
   } catch (_) {}
   const state = window.__pbpCases = { filtered: parts.length > 0, seen: 0, ran: 0, pending: 0 };
   // Returns null when the case is filtered out, otherwise the done callback.
-  window.pbpCaseGate = function (name) {
+  window.pbpCaseGate = function (name, options) {
     state.seen++;
-    if (state.filtered && !parts.some((part) => String(name).toLowerCase().includes(part))) return null;
+    if (state.filtered && !(options && options.always) && !parts.some((part) => String(name).toLowerCase().includes(part))) return null;
     state.ran++;
     state.pending++;
     let finished = false;

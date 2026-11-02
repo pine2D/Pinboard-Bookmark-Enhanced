@@ -1299,6 +1299,7 @@ await test("reader editor rejects over-limit titles locally, keeps the full inpu
 });
 async function deleteUiHarness(options = {}) {
   const h = await pipelineHarness(options);
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const frame = document.createElement("iframe"); frame.width = 800; frame.height = 600; document.body.append(frame);
   const w = frame.contentWindow;
   w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"><p>Keep reading</p></div><div id="reader-notes">Keep highlight notes</div>';

@@ -14,8 +14,8 @@ body { font-family: monospace; padding: 16px; max-width: 1000px; }
 <script src="../wayback.js"></script>
 <script src="fixtures/case-filter.js"></script>
 <script>
-function test(name, fn) {
-  const done = pbpCaseGate(name);
+function test(name, fn, gateOptions) {
+  const done = pbpCaseGate(name, gateOptions);
   if (!done) return;
   const div = document.createElement("div");
   div.className = "case";
@@ -6091,7 +6091,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
   } catch (error) {
-    test("popup submit source contracts load", () => { throw error; });
+    test("popup submit source contracts load", () => { throw error; }, { always: true });
   }
 })();
 </script>
