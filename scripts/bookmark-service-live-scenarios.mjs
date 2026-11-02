@@ -1966,36 +1966,54 @@ export const SELFHOSTED_MODULES = [
     settings: {},
     async steps(t) {
       const url = t.claimUrl();
-      await t.phase('tag_input_quotes');
-      let form = await t.openPopup(url);
-      const input = form.popup.locator('#tags-input');
-      const chips = () => form.popup.locator('#tags-display .tag-item').allTextContents();
-      await input.click();
-      await form.popup.keyboard.type('"' + t.prefix + ' two');
-      await form.popup.keyboard.press('Space');
-      await form.popup.keyboard.type('words');
-      t.expectEq((await chips()).length, 0, 'quote_space_committed');
-      t.expectEq(await input.inputValue(), '"' + t.prefix + ' two words', 'quote_input_kept');
-      await form.popup.keyboard.type('"');
-      await form.popup.keyboard.press('Space');
-      const committed = await chips();
-      t.note('quotedChips', committed.length);
-      t.expect(committed.length === 1 && committed[0].includes('two words') && !committed[0].includes('"'), 'quote_closed_commit');
-      await form.close();
+      let form;
+      await t.part('quoted_tag', ['G21+G23'], async () => {
+        await t.phase('tag_input_quotes');
+        form = await t.openPopup(url);
+        const input = form.popup.locator('#tags-input');
+        const chips = () => form.popup.locator('#tags-display .tag-item').allTextContents();
+        await input.click();
+        await form.popup.keyboard.type('"' + t.prefix + ' two');
+        await form.popup.keyboard.press('Space');
+        await form.popup.keyboard.type('words');
+        t.expectEq((await chips()).length, 0, 'quote_space_committed');
+        t.expectEq(await input.inputValue(), '"' + t.prefix + ' two words', 'quote_input_kept');
+        await form.popup.keyboard.type('"');
+        await form.popup.keyboard.press('Space');
+        const chipNames = () => form.popup.locator('#tags-display .tag-item').evaluateAll(els => els.map(el => el.textContent.trim()));
+        const committed = await chipNames();
+        t.note('quotedChips', committed.length);
+        t.expect(committed.length === 1, 'quote_closed_commit');
+        // The closing quote commits what pasting the same text and pressing
+        // Enter gives (pbpSplitTagInput, then the name minted by the
+        // separator setting): the reference is the popup's own paste path,
+        // not a spelling assumed here.
+        await form.popup.locator('#tags-display .tag-remove').first().click();
+        t.expectEq(await form.popup.locator('#tags-display .tag-item').count(), 0, 'quote_chip_removed');
+        await input.fill('"' + t.prefix + ' two words"');
+        await input.press('Enter');
+        const pasted = await chipNames();
+        t.note('quotedVsPasted', { typed: committed.map(n => n.slice(t.prefix.length)), pasted: pasted.map(n => n.slice(t.prefix.length)) });
+        t.expect(pasted.length === 1, 'quote_paste_commit');
+        t.expectEq(committed[0], pasted[0], 'quote_closed_matches_paste');
+        t.expect(!committed[0].includes('"') && /two/.test(committed[0]) && /words/.test(committed[0]), 'quote_closed_name');
+        await form.close();
+      });
 
-      await t.phase('tag_input_long_chip');
-      form = await t.openPopup(url, { locale: 'de', width: 550 });
-      const long = (t.prefix + '_' + 'abcdefghijklmnopqrstuvwxyz').slice(0, 68);
-      await form.popup.locator('#tags-input').fill(long);
-      await form.popup.locator('#tags-input').press('Enter');
-      const g = await form.popup.evaluate(() => {
-        const chip = document.querySelector('#tags-display .tag-item');
-        const wrap = chip?.closest('.tags-input-wrap') || document.getElementById('tags-display');
-        const remove = chip?.querySelector('.tag-remove');
-        if (!chip || !remove) return { missing: true };
-        const c = chip.getBoundingClientRect(), w = wrap.getBoundingClientRect(), r = remove.getBoundingClientRect();
-        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        return { scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth, chipRight: Math.round(c.right), wrapRight: Math.round(w.right), removeLeft: Math.round(r.left), removeRight: Math.round(r.right), hit: !!hit && (hit === remove || remove.contains(hit)) };
+      await t.part('long_chip', ['G29'], async () => {
+        await t.phase('tag_input_long_chip');
+        form = await t.openPopup(url, { locale: 'de', width: 550 });
+        const long = (t.prefix + '_' + 'abcdefghijklmnopqrstuvwxyz').slice(0, 68);
+        await form.popup.locator('#tags-input').fill(long);
+        await form.popup.locator('#tags-input').press('Enter');
+        const g = await form.popup.evaluate(() => {
+          const chip = document.querySelector('#tags-display .tag-item');
+          const wrap = chip?.closest('.tags-input-wrap') || document.getElementById('tags-display');
+          const remove = chip?.querySelector('.tag-remove');
+          if (!chip || !remove) return { missing: true };
+          const c = chip.getBoundingClientRect(), w = wrap.getBoundingClientRect(), r = remove.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return { scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth, chipRight: Math.round(c.right), wrapRight: Math.round(w.right), removeLeft: Math.round(r.left), removeRight: Math.round(r.right), hit: !!hit && (hit === remove || remove.contains(hit)) };
       });
       t.note('longChip', g);
       t.expect(!g.missing, 'long_chip_missing');
@@ -2007,6 +2025,7 @@ export const SELFHOSTED_MODULES = [
       await form.popup.locator('#tags-display .tag-remove').first().click();
       t.expectEq(await form.popup.locator('#tags-display .tag-item').count(), 0, 'long_chip_not_removed');
       await form.close();
+      });
       t.check(`${t.service}: a quoted tag keeps its spaces until the closing quote; a 68-character chip in German stays inside the popup with a reachable remove button`);
     },
   },
