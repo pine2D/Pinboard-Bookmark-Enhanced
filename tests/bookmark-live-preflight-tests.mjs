@@ -378,6 +378,15 @@ try {
     assert.deepEqual(live.tagPageBudget(ld, 200).problems, ['tag_pages', 'browser', 'node']);
     assert.equal(live.cleanupCost({ service: 'linkding', tagPages: 10 }) - live.cleanupCost({ service: 'linkding' }), 16, 'the sweep and verify pass read every page');
     assert(live.tagPageBudget(ld, 3).cleanupReserve >= live.cleanupCost({ service: 'linkding', bookmarks: ld.bookmarks, urls: ld.urls, tags: ld.tags, lists: ld.lists, tagPages: 3 }));
+    // The count itself is in the plan's Node requests on the user target:
+    // one count page on linkding, Karakeep paged through (review of H1c,
+    // should-fix 2).
+    assert.deepEqual(['linkding', 'karakeep'].map(s => live.preflightCost({ service: s, target: 'user' }) - live.preflightCost({ service: s, target: 'temp' })), [1, live.TAG_PAGES.karakeep.browser]);
+    for (const [instance, row] of Object.entries(plan.budget)) {
+      const moduleNode = row.modules.reduce((n, id) => n + live.resolveBudget(selected.find(m => m.id === id)).node, 0);
+      const writes = row.modules.some(id => selected.find(m => m.id === id).needs?.writes !== false);
+      assert.equal(row.node - moduleNode - live.preflightCost({ service: row.service, urls: row.urls, writes }), { linkding: 1, karakeep: 6 }[instance], instance);
+    }
     // The temporary target counts nothing: its libraries hold the run's tags only.
     const tempPlan = live.buildPlan({ target: 'temp', ...live.selectModules('all', { target: 'temp' }) });
     assert(Object.values(tempPlan.budget).every(row => row.tagPages === undefined));
@@ -1445,12 +1454,19 @@ try {
     assert.deepEqual(closed.report.modules, []);
     // A worker gone before the module's settings snapshot: the record it
     // just made is aborted with the cause, never left "running" to read as
-    // an interruption (review of H1c, should-fix 1).
+    // an interruption (review of H1c, should-fix 1). The same call shows
+    // the module's browser budget carrying its tag-list reads times the
+    // extra pages the preflight measured (review of H1c, should-fix 2).
     const gone = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
     const offline = all.find(m => m.id === 'linkding.edges.offline');
+    const planned = live.resolveBudget(offline);
+    assert(planned.tagReads > 0);
     gone.ctx = { pages: () => [] };
-    gone.sw = async () => { throw new live.HarnessFailure('worker_gone'); };
+    gone.tagExtraPages = { linkding: 2 };
+    let budgetSeen = null;
+    gone.sw = async () => { budgetSeen = gone.currentModule?.budget.browser; throw new live.HarnessFailure('worker_gone'); };
     await assert.rejects(gone.runModule(offline), e => e.code === 'worker_gone');
+    assert.equal(budgetSeen, planned.browser + planned.tagReads * 2, 'tag-list reads cost one request per extra page');
     assert.deepEqual(gone.report.modules.map(m => [m.id, m.status, m.failure?.code]), [['linkding.edges.offline', 'aborted', 'worker_gone']]);
     assert.equal(gone.currentModule, null);
 
@@ -1560,6 +1576,33 @@ try {
     assert.deepEqual([kRun.report.tagPages.karakeep.complete, kRun.report.tagPages.karakeep.tags, kRun.report.tagPages.karakeep.ok], [false, 1000 * (most + 1), false]);
     assert(!JSON.stringify(kRun.report.tagPages).includes('tag1'), 'no tag name is kept');
     await closeServer(kServer);
+  }
+  // A linkding library within the caps (250 tags, three pages): the run
+  // keeps going with the cleanup reserve api() enforces and the extra pages
+  // runModule charges recomputed for the pages counted (review of H1c,
+  // should-fix 2).
+  {
+    const lServer = createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ count: 250, next: null, previous: null, results: [] }));
+    });
+    const lPort = await listen(lServer);
+    const lBase = `http://127.0.0.1:${lPort}/`;
+    const lRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    const { selected, skipped } = live.selectModules('linkding.*', { target: 'user' });
+    lRun.target = 'user';
+    lRun.plan = live.buildPlan({ target: 'user', selected, skipped });
+    lRun.instances.linkding = { id: 'linkding', service: 'linkding', base: lBase, root: live.apiRootFor('linkding', lBase), token: 'l'.repeat(40) };
+    lRun.caps = { linkding: live.BUDGETS.user.linkding };
+    const row = lRun.plan.budget.linkding;
+    lRun.reserve = { linkding: row.cleanupReserve };
+    await lRun.checkTagPages('linkding');
+    const expected = live.tagPageBudget(row, 3);
+    assert(expected.ok && expected.cleanupReserve !== row.cleanupReserve, 'three pages change the reserve');
+    assert.equal(lRun.reserve.linkding, expected.cleanupReserve);
+    assert.deepEqual(lRun.tagExtraPages, { linkding: 2 });
+    assert.deepEqual([lRun.report.tagPages.linkding.pages, lRun.report.tagPages.linkding.ok], [3, true]);
+    await closeServer(lServer);
   }
 
   // Review of H1b r2, notes: a failed feature names its failed modules and
