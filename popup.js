@@ -515,6 +515,18 @@ async function resetPinboardSession(expectedToken) {
 // Also fixes a latent bug: the previous direct chrome.storage.sync.get bypassed the
 // optSyncEnabled toggle, so users with sync disabled would have read defaults instead
 // of their saved values (options.js writes via getSettingsStorage, which respects the toggle).
+// stripTrackingParams over the stored cleaning settings, for the popup's own
+// steps (the prefetch key, the address put in the form, a paste). Settings it
+// cannot apply (hand-edited storage, an old backup: customParams not a list)
+// must not stop the form from opening or saving: the failure is logged and the
+// address stays as it was.
+function pbpPopupCleanAddress(url, ucs) {
+  try { return stripTrackingParams(url, ucs); }
+  catch (e) {
+    console.warn("URL cleaning failed:", e && e.name, e && e.message);
+    return { cleaned: url, removedCount: 0, original: url };
+  }
+}
 function _loadUrlCleanSettings() {
   return settings.urlClean || { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
 }
@@ -868,7 +880,7 @@ async function showMain(token) {
   // away (and paid for a second lookup message) on every link carrying utm_* or
   // fbclid, which is most of what gets shared and saved.
   const _bookmarkPrefetchUrl = _popupDraftUserUrl ? $id("url-input").value.trim() : tab?.url
-    ? (_ucs.enabled && _ucs.onPopupOpen ? stripTrackingParams(tab.url, _ucs).cleaned : tab.url)
+    ? (_ucs.enabled && _ucs.onPopupOpen ? pbpPopupCleanAddress(tab.url, _ucs).cleaned : tab.url)
     : "";
   const _bookmarkPrefetchPromise = pbpPopupHasWebUrl(_bookmarkPrefetchUrl)
     ? chrome.runtime.sendMessage({ type: "get_bookmark_data", url: _bookmarkPrefetchUrl, account: sessionAccount }).catch(() => null)
@@ -895,7 +907,7 @@ async function showMain(token) {
 
   let targetUrl = _popupDraftUserUrl ? $id("url-input").value.trim() : pageInfo.url;
   if (_ucs.enabled && _ucs.onPopupOpen && pageInfo.url) {
-    const { cleaned, removedCount, original } = stripTrackingParams(pageInfo.url, _ucs);
+    const { cleaned, removedCount, original } = pbpPopupCleanAddress(pageInfo.url, _ucs);
     targetUrl = _popupDraftUserUrl ? $id("url-input").value.trim() : cleaned;
     if (!_popupDraftUserUrl) {
       $id("url-input").value = cleaned;
@@ -968,7 +980,7 @@ async function showMain(token) {
     if (!settings.enabled || !settings.onPaste) return;
     const pasted = e.clipboardData?.getData("text") || "";
     if (!pasted) return;
-    const { cleaned, removedCount, original } = stripTrackingParams(pasted, settings);
+    const { cleaned, removedCount, original } = pbpPopupCleanAddress(pasted, settings);
     if (removedCount > 0) {
       e.preventDefault();
       $id("url-input").value = cleaned;

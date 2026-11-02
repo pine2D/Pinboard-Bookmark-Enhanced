@@ -213,9 +213,11 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    }
  });
  // The cleaned address comes from the stored cleaning settings. If those cannot
- // be applied (hand-edited storage, an imported backup), opening the form must
- // not fail on it: the plain equivalence decides and the failure is logged.
- await test('cleaning settings that cannot be applied never stop the form: the plain equivalence decides and the failure is logged',async()=>{
+ // be applied (hand-edited storage, an imported backup), the Description prefill
+ // must not fail on it: the plain equivalence decides and the failure is logged.
+ // That the form itself still opens and saves on such settings is the runtime
+ // block "linkding cleaned page address" (tests/bookmark-service-runtime-tests.mjs).
+ await test('cleaning settings that cannot be applied leave the Description prefill to the plain equivalence and log the failure',async()=>{
    const PAGE='https://example.com/article',META='Page meta',urlClean={enabled:true,onPopupOpen:true,onPaste:true,aggressiveMode:true,customParams:'campaign',excludeParams:[]};
    const warned=[],warn=console.warn;console.warn=(...args)=>warned.push(args.join(' '));
    try{

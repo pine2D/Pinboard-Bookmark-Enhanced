@@ -914,9 +914,27 @@ try{
     const create=await createFrom(popup,'create from the restored draft of a cleaned page');
     assert.deepEqual([create.data.url,create.query,create.data.description],[cleanedUrl,'?disable_scraping','Server-scraped description'],'a create from the cleaned page did not send its known Description');
     for(const row of [...records.linkding.values()].filter(b=>b.url===cleanedUrl))records.linkding.delete(String(row.id));
+    // Cleaning settings the popup cannot apply (customParams not a list, as a
+    // hand-edited storage or an old backup can leave it): opening runs every
+    // cleaning step of showMain, and the form must still open, keep the page's
+    // own address, log the failure and save.
+    await worker.evaluate(()=>{statusCache.clear();return chrome.storage.local.set({urlClean:{enabled:true,onPopupOpen:true,onPaste:true,aggressiveMode:true,customParams:'campaign',excludeParams:[]}});});
+    await worker.evaluate(async()=>{const drafts=Object.entries(await chrome.storage.session.get(null)).filter(([,row])=>row?.pageUrl).map(([key])=>key);if(drafts.length)await chrome.storage.session.remove(drafts);});
+    const warnings=[],onPage=page=>page.on('console',message=>{if(message.type()==='warning')warnings.push(message.text());});
+    ctx.on('page',onPage);
+    try{
+      const errorsBefore=errors.length;
+      popup=await openOnTab();
+      assert.equal(await popup.locator('#url-input').inputValue(),tabUrl,'unusable cleaning settings did not leave the page address as it was');
+      assert(warnings.some(text=>text.includes('URL cleaning failed')&&text.includes('TypeError')),'the cleaning failure was not logged: '+JSON.stringify(warnings));
+      assert.equal(errors.length,errorsBefore,'opening with unusable cleaning settings threw: '+errors.slice(errorsBefore).join('; '));
+      const create=await createFrom(popup,'create with unusable cleaning settings');
+      assert.equal(create.data.url,tabUrl,'the form opened on unusable cleaning settings did not save the page address');
+    }finally{ctx.off('page',onPage);}
+    for(const row of [...records.linkding.values()].filter(b=>b.url===tabUrl))records.linkding.delete(String(row.id));
     await worker.evaluate(()=>{statusCache.clear();return chrome.storage.local.remove('urlClean');});
     await article.goto(origin+'/article');await ctx.unroute(cleanOrigin+'/**');
-    console.log("linkding page address cleaned by aggressive mode and a custom parameter: a first open and a restored draft still take the page's description and send it with ?disable_scraping");
+    console.log("linkding page address cleaned by aggressive mode and a custom parameter: a first open and a restored draft still take the page's description and send it with ?disable_scraping; unusable cleaning settings leave the address as it is and the form saves");
   });
   await block('linkding Description server semantics',['linkding'],async()=>{
   // linkding Description against the server's own v1.47 create and update
