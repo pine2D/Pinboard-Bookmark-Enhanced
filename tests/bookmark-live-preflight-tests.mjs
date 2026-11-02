@@ -1957,6 +1957,21 @@ try {
   // Requests go through the run's own counter, as api() and the route count them.
   Object.assign(pendingRun.count('linkding'), { node: 105, browser: 77, browserWrites: 3, sw: 70, setup: 4 });
   pendingRun.report.modules.push({ id: 'linkding.core.worker', instance: 'linkding', status: 'passed', started: '2026-11-01T00:00:00.000Z', finished: '2026-11-01T00:00:10.000Z', ms: 10000, checks: [], notes: {}, failure: null, counts: {}, timing: { waitMs: 0, throttleMs: 0 } },
+    { id: 'linkding.edges.quote-unread', instance: 'linkding', status: 'failed', started: '2026-11-01T00:00:10.000Z', finished: '2026-11-01T00:00:20.000Z', ms: 10000, checks: [], notes: {}, failure: { phase: 'linkding.edges.quote-unread', code: 'read_back_mismatch' }, counts: {}, timing: { waitMs: 0, throttleMs: 0 } });
+  // The failed module's screenshot, through the run's own shot() writer: the
+  // shots.json manifest a --cleanup reads back for the summary.
+  browser = await chromium.launch({ headless: true, executablePath: chromium.executablePath() });
+  const pendingPage = await browser.newPage({ viewport: { width: 420, height: 600 } });
+  await pendingPage.setContent('<!doctype html><title>Shot</title><body style="margin:0"><button id="save">Save</button></body>');
+  pendingRun.shotsEnabled = true;
+  pendingRun.shotsDir = join(pendingDir, 'shots');
+  pendingRun.currentModule = { id: 'linkding.edges.quote-unread' };
+  const [pendingShot] = await pendingRun.shot(pendingPage, 'failed', { service: 'linkding', keys: ['#save'] });
+  pendingRun.currentModule = null;
+  await browser.close();
+  browser = null;
+  assert(pendingShot.file && existsSync(pendingShot.file), 'the run wrote the screenshot');
+  pendingRun.report.modules.push(
     { id: 'linkding.core.popup-reader', instance: 'linkding', status: 'running', started: '2026-11-01T00:00:10.000Z', ms: 0, checks: [], notes: {}, failure: null, counts: {}, timing: { waitMs: 0, throttleMs: 0 } });
   pendingRun.persist();
   const pendingReport = JSON.parse(readFileSync(join(pendingDir, 'report.json'), 'utf8'));
@@ -1995,6 +2010,10 @@ try {
   // The module the run was cut off in is interrupted, not failed: its
   // features are unfinished, and a run that never summed its timing says so.
   assert.match(resumedSummary, /linkding\.core\.popup-reader：中断/, resumedSummary);
+  // The failed module's screenshot is read back from the run's manifest.
+  assert(resumedSummary.includes('linkding.edges.quote-unread：失败于 linkding.edges.quote-unread，read_back_mismatch') && resumedSummary.includes('截图 ' + pendingShot.file), resumedSummary);
+  // The cleanup pass's own requests, apart from the run's.
+  assert(resumedSummary.includes(`续清请求（第 1 次 --cleanup）：linkding Node ${resumed.report.cleanup.counts.linkding.node}\n`), resumedSummary);
   assert(!resumedSummary.includes('undefined'), resumedSummary);
   assert.match(resumedSummary, /未完成（\d+，[^）]*）：[^\n]*popup-save/, resumedSummary);
   assert(!/未通过 (popup-save|reader-edit)/.test(resumedSummary), resumedSummary);
@@ -2031,6 +2050,10 @@ try {
   assert.match(confirmedSummary, /清理完成：是/);
   assert(!/残留|未清理/.test(confirmedSummary), confirmedSummary);
   assert.match(confirmedSummary, /请求：linkding Node 105 \/ 浏览器 77/, confirmedSummary);
+  // The latest pass's number and requests: a confirming pass deletes
+  // nothing, so it costs fewer requests than the first.
+  assert(confirmed.report.cleanup.counts.linkding.node < resumed.report.cleanup.counts.linkding.node);
+  assert(confirmedSummary.includes(`续清请求（第 3 次 --cleanup）：linkding Node ${confirmed.report.cleanup.counts.linkding.node}\n`), confirmedSummary);
   assert(confirmed.report.cleanup.entries.some(e => e.code === 'residue_tag_not_in_ledger'), 'earlier passes stay in report.json');
 
   requests.length = 0;
