@@ -820,8 +820,12 @@ function pbpAlignTagName(name, ctx) {
 
 // linkding splits names containing commas on the server; that existing server
 // behavior is outside this client-side name normalization.
+// U+200B, U+2060 and U+FEFF never change how a name looks, so a new name
+// drops them before anything else; U+200C/U+200D shape Persian, Indic and
+// emoji sequences and are kept (the group key ignores them anyway).
+const PBP_TAG_MINT_INVISIBLE = /[\u200B\u2060\uFEFF]/g;
 function pbpMintTagName(raw, {service, separator} = {}) {
-  let name = String(raw ?? "").trim();
+  let name = String(raw ?? "").replace(PBP_TAG_MINT_INVISIBLE, "").trim();
   // Karakeep's server drops a leading "#"; strip every leading hash and space
   // in one pass so minting an already minted name never changes it again.
   if (service === "karakeep") name = name.replace(/^[#\s]+/, "");

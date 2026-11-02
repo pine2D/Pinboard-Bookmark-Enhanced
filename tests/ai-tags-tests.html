@@ -2026,6 +2026,35 @@ suite("shared tag canonicalization", () => {
     assertEq(pbpMintTagName("# #foo", {service: "pinboard", separator: "-"}), "#-#foo");
   });
 
+  test("minting drops invisible zero-width characters but keeps the joiners scripts and emoji need", () => {
+    const invisible = ["\u200b", "\u2060", "\ufeff"];
+    const joiners = ["\u200c", "\u200d"];
+    const samples = ["fo\u200bo", "\u2060bar\u2060", "\ufeffbaz", "a\u200b b", "\u200b#\u200b#tag", "\u200b", "\u2060 \ufeff",
+      "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645", "\u{1F469}\u200d\u{1F4BB}", "x\u200c\u200by\u200d"];
+    for (const service of ["pinboard", "linkding", "karakeep"]) {
+      for (const separator of ["-", "_"]) {
+        for (const raw of samples) {
+          const once = pbpMintTagName(raw, {service, separator});
+          const where = service + separator + " " + JSON.stringify(raw);
+          assertEq(pbpMintTagName(once, {service, separator}), once, "not idempotent: " + where);
+          for (const ch of invisible) assert(!once.includes(ch), "kept an invisible character: " + where);
+          for (const ch of joiners) {
+            assertEq(once.split(ch).length, raw.split(ch).length, "dropped a joiner: " + where);
+          }
+        }
+      }
+    }
+    const mint = raw => pbpMintTagName(raw, {service: "linkding", separator: "-"});
+    assertEq(mint("fo\u200bo"), "foo");
+    assertEq(mint("a\u200b b"), "a-b");
+    assertEq(mint("\u2060 \ufeff"), "");
+    assertEq(pbpMintTagName("\u200b#\u200b#tag", {service: "karakeep", separator: "-"}), "tag");
+    const fresh = ctx({}, [], true, "pinboard", "-");
+    assertEq(JSON.stringify(pbpCanonicalTagList(["\u200b", "fo\u200bo", "foo"], fresh)), JSON.stringify(["foo"]),
+      "an all-invisible name is dropped like an empty one and the twin collapses");
+    assertEq(pbpCanonicalTagName("fo\u200bo", ctx({"fo\u200bo": 2}, [], false)), "fo\u200bo", "an existing exact spelling is still kept");
+  });
+
   test("a canonicalized list never holds two names of one group, keeping the first, unless both are on the bookmark", () => {
     const c = ctx({}, [], false, "linkding", "-");
     assertEq(JSON.stringify(pbpCanonicalTagList(["AI", "ai", "caf\u00e9", "cafe\u0301", "web design", "Web_Design", "", " ", "-", "_", "-"], c)),
