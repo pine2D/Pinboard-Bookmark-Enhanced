@@ -145,24 +145,6 @@ function pbpPopupPrefillDescription() {
   if (settings.optIncludeReferrer && pageInfo.referrer) { notes += (notes ? "\n\n" : "") + `via: ${pageInfo.referrer}`; }
   if (shouldUpdateField("description-input")) $id("description-input").value = notes;
 }
-// Whether the form holds the page the popup was opened on. Same page = the
-// equivalence the AI summary is anchored by (popup-ai.js), so a fragment or a
-// tracking parameter does not make another page; where popup-ai.js is not
-// loaded the popup cannot tell, which counts as another page. That check
-// ignores only what the default cleaning removes, and the popup's own cleaning
-// (aggressive mode, custom parameters) can take off more before it puts the
-// page's address in the form: the address it cleans the page URL to is the
-// same page too.
-function pbpPopupFormHoldsOpenedPage() {
-  if (typeof _aiUrlEquivalent !== "function") return false;
-  const form = $id("url-input").value;
-  if (_aiUrlEquivalent(form, pageInfo.url)) return true;
-  try { return _aiUrlEquivalent(form, stripTrackingParams(pageInfo.url, _loadUrlCleanSettings()).cleaned); }
-  catch (e) {
-    console.warn("page URL cleaning failed:", e && e.name, e && e.message);
-    return false;
-  }
-}
 // The Description box for the address the form holds. The meta description
 // describes the page the popup opened on, not whatever URL the form holds (a
 // restored draft of a recent bookmark, a typed URL). For another URL the lookup
@@ -170,7 +152,9 @@ function pbpPopupFormHoldsOpenedPage() {
 // reads that URL itself.
 function pbpPopupFillPageDescription() {
   const auto = settings.optAutoDescription !== false;
-  const ownPage = pbpPopupFormHoldsOpenedPage();
+  // The same-page check is popup-ai.js's (pbpPopupFormHoldsOpenedPage); where
+  // it is not loaded the popup cannot tell, which counts as another page.
+  const ownPage = typeof pbpPopupFormHoldsOpenedPage === "function" && pbpPopupFormHoldsOpenedPage();
   const input = $id("linkding-description-input");
   input.value = auto && ownPage ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
   // A page that could not be read has no known description of its own, and

@@ -1563,8 +1563,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(popupAiSource.includes("function _aiUrlEquivalent"), "equivalence helper missing");
       assert(popupAiSource.includes("function pbpAiSyncUrlEditState"), "button-grey sync missing");
       assert(source.includes("pbpAiSyncUrlEditState()"), "url-input listener does not sync the AI buttons");
-      const guards = (popupAiSource.match(/_aiUrlEquivalent\(\$id\("url-input"\)\.value, pageInfo\.url\)/g) || []).length;
-      assert(guards >= 3, "doAISummary+doAITags guards and the sync must all check equivalence, got " + guards);
+      // Which addresses count as the opened page is run, not counted, in
+      // "AI summary and tags take the address the popup cleaned itself".
       assert(!/build(Tag|Summary|Combined)Prompt\(s, \$id\("title-input"\)\.value, \$id\("url-input"\)\.value/.test(popupAiSource),
         "prompts must use pageInfo.url, never the edited input");
     });
@@ -2058,12 +2058,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
     })();
 
     // The same-page check also asks for the popup's own cleaned address of its
-    // page (pbpPopupFormHoldsOpenedPage): the real _loadUrlCleanSettings, run
-    // beside the sliced prefill so it reads the `settings` that slice gets.
+    // page: popup-ai.js's pbpPopupFormHoldsOpenedPage and the real
+    // _loadUrlCleanSettings, run beside the sliced prefill so they read the
+    // `pageInfo` and `settings` that slice gets.
     const loadUrlCleanSource = (() => {
       const from = source.indexOf("function _loadUrlCleanSettings(");
       assert(from >= 0, "_loadUrlCleanSettings missing from popup.js");
-      return source.slice(from, source.indexOf("\n}", from) + 2);
+      const holds = popupAiSource.indexOf("function pbpPopupFormHoldsOpenedPage(");
+      assert(holds >= 0, "pbpPopupFormHoldsOpenedPage missing from popup-ai.js");
+      return source.slice(from, source.indexOf("\n}", from) + 2) + "\n" + popupAiSource.slice(holds, popupAiSource.indexOf("\n}", holds) + 2);
     })();
 
     test("popup prefill formats selected text for the connected service", () => {
@@ -2653,6 +2656,29 @@ test("posts/add default remains replace=yes for existing callers", () => {
       "popup AI routing slice A not found");
     assert(k44SliceB.includes("async function doAITags"), "popup AI routing slice B not found");
 
+    // The real same-page guards of popup-ai.js (_aiUrlEquivalent,
+    // pbpPopupFormHoldsOpenedPage, pbpAiSyncUrlEditState, _aiOpStillCurrent)
+    // and popup.js's _loadUrlCleanSettings, for makePopupAi's realPageGuard.
+    // shared.js's stripTrackingParams is re-scoped with the real URL
+    // constructor: this page's global `const URL` string degrades the loaded
+    // copy to identity, and a cleaned-address case on it would pass vacuously.
+    const pageGuardSource = (() => {
+      const from = popupAiSource.indexOf("function _aiUrlEquivalent(");
+      const to = popupAiSource.indexOf("// Settle any in-flight same-URL bookmark lookup", from);
+      const live = popupAiSource.indexOf("function _aiOpStillCurrent(");
+      const clean = source.indexOf("function _loadUrlCleanSettings(");
+      assert(from >= 0 && to > from && live >= 0 && clean >= 0, "same-page guard source not found");
+      return popupAiSource.slice(from, to) + "\n" + popupAiSource.slice(live, popupAiSource.indexOf("\n}", live) + 2)
+        + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2);
+    })();
+    const pageGuardStrip = (() => {
+      const from = sharedSource.indexOf("function stripTrackingParams(");
+      const to = sharedSource.indexOf("// True when two URLs refer to the same bookmark", from);
+      assert(from >= 0 && to > from, "stripTrackingParams source not found");
+      const strip = new Function("URL", sharedSource.slice(from, to) + "\nreturn stripTrackingParams;")(window.URL);
+      assert(strip(URL + "?utm_source=x", {}).cleaned === URL, "the re-scoped stripTrackingParams is still degraded");
+      return strip;
+    })();
     function makePopupAi(opts) {
       const o = opts || {};
       const calls = { sent: [], callAI: [], cache: [], rendered: [], summary: [], status: [], errors: [], order: [], progressCleared: [] };
@@ -2684,7 +2710,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "title-input": { value: "Title" },
         "description-input": { value: "Notes" },
         "linkding-description-input": { value: "Meta description" },
-        "url-input": { value: URL },
+        "url-input": { value: o.formUrl === undefined ? URL : o.formUrl },
         "ai-suggest-tags": container,
         "ai-summary-btn": fakeEl(),
         "ai-tags-btn": fakeEl(),
@@ -2708,7 +2734,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         ...(o.realSummary ? { _popupDraftRevision:0, _popupDraftEdited:false, _popupDraftUserUrl:false, _linkdingDescriptionKnown:true,
           _popupDraftChangedFields:new Set(), fieldDirtyFlags:{"linkding-description-input":false},
           _archiveUserTouched:false, pbpRememberPopupDraft() {} } : {}),
-        pageInfo: { url: URL, pageText: "extracted body" },
+        pageInfo: { url: o.pageUrl === undefined ? URL : o.pageUrl, pageText: "extracted body" },
         bookmarkLookup: lookupState,
         allUserTags: [],
         pbpPopupTagContext: (s) => ({ service: pbpBookmarkServiceId(s), separator: s.aiTagSeparator,
@@ -2750,6 +2776,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         // stronger (account + URL) gate must fail while the account gate holds.
         _aiOpStillCurrent: (a) => a === account && !o.ownerChanged && !o.urlDriftedNow && !(o.urlDrifted && calls.sent.length > 0),
         _aiUrlEquivalent: () => true,
+        pbpPopupFormHoldsOpenedPage: () => true,
         _aiAwaitBookmarkLookup: async () => {},
         _aiRestoreSummaryOwnership: async () => false,
         _aiRequiredOriginPatterns: () => ["https://api.openai.com/*"],
@@ -2781,9 +2808,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
       // keep the recording stub.
       const realSummary = o.realSummary ? popupAiSource.slice(popupAiSource.indexOf("function upsertSummary("), popupAiSource.indexOf("// ---- Remove AI summary block")) : "";
       const realDraftEdit = o.realSummary ? source.slice(source.indexOf("function pbpPopupDraftFieldEdited("),source.indexOf("function setupPopupDraftTracking(")) : "";
-      const body = k44SliceA + "\n" + k44SliceB + "\n" + realSummary + "\n" + realDraftEdit + (o.realErrorCard ? "\n" + k44SliceC : "");
+      // realPageGuard: the same-page check itself is real (popup-ai.js's guard
+      // functions over the real cleaning and the stored urlClean settings), so
+      // the case decides which addresses count as the opened page.
+      if (o.realPageGuard) Object.assign(deps, { stripTrackingParams: pageGuardStrip,
+        pbpAiPageUrlNorm: summaryReceiptApi({ stripTrackingParams: pageGuardStrip }).pbpAiPageUrlNorm });
+      const body = k44SliceA + "\n" + k44SliceB + "\n" + realSummary + "\n" + realDraftEdit + (o.realErrorCard ? "\n" + k44SliceC : "")
+        + (o.realPageGuard ? "\n" + pageGuardSource : "");
       const api = new Function(...Object.keys(deps),
-        body + "\n; return { fetchAIArtifacts, doAISummary, doAITags, refreshAITags: typeof pbpRefreshDisplayedAITagsForBookmark === 'function' ? pbpRefreshDisplayedAITagsForBookmark : null, editDescription(value) { fieldsEdit(value); pbpPopupDraftFieldEdited('linkding-description-input'); } };"
+        body + "\n; return { fetchAIArtifacts, doAISummary, doAITags, refreshAITags: typeof pbpRefreshDisplayedAITagsForBookmark === 'function' ? pbpRefreshDisplayedAITagsForBookmark : null, syncUrlEditState: typeof pbpAiSyncUrlEditState === 'function' ? pbpAiSyncUrlEditState : null, editDescription(value) { fieldsEdit(value); pbpPopupDraftFieldEdited('linkding-description-input'); } };"
       )(...Object.values(deps));
       return { ...api, calls, snapshot, account, el: fields, lookupState };
     }
@@ -2798,6 +2831,65 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(h.el["linkding-description-input"].value === "Manual while waiting", "completion replaced manual input");
       assert(h.el["description-input"].value === "Notes", "AI changed linkding Notes");
       assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryKeptDescription"), "generic completion hid kept feedback");
+    });
+    // The popup's own URL cleaning (aggressive mode, custom parameters) can
+    // take more off the page's address than the default cleaning the AI cache
+    // keys ignore. The address it put in the form is still the opened page, so
+    // the summary and tags it asks for belong there; an address the user moved
+    // to another page is still refused, before anything is sent.
+    await testAsync("AI summary and tags take the address the popup cleaned itself and still refuse another page", async () => {
+      const PAGE = URL, cleaning = (aggressiveMode, customParams) => ({ enabled: true, onPopupOpen: true, onPaste: true,
+        aggressiveMode, customParams, excludeParams: [] });
+      const rows = [
+        ["aggressive mode removed ref=", cleaning(true, []), PAGE + "?ref=abc", PAGE, true],
+        ["a custom parameter was removed", cleaning(false, ["campaign"]), PAGE + "?campaign=spring", PAGE, true],
+        ["both, with a fragment left on", cleaning(true, ["campaign"]), PAGE + "?campaign=spring&ref=abc#top", PAGE + "#top", true],
+        ["the form is another page", cleaning(true, ["campaign"]), PAGE + "?campaign=spring", "https://example.com/other", false],
+        ["the form kept a real parameter the page lacks", cleaning(true, []), PAGE + "?ref=abc", PAGE + "?id=2", false],
+        ["the form dropped a real parameter", cleaning(true, []), PAGE + "?id=2&ref=abc", PAGE, false],
+      ];
+      const refused = h => h.calls.status.some(row => row[1] === tEn("aiUrlEdited"));
+      for (const service of ["pinboard", "karakeep", "linkding"]) {
+        for (const [label, urlClean, pageUrl, formUrl, same] of rows) {
+          const where = service + ", " + label;
+          const h = makePopupAi({ realPageGuard: true, settings: { bookmarkService: service, urlClean }, pageUrl, formUrl });
+          h.syncUrlEditState();
+          assert(h.el["ai-summary-btn"].classList.contains("disabled-link") === !same
+            && h.el["ai-tags-btn"].classList.contains("disabled-link") === !same, where + ": the AI buttons were greyed " + !same + " wrong");
+          await h.doAISummary(true); await flushMicrotasks();
+          const written = h.calls.summary.includes("worker summary");
+          assert(same ? h.calls.sent.length === 1 && written && !refused(h) : h.calls.sent.length === 0 && !written && refused(h),
+            where + ": summary sent " + h.calls.sent.length + ", written " + written + ", status " + JSON.stringify(h.calls.status));
+          const sentBefore = h.calls.sent.length;
+          h.calls.status.length = 0;
+          await h.doAITags(true); await flushMicrotasks();
+          assert(same ? h.calls.sent.length === sentBefore + 1 && !refused(h) : h.calls.sent.length === sentBefore && refused(h),
+            where + ": tags sent " + (h.calls.sent.length - sentBefore) + ", status " + JSON.stringify(h.calls.status));
+        }
+      }
+    });
+    // The ownership check the worker relies on is tied to the page it ran
+    // for. A form holding the address the popup cleaned that page to is still
+    // that page, so a completed check that found no summary of this popup's
+    // own reports "none" (null); another page in the form cannot tell
+    // (undefined), and the worker leaves the receipt alone.
+    test("the summary ownership check answers for the page's cleaned address and not for another page", () => {
+      const from = popupAiSource.indexOf("function _aiUrlEquivalent");
+      const to = popupAiSource.indexOf("// ---- Setup AI feature listeners ----", from);
+      const clean = source.indexOf("function _loadUrlCleanSettings(");
+      assert(from >= 0 && to > from && clean >= 0, "summary ownership runtime missing");
+      const page = URL + "?campaign=spring&ref=abc";
+      for (const [label, formUrl, expected] of [["the cleaned address", URL, null], ["the page's own address", page, null], ["another page", URL + "/other", undefined]]) {
+        const fields = { "url-input": { value: formUrl } };
+        const h = new Function("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "_AI_BQ_REGEX_SHARED", "$id", "pageInfo", "existingBookmark", "settings", "stripTrackingParams",
+          popupAiSource.slice(from, to) + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) +
+          "; return { snapshot: pbpAiSummaryOwnershipSnapshot, checked(url) { _aiSummaryOwnershipChecked = { bookmark: existingBookmark, url }; } };"
+        )(summaryReceiptApi({ stripTrackingParams: pageGuardStrip }).pbpAiPageUrlNorm, summaryReceiptApi().pbpAiSummaryRangeValid, /$a/g,
+          id => fields[id] || null, { url: page }, null,
+          { urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: true, customParams: ["campaign"], excludeParams: [] } }, pageGuardStrip);
+        h.checked(page);
+        assert(h.snapshot("Notes") === expected, label + ": the snapshot was " + h.snapshot("Notes"));
+      }
     });
     function pressCombinedAi(h) {
       const startAt = source.indexOf('  document.addEventListener("keydown", (e) => {\n    if ((e.ctrlKey || e.metaKey) && e.key === "Enter")');

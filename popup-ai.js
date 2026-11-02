@@ -233,12 +233,35 @@ function _aiUrlEquivalent(a, b) {
   return pbpAiPageUrlNorm(a) === pbpAiPageUrlNorm(b);
 }
 
+// Whether the form holds the page the popup was opened on (pageUrl, which is
+// pageInfo.url unless a caller recorded it earlier). Same page = the
+// equivalence above, so a fragment or a tracking parameter does not make
+// another page. That check ignores only what the default cleaning removes,
+// and the popup's own cleaning (aggressive mode, custom parameters) can take
+// off more before it puts the page's address in the form: the address it
+// cleans the page URL to is the same page too. This is the one same-page
+// check of the popup: the AI guards below, the summary ownership snapshot and
+// the Description prefill (popup.js) all ask it, so an address the popup
+// cleaned itself is never mistaken for an edit to another page.
+// _loadUrlCleanSettings lives in popup.js; without it only the plain
+// equivalence decides.
+function pbpPopupFormHoldsOpenedPage(pageUrl = pageInfo.url) {
+  const form = $id("url-input").value;
+  if (_aiUrlEquivalent(form, pageUrl)) return true;
+  if (typeof _loadUrlCleanSettings !== "function") return false;
+  try { return _aiUrlEquivalent(form, stripTrackingParams(pageUrl, _loadUrlCleanSettings()).cleaned); }
+  catch (e) {
+    console.warn("page URL cleaning failed:", e && e.name, e && e.message);
+    return false;
+  }
+}
+
 // Called from the url-input "input" listener (popup.js): grey the AI
 // entry points out while the URL differs from the opened page; editing
 // back re-enables them. The in-op guards below stay authoritative
 // (hotkey/retry paths bypass pointer-events).
 function pbpAiSyncUrlEditState() {
-  const edited = !_aiUrlEquivalent($id("url-input").value, pageInfo.url);
+  const edited = !pbpPopupFormHoldsOpenedPage();
   $id("ai-summary-btn")?.classList.toggle("disabled-link", edited);
   $id("ai-tags-btn")?.classList.toggle("disabled-link", edited);
 }
@@ -269,7 +292,7 @@ async function _aiAwaitBookmarkLookup() {
 // pageInfo.url stay legitimate either way; only the FORM commits gate.
 function _aiOpStillCurrent(account) {
   return pbpPopupAiAccountIsCurrent(account)
-    && _aiUrlEquivalent($id("url-input").value, pageInfo.url);
+    && pbpPopupFormHoldsOpenedPage();
 }
 
 function pbpAiWrapSummary(summary, service = "pinboard") {
@@ -371,7 +394,7 @@ function pbpAiSummaryOwnershipSnapshot(description) {
   const checked = _aiSummaryOwnershipChecked;
   if (!checked) return undefined;
   const bookmark = typeof existingBookmark === "undefined" ? null : existingBookmark;
-  return checked.bookmark === bookmark && _aiUrlEquivalent($id("url-input").value, checked.url)
+  return checked.bookmark === bookmark && pbpPopupFormHoldsOpenedPage(checked.url)
     ? null : undefined;
 }
 
@@ -1147,7 +1170,7 @@ async function doAISummary(forceRefresh, sOverride) {
   const account = pbpPopupAiAccount();
   if (!account) return;
   if (!hasAIKey(s)) { showSetKeyError(); return; }
-  if (!_aiUrlEquivalent($id("url-input").value, pageInfo.url)) {
+  if (!pbpPopupFormHoldsOpenedPage()) {
     showStatus("status-msg", t("aiUrlEdited"), "error");
     return;
   }
@@ -1283,7 +1306,7 @@ function showSummaryActions(fromCache) {
     // pbpAiSyncUrlEditState only disables #ai-summary-btn / #ai-tags-btn, so
     // this link stays clickable: swapping the label before the refusal left it
     // pinned on "Regenerating..." forever, with no request and no feedback.
-    if (!_aiUrlEquivalent($id("url-input").value, pageInfo.url)) {
+    if (!pbpPopupFormHoldsOpenedPage()) {
       showStatus("status-msg", t("aiUrlEdited"), "error");
       return;
     }
@@ -1320,7 +1343,7 @@ async function doAITags(forceRefresh, sOverride) {
   hideAIError();
 
   if (!hasAIKey(s)) { showSetKeyError(); return; }
-  if (!_aiUrlEquivalent($id("url-input").value, pageInfo.url)) {
+  if (!pbpPopupFormHoldsOpenedPage()) {
     showStatus("status-msg", t("aiUrlEdited"), "error");
     return;
   }
@@ -1537,7 +1560,7 @@ function renderAITags(tags, fromCache) {
     // label/loading swap, which otherwise pinned the link on
     // "Regenerating..." forever (these links are not covered by
     // pbpAiSyncUrlEditState's disabled-link pass), with no feedback.
-    if (!_aiUrlEquivalent($id("url-input").value, pageInfo.url)) {
+    if (!pbpPopupFormHoldsOpenedPage()) {
       showStatus("status-msg", t("aiUrlEdited"), "error");
       return;
     }
