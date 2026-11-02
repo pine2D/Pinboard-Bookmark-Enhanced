@@ -794,11 +794,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
-    test("fresh bookmark lookup wires the submitted tag baseline into the rebase helper", () => {
-      assert(lookupSource.includes("Array.isArray(submittedTags)"), "lookup does not detect the submitted tag baseline");
-      assert(lookupSource.includes('pbpRebasePopupTags(pbpBookmarkServiceId(settings) === "pinboard"'), "lookup bypasses the service-aware rebase helper");
-    });
-
     await testAsync("real submit callback keeps queued separate from saved side effects", async () => {
       const harness = createSubmitHarness();
       const pending = harness.click();
@@ -1693,14 +1688,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "documents why the adopt step is needed: the legacy guard alone does not see the current format");
     });
 
-    test("AI ops run on immutable settings snapshots - no global provider mutation (A4)", () => {
-      assert(!popupAiSource.includes("settings.aiProvider = "), "global settings.aiProvider mutation must be gone");
-      assert(popupAiSource.includes("const s = { ...(sOverride || settings) }"), "op-level snapshot missing");
-      assert(!/\{\s*\.\.\.settings\s*,\s*aiProvider:/.test(popupAiSource), "error-card handlers must build from the failed snapshot, never the global settings");
-      assert(popupAiSource.includes("async function fetchAIArtifacts(kind, forceRefresh, account, s, source"),
-        "fetchAIArtifacts must take the snapshot explicitly");
-    });
-
     test("batch startup account race writes a terminal progress record (A13)", () => {
       const fnStart = backgroundSource.indexOf("async function _runBatchSave");
       const guardEnd = backgroundSource.indexOf("const total = tabs.length", fnStart);
@@ -1717,8 +1704,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     });
 
     test("SW tag prompts anchor on the cached user vocabulary (A14)", () => {
-      assert((backgroundSource.match(/userTagsTop = tagVocab\.counts \? pbpTagsByCount\(tagVocab\.counts\)/g) || []).length === 2,
-        "quick-save AND batch must derive the frequency-sorted list");
+      // That quick save and Batch derive the frequency-sorted list is asserted by running them (save-pipeline-tests.html).
       const fed = (backgroundSource.match(/pbpRelevantTagsFirst\(userTagsTop/g) || []).length;
       assert(fed === 4, "all four SW tag/combined builders must receive the relevance-ordered vocabulary, got " + fed);
       const popupFed = (popupAiSource.match(/pbpRelevantTagsFirst\(allUserTags/g) || []).length;
@@ -1743,8 +1729,19 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(hotkey.slice(0, 400).includes("el.click();") && !hotkey.slice(0, 400).includes("addTag(el.dataset.tag)"),
         "Alt+N must route through the chip click handler");
       const removeSrc = await fetch("../popup-tags.js").then(r => r.text());
-      assert(removeSrc.includes("_aiSessionAddedTags.delete(pbpTagDedupeKey(tag))"),
-        "removeTag must drop AI provenance for re-added names");
+      // The real removeTag, run over the provenance set: removing a tag drops
+      // the provenance of every spelling in its group and nothing else.
+      const from = removeSrc.indexOf("function removeTag(");
+      assert(from >= 0, "removeTag missing from popup-tags.js");
+      const removal = new Function("pbpTagDedupeKey", "_aiSessionAddedTags", "currentTags", "renderTags",
+        '"use strict";\nlet _tagsUserTouched = false;\n' + removeSrc.slice(from, removeSrc.indexOf("\n}", from) + 2) +
+        "\nreturn { removeTag, tags: () => currentTags, touched: () => _tagsUserTouched };");
+      const provenance = new Set([pbpTagDedupeKey("web-design"), pbpTagDedupeKey("python")]);
+      const r = removal(pbpTagDedupeKey, provenance, ["python", "web_design", "rust"], () => {});
+      r.removeTag("Web-Design");
+      assert(r.tags().join(",") === "python,rust", "removeTag kept the removed group: " + r.tags().join(","));
+      assert(!provenance.has(pbpTagDedupeKey("web_design")), "removeTag kept AI provenance for the removed name, so a hand re-add would be retracted by replace-mode regen");
+      assert(provenance.has(pbpTagDedupeKey("python")) && provenance.size === 1, "removeTag dropped the provenance of an unrelated tag");
       // The third leg of r2 M3 -- the replace-mode regen link must abort when
       // the form was switched to another bookmark -- is a BEHAVIOUR, not a
       // source spelling, so it is asserted by running the real handler in
@@ -2045,12 +2042,17 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
-    test("replace-mode regen retracts only session-AI-added tags (A10)", () => {
-      assert(popupAiSource.includes("const _aiSessionAddedTags = new Set()"), "provenance set missing");
-      assert(popupAiSource.includes("cachedTagSet.has(pbpTagDedupeKey(t)) && _aiSessionAddedTags.has(pbpTagDedupeKey(t))"),
-        "replace filter must require AI provenance, not just name equality");
-      const chipAdds = (popupAiSource.match(/_aiSessionAddedTags\.add\(/g) || []).length;
-      assert(chipAdds >= 2, "both the single-chip and add-all paths must record provenance, got " + chipAdds);
+    await testAsync("replace-mode regen retracts only session-AI-added tags (A10)", async () => {
+      // "Beta" is the user's own tag and shares its name with a cached AI tag;
+      // "alpha" arrives through the chip and "gamma" through Add all. Only the
+      // two the session added are retracted, and both paths record provenance.
+      const run = regenRuntime({ formUrl: URL, pageUrl: URL, tags: ["alpha", "beta", "gamma"], seedTags: ["Beta"], accept: ["alpha"] });
+      assert(run.provenance.size === 1 && run.provenance.has(pbpTagDedupeKey("alpha")), "the single-chip path did not record provenance");
+      run.container.querySelector(".add-all-link").click();
+      assert(run.tags().join("|") === "Beta|alpha|gamma" && run.provenance.size === 2 && run.provenance.has(pbpTagDedupeKey("gamma")),
+        "the add-all path did not record provenance, or claimed the user's tag: " + run.tags().join("|"));
+      run.replaceLink.click(); await settle();
+      assert(run.tags().join("|") === "Beta", "replace retracted by name instead of by provenance: " + run.tags().join("|"));
     });
 
     test("summary upsert/remove operate on the LAST block, in place (A11)", () => {
@@ -2762,7 +2764,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const respond = o.respond || (async () => ({ ok: true, tags: null, summary: "worker summary" }));
       const deps = {
         PBP_AI_VIA_SW: o.viaSW !== false,
-        settings: snapshot,
+        settings: o.globalSettings ? { ...snapshot, ...o.globalSettings } : snapshot,
         pbpBookmarkServiceId,
         _linkdingDescriptionTouched: false,
         _linkdingDescriptionPending: false,
@@ -3162,6 +3164,18 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(!h.calls.status.some(row=>row[1] === tEn("aiSummaryTagsGenerated")),"failed " + failedKind + " reported double success");
       }
     });
+    await testAsync("AI ops run on immutable settings snapshots - no global provider mutation (A4)", async () => {
+      assert(!popupAiSource.includes("settings.aiProvider = "), "global settings.aiProvider mutation must be gone");
+      assert(popupAiSource.includes("const s = { ...(sOverride || settings) }"), "op-level snapshot missing");
+      assert(!/\{\s*\.\.\.settings\s*,\s*aiProvider:/.test(popupAiSource), "error-card handlers must build from the failed snapshot, never the global settings");
+      const h = makePopupAi({ settings: { aiProvider: "openai" }, globalSettings: { aiProvider: "anthropic" } });
+      assert(h.snapshot.aiProvider === "openai", "fixture: the snapshot must name a different provider than the module-level settings");
+      await h.fetchAIArtifacts("summary", true, h.account, h.snapshot, "local");
+      const msg = h.calls.sent[0];
+      assert(msg && msg.aiOverrides.aiProvider === "openai", "the request took its provider from the module-level settings, not the snapshot: " + JSON.stringify(msg && msg.aiOverrides.aiProvider));
+      assert(msg.inflightKey === `${h.account}|openai#summary|summary|${URL}|local`, "the inflight identity ignored the snapshot: " + msg.inflightKey);
+    });
+
     await testAsync("the popup hands the worker a finished prompt, its cache coordinates and no credential", async () => {
       const h = makePopupAi({ source: "jina" });
       const out = await h.fetchAIArtifacts("summary", true, h.account, h.snapshot, "jina");
@@ -4307,6 +4321,27 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(result.status === "failed", "lookup did not fail: " + result.status);
       assert(harness.warns.length === 1 && harness.warns[0][1] === "TypeError", "the form fill did not fail as expected: " + JSON.stringify(harness.warns));
       assert(harness.statuses.length === 0, "a DOM failure was reported as a transport failure: " + JSON.stringify(harness.statuses));
+    });
+
+    // A save that landed re-reads the bookmark with the tags the user submitted
+    // as the baseline: a tag the server gained meanwhile is merged in, which the
+    // plain lookup (the user already edited the tags) would not do. Linkding
+    // names arrive as an array and as a quoted string; the array is the truth.
+    await testAsync("a fresh lookup after a save rebases on the submitted tags, in each service's own shape", async () => {
+      const cases = [
+        ["pinboard", { ok: true, status: 200, text: JSON.stringify({ posts: [{ description: "Saved title", extended: "", tags: "alpha gamma", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] }) }, ["alpha", "gamma"]],
+        ["linkding", { ok: true, status: 200, data: { posts: [{ href: URL, description: "Saved title", extended: "", tags: 'alpha "big idea"', tagNames: ["alpha", "big idea"], shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] } }, ["alpha", "big idea"]],
+      ];
+      for (const [service, reply, serverTags] of cases) {
+        const withBaseline = createLookupHarness(reply, { service });
+        withBaseline.touchTags(["alpha"]);
+        assert((await withBaseline.run(["alpha"])).status === "found", service + ": the lookup did not find the bookmark");
+        assert(JSON.stringify(withBaseline.getTags()) === JSON.stringify(serverTags), service + ": the server's tags were not merged over the submitted baseline: " + JSON.stringify(withBaseline.getTags()));
+        const plain = createLookupHarness(reply, { service });
+        plain.touchTags(["alpha"]);
+        assert((await plain.run()).status === "found", service + ": the plain lookup did not find the bookmark");
+        assert(JSON.stringify(plain.getTags()) === JSON.stringify(["alpha"]), service + ": a lookup with no baseline overwrote the user's tags: " + JSON.stringify(plain.getTags()));
+      }
     });
 
     await testAsync("a 401 lookup stays silent and hands off to the login screen", async () => {

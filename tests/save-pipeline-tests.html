@@ -377,15 +377,15 @@ async function createBatchSaveHarness(options) {
     getAICache: async (_url, kind) => opts.cached?.[kind] ?? null,
     setAICache: async (...args) => { cacheWrites.push(args); },
     callAI: opts.callAI || (async () => "AI summary"),
-    buildCombinedPrompt: () => "combined",
+    buildCombinedPrompt: opts.buildCombinedPrompt || (() => "combined"),
     parseAICombined: () => ({ tags: ["ai-tag"], summary: "  Combined\n summary  " }),
     buildSummaryPrompt: () => "summary",
-    buildTagPrompt: () => "tags",
+    buildTagPrompt: opts.buildTagPrompt || (() => "tags"),
     parseAITags: () => ["ai-tag"],
     refineTags: (tags) => tags,
     chrome: { storage: { local: { get: opts.storageGet || (async () => ({})),
       set: async (value) => { if (value.batch_job) jobs.push(JSON.parse(JSON.stringify(value.batch_job))); } } } },
-    pbpLoadTagVocab: async (account) => ({ account, timestamp: Date.now(), counts: null, index: opts.tagVocabIndex || null }),
+    pbpLoadTagVocab: async (account) => ({ account, timestamp: Date.now(), counts: opts.tagVocabCounts || null, index: opts.tagVocabIndex || null }),
     pbpCanonicalTagName, pbpTagGroupKey,
     pbpServiceEffectivePrivate,
     submitSaveIntent: async (prepared, deliveryOptions) => {
@@ -2035,6 +2035,40 @@ await suite("unified save pipeline", async () => {
       await plain.handleBatchSave(batchTabs(1));
       // null: these notes hold no block, so a stale receipt is retired once they are written.
       equal(plain.intents[0].deliveryOptions.summaryRange, null, service + ": a save without a summary did not disown its notes");
+    }
+  });
+
+  // The tag prompts of a quick save and of Batch anchor on the user's cached
+  // tags, most used first (popup parity). The prompt builders record what the
+  // worker hands them; the vocabulary is a cache row in the shape
+  // pbpLoadTagVocab returns, so the order is derived from the counts alone.
+  await test("quick-save and Batch tag prompts receive the cached vocabulary, most used first", async () => {
+    const same = (actual, expected, msg) => equal(JSON.stringify(actual), JSON.stringify(expected), msg);
+    const counts = { rare: 1, common: 9, mid: 5 };
+    const seen = [];
+    const record = (kind) => (_s, _title, _url, _text, _notes, vocabulary) => { seen.push({ kind, vocabulary: vocabulary === undefined ? undefined : [...vocabulary] }); return kind; };
+    const prompts = { buildTagPrompt: record("tags"), buildCombinedPrompt: record("combined") };
+    const quickDeps = (tagVocab) => ({ hasAIKey: () => true, getPageInfoFromTab: async () => ({ pageText: "article body" }),
+      getAICache: async () => null, setAICache: async () => {}, callAI: async () => "reply",
+      parseAITags: () => ["ai-tag"], parseAICombined: () => ({ tags: ["ai-tag"], summary: "s" }), refineTags: (tags) => tags,
+      pbpLoadTagVocab: async (account) => ({ account, timestamp: Date.now(), counts: tagVocab, index: null }), ...prompts });
+    for (const [label, tagVocab, expected] of [["with a cached vocabulary", counts, ["common", "mid", "rare"]], ["without one", null, []]]) {
+      for (const [mode, flags] of [["tags", { _aiTags: true, _aiSummary: false }], ["combined", { _aiTags: true, _aiSummary: true }]]) {
+        seen.length = 0;
+        const quick = await createBackgroundSaveHarness({
+          cachedSettings: { pinboardToken: "alice:token", bgSaveMode: "merge", optPrivateDefault: false, optPrivateIncognito: true,
+            _defaultTags: "", _autoNotes: false, _blockquote: false, ...flags },
+          deps: quickDeps(tagVocab) });
+        await runBackgroundSave(quick);
+        same(seen.map((call) => call.kind), [mode], "quick save " + label + " (" + mode + "): which prompt was built");
+        same(seen[0].vocabulary, expected, "quick save " + label + " (" + mode + ")");
+        seen.length = 0;
+        const batch = await createBatchSaveHarness({ settings: { batchAiTags: true, batchAiSummary: mode === "combined" },
+          hasAIKey: true, pageInfo: { pageText: "article body" }, tagVocabCounts: tagVocab, ...prompts });
+        await batch.handleBatchSave(batchTabs(1));
+        same(seen.map((call) => call.kind), [mode], "Batch " + label + " (" + mode + "): which prompt was built");
+        same(seen[0].vocabulary, expected, "Batch " + label + " (" + mode + ")");
+      }
     }
   });
 

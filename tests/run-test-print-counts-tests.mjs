@@ -15,10 +15,13 @@ const tree = mkdtempSync(join(tmpdir(), 'pbp-print-counts-'));
 mkdirSync(join(tree, '.qa-scan')); mkdirSync(join(tree, 'tests'));
 symlinkSync(join(repo, '.qa-scan/node_modules'), join(tree, '.qa-scan/node_modules'));
 const source = readFileSync(join(repo, '.qa-scan/run-test.mjs'), 'utf8');
-assert.ok(source.includes('Object.freeze({'), 'the EXPECTED_RESULTS table moved');
-assert.ok(source.includes(': 30000;'), 'the TEST_TIMEOUT_MS default moved');
+// Each patch must actually change the runner copy: a moved table or default would otherwise leave the real 30s deadline and no registered pages.
+const shortened = source.replace(': 30000;', ': 20000;');
+assert.notEqual(shortened, source, 'the TEST_TIMEOUT_MS default moved');
+const registered = shortened.replace('Object.freeze({', 'Object.freeze({\n  "tests/gap-tests.html": 3,\n  "tests/extra-tests.html": 2,\n  "tests/low-tests.html": 2,\n  "tests/summary-tests.html": 2,\n  "tests/title-tests.html": 2,\n  "tests/short-tests.html": 3,\n  "tests/early-tests.html": 2,\n  "tests/late-tests.html": 2,\n  "tests/latesum-tests.html": 2,\n  "tests/sigstall-tests.html": 3,\n  "tests/fmt-tests.html": 2,\n  "tests/g1-tests.html": 3,\n  "tests/g2-tests.html": 2,');
+assert.notEqual(registered, shortened, 'the EXPECTED_RESULTS table moved');
 // A 20s stall deadline (instead of 30s; about 13s of waiting) so the UNCONFIRMED case below ends quickly.
-writeFileSync(join(tree, '.qa-scan/run-test.mjs'), source.replace(': 30000;', ': 20000;').replace('Object.freeze({', 'Object.freeze({\n  "tests/gap-tests.html": 3,\n  "tests/extra-tests.html": 2,\n  "tests/low-tests.html": 2,\n  "tests/summary-tests.html": 2,\n  "tests/title-tests.html": 2,\n  "tests/short-tests.html": 3,\n  "tests/early-tests.html": 2,\n  "tests/late-tests.html": 2,\n  "tests/latesum-tests.html": 2,\n  "tests/sigstall-tests.html": 3,\n  "tests/fmt-tests.html": 2,\n  "tests/g1-tests.html": 3,\n  "tests/g2-tests.html": 2,'));
+writeFileSync(join(tree, '.qa-scan/run-test.mjs'), registered);
 writeFileSync(join(tree, '.qa-scan/package.json'), '{"type":"module"}');
 // rows: [[delayMs, class], ...] appended one by one after load.
 const page = (name, rows) => writeFileSync(join(tree, 'tests', name), `<!doctype html><meta charset=utf-8><title>${name}</title><body><script>
