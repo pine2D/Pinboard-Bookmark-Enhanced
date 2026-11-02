@@ -3303,20 +3303,29 @@ export class LiveRun {
         work,
         new Promise((_, reject) => { timer = setTimeout(() => { current.revoked = true; reject(new HarnessFailure('module_timeout')); }, seconds * 1000); }),
       ]);
-      // Every part ran; the module fails on the first part that failed.
+      // Every part ran. The closing checks run whether or not a part failed:
+      // the fatal ones (guard, request budget, fake AI) first, so a module
+      // over its budget aborts as module_request_budget; then the module
+      // fails on the first part that failed, with an undeclared surface or a
+      // page error kept beside it in alsoFailed.
       const failedPart = (record.parts || []).find(p => p.status === 'failed');
-      if (failedPart) { const error = new HarnessFailure(failedPart.code); error.partPhase = failedPart.phase; throw error; }
       await this.syncGuard();
       this.throwIfFatal();
-      const undeclared = undeclaredSurfaces(mod.surfaces, [...current.driven]);
-      if (undeclared.length) { record.undeclaredSurfaces = undeclared; fail('surface_undeclared'); }
-      check(this.report.pageErrors.length === errorsBefore, 'browser_page_error');
       const after = this.count(mod.instance);
       const usedNode = after.node - before.node, usedBrowser = after.browser - before.browser;
       const usedAi = this.fakeAi ? this.fakeAi.calls() - before.ai : 0;
       record.counts = { node: usedNode, browser: usedBrowser, ai: usedAi };
       if (usedNode > budget.node || usedBrowser > budget.browser || usedAi > budget.ai) { this.setFatal('module_request_budget'); this.throwIfFatal(); }
       if (this.fakeAi?.failed()) { this.setFatal(this.fakeAi.failed()); this.throwIfFatal(); }
+      const soft = [];
+      const undeclared = undeclaredSurfaces(mod.surfaces, [...current.driven]);
+      if (undeclared.length) { record.undeclaredSurfaces = undeclared; soft.push('surface_undeclared'); }
+      if (this.report.pageErrors.length !== errorsBefore) soft.push('browser_page_error');
+      if (failedPart) {
+        if (soft.length) record.alsoFailed = soft;
+        const error = new HarnessFailure(failedPart.code); error.partPhase = failedPart.phase; throw error;
+      }
+      if (soft.length) fail(soft[0]);
       record.status = 'passed';
       console.log(mod.id + ': passed');
     } catch (error) {
@@ -3869,7 +3878,7 @@ export class LiveRun {
       const verdict = m.status === 'running' ? '中断（运行在此模块中被打断，未得出结论）'
         : m.beforeSteps ? `中止于开始前（未执行任何步骤，未得出结论），${m.failure?.code}`
         : `${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}`;
-      return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${oneLine(diffs[0].expected, 60)}，实际 ${oneLine(diffs[0].actual, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}${(m.fixRefs || []).length ? `；依赖修复组 ${m.fixRefs.map(g => oneLine(g, 12)).join('、')}（产品树未含这些修复时属预期失败）` : ''}${(m.parts || []).length ? `；分段：${m.parts.map(p => `${oneLine(p.name, 40)} ${p.status === 'passed' ? '通过' : p.status === 'failed' ? `失败于 ${p.phase}，${p.code}` : '未完成'}（依赖 ${(p.fixRefs || []).map(g => oneLine(g, 12)).join('、') || '无'}）`).join('；')}` : ''}`;
+      return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${oneLine(diffs[0].expected, 60)}，实际 ${oneLine(diffs[0].actual, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}${(m.fixRefs || []).length ? `；依赖修复组 ${m.fixRefs.map(g => oneLine(g, 12)).join('、')}（产品树未含这些修复时属预期失败）` : ''}${(m.parts || []).length ? `；分段：${m.parts.map(p => `${oneLine(p.name, 40)} ${p.status === 'passed' ? '通过' : p.status === 'failed' ? `失败于 ${p.phase}，${p.code}` : '未完成'}（依赖 ${(p.fixRefs || []).map(g => oneLine(g, 12)).join('、') || '无'}）`).join('；')}` : ''}${(m.alsoFailed || []).length ? `；另有收尾检查未过：${m.alsoFailed.join('、')}` : ''}`;
     });
     const pendingRows = r.modules.filter(m => (m.pendingDecisions || []).length);
     for (const m of pendingRows.slice(0, 5)) lines.push(`- ${m.id} 待裁定：${m.pendingDecisions.slice(0, 3).map(d => `${d.code}（${oneLine(d.question || '', 60)}；期望 ${oneLine(d.expected, 50)}，实际 ${oneLine(d.actual, 50)}）`).join('；')}`);

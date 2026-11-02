@@ -1268,6 +1268,40 @@ try {
       const fatalMod = { ...mod, id: 'linkding.parts.fatal', async steps(t) { await t.part('fatal', ['G1'], async () => { fatalRun.setFatal('live_guard_mutation'); t.expect(true, 'x'); }); after = true; } };
       await assert.rejects(quiet(() => fatalRun.runModule(fatalMod)), e => e.code === 'live_guard_mutation');
       assert.deepEqual([fatalRun.report.modules[0].status, after], ['aborted', false], 'a fatal finding in a part ends the module');
+      // A failed part does not skip the module's closing checks: a module
+      // over its request budget still aborts the run as module_request_budget,
+      // and an undeclared surface or an uncaught page error is recorded.
+      const overRun = partRun();
+      const overMod = { ...mod, id: 'linkding.parts.over', surfaces: [], async steps(t) {
+        await t.part('first', ['G1'], async () => { t.expectEq('shown', 'wanted', 'first_failed'); });
+        await t.part('second', ['G2'], async () => { overRun.count('linkding').browser += 5; overRun.report.pageErrors.push({ message: 'boom' }); });
+      } };
+      await assert.rejects(quiet(() => overRun.runModule(overMod)), e => e.code === 'module_request_budget');
+      const over = overRun.report.modules[0];
+      assert.deepEqual([over.status, over.failure.code, overRun.fatal, over.counts.browser], ['aborted', 'module_request_budget', 'module_request_budget', 5], 'the budget is checked after a failed part');
+      // A fatal finding the parts left (set after the last harness call)
+      // names the abort, not the earlier part's code.
+      const lateRun = partRun();
+      const lateMod = { ...mod, id: 'linkding.parts.late', async steps(t) {
+        await t.part('first', ['G1'], async () => { t.expectEq('shown', 'wanted', 'first_failed'); });
+        lateRun.fatal = 'live_guard_mutation';
+      } };
+      await assert.rejects(quiet(() => lateRun.runModule(lateMod)), e => e.code === 'live_guard_mutation');
+      assert.deepEqual([lateRun.report.modules[0].status, lateRun.report.modules[0].failure.code], ['aborted', 'live_guard_mutation']);
+      // Within budget: the part's failure stands, the page error and the
+      // undeclared surface are kept beside it.
+      const softRun = partRun();
+      const softMod = { ...mod, id: 'linkding.parts.soft', surfaces: [], async steps(t) {
+        await t.part('first', ['G1'], async () => { t.expectEq('shown', 'wanted', 'first_failed'); });
+        await t.part('second', ['G2'], async () => { softRun.report.pageErrors.push({ message: 'boom' }); softRun.currentModule.driven.add('popup'); });
+      } };
+      await quiet(() => softRun.runModule(softMod));
+      const soft = softRun.report.modules[0];
+      assert.deepEqual([soft.status, soft.failure.code, soft.alsoFailed, soft.undeclaredSurfaces], ['failed', 'first_failed', ['surface_undeclared', 'browser_page_error'], ['popup']]);
+      softRun.runDir = mkdtempSync(join(dir, 'parts-soft-'));
+      softRun.summaryPath = join(softRun.runDir, 'summary.zh.md');
+      softRun.writeSummary();
+      assert(readFileSync(softRun.summaryPath, 'utf8').includes('另有收尾检查未过：surface_undeclared、browser_page_error'), 'the summary names the closing checks that failed beside the part');
     }
   }
 
