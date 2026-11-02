@@ -1041,7 +1041,42 @@ try{
     await options.close();
     await worker.evaluate(async before=>{await chrome.storage.local.remove(['cached_user_tags','pinboardToken','bookmarkService']);await chrome.storage.local.set(before);},before);
   }
-  console.log('settings Tags panel reloads on a bookmark service change: Pinboard tags in, linkding explanation back');
+  // With settings sync on, bookmarkService is routed to chrome.storage.sync
+  // (the Pinboard token stays local while syncApiKeys is off), so a change
+  // arriving from another device lands in the sync area. The panel must
+  // follow it there too, and keep reading the service from sync after a
+  // bookmarkService write to local, which is not the settings area now.
+  const beforeSync=await worker.evaluate(async()=>({local:await chrome.storage.local.get(['optSyncEnabled','bookmarkService','pinboardToken']),sync:await chrome.storage.sync.get(['bookmarkService','syncApiKeys'])}));
+  await worker.evaluate(async()=>{
+    await chrome.storage.local.set({optSyncEnabled:true,bookmarkService:'pinboard',pinboardToken:obfuscateKey('tagfixture:0123456789ABCDEF0123'),
+      cached_user_tags:{account:'tagfixture',counts:{reading:3,qa:2},timestamp:Date.now()}});
+    await chrome.storage.sync.set({syncApiKeys:false,bookmarkService:'linkding'});
+  });
+  const synced=await ctx.newPage();await synced.goto(pageUrl+'options.html#tags');
+  const syncedNow=()=>synced.evaluate(()=>({state:document.getElementById('panel-tags').dataset.tagGovState||'',stats:document.getElementById('tag-gov-stats').textContent.trim()}));
+  const syncedUntil=(want,label)=>until(async()=>{const r=await syncedNow();return r.state===want.state&&r.stats===want.stats;},label).catch(async e=>{throw new Error(e.message+' '+JSON.stringify(await syncedNow()));});
+  const pinboardOnly={state:'pinboard-only',stats:en.tagGovPinboardOnly.message};
+  try{
+    await syncedUntil(pinboardOnly,'settings sync on: linkding read from sync, not the stale local Pinboard value');
+    await worker.evaluate(()=>chrome.storage.sync.set({bookmarkService:'pinboard'}));
+    await syncedUntil({state:'ready',stats:overview},'Pinboard chosen on another device (sync area) reloaded the Pinboard tags');
+    await worker.evaluate(()=>chrome.storage.sync.set({bookmarkService:'linkding'}));
+    await syncedUntil(pinboardOnly,'linkding chosen on another device (sync area) cleared the Pinboard tags');
+    await worker.evaluate(()=>chrome.storage.sync.set({bookmarkService:'pinboard'}));
+    await syncedUntil({state:'ready',stats:overview},'Pinboard chosen on another device again');
+    // A local bookmarkService write is not the setting while sync is on; the
+    // token removal after it decides the panel, which must still follow the
+    // Pinboard choice in sync (asking for a token, not explaining linkding).
+    await worker.evaluate(async()=>{await chrome.storage.local.set({bookmarkService:'linkding'});await chrome.storage.local.remove('pinboardToken');});
+    await syncedUntil({state:'no-token',stats:en.tagGovNeedToken.message},'a local bookmarkService write was taken as the setting while settings sync is on');
+  }finally{
+    await synced.close();
+    await worker.evaluate(async before=>{
+      await chrome.storage.local.remove(['cached_user_tags','pinboardToken','bookmarkService','optSyncEnabled']);await chrome.storage.local.set(before.local);
+      await chrome.storage.sync.remove(['bookmarkService','syncApiKeys']);await chrome.storage.sync.set(before.sync);
+    },beforeSync);
+  }
+  console.log('settings Tags panel reloads on a bookmark service change: Pinboard tags in, linkding explanation back, in local and in sync');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));
