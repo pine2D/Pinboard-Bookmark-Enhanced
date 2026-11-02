@@ -1983,8 +1983,10 @@ try {
       live.assertDockerArgs(args, runId);
     }
 
-    const linkdingHealth = createServer((req, res) => { res.writeHead(req.url === '/health' ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: 'healthy' })); });
-    const karakeepHealth = createServer((req, res) => { res.writeHead(req.url === '/api/health' ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: 'ok', message: 'Web app is working' })); });
+    // healthyAt: both health routes answer "starting" until then.
+    let healthyAt = 0;
+    const linkdingHealth = createServer((req, res) => { res.writeHead(req.url === '/health' ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: Date.now() < healthyAt ? 'starting' : 'healthy' })); });
+    const karakeepHealth = createServer((req, res) => { res.writeHead(req.url === '/api/health' ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: Date.now() < healthyAt ? 'starting' : 'ok', message: 'Web app is working' })); });
     servers.push(linkdingHealth, karakeepHealth);
     const ports = { '9101/tcp': await listen(linkdingHealth), '9102/tcp': await listen(karakeepHealth) };
     const fakeDocker = ({ leftovers = [], imageMissing = false, states = {}, token = 'Traceback (most recent call last)' } = {}) => {
@@ -2106,6 +2108,22 @@ try {
       // linkding is ready; the fake Karakeep only answers its health route.
       assert.equal(report.failure.code, 'temp_signup_failed');
       assert(!JSON.stringify(report).includes('a'.repeat(40)), 'the temp token stays out of the report');
+    }
+    {
+      // The two health waits run side by side: they count once on the wall
+      // clock in temp_start and the run's totals, never more than the stage
+      // lasted; their plain sum stays in report.temp.timing.waitSumMs.
+      healthyAt = Date.now() + 1500;
+      const docker = fakeDocker({ token: 'PBPSNAPSHOTS=False\nPBPTOKEN=' + 'a'.repeat(40) });
+      const { report } = await tempRun('parallel-waits', docker);
+      healthyAt = 0;
+      const stage = report.stages.find(st => st.name === 'temp_start');
+      const t = report.temp.timing;
+      assert(t['health:linkding'] >= 1000 && t['health:karakeep'] >= 1000, JSON.stringify(t));
+      assert(t.waitSumMs > stage.ms, 'the waits overlapped: ' + JSON.stringify({ t, ms: stage.ms }));
+      assert(stage.waitMs <= stage.ms && t.waitMs === stage.waitMs, 'temp_start waits on the wall clock: ' + JSON.stringify({ wait: stage.waitMs, ms: stage.ms }));
+      assert(report.timing.totals.waitMs <= stage.ms, 'the run total counts them once');
+      assert(readFileSync(join(stateDirFor('parallel-waits'), 'pbp-it-' + report.runId, 'summary.zh.md'), 'utf8').includes('墙钟'), 'the summary names the measure');
     }
     {
       const docker = fakeDocker({ states: {} });

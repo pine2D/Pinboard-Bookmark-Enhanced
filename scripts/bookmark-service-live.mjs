@@ -1587,6 +1587,21 @@ export class LiveRun {
     add(this.openPhase);
     if (this.currentModule?.record) add(this.currentModule.record.timing ||= {});
   }
+  // The wall-clock union of wait spans (a span still open ends now), charged
+  // once; returns { unionMs, sumMs }.
+  chargeWaits(spans) {
+    const now = Date.now();
+    const list = spans.map(s => [s.start, s.end || now]).sort((a, b) => a[0] - b[0]);
+    let unionMs = 0, sumMs = 0, from = 0, to = 0;
+    for (const [a, b] of list) {
+      sumMs += b - a;
+      if (a > to) { unionMs += to - from; from = a; to = b; } else if (b > to) to = b;
+    }
+    unionMs += to - from;
+    spans.length = 0;
+    this.noteWait('wait', unionMs);
+    return { unionMs, sumMs };
+  }
   // Module phases (t.phase) are timed one after the other; the next phase,
   // or the module's end, closes the open one.
   closePhase() {
@@ -2206,6 +2221,8 @@ export class LiveRun {
       }
     });
     check(netOk, 'temp_network_failed');
+    // Health and postgres waits of the branches below (see chargeWaits).
+    const waits = [];
     const forwards = [...need].map(i => `${TEMP_INSTANCES[i].edgePort}=${names[i]}:${TEMP_INSTANCES[i].port}`).join(',');
     const publish = [...need].flatMap(i => ['-p', '127.0.0.1::' + TEMP_INSTANCES[i].edgePort]);
     // From here the containers start side by side (E25): the edge, each
@@ -2255,7 +2272,7 @@ export class LiveRun {
         created(names.postgres);
         await docker.run(['run', '-d', '--pull', 'never', '--name', names.postgres, '--label', 'pbp-it=' + this.runId, '--network', names.net, '--memory', '512m', '--tmpfs', '/var/lib/postgresql:rw,size=256m', '--env-file', env, images.postgres]);
         rmSync(env, { force: true });
-        await sub('postgres_ready', () => this.waitFor(async () => (await docker.exec(names.postgres, ['pg_isready', '-U', 'linkding', '-d', 'linkding'], { allowFail: true })).code === 0, 60000, names.postgres, 'container_unhealthy'));
+        await sub('postgres_ready', () => this.waitFor(async () => (await docker.exec(names.postgres, ['pg_isready', '-U', 'linkding', '-d', 'linkding'], { allowFail: true })).code === 0, 60000, names.postgres, 'container_unhealthy', waits));
         await startLinkding('linkding-pg', { LD_DB_ENGINE: 'postgres', LD_DB_HOST: names.postgres, LD_DB_PORT: '5432', LD_DB_DATABASE: 'linkding', LD_DB_USER: 'linkding', LD_DB_PASSWORD: pgPassword });
       }),
       karakeep: () => edgeReady.then(() => sub('run:karakeep', async () => {
@@ -2280,7 +2297,7 @@ export class LiveRun {
           const data = r.ok ? await r.json() : {};
           return ['healthy', 'ok'].includes(data.status);
         } catch { return false; }
-      }, 120000, names[instance], 'container_unhealthy'));
+      }, 120000, names[instance], 'container_unhealthy', waits));
     };
     const token = instance => sub('token:' + instance, async () => {
       const inst = this.instances[instance];
@@ -2306,21 +2323,33 @@ export class LiveRun {
       }
       this.addSecret(inst.token);
     });
-    await Promise.all([edgeReady, ...[...need].map(async instance => {
-      await start[instance]();
-      await edgeReady;
-      await health(instance);
-      await token(instance);
-    })]);
+    try {
+      await Promise.all([edgeReady, ...[...need].map(async instance => {
+        await start[instance]();
+        await edgeReady;
+        await health(instance);
+        await token(instance);
+      })]);
+    } finally {
+      // Waits of parallel branches count once on the wall clock; a branch
+      // still waiting when another failed is counted up to now.
+      const { unionMs, sumMs } = this.chargeWaits(waits);
+      Object.assign(this.report.temp.timing, { waitMs: unionMs, waitSumMs: sumMs });
+      this.persist();
+    }
     this.report.instances = Object.fromEntries(Object.values(this.instances).map(i => [i.id, { service: i.service, base: i.base }]));
     this.persist();
   }
 
-  async waitFor(read, timeoutMs, label, code) {
+  // `spans`: a section whose waits run side by side collects them there and
+  // charges their wall-clock union itself (chargeWaits), not their sum.
+  async waitFor(read, timeoutMs, label, code, spans = null) {
     const started = Date.now(), end = started + timeoutMs;
+    const span = { start: started, end: 0 };
+    if (spans) spans.push(span);
     try {
       while (Date.now() < end) { this.throwIfFatal(); if (await read()) return; await sleep(1000); }
-    } finally { this.noteWait('wait', Date.now() - started); }
+    } finally { span.end = Date.now(); if (!spans) this.noteWait('wait', span.end - started); }
     void label;
     fail(code);
   }
@@ -3552,7 +3581,8 @@ export class LiveRun {
     const tt = r.timing?.totals || {};
     // timingSummary() runs in conclude(); a run cut off before it has none.
     if (!('modulesMs' in tt)) lines.push(`- 耗时分类：未统计（运行未正常结束${r.stages?.length ? '，见上方阶段耗时' : ''}）`);
-    else lines.push(`- 耗时分类：容器启动 ${sec(tt.containerStartMs || 0)}，浏览器启动 ${sec(tt.browserStartMs || 0)}，连接 ${sec(tt.connectMs || 0)}，模块 ${sec(tt.modulesMs || 0)}，等待 ${sec(tt.waitMs || 0)}，节流等待 ${sec(tt.throttleMs || 0)}，清理 ${sec(tt.cleanupMs || 0)}`);
+    else lines.push(`- 耗时分类：容器启动 ${sec(tt.containerStartMs || 0)}，浏览器启动 ${sec(tt.browserStartMs || 0)}，连接 ${sec(tt.connectMs || 0)}，模块 ${sec(tt.modulesMs || 0)}，等待 ${sec(tt.waitMs || 0)}（并行区段按墙钟并集计），节流等待 ${sec(tt.throttleMs || 0)}，清理 ${sec(tt.cleanupMs || 0)}`);
+    if (r.temp?.timing && 'waitSumMs' in r.temp.timing) lines.push(`- 容器启动等待：墙钟 ${sec(r.temp.timing.waitMs || 0)}，各并行分支合计 ${sec(r.temp.timing.waitSumMs || 0)}（等待总计只计墙钟）`);
     if (r.timing?.slowest?.length) lines.push(`- 最慢 5 个阶段：${r.timing.slowest.map(x => `${x.name} ${sec(x.ms)}（${x.requests} 次请求${x.throttleMs ? `，节流 ${sec(x.throttleMs)}` : ''}${x.waitMs ? `，等待 ${sec(x.waitMs)}` : ''}）`).join('；')}`);
     lines.push('', '## 失败与证据');
     const bad = r.modules.filter(m => m.status !== 'passed');
