@@ -526,6 +526,72 @@ try {
       assert.equal(reports[0].failure.code, 'budget_exceeded_plan');
       assert.equal(reports[0].cleanup.complete, true);
     }
+    // Rounds (E8): a selection over one run's caps is packed into the fewest
+    // runs each within every cap, from the rows alone (the same answer each
+    // time); past three on the user target the plan fails and names the
+    // modules left over; --round N runs one of them.
+    {
+      const userAll = live.selectModules('all', { target: 'user', services: ['linkding', 'karakeep', 'pinboard'] }).selected;
+      assert.equal(live.buildPlan({ target: 'user', selected: userAll }).withinCaps, false, 'all modules do not fit one user round');
+      const packed = live.packRounds(userAll, 'user');
+      assert.deepEqual(live.packRounds([...userAll].reverse(), 'user').rounds.map(r => [...r.modules].sort()).sort(), packed.rounds.map(r => [...r.modules].sort()).sort(), 'the order given does not change the rounds');
+      assert.deepEqual(live.packRounds(userAll, 'user'), packed, 'recomputed the same');
+      assert.deepEqual([packed.ok, packed.exhaustive, packed.count, packed.maxRounds, packed.overflow, packed.unfit], [true, true, 2, 3, [], []]);
+      const placed = packed.rounds.flatMap(r => r.modules);
+      assert.deepEqual([...placed].sort(), userAll.map(m => m.id).sort(), 'every module in exactly one round');
+      for (const round of packed.rounds) {
+        const mods = userAll.filter(m => round.modules.includes(m.id));
+        assert.deepEqual(round.modules, mods.map(m => m.id), 'registry order inside a round');
+        const plan = live.buildPlan({ target: 'user', selected: mods });
+        assert.equal(plan.withinCaps, true, plan.problems.join(','));
+        for (const [instance, row] of Object.entries(round.instances)) {
+          const cap = live.BUDGETS.user[instance];
+          assert(row.bookmarks <= cap.bookmarks && row.node + row.cleanupReserve <= cap.node && row.browser <= cap.browser && row.tags <= cap.tags, instance);
+        }
+        assert(round.fakeAi <= live.BUDGETS.user.run.fakeAi && round.worstCaseSeconds <= live.BUDGETS.user.run.runMinutes * 60);
+      }
+      assert.deepEqual([packed.caps.linkding.bookmarks, packed.caps.karakeep.bookmarks, packed.caps.pinboard.bookmarks, packed.caps.linkding.node, packed.caps.linkding.cleanupReserve, packed.caps.linkding.browser, packed.caps.karakeep.browser, packed.caps.run.fakeAi, packed.caps.run.runMinutes], [15, 12, 8, 250, 60, 350, 500, 60, 20]);
+      assert.deepEqual(live.packRounds(live.selectModules('all').selected, 'temp').count, 1);
+      // Seven Karakeep bookmarks each: one module per round, four rounds.
+      const big = Array.from({ length: 4 }, (_, i) => ({ ...base, id: 'big.' + i, services: ['karakeep'], budget: { bookmarks: 7, urls: 7, node: 10, browser: 20, ai: 0, tags: 0, seconds: 30 } }));
+      const overRound = { ...base, id: 'big.alone', services: ['karakeep'], budget: { bookmarks: 13, urls: 13, node: 10, browser: 20, seconds: 30 } };
+      const fourRows = [...big, overRound];
+      const four = live.packRounds(live.selectModules('*', { target: 'user', services: ['karakeep'], modules: fourRows }).selected, 'user');
+      assert.deepEqual([four.ok, four.count, four.overflow, four.unfit], [false, 4, ['karakeep.big.3'], ['karakeep.big.alone']]);
+      const roundSel = (values, rows = undefined) => live.resolveSelection({ values: { target: 'user', service: 'linkding,karakeep,pinboard', scenario: 'all', ...values }, flags: new Set() }, rows ? { modules: rows } : {});
+      assert.deepEqual(roundSel({ round: '2' }).selected.map(m => m.id), packed.rounds[1].modules);
+      assert.deepEqual(roundSel({ round: '2' }).round, { n: 2, of: 2, modules: packed.rounds[1].modules });
+      assert.throws(() => roundSel({ round: '3' }), e => e.code === 'round_out_of_range');
+      for (const bad of ['0', 'x', '-1', '1.5']) assert.throws(() => roundSel({ round: bad }), e => e.code === 'round', bad);
+      assert.throws(() => roundSel({ round: '1', service: 'karakeep' }, fourRows), e => e.code === 'rounds_exceeded');
+      // --plan: rounds and their totals; an error past three rounds.
+      const planOut = async (argv, rows) => {
+        const write = process.stdout.write, chunks = [];
+        process.stdout.write = (chunk, cb) => { chunks.push(String(chunk)); if (typeof cb === 'function') cb(); return true; };
+        process.env.PBP_LIVE_STATE_DIR = stateDirFor('rounds');
+        try { return { code: await live.main(argv, rows ? { modules: rows } : {}), value: JSON.parse(chunks.join('')) }; } finally { process.stdout.write = write; }
+      };
+      const shown = await planOut(['--plan', '--target', 'user', '--service', 'linkding,karakeep,pinboard', '--scenario', 'all']);
+      assert.equal(shown.code, 0, 'over one round but within two: the plan stands');
+      assert.equal(shown.value.withinCaps, false);
+      assert.deepEqual(shown.value.rounds.rounds, packed.rounds);
+      assert(shown.value.rounds.hint.includes('--round 1..2'), shown.value.rounds.hint);
+      const second = await planOut(['--plan', '--target', 'user', '--service', 'linkding,karakeep,pinboard', '--scenario', 'all', '--round', '2']);
+      assert.deepEqual([second.value.withinCaps, second.value.modules.map(m => m.id), second.value.round.n, second.value.rounds.count], [true, packed.rounds[1].modules, 2, 2]);
+      const tooMany = await planOut(['--plan', '--target', 'user', '--service', 'karakeep', '--scenario', '*', '--authorization', 'rounds-test'], fourRows);
+      assert.equal(tooMany.code, 1);
+      assert(tooMany.value.problems.includes('rounds'));
+      assert.deepEqual([tooMany.value.rounds.overflow, tooMany.value.rounds.unfit], [['karakeep.big.3'], ['karakeep.big.alone']]);
+      // --run --round records which round it ran.
+      const state = stateDirFor('round-run');
+      process.env.PBP_LIVE_STATE_DIR = state;
+      const code = await quiet(() => live.main(['--run', '--target', 'user', '--service', 'linkding,karakeep,pinboard', '--scenario', 'all', '--round', '2', '--linkding', 'http://127.0.0.1:9', '--karakeep', 'http://127.0.0.1:10', '--confirm-karakeep-no-auto-ai', '--allow-dirty', '--authorization', 'round-run', '--credentials', join(dir, 'absent.json')]));
+      assert.equal(code, 1);
+      const roundReport = JSON.parse(readFileSync(join(state, readdirSync(state).find(n => /^pbp-it-[0-9a-f-]{36}$/.test(n)), 'report.json'), 'utf8'));
+      assert.equal(roundReport.failure.code, 'credentials_unreadable');
+      assert.deepEqual(roundReport.round, { n: 2, of: 2, modules: packed.rounds[1].modules });
+      assert.deepEqual(roundReport.selected, packed.rounds[1].modules);
+    }
   }
 
   // ---------------------------------------------------------------------

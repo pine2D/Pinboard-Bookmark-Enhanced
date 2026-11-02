@@ -170,7 +170,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // ---------------------------------------------------------------------------
 
 const BOOL_FLAGS = new Set(['--run', '--plan', '--list', '--help', '--read-only', '--confirm-karakeep-no-auto-ai', '--allow-dirty', '--shots', '--headed']);
-const VALUE_FLAGS = new Set(['--target', '--scenario', '--service', '--linkding', '--karakeep', '--credentials', '--cleanup', '--shots-dir', '--authorization', '--ext-root', '--rerun-failed']);
+const VALUE_FLAGS = new Set(['--target', '--scenario', '--service', '--linkding', '--karakeep', '--credentials', '--cleanup', '--shots-dir', '--authorization', '--ext-root', '--rerun-failed', '--round']);
 
 export function parseArgs(argv) {
   const flags = new Set(), values = {}, errors = [];
@@ -400,7 +400,19 @@ export function resolveSelection({ values = {}, flags = new Set() }, { modules =
     changed = { base: read.base, mergeBase: read.mergeBase || '', files: read.files.length, ...routed };
     if (routed.uncovered.length) changed.note = `未覆盖：${routed.uncovered.length} 个改动的产品运行时文件没有模块声明（uncovered），真实测试不检查它们`;
   }
-  return { target, services, scenario, selected, skipped, rerunOf, changed };
+  // --round N: the N-th of the rounds this selection packs into.
+  let round = null;
+  if (values.round !== undefined) {
+    check(/^[1-9][0-9]?$/.test(values.round), 'round');
+    const packed = packRounds(selected, target);
+    check(packed.ok, 'rounds_exceeded');
+    const n = Number(values.round);
+    check(n <= packed.count, 'round_out_of_range');
+    const keep = new Set(packed.rounds[n - 1].modules);
+    selected = selected.filter(m => keep.has(m.id));
+    round = { n, of: packed.count, modules: [...keep] };
+  }
+  return { target, services, scenario, selected, skipped, rerunOf, changed, round };
 }
 
 export function resolveBudget(mod) {
@@ -572,6 +584,66 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
     karakeepWritesRequireAutoAiDisabled: target === 'user' && selected.some(m => m.service === 'karakeep' && m.needs?.writes !== false),
     cleanup: 'ledger bookmarks, ledger lists and zero-use run-prefix tags; then a read-only pass over the URL pool',
     withinCaps: problems.length === 0, problems,
+  };
+}
+
+// Rounds (E8): a selection over one run's caps is packed into as few runs
+// ("rounds") as the caps allow, each one a selection buildPlan accepts
+// whole (bookmarks, URLs, Node with the cleanup reserve, browser, tags,
+// lists, fake AI, module and run time). The packing reads the registry rows
+// only, so the same selection always gives the same rounds. A module over
+// the caps on its own fits no round. On the user target more rounds than one
+// authorisation allows (3) is an error that names the modules left over.
+export const ROUND_SEARCH_LIMIT = 50000;
+export function packRounds(selected, target, { maxRounds = BUDGETS[target].run.roundsPerAuthorization ?? null, searchLimit = ROUND_SEARCH_LIMIT } = {}) {
+  const caps = BUDGETS[target];
+  const order = new Map(selected.map((m, i) => [m.id, i]));
+  const byOrder = mods => [...mods].sort((a, b) => order.get(a.id) - order.get(b.id));
+  const fits = mods => buildPlan({ target, selected: byOrder(mods) }).withinCaps;
+  const unfit = selected.filter(m => !fits([m]));
+  // Largest first: its share of the tightest cap it touches.
+  const runSeconds = caps.run.runMinutes * 60 - SETUP_ALLOWANCE_SECONDS[target];
+  const weight = m => {
+    const b = resolveBudget(m), c = caps[m.instance];
+    return Math.max(b.seconds / runSeconds, b.bookmarks / c.bookmarks, b.browser / c.browser, b.node / (c.node - c.cleanupReserve), b.tags / (c.tags || 1), b.ai / caps.run.fakeAi);
+  };
+  // Ties by id, not by the order given: the rounds depend on the rows alone.
+  const items = selected.filter(m => !unfit.includes(m)).sort((a, b) => weight(b) - weight(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  // First fit, unlimited rounds: always succeeds, an upper bound.
+  const firstFit = () => {
+    const bins = [];
+    for (const m of items) { const bin = bins.find(b => fits([...b, m])); if (bin) bin.push(m); else bins.push([m]); }
+    return bins;
+  };
+  let bins = firstFit(), exhaustive = true, steps = 0;
+  // Then the fewest rounds by depth-first search, k = 1, 2, ... below it.
+  for (let k = 1; k < bins.length; k++) {
+    const trial = [];
+    const place = i => {
+      if (i === items.length) return true;
+      if (++steps > searchLimit) return false;
+      for (let b = 0; b < trial.length; b++) {
+        trial[b].push(items[i]);
+        if (fits(trial[b]) && place(i + 1)) return true;
+        trial[b].pop();
+      }
+      if (trial.length < k) { trial.push([items[i]]); if (place(i + 1)) return true; trial.pop(); }
+      return false;
+    };
+    if (place(0)) { bins = trial.map(b => [...b]); break; }
+    if (steps > searchLimit) { exhaustive = false; break; }
+  }
+  const rounds = bins.map(byOrder).sort((a, b) => order.get(a[0].id) - order.get(b[0].id)).map((mods, i) => {
+    const plan = buildPlan({ target, selected: mods });
+    return {
+      n: i + 1, modules: mods.map(m => m.id), fakeAi: plan.fakeAi.calls, worstCaseSeconds: plan.limits.worstCaseSeconds + plan.limits.setupAllowanceSeconds,
+      instances: Object.fromEntries(Object.entries(plan.budget).map(([instance, row]) => [instance, { bookmarks: row.bookmarks, node: row.node, cleanupReserve: row.cleanupReserve, browser: row.browser, tags: row.tags, ai: row.ai }])),
+    };
+  });
+  const overflow = maxRounds ? rounds.slice(maxRounds).flatMap(r => r.modules) : [];
+  return {
+    count: rounds.length, maxRounds, ok: !unfit.length && !overflow.length, exhaustive, rounds, overflow, unfit: unfit.map(m => m.id),
+    caps: Object.fromEntries(Object.entries(caps).filter(([k]) => k !== 'run').map(([k, c]) => [k, { bookmarks: c.bookmarks, node: c.node, cleanupReserve: c.cleanupReserve, browser: c.browser, tags: c.tags }]).concat([['run', { fakeAi: caps.run.fakeAi, runMinutes: caps.run.runMinutes }]])),
   };
 }
 
@@ -1768,12 +1840,13 @@ export class LiveRun {
     check(!errors.length, errors[0] || 'arguments');
     this.extRoot = resolveExtRoot(values['ext-root']);
     this.report.extRoot = this.extRoot;
-    const { target, scenario, selected, skipped, rerunOf, changed } = resolveSelection(this.opts, { modules: this.opts.modules || MODULES, dir: this.extRoot, changedFiles: this.opts.changedFiles });
+    const { target, scenario, selected, skipped, rerunOf, changed, round } = resolveSelection(this.opts, { modules: this.opts.modules || MODULES, dir: this.extRoot, changedFiles: this.opts.changedFiles });
     this.target = target;
     this.report.target = target;
     this.report.scenario = scenario;
     if (rerunOf) this.report.rerunOf = rerunOf;
     if (changed) this.report.changed = changed;
+    if (round) this.report.round = round;
     check(selected.length, 'no_modules_selected');
     this.report.skipped = skipped;
     this.selected = selected;
@@ -1782,6 +1855,10 @@ export class LiveRun {
     this.report.selected = selected.map(m => m.id);
     this.shotsEnabled = flags.has('--shots') || !!values['shots-dir'];
     this.plan = buildPlan({ target, selected, skipped, shotsEnabled: this.shotsEnabled, headedFlag: flags.has('--headed') });
+    if (!this.plan.withinCaps) {
+      const packed = packRounds(selected, target);
+      if (packed.ok) console.error(`Over one run's caps: run it as --round 1..${packed.count} (--plan shows the rounds)`);
+    }
     check(this.plan.withinCaps, 'budget_exceeded_plan');
     this.caps = {};
     this.reserve = {};
@@ -3353,6 +3430,7 @@ export class LiveRun {
     };
     lines.push(`# 真实测试摘要 ${r.runId}`);
     lines.push(`- 结论：${r.passed ? '通过' : '未通过'}${r.failure ? `（${r.failure.phase}：${r.failure.code}）` : ''}；目标 ${r.target || '未定'}；工具 HEAD ${(r.head || '未知').slice(0, 12)}；工作区干净：${r.clean === null ? '未检查' : r.clean ? '是' : '否'}${r.extRoot && r.extRoot !== ROOT ? `；产品 HEAD ${(r.productHead || '未知').slice(0, 12)}（--ext-root）` : ''}`);
+    if (r.round) lines.push(`- 轮次：第 ${r.round.n}/${r.round.of} 轮（--round，按模块声明编排）`);
     if (r.rerunOf) lines.push(`- 重跑上一轮未通过的模块：来源 ${oneLine(r.rerunOf.runId, 40)}，${(r.rerunOf.modules || []).length} 个`);
     if (r.changed) lines.push(`- 按改动选择：基准 ${oneLine(r.changed.base, 40)}，改动的产品文件 ${Object.keys(r.changed.byFile || {}).length + (r.changed.uncovered || []).length} 个；未覆盖 ${(r.changed.uncovered || []).length} 个${(r.changed.uncovered || []).length ? '：' + oneLine(r.changed.uncovered.slice(0, 5).join('，'), 200) : ''}`);
     for (const path of (Array.isArray(r.foreignLocks) ? r.foreignLocks : []).slice(-2)) lines.push(`- 已释放外来版本的陈旧锁：${oneLine(path, 200)}（报告留给人工核对）`);
@@ -3770,6 +3848,8 @@ function printHelp() {
     '--changed [BASE] picks the modules whose declared product files changed since the merge base of BASE (default main)',
     '  and HEAD or in the worktree, in the tree the extension loads; with --scenario it takes the intersection. --plan',
     '  lists changed product files no module declares under changed.uncovered.',
+    '--plan packs a selection over one run\'s caps into the fewest rounds within every cap (rounds.rounds, with totals);',
+    '  more than 3 on --target user is an error naming the modules left over. --run --round N runs round N only.',
     '--rerun-failed REPORT runs only the modules that did not pass in REPORT, on its target and services (the user target',
     '  takes the same bases again); refused while that report\'s cleanup is unfinished. The new report names its runId.',
     '--ext-root DIR loads the extension from another worktree (e.g. a `git worktree add --detach` of a fix commit); it must',
@@ -3795,7 +3875,7 @@ export async function main(argv = process.argv.slice(2), { dockerExec, modules, 
     try {
       check(!opts.errors.length, opts.errors[0] || 'arguments');
       const extRoot = resolveExtRoot(opts.values['ext-root']);
-      const { target, services, scenario, selected, skipped, rerunOf, changed } = resolveSelection(opts, { modules: modules || MODULES, dir: extRoot, changedFiles });
+      const { target, services, scenario, selected, skipped, rerunOf, changed, round } = resolveSelection(opts, { modules: modules || MODULES, dir: extRoot, changedFiles });
       // Nothing to run for these files: say which were uncovered all the same.
       if (!selected.length && changed) {
         await new Promise(r => process.stdout.write(JSON.stringify({ error: 'no_modules_selected', changed }, null, 2) + '\n', r));
@@ -3808,11 +3888,17 @@ export async function main(argv = process.argv.slice(2), { dockerExec, modules, 
       if (rerunOf) plan.rerunOf = rerunOf;
       if (changed) plan.changed = changed;
       plan.extRoot = extRoot;
+      // The rounds of the whole selection (not only --round's), and which
+      // one this plan shows.
+      if (round) plan.round = round;
+      plan.rounds = round ? packRounds(resolveSelection({ ...opts, values: { ...opts.values, round: undefined } }, { modules: modules || MODULES, dir: extRoot, changedFiles }).selected, target) : packRounds(selected, target);
+      if (!plan.withinCaps && plan.rounds.ok) plan.rounds.hint = `整体超出一轮的上限：按 --round 1..${plan.rounds.count} 分轮运行（每轮各用一次授权）`;
+      if (!plan.rounds.ok) plan.problems.push('rounds');
       if (target === 'user') plan.bases = Object.fromEntries(services.filter(s => opts.values[s]).map(s => [s, validateBase(opts.values[s])]));
       // Rounds left under the named authorisation: a local count, no credential.
       plan.authorization = target === 'user' ? authorizationStatus(stateDir(), opts.values.authorization || '', BUDGETS.user.run.roundsPerAuthorization) : { required: false };
       await new Promise(r => process.stdout.write(JSON.stringify(plan, null, 2) + '\n', r));
-      return plan.withinCaps && plan.authorization.left !== 0 ? 0 : 1;
+      return (plan.withinCaps || plan.rounds.ok) && !plan.problems.includes('rounds') && plan.authorization.left !== 0 ? 0 : 1;
     } catch (error) {
       await new Promise(r => process.stdout.write(JSON.stringify({ error: failureCode(error) }) + '\n', r));
       return 1;
