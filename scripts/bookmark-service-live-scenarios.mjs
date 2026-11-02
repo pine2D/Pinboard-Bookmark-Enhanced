@@ -1913,10 +1913,10 @@ export const SELFHOSTED_MODULES = [
     id: 'sh.options-connect',
     services: ['linkding', 'karakeep'],
     surfaces: ['options', 'popup'],
-    features: ['connect-before-switch', 'connect-errors', 'connect-aria-invalid', 'disconnect', 'pinboard-roundtrip'],
-    fixRefs: ['G8', 'G22', 'G28'],
+    features: ['tag-panel-follows-service', 'connect-before-switch', 'connect-errors', 'connect-aria-invalid', 'failed-connect-keeps-credentials', 'disconnect', 'pinboard-roundtrip'],
+    fixRefs: ['G5', 'G8', 'G22', 'G28'],
     needs: needs({ target: 'temp', shots: true }),
-    budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 120, karakeep: 200 }, ai: 0, tags: 0, seconds: 90, tagReads: 3 },
+    budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 120, karakeep: 200 }, ai: 0, tags: 0, seconds: 120, tagReads: 3 },
     files: [],
     settings: {},
     async steps(t) {
@@ -1924,73 +1924,106 @@ export const SELFHOSTED_MODULES = [
       const conn = () => t.sw(async () => { const c = await pbpReadBookmarkConnection(); return { service: c.service, account: c.account || '' }; });
       const original = await conn();
       t.expectEq(original.service, s, 'connected_service');
-      const writesBefore = await t.writes();
-      let options = await t.openOptions();
-      await t.phase('options_switch_needs_connect');
-      await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
-      await t.sleep(800);
-      t.expectEq((await conn()).service, s, 'switched_before_connect');
-      await options.locator(`input[name="bookmark-service"][value="${s}"]`).check();
+      // bookmarkService as another tab or a synced device changes it: a real
+      // storage event in the area ordinary settings live in.
+      const storeService = value => t.sw(async value => {
+        const { optSyncEnabled } = await chrome.storage.local.get('optSyncEnabled');
+        await (optSyncEnabled === true ? chrome.storage.sync : chrome.storage.local).set({ bookmarkService: value });
+      }, value);
 
-      const connectError = async (code, invalidSelector) => {
-        const status = options.locator(`#connect-${s}-status`);
-        await options.locator(`#connect-${s}`).click();
-        await t.until(async () => { const text = (await status.innerText()).trim(); return text && !/Connecting|Checking/i.test(text); }, code + '_status', 20000);
-        const text = (await status.innerText()).trim();
-        t.note(code, text.slice(0, 200));
-        t.expect(!/^Connected/.test(text), code + '_connected');
-        t.expectEq(await options.locator(invalidSelector).getAttribute('aria-invalid'), 'true', code + '_aria_invalid');
-        return text;
-      };
-      await t.phase('options_wrong_token');
-      await options.locator(`#opt-${s}-token`).fill('pbp-it-wrong-token-' + t.runId.slice(0, 8));
-      const tokenText = await connectError('wrong_token', `#opt-${s}-token`);
-      const auth = t.message('bookmarkConnectErrAuth');
-      if (auth) t.expect(tokenText.includes(auth.split('$')[0].trim().slice(0, 20)), 'wrong_token_not_auth');
-      await t.shot(options, 'wrong-token', { surface: 'options', keys: [`#connect-${s}`] });
-      await t.axe(options, 'wrong-token');
-      await t.phase('options_wrong_port');
-      const other = t.otherBases().find(b => b.service !== s);
-      if (other) {
-        await options.locator(`#opt-${s}-url`).fill(other.base);
-        await connectError('wrong_port', `#opt-${s}-url`);
-      } else t.note('wrong_port', 'skipped: no other instance in this run');
-      await t.phase('options_gateway_empty');
-      await options.locator(`#opt-${s}-url`).fill(t.base);
-      await options.evaluate(s => { const sel = document.getElementById('opt-' + s + '-gateway'); sel.value = 'cloudflare'; sel.dispatchEvent(new Event('change', { bubbles: true })); }, s);
-      const gwSince = t.now();
-      await connectError('gateway_empty', `#opt-${s}-cf-id`);
-      t.expectEq(t.requests({ since: gwSince }).length, 0, 'gateway_empty_request');
-      t.expectEq(await t.writes(), writesBefore, 'connect_errors_wrote');
-      t.expect(JSON.stringify(await conn()) === JSON.stringify(original), 'failed_connect_changed_connection');
-      await options.close();
+      // Landed fix first (49beb7a8, 0638cf0c): the Tags panel follows a
+      // stored service change without a reload, both ways, and the popup
+      // opens normally after the round trip through an unconfigured Pinboard.
+      await t.part('tag_panel_roundtrip', ['G5'], async () => {
+        await t.phase('options_tag_panel_roundtrip');
+        const options = await t.openOptions('tags');
+        const state = () => options.evaluate(() => document.getElementById('panel-tags')?.dataset.tagGovState || '');
+        await t.until(async () => (await state()) === 'pinboard-only', 'tag_panel_pinboard_only');
+        await storeService('pinboard');
+        await t.until(async () => (await state()) !== 'pinboard-only', 'tag_panel_followed_pinboard', 8000);
+        t.note('tagPanelUnderPinboard', { state: await state(), tokenPrompt: await options.locator('#tag-gov-need-token').isVisible() });
+        t.expect(await options.locator('#tag-gov-need-token').isVisible(), 'tag_panel_token_prompt');
+        await storeService(s);
+        await t.until(async () => (await state()) === 'pinboard-only', 'tag_panel_followed_back', 8000);
+        await options.close();
+        t.expectEq((await conn()).service, s, 'roundtrip_service');
+        const form = await t.openPopup(t.claimUrl());
+        t.expect(await form.popup.locator('#main-section').isVisible(), 'popup_stuck_after_roundtrip');
+        await form.close();
+      });
 
-      await t.phase('options_disconnect');
-      options = await t.openOptions();
-      const disconnect = options.locator(`#disconnect-${s}`);
-      t.expect(await disconnect.count() === 1, 'pending_disconnect_button');
-      await disconnect.click();
-      await options.locator('.confirm-yes').waitFor({ timeout: 5000 });
-      const tokenKey = s + 'Token';
-      const hasToken = () => t.sw(async key => !!(await pbpReadSettingsWithSecrets({ [key]: '' }))[key], tokenKey);
-      t.expect(await hasToken(), 'disconnect_without_confirm');
-      await options.locator('.confirm-yes').click();
-      await t.until(async () => !(await hasToken()), 'disconnect_token_removed', 8000);
-      await options.close();
-      await t.reconnect();
+      // Connect errors: a hint, aria-invalid on the field at fault, no
+      // write, and the stored connection untouched (compared by digest in
+      // the worker; no value leaves it).
+      await t.part('connect_errors', ['G8', 'G22'], async () => {
+        const writesBefore = await t.writes();
+        const stored = await connectionDigest(t);
+        const options = await t.openOptions();
+        const connectError = async (code, invalidSelector) => {
+          const status = options.locator(`#connect-${s}-status`);
+          await options.locator(`#connect-${s}`).click();
+          await t.until(async () => { const text = (await status.innerText()).trim(); return text && !/Connecting|Checking/i.test(text); }, code + '_status', 20000);
+          const text = (await status.innerText()).trim();
+          t.note(code, text.slice(0, 200));
+          t.expect(!/^Connected/.test(text), code + '_connected');
+          t.expectEq(await options.locator(invalidSelector).getAttribute('aria-invalid'), 'true', code + '_aria_invalid');
+          return text;
+        };
+        await t.phase('options_wrong_token');
+        await options.locator(`#opt-${s}-token`).fill('pbp-it-wrong-token-' + t.runId.slice(0, 8));
+        const tokenText = await connectError('wrong_token', `#opt-${s}-token`);
+        const auth = t.message('bookmarkConnectErrAuth');
+        if (auth) t.expect(tokenText.includes(auth.split('$')[0].trim().slice(0, 20)), 'wrong_token_not_auth');
+        await t.shot(options, 'wrong-token', { surface: 'options', keys: [`#connect-${s}`] });
+        await t.axe(options, 'wrong-token');
+        await t.phase('options_wrong_port');
+        const other = t.otherBases().find(b => b.service !== s);
+        if (other) {
+          await options.locator(`#opt-${s}-url`).fill(other.base);
+          await connectError('wrong_port', `#opt-${s}-url`);
+        } else t.note('wrong_port', 'skipped: no other instance in this run');
+        await t.phase('options_gateway_empty');
+        await options.locator(`#opt-${s}-url`).fill(t.base);
+        await options.evaluate(s => { const sel = document.getElementById('opt-' + s + '-gateway'); sel.value = 'cloudflare'; sel.dispatchEvent(new Event('change', { bubbles: true })); }, s);
+        const gwSince = t.now();
+        await connectError('gateway_empty', `#opt-${s}-cf-id`);
+        t.expectEq(t.requests({ since: gwSince }).length, 0, 'gateway_empty_request');
+        t.expectEq(await t.writes(), writesBefore, 'connect_errors_wrote');
+        t.expect(JSON.stringify(await conn()) === JSON.stringify(original), 'failed_connect_changed_connection');
+        t.expectEq(await connectionDigest(t), stored, 'failed_connect_overwrote_credentials');
+        await options.close();
+      });
+
+      // Choosing a service only opens its form; the switch waits for a
+      // successful Connect (decision 6).
+      await t.part('switch_needs_connect', ['G28'], async () => {
+        await t.phase('options_switch_needs_connect');
+        const options = await t.openOptions();
+        await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
+        await t.sleep(800);
+        t.expectEq((await conn()).service, s, 'switched_before_connect');
+        await options.locator(`input[name="bookmark-service"][value="${s}"]`).check();
+        await options.close();
+      });
+
+      await t.part('disconnect', ['G22'], async () => {
+        await t.phase('options_disconnect');
+        const options = await t.openOptions();
+        const disconnect = options.locator(`#disconnect-${s}`);
+        t.expect(await disconnect.count() === 1, 'pending_disconnect_button');
+        await disconnect.click();
+        await options.locator('.confirm-yes').waitFor({ timeout: 5000 });
+        const tokenKey = s + 'Token';
+        const hasToken = () => t.sw(async key => !!(await pbpReadSettingsWithSecrets({ [key]: '' }))[key], tokenKey);
+        t.expect(await hasToken(), 'disconnect_without_confirm');
+        await options.locator('.confirm-yes').click();
+        await t.until(async () => !(await hasToken()), 'disconnect_token_removed', 8000);
+        await options.close();
+      });
+      // Whatever the parts did, the module ends connected as it began.
+      if ((await conn()).service !== s || !(await t.sw(async key => !!(await pbpReadSettingsWithSecrets({ [key]: '' }))[key], s + 'Token'))) await t.reconnect();
       t.expectEq((await conn()).service, s, 'reconnected');
-
-      await t.phase('options_pinboard_roundtrip');
-      options = await t.openOptions();
-      await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
-      await t.sleep(500);
-      await options.locator(`input[name="bookmark-service"][value="${s}"]`).check();
-      await t.sleep(500);
-      await options.close();
-      const form = await t.openPopup(t.claimUrl());
-      t.expect(await form.popup.locator('#main-section').isVisible(), 'popup_stuck_after_roundtrip');
-      await form.close();
-      t.check(`${s}: choosing a service only opens its form; wrong token, wrong port and empty gateway fail with aria-invalid and no writes; Disconnect asks first and removes the token; a Pinboard round trip leaves the popup working`);
+      t.check(`${s}: the Tags panel follows a stored service change both ways and the popup opens after it; wrong token, wrong port and empty gateway fail with aria-invalid, no writes and the stored connection unchanged; choosing a service only opens its form; Disconnect asks first and removes the token`);
     },
   },
 
