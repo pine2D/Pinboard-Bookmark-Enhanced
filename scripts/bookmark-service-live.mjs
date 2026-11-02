@@ -2108,16 +2108,20 @@ export class LiveRun {
 
   async removeTemp() {
     const docker = this.docker;
+    // No record yet (a run killed before startTemp wrote one): every container
+    // and the network are recorded before they are created, so none exists,
+    // and the leftover check below confirms it.
+    const temp = this.report.temp ||= { names: [], network: '' };
     try {
       // A command still running when cleanup began finishes first; only then
       // are the names read, removed and the leftovers checked.
       await docker.settle();
-      const names = [...(this.report.temp?.names || [])].reverse();
+      const names = [...(temp.names || [])].reverse();
       await docker.remove(names);
-      if (this.report.temp?.network) await docker.removeNetwork(this.report.temp.network);
+      if (temp.network) await docker.removeNetwork(temp.network);
       const left = await docker.ownLeftovers();
-      this.report.temp.removed = left.length === 0;
-      this.report.temp.residue = left;
+      temp.removed = left.length === 0;
+      temp.residue = left;
       this.report.cleanup.entries.push({ kind: 'temp', deleted: left.length === 0, names: names.length });
       this.persist();
       return left.length === 0;

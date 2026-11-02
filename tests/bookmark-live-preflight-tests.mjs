@@ -1118,6 +1118,24 @@ try {
     assert.deepEqual([resumed.report.cleanup.complete, resumed.report.temp.removed, resumed.report.cleanup.resumed], [true, true, 1]);
     assert(!existsSync(join(state, 'pbp-it-live.lock')));
   }
+  {
+    // A temp run killed (kill -9, OOM) after its pools were written but
+    // before startTemp recorded anything has no temp record. Every container
+    // and the network are recorded before they are created, so nothing of
+    // that run can exist: --cleanup checks for leftovers and completes,
+    // instead of failing on the missing record at every attempt while the
+    // incomplete report blocks every new run.
+    const state = stateDirFor('resume-early');
+    const id = randomUUID();
+    const early = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] }).report;
+    Object.assign(early, { runId: id, prefix: 'pbp-it-' + id, target: 'temp', scenario: 'linkding.readonly', pools: { linkding: live.poolUrls('temp', id, 'linkding', 3) } });
+    mkdirSync(join(state, 'pbp-it-' + id), { mode: 0o700 });
+    live.writePrivateJson(join(state, 'pbp-it-' + id, 'report.json'), early);
+    const resumed = await dockerChildRun({ state, args: ['--cleanup', join(state, 'pbp-it-' + id, 'report.json')] });
+    assert.equal(resumed.code, 0, resumed.output);
+    assert.deepEqual(resumed.lines.filter(l => l.startsWith('start\t')).map(l => l.split('\t')[1]), ['ps', 'network ls', 'volume ls'], 'only the leftover check');
+    assert.deepEqual([resumed.report.cleanup.complete, resumed.report.temp.removed, resumed.report.temp.residue], [true, true, []]);
+  }
 
   // ---------------------------------------------------------------------
   // Screenshot canary on a plain page (no extension, no network)
