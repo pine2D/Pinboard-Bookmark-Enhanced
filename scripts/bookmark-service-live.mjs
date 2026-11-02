@@ -743,6 +743,8 @@ export function validateBase(raw) {
   return url.origin + '/';
 }
 
+export const LONG_TAG_USER_CODE = 'live_guard_long_tag_user';
+
 export const apiRootFor = (service, base) => (service === 'pinboard' ? PINBOARD_ROOT : base + (service === 'linkding' ? 'api/' : 'api/v1/'));
 
 // How a service keys a tag name, so one tag counts once however a write or a
@@ -771,8 +773,11 @@ export const TAG_WRITE_SOURCES = Object.freeze(['route', 'sw', 'node']);
 // view.lists and view.tags hold what the calling layer has recorded (a
 // deleted bookmark still counts), view.pending the creations it has in
 // flight. An allowed write carries the run-prefix tag keys it names that
-// are not yet known (`tags`), for the layer to reserve as it sends it. With
-// cfg.prefix a write naming any tag outside that prefix is refused.
+// are not yet known (`tags`), for the layer to reserve as it sends it, and
+// `longTag` when it names a tag past linkding's varchar(64) (in code
+// points): the Node layers refuse that on a user instance unless an
+// injected answer stands in for the service. With cfg.prefix a write naming
+// any tag outside that prefix is refused.
 export function liveGuardRule(cfg, view, req) {
   const url = String(req.url || '');
   const method = String(req.method || 'GET').toUpperCase();
@@ -804,7 +809,8 @@ export function liveGuardRule(cfg, view, req) {
     // instance, where cleanup removes ledger tags only. Fatal, not sent.
     const runPrefix = String(cfg.prefix || '');
     if (runPrefix && names.some(name => { const key = liveTagKey(inst.service, name); return key && !key.toLowerCase().startsWith(runPrefix); })) return { ok: false, instance, code: 'live_guard_foreign_tag' };
-    if (!cfg.limits) return decision;
+    const longTag = names.some(name => [...String(name).trim()].length > 64);
+    if (!cfg.limits) return { ...decision, longTag };
     const limit = cfg.limits[instance] || {};
     const cap = key => (typeof limit[key] === 'number' ? limit[key] : 0);
     const pending = (view.pending && view.pending[instance]) || {};
@@ -819,7 +825,7 @@ export function liveGuardRule(cfg, view, req) {
       if (key && key.toLowerCase().startsWith(prefix) && !known.has(key) && !fresh.includes(key)) fresh.push(key);
     }
     if (fresh.length && known.size + fresh.length > cap('tags')) return { ok: false, instance, code: 'live_guard_tag_budget' };
-    return { ...decision, tags: fresh };
+    return { ...decision, tags: fresh, longTag };
   };
   if (inst.service === 'pinboard') {
     // Pinboard writes are GETs: posts/add may only save a private run URL
@@ -1894,6 +1900,7 @@ export class LiveRun {
     const capped = create => {
       const decision = liveGuardRule({ ...this.buildGuardCfg(), writes: true }, this.guardView(), { url, method, body });
       if (!decision.ok) refuse(decision.code);
+      if (decision.longTag && this.target !== 'temp') refuse(LONG_TAG_USER_CODE);
       return { create, tags: decision.tags || [] };
     };
     if (method === 'POST' && segs.length === 1 && segs[0] === 'bookmarks' && !this.cleaning) {
@@ -2683,6 +2690,11 @@ export class LiveRun {
       const fault = this.faults.find(f => faultMatches(f, { on: 'service', instance: decision.instance, method, path: root && url.startsWith(root) ? url.slice(root.length) : url }));
       if (fault) return this.answerFault(route, fault);
     }
+    // An over-long tag reaches only a temporary instance: on a user
+    // instance PostgreSQL would answer 500 and may keep the bookmark without
+    // its tags and outside the ledger (G3). An injected answer above stands
+    // in for the service and is fine.
+    if (decision.longTag && this.target !== 'temp') { this.setFatal(LONG_TAG_USER_CODE); return route.abort('blockedbyclient'); }
     // What leaves counts from here: its run tags now, a creation's slot
     // until its answer is recorded.
     if (decision.tags?.length) this.noteTags(decision.instance, decision.tags.map(key => ({ key })), 'route');

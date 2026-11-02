@@ -222,6 +222,11 @@ try {
       if (row.id.startsWith('sh.')) assert(row.fixRefs.length > 0 && row.services.every(s => s !== 'pinboard'), row.id + ' is a self-hosted row with fix groups');
       assert(['temp', 'user', 'any'].includes(row.needs.target) && ['any', 'on', 'off'].includes(row.needs.sharing), row.id + ' needs');
       assert.equal(typeof row.needs.snapshots, 'boolean', row.id + ' needs.snapshots');
+      // A row that writes an over-long tag says how it reaches the service:
+      // 'server' only on temporary instances, 'injected' answered by faults.
+      assert(['none', 'injected', 'server'].includes(row.needs.longTag), row.id + ' needs.longTag');
+      if (row.needs.longTag === 'server') assert.equal(row.needs.target, 'temp', row.id + ' sends an over-long tag to the service: temporary instances only');
+      if (row.needs.writes !== false && row.features.some(f => /long-tag/.test(f))) assert.notEqual(row.needs.longTag, 'none', row.id + ' writes over-long tags without saying how they reach the service');
       if (row.needs.snapshots) assert.deepEqual(row.services, ['linkding'], row.id + ': only linkding builds HTML snapshots');
       for (const service of row.services) {
         const b = live.resolveBudget({ ...row, service });
@@ -824,6 +829,38 @@ try {
       await routeRun.onRoute(foreign.route);
       assert.deepEqual([foreign.aborted, foreign.continued, sent, routeRun.fatal], ['blockedbyclient', undefined, [], 'live_guard_foreign_tag']);
       assert.equal(routeRun.report.ledger.tags.length, 1, 'a refused write reserves nothing');
+      // An over-long tag (past 64 code points) never reaches a user
+      // instance: fatal and not sent, unless an injected answer stands in
+      // for the service. A temporary instance gets it.
+      const longName = routeRun.prefix + '_' + 'long'.repeat(6);
+      assert(longName.length > 64);
+      for (const [target, injected, outcome] of [['user', false, ['blockedbyclient', undefined, [], live.LONG_TAG_USER_CODE]], ['user', true, [undefined, undefined, [], null]], ['temp', false, [undefined, true, ['POST bookmarks/k7/tags'], null]]]) {
+        routeRun.fatal = null;
+        routeRun.target = target;
+        routeRun.faults = injected ? [{ on: 'service', instance: 'karakeep', method: 'POST', path: /tags$/, status: 500, left: -1, hits: 0 }] : [];
+        sent.length = 0;
+        const long = fakeRoute('bookmarks/k7/tags', 'POST', JSON.stringify({ tags: [{ tagName: longName }] }));
+        await routeRun.onRoute(long.route);
+        assert.deepEqual([long.aborted, long.continued, sent, routeRun.fatal], outcome, 'over-long tag on ' + target + (injected ? ' (injected)' : ''));
+        if (injected) assert.equal(long.fulfilled, true, 'the injected answer stands in for the service');
+      }
+      assert.equal(live.liveGuardRule({ ...cfg, prefix: routeRun.prefix }, { created: [{ instance: 'linkding', id: '1', url: cfg.pools.linkding[0] }] }, { url: cfg.instances.linkding.root + 'bookmarks/1/', method: 'PATCH', body: JSON.stringify({ tag_names: [routeRun.prefix + '_' + 'é'.repeat(64)] }) }).longTag, true, 'code points, not bytes or UTF-16 units: 64 accented letters past the prefix are long');
+      assert.equal(live.liveGuardRule({ ...cfg, prefix: 'pbp-it-x' }, { created: [{ instance: 'linkding', id: '1', url: cfg.pools.linkding[0] }] }, { url: cfg.instances.linkding.root + 'bookmarks/1/', method: 'PATCH', body: JSON.stringify({ tag_names: ['pbp-it-x' + '😀'.repeat(56)] }) }).longTag, false, '64 code points is not long, however many UTF-16 units');
+      routeRun.target = 'user';
+      routeRun.faults = [];
+      routeRun.fatal = null;
+      // The Node API (t.api, t.seed) refuses it on a user instance too.
+      for (const target of ['user', 'temp']) {
+        const nodeRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+        nodeRun.target = target;
+        nodeRun.instances.linkding = { id: 'linkding', service: 'linkding', ...cfg.instances.linkding };
+        nodeRun.caps = { linkding: live.BUDGETS[target].linkding };
+        nodeRun.pools.linkding = cfg.pools.linkding;
+        const body = { url: cfg.pools.linkding[0], title: 't', tag_names: [nodeRun.prefix + '_' + 'long'.repeat(6)] };
+        const attempt = () => nodeRun.nodeGuard('linkding', 'POST', cfg.instances.linkding.root + 'bookmarks/', body);
+        if (target === 'user') { assert.throws(attempt, e => e.code === live.LONG_TAG_USER_CODE && e.fatal === true); assert.equal(nodeRun.fatal, live.LONG_TAG_USER_CODE); }
+        else assert.equal(attempt().create, cfg.pools.linkding[0], 'a temporary instance takes it');
+      }
 
       // A list create without an answer may have made a list nobody recorded:
       // its slot stays held and the next one is not sent. A refusal (4xx)

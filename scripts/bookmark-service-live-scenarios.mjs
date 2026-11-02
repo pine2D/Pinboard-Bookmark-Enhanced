@@ -26,6 +26,12 @@
 //             Chinese summary names the groups next to a failed row
 //   needs     { fakeAi, target: 'temp'|'user'|'any', container, sharing: 'any'|'on'|'off',
 //               headed, shots, pinboard, writes, urls, snapshots }
+//             longTag: 'none' | 'injected' | 'server'. A row that sends a tag
+//             past linkding's 64 characters says so: 'server' lets the
+//             service answer (temporary instances only; the preflight holds
+//             it to needs.target 'temp'), 'injected' has every such write
+//             answered by t.inject. The runner refuses an over-long tag that
+//             would reach a user instance either way (live_guard_long_tag_user).
 //             snapshots: the module waits for linkding's automatic HTML
 //             snapshot. Temporary linkding instances start with automatic
 //             snapshots off; the runner switches them on for such a module
@@ -60,7 +66,7 @@ export const META_DESCRIPTION = 'Public synthetic meta description.';
 
 const NEEDS = Object.freeze({
   fakeAi: false, target: 'any', container: null, sharing: 'any', headed: false,
-  shots: false, pinboard: false, writes: true, snapshots: false,
+  shots: false, pinboard: false, writes: true, snapshots: false, longTag: 'none',
 });
 
 // linkding builds HTML snapshots one at a time in the background. Only the
@@ -777,7 +783,7 @@ export const MODULES = [
     // reproduces it. The module records what the popup shows (notes) and
     // asserts only what must hold before and after the planned fix: no
     // reported success and no request storm.
-    needs: needs({ target: 'temp', container: 'linkding-pg', shots: true }),
+    needs: needs({ target: 'temp', container: 'linkding-pg', shots: true, longTag: 'server' }),
     budget: { bookmarks: 2, urls: 2, node: 12, browser: 80, ai: 0, tags: 1, seconds: 120, tagReads: 1 },
     files: [],
     settings: { offlineQueueEnabled: true },
@@ -1245,7 +1251,7 @@ export const SELFHOSTED_MODULES = [
     surfaces: ['popup'],
     features: ['linkding-long-tag-500', 'linkding-long-tag-not-queued'],
     fixRefs: ['G3', 'G4b'],
-    needs: needs({ target: 'temp', container: 'linkding-pg', shots: true }),
+    needs: needs({ target: 'temp', container: 'linkding-pg', shots: true, longTag: 'server' }),
     budget: { bookmarks: 3, urls: 2, node: 4, browser: 30, ai: 0, tags: 1, seconds: 60, tagReads: 1 },
     files: [],
     settings: { offlineQueueEnabled: true, qsAiTags: false, qsAiSummary: false },
@@ -1276,16 +1282,82 @@ export const SELFHOSTED_MODULES = [
       t.check('linkding-pg: an over-long tag is tag_too_long in the popup and quick save, never queued or replayed');
     },
   },
+  // On any target: every write that carries the over-long tag is answered
+  // by an injected 500 or 502, so the tag never reaches the service (a user
+  // instance's database is not known; PostgreSQL would answer a real 500 and
+  // may keep an untagged bookmark outside the ledger).
   {
     id: 'sh.long-tag-inject',
     services: ['linkding'],
     surfaces: ['popup'],
-    features: ['linkding-long-tag-sqlite', 'linkding-long-tag-500-injected', 'linkding-502-queued'],
+    features: ['linkding-long-tag-500-injected', 'linkding-502-queued'],
     fixRefs: ['G3', 'G4b'],
-    needs: needs(),
+    needs: needs({ longTag: 'injected' }),
     // Injected 5xx creates keep a worker-guard slot each (the creation may
-    // exist): two of the four bookmarks.
-    budget: { bookmarks: 4, urls: 3, node: 5, browser: 40, ai: 0, tags: 1, seconds: 45, tagReads: 1 },
+    // exist): the 500, the 502 and its replay.
+    budget: { bookmarks: 3, urls: 3, node: 4, browser: 40, ai: 0, tags: 1, seconds: 45, tagReads: 1 },
+    files: [],
+    settings: { offlineQueueEnabled: true },
+    async steps(t) {
+      const long = LONG_TAG(t);
+      const createPath = /^bookmarks\/(\?|$)/;
+      const fill = async (popup, title) => {
+        await popup.locator('#title-input').fill(t.prefix + ' ' + title);
+        await popup.locator('#tags-input').fill(long);
+        await popup.locator('#tags-input').press('Enter');
+      };
+      await t.phase('long_tag_injected_500');
+      const failed = t.claimUrl();
+      const fault500 = t.inject({ method: 'POST', path: createPath, status: 500, contentType: 'text/html', body: '<h1>Server Error (500)</h1>' });
+      let form = await t.openPopup(failed);
+      await fill(form.popup, 'long tag 500');
+      const seen = await clickSave(t, form.popup, 'long_tag_500_outcome');
+      t.note('popup500', seen);
+      t.expect(fault500.hits() >= 1, 'injected_500_sent');
+      t.expect(seen.outcome !== 'saved' && seen.outcome !== 'queued', 'injected_500_outcome');
+      t.expectEq((await queue(t)).length, 0, 'injected_500_queued');
+      const settled = await t.writes();
+      await t.sleep(4000);
+      t.expectEq(await t.writes(), settled, 'injected_500_retry_loop');
+      fault500.clear();
+      await form.close();
+
+      await t.phase('long_tag_injected_502');
+      // A 502 is the proxy's, not the tag's: queued as a server failure. The
+      // replay meets the same 502 (never the service): still queued, sent
+      // with the tag, and not set aside as needing attention.
+      const proxied = t.claimUrl();
+      const fault502 = t.inject({ method: 'POST', path: createPath, status: 502, contentType: 'text/html', body: '<h1>502 Bad Gateway</h1>' });
+      form = await t.openPopup(proxied);
+      await fill(form.popup, 'long tag 502');
+      const proxiedSeen = await clickSave(t, form.popup, 'long_tag_502_outcome');
+      t.note('popup502', proxiedSeen);
+      t.expectEq(fault502.hits(), 1, 'injected_502_sent');
+      let q = await queue(t);
+      t.expect(q.length === 1 && q[0].url === proxied, 'injected_502_queued');
+      await form.close();
+      const replaySince = t.now();
+      await drainQueue(t);
+      const replays = createsOf(t, proxied, replaySince);
+      t.expect(fault502.hits() === 2 && replays.length === 1, 'injected_502_replay_sent');
+      t.expect((replays[0].body?.tag_names || []).includes(long), 'injected_502_replay_tag');
+      q = await queue(t);
+      t.expect(q.length === 1 && q[0].url === proxied && !q[0].failure, 'injected_502_still_queued');
+      fault502.clear();
+      await t.sw(async url => { const { offlineQueue = [] } = await chrome.storage.local.get('offlineQueue'); await chrome.storage.local.set({ offlineQueue: offlineQueue.filter(i => i.url !== url) }); }, proxied);
+      t.check('linkding: an injected 500 with an over-long tag is tag_too_long and not queued; an injected 502 is a server failure, queued and replayed with the tag; the tag never reached the service');
+    },
+  },
+  // Temporary SQLite linkding only: the over-long tag reaches the service.
+  {
+    id: 'sh.long-tag-sqlite',
+    services: ['linkding'],
+    surfaces: ['popup'],
+    features: ['linkding-long-tag-sqlite', 'linkding-502-replayed'],
+    fixRefs: ['G3', 'G4b'],
+    // Temp only: SQLite stores the tag, and the replay after a 502 is real.
+    needs: needs({ target: 'temp', longTag: 'server' }),
+    budget: { bookmarks: 3, urls: 3, node: 5, browser: 40, ai: 0, tags: 1, seconds: 45, tagReads: 1 },
     files: [],
     settings: { offlineQueueEnabled: true },
     async steps(t) {
@@ -1303,22 +1375,7 @@ export const SELFHOSTED_MODULES = [
       t.expect(tagsOfRow(t, await t.ownRow(plain)).map(n => n.toLowerCase()).includes(long.toLowerCase()), 'sqlite_long_tag_saved');
       await form.close();
 
-      await t.phase('long_tag_injected_500');
-      const failed = t.claimUrl();
-      const fault500 = t.inject({ method: 'POST', path: /^bookmarks\/(\?|$)/, status: 500, contentType: 'text/html', body: '<h1>Server Error (500)</h1>' });
-      form = await t.openPopup(failed);
-      await fill(form.popup, 'long tag 500');
-      const seen = await clickSave(t, form.popup, 'long_tag_500_outcome');
-      t.note('popup500', seen);
-      t.expect(seen.outcome !== 'saved' && seen.outcome !== 'queued', 'injected_500_outcome');
-      t.expectEq((await queue(t)).length, 0, 'injected_500_queued');
-      const settled = await t.writes();
-      await t.sleep(4000);
-      t.expectEq(await t.writes(), settled, 'injected_500_retry_loop');
-      fault500.clear();
-      await form.close();
-
-      await t.phase('long_tag_injected_502');
+      await t.phase('long_tag_502_replayed');
       const proxied = t.claimUrl();
       const fault502 = t.inject({ method: 'POST', path: /^bookmarks\/(\?|$)/, status: 502, contentType: 'text/html', body: '<h1>502 Bad Gateway</h1>', times: 1 });
       form = await t.openPopup(proxied);
@@ -1332,7 +1389,7 @@ export const SELFHOSTED_MODULES = [
       await drainQueue(t);
       t.expectEq((await queue(t)).length, 0, 'injected_502_replayed');
       t.expect(tagsOfRow(t, await t.ownRow(proxied)).length === 1, 'injected_502_replay_tag');
-      t.check('linkding: SQLite stores an over-long tag; an injected 500 with it is tag_too_long and not queued; an injected 502 is a server failure, queued and replayed');
+      t.check('linkding (temporary SQLite): an over-long tag is stored; after an injected 502 the queued save replays with it');
     },
   },
 
