@@ -3009,6 +3009,71 @@ test("posts/add default remains replace=yes for existing callers", () => {
         }
       }
     });
+    // The other two ownership checks read the receipt under the form's
+    // address too. A summary click that finds an AI cache entry checks
+    // ownership itself (the opening restore may not have run yet, or was
+    // dropped): with the saved block's receipt under the cleaned address and
+    // another summary in the cache, it owns the saved block and leaves the
+    // notes alone instead of appending the cached copy. On a new page the
+    // completed check vouches for "none" under the address the save writes.
+    await testAsync("a summary click and a new page's restore read the receipt under the cleaned address", async () => {
+      const from = popupAiSource.indexOf("function _aiUrlEquivalent");
+      const to = popupAiSource.indexOf('// Unified "no AI key"', from);
+      const blockStart = popupAiSource.indexOf("  const restoreAccount = pbpPopupAiAccount();");
+      const blockEnd = popupAiSource.indexOf('  $id("ai-tags-btn").addEventListener', blockStart);
+      const sumFrom = popupAiSource.indexOf("async function doAISummary(");
+      const sumTo = popupAiSource.indexOf("function _aiResetSummaryActions()", sumFrom);
+      const clean = source.indexOf("function _loadUrlCleanSettings(");
+      assert(from >= 0 && to > from && blockStart >= 0 && blockEnd > blockStart && sumFrom >= 0 && sumTo > sumFrom && clean >= 0,
+        "summary ownership sources missing");
+      const cleaning = (aggressiveMode, customParams) => ({ enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode, customParams, excludeParams: [] });
+      function runtime({ service, urlClean, page, formUrl, notes, bookmark, cached, receipts }) {
+        const fields = { "url-input": { value: formUrl }, "description-input": { value: notes }, "linkding-description-input": { value: "" } };
+        const shown = [];
+        const status = [];
+        const api = new Function("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "pbpAiLoadSummaryOwnership", "_AI_BQ_REGEX_SHARED",
+          "$id", "pbpPopupAiAccount", "pbpPopupAiAccountIsCurrent", "pbpAiFastCached", "pageInfo", "existingBookmark", "settings",
+          "stripTrackingParams", "escapeForExtended", "showSummaryActions", "pbpShouldRestoreCachedSummary", "updateCharCount", "autoResizeTextarea",
+          "hasAIKey", "showSetKeyError", "showStatus", "t",
+          "let bookmarkLookup = { promise: null };" + popupAiSource.slice(from, to) + "\n" + popupAiSource.slice(sumFrom, sumTo) +
+          "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) +
+          "\nfunction start() {" + popupAiSource.slice(blockStart, blockEnd) + "}" +
+          "\nreturn { start, doAISummary, snapshot: pbpAiSummaryOwnershipSnapshot };"
+        )(receipts.pbpAiPageUrlNorm, receipts.pbpAiSummaryRangeValid, receipts.pbpAiLoadSummaryOwnership, _AI_BQ_REGEX_SHARED,
+          id => fields[id] || null, () => "alice", a => a === "alice", async () => cached, { url: page }, bookmark,
+          { bookmarkService: service, urlClean, optShowAiSummary: true }, pageGuardStrip, v => v, c => shown.push(c), () => false, () => {}, () => {},
+          () => true, () => status.push("no key"), (_id, message, kind) => status.push(kind + ": " + message), key => key);
+        return { ...api, fields, shown, status };
+      }
+      for (const [label, urlClean, page] of [["aggressive mode removed ref=", cleaning(true, []), URL + "?ref=abc"],
+        ["a custom parameter was removed", cleaning(false, ["campaign"]), URL + "?campaign=spring"]]) {
+        for (const service of ["pinboard", "karakeep"]) {
+          const where = service + ", " + label;
+          const receipts = summaryReceiptApi({ stripTrackingParams: pageGuardStrip });
+          const formUrl = pageGuardStrip(page, urlClean).cleaned;
+          assert(formUrl === URL && receipts.pbpAiSummaryOwnershipKey("alice", formUrl) !== receipts.pbpAiSummaryOwnershipKey("alice", page),
+            where + ": the case does not separate the two receipt keys");
+
+          const notes = "my note\n\n<blockquote>saved summary</blockquote>";
+          const range = { start: notes.indexOf("<blockquote>"), end: notes.length };
+          await receipts.pbpAiSaveSummaryOwnership("alice", formUrl, notes, range);
+          const click = runtime({ service, urlClean, page, formUrl, notes, bookmark: { extended: notes }, cached: "another summary", receipts });
+          const result = await click.doAISummary(false);
+          await flushMicrotasks();
+          const owned = click.snapshot(notes);
+          assert(result === undefined && click.fields["description-input"].value === notes,
+            where + ": the summary click changed the saved notes: " + JSON.stringify(click.fields["description-input"].value));
+          assert(owned && owned.start === range.start && owned.end === range.end && click.shown.length === 1 && click.status.length === 0,
+            where + ": the summary click did not own the saved block: " + JSON.stringify(owned) + ", actions " + click.shown.length + ", status " + JSON.stringify(click.status));
+
+          const fresh = runtime({ service, urlClean, page, formUrl, notes: "", bookmark: null, cached: null, receipts: summaryReceiptApi({ stripTrackingParams: pageGuardStrip }) });
+          fresh.start();
+          await new Promise(resolve => setTimeout(resolve, 0)); await flushMicrotasks();
+          assert(fresh.snapshot("") === null,
+            where + ": a new page's completed check did not vouch for the cleaned address: " + fresh.snapshot(""));
+        }
+      }
+    });
     function pressCombinedAi(h) {
       const startAt = source.indexOf('  document.addEventListener("keydown", (e) => {\n    if ((e.ctrlKey || e.metaKey) && e.key === "Enter")');
       const endAt = source.indexOf("\n  });\n", startAt);
