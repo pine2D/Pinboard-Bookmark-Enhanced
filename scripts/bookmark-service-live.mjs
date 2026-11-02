@@ -463,6 +463,10 @@ export function liveGuardRule(cfg, view, req) {
     let params;
     try { params = new URL(url).searchParams; } catch (_) { return { ok: false, instance, code: 'live_guard_mutation' }; }
     if (!read || method === 'OPTIONS') return { ok: false, instance, code: 'live_guard_mutation' };
+    // Each judged parameter once: get() reads the first value, a server may
+    // act on the last, so a repeat could delete, save or publish a URL the
+    // guard never judged.
+    if (['url', 'shared', 'tags', 'auth_token', 'replace', 'toread'].some(key => params.getAll(key).length > 1)) return { ok: false, instance, code: 'live_guard_pinboard_params' };
     const endpoint = path.replace(/\/+$/, '');
     const target = params.get('url');
     const mine = created.some(r => r.instance === instance && r.url === target && !r.deleted);
@@ -1302,9 +1306,11 @@ export class LiveRun {
   async pinboardSend(instance, url) {
     const inst = this.instances[instance];
     check(inst?.service === 'pinboard' && pinboardEndpoint(url), 'api_origin', true);
-    let token = '';
-    try { token = new URL(url).searchParams.get('auth_token') || ''; } catch { /* refused below */ }
-    if (!inst.token || token !== inst.token) { this.setFatal('live_guard_pinboard_token'); this.throwIfFatal(); }
+    // Exactly one auth_token, this run's: a second one is what a server
+    // reading the last value would use.
+    let tokens = [];
+    try { tokens = new URL(url).searchParams.getAll('auth_token'); } catch { /* refused below */ }
+    if (!inst.token || tokens.length !== 1 || tokens[0] !== inst.token) { this.setFatal('live_guard_pinboard_token'); this.throwIfFatal(); }
     const gate = this.pinboardGate();
     return gate.run(() => this.pinboardTransport(url));
   }
@@ -1318,6 +1324,7 @@ export class LiveRun {
     const endpoint = pinboardEndpoint(url.href);
     const refuse = code => { this.setFatal(code); throw new HarnessFailure(code, { fatal: true }); };
     if (!PINBOARD_ENDPOINTS.node.includes(endpoint)) refuse('node_guard_pinboard_endpoint');
+    if (url.searchParams.getAll('url').length > 1) refuse('node_guard_pinboard_params');
     if (endpoint === 'posts/delete') {
       const target = url.searchParams.get('url');
       this.writesPossible = true;

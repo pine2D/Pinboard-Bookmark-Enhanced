@@ -418,6 +418,14 @@ try {
       .map(path => [{ url: live.PINBOARD_ROOT + path, method: 'GET' }, false, 'live_guard_pinboard_endpoint']),
     [{ url: 'https://pinboard.in/u:someone/', method: 'GET' }, false, 'live_guard_origin'],
     [{ url: 'https://api.pinboard.in/v2/bookmarks', method: 'GET' }, false, 'live_guard_origin'],
+    // A repeated parameter is refused on every endpoint: a server that reads
+    // the last value would otherwise delete, save or publish what the guard
+    // never judged (third review).
+    [{ url: live.PINBOARD_ROOT + 'posts/delete?url=' + encodeURIComponent(cfg.pools.pinboard[0]) + '&url=' + encodeURIComponent('https://real.example.org/'), method: 'GET' }, false, 'live_guard_pinboard_params'],
+    [{ url: pbAdd(cfg.pools.pinboard[1], 'no') + '&url=' + encodeURIComponent('https://real.example.org/'), method: 'GET' }, false, 'live_guard_pinboard_params'],
+    [{ url: pbAdd(cfg.pools.pinboard[1], 'no') + '&shared=yes', method: 'GET' }, false, 'live_guard_pinboard_params'],
+    ...['tags=x', 'auth_token=b%3A2', 'replace=no', 'toread=yes'].map(extra => [{ url: pbAdd(cfg.pools.pinboard[1], 'no') + '&' + extra, method: 'GET' }, false, 'live_guard_pinboard_params']),
+    [{ url: live.PINBOARD_ROOT + 'posts/get?url=' + encodeURIComponent(cfg.pools.pinboard[0]) + '&url=' + encodeURIComponent('https://real.example.org/'), method: 'GET' }, false, 'live_guard_pinboard_params'],
   ];
   for (const rule of [live.liveGuardRule, transported]) {
     for (const [req, ok, code, kind] of cases) {
@@ -1904,6 +1912,27 @@ try {
     const user = 'pbpsynthetic';
     const hex = '0f1e2d3c4b5a69788796a5b4';
     const token = user + ':' + hex;
+
+    // A LiveRun wired to the mock without a browser, for the Node and route
+    // paths one at a time.
+    const unitRun = (mock, { node = live.BUDGETS.user.pinboard.node } = {}) => {
+      const r = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [], pinboard: { transport: mock.transport, intervalMs: 1, mock: true } });
+      r.target = 'user';
+      r.instances = { pinboard: { id: 'pinboard', service: 'pinboard', base: '', root: live.PINBOARD_ROOT, token } };
+      r.pools = { pinboard: live.poolUrls('user', r.runId, 'pinboard', 3) };
+      r.caps = { pinboard: { ...live.BUDGETS.user.pinboard, node } };
+      r.reserve = { pinboard: live.BUDGETS.user.pinboard.cleanupReserve };
+      return r;
+    };
+
+    // The send gate takes exactly one auth_token, this run's.
+    {
+      const mock = createPinboardMock({ token });
+      const r = unitRun(mock);
+      const t = encodeURIComponent(token);
+      await assert.rejects(r.pinboardSend('pinboard', live.PINBOARD_ROOT + 'posts/get?auth_token=' + t + '&auth_token=other%3A00000000'), e => e.code === 'live_guard_pinboard_token');
+      assert.deepEqual(mock.calls, []);
+    }
     const pbCredentials = join(pbState, '..', 'pinboard-credentials.json');
     writeFileSync(pbCredentials, JSON.stringify({ pinboardToken: token }), { mode: 0o600 });
     const noTokenCredentials = join(pbState, '..', 'pinboard-none.json');
