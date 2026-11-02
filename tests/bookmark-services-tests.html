@@ -1093,11 +1093,23 @@ test("failure keys apply only to self-hosted services",()=>{
 });
 // What nginx in front of linkding answers while gunicorn restarts or times
 // out (ngx_http_special_response.c): the request never reached Django.
+const nginxTitles = {501:"501 Not Implemented",502:"502 Bad Gateway",503:"503 Service Temporarily Unavailable",
+  504:"504 Gateway Time-out",505:"505 HTTP Version Not Supported",507:"507 Insufficient Storage"};
+// Cloudflare's own error page when the tunnel or origin behind it is down
+// (52x and 530 are generated at the edge, never by linkding).
+const cloudflareTitles = {520:"Web server is returning an unknown error",521:"Web server is down",
+  522:"Connection timed out",524:"A timeout occurred",530:"Origin DNS error"};
 const proxyError = status => {
-  const title = {502:"502 Bad Gateway",503:"503 Service Temporarily Unavailable",504:"504 Gateway Time-out"}[status];
+  if (cloudflareTitles[status] !== undefined) {
+    return new Response("<!DOCTYPE html>\n<html lang=\"en-US\">\n<head>\n<title>linkding.example.com | "+status+": "+cloudflareTitles[status]+"</title>\n</head>\n<body>\n<h1>"+cloudflareTitles[status]+"</h1>\n<span>Error code "+status+"</span>\n<span>Cloudflare Ray ID: <strong>8f2a1c3d4e5b6a7c</strong></span>\n</body>\n</html>\n",
+      {status,headers:{"Content-Type":"text/html; charset=UTF-8","Server":"cloudflare","CF-RAY":"8f2a1c3d4e5b6a7c-NRT"}});
+  }
+  const title = nginxTitles[status];
   return new Response("<html>\r\n<head><title>"+title+"</title></head>\r\n<body>\r\n<center><h1>"+title+"</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n",
     {status,headers:{"Content-Type":"text/html","Server":"nginx"}});
 };
+// Every 5xx other than Django's 500: proxy, gateway and edge statuses alike.
+const non500ServerStatuses = [501,502,503,504,505,507,520,521,522,524,530];
 test("a linkding 500 names a tag longer than 64 characters, and only such a tag",async()=>{
   for(const tag of overlongTags)for(const existing of [undefined,{id:"7",url:pageUrl,private:true,summary:""}]){
     const h=harness("linkding",[djangoServerError()]);
@@ -1107,9 +1119,10 @@ test("a linkding 500 names a tag longer than 64 characters, and only such a tag"
     // The request carried the tag as typed: nothing is cut or held back.
     equal([h.calls[0].method,h.calls[0].body.tag_names],[existing?"PATCH":"POST",["work",tag]]);
   }
-  // A proxy's 502/503/504 never reached Django's database: an outage, even
-  // with an over-long tag (SQLite stores it), so it stays retryable.
-  for(const status of [502,503,504])for(const existing of [undefined,{id:"7",url:pageUrl,private:true,summary:""}]){
+  // Any 5xx but 500 (a proxy, a gateway, Cloudflare's edge) never came from
+  // Django's database: an outage, even with an over-long tag (SQLite stores
+  // it), so it stays retryable.
+  for(const status of non500ServerStatuses)for(const existing of [undefined,{id:"7",url:pageUrl,private:true,summary:""}]){
     let error;
     try{await harness("linkding",[proxyError(status)]).client.save({url:pageUrl,title:"T",notes:"",tags:["work",overlongTags[0]]},existing);}catch(e){error=e;}
     equal([status,error?.code,error?.status,error?.tag],[status,"server",status,undefined]);
@@ -1155,7 +1168,7 @@ test("the worker never queues a save stopped by an over-long linkding tag, queue
   const later=await queued.submitSaveIntent({...saveIntent,tags:"work "+fittingTags[1]});
   equal([later.status,later.cause,queued.state.queue.length],["queued","server",1]);
   // A proxy outage with an over-long tag is queued too, tag kept whole.
-  for(const status of [502,503,504]){
+  for(const status of non500ServerStatuses){
     const outage=await workerHarness("linkding",[[200,{bookmark:null}],proxyError(status)]);
     const result=await outage.submitSaveIntent({...saveIntent,tags:"work "+tag});
     equal([status,result.status,result.cause,result.reason,outage.state.queue.map(item=>item.tags)],[status,"queued","server",undefined,["work "+tag]]);
