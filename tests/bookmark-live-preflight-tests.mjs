@@ -1326,6 +1326,47 @@ try {
   }
 
   // ---------------------------------------------------------------------
+  // Karakeep tag cleanup (review of H1b, should-fix): a ledger tag is
+  // deleted only while no bookmark refers to it (numBookmarks from
+  // GET /api/v1/tags, Karakeep 0.34.1); a ledger tag still attached to a
+  // bookmark is kept, and a run-prefix tag outside the ledger is residue,
+  // never deleted.
+  // ---------------------------------------------------------------------
+  {
+    const run = new live.LiveRun({ mode: 'run' });
+    const p = run.prefix;
+    const kTag = (id, name, n) => ({ id, name, numBookmarks: n, numBookmarksByAttachedType: { ai: 0, human: n } });
+    const tags = [kTag('ta', p + '_free', 0), kTag('tb', p + '_held', 1), kTag('tc', p + '_stray', 0), kTag('td', 'personal', 3)];
+    const requests = [];
+    const server = createServer((req, res) => {
+      const url = new URL(req.url, 'http://x');
+      requests.push(req.method + ' ' + url.pathname);
+      const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(body === undefined ? '' : JSON.stringify(body)); };
+      const tag = url.pathname.match(/^\/api\/v1\/tags\/([^/]+)$/);
+      if (tag) {
+        const at = tags.findIndex(t => t.id === tag[1]);
+        if (at < 0) return json(404, { code: 'NOT_FOUND', message: 'Tag not found' });
+        if (req.method === 'DELETE') { tags.splice(at, 1); res.writeHead(204); return res.end(); }
+        return json(200, tags[at]);
+      }
+      if (url.pathname === '/api/v1/tags') return json(200, { tags, nextCursor: null });
+      return json(404, { code: 'NOT_FOUND', message: 'Unknown fixture route' });
+    });
+    const port = await listen(server);
+    const base = `http://127.0.0.1:${port}/`;
+    run.instances.karakeep = { id: 'karakeep', service: 'karakeep', base, root: live.apiRootFor('karakeep', base), token: 'k'.repeat(40) };
+    run.caps = { karakeep: { node: 100 } };
+    run.reserve = { karakeep: 0 };
+    run.cleaning = true;
+    run.report.ledger.tags.push({ instance: 'karakeep', key: p + '_free', id: '', source: 'route', module: '' }, { instance: 'karakeep', key: p + '_held', id: 'tb', source: 'sw', module: '' });
+    assert.equal(await run.cleanupTags('karakeep'), false, 'a referenced ledger tag and residue fail the cleanup');
+    assert.deepEqual(tags.map(t => t.id), ['tb', 'tc', 'td'], 'only the unreferenced ledger tag is deleted');
+    assert.deepEqual(requests.filter(r => r.startsWith('DELETE')), ['DELETE /api/v1/tags/ta']);
+    assert.deepEqual(run.report.cleanup.entries.map(e => [e.id, e.deleted, e.code || '', !!e.residue]), [['ta', true, '', false], ['tb', false, 'cleanup_tag_referenced', false], ['tc', false, 'residue_tag_not_in_ledger', true]]);
+    await closeServer(server);
+  }
+
+  // ---------------------------------------------------------------------
   // Fake AI: product prompts classify, replies parse with product parsers
   // ---------------------------------------------------------------------
   const productCtx = vm.createContext({ console, URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, btoa, atob, encodeURIComponent, decodeURIComponent, escape, unescape });
