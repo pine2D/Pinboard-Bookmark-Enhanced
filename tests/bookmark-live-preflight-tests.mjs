@@ -1724,6 +1724,22 @@ try {
   // a person what to remove by hand.
   // ---------------------------------------------------------------------
   if (only('summary')) {
+    // worktree_dirty / ext_root_dirty: the summary names which check failed,
+    // since git status can look clean (an ignored loadable file, an ignored
+    // subdirectory) and the code alone does not say why.
+    {
+      const run = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+      run.runDir = join(dir, 'summary-dirty');
+      mkdirSync(run.runDir, { mode: 0o700 });
+      run.reportPath = join(run.runDir, 'report.json');
+      Object.assign(run.report, { target: 'user', head: 'a'.repeat(40), clean: false, cleanReason: 'ignored_product_files', failure: { phase: 'preflight', code: 'worktree_dirty' } });
+      run.writeSummary();
+      assert.match(readFileSync(join(run.runDir, 'summary.zh.md'), 'utf8'), /工作区干净：否（ignored_product_files）/);
+      Object.assign(run.report, { clean: true, cleanReason: '', extRoot: join(dir, 'elsewhere') + '/', productHead: 'b'.repeat(40), productClean: false, productReason: 'not_toplevel', failure: { phase: 'preflight', code: 'ext_root_dirty' } });
+      run.writeSummary();
+      const text = readFileSync(join(run.runDir, 'summary.zh.md'), 'utf8');
+      assert.match(text, /工作区干净：是；产品 HEAD bbbbbbbbbbbb（--ext-root，不干净：not_toplevel）/, text);
+    }
     {
       const run = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
       run.runDir = join(dir, 'summary-cap');
@@ -2394,6 +2410,8 @@ try {
       assert.equal(clean.report.extRoot, realpathSync(ext) + '/');
       assert.equal(clean.report.productHead, productHead);
       assert.equal(clean.report.productClean, true);
+      assert.equal(clean.report.productReason, '');
+      assert.equal(typeof clean.report.cleanReason, 'string', 'the harness tree records why it is not clean');
       assert.match(clean.report.head, /^[0-9a-f]{40}$/);
       assert.notEqual(clean.report.head, productHead);
       assert(readFileSync(join(clean.reportPath, '..', 'summary.zh.md'), 'utf8').includes('产品 HEAD ' + productHead.slice(0, 12)));
@@ -2402,6 +2420,8 @@ try {
       assert.equal(dirty.code, 1);
       assert.equal(dirty.report.failure.code, 'ext_root_dirty');
       assert.equal(dirty.report.productClean, false);
+      assert.equal(dirty.report.productReason, 'uncommitted');
+      assert(readFileSync(join(dirty.reportPath, '..', 'summary.zh.md'), 'utf8').includes('uncommitted'), 'the summary names why the product tree was refused');
       assert.equal(dirty.report.authorization, undefined, 'no round claimed');
       // A directory git ignores inside a clean tree is not that tree: it
       // holds files of no commit (say an unpacked release ZIP), so it is
@@ -2422,12 +2442,16 @@ try {
       const ignoredDir = await run([...extArgs.slice(0, -1), join(ext, 'release', 'unpacked')], { credentials: false, state: extState });
       assert.equal(ignoredDir.report.failure.code, 'ext_root_dirty', ignoredDir.output);
       assert.equal(ignoredDir.report.productClean, false);
+      assert.equal(ignoredDir.report.productReason, 'not_toplevel');
+      assert(readFileSync(join(ignoredDir.reportPath, '..', 'summary.zh.md'), 'utf8').includes('not_toplevel'));
       writeFileSync(join(ext, 'local-debug.js'), '// ignored but loadable\n');
       assert.deepEqual([live.gitState(realpathSync(ext) + '/').clean, live.gitState(realpathSync(ext) + '/').reason], [false, 'ignored_product_files']);
       // status.showUntrackedFiles=no hides untracked and ignored files from
       // a plain git status; the check must not depend on that setting.
       git('config', 'status.showUntrackedFiles', 'no');
       assert.deepEqual([live.gitState(realpathSync(ext) + '/').clean, live.gitState(realpathSync(ext) + '/').reason], [false, 'ignored_product_files'], 'showUntrackedFiles=no still sees ignored product files');
+      const ignoredFile = await run(extArgs, { credentials: false, state: extState });
+      assert.deepEqual([ignoredFile.report.failure.code, ignoredFile.report.productReason], ['ext_root_dirty', 'ignored_product_files'], ignoredFile.output);
       rmSync(join(ext, 'local-debug.js'));
       writeFileSync(join(ext, 'other.js'), '// untracked\n');
       assert.deepEqual([live.gitState(realpathSync(ext) + '/').clean, live.gitState(realpathSync(ext) + '/').reason], [false, 'uncommitted'], 'showUntrackedFiles=no still sees untracked files');

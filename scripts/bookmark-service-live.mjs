@@ -1556,7 +1556,7 @@ export class LiveRun {
     this.scheme = 'light';
     this.report = {
       harness: HARNESS_VERSION, runId: this.runId, prefix: this.prefix, mode: opts.mode, started: new Date().toISOString(),
-      head: '', clean: null, extRoot: '', productHead: '', productClean: null, target: '', scenario: '', modules: [], skipped: [], instances: {}, pools: {},
+      head: '', clean: null, cleanReason: '', extRoot: '', productHead: '', productClean: null, productReason: '', target: '', scenario: '', modules: [], skipped: [], instances: {}, pools: {},
       ledger: { created: [], lists: [], tags: [] }, counts: {}, checks: [], readBackDiffs: [], console: [], swConsole: [],
       pageErrors: [], requestFailed: [], blockedOrigins: [], blockedSamples: [], violations: [], findings: [], shots: { dir: '', count: 0, manifest: '' },
       fakeAi: null, temp: null, cleanup: { complete: false, entries: [] }, failure: null, finished: null, passed: false,
@@ -2038,15 +2038,19 @@ export class LiveRun {
       const incomplete = scanIncompleteReports(this.state, this.runId);
       if (incomplete.length) { for (const file of incomplete) console.error('Previous report not cleaned: ' + file); fail('previous_cleanup_incomplete'); }
       // head / clean: this harness's tree. productHead / productClean: the
-      // extension the browser loads (--ext-root, else the same tree).
+      // extension the browser loads (--ext-root, else the same tree). The
+      // reasons name gitState's failed check: git status alone can look
+      // clean (an ignored loadable file, an ignored subdirectory).
       const tool = gitState(ROOT);
       this.report.head = tool.head;
       this.report.clean = tool.clean;
+      this.report.cleanReason = tool.reason;
       check(this.report.clean || this.opts.flags.has('--allow-dirty'), 'worktree_dirty');
       this.report.allowDirty = this.opts.flags.has('--allow-dirty');
       const product = this.extRoot === ROOT ? tool : gitState(this.extRoot);
       this.report.productHead = product.head;
       this.report.productClean = product.clean;
+      this.report.productReason = product.reason;
       // Another tree is there to test one commit: --allow-dirty (for this
       // harness's own tree) does not cover it.
       check(this.extRoot === ROOT || (product.head && product.clean), 'ext_root_dirty');
@@ -3579,7 +3583,7 @@ export class LiveRun {
       if (items.length > max) lines.push(rest(items.length - max));
     };
     lines.push(`# 真实测试摘要 ${r.runId}`);
-    lines.push(`- 结论：${r.passed ? '通过' : '未通过'}${r.failure ? `（${r.failure.phase}：${r.failure.code}）` : ''}；目标 ${r.target || '未定'}；工具 HEAD ${(r.head || '未知').slice(0, 12)}；工作区干净：${r.clean === null ? '未检查' : r.clean ? '是' : '否'}${r.extRoot && r.extRoot !== ROOT ? `；产品 HEAD ${(r.productHead || '未知').slice(0, 12)}（--ext-root）` : ''}`);
+    lines.push(`- 结论：${r.passed ? '通过' : '未通过'}${r.failure ? `（${r.failure.phase}：${r.failure.code}）` : ''}；目标 ${r.target || '未定'}；工具 HEAD ${(r.head || '未知').slice(0, 12)}；工作区干净：${r.clean === null ? '未检查' : r.clean ? '是' : `否${r.cleanReason ? `（${r.cleanReason}）` : ''}`}${r.extRoot && r.extRoot !== ROOT ? `；产品 HEAD ${(r.productHead || '未知').slice(0, 12)}（--ext-root${r.productClean === false && r.productReason ? `，不干净：${r.productReason}` : ''}）` : ''}`);
     if (r.round) lines.push(`- 轮次：第 ${r.round.n}/${r.round.of} 轮（--round，按模块声明编排）`);
     if (r.rerunOf) lines.push(`- 重跑上一轮未通过的模块：来源 ${oneLine(r.rerunOf.runId, 40)}，${(r.rerunOf.modules || []).length} 个`);
     if (r.changed) lines.push(`- 按改动选择：基准 ${oneLine(r.changed.base, 40)}，改动的产品文件 ${Object.keys(r.changed.byFile || {}).length + (r.changed.uncovered || []).length} 个；未覆盖 ${(r.changed.uncovered || []).length} 个${(r.changed.uncovered || []).length ? '：' + oneLine(r.changed.uncovered.slice(0, 5).join('，'), 200) : ''}`);
