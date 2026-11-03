@@ -2373,6 +2373,13 @@ function setupSubmit(token) {
         return;
       }
 
+      if (result?.status === "failed" && result.reason === "duplicate_unknown") {
+        // The worker's own duplicate check before writing got no answer: the
+        // same stop as lookup_failed above, so Save stays Save, not Retry.
+        showSaveError(result);
+        setSubmitState("idle");
+        return;
+      }
       showSaveError(result?.status === "failed" ? result : null);
       setSubmitState("error");
     } catch (e) {

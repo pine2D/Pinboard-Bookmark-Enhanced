@@ -999,6 +999,23 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
+    // The commonest stop: the popup's own check found nothing, the worker's
+    // fresh check before writing got no answer. Same stop, same Save button.
+    await testAsync("a duplicate check the worker could not finish leaves Save as Save, not Retry", async () => {
+      for (const service of ["karakeep", "linkding"]) {
+        const h = createSubmitHarness({ service });
+        const pending = h.click();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        h.resolveSave({ status: "failed", reason: "duplicate_unknown" });
+        await pending;
+        const btn = h.elements["submit-btn"];
+        assert(h.messages.filter((m) => m.type === "save_intent").length === 1, service + ": a second write followed");
+        assert(JSON.stringify(h.statuses.at(-1)) === JSON.stringify(["status-msg", "save-error:duplicate_unknown", "error"]), service + ": " + JSON.stringify(h.statuses));
+        assert(!btn.classList.contains("save-error") && !btn.classList.contains("loading"), service + ": Save was left in the error state");
+        assert(h.elements["title-input"].value === "Submitted title", service + ": the form changed");
+      }
+    });
+
     await testAsync("the popup reports a create as saved, an update as updated, and a merge by service", async () => {
       const loaded = { href: URL, description: "Stored title", extended: "", summary: "", tags: "", tagNames: [], shared: "no", toread: "no", time: "2026-10-30T03:01:22Z" };
       for (const [service, options, result, want] of [
