@@ -152,13 +152,34 @@ function selfHostedServer(service, row, { postgres = false, readLater = null } =
       }
       return json(404, { detail: "Not found." });
     }
-    if (method === "GET" && url.pathname === "/api/v1/bookmarks/check-url") return json(200, { bookmarkId: page === row.content.url ? row.id : null });
+    if (method === "GET" && url.pathname === "/api/v1/bookmarks/check-url") return json(200, { bookmarkId: row && page === row.content.url ? row.id : null });
+    // Karakeep 0.34.1 POST /api/v1/bookmarks: 201 and the full bookmark plus
+    // alreadyExists for a URL it does not hold (routes/bookmarks.ts).
+    if (method === "POST" && url.pathname === "/api/v1/bookmarks" && !row) {
+      const now = new Date().toISOString();
+      row = { id: "kk2created", createdAt: now, modifiedAt: now, title: body.title ?? null, archived: body.archived ?? false,
+        favourited: body.favourited ?? false, note: body.note ?? null, summary: body.summary ?? null, source: body.source ?? "api",
+        taggingStatus: "pending", summarizationStatus: "pending", tags: [],
+        content: { type: "link", url: body.url, title: null, description: null }, assets: [] };
+      return json(201, { ...structuredClone(row), alreadyExists: false });
+    }
     if (readLater && method === "GET" && url.pathname === "/api/v1/lists/" + laterList.id) return json(200, structuredClone(laterList));
+    if (!row) return json(404, { code: "NOT_FOUND", message: "Bookmark not found" });
     if (readLater && method === "GET" && url.pathname === "/api/v1/bookmarks/" + row.id + "/lists")
       return json(200, { lists: readLater.members.has(row.id) ? [structuredClone(laterList)] : [] });
     if (readLater && (method === "PUT" || method === "DELETE") && url.pathname === "/api/v1/lists/" + laterList.id + "/bookmarks/" + row.id) {
       if (method === "PUT") readLater.members.add(row.id); else readLater.members.delete(row.id);
       return new Response(null, { status: 204 });
+    }
+    // updateTags: a tagName not yet held is created; 200 lists the ids attached.
+    if (method === "POST" && url.pathname === "/api/v1/bookmarks/" + row.id + "/tags") {
+      const attached = [];
+      for (const { tagName } of body.tags) {
+        let tag = row.tags.find(t => t.name === tagName);
+        if (!tag) row.tags.push(tag = { id: "kktag" + (row.tags.length + 1), name: tagName, attachedBy: "human" });
+        attached.push(tag.id);
+      }
+      return json(200, { attached });
     }
     if (method === "GET" && url.pathname === "/api/v1/bookmarks/" + row.id) return json(200, structuredClone(row));
     if (method === "PATCH" && url.pathname === "/api/v1/bookmarks/" + row.id) {
@@ -174,7 +195,8 @@ function selfHostedServer(service, row, { postgres = false, readLater = null } =
     ...(readLater ? { readLaterListId: laterList.id, saveReadLaterList: async () => {} } : {}) };
   const client = pbpCreateBookmarkServiceClient(connection);
   const clientFor = config => pbpCreateBookmarkServiceClient({ ...connection, sharingEnabled: config?.sharingEnabled });
-  return { get row() { return row; }, requests, failures, client, clientFor };
+  // remove(): the bookmark is deleted on the server (from another device).
+  return { get row() { return row; }, remove() { row = null; }, requests, failures, client, clientFor };
 }
 // Lets every reader request the runtime started, including the ones a result
 // starts (a refresh after a save), finish before the test reads the outcome.
@@ -1367,17 +1389,17 @@ await test("a reader edit or Read Later on a bookmark deleted elsewhere does not
   for (const service of ["linkding", "karakeep"]) for (const action of ["edit", "later"]) {
     const where = service + " " + action;
     const account = service === "linkding" ? "linkding:https://links.example/:conn-1" : "karakeep:https://keep.example/:user-1";
-    const server = selfHostedServer(service, structuredClone(service === "linkding" ? LINKDING_ROW : KARAKEEP_ROW));
+    // Karakeep keeps Read Later on the user's own list; it starts empty.
+    const readLater = service === "karakeep" ? { members: new Set() } : null;
+    const server = selfHostedServer(service, structuredClone(service === "linkding" ? LINKDING_ROW : KARAKEEP_ROW), { readLater });
     const h = await pipelineHarness({ account, token: service + "-token", service, settings: { bookmarkService: service }, client: server.client, slot: { account } });
-    const writes = () => server.requests.filter(q => q.method !== "GET").length;
+    const writeRequests = () => server.requests.filter(q => q.method !== "GET");
+    const writes = () => writeRequests().length;
     const r = await tagFixReader(h, account, null);
     try {
       // Deleted elsewhere after the reader showed it (and after the editor
-      // opened on it): the check no longer finds it.
-      const deleteElsewhere = () => {
-        if (service === "linkding") server.row.url = "https://example.com/elsewhere";
-        else server.row.content.url = "https://example.com/elsewhere";
-      };
+      // opened on it): the server no longer holds it.
+      const deleteElsewhere = () => server.remove();
       if (action === "edit") {
         await r.w.pbpReaderBookmarkAction("edit"); await settle(r.pending);
         assert(r.el("editor").matches(":popover-open"), where + ": the editor did not open");
@@ -1392,7 +1414,20 @@ await test("a reader edit or Read Later on a bookmark deleted elsewhere does not
       assert(h.env.queue.length === 0, where + ": the save was queued");
       // The user has read it; their next save is theirs to make.
       if (action === "edit") { r.el("apply").click(); await settle(r.pending); } else await r.command("later");
-      assert(writes() > 0, where + ": the next save after the explanation sent nothing");
+      // That save is a create carrying the user's edit, not a write to the
+      // deleted record, and Read Later marks the new bookmark unread.
+      const sent = writeRequests();
+      const createPath = service === "linkding" ? "/api/bookmarks/" : "/api/v1/bookmarks";
+      assert(sent.length && sent[0].method === "POST" && sent[0].path === createPath,
+        where + ": the next save was not a create: " + JSON.stringify(sent.map(q => q.method + " " + q.path)));
+      assert(!sent.some(q => q.method === "PATCH"), where + ": the next save patched a record: " + JSON.stringify(sent));
+      if (action === "edit") assert(sent[0].body.title === "Typed title", where + ": the create lost the typed title: " + JSON.stringify(sent[0].body));
+      assert(server.row, where + ": the server holds no bookmark after the next save");
+      if (action === "later") {
+        const unread = service === "linkding" ? server.row.unread === true : readLater.members.has(server.row.id);
+        assert(unread, where + ": the new bookmark is not on Read Later: " + JSON.stringify(sent));
+      }
+      equal(r.el("status").textContent, "readerBookmarkSaved");
     } finally { r.frame.remove(); }
   }
   const en = await (await fetch("../_locales/en/messages.json")).json();
