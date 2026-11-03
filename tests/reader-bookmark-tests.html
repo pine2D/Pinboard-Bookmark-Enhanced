@@ -1354,6 +1354,50 @@ await test("an interactive self-hosted save whose duplicate check fails writes a
   const en = await (await fetch("../_locales/en/messages.json")).json();
   assert(en.bookmarkErrDuplicateUnknown?.message, "en catalogue lacks bookmarkErrDuplicateUnknown");
 });
+// The bar showed the bookmark, then it was deleted elsewhere: an edit or a
+// Read Later is a change to that bookmark, not a request to make a new one.
+// Nothing is written; the reader says so and keeps the edit, and only the
+// user's next save, made after reading that, may bookmark the page again.
+await test("a reader edit or Read Later on a bookmark deleted elsewhere does not bring it back", async () => {
+  const LINKDING_ROW = { id: 7, url: URL_ARTICLE, title: "Server title", description: "", notes: "Server notes",
+    is_archived: false, unread: false, shared: false, tag_names: ["server"], date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z" };
+  const KARAKEEP_ROW = { id: "kk1bookmark", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
+    title: "Server title", archived: false, favourited: false, note: "Server notes", summary: null, source: "web",
+    taggingStatus: "success", summarizationStatus: "success", tags: [], content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null }, assets: [] };
+  for (const service of ["linkding", "karakeep"]) for (const action of ["edit", "later"]) {
+    const where = service + " " + action;
+    const account = service === "linkding" ? "linkding:https://links.example/:conn-1" : "karakeep:https://keep.example/:user-1";
+    const server = selfHostedServer(service, structuredClone(service === "linkding" ? LINKDING_ROW : KARAKEEP_ROW));
+    const h = await pipelineHarness({ account, token: service + "-token", service, settings: { bookmarkService: service }, client: server.client, slot: { account } });
+    const writes = () => server.requests.filter(q => q.method !== "GET").length;
+    const r = await tagFixReader(h, account, null);
+    try {
+      // Deleted elsewhere after the reader showed it (and after the editor
+      // opened on it): the check no longer finds it.
+      const deleteElsewhere = () => {
+        if (service === "linkding") server.row.url = "https://example.com/elsewhere";
+        else server.row.content.url = "https://example.com/elsewhere";
+      };
+      if (action === "edit") {
+        await r.w.pbpReaderBookmarkAction("edit"); await settle(r.pending);
+        assert(r.el("editor").matches(":popover-open"), where + ": the editor did not open");
+        deleteElsewhere();
+        const title = r.el("title");
+        title.value = "Typed title"; title.dispatchEvent(new r.w.Event("input", { bubbles: true }));
+        r.el("apply").click(); await settle(r.pending);
+        assert(r.el("editor").matches(":popover-open") && r.el("title").value === "Typed title", where + ": the edit was dropped");
+      } else { deleteElsewhere(); await r.command("later"); }
+      equal(r.el("status").textContent, "readerBookmarkDeletedElsewhere");
+      assert(writes() === 0, where + ": the bookmark was recreated: " + JSON.stringify(server.requests.filter(q => q.method !== "GET")));
+      assert(h.env.queue.length === 0, where + ": the save was queued");
+      // The user has read it; their next save is theirs to make.
+      if (action === "edit") { r.el("apply").click(); await settle(r.pending); } else await r.command("later");
+      assert(writes() > 0, where + ": the next save after the explanation sent nothing");
+    } finally { r.frame.remove(); }
+  }
+  const en = await (await fetch("../_locales/en/messages.json")).json();
+  assert(en.readerBookmarkDeletedElsewhere?.message, "en catalogue lacks readerBookmarkDeletedElsewhere");
+});
 await test("reader save, delete and lookup show self-hosted causes", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();
   const run = async (account, handler, act) => {

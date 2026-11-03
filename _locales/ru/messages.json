@@ -4635,6 +4635,7 @@
   "readerBookmarkFailed": {"message": "Не удалось сохранить. Попробуйте ещё раз."},
   "readerBookmarkAccountChanged": {"message": "Аккаунт изменился. Для сохранения откройте режим чтения заново."},
   "readerBookmarkApply": {"message": "Сохранить изменения"},
+  "readerBookmarkDeletedElsewhere": {"message": "Эта закладка была удалена в другом месте, поэтому изменения не сохранены. Чтобы снова добавить страницу в закладки, сохраните ещё раз."},
   "readerBookmarkTitle": {"message": "Заголовок"},
   "readerBookmarkTags": {"message": "Метки (через пробел)"},
   "readerBookmarkTagsQuoted": {"message": "Метки (через пробел; существующие метки с пробелами показаны в двойных кавычках)"},

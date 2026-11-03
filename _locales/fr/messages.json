@@ -4635,6 +4635,7 @@
   "readerBookmarkFailed": {"message": "Échec de l’enregistrement. Réessayez."},
   "readerBookmarkAccountChanged": {"message": "Le compte a changé. Rouvrez le lecteur pour enregistrer."},
   "readerBookmarkApply": {"message": "Enregistrer les modifications"},
+  "readerBookmarkDeletedElsewhere": {"message": "Ce signet a été supprimé ailleurs : vos modifications n’ont pas été enregistrées. Pour ajouter de nouveau la page à vos signets, enregistrez une nouvelle fois."},
   "readerBookmarkTitle": {"message": "Titre"},
   "readerBookmarkTags": {"message": "Tags (séparés par des espaces)"},
   "readerBookmarkTagsQuoted": {"message": "Tags (séparés par des espaces ; les tags existants contenant des espaces sont entre guillemets doubles)"},

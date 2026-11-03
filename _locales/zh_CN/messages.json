@@ -4629,6 +4629,7 @@
   "readerBookmarkFailed": {"message": "保存失败，请重试。"},
   "readerBookmarkAccountChanged": {"message": "账号已切换，请重新打开阅读器后保存。"},
   "readerBookmarkApply": {"message": "保存修改"},
+  "readerBookmarkDeletedElsewhere": {"message": "这个书签已在别处删除，这次的修改没有保存。要重新收藏这一页，再保存一次即可。"},
   "readerBookmarkTitle": {"message": "标题"},
   "readerBookmarkTags": {"message": "标签（以空格分隔）"},
   "readerBookmarkTagsQuoted": {"message": "标签（以空格分隔；已有的带空格标签显示在英文双引号内）"},

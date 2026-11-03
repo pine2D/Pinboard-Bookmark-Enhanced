@@ -4635,6 +4635,7 @@
   "readerBookmarkFailed": {"message": "儲存失敗，請重試。"},
   "readerBookmarkAccountChanged": {"message": "帳號已切換，請重新開啟閱讀器後儲存。"},
   "readerBookmarkApply": {"message": "儲存變更"},
+  "readerBookmarkDeletedElsewhere": {"message": "這個書籤已在別處刪除，這次的修改沒有儲存。如要重新收藏這一頁，再儲存一次即可。"},
   "readerBookmarkTitle": {"message": "標題"},
   "readerBookmarkTags": {"message": "標籤（以空格分隔）"},
   "readerBookmarkTagsQuoted": {"message": "標籤（以空格分隔；現有的含空格標籤會顯示在英文雙引號內）"},

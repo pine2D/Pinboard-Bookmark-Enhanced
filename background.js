@@ -1209,7 +1209,7 @@ async function pbpReleaseDroppedSummaryHolds(before, after) {
 
 // interactive: a popup save; a reader save (readerAction) is one too. Their
 // self-hosted duplicate check failing stops the save (pbpLookupStopFailure).
-function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, summaryRange, tagVocab, interactive = false } = {}) {
+function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, readerExpectBookmarked = false, summaryRange, tagVocab, interactive = false } = {}) {
   return runSaveDeliveryTransaction(async () => {
     let settings;
     try { settings = await loadSettings(); }
@@ -1240,7 +1240,7 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
     // lookup-to-write transaction. The offline record remains a normal intent.
     if (readerAction) {
       const handedNotes = intent.notes;
-      const prepared = await pbpPrepareReaderSaveIntent(intent, readerAction, readerDraft, deliverySettings, deliveryAuth);
+      const prepared = await pbpPrepareReaderSaveIntent(intent, readerAction, readerDraft, deliverySettings, deliveryAuth, readerExpectBookmarked);
       if (prepared.result) return prepared.result;
       intent = prepared.intent;
       // The popup's handed range still describes a create, and a Save's skip,
@@ -1519,7 +1519,7 @@ async function pbpReaderBookmarkContext(sender, account) {
   return { ...stored, bookmarkUrl, account };
 }
 
-async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth) {
+async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth, expectBookmarked = false) {
   if (action === "save") return { intent: { ...intent, mode: "skip" } };
   const lookup = await fetchExistingBookmark(intent.url, settings.pinboardToken, auth);
   if (!pbpBookmarkAuthIsCurrent(auth)) return { result: pbpSaveFailure("account_changed") };
@@ -1554,6 +1554,13 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth)
   }
   if (!lookup.exists) {
     if (action === "read") return { result: pbpSaveFailure("lookup") };
+    // The reader showed this bookmark and the user changed it (edit, Read
+    // Later): deleted elsewhere since, it is not silently created again. The
+    // reader says so; its next save, sent knowing the page is not bookmarked,
+    // creates it. Pinboard keeps its existing behaviour.
+    if (expectBookmarked && (action === "edit" || action === "later") && pbpSelfHostedAuth(auth)) {
+      return { result: pbpSaveFailure("deleted_elsewhere") };
+    }
     return { intent: { ...intent, mode: "create", ...(action === "edit" ? draft : {}), toread: action === "later" || (action === "edit" ? draft.toread : intent.toread) } };
   }
   const plan = pbpResolveSavePlan({ ...intent, mode: "overwrite", tags: lookup.post?.tags, private: false, toread: false }, lookup);
@@ -1683,6 +1690,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
   }
   const action = message.action;
   if (!["save", "later", "read", "edit"].includes(action)) return pbpSaveFailure("invalid");
+  if (message.expectBookmarked !== undefined && typeof message.expectBookmarked !== "boolean") return pbpSaveFailure("invalid");
   let draft = null;
   if (action === "edit") {
     const input = message.draft;
@@ -1704,7 +1712,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
   const summaryRange = typeof context.bookmarkDraft?.notes === "string"
     && Number.isInteger(handed?.start) && Number.isInteger(handed?.end)
     ? { start: handed.start, end: handed.end } : undefined;
-  const result = await submitSaveIntent(intent, { expectedAccount: context.account, readerAction: action, readerDraft: draft, summaryRange });
+  const result = await submitSaveIntent(intent, { expectedAccount: context.account, readerAction: action, readerDraft: draft, readerExpectBookmarked: message.expectBookmarked === true, summaryRange });
   const current = await pbpReadFreshBookmarkAuthForAccount(context.account);
   if (!current) return pbpSaveFailure("account_changed");
   return { ...result, account: context.account };

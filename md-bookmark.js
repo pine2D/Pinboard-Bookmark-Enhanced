@@ -395,7 +395,10 @@
     // before this save: a bookmark that was not there yet has been saved.
     const wasBookmarked = Boolean(state.known && state.bookmarked);
     inflight = true; showStatus("readerBookmarkSaving");
-    const result = await request({ type: "mdReaderBookmarkSave", action, ...(draft ? { draft } : {}) });
+    // An edit or Read Later changes the bookmark the bar showed. If it has been
+    // deleted elsewhere since, the worker stops instead of creating it again.
+    const result = await request({ type: "mdReaderBookmarkSave", action, ...(draft ? { draft } : {}),
+      ...(action === "edit" || action === "later" ? { expectBookmarked: wasBookmarked } : {}) });
     if (gen !== generation) return;
     if (result?.account && result.account !== context.account) {
       inflight = false; showStatus("readerBookmarkAccountChanged"); return;
@@ -411,6 +414,14 @@
       document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: changedDetail() }));
     } else if (result?.status === "queued") {
       closeEditor(); statusKey = "readerBookmarkQueued";
+    } else if (result?.reason === "deleted_elsewhere") {
+      // Nothing was written. The bar now shows the page as not bookmarked, an
+      // open editor keeps what the user typed, and only their next save, made
+      // after reading this, bookmarks the page again.
+      await refresh(gen);
+      if (gen !== generation) return;
+      statusKey = "readerBookmarkDeletedElsewhere";
+      if (action === "edit") editorStatusKey = statusKey;
     } else if (result?.reason === "partial") {
       await refresh(gen);
       if (gen !== generation) return;

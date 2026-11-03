@@ -4635,6 +4635,7 @@
   "readerBookmarkFailed": {"message": "Speichern fehlgeschlagen. Bitte erneut versuchen."},
   "readerBookmarkAccountChanged": {"message": "Das Konto hat sich geändert. Öffne den Reader zum Speichern erneut."},
   "readerBookmarkApply": {"message": "Änderungen speichern"},
+  "readerBookmarkDeletedElsewhere": {"message": "Dieses Lesezeichen wurde an anderer Stelle gelöscht, deine Änderungen wurden daher nicht gespeichert. Um die Seite wieder als Lesezeichen anzulegen, speichere noch einmal."},
   "readerBookmarkTitle": {"message": "Titel"},
   "readerBookmarkTags": {"message": "Tags (durch Leerzeichen getrennt)"},
   "readerBookmarkTagsQuoted": {"message": "Tags (durch Leerzeichen getrennt; vorhandene Tags mit Leerzeichen stehen in doppelten Anführungszeichen)"},

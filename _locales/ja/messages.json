@@ -4635,6 +4635,7 @@
   "readerBookmarkFailed": {"message": "保存できませんでした。もう一度お試しください。"},
   "readerBookmarkAccountChanged": {"message": "アカウントが変わりました。保存するにはリーダーを開き直してください。"},
   "readerBookmarkApply": {"message": "変更を保存"},
+  "readerBookmarkDeletedElsewhere": {"message": "このブックマークは別の場所で削除されたため、変更は保存されていません。ページを再びブックマークするには、もう一度保存してください。"},
   "readerBookmarkTitle": {"message": "タイトル"},
   "readerBookmarkTags": {"message": "タグ（スペース区切り）"},
   "readerBookmarkTagsQuoted": {"message": "タグ（スペース区切り。スペースを含む既存のタグは半角の二重引用符で囲んで表示）"},

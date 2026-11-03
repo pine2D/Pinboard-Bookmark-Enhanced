@@ -4645,6 +4645,7 @@
   "readerBookmarkFailed": {"message": "Could not save. Please retry."},
   "readerBookmarkAccountChanged": {"message": "Account changed. Reopen this reader to save."},
   "readerBookmarkApply": {"message": "Save changes"},
+  "readerBookmarkDeletedElsewhere": {"message": "This bookmark was deleted elsewhere, so your changes were not saved. To bookmark the page again, save once more."},
   "readerBookmarkTitle": {"message": "Title"},
   "readerBookmarkTags": {"message": "Tags (space-separated)"},
   "readerBookmarkTagsQuoted": {"message": "Tags (space-separated; existing tags with spaces appear in double quotes)"},
