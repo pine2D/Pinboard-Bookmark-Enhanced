@@ -538,6 +538,7 @@
       }
     }
   },
+  "batchPartial": { "message": ", $COUNT$ nur teilweise gespeichert", "placeholders": {"count": {"content": "$1"}} },
   "batchTooLong": {
     "message": ", $COUNT$ zu lang zum Speichern",
     "placeholders": {
@@ -5131,6 +5132,7 @@
   "bookmarkErrRateLimit": {
     "message": "Der Lesezeichenserver erhält zu viele Anfragen. Später erneut versuchen."
   },
+  "bookmarkErrUrlInvalid": { "message": "linkding nimmt diese Adresse nicht an. Sie darf höchstens 2048 Zeichen lang sein, und der Host braucht eine Domainendung wie .com, außer bei localhost oder einer IP-Adresse. Ein neuer Versuch ändert daran nichts." },
   "bookmarkErrRemote": {
     "message": "Der Lesezeichenserver hat die Anfrage abgelehnt (HTTP $STATUS$). Ein neuer Versuch ändert daran nichts. Das Lesezeichen und die Servereinstellungen prüfen.",
     "placeholders": {

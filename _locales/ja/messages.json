@@ -538,6 +538,7 @@
       }
     }
   },
+  "batchPartial": { "message": "、$COUNT$ 件は一部のみ保存", "placeholders": {"count": {"content": "$1"}} },
   "batchTooLong": {
     "message": "、$COUNT$ 件は長すぎて保存できませんでした",
     "placeholders": {
@@ -5131,6 +5132,7 @@
   "bookmarkErrRateLimit": {
     "message": "ブックマークサーバーへのリクエストが多すぎます。しばらくしてからもう一度お試しください。"
   },
+  "bookmarkErrUrlInvalid": { "message": "linkding はこのアドレスを受け付けません。アドレスは 2048 文字以内で、localhost や IP アドレス以外のホストには .com などのドメインが必要です。再試行しても結果は変わりません。" },
   "bookmarkErrRemote": {
     "message": "ブックマークサーバーがリクエストを拒否しました（HTTP $STATUS$）。再試行しても結果は変わりません。ブックマークの内容とサーバーの設定を確認してください。",
     "placeholders": {

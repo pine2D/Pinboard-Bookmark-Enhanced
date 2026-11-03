@@ -538,6 +538,7 @@
       }
     }
   },
+  "batchPartial": { "message": "，部分完成 $COUNT$ 个", "placeholders": {"count": {"content": "$1"}} },
   "batchTooLong": {
     "message": "，$COUNT$ 个因过长未保存",
     "placeholders": {
@@ -5125,6 +5126,7 @@
   "bookmarkErrRateLimit": {
     "message": "书签服务器收到的请求过多，请稍后重试。"
   },
+  "bookmarkErrUrlInvalid": { "message": "linkding 不接受这个网址：网址最多 2048 个字符，主机名要带 .com 这样的域名后缀（localhost 和 IP 地址除外）。重试不会改变结果。" },
   "bookmarkErrRemote": {
     "message": "书签服务器拒绝了这次请求（HTTP $STATUS$）。重试不会改变结果，请检查书签内容和服务器设置。",
     "placeholders": {

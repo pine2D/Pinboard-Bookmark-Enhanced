@@ -257,6 +257,11 @@ function pbpCreateBookmarkServiceClient(config) {
         // reached the database and SQLite stores long tags: still "server".
         const tag = error?.code === "server" && error.status === 500 ? pbpLinkdingOverlongTag(tags) : "";
         if (tag) throw Object.assign(pbpBookmarkServiceError("tag_too_long", error.status), {tag});
+        // Only a create sends the address. A 400 for one the URL column or
+        // Django's URLValidator cannot take fails the same way every time.
+        if (!existing && error?.code === "remote" && error.status === 400 && pbpLinkdingUrlRejected(fields.url)) {
+          throw pbpBookmarkServiceError("url_invalid", error.status);
+        }
         throw error;
       }
       const bookmark = pbpBookmarkNormalize(service,data);

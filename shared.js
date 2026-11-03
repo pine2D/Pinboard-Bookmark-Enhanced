@@ -2079,6 +2079,13 @@ function pbpBookmarkTitleTooLong(title, service) {
   const value = String(title ?? "");
   return (service === "linkding" ? Array.from(value).length : value.length) > limit;
 }
+// The save result for a title the service cannot store, or null. Background
+// saves (quick save, Batch, offline replay) stop on it before any request:
+// a title is never cut (handoff 6.2), and the same title fails every retry.
+function pbpBookmarkTitleFailure(title, service) {
+  if (!pbpBookmarkTitleTooLong(title, service)) return null;
+  return { status: "failed", reason: "too_long", limit: pbpBookmarkLimits(service).title };
+}
 
 // linkding's Description is shown and edited as one line in the popup and the
 // reader. This is the only definition of that line: every producer (form
@@ -2209,7 +2216,8 @@ const PBP_BOOKMARK_FAILURE_KEYS = Object.freeze({
   permission:"bookmarkPermissionDenied", network:"bookmarkErrNetwork", timeout:"bookmarkErrTimeout",
   server:"bookmarkErrServer", rate_limited:"bookmarkErrRateLimit", remote:"bookmarkErrRemote",
   payload_too_large:"bookmarkErrTooLarge", invalid_response:"bookmarkErrInvalidResponse",
-  account_changed:"bookmarkErrAccountChanged", duplicate_unknown:"bookmarkErrDuplicateUnknown"});
+  account_changed:"bookmarkErrAccountChanged", duplicate_unknown:"bookmarkErrDuplicateUnknown",
+  too_long:"titleTooLong", url_invalid:"bookmarkErrUrlInvalid"});
 // The only self-hosted causes a second attempt can get past. Everything else
 // (a 4xx, a 413, a gateway, a token, a grant, an unreadable reply) meets the
 // same answer again, so no outlet offers a retry for it.
@@ -2265,10 +2273,25 @@ function pbpBookmarkTagShown(tag) {
   const chars = [...String(tag ?? "")];
   return chars.length > 40 ? chars.slice(0, 40).join("") + "…" : chars.join("");
 }
+// linkding stores Bookmark.url in a 2048-character column behind Django's
+// URLValidator, which wants a dotted host unless it is localhost or an IP
+// literal. This only names the cause of a 400 the server already returned for
+// that address (user decision: recognise on failure); input is never checked
+// or changed ahead of the request.
+function pbpLinkdingUrlRejected(url) {
+  const value = String(url ?? "");
+  if ([...value].length > 2048) return true;
+  let host;
+  try { host = new URL(value).hostname; } catch (_) { return false; }
+  if (!host || host.includes(".") || host === "localhost" || host.startsWith("[")) return false;
+  return true;
+}
 // Placeholder values for the key pbpBookmarkFailureKey returned: [tag, limit]
-// for tag_too_long, [HTTP status] for remote, none for every other cause.
+// for tag_too_long, [title limit] for too_long, [HTTP status] for remote,
+// none for every other cause.
 function pbpBookmarkFailureArgs(result) {
   if (result?.reason === "remote") return [Number.isInteger(result.httpStatus) && result.httpStatus > 0 ? String(result.httpStatus) : "?"];
+  if (result?.reason === "too_long") return [Number.isInteger(result.limit) && result.limit > 0 ? String(result.limit) : "?"];
   if (result?.reason !== "tag_too_long") return [];
   return [typeof result.tag === "string" && result.tag ? pbpBookmarkTagShown(result.tag) : "?", String(PBP_LINKDING_TAG_MAX)];
 }

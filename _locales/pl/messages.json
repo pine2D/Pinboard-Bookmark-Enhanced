@@ -538,6 +538,7 @@
       }
     }
   },
+  "batchPartial": { "message": ", zapisane częściowo: $COUNT$", "placeholders": {"count": {"content": "$1"}} },
   "batchTooLong": {
     "message": ", zbyt długie do zapisania: $COUNT$",
     "placeholders": {
@@ -5131,6 +5132,7 @@
   "bookmarkErrRateLimit": {
     "message": "Serwer zakładek otrzymuje zbyt wiele żądań. Spróbuj ponownie później."
   },
+  "bookmarkErrUrlInvalid": { "message": "linkding nie przyjmuje tego adresu. Może mieć najwyżej 2048 znaków, a host musi mieć końcówkę domeny, np. .com, chyba że to localhost lub adres IP. Ponowna próba nic nie zmieni." },
   "bookmarkErrRemote": {
     "message": "Serwer zakładek odrzucił żądanie (HTTP $STATUS$). Ponowna próba nic nie zmieni. Sprawdź zakładkę i ustawienia serwera.",
     "placeholders": {

@@ -378,6 +378,7 @@ function renderBatchProgress(p, currentAccount) {
   if (p.done) {
     const skipMsg = p.skipped > 0 ? t("batchSkipped", String(p.skipped)) : "";
     const tooLongMsg = p.tooLong > 0 ? t("batchTooLong", String(p.tooLong)) : "";
+    const partialMsg = p.partial > 0 ? t("batchPartial", String(p.partial)) : "";
     const queuedDoneMsg = p.queued > 0 ? ` · ${t("offlineQueued", String(p.queued))}` : "";
     const aiWarnMsg = p.aiFailed > 0 ? t("batchAiFailed", String(p.aiFailed)) : "";
     const tagTooLongMsg = p.tagTooLong > 0
@@ -399,9 +400,9 @@ function renderBatchProgress(p, currentAccount) {
     else if (p.error === "auth" || PBP_BOOKMARK_STOP_CODES.includes(p.error)) showStatus("status-msg", t(PBP_BOOKMARK_FAILURE_KEYS[p.error]), "error");
     else if (p.error) showStatus("status-msg", t("batchFailed", p.error), "error");
     else {
-      const hasFailure = (p.failed || 0) > 0 || (p.tooLong || 0) > 0 || (p.tagTooLong || 0) > 0;
+      const hasFailure = (p.failed || 0) > 0 || (p.tooLong || 0) > 0 || (p.tagTooLong || 0) > 0 || (p.partial || 0) > 0;
       const kind = hasFailure ? "error" : (p.saved || 0) > 0 ? "success" : "info";
-      showStatus("status-msg", t("batchDone", String(p.saved || 0), String(p.failed || 0)) + skipMsg + tooLongMsg + queuedDoneMsg + aiWarnMsg + tagTooLongMsg, kind);
+      showStatus("status-msg", t("batchDone", String(p.saved || 0), String(p.failed || 0)) + skipMsg + tooLongMsg + partialMsg + queuedDoneMsg + aiWarnMsg + tagTooLongMsg, kind);
     }
     setBtnIcon(batchBtn, "pin", t("batchSavedCount", String(p.saved || 0)));
     // Timer handles live on the element (not module lets: the test pages

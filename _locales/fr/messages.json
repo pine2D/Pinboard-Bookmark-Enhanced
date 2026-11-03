@@ -538,6 +538,7 @@
       }
     }
   },
+  "batchPartial": { "message": ", $COUNT$ enregistrés en partie", "placeholders": {"count": {"content": "$1"}} },
   "batchTooLong": {
     "message": ", $COUNT$ trop longs pour être enregistrés",
     "placeholders": {
@@ -5131,6 +5132,7 @@
   "bookmarkErrRateLimit": {
     "message": "Le serveur de signets reçoit trop de requêtes. Réessayez plus tard."
   },
+  "bookmarkErrUrlInvalid": { "message": "linkding refuse cette adresse. Elle ne doit pas dépasser 2048 caractères, et son hôte doit avoir une extension de domaine comme .com, sauf pour localhost ou une adresse IP. Réessayer n’y changera rien." },
   "bookmarkErrRemote": {
     "message": "Le serveur de signets a refusé la requête (HTTP $STATUS$). Réessayer n’y changera rien. Vérifiez le signet et la configuration du serveur.",
     "placeholders": {

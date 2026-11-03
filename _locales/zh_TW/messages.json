@@ -538,6 +538,7 @@
       }
     }
   },
+  "batchPartial": { "message": "，$COUNT$ 個僅部分完成", "placeholders": {"count": {"content": "$1"}} },
   "batchTooLong": {
     "message": "，$COUNT$ 個因過長未儲存",
     "placeholders": {
@@ -5131,6 +5132,7 @@
   "bookmarkErrRateLimit": {
     "message": "書籤伺服器收到的請求過多，請稍後再試。"
   },
+  "bookmarkErrUrlInvalid": { "message": "linkding 不接受這個網址：網址最多 2048 個字元，主機名稱需有 .com 這類網域字尾（localhost 與 IP 位址除外）。重試也不會成功。" },
   "bookmarkErrRemote": {
     "message": "書籤伺服器拒絕了這次請求（HTTP $STATUS$）。重試也不會成功，請檢查書籤內容與伺服器設定。",
     "placeholders": {

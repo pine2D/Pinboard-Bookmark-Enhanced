@@ -538,6 +538,7 @@
       }
     }
   },
+  "batchPartial": { "message": ", $COUNT$ сохранено частично", "placeholders": {"count": {"content": "$1"}} },
   "batchTooLong": {
     "message": ", $COUNT$ слишком длинных для сохранения",
     "placeholders": {
@@ -5131,6 +5132,7 @@
   "bookmarkErrRateLimit": {
     "message": "Сервер закладок получает слишком много запросов. Попробуйте позже."
   },
+  "bookmarkErrUrlInvalid": { "message": "linkding не принимает этот адрес. Он может быть не длиннее 2048 символов, а у хоста должно быть доменное окончание вроде .com, если это не localhost и не IP-адрес. Повторная попытка не поможет." },
   "bookmarkErrRemote": {
     "message": "Сервер закладок отклонил запрос (HTTP $STATUS$). Повторная попытка не поможет. Проверьте закладку и настройки сервера.",
     "placeholders": {

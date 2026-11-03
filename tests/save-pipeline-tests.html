@@ -367,6 +367,7 @@ async function createBatchSaveHarness(options) {
   const cacheWrites = [];
   const removed = [];
   const jobs = [];
+  const lookups = [];
   const outcomes = opts.outcomes || [{ status: "saved", mutation: "created" }];
   let outcomeIndex = 0;
   const deps = {
@@ -392,6 +393,11 @@ async function createBatchSaveHarness(options) {
     chrome: { permissions: { contains: async () => true }, storage: { local: { get: opts.storageGet || (async () => ({})),
       set: async (value) => { if (value.batch_job) jobs.push(JSON.parse(JSON.stringify(value.batch_job))); } } } },
     pbpLoadTagVocab: async (account) => ({ account, timestamp: Date.now(), counts: opts.tagVocabCounts || null, index: opts.tagVocabIndex || null }),
+    // Skip mode's duplicate check before AI. Default: the page is not saved yet.
+    fetchExistingBookmark: async (url, token, auth) => {
+      lookups.push({ url, token, account: auth?.account });
+      return opts.lookup ? opts.lookup(url) : { exists: false, lookupFailed: false, post: null };
+    },
     pbpCanonicalTagName, pbpTagGroupKey,
     pbpServiceEffectivePrivate,
     submitSaveIntent: async (prepared, deliveryOptions) => {
@@ -430,6 +436,7 @@ async function createBatchSaveHarness(options) {
     jobs,
     extractionCalls,
     cacheWrites,
+    lookups,
   };
 }
 
@@ -2458,6 +2465,29 @@ await suite("unified save pipeline", async () => {
     equal(h.progress[h.progress.length - 1].skipped, 1);
     equal(h.badgeCalls.length, 0);
     equal(h.notifications.length, 0, "all-skipped Batch must not masquerade as saved");
+  });
+
+  // User decision 2026-11-02 (7): skip mode checks first and pays for AI only
+  // on a page not saved yet; delivery reuses that answer.
+  await test("skip-mode Pinboard Batch checks before AI and hands the answer to delivery", async () => {
+    const saved = { exists: true, lookupFailed: false, post: { href: "https://example.com/0" } };
+    const h = await createBatchSaveHarness({
+      settings: { batchSkipExisting: true, batchAiSummary: true }, hasAIKey: true, pageInfo: { pageText: "Synthetic public text" },
+      lookup: (url) => url.endsWith("/0") ? saved : { exists: false, lookupFailed: false, post: null },
+      outcomes: [{ status: "skipped" }, { status: "saved", mutation: "created" }],
+    });
+    const tabs = [0, 1].map((i) => ({ id: i + 1, url: "https://example.com/" + i, title: "T" + i, incognito: false }));
+    await h.handleBatchSave(tabs.map((tab) => ({ ...tab })));
+    equal(h.lookups.map((l) => l.url).join(","), tabs.map((tab) => tab.url).join(","));
+    equal(h.lookups[0].token, "alice:token");
+    equal(h.extractionCalls.length, 1, "a saved page was read");
+    equal(h.cacheWrites.filter((w) => w[1] === "summary").length, 1, "AI ran for a saved page");
+    equal(h.intents.map((i) => i.deliveryOptions.lookup?.found === saved).join(","), "true,false");
+    equal(h.intents.map((i) => i.deliveryOptions.lookup?.url).join(","), tabs.map((tab) => tab.url).join(","));
+    // Merge mode keeps paying for AI first and asks nothing before delivery.
+    const merge = await createBatchSaveHarness({ settings: { batchAiSummary: true }, hasAIKey: true, pageInfo: { pageText: "Synthetic public text" } });
+    await merge.handleBatchSave(batchTabs(2));
+    equal([merge.lookups.length, merge.extractionCalls.length, merge.intents.every((i) => i.deliveryOptions.lookup === undefined)].join(","), "0,2,true");
   });
 
   await test("Batch isolates a thrown tab delivery and continues", async () => {

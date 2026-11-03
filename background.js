@@ -715,9 +715,16 @@ async function pbpReadTagVocab(account, loaded) {
     return null;
   }
 }
-async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab) {
+// prefetched: a duplicate check this save already made (Batch in skip mode),
+// used instead of asking the server again.
+async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched) {
+  // Without a check in hand a title the service cannot store stops before any
+  // request (quick save, Batch and replay share this point); with one, only a
+  // title the write would actually send (a new bookmark's) is held to it.
+  const titleFailure = prefetched ? null : pbpBookmarkTitleFailure(intent.title, auth.service);
+  if (titleFailure) return {result:titleFailure, persisted:null, retryable:false};
   try {
-    const lookup = await fetchExistingBookmark(intent.url, auth.token, auth);
+    const lookup = prefetched || await fetchExistingBookmark(intent.url, auth.token, auth);
     // lookupFailed: nothing was written, so an interactive save can stop here
     // instead of queueing (submitSaveIntent).
     if (lookup.lookupFailed) return {result:pbpSaveFailure(lookup.reason || "lookup", {httpStatus:lookup.httpStatus}), persisted:null, retryable:lookup.retryable, lookupFailed:true};
@@ -725,6 +732,10 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab) {
     const plan = pbpResolveSavePlan(intent, lookup);
     if (plan.action === "failed") return {result:plan.result, persisted:null, retryable:false};
     if (plan.action === "skip") return {result:{status:"skipped"}, persisted:pbpSkippedPersisted(plan, lookup), retryable:false};
+    // Only a new bookmark's title is the page's; an existing one keeps the
+    // server's own (Karakeep's may be a crawled title it never re-sends).
+    const sentTitleFailure = lookup.exists ? null : pbpBookmarkTitleFailure(plan.fields.title, auth.service);
+    if (sentTitleFailure) return {result:sentTitleFailure, persisted:null, retryable:false};
     const incomingTags = pbpBookmarkParseTags(intent.tags);
     const index = await pbpReadTagVocab(auth.account, tagVocab);
     const bookmarkNames = lookup.exists ? lookup.bookmark.tags : [];
@@ -917,10 +928,12 @@ async function pbpSendResolvedPlan(plan, settings) {
   };
 }
 
-async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth(settings), { tagVocab } = {}) {
+// lookup: a fresh duplicate check the caller already made for intent.url under
+// this connection (Batch in skip mode). It stands in for the first read only.
+async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth(settings), { tagVocab, lookup: prefetched } = {}) {
   const invalid = validateSaveIntent(intent);
   if (invalid) return { result: invalid, persisted: null, retryable: false };
-  if (pbpSelfHostedAuth(auth)) return pbpDeliverSelfHosted(intent, auth, settings, tagVocab);
+  if (pbpSelfHostedAuth(auth)) return pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched);
   if (!settings?.pinboardToken) {
     return { result: pbpSaveFailure("not_logged_in"), persisted: null, retryable: false };
   }
@@ -934,7 +947,7 @@ async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth
     // overwrite pre-reads too: it replaces the tag set only, so it needs the
     // server's description, note, privacy flag and original time to send back.
     if (intent.mode === "merge" || intent.mode === "skip" || intent.mode === "overwrite") {
-      lookup = await fetchExistingBookmark(intent.url, settings.pinboardToken, auth);
+      lookup = prefetched && !recoveredConflict ? prefetched : await fetchExistingBookmark(intent.url, settings.pinboardToken, auth);
     }
     if (!pbpBookmarkAuthIsCurrent(auth)) {
       return { result: pbpSaveFailure("account_changed"), persisted: null, retryable: false };
@@ -1209,7 +1222,9 @@ async function pbpReleaseDroppedSummaryHolds(before, after) {
 
 // interactive: a popup save; a reader save (readerAction) is one too. Their
 // self-hosted duplicate check failing stops the save (pbpLookupStopFailure).
-function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, readerExpectBookmarked = false, summaryRange, tagVocab, interactive = false } = {}) {
+// lookup: {url, account, found} from a duplicate check the caller made before
+// paying for AI (Batch in skip mode); used only for that URL and account.
+function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, readerExpectBookmarked = false, summaryRange, tagVocab, interactive = false, lookup } = {}) {
   return runSaveDeliveryTransaction(async () => {
     let settings;
     try { settings = await loadSettings(); }
@@ -1261,7 +1276,9 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
     // finishes on that lookup's skip: nothing is delivered or queued.
     let envelope = readerKept;
     if (!envelope) {
-      try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth, { tagVocab }); }
+      const prefetched = !readerAction && lookup?.found && lookup.url === intent.url && lookup.account === deliveryAuth.account
+        ? lookup.found : undefined;
+      try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth, { tagVocab, lookup: prefetched }); }
       catch (e) {
         console.warn("save intent failed:", e?.name, e?.message);
         return pbpSaveFailure("internal");
@@ -1748,6 +1765,14 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     await pbpI18nReady();
     notifySaveFailure(notifyId, result, startAuth.service);
     return result;
+  }
+  // A title the service cannot store fails every attempt: stop before reading
+  // the page, paying for AI or queueing anything.
+  const titleFailure = pbpBookmarkTitleFailure(title, startAuth.service);
+  if (titleFailure) {
+    await pbpI18nReady();
+    notifySaveFailure(notifyId, titleFailure, startAuth.service);
+    return titleFailure;
   }
   const loadedSettings = await loadSettings();
   const s = pbpBookmarkDeliverySettings({ ...loadedSettings, ...(settingsOverrides || {}) }, startAuth);
@@ -5100,7 +5125,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       await _writeBatchProgress({
         running: false, done: true, error: "account_changed",
         runId, account, total: tabs.length, i: 0,
-        saved: 0, queued: 0, failed: 0, aiFailed: 0, skipped: 0, tooLong: 0, tagTooLong: 0
+        saved: 0, queued: 0, failed: 0, aiFailed: 0, skipped: 0, tooLong: 0, tagTooLong: 0, partial: 0
       });
     }
     // A resumed run landing here means the account changed while the batch
@@ -5118,6 +5143,9 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
   let saved = Number(rc.saved) || 0, queued = Number(rc.queued) || 0, failed = Number(rc.failed) || 0,
       aiFailed = Number(rc.aiFailed) || 0, skipped = Number(rc.skipped) || 0, tooLong = Number(rc.tooLong) || 0,
       tagTooLong = Number(rc.tagTooLong) || 0;
+  // A Karakeep save that created the bookmark but not every later step: it is
+  // on the server, so it is not a failure, and a rerun updates it in place.
+  let partial = Number(rc.partial) || 0;
   // The first tag linkding could not store, as the summary names it. It rides
   // with the counts so a resumed run can still name it.
   let longTag = typeof rc.longTag === "string" ? rc.longTag : "";
@@ -5126,7 +5154,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
   let longTagSkip = rc.longTagSkip === true;
   const startIndex = resumeState ? Math.max(0, Number(resumeState.startIndex) || 0) : 0;
   const resumeCount = Number(resumeState?.resumeCount) || 0;
-  const base = () => ({ runId, resumeCount, account, total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, longTag, longTagSkip });
+  const base = () => ({ runId, resumeCount, account, total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, partial, longTag, longTagSkip });
   // Persist the job snapshot BEFORE the first item: everything a resume needs
   // (public tab identity + cursor + counts), never a token. The per-item
   // checkpoint below rewrites cursor+counts; every terminal path removes it.
@@ -5135,7 +5163,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     account,
     tabs: tabs.map((tb) => ({ id: tb.id, url: tb.url, title: tb.title, incognito: !!tb.incognito })),
     next: processed,
-    counts: { processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, longTag, longTagSkip },
+    counts: { processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, partial, longTag, longTagSkip },
     resumeCount,
     ts: Date.now(),
   });
@@ -5220,18 +5248,31 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
 
       try {
         await requireAccount();
+        const mode = s.batchSkipExisting ? "skip" : "merge";
+        const title = tab.title || tab.url;
+        // Skip mode asks first (user decision 2026-11-02): a page already saved
+        // is skipped without reading it or paying for AI, and so is one whose
+        // check met a cause every request meets (it stops the run below). The
+        // answer goes to delivery, so the server is asked once per page; a
+        // check that got no answer is queued there like an outage.
+        let lookup;
+        if (mode === "skip") lookup = { url: tab.url, account, found: await fetchExistingBookmark(tab.url, currentAuth.token, currentAuth) };
+        const settled = !!lookup && (lookup.found.exists || (lookup.found.lookupFailed && !lookup.found.retryable));
+        // A title the service cannot store fails every attempt: count it before
+        // any page read, AI request or write.
+        if (!settled && pbpBookmarkTitleFailure(title, currentAuth.service)) { tooLong++; continue; }
         let tags = [...baseTags];
         let notes = "";
         let linkdingSummary = "";
         let pageInfo = null;
 
-        if (useAiTags || useAiSummary || (linkding && s.optAutoDescription !== false)) {
+        if (!settled && (useAiTags || useAiSummary || (linkding && s.optAutoDescription !== false))) {
           try { pageInfo = await getPageInfoFromTab(tab.id, {
             withDefuddle: !!(useAiTags || useAiSummary), expectedUrl: tab.url
           }); }
           catch (e) { console.warn("batch: cannot extract page content for", tab.url, e.message); }
         }
-        if (useAiTags || useAiSummary) {
+        if (!settled && (useAiTags || useAiSummary)) {
           await requireAccount();
           if (pageInfo?.pageText) {
             // Per-artifact resolution (audit A8, mirrors the quick-save
@@ -5322,18 +5363,17 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         await requireAccount();
         // Batch notes hold the summary block and nothing else (null: no block).
         const summaryRange = !linkding && notes ? { start: 0, end: notes.length } : null;
-        const mode = s.batchSkipExisting ? "skip" : "merge";
         const result = await submitSaveIntent({
           mode,
           url: tab.url,
-          title: tab.title || tab.url,
+          title,
           notes,
           ...(description !== undefined ? { summary: description } : {}),
           tags: pbpSerializeIntentTags(dedupedTags, currentAuth.service),
           private: isPrivate,
           toread: s.optReadlaterDefault ? true : undefined,
           archive: s.waybackArchiveBatch ? undefined : false,
-        }, { deferBadge: true, expectedAccount: account, summaryRange, tagVocab });
+        }, { deferBadge: true, expectedAccount: account, summaryRange, tagVocab, lookup });
         if (result.reason === "account_changed") {
           const error = new Error("account_changed");
           error.code = "account_changed";
@@ -5347,6 +5387,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         else if (result.status === "queued") queued++;
         else if (result.status === "skipped") skipped++;
         else if (result.reason === "too_long") tooLong++;
+        else if (result.reason === "partial") partial++;
         else if (result.reason === "tag_too_long") {
           tagTooLong++; longTag ||= pbpBookmarkFailureArgs(result)[0];
           if (mode === "skip") longTagSkip = true;
@@ -5366,7 +5407,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       }
     }
 
-    if (saved > 0) await updateBadge().catch(() => {});
+    if (saved > 0 || partial > 0) await updateBadge().catch(() => {});
 
     await clearJob();
     await clearCancel();
@@ -5374,6 +5415,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     const tagsSuffix = baseTags.length ? t("batchTaggedSuffix", baseTags.join(", ")) : "";
     const skippedMsg = skipped > 0 ? t("batchSkipped", String(skipped)) : "";
     const tooLongMsg = tooLong > 0 ? t("batchTooLong", String(tooLong)) : "";
+    const partialMsg = partial > 0 ? t("batchPartial", String(partial)) : "";
     const queuedMsg = queued > 0 ? ` · ${t("offlineQueued", String(queued))}` : "";
     // A sentence of its own after the summary: which tag, the limit, what to do.
     const tagTooLongMsg = tagTooLong > 0
@@ -5381,8 +5423,8 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       // "run Batch Save again" alone would skip them; it names the way out.
       ? t(longTagSkip ? "batchTagTooLongSkip" : "batchTagTooLong", String(tagTooLong), ...pbpBookmarkFailureArgs({ reason: "tag_too_long", tag: longTag }))
       : "";
-    if (saved > 0 || queued > 0 || failed > 0 || tooLong > 0 || tagTooLong > 0) {
-      const message = t("batchDone", String(saved), String(failed)) + skippedMsg + tooLongMsg + queuedMsg + tagsSuffix + tagTooLongMsg;
+    if (saved > 0 || queued > 0 || failed > 0 || tooLong > 0 || tagTooLong > 0 || partial > 0) {
+      const message = t("batchDone", String(saved), String(failed)) + skippedMsg + tooLongMsg + partialMsg + queuedMsg + tagsSuffix + tagTooLongMsg;
       if (saved > 0 || queued > 0) {
         const title = saved > 0 ? t("bgBatchSaved") : t("bgQueuedOffline");
         showNotification("batch-saved", title, message, "batchSave");

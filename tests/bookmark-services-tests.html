@@ -400,7 +400,7 @@ async function workerHarness(service, replies, options = {}) {
       remove:async keys=>{for(const k of [].concat(keys)){if(k==="offlineQueue")state.queue=[];else delete state.local[k];}}
     }}}
   };
-  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,submitPopupSaveIntent,sendOfflineItem,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient,mutateOfflineQueue,pbpReadTagVocab,pbpLoadTagVocab};")(...Object.values(deps));
+  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,submitPopupSaveIntent,sendOfflineItem,fetchExistingBookmark,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient,mutateOfflineQueue,pbpReadTagVocab,pbpLoadTagVocab};")(...Object.values(deps));
   return {...api,state,auth,chrome:deps.chrome};
 }
 const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"work",private:true,toread:false};
@@ -418,6 +418,7 @@ async function producers(h, {autoNotes, summary, settings: overrides = {}, realV
     batchAiSummary:true, batchAiTags:false, optBatchTagEnabled:false, batchSkipExisting:false, waybackArchiveBatch:false, ...overrides};
   const deps = {
     loadSettings:async()=>({...settings}), getCurrentBookmarkAuth:h.auth, submitSaveIntent:(...args)=>h.submitSaveIntent(...args),
+    fetchExistingBookmark:(...args)=>h.fetchExistingBookmark(...args),
     hasAIKey:()=>true, buildAutoNotes:()=>autoNotes,
     getAICache:async()=>null, setAICache:async()=>{}, callAI:async()=>{h.state.aiCalls=(h.state.aiCalls||0)+1;return summary;}, buildSummaryPrompt:()=>"summary prompt",
     getPageInfoFromTab:async()=>{h.state.extractions=(h.state.extractions||0)+1;return {pageText:"article body"};},
@@ -434,7 +435,7 @@ async function producers(h, {autoNotes, summary, settings: overrides = {}, realV
     + ";return {saveFromBackground,handleBatchSave};")(...Object.values(deps));
   const tab = {id:9, url:pageUrl, title:"Title", incognito:false};
   return {
-    quickSave:()=>api.saveFromBackground({url:pageUrl, title:"Title", tab, notifyId:"qs", notifyTitle:"Quick saved", notifyCategory:"quickSave"}),
+    quickSave:(overrides={})=>api.saveFromBackground({url:pageUrl, title:"Title", tab, notifyId:"qs", notifyTitle:"Quick saved", notifyCategory:"quickSave", ...overrides}),
     batchSave:(tabs=[tab])=>api.handleBatchSave(tabs),
   };
 }
@@ -1450,6 +1451,132 @@ test("a skip-mode quick save stopped by an over-long tag says the page was saved
     await (await producers(h,{autoNotes:"",summary:"",settings:{_aiSummary:false,bgSaveMode:mode,_defaultTags:tag}})).quickSave();
     equal([mode,h.state.calls.map(c=>c.method),h.state.queue],[mode,["GET","POST"],[]]);
     equal([mode,h.state.notifications.at(-1)?.slice(1,3)],[mode,["bgSaveFailed",key+":"+shown+":64"]]);
+  }
+});
+// Title limits (pbpBookmarkLimits): linkding counts code points, Karakeep
+// UTF-16 units. A title the server cannot store is refused before any
+// request: nothing is sent, queued or billed to the AI key.
+const titleCases=[["linkding","😀".repeat(513),"😀".repeat(512),"512"],["karakeep","x".repeat(1001),"x".repeat(1000),"1000"]];
+test("a quick save whose title the service cannot store sends, queues and pays for nothing and names the limit",async()=>{
+  for(const [service,long,,limit] of titleCases){
+    const h=await workerHarness(service,[]);
+    const result=await (await producers(h,{autoNotes:"Auto notes",summary:"A summary."})).quickSave({title:long});
+    equal([service,result.status,result.reason,result.retryable],[service,"failed","too_long",undefined]);
+    equal([service,h.state.calls.length,h.state.queue,h.state.aiCalls||0,h.state.extractions||0],[service,0,[],0,0]);
+    equal([service,h.state.notifications.at(-1)?.slice(1,3)],[service,["bgSaveFailed","titleTooLong:"+limit]]);
+  }
+});
+test("a quick save whose title is exactly at the limit is sent whole",async()=>{
+  for(const [service,,fits] of titleCases){
+    const replies=service==="linkding"?[[200,{bookmark:null}],[201,{...ldUnscraped,title:fits}]]:[[200,{bookmarkId:null}],[201,{...kkRecord("bk-new",""),title:fits}]];
+    const h=await workerHarness(service,replies);
+    const result=await (await producers(h,{autoNotes:"",summary:"",settings:{_aiSummary:false}})).quickSave({title:fits});
+    equal([service,result.status,h.state.calls[1]?.body?.title],[service,"saved",fits]);
+  }
+});
+test("Batch counts an over-long title as too long before AI and a partial save as partial, not failed",async()=>{
+  const tabs=[{id:31,url:pageUrl+"?b=0",title:"x".repeat(1001),incognito:false},{id:32,url:pageUrl+"?b=1",title:"T1",incognito:false}];
+  // Karakeep 0.34.1: the bookmark is created, then its tag request fails.
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[201,kkRecord("bk-new","")],[400,{code:"invalid_request"}]]);
+  await (await producers(h,{autoNotes:"",summary:"A summary.",settings:{optBatchTagEnabled:true,optBatchTag:"work"}})).batchSave(tabs);
+  const last=h.state.progress.at(-1);
+  equal([last.done,last.error,last.saved,last.failed,last.tooLong,last.partial,last.queued],[true,null,0,0,1,1,0]);
+  equal([h.state.aiCalls,h.state.calls.map(c=>c.method+" "+new URL(c.url).pathname.replace(/^\/base\/api\/v1\//,""))],[1,["GET bookmarks/check-url","POST bookmarks","POST bookmarks/bk-new/tags"]]);
+  equal(h.state.queue,[]);
+  const [, , body]=h.state.notifications.at(-1)||[];
+  ok(body.startsWith("batchDone:0:0")&&body.includes("batchTooLong:1")&&body.includes("batchPartial:1"));
+});
+test("a queued save whose title the service cannot store is never sent on replay or on a manual retry",async()=>{
+  for(const [service,long,,limit] of titleCases){
+    const h=await workerHarness(service,[new TypeError("offline")]);
+    equal((await h.submitSaveIntent({...saveIntent})).status,"queued");
+    // An item queued before this check existed.
+    h.state.queue[0].title=long;
+    const queueId=h.state.queue[0].queueId;
+    await h.processOfflineQueue();
+    equal([service,h.state.calls.length,h.state.queue.map(item=>item.queueId)],[service,1,[queueId]]);
+    const retried=await h.retryOfflineItem(queueId);
+    equal([service,retried.ok,retried.result.reason,pbpBookmarkFailureText(retried.result,service,(key,...args)=>[key,...args].join(":"))],[service,false,"too_long","titleTooLong:"+limit]);
+    equal([service,h.state.calls.length,h.state.queue.map(item=>item.queueId)],[service,1,[queueId]]);
+  }
+});
+// linkding v1.47 Bookmark.url: CharField(max_length=2048) with Django's
+// URLValidator, which needs a dotted host unless it is localhost or an IP.
+// DRF answers either rejection with a 400 naming the url field.
+const ldUrlTooLong=[400,{url:["Ensure this field has no more than 2048 characters."]}], ldUrlNotValid=[400,{url:["Enter a valid URL."]}];
+const longPageUrl=n=>{const head="https://example.com/a?q=";return head+"x".repeat(n-head.length);};
+test("a linkding 400 on a create names the address only when the server cannot take that address",async()=>{
+  equal(longPageUrl(2049).length,2049);
+  for(const [url,reply,code] of [
+    [longPageUrl(2049),ldUrlTooLong,"url_invalid"],
+    ["http://intranet/page",ldUrlNotValid,"url_invalid"],
+    ["https://wiki:8443/page",ldUrlNotValid,"url_invalid"],
+    [longPageUrl(2048),[400,{title:["Ensure this field has no more than 512 characters."]}],"remote"],
+    [pageUrl,[400,{url:["This field is required."]}],"remote"],
+    ["http://localhost:8000/page",ldUrlNotValid,"remote"],
+    ["http://192.168.1.5/page",ldUrlNotValid,"remote"],
+    ["http://[::1]/page",ldUrlNotValid,"remote"],
+  ])await rejects(()=>harness("linkding",[reply]).client.save({url,title:"T",notes:"",tags:[]},null),code);
+  // A PATCH never sends the address, so its 400 stays a plain rejection.
+  await rejects(()=>harness("linkding",[ldUrlNotValid]).client.save({url:"http://intranet/page",title:"T",notes:"",tags:[]},{id:"7",url:"http://intranet/page",private:true,summary:""}),"remote");
+  // Karakeep keeps its own codes.
+  await rejects(()=>harness("karakeep",[[400,{code:"invalid_request"}]]).client.save({url:"http://intranet/page",title:"T",notes:"",tags:[]},null),"remote");
+});
+test("a linkding address the server refuses is not queued and names the address; another 400 stays remote",async()=>{
+  for(const [url,reply,reason,key] of [[longPageUrl(2049),ldUrlTooLong,"url_invalid","bookmarkErrUrlInvalid"],[pageUrl,[400,{title:["Ensure this field has no more than 512 characters."]}],"remote","bookmarkErrRemote"]]){
+    const h=await workerHarness("linkding",[[200,{bookmark:null}],reply]);
+    const result=await h.submitSaveIntent({...saveIntent,url});
+    equal([reason,result.status,result.reason,h.state.queue],[reason,"failed",reason,[]]);
+    equal([reason,pbpBookmarkFailureKey(result,"linkding"),pbpBookmarkFailureRetryable(result)],[reason,key,false]);
+  }
+  const quick=await workerHarness("linkding",[[200,{bookmark:null}],ldUrlNotValid]);
+  await (await producers(quick,{autoNotes:"",summary:"",settings:{_aiSummary:false}})).quickSave({url:"http://intranet/page"});
+  equal([quick.state.queue,quick.state.notifications.at(-1)?.slice(1,3)],[[],["bgSaveFailed","bookmarkErrUrlInvalid"]]);
+});
+// User decision 2026-11-01 (1): only a visible sharing choice changes it.
+test("quick save and Batch merging into a shared linkding bookmark never send shared",async()=>{
+  for(const run of ["quickSave","batchSave"]){
+    const shared={...ld,shared:true};
+    const h=await workerHarness("linkding",[[200,{bookmark:shared,metadata:{},auto_tags:[]}],[200,{...shared,date_modified:"2026-11-03T10:00:00.000000Z"}]]);
+    h.state.settings.linkdingToken=JSON.stringify({v:1,baseUrl:"https://bookmarks.example/base/",token:"fixture-secret",connectionId:"connection1",userId:"user1",sharing:true});
+    equal((await h.auth()).sharingEnabled,true);
+    await (await producers(h,{autoNotes:"",summary:"",settings:{_aiSummary:false,batchAiSummary:false}}))[run]();
+    equal([run,h.state.calls.map(c=>c.method)],[run,["GET","PATCH"]]);
+    equal([run,Object.hasOwn(h.state.calls[1].body,"shared")],[run,false]);
+  }
+});
+// User decision 2026-11-02 (7): in skip mode Batch asks first and pays for
+// AI only on pages not saved yet; the answer is the one delivery uses.
+test("skip-mode Batch checks each page once and calls AI only for a page not saved yet",async()=>{
+  const tabs=[{id:41,url:pageUrl+"?s=0",title:"T0",incognito:false},{id:42,url:pageUrl+"?s=1",title:"T1",incognito:false}];
+  const h=await workerHarness("linkding",[[200,{bookmark:{...ld,url:tabs[0].url},metadata:{},auto_tags:[]}],[200,{bookmark:null}],[201,{...ldUnscraped,url:tabs[1].url}]]);
+  await (await producers(h,{autoNotes:"",summary:"A summary.",settings:{batchSkipExisting:true}})).batchSave(tabs);
+  const last=h.state.progress.at(-1);
+  equal([last.saved,last.skipped,last.failed,h.state.aiCalls,h.state.extractions],[1,1,0,1,1]);
+  const checks=h.state.calls.filter(c=>new URL(c.url).pathname.endsWith("/check/")).map(c=>new URL(c.url).searchParams.get("url"));
+  equal([checks,h.state.calls.map(c=>c.method)],[tabs.map(tab=>tab.url),["GET","GET","POST"]]);
+  equal(h.state.calls[2].body.description,"A summary.");
+});
+test("skip-mode Batch queues a page whose check fails and stops on a token rejection before AI",async()=>{
+  const tabs=[{id:43,url:pageUrl+"?f=0",title:"T0",incognito:false}];
+  const queued=await workerHarness("linkding",[new TypeError("offline")]);
+  await (await producers(queued,{autoNotes:"",summary:"A summary.",settings:{batchSkipExisting:true}})).batchSave(tabs);
+  equal([queued.state.progress.at(-1).queued,queued.state.calls.length,queued.state.queue.map(item=>item.mode)],[1,1,["skip"]]);
+  const stopped=await workerHarness("linkding",[[401,{detail:"Invalid token."}]]);
+  await (await producers(stopped,{autoNotes:"",summary:"A summary.",settings:{batchSkipExisting:true}})).batchSave(tabs);
+  equal([stopped.state.progress.at(-1).error,stopped.state.aiCalls||0,stopped.state.calls.length,stopped.state.queue],["auth",0,1,[]]);
+});
+// User decision 2026-11-02 (5a): a background save whose duplicate check got
+// no answer is queued like an outage; replay checks again and keeps it queued.
+test("a quick save whose duplicate check times out is queued without a write, and replay never writes without a check",async()=>{
+  const timeout=()=>Object.assign(new Error("signal timed out"),{name:"TimeoutError"});
+  for(const service of ["linkding","karakeep"]){
+    const h=await workerHarness(service,[timeout(),timeout()]);
+    const result=await (await producers(h,{autoNotes:"",summary:"",settings:{_aiSummary:false}})).quickSave();
+    equal([service,result.status,h.state.calls.map(c=>c.method),h.state.queue.length],[service,"queued",["GET"],1]);
+    equal([service,h.state.notifications.at(-1)?.[1]],[service,"bgQueuedOffline"]);
+    await h.processOfflineQueue();
+    equal([service,h.state.calls.map(c=>c.method),h.state.queue.length],[service,["GET","GET"],1]);
   }
 });
 test("every placeholder the save failure copy fills keeps its name and order in all nine locales",async()=>{

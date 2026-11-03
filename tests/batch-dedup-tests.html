@@ -663,6 +663,17 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     equal(early.elements["batch-bookmark-btn"].focused, true, "hidden progress kept keyboard focus");
   });
 
+  await test("a partial save is reported apart from failures and still flags the run", async () => {
+    const h = await createUiHarness(null, 5000);
+    h.renderBatchProgress({ running: false, done: true, total: 3, saved: 1, queued: 0, failed: 0, skipped: 0, tooLong: 0, partial: 2 });
+    assert(h.statuses[0].message.startsWith("batchDone:1:0"), "partial saves counted as failed: " + h.statuses[0].message);
+    assert(h.statuses[0].message.includes("batchPartial:2"), "partial count missing: " + h.statuses[0].message);
+    equal(h.statuses[0].kind, "error");
+    const none = await createUiHarness(null, 5000);
+    none.renderBatchProgress({ running: false, done: true, total: 1, saved: 1, queued: 0, failed: 0, skipped: 0, tooLong: 0 });
+    assert(!none.statuses[0].message.includes("batchPartial"), none.statuses[0].message);
+  });
+
   await test("over-long linkding tags name the tag after the summary and render as an error", async () => {
     const shown = "x".repeat(40) + "\u2026";
     const h = await createUiHarness(null, 5000);
