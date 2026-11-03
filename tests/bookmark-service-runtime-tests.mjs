@@ -763,12 +763,18 @@ try{
     }
     // Suggested-tag chips (.stag, here the AI row) share the root cause: a name with no space must not push the chip out.
     await popup.evaluate(tag=>{document.getElementById('ai-tags-row').classList.remove('hidden');renderAITags([tag,'ab'],false);},long);
-    const stags=await popup.evaluate(()=>[...document.querySelectorAll('#ai-suggest-tags .stag')].map(el=>{const box=el.getBoundingClientRect();return{right:box.right,left:box.left,w:box.width,h:box.height,clipped:el.scrollWidth>el.clientWidth};}));
+    const stags=await popup.evaluate(()=>[...document.querySelectorAll('#ai-suggest-tags .stag')].map(el=>{const box=el.getBoundingClientRect();const tx=el.querySelector('.stag-text');return{right:box.right,left:box.left,w:box.width,h:box.height,clipped:tx.scrollWidth>tx.clientWidth,title:tx.title,tag:el.dataset.tag};}));
     assert.equal(stags.length,2);
+    assert(stags.every(c=>c.title===c.tag&&c.tag),'a suggested tag chip does not carry its full name as a tooltip: '+JSON.stringify(stags));
     assert(stags.every(c=>c.left>=0&&c.right<=550),'a long suggested tag chip left the popup: '+JSON.stringify(stags));
     assert(stags[0].clipped,'the long suggested tag was not ellipsized '+JSON.stringify(stags));
     assert(!stags[1].clipped&&Math.abs(stags[1].h-STAG_H)<=0.5,'a short suggested tag chip changed: '+JSON.stringify(stags[1]));
     assert((await popup.evaluate(()=>document.documentElement.scrollWidth))<=550,'a long suggested tag widened the popup');
+    // A suggestion that carries a usage count keeps the count whole and exactly one 4px gap after the name (the count text
+    // starts with a space, which only collapses while the chip lays out as flex), also when the long name is what shrinks.
+    await popup.evaluate(tag=>{allUserTagCounts[tag]=7;allUserTagCounts.ab=12;renderAITags([tag,'ab'],false);},long);
+    const counted=await popup.evaluate(()=>[...document.querySelectorAll('#ai-suggest-tags .stag')].map(el=>{const box=el.getBoundingClientRect(),tx=el.querySelector('.stag-text').getBoundingClientRect(),c=el.querySelector('.ac-count').getBoundingClientRect();return{gap:c.left-tx.right,countInside:c.right<=box.right+0.5&&c.right<=550,right:box.right};}));
+    assert(counted.every(c=>Math.abs(c.gap-4)<=0.5&&c.countInside&&c.right<=550),'a counted suggestion changed its name/count spacing or lost its count: '+JSON.stringify(counted));
     await popup.locator('#tags-input').fill(fits);await popup.locator('#tags-input').press('Enter');
     const before=requests.length;await popup.locator('#submit-btn').click();
     await until(()=>JSON.stringify(kept.tag_names)===JSON.stringify([fits]),'the shortened tag updated the kept bookmark');

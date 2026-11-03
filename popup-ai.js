@@ -1483,7 +1483,11 @@ function renderAITags(tags, fromCache) {
     el.type = "button";
     el.className = "stag ai";
     el.dataset.tag = tag;
-    el.appendChild(document.createTextNode(tag));
+    const nameEl = document.createElement("span");
+    nameEl.className = "stag-text";
+    nameEl.title = tag;
+    nameEl.textContent = tag;
+    el.appendChild(nameEl);
     const count = allUserTagCounts[tag];
     if (count) {
       const cs = document.createElement("span");

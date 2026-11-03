@@ -117,7 +117,11 @@ async function fetchPinboardSuggestTags(token, url) {
         el.type = "button";
         el.className = "stag";
         el.dataset.tag = resolved;
-        el.appendChild(document.createTextNode(resolved));
+        const nameEl = document.createElement("span");
+        nameEl.className = "stag-text";
+        nameEl.title = resolved;
+        nameEl.textContent = resolved;
+        el.appendChild(nameEl);
         const count = allUserTagCounts[resolved];
         if (count) {
           const cs = document.createElement("span");
