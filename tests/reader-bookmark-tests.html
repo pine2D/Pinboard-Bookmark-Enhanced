@@ -67,6 +67,10 @@ async function pipelineHarness(options = {}) {
     pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { account, token: env.token, epoch: env.epoch, service: env.service, ...sharing() } : null,
     pbpWaybackArchive: async () => {}, updateBadge: async () => {}, setIcon: () => {},
     statusCache: (env.statusCache ||= new Map()),
+    // The notification Undo's own record store and toasts.
+    pbpTakeUndoRecord: async id => { const record = (env.undo ||= {})[id] || null; delete env.undo[id]; return record; },
+    pbpClearNotification: async id => { (env.clearedToasts ||= []).push(id); },
+    showNotification: (id, title, message) => { (env.toasts ||= []).push({ id, title, message }); },
     pinboardFetch: async raw => {
       const url = new URL(raw); env.calls.push(url);
       if (env.networkDown) throw new Error("offline");
@@ -88,7 +92,7 @@ async function pipelineHarness(options = {}) {
       return { ok: true, status: 200, json: async () => ({ result_code: "done" }) };
     },
   };
-  return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, submitPopupSaveIntent, pbpReaderBookmarkRequest, processOfflineQueue, bookmarkApi: typeof pbpBookmarkApiRequest === \"function\" ? pbpBookmarkApiRequest : null }; ")(...Object.values(deps)), env };
+  return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, submitPopupSaveIntent, pbpReaderBookmarkRequest, processOfflineQueue, bookmarkApi: typeof pbpBookmarkApiRequest === \"function\" ? pbpBookmarkApiRequest : null, undo: typeof pbpRunNotificationUndo === \"function\" ? pbpRunNotificationUndo : null }; ")(...Object.values(deps)), env };
 }
 // The two self-hosted APIs as the adapter meets them, hand-written from
 // linkding v1.47 (routes.py check(), serializers.py create() and update())
@@ -1289,6 +1293,61 @@ await test("the popup's delete removes the bookmark it names and cancels that ad
   equal(h.env.calls.filter(url => url.pathname.endsWith("/delete")).map(url => url.searchParams.get("url")).join(), URL_ARTICLE);
   equal(h.env.post, null);
   equal(h.env.queue.map(item => item.queueId).join(), "other-url");
+});
+// The notification's Undo deletes as the reader does (user decision G17):
+// after a delivery in flight, with this owner's earlier queued saves of the
+// address cancelled first, and only for the connection that saved it.
+const undoDeletes = h => h.env.calls.filter(url => url.pathname.endsWith("/delete")).map(url => url.searchParams.get("url"));
+await test("Undo waits for a delivery in flight before it deletes", async () => {
+  let began, release; const started = new Promise(resolve => { began = resolve; }); const blocked = new Promise(resolve => { release = resolve; });
+  const h = await pipelineHarness({ post: null, onWrite: async () => { began(); await blocked; } });
+  assert(h.undo, "the notification Undo is not reachable");
+  const saving = h.submitSaveIntent({ ...base(), url: URL_ARTICLE + "?other=1", mode: "merge" }, { expectedAccount: "alice" });
+  await started;
+  h.env.undo = { toast: { url: URL_ARTICLE, account: "alice", expiresAt: Date.now() + 30000 } };
+  const undoing = h.undo("toast");
+  await new Promise(resolve => setTimeout(resolve, 0));
+  equal(undoDeletes(h).length, 0);
+  release(); await saving; await undoing;
+  equal(undoDeletes(h).join(), URL_ARTICLE);
+  equal(h.env.toasts.map(toast => toast.title).join(), "bgUndone");
+});
+await test("Undo cancels the owner's earlier queued save of that address, so replay does not rebuild it", async () => {
+  const h = await pipelineHarness({ queue: [
+    { ...base(), mode: "merge", account: "alice", queueId: "old-save" },
+    { ...base(), mode: "merge", account: "bob", queueId: "bob-save" },
+  ] });
+  h.env.undo = { toast: { url: URL_ARTICLE, account: "alice", expiresAt: Date.now() + 30000 } };
+  await h.undo("toast");
+  equal(undoDeletes(h).join(), URL_ARTICLE); equal(h.env.post, null);
+  equal(h.env.queue.map(item => item.queueId).join(), "bob-save");
+  h.env.calls = [];
+  await h.processOfflineQueue();
+  assert(!h.env.calls.some(url => url.pathname.endsWith("/add")), "the queued save rebuilt the undone bookmark");
+  equal(h.env.post, null);
+});
+await test("Undo after the connection changed sends nothing and keeps the queue", async () => {
+  const h = await pipelineHarness({ account: "bob", token: "bob:token", queue: [{ ...base(), mode: "merge", account: "alice", queueId: "old-save" }] });
+  h.env.undo = { toast: { url: URL_ARTICLE, account: "alice", expiresAt: Date.now() + 30000 } };
+  await h.undo("toast");
+  equal(h.env.calls.length, 0); assert(h.env.post, "the bookmark was deleted for another connection");
+  equal(h.env.queue.map(item => item.queueId).join(), "old-save");
+  equal((h.env.toasts || []).length, 0);
+});
+await test("a failed pending-save cancellation stops Undo before any delete", async () => {
+  const h = await pipelineHarness({ queueWriteFailure: true, queue: [{ ...base(), mode: "merge", account: "alice", queueId: "old-save" }] });
+  h.env.undo = { toast: { url: URL_ARTICLE, account: "alice", expiresAt: Date.now() + 30000 } };
+  await h.undo("toast");
+  equal(h.env.calls.length, 0); assert(h.env.post);
+  equal(h.env.toasts.map(toast => toast.title).join(), "bgUndoFailed");
+});
+await test("a self-hosted Undo failure names its cause from the shared table", async () => {
+  const account = "linkding:https://bookmarks.example/:c1";
+  const h = await pipelineHarness({ account, service: "linkding", token: "fixture-token",
+    client: { lookup: async () => { throw pbpBookmarkServiceError("gateway_denied", 403); } } });
+  h.env.undo = { toast: { url: URL_ARTICLE, account, expiresAt: Date.now() + 30000 } };
+  await h.undo("toast");
+  equal(JSON.stringify(h.env.toasts.map(toast => [toast.title, toast.message])), JSON.stringify([["bgUndoFailed", "bookmarkErrGatewayDenied"]]));
 });
 await test("runtime script implements guarded shared keyboard and action state", async () => {
   runtime = await (await fetch("../md-bookmark.js")).text(); assert(!runtime.startsWith("<!DOCTYPE"), "reader runtime is not implemented");

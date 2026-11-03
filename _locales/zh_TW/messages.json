@@ -648,6 +648,15 @@
       }
     }
   },
+  "offlineQueueOtherConnection": {
+    "message": "另有 $COUNT$ 個屬於其他連線",
+    "description": "Popup offline queue bar: how many queued bookmarks belong to a bookmark connection other than the current one. They stay queued and are not retried for this connection. $COUNT$ is the number.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "saveQueuedNetwork": {
     "message": "無法連線至書籤伺服器。已加入離線佇列，稍後自動重試。"
   },

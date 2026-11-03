@@ -107,7 +107,18 @@ async function getUndoSource() {
   const start = source.indexOf("const _recentSaves");
   const end = source.indexOf("// ---- 设置图标", start);
   assert(start >= 0 && end > start, "Undo notification source not found");
-  undoSource = source.slice(start, end);
+  // Undo deletes through the reader's ordered delete; the Pinboard request
+  // and failure shapes are the worker's own.
+  const piece = (from, to) => {
+    const a = source.indexOf(from), b = source.indexOf(to, a);
+    assert(a >= 0 && b > a, "Undo dependency source not found: " + from);
+    return source.slice(a, b);
+  };
+  undoSource = source.slice(start, end)
+    + piece("async function pbpBookmarkDeleteResponse(", "async function pbpBookmarkTagCounts(")
+    + piece("function pbpBookmarkFailure(", "// A vocabulary cache is advisory.")
+    + piece("function pbpSaveFailure(", "function validateSaveIntent(")
+    + piece("function pbpDeleteBookmarkInOrder(", "// The popup's bookmark requests");
   return undoSource;
 }
 
@@ -1870,6 +1881,7 @@ await suite("unified save pipeline", async () => {
         clear: async () => true,
       },
       tabs: { query: async () => [] },
+      storage: { local: { get: async () => ({ offlineQueue: [] }), set: async () => {} } },
     };
     const settled = async () => { await new Promise((resolve) => setTimeout(resolve, 0)); };
     const deps = {
@@ -1909,6 +1921,9 @@ await suite("unified save pipeline", async () => {
       t: (key) => key,
       setTimeout: () => 0,
       console,
+      runOfflineQueueConsumer: pbpCreateRecoveringTail(), runSaveDeliveryTransaction: pbpCreateRecoveringTail(),
+      runOfflineQueueWrite: pbpCreateRecoveringTail(), pbpReleaseDroppedSummaryHolds: async () => {},
+      updateBadge: async () => {}, setIcon: () => {},
     };
     const source = await getUndoSource();
     const factory = new Function(...Object.keys(deps), `${source}\nreturn { recent: _recentSaves };`);

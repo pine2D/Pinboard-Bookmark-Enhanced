@@ -655,6 +655,15 @@
       }
     }
   },
+  "offlineQueueOtherConnection": {
+    "message": "$COUNT$ more from another connection",
+    "description": "Popup offline queue bar: how many queued bookmarks belong to a bookmark connection other than the current one. They stay queued and are not retried for this connection. $COUNT$ is the number.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "saveQueuedNetwork": {
     "message": "Couldn’t reach your bookmark server. The save is queued and will retry automatically."
   },

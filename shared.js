@@ -2429,6 +2429,19 @@ function pbpOfflineQueueAccount(item) {
   return pbpPinboardAccountFromToken(item.token);
 }
 
+// How the offline queue names a record's connection: "@username" for
+// Pinboard, "<service> · <host>" for a self-hosted one. The owner string
+// also carries the connection's user or connection ID, which is never shown.
+function pbpOfflineQueueSourceLabel(account) {
+  const service = pbpBookmarkAccountService(account);
+  if (service === "pinboard") return "@" + account;
+  if (!service) return "";
+  const name = service === "karakeep" ? "Karakeep" : "linkding";
+  let host = "";
+  try { host = new URL(account.slice(service.length + 1)).host; } catch (_) { /* name the service alone */ }
+  return host ? name + " · " + host : name;
+}
+
 // Legacy tokens identify ownership only; replay always requires the current
 // token for that same account, so logout/account-switch drains fail closed.
 function pbpResolveOfflineQueueToken(currentToken, item) {

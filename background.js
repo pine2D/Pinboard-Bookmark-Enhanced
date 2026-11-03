@@ -446,83 +446,11 @@ async function showNotification(id, title, message, category, undoInfo) {
   chrome.notifications.create(notifId, opts);
 }
 
-// Undo failure feedback: the bookmark is still on Pinboard, so the "saved"
-// toast stays truthful and is left in place — what the click needs is to hear
-// that the removal did not happen. Same showNotification error family (and the
-// same notifyErrors gate) every other Pinboard write path uses; the body is the
-// server's own result_code when it sent one, else the key classifyPinboardError
-// derives from the response or the thrown error.
-function pbpNotifyUndoFailed(cause) {
-  const message = (typeof cause === "string" && cause) ? cause : t(classifyPinboardError(cause));
-  showNotification("undo-error", t("bgUndoFailed"), message, "error");
-}
-
-// F7: Handle undo button click on notifications
-chrome.notifications.onButtonClicked.addListener(async (notifId, btnIndex) => {
+// F7: Handle undo button click on notifications. pbpRunNotificationUndo
+// lives with the delete it shares (reader bookmark workflow below).
+chrome.notifications.onButtonClicked.addListener((notifId, btnIndex) => {
   if (btnIndex !== 0) return;
-  const info = await pbpTakeUndoRecord(notifId);
-  if (!info) {
-    // Expired, or lost with an earlier worker generation: the toast is still on
-    // screen offering an Undo that cannot happen. Take it down so the click at
-    // least removes the dead button instead of doing nothing at all.
-    await pbpClearNotification(notifId);
-    return;
-  }
-  try {
-    const auth = await pbpReadFreshBookmarkAuthForAccount(info.account);
-    if (!auth || !pbpBookmarkAuthIsCurrent(auth)) {
-      // A different signed-in account is the deliberate isolation cancel — the
-      // record belongs to an account this session may not act for, the same
-      // reason the catch below exempts account_changed from even a log. A
-      // cleared token is a real failure the click deserves to hear about; 401
-      // is the shape classifyPinboardError maps to the auth copy.
-      const current = await getCurrentBookmarkAuth().catch(() => null);
-      if (!current?.token) pbpNotifyUndoFailed(401);
-      return;
-    }
-    const resp = await (pbpSelfHostedAuth(auth) ? pbpBookmarkDeleteResponse(auth, info.url) : pinboardFetch(`https://api.pinboard.in/v1/posts/delete?auth_token=${auth.token}&url=${encodeURIComponent(info.url)}&format=json`));
-    // Classify the HTTP layer first, the way deliverSaveIntent does: 401/403/429
-    // and 5xx answer with an HTML body, so reading result_code first turned every
-    // one of them into a silent JSON parse failure.
-    if (!resp.ok) { pbpNotifyUndoFailed(resp); return; }
-    let data = null;
-    // Leave a trace before folding this into a product error code: an empty
-    // `code` classifies as "you appear to be offline", which is exactly wrong
-    // for a 200 that carried a gateway interstitial or a maintenance page, and
-    // without this line the log says nothing at all about what happened.
-    // name/message only -- no token, no URL. (Same shape as the icon-reset
-    // warn below.)
-    try { data = await resp.json(); }
-    catch (e) { console.warn("[undo] delete response parse failed:", e?.name, e?.message); }
-    const code = typeof data?.result_code === "string" ? data.result_code : "";
-    // "item not found" means the bookmark is already gone — that IS the state the
-    // user asked for, so finish it exactly like a delete this click performed.
-    if (code === "done" || /item\s+not\s+found/i.test(code)) {
-      pbpStatusCacheSet(info.url, auth, { bookmarked: false, timestamp: Date.now() });
-      try {
-        // Same reset the bookmark_deleted handler does: _lastIconState dedup would
-        // otherwise pin the toolbar icon to "saved" until the user navigates away.
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (pbpBookmarkAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, info.url)) {
-          setIcon(tab.id, "default");
-        }
-      } catch (e) {
-        // The removal already landed: a failed icon reset must never reach the
-        // user as a failed Undo.
-        console.warn("[undo] icon reset failed:", e?.name, e?.message);
-      }
-      // The "saved" toast is now false and its button is spent — replace it.
-      await pbpClearNotification(notifId);
-      showNotification("undo-done", t("bgUndone"), t("bgBookmarkRemoved"));
-      return;
-    }
-    pbpNotifyUndoFailed(code);
-  } catch (e) {
-    if (e?.code === "account_changed") return;
-    // Undo path failure — user expects feedback, log so it's debuggable
-    console.warn("[undo] bookmark removal failed:", e?.message || e);
-    pbpNotifyUndoFailed(e);
-  }
+  return pbpRunNotificationUndo(notifId).catch((e) => console.warn("[undo] failed:", e?.name, e?.message));
 });
 
 // ---- 设置图标 ----
@@ -1674,7 +1602,9 @@ function pbpDeleteBookmarkInOrder(account, url) {
       const data = await resp.json();
       auth = await pbpReadFreshBookmarkAuthForAccount(account);
       if (!auth) return pbpSaveFailure("account_changed");
-      if (data?.result_code !== "done" && data?.result_code !== "item not found") return pbpSaveFailure("api");
+      const code = typeof data?.result_code === "string" ? data.result_code : "";
+      // "item not found": the bookmark is already gone, the state asked for.
+      if (code !== "done" && !/item\s+not\s+found/i.test(code)) return pbpSaveFailure("api", { detail: code });
       try {
         if (pbpStatusCacheSet(url, auth, { bookmarked: false, timestamp: Date.now(), posts: [] })) {
           const tabs = await chrome.tabs.query({});
@@ -1683,18 +1613,72 @@ function pbpDeleteBookmarkInOrder(account, url) {
           }
         }
         await updateBadge();
-      } catch (e) { console.warn("reader bookmark delete status failed:", e?.name, e?.message); }
+      } catch (e) { console.warn("bookmark delete status failed:", e?.name, e?.message); }
       return await pbpReadFreshBookmarkAuthForAccount(account)
         ? { status: "deleted", account: account } : pbpSaveFailure("account_changed");
     } catch (e) {
-      console.warn("reader bookmark delete failed:", e?.name, pbpSaveFailure(failure, { detail: e?.message }).detail);
+      console.warn("bookmark delete failed:", e?.name, pbpSaveFailure(failure, { detail: e?.message }).detail);
       if (e?.code === "account_changed") return pbpSaveFailure("account_changed");
       // Self-hosted clients throw classified product errors; keep their code
       // (gateway, auth, remote) instead of folding everything into network.
       if (typeof e?.code === "string" && e.code) return pbpBookmarkFailure(e);
+      // A Pinboard request that ran out of time (AbortSignal.timeout).
+      if (failure === "network" && (e?.name === "TimeoutError" || e?.name === "AbortError")) return pbpSaveFailure("timeout");
       return pbpSaveFailure(failure);
     }
   }));
+}
+
+// Undo failure feedback: the bookmark is still saved, so the "saved" toast
+// stays truthful and is left in place; what the click needs is to hear that
+// the removal did not happen. Same showNotification error family (and the
+// same notifyErrors gate) every other write path uses. A self-hosted cause
+// takes its copy from the shared failure table; a Pinboard one keeps the
+// server's own result_code when it sent one, else the key
+// classifyPinboardError derives from the HTTP status or the error.
+function pbpNotifyUndoFailed(cause) {
+  const message = (typeof cause === "string" && cause) ? cause : t(classifyPinboardError(cause));
+  showNotification("undo-error", t("bgUndoFailed"), message, "error");
+}
+function pbpNotifyUndoFailedResult(result, account) {
+  const text = pbpBookmarkFailureText(result, pbpBookmarkAccountService(account), t);
+  if (text) return pbpNotifyUndoFailed(text);
+  if (result?.reason === "api" && result.detail) return pbpNotifyUndoFailed(result.detail);
+  if (Number.isInteger(result?.httpStatus)) return pbpNotifyUndoFailed({ status: result.httpStatus });
+  if (result?.reason === "timeout") return pbpNotifyUndoFailed({ name: "TimeoutError" });
+  return pbpNotifyUndoFailed(new TypeError("network"));
+}
+
+// The notification's Undo deletes through the same ordered delete as the
+// reader: after any delivery or replay in flight, with the owner's earlier
+// queued saves of that address cancelled first, so none rebuilds it later.
+// The record's owner must still be the current connection.
+async function pbpRunNotificationUndo(notifId) {
+  const info = await pbpTakeUndoRecord(notifId);
+  if (!info) {
+    // Expired, or lost with an earlier worker generation: the toast is still on
+    // screen offering an Undo that cannot happen. Take it down so the click at
+    // least removes the dead button instead of doing nothing at all.
+    await pbpClearNotification(notifId);
+    return;
+  }
+  const result = await pbpDeleteBookmarkInOrder(info.account, info.url);
+  if (result?.status === "deleted") {
+    // The "saved" toast is now false and its button is spent: replace it.
+    await pbpClearNotification(notifId);
+    showNotification("undo-done", t("bgUndone"), t("bgBookmarkRemoved"));
+    return;
+  }
+  if (result?.reason === "account_changed") {
+    // A different signed-in account is the deliberate isolation cancel: the
+    // record belongs to an account this session may not act for. A cleared
+    // token is a real failure the click deserves to hear about; 401 is the
+    // shape classifyPinboardError maps to the auth copy.
+    const current = await getCurrentBookmarkAuth().catch(() => null);
+    if (!current?.token) pbpNotifyUndoFailed(401);
+    return;
+  }
+  pbpNotifyUndoFailedResult(result, info.account);
 }
 
 // The popup's bookmark requests (bookmark_api) for the current connection.
@@ -4611,8 +4595,11 @@ function handleRuntimeMessage(message, sender, sendResponse) {
 
   if (message.type === "get_offline_queue") {
     // pbpReadOfflineQueuePause never rejects; a failed read reports no pause.
-    Promise.all([readOfflineQueueWithIds(), pbpReadOfflineQueuePause()])
-      .then(([queue, pause]) => sendResponse({ ok: true, queue, pause: pause ? { account: pause.account, reason: pause.reason } : null }))
+    // account: the current connection's non-secret owner ("" when there is
+    // none), so the popup can tell its items from other connections'.
+    Promise.all([readOfflineQueueWithIds(), pbpReadOfflineQueuePause(), getCurrentBookmarkAuth().catch(() => null)])
+      .then(([queue, pause, auth]) => sendResponse({ ok: true, queue, pause: pause ? { account: pause.account, reason: pause.reason } : null,
+        ...(auth ? { account: typeof auth.account === "string" ? auth.account : "" } : {}) }))
       .catch(() => sendResponse({ ok: false, queue: [] }));
     return true;
   }

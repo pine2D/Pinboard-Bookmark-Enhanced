@@ -57,6 +57,34 @@ const Q = () => ([
   { queueId: "c", url: "https://c.com" },
 ]);
 
+// The popup's queue bar (popup-offline.js) on real DOM, answered by a stub
+// worker. Returns the bar text and, once expanded, each row's meta line.
+let popupOfflineSource;
+async function renderQueueBar(response) {
+  popupOfflineSource ||= await (await fetch("../popup-offline.js")).text();
+  const host = document.createElement("div");
+  host.innerHTML = '<div id="oq-bar" class="hidden"><span id="oq-text"></span><button id="oq-toggle" aria-expanded="false"></button></div><div id="oq-list" class="hidden"></div>';
+  document.body.appendChild(host);
+  const ids = { "offline-queue-bar": "oq-bar", "offline-queue-text": "oq-text", "offline-queue-toggle": "oq-toggle", "offline-queue-list": "oq-list" };
+  const byId = (id) => host.querySelector("#" + (ids[id] || id));
+  const tr = (key, ...args) => args.length ? key + ":" + args.join(":") : key;
+  const chromeStub = {
+    runtime: { lastError: null, sendMessage: (message, callback) => callback(message.type === "get_offline_queue" ? response : null) },
+    storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } },
+  };
+  const win = {};
+  new Function("window", "chrome", "$id", "t", popupOfflineSource)(win, chromeStub, byId, tr);
+  win.PPOffline.init();
+  await win.PPOffline.refresh();
+  const text = byId("offline-queue-text").textContent;
+  byId("offline-queue-toggle").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  for (let i = 0; i < 20 && !byId("offline-queue-list").querySelector(".offline-queue-item"); i++) await new Promise((r) => setTimeout(r, 0));
+  const rows = [...byId("offline-queue-list").querySelectorAll(".offline-queue-item")].map((row) => ({
+    id: row.dataset.queueId, meta: row.querySelector(".offline-queue-meta").textContent, html: row.outerHTML }));
+  host.remove();
+  return { text, rows };
+}
+
 (async () => {
 await suite("offline queue", async () => {
   await test("remove drops only the matching queueId", () => {
@@ -337,6 +365,31 @@ await suite("offline queue", async () => {
     assert(queue.length === 1 && queue[0].queueId === "a", "item remains queued");
   });
 
+  // Items of another connection stay queued and are never replayed for this
+  // one; the bar counts them apart and names them by service and host only.
+  await test("the queue bar counts the current connection apart and labels other connections by service and host", async () => {
+    const LD = "linkding:https://ld.example/base/:conn-ld-77";
+    const KK = "karakeep:https://kk.example:8443/:user-kk-99";
+    const item = (queueId, account) => ({ queueId, account, url: "https://page.example/" + queueId, title: queueId, queuedAt: Date.now() });
+    const { text, rows } = await renderQueueBar({ ok: true, pause: null, account: LD,
+      queue: [item("ld1", LD), item("kk1", KK), item("ld2", LD), item("pin1", "alice")] });
+    assert(text === "offlineQueued:2 · offlineQueueOtherConnection:2", "bar text: " + text);
+    const meta = Object.fromEntries(rows.map((row) => [row.id, row.meta]));
+    assert(meta.kk1.startsWith("Karakeep · kk.example:8443 · page.example"), "other self-hosted row: " + meta.kk1);
+    assert(meta.pin1.startsWith("@alice · page.example"), "Pinboard row: " + meta.pin1);
+    assert(meta.ld1.startsWith("page.example") && meta.ld2.startsWith("page.example"), "current-connection rows carry a source label: " + meta.ld1);
+    for (const row of rows) {
+      for (const secret of ["conn-ld-77", "user-kk-99", "linkding:", "karakeep:", "/base/"]) {
+        assert(!row.html.includes(secret), row.id + " shows " + secret);
+      }
+    }
+    const pinboard = await renderQueueBar({ ok: true, pause: null, account: "alice", queue: [item("pin1", "alice"), item("pin2", "bob")] });
+    assert(pinboard.text === "offlineQueued:1 · offlineQueueOtherConnection:1", "Pinboard bar text: " + pinboard.text);
+    assert(pinboard.rows[1].meta.startsWith("@bob · "), "another Pinboard account keeps @username");
+    // No answer from the worker: nothing is split off, every row is labelled.
+    const unknown = await renderQueueBar(null);
+    assert(unknown.text === "", "an empty fallback queue showed text");
+  });
   await test("drain skips items the hook marks and reports failures to onFailure", async () => {
     const run = async (hooks) => {
       let queue = Q();

@@ -19,8 +19,9 @@
     return t("offlineDayAgo", String(d));
   }
 
-  // { queue, pause }: pause is the worker's connection-level replay pause
-  // ({account, reason}) or null.
+  // { queue, pause, account }: pause is the worker's connection-level replay
+  // pause ({account, reason}) or null; account is the current connection's
+  // owner ("" for none), or null when the worker did not answer.
   async function getQueueState() {
     const response = await new Promise((resolve) => {
       chrome.runtime.sendMessage({ type: "get_offline_queue" }, (resp) => {
@@ -28,12 +29,25 @@
         resolve(resp);
       });
     });
-    if (response?.ok && Array.isArray(response.queue)) return { queue: response.queue, pause: response.pause || null };
+    if (response?.ok && Array.isArray(response.queue)) {
+      return { queue: response.queue, pause: response.pause || null, account: typeof response.account === "string" ? response.account : null };
+    }
     const { offlineQueue = [], offlineQueuePause = null } = await chrome.storage.local.get(["offlineQueue", "offlineQueuePause"]);
-    return { queue: Array.isArray(offlineQueue) ? offlineQueue : [], pause: offlineQueuePause };
+    return { queue: Array.isArray(offlineQueue) ? offlineQueue : [], pause: offlineQueuePause, account: null };
   }
-  async function getQueue() {
-    return (await getQueueState()).queue;
+
+  // An item queued under a connection other than the current one stays in
+  // the queue and is never replayed for this one (fail-closed); it is only
+  // counted and labelled apart. Unknown current connection: nothing is.
+  function fromOtherConnection(item, current) {
+    return typeof current === "string" && pbpOfflineQueueAccount(item) !== current;
+  }
+  // Pinboard rows keep "@username"; a self-hosted row names its service and
+  // host when it is not the current connection's.
+  function sourceLabel(item, current) {
+    const owner = pbpOfflineQueueAccount(item);
+    if (pbpBookmarkAccountService(owner) === "pinboard") return pbpOfflineQueueSourceLabel(owner);
+    return typeof current === "string" && owner === current ? "" : pbpOfflineQueueSourceLabel(owner);
   }
 
   // The pause only matters while that connection still has queued items.
@@ -49,7 +63,7 @@
   // via getQueue() and sends messages for retry/remove; it never writes directly.
 
   async function refreshBar() {
-    const { queue: q, pause } = await getQueueState();
+    const { queue: q, pause, account: current } = await getQueueState();
     const bar = $id("offline-queue-bar");
     const text = $id("offline-queue-text");
     if (!bar || !text) return;
@@ -60,8 +74,13 @@
     }
     bar.classList.remove("hidden");
     const paused = pauseText(q, pause);
-    text.textContent = t("offlineQueued", String(q.length)) + (paused ? " · " + paused : "");
-    if (expanded) renderList(q);
+    const other = q.filter((item) => fromOtherConnection(item, current)).length;
+    const parts = [];
+    if (q.length > other) parts.push(t("offlineQueued", String(q.length - other)));
+    if (other) parts.push(t("offlineQueueOtherConnection", String(other)));
+    if (paused) parts.push(paused);
+    text.textContent = parts.join(" · ");
+    if (expanded) renderList(q, current);
   }
 
   function hideList() {
@@ -77,7 +96,7 @@
     while (el.firstChild) el.removeChild(el.firstChild);
   }
 
-  function renderList(queue) {
+  function renderList(queue, current) {
     const list = $id("offline-queue-list");
     const toggle = $id("offline-queue-toggle");
     if (!list) return;
@@ -108,8 +127,7 @@
       meta.className = "offline-queue-meta";
       let host = "";
       try { host = new URL(item.url).hostname.replace(/^www\./, ""); } catch (_) {}
-      const account = pbpOfflineQueueAccount(item);
-      meta.textContent = [account ? `@${account}` : "", host, relTime(item.queuedAt)].filter(Boolean).join(" · ");
+      meta.textContent = [sourceLabel(item, current), host, relTime(item.queuedAt)].filter(Boolean).join(" · ");
 
       body.appendChild(title);
       body.appendChild(meta);
@@ -152,8 +170,8 @@
   // background.js answers { ok, result } where result is a pbpSaveFailure envelope
   // (sendOfflineItem / retryOfflineItem). Collapsing it to a boolean left the red
   // pulse as the only feedback, and two of those reasons are permanent dead ends:
-  // replay is fail-closed, so an item queued under another account (the row's meta
-  // already prints its @account) can never succeed however often it is clicked.
+  // replay is fail-closed, so an item queued under another connection (the row's
+  // meta names it) can never succeed however often it is clicked.
   // Same reason -> message table the save path uses in popup.js.
   function retryFailureMessage(result, service) {
     const reason = result && typeof result === "object" ? result.reason : "";
@@ -235,8 +253,8 @@
     if (ev) ev.preventDefault();
     expanded = !expanded;
     if (!expanded) { hideList(); return; }
-    const q = await getQueue();
-    renderList(q);
+    const { queue, account } = await getQueueState();
+    renderList(queue, account);
   }
 
   function init() {
