@@ -1351,6 +1351,9 @@ function pbpOfflinePauseOnCredentialChange(changes) {
   return pbpClearOfflineQueuePause();
 }
 
+// Failures sendOfflineItem / deliverSaveIntent return before any request.
+const PBP_OFFLINE_QUEUE_UNSENT_REASONS = new Set(["account_mismatch", "not_logged_in", "account_changed", "permission", "internal", "storage"]);
+
 // manual: a user-initiated retry ignores the pause (and lifts it first); the
 // automatic path skips paused accounts, starting from the stored pause, and
 // records it holds (pbpOfflineQueueHeld: needing attention, or rate limited).
@@ -1392,9 +1395,14 @@ function drainOfflineQueueIds(queueIds, { manual = false, pausedAccount = "" } =
       // replay leaves it until the user retries or removes it. Any other
       // failure drops a marker the record still carries. A record queued
       // before markers existed is simply replayed once and marked then.
+      // An attempt that never reached the server (another connection's
+      // record, no sign-in, no host grant, a local failure) has nothing new
+      // to say about the record and leaves its marker as it was.
       const mark = pbpOfflineQueueFailureMark(delivered?.result || delivered);
       if (mark) await mutateOfflineQueue({ kind: "mark_failure", queueId: item.queueId, failure: mark });
-      else if (item.failure !== undefined) await mutateOfflineQueue({ kind: "clear_failure", queueId: item.queueId });
+      else if (item.failure !== undefined && !PBP_OFFLINE_QUEUE_UNSENT_REASONS.has(reason)) {
+        await mutateOfflineQueue({ kind: "clear_failure", queueId: item.queueId });
+      }
       // Pinboard items never pause: nothing on that path would lift it.
       const service = pbpBookmarkAccountService(item.account);
       const cause = pbpBookmarkStopCause(delivered?.result || delivered, service);
@@ -1429,9 +1437,8 @@ function retryOfflineItem(queueId) {
   return runOfflineQueueConsumer(async () => {
     try {
       await readOfflineQueueWithIds();
-      // A manual retry starts clean: the attempt's own outcome marks the
-      // record again if the failure is still there.
-      await mutateOfflineQueue({ kind: "clear_failure", queueId });
+      // The marker stays until the attempt's own outcome replaces or clears
+      // it (onFailure above): a retry that sends nothing keeps the cause.
       const outcomes = await drainOfflineQueueIds([queueId], { manual: true });
       const outcome = outcomes[0];
       return outcome

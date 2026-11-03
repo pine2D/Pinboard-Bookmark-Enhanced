@@ -1467,6 +1467,17 @@ test("a failure a retry cannot change is replayed once, marked, and not sent aga
   equal((await h.retryOfflineItem(queueId)).ok,true);
   equal([h.state.calls.map(c=>c.method),h.state.queue],[["GET","POST"],[]]);
 });
+test("a manual retry of another connection's marked record sends nothing and keeps its marker",async()=>{
+  const replies=[new TypeError("offline")];
+  const h=await workerHarness("linkding",replies);
+  equal((await h.submitSaveIntent(saveIntent)).status,"queued");
+  const failure={code:"remote",at:1,status:400};
+  h.state.queue[0]={...h.state.queue[0],account:"karakeep:https://kk.example/:user-kk-1",failure};
+  h.state.calls=[];
+  const retried=await h.retryOfflineItem(h.state.queue[0].queueId);
+  equal([retried.ok,retried.result.reason,h.state.calls.length],[false,"account_mismatch",0]);
+  equal(h.state.queue[0].failure,failure);
+});
 test("only failures a retry cannot change mark a record; a transient one clears an old marker",async()=>{
   for(const [result,marked] of [
     [{reason:"remote",httpStatus:400},true],[{reason:"remote",httpStatus:422},true],[{reason:"remote"},true],

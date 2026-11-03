@@ -1601,6 +1601,20 @@ await suite("unified save pipeline", async () => {
     assert(!("token" in mismatch.storageData.offlineQueue[0]), "mismatch path must also purge the durable legacy credential");
   });
 
+  // A retry that never reached the server has nothing new to say about the
+  // record: the cause it was marked with stays on its row.
+  await test("a manual retry that sends nothing keeps the record's failure marker", async () => {
+    const failure = { code: "http", at: 1, status: 404 };
+    for (const [pinboardToken, reason] of [["", "not_logged_in"], ["bob:current-token", "account_mismatch"]]) {
+      const queued = { queueId: "marked", ...intent({ mode: "overwrite" }), account: "alice", failure };
+      const h = await createHarness({ queue: [queued], settings: { pinboardToken } });
+      const result = await h.retryOfflineItem("marked");
+      equal(result.result.reason, reason);
+      equal(h.fetchCalls.length, 0);
+      equal(JSON.stringify(h.storageData.offlineQueue[0].failure), JSON.stringify(failure), reason + " dropped the marker");
+    }
+  });
+
   await test("tokenless unbound legacy work remains queued after manual retry", async () => {
     const queued = { queueId: "unbound", ...intent({ mode: "overwrite" }) };
     const h = await createHarness({ queue: [queued], settings: { pinboardToken: "alice:current-token" } });
