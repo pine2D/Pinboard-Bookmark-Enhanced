@@ -55,6 +55,42 @@ try {
   check('history refresh cannot duplicate an in-flight reader open', await page.locator('.ask-library-actions button').first().isDisabled());
   await page.evaluate(() => finishPermission(false));
   await page.waitForFunction(() => !document.querySelector('.ask-library-actions button').disabled);
+  // Continue opens the reader on the archived page address. The bookmark bar
+  // there must ask about the address the toolbar icon asks about (the cleaned
+  // one while the popup cleans on open), while the slot's url stays the page's
+  // own so highlights keep their key.
+  await page.evaluate(() => {
+    window.readerSlots = [];
+    window.askStubs = { query: chrome.tabs.query, get: chrome.tabs.get, create: chrome.tabs.create, contains: chrome.permissions.contains, set: chrome.storage.local.set };
+    chrome.permissions.contains = async () => true;
+    chrome.tabs.query = async () => [{ id: 4242, url: window.continueUrl, status: 'complete', incognito: false }];
+    chrome.tabs.get = async () => ({ id: 4242, url: window.continueUrl, status: 'complete', incognito: false });
+    chrome.tabs.create = async () => ({ id: 4243 });
+    chrome.storage.local.set = function (items, ...rest) {
+      const slots = Object.entries(items || {}).filter(([key]) => key.startsWith('md_preview_data_'));
+      if (slots.length) { for (const [, slot] of slots) readerSlots.push(slot); return Promise.resolve(); }
+      return askStubs.set.call(chrome.storage.local, items, ...rest);
+    };
+  });
+  const tracked = 'https://example.test/reading?utm_source=newsletter&id=7';
+  for (const [urlClean, expected] of [[undefined, 'https://example.test/reading?id=7'], [{ enabled: false, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] }, tracked], [{ enabled: true, onPopupOpen: false, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] }, tracked]]) {
+    const slot = await page.evaluate(async ({ tracked, urlClean }) => {
+      if (urlClean === undefined) await chrome.storage.local.remove('urlClean'); else await askStubs.set.call(chrome.storage.local, { urlClean });
+      window.continueUrl = tracked; readerSlots.length = 0;
+      const session = _libAskSessions.find(row => row.id === 'render-session-main');
+      const saved = session.url; session.url = tracked;
+      try { await _pbpLibAskContinue(session, document.querySelector('.ask-library-actions button')); }
+      finally { session.url = saved; }
+      return readerSlots[0] || null;
+    }, { tracked, urlClean });
+    check('Continue hands the reader the bookmark address under ' + JSON.stringify(urlClean ?? 'default'), slot && slot.url === tracked && slot.baseUrl === tracked && slot.sourceTabUrl === tracked && slot.bookmarkUrl === expected, slot);
+  }
+  await page.evaluate(async () => {
+    Object.assign(chrome.tabs, { query: askStubs.query, get: askStubs.get, create: askStubs.create });
+    chrome.permissions.contains = askStubs.contains; chrome.storage.local.set = askStubs.set;
+    await chrome.storage.local.remove('urlClean');
+  });
+  await page.waitForFunction(() => !document.querySelector('.ask-library-actions button').disabled);
   await page.locator('#lib-keys-open').click();
   check('Ask keyboard help exposes conversation keys without vocabulary selection actions', await page.evaluate(() => document.querySelector('#lib-keys [data-keys-for="ask"] dd').getClientRects().length > 0 && [...document.querySelectorAll('#lib-keys [data-keys-for="vocab"] dd, #lib-keys [data-keys-for="notes"] dd, #lib-keys [data-keys-for="selection"] dd')].every(el => !el.getClientRects().length)));
   await page.keyboard.press('/');

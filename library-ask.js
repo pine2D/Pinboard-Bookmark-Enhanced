@@ -282,10 +282,15 @@ async function _pbpLibAskContinue(session, button) {
     if (!await _pbpLibAskCurrent(owner, revision)) return;
     const current = await chrome.tabs.get(tab.id);
     if (!await _pbpLibAskCurrent(owner, revision) || current.url !== url) throw new Error("source_changed");
+    // The reader's bookmark bar looks up and saves under the address the
+    // toolbar icon asks about (pbpBookmarkLookupUrl); url stays the archived
+    // page address so highlights keep their key.
+    const { urlClean } = await (await getSettingsStorage()).get({ urlClean: SETTINGS_DEFAULTS.urlClean });
+    if (!await _pbpLibAskCurrent(owner, revision)) return;
     key = crypto.randomUUID();
     let account = ""; if (owner?.startsWith("acct_")) account = decodeURIComponent(owner.slice(5));
     await chrome.storage.local.set({ ["md_preview_data_" + key]: { pending: true, engine: "local", source: "local", tabId: tab.id,
-      url, baseUrl: url, sourceTabUrl: url, title: session.title, sourceIncognito: false, account, tags: [], description: "", ts: Date.now() } });
+      url, baseUrl: url, sourceTabUrl: url, bookmarkUrl: pbpBookmarkLookupUrl(url, urlClean), title: session.title, sourceIncognito: false, account, tags: [], description: "", ts: Date.now() } });
     if (!await _pbpLibAskCurrent(owner, revision)) return;
     await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html") + "?k=" + key + "&askSession=" + encodeURIComponent(session.id) });
     key = "";
