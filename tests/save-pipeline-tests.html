@@ -316,8 +316,11 @@ async function createBackgroundSaveHarness(options) {
       account: pbpPinboardAccountFromToken(cachedSettings.pinboardToken),
       epoch: 0,
       service: "pinboard",
+      baseUrl: "https://bookmarks.example/",
       ...(opts.auth || {}),
     }),
+    // A self-hosted quick save checks its exact host grant first (granted here).
+    chrome: { permissions: { contains: async () => true } },
     POSTS_ADD_URI_BUDGET,
     // K100: pbpI18nReady is a dep of saveFromBackground now (awaited on the
     // not-logged-in branch only) — every harness slicing it needs this or the
@@ -371,7 +374,7 @@ async function createBatchSaveHarness(options) {
     _removeBatchRecordIfOwned: async (key) => { removed.push(key); return true; },
     _writeBatchProgress: async (value) => progress.push({ ...value }),
     loadSettings: opts.loadSettings || (async () => settings),
-    getCurrentBookmarkAuth: async () => ({ token: settings.pinboardToken, account: "alice", epoch: 0, service: settings.bookmarkService || "pinboard" }),
+    getCurrentBookmarkAuth: async () => ({ token: settings.pinboardToken, account: "alice", epoch: 0, service: settings.bookmarkService || "pinboard", baseUrl: "https://bookmarks.example/" }),
     showNotification: (...args) => notifications.push(args),
     t: (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
     hasAIKey: () => opts.hasAIKey === true,
@@ -386,7 +389,7 @@ async function createBatchSaveHarness(options) {
     buildTagPrompt: opts.buildTagPrompt || (() => "tags"),
     parseAITags: () => ["ai-tag"],
     refineTags: (tags) => tags,
-    chrome: { storage: { local: { get: opts.storageGet || (async () => ({})),
+    chrome: { permissions: { contains: async () => true }, storage: { local: { get: opts.storageGet || (async () => ({})),
       set: async (value) => { if (value.batch_job) jobs.push(JSON.parse(JSON.stringify(value.batch_job))); } } } },
     pbpLoadTagVocab: async (account) => ({ account, timestamp: Date.now(), counts: opts.tagVocabCounts || null, index: opts.tagVocabIndex || null }),
     pbpCanonicalTagName, pbpTagGroupKey,

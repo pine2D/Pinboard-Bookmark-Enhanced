@@ -47,14 +47,14 @@ async function createSaveTagsHarness(service, names) {
     return source.slice(start, end);
   }
   const settings = {bookmarkService:service, pinboardToken:"fixture-token", _aiTags:true, batchAiTags:true};
-  const auth = {service, account:"test-owner", token:"fixture-token"};
+  const auth = {service, account:"test-owner", token:"fixture-token", baseUrl:"https://bookmarks.example/"};
   const calls = {intents:[], uris:[], names:[], progress:[]};
   const dependencies = {
     getCurrentBookmarkAuth:async () => auth,
     loadSettings:async () => settings,
     pbpLoadTagVocab:async account => ({account, timestamp:Date.now(), counts:null, index:pbpTagVocabIndex(Object.fromEntries(names.map(name => [name, 1])))}),
     pbpCanonicalTagName, pbpTagGroupKey,
-    chrome:{storage:{local:{get:async () => ({}), set:async () => {}}}},
+    chrome:{permissions:{contains:async () => true}, storage:{local:{get:async () => ({}), set:async () => {}}}},
     getPageInfoFromTab:async () => ({pageText:"Synthetic public text"}),
     buildAutoNotes:() => "",
     pbpNotesDescription:() => "",

@@ -252,6 +252,8 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     // saveFromBackground, or the sliced function throws ReferenceError. Default
     // is an already-resolved promise so the 57 existing cases below stay unchanged.
     pbpI18nReady: () => { i18nReadyCalls.count++; return Promise.resolve(); },
+    // A self-hosted quick save checks its exact host grant first (granted here).
+    chrome: { permissions: { contains: async () => true } },
     ...overrides,
   };
   const names = Object.keys(dependencies);
@@ -409,7 +411,7 @@ async function run() {
       for (const cached of [{ summary: "<b> *summary*" }, {}]) {
         const h = buildBackgroundSaveHarness(source, async () => "<b> *summary*", cached,
           { _aiTags: false }, true, {
-            getCurrentBookmarkAuth: async () => ({ service, token: "fixture", account: "fixture", epoch: 1 })
+            getCurrentBookmarkAuth: async () => ({ service, token: "fixture", account: "fixture", epoch: 1, baseUrl: "https://bookmarks.example/" })
           });
         await h.save({ url, title: "Article", tab: { id: 7 }, settingsOverrides: {}, notifyId: "qs", notifyCategory: "quickSave" });
         assert(h.intents[0]?.notes === expected, service + " summary format: " + h.intents[0]?.notes);
@@ -432,7 +434,7 @@ async function run() {
           ["combined", {}, { _aiTags: true }],
         ]) {
           const h = buildBackgroundSaveHarness(source, async () => "Fresh <b>summary</b>", cached, patch, true, {
-            getCurrentBookmarkAuth: async () => ({ service, token: "fixture", account: "fixture", epoch: 1 }),
+            getCurrentBookmarkAuth: async () => ({ service, token: "fixture", account: "fixture", epoch: 1, baseUrl: "https://bookmarks.example/" }),
             buildAutoNotes: () => base,
           });
           await h.save({ url, title: "Article", tab: { id: 7 }, settingsOverrides: {}, notifyId: "qs", notifyCategory: "quickSave" });
@@ -470,7 +472,7 @@ async function run() {
       const h = buildBackgroundSaveHarness(source, async (_s, prompt) => prompt === "summary"
         ? "  Single\n Description  " : "ignored", cached,
         { _aiTags: branch === "combined", customSummaryPrompt: branch === "single" ? "custom" : "" }, true, {
-          getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1 }),
+          getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1, baseUrl: "https://bookmarks.example/" }),
           parseAICombined: () => ({ tags: ["ai-tag"], summary: "  Combined\n Description  " }),
         });
       await h.save({ url, title: "Article", tab: { id: 7 }, notifyId: "qs", notifyCategory: "quickSave" });
@@ -484,7 +486,7 @@ async function run() {
     for (const [globalOn, quickOn, expected] of [[true, true, "Meta description"], [false, true, ""], [true, false, ""]]) {
       const h = buildBackgroundSaveHarness(source, async () => "unused", {},
         { _aiTags: false, _aiSummary: false, _autoNotes: quickOn, optAutoDescription: globalOn }, true, {
-          getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1 }),
+          getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1, baseUrl: "https://bookmarks.example/" }),
           pageInfo: { title: "Article", metaDescription: "  Meta\n description  ", selectedText: "quoted" },
           buildAutoNotes: (info) => info.selectedText ? "> quoted" : "",
           pbpNotesDescription: (info) => info.metaDescription || "",
@@ -511,7 +513,7 @@ async function run() {
     ]) {
       const h = buildBackgroundSaveHarness(source, async () => "unused", {},
         { _aiTags: false, _aiSummary: aiSummary, _autoNotes: quickOn, optAutoDescription: globalOn }, true, {
-          getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1 }),
+          getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1, baseUrl: "https://bookmarks.example/" }),
           getPageInfoFromTab: async () => null,
           pbpNotesDescription: () => { throw new Error("an unread page has no meta description to read"); },
         });
@@ -526,7 +528,7 @@ async function run() {
   await test("linkding quick saves fall back to meta when AI summary is empty", async () => {
     const h = buildBackgroundSaveHarness(source, async () => " \n ", {},
       { _aiTags: false, _aiSummary: true, _autoNotes: true, optAutoDescription: true }, true, {
-        getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1 }),
+        getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1, baseUrl: "https://bookmarks.example/" }),
         pageInfo: { title: "Article", metaDescription: "  Fallback\n meta  " },
         pbpNotesDescription: (info) => info.metaDescription || "",
       });

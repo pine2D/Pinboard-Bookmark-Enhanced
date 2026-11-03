@@ -427,6 +427,28 @@ test("Batch stops on a server token rejection or a missing host grant before the
     equal([at, title, body], [at, "bgSaveFailed", cause === "auth" ? "bookmarkErrAuth" : "bookmarkPermissionDenied"]);
   }
 });
+// Without the exact host grant a self-hosted save cannot be delivered: quick
+// save and Batch stop before reading the page or calling AI, queue nothing,
+// and only check the grant (they never request one).
+test("a missing host grant stops quick save and Batch before extraction and AI", async () => {
+  for (const service of ["karakeep", "linkding"]) for (const run of ["quickSave", "batchSave"]) {
+    const h = await workerHarness(service, []);
+    h.state.permitted = false;
+    const checked = [];
+    const contains = h.chrome.permissions.contains;
+    h.chrome.permissions.contains = async query => { checked.push(query); return contains(query); };
+    h.chrome.permissions.request = async () => { throw new Error("a save requested a permission"); };
+    const p = await producers(h, {autoNotes:"Auto notes", summary:"A summary.", settings:{_aiTags:true, batchAiTags:true}});
+    const result = await p[run]();
+    const label = service + " " + run;
+    equal([label, h.state.aiCalls || 0, h.state.extractions || 0, h.state.calls.length, h.state.queue], [label, 0, 0, 0, []]);
+    equal([label, checked[0]], [label, {origins:["https://bookmarks.example/*"]}]);
+    if (run === "quickSave") equal([label, result?.status, result?.reason], [label, "failed", "permission"]);
+    else equal([label, h.state.progress.at(-1)?.error, h.state.progress.at(-1)?.done], [label, "permission", true]);
+    const [, title, body] = h.state.notifications.at(-1) || [];
+    equal([label, title, body], [label, "bgSaveFailed", "bookmarkPermissionDenied"]);
+  }
+});
 test("a Karakeep create merged into a concurrent bookmark owns the note it supplied; a merge that keeps the server note owns nothing", async()=>{
   const notes="Auto notes\n\n" + KK_SUMMARY, range={start:"Auto notes\n\n".length, end:notes.length};
   await pbpFixtureClearSummaryOwnership();
