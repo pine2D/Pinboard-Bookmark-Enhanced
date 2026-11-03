@@ -1659,7 +1659,11 @@ async function pbpReaderBookmarkRequest(message, sender) {
       result = { known: true, bookmarked: false, bookmark: pbpReaderInitialIntent(context, await loadSettings(), "save"), account: context.account };
     } else if (!lookup.lookupFailed) {
       const plan = pbpResolveSavePlan({ mode: "overwrite", url: context.bookmarkUrl, tags: lookup.post?.tags }, lookup);
-      if (plan.action === "send") result = { known: true, bookmarked: true, bookmark: plan.fields, account: context.account };
+      // tagNames: the bookmark's tags as names, which the reader's export
+      // metadata takes over after a save (self-hosted names may hold spaces).
+      const tagNames = Array.isArray(lookup.post?.tagNames) ? lookup.post.tagNames.slice()
+        : String(lookup.post?.tags || "").split(/\s+/).filter(Boolean);
+      if (plan.action === "send") result = { known: true, bookmarked: true, bookmark: { ...plan.fields, tagNames }, account: context.account };
     }
     // Token rotation under the same owner does not invalidate display metadata.
     // Re-read the effective owner after every await before returning it to UI.

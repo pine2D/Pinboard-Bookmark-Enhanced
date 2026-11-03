@@ -1194,12 +1194,17 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   let description = info.description || "";
   const sourceIncognito = info.sourceIncognito === true;
   let bookmarkDraft = info.bookmarkDraft && typeof info.bookmarkDraft === "object" ? info.bookmarkDraft : null;
+  // linkding keeps a Description beside its Notes (`description` above holds
+  // the notes). Its exports carry both: the Description as `description` and
+  // the Notes as `notes` (user decision 2026-11-02, buildMeta). Bookmark
+  // metadata like tags: retired with the account, refreshed by a reader save.
+  let bookmarkDescription = typeof bookmarkDraft?.summary === "string" ? bookmarkDraft.summary : "";
   // A handoff may outlive a service switch before this page opens. Retire its
   // private metadata before any reader module or export can consume it.
   const initialConnection = await pbpReadBookmarkConnection();
   if (bookmarkAccount !== initialConnection.account) {
     bookmarkAccount = initialConnection.account;
-    tags = []; description = ""; bookmarkDraft = null;
+    tags = []; description = ""; bookmarkDraft = null; bookmarkDescription = "";
     await chrome.storage.local.set({[MP_KEY]:{...info,account:bookmarkAccount,tags,description,bookmarkDraft}});
   }
   // X4: raw metadata transported by popup.js/background.js's widened
@@ -1254,7 +1259,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         }
         if (connection.account !== bookmarkAccount) {
           bookmarkAccount = connection.account;
-          tags = []; description = ""; bookmarkDraft = null;
+          tags = []; description = ""; bookmarkDraft = null; bookmarkDescription = "";
           const key = k ? "md_preview_data_" + k : "md_preview_data";
           const stored = (await chrome.storage.local.get(key))[key];
           if (gen !== accountGen) return;
@@ -1991,7 +1996,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       tags,
       source: source === "jina" ? "jina" : "defuddle"
     };
-    if (description) meta.description = description;
+    if (pbpBookmarkAccountService(bookmarkAccount) === "linkding") {
+      if (bookmarkDescription) meta.description = bookmarkDescription;
+      if (description) meta.notes = description;
+    } else if (description) meta.description = description;
     // X4: extended metadata (author/published/site/image/words), gated by the
     // mdExportExtendedMeta setting (default on). Off -> meta stays exactly the
     // six keys above, byte-identical to pre-X4 exports (spec invariant 1).
@@ -2229,8 +2237,19 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   }
   window.addEventListener("focus", refreshExportCount);
   window.addEventListener("pagehide", () => exportHistoryChannel?.close(), { once: true });
+  // A reader save or delete of THIS page's bookmark under the live bookmark
+  // connection: anything else (another account's, another address's) leaves
+  // the badge and the export metadata alone. A save hands the bookmark as the
+  // server now holds it, which the export metadata takes over; a delete
+  // hands none and the export keeps what it had.
   document.addEventListener("pbp:bookmark-changed", (e) => {
-    if (e.detail?.account === bookmarkAccount && e.detail?.url === bookmarkUrl) refreshBookmarkBadge();
+    if (e.detail?.account !== bookmarkAccount || e.detail?.url !== bookmarkUrl) return;
+    refreshBookmarkBadge();
+    const saved = e.detail.bookmark;
+    if (!saved || typeof saved !== "object") return;
+    if (Array.isArray(saved.tags)) tags = saved.tags.filter(tag => typeof tag === "string");
+    if (typeof saved.notes === "string") description = saved.notes;
+    if (pbpBookmarkAccountService(bookmarkAccount) === "linkding") bookmarkDescription = typeof saved.summary === "string" ? saved.summary : "";
   });
   document.addEventListener("pbp:rendered", refreshExportCount, { once: true });
   updateExportSummary();

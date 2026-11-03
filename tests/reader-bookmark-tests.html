@@ -587,6 +587,42 @@ await test("reader editor shares a new linkding bookmark only when its own Share
     } finally { frame.remove(); }
   }
 });
+// After a reader save, pbp:bookmark-changed names the bookmark by its own
+// address and owner and hands it as the server now holds it, which the export
+// metadata takes over (md-preview.js).
+await test("a reader save announces the bookmark under its cleaned address with the server's tags, Description and Notes", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  const account = "linkding:https://links.example/:conn-1";
+  const row = { id: 7, url: URL_ARTICLE, title: "Stored title", description: "Stored description", notes: "Stored notes", is_archived: false, unread: false,
+    shared: false, tag_names: ["two-words", "one"], date_added: "2026-10-01T08:00:00.000000Z", date_modified: "2026-10-01T08:00:00.000000Z" };
+  const server = selfHostedServer("linkding", row);
+  const h = await pipelineHarness({ account, token: "linkding-token", service: "linkding", post: null,
+    slot: { account, url: TRACKED, bookmarkUrl: URL_ARTICLE }, clientFor: server.clientFor, settings: { bookmarkService: "linkding" } });
+  const frame = document.createElement("iframe"); document.body.append(frame);
+  try {
+    const w = frame.contentWindow, pending = [], changed = [];
+    w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+    w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
+      sendMessage: msg => { const request = h.pbpReaderBookmarkRequest(msg, SENDER); pending.push(request); return request; },
+      onMessage: { addListener: () => {} } } };
+    w.eval(await (await fetch("../shared.js")).text());
+    w.t = k => k; w.eval(runtime);
+    w.document.addEventListener("pbp:bookmark-changed", e => changed.push(JSON.parse(JSON.stringify(e.detail))));
+    w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: TRACKED, bookmarkUrl: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "" } } }));
+    await settle(pending);
+    await readerIdle(w);
+    await w.pbpReaderBookmarkAction("edit");
+    const tags = w.document.getElementById("reader-bookmark-tags");
+    equal(tags.value, "two-words one", "the editor did not open on the stored bookmark");
+    tags.value = "fresh extra"; tags.dispatchEvent(new w.Event("input", { bubbles: true }));
+    w.document.getElementById("reader-bookmark-apply").click();
+    await settle(pending);
+    await until(() => changed.length === 1, "the save's announcement");
+    equal(JSON.stringify(row.tag_names), JSON.stringify(["fresh", "extra"]));
+    equal(JSON.stringify(changed[0]), JSON.stringify({ url: URL_ARTICLE, account,
+      bookmark: { tags: ["fresh", "extra"], notes: "Stored notes", summary: "Stored description" } }));
+  } finally { frame.remove(); }
+});
 await test("the reader names a linkding tag the server cannot store, queues nothing and keeps the editor open to shorten it", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();
   const account = "linkding:https://links.example/:conn-1";

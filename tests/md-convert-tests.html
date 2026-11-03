@@ -352,6 +352,18 @@ function assertEq(actual, expected, label) {
   // description omitted when absent
   const fm2 = applyFrontmatter("body", { title: "T", url: "u", date: "d", tags: [], source: "jina" }, {});
   assert(!fm2.includes("description:"), "no description field when absent");
+  assert(!fm2.includes("notes:"), "no notes field when absent");
+
+  // linkding exports its Description and its Notes (user decision 2026-11-02):
+  // notes follows description, multi-line Markdown as one escaped scalar.
+  const fmNotes = applyFrontmatter("body", { title: "T", url: "u", date: "d", tags: [], source: "x",
+    description: "One-line Description", notes: "> quoted\n\nNotes: line 2" }, {});
+  const notesLines = fmNotes.split("\n");
+  const descAt = notesLines.indexOf('description: "One-line Description"');
+  assert(descAt > 0, "description present beside notes");
+  assertEq(notesLines[descAt + 1], 'notes: "> quoted\\n\\nNotes: line 2"', "notes follows description as one escaped scalar");
+  const fmNotesOnly = applyFrontmatter("body", { title: "T", notes: "Only notes" }, {});
+  assert(fmNotesOnly.includes('notes: "Only notes"') && !fmNotesOnly.includes("description:"), "notes without a Description");
   assert(fm2.includes("tags: []"), "empty tags renders empty array");
 
   // Pinboard splits tags on whitespace ONLY, so ",", "[", "]", '"' and "#"

@@ -1122,7 +1122,7 @@ function publishedIso(s) {
   return y + "-" + m + "-" + day;
 }
 
-// meta: {title,url,date,tags,source,description?,author?,published?,clipped?,site?,image?,words?}
+// meta: {title,url,date,tags,source,description?,notes?,author?,published?,clipped?,site?,image?,words?}
 // opts.fields: ordered subset of [title,url,date,tags,source]; description always
 // trails (only when present). Bare scalars for url/ISO date/source; quoted for
 // title/description; tags as an inline flow array whose ITEMS are quoted the
@@ -1146,6 +1146,8 @@ function applyFrontmatter(md, meta, opts) {
     else if (f === "source") lines.push("source: " + (meta.source || ""));
   }
   if (meta.description) lines.push("description: " + yamlString(meta.description));
+  // notes: linkding's Notes beside its Description (md-preview.js buildMeta).
+  if (meta.notes) lines.push("notes: " + yamlString(meta.notes));
   // X4 (metadata export pack): extended fields, fixed order, each only when present
   // on meta. published: bare scalar when it already looks like a normalized
   // YYYY-MM-DD (the meta-build-time publishedIso() call's success shape), else
@@ -1818,7 +1820,7 @@ function _pbpConvertScratchDiv() {
 // VISIBLE header (never YAML). renderMarkdown + highlightCodeBlocks run on a
 // detached node (needs a DOM — preview/test page, not the popup). The caller
 // passes opts.hljsCss (fetched from the vendored theme) so this stays chrome-free.
-// meta: {title,url,date,tags,source,description?,author?,published?,clipped?,site?,image?,words?}
+// meta: {title,url,date,tags,source,description?,notes?,author?,published?,clipped?,site?,image?,words?}
 // opts: { frontmatter, imagePolicy, includeToc, hljsCss, math, katexCss, highlights }
 function composeStyledHtml(canonicalMd, meta, opts) {
   // Math pages: repair scraped TeX before parsing (idempotent — md-preview may

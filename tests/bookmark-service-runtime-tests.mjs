@@ -27,6 +27,7 @@ const BLOCKS=[
   'linkding restored draft for another URL',
   'linkding address typed after open',
   'linkding cleaned page address',
+  'reader export metadata follows its bookmark',
   'linkding Description server semantics',
   'gateway probes',
   'settings Connect names the failure cause',
@@ -984,6 +985,54 @@ try{
     await worker.evaluate(()=>{statusCache.clear();return chrome.storage.local.remove('urlClean');});
     await article.goto(origin+'/article');await ctx.unroute(cleanOrigin+'/**');
     console.log("linkding page address cleaned by aggressive mode and a custom parameter: a first open and a restored draft still take the page's description and send it with ?disable_scraping; unusable cleaning settings leave the address as it is and the form saves");
+  });
+  // The reader of a page reached through a tracking link (G10): its bookmark
+  // bar and badge speak in the handoff's cleaned bookmark address, and its
+  // export metadata (Markdown front matter) carries linkding's Description as
+  // description and its Notes as notes, taken over from the bookmark after a
+  // reader save. Another connection's or another address's announcement
+  // changes nothing.
+  await block('reader export metadata follows its bookmark',['linkding'],async()=>{
+    const cleanUrl=origin+'/article-export', trackedUrl=cleanUrl+'?utm_source=feed&utm_medium=social', id='41';
+    records.linkding.set(id,{id:41,url:cleanUrl,title:'Stored title',description:'Stored description',notes:'Stored notes',web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:['kept'],date_added:'2026-10-30T03:01:22.656384Z',date_modified:'2026-10-30T03:01:22.656384Z',website_title:null,website_description:null});
+    const patches=()=>requests.filter(r=>r.service==='linkding'&&r.method==='PATCH'&&r.path==='bookmarks/'+id+'/');
+    const account=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
+    await worker.evaluate(async data=>chrome.storage.local.set({md_preview_data_exportmeta:{markdown:'# Export article\n\nBody.',title:'Export article',url:data.trackedUrl,baseUrl:data.trackedUrl,sourceTabUrl:data.trackedUrl,bookmarkUrl:data.cleanUrl,
+      account:data.account,tags:['popup-tag'],description:'Popup notes',bookmarkDraft:{summary:'Popup description',toread:false},source:'local',ts:Date.now()}}),{trackedUrl,cleanUrl,account});
+    const reader=await ctx.newPage();await reader.goto(pageUrl+'md-preview.html?k=exportmeta');
+    try{
+      await reader.locator('#reader-bookmark-edit[aria-busy="false"]').waitFor();
+      await reader.locator('.bookmark-badge').waitFor({timeout:10000});
+      assert.equal(await reader.locator('#reader-bookmark-later').getAttribute('aria-pressed'),'false');
+      await reader.evaluate(()=>{window.__copied=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copied.push(text);}}});});
+      const frontMatter=async label=>{
+        const before=await reader.evaluate(()=>window.__copied.length);
+        await reader.evaluate(()=>document.getElementById('btn-copy-md').click());
+        await reader.waitForFunction(n=>window.__copied.length>n,before).catch(error=>{throw new Error(label+': nothing was copied ('+error.message+')');});
+        const text=await reader.evaluate(()=>window.__copied.at(-1));
+        const fields=Object.fromEntries(text.split('\n---\n')[0].split('\n').slice(1).map(line=>[line.slice(0,line.indexOf(':')),line.slice(line.indexOf(':')+2)]));
+        return {tags:fields.tags,description:fields.description,notes:fields.notes,url:fields.url};
+      };
+      assert.deepEqual(await frontMatter('opened'),{tags:'["popup-tag"]',description:'"Popup description"',notes:'"Popup notes"',url:trackedUrl},'the handoff metadata did not export Description and Notes apart');
+      // Announcements for another connection or another address leave it alone.
+      await reader.evaluate(({cleanUrl,trackedUrl,account})=>{
+        for(const detail of [{url:cleanUrl,account:'linkding:https://other.example/:conn-9'},{url:trackedUrl,account},{url:cleanUrl+'/other',account}])
+          document.dispatchEvent(new CustomEvent('pbp:bookmark-changed',{detail:{...detail,bookmark:{tags:['foreign'],notes:'Foreign notes',summary:'Foreign description'}}}));
+      },{cleanUrl,trackedUrl,account});
+      assert.deepEqual(await frontMatter('foreign announcements'),{tags:'["popup-tag"]',description:'"Popup description"',notes:'"Popup notes"',url:trackedUrl},'another bookmark changed the export metadata');
+      await reader.locator('#reader-bookmark-edit[aria-busy="false"]').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
+      assert.equal(await reader.locator('#reader-bookmark-tags').inputValue(),'kept','the reader did not open the bookmark stored under the cleaned address');
+      await reader.locator('#reader-bookmark-tags').fill('fresh extra');
+      await reader.locator('#reader-bookmark-summary').fill('Reader description');
+      const before=patches().length;await reader.locator('#reader-bookmark-apply').click();
+      await until(()=>patches().length>before,'reader edit of the cleaned-address bookmark');
+      assert.deepEqual(records.linkding.get(id).tag_names,['fresh','extra']);
+      assert.equal(requests.filter(r=>r.service==='linkding'&&r.method==='POST'&&r.path==='bookmarks/').filter(r=>String(r.data?.url).startsWith(cleanUrl)).length,0,'the reader created a second bookmark');
+      await reader.locator('#reader-bookmark-edit[aria-busy="false"]').waitFor();
+      await reader.waitForFunction(()=>document.getElementById('reader-bookmark-status')?.textContent!=='');
+      assert.deepEqual(await frontMatter('after the reader save'),{tags:'["fresh", "extra"]',description:'"Reader description"',notes:'"Stored notes"',url:trackedUrl},'the export metadata did not take over the saved bookmark');
+    }finally{await reader.close();records.linkding.delete(id);}
+    console.log('reader of a tracked page: badge, bookmark bar and edit use the cleaned bookmark address; linkding exports Description and Notes apart and takes them over after a reader save; foreign announcements change nothing');
   });
   await block('linkding Description server semantics',['linkding'],async()=>{
   // linkding Description against the server's own v1.47 create and update

@@ -165,9 +165,20 @@
   }
 
   // pbp:bookmark-changed names the bookmark by its own address (the handoff's
-  // bookmarkUrl; a slot from before it existed has only url) and owner.
+  // bookmarkUrl; a slot from before it existed has only url) and owner. After
+  // a save it also hands the bookmark as the server now holds it, which the
+  // export metadata takes over (md-preview.js); a delete hands none.
   function changedDetail() {
-    return { url: context.bookmarkUrl || context.url, account: context.account };
+    const detail = { url: context.bookmarkUrl || context.url, account: context.account };
+    const saved = state.known && state.bookmarked ? state.bookmark : null;
+    if (saved && typeof saved === "object") {
+      detail.bookmark = {
+        tags: Array.isArray(saved.tagNames) ? saved.tagNames.slice() : String(saved.tags || "").split(/\s+/).filter(Boolean),
+        ...(typeof saved.notes === "string" ? { notes: saved.notes } : {}),
+        ...(typeof saved.summary === "string" ? { summary: saved.summary } : {}),
+      };
+    }
+    return detail;
   }
 
   async function request(message) {
