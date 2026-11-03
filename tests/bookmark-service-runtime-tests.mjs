@@ -728,7 +728,7 @@ try{
   const STAG_H=18;
   await block('linkding over-long tag',['linkding'],async()=>{
     postgres.linkding=true;
-    const tagUrl=origin+'/article-tag-limit', long='research-'+'x'.repeat(56), fits='\u{1F600}'.repeat(64);
+    const tagUrl=origin+'/article-tag-limit', long='research-'+'x'.repeat(59), fits='\u{1F600}'.repeat(64);
     const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
     const expected=en.bookmarkErrTagTooLong.message.replace('$TAG$',[...long].slice(0,40).join('')+'…').replace('$MAX$','64');
     await article.goto(tagUrl);await article.bringToFront();
@@ -748,7 +748,7 @@ try{
     assert(kept,'the PostgreSQL create left no bookmark');assert.deepEqual(kept.tag_names,[]);
     await popup.waitForFunction(()=>!document.getElementById('existing-banner').classList.contains('hidden'));
     assert.deepEqual(await popup.locator('#tags-display .tag-item').allTextContents(),[long],'the form lost the tag to shorten');
-    // A 66-character tag with no space must not push its chip or its remove button out of a 550px popup.
+    // A 68-character tag with no space must not push its chip or its remove button out of a 550px popup.
     await popup.setViewportSize({width:550,height:600});
     const fit=await popup.evaluate(()=>{const rm=document.querySelector('#tags-display .tag-remove').getBoundingClientRect(),hit=document.elementFromPoint(rm.left+rm.width/2,rm.top+rm.height/2);return{scroll:document.documentElement.scrollWidth,inner:innerWidth,left:rm.left,right:rm.right,hitIsRemove:!!hit&&!!hit.closest('.tag-remove')};});
     assert(fit.scroll<=fit.inner&&fit.left>=0&&fit.right<=fit.inner&&fit.hitIsRemove,'a long tag chip overflowed the popup: '+JSON.stringify(fit));
@@ -773,8 +773,31 @@ try{
     // A suggestion that carries a usage count keeps the count whole and exactly one 4px gap after the name (the count text
     // starts with a space, which only collapses while the chip lays out as flex), also when the long name is what shrinks.
     await popup.evaluate(tag=>{allUserTagCounts[tag]=7;allUserTagCounts.ab=12;renderAITags([tag,'ab'],false);},long);
-    const counted=await popup.evaluate(()=>[...document.querySelectorAll('#ai-suggest-tags .stag')].map(el=>{const box=el.getBoundingClientRect(),tx=el.querySelector('.stag-text').getBoundingClientRect(),c=el.querySelector('.ac-count').getBoundingClientRect();return{gap:c.left-tx.right,countInside:c.right<=box.right+0.5&&c.right<=550,right:box.right};}));
+    const counted=await popup.evaluate(()=>[...document.querySelectorAll('#ai-suggest-tags .stag')].map(el=>{const box=el.getBoundingClientRect(),txEl=el.querySelector('.stag-text'),tx={right:txEl.getBoundingClientRect().right-parseFloat(getComputedStyle(txEl).paddingRight)},c=el.querySelector('.ac-count'),r=document.createRange(),n=c.firstChild;let i=0;while(i<n.data.length&&/\s/.test(n.data[i]))i++;r.setStart(n,i);r.setEnd(n,i+1);const ink=r.getBoundingClientRect(),cb=c.getBoundingClientRect();return{gap:ink.left-tx.right,countInside:cb.right<=box.right+0.5&&cb.right<=550,right:box.right,first:n.data[i]};}));
     assert(counted.every(c=>Math.abs(c.gap-4)<=0.5&&c.countInside&&c.right<=550),'a counted suggestion changed its name/count spacing or lost its count: '+JSON.stringify(counted));
+    assert(counted.every(c=>c.first==='('),'the count text did not start with its parenthesis: '+JSON.stringify(counted));
+    // The text boxes clip with overflow:hidden, so they must leave the glyph ink room: a short chip full of descenders
+    // (j g y p) paints the same with the clip and without it, at fractional device pixel ratios too, and the chip keeps
+    // the size it has when the text box has no ink padding.
+    await popup.evaluate(()=>{renderAITags(['jgyp'],false);});
+    await popup.locator('#tags-input').fill('jgyp');await popup.locator('#tags-input').press('Enter');
+    // Playwright resets device metrics around an element screenshot, so fractional DPRs cannot be compared pixel for pixel
+    // here; the geometric form of the same promise holds at any DPR: the clip box (padding box) covers the line box the
+    // glyphs are laid out in with room to spare vertically, and one pixel to each side.
+    for(const sel of ['#ai-suggest-tags .stag','#tags-display .tag-item']){
+      const textSel=sel+' '+(sel.includes('stag')?'.stag-text':'.tag-text');
+      const shot=async overflow=>{await popup.evaluate(([q,o])=>{document.querySelector(q).style.setProperty('overflow',o,'important');},[textSel,overflow]);return popup.locator(sel).first().screenshot({animations:'disabled'});};
+      const clipped=await shot('hidden'),open=await shot('visible');
+      await popup.evaluate(q=>document.querySelector(q).style.removeProperty('overflow'),textSel);
+      // Clipping can re-rasterize an edge pixel by a few levels; a cut descender or hook is a full-ink pixel.
+      const worst=await popup.evaluate(async([a,b])=>{const load=async data=>{const img=new Image();img.src='data:image/png;base64,'+data;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const x=c.getContext('2d');x.drawImage(img,0,0);return x.getImageData(0,0,c.width,c.height);};const p=await load(a),q=await load(b);if(p.width!==q.width||p.height!==q.height)return 255;let m=0;for(let k=0;k<p.data.length;k++)m=Math.max(m,Math.abs(p.data[k]-q.data[k]));return m;},[clipped.toString('base64'),open.toString('base64')]);
+      assert(worst<=32,'clipped chip text differs from unclipped (descender or hook cut, max channel delta '+worst+') for '+sel);
+    }
+    const ink=await popup.evaluate(()=>['.stag-text','.tag-text'].map(c=>{const cs=getComputedStyle(document.querySelector(c));return{c,padL:parseFloat(cs.paddingLeft),padR:parseFloat(cs.paddingRight),mL:parseFloat(cs.marginLeft),padT:parseFloat(cs.paddingTop),mT:parseFloat(cs.marginTop)};}));
+    assert(ink.every(c=>c.padL>=1&&c.padR>=1&&c.mL===-c.padL&&(c.c==='.tag-text'||(c.padT>=2&&c.mT===-c.padT))),'the clipped chip text leaves no ink room: '+JSON.stringify(ink));
+    const tight=await popup.evaluate(()=>['#ai-suggest-tags .stag','#tags-display .tag-item'].map(sel=>{const el=document.querySelector(sel),tx=el.querySelector('.stag-text,.tag-text'),w=()=>el.getBoundingClientRect(),a=w();const keep=[tx.style.padding,tx.style.margin];tx.style.padding='0';tx.style.margin='0';const b=w();tx.style.padding=keep[0];tx.style.margin=keep[1];return{sel,dw:a.width-b.width,dh:a.height-b.height};}));
+    assert(tight.every(c=>Math.abs(c.dw)<=0.01&&Math.abs(c.dh)<=0.01),'the ink padding changed the chip size: '+JSON.stringify(tight));
+    await popup.locator('#tags-input').press('Backspace');
     await popup.locator('#tags-input').fill(fits);await popup.locator('#tags-input').press('Enter');
     const before=requests.length;await popup.locator('#submit-btn').click();
     await until(()=>JSON.stringify(kept.tag_names)===JSON.stringify([fits]),'the shortened tag updated the kept bookmark');

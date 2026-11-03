@@ -1030,7 +1030,11 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
      handle and remove button keep their size. */
   max-width: 100%; min-width: 0; box-sizing: border-box;
 }
-.tag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* overflow:hidden clips at the padding box, and the chip's line box is shorter than the
+   glyphs' ink (j g p q y descend past an 18px line, the j hook starts left of its
+   advance). Padding gives the clip box room; the equal negative margin returns the
+   layout box to its old size, so the chip's geometry does not change. */
+.tag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-inline: 1px; margin-inline: -1px; }
 .tag-remove {
   display: inline-flex; align-items: center; justify-content: center;
   border: 0; background: none; padding: 0; cursor: pointer;
@@ -1236,7 +1240,7 @@ html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display:
    as the selected chip's .tag-text) ellipsizes while the Alt+N badge and the
    count stay whole flex items, so a short chip keeps its flex geometry. */
 .stag { max-width: 100%; min-width: 0; box-sizing: border-box; }
-.stag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 1px; margin: -2px -1px; }
 .stag:hover { background: var(--pp-btn-hover); }
 /* AI-suggested chip text (Task 4, D9): --pp-ai-chip-fg is gated against BOTH
    the chip's rest fill (chip-bg) and its hover fill (btn-hover, painted by
