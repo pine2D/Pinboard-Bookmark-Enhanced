@@ -338,13 +338,14 @@ function pbpCreateBookmarkServiceClient(config) {
       const page = readRows(data);
       if (!Array.isArray(page)) throw pbpBookmarkServiceError("invalid_response");
       rows.push(...page);
-      const following = nextPage(data);
-      if (following && typeof following !== "string") throw pbpBookmarkServiceError("invalid_response");
       if (rows.length >= limit) {
+        // Full already: do not read or validate a next that will not be requested.
         // Count only: never the names.
-        if (warnOnCap && (rows.length > limit || following)) console.warn("[bookmark-services] result capped at " + limit + " rows");
+        if (warnOnCap && (rows.length > limit || data?.next || data?.nextCursor)) console.warn("[bookmark-services] result capped at " + limit + " rows");
         return rows.slice(0,limit);
       }
+      const following = nextPage(data);
+      if (following && typeof following !== "string") throw pbpBookmarkServiceError("invalid_response");
       path = following;
     }
     return rows;

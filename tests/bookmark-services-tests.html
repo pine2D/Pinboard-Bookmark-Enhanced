@@ -187,6 +187,15 @@ test("linkding recent shares the same next handling",async()=>{
   equal((await h.client.recent(3)).length,3);
   equal(h.calls.map(c=>c.url),["https://bookmarks.example/base/api/bookmarks/?limit=3","https://bookmarks.example/base/api/bookmarks/?limit=2&offset=2"]);
 });
+test("linkding recent stops at its limit without validating a next it will not request",async()=>{
+  // A proxy that strips the context path leaves a next whose path is not under
+  // the configured root; once the page is full that next is never followed.
+  for(const next of ["http://linkding:9090/api/bookmarks/?limit=2&offset=2","https://other.example/steal",5]){
+    const h=harness("linkding",[[200,{count:9,next,previous:null,results:[ld,ld]}]]);
+    equal((await h.client.recent(2)).length,2);
+    equal(h.calls.length,1);
+  }
+});
 test("linkding tags cap at 10000 with one count-only warning",async()=>{
   const warns=[],original=console.warn;console.warn=(...a)=>warns.push(a);
   try{
