@@ -2448,9 +2448,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
       for(const [pageInfo,settings,formUrl,known,value,hint] of [
         [html,{},undefined,true,"Meta",""],[xhtml,{},undefined,true,"Meta",""],
         [pdf,{},undefined,false,"",HINT],[pdfAtHtmlAddress,{},undefined,false,"",HINT],[text,{},undefined,false,"",HINT],[unread,{},undefined,false,"",HINT],
+        // A form holding another address (a restored draft, a typed URL) is
+        // not the read page either: its Description is linkding's too.
+        [html,{},URL+"/other",false,"",HINT],[pdf,{},URL+"/other",false,"",HINT],
         // Not said where it is not so, or not the reason.
         [pdf,{optAutoDescription:false},undefined,true,"",""],[pdf,{linkdingBrowserMetadata:false},undefined,false,"",""],
-        [pdf,{},URL+"/other",false,"",""],[pdf,{bookmarkService:"karakeep"},undefined,"untouched","",""]]){
+        [html,{optAutoDescription:false},URL+"/other",true,"",""],[pdf,{bookmarkService:"karakeep"},undefined,"untouched","",""]]){
         const got=run(pageInfo,settings,formUrl),where=JSON.stringify({pageInfo,settings,formUrl});
         assert(got.known===known&&got.value===value&&got.hint===hint,where+": "+JSON.stringify(got));
       }

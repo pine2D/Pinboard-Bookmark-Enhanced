@@ -213,7 +213,7 @@ function pbpPopupFillPageDescription() {
   _linkdingDescriptionKnown = !auto || (browser && ownPage && readable);
   _linkdingDescriptionPending = false;
   _linkdingPageDescription = input.value;
-  pbpPopupRenderDescriptionHint(ownPage);
+  pbpPopupRenderDescriptionHint();
 }
 // The address can change after the popup opened (typed, pasted, put back by
 // Undo). For as long as the box holds only what the page put there it follows
@@ -2095,19 +2095,20 @@ function pbpPopupApplyServerMetadata(metadata) {
   _linkdingPageDescription = input.value;
 }
 
-// The grey hint in an empty Description box: the popup could not read the
-// opened page (or it is a PDF), so nothing will be sent and linkding fills the
-// Description in from the page itself. Only where that is so: linkding, the
-// browser's page information in use, auto-fill on, the box still the page's
-// own. A placeholder never shows over text, so a filled box hides it.
-// ownPage: the caller's pbpPopupFormHoldsOpenedPage() answer, if it has one.
-function pbpPopupRenderDescriptionHint(ownPage) {
+// The grey hint in an empty Description box: the popup has no description of
+// the page the form holds (it could not read the opened page, the page is a PDF,
+// or the form holds another address: a restored draft, a typed URL), so nothing
+// will be sent and linkding fills the Description in from the page itself.
+// Only where that is so: linkding, the browser's page information in use,
+// auto-fill on, the box still the page's own (an existing bookmark's stored
+// Description sets _linkdingPageDescription to null). A placeholder never
+// shows over text, so a filled box hides it.
+function pbpPopupRenderDescriptionHint() {
   const input = $id("linkding-description-input");
   if (!input) return;
   const show = pbpBookmarkServiceId(settings) === "linkding"
     && settings.linkdingBrowserMetadata !== false && settings.optAutoDescription !== false
-    && !_linkdingDescriptionKnown && _linkdingPageDescription !== null
-    && (ownPage ?? (typeof pbpPopupFormHoldsOpenedPage === "function" && pbpPopupFormHoldsOpenedPage()));
+    && !_linkdingDescriptionKnown && _linkdingPageDescription !== null;
   input.placeholder = show ? t("linkdingDescriptionServerFills") : "";
 }
 // The duplicate check's own request, without any form work: the cache or the
