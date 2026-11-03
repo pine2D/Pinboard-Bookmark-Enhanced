@@ -1021,6 +1021,29 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
+    // User decision 2026-11-02: a merge is a result the user has to read, so
+    // the popup stays open for it; ordinary creates and updates still close.
+    await testAsync("a merged save keeps the popup open while created and updated ones auto-close", async () => {
+      const loaded = { href: URL, description: "Stored title", extended: "", summary: "", tags: "", tagNames: [], shared: "no", toread: "no", time: "2026-10-30T03:01:22Z" };
+      for (const service of ["pinboard", "karakeep", "linkding"]) for (const [options, mutation, closes] of [
+        [{}, "created", true], [{ loaded }, "updated", true], [{}, "merged", false],
+      ]) {
+        const where = service + " " + mutation;
+        const h = createSubmitHarness({ service, ...options });
+        // linkding's Share box mirrors Private: an unshared bookmark, as the form shows it.
+        if (service === "linkding") h.elements["private-check"].checked = true;
+        const pending = h.click();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        h.resolveSave({ status: "saved", mutation });
+        await pending;
+        const timer = h.timers.find((candidate) => candidate.delay === 1800 && !candidate.cancelled);
+        assert(!!timer === closes, where + ": auto-close timer " + (timer ? "started" : "missing"));
+        assert(h.bars.some((bar) => bar.className === "auto-close-bar") === closes, where + ": auto-close bar disagrees");
+        if (timer) { timer.callback(); assert(h.closeCalls() === 1, where + ": the timer did not close the popup"); }
+        else assert(h.closeCalls() === 0, where + ": the popup closed");
+      }
+    });
+
     await testAsync("real submit callback awaits Wayback snapshot before save_intent", async () => {
       const harness = createSubmitHarness({ archiveRequested: true, deferWayback: true });
       const pending = harness.click();

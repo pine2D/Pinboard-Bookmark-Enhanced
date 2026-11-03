@@ -2314,7 +2314,9 @@ function setupSubmit(token) {
             }
           } catch (_) {}
         }
-        if (settings.optAutoCloseAfterSave && !tagDraftAtClick && formMatchesSubmitted()) {
+        // A merge tells the user what the service did to a bookmark it already
+        // had, so the popup stays open for it (user decision 2026-11-02).
+        if (settings.optAutoCloseAfterSave && !tagDraftAtClick && result.mutation !== "merged" && formMatchesSubmitted()) {
           const autoCloseGeneration = bookmarkLookup.generation;
           const bar = document.createElement("div");
           bar.className = "auto-close-bar";
