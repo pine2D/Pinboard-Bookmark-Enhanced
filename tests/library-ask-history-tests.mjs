@@ -85,6 +85,35 @@ try {
     }, { tracked, urlClean });
     check('Continue hands the reader the bookmark address under ' + JSON.stringify(urlClean ?? 'default'), slot && slot.url === tracked && slot.baseUrl === tracked && slot.sourceTabUrl === tracked && slot.bookmarkUrl === expected, slot);
   }
+  // The slot's account is the bookmark connection, not the library owner: the
+  // reader keeps the slot when it equals the current connection and retires
+  // its bookmark data only when it does not.
+  const continueSlot = () => page.evaluate(async () => {
+    window.continueUrl = 'https://example.test/reading'; readerSlots.length = 0;
+    await _pbpLibAskContinue(_libAskSessions.find(row => row.id === 'render-session-main'), document.querySelector('.ask-library-actions button'));
+    return { slot: readerSlots[0] || null, connection: (await pbpReadBookmarkConnection()).account };
+  });
+  let handoff = await continueSlot();
+  check('Continue under Pinboard hands over the bookmark connection account', handoff.slot && handoff.connection === 'ask-library-fixture' && handoff.slot.account === handoff.connection, handoff);
+  for (const [service, userId] of [['karakeep', 'user-7'], ['linkding', 'conn-9']]) {
+    await page.evaluate(async ({ service, userId }) => {
+      const baseUrl = 'https://' + service + '.example/';
+      const credential = { v: 1, baseUrl, token: 'fixture-token', connectionId: 'conn-9', ...(service === 'karakeep' ? { userId } : {}) };
+      await askStubs.set.call(chrome.storage.local, { bookmarkService: service, [service + 'Url']: baseUrl, [service + 'Token']: obfuscateKey(JSON.stringify(credential)) });
+    }, { service, userId });
+    handoff = await continueSlot();
+    check('Continue under ' + service + ' hands over the current connection, matching what the reader compares', handoff.slot && handoff.connection === service + ':https://' + service + '.example/:' + userId && handoff.slot.account === handoff.connection && handoff.slot.account !== '', handoff);
+  }
+  await page.evaluate(() => askStubs.set.call(chrome.storage.local, { bookmarkService: 'pinboard' }));
+  // An unreadable urlClean setting is traced and the reader still opens, with the page address as the bookmark address.
+  await page.evaluate(() => {
+    window.warnings = []; window.warnStub = console.warn; console.warn = (...args) => warnings.push(args.join(' '));
+    window.settingsStub = window.getSettingsStorage;
+    window.getSettingsStorage = async () => ({ get: async () => { throw new Error('storage unavailable'); } });
+  });
+  handoff = await continueSlot();
+  await page.evaluate(() => { window.getSettingsStorage = settingsStub; console.warn = warnStub; });
+  check('Continue still opens the reader when the urlClean read throws', handoff.slot && handoff.slot.bookmarkUrl === 'https://example.test/reading' && await page.evaluate(() => warnings.some(line => line.includes('urlClean'))), handoff);
   await page.evaluate(async () => {
     Object.assign(chrome.tabs, { query: askStubs.query, get: askStubs.get, create: askStubs.create });
     chrome.permissions.contains = askStubs.contains; chrome.storage.local.set = askStubs.set;

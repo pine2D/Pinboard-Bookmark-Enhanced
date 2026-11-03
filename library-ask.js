@@ -285,10 +285,18 @@ async function _pbpLibAskContinue(session, button) {
     // The reader's bookmark bar looks up and saves under the address the
     // toolbar icon asks about (pbpBookmarkLookupUrl); url stays the archived
     // page address so highlights keep their key.
-    const { urlClean } = await (await getSettingsStorage()).get({ urlClean: SETTINGS_DEFAULTS.urlClean });
+    // A failed read only costs the cleaned address: the reader still opens.
+    let urlClean = SETTINGS_DEFAULTS.urlClean;
+    try { urlClean = (await (await getSettingsStorage()).get({ urlClean })).urlClean; }
+    catch (error) { console.warn("[library] urlClean read failed:", error?.name, error?.message); }
+    // The slot's account is the bookmark connection (as the popup hands over),
+    // not the library owner; the reader retires the slot's bookmark data when
+    // it differs from the current connection.
+    let account = "";
+    try { account = (await pbpReadBookmarkConnection()).account || ""; }
+    catch (error) { console.warn("[library] bookmark connection read failed:", error?.name, error?.message); }
     if (!await _pbpLibAskCurrent(owner, revision)) return;
     key = crypto.randomUUID();
-    let account = ""; if (owner?.startsWith("acct_")) account = decodeURIComponent(owner.slice(5));
     await chrome.storage.local.set({ ["md_preview_data_" + key]: { pending: true, engine: "local", source: "local", tabId: tab.id,
       url, baseUrl: url, sourceTabUrl: url, bookmarkUrl: pbpBookmarkLookupUrl(url, urlClean), title: session.title, sourceIncognito: false, account, tags: [], description: "", ts: Date.now() } });
     if (!await _pbpLibAskCurrent(owner, revision)) return;
