@@ -82,6 +82,9 @@
   "kbdAltCheckHint": {
     "message": "Alt+P/R/A 切换"
   },
+  "kbdAltCheckHintSelfHosted": {
+    "message": "Alt+R/A 切换"
+  },
   "lastUsedTagsLabel": {
     "message": "上次使用："
   },
@@ -222,6 +225,8 @@
     "message": "退出登录？"
   },
   "confirmLogoutDetail": {"message": "API Token 将被移除，未保存的书签草稿将被丢弃。"},
+  "confirmLogoutDetailKarakeep": {"message": "API Token 和访问网关凭据将被移除，未保存的书签草稿将被丢弃。"},
+  "confirmLogoutDetailLinkding": {"message": "API Token 和访问网关凭据将被移除，未保存的书签草稿将被丢弃。之后即使用同一地址和 Token 再次连接，也会视为新连接，原连接中尚未发出的保存不再自动重试。"},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -1919,6 +1924,9 @@
   },
   "qlUnreadTitle": {
     "message": "你的稍后阅读书签"
+  },
+  "qlUnreadTitleKarakeep": {
+    "message": "打开 Karakeep"
   },
   "qlNotesTitle": {
     "message": "你的 Pinboard 笔记"

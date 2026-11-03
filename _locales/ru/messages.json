@@ -82,6 +82,9 @@
   "kbdAltCheckHint": {
     "message": "Alt+P/R/A переключает"
   },
+  "kbdAltCheckHintSelfHosted": {
+    "message": "Alt+R/A переключает"
+  },
   "lastUsedTagsLabel": {
     "message": "Недавние:"
   },
@@ -222,6 +225,8 @@
     "message": "Выйти?"
   },
   "confirmLogoutDetail": {"message": "Ваш API-токен будет удалён. Несохранённые черновики закладок будут удалены."},
+  "confirmLogoutDetailKarakeep": {"message": "Ваш API-токен и учётные данные шлюза доступа будут удалены. Несохранённые черновики закладок будут удалены."},
+  "confirmLogoutDetailLinkding": {"message": "Ваш API-токен и учётные данные шлюза доступа будут удалены. Несохранённые черновики закладок будут удалены. Повторное подключение, даже с тем же адресом и токеном, считается новым подключением, поэтому ожидающие сохранения прежнего не будут повторяться автоматически."},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -1919,6 +1924,9 @@
   },
   "qlUnreadTitle": {
     "message": "Ваши непрочитанные закладки («Напочитать»)"
+  },
+  "qlUnreadTitleKarakeep": {
+    "message": "Открыть Karakeep"
   },
   "qlNotesTitle": {
     "message": "Ваши заметки в Pinboard"

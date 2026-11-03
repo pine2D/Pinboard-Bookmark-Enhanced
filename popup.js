@@ -126,6 +126,35 @@ async function refreshWaybackHostPermission() {
   }
   return _waybackHostGranted;
 }
+// Hints that only hold for Pinboard: the private box (and so Alt+P) is hidden on
+// self-hosted services, and an unbound Karakeep Read Later entry opens the home
+// page, not an unread list. The keys ride data-i18n so applyI18n keeps them.
+function pbpPopupServiceHints() {
+  const service = pbpBookmarkServiceId(settings);
+  const hint = $id("bottom-kb-hint");
+  if (hint) {
+    const key = service === "karakeep" || service === "linkding" ? "kbdAltCheckHintSelfHosted" : "kbdAltCheckHint";
+    hint.setAttribute("data-i18n", key);
+    hint.setAttribute("data-i18n-title", key);
+    hint.textContent = t(key);
+    hint.title = t(key);
+  }
+  const unbound = service === "karakeep" && !pbpBookmarkConnection(settings).readLaterListId;
+  const unread = $id("unread-link");
+  if (unread) {
+    const key = unbound ? "qlUnreadTitleKarakeep" : "qlUnreadTitle";
+    unread.setAttribute("data-i18n-title", key);
+    unread.title = t(key);
+  }
+}
+// Self-hosted sign-out also drops the access gateway credential. linkding has no
+// user ID, so reconnecting makes a new connection; Karakeep's owner includes the
+// verified user ID, so the same account keeps its queue and gets no such warning.
+function pbpLogoutDetailKey(service) {
+  if (service === "karakeep") return "confirmLogoutDetailKarakeep";
+  if (service === "linkding") return "confirmLogoutDetailLinkding";
+  return "confirmLogoutDetail";
+}
 function pbpPopupBookmarkPrivacy() {
   const service = pbpBookmarkServiceId(settings);
   $id("private-check").closest("label").hidden = service !== "pinboard";
@@ -790,7 +819,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // window.confirm is a browser-modal that freezes the whole popup.
     showConfirmPopover($id("logout-link"), {
       msg: t("confirmLogout"),
-      detail: t("confirmLogoutDetail"),
+      detail: t(pbpLogoutDetailKey(pbpBookmarkServiceId(settings))),
       yesText: t("logout"),
       noText: t("cancel"),
       onConfirm: async () => {
@@ -914,6 +943,7 @@ async function showMain(token) {
     for (const el of document.querySelectorAll(".quick-links > *")) el.hidden = el !== unreadLink;
   }
   pbpPopupBookmarkPrivacy();
+  pbpPopupServiceHints();
 
   if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {
     const searchRow = document.querySelector(".search-row");

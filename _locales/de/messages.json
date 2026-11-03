@@ -82,6 +82,9 @@
   "kbdAltCheckHint": {
     "message": "Alt+P/R/A schaltet um"
   },
+  "kbdAltCheckHintSelfHosted": {
+    "message": "Alt+R/A schaltet um"
+  },
   "lastUsedTagsLabel": {
     "message": "Zuletzt:"
   },
@@ -222,6 +225,8 @@
     "message": "Abmelden?"
   },
   "confirmLogoutDetail": {"message": "Dein API-Token wird entfernt. Nicht gespeicherte Lesezeichenentwürfe werden verworfen."},
+  "confirmLogoutDetailKarakeep": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden entfernt. Nicht gespeicherte Lesezeichenentwürfe werden verworfen."},
+  "confirmLogoutDetailLinkding": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden entfernt. Nicht gespeicherte Lesezeichenentwürfe werden verworfen. Eine erneute Verbindung gilt auch mit gleicher Adresse und gleichem Token als neue Verbindung; noch wartende Speicherungen der bisherigen werden nicht automatisch wiederholt."},
   "hintCtrlEnter": {
     "message": "Strg+Eingabe"
   },
@@ -1919,6 +1924,9 @@
   },
   "qlUnreadTitle": {
     "message": "Deine ungelesenen Lesezeichen („Später lesen“)"
+  },
+  "qlUnreadTitleKarakeep": {
+    "message": "Karakeep öffnen"
   },
   "qlNotesTitle": {
     "message": "Deine Pinboard-Notizen"

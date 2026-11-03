@@ -82,6 +82,9 @@
   "kbdAltCheckHint": {
     "message": "Alt+P/R/A で切り替え"
   },
+  "kbdAltCheckHintSelfHosted": {
+    "message": "Alt+R/A で切り替え"
+  },
   "lastUsedTagsLabel": {
     "message": "前回："
   },
@@ -222,6 +225,8 @@
     "message": "ログアウトしますか？"
   },
   "confirmLogoutDetail": {"message": "API トークンが削除されます。未保存のブックマークの下書きは破棄されます。"},
+  "confirmLogoutDetailKarakeep": {"message": "API トークンとアクセスゲートウェイの認証情報が削除されます。未保存のブックマークの下書きは破棄されます。"},
+  "confirmLogoutDetailLinkding": {"message": "API トークンとアクセスゲートウェイの認証情報が削除されます。未保存のブックマークの下書きは破棄されます。同じアドレスとトークンで再接続しても新しい接続として扱われ、以前の接続で待機中の保存は自動で再試行されません。"},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -1919,6 +1924,9 @@
   },
   "qlUnreadTitle": {
     "message": "未読（あとで読む）のブックマーク"
+  },
+  "qlUnreadTitleKarakeep": {
+    "message": "Karakeep を開く"
   },
   "qlNotesTitle": {
     "message": "Pinboard のメモ"

@@ -82,6 +82,9 @@
   "kbdAltCheckHint": {
     "message": "Alt+P/R/A przełącza"
   },
+  "kbdAltCheckHintSelfHosted": {
+    "message": "Alt+R/A przełącza"
+  },
   "lastUsedTagsLabel": {
     "message": "Ostatnie:"
   },
@@ -222,6 +225,8 @@
     "message": "Wylogować?"
   },
   "confirmLogoutDetail": {"message": "Twój token API zostanie usunięty. Niezapisane wersje robocze zakładek zostaną odrzucone."},
+  "confirmLogoutDetailKarakeep": {"message": "Twój token API i dane uwierzytelniające bramki dostępu zostaną usunięte. Niezapisane wersje robocze zakładek zostaną odrzucone."},
+  "confirmLogoutDetailLinkding": {"message": "Twój token API i dane uwierzytelniające bramki dostępu zostaną usunięte. Niezapisane wersje robocze zakładek zostaną odrzucone. Ponowne połączenie, nawet z tym samym adresem i tokenem, jest traktowane jako nowe połączenie, więc zapisy czekające z poprzedniego nie będą ponawiane automatycznie."},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -1919,6 +1924,9 @@
   },
   "qlUnreadTitle": {
     "message": "Twoje nieprzeczytane zakładki (Przeczytaj później)"
+  },
+  "qlUnreadTitleKarakeep": {
+    "message": "Otwórz Karakeep"
   },
   "qlNotesTitle": {
     "message": "Twoje notki w Pinboard"

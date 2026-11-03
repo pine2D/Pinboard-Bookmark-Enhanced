@@ -82,6 +82,9 @@
   "kbdAltCheckHint": {
     "message": "Alt+P/R/A toggles"
   },
+  "kbdAltCheckHintSelfHosted": {
+    "message": "Alt+R/A toggles"
+  },
   "lastUsedTagsLabel": {
     "message": "Last used:"
   },
@@ -222,6 +225,8 @@
     "message": "Log out?"
   },
   "confirmLogoutDetail": {"message": "Your API token will be removed. Unsaved bookmark drafts will be discarded."},
+  "confirmLogoutDetailKarakeep": {"message": "Your API token and any access gateway credential will be removed. Unsaved bookmark drafts will be discarded."},
+  "confirmLogoutDetailLinkding": {"message": "Your API token and any access gateway credential will be removed. Unsaved bookmark drafts will be discarded. Connecting again, even with the same address and token, counts as a new connection, so saves still waiting from this one are not retried automatically."},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -1928,6 +1933,9 @@
   },
   "qlUnreadTitle": {
     "message": "Your unread (Read Later) bookmarks"
+  },
+  "qlUnreadTitleKarakeep": {
+    "message": "Open Karakeep"
   },
   "qlNotesTitle": {
     "message": "Your Pinboard notes"

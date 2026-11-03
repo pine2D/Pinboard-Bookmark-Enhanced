@@ -6132,6 +6132,51 @@ test("posts/add default remains replace=yes for existing callers", () => {
       } finally { h.cleanup(); }
     });
 
+    function extractPopupFn(name) {
+      const start = source.indexOf("function " + name + "(");
+      assert(start >= 0, name + " is missing from popup.js");
+      return source.slice(start, source.indexOf("\n}", start) + 2);
+    }
+    function runServiceHints(service, readLaterListId) {
+      const makeEl = () => { const attrs = {}; return { attrs, title: "", textContent: "", setAttribute(k, v) { attrs[k] = v; } }; };
+      const els = { "bottom-kb-hint": makeEl(), "unread-link": makeEl() };
+      const t = (key) => { assert(enMessages[key]?.message, "en catalogue lacks " + key); return enMessages[key].message; };
+      new Function("$id", "settings", "pbpBookmarkServiceId", "pbpBookmarkConnection", "t",
+        extractPopupFn("pbpPopupServiceHints") + ";pbpPopupServiceHints();")(
+        (id) => els[id], { bookmarkService: service }, pbpBookmarkServiceId, () => ({ readLaterListId }), t);
+      return els;
+    }
+    test("bottom shortcut hint names Alt+P only where the Private box exists", () => {
+      for (const service of ["linkding", "karakeep"]) {
+        const hint = runServiceHints(service, "list-1")["bottom-kb-hint"];
+        assert(!/Alt\+P/.test(hint.textContent) && !/Alt\+P/.test(hint.title), service + " hint still advertises Alt+P: " + hint.textContent);
+        assert(/Alt\+R\/A/.test(hint.textContent), service + " hint lost Alt+R/A");
+        assert(hint.attrs["data-i18n"] === "kbdAltCheckHintSelfHosted" && hint.attrs["data-i18n-title"] === "kbdAltCheckHintSelfHosted", service + " hint keys would be reverted by the next applyI18n");
+      }
+      const pinboard = runServiceHints("pinboard")["bottom-kb-hint"];
+      assert(pinboard.textContent === enMessages.kbdAltCheckHint.message && /Alt\+P/.test(pinboard.textContent), "Pinboard hint changed");
+      assert(pinboard.attrs["data-i18n"] === "kbdAltCheckHint", "Pinboard hint key changed");
+    });
+    test("Karakeep without a bound Read Later list titles the entry after the service", () => {
+      const unbound = runServiceHints("karakeep", "")["unread-link"];
+      assert(unbound.title === enMessages.qlUnreadTitleKarakeep.message && unbound.attrs["data-i18n-title"] === "qlUnreadTitleKarakeep", "unbound Karakeep entry still claims to open the unread list");
+      const bound = runServiceHints("karakeep", "list-1")["unread-link"];
+      assert(bound.title === enMessages.qlUnreadTitle.message && bound.attrs["data-i18n-title"] === "qlUnreadTitle", "bound Karakeep entry title changed");
+      for (const service of ["pinboard", "linkding"]) {
+        const el = runServiceHints(service, "")["unread-link"];
+        assert(el.title === enMessages.qlUnreadTitle.message, service + " entry title changed");
+      }
+    });
+    test("logout confirmation covers the gateway credential and linkding reconnect only on self-hosted services", () => {
+      const keyFor = (service) => new Function(extractPopupFn("pbpLogoutDetailKey") + ";return pbpLogoutDetailKey(" + JSON.stringify(service) + ");")();
+      assert(keyFor("pinboard") === "confirmLogoutDetail", "Pinboard logout wording changed");
+      assert(keyFor("") === "confirmLogoutDetail", "unknown service must keep the original wording");
+      const karakeep = enMessages[keyFor("karakeep")].message, linkding = enMessages[keyFor("linkding")].message;
+      assert(/gateway/i.test(karakeep) && /gateway/i.test(linkding), "self-hosted logout detail omits the gateway credential");
+      assert(/new connection/i.test(linkding) && /not retried/i.test(linkding), "linkding logout detail omits the reconnect consequence");
+      assert(!/new connection/i.test(karakeep), "Karakeep keeps its connection ID across reconnects (user ID based); the warning would be false");
+    });
+
     test("Alt+P ignores hidden linkding Private and preserves visible Pinboard keyboard behavior", () => {
       for(const sharingSupported of [true,false]) {
         const h=createAltHotkeyHarness();
