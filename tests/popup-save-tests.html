@@ -1191,7 +1191,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     test("reader initial intents preserve service tags and an existing serialized draft", () => {
       const start = backgroundSource.indexOf("function pbpReaderInitialIntent(");
-      const end = backgroundSource.indexOf("function pbpDeleteReaderBookmark(", start);
+      const end = backgroundSource.indexOf("function pbpDeleteBookmarkInOrder(", start);
       assert(start >= 0 && end > start, "reader initial intent source not found");
       const initialIntent = new Function(backgroundSource.slice(start, end) + "\nreturn pbpReaderInitialIntent;")();
       const names = ["machine learning", 'say"hello', "path\\name"];

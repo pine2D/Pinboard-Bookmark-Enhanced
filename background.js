@@ -1636,26 +1636,29 @@ function pbpReaderInitialIntent(context, settings, action) {
   };
 }
 
-function pbpDeleteReaderBookmark(context) {
+// Deletes the bookmark `url` of `account` after every save before it, and
+// cancels that owner's earlier queued saves of the same address first. The
+// reader, the popup and the notification's Undo all delete through this.
+function pbpDeleteBookmarkInOrder(account, url) {
   // Wait for replay as well as live saves. Otherwise a queued snapshot that
   // was read before this deletion could recreate the bookmark afterwards.
   return runOfflineQueueConsumer(() => runSaveDeliveryTransaction(async () => {
     let failure = "storage";
     try {
-      let auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
+      let auth = await pbpReadFreshBookmarkAuthForAccount(account);
       if (!auth) return pbpSaveFailure("account_changed");
       // This explicit delete supersedes earlier pending saves, including when
       // its response is lost or the owner switches during the request. Cancel
       // those saves while we still own the account, before any remote mutation.
       const cleared = await runOfflineQueueWrite(async () => {
         const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
-        auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
+        auth = await pbpReadFreshBookmarkAuthForAccount(account);
         if (!auth) return false;
         if (Array.isArray(offlineQueue)) {
           // Only this exact bookmark and owner. Other URLs and accounts are
           // untouched; legacy queue records may still carry a token binding.
-          const next = offlineQueue.filter(item => item?.url !== context.bookmarkUrl
-            || (item.account || pbpPinboardAccountFromToken(item.token)) !== context.account);
+          const next = offlineQueue.filter(item => item?.url !== url
+            || (item.account || pbpPinboardAccountFromToken(item.token)) !== account);
           if (next.length !== offlineQueue.length) {
             await chrome.storage.local.set({ offlineQueue: next });
             await pbpReleaseDroppedSummaryHolds(offlineQueue, next);
@@ -1663,26 +1666,26 @@ function pbpDeleteReaderBookmark(context) {
         }
         return true;
       });
-      auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
+      auth = await pbpReadFreshBookmarkAuthForAccount(account);
       if (!cleared || !auth) return pbpSaveFailure("account_changed");
       failure = "network";
-      const resp = await pbpBookmarkDeleteResponse(auth, context.bookmarkUrl);
+      const resp = await pbpBookmarkDeleteResponse(auth, url);
       if (!resp.ok) return pbpSaveFailure(resp.status === 401 || resp.status === 403 ? "not_logged_in" : "http", { httpStatus: resp.status });
       const data = await resp.json();
-      auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
+      auth = await pbpReadFreshBookmarkAuthForAccount(account);
       if (!auth) return pbpSaveFailure("account_changed");
       if (data?.result_code !== "done" && data?.result_code !== "item not found") return pbpSaveFailure("api");
       try {
-        if (pbpStatusCacheSet(context.bookmarkUrl, auth, { bookmarked: false, timestamp: Date.now(), posts: [] })) {
+        if (pbpStatusCacheSet(url, auth, { bookmarked: false, timestamp: Date.now(), posts: [] })) {
           const tabs = await chrome.tabs.query({});
           for (const tab of tabs) {
-            if (pbpBookmarkAuthIsCurrent(auth) && tab.id && pbpSameBookmark(tab.url, context.bookmarkUrl)) setIcon(tab.id, "default");
+            if (pbpBookmarkAuthIsCurrent(auth) && tab.id && pbpSameBookmark(tab.url, url)) setIcon(tab.id, "default");
           }
         }
         await updateBadge();
       } catch (e) { console.warn("reader bookmark delete status failed:", e?.name, e?.message); }
-      return await pbpReadFreshBookmarkAuthForAccount(context.account)
-        ? { status: "deleted", account: context.account } : pbpSaveFailure("account_changed");
+      return await pbpReadFreshBookmarkAuthForAccount(account)
+        ? { status: "deleted", account: account } : pbpSaveFailure("account_changed");
     } catch (e) {
       console.warn("reader bookmark delete failed:", e?.name, pbpSaveFailure(failure, { detail: e?.message }).detail);
       if (e?.code === "account_changed") return pbpSaveFailure("account_changed");
@@ -1694,10 +1697,30 @@ function pbpDeleteReaderBookmark(context) {
   }));
 }
 
+// The popup's bookmark requests (bookmark_api) for the current connection.
+async function pbpBookmarkApiRequest(message) {
+  const auth = await getCurrentBookmarkAuth();
+  if (!message.account || message.account !== auth.account || !auth.token) return {ok:false,status:0,error:"account_changed"};
+  const client = pbpSelfHostedAuth(auth) ? pbpBookmarkClient(auth) : null;
+  let data;
+  if (message.action === "tags") data = await pbpBookmarkTagCounts(auth);
+  else if (message.action === "lookup") data = await (await pbpBookmarkPostsResponse(auth, message.url)).json();
+  else if (message.action === "recent" && client) data = {posts:(await client.recent(5)).map(pbpBookmarkAsPost)};
+  else if (message.action === "delete") {
+    if (!pbpBookmarkWebUrl(message.url)) return {ok:false,status:0,error:"invalid_request"};
+    const result = await pbpDeleteBookmarkInOrder(auth.account, message.url);
+    if (result.status !== "deleted") return {ok:false,status:result.httpStatus || 0,error:result.reason};
+    data = {result_code:"done"};
+  } else return {ok:false,status:0,error:"invalid_request"};
+  const fresh = await getCurrentBookmarkAuth();
+  if (!pbpBookmarkAuthIsCurrent(auth) || fresh.account !== auth.account) return {ok:false,status:0,error:"account_changed"};
+  return {ok:true,status:200,data,account:auth.account};
+}
+
 async function pbpReaderBookmarkRequest(message, sender) {
   const context = await pbpReaderBookmarkContext(sender, message.account);
   if (!context) return pbpSaveFailure("account_changed");
-  if (message.type === "mdReaderBookmarkDelete") return pbpDeleteReaderBookmark(context);
+  if (message.type === "mdReaderBookmarkDelete") return pbpDeleteBookmarkInOrder(context.account, context.bookmarkUrl);
   if (message.type === "mdReaderBookmarkState") {
     const auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
     if (!auth) return pbpSaveFailure("account_changed");
@@ -4336,24 +4359,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     return true;
   }
   if (message.type === "bookmark_api") {
-    (async () => {
-      const auth = await getCurrentBookmarkAuth();
-      if (!message.account || message.account !== auth.account || !auth.token) return {ok:false,status:0,error:"account_changed"};
-      const client = pbpSelfHostedAuth(auth) ? pbpBookmarkClient(auth) : null;
-      let data;
-      if (message.action === "tags") data = await pbpBookmarkTagCounts(auth);
-      else if (message.action === "lookup") data = await (await pbpBookmarkPostsResponse(auth, message.url)).json();
-      else if (message.action === "recent" && client) data = {posts:(await client.recent(5)).map(pbpBookmarkAsPost)};
-      else if (message.action === "delete") {
-        if (!pbpBookmarkWebUrl(message.url)) return {ok:false,status:0,error:"invalid_request"};
-        const result = await pbpDeleteReaderBookmark({account:auth.account,url:message.url});
-        if (result.status !== "deleted") return {ok:false,status:result.httpStatus || 0,error:result.reason};
-        data = {result_code:"done"};
-      } else return {ok:false,status:0,error:"invalid_request"};
-      const fresh = await getCurrentBookmarkAuth();
-      if (!pbpBookmarkAuthIsCurrent(auth) || fresh.account !== auth.account) return {ok:false,status:0,error:"account_changed"};
-      return {ok:true,status:200,data,account:auth.account};
-    })().then(sendResponse).catch(error => {
+    pbpBookmarkApiRequest(message).then(sendResponse).catch(error => {
       if (typeof error?.code !== "string") console.warn("[bookmark-api] failed:", error?.name, error?.message);
       sendResponse({ok:false,status:error?.status || 0,error:error?.code || "network"});
     });

@@ -88,7 +88,7 @@ async function pipelineHarness(options = {}) {
       return { ok: true, status: 200, json: async () => ({ result_code: "done" }) };
     },
   };
-  return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, submitPopupSaveIntent, pbpReaderBookmarkRequest, processOfflineQueue }; ")(...Object.values(deps)), env };
+  return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, submitPopupSaveIntent, pbpReaderBookmarkRequest, processOfflineQueue, bookmarkApi: typeof pbpBookmarkApiRequest === \"function\" ? pbpBookmarkApiRequest : null }; ")(...Object.values(deps)), env };
 }
 // The two self-hosted APIs as the adapter meets them, hand-written from
 // linkding v1.47 (routes.py check(), serializers.py create() and update())
@@ -1275,6 +1275,20 @@ await test("delete runs after an in-flight save and removes only this owner's ex
   assert(!h.env.calls.some(url => url.pathname.endsWith("/delete")), "delete raced an in-flight save");
   release(); await saving; equal((await deleting).status, "deleted"); equal(h.env.post, null);
   equal(h.env.queue.map(item => item.queueId).join(","), "other-owner,other-url");
+});
+// The popup's Delete (bookmark_api) names the bookmark by its own address.
+await test("the popup's delete removes the bookmark it names and cancels that address's queued saves", async () => {
+  const other = URL_ARTICLE + "?page=2";
+  const h = await pipelineHarness({ post: { ...POST }, queue: [
+    { queueId: "same", account: "alice", url: URL_ARTICLE, mode: "merge" },
+    { queueId: "other-url", account: "alice", url: other, mode: "merge" },
+  ] });
+  assert(h.bookmarkApi, "the popup's bookmark requests are not reachable");
+  const resp = await h.bookmarkApi({ type: "bookmark_api", action: "delete", url: URL_ARTICLE, account: "alice" });
+  equal(resp.ok, true);
+  equal(h.env.calls.filter(url => url.pathname.endsWith("/delete")).map(url => url.searchParams.get("url")).join(), URL_ARTICLE);
+  equal(h.env.post, null);
+  equal(h.env.queue.map(item => item.queueId).join(), "other-url");
 });
 await test("runtime script implements guarded shared keyboard and action state", async () => {
   runtime = await (await fetch("../md-bookmark.js")).text(); assert(!runtime.startsWith("<!DOCTYPE"), "reader runtime is not implemented");
