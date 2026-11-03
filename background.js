@@ -1547,6 +1547,9 @@ async function pbpReaderBookmarkContext(sender, account) {
 
 async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth, expectBookmarked = false) {
   if (action === "save") return { intent: { ...intent, mode: "skip" } };
+  // Pinboard's posts/add needs a title and the others would store an empty one;
+  // the reader editor refuses it first, this is the worker's own check.
+  if (action === "edit" && !String(draft?.title ?? "").trim()) return { result: pbpSaveFailure("invalid") };
   const lookup = await fetchExistingBookmark(intent.url, settings.pinboardToken, auth);
   if (!pbpBookmarkAuthIsCurrent(auth)) return { result: pbpSaveFailure("account_changed") };
   if (lookup.lookupFailed) {
@@ -1805,7 +1808,8 @@ async function pbpReaderBookmarkRequest(message, sender) {
     if (!input || typeof input.title !== "string" || typeof input.tags !== "string"
         || typeof input.notes !== "string" || typeof input.private !== "boolean" || typeof input.toread !== "boolean"
         || (input.summary !== undefined && typeof input.summary !== "string")
-        || (input.sharedExplicit !== undefined && typeof input.sharedExplicit !== "boolean")) return pbpSaveFailure("invalid");
+        || (input.sharedExplicit !== undefined && typeof input.sharedExplicit !== "boolean")
+        || !input.title.trim()) return pbpSaveFailure("invalid");
     draft = { title: input.title, tags: input.tags, notes: input.notes, private: input.private, toread: input.toread,
       ...(input.sharedExplicit !== undefined ? { sharedExplicit: input.sharedExplicit } : {}),
       ...(input.summary !== undefined && (await pbpReadFreshBookmarkAuthForAccount(context.account))?.service === "linkding"

@@ -1266,6 +1266,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           if (stored) await chrome.storage.local.set({[key]:{...stored,account:bookmarkAccount,tags:[],description:"",bookmarkDraft:null}});
           if (_badgeArmed) refreshBookmarkBadge(); else pbpClearBookmarkBadge();
           document.dispatchEvent(new CustomEvent("pbp:bookmark-account-changed", {detail:{url,bookmarkUrl,title,account:bookmarkAccount}}));
+        } else if (bookmarkAccount && pbpBookmarkSettingsChanged(changes)) {
+          // Same account, other connection settings (gateway, rotated token,
+          // Connect again): only the fact is passed on, never a credential.
+          document.dispatchEvent(new CustomEvent("pbp:bookmark-connection-changed", {detail:{url,bookmarkUrl,title,account:bookmarkAccount}}));
         }
       } catch (error) { console.warn("[preview] identity refresh failed:", error?.name, error?.message); }
     });

@@ -1922,6 +1922,79 @@ await test("delete ignores duplicate confirmation and stale completion after acc
     assert(!h.node("editor").matches(":popover-open")); equal(h.node("notes").value, "");
   } finally { release(); h.frame.remove(); }
 });
+
+// ---- G19 / G20: connection bar and badge ----
+async function barFrame(account, handler, detailExtra = {}) {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  const frame = document.createElement("iframe"); document.body.append(frame);
+  const w = frame.contentWindow, requests = [], states = [];
+  w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+  w.eval(await (await fetch("../shared.js")).text());
+  w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p, onMessage: { addListener() {} },
+    sendMessage: async msg => { requests.push(msg); return handler(msg); } } };
+  w.t = k => k; w.eval(runtime);
+  w.document.addEventListener("pbp:bookmark-state", e => states.push(e.detail));
+  w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "" }, ...detailExtra } }));
+  await new Promise(r => setTimeout(r, 30));
+  return { w, frame, requests, states, status: () => w.document.getElementById("reader-bookmark-status").textContent,
+    node: name => w.document.getElementById("reader-bookmark-" + name) };
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+await test("no bookmark connection asks the user to connect instead of reporting an account switch, and sends no request", async () => {
+  const none = await barFrame("", () => { throw new Error("no request may be sent"); });
+  try {
+    equal(none.status(), "bgSetToken"); equal(none.requests.length, 0);
+    for (const name of ["save", "later", "edit"]) assert(none.node(name).disabled, name + " must stay disabled");
+  } finally { none.frame.remove(); }
+  // The connection is removed while the reader is open: also "connect", not "switched".
+  const known = a => ({ known: true, bookmarked: true, account: a, bookmark: { tags: [], notes: "" } });
+  const lost = await barFrame("alice", m => known("alice"));
+  try {
+    lost.w.document.dispatchEvent(new lost.w.CustomEvent("pbp:bookmark-account-changed", { detail: { url: URL_ARTICLE, title: "Article", account: "" } }));
+    await wait(20);
+    equal(lost.status(), "bgSetToken");
+    const before = lost.requests.length;
+    await wait(20); equal(lost.requests.length, before);
+  } finally { lost.frame.remove(); }
+});
+await test("reader editor and background both refuse a blank title", async () => {
+  const known = { known: true, bookmarked: true, account: "alice", bookmark: { title: "T", notes: "", tags: "", private: false, toread: false } };
+  for (const blank of ["", "   ", "　\t"]) {
+    const r = await barFrame("alice", m => m.type === "mdReaderBookmarkState" ? known : { status: "saved", mutation: "updated", account: "alice" });
+    try {
+      await r.w.pbpReaderBookmarkAction("edit"); await wait(20);
+      const title = r.node("title"); title.value = blank; title.dispatchEvent(new r.w.Event("input", { bubbles: true }));
+      r.node("apply").click(); await wait(30);
+      equal(r.node("editor-status").textContent, "urlAndTitleRequired"); equal(r.node("editor-status").dataset.state, "error");
+      assert(!r.requests.some(m => m.type === "mdReaderBookmarkSave"), "a blank title was sent: " + JSON.stringify(blank));
+      assert(r.node("editor").matches(":popover-open"), "the editor must stay open");
+      title.value = "Fixed"; r.node("apply").click(); await wait(30);
+      assert(r.requests.some(m => m.type === "mdReaderBookmarkSave" && m.draft.title === "Fixed"), "the corrected title was not sent");
+    } finally { r.frame.remove(); }
+  }
+  for (const service of ["pinboard", "linkding"]) for (const title of ["", "  \n ", undefined]) {
+    const h = await harness({ service, post: { ...POST } });
+    const draft = { title, notes: "", tags: "", private: false, toread: false };
+    const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "edit", draft }, SENDER);
+    equal(result.reason, "invalid"); equal(h.env.calls.length, 0); equal(h.env.submitted, undefined);
+  }
+});
+await test("a connection change under the same account looks the bookmark up again and clears the old error", async () => {
+  let gateway = true;
+  const r = await barFrame("linkding:https://ld.example:c1", m => gateway
+    ? { known: false, reason: "gateway_redirect", account: "linkding:https://ld.example:c1" }
+    : { known: true, bookmarked: true, account: "linkding:https://ld.example:c1", bookmark: { tags: [], notes: "" } });
+  try {
+    equal(r.status(), "bookmarkErrGatewayRedirect"); equal(r.requests.length, 1);
+    gateway = false;
+    r.w.document.dispatchEvent(new r.w.CustomEvent("pbp:bookmark-connection-changed", { detail: { url: URL_ARTICLE, title: "Article", account: "linkding:https://ld.example:c1" } }));
+    await wait(30);
+    equal(r.requests.length, 2); equal(r.status(), ""); equal(r.node("save").dataset.saved, "true");
+    // Another account's event is not this bar's to answer.
+    r.w.document.dispatchEvent(new r.w.CustomEvent("pbp:bookmark-connection-changed", { detail: { url: URL_ARTICLE, account: "linkding:https://other.example:c9" } }));
+    await wait(30); equal(r.requests.length, 2);
+  } finally { r.frame.remove(); }
+});
 document.body.dataset.complete = "true";
 })();
 </script></body></html>

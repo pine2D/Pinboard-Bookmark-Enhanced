@@ -112,7 +112,7 @@
         id("editor-status").removeAttribute("data-i18n");
         id("editor-status").textContent = text(editorStatusKey, ...argsFor(editorStatusKey));
       }
-      id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "readerBookmarkTagsQuoteError", "titleTooLong", "submitUriTooLong"].includes(editorStatusKey) || failureCopy(editorStatusKey) ? "error" : "";
+      id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "readerBookmarkTagsQuoteError", "urlAndTitleRequired", "titleTooLong", "submitUriTooLong"].includes(editorStatusKey) || failureCopy(editorStatusKey) ? "error" : "";
     }
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) input.disabled = deleting;
   }
@@ -378,6 +378,7 @@
       }
       const service = pbpBookmarkAccountService(context.account);
       const limits = pbpBookmarkLimits(service);
+      if (!String(draft.title ?? "").trim()) { editorStatusKey = "urlAndTitleRequired"; paint(); return; }
       const titleOver = pbpBookmarkTitleTooLong(draft.title, service);
       if (titleOver || (limits.notesHard !== null && draft.notes.length > limits.notesHard)) {
         editorStatusKey = titleOver ? "titleTooLong" : "submitUriTooLong";
@@ -485,14 +486,27 @@
     if (context?.url === next?.url && context?.account === next?.account) return;
     closeEditor();
     generation++; context = next; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
-    mount(); showStatus("readerBookmarkChecking"); const gen = generation;
+    mount();
+    // No bookmark connection: nothing to look up. The buttons stay disabled and
+    // the bar says where to connect (it is not an account switch).
+    if (!context?.account) { inflight = false; showStatus("bgSetToken"); return; }
+    showStatus("readerBookmarkChecking"); const gen = generation;
+    refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); } });
+  });
+  // The same account with other connection settings (a new gateway, a rotated
+  // token, a Connect again): look the address up once more so an earlier error
+  // does not outlive the fix. A write in flight finishes first and looks again.
+  document.addEventListener("pbp:bookmark-connection-changed", event => {
+    if (!context?.account || event.detail?.account !== context.account || inflight) return;
+    inflight = true; showStatus("readerBookmarkChecking");
+    const gen = generation;
     refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); } });
   });
   document.addEventListener("pbp:bookmark-account-changed", event => {
     generation++; context = event.detail || null; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
     closeEditor();
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) { input.value = ""; input.checked = false; }
-    if (!context?.account) { showStatus("readerBookmarkAccountChanged"); return; }
+    if (!context?.account) { inflight = false; showStatus("bgSetToken"); return; }
     showStatus("readerBookmarkChecking");
     const gen = generation;
     refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); } });
