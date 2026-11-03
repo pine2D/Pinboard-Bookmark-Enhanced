@@ -4792,6 +4792,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         getCurrentBookmarkAuth: async () => auth,
         pbpStatusCacheGet: () => null,
         pbpStatusCacheSet: () => true,
+        pbpStatusCacheRestore: async () => {},
         CACHE_TTL: 300000,
         // The shared check's own answer for a failed self-hosted lookup: no
         // state, and the cause (fetchExistingBookmark's reason + HTTP status).

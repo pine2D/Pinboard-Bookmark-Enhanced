@@ -395,6 +395,7 @@ async function workerHarness(service, replies, options = {}) {
     pbpReadFreshBookmarkAuthForAccount:async account=>{const a=await auth();return a.account===account?a:null;},
     pbpStatusCacheGet:(url,a)=>state.cache.get(url)?.account===a.account?state.cache.get(url):null,
     pbpStatusCacheSet:(url,a,data)=>{if(a.epoch!==state.epoch)return false;state.cache.set(url,{...data,account:a.account});return true;},
+    pbpStatusCacheDelete:url=>state.cache.delete(url),
     PBP_TAG_VOCAB_STALE_CEILING, pbpTagVocabIndex, pbpTagGroupKey, pbpAlignTagName,
     setIcon:()=>{}, updateBadge:async()=>{}, pbpWaybackArchive:async(url,settings,options)=>state.sideEffects.push({type:"wayback",options}),
     persistSettings:async patch=>{Object.assign(settings,patch);return {ok:true};},

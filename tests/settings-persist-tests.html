@@ -2362,7 +2362,7 @@ async function run() {
       const k11Source = backgroundSource.slice(k11Start, k11End);
       const k11Factory = new Function(
         "SETTINGS_DEFAULTS", "getSettingsStorage", "pbpReadSettingsWithSecrets", "deobfuscateSettings", "pbpCheckBookmarkStatus",
-        `let _pinboardAuthEpoch = 0;\nconst _pendingChecks = new Map();\n${k11Source}\n` +
+        `const getCurrentBookmarkAuth = async () => ({ service: "pinboard", token: "alice:secret", account: "alice", epoch: 0 });\nlet _pinboardAuthEpoch = 0;\nconst _pendingChecks = new Map();\n${k11Source}\n` +
         `return { debouncedCheck, loadSettings, invalidateSettingsCache, cached: () => _settingsCache };`
       );
 

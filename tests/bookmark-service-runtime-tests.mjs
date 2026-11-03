@@ -39,6 +39,7 @@ const BLOCKS=[
   'settings tag panel follows the service',
   'archive log follows the bookmark connection',
   'linkding #fragment address saved without it',
+  'linkding browsing checks',
 ];
 // Self-check before any browser starts: the list above and the block() calls
 // below must name exactly the same blocks, so a block added to one place only
@@ -270,7 +271,7 @@ try{
       const rows=await chrome.storage.session.get(null);
       const drafts=Object.entries(rows).filter(([,row])=>row?.pageUrl).map(([key])=>key);
       if(drafts.length)await chrome.storage.session.remove(drafts);
-      await chrome.storage.local.set({offlineQueue:[]});await chrome.storage.local.remove('urlClean');
+      await chrome.storage.local.set({offlineQueue:[],optCheckBookmarkStatus:false,linkdingPreload:false});await chrome.storage.local.remove('urlClean');
     });
     for(const page of ctx.pages())if(page!==article)await page.close();
     records.linkding.clear();records.karakeep.clear();membership.clear();raceCreates.clear();
@@ -1826,6 +1827,75 @@ try{
     await popup.evaluate(()=>pbpDiscardPopupDraft());await popup.close();
     records.linkding.clear();await worker.evaluate(()=>statusCache.clear());await article.goto(origin+'/article');
     console.log('linkding #fragment address: one more lookup without it, a notice with Edit and Save as new; no fragment or a failed lookup asks once');
+  });
+  await block('linkding browsing checks',['linkding'],async()=>{
+    const checksSince=since=>requests.slice(since).filter(r=>r.service==='linkding'&&r.path.startsWith('bookmarks/check')).map(r=>new URLSearchParams(r.query).get('url'));
+    // A settle point for a tab event: the worker writes its current-tab
+    // mirror after the status check ran, or was skipped, for that address.
+    const visit=async address=>{
+      const before=Date.now();
+      await article.bringToFront();await article.goto(address);
+      await until(()=>worker.evaluate(({address,before})=>chrome.storage.session.get('_currentTab').then(row=>row._currentTab?.url===address&&row._currentTab.ts>=before),{address,before}),'the worker handled the tab event for '+address);
+    };
+    const articleIcon=()=>worker.evaluate(async address=>{const [tab]=await chrome.tabs.query({url:address});return _lastIconState.get(tab?.id)??null;},article.url());
+    const setSettings=values=>worker.evaluate(async values=>{await chrome.storage.local.set(values);await new Promise(r=>setTimeout(r,0));invalidateSettingsCache();},values);
+    // 1. The settings page: the switch sits with linkding's connection only,
+    // starts off, and is stored as switched; there the general status row
+    // gives way to a note pointing at it.
+    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    for(const service of ['pinboard','karakeep','linkding']){
+      await options.locator('#tab-general').click();
+      await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
+      assert.equal(await options.locator('#opt-linkding-preload').isVisible(),service==='linkding',service+': browsing-check switch visibility');
+      await options.locator('#tab-popup').click();
+      assert.equal(await options.locator('#opt-check-bookmark-status').isVisible(),service!=='linkding',service+': general status row visibility');
+      assert.equal(await options.locator('#check-status-linkding-note').isVisible(),service==='linkding',service+': linkding note visibility');
+    }
+    await options.locator('#tab-general').click();
+    assert.equal(await options.locator('#opt-linkding-preload').isChecked(),false,'the browsing-check switch does not start off');
+    const stored=()=>worker.evaluate(()=>chrome.storage.local.get('linkdingPreload').then(row=>row.linkdingPreload));
+    await options.locator('#opt-linkding-preload').check();
+    await until(async()=>await stored()===true,'switching on was stored');
+    await options.locator('#opt-linkding-preload').uncheck();
+    await until(async()=>await stored()===false,'switching off was stored');
+    await options.close();
+    const now=serverNow();
+    records.linkding.set('51',{id:51,url:origin+'/article?saved',title:'Saved',description:'',notes:'',web_archive_snapshot_url:null,is_archived:false,unread:false,shared:false,tag_names:[],date_added:now,date_modified:now});
+    // 2. Off, even with the general status icon on: tab events ask nothing
+    // and leave the icon; the popup asks once on open.
+    await setSettings({optCheckBookmarkStatus:true,linkdingPreload:false});
+    let since=requests.length;
+    await visit(origin+'/article?off');await visit(origin+'/article?saved');
+    assert.deepEqual(checksSince(since),[],'linkding was asked while browsing with the switch off');
+    assert.equal(await articleIcon(),null,'the toolbar icon was set with the switch off');
+    let popup=await openOnTab();await settled(popup,'found');
+    assert.deepEqual(checksSince(since),[origin+'/article?saved'],'the popup did not ask exactly once');
+    await popup.close();
+    // 3. On, with the general status icon off: each page is asked once, the
+    // icon follows, and the popup opened there asks nothing more.
+    await setSettings({optCheckBookmarkStatus:false,linkdingPreload:true});
+    await worker.evaluate(()=>statusCache.clear());
+    since=requests.length;
+    await visit(origin+'/article?on');
+    assert.deepEqual(checksSince(since),[origin+'/article?on'],'the page was not asked once while browsing');
+    assert.equal(await articleIcon(),'default');
+    await visit(origin+'/article?saved');
+    assert.deepEqual(checksSince(since),[origin+'/article?on',origin+'/article?saved']);
+    assert.equal(await articleIcon(),'saved','the icon did not show the saved page');
+    const beforePopup=requests.length;
+    popup=await openOnTab();await settled(popup,'found');
+    assert.deepEqual(checksSince(beforePopup),[],'the popup asked again after the browsing check');
+    await popup.close();
+    // 4. A stopped worker loses its memory cache: the next one answers the
+    // popup from the storage.session copy, without asking linkding again.
+    await worker.evaluate(()=>statusCache.clear());
+    popup=await openOnTab();await settled(popup,'found');
+    assert.deepEqual(checksSince(beforePopup),[],'the popup asked again once the memory cache was gone');
+    await popup.close();
+    // 5. Switching it off drops the copy and the icon.
+    await worker.evaluate(()=>chrome.storage.local.set({linkdingPreload:false}));
+    await until(async()=>!(await worker.evaluate(()=>chrome.storage.session.get('_linkdingStatus').then(row=>!!row._linkdingStatus)))&&await articleIcon()==='default','switching off dropped the copy and the icon');
+    console.log('linkding browsing checks: off asks only on popup open; on asks once per page, shows the icon and serves the popup, across a worker restart');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));

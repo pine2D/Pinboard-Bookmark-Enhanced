@@ -263,6 +263,13 @@
               <span class="save-status" id="connect-linkding-status" role="status" aria-live="polite"></span>
             </div>
           </div>
+          <div class="pref-group">
+            <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" role="switch" id="opt-linkding-preload" aria-labelledby="opt-linkding-preload-label" /> <span class="switch-text" id="opt-linkding-preload-label" data-i18n="optLinkdingPreload">Check pages while browsing</span>
+              <details class="context-help">
+                <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+                <p class="hint context-help-body" data-i18n="optLinkdingPreloadHint">The toolbar icon shows whether each page you open is bookmarked, and the popup opens ready. Every address you visit is sent to your linkding server and written to its logs, and the server visits the page itself. Off: linkding is asked only when you open the popup.</p>
+              </details><span class="switch-track" aria-hidden="true"></span></label></div>
+          </div>
         </div>
         <!-- First-run follow-up, shown by renderConnectionOverview while the
              token is well-formed and no AI provider has a key yet. -->
@@ -299,6 +306,7 @@
         </div>
         <div class="pref-group" role="group" aria-labelledby="sec-popup-behavior">
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-check-bookmark-status" checked /> <span class="switch-text" data-i18n="optCheckBookmarkStatus">Show on the toolbar icon whether this page is bookmarked</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row" id="check-status-linkding-note" hidden><p class="hint" data-i18n="optCheckBookmarkStatusLinkding">With linkding, the toolbar icon shows whether a page is bookmarked only when "Check pages while browsing" is on in the linkding connection settings on the Account tab.</p></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-auto-close" checked /> <span class="switch-text" data-i18n="optAutoClose">Auto-close popup after save</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="offline-queue-enabled" checked /> <span class="switch-text" data-i18n="optOfflineQueue">Enable offline save queue</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>

@@ -5025,6 +5025,15 @@
   "bookmarkLinkdingSharingHint": {
     "message": "Nach einer Änderung der Freigabeeinstellung in linkding erneut auf Verbinden klicken, um die Option hier zu aktualisieren."
   },
+  "optLinkdingPreload": {
+    "message": "Seiteninfos schon beim Surfen laden"
+  },
+  "optLinkdingPreloadHint": {
+    "message": "Das Symbol in der Symbolleiste zeigt dann für jede geöffnete Seite, ob sie schon in linkding liegt, und das Popup öffnet ohne Wartezeit. Der Preis: Jede besuchte Adresse geht an deinen linkding-Server und landet in dessen Protokoll, und der Server ruft die Seite selbst auf. Ist die Option aus, fragt die Erweiterung linkding nur, wenn du das Popup öffnest."
+  },
+  "optCheckBookmarkStatusLinkding": {
+    "message": "Mit linkding zeigt das Symbol in der Symbolleiste nur dann, ob eine Seite gespeichert ist, wenn „Seiteninfos schon beim Surfen laden“ eingeschaltet ist. Den Schalter findest du in den linkding-Verbindungseinstellungen im Tab „Konto“."
+  },
   "bookmarkGatewayLabel": {
     "message": "Zugangs-Gateway"
   },

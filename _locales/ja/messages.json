@@ -5025,6 +5025,15 @@
   "bookmarkLinkdingSharingHint": {
     "message": "linkdingで共有設定を変更した場合は、もう一度「接続」をクリックして、この画面の共有オプションを更新してください。"
   },
+  "optLinkdingPreload": {
+    "message": "閲覧中にページ情報を先に読み込む"
+  },
+  "optLinkdingPreloadHint": {
+    "message": "オンにすると、開いた各ページがlinkdingに保存済みかどうかをツールバーのアイコンに表示し、ポップアップも待たずに開きます。その代わり、アクセスしたすべてのURLがlinkdingサーバーに送られてサーバーのログに残り、サーバー自身もそのページにアクセスします。オフのときは、ポップアップを開いたときだけlinkdingに問い合わせます。"
+  },
+  "optCheckBookmarkStatusLinkding": {
+    "message": "linkdingでは、「閲覧中にページ情報を先に読み込む」がオンのときだけ、ページがブックマーク済みかどうかをツールバーのアイコンに表示します。この設定は「アカウント」タブのlinkding接続設定にあります。"
+  },
   "bookmarkGatewayLabel": {
     "message": "アクセスゲートウェイ"
   },

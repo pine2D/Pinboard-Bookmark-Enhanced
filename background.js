@@ -99,7 +99,60 @@ function pbpStatusCacheSet(url, auth, value) {
   if (!pbpBookmarkAuthIsCurrent(auth)) return false;
   statusCache.set(url, { ...value, account: auth.account });
   cleanupStatusCache();
+  pbpStatusMirrorWrite(url, auth, statusCache.get(url));
   return true;
+}
+function pbpStatusCacheDelete(url, auth) {
+  statusCache.delete(url);
+  pbpStatusMirrorWrite(url, auth, null);
+}
+
+// linkding answers live in memory only until the worker is stopped (30s idle).
+// A copy in storage.session, owned by the connection and capped, lets the next
+// worker answer the toolbar and the popup without asking linkding again, which
+// makes the server fetch the page once more. Kept for every linkding entry the
+// memory cache holds, so the copy is never older than it; dropped whole on any
+// connection change or logout (invalidateBookmarkAuthState), and per URL where
+// the memory entry is deleted. storage.session never reaches disk.
+const PBP_STATUS_MIRROR_KEY = "_linkdingStatus";
+const PBP_STATUS_MIRROR_MAX = 20;
+let _statusMirrorTail = Promise.resolve();
+function pbpStatusMirrorQueue(work) {
+  const run = _statusMirrorTail.then(work).catch((e) => console.warn("[bookmark-status] session copy failed:", e?.name, e?.message));
+  _statusMirrorTail = run;
+  return run;
+}
+function pbpStatusMirrorWrite(url, auth, value) {
+  if (auth?.service !== "linkding") return;
+  const epoch = auth.epoch;
+  pbpStatusMirrorQueue(async () => {
+    if (epoch !== _pinboardAuthEpoch) return;
+    const row = (await chrome.storage.session.get(PBP_STATUS_MIRROR_KEY))?.[PBP_STATUS_MIRROR_KEY];
+    const entries = row?.account === auth.account && row.entries && typeof row.entries === "object" ? { ...row.entries } : {};
+    if (value) entries[url] = value; else delete entries[url];
+    const kept = Object.entries(entries).sort((a, b) => (b[1]?.timestamp || 0) - (a[1]?.timestamp || 0)).slice(0, PBP_STATUS_MIRROR_MAX);
+    if (epoch !== _pinboardAuthEpoch) return;
+    await chrome.storage.session.set({ [PBP_STATUS_MIRROR_KEY]: { account: auth.account, entries: Object.fromEntries(kept) } });
+  });
+}
+function pbpStatusMirrorClear() {
+  return pbpStatusMirrorQueue(() => chrome.storage.session.remove(PBP_STATUS_MIRROR_KEY));
+}
+// Puts a fresh copied linkding entry back into the memory cache when this
+// worker has none for the URL. Never asks the server; any failure is a miss.
+async function pbpStatusCacheRestore(url, auth) {
+  if (auth?.service !== "linkding" || !pbpBookmarkAuthIsCurrent(auth) || statusCache.has(url)) return;
+  try {
+    await _statusMirrorTail;
+    const row = (await chrome.storage.session.get(PBP_STATUS_MIRROR_KEY))?.[PBP_STATUS_MIRROR_KEY];
+    const entry = row?.account === auth.account ? row.entries?.[url] : null;
+    if (!entry || entry.account !== auth.account || !Number.isFinite(entry.timestamp) || Date.now() - entry.timestamp >= CACHE_TTL) return;
+    if (!pbpBookmarkAuthIsCurrent(auth) || statusCache.has(url)) return;
+    statusCache.set(url, entry);
+    cleanupStatusCache();
+  } catch (e) {
+    console.warn("[bookmark-status] session copy read failed:", e?.name, e?.message);
+  }
 }
 
 function cleanupStatusCache() {
@@ -165,6 +218,7 @@ function invalidateBookmarkAuthState() {
   _iconPageUrl.clear();
   _lastCheckedUrl.clear();
   try { Promise.resolve(chrome.storage.session.remove("_currentTab")).catch(() => {}); } catch (_) {}
+  pbpStatusMirrorClear();
   chrome.tabs.query({}).then((tabs) => {
     if (epoch !== _pinboardAuthEpoch) return;
     for (const tab of tabs) {
@@ -212,20 +266,25 @@ async function debouncedCheck(url) {
   // settings snapshot as the on/off decision, and no extra round-trip is spent
   // to get it. A read failure leaves the shipped defaults in place, which is
   // also what popup.js's _loadUrlCleanSettings falls back to.
+  // linkding: every check makes the server fetch the page (and log its
+  // address), so a tab event asks it only with "Check pages while browsing"
+  // (linkdingPreload, default off) on, whatever optCheckBookmarkStatus says.
+  // Off, the toolbar keeps the icon it has; the popup still asks on open.
+  // Pinboard and Karakeep follow optCheckBookmarkStatus as before. A read
+  // failure keeps the defaults: checks on, linkding preload off.
   let urlCleanSettings = SETTINGS_DEFAULTS.urlClean;
+  let checkStatus = true, linkdingPreload = false;
   try {
-    if (_settingsCache) {
-      if (_settingsCache.optCheckBookmarkStatus === false) return;
-      if (_settingsCache.urlClean) urlCleanSettings = _settingsCache.urlClean;
-    } else {
-      const read = await (await getSettingsStorage()).get({ optCheckBookmarkStatus: true, urlClean: SETTINGS_DEFAULTS.urlClean });
-      if (read.optCheckBookmarkStatus === false) return;
-      if (read.urlClean) urlCleanSettings = read.urlClean;
-    }
+    const read = _settingsCache || await (await getSettingsStorage()).get({ optCheckBookmarkStatus: true, linkdingPreload: false, urlClean: SETTINGS_DEFAULTS.urlClean });
+    checkStatus = read.optCheckBookmarkStatus !== false;
+    linkdingPreload = read.linkdingPreload === true;
+    if (read.urlClean) urlCleanSettings = read.urlClean;
   } catch (e) {
     // Storage unavailable — fall through to default behavior (check enabled)
     console.warn("[bookmark-status] settings read failed:", e?.message || e);
   }
+  const auth = await getCurrentBookmarkAuth();
+  if (auth.service === "linkding" ? !linkdingPreload : !checkStatus) return;
   // K0: ask Pinboard about the URL the popup SAVES under, not the raw tab URL.
   // popup.js derives _bookmarkPrefetchUrl with exactly this condition, so a page
   // reached through a utm_*/fbclid link was stored under the cleaned URL while
@@ -241,7 +300,7 @@ async function debouncedCheck(url) {
   // this check wrote, so reading back by the raw tab URL would find nothing.
   // bookmarked is null when a self-hosted check failed: the caller keeps the
   // icon it already shows instead of reading the failure as "not saved".
-  return { bookmarked: (await _dedupedBookmarkCheck(target)).bookmarked, target };
+  return { bookmarked: (await _dedupedBookmarkCheck(target, auth)).bookmarked, target };
 }
 
 // Network-layer dedup for the bookmark status check, shared by the toolbar-icon
@@ -512,6 +571,7 @@ async function pbpCheckBookmarkStatus(url, capturedAuth = null) {
   const auth = capturedAuth || await getCurrentBookmarkAuth();
   if (!auth.token || !auth.account) return { bookmarked: false };
   if (capturedAuth && !pbpBookmarkAuthIsCurrent(auth)) return { bookmarked: false };
+  await pbpStatusCacheRestore(url, auth);
   const cached = pbpStatusCacheGet(url, auth);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) return { bookmarked: cached.bookmarked };
   try {
@@ -719,7 +779,7 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched
     const result = await pbpBookmarkClient(auth, alignCreatedTags).save(fields, lookup.bookmark);
     if (!pbpBookmarkAuthIsCurrent(auth)) return {result:pbpSaveFailure("account_changed"), persisted:null, retryable:false};
     if (result.status === "partial") {
-      statusCache.delete(intent.url);
+      pbpStatusCacheDelete(intent.url, auth);
       // Past the bookmark step the note is on the server (a create posts it,
       // an update patches it before tags and Read Later), so summary
       // ownership treats it as written while the save still reports failure.
@@ -732,7 +792,7 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched
   } catch (error) {
     // linkding writes a new bookmark before its tags, so a tag the server
     // could not store may have left the bookmark behind without them.
-    if (error?.code === "tag_too_long") statusCache.delete(intent.url);
+    if (error?.code === "tag_too_long") pbpStatusCacheDelete(intent.url, auth);
     return {result:pbpBookmarkFailure(error), persisted:null, retryable:pbpBookmarkFailureRetryable(error?.code)};
   }
 }
@@ -4040,6 +4100,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if ((area === "sync" || area === "local") && pbpSettingsKeysChanged(changes)) {
     invalidateSettingsCache();
   }
+  // Turning linkding's browsing checks on or off changes what the toolbar may
+  // show: drop every state and copy, and let the active tab ask again (or not).
+  if ((area === "sync" || area === "local") && changes.linkdingPreload) {
+    pbpReadBookmarkConnection().then((connection) => {
+      if (connection.service === "linkding") invalidateBookmarkAuthState();
+    }).catch((e) => console.warn("[bookmark-status] connection read failed:", e?.name, e?.message));
+  }
   if (area === "sync" || area === "local") {
     scheduleEffectiveAuthRefresh(changes, area);
     pbpOfflinePauseOnCredentialChange(changes);
@@ -4661,11 +4728,12 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   }
 
   if (message.type === "get_bookmark_data" && message.url) {
-    getCurrentBookmarkAuth().then((auth) => {
+    getCurrentBookmarkAuth().then(async (auth) => {
       if (!message.account || message.account !== auth.account) {
         sendResponse({ posts: null, account: "" });
         return;
       }
+      await pbpStatusCacheRestore(message.url, auth);
       const cached = pbpStatusCacheGet(message.url, auth);
       sendResponse({
         posts: cached && Date.now() - cached.timestamp < CACHE_TTL && cached.posts
@@ -4705,6 +4773,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         const cached = pbpStatusCacheGet(url, auth);
         return cached && Date.now() - cached.timestamp < CACHE_TTL && cached.posts ? cached.posts : null;
       };
+      await pbpStatusCacheRestore(url, auth);
       let posts = freshPosts();
       if (!posts) {
         const check = await _dedupedBookmarkCheck(url, auth);

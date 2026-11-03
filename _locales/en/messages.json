@@ -5036,6 +5036,15 @@
   "bookmarkLinkdingSharingHint": {
     "message": "After changing sharing in linkding, click Connect again to refresh the sharing option here."
   },
+  "optLinkdingPreload": {
+    "message": "Load page information while browsing"
+  },
+  "optLinkdingPreloadHint": {
+    "message": "The toolbar icon then shows whether each page you open is already in linkding, and the popup opens without waiting. The cost: every address you visit is sent to your linkding server and written to its log, and the server visits the page itself. When this is off, linkding is asked only when you open the popup."
+  },
+  "optCheckBookmarkStatusLinkding": {
+    "message": "With linkding, the toolbar icon shows whether a page is bookmarked only while “Load page information while browsing” is on. That switch is in the linkding connection settings on the Account tab."
+  },
   "bookmarkGatewayLabel": {
     "message": "Access gateway"
   },

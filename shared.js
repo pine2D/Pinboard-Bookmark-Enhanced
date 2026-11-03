@@ -643,6 +643,9 @@ const SETTINGS_DEFAULTS = {
   offlineQueueEnabled: true, optShowBadge: false,
   tagSyncMode: "cached", // "fresh" | "cached" | "prewarmed"
   optCheckBookmarkStatus: true, optShowSuggestTags: true,
+  // linkding only: check each page while browsing (toolbar icon, popup ready
+  // at once). Off by default: every check makes the server fetch the page.
+  linkdingPreload: false,
   optShowAiSummary: true, optShowAiTags: true,
   optShowQuickLinks: true, optShowQuickRow: true,
   tagPresets: "", optAutoCloseAfterSave: true,

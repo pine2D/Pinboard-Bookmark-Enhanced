@@ -5025,6 +5025,15 @@
   "bookmarkLinkdingSharingHint": {
     "message": "在 linkding 更改分享設定後，請再按一次「連線」，更新這裏的分享選項。"
   },
+  "optLinkdingPreload": {
+    "message": "瀏覽時預先讀取網頁資料"
+  },
+  "optLinkdingPreloadHint": {
+    "message": "開啟後，工具列圖示會顯示你開啟的每個網頁是否已在 linkding 收藏，彈出視窗開啟時亦毋須等待。代價是：你瀏覽的每個網址都會傳送到你的 linkding 伺服器並寫入伺服器記錄，伺服器亦會自行瀏覽該網頁。關閉時，只會在你開啟彈出視窗時查詢 linkding。"
+  },
+  "optCheckBookmarkStatusLinkding": {
+    "message": "使用 linkding 時，只有開啟「瀏覽時預先讀取網頁資料」，工具列圖示才會顯示網頁是否已收藏。這個開關在「帳戶」頁的 linkding 連線設定內。"
+  },
   "bookmarkGatewayLabel": {
     "message": "存取網關"
   },

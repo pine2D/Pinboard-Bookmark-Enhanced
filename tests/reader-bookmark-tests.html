@@ -67,6 +67,7 @@ async function pipelineHarness(options = {}) {
     pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { account, token: env.token, epoch: env.epoch, service: env.service, ...sharing() } : null,
     pbpWaybackArchive: async () => {}, updateBadge: async () => {}, setIcon: () => {},
     statusCache: (env.statusCache ||= new Map()),
+    pbpStatusCacheDelete: (url) => env.statusCache.delete(url),
     // The notification Undo's own record store and toasts.
     pbpTakeUndoRecord: async id => { const record = (env.undo ||= {})[id] || null; delete env.undo[id]; return record; },
     pbpClearNotification: async id => { (env.clearedToasts ||= []).push(id); },

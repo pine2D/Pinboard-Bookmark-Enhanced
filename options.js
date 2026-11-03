@@ -1920,9 +1920,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ---- Reset current tab to defaults ----
-  // No `general` entry: the Account tab holds only the Pinboard token and the
-  // connection overview, neither of which has a default to go back to, so
-  // _syncResetBtnVisibility hides "Reset This Tab" there.
+  // No `general` entry: the Account tab holds the bookmark connections and
+  // the connection overview, none of which a reset may touch (linkding's
+  // switches belong with its connection), so _syncResetBtnVisibility hides
+  // "Reset This Tab" there.
   const PANEL_DEFAULTS = {
     popup: {
       fields: {
@@ -2855,6 +2856,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       const row = $id(id)?.closest(".pref-row");
       if (row) row.hidden = service !== "pinboard";
     }
+    // linkding's browsing checks have their own switch in its connection
+    // settings; the general one would only contradict it there.
+    const statusRow = $id("opt-check-bookmark-status")?.closest(".pref-row");
+    if (statusRow) statusRow.hidden = service === "linkding";
+    $id("check-status-linkding-note").hidden = service !== "linkding";
     pbpSyncPinboardOnlyRows(service);
   }
   // ---- Switching the bookmark service: connect first ----
@@ -3320,6 +3326,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "offline-queue-enabled": s.offlineQueueEnabled,
     "opt-show-badge": s.optShowBadge,
     "opt-check-bookmark-status": s.optCheckBookmarkStatus,
+    "opt-linkding-preload": s.linkdingPreload === true,
     "opt-show-suggest-tags": s.optShowSuggestTags,
     "opt-show-ai-summary": s.optShowAiSummary,
     "opt-show-ai-tags": s.optShowAiTags,
@@ -4417,6 +4424,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       customFont: $id("opt-custom-font").value.trim(),
       // New toggles
       optCheckBookmarkStatus: $id("opt-check-bookmark-status").checked,
+      linkdingPreload: $id("opt-linkding-preload").checked,
       optShowSuggestTags: $id("opt-show-suggest-tags").checked,
       optShowAiSummary: $id("opt-show-ai-summary").checked,
       optShowAiTags: $id("opt-show-ai-tags").checked,

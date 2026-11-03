@@ -277,7 +277,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
 // lookup_bookmark branch. Only the adapter's lookup is stubbed, failing the
 // way bookmark-services.js fails it (pbpBookmarkServiceError: code + status).
 const G14_URL = "https://example.com/article";
-function buildStatusFailureHarness(source, { service = "linkding", failure = null, bookmark = null, pinboardStatus = 200 } = {}) {
+function buildStatusFailureHarness(source, { service = "linkding", failure = null, bookmark = null, pinboardStatus = 200, checkStatus = true, linkdingPreload = true, session = {} } = {}) {
   const slice = (from, to) => {
     const start = source.indexOf(from);
     const end = source.indexOf(to, start);
@@ -325,6 +325,13 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
       },
       action: { setIcon: (details, done) => { icons.push({ tabId: details.tabId, state: details.path }); if (done) done(); } },
       runtime: { lastError: undefined },
+      // storage.session as the next worker finds it: `session` is shared
+      // between two harnesses to stand for a worker that was stopped.
+      storage: { session: {
+        get: async (key) => (key in session ? { [key]: structuredClone(session[key]) } : {}),
+        set: async (items) => { for (const [key, value] of Object.entries(items)) session[key] = structuredClone(value); },
+        remove: async (key) => { delete session[key]; },
+      } },
     },
     ICONS_DEFAULT: "default", ICON_PATHS: { default: "default", saved: "saved", toread: "toread" },
     _iconImageData: {}, _ensureIconDecode: () => {},
@@ -335,7 +342,7 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
   };
   const body = [
     "const _pendingChecks = new Map();",
-    "let _settingsCache = { optCheckBookmarkStatus: true, urlClean: SETTINGS_DEFAULTS.urlClean };",
+    "let _settingsCache = { optCheckBookmarkStatus: " + checkStatus + ", linkdingPreload: " + linkdingPreload + ", urlClean: SETTINGS_DEFAULTS.urlClean };",
     slice("const statusCache = new Map();", "// ---- P2: Cached token + invalidation ----"),
     slice("async function debouncedCheck(url) {", "// ---- Load settings with deobfuscation"),
     slice("async function checkBookmarked(url, capturedAuth = null) {", "// ---- Badge: unread count ----"),
@@ -344,11 +351,11 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
     slice("const _lastIconState = new Map();", "// ---- 检查 URL 是否已收藏"),
     slice("async function _getFocusedActiveTab", "chrome.windows.onFocusChanged"),
     "function handleMessage(message, sendResponse) {\n" + slice('if (message.type === "lookup_bookmark" && message.url) {', 'if (message.type === "PBP_POPUP_DRAFT")') + "\n  return false;\n}",
-    "return { handleMessage, _scheduleCurrentTabRefresh, statusCache, pbpStatusCacheSet, CACHE_TTL };",
+    "return { handleMessage, _scheduleCurrentTabRefresh, statusCache, pbpStatusCacheSet, pbpStatusCacheDelete, CACHE_TTL, mirrorSettled: () => _statusMirrorTail };",
   ].join("\n");
   const api = new Function(...Object.keys(deps), body)(...Object.values(deps));
   return {
-    api, auth, lookups, pinboardRequests, icons, answer, tab,
+    api, auth, lookups, pinboardRequests, icons, answer, tab, session,
     refresh: async () => { api._scheduleCurrentTabRefresh(7, activeTab.url); await scheduled; },
     // The tab moves to `url` the way tabs.onUpdated reports it: an in-page
     // route change (pushState) carries only changeInfo.url, a new document
@@ -1056,7 +1063,10 @@ async function run() {
         h.answer.onLookup = (url) => { if (url === OTHER) h.setTabUrl(G14_URL); };
         await h.navigate(OTHER, { sameDocument: true });
         h.answer.onLookup = null;
-        h.api.statusCache.clear(); // its entry has expired by now
+        // Its entry has expired by now, in memory and in the storage.session copy.
+        h.api.statusCache.clear();
+        await h.api.mirrorSettled();
+        delete h.session._linkdingStatus;
         await h.navigate(G14_URL, { sameDocument: true });
         assert(h.lookups.join("|") === [G14_URL, OTHER, G14_URL].join("|"), service + ": checks " + JSON.stringify(h.lookups));
         assert(h.icons.length === 1 && h.icons[0].state === "saved", service + ": back on the saved page a failure set " + JSON.stringify(h.icons));
@@ -1123,7 +1133,10 @@ async function run() {
       {
         const h = buildStatusFailureHarness(source, { service, bookmark: G14_BOOKMARK });
         await h.refresh();
-        h.api.statusCache.clear(); // its entry has expired by now
+        // Its entry has expired by now, in memory and in the storage.session copy.
+        h.api.statusCache.clear();
+        await h.api.mirrorSettled();
+        delete h.session._linkdingStatus;
         h.answer.onLookup = (url) => { if (url === G14_URL) h.setTabUrl(OTHER); };
         await h.refresh();
         assert(h.icons.length === 1 && h.icons[0].state === "saved", service + ": the focused tab moving on mid-check set " + JSON.stringify(h.icons));
@@ -1178,6 +1191,86 @@ async function run() {
     const icon = buildStatusFailureHarness(source, { service: "pinboard", pinboardStatus: 503 });
     await icon.refresh();
     assert(icon.icons.length === 1 && icon.icons[0].state === "default", "the Pinboard toolbar path changed: " + JSON.stringify(icon.icons));
+  });
+
+  await test("G26: linkding with its browsing checks off asks nothing on tab events and leaves the icon", async () => {
+    const OTHER = "https://example.com/other";
+    for (const checkStatus of [true, false]) {
+      const h = buildStatusFailureHarness(source, { bookmark: G14_BOOKMARK, checkStatus, linkdingPreload: false });
+      await h.refresh();
+      await h.navigate(OTHER, { sameDocument: true });
+      await h.navigate(G14_URL, { sameDocument: false });
+      assert(h.lookups.length === 0, "status icon " + checkStatus + ": linkding was asked " + h.lookups.length + " times while browsing");
+      assert(h.icons.length === 0, "status icon " + checkStatus + ": the icon was set " + JSON.stringify(h.icons));
+    }
+  });
+
+  await test("G26: linkding with its browsing checks on asks once per page and shows the answer, whatever the status icon setting", async () => {
+    const OTHER = "https://example.com/other";
+    for (const checkStatus of [true, false]) {
+      const h = buildStatusFailureHarness(source, { bookmark: G14_BOOKMARK, checkStatus, linkdingPreload: true });
+      await h.refresh();
+      assert(h.lookups.length === 1 && h.icons.at(-1)?.state === "saved", "status icon " + checkStatus + ": the saved page " + JSON.stringify({ lookups: h.lookups, icons: h.icons }));
+      await h.navigate(OTHER, { sameDocument: false });
+      assert(h.lookups.length === 2 && h.lookups[1] === OTHER && h.icons.at(-1)?.state === "default", "status icon " + checkStatus + ": the other page " + JSON.stringify({ lookups: h.lookups, icons: h.icons }));
+    }
+  });
+
+  await test("G26: Pinboard and Karakeep follow the status icon setting, never linkding's", async () => {
+    for (const service of ["pinboard", "karakeep"]) {
+      for (const checkStatus of [true, false]) {
+        for (const linkdingPreload of [true, false]) {
+          const h = buildStatusFailureHarness(source, { service, checkStatus, linkdingPreload });
+          await h.refresh();
+          const asked = service === "pinboard" ? h.pinboardRequests.length : h.lookups.length;
+          assert(asked === (checkStatus ? 1 : 0), service + " status icon " + checkStatus + " linkding preload " + linkdingPreload + ": " + asked + " requests");
+        }
+      }
+    }
+  });
+
+  await test("G26: the next worker answers the popup from a linkding check the stopped one made", async () => {
+    const session = {};
+    const first = buildStatusFailureHarness(source, { bookmark: G14_BOOKMARK, session });
+    await first.refresh();
+    await first.api.mirrorSettled();
+    assert(first.lookups.length === 1, "the first worker did not check the page");
+    const next = buildStatusFailureHarness(source, { bookmark: G14_BOOKMARK, session });
+    const reply = await next.lookup();
+    assert(next.lookups.length === 0, "the next worker asked linkding again");
+    assert(reply.ok === true && reply.posts?.[0]?.href === G14_URL, "the copied answer was not served: " + JSON.stringify(reply));
+    // Another connection, an expired copy and a deleted entry are misses.
+    const other = buildStatusFailureHarness(source, { bookmark: G14_BOOKMARK, session });
+    other.auth.account = "linkding:https://other.example/:id-2";
+    await other.lookup();
+    assert(other.lookups.length === 1, "another connection was served this connection's copy");
+    const row = session._linkdingStatus;
+    row.entries[G14_URL].timestamp = Date.now() - first.api.CACHE_TTL - 1;
+    const expired = buildStatusFailureHarness(source, { bookmark: G14_BOOKMARK, session });
+    await expired.lookup();
+    assert(expired.lookups.length === 1, "an expired copy was served");
+    await expired.api.mirrorSettled();
+    expired.api.pbpStatusCacheDelete(G14_URL, expired.auth);
+    await expired.api.mirrorSettled();
+    const deleted = buildStatusFailureHarness(source, { bookmark: G14_BOOKMARK, session });
+    await deleted.lookup();
+    assert(deleted.lookups.length === 1, "a deleted entry was served from the copy");
+  });
+
+  await test("G26: the storage.session copy holds a bounded number of pages, Pinboard and Karakeep none", async () => {
+    const session = {};
+    const h = buildStatusFailureHarness(source, { session });
+    for (let i = 0; i < 30; i++) h.api.pbpStatusCacheSet("https://example.com/p" + i, h.auth, { bookmarked: false, timestamp: Date.now() + i, posts: [] });
+    await h.api.mirrorSettled();
+    const urls = Object.keys(session._linkdingStatus.entries);
+    assert(urls.length > 0 && urls.length <= 20 && urls.includes("https://example.com/p29"), "copy holds " + urls.length + " pages");
+    for (const service of ["pinboard", "karakeep"]) {
+      const other = {};
+      const o = buildStatusFailureHarness(source, { service, session: other });
+      o.api.pbpStatusCacheSet(G14_URL, o.auth, { bookmarked: true, timestamp: Date.now(), posts: [] });
+      await o.api.mirrorSettled();
+      assert(Object.keys(other).length === 0, service + " was copied to storage.session");
+    }
   });
 }
 run();

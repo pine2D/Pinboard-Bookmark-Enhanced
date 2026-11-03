@@ -5019,6 +5019,15 @@
   "bookmarkLinkdingSharingHint": {
     "message": "在 linkding 中更改共享设置后，请再次点击「连接」，刷新这里的共享选项。"
   },
+  "optLinkdingPreload": {
+    "message": "浏览时预先读取页面信息"
+  },
+  "optLinkdingPreloadHint": {
+    "message": "开启后，工具栏图标会显示你打开的每个页面是否已在 linkding 收藏，弹窗打开时也无需等待。代价是：你访问的每个网址都会发给你的 linkding 服务器并写入服务器日志，服务器还会自己去访问这个网页。关闭时，只在你打开弹窗时查询 linkding。"
+  },
+  "optCheckBookmarkStatusLinkding": {
+    "message": "使用 linkding 时，只有开启「浏览时预先读取页面信息」，工具栏图标才会显示页面是否已收藏。这个开关在「账号」页的 linkding 连接设置里。"
+  },
   "bookmarkGatewayLabel": {
     "message": "访问网关"
   },

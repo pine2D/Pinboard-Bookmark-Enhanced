@@ -5025,6 +5025,15 @@
   "bookmarkLinkdingSharingHint": {
     "message": "Po zmianie ustawień udostępniania w linkding kliknij ponownie Połącz, aby odświeżyć tę opcję tutaj."
   },
+  "optLinkdingPreload": {
+    "message": "Wczytuj informacje o stronie już podczas przeglądania"
+  },
+  "optLinkdingPreloadHint": {
+    "message": "Ikona na pasku narzędzi pokazuje wtedy przy każdej otwartej stronie, czy jest już w linkding, a okienko otwiera się bez czekania. Ceną jest to, że każdy odwiedzany adres trafia na Twój serwer linkding i do jego dziennika, a serwer sam odwiedza tę stronę. Gdy opcja jest wyłączona, linkding jest pytany tylko przy otwarciu okienka."
+  },
+  "optCheckBookmarkStatusLinkding": {
+    "message": "W linkding ikona na pasku narzędzi pokazuje, czy strona jest zapisana, tylko gdy włączona jest opcja „Wczytuj informacje o stronie już podczas przeglądania”. Znajdziesz ją w ustawieniach połączenia z linkding na karcie Konto."
+  },
   "bookmarkGatewayLabel": {
     "message": "Bramka dostępu"
   },
