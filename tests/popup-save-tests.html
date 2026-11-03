@@ -2067,7 +2067,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       let badgeCalls = 0;
       const calls = { renderTags: 0, doAITags: 0, status: [] };
       const tagAddRemoveSource = popupTagsSource.slice(
-        popupTagsSource.indexOf("function addTag(tag) {"), popupTagsSource.indexOf("function renderTags() {"));
+        popupTagsSource.indexOf("function addTag("), popupTagsSource.indexOf("function renderTags() {"));
       const clearStart = popupTagsSource.indexOf('$id("tags-clear-all")?.addEventListener("click"');
       const clearEnd = popupTagsSource.indexOf('$id("tags-copy-all")', clearStart);
       assert(clearStart >= 0 && clearEnd > clearStart, "clear-all source not found");
@@ -5597,7 +5597,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(runFormIsDirty(flags, true) === true, "a tags-only edit was not treated as dirty");
     });
 
-    const addRemoveTagStart = popupTagsSource.indexOf("function addTag(tag) {");
+    const addRemoveTagStart = popupTagsSource.indexOf("function addTag(");
     const addRemoveTagEnd = popupTagsSource.indexOf("function renderTags() {", addRemoveTagStart);
     assert(addRemoveTagStart >= 0 && addRemoveTagEnd > addRemoveTagStart, "addTag/removeTag source not found");
     const addRemoveTagSource = popupTagsSource.slice(addRemoveTagStart, addRemoveTagEnd);

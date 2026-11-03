@@ -465,6 +465,15 @@ function setupTagsInput() {
       }
       input.value = ""; closeAutocomplete();
     } else if (e.key === " " || e.key === "," || e.key === "，") {
+      // Karakeep/linkding quote syntax: until the closing quote, Space and commas
+      // are part of the name. A closed quote commits through the paste parser.
+      if (pbpTagQuoteSyntax() && input.value.trimStart().startsWith('"')) {
+        if (pbpTagQuoteOpen(input.value)) return;
+        e.preventDefault();
+        pbpSplitTagInput(input.value).forEach((t) => addTag(t));
+        input.value = ""; closeAutocomplete();
+        return;
+      }
       const v = input.value.replace(/[,，]/g, "").trim();
       if (v) { e.preventDefault(); addTag(v); input.value = ""; closeAutocomplete(); }
       else if (e.key !== " ") e.preventDefault();
@@ -527,7 +536,9 @@ function setupTagsInput() {
   });
   $id("tags-last-used")?.addEventListener("click", (e) => {
     e.preventDefault();
-    _lastUsedTagsCache.forEach(tag => addTag(tag));
+    // Saved names are server names: align them, never re-mint (a vocabulary
+    // that has not loaded yet would turn "machine learning" into a new tag).
+    _lastUsedTagsCache.forEach(tag => addTag(tag, { literal: true }));
   });
   loadLastUsedTags();
 }
@@ -600,9 +611,27 @@ function updateAc(items, input) {
 
 let _dragReorderFromIdx = null;
 
-function addTag(tag) {
+function pbpTagQuoteSyntax() {
+  const service = pbpBookmarkServiceId(settings);
+  return service === "karakeep" || service === "linkding";
+}
+// True while a leading quote has no closing quote yet (a backslash escapes the
+// next character, as in pbpSplitTagInput).
+function pbpTagQuoteOpen(text) {
+  const source = String(text ?? "").trimStart();
+  for (let i = 1; i < source.length; i++) {
+    if (source[i] === "\\") { i++; continue; }
+    if (source[i] === '"') return false;
+  }
+  return true;
+}
+
+// `literal` is for names that already exist on the service: alignment only, no
+// minting and no whitespace rewrite. Typed, pasted and completed input keeps the
+// canonical path.
+function addTag(tag, { literal = false } = {}) {
   if (typeof tag !== "string" || !tag) return;
-  tag = pbpCanonicalTagName(tag, pbpPopupTagContext());
+  tag = literal ? pbpAlignTagName(tag, pbpPopupTagContext()).name : pbpCanonicalTagName(tag, pbpPopupTagContext());
   if (!tag) return;
   const key = pbpTagDedupeKey(tag);
   const already = currentTags.find(t => pbpTagDedupeKey(t) === key);

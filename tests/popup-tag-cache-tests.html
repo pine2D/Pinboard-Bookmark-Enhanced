@@ -302,6 +302,98 @@ function typeInto(value) {
     }
   });
 
+  await test("last-used names restore as saved before the vocabulary loads, and after it", () => {
+    for (const vocab of [null, {}, { "machine learning": 1 }, { "Machine Learning": 4 }]) {
+      resetInput();
+      settings.bookmarkService = "karakeep";
+      if (vocab === null) tagVocabIndex = null; else applyTagData(vocab);
+      _lastUsedTagsCache = ["machine learning", "C++ notes"];
+      document.getElementById("tags-last-used").click();
+      assert(currentTags.join("|") === "machine learning|C++ notes",
+        "last-used was re-minted for vocabulary " + JSON.stringify(vocab) + ": " + currentTags.join("|"));
+    }
+  });
+
+  await test("last-used still aligns to the server spelling and skips a name already present by group", () => {
+    resetInput();
+    settings.bookmarkService = "karakeep";
+    settings.optRespectTagCase = true;
+    applyTagData({ "Machine Learning": 4 });
+    _lastUsedTagsCache = ["machine learning"];
+    document.getElementById("tags-last-used").click();
+    assert(currentTags.join("|") === "Machine Learning", "alignment to the server spelling was lost: " + currentTags.join("|"));
+    currentTags = ["Machine-Learning"];
+    document.getElementById("tags-last-used").click();
+    assert(currentTags.join("|") === "Machine-Learning", "a same-group name was added twice: " + currentTags.join("|"));
+  });
+
+  await test("typed and pasted names are still canonicalized", () => {
+    resetInput();
+    settings.bookmarkService = "karakeep";
+    tagVocabIndex = null;
+    assert(addTag("machine learning") === "machine-learning", "typed entry stopped minting");
+  });
+
+  // Real keystrokes: dispatch keydown, then insert the character the way the
+  // browser would unless the handler prevented it.
+  function typeKeys(text) {
+    for (const ch of text) {
+      const ev = key({ key: ch, cancelable: true });
+      tagsInput.dispatchEvent(ev);
+      if (!ev.defaultPrevented) tagsInput.value += ch;
+    }
+  }
+  function viaPaste(text, service, separator = "-") {
+    resetInput(); settings.bookmarkService = service; settings.aiTagSeparator = separator;
+    typeInto(text);
+    tagsInput.dispatchEvent(key({ key: "Enter" }));
+    return currentTags.slice();
+  }
+
+  await test("self-hosted: an open quote keeps spaces and commas in the tag, a closed one commits like paste + Enter", () => {
+    for (const service of ["karakeep", "linkding"]) for (const separator of ["-", "_"]) for (const closer of [" ", ",", "，"]) {
+      resetInput(); settings.bookmarkService = service; settings.aiTagSeparator = separator;
+      typeKeys('"machine learning');
+      assert(currentTags.length === 0 && tagsInput.value === '"machine learning', service + ": an open quote committed early: " + JSON.stringify(currentTags) + tagsInput.value);
+      typeKeys('"');
+      assert(currentTags.length === 0, "closing quote alone must not commit");
+      typeKeys(closer);
+      const typed = currentTags.slice();
+      const pasted = viaPaste('"machine learning"', service, separator);
+      assert(JSON.stringify(typed) === JSON.stringify(pasted) && typed.length === 1,
+        service + " " + separator + " closer " + closer + ": typed " + JSON.stringify(typed) + " vs paste " + JSON.stringify(pasted));
+      assert(typed[0] === "machine" + separator + "learning", "separator setting ignored: " + typed[0]);
+    }
+  });
+
+  await test("self-hosted: commas inside an open quote stay, and a quoted comma name matches paste", () => {
+    resetInput(); settings.bookmarkService = "karakeep";
+    typeKeys('"a,b');
+    assert(currentTags.length === 0 && tagsInput.value === '"a,b', "comma inside an open quote committed");
+    typeKeys('" ');
+    const pasted = viaPaste('"a,b"', "karakeep");
+    assert(pasted.join("|") === "a,b", "paste baseline changed: " + pasted.join("|"));
+    resetInput(); settings.bookmarkService = "karakeep";
+    typeKeys('"a,b" ');
+    assert(currentTags.join("|") === "a,b", "typed quoted comma name differs from paste: " + currentTags.join("|"));
+  });
+
+  await test("self-hosted: plain names and IME composition are unaffected", () => {
+    resetInput(); settings.bookmarkService = "linkding";
+    typeKeys("one two ");
+    assert(currentTags.join("|") === "one|two", "plain Space commit changed: " + currentTags.join("|"));
+    resetInput(); settings.bookmarkService = "karakeep";
+    tagsInput.value = '"biao';
+    tagsInput.dispatchEvent(key({ key: " ", isComposing: true }));
+    assert(currentTags.length === 0 && tagsInput.value === '"biao', "composition handling changed");
+  });
+
+  await test("Pinboard: quotes are literal and Space still commits", () => {
+    resetInput(); settings.bookmarkService = "pinboard";
+    typeKeys('"machine learning" ');
+    assert(currentTags.join("|") === '"machine|learning"', "Pinboard typing changed: " + currentTags.join("|"));
+  });
+
   await test("suggestion and AI chips show used for a group-equivalent saved name", () => {
     resetInput();
     currentTags = ["Nick_Drake"];
