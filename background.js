@@ -600,7 +600,7 @@ async function pbpBookmarkTagCounts(auth) {
   return resp.json();
 }
 function pbpBookmarkFailure(error) {
-  return pbpSaveFailure(error?.code === "auth" ? "not_logged_in" : error?.code || "network", {httpStatus:error?.status, tag:error?.tag});
+  return pbpSaveFailure(error?.code === "auth" ? "not_logged_in" : error?.code || "network", {httpStatus:error?.status, tag:error?.tag, retryAfter:error?.retryAfter});
 }
 // A vocabulary cache is advisory. Never use another owner's or an old device
 // snapshot to choose a spelling at dispatch time.
@@ -658,7 +658,7 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched
     const lookup = prefetched || await fetchExistingBookmark(intent.url, auth.token, auth);
     // lookupFailed: nothing was written, so an interactive save can stop here
     // instead of queueing (submitSaveIntent).
-    if (lookup.lookupFailed) return {result:pbpSaveFailure(lookup.reason || "lookup", {httpStatus:lookup.httpStatus}), persisted:null, retryable:lookup.retryable, lookupFailed:true};
+    if (lookup.lookupFailed) return {result:pbpSaveFailure(lookup.reason || "lookup", {httpStatus:lookup.httpStatus, retryAfter:lookup.retryAfter}), persisted:null, retryable:lookup.retryable, lookupFailed:true};
     if ((intent.mode === "create" && lookup.exists) || (intent.mode === "update" && !lookup.exists)) return {result:pbpSaveFailure("conflict"), persisted:null, retryable:false};
     const plan = pbpResolveSavePlan(intent, lookup);
     if (plan.action === "failed") return {result:plan.result, persisted:null, retryable:false};
@@ -718,7 +718,8 @@ function pbpSkippedPersisted(plan, lookup) {
 
 // tag: the tag a self-hosted server could not store (tag_too_long). The error
 // copy names it, so it travels to the outlets but is never logged.
-function pbpSaveFailure(reason, { detail, httpStatus, tag } = {}) {
+// retryAfter: a 429's Retry-After delay in ms (pbpRetryAfterDelay).
+function pbpSaveFailure(reason, { detail, httpStatus, tag, retryAfter } = {}) {
   const result = { status: "failed", reason };
   if (detail) {
     result.detail = String(detail)
@@ -727,6 +728,7 @@ function pbpSaveFailure(reason, { detail, httpStatus, tag } = {}) {
   }
   if (Number.isInteger(httpStatus)) result.httpStatus = httpStatus;
   if (typeof tag === "string" && tag) result.tag = tag;
+  if (Number.isSafeInteger(retryAfter) && retryAfter > 0) result.retryAfter = retryAfter;
   return result;
 }
 
@@ -767,11 +769,13 @@ async function fetchExistingBookmark(url, token, auth = pbpCaptureBookmarkAuth(t
     if (!resp.ok) {
       const httpStatus = Number.isInteger(resp.status) ? resp.status : undefined;
       const reason = httpStatus === 401 || httpStatus === 403 ? "not_logged_in" : "http";
+      const retryAfter = httpStatus === 429 ? pbpRetryAfterDelay(resp.headers?.get?.("Retry-After")) : undefined;
       return {
         exists: false,
         lookupFailed: true,
         reason,
         httpStatus,
+        ...(retryAfter !== undefined ? { retryAfter } : {}),
         retryable: httpStatus === 429 || httpStatus >= 500,
       };
     }
@@ -794,7 +798,8 @@ async function fetchExistingBookmark(url, token, auth = pbpCaptureBookmarkAuth(t
       post,
     };
   } catch (error) {
-    if (pbpSelfHostedAuth(auth)) return {exists:false, lookupFailed:true, reason:error?.code === "auth" ? "not_logged_in" : error?.code || "lookup", httpStatus:error?.status, retryable:pbpBookmarkFailureRetryable(error?.code)};
+    if (pbpSelfHostedAuth(auth)) return {exists:false, lookupFailed:true, reason:error?.code === "auth" ? "not_logged_in" : error?.code || "lookup", httpStatus:error?.status,
+      ...(error?.retryAfter !== undefined ? {retryAfter:error.retryAfter} : {}), retryable:pbpBookmarkFailureRetryable(error?.code)};
     if (error?.code === "account_changed") {
       return { exists: false, lookupFailed: true, reason: "account_changed", retryable: false };
     }
@@ -845,7 +850,7 @@ async function pbpSendResolvedPlan(plan, settings) {
       return { result: pbpSaveFailure("too_long", { detail: String(apiUrl.length), httpStatus }), persisted: null, retryable: false };
     }
     return {
-      result: pbpSaveFailure("http", { httpStatus }),
+      result: pbpSaveFailure("http", { httpStatus, retryAfter: httpStatus === 429 ? pbpRetryAfterDelay(resp.headers?.get?.("Retry-After")) : undefined }),
       persisted: null,
       retryable: httpStatus === 429 || httpStatus >= 500,
     };
@@ -1345,7 +1350,7 @@ function pbpOfflinePauseOnCredentialChange(changes) {
 
 // manual: a user-initiated retry ignores the pause (and lifts it first); the
 // automatic path skips paused accounts, starting from the stored pause, and
-// records that need attention (pbpOfflineQueueNeedsAttention).
+// records it holds (pbpOfflineQueueHeld: needing attention, or rate limited).
 function drainOfflineQueueIds(queueIds, { manual = false, pausedAccount = "" } = {}) {
   const paused = new Set(pausedAccount ? [pausedAccount] : []);
   return pbpDrainOfflineQueue(queueIds, {
@@ -1355,7 +1360,7 @@ function drainOfflineQueueIds(queueIds, { manual = false, pausedAccount = "" } =
         ? offlineQueue.find((item) => item?.queueId === queueId) || null
         : null;
     }),
-    ...(manual ? {} : { skipItem: (item) => (typeof item.account === "string" && paused.has(item.account)) || pbpOfflineQueueNeedsAttention(item) }),
+    ...(manual ? {} : { skipItem: (item) => (typeof item.account === "string" && paused.has(item.account)) || pbpOfflineQueueHeld(item, Date.now()) }),
     // noteActivity: replay work is activity (same rationale as batch progress —
     // a long drain driven by the keepalive alarm must not idle-terminate
     // mid-run). typeof-guarded: source-slice test pages execute this function

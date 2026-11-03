@@ -1158,6 +1158,7 @@ function pbpResolveSavePlan(intent, lookup) {
   if (!lookup || lookup.lookupFailed) {
     const result = { status: "failed", reason: lookup?.reason || "lookup" };
     if (Number.isInteger(lookup?.httpStatus)) result.httpStatus = lookup.httpStatus;
+    if (Number.isSafeInteger(lookup?.retryAfter) && lookup.retryAfter > 0) result.retryAfter = lookup.retryAfter;
     return { action: "failed", result, retryable: !lookup || !!lookup.retryable };
   }
   if (!lookup.exists) return send({ ...incoming, time: undefined }, false, "created");
@@ -2084,26 +2085,61 @@ function pbpOfflineQueueAttentionFailure(result) {
   if (!Number.isInteger(status)) return reason === "remote";
   return status >= 400 && status < 500 && !PBP_OFFLINE_QUEUE_TRANSIENT_STATUSES.includes(status);
 }
+// Retry-After (RFC 9110 10.2.3) as a delay in ms: delay-seconds or an
+// HTTP-date. undefined when the header is missing, malformed or already
+// past. The Pinboard paths and bookmark-services.js both read it.
+function pbpRetryAfterDelay(value, now = Date.now()) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return undefined;
+  if (/^\d+$/.test(text)) {
+    const seconds = Number(text);
+    return Number.isSafeInteger(seconds) && seconds > 0 ? seconds * 1000 : undefined;
+  }
+  const at = Date.parse(text);
+  return Number.isFinite(at) && at > now ? at - now : undefined;
+}
+
+// A server that says when to come back (a 429's Retry-After) holds the
+// record until then, at most this long; without the header the record is
+// retried on the queue's usual ticks.
+const PBP_OFFLINE_QUEUE_RETRY_AFTER_MAX = 60 * 60 * 1000;
+function pbpOfflineQueueRateLimited(result) {
+  return result?.reason === "rate_limited" || (result?.reason === "http" && result.httpStatus === 429);
+}
 // The record's failure marker, the queue's only field about a failure: the
-// product code, the HTTP status when the copy names it, and when it
-// happened. No response body, header or credential.
+// product code, the HTTP status when the copy names it, when it happened,
+// and for a rate limit the time replay may try again (retryAfter). No
+// response body, header or credential.
 function pbpOfflineQueueFailureMark(result, now = Date.now()) {
+  const status = result?.httpStatus;
+  const withStatus = (result?.reason === "remote" || result?.reason === "http") && Number.isInteger(status) ? { status } : {};
+  if (pbpOfflineQueueRateLimited(result)) {
+    const delay = result.retryAfter;
+    if (!Number.isSafeInteger(delay) || delay <= 0) return null;
+    return { code: result.reason, at: now, ...withStatus, retryAfter: now + Math.min(delay, PBP_OFFLINE_QUEUE_RETRY_AFTER_MAX) };
+  }
   if (!pbpOfflineQueueAttentionFailure(result)) return null;
-  const status = result.httpStatus;
-  return { code: result.reason, at: now,
-    ...((result.reason === "remote" || result.reason === "http") && Number.isInteger(status) ? { status } : {}) };
+  return { code: result.reason, at: now, ...withStatus };
 }
 function pbpOfflineQueueFailureShape(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const { code, at, status } = value;
+  const { code, at, status, retryAfter } = value;
   if (typeof code !== "string" || !code || !Number.isFinite(at)) return null;
   if (status !== undefined && !(Number.isInteger(status) && status >= 100 && status <= 599)) return null;
-  return { code, at, ...(status !== undefined ? { status } : {}) };
+  if (retryAfter !== undefined && !Number.isFinite(retryAfter)) return null;
+  return { code, at, ...(status !== undefined ? { status } : {}), ...(retryAfter !== undefined ? { retryAfter } : {}) };
 }
 // A record replay leaves alone until the user retries or removes it.
 function pbpOfflineQueueNeedsAttention(item) {
   const failure = pbpOfflineQueueFailureShape(item?.failure);
-  return !!failure && PBP_OFFLINE_QUEUE_ATTENTION_CODES.includes(failure.code);
+  return !!failure && failure.retryAfter === undefined && PBP_OFFLINE_QUEUE_ATTENTION_CODES.includes(failure.code);
+}
+// A record automatic replay does not send at `now`: it needs attention, or
+// its server asked for a pause that has not ended yet.
+function pbpOfflineQueueHeld(item, now) {
+  if (pbpOfflineQueueNeedsAttention(item)) return true;
+  const failure = pbpOfflineQueueFailureShape(item?.failure);
+  return !!failure && failure.retryAfter !== undefined && failure.retryAfter > now;
 }
 
 function pbpCreateRecoveringTail() {

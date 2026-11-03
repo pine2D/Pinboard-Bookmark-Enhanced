@@ -133,7 +133,13 @@ function pbpCreateBookmarkServiceClient(config) {
     }
     await guard();
     if (response.type === "opaqueredirect") throw pbpBookmarkServiceError("gateway_redirect");
-    if (!response.ok) throw pbpBookmarkServiceError(pbpBookmarkResponseFailure(response, "status", service), response.status);
+    if (!response.ok) {
+      const error = pbpBookmarkServiceError(pbpBookmarkResponseFailure(response, "status", service), response.status);
+      // A 429's Retry-After: offline replay holds the record until then.
+      const retryAfter = response.status === 429 ? pbpRetryAfterDelay(response.headers?.get?.("Retry-After")) : undefined;
+      if (retryAfter !== undefined) error.retryAfter = retryAfter;
+      throw error;
+    }
     if (response.status === 204) { responseOk(); return {status:204, data:null}; }
     let data;
     let text;

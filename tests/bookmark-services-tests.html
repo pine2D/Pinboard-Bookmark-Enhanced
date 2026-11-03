@@ -1490,7 +1490,51 @@ test("only failures a retry cannot change mark a record; a transient one clears 
   replies.push(new TypeError("offline"));
   equal((await h.retryOfflineItem(h.state.queue[0].queueId)).result.reason,"network");
   ok(!("failure" in h.state.queue[0]),"a network failure kept the old marker");
+  // A rate-limit hold that ran out is replayed automatically; a network
+  // failure then drops it.
+  h.state.queue[0]={...h.state.queue[0],failure:{code:"rate_limited",at:1,retryAfter:2}};
+  replies.push(new TypeError("offline")); h.state.calls=[];
+  await h.processOfflineQueue();
+  equal(h.state.calls.length,1); ok(!("failure" in h.state.queue[0]),"an expired hold stayed after a network failure");
 });
+// DRF's throttle answer (linkding): JSON detail plus Retry-After in seconds.
+const ldThrottled = retryAfter => new Response(JSON.stringify({detail:"Request was throttled. Expected available in 120 seconds."}),
+  {status:429, headers:{"Content-Type":"application/json", ...(retryAfter === undefined ? {} : {"Retry-After":retryAfter})}});
+test("a 429 with Retry-After holds the queued record until then, and one without is retried on the next tick",async()=>{
+  const realNow=Date.now;
+  try {
+    for(const [label,header,delay] of [["seconds","120",120000],["HTTP date far ahead",new Date(realNow()+5*3600*1000).toUTCString(),3600000]]){
+      const replies=[new TypeError("offline"),ldThrottled(header)];
+      const h=await workerHarness("linkding",replies);
+      equal((await h.submitSaveIntent(saveIntent)).status,"queued");
+      h.state.calls=[];
+      await h.processOfflineQueue();
+      equal([label,h.state.calls.length],[label,1]);
+      const failure=h.state.queue[0].failure;
+      equal([label,Object.keys(failure).sort(),failure.code],[label,["at","code","retryAfter"],"rate_limited"]);
+      ok(Math.abs(failure.retryAfter-failure.at-delay)<=2000,label+": hold "+(failure.retryAfter-failure.at));
+      // Inside the window nothing is sent; the record is not one that needs attention.
+      ok(!pbpOfflineQueueNeedsAttention(h.state.queue[0]));
+      Date.now=()=>failure.retryAfter-1000; h.state.calls=[];
+      await h.processOfflineQueue();
+      equal([label,h.state.calls.length],[label,0]);
+      Date.now=()=>failure.retryAfter+1000;
+      replies.push([200,{bookmark:null}],[201,ld]);
+      await h.processOfflineQueue();
+      equal([label,h.state.calls.map(c=>c.method),h.state.queue],[label,["GET","POST"],[]]);
+      Date.now=realNow;
+    }
+    const replies=[new TypeError("offline"),ldThrottled(undefined)];
+    const h=await workerHarness("linkding",replies);
+    equal((await h.submitSaveIntent(saveIntent)).status,"queued");
+    await h.processOfflineQueue();
+    ok(!("failure" in h.state.queue[0]),"a 429 without Retry-After was held");
+    replies.push([200,{bookmark:null}],[201,ld]); h.state.calls=[];
+    await h.processOfflineQueue();
+    equal([h.state.calls.length,h.state.queue],[2,[]]);
+  } finally { Date.now=realNow; }
+});
+
 test("quick save and Batch notify which linkding tag is too long and queue nothing",async()=>{
   const tag=overlongTags[1], shown="標".repeat(40)+"…";
   for(const run of ["quickSave","batchSave"]){

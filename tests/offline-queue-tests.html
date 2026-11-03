@@ -141,6 +141,23 @@ await suite("offline queue", async () => {
     assert(pbpOfflineQueueNeedsAttention(marked[1]) && !pbpOfflineQueueNeedsAttention(cleared[1]), "attention predicate");
     assert(!pbpOfflineQueueNeedsAttention({ failure: { code: "network", at: 1 } }), "a transient code needs attention");
   });
+  await test("Retry-After reads seconds and HTTP dates, and a rate-limit marker holds only until then, at most an hour", () => {
+    const now = Date.parse("2026-11-03T10:00:00Z");
+    assert(pbpRetryAfterDelay("120", now) === 120000 && pbpRetryAfterDelay(" 7 ", now) === 7000, "seconds");
+    assert(pbpRetryAfterDelay("Tue, 03 Nov 2026 10:02:00 GMT", now) === 120000, "HTTP date");
+    for (const value of [undefined, null, "", "0", "-5", "1.5", "soon", "Tue, 03 Nov 2026 09:00:00 GMT", 120]) {
+      assert(pbpRetryAfterDelay(value, now) === undefined, "accepted " + JSON.stringify(value));
+    }
+    const mark = (result) => pbpOfflineQueueFailureMark({ status: "failed", ...result }, now);
+    assert(JSON.stringify(mark({ reason: "rate_limited", httpStatus: 429, retryAfter: 120000 })) === JSON.stringify({ code: "rate_limited", at: now, retryAfter: now + 120000 }), "self-hosted 429");
+    assert(JSON.stringify(mark({ reason: "http", httpStatus: 429, retryAfter: 9e6 })) === JSON.stringify({ code: "http", at: now, status: 429, retryAfter: now + 3600000 }), "Pinboard 429 capped");
+    assert(mark({ reason: "rate_limited", httpStatus: 429 }) === null, "a 429 without the header was held");
+    const held = { failure: mark({ reason: "rate_limited", retryAfter: 120000 }) };
+    assert(pbpOfflineQueueHeld(held, now + 119000) && !pbpOfflineQueueHeld(held, now + 121000), "hold window");
+    assert(!pbpOfflineQueueNeedsAttention(held), "a rate limit needs attention");
+    assert(pbpOfflineQueueHeld({ failure: { code: "remote", at: now } }, now + 1e9), "attention is held for good");
+    assert(!pbpOfflineQueueHeld({}, now) && !pbpOfflineQueueHeld({ failure: { code: "rate_limited", at: now, retryAfter: "x" } }, now), "no or invalid marker held");
+  });
   await test("new queue payload does not persist credentials", () => {
     const out = pbpOfflineQueueReduce([], { kind: "enqueue", item: { queueId: "a", account: "alice", url: "https://a.com", token: "secret" } });
     assert(out.length === 1 && !("token" in out[0]), "new item strips token");
