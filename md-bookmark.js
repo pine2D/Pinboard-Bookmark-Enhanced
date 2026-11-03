@@ -310,18 +310,20 @@
     return state.known && state.bookmarked && typeof state.bookmark?.tags === "string" ? state.bookmark.tags.trim() : "";
   }
 
-  // The reader looks the address up again for a connection change that arrived
-  // while a request was in flight, once that request has ended (success or not).
-  // Only an error or a pending check can come from the old settings. A write
-  // result (saved, merged, queued, partial, deleted) is the outcome of that
-  // request and stays on screen; the delete result is final, so no second look.
+  // The reader looks the address up again after a connection change. A change
+  // while the bar is idle always looks again (the user changed settings after
+  // seeing the result). A change that arrived while a request was in flight is
+  // handled once that request has ended (success or not): only an error or a
+  // pending check can come from the old settings, while a write result (saved,
+  // merged, queued, partial, deleted) is the outcome of that request and stays
+  // on screen; the delete result is final, so no second look.
   const WRITE_OUTCOME_KEYS = new Set(["readerBookmarkSaved", "readerBookmarkUpdated", "saveMergedExisting", "readerBookmarkQueued",
     "readerBookmarkDeleted", "readerBookmarkDeletedElsewhere", "bookmarkPartialSave", "bookmarkErrTagTooLong"]);
   function statusFromOldConnection() { return !WRITE_OUTCOME_KEYS.has(statusKey) && !partialKeys.has(statusKey); }
-  function recheckIfPending() {
+  function recheckIfPending(idleChange = false) {
     if (!recheckConnection || inflight || !context?.account) return;
     recheckConnection = false;
-    if (!statusFromOldConnection()) return;
+    if (!idleChange && !statusFromOldConnection()) return;
     inflight = true; showStatus("readerBookmarkChecking");
     const gen = generation;
     refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); recheckIfPending(); } });
@@ -542,11 +544,12 @@
   });
   // The same account with other connection settings (a new gateway, a rotated
   // token, a Connect again): look the address up once more so an earlier error
-  // does not outlive the fix. A request in flight finishes first, then this looks again.
+  // does not outlive the fix. A request in flight finishes first, then this looks again
+  // unless the bar then shows that request's write outcome.
   document.addEventListener("pbp:bookmark-connection-changed", event => {
     if (!context?.account || event.detail?.account !== context.account) return;
     recheckConnection = true;
-    recheckIfPending();
+    recheckIfPending(true);
   });
   document.addEventListener("pbp:bookmark-account-changed", event => {
     generation++; recheckConnection = false; context = event.detail || null; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;

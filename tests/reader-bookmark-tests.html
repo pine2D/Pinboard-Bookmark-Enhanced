@@ -2055,6 +2055,26 @@ await test("a connection change during a write keeps that write's outcome and do
     } finally { r.frame.remove(); }
   }
 });
+await test("a connection change while idle looks the address up again even after a write outcome", async () => {
+  const account = "linkding:https://ld.example:c1";
+  const ok = { known: true, bookmarked: true, account, bookmark: { tags: [], notes: "" } };
+  const fire = r => r.w.document.dispatchEvent(new r.w.CustomEvent("pbp:bookmark-connection-changed", { detail: { url: URL_ARTICLE, title: "Article", account } }));
+  const cases = [
+    ["queued", { status: "queued", account }, "readerBookmarkQueued"],
+    ["partial", { status: "failed", reason: "partial", account }, "bookmarkPartialSave"],
+    ["saved", { status: "saved", mutation: "updated", account }, "readerBookmarkUpdated"]];
+  for (const [name, reply, key] of cases) {
+    const r = await barFrame(account, m => m.type === "mdReaderBookmarkState" ? ok : reply);
+    try {
+      r.w.pbpReaderBookmarkAction("later"); await wait(80);
+      equal(r.status(), key, name + " outcome shown");
+      const lookups = r.requests.filter(m => m.type === "mdReaderBookmarkState").length;
+      fire(r); await wait(80);
+      equal(r.requests.filter(m => m.type === "mdReaderBookmarkState").length, lookups + 1, name + " idle change looks up once more");
+      equal(r.status(), "", name + " old outcome cleared after the new lookup");
+    } finally { r.frame.remove(); }
+  }
+});
 await test("the bar publishes its lookup once for the badge, and nothing else queries the address", async () => {
   const r = await barFrame("alice", m => ({ known: true, bookmarked: true, account: "alice", bookmark: { tags: "a b", tagNames: ["a", "b"], notes: "", private: true } }));
   try {
