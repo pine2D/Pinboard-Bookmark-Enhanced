@@ -154,7 +154,9 @@ try {
   await installAskHistoryFixture(page); await page.setViewportSize({ width: 1280, height: 900 });
   await page.evaluate(() => { window.oldRows = _libAskSessions; window.staleOwner = _libAskOwner; _pbpAskArchiveDefaultStore().read = async args => args.owner === staleOwner ? new Promise(resolve => { window.finishOldRead = resolve; }) : []; pbpLibAskRefresh(); });
   await page.waitForFunction(() => typeof finishOldRead === 'function');
-  await sw.evaluate(() => chrome.storage.local.set({ pinboardToken: 'obf:' + btoa('different-account:test-only') }));
+  // The library owner is the fixed personal-library identity, not the current
+  // bookmark login: switching it (not the Pinboard token) is what changes owner.
+  await sw.evaluate(() => chrome.storage.local.set({ personalLibraryAccount: 'different-library:test-only' }));
   await page.waitForFunction(() => _libAskOwner !== staleOwner && _libAskSessions.length === 0);
   await page.evaluate(() => finishOldRead(oldRows)); await page.waitForTimeout(50);
   check('late previous-account read cannot repopulate history', await page.locator('.ask-library-hit').count() === 0);
