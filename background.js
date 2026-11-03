@@ -718,7 +718,9 @@ async function pbpReadTagVocab(account, loaded) {
 async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab) {
   try {
     const lookup = await fetchExistingBookmark(intent.url, auth.token, auth);
-    if (lookup.lookupFailed) return {result:pbpSaveFailure(lookup.reason || "lookup", {httpStatus:lookup.httpStatus}), persisted:null, retryable:lookup.retryable};
+    // lookupFailed: nothing was written, so an interactive save can stop here
+    // instead of queueing (submitSaveIntent).
+    if (lookup.lookupFailed) return {result:pbpSaveFailure(lookup.reason || "lookup", {httpStatus:lookup.httpStatus}), persisted:null, retryable:lookup.retryable, lookupFailed:true};
     if ((intent.mode === "create" && lookup.exists) || (intent.mode === "update" && !lookup.exists)) return {result:pbpSaveFailure("conflict"), persisted:null, retryable:false};
     const plan = pbpResolveSavePlan(intent, lookup);
     if (plan.action === "failed") return {result:plan.result, persisted:null, retryable:false};
@@ -1205,7 +1207,9 @@ async function pbpReleaseDroppedSummaryHolds(before, after) {
   }
 }
 
-function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, summaryRange, tagVocab } = {}) {
+// interactive: a popup save; a reader save (readerAction) is one too. Their
+// self-hosted duplicate check failing stops the save (pbpLookupStopFailure).
+function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, summaryRange, tagVocab, interactive = false } = {}) {
   return runSaveDeliveryTransaction(async () => {
     let settings;
     try { settings = await loadSettings(); }
@@ -1270,6 +1274,12 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
       return envelope.result.status === "saved" && envelope.result.mutation === "created"
         ? { ...envelope.result, account: deliveryAuth.account }
         : envelope.result;
+    }
+    // The user is looking at the form: a self-hosted duplicate check that got
+    // no answer stops here, before anything is written or queued (user
+    // decision 2026-11-02). Quick save and Batch keep their own handling.
+    if ((interactive || readerAction) && envelope.lookupFailed && pbpSelfHostedAuth(deliveryAuth)) {
+      return pbpLookupStopFailure(envelope.result);
     }
     // A Karakeep save that failed after its bookmark step wrote the note.
     if (envelope.notesDelivered) await pbpRecordSummaryOwnership(intent, envelope, deliveryAuth, ownershipRange);
@@ -1470,7 +1480,7 @@ function submitPopupSaveIntent(intent, expectedAccount, summaryRange) {
   if (intent.mode === "create" && intent.time !== undefined) {
     return Promise.resolve(pbpSaveFailure("invalid"));
   }
-  return submitSaveIntent(intent, { expectedAccount, summaryRange });
+  return submitSaveIntent(intent, { expectedAccount, summaryRange, interactive: true });
 }
 
 // ---- Reader bookmark workflow ----
@@ -1515,9 +1525,11 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth)
   if (!pbpBookmarkAuthIsCurrent(auth)) return { result: pbpSaveFailure("account_changed") };
   if (lookup.lookupFailed) {
     // Without server metadata a queued flag change cannot preserve both an
-    // existing record and a new bookmark's privacy/defaults. Fail closed;
-    // ordinary save's skip intent can still safely enter the offline queue.
-    return { result: pbpSaveFailure(lookup.reason || "lookup") };
+    // existing record and a new bookmark's privacy/defaults. Fail closed.
+    // Pinboard's ordinary save (skip) can still enter the offline queue; a
+    // self-hosted one stops on its own lookup in submitSaveIntent.
+    const failure = pbpSaveFailure(lookup.reason || "lookup", Number.isInteger(lookup.httpStatus) ? { httpStatus: lookup.httpStatus } : undefined);
+    return { result: pbpSelfHostedAuth(auth) ? pbpLookupStopFailure(failure) : failure };
   }
   if (action === "edit") {
     // Same entry rule as the popup for each service: self-hosted text uses the

@@ -88,7 +88,7 @@ async function pipelineHarness(options = {}) {
       return { ok: true, status: 200, json: async () => ({ result_code: "done" }) };
     },
   };
-  return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, pbpReaderBookmarkRequest, processOfflineQueue }; ")(...Object.values(deps)), env };
+  return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, submitPopupSaveIntent, pbpReaderBookmarkRequest, processOfflineQueue }; ")(...Object.values(deps)), env };
 }
 // The two self-hosted APIs as the adapter meets them, hand-written from
 // linkding v1.47 (routes.py check(), serializers.py create() and update())
@@ -97,7 +97,8 @@ async function pipelineHarness(options = {}) {
 // with the serializer's defaults and answers it with 201; PATCH changes only
 // the fields it is sent and answers the stored record. Each failures[] row
 // lets `skip` matching requests through, then answers the next one with the
-// 503 a proxy in front of the server gives while it is down. clientFor builds
+// 503 a proxy in front of the server gives while it is down, or with
+// timeout: true rejects the request as a deadline would. clientFor builds
 // the adapter with the worker's own sharing setting (background.js
 // pbpBookmarkClient), so a test exercises the setting the worker passes.
 // postgres: linkding on PostgreSQL, whose Tag.name column holds 64 characters.
@@ -126,6 +127,8 @@ function selfHostedServer(service, row, { postgres = false, readLater = null } =
     if (failure && failure.skip > 0) failure.skip--;
     else if (failure) {
       failures.splice(failures.indexOf(failure), 1);
+      // A request cut off by its deadline (AbortSignal.timeout) rejects so.
+      if (failure.timeout) throw new DOMException("signal timed out", "TimeoutError");
       return new Response("<html><body><h1>503 Service Temporarily Unavailable</h1></body></html>", { status: 503, headers: { "Content-Type": "text/html" } });
     }
     const page = url.searchParams.get("url");
@@ -547,19 +550,20 @@ await test("a reader-created linkding bookmark stays unshared whatever the popup
     assert(create, where + ": the reader did not create the bookmark");
     assert(create.body.shared === false && server.row.shared === false, where + ": linkding was asked to share it");
   }
-  // Through the offline queue too: the reader's own lookup gets through, the
-  // save's lookup meets an outage, and the replay creates it unshared.
+  // Through the offline queue too: both lookups get through, the create meets
+  // an outage, and the replay creates it unshared. (A failed lookup stops the
+  // reader's save before anything is queued.)
   const server = selfHostedServer("linkding", null);
   const h = await pipelineHarness({ account, token: "linkding-token", service: "linkding", sharingEnabled: true, post: null,
     slot: { account, bookmarkDraft: { private: false, sharedExplicit: true } }, clientFor: server.clientFor, settings: { bookmarkService: "linkding" } });
-  server.failures.push({ method: "GET", path: "/api/bookmarks/check/", skip: 1 });
+  server.failures.push({ method: "POST", path: "/api/bookmarks/", skip: 0 });
   equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER)).bookmarked, false);
   equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "save" }, SENDER)).status, "queued");
   const stored = assertQueueFields(h.env.queue[0], "linkding");
   assert(stored.private === true && stored.sharedExplicit !== true, "queued reader save " + JSON.stringify(stored));
   await h.processOfflineQueue();
   equal(h.env.queue.length, 0);
-  equal(server.requests.find(request => request.method === "POST" && request.path === "/api/bookmarks/")?.body.shared, false);
+  assert(server.requests.filter(request => request.method === "POST" && request.path === "/api/bookmarks/").every(request => request.body.shared === false), "a create asked linkding to share it");
   equal(server.row.shared, false);
 });
 // The reader editor's own Share box (handoff D5 c) still decides: it opens
@@ -1190,7 +1194,10 @@ await test("a reader action that finds the bookmark already in its state finishe
 });
 // Karakeep's summary is the server's own AI text, which the extension never
 // writes; a queued reader edit must not store it either.
-await test("a queued Karakeep reader edit keeps the server's own summary out of the queue", async () => {
+// A Karakeep edit reaches the queue from no interactive path: a failed check
+// stops it, and a failed write past the check is a partial save. Neither puts
+// the server's own summary into a queue record or writes it back.
+await test("a Karakeep reader edit whose delivery check fails queues nothing and leaves the server's summary alone", async () => {
   const account = "karakeep:https://keep.example/:user-1";
   const summary = "Karakeep's AI summary of the article.";
   const server = selfHostedServer("karakeep", { id: "kk1bookmark", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
@@ -1203,11 +1210,9 @@ await test("a queued Karakeep reader edit keeps the server's own summary out of 
   server.failures.push({ method: "GET", path: "/api/v1/bookmarks/check-url", skip: 1 });
   const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "edit",
     draft: { title: "Edited title", tags: "server", notes: "Edited notes", private: true, toread: false } }, SENDER);
-  equal(result.status, "queued"); equal(h.env.queue.length, 1);
-  assertQueueFields(h.env.queue[0], "karakeep");
-  await h.processOfflineQueue();
-  equal(h.env.queue.length, 0);
-  equal(server.row.title, "Edited title"); equal(server.row.note, "Edited notes"); equal(server.row.summary, summary);
+  equal(result.reason, "duplicate_unknown"); equal(h.env.queue.length, 0);
+  equal(server.requests.filter(request => request.method !== "GET").length, 0);
+  equal(server.row.title, "Server title"); equal(server.row.note, "Server notes"); equal(server.row.summary, summary);
 });
 await test("account switch during deletion suppresses success and foreign-account side effects", async () => {
   const h = await pipelineHarness({ onDelete: () => { h.env.account = "bob"; h.env.token = "bob:token"; h.env.epoch++; } });
@@ -1302,6 +1307,48 @@ await test("reader save results say saved, updated, merged or partial as the wor
     const got = await run(account, bookmarked, result, action);
     assert(got === want, account + " bookmarked=" + bookmarked + " " + JSON.stringify(result) + " -> " + JSON.stringify(got));
   }
+});
+// User decision 2026-11-02: a popup or reader save whose duplicate check gets
+// no answer (a deadline, a dropped connection, a 5xx) is not merged, queued or
+// written blind. It ends on duplicate_unknown, whose copy asks for another press.
+await test("an interactive self-hosted save whose duplicate check fails writes and queues nothing", async () => {
+  const LINKDING_ROW = { id: 7, url: URL_ARTICLE, title: "Server title", description: "", notes: "Server notes",
+    is_archived: false, unread: false, shared: false, tag_names: ["server"], date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z" };
+  const KARAKEEP_ROW = { id: "kk1bookmark", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
+    title: "Server title", archived: false, favourited: false, note: "Server notes", summary: null, source: "web",
+    taggingStatus: "success", summarizationStatus: "success", tags: [], content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null }, assets: [] };
+  for (const service of ["linkding", "karakeep"]) for (const failure of [{ timeout: true }, {}]) for (const exists of [false, true]) {
+    const where = service + (failure.timeout ? " timeout" : " 503") + (exists ? " existing" : " new");
+    const account = service === "linkding" ? "linkding:https://links.example/:conn-1" : "karakeep:https://keep.example/:user-1";
+    const check = service === "linkding" ? "/api/bookmarks/check/" : "/api/v1/bookmarks/check-url";
+    // Karakeep's check-url answers null for a URL it does not hold.
+    const server = selfHostedServer(service, service === "linkding" ? (exists ? { ...LINKDING_ROW } : null)
+      : structuredClone({ ...KARAKEEP_ROW, content: { ...KARAKEEP_ROW.content, url: exists ? URL_ARTICLE : "https://example.com/elsewhere" } }));
+    const h = await pipelineHarness({ account, token: service + "-token", service, settings: { bookmarkService: service }, client: server.client, slot: { account } });
+    const writes = () => server.requests.filter(q => q.method !== "GET").length;
+    // The popup: its own lookup answered, the worker's check before writing does not.
+    server.failures.push({ method: "GET", path: check, skip: 0, ...failure });
+    const intent = exists
+      ? { mode: "update", url: URL_ARTICLE, title: "Form title", notes: "Form notes", tags: "form", private: false, toread: false, time: "2026-10-30T03:01:22Z" }
+      : { mode: "create", url: URL_ARTICLE, title: "Form title", notes: "Form notes", tags: "form", private: false, toread: false };
+    const popup = await h.submitPopupSaveIntent(intent, account);
+    assert(popup?.status === "failed" && popup.reason === "duplicate_unknown", where + " popup: " + JSON.stringify(popup));
+    assert(writes() === 0, where + " popup: the save was written");
+    assert(h.env.queue.length === 0, where + " popup: the save was queued: " + JSON.stringify(h.env.queue));
+    // The reader: Save and Read Later each run their own check.
+    for (const action of ["save", "later"]) {
+      const r = await tagFixReader(h, account, null);
+      try {
+        server.failures.push({ method: "GET", path: check, skip: 0, ...failure });
+        await r.command(action);
+        assert(r.el("status").textContent === "bookmarkErrDuplicateUnknown", where + " reader " + action + ": " + r.el("status").textContent);
+        assert(writes() === 0, where + " reader " + action + ": the save was written");
+        assert(h.env.queue.length === 0, where + " reader " + action + ": the save was queued");
+      } finally { r.frame.remove(); }
+    }
+  }
+  const en = await (await fetch("../_locales/en/messages.json")).json();
+  assert(en.bookmarkErrDuplicateUnknown?.message, "en catalogue lacks bookmarkErrDuplicateUnknown");
 });
 await test("reader save, delete and lookup show self-hosted causes", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();

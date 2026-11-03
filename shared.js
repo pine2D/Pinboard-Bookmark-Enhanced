@@ -1077,7 +1077,12 @@ function _executePinboardFetch(url, options, resolve, reject) {
 // buildPostsAddUri below, so the measured length equals what is actually sent.
 const POSTS_ADD_URI_BUDGET = 3900;
 
-function pbpPopupSavePolicy({ lookupStatus, lookupUrl, currentUrl, formLoaded, reviewedAtClick }) {
+// service: the connected bookmark service. A self-hosted save whose duplicate
+// check got no answer stops (user decision 2026-11-02): a blind merge would
+// replace the form's title and notes with the server's, or overwrite the
+// bookmark on linkding, while the popup only said "saved". Pinboard keeps its
+// fail-safe merge.
+function pbpPopupSavePolicy({ lookupStatus, lookupUrl, currentUrl, formLoaded, reviewedAtClick, service }) {
   if (lookupUrl !== currentUrl) return { allow: false, reason: "url_mismatch" };
   if (lookupStatus === "missing") return { allow: true, mode: "create" };
   if (lookupStatus === "found") {
@@ -1085,7 +1090,10 @@ function pbpPopupSavePolicy({ lookupStatus, lookupUrl, currentUrl, formLoaded, r
       ? { allow: true, mode: "update" }
       : { allow: false, reason: "review_required" };
   }
-  if (lookupStatus === "failed") return { allow: true, mode: "merge" };
+  if (lookupStatus === "failed") {
+    return service === "karakeep" || service === "linkding"
+      ? { allow: false, reason: "lookup_failed" } : { allow: true, mode: "merge" };
+  }
   if (lookupStatus === "pending") return { allow: false, reason: "lookup_pending" };
   return { allow: false, reason: "lookup_idle" };
 }
@@ -2201,7 +2209,7 @@ const PBP_BOOKMARK_FAILURE_KEYS = Object.freeze({
   permission:"bookmarkPermissionDenied", network:"bookmarkErrNetwork", timeout:"bookmarkErrTimeout",
   server:"bookmarkErrServer", rate_limited:"bookmarkErrRateLimit", remote:"bookmarkErrRemote",
   payload_too_large:"bookmarkErrTooLarge", invalid_response:"bookmarkErrInvalidResponse",
-  account_changed:"bookmarkErrAccountChanged"});
+  account_changed:"bookmarkErrAccountChanged", duplicate_unknown:"bookmarkErrDuplicateUnknown"});
 // The only self-hosted causes a second attempt can get past. Everything else
 // (a 4xx, a 413, a gateway, a token, a grant, an unreadable reply) meets the
 // same answer again, so no outlet offers a retry for it.
@@ -2209,6 +2217,16 @@ const PBP_BOOKMARK_RETRYABLE_CODES = Object.freeze(["network", "timeout", "rate_
 function pbpBookmarkFailureRetryable(result) {
   const reason = typeof result === "string" ? result : result?.reason;
   return PBP_BOOKMARK_RETRYABLE_CODES.includes(reason);
+}
+// An interactive self-hosted save (popup, reader) whose duplicate check failed
+// stops without writing or queueing (user decision 2026-11-02). A cause a later
+// press can get past (network, timeout, 5xx, 429, or none named) becomes
+// duplicate_unknown, whose copy asks the user to press Save again later; a
+// gateway, token, grant or account cause keeps its own copy.
+function pbpLookupStopFailure(failure) {
+  const reason = failure?.reason;
+  return !reason || reason === "lookup" || pbpBookmarkFailureRetryable(failure)
+    ? { status: "failed", reason: "duplicate_unknown" } : failure;
 }
 // Failures every later request of the same connection meets too: a gateway,
 // a token the server rejects (or no connection), a host grant that is gone.

@@ -5133,6 +5133,7 @@
     "message": "Couldn't reach the bookmark server. Check your network and the server URL. A self-signed or expired HTTPS certificate on the server also causes this.",
     "description": "A self-hosted bookmark server could not be reached. Browsers report a certificate error the same way, so the copy names it."
   },
+  "bookmarkErrDuplicateUnknown": {"message": "Network trouble: couldn't check whether this URL is already bookmarked, so nothing was saved. Press Save again in a moment."},
   "bookmarkErrTimeout": {
     "message": "The bookmark server didn't respond in time. Try again later.",
     "description": "A self-hosted bookmark server did not answer within the request deadline."

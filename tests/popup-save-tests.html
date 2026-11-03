@@ -84,9 +84,18 @@ test("pending lookup blocks save", () => {
   assert(!result.allow && result.reason === "lookup_pending");
 });
 
-test("exact failed lookup maps to fail-safe merge", () => {
-  const result = pbpPopupSavePolicy({ lookupStatus: "failed", lookupUrl: URL, currentUrl: URL, formLoaded: false, reviewedAtClick: false });
-  assert(result.allow && result.mode === "merge" && !("replace" in result));
+test("exact failed Pinboard lookup maps to fail-safe merge", () => {
+  for (const service of [undefined, "pinboard"]) {
+    const result = pbpPopupSavePolicy({ lookupStatus: "failed", lookupUrl: URL, currentUrl: URL, formLoaded: false, reviewedAtClick: false, service });
+    assert(result.allow && result.mode === "merge" && !("replace" in result), String(service));
+  }
+});
+
+test("exact failed self-hosted lookup stops the save instead of merging", () => {
+  for (const service of ["karakeep", "linkding"]) for (const formLoaded of [false, true]) {
+    const result = pbpPopupSavePolicy({ lookupStatus: "failed", lookupUrl: URL, currentUrl: URL, formLoaded, reviewedAtClick: formLoaded, service });
+    assert(!result.allow && result.reason === "lookup_failed" && !("mode" in result), service + " " + JSON.stringify(result));
+  }
 });
 
 test("idle lookup blocks save", () => {
@@ -946,6 +955,47 @@ test("posts/add default remains replace=yes for existing callers", () => {
         await new Promise((resolve) => requestAnimationFrame(resolve));
         assert(h.messages.length === 2 && h.messages[1].intent.mode === "create" && h.messages[1].intent.time === undefined, service + ": the next Save did not create");
         await again;
+      }
+    });
+
+    // User decision 2026-11-02: a self-hosted save whose duplicate check got
+    // no answer sends nothing, keeps the form and leaves Save usable; the copy
+    // asks for another press. A gateway or token cause keeps its own copy.
+    await testAsync("a self-hosted save whose duplicate check fails sends nothing and keeps the form", async () => {
+      for (const service of ["karakeep", "linkding"]) for (const [failure, shown] of [
+        [undefined, "duplicate_unknown"], [{ reason: "timeout" }, "duplicate_unknown"], [{ reason: "network" }, "duplicate_unknown"],
+        [{ reason: "server", httpStatus: 503 }, "duplicate_unknown"], [{ reason: "gateway_denied", httpStatus: 403 }, "gateway_denied"],
+      ]) {
+        const where = service + " " + JSON.stringify(failure);
+        const h = createSubmitHarness({ service, lookupFailed: true });
+        if (failure) h.bookmarkLookup.failure = failure;
+        const before = h.snapshot();
+        await h.click();
+        assert(h.checkCalls.length === 1, where + ": the click did not check again");
+        assert(!h.messages.some((m) => m.type === "save_intent"), where + ": a save was sent");
+        assert(JSON.stringify(h.statuses.at(-1)) === JSON.stringify(["status-msg", "save-error:" + shown, "error"]), where + ": " + JSON.stringify(h.statuses));
+        assert(!h.elements["submit-btn"].classList.contains("save-error") && !h.elements["submit-btn"].classList.contains("loading"), where + ": Save was left unusable");
+        assert(JSON.stringify(h.snapshot()) === JSON.stringify(before) && h.elements["title-input"].value === "Submitted title", where + ": the form changed");
+      }
+      // The copy, and that it offers no Retry: the next press checks first.
+      for (const service of ["karakeep", "linkding"]) {
+        const got = bookmarkErrorView(service)(pbpLookupStopFailure({ reason: "timeout" }));
+        assert(got.message === "bookmarkErrDuplicateUnknown" && got.retry === false, service + " " + JSON.stringify(got));
+      }
+      assert(enMessages.bookmarkErrDuplicateUnknown?.message, "en catalogue lacks bookmarkErrDuplicateUnknown");
+    });
+
+    await testAsync("a self-hosted conflict whose recheck fails offers no blind retry", async () => {
+      for (const service of ["karakeep", "linkding"]) {
+        const loaded = { href: URL, description: "Stored title", extended: "", summary: "", tags: "", tagNames: [], shared: "no", toread: "no", time: "2026-10-30T03:01:22Z" };
+        const h = createSubmitHarness({ service, loaded, recheck: "failed" });
+        const pending = h.click();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        h.resolveSave({ status: "failed", reason: "conflict" });
+        await pending;
+        assert(h.messages.filter((m) => m.type === "save_intent").length === 1, service + ": a second write followed");
+        assert(JSON.stringify(h.statuses.at(-1)) === JSON.stringify(["status-msg", "save-error:duplicate_unknown", "error"]), service + ": " + JSON.stringify(h.statuses));
+        assert(!h.elements["submit-btn"].classList.contains("save-error"), service + ": the button was left in the error state");
       }
     });
 

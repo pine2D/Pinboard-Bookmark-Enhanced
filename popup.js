@@ -1864,7 +1864,9 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
       return { status: bookmarkLookup.status, url: lookupUrl };
     } catch (e) {
       if (bookmarkLookup.generation === generation && bookmarkLookup.url === lookupUrl && $id("url-input").value.trim() === lookupUrl) {
-        bookmarkLookup = { status: "failed", url: lookupUrl, generation, promise: null, formLoaded: false };
+        // failure: the non-secret cause, so a save stopped by this lookup can name it.
+        const lookupFailure = {reason:e?.code, httpStatus:Number.isInteger(e?.httpStatus) ? e.httpStatus : e?.status};
+        bookmarkLookup = { status: "failed", url: lookupUrl, generation, promise: null, formLoaded: false, failure: lookupFailure };
         console.warn("bookmark lookup failed:", e && e.name, e && e.message);
         // Silence here left the form identical to a brand-new page: no banner,
         // no Delete button, the submit button still reading Save. 401 stays
@@ -1889,7 +1891,6 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         // which is why the throw above copies it onto .code.
         // The worker folds its own failures to status 0 and sends the HTTP
         // status apart (httpStatus); a direct call carries it as status.
-        const lookupFailure = {reason:e?.code, httpStatus:Number.isInteger(e?.httpStatus) ? e.httpStatus : e?.status};
         const lookupFailureText = typeof settings === "object"
           ? pbpBookmarkFailureText(lookupFailure, pbpBookmarkServiceId(settings), t) : "";
         if (lookupFailureText) {
@@ -2029,11 +2030,17 @@ function setupSubmit(token) {
         currentUrl: url,
         formLoaded: bookmarkLookup.formLoaded,
         reviewedAtClick,
+        service: pbpBookmarkServiceId(settings),
       });
       if (!savePolicy.allow) {
         if (savePolicy.reason === "review_required") {
           // Not a state label: nothing was saved and the user has to press again.
           showStatus("status-msg", t("saveNeedsReview"), "info");
+          setSubmitState("idle");
+        } else if (savePolicy.reason === "lookup_failed") {
+          // Self-hosted: nothing is sent or queued. The form stays as it is
+          // and the next press runs the duplicate check again.
+          showSaveError(pbpLookupStopFailure(bookmarkLookup.failure));
           setSubmitState("idle");
         } else {
           showSaveError({ reason: "lookup" });
@@ -2208,6 +2215,13 @@ function setupSubmit(token) {
           // no Retry: the form is now a new bookmark's, and only the user's own
           // next Save, after reading this, may create it again.
           showStatus("status-msg", t("bookmarkDeletedElsewhere"), "info");
+          setSubmitState("idle");
+          return;
+        }
+        if (pbpBookmarkServiceId(settings) !== "pinboard" && conflictLookup.status === "failed") {
+          // Whether the bookmark exists is unknown again: no Retry, which
+          // would create or update blind; the next press checks first.
+          showSaveError(pbpLookupStopFailure(bookmarkLookup.failure));
           setSubmitState("idle");
           return;
         }

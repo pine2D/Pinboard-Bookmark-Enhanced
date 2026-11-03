@@ -5114,6 +5114,7 @@
   "bookmarkErrNetwork": {
     "message": "无法连接书签服务器。请检查网络和服务器地址。服务器使用自签名或已过期的 HTTPS 证书时也会这样。"
   },
+  "bookmarkErrDuplicateUnknown": {"message": "网络有问题，没能确认这个网址是否已存在，这次没有保存。请稍后再点「保存」。"},
   "bookmarkErrTimeout": {
     "message": "书签服务器没有及时响应，请稍后重试。"
   },

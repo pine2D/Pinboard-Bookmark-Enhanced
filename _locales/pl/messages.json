@@ -5120,6 +5120,7 @@
   "bookmarkErrNetwork": {
     "message": "Nie można połączyć się z serwerem zakładek. Sprawdź sieć i adres serwera. Ten sam błąd pojawia się, gdy serwer używa certyfikatu HTTPS z podpisem własnym lub wygasłego."
   },
+  "bookmarkErrDuplicateUnknown": {"message": "Problem z siecią: nie udało się sprawdzić, czy ten adres URL jest już w zakładkach, więc niczego nie zapisano. Za chwilę naciśnij ponownie „Zapisz”."},
   "bookmarkErrTimeout": {
     "message": "Serwer zakładek nie odpowiedział na czas. Spróbuj ponownie później."
   },
