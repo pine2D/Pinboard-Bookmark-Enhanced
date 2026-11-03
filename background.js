@@ -1330,8 +1330,9 @@ function sendOfflineItem(item) {
   });
 }
 
-// Connection-level replay pause. A gateway that rejected a queued item will
-// reject the rest of that connection's items too, so automatic replay skips
+// Connection-level replay pause. A gateway, a rejected token or a missing host
+// grant that failed a queued item (PBP_BOOKMARK_STOP_CODES) will fail the rest
+// of that connection's items too, so automatic replay skips
 // the account until it reconnects, any request for it succeeds, or the user
 // retries by hand. A separate non-secret local key: queue records keep only
 // their listed fields. Runs on the queue's write tail; storage failures are
@@ -1411,9 +1412,12 @@ function drainOfflineQueueIds(queueIds, { manual = false, pausedAccount = "" } =
       if (reason === "tag_too_long" && delivered?.mode === "skip") {
         await mutateOfflineQueue({ kind: "skip_to_merge", queueId: item.queueId });
       }
-      if (!PBP_BOOKMARK_GATEWAY_CODES.includes(reason) || typeof item.account !== "string" || !item.account) return;
+      // Pinboard items never pause: nothing on that path would lift it.
+      const service = pbpBookmarkAccountService(item.account);
+      const cause = pbpBookmarkStopCause(delivered?.result || delivered, service);
+      if (!cause || (service !== "karakeep" && service !== "linkding")) return;
       paused.add(item.account);
-      await pbpSetOfflineQueuePause(item.account, reason);
+      await pbpSetOfflineQueuePause(item.account, cause);
     },
   });
 }
@@ -5090,11 +5094,13 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
   // Cancel markers carry runId, so a fresh run ignores an old marker while a
   // resumed run still honors the exact persisted intent on its first item.
   await _writeBatchProgress({ running: true, done: false, error: null, ...base() });
+  let runService = "";
 
   try {
     await requireAccount();
     const loadedSettings = await loadSettings();
     const currentAuth = await requireAccount();
+    runService = currentAuth.service;
     const s = pbpBookmarkDeliverySettings(loadedSettings, currentAuth);
     if (!currentAuth.token) {
       await clearJob();
@@ -5267,11 +5273,10 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
           error.code = "account_changed";
           throw error;
         }
-        // A gateway in front of the server answers every tab the same way:
-        // stop the run instead of sending the remaining requests.
-        if (PBP_BOOKMARK_GATEWAY_CODES.includes(result.reason)) {
-          throw Object.assign(new Error(result.reason), { code: result.reason });
-        }
+        // A gateway, a rejected token or a missing host grant answers every
+        // tab the same way: stop before the next tab's AI request.
+        const stopCause = pbpBookmarkStopCause(result, currentAuth.service);
+        if (stopCause) throw Object.assign(new Error(stopCause), { code: stopCause, result });
         if (result.status === "saved") saved++;
         else if (result.status === "queued") queued++;
         else if (result.status === "skipped") skipped++;
@@ -5282,7 +5287,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         }
         else failed++;
       } catch (e) {
-        if (e?.code === "account_changed" || PBP_BOOKMARK_GATEWAY_CODES.includes(e?.code)) throw e;
+        if (e?.code === "account_changed" || e?.result) throw e;
         failed++;
       } finally {
         processed = i + 1;
@@ -5316,8 +5321,8 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         const title = saved > 0 ? t("bgBatchSaved") : t("bgQueuedOffline");
         showNotification("batch-saved", title, message, "batchSave");
       } else {
-        // Nothing landed at all (a server-revoked token answers 401 -> not
-        // retryable -> not even queued). Batch is built to outlive the popup,
+        // Nothing landed at all (every tab failed on its own; a revoked token
+        // stops the run in the catch below instead). Batch is built to outlive the popup,
         // and the popup only replays a terminal record for BATCH_STALE_TTL, so
         // without this the whole run vanishes without a word. Report it in the
         // error family the other terminal batch failures use — never as a
@@ -5332,8 +5337,9 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     await clearJob();
     await clearCancel();
     await _writeBatchProgress({ running: false, done: true, error: e.message, ...base() });
-    const gatewayKey = PBP_BOOKMARK_GATEWAY_CODES.includes(e?.code) ? PBP_BOOKMARK_FAILURE_KEYS[e.code] : "";
-    if (e?.code !== "account_changed") showNotification("batch-error", t("bgSaveFailed"), gatewayKey ? t(gatewayKey) : e.message, "error");
+    // A stopping save failure gets the same notification a quick save would.
+    if (e?.result) notifySaveFailure("batch", e.result, runService);
+    else if (e?.code !== "account_changed") showNotification("batch-error", t("bgSaveFailed"), e.message, "error");
   } finally {
     _batchRunning = false;
   }

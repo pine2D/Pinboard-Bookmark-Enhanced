@@ -744,6 +744,14 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const pause = { account, reason: "gateway_denied" };
       const paused = await render([{ queueId: "q1", url: "https://a.example/", account }], pause);
       assert(paused === tr("offlineQueued", "1") + " · " + tr("offlineQueuePaused", tr("bookmarkErrGatewayDenied")), "pause cause missing: " + paused);
+      // Every cause a replay pause can record names itself (G8: auth, permission, no connection).
+      for (const [reason, key] of [["auth", "bookmarkErrAuth"], ["permission", "bookmarkPermissionDenied"], ["not_logged_in", "bgSetToken"],
+        ...PBP_BOOKMARK_GATEWAY_CODES.map((code) => [code, PBP_BOOKMARK_FAILURE_KEYS[code]])]) {
+        for (const owner of [account, "karakeep:https://k.example/:u1"]) {
+          const text = await render([{ queueId: "q1", url: "https://a.example/", account: owner }], { account: owner, reason });
+          assert(text === tr("offlineQueued", "1") + " · " + tr("offlineQueuePaused", tr(key)), reason + " pause cause missing: " + text);
+        }
+      }
       const other = await render([{ queueId: "q1", url: "https://a.example/", account: "alice" }], pause);
       assert(other === tr("offlineQueued", "1"), "pause shown for an account with no queued item: " + other);
       assert(/\$REASON\$/.test(enMessages.offlineQueuePaused?.message || ""), "en catalogue lacks offlineQueuePaused");

@@ -356,15 +356,16 @@ async function producers(h, {autoNotes, summary, settings: overrides = {}, realV
   const settings = {...h.state.settings, bgSaveMode:"merge", _defaultTags:"", _autoNotes:true, _blockquote:false, _aiTags:false, _aiSummary:true,
     batchAiSummary:true, batchAiTags:false, optBatchTagEnabled:false, batchSkipExisting:false, waybackArchiveBatch:false, ...overrides};
   const deps = {
-    loadSettings:async()=>({...settings}), getCurrentBookmarkAuth:h.auth, submitSaveIntent:h.submitSaveIntent,
-    hasAIKey:()=>true, getPageInfoFromTab:async()=>({pageText:"article body"}), buildAutoNotes:()=>autoNotes,
-    getAICache:async()=>null, setAICache:async()=>{}, callAI:async()=>summary, buildSummaryPrompt:()=>"summary prompt",
+    loadSettings:async()=>({...settings}), getCurrentBookmarkAuth:h.auth, submitSaveIntent:(...args)=>h.submitSaveIntent(...args),
+    hasAIKey:()=>true, buildAutoNotes:()=>autoNotes,
+    getAICache:async()=>null, setAICache:async()=>{}, callAI:async()=>{h.state.aiCalls=(h.state.aiCalls||0)+1;return summary;}, buildSummaryPrompt:()=>"summary prompt",
+    getPageInfoFromTab:async()=>{h.state.extractions=(h.state.extractions||0)+1;return {pageText:"article body"};},
     pbpLoadTagVocab:realVocab ? h.pbpLoadTagVocab : async account=>({account,timestamp:undefined,counts:null,index:null}),
     pbpServiceEffectivePrivate:()=>true, pbpNotesDescription:()=>"",
     showNotification:(...args)=>h.state.notifications.push(args), t:(key,...args)=>args.length?key+":"+args.join(":"):key,
     pbpI18nReady:async()=>{}, processOfflineQueue:async()=>{}, updateBadge:async()=>{},
-    _newBatchRunId:()=>"run-1", _removeBatchRecordIfOwned:async()=>true, _writeBatchProgress:async()=>{},
-    chrome:realVocab ? h.chrome : {storage:{local:{get:async()=>({}),set:async()=>{}}}},
+    _newBatchRunId:()=>"run-1", _removeBatchRecordIfOwned:async()=>true, _writeBatchProgress:async row=>{(h.state.progress||=[]).push(row);},
+    chrome:realVocab ? h.chrome : {permissions:h.chrome.permissions,storage:{local:{get:async()=>({}),set:async()=>{}}}},
   };
   const api = new Function(...Object.keys(deps), "let _batchRunning = false;\n"
     + slice("async function saveFromBackground", "// Helper: resolve prefix-specific settings")
@@ -400,6 +401,30 @@ test("Karakeep quick-save and Batch summaries are replaced and removed in place 
     popup=await kkPopup(h, stored);
     await popup.restore();
     equal([label, popup.remove(), popup.field.value], [label, true, kept]);
+  }
+});
+// Batch: a rejected token answers every tab alike, so the run stops before the
+// next tab's AI request and keeps the counts it already has.
+test("Batch stops on a server token rejection or a missing host grant before the next AI request", async () => {
+  const tabs = [0, 1, 2].map(i=>({id:20 + i, url:pageUrl + "?b=" + i, title:"T" + i, incognito:false}));
+  const saves = [[200,{bookmarkId:null}],[201,kkRecord("bk-new", KK_SUMMARY)]];
+  // failAt: the tab whose save meets the failure; every tab before it saved.
+  for (const failAt of [0, 1]) for (const [label, cause, failCalls] of [["Karakeep 401", "auth", 1], ["permission", "permission", 0]]) {
+    await pbpFixtureClearSummaryOwnership();
+    const replies = [...Array(failAt)].flatMap(()=>saves.map(r=>[...r]));
+    if (label === "Karakeep 401") replies.push(kkPlain(401, "Unauthorized"));
+    const h = await workerHarness("karakeep", replies);
+    const p = await producers(h, {autoNotes:"", summary:KK_SUMMARY});
+    const submit = h.submitSaveIntent;
+    let n = 0;
+    h.submitSaveIntent = async (...args) => { if (n++ === failAt && label === "permission") h.state.permitted = false; return submit(...args); };
+    await p.batchSave(tabs);
+    const last = h.state.progress.at(-1), at = label + " at tab " + failAt;
+    equal([at, h.state.aiCalls, h.state.calls.length], [at, failAt + 1, failAt * 2 + failCalls]);
+    equal([at, last.done, last.error, last.saved, last.i], [at, true, cause, failAt, failAt + 1]);
+    equal([at, h.state.queue], [at, []]);
+    const [, title, body] = h.state.notifications.at(-1) || [];
+    equal([at, title, body], [at, "bgSaveFailed", cause === "auth" ? "bookmarkErrAuth" : "bookmarkPermissionDenied"]);
   }
 });
 test("a Karakeep create merged into a concurrent bookmark owns the note it supplied; a merge that keeps the server note owns nothing", async()=>{
@@ -878,6 +903,32 @@ test("credential change, a successful request or a manual retry lifts the pause"
   replies.push([200, {bookmark:null}], [201, ld]); h.state.calls = [];
   equal((await h.retryOfflineItem(queued.queueId)).ok, true); equal(h.state.calls.length, 2);
   equal(await h.readPause(), null); equal(h.state.queue, []);
+});
+// A token the server rejects, or a host grant that is gone, fails every later
+// request of the connection the same way: replay pauses only that connection.
+test("a server token rejection or a missing host grant on replay pauses only that connection", async () => {
+  for (const [label, fail, reason, calls] of [
+    ["Karakeep 401", h=>h.replies.push(kkPlain(401, "Unauthorized")), "auth", 1],
+    ["permission", h=>{h.state.permitted=false;}, "permission", 0],
+  ]) {
+    const replies = [new TypeError("offline"), new TypeError("offline")];
+    const h = await workerHarness("karakeep", replies); h.replies = replies;
+    for (const n of [0, 1]) equal((await h.submitSaveIntent({...saveIntent, url:pageUrl + "?n=" + n})).status, "queued");
+    const account = (await h.auth()).account;
+    const record = h.state.queue[0];
+    h.state.queue.push({...record, queueId:"pin1", account:"alice"}, {...record, queueId:"kk2", account:"karakeep:https://k.example/:u9"});
+    h.state.calls = []; h.state.sends = 0; fail(h);
+    await h.processOfflineQueue();
+    // The first item of the failing connection is tried once; its second is
+    // skipped; both other connections' items still get their own attempt.
+    equal([label, h.state.calls.length, h.state.sends], [label, calls, 3]);
+    const pause = h.state.local.offlineQueuePause;
+    equal([label, pause?.account, pause?.reason], [label, account, reason]);
+    equal([label, h.state.queue.length], [label, 4]);
+    h.state.calls = []; h.state.sends = 0;
+    await h.processOfflineQueue();
+    equal([label, h.state.calls.length, h.state.sends], [label, 0, 2]);
+  }
 });
 test("a pause ends with its account's last queued item, so a later queued save replays", async () => {
   const replies = [new TypeError("offline"), new TypeError("offline")];

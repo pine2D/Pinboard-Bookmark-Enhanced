@@ -403,6 +403,13 @@ async function createBatchSaveHarness(options) {
       return opts.updateBadge ? opts.updateBadge() : Promise.resolve();
     },
   };
+  // The worker's real notification mapping, so a stopped run's copy is the
+  // one a quick save with the same failure would show.
+  const background = await getBackgroundSource();
+  const notifyStart = background.indexOf("function notifySaveFailure(");
+  const notifyEnd = background.indexOf("// Helper: resolve prefix-specific settings", notifyStart);
+  assert(notifyStart >= 0 && notifyEnd > notifyStart, "notifySaveFailure source not found");
+  deps.notifySaveFailure = new Function("showNotification", "t", background.slice(notifyStart, notifyEnd) + "\nreturn notifySaveFailure;")(deps.showNotification, deps.t);
   const source = await getBatchSaveSource();
   const factory = new Function(...Object.keys(deps), `let _batchRunning = false;\n${source}\nreturn handleBatchSave;`);
   return {
@@ -2407,12 +2414,12 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("all-failed Batch reports the outcome instead of finishing in silence", async () => {
-    // A token revoked server-side answers 401 on every item: not retryable, so
-    // nothing is queued either. Batch is built to run with the popup closed and
-    // the popup only replays a terminal record for BATCH_STALE_TTL, so this
-    // notification is the only feedback the run can still produce.
+    // Every item fails on its own and nothing is queued. Batch is built to run
+    // with the popup closed and the popup only replays a terminal record for
+    // BATCH_STALE_TTL, so this notification is the only feedback the run can
+    // still produce.
     const h = await createBatchSaveHarness({
-      outcomes: [{ status: "failed", reason: "not_logged_in", httpStatus: 401 }],
+      outcomes: [{ status: "failed", reason: "http", httpStatus: 400 }],
     });
     await h.handleBatchSave(batchTabs(3));
     const done = h.progress[h.progress.length - 1];
@@ -2501,7 +2508,7 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("first gateway failure stops the batch and records the code", async () => {
-    const h = await createBatchSaveHarness({ outcomes: [
+    const h = await createBatchSaveHarness({ settings: { bookmarkService: "linkding" }, outcomes: [
       { status: "saved", mutation: "created" },
       { status: "failed", reason: "gateway_redirect", httpStatus: 302 },
       { status: "saved", mutation: "created" },
@@ -2518,6 +2525,30 @@ await suite("unified save pipeline", async () => {
     equal(h.notifications[0][0], "batch-error");
     equal(h.notifications[0][1], "bgSaveFailed");
     equal(h.notifications[0][2], "bookmarkErrGatewayRedirect");
+  });
+
+  await test("a rejected token, no connection or a missing host grant stops the batch before the next AI request", async () => {
+    // Pinboard and self-hosted alike: a token revoked server-side answers every
+    // tab the same way, so the rest of the run would only pay for AI first.
+    for (const [service, outcome, error, body] of [
+      ["pinboard", { status: "failed", reason: "not_logged_in", httpStatus: 401 }, "not_logged_in", "bgSetToken"],
+      ["karakeep", { status: "failed", reason: "not_logged_in", httpStatus: 401 }, "auth", "bookmarkErrAuth"],
+      ["linkding", { status: "failed", reason: "not_logged_in", httpStatus: 403 }, "auth", "bookmarkErrAuth"],
+      ["linkding", { status: "failed", reason: "not_logged_in" }, "not_logged_in", "bgSetToken"],
+      ["karakeep", { status: "failed", reason: "permission" }, "permission", "bookmarkPermissionDenied"],
+    ]) {
+      let aiCalls = 0;
+      const h = await createBatchSaveHarness({ settings: { bookmarkService: service, batchAiSummary: true }, hasAIKey: true,
+        pageInfo: { pageText: "Synthetic public text" }, callAI: async () => { aiCalls++; return "AI summary"; },
+        outcomes: [{ status: "saved", mutation: "created" }, outcome, { status: "saved", mutation: "created" }] });
+      await h.handleBatchSave(batchTabs(4));
+      const label = service + " " + outcome.reason + " " + (outcome.httpStatus || "");
+      const same = (actual, expected) => equal(JSON.stringify(actual), JSON.stringify(expected));
+      same([label, h.intents.length, aiCalls], [label, 2, 2]);
+      const done = h.progress[h.progress.length - 1];
+      same([label, done.done, done.error, done.saved, done.failed, done.i], [label, true, error, 1, 0, 2]);
+      same([label, h.notifications.length, h.notifications[0]?.[0], h.notifications[0]?.[2]], [label, 1, "batch-error", body]);
+    }
   });
 
   await test("authorize swaps ONLY the token bytes, preserving every other query byte", async () => {

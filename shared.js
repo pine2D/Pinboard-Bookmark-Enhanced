@@ -2189,6 +2189,20 @@ const PBP_BOOKMARK_FAILURE_KEYS = Object.freeze({
   gateway_redirect:"bookmarkErrGatewayRedirect", gateway_challenge:"bookmarkErrGatewayChallenge",
   gateway_basic:"bookmarkErrGatewayBasic", gateway_denied:"bookmarkErrGatewayDenied",
   not_api:"bookmarkErrNotApi", auth:"bookmarkErrAuth", tag_too_long:"bookmarkErrTagTooLong"});
+// Failures every later request of the same connection meets too: a gateway,
+// a token the server rejects (or no connection), a host grant that is gone.
+// Batch stops at the first one, before its next AI request; offline replay
+// pauses that self-hosted connection.
+const PBP_BOOKMARK_STOP_CODES = Object.freeze([...PBP_BOOKMARK_GATEWAY_CODES, "not_logged_in", "permission"]);
+// The code a stop is recorded under (Batch's terminal error, the replay
+// pause), or "" for any other failure. A self-hosted server's own 401/403 is
+// "auth", so the copy names the token rather than a missing connection.
+function pbpBookmarkStopCause(result, service) {
+  const reason = result?.reason;
+  if (!PBP_BOOKMARK_STOP_CODES.includes(reason)) return "";
+  return reason === "not_logged_in" && (service === "karakeep" || service === "linkding")
+    && (result.httpStatus === 401 || result.httpStatus === 403) ? "auth" : reason;
+}
 // linkding keeps a tag name in a 64-character column (models.py Tag.name).
 // SQLite stores a longer one anyway; PostgreSQL rejects the write and linkding
 // answers with an HTTP 500. This only names the cause of such an error:

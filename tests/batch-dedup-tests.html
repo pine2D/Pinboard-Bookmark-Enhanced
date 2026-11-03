@@ -690,7 +690,7 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     equal(switched.statuses[0].message, "batchAccountChanged", "account switch was reported as a token failure");
   });
 
-  await test("gateway batch error shows its cause", async () => {
+  await test("gateway, token and host-grant batch stops show their cause", async () => {
     for (const code of PBP_BOOKMARK_GATEWAY_CODES) {
       const h = await createUiHarness(null, 5000);
       h.renderBatchProgress({ running: false, done: true, total: 3, i: 2, saved: 1, queued: 0, failed: 0, error: code });
@@ -700,10 +700,17 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     const notApi = await createUiHarness(null, 5000);
     notApi.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, error: "not_api" });
     equal(notApi.statuses[0].message, "bookmarkErrNotApi");
-    // Only gateway codes take this branch; other thrown messages keep batchFailed.
+    // A rejected token and a missing host grant stop a run too and name their cause.
+    for (const [code, key] of [["auth", "bookmarkErrAuth"], ["permission", "bookmarkPermissionDenied"]]) {
+      const stopped = await createUiHarness(null, 5000);
+      stopped.renderBatchProgress({ running: false, done: true, total: 3, i: 1, saved: 0, error: code });
+      equal(stopped.statuses[0].message, key, code + " fell back to the raw batchFailed code");
+      equal(stopped.statuses[0].kind, "error");
+    }
+    // Any other thrown message keeps batchFailed.
     const other = await createUiHarness(null, 5000);
-    other.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, error: "auth" });
-    equal(other.statuses[0].message, "batchFailed:auth");
+    other.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, error: "boom" });
+    equal(other.statuses[0].message, "batchFailed:boom");
   });
 
   await test("reopen restores fresh running/done progress but ignores stale done", async () => {

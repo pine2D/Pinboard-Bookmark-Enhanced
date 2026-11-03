@@ -40,7 +40,10 @@
   function pauseText(queue, pause) {
     if (!pause || typeof pause.account !== "string" || !pause.account || typeof pause.reason !== "string") return "";
     if (!queue.some((item) => item?.account === pause.account)) return "";
-    const key = pbpBookmarkFailureKey({ reason: pause.reason }, pbpBookmarkAccountService(pause.account));
+    // Every cause pbpBookmarkStopCause records names its copy; a missing host
+    // grant has no row in the shared failure table.
+    const key = pause.reason === "permission" ? "bookmarkPermissionDenied"
+      : pbpBookmarkFailureKey({ reason: pause.reason }, pbpBookmarkAccountService(pause.account));
     return key ? t("offlineQueuePaused", t(key)) : "";
   }
   // NOTE: no setQueue() here — the offline queue is mutated ONLY by the SW
