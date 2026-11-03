@@ -4594,11 +4594,14 @@ test("posts/add default remains replace=yes for existing callers", () => {
         pbpStatusCacheGet: () => null,
         pbpStatusCacheSet: () => true,
         CACHE_TTL: 300000,
-        _dedupedBookmarkCheck: async () => false,
+        // The shared check's own answer for a failed self-hosted lookup: no
+        // state, and the cause (fetchExistingBookmark's reason + HTTP status).
+        _dedupedBookmarkCheck: async () => ({ bookmarked: null, failure: { reason: failure.code, ...(Number.isInteger(failure.status) ? { httpStatus: failure.status } : {}) } }),
         pbpBookmarkAuthIsCurrent: () => true,
         pbpSelfHostedAuth,
         pinboardFetch: async () => { throw new Error("unexpected Pinboard request"); },
-        pbpBookmarkPostsResponse: async () => { throw Object.assign(new Error(failure.code), failure); },
+        // The shared check already failed: a second request only doubles the wait.
+        pbpBookmarkPostsResponse: async () => { throw new Error("unexpected second lookup"); },
         console: { warn() {} },
       };
       const handle = new Function(...Object.keys(deps), "return function (message, sendResponse) {\n" + backgroundSource.slice(branchStart, branchEnd) + "\nreturn false;\n};")(...Object.values(deps));

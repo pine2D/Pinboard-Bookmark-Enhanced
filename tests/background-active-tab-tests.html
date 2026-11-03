@@ -11,6 +11,7 @@ body { font-family: monospace; padding: 16px; max-width: 1000px; }
 <div id="results"></div>
 <script src="../shared.js"></script>
 <script src="../wayback.js"></script>
+<script src="../bookmark-services.js"></script>
 <script>
 function assert(condition, message) {
   if (!condition) throw new Error(message || "assertion failed");
@@ -268,6 +269,73 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     i18nReadyCalls,
   };
 }
+
+// G14: the status chain a failed self-hosted check runs through, end to end in
+// one scope: the real cache, debouncedCheck/_dedupedBookmarkCheck,
+// checkBookmarked, fetchExistingBookmark, the toolbar refresh and the worker's
+// lookup_bookmark branch. Only the adapter's lookup is stubbed, failing the
+// way bookmark-services.js fails it (pbpBookmarkServiceError: code + status).
+const G14_URL = "https://example.com/article";
+function buildStatusFailureHarness(source, { service = "linkding", failure = null, bookmark = null, pinboardStatus = 200 } = {}) {
+  const slice = (from, to) => {
+    const start = source.indexOf(from);
+    const end = source.indexOf(to, start);
+    assert(start >= 0 && end > start, "source slice not found: " + from);
+    return source.slice(start, end);
+  };
+  const lookups = [];
+  const pinboardRequests = [];
+  const icons = [];
+  let scheduled = Promise.resolve();
+  // epoch 0 matches the `let _pinboardAuthEpoch = 0` the sliced cache block declares.
+  const auth = service === "pinboard"
+    ? { service: "pinboard", token: "alice:secret", account: "alice", epoch: 0 }
+    : { service, token: "fixture-token", account: service + ":https://bookmarks.example/:id-1", baseUrl: "https://bookmarks.example/", epoch: 0 };
+  const deps = {
+    SETTINGS_DEFAULTS, stripTrackingParams, pbpBookmarkLookupUrl, pbpPinboardAccountFromToken,
+    pbpSelfHostedAuth, pbpBookmarkAsPost, pbpBookmarkFailureRetryable, pbpRetryAfterDelay, iconStateFor,
+    getCurrentBookmarkAuth: async () => auth,
+    getSettingsStorage: async () => ({ get: async (defaults) => ({ ...defaults }) }),
+    pbpBookmarkClient: () => ({ lookup: async (url) => {
+      lookups.push(url);
+      if (failure) throw pbpBookmarkServiceError(failure.code, failure.status);
+      return bookmark;
+    } }),
+    pinboardFetch: async (url) => {
+      pinboardRequests.push(url);
+      if (pinboardStatus !== 200) return { ok: false, status: pinboardStatus, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => ({ posts: [] }) };
+    },
+    chrome: { tabs: { query: async () => [{ id: 7, url: G14_URL, title: "Article", active: true }] } },
+    _scheduleTabCheck: (tabId, fn) => { scheduled = fn(); },
+    noteActivity: () => {},
+    setIcon: (tabId, state) => icons.push({ tabId, state }),
+    _writeCurrentTabMirror: async () => {},
+    console: { warn: () => {} },
+  };
+  const body = [
+    "const _pendingChecks = new Map();",
+    "let _settingsCache = { optCheckBookmarkStatus: true, urlClean: SETTINGS_DEFAULTS.urlClean };",
+    slice("const statusCache = new Map();", "// ---- P2: Cached token + invalidation ----"),
+    slice("async function debouncedCheck(url) {", "// ---- Load settings with deobfuscation"),
+    slice("async function checkBookmarked(url, capturedAuth = null) {", "// ---- Badge: unread count ----"),
+    slice("async function pbpBookmarkPostsResponse(", "async function pbpBookmarkDeleteResponse("),
+    slice("async function fetchExistingBookmark(", "async function pbpSendResolvedPlan("),
+    slice("async function _getFocusedActiveTab", "// ---- 标签页激活/更新时刷新图标"),
+    "function handleMessage(message, sendResponse) {\n" + slice('if (message.type === "lookup_bookmark" && message.url) {', 'if (message.type === "PBP_POPUP_DRAFT")') + "\n  return false;\n}",
+    "return { handleMessage, _scheduleCurrentTabRefresh, statusCache, pbpStatusCacheSet, CACHE_TTL };",
+  ].join("\n");
+  const api = new Function(...Object.keys(deps), body)(...Object.values(deps));
+  return {
+    api, auth, lookups, pinboardRequests, icons,
+    refresh: async () => { api._scheduleCurrentTabRefresh(7, G14_URL); await scheduled; },
+    lookup: () => new Promise((resolve) => {
+      assert(api.handleMessage({ type: "lookup_bookmark", url: G14_URL, account: auth.account }, resolve) === true, "lookup_bookmark did not keep the channel open");
+    }),
+  };
+}
+const G14_FAILURES = [{ code: "network" }, { code: "timeout" }, { code: "server", status: 503 }, { code: "auth", status: 401 }, { code: "permission" }];
+const G14_BOOKMARK = { id: 1, url: G14_URL, title: "Article", notes: "", summary: "", tags: ["alpha"], private: true, toread: false, time: "2026-01-01T00:00:00Z" };
 
 async function run() {
   const [source, popupSource] = await Promise.all([
@@ -889,6 +957,70 @@ async function run() {
     assert(h.calls.cacheReads[0] === K0_CLEAN,
       "the icon read back a key nothing wrote: " + h.calls.cacheReads[0]);
     assert(h.calls.icons.length === 1 && h.calls.icons[0].state === "saved", "the icon was not applied as saved");
+  });
+
+  await test("G14: a failed self-hosted check keeps the icon a page already shows", async () => {
+    for (const service of ["linkding", "karakeep"]) {
+      for (const failure of G14_FAILURES) {
+        const where = service + " " + failure.code;
+        // Saved before and the entry has gone past its TTL, or the worker
+        // restarted and holds no entry at all (the icon still shows saved).
+        for (const seeded of [true, false]) {
+          const h = buildStatusFailureHarness(source, { service, failure });
+          if (seeded) h.api.pbpStatusCacheSet(G14_URL, h.auth, { bookmarked: true, timestamp: Date.now() - h.api.CACHE_TTL - 1, posts: [] });
+          await h.refresh();
+          assert(h.lookups.length === 1, where + ": the page was not checked");
+          assert(h.icons.length === 0, where + (seeded ? " (expired entry)" : " (no entry)") + ": the failure set the icon to " + JSON.stringify(h.icons));
+        }
+      }
+      // Control: a check that answers still sets the icon either way.
+      for (const [bookmark, state] of [[G14_BOOKMARK, "saved"], [null, "default"]]) {
+        const h = buildStatusFailureHarness(source, { service, bookmark });
+        await h.refresh();
+        assert(h.icons.length === 1 && h.icons[0].state === state, service + ": an answered check set " + JSON.stringify(h.icons) + ", expected " + state);
+      }
+    }
+  });
+
+  await test("G14: a failed self-hosted popup lookup answers its cause after one request", async () => {
+    for (const service of ["linkding", "karakeep"]) {
+      for (const failure of G14_FAILURES) {
+        const where = service + " " + failure.code;
+        const h = buildStatusFailureHarness(source, { service, failure });
+        const reply = await h.lookup();
+        assert(h.lookups.length === 1, where + ": the lookup asked the server " + h.lookups.length + " times");
+        assert(reply.ok === false && reply.status === 0 && reply.posts === null, where + ": reply " + JSON.stringify(reply));
+        // fetchExistingBookmark's own cause names: auth -> not_logged_in (+401).
+        const reason = failure.code === "auth" ? "not_logged_in" : failure.code;
+        assert(reply.error === reason, where + ": the cause was lost: " + JSON.stringify(reply));
+        assert(reply.httpStatus === failure.status, where + ": the HTTP status was lost: " + JSON.stringify(reply));
+        assert(pbpBookmarkFailureKey(reply.error === "not_logged_in" ? { reason: reply.error, httpStatus: reply.httpStatus } : reply.error, service),
+          where + ": the popup has no copy for the cause " + reply.error);
+        assert(h.api.statusCache.size === 0, where + ": a failed lookup wrote the status cache");
+      }
+    }
+  });
+
+  await test("G14: a self-hosted lookup still refreshes a cache entry that carries no posts, once", async () => {
+    for (const service of ["linkding", "karakeep"]) {
+      const h = buildStatusFailureHarness(source, { service, bookmark: G14_BOOKMARK });
+      h.api.pbpStatusCacheSet(G14_URL, h.auth, { bookmarked: true, timestamp: Date.now() });
+      const reply = await h.lookup();
+      assert(h.lookups.length === 1, service + ": expected one fresh lookup, got " + h.lookups.length);
+      assert(reply.ok === true && reply.posts?.length === 1 && reply.posts[0].href === G14_URL, service + ": reply " + JSON.stringify(reply));
+    }
+  });
+
+  await test("G14: a Pinboard 401 still takes the second request back to the popup", async () => {
+    const h = buildStatusFailureHarness(source, { service: "pinboard", pinboardStatus: 401 });
+    const reply = await h.lookup();
+    assert(h.pinboardRequests.length === 2, "expected the shared check plus one fresh posts/get, got " + h.pinboardRequests.length);
+    assert(reply.ok === false && reply.status === 401, "the 401 did not reach the popup: " + JSON.stringify(reply));
+    assert(h.lookups.length === 0, "a Pinboard lookup reached the self-hosted adapter");
+    // The toolbar path is unchanged for Pinboard: a failed check reads as not saved.
+    const icon = buildStatusFailureHarness(source, { service: "pinboard", pinboardStatus: 503 });
+    await icon.refresh();
+    assert(icon.icons.length === 1 && icon.icons[0].state === "default", "the Pinboard toolbar path changed: " + JSON.stringify(icon.icons));
   });
 }
 run();

@@ -2361,7 +2361,7 @@ async function run() {
     try {
       const k11Source = backgroundSource.slice(k11Start, k11End);
       const k11Factory = new Function(
-        "SETTINGS_DEFAULTS", "getSettingsStorage", "pbpReadSettingsWithSecrets", "deobfuscateSettings", "checkBookmarked",
+        "SETTINGS_DEFAULTS", "getSettingsStorage", "pbpReadSettingsWithSecrets", "deobfuscateSettings", "pbpCheckBookmarkStatus",
         `let _pinboardAuthEpoch = 0;\nconst _pendingChecks = new Map();\n${k11Source}\n` +
         `return { debouncedCheck, loadSettings, invalidateSettingsCache, cached: () => _settingsCache };`
       );
@@ -2376,7 +2376,7 @@ async function run() {
           async () => ({ get: async () => { getCalls++; return { optCheckBookmarkStatus: true }; } }),
           async () => ({ ...SETTINGS_DEFAULTS, optCheckBookmarkStatus: true }),
           deobfuscateSettings,
-          async () => { checkCalls++; return true; }
+          async () => { checkCalls++; return { bookmarked: true }; }
         );
         await api.loadSettings();
         getCalls = 0; // the warm-up read above isn't the behavior under test
@@ -2396,7 +2396,7 @@ async function run() {
           async () => ({ get: async () => { getCalls++; return { optCheckBookmarkStatus: true }; } }),
           async () => ({ ...SETTINGS_DEFAULTS, optCheckBookmarkStatus: true }),
           deobfuscateSettings,
-          async () => { checkCalls++; return true; }
+          async () => { checkCalls++; return { bookmarked: true }; }
         );
         await api.debouncedCheck("https://example.com/cold");
         check("K11 cold cache: debouncedCheck falls back to the single-key storage.get",

@@ -238,7 +238,9 @@ async function debouncedCheck(url) {
   const target = pbpBookmarkLookupUrl(url, urlCleanSettings);
   // The caller needs `target` to read the cache entry back: it is the only key
   // this check wrote, so reading back by the raw tab URL would find nothing.
-  return { bookmarked: await _dedupedBookmarkCheck(target), target };
+  // bookmarked is null when a self-hosted check failed: the caller keeps the
+  // icon it already shows instead of reading the failure as "not saved".
+  return { bookmarked: (await _dedupedBookmarkCheck(target)).bookmarked, target };
 }
 
 // Network-layer dedup for the bookmark status check, shared by the toolbar-icon
@@ -248,11 +250,14 @@ async function debouncedCheck(url) {
 // Deliberately separate from debouncedCheck, which returns early when
 // optCheckBookmarkStatus is off — a user who hid the toolbar state still needs
 // the popup to know whether the page is saved.
+// Resolves {bookmarked, failure?} (see pbpCheckBookmarkStatus): both callers
+// share one request, and a self-hosted failure's cause reaches the popup
+// without a second request against the same server.
 function _dedupedBookmarkCheck(url, capturedAuth = null) {
   const pendingKey = _pinboardAuthEpoch + "\n" + url;
   const inFlight = _pendingChecks.get(pendingKey);
   if (inFlight) return inFlight;
-  const promise = checkBookmarked(url, capturedAuth);
+  const promise = pbpCheckBookmarkStatus(url, capturedAuth);
   _pendingChecks.set(pendingKey, promise);
   return promise.finally(() => {
     if (_pendingChecks.get(pendingKey) === promise) _pendingChecks.delete(pendingKey);
@@ -480,31 +485,43 @@ function setIcon(tabId, state) {
 }
 
 // ---- 检查 URL 是否已收藏 (uses cached token, direct fetch for latency) ----
+// The boolean view (null for a failed self-hosted check, which callers read as
+// "not known to be saved" without touching the icon).
 async function checkBookmarked(url, capturedAuth = null) {
+  return (await pbpCheckBookmarkStatus(url, capturedAuth)).bookmarked;
+}
+// Resolves {bookmarked, failure?}. Pinboard folds every failure into
+// bookmarked:false (lookup_bookmark's second request is how a 401 reaches the
+// popup). A self-hosted failure answers bookmarked:null plus its non-secret
+// cause ({reason, httpStatus}), held only in this call's result: the toolbar
+// keeps its last known state, and the popup names the cause at once instead
+// of asking the server again (a linkding check makes it fetch the page, up to
+// one timeout per request).
+async function pbpCheckBookmarkStatus(url, capturedAuth = null) {
   const auth = capturedAuth || await getCurrentBookmarkAuth();
-  if (!auth.token || !auth.account) return false;
-  if (capturedAuth && !pbpBookmarkAuthIsCurrent(auth)) return false;
+  if (!auth.token || !auth.account) return { bookmarked: false };
+  if (capturedAuth && !pbpBookmarkAuthIsCurrent(auth)) return { bookmarked: false };
   const cached = pbpStatusCacheGet(url, auth);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.bookmarked;
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) return { bookmarked: cached.bookmarked };
   try {
     if (pbpSelfHostedAuth(auth)) {
       const found = await fetchExistingBookmark(url, auth.token, auth);
-      return !found.lookupFailed && found.exists;
+      if (!found.lookupFailed) return { bookmarked: !!found.exists };
+      console.warn("[bookmark-status] self-hosted check failed:", found.reason, found.httpStatus);
+      return { bookmarked: null, failure: { reason: found.reason, ...(Number.isInteger(found.httpStatus) ? { httpStatus: found.httpStatus } : {}) } };
     }
-    const resp = await (pbpSelfHostedAuth(auth) ? pbpBookmarkPostsResponse(auth, url) : pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`));
-    if (!resp.ok) return false;
+    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`);
+    if (!resp.ok) return { bookmarked: false };
     const data = await resp.json();
     const posts = data.posts || [];
     const bookmarked = posts.length > 0;
-    return pbpStatusCacheSet(url, auth, { bookmarked, timestamp: Date.now(), posts })
-      ? bookmarked
-      : false;
+    return { bookmarked: pbpStatusCacheSet(url, auth, { bookmarked, timestamp: Date.now(), posts }) ? bookmarked : false };
   } catch (e) {
     // "Failed to fetch" is expected on network loss or API downtime — only warn for unexpected errors
     if (e?.code !== "account_changed" && !(e instanceof TypeError && /failed to fetch/i.test(e.message))) {
       console.warn("checkBookmarked error:", e);
     }
-    return false;
+    return { bookmarked: false };
   }
 }
 
@@ -4593,13 +4610,21 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       };
       let posts = freshPosts();
       if (!posts) {
-        await _dedupedBookmarkCheck(url, auth);
+        const check = await _dedupedBookmarkCheck(url, auth);
         if (!pbpBookmarkAuthIsCurrent(auth)) { refuse(); return; }
+        // A self-hosted check that already failed is answered with its cause:
+        // asking the same server again only doubles the wait (linkding fetches
+        // the page on every check). Same shape as the catch below.
+        if (pbpSelfHostedAuth(auth) && check?.failure) {
+          sendResponse({ ok: false, status: 0, error: check.failure.reason || "lookup", ...(Number.isInteger(check.failure.httpStatus) ? { httpStatus: check.failure.httpStatus } : {}), posts: null, account: "" });
+          return;
+        }
         posts = freshPosts();
       }
       if (!posts) {
-        // Either the cache entry was posts-less, or the shared check failed —
-        // one fresh lookup settles both, and its result is what gets cached.
+        // Either the cache entry was posts-less, or the shared Pinboard check
+        // failed (a failed self-hosted check was answered above) — one fresh
+        // lookup settles both, and its result is what gets cached.
         // This is also the ONLY path that can surface a 401 to the caller:
         // checkBookmarked() (inside _dedupedBookmarkCheck) folds !resp.ok into
         // a plain `false`, so an expired token never reaches here as an error
