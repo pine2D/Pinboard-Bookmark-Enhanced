@@ -205,13 +205,25 @@ function pbpCreateBookmarkServiceClient(config) {
     await guard();
     return readLaterListId;
   };
-  const lookup = async url => {
+  // {bookmark, metadata}: the stored bookmark (or null) and, for linkding, the
+  // page's title and description as its server read them (routes.py check():
+  // website_loader's WebsiteMetadata, each a string or null; null as a whole
+  // when the answer carries none). Karakeep's check reads no page: null.
+  const check = async url => {
     if (!pbpBookmarkWebUrl(url)) throw pbpBookmarkServiceError("invalid_request");
     if (service === "linkding") {
       const {data} = await request("bookmarks/check/?url=" + encodeURIComponent(url));
       if (!data || !Object.hasOwn(data,"bookmark")) throw pbpBookmarkServiceError("invalid_response");
-      return data.bookmark === null ? null : pbpBookmarkNormalize(service,data.bookmark);
+      const meta = data.metadata;
+      const text = value => typeof value === "string" ? value : null;
+      return {bookmark:data.bookmark === null ? null : pbpBookmarkNormalize(service,data.bookmark),
+        metadata:meta && typeof meta === "object" && !Array.isArray(meta) ? {title:text(meta.title),description:text(meta.description)} : null};
     }
+    return {bookmark:await lookup(url), metadata:null};
+  };
+  const lookup = async url => {
+    if (!pbpBookmarkWebUrl(url)) throw pbpBookmarkServiceError("invalid_request");
+    if (service === "linkding") return (await check(url)).bookmark;
     const {data} = await request("bookmarks/check-url?url=" + encodeURIComponent(url));
     if (!data || !Object.hasOwn(data,"bookmarkId")) throw pbpBookmarkServiceError("invalid_response");
     if (data.bookmarkId === null) return null;
@@ -407,7 +419,7 @@ function pbpCreateBookmarkServiceClient(config) {
     return links.slice(0,limit).map(row=>pbpBookmarkNormalize(service,row));
   };
   return {
-    lookup, save, tags, recent, setReadLater, findReadLaterList,
+    lookup, check, save, tags, recent, setReadLater, findReadLaterList,
     async verify() {
       const {data} = await request(service === "linkding" ? "user/profile/" : "users/me");
       if (!data || typeof data !== "object" || Array.isArray(data) ||

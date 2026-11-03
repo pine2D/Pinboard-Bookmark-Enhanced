@@ -681,8 +681,8 @@ async function pbpVerifyBookmarkConnection({service, baseUrl, token, gateway}) {
 }
 async function pbpBookmarkPostsResponse(auth, url) {
   if (!pbpSelfHostedAuth(auth)) return pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`);
-  const bookmark = await pbpBookmarkClient(auth).lookup(url);
-  return {ok:true, status:200, json:async () => ({posts:bookmark ? [pbpBookmarkAsPost(bookmark)] : []})};
+  const {bookmark, metadata} = await pbpBookmarkClient(auth).check(url);
+  return {ok:true, status:200, json:async () => ({posts:bookmark ? [pbpBookmarkAsPost(bookmark)] : [], metadata})};
 }
 async function pbpBookmarkDeleteResponse(auth, url) {
   if (!pbpSelfHostedAuth(auth)) return pinboardFetch(`https://api.pinboard.in/v1/posts/delete?auth_token=${auth.token}&url=${encodeURIComponent(url)}&format=json`);
@@ -859,9 +859,11 @@ function validateSaveIntent(intent) {
 async function fetchExistingBookmark(url, token, auth = pbpCaptureBookmarkAuth(token)) {
   try {
     if (pbpSelfHostedAuth(auth)) {
-      const bookmark = await pbpBookmarkClient(auth).lookup(url);
+      // metadata: what linkding read from the page (popup prefill when the
+      // browser's own title and description are turned off); null otherwise.
+      const {bookmark, metadata} = await pbpBookmarkClient(auth).check(url);
       const posts = bookmark ? [pbpBookmarkAsPost(bookmark)] : [];
-      if (!pbpStatusCacheSet(url, auth, {bookmarked:!!bookmark, timestamp:Date.now(), posts})) throw pbpBookmarkServiceError("account_changed");
+      if (!pbpStatusCacheSet(url, auth, {bookmarked:!!bookmark, timestamp:Date.now(), posts, metadata})) throw pbpBookmarkServiceError("account_changed");
       return {exists:!!bookmark, lookupFailed:false, post:posts[0] || null, bookmark};
     }
 
@@ -4735,10 +4737,11 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       }
       await pbpStatusCacheRestore(message.url, auth);
       const cached = pbpStatusCacheGet(message.url, auth);
+      const fresh = cached && Date.now() - cached.timestamp < CACHE_TTL && cached.posts;
       sendResponse({
-        posts: cached && Date.now() - cached.timestamp < CACHE_TTL && cached.posts
-          ? cached.posts
-          : null,
+        posts: fresh ? cached.posts : null,
+        // The page as linkding read it, when the check that filled this entry did.
+        metadata: fresh ? cached.metadata ?? null : null,
         account: auth.account,
       });
     }).catch(() => sendResponse({ posts: null, account: "" }));
@@ -4773,6 +4776,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         const cached = pbpStatusCacheGet(url, auth);
         return cached && Date.now() - cached.timestamp < CACHE_TTL && cached.posts ? cached.posts : null;
       };
+      const freshMetadata = () => pbpStatusCacheGet(url, auth)?.metadata ?? null;
       await pbpStatusCacheRestore(url, auth);
       let posts = freshPosts();
       if (!posts) {
@@ -4805,9 +4809,9 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         const data = await resp.json();
         posts = data.posts || [];
         if (!pbpBookmarkAuthIsCurrent(auth)) { refuse(); return; }
-        if (!pbpStatusCacheSet(url, auth, { bookmarked: posts.length > 0, timestamp: Date.now(), posts })) { refuse(); return; }
+        if (!pbpStatusCacheSet(url, auth, { bookmarked: posts.length > 0, timestamp: Date.now(), posts, metadata: data.metadata ?? null })) { refuse(); return; }
       }
-      sendResponse({ ok: true, status: 200, posts, account: auth.account });
+      sendResponse({ ok: true, status: 200, posts, metadata: freshMetadata(), account: auth.account });
     })().catch((e) => {
       // Fold to the proxy's own failure shape (status 0 + reason) so the popup
       // names the cause the same way it does for every other proxied call.

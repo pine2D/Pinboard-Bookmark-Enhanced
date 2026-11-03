@@ -40,6 +40,7 @@ const BLOCKS=[
   'archive log follows the bookmark connection',
   'linkding #fragment address saved without it',
   'linkding browsing checks',
+  'linkding page information from the browser or the server',
 ];
 // Self-check before any browser starts: the list above and the block() calls
 // below must name exactly the same blocks, so a block added to one place only
@@ -65,8 +66,12 @@ const raceCreates=new Map();
 // The synthetic pages this server publishes. linkding's own scraper reads the
 // same title and meta description, so a "server-scraped" value below comes
 // from the page itself, never from the request the extension sent.
+// /article-spa is a page whose script rewrites its title and description
+// after loading: the browser shows the rewritten ones, linkding's scraper
+// (no script) reads the served ones.
 const pageMetadata=pathname=>pathname==='/article-meta'
   ?{title:'Meta article',description:'Server-scraped description'}
+  :pathname==='/article-spa'?{title:'Served title',description:'Served description'}
   :pathname==='/article-recent'?{title:'Recent article',description:'Recent page description'}
   :{title:'Runtime article',description:null};
 // linkding v1.47 serializer timestamps carry microseconds.
@@ -117,7 +122,7 @@ const server=createServer(async(req,res)=>{
     }
     res.writeHead(404).end();return;
   }
-  if(url.pathname.startsWith('/article')) {const meta=pageMetadata(url.pathname);res.setHeader('Content-Type','text/html');res.end('<html><head><title>'+meta.title+'</title>'+(meta.description?'<meta name="description" content="'+meta.description+'">':'')+'</head><body><article><h1>'+meta.title+'</h1><p>'+('Public synthetic article for a local extension test. '.repeat(80))+'</p></article></body></html>');return;}
+  if(url.pathname.startsWith('/article')) {const meta=pageMetadata(url.pathname);res.setHeader('Content-Type','text/html');res.end('<html><head><title>'+meta.title+'</title>'+(meta.description?'<meta name="description" content="'+meta.description+'">':'')+(url.pathname==='/article-spa'?'<script>document.title="Browser title";document.querySelector(\'meta[name="description"]\').content="Browser description";</script>':'')+'</head><body><article><h1>'+meta.title+'</h1><p>'+('Public synthetic article for a local extension test. '.repeat(80))+'</p></article></body></html>');return;}
   const service=url.pathname.startsWith('/linkding/')?'linkding':'karakeep';
   if(service==='linkding'&&gate.linkding&&(req.headers['cf-access-client-id']!=='fixture-cf-id'||req.headers['cf-access-client-secret']!=='fixture-cf-secret')){
     res.writeHead(302,{Location:origin+'/cdn-cgi/access/login/fixture'});res.end();return;
@@ -271,7 +276,7 @@ try{
       const rows=await chrome.storage.session.get(null);
       const drafts=Object.entries(rows).filter(([,row])=>row?.pageUrl).map(([key])=>key);
       if(drafts.length)await chrome.storage.session.remove(drafts);
-      await chrome.storage.local.set({offlineQueue:[],optCheckBookmarkStatus:false,linkdingPreload:false});await chrome.storage.local.remove('urlClean');
+      await chrome.storage.local.set({offlineQueue:[],optCheckBookmarkStatus:false,linkdingPreload:false,linkdingBrowserMetadata:true});await chrome.storage.local.remove('urlClean');
     });
     for(const page of ctx.pages())if(page!==article)await page.close();
     records.linkding.clear();records.karakeep.clear();membership.clear();raceCreates.clear();
@@ -1896,6 +1901,53 @@ try{
     await worker.evaluate(()=>chrome.storage.local.set({linkdingPreload:false}));
     await until(async()=>!(await worker.evaluate(()=>chrome.storage.session.get('_linkdingStatus').then(row=>!!row._linkdingStatus)))&&await articleIcon()==='default','switching off dropped the copy and the icon');
     console.log('linkding browsing checks: off asks only on popup open; on asks once per page, shows the icon and serves the popup, across a worker restart');
+  });
+  await block('linkding page information from the browser or the server',['linkding'],async()=>{
+    const spa=origin+'/article-spa';
+    const checksSince=since=>requests.slice(since).filter(r=>r.service==='linkding'&&r.path.startsWith('bookmarks/check'));
+    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    await options.locator('#tab-general').click();
+    assert.equal(await options.locator('#opt-linkding-browser-metadata').isChecked(),true,'the browser page information switch does not start on');
+    const stored=()=>worker.evaluate(()=>chrome.storage.local.get('linkdingBrowserMetadata').then(row=>row.linkdingBrowserMetadata));
+    await options.locator('#opt-linkding-browser-metadata').uncheck();
+    await until(async()=>await stored()===false,'switching off was stored');
+    await options.locator('#opt-linkding-browser-metadata').check();
+    await until(async()=>await stored()===true,'switching on was stored');
+    await options.close();
+    // Forget earlier answers, in memory and in the storage.session copy.
+    const forget=()=>worker.evaluate(async()=>{statusCache.clear();await _statusMirrorTail;await chrome.storage.session.remove('_linkdingStatus');});
+    const openSpa=async()=>{await forget();await article.goto(spa);await article.waitForFunction(()=>document.title==='Browser title');const since=requests.length;const popup=await openOnTab();await settled(popup,'missing');return {popup,since};};
+    // On (default): the browser's page, as today.
+    let {popup,since}=await openSpa();
+    assert.deepEqual([await popup.locator('#title-input').inputValue(),await popup.locator('#linkding-description-input').inputValue()],['Browser title','Browser description']);
+    await popup.close();
+    // Off: what linkding read in the popup's own check, sent as known.
+    await worker.evaluate(()=>chrome.storage.local.set({linkdingBrowserMetadata:false}));
+    ({popup,since}=await openSpa());
+    assert.deepEqual([await popup.locator('#title-input').inputValue(),await popup.locator('#linkding-description-input').inputValue()],['Served title','Served description'],'the server-read page information was not used');
+    assert.equal(checksSince(since).length,1,'the popup asked linkding more than once');
+    const beforeSave=requests.length;
+    await popup.locator('#submit-btn').click();
+    await until(()=>linkdingCreates(beforeSave).length>0,'the save sent a create');
+    const create=linkdingCreates(beforeSave)[0];
+    assert.deepEqual([create.query,create.data.title,create.data.description],['?disable_scraping','Served title','Served description']);
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    await popup.close();
+    // An existing bookmark keeps its own values with the switch off.
+    ({popup}=await (async()=>{await forget();const p=await openOnTab();await settled(p,'found');return {popup:p};})());
+    assert.deepEqual([await popup.locator('#title-input').inputValue(),await popup.locator('#linkding-description-input').inputValue()],['Served title','Served description']);
+    await popup.close();
+    records.linkding.clear();
+    // A title the user typed before the check answered is theirs.
+    let release;holdLinkdingCheck={url:spa,promise:new Promise(resolve=>{release=resolve;})};
+    await forget();await article.goto(spa);
+    popup=await openOnTab();
+    await popup.locator('#title-input').fill('My title');
+    release();holdLinkdingCheck=null;
+    await settled(popup,'missing');
+    assert.deepEqual([await popup.locator('#title-input').inputValue(),await popup.locator('#linkding-description-input').inputValue()],['My title','Served description']);
+    await popup.evaluate(()=>pbpDiscardPopupDraft());await popup.close();
+    console.log('linkding page information: the browser\'s by default, linkding\'s from the same check (sent with disable_scraping) when switched off');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));

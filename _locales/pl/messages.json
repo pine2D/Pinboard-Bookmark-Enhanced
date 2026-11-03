@@ -5031,6 +5031,12 @@
   "optLinkdingPreloadHint": {
     "message": "Ikona na pasku narzędzi pokazuje wtedy przy każdej otwartej stronie, czy jest już w linkding, a okienko otwiera się bez czekania. Ceną jest to, że każdy odwiedzany adres trafia na Twój serwer linkding i do jego dziennika, a serwer sam odwiedza tę stronę. Gdy opcja jest wyłączona, linkding jest pytany tylko przy otwarciu okienka."
   },
+  "optLinkdingBrowserMetadata": {
+    "message": "Używaj tytułu i opisu strony z przeglądarki"
+  },
+  "optLinkdingBrowserMetadataHint": {
+    "message": "Nowa zakładka dostaje tytuł i opis strony w takiej postaci, w jakiej pokazuje je przeglądarka. Gdy opcja jest wyłączona, dostaje to, co z tej strony odczytał Twój serwer linkding. Może się to różnić na stronach, które zmieniają się po wczytaniu albo wymagają zalogowania."
+  },
   "optCheckBookmarkStatusLinkding": {
     "message": "W linkding ikona na pasku narzędzi pokazuje, czy strona jest zapisana, tylko gdy włączona jest opcja „Wczytuj informacje o stronie już podczas przeglądania”. Znajdziesz ją w ustawieniach połączenia z linkding na karcie Konto."
   },

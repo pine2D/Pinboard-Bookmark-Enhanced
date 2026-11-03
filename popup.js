@@ -198,14 +198,17 @@ function pbpPopupPrefillTitle(title, pageUrl) {
 // reads that URL itself.
 function pbpPopupFillPageDescription() {
   const auto = settings.optAutoDescription !== false;
+  // With the browser's page information turned off, the Description waits
+  // for the page as linkding read it (pbpPopupApplyServerMetadata).
+  const browser = settings.linkdingBrowserMetadata !== false;
   // The same-page check is popup-ai.js's (pbpPopupFormHoldsOpenedPage); where
   // it is not loaded the popup cannot tell, which counts as another page.
   const ownPage = typeof pbpPopupFormHoldsOpenedPage === "function" && pbpPopupFormHoldsOpenedPage();
   const input = $id("linkding-description-input");
-  input.value = auto && ownPage ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
+  input.value = auto && browser && ownPage ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
   // A page that could not be read has no known description of its own, and
   // nothing has read another URL: an empty box is known only with auto-fill off.
-  _linkdingDescriptionKnown = !auto || (ownPage && pageInfo?._pbpUnavailable !== true);
+  _linkdingDescriptionKnown = !auto || (browser && ownPage && pageInfo?._pbpUnavailable !== true);
   _linkdingDescriptionPending = false;
   _linkdingPageDescription = input.value;
 }
@@ -1977,6 +1980,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
       } else {
         existingBookmark = null;
         bookmarkLookup = { status: "missing", url: lookupUrl, generation, promise: null, formLoaded: false };
+        pbpPopupApplyServerMetadata(data.metadata);
         // Only an answered "not saved" asks again without the #fragment: a
         // failed lookup above never gets here. Not awaited here: a save
         // pressed meanwhile waits for it, bounded, in pbpFragmentProbeWait.
@@ -2065,6 +2069,28 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
   return promise;
 }
 
+// linkding with the browser's page information turned off: a new bookmark
+// takes its title and Description from the page as linkding read it, in the
+// check this lookup already made (no request of its own). Both are then
+// known, so the save asks linkding not to scrape them in again. A field the
+// user, a restored draft or an AI summary filled keeps its text; a missing
+// title (linkding could not read the page) keeps the tab's, and no metadata
+// at all (a cached state without it) leaves the Description to linkding.
+function pbpPopupApplyServerMetadata(metadata) {
+  if (pbpBookmarkServiceId(settings) !== "linkding" || settings.linkdingBrowserMetadata !== false
+      || !metadata || typeof metadata !== "object") return;
+  if (typeof metadata.title === "string" && metadata.title.trim() && shouldUpdateField("title-input")) {
+    $id("title-input").value = metadata.title;
+    if (typeof updateCharCount === "function") updateCharCount();
+  }
+  const input = $id("linkding-description-input");
+  if (settings.optAutoDescription === false || _linkdingPageDescription === null || _linkdingDescriptionPending
+      || !shouldUpdateField("linkding-description-input") || input.value !== _linkdingPageDescription) return;
+  input.value = pbpBookmarkDescriptionLine(typeof metadata.description === "string" ? metadata.description : "");
+  _linkdingDescriptionKnown = true;
+  _linkdingPageDescription = input.value;
+}
+
 // The duplicate check's own request, without any form work: the cache or the
 // prefetch, then the worker's shared lookup, then a direct call. Resolves the
 // posts/get-shaped body ({posts}); a failure throws with its status and the
@@ -2082,7 +2108,7 @@ async function pbpPopupLookupPosts(token, lookupUrl, prefetch, forceFresh) {
         cached = await chrome.runtime.sendMessage({ type: "get_bookmark_data", url: lookupUrl, account: lookupAccount });
       }
       if (cached?.account !== lookupAccount) cached = null;
-      if (cached?.posts) data = { posts: cached.posts };
+      if (cached?.posts) data = { posts: cached.posts, metadata: cached.metadata ?? null };
     } catch (_) {}
   }
   // K1: a cold miss goes BACK to the worker rather than straight to the
@@ -2100,7 +2126,7 @@ async function pbpPopupLookupPosts(token, lookupUrl, prefetch, forceFresh) {
       const lookupAccount = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
       const resolved = await chrome.runtime.sendMessage({ type: "lookup_bookmark", url: lookupUrl, account: lookupAccount });
       if (resolved?.ok && resolved.account === lookupAccount && Array.isArray(resolved.posts)) {
-        data = { posts: resolved.posts };
+        data = { posts: resolved.posts, metadata: resolved.metadata ?? null };
       } else if (resolved && resolved.ok === false) {
         // This reply did not travel through _pbpProxyPinboardFetch, so the
         // 401 -> login-screen handoff it owns has to be made here too --

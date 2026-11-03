@@ -304,12 +304,16 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
     pbpSelfHostedAuth, pbpBookmarkAsPost, pbpBookmarkFailureRetryable, pbpRetryAfterDelay, iconStateFor,
     getCurrentBookmarkAuth: async () => auth,
     getSettingsStorage: async () => ({ get: async (defaults) => ({ ...defaults }) }),
-    pbpBookmarkClient: () => ({ lookup: async (url) => {
-      lookups.push(url);
-      if (answer.onLookup) answer.onLookup(url);
-      if (answer.failure) throw pbpBookmarkServiceError(answer.failure.code, answer.failure.status);
-      return answer.bookmark && answer.bookmark.url === url ? answer.bookmark : null;
-    } }),
+    pbpBookmarkClient: () => {
+      const lookup = async (url) => {
+        lookups.push(url);
+        if (answer.onLookup) answer.onLookup(url);
+        if (answer.failure) throw pbpBookmarkServiceError(answer.failure.code, answer.failure.status);
+        return answer.bookmark && answer.bookmark.url === url ? answer.bookmark : null;
+      };
+      // check(): the same answer plus what the server read from the page (none here).
+      return { lookup, check: async (url) => ({ bookmark: await lookup(url), metadata: null }) };
+    },
     pinboardFetch: async (url) => {
       pinboardRequests.push(url);
       if (pinboardStatus !== 200) return { ok: false, status: pinboardStatus, json: async () => ({}) };

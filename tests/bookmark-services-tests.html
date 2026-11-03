@@ -50,6 +50,18 @@ test("quick links keep service-specific unread destinations and configured subpa
   equal(pbpBookmarkHome(pinboard,true),"https://pinboard.in/u:fixture-user/unread/");
 });
 test("linkding lookup preserves independent notes, summary, unread and visibility", async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:ld,metadata:{},auto_tags:[]}]]);const b=await client.lookup(pageUrl);equal([b.id,b.url,b.title,b.notes,b.summary,b.tags,b.toread,b.private],["7",pageUrl,"Saved title","My note","Website summary",["work"],true,true]);equal(calls[0].url,"https://bookmarks.example/base/api/bookmarks/check/?url=https%3A%2F%2Fexample.com%2Farticle");equal(calls[0].headers.get("Authorization"),"Token fixture-token");equal(calls[0].redirect,"manual");equal(calls[0].credentials,"omit");});
+// routes.py check() (v1.47): metadata is website_loader's WebsiteMetadata,
+// each field a string or None; the bookmark is the serializer's or null.
+test("linkding check reports the page as the server read it, beside the bookmark",async()=>{
+  const read=await harness("linkding",[[200,{bookmark:null,metadata:{url:pageUrl,title:"Served title",description:"Served description",preview_image:null},auto_tags:[]}]]).client.check(pageUrl);
+  equal([read.bookmark,read.metadata],[null,{title:"Served title",description:"Served description"}]);
+  const unread=await harness("linkding",[[200,{bookmark:ld,metadata:{url:pageUrl,title:null,description:null,preview_image:null},auto_tags:[]}]]).client.check(pageUrl);
+  equal([unread.bookmark.id,unread.metadata],["7",{title:null,description:null}]);
+  // A non-string field is not a value; an answer without metadata has none.
+  equal((await harness("linkding",[[200,{bookmark:null,metadata:{title:7,description:["x"]}}]]).client.check(pageUrl)).metadata,{title:null,description:null});
+  equal((await harness("linkding",[[200,{bookmark:null}]]).client.check(pageUrl)).metadata,null);
+  equal((await harness("karakeep",[[200,{bookmarkId:null}]]).client.check(pageUrl)),{bookmark:null,metadata:null});
+});
 test("linkding missing bookmark is null, malformed lookup is an error",async()=>{equal(await harness("linkding",[[200,{bookmark:null}]]).client.lookup(pageUrl),null);await rejects(()=>harness("linkding",[[200,{}]]).client.lookup(pageUrl),"invalid_response");});
 test("linkding update patches requested fields without rewriting scraped description",async()=>{const {client,calls}=harness("linkding",[[200,{...ld,title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true,date_modified:"2026-10-02T10:00:00Z"}]],{sharingEnabled:true});const result=await client.save({url:pageUrl,title:"New",notes:"Note",tags:["new"],toread:false,private:false,sharedExplicit:true},{id:"7",url:pageUrl,private:true});equal([result.status,result.mutation],["saved","updated"]);equal(calls[0].method,"PATCH");equal(calls[0].body,{title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true});});
 // v1.47 id 18 was scraped; id 19 was created with disable_scraping.

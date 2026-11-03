@@ -5031,6 +5031,12 @@
   "optLinkdingPreloadHint": {
     "message": "L’icône de la barre d’outils indique alors si chaque page ouverte se trouve déjà dans linkding, et le popup s’ouvre sans attente. En contrepartie, chaque adresse que vous visitez est envoyée à votre serveur linkding et inscrite dans son journal, et le serveur consulte lui-même la page. Option désactivée, linkding n’est interrogé qu’à l’ouverture du popup."
   },
+  "optLinkdingBrowserMetadata": {
+    "message": "Utiliser le titre et la description de la page vus par le navigateur"
+  },
+  "optLinkdingBrowserMetadataHint": {
+    "message": "Un nouveau signet reprend le titre et la description de la page tels que votre navigateur les affiche. Option désactivée, il reprend ce que votre serveur linkding a lu sur la page, ce qui peut différer pour les pages qui changent après leur chargement ou qui demandent une connexion."
+  },
   "optCheckBookmarkStatusLinkding": {
     "message": "Avec linkding, l’icône de la barre d’outils n’indique si une page figure dans vos signets que lorsque « Charger les infos de la page pendant la navigation » est activé. Cette option se trouve dans les réglages de connexion linkding, onglet Compte."
   },

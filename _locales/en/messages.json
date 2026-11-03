@@ -5042,8 +5042,14 @@
   "optLinkdingPreloadHint": {
     "message": "The toolbar icon then shows whether each page you open is already in linkding, and the popup opens without waiting. The cost: every address you visit is sent to your linkding server and written to its log, and the server visits the page itself. When this is off, linkding is asked only when you open the popup."
   },
+  "optLinkdingBrowserMetadata": {
+    "message": "Use the browser's page title and description"
+  },
+  "optLinkdingBrowserMetadataHint": {
+    "message": "A new bookmark starts with the page's title and description as your browser shows them. When this is off, it starts with what your linkding server read from the page instead, which can differ on pages that change after loading or that need you to sign in."
+  },
   "optCheckBookmarkStatusLinkding": {
-    "message": "With linkding, the toolbar icon shows whether a page is bookmarked only while “Load page information while browsing” is on. That switch is in the linkding connection settings on the Account tab."
+    "message": "With linkding, the toolbar icon shows whether a page is bookmarked only while \"Load page information while browsing\" is on. That switch is in the linkding connection settings on the Account tab."
   },
   "bookmarkGatewayLabel": {
     "message": "Access gateway"

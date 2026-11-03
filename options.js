@@ -3327,6 +3327,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-show-badge": s.optShowBadge,
     "opt-check-bookmark-status": s.optCheckBookmarkStatus,
     "opt-linkding-preload": s.linkdingPreload === true,
+    "opt-linkding-browser-metadata": s.linkdingBrowserMetadata !== false,
     "opt-show-suggest-tags": s.optShowSuggestTags,
     "opt-show-ai-summary": s.optShowAiSummary,
     "opt-show-ai-tags": s.optShowAiTags,
@@ -4425,6 +4426,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // New toggles
       optCheckBookmarkStatus: $id("opt-check-bookmark-status").checked,
       linkdingPreload: $id("opt-linkding-preload").checked,
+      linkdingBrowserMetadata: $id("opt-linkding-browser-metadata").checked,
       optShowSuggestTags: $id("opt-show-suggest-tags").checked,
       optShowAiSummary: $id("opt-show-ai-summary").checked,
       optShowAiTags: $id("opt-show-ai-tags").checked,

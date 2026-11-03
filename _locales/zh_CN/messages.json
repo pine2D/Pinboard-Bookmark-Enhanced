@@ -5025,6 +5025,12 @@
   "optLinkdingPreloadHint": {
     "message": "开启后，工具栏图标会显示你打开的每个页面是否已在 linkding 收藏，弹窗打开时也无需等待。代价是：你访问的每个网址都会发给你的 linkding 服务器并写入服务器日志，服务器还会自己去访问这个网页。关闭时，只在你打开弹窗时查询 linkding。"
   },
+  "optLinkdingBrowserMetadata": {
+    "message": "使用浏览器里的网页标题和简介"
+  },
+  "optLinkdingBrowserMetadataHint": {
+    "message": "新建书签时，标题和简介取自浏览器里显示的网页。关闭后改用你的 linkding 服务器从网页读到的内容；加载后会变化或需要登录的网页，两者可能不同。"
+  },
   "optCheckBookmarkStatusLinkding": {
     "message": "使用 linkding 时，只有开启「浏览时预先读取页面信息」，工具栏图标才会显示页面是否已收藏。这个开关在「账号」页的 linkding 连接设置里。"
   },

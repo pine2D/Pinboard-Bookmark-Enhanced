@@ -1367,7 +1367,7 @@ await test("a self-hosted Undo stopped by a local write failure says so, not net
 await test("a self-hosted Undo failure names its cause from the shared table", async () => {
   const account = "linkding:https://bookmarks.example/:c1";
   const h = await pipelineHarness({ account, service: "linkding", token: "fixture-token",
-    client: { lookup: async () => { throw pbpBookmarkServiceError("gateway_denied", 403); } } });
+    client: { lookup: async () => { throw pbpBookmarkServiceError("gateway_denied", 403); }, check: async () => { throw pbpBookmarkServiceError("gateway_denied", 403); } } });
   h.env.undo = { toast: { url: URL_ARTICLE, account, expiresAt: Date.now() + 30000 } };
   await h.undo("toast");
   equal(JSON.stringify(h.env.toasts.map(toast => [toast.title, toast.message])), JSON.stringify([["bgUndoFailed", "bookmarkErrGatewayDenied"]]));

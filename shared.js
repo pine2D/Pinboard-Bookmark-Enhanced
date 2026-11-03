@@ -646,6 +646,9 @@ const SETTINGS_DEFAULTS = {
   // linkding only: check each page while browsing (toolbar icon, popup ready
   // at once). Off by default: every check makes the server fetch the page.
   linkdingPreload: false,
+  // linkding only: a new bookmark's title and Description come from the
+  // browser's page (on) or from what linkding read in its check (off).
+  linkdingBrowserMetadata: true,
   optShowAiSummary: true, optShowAiTags: true,
   optShowQuickLinks: true, optShowQuickRow: true,
   tagPresets: "", optAutoCloseAfterSave: true,
