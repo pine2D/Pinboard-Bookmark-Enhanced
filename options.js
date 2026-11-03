@@ -242,6 +242,15 @@ function pbpAiSetupTarget() {
   return $id(id) ? id : "opt-ai-provider-btn";
 }
 
+// The two Private switches only reach Pinboard saves (Karakeep has no private
+// flag; linkding's sharing has its own control), so off Pinboard the rows are
+// hidden whole. The stored values are untouched and return with Pinboard.
+function pbpSyncPinboardOnlyRows(service) {
+  for (const id of ["opt-private-default", "opt-private-incognito"]) {
+    const row = document.getElementById(id)?.closest(".pref-row");
+    if (row) row.hidden = service !== "pinboard";
+  }
+}
 async function renderConnectionOverview() {
   const host = $id("connection-health");
   if (!host || typeof pbpLiveAiSettingsSnapshot !== "function") return;
@@ -361,8 +370,13 @@ async function renderConnectionOverview() {
       // in the warning tier instead of the optional services' neutral
       // "Not configured" -- on a fresh install it was the only row the red
       // header count referred to, and it looked exactly like the rest.
-      if (["pinboard", "karakeep", "linkding"].includes(item.id)) {
+      if (item.id === "pinboard") {
         stateKey = "connectionTokenNeeded";
+        stateClass = "warn";
+      } else if (item.id === "karakeep" || item.id === "linkding") {
+        // A self-hosted service is joined by Connect (URL + token + grant),
+        // not by a bare token, so "Token needed" named the wrong step.
+        stateKey = "connectionNotConnected";
         stateClass = "warn";
       } else {
         stateKey = "connectionNotConfigured";
@@ -2838,6 +2852,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const row = $id(id)?.closest(".pref-row");
       if (row) row.hidden = service !== "pinboard";
     }
+    pbpSyncPinboardOnlyRows(service);
   }
   for (const radio of document.querySelectorAll('input[name="bookmark-service"]')) {
     radio.checked = radio.value === pbpBookmarkServiceId(s);
@@ -3013,12 +3028,48 @@ document.addEventListener("DOMContentLoaded", async () => {
           pbpBookmarkConnection({...fresh,bookmarkService:service}).account, "karakeep:" + baseUrl + ":" + result.identity.id, result.readLaterListId));
         const saved = await persistSettings(patch);
         setConnectStatus(saved.ok ? "ok" : "bad", t(saved.ok ? "bookmarkConnected" : "bookmarkConnectFailed"));
-        if (saved.ok) { gatewayStored[service] = gateway; connectStored[service] = {url:baseUrl, token}; pbpOptGatewaySync(service); }
+        if (saved.ok) { gatewayStored[service] = gateway; connectStored[service] = {url:baseUrl, token}; pbpOptGatewaySync(service); $id("disconnect-" + service).hidden = false; }
         void renderConnectionOverview();
       } catch (error) {
         console.warn("[bookmark-connect] failed:", error?.name, error?.message);
         setConnectStatus("bad", t("bookmarkConnectFailed"));
       } finally { button.disabled = false; }
+    });
+    // Disconnect: the same credential removal as the popup's Log out. The
+    // button shows only while the service holds a usable connection.
+    const disconnectButton = $id("disconnect-" + service);
+    const syncDisconnectButton = async () => {
+      const fresh = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
+      disconnectButton.hidden = !pbpBookmarkConnection({...fresh, bookmarkService:service}).account;
+    };
+    syncDisconnectButton().catch(error => console.warn("[bookmark-connect] state read failed:", error?.name, error?.message));
+    chrome.storage.onChanged?.addListener((changes, area) => {
+      if ((area === "sync" || area === "local") && (changes[service + "Token"] || changes.optSyncEnabled || changes.syncApiKeys)) {
+        syncDisconnectButton().catch(() => {});
+      }
+    });
+    disconnectButton.addEventListener("click", () => {
+      const statusEl = $id("connect-" + service + "-status");
+      // Same anchored confirm as the popup's Log out, so it keeps that
+      // popover's default styling.
+      showConfirmPopover(disconnectButton, {
+        msg: t("bookmarkDisconnectConfirm"),
+        detail: t(service === "linkding" ? "bookmarkDisconnectDetailLinkding" : "bookmarkDisconnectDetail"),
+        yesText: t("bookmarkDisconnect"),
+        noText: t("cancel"),
+        onConfirm: async () => {
+          const result = await pbpBookmarkDisconnect(service);
+          if (!result.ok) { statusEl.classList.remove("pending", "ok", "warn"); setStatusIcon(statusEl, false, t("bookmarkConnectFailed")); return; }
+          $id("opt-" + service + "-token").value = "";
+          connectStored[service] = {url:connectStored[service].url, token:""};
+          pbpOptGatewayFill(service, null);
+          pbpOptConnectPendingSync(service);
+          statusEl.classList.remove("pending", "bad", "warn");
+          setStatusIcon(statusEl, true, t("bookmarkDisconnected"));
+          disconnectButton.hidden = true;
+          void renderConnectionOverview();
+        },
+      });
     });
   }
 

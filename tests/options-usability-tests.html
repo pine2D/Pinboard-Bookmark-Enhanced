@@ -673,6 +673,50 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       "overview contains an active permission or network path");
   });
 
+  await test("a connected self-hosted service reads Connected, not Token needed, and an unconnected one says Not connected", async () => {
+    const radio = document.createElement("input");
+    radio.type = "radio"; radio.name = "bookmark-service"; radio.value = "linkding"; radio.checked = true;
+    document.body.appendChild(radio);
+    const rowText = () => {
+      const row = document.querySelector(".connection-health-row");
+      return row ? row.textContent : "";
+    };
+    try {
+      localData.linkdingUrl = "http://127.0.0.1:9090";
+      localData.linkdingToken = pbpBookmarkCredentialSeal({ baseUrl:"http://127.0.0.1:9090/", token:"TOK", connectionId:"c1", userId:"u1" });
+      await renderConnectionOverview();
+      assert(rowText().includes("linkding") && rowText().includes("connectionConnected") && !rowText().includes("connectionTokenNeeded"),
+        "a connected linkding row must read connected: " + rowText());
+      delete localData.linkdingToken;
+      await renderConnectionOverview();
+      assert(rowText().includes("connectionNotConnected") && !rowText().includes("connectionTokenNeeded"),
+        "an unconnected linkding row must read not connected: " + rowText());
+    } finally {
+      radio.remove();
+      delete localData.linkdingUrl; delete localData.linkdingToken;
+      await renderConnectionOverview();
+    }
+  });
+
+  await test("Pinboard-only private rows are hidden, not disabled, off Pinboard and come back on Pinboard", async () => {
+    const host = document.createElement("div");
+    host.innerHTML = '<div class="pref-row"><input type="checkbox" id="opt-private-default" checked></div>' +
+      '<div class="pref-row"><input type="checkbox" id="opt-private-incognito"></div>';
+    document.body.appendChild(host);
+    const rows = [...host.querySelectorAll(".pref-row")];
+    try {
+      assert(typeof pbpSyncPinboardOnlyRows === "function", "no shared service-visibility helper");
+      for (const service of ["karakeep", "linkding"]) {
+        pbpSyncPinboardOnlyRows(service);
+        assert(rows.every((row) => row.hidden), service + " still shows a Pinboard-only private row");
+        assert(host.querySelector("#opt-private-default").checked === true && !host.querySelector("#opt-private-default").disabled,
+          "hiding must not change or disable the stored value");
+      }
+      pbpSyncPinboardOnlyRows("pinboard");
+      assert(rows.every((row) => !row.hidden), "Pinboard must show both private rows");
+    } finally { host.remove(); }
+  });
+
   await test("AnkiConnect is not called configured just because the port field carries its default", async () => {
     const realContains = chrome.permissions.contains;
     chrome.permissions.contains = async (query) => !!query.permissions?.includes("identity");

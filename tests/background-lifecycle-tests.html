@@ -888,6 +888,85 @@ function buildUndoHarness(source, opts) {
       h.startupOk() === true);
   }
 
+  // ---- Pinboard-only background work off Pinboard ----
+  const bookmarkServiceOf = (settings) => settings?.bookmarkService === "karakeep" || settings?.bookmarkService === "linkding" ? settings.bookmarkService : "pinboard";
+  {
+    const aStart = source.indexOf("async function _syncBadgeAlarm");
+    const aEnd = source.indexOf("_syncKeepaliveAlarm();\n_syncBadgeAlarm();", aStart);
+    const lStart = source.indexOf("chrome.storage.onChanged.addListener((changes) => {\n  if (changes.optShowBadge");
+    const lEnd = source.indexOf("// ---- Markdown preview via keyboard shortcut", lStart);
+    check("badge alarm / storage listener source markers exist", aStart > 0 && aEnd > aStart && lStart > 0 && lEnd > lStart);
+    const build = (settings) => {
+      const alarms = new Set(), badgeUpdates = [], listeners = [];
+      const chrome = {
+        alarms: {
+          get: async (name) => (alarms.has(name) ? { name } : undefined),
+          create: (name) => { alarms.add(name); },
+          clear: async (name) => alarms.delete(name),
+        },
+        storage: { onChanged: { addListener: (fn) => listeners.push(fn) } },
+      };
+      const deps = { chrome, loadSettings: async () => settings, pbpBookmarkServiceId: bookmarkServiceOf,
+        updateBadge: async () => { badgeUpdates.push(1); } };
+      const factory = new Function(...Object.keys(deps), `${source.slice(aStart, aEnd)}\n${source.slice(lStart, lEnd)}
+        return { _syncBadgeAlarm };`);
+      const api = factory(...Object.values(deps));
+      return { ...api, alarms, badgeUpdates, fire: (changes) => listeners.forEach((fn) => fn(changes, "sync")) };
+    };
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+    for (const service of ["karakeep", "linkding"]) {
+      const settings = { optShowBadge: true, bookmarkService: service };
+      const h = build(settings);
+      h.alarms.add("badge-refresh"); // left over from when Pinboard was active
+      await h._syncBadgeAlarm();
+      check(service + " with the badge switch on has no badge-refresh alarm", !h.alarms.has("badge-refresh"));
+      settings.bookmarkService = "pinboard";
+      h.fire({ bookmarkService: { newValue: "pinboard" } });
+      await settle();
+      check("switching " + service + " -> Pinboard (badge on) creates the alarm from the storage event", h.alarms.has("badge-refresh"));
+      settings.bookmarkService = service;
+      h.fire({ bookmarkService: { newValue: service } });
+      await settle();
+      check("switching Pinboard -> " + service + " clears the alarm from the storage event", !h.alarms.has("badge-refresh") && h.badgeUpdates.length === 2);
+    }
+    {
+      const h = build({ optShowBadge: false, bookmarkService: "pinboard" });
+      await h._syncBadgeAlarm();
+      check("Pinboard with the badge switch off has no alarm", !h.alarms.has("badge-refresh"));
+      const h2 = build({ optShowBadge: true, bookmarkService: "pinboard" });
+      await h2._syncBadgeAlarm();
+      check("Pinboard with the badge switch on keeps the alarm", h2.alarms.has("badge-refresh"));
+    }
+  }
+  {
+    const start = source.indexOf("async function handleSaveTabSet");
+    const end = source.indexOf("// ---- Storage change listener ----", start);
+    const build = (service) => {
+      const notes = [], fetches = [], created = [];
+      const deps = {
+        loadSettings: async () => ({ bookmarkService: service }), pbpBookmarkServiceId: bookmarkServiceOf,
+        showNotification: (...args) => { notes.push(args); },
+        t: (k, ...a) => (a.length ? `${k}:${a.join(":")}` : k),
+        fetch: async (url) => { fetches.push(String(url)); return { ok: true, status: 200 }; },
+        chrome: { tabs: { create: (info) => { created.push(info); } } },
+        AbortSignal, FormData, console,
+      };
+      const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}\nreturn handleSaveTabSet;`);
+      return { run: factory(...Object.values(deps)), notes, fetches, created };
+    };
+    for (const service of ["karakeep", "linkding"]) {
+      const h = build(service);
+      await h.run([{ title: "A", url: "https://a.example/" }]);
+      check("Tab Set on " + service + " gives one visible error notice and sends nothing",
+        h.notes.length === 1 && h.notes[0][3] === "error" && h.notes[0][2] === "bgTabSetPinboardOnly" &&
+        h.fetches.length === 0 && h.created.length === 0);
+    }
+    const h = build("pinboard");
+    await h.run([{ title: "A", url: "https://a.example/" }]);
+    check("Tab Set on Pinboard still posts to pinboard.in and reports saved",
+      h.fetches.length === 1 && h.fetches[0] === "https://pinboard.in/tabs/save/" && h.notes.length === 1 && h.notes[0][0] === "tabset-saved");
+  }
+
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>

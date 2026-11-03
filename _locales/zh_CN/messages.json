@@ -5132,8 +5132,14 @@
   "bookmarkPartialSavePopupReadLater": {"message": "书签已保存，但稍后阅读状态没有改过来。再按一次「更新」，就会补上这一步。"},
   "bookmarkPartialSavePopupBookmark": {"message": "标题和备注没有更新，书签保持原样。再按一次「更新」，就会写入这些修改。"},
   "bookmarkErrGatewayRedirect": {
-    "message": "服务器把请求重定向到了别处。常见原因是前面有要求登录的访问网关（如 Cloudflare Access），或地址填错。可在「访问网关」中填写 Service Token，或在网关里为接口路径放行。"
+    "message": "服务器把请求重定向到了别处。请先检查地址和端口：必须指向 Karakeep 或 linkding 本身。地址无误时，才可能是 Cloudflare Access 之类要求登录的访问网关在重定向，可在「访问网关」中填写 Service Token，或在网关里为接口路径放行。"
   },
+  "bgTabSetPinboardOnly": {"message": "标签页集只能保存到 Pinboard。要使用它，请先在设置中把书签服务切换为 Pinboard。"},
+  "bookmarkDisconnect": {"message": "断开连接"},
+  "bookmarkDisconnectConfirm": {"message": "断开与此服务的连接？"},
+  "bookmarkDisconnectDetail": {"message": "API Token 和访问网关凭据将从此浏览器移除。需要时点击「连接」即可重新连接。"},
+  "bookmarkDisconnectDetailLinkding": {"message": "API Token 和访问网关凭据将从此浏览器移除。之后即使用同一地址和 Token 再次连接，也会视为新连接，原连接中尚未发出的保存不再自动重试。"},
+  "bookmarkDisconnected": {"message": "已断开连接"},
   "bookmarkErrGatewayChallenge": {
     "message": "请求被安全验证（人机验证）拦下。常见来源是 Cloudflare 的安全规则，请在规则里为接口路径放行。"
   },

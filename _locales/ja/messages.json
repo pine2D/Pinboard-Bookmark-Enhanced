@@ -5138,8 +5138,14 @@
   "bookmarkPartialSavePopupReadLater": {"message": "ブックマークは保存されましたが、「あとで読む」の状態は変更されていません。もう一度「更新」を押すと反映します。"},
   "bookmarkPartialSavePopupBookmark": {"message": "タイトルとメモは更新されず、ブックマークは変更されていません。もう一度「更新」を押すと、変更を反映します。"},
   "bookmarkErrGatewayRedirect": {
-    "message": "サーバーがリクエストをリダイレクトしました。よくある原因は、ログインを求めるアクセスゲートウェイ（Cloudflare Accessなど）か、URLの誤りです。「アクセスゲートウェイ」にサービストークンを入力するか、ゲートウェイでAPIのパスを許可してください。"
+    "message": "サーバーがリクエストをリダイレクトしました。まずアドレスとポートを確認してください。Karakeep または linkding 自体を指している必要があります。正しい場合は、Cloudflare Accessなど、ログインを求めるアクセスゲートウェイが原因かもしれません。「アクセスゲートウェイ」にサービストークンを入力するか、ゲートウェイでAPIのパスを許可してください。"
   },
+  "bgTabSetPinboardOnly": {"message": "タブセットは Pinboard でのみ使えます。使うには、設定でブックマークサービスを Pinboard に切り替えてください。"},
+  "bookmarkDisconnect": {"message": "接続を解除"},
+  "bookmarkDisconnectConfirm": {"message": "このサービスとの接続を解除しますか？"},
+  "bookmarkDisconnectDetail": {"message": "API トークンとアクセスゲートウェイの認証情報をこのブラウザーから削除します。「接続」を押すと、いつでも再接続できます。"},
+  "bookmarkDisconnectDetailLinkding": {"message": "API トークンとアクセスゲートウェイの認証情報をこのブラウザーから削除します。同じアドレスとトークンで再接続しても新しい接続として扱われ、以前の接続で待機中の保存は自動で再試行されません。"},
+  "bookmarkDisconnected": {"message": "接続を解除しました"},
   "bookmarkErrGatewayChallenge": {
     "message": "セキュリティチェック（ボット判定）でリクエストがブロックされました。よくある原因はCloudflareのセキュリティルールです。ルールでAPIのパスを許可してください。"
   },

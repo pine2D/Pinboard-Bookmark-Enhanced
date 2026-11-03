@@ -5138,8 +5138,14 @@
   "bookmarkPartialSavePopupReadLater": {"message": "Das Lesezeichen wurde gespeichert, „Später lesen“ aber nicht geändert. Klicke erneut auf „Aktualisieren“, um es nachzuholen."},
   "bookmarkPartialSavePopupBookmark": {"message": "Titel und Notizen wurden nicht aktualisiert, das Lesezeichen ist unverändert. Klicke erneut auf „Aktualisieren“, um deine Änderungen zu übernehmen."},
   "bookmarkErrGatewayRedirect": {
-    "message": "Der Server hat die Anfrage umgeleitet. Häufige Ursache ist ein Zugangs-Gateway mit Anmeldung wie Cloudflare Access oder eine falsche URL. Unter „Zugangs-Gateway“ ein Service-Token eintragen oder den API-Pfad im Gateway freigeben."
+    "message": "Der Server hat die Anfrage umgeleitet. Prüfe zuerst Adresse und Port: Sie müssen auf Karakeep oder linkding selbst zeigen. Stimmt beides, leitet vielleicht ein Zugangs-Gateway mit Anmeldung wie Cloudflare Access um. Dann unter „Zugangs-Gateway“ ein Service-Token eintragen oder den API-Pfad im Gateway freigeben."
   },
+  "bgTabSetPinboardOnly": {"message": "Tab-Sets funktionieren nur mit Pinboard. Stelle dafür in den Einstellungen den Lesezeichen-Dienst auf Pinboard um."},
+  "bookmarkDisconnect": {"message": "Trennen"},
+  "bookmarkDisconnectConfirm": {"message": "Verbindung zu diesem Dienst trennen?"},
+  "bookmarkDisconnectDetail": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden aus diesem Browser entfernt. Mit „Verbinden“ kannst du dich jederzeit neu verbinden."},
+  "bookmarkDisconnectDetailLinkding": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden aus diesem Browser entfernt. Eine erneute Verbindung gilt auch mit gleicher Adresse und gleichem Token als neue Verbindung; noch wartende Speicherungen der bisherigen werden nicht automatisch wiederholt."},
+  "bookmarkDisconnected": {"message": "Getrennt"},
   "bookmarkErrGatewayChallenge": {
     "message": "Eine Sicherheitsprüfung (Bot-Challenge) hat die Anfrage blockiert. Häufige Ursache sind die Sicherheitsregeln von Cloudflare; dort den API-Pfad freigeben."
   },

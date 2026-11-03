@@ -2687,7 +2687,9 @@ async function _maybeReleaseKeepaliveAlarm() {
 async function _syncBadgeAlarm() {
   try {
     const s = await loadSettings();
-    if (s.optShowBadge) {
+    // Only Pinboard has an unread-count poll; for the self-hosted services
+    // updateBadge just clears the badge, so a 15-minute wake would do nothing.
+    if (s.optShowBadge && pbpBookmarkServiceId(s) === "pinboard") {
       const existing = await chrome.alarms.get("badge-refresh");
       if (!existing) chrome.alarms.create("badge-refresh", { periodInMinutes: 15 });
     } else {
@@ -5581,7 +5583,11 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
 
 // ===================== Tab Set 保存 =====================
 async function handleSaveTabSet(tabsData) {
-  if (pbpBookmarkServiceId(await loadSettings()) !== "pinboard") return;
+  if (pbpBookmarkServiceId(await loadSettings()) !== "pinboard") {
+    // Tab Sets are a pinboard.in web feature; say so instead of dropping the shortcut silently.
+    showNotification("tabset-error", t("bgTabSetFailed"), t("bgTabSetPinboardOnly"), "error");
+    return;
+  }
   try {
     // Tab Set uses pinboard.in web API (cookie auth, not API token)
     const result = { browser: "chrome", windows: [tabsData.map(t => ({ title: t.title, url: t.url }))] };
@@ -5614,9 +5620,10 @@ async function handleSaveTabSet(tabsData) {
 
 // ---- Storage change listener ----
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.optShowBadge) {
+  if (changes.optShowBadge || changes.bookmarkService) {
     // The event can come from an inactive storage area. Resolve the effective
-    // setting instead of trusting this area's candidate value.
+    // setting instead of trusting this area's candidate value. A service
+    // change matters too: the poll exists only for Pinboard.
     updateBadge().catch(() => {});
     _syncBadgeAlarm(); // create/clear the 15-min network poll to match
   }

@@ -5138,8 +5138,14 @@
   "bookmarkPartialSavePopupReadLater": {"message": "書籤已儲存，但稍後閱讀狀態沒有改過來。再按一次「更新」，就會補上這一步。"},
   "bookmarkPartialSavePopupBookmark": {"message": "標題和備註沒有更新，書籤維持原樣。再按一次「更新」，就會寫入這些修改。"},
   "bookmarkErrGatewayRedirect": {
-    "message": "伺服器將請求重新導向。常見原因是前方有需要登入的存取閘道（例如 Cloudflare Access），或網址有誤。可在「存取閘道」中填入 Service Token，或在閘道中允許 API 路徑通過。"
+    "message": "伺服器將請求重新導向。請先檢查位址和連接埠：必須指向 Karakeep 或 linkding 本身。位址無誤時，才可能是 Cloudflare Access 之類需要登入的存取閘道在重新導向，可在「存取閘道」中填入 Service Token，或在閘道中允許 API 路徑通過。"
   },
+  "bgTabSetPinboardOnly": {"message": "分頁集只能儲存到 Pinboard。要使用它，請先在設定中把書籤服務切換為 Pinboard。"},
+  "bookmarkDisconnect": {"message": "中斷連線"},
+  "bookmarkDisconnectConfirm": {"message": "中斷與此服務的連線？"},
+  "bookmarkDisconnectDetail": {"message": "API Token 和存取閘道憑證將從此瀏覽器移除。需要時按一下「連線」即可重新連線。"},
+  "bookmarkDisconnectDetailLinkding": {"message": "API Token 和存取閘道憑證將從此瀏覽器移除。之後即使用同一位址和 Token 再次連線，也會視為新連線，原連線中尚未送出的儲存不再自動重試。"},
+  "bookmarkDisconnected": {"message": "已中斷連線"},
   "bookmarkErrGatewayChallenge": {
     "message": "請求遭安全性驗證（人機驗證）攔截。常見來源是 Cloudflare 的安全性規則，請在規則中允許 API 路徑通過。"
   },

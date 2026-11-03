@@ -34,6 +34,7 @@ const BLOCKS=[
   'linkding Description server semantics',
   'gateway probes',
   'settings Connect names the failure cause',
+  'settings Disconnect',
   'settings tag panel follows the service',
   'archive log follows the bookmark connection',
   'linkding #fragment address saved without it',
@@ -517,6 +518,7 @@ try{
     await options.locator('#connect-linkding').click();
     await waitStatus(en.bookmarkErrGatewayRedirect.message);
     assert.equal((await status.textContent()).trim(),en.bookmarkErrGatewayRedirect.message);
+    assert(/address and port/i.test(en.bookmarkErrGatewayRedirect.message)&&en.bookmarkErrGatewayRedirect.message.indexOf('port')<en.bookmarkErrGatewayRedirect.message.indexOf('gateway'),'a redirect must send the user to the address and port before the gateway');
     await chooseGateway('cloudflare');
     const wireBefore=wire.length;
     await options.locator('#connect-linkding').click();
@@ -1288,6 +1290,57 @@ try{
     }
   }finally{await worker.evaluate(()=>{if(self.__pbpRealTimeout)AbortSignal.timeout=self.__pbpRealTimeout;});}
   console.log('settings Connect: wrong address, dropped connection and timeout each named');
+  });
+  await block('settings Disconnect',['linkding','karakeep'],async()=>{
+  // Disconnect is the popup's Log out from the settings page: both credential
+  // halves go, the chosen service and the queued saves stay, and Pinboard
+  // (which has its own token field) gets no such button.
+  const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
+  const saved=await worker.evaluate(()=>chrome.storage.local.get(['bookmarkService','karakeepToken','linkdingToken','offlineQueue']));
+  try{
+    for(const service of ['linkding','karakeep']){
+      const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+      await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
+      const button=options.locator('#disconnect-'+service),status=options.locator('#connect-'+service+'-status');
+      await button.waitFor({state:'visible',timeout:10000});
+      const account=await options.evaluate(async service=>pbpBookmarkConnection({...await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),bookmarkService:service}).account,service);
+      assert(account,service+' has no connection to disconnect');
+      const record={queueId:'disc-'+service,queuedAt:1,account,mode:'merge',url:origin+'/disconnect-'+service,title:'Waiting',notes:'',summary:'',tags:'',private:true,toread:false};
+      await worker.evaluate(async item=>chrome.storage.local.set({offlineQueue:[item]}),record);
+      await button.click();
+      await options.locator('.confirm-popover').waitFor();
+      assert.equal((await options.locator('.confirm-msg').textContent()).trim(),en.bookmarkDisconnectConfirm.message);
+      await options.locator('.confirm-no').click();await options.locator('.confirm-popover').waitFor({state:'detached'});
+      assert((await worker.evaluate(s=>chrome.storage.local.get(s+'Token'),service))[service+'Token'],'cancelling the confirm still removed the credential');
+      await button.click();await options.locator('.confirm-yes').click();
+      await status.filter({hasText:en.bookmarkDisconnected.message}).waitFor({timeout:10000});
+      assert.equal((await worker.evaluate(s=>chrome.storage.local.get(s+'Token'),service))[service+'Token'],'','the credential envelope (token and gateway) was not emptied');
+      assert.equal(await options.evaluate(async service=>pbpBookmarkConnection({...await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),bookmarkService:service}).account,service),'');
+      assert.equal(await options.locator('#opt-'+service+'-token').inputValue(),'');
+      assert(await button.isHidden(),'Disconnect stayed after disconnecting');
+      assert.equal((await worker.evaluate(()=>chrome.storage.local.get('bookmarkService'))).bookmarkService,service,'disconnecting changed the chosen service');
+      const queue=await worker.evaluate(()=>chrome.storage.local.get('offlineQueue').then(r=>r.offlineQueue||[]));
+      assert.deepEqual(queue.map(item=>item.queueId),['disc-'+service],'the queued save of the disconnected connection was dropped');
+      await until(async()=>(await options.locator('.connection-health-row').first().textContent()).includes(en.connectionNotConnected.message),'overview does not read Not connected');
+      await worker.evaluate(saved=>chrome.storage.local.set({[saved.key]:saved.value}),{key:service+'Token',value:saved[service+'Token']});
+      await options.close();
+    }
+    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
+    assert.equal(await options.locator('#disconnect-pinboard').count(),0);
+    assert(await options.locator('#disconnect-linkding').isHidden()&&await options.locator('#disconnect-karakeep').isHidden(),'Pinboard shows a Disconnect button');
+    for(const id of ['opt-private-default','opt-private-incognito'])assert(!(await options.locator('#'+id).evaluate(el=>el.closest('.pref-row').hidden)),'Pinboard hides '+id);
+    await options.locator('input[name="bookmark-service"][value="karakeep"]').check();
+    for(const id of ['opt-private-default','opt-private-incognito'])assert(await options.locator('#'+id).evaluate(el=>el.closest('.pref-row').hidden),'Karakeep still shows '+id);
+    await options.close();
+  }finally{
+    await worker.evaluate(saved=>chrome.storage.local.set({bookmarkService:saved.bookmarkService,karakeepToken:saved.karakeepToken,linkdingToken:saved.linkdingToken,offlineQueue:saved.offlineQueue||[]}),saved);
+  }
+  for(const lang of ['de','en','fr','ja','pl','ru','zh_CN','zh_HK','zh_TW']){
+    const messages=JSON.parse(readFileSync(new URL('../_locales/'+lang+'/messages.json',import.meta.url),'utf8'));
+    for(const key of ['bookmarkDisconnect','bookmarkDisconnectConfirm','bookmarkDisconnectDetail','bookmarkDisconnectDetailLinkding','bookmarkDisconnected','bgTabSetPinboardOnly'])assert(messages[key]?.message,lang+' lacks '+key);
+  }
+  console.log('settings Disconnect: credentials cleared, service and queue kept, Pinboard-only rows hidden off Pinboard');
   });
   await block('settings tag panel follows the service',[],async()=>{
   // The Tags panel opened by a deep link while linkding is chosen explains it

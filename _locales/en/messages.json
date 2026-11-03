@@ -5149,8 +5149,14 @@
   "bookmarkPartialSavePopupReadLater": {"message": "The bookmark was saved, but its read later state was not changed. Press Update again to finish."},
   "bookmarkPartialSavePopupBookmark": {"message": "The title and notes were not updated, so the bookmark is unchanged. Press Update again to apply your changes."},
   "bookmarkErrGatewayRedirect": {
-    "message": "The server redirected the request. Common causes: a sign-in gateway such as Cloudflare Access, or a wrong URL. Add a service token under Access gateway, or allow the API path in the gateway."
+    "message": "The server redirected the request. Check the address and port first: it must point to Karakeep or linkding itself. If it does, a sign-in gateway such as Cloudflare Access may be redirecting; add a service token under Access gateway, or allow the API path in the gateway."
   },
+  "bgTabSetPinboardOnly": {"message": "Tab sets only work with Pinboard. Switch the bookmark service to Pinboard in Settings to use them."},
+  "bookmarkDisconnect": {"message": "Disconnect"},
+  "bookmarkDisconnectConfirm": {"message": "Disconnect from this service?"},
+  "bookmarkDisconnectDetail": {"message": "Your API token and any access gateway credential will be removed from this browser. Click Connect to connect again."},
+  "bookmarkDisconnectDetailLinkding": {"message": "Your API token and any access gateway credential will be removed from this browser. Connecting again, even with the same address and token, counts as a new connection, so saves still waiting from this one are not retried automatically."},
+  "bookmarkDisconnected": {"message": "Disconnected"},
   "bookmarkErrGatewayChallenge": {
     "message": "A security check (bot challenge) blocked the request. Cloudflare security rules are a common cause; allow the API path there."
   },

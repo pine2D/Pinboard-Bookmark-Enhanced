@@ -2306,6 +2306,13 @@ function pbpBookmarkConnection(settings) {
     headers:ready && gateway ? gateway.headers.map(row => [...row]) : [],
     readLaterListId:service === "karakeep" && settings?.karakeepReadLaterListOwner === account ? settings?.karakeepReadLaterListId || "" : ""};
 }
+// Log out (popup) and Disconnect (settings) are one write: the service's
+// credential envelope, which also carries its access-gateway credentials, is
+// emptied. The address, offline queue and every other setting stay, so Connect
+// can restore it; queued saves of the old connection are kept but not replayed.
+function pbpBookmarkDisconnect(service) {
+  return persistSettings({[(service || "pinboard") + "Token"]: ""});
+}
 function pbpBookmarkReusableConnectionId(settings, service, baseUrl, token) {
   const old = pbpBookmarkConnection({...settings, bookmarkService:service});
   return old.connectionId && old.baseUrl === baseUrl && old.token === token ? old.connectionId : "";

@@ -5138,8 +5138,14 @@
   "bookmarkPartialSavePopupReadLater": {"message": "Le signet a été enregistré, mais son état « à lire » n’a pas été modifié. Appuyez de nouveau sur « Mettre à jour » pour terminer."},
   "bookmarkPartialSavePopupBookmark": {"message": "Le titre et les notes n’ont pas été mis à jour : le signet est inchangé. Appuyez de nouveau sur « Mettre à jour » pour appliquer vos modifications."},
   "bookmarkErrGatewayRedirect": {
-    "message": "Le serveur a redirigé la requête. Cause fréquente : une passerelle d’accès qui exige une connexion, comme Cloudflare Access, ou une URL erronée. Ajoutez un jeton de service dans « Passerelle d’accès » ou autorisez le chemin de l’API dans la passerelle."
+    "message": "Le serveur a redirigé la requête. Vérifiez d’abord l’adresse et le port : ils doivent pointer vers Karakeep ou linkding lui-même. Si c’est le cas, une passerelle d’accès qui exige une connexion, comme Cloudflare Access, redirige peut-être la requête. Ajoutez un jeton de service dans « Passerelle d’accès » ou autorisez le chemin de l’API dans la passerelle."
   },
+  "bgTabSetPinboardOnly": {"message": "Les ensembles d’onglets ne fonctionnent qu’avec Pinboard. Pour les utiliser, choisissez Pinboard comme service de signets dans les réglages."},
+  "bookmarkDisconnect": {"message": "Déconnecter"},
+  "bookmarkDisconnectConfirm": {"message": "Se déconnecter de ce service ?"},
+  "bookmarkDisconnectDetail": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés de ce navigateur. Cliquez sur Connecter pour vous reconnecter à tout moment."},
+  "bookmarkDisconnectDetailLinkding": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés de ce navigateur. Se reconnecter, même avec la même adresse et le même jeton, crée une nouvelle connexion : les enregistrements encore en attente de l’ancienne ne seront pas relancés automatiquement."},
+  "bookmarkDisconnected": {"message": "Déconnecté"},
   "bookmarkErrGatewayChallenge": {
     "message": "Une vérification de sécurité (test anti-robot) a bloqué la requête. Elle vient souvent des règles de sécurité de Cloudflare ; autorisez-y le chemin de l’API."
   },

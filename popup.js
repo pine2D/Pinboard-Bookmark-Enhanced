@@ -824,7 +824,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       noText: t("cancel"),
       onConfirm: async () => {
         await pbpDiscardPopupDraft(true);
-        const result = await persistSettings({ [(pbpBookmarkServiceId(settings) || "pinboard") + "Token"]: "" });
+        const result = await pbpBookmarkDisconnect(pbpBookmarkServiceId(settings));
         if (!result.ok) return;
         settings.pinboardToken = "";
         invalidateBookmarkLookup();
