@@ -1511,8 +1511,20 @@ test("Batch counts an over-long title as too long before AI and a partial save a
   equal([h.state.aiCalls,h.state.calls.map(c=>c.method+" "+new URL(c.url).pathname.replace(/^\/base\/api\/v1\//,""))],[1,["GET bookmarks/check-url","GET bookmarks/check-url","POST bookmarks","POST bookmarks/bk-new/tags"]]);
   equal(h.state.calls.filter(c=>c.method==="GET").map(c=>new URL(c.url).searchParams.get("url")),tabs.map(tab=>tab.url));
   equal(h.state.queue,[]);
-  const [, , body]=h.state.notifications.at(-1)||[];
+  const [, title, body]=h.state.notifications.at(-1)||[];
   ok(body.startsWith("batchDone:0:0")&&body.includes("batchTooLong:1")&&body.includes("batchPartial:1"));
+  // A partly saved page landed: the run is not reported as a failure.
+  equal(title,"bgBatchSaved");
+});
+test("a Batch that only partly saved its pages is not titled a failure",async()=>{
+  const tabs=[0,1].map(i=>({id:50+i,url:pageUrl+"?p="+i,title:"T"+i,incognito:false}));
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[201,kkRecord("bk-a","")],[400,{code:"invalid_request"}],[200,{bookmarkId:null}],[201,kkRecord("bk-b","")],[400,{code:"invalid_request"}]]);
+  await (await producers(h,{autoNotes:"",summary:"",settings:{batchAiSummary:false,optBatchTagEnabled:true,optBatchTag:"work"}})).batchSave(tabs);
+  const last=h.state.progress.at(-1);
+  equal([last.saved,last.failed,last.partial,last.queued],[0,0,2,0]);
+  const [id, title, body, category]=h.state.notifications.at(-1)||[];
+  equal([id,title,category],["batch-saved","bgBatchSaved","batchSave"]);
+  ok(body.includes("batchPartial:2"),body);
 });
 test("merge-mode Batch with an over-long page title merges into a bookmark already saved and checks it once",async()=>{
   const long="😀".repeat(513), tabs=[{id:33,url:pageUrl,title:long,incognito:false}];

@@ -5452,8 +5452,9 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       : "";
     if (saved > 0 || queued > 0 || failed > 0 || tooLong > 0 || tagTooLong > 0 || partial > 0) {
       const message = t("batchDone", String(saved), String(failed)) + skippedMsg + tooLongMsg + partialMsg + queuedMsg + tagsSuffix + tagTooLongMsg;
-      if (saved > 0 || queued > 0) {
-        const title = saved > 0 ? t("bgBatchSaved") : t("bgQueuedOffline");
+      // A partly saved page landed on the server too (its bookmark exists).
+      if (saved > 0 || partial > 0 || queued > 0) {
+        const title = saved > 0 || partial > 0 ? t("bgBatchSaved") : t("bgQueuedOffline");
         showNotification("batch-saved", title, message, "batchSave");
       } else {
         // Nothing landed at all (every tab failed on its own; a revoked token
