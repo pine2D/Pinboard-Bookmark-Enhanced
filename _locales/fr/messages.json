@@ -228,6 +228,15 @@
   "editingExisting": {
     "message": "Modification du signet existant"
   },
+  "fragmentMatchSaved": {
+    "message": "Cette page est déjà enregistrée sous son URL sans la partie #."
+  },
+  "fragmentMatchEdit": {
+    "message": "Modifier ce signet"
+  },
+  "fragmentMatchSaveNew": {
+    "message": "Enregistrer comme nouveau signet"
+  },
   "editingExistingDetails": {
     "message": "$BASE$ ($DETAILS$)",
     "placeholders": {

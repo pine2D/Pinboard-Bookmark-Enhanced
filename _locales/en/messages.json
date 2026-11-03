@@ -228,6 +228,16 @@
   "editingExisting": {
     "message": "Editing existing bookmark"
   },
+  "fragmentMatchSaved": {
+    "message": "This page is already saved under its address without the # part.",
+    "description": "Popup notice: this #fragment address is not saved, but the same address without the fragment is."
+  },
+  "fragmentMatchEdit": {
+    "message": "Edit that bookmark"
+  },
+  "fragmentMatchSaveNew": {
+    "message": "Save as new bookmark"
+  },
   "editingExistingDetails": {
     "message": "$BASE$ ($DETAILS$)",
     "description": "Popup edit banner: the editingExisting text followed by the saved date and tag count in this language's brackets.",

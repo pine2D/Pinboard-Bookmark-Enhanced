@@ -228,6 +228,15 @@
   "editingExisting": {
     "message": "既存のブックマークを編集中"
   },
+  "fragmentMatchSaved": {
+    "message": "このページは # 以降を除いた URL で保存済みです。"
+  },
+  "fragmentMatchEdit": {
+    "message": "元のブックマークを編集"
+  },
+  "fragmentMatchSaveNew": {
+    "message": "新しいブックマークとして保存"
+  },
   "editingExistingDetails": {
     "message": "$BASE$（$DETAILS$）",
     "placeholders": {

@@ -228,6 +228,15 @@
   "editingExisting": {
     "message": "Vorhandenes Lesezeichen bearbeiten"
   },
+  "fragmentMatchSaved": {
+    "message": "Diese Seite ist bereits unter ihrer URL ohne den #-Teil gespeichert."
+  },
+  "fragmentMatchEdit": {
+    "message": "Dieses Lesezeichen bearbeiten"
+  },
+  "fragmentMatchSaveNew": {
+    "message": "Als neues Lesezeichen speichern"
+  },
   "editingExistingDetails": {
     "message": "$BASE$ ($DETAILS$)",
     "placeholders": {

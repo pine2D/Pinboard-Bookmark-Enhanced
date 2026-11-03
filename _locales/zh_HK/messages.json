@@ -228,6 +228,15 @@
   "editingExisting": {
     "message": "正在編輯已有書籤"
   },
+  "fragmentMatchSaved": {
+    "message": "這篇文章已用不含 # 的網址收藏。"
+  },
+  "fragmentMatchEdit": {
+    "message": "編輯原書籤"
+  },
+  "fragmentMatchSaveNew": {
+    "message": "另存為新書籤"
+  },
   "editingExistingDetails": {
     "message": "$BASE$（$DETAILS$）",
     "placeholders": {

@@ -228,6 +228,15 @@
   "editingExisting": {
     "message": "Edytowanie istniejącej zakładki"
   },
+  "fragmentMatchSaved": {
+    "message": "Ta strona jest już zapisana pod adresem bez części #."
+  },
+  "fragmentMatchEdit": {
+    "message": "Edytuj tę zakładkę"
+  },
+  "fragmentMatchSaveNew": {
+    "message": "Zapisz jako nową zakładkę"
+  },
   "editingExistingDetails": {
     "message": "$BASE$ ($DETAILS$)",
     "placeholders": {

@@ -4476,6 +4476,169 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     const FOUND_BODY = JSON.stringify({ posts: [{ description: "Saved title", extended: "", tags: "alpha", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] });
 
+    // ---- The #fragment address saved without it (user ruling 2026-11-02) ----
+    // The shipped open lookup, its request helper and the fragment probe in one
+    // scope, over real DOM nodes for the address, the title, Save and the
+    // banner the notice mounts under, and the real showFeedback card.
+    // workerReply answers the worker messages by type and address.
+    const HASHED = URL + "#section-2";
+    const fragmentProbeStart = source.indexOf("// ---- The same page saved without its #fragment");
+    const fragmentProbeEnd = source.indexOf("// ===================== Existing Bookmark", fragmentProbeStart);
+    assert(fragmentProbeStart >= 0 && fragmentProbeEnd > fragmentProbeStart, "the #fragment probe source was not found");
+    const fragmentProbeSource = source.slice(fragmentProbeStart, fragmentProbeEnd);
+    function createFragmentHarness(service, answer) {
+      const sent = [];
+      const host = document.createElement("div");
+      host.className = "form-body";
+      host.hidden = true;
+      document.body.appendChild(host);
+      const real = {};
+      for (const [id, tag] of [["existing-banner", "div"], ["url-input", "input"], ["title-input", "input"], ["submit-btn", "button"]]) {
+        real[id] = document.createElement(tag);
+        real[id].id = id;
+        host.appendChild(real[id]);
+      }
+      real["existing-banner"].className = "existing-banner hidden";
+      real["url-input"].value = HASHED;
+      real["title-input"].value = "Page title";
+      let submits = 0;
+      real["submit-btn"].addEventListener("click", () => { submits++; });
+      const stubs = {};
+      const settings = service === "pinboard" ? { bookmarkService: "pinboard", pinboardToken: "alice:token" }
+        : { bookmarkService: service, pinboardToken: "alice:token", [service + "Url"]: "https://bookmarks.example/" };
+      const account = pbpBookmarkConnection(settings).account;
+      const dependencies = {
+        settings,
+        chrome: { runtime: { sendMessage(message) { sent.push(message); return Promise.resolve(answer(message, account)); } } },
+        resetPinboardSession() {},
+        $id: (id) => real[id] || (stubs[id] ||= createElementStub()),
+        t: (key) => key,
+        showStatus() {}, clearSaveError() {}, showSaveError() {}, showSaveQueued() {},
+        console: { warn() {} },
+        enc: encodeURIComponent,
+        shouldUpdateField: () => true,
+        recomputeArchiveCheck() {}, renderTags() {}, pbpRefreshDisplayedAITagsForBookmark() {}, updateCharCount() {}, autoResizeTextarea() {},
+        setTimeout: () => 0,
+        localStorage: { setItem() {} },
+        uiLangToBCP47: () => "en",
+        _activeTabAtOpen: null,
+        pbpRebasePopupTags: rebasePopupTags,
+        pbpParseJsonText, pbpPinboardAccountFromToken, classifyPinboardError, unionTags,
+      };
+      const body = [
+        'let bookmarkLookup = { status: "idle", url: "", generation: 0, promise: null, formLoaded: false };',
+        "let existingBookmark = null;",
+        "let currentTags = [];",
+        "let _fragmentMatchFeedback = null;",
+        "let pinboardFetch, pinboardFetchImmediate;",
+        proxySource,
+        "let _popupDraftRestored = false, _tagsUserTouched = false, _linkdingDescriptionKnown = false, _linkdingDescriptionPending = false, _linkdingPageDescription = null;",
+        // popup.js's invalidateBookmarkLookup, for the parts this flow reads:
+        // a new generation, and the hint of the lookup it ends goes with it.
+        "function invalidateBookmarkLookup() { bookmarkLookup = { status: 'idle', url: '', generation: bookmarkLookup.generation + 1, promise: null, formLoaded: false }; existingBookmark = null; pbpDismissFragmentMatch(); }",
+        fragmentProbeSource,
+        lookupSource,
+        "return { checkExistingBookmark, invalidateBookmarkLookup, getLookup: () => bookmarkLookup };",
+      ].join("\n");
+      const names = Object.keys(dependencies);
+      const built = new Function(...names, body)(...names.map((name) => dependencies[name]));
+      // The address input's own listener in popup.js (pbpPopupUrlEdited) starts the lookup over.
+      real["url-input"].addEventListener("input", () => built.invalidateBookmarkLookup());
+      const notice = () => [...host.querySelectorAll(":scope > .feedback-card")].filter((card) => !card.classList.contains("dismissing"));
+      return {
+        real, sent, notice, submits: () => submits, getLookup: built.getLookup,
+        // The popup's open lookup: the prefetch for the tab address, as showMain passes it.
+        open: (address = HASHED) => { real["url-input"].value = address; return built.checkExistingBookmark("alice:token", address, { prefetchUrl: address, prefetchPromise: Promise.resolve(null), fragmentProbe: true }); },
+        asked: () => sent.filter((m) => m.type === "lookup_bookmark" || m.type === "get_bookmark_data").map((m) => m.type + " " + m.url),
+        cleanup: () => host.remove(),
+      };
+    }
+    const fragmentPost = (service) => service === "pinboard"
+      ? { href: URL, description: "Saved original", extended: "Original notes", tags: "kept", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }
+      : { href: URL, description: "Saved original", extended: "Original notes", summary: "Original description", tagNames: ["kept"], tags: "kept", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" };
+    // The worker's answer per address: saved = posts at that address.
+    const fragmentWorker = (saved, fail = null) => (message, account) => {
+      if (message.type === "get_bookmark_data") return { posts: null, account };
+      if (message.type !== "lookup_bookmark") return undefined;
+      if (fail && message.url === fail.url) return { ok: false, status: fail.status, error: fail.error, posts: null, account: "" };
+      return { ok: true, status: 200, posts: saved[message.url] ? [saved[message.url]] : [], account };
+    };
+    async function settleProbe(h) { await flushMicrotasks(); await flushMicrotasks(); }
+
+    await testAsync("#fragment address: Pinboard and linkding ask again without it, and Edit loads the saved bookmark", async () => {
+      for (const service of ["pinboard", "linkding"]) {
+        const h = createFragmentHarness(service, fragmentWorker({ [URL]: fragmentPost(service) }));
+        try {
+          assert((await h.open()).status === "missing", service + ": the #fragment address read as saved");
+          await settleProbe(h);
+          assert(h.asked().filter((line) => line.startsWith("lookup_bookmark")).join("|") === "lookup_bookmark " + HASHED + "|lookup_bookmark " + URL,
+            service + ": expected one more lookup without the fragment: " + JSON.stringify(h.asked()));
+          const [card] = h.notice();
+          assert(card && h.notice().length === 1, service + ": no notice for the address saved without its fragment");
+          assert(card.previousElementSibling === h.real["existing-banner"], service + ": the notice is not above the form");
+          assert(card.querySelector(".fc-message")?.textContent === "fragmentMatchSaved", service + ": notice copy " + card.textContent);
+          assert(h.real["url-input"].value === HASHED && h.real["title-input"].value === "Page title", service + ": the notice changed the form");
+          const asked = h.sent.length;
+          const edit = [...card.querySelectorAll(".fc-actions button")].find((b) => b.textContent === "fragmentMatchEdit");
+          assert(edit, service + ": no Edit action");
+          edit.click();
+          await settleProbe(h);
+          await h.getLookup().promise;
+          assert(h.getLookup().status === "found" && h.getLookup().url === URL, service + ": Edit did not load the saved bookmark: " + JSON.stringify(h.getLookup()));
+          assert(h.real["url-input"].value === URL, service + ": Edit did not switch to the saved address");
+          assert(h.real["title-input"].value === "Saved original", service + ": Edit did not fill the saved title");
+          assert(h.sent.slice(asked).every((m) => m.type !== "lookup_bookmark" && m.type !== "get_bookmark_data"), service + ": Edit asked again: " + JSON.stringify(h.sent.slice(asked)));
+          assert(h.notice().length === 0 && h.submits() === 0, service + ": after Edit the notice stayed or a save started");
+        } finally { h.cleanup(); }
+      }
+    });
+
+    await testAsync("#fragment address: Save as new keeps the #fragment address", async () => {
+      for (const service of ["pinboard", "linkding"]) {
+        const h = createFragmentHarness(service, fragmentWorker({ [URL]: fragmentPost(service) }));
+        try {
+          await h.open();
+          await settleProbe(h);
+          const saveNew = [...(h.notice()[0]?.querySelectorAll(".fc-actions button") || [])].find((b) => b.textContent === "fragmentMatchSaveNew");
+          assert(saveNew, service + ": no Save as new action");
+          saveNew.click();
+          assert(h.submits() === 1, service + ": Save as new did not press Save");
+          assert(h.real["url-input"].value === HASHED, service + ": Save as new changed the address to " + h.real["url-input"].value);
+          assert(h.getLookup().status === "missing" && h.getLookup().url === HASHED, service + ": Save as new changed the lookup it saves against");
+          assert(h.notice().length === 0, service + ": the notice stayed after Save as new");
+        } finally { h.cleanup(); }
+      }
+    });
+
+    await testAsync("#fragment address: no second lookup without a fragment, after a failed lookup, for Karakeep, or when also unsaved", async () => {
+      const cases = [];
+      for (const service of ["pinboard", "linkding"]) {
+        // A failed first lookup: Pinboard's worker answers a status, self-hosted a cause.
+        const fail = service === "pinboard" ? { url: HASHED, status: 503, error: "" } : { url: HASHED, status: 0, error: "network" };
+        cases.push({ service, label: "failed first lookup", worker: fragmentWorker({ [URL]: fragmentPost(service) }, fail), status: "failed", asks: [HASHED] });
+        cases.push({ service, label: "saved nowhere", worker: fragmentWorker({}), status: "missing", asks: [HASHED, URL], noNotice: true });
+        cases.push({ service, label: "no fragment, saved", worker: fragmentWorker({ [URL]: fragmentPost(service) }), status: "found", asks: [URL], plain: true });
+        // An unsaved address without a fragment: nothing to take off, one lookup.
+        cases.push({ service, label: "no fragment, unsaved", worker: fragmentWorker({}), status: "missing", asks: [URL], plain: true });
+      }
+      // Karakeep's check-url already ignores the fragment.
+      cases.push({ service: "karakeep", label: "Karakeep", worker: fragmentWorker({ [URL]: fragmentPost("karakeep") }), status: "missing", asks: [HASHED] });
+      for (const c of cases) {
+        const where = c.service + " " + c.label;
+        const h = createFragmentHarness(c.service, c.worker);
+        try {
+          const address = c.plain ? URL : HASHED;
+          assert((await h.open(address)).status === c.status, where + ": lookup " + JSON.stringify(h.getLookup()));
+          await settleProbe(h);
+          const asked = h.sent.filter((m) => m.type === "lookup_bookmark").map((m) => m.url);
+          assert(JSON.stringify(asked) === JSON.stringify(c.asks), where + ": asked " + JSON.stringify(asked) + ", expected " + JSON.stringify(c.asks));
+          assert(h.sent.every((m) => m.url === address || c.asks.includes(m.url)), where + ": an address was asked beyond the lookups: " + JSON.stringify(h.asked()));
+          assert(h.notice().length === 0, where + ": a notice was shown");
+          assert(h.real["url-input"].value === address, where + ": the address changed");
+        } finally { h.cleanup(); }
+      }
+    });
+
     await testAsync("existing linkding summary refills Description but a later user edit wins",async()=>{
       const response={ok:true,status:200,data:{posts:[{href:URL,description:"Saved title",extended:"Saved notes",summary:"Saved\ndescription",tags:"",shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}};
       for(const dirtyDescription of [false,true]){const h=createLookupHarness(response,{service:"linkding",dirtyDescription,realDescription:true});assert((await h.run()).status==="found",JSON.stringify({statuses:h.statuses,warns:h.warns}));assert(h.elements["linkding-description-input"].value===(dirtyDescription?"Manual":"Saved description"),"wrong Description "+h.elements["linkding-description-input"].value);assert(h.elements["description-input"].value==="Saved notes");

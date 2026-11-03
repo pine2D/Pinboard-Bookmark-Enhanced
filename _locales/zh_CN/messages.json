@@ -228,6 +228,15 @@
   "editingExisting": {
     "message": "正在编辑已有书签"
   },
+  "fragmentMatchSaved": {
+    "message": "这篇文章已用不带 # 的网址收藏。"
+  },
+  "fragmentMatchEdit": {
+    "message": "编辑原书签"
+  },
+  "fragmentMatchSaveNew": {
+    "message": "另存为新书签"
+  },
   "editingExistingDetails": {
     "message": "$BASE$（$DETAILS$）",
     "placeholders": {

@@ -64,6 +64,8 @@ let pageInfo = {};
 // during the wait would hand back an enabled button with no handler behind it.
 let _pageInfoReady = false;
 let existingBookmark = null;
+// The "#fragment saved without it" hint on screen (pbpProbeFragmentlessBookmark).
+let _fragmentMatchFeedback = null;
 let bookmarkLookup = { status: "idle", url: "", generation: 0, promise: null, formLoaded: false };
 // P2: track which form fields the user has edited so the async existing-bookmark
 // lookup never clobbers in-progress input. Resets naturally on each popup open
@@ -209,6 +211,8 @@ function invalidateBookmarkLookup() {
     formLoaded: false,
   };
   existingBookmark = null;
+  // The #fragment hint belongs to the lookup it came from.
+  if (typeof pbpDismissFragmentMatch === "function") pbpDismissFragmentMatch();
   const banner = $id("existing-banner");
   if (banner) {
     banner.textContent = "";
@@ -1675,11 +1679,87 @@ async function htmlToMarkdownAsync(html, opts) {
   if (pbpPopupHasWebUrl(targetUrl)) checkExistingBookmark(token, targetUrl, {
     prefetchUrl: _bookmarkPrefetchUrl,
     prefetchPromise: _bookmarkPrefetchPromise,
+    fragmentProbe: true,
   });
   // Recent bookmarks — lowest priority, enqueue last
   if (settings.optShowRecent) fetchRecentBookmarks(token);
 
   document.querySelector(".tags-input-wrap")?.addEventListener("click", () => $id("tags-input").focus());
+}
+
+// ---- The same page saved without its #fragment (user ruling 2026-11-02) ----
+// A tab address with a #fragment that is not saved may still be saved without
+// it (a link to a section, a reopened anchor). Pinboard and linkding look a URL
+// up exactly as given, so the open lookup asks once more without the fragment
+// and, on a hit, says so above the form with two ways on: edit that bookmark
+// (the form switches to it and its address) or save this address as a new one.
+// The address to save is never changed on the user's behalf. Karakeep's
+// check-url already ignores the fragment.
+const PBP_FRAGMENT_PROBE_SERVICES = ["pinboard", "linkding"];
+// The address up to its "#", or "" when it has none (or nothing before it).
+function pbpFragmentlessUrl(url) {
+  const raw = String(url || "");
+  const at = raw.indexOf("#");
+  if (at < 0) return "";
+  const base = raw.slice(0, at);
+  return /^https?:\/\/[^/?#]/i.test(base) ? base : "";
+}
+function pbpDismissFragmentMatch() {
+  const feedback = _fragmentMatchFeedback;
+  _fragmentMatchFeedback = null;
+  if (feedback) feedback.dismiss();
+}
+async function pbpProbeFragmentlessBookmark(token, lookupUrl, generation) {
+  const service = pbpBookmarkServiceId(typeof settings === "object" ? settings : null);
+  if (!PBP_FRAGMENT_PROBE_SERVICES.includes(service)) return;
+  const baseUrl = pbpFragmentlessUrl(lookupUrl);
+  if (!baseUrl) return;
+  // Still the answered miss this probe was started for, on the same address.
+  const stillMissing = () => bookmarkLookup.generation === generation && bookmarkLookup.status === "missing"
+    && bookmarkLookup.url === lookupUrl && $id("url-input").value.trim() === lookupUrl;
+  let data;
+  try {
+    data = await pbpPopupLookupPosts(token, baseUrl, null, false);
+  } catch (e) {
+    // The page's own lookup answered; this extra one only adds a hint.
+    console.warn("[fragment-probe] lookup failed:", e && e.name, e && e.message);
+    return;
+  }
+  if (!stillMissing() || !Array.isArray(data?.posts) || !data.posts.length) return;
+  const posts = data.posts;
+  pbpDismissFragmentMatch();
+  const feedback = showFeedback({
+    variant: "info",
+    message: t("fragmentMatchSaved"),
+    actions: [
+      {
+        label: t("fragmentMatchEdit"),
+        onClick: async () => {
+          pbpDismissFragmentMatch();
+          const input = $id("url-input");
+          input.value = baseUrl;
+          // The same path as an address typed by hand: the lookup starts over,
+          // the draft records the address, page-bound values follow it.
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          const account = pbpBookmarkConnection(settings).account;
+          // The probe already holds that bookmark: no request is made again.
+          await checkExistingBookmark(token, baseUrl, { prefetchUrl: baseUrl, prefetchPromise: Promise.resolve({ posts, account }) });
+          $id("title-input")?.focus({ preventScroll: true });
+        },
+      },
+      {
+        label: t("fragmentMatchSaveNew"),
+        onClick: () => {
+          pbpDismissFragmentMatch();
+          const btn = $id("submit-btn");
+          btn.focus();
+          btn.click();
+        },
+      },
+    ],
+  });
+  $id("existing-banner").after(feedback.element);
+  _fragmentMatchFeedback = feedback;
 }
 
 // ===================== Existing Bookmark =====================
@@ -1696,77 +1776,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
 
   const promise = (async () => {
     try {
-      let data;
-      if (!forceFresh) {
-        try {
-          let cached;
-          const lookupAccount = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
-          if (prefetch && prefetch.prefetchUrl === lookupUrl && prefetch.prefetchPromise) {
-            cached = await prefetch.prefetchPromise;
-          } else {
-            cached = await chrome.runtime.sendMessage({ type: "get_bookmark_data", url: lookupUrl, account: lookupAccount });
-          }
-          if (cached?.account !== lookupAccount) cached = null;
-          if (cached?.posts) data = { posts: cached.posts };
-        } catch (_) {}
-      }
-      // K1: a cold miss goes BACK to the worker rather than straight to the
-      // network. The worker resolves it through the same status cache and
-      // in-flight dedup the toolbar icon uses, so this query and the icon's own
-      // check for the same page become one posts/get instead of two competing
-      // for the same rate-limit slot, and the answer is cached for the next
-      // open (the bare proxy path below never wrote it back). forceFresh keeps
-      // the direct call: after a save or delete the cache is exactly what must
-      // not be trusted. A worker that cannot answer (rejected sendMessage) just
-      // falls through to the direct call, unchanged.
-      if (!forceFresh && !data) {
-        let workerError = null;
-        try {
-          const lookupAccount = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
-          const resolved = await chrome.runtime.sendMessage({ type: "lookup_bookmark", url: lookupUrl, account: lookupAccount });
-          if (resolved?.ok && resolved.account === lookupAccount && Array.isArray(resolved.posts)) {
-            data = { posts: resolved.posts };
-          } else if (resolved && resolved.ok === false) {
-            // This reply did not travel through _pbpProxyPinboardFetch, so the
-            // 401 -> login-screen handoff it owns has to be made here too --
-            // otherwise an invalidated token would leave the popup silently
-            // stuck on a form it can never submit (the catch below stays quiet
-            // on 401 precisely because the login screen is supposed to be up).
-            if (resolved.status === 401) resetPinboardSession(token);
-            // Same error shape the proxied branch below builds, so the catch
-            // names an account switch and a dead network apart either way.
-            workerError = new Error(`HTTP ${resolved.status || 0}`);
-            workerError.status = resolved.status || 0;
-            if (resolved.error) workerError.code = resolved.error;
-            if (Number.isInteger(resolved.httpStatus)) workerError.httpStatus = resolved.httpStatus;
-          }
-          // Deliberate: an `ok:false` reply here always throws below rather than
-          // falling through to the direct call, even for reasons the popup could
-          // sometimes recover from on its own (e.g. a transient
-          // getCurrentPinboardAuth() failure inside the worker). A retry would
-          // burn another slot against the 3.1s rate limit for what is likely a
-          // one-off hiccup; console.warn("[lookup_bookmark] failed: ...") on the
-          // worker side leaves a trail to tell that apart from a real outage in
-          // the field. Only a genuinely unreachable worker (rejected
-          // sendMessage, caught below) falls through to the direct call.
-        } catch (_) { /* worker unreachable — fall through to the direct call */ }
-        if (workerError) throw workerError;
-      }
-      if (!data) {
-        const resp = await (pbpBookmarkServiceId(typeof settings === "object" ? settings : null) === "pinboard" ? pinboardFetch(`https://api.pinboard.in/v1/posts/get?url=${enc(lookupUrl)}&auth_token=${token}&format=json`) : pbpPopupBookmarkApi("lookup", lookupUrl));
-        // Carry the status on the error so the catch can name the failure
-        // (and stay silent on 401, where pinboardFetch already swapped in the
-        // login screen). Carry the worker's reason string as well: status 0 is
-        // what every proxied failure looks like, so without it an account
-        // switch mid-lookup is indistinguishable from a dead network.
-        if (!resp.ok || resp.status === 0) {
-          const httpError = new Error(`HTTP ${resp.status}`);
-          httpError.status = resp.status;
-          if (resp.error) httpError.code = resp.error;
-          throw httpError;
-        }
-        data = await resp.json();
-      }
+      const data = await pbpPopupLookupPosts(token, lookupUrl, prefetch, forceFresh);
 
       if (bookmarkLookup.generation !== generation || bookmarkLookup.url !== lookupUrl || $id("url-input").value.trim() !== lookupUrl) {
         return { status: "stale", url: lookupUrl };
@@ -1843,6 +1853,10 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
       } else {
         existingBookmark = null;
         bookmarkLookup = { status: "missing", url: lookupUrl, generation, promise: null, formLoaded: false };
+        // Only an answered "not saved" asks again without the #fragment: a
+        // failed lookup above never gets here. Not awaited, so a save waiting
+        // on this lookup is not held by the second request.
+        if (prefetch?.fragmentProbe) pbpProbeFragmentlessBookmark(token, lookupUrl, generation);
       }
 
       // B4: Write only public page identity for next-popup prefill. Existing-bookmark
@@ -1920,6 +1934,86 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
   })();
   bookmarkLookup.promise = promise;
   return promise;
+}
+
+// The duplicate check's own request, without any form work: the cache or the
+// prefetch, then the worker's shared lookup, then a direct call. Resolves the
+// posts/get-shaped body ({posts}); a failure throws with its status and the
+// worker's reason (.code) so the caller can name it. Also the request behind
+// the fragment probe below, so both ask the server the same way.
+async function pbpPopupLookupPosts(token, lookupUrl, prefetch, forceFresh) {
+  let data;
+  if (!forceFresh) {
+    try {
+      let cached;
+      const lookupAccount = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
+      if (prefetch && prefetch.prefetchUrl === lookupUrl && prefetch.prefetchPromise) {
+        cached = await prefetch.prefetchPromise;
+      } else {
+        cached = await chrome.runtime.sendMessage({ type: "get_bookmark_data", url: lookupUrl, account: lookupAccount });
+      }
+      if (cached?.account !== lookupAccount) cached = null;
+      if (cached?.posts) data = { posts: cached.posts };
+    } catch (_) {}
+  }
+  // K1: a cold miss goes BACK to the worker rather than straight to the
+  // network. The worker resolves it through the same status cache and
+  // in-flight dedup the toolbar icon uses, so this query and the icon's own
+  // check for the same page become one posts/get instead of two competing
+  // for the same rate-limit slot, and the answer is cached for the next
+  // open (the bare proxy path below never wrote it back). forceFresh keeps
+  // the direct call: after a save or delete the cache is exactly what must
+  // not be trusted. A worker that cannot answer (rejected sendMessage) just
+  // falls through to the direct call, unchanged.
+  if (!forceFresh && !data) {
+    let workerError = null;
+    try {
+      const lookupAccount = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
+      const resolved = await chrome.runtime.sendMessage({ type: "lookup_bookmark", url: lookupUrl, account: lookupAccount });
+      if (resolved?.ok && resolved.account === lookupAccount && Array.isArray(resolved.posts)) {
+        data = { posts: resolved.posts };
+      } else if (resolved && resolved.ok === false) {
+        // This reply did not travel through _pbpProxyPinboardFetch, so the
+        // 401 -> login-screen handoff it owns has to be made here too --
+        // otherwise an invalidated token would leave the popup silently
+        // stuck on a form it can never submit (the catch below stays quiet
+        // on 401 precisely because the login screen is supposed to be up).
+        if (resolved.status === 401) resetPinboardSession(token);
+        // Same error shape the proxied branch below builds, so the catch
+        // names an account switch and a dead network apart either way.
+        workerError = new Error(`HTTP ${resolved.status || 0}`);
+        workerError.status = resolved.status || 0;
+        if (resolved.error) workerError.code = resolved.error;
+        if (Number.isInteger(resolved.httpStatus)) workerError.httpStatus = resolved.httpStatus;
+      }
+      // Deliberate: an `ok:false` reply here always throws below rather than
+      // falling through to the direct call, even for reasons the popup could
+      // sometimes recover from on its own (e.g. a transient
+      // getCurrentPinboardAuth() failure inside the worker). A retry would
+      // burn another slot against the 3.1s rate limit for what is likely a
+      // one-off hiccup; console.warn("[lookup_bookmark] failed: ...") on the
+      // worker side leaves a trail to tell that apart from a real outage in
+      // the field. Only a genuinely unreachable worker (rejected
+      // sendMessage, caught below) falls through to the direct call.
+    } catch (_) { /* worker unreachable — fall through to the direct call */ }
+    if (workerError) throw workerError;
+  }
+  if (!data) {
+    const resp = await (pbpBookmarkServiceId(typeof settings === "object" ? settings : null) === "pinboard" ? pinboardFetch(`https://api.pinboard.in/v1/posts/get?url=${enc(lookupUrl)}&auth_token=${token}&format=json`) : pbpPopupBookmarkApi("lookup", lookupUrl));
+    // Carry the status on the error so the catch can name the failure
+    // (and stay silent on 401, where pinboardFetch already swapped in the
+    // login screen). Carry the worker's reason string as well: status 0 is
+    // what every proxied failure looks like, so without it an account
+    // switch mid-lookup is indistinguishable from a dead network.
+    if (!resp.ok || resp.status === 0) {
+      const httpError = new Error(`HTTP ${resp.status}`);
+      httpError.status = resp.status;
+      if (resp.error) httpError.code = resp.error;
+      throw httpError;
+    }
+    data = await resp.json();
+  }
+  return data;
 }
 
 // ===================== Submit / Delete =====================

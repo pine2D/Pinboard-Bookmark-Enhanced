@@ -228,6 +228,15 @@
   "editingExisting": {
     "message": "Редактирование существующей закладки"
   },
+  "fragmentMatchSaved": {
+    "message": "Эта страница уже сохранена по ссылке без части после #."
+  },
+  "fragmentMatchEdit": {
+    "message": "Изменить эту закладку"
+  },
+  "fragmentMatchSaveNew": {
+    "message": "Сохранить как новую закладку"
+  },
   "editingExistingDetails": {
     "message": "$BASE$ ($DETAILS$)",
     "placeholders": {

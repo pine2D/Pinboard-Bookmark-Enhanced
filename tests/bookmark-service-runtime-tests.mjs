@@ -36,6 +36,7 @@ const BLOCKS=[
   'settings Connect names the failure cause',
   'settings tag panel follows the service',
   'archive log follows the bookmark connection',
+  'linkding #fragment address saved without it',
 ];
 // Self-check before any browser starts: the list above and the block() calls
 // below must name exactly the same blocks, so a block added to one place only
@@ -78,6 +79,8 @@ const gate={linkding:false}, acceptedKeys=new Set(['fixture-key']);
 // (django/views/defaults.py server_error; linkding ships no 500.html).
 // down: every linkding write meets the same page, whatever its tags.
 const postgres={linkding:false}, down={linkding:false};
+// checkDown: every linkding /check/ meets the stock 500 page (the duplicate check fails).
+const checkDown={linkding:false};
 const tooLongForPostgres=names=>postgres.linkding&&(names||[]).some(name=>String(name).split(',').some(part=>Array.from(part.trim()).length>64));
 const DJANGO_500='\n<!doctype html>\n<html lang="en">\n<head>\n  <title>Server Error (500)</title>\n</head>\n<body>\n  <h1>Server Error (500)</h1><p></p>\n</body>\n</html>\n';
 const server=createServer(async(req,res)=>{
@@ -141,6 +144,7 @@ const server=createServer(async(req,res)=>{
   if(path==='user/profile/')return reply(200,{theme:'auto',enable_sharing:true,permanent_notes:false});
   if(path==='users/me')return reply(200,{id:'u1',name:'Fixture',email:null,localUser:true});
   if(path.startsWith('bookmarks/check')){
+    if(service==='linkding'&&checkDown.linkding)return serverError();
     const row=[...store.values()].find(b=>(b.url||b.content?.url)===url.searchParams.get('url'));
     if(service!=='linkding')return reply(200,{bookmarkId:row?.id||null});
     // routes.py check(): the page's metadata is loaded whether or not it is saved.
@@ -262,7 +266,7 @@ try{
     });
     for(const page of ctx.pages())if(page!==article)await page.close();
     records.linkding.clear();records.karakeep.clear();membership.clear();raceCreates.clear();
-    postgres.linkding=false;down.linkding=false;gate.linkding=false;holdLinkdingPatch=null;
+    postgres.linkding=false;down.linkding=false;checkDown.linkding=false;gate.linkding=false;holdLinkdingPatch=null;
     await article.goto(origin+'/article');
   };
   // The connection a block needs, made through the settings page like a user.
@@ -1389,6 +1393,85 @@ try{
   }
   assert.equal(await worker.evaluate(async()=>(await pbpReadBookmarkConnection()).account),linkdingAccount,'the linkding connection was not restored');
   console.log('archive log follows service and credential changes made elsewhere');
+  });
+  // User ruling 2026-11-02: a tab address with a #fragment that linkding has
+  // not saved is looked up once more without the fragment (/check/ matches the
+  // URL exactly). A hit puts a notice above the form; "edit" moves the form to
+  // that bookmark and its address, "save as new" keeps the #fragment address.
+  // A failed first lookup or an address without a fragment asks once.
+  await block('linkding #fragment address saved without it',['linkding'],async()=>{
+    const base=origin+'/article', hashed=base+'#section-2';
+    const checkedSince=since=>requests.slice(since).filter(r=>r.service==='linkding'&&r.path.startsWith('bookmarks/check')).map(r=>new URLSearchParams(r.query).get('url'));
+    const writesSince=since=>requests.slice(since).filter(r=>r.service==='linkding'&&(r.method==='POST'||r.method==='PATCH')&&r.path.startsWith('bookmarks/')&&!r.path.startsWith('bookmarks/check'));
+    const seed=()=>{const now=serverNow();records.linkding.set('41',{id:41,url:base,title:'Saved original',description:'Original description',notes:'Original notes',web_archive_snapshot_url:null,is_archived:false,unread:false,shared:false,tag_names:['kept'],date_added:now,date_modified:now});};
+    const notice=popup=>popup.locator('.form-body > .feedback-card',{hasText:'This page is already saved under its address without the # part.'});
+    const openAt=async address=>{await worker.evaluate(()=>statusCache.clear());await article.goto(address);const since=requests.length;const popup=await openOnTab();return {popup,since};};
+    // 1. Not saved with the fragment, saved without it: one more lookup, the notice.
+    seed();
+    let {popup,since}=await openAt(hashed);
+    await settled(popup,'missing');
+    await notice(popup).waitFor({timeout:10000});
+    assert.deepEqual(checkedSince(since),[hashed,base],'the lookup did not ask once more without the fragment');
+    assert.equal(await popup.locator('#url-input').inputValue(),hashed,'the notice changed the address to save');
+    assert(await popup.locator('#existing-banner').isHidden(),'the #fragment address was shown as an existing bookmark');
+    // Edit: the form moves to that bookmark and its address, with no new request.
+    const beforeEdit=requests.length;
+    await notice(popup).getByRole('button',{name:'Edit that bookmark'}).click();
+    await settled(popup,'found');
+    await notice(popup).waitFor({state:'detached',timeout:5000}).catch(()=>{throw new Error('the notice stayed after Edit');});
+    assert.equal(await popup.locator('#url-input').inputValue(),base,'Edit did not move the form to the saved address');
+    assert.equal(await popup.locator('#title-input').inputValue(),'Saved original','Edit did not load the saved bookmark');
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'Original description');
+    assert(await popup.locator('#existing-banner').isVisible(),'Edit did not show the existing-bookmark banner');
+    assert.deepEqual(checkedSince(beforeEdit),[],'Edit asked the server again for a bookmark the probe already holds');
+    await popup.locator('#title-input').fill('Edited original');
+    const beforeUpdate=requests.length;
+    await popup.locator('#submit-btn').click();
+    await until(()=>records.linkding.get('41')?.title==='Edited original','the edit saved onto the original bookmark');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    assert.equal(records.linkding.size,1,'Edit then Save created another bookmark');
+    assert(writesSince(beforeUpdate).every(r=>r.method==='PATCH'||r.data?.url===base),'a write went to another address: '+JSON.stringify(writesSince(beforeUpdate).map(r=>r.data?.url)));
+    await popup.evaluate(()=>pbpDiscardPopupDraft());await popup.close();
+    // Save as new: the #fragment address becomes its own bookmark; the original is untouched.
+    records.linkding.clear();seed();
+    ({popup,since}=await openAt(hashed));
+    await notice(popup).waitFor({timeout:10000});
+    const beforeNew=requests.length;
+    await notice(popup).getByRole('button',{name:'Save as new bookmark'}).click();
+    await until(()=>linkdingCreates(beforeNew).length>0,'Save as new sent a create');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    assert.deepEqual(linkdingCreates(beforeNew).map(r=>r.data.url),[hashed],'Save as new did not create the #fragment address');
+    assert.equal(records.linkding.get('41').title,'Saved original','Save as new changed the original bookmark');
+    assert.deepEqual([...records.linkding.values()].map(b=>b.url).sort(),[base,hashed].sort());
+    await notice(popup).waitFor({state:'detached',timeout:5000}).catch(()=>{throw new Error('the notice stayed after Save as new');});
+    await popup.close();
+    // 2. An address without a fragment: one lookup, no notice.
+    records.linkding.clear();seed();
+    ({popup,since}=await openAt(base));
+    await settled(popup,'found');
+    // A settle point after the open: a save, whose own requests come after any probe.
+    const beforePlain=requests.length;
+    await popup.locator('#submit-btn').click();
+    await until(()=>writesSince(beforePlain).length>0,'a save on the plain address');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    assert.deepEqual(checkedSince(since).slice(0,checkedSince(since).length-checkedSince(beforePlain).length),[base],'an address without a fragment was looked up more than once');
+    assert.equal(await notice(popup).count(),0);
+    await popup.evaluate(()=>pbpDiscardPopupDraft());await popup.close();
+    // 3. The first lookup fails: no second lookup, the failure is named.
+    records.linkding.clear();seed();checkDown.linkding=true;
+    ({popup,since}=await openAt(hashed));
+    await settled(popup,'failed');
+    // A settle point: Save runs the duplicate check again and stops on it.
+    await popup.locator('#submit-btn').click();
+    await until(()=>checkedSince(since).length>=2,'Save ran the duplicate check again');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    assert.deepEqual(checkedSince(since),[hashed,hashed],'a failed lookup was followed by a lookup without the fragment');
+    assert.equal(await notice(popup).count(),0,'a failed lookup showed the #fragment notice');
+    assert.equal(writesSince(since).length,0,'a save went out after the duplicate check failed');
+    checkDown.linkding=false;
+    await popup.evaluate(()=>pbpDiscardPopupDraft());await popup.close();
+    records.linkding.clear();await worker.evaluate(()=>statusCache.clear());await article.goto(origin+'/article');
+    console.log('linkding #fragment address: one more lookup without it, a notice with Edit and Save as new; no fragment or a failed lookup asks once');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));
