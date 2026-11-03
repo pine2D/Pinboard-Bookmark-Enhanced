@@ -912,6 +912,13 @@ function _aiRestoreLinkdingSummary(cachedSummary) {
   return "cache";
 }
 
+// The note for a summary that can no longer be told apart from the user's
+// words names the box it lives in: linkding's Description sits beside a
+// Notes box the summary never touched.
+function _aiSummaryMergedKey() {
+  return pbpBookmarkServiceId(settings) === "linkding" ? "aiSummaryMergedDescription" : "aiSummaryMerged";
+}
+
 // The user edited the box the summary lives in (Notes, or linkding's
 // Description): follow the summary range through the edit, or let it go.
 function _aiTrackSummaryEdit(nextValue) {
@@ -932,7 +939,7 @@ function _aiTrackSummaryEdit(nextValue) {
   _aiResetSummaryActions();
   if (tracked.kind === "merged") {
     // Information, not failure: the user's own edit merged it (critique 2026-10-19).
-    showStatus("status-msg", t("aiSummaryMerged"), "info");
+    showStatus("status-msg", t(_aiSummaryMergedKey()), "info");
   }
 }
 
@@ -1393,7 +1400,7 @@ function showSummaryActions(fromCache) {
     e.preventDefault();
     const removed = removeSummary();
     _aiResetSummaryActions();
-    showStatus("status-msg", t(removed ? "aiSummaryRemoved" : "aiSummaryMerged"), removed ? "success" : "info");
+    showStatus("status-msg", t(removed ? "aiSummaryRemoved" : _aiSummaryMergedKey()), removed ? "success" : "info");
   });
 
   regenLink.addEventListener("click", async (e) => {

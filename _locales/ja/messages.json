@@ -347,6 +347,9 @@
   "aiSummaryMerged": {
     "message": "要約がメモと結合されたため、個別には削除できなくなりました。"
   },
+  "aiSummaryMergedDescription": {
+    "message": "要約が説明と結合されたため、個別には削除できなくなりました。"
+  },
   "aiTagsRegenerated": {
     "message": "別のタグ候補を生成しました"
   },

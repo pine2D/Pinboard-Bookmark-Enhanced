@@ -531,8 +531,22 @@ async function loadLocale(loc) {
     zh_TW: "摘要已與備註合併，無法再單獨移除。",
     ja: "要約がメモと結合されたため、個別には削除できなくなりました。"
   };
+  // linkding keeps the summary in its Description, beside a Notes box it
+  // never touches: that note names the Description instead.
+  const SUMMARY_MERGED_DESCRIPTION = {
+    en: "This summary has been merged with your description and can no longer be removed separately.",
+    de: "Die Zusammenfassung wurde mit deiner Beschreibung zusammengeführt und kann nicht mehr separat entfernt werden.",
+    fr: "Ce résumé a été fusionné avec votre description et ne peut plus être supprimé séparément.",
+    pl: "Podsumowanie zostało połączone z opisem i nie można go już usunąć osobno.",
+    ru: "Сводка объединена с описанием, поэтому удалить её отдельно больше нельзя.",
+    zh_HK: "摘要已與描述合併，無法再單獨移除。",
+    zh_CN: "摘要已与描述合并，无法再单独移除。",
+    zh_TW: "摘要已與描述合併，無法再單獨移除。",
+    ja: "要約が説明と結合されたため、個別には削除できなくなりました。"
+  };
   const mergedFailures = LOCALES.filter((loc) =>
-    msgs[loc].aiSummaryMerged?.message !== SUMMARY_MERGED[loc]);
+    msgs[loc].aiSummaryMerged?.message !== SUMMARY_MERGED[loc]
+    || msgs[loc].aiSummaryMergedDescription?.message !== SUMMARY_MERGED_DESCRIPTION[loc]);
   check("H14 summary ownership loss is specific and actionable in every locale",
     mergedFailures.length === 0, `copy mismatch: ${mergedFailures.join(", ")}`);
 

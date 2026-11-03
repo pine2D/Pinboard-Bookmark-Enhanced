@@ -347,6 +347,9 @@
   "aiSummaryMerged": {
     "message": "Podsumowanie zostało połączone z notatkami i nie można go już usunąć osobno."
   },
+  "aiSummaryMergedDescription": {
+    "message": "Podsumowanie zostało połączone z opisem i nie można go już usunąć osobno."
+  },
   "aiTagsRegenerated": {
     "message": "Wygenerowano nowy zestaw tagów"
   },

@@ -350,6 +350,9 @@
   "aiSummaryMerged": {
     "message": "This summary has been merged with your notes and can no longer be removed separately."
   },
+  "aiSummaryMergedDescription": {
+    "message": "This summary has been merged with your description and can no longer be removed separately."
+  },
   "aiTagsRegenerated": {
     "message": "New set of tags ready"
   },

@@ -347,6 +347,9 @@
   "aiSummaryMerged": {
     "message": "摘要已与备注合并，无法再单独移除。"
   },
+  "aiSummaryMergedDescription": {
+    "message": "摘要已与描述合并，无法再单独移除。"
+  },
   "aiTagsRegenerated": {
     "message": "已换一组标签"
   },

@@ -347,6 +347,9 @@
   "aiSummaryMerged": {
     "message": "Die Zusammenfassung wurde mit deinen Notizen zusammengeführt und kann nicht mehr separat entfernt werden."
   },
+  "aiSummaryMergedDescription": {
+    "message": "Die Zusammenfassung wurde mit deiner Beschreibung zusammengeführt und kann nicht mehr separat entfernt werden."
+  },
   "aiTagsRegenerated": {
     "message": "Neue Tags erstellt"
   },

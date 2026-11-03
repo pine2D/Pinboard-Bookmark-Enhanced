@@ -4188,7 +4188,7 @@ check(popupCss.includes("html[data-theme] .confirm-popover .confirm-no:hover { b
     setupAi.includes("_aiTrackSummaryEdit(") &&
     trackEdit.includes("pbpAiTrackSummaryRange") &&
     trackEdit.includes("_aiResetSummaryActions()") &&
-    trackEdit.includes('t("aiSummaryMerged")') &&
+    trackEdit.includes("t(_aiSummaryMergedKey())") &&
     sharedJs.includes("const _AI_BQ_REGEX_SHARED") &&
     sharedJs.includes("legacy"),
     "popup AI summary ownership still writes a marker, lacks fail-closed range tracking, or dropped legacy recognition");

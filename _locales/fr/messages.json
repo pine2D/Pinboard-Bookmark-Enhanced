@@ -347,6 +347,9 @@
   "aiSummaryMerged": {
     "message": "Ce résumé a été fusionné avec vos notes et ne peut plus être supprimé séparément."
   },
+  "aiSummaryMergedDescription": {
+    "message": "Ce résumé a été fusionné avec votre description et ne peut plus être supprimé séparément."
+  },
   "aiTagsRegenerated": {
     "message": "Nouveaux tags générés"
   },

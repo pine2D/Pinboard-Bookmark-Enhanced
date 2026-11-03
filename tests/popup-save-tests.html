@@ -3083,9 +3083,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
         pbpBookmarkServiceId,
         _linkdingDescriptionPending: false,
         fieldsEdit: value => { fields["linkding-description-input"].value = value; },
+        notesEdit: value => { fields["description-input"].value = value; },
         pbpPopupDraftFieldEdited() {}, updateCharCount() {},
         ...(o.realSummary ? { pbpAiSummaryRangeValid: summaryReceiptApi().pbpAiSummaryRangeValid,
           pbpAiRemoveSummaryRange: summaryHelpers().pbpAiRemoveSummaryRange, pbpAiTrackSummaryRange: summaryHelpers().pbpAiTrackSummaryRange,
+          pbpAiWrapSummary: summaryHelpers().pbpAiWrapSummary, _aiLastLegacySummaryRange: () => null, autoResizeTextarea() {},
           _aiResetSummaryActions() { calls.reset = (calls.reset || 0) + 1; }, _popupDraftRevision:0, _popupDraftEdited:false, _popupDraftUserUrl:false, _linkdingDescriptionKnown:true,
           _popupDraftChangedFields:new Set(), fieldDirtyFlags:{"linkding-description-input":false},
           _archiveUserTouched:false, pbpRememberPopupDraft() {} } : {}),
@@ -3177,7 +3179,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const body = summaryState + k44SliceA + "\n" + k44SliceB + "\n" + realSummary + "\n" + realDraftEdit + (o.realErrorCard ? "\n" + k44SliceC : "")
         + (o.realPageGuard ? "\n" + pageGuardSource : "");
       const api = sliceFn(...Object.keys(deps),
-        body + "\n; return { fetchAIArtifacts, doAISummary, doAITags, refreshAITags: typeof pbpRefreshDisplayedAITagsForBookmark === 'function' ? pbpRefreshDisplayedAITagsForBookmark : null, syncUrlEditState: typeof pbpAiSyncUrlEditState === 'function' ? pbpAiSyncUrlEditState : null, removeSummary: typeof removeSummary === 'function' ? removeSummary : null, editDescription(value) { fieldsEdit(value); if (typeof _aiTrackSummaryEdit === 'function') _aiTrackSummaryEdit(value); pbpPopupDraftFieldEdited('linkding-description-input'); } };"
+        body + "\n; return { fetchAIArtifacts, doAISummary, doAITags, refreshAITags: typeof pbpRefreshDisplayedAITagsForBookmark === 'function' ? pbpRefreshDisplayedAITagsForBookmark : null, syncUrlEditState: typeof pbpAiSyncUrlEditState === 'function' ? pbpAiSyncUrlEditState : null, removeSummary: typeof removeSummary === 'function' ? removeSummary : null, editDescription(value) { fieldsEdit(value); if (typeof _aiTrackSummaryEdit === 'function') _aiTrackSummaryEdit(value); pbpPopupDraftFieldEdited('linkding-description-input'); }, editNotes(value) { notesEdit(value); if (typeof _aiTrackSummaryEdit === 'function') _aiTrackSummaryEdit(value); } };"
       )(...Object.values(deps));
       return { ...api, calls, snapshot, account, el: fields, lookupState };
     }
@@ -3256,8 +3258,21 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const box = h.el["linkding-description-input"];
       h.editDescription("Mine plus AI");
       const merged = box.value;
-      assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryMerged"), "a merged summary was not reported");
+      // The summary lives in the Description there, not the Notes box beside
+      // it: the note names the Description.
+      assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryMergedDescription"), "a merged Description summary was not reported as such: " + JSON.stringify(h.calls.status.at(-1)));
       assert(h.removeSummary() === false && box.value === merged, "Remove guessed at a merged summary: " + JSON.stringify(box.value));
+      // Pinboard and Karakeep keep the summary in Notes, and the note says so.
+      for (const bookmarkService of ["pinboard", "karakeep"]) {
+        const p = makePopupAi({ realSummary:true, settings:{bookmarkService}, respond: async () => ({ ok:true, summary:"AI part", tags:null }) });
+        p.el["description-input"].value = "Mine";
+        const wrote = await p.doAISummary(true); assert(wrote === true, bookmarkService + ": summary not written " + JSON.stringify(p.calls.errors.map(r => String(r.e && (r.e.stack || r.e)))));
+        const notes = p.el["description-input"].value;
+        const at = notes.indexOf("AI part");
+        assert(at > 0, bookmarkService + ": summary missing from Notes " + JSON.stringify(notes));
+        p.editNotes("Mine plus" + notes.slice(at + 2));
+        assert(p.calls.status.at(-1)?.[1] === tEn("aiSummaryMerged"), bookmarkService + ": a merged Notes summary was not reported: " + JSON.stringify(p.calls.status.at(-1)));
+      }
       // A box rewritten without an input event (a lookup, a form reset) is not
       // the one the popup wrote either.
       const g = await make("Mine");
