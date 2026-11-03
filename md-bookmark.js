@@ -21,6 +21,7 @@
   // Every self-hosted failure copy failureKey() has handed out paints the
   // editor status as an error.
   const failureKeys = new Set();
+  const partialKeys = new Set(); // the self-hosted partial-save copies, also outcomes of a write
   const failureCopy = key => failureKeys.has(key);
   // Tags linkding could not store, with their copy's placeholders, until a
   // save stores them. A plain Save sends the popup draft's tags, which the
@@ -311,9 +312,16 @@
 
   // The reader looks the address up again for a connection change that arrived
   // while a request was in flight, once that request has ended (success or not).
+  // Only an error or a pending check can come from the old settings. A write
+  // result (saved, merged, queued, partial, deleted) is the outcome of that
+  // request and stays on screen; the delete result is final, so no second look.
+  const WRITE_OUTCOME_KEYS = new Set(["readerBookmarkSaved", "readerBookmarkUpdated", "saveMergedExisting", "readerBookmarkQueued",
+    "readerBookmarkDeleted", "readerBookmarkDeletedElsewhere", "bookmarkPartialSave", "bookmarkErrTagTooLong"]);
+  function statusFromOldConnection() { return !WRITE_OUTCOME_KEYS.has(statusKey) && !partialKeys.has(statusKey); }
   function recheckIfPending() {
     if (!recheckConnection || inflight || !context?.account) return;
     recheckConnection = false;
+    if (!statusFromOldConnection()) return;
     inflight = true; showStatus("readerBookmarkChecking");
     const gen = generation;
     refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); recheckIfPending(); } });
@@ -466,7 +474,7 @@
       await refresh(gen);
       if (gen !== generation) return;
       const named = typeof pbpBookmarkPartialKey === "function" ? pbpBookmarkPartialKey(result) : "";
-      if (named) failureKeys.add(named);
+      if (named) { failureKeys.add(named); partialKeys.add(named); }
       statusKey = named || "bookmarkPartialSave";
     } else if (result?.reason === "tag_too_long") {
       // linkding writes a new bookmark before its tags, so read it again. An
