@@ -29,6 +29,12 @@ function pbpBookmarkResponseFailure(response, phase, service) {
   if (status === 401 && /^basic(?:\s|$)/i.test(String(response.headers?.get?.("WWW-Authenticate") || "").trim())) return "gateway_basic";
   if ((status === 401 || status === 403) && (kind === "html" || (kind === "other" && service !== "karakeep"))) return "gateway_denied";
   if (status === 401 || status === 403) return "auth";
+  // A reverse proxy's body-size limit (nginx client_max_body_size) refuses
+  // the request before the server sees it; the same save always meets it.
+  if (status === 413) return "payload_too_large";
+  // Both servers answer a missing record with JSON, so a 404 web page means
+  // the URL does not reach the API at all.
+  if (status === 404 && kind === "html") return "not_api";
   if (status === 429) return "rate_limited";
   return status >= 500 ? "server" : "remote";
 }

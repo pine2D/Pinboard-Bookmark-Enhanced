@@ -859,6 +859,27 @@ test("Karakeep plain-text or other non-HTML 401/403 are auth; only gateway shape
     equal([service, await gwCode(gwRedirect(), service)], [service, "gateway_redirect"]);
   }
 });
+// nginx's stock client_max_body_size page; Caddy's request_body limit answers
+// 413 with no body. Django 6.0 (DEBUG off) answers an unknown path with its
+// stock not-found page, DRF with JSON {"detail":"Not found."}.
+const nginx413 = () => new Response("<html>\r\n<head><title>413 Request Entity Too Large</title></head>\r\n<body>\r\n<center><h1>413 Request Entity Too Large</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n",
+  {status:413, headers:{"Content-Type":"text/html"}});
+const django404 = () => new Response("\n<!doctype html>\n<html lang=\"en\">\n<head>\n  <title>Not Found</title>\n</head>\n<body>\n  <h1>Not Found</h1><p>The requested resource was not found on this server.</p>\n</body>\n</html>\n",
+  {status:404, headers:{"Content-Type":"text/html; charset=utf-8"}});
+test("413 is payload_too_large whatever the body; an HTML 404 is not_api; other 4xx stay remote with their status", async () => {
+  for (const service of ["linkding", "karakeep"]) {
+    const empty413 = new Response(null, {status:413}); empty413.headers.delete("Content-Type");
+    for (const reply of [nginx413(), empty413, new Response('{"error":"too large"}', {status:413, headers:{"Content-Type":"application/json"}})])
+      equal([service, await gwCode(reply, service)], [service, "payload_too_large"]);
+    equal([service, await gwCode(django404(), service)], [service, "not_api"]);
+    equal([service, await gwCode(gwHtml(404, {}, "<html><body>404 Not Found</body></html>"), service)], [service, "not_api"]);
+    equal([service, await gwCode(new Response('{"detail":"Not found."}', {status:404, headers:{"Content-Type":"application/json"}}), service)], [service, "remote"]);
+    equal([service, await gwCode(new Response('{"url":["This field is required."]}', {status:400, headers:{"Content-Type":"application/json"}}), service)], [service, "remote"]);
+    for (const [reply, status] of [[nginx413(), 413], [django404(), 404], [new Response("{}", {status:400, headers:{"Content-Type":"application/json"}}), 400]]) {
+      try { await harness(service, [reply]).client.verify(); throw new Error("resolved"); } catch (error) { equal([service, error.status], [service, status]); }
+    }
+  }
+});
 test("HTML 200 is not_api; JSON with a wrong Content-Type still parses; untyped non-JSON stays invalid_response", async () => {
   equal(await gwCode(new Response("<html><title>Sign in</title></html>", {status:200, headers:{"Content-Type":"text/html; charset=utf-8"}})), "not_api");
   equal(await gwCode(new Response('{"theme":"auto","version":"1.44.0"}', {status:200, headers:{"Content-Type":"text/html"}})), "ok");
