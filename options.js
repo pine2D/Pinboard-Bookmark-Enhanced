@@ -2858,8 +2858,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     // linkding's browsing checks have their own switch in its connection
     // settings; the general one would only contradict it there.
-    const statusRow = $id("opt-check-bookmark-status")?.closest(".pref-row");
-    if (statusRow) statusRow.hidden = service === "linkding";
+    // One row, so the note keeps the switch as its owner control; .hidden, as
+    // label.switch's own display outranks the [hidden] attribute.
+    $id("check-status-switch")?.classList.toggle("hidden", service === "linkding");
     $id("check-status-linkding-note").hidden = service !== "linkding";
     pbpSyncPinboardOnlyRows(service);
   }

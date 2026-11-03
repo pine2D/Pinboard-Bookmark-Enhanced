@@ -24,7 +24,7 @@
       "aiCustomFieldInvalid", "aiProtocolUnknown", "aiCustomBaseUrlInvalid", "aiCustomKeyRebind", "aiCustomKeyPending",
       "backupIncludeSecretsHint",
       "#preview-ai-model-provider", "#multi-pack-name", "#tag-gov-overview", "#tag-gov-ai-status",
-      "#tag-gov-selected-count", "#opt-theme-overridden"
+      "#tag-gov-selected-count", "#opt-theme-overridden", "optCheckBookmarkStatusLinkding"
     ],
     "help": [
       "aiCacheHint", "aiContentSourceJinaHint", "aiContentSourceLocalHint", "archiveLogNote",
@@ -42,7 +42,7 @@
       "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint",
       "optUrlCleanOnOpenHint", "optUrlCleanOnPasteHint", "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
       "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "tagSeparatorHint", "mdExportExtendedMetaHelp",
-      "vocabCompleteExportHint", "ecdictHint", "dictPackHint"
+      "vocabCompleteExportHint", "ecdictHint", "dictPackHint", "optLinkdingPreloadHint", "optLinkdingBrowserMetadataHint", "optLinkdingSingleFileHint"
     ],
     "pending": []
   }
