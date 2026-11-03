@@ -1458,6 +1458,31 @@ try{
     await note.filter({hasText:fill('bookmarkServicePendingPinboard',{ACTIVE:'linkding'})}).waitFor({timeout:5000});
     await settled(options);
     assert.equal((await stored()).bookmarkServiceActive,'linkding','picking Pinboard without a token switched to it');
+    // The form in view becomes connected outside this page (a login in the
+    // popup, another tab): the note says it is connected but unused, and its
+    // button switches to exactly that service.
+    const pinboardLogin='g28page:0123456789ABCDEF0123';
+    await worker.evaluate(async token=>chrome.storage.local.set({pinboardToken:obfuscateKey(token),...await pbpPinboardVerifiedPatch(token)}),pinboardLogin);
+    await note.filter({hasText:fill('bookmarkServiceConnectedNotActive',{SERVICE:'Pinboard',ACTIVE:'linkding'})}).waitFor({timeout:5000});
+    const useViewed=options.locator('#bookmark-service-connect-chosen');
+    assert(await useViewed.isVisible(),'no button to use the connected service in view');
+    assert.equal((await useViewed.textContent()).trim(),fill('bookmarkServiceUseViewed',{SERVICE:'Pinboard'}));
+    assert.equal(await useViewed.getAttribute('data-service'),'pinboard','the button points at another service than the one in view');
+    await settled(options);
+    assert.equal((await stored()).bookmarkServiceActive,'linkding','a login elsewhere switched without the button');
+    await useViewed.click();
+    await until(async()=>JSON.stringify(await stored())===JSON.stringify({bookmarkService:'pinboard',bookmarkServiceActive:'pinboard'}),'the button did not switch to the connected service in view');
+    await note.waitFor({state:'hidden',timeout:5000});
+    assert(await options.locator('#bookmark-service-chosen-actions').isHidden(),'the button stays after the switch');
+    // Back to linkding without a Pinboard login, for the Test connection steps below.
+    await options.locator('input[name="bookmark-service"][value="linkding"]').check();
+    await until(async()=>(await stored()).bookmarkServiceActive==='linkding','picking linkding did not switch back');
+    await worker.evaluate(()=>chrome.storage.local.remove(['pinboardToken','pinboardTokenVerified']));
+    await options.locator('#opt-pinboard-token').evaluate(node=>{node.value='';});
+    await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
+    await note.filter({hasText:fill('bookmarkServicePendingPinboard',{ACTIVE:'linkding'})}).waitFor({timeout:5000});
+    await settled(options);
+    assert.equal((await stored()).bookmarkServiceActive,'linkding','picking Pinboard again without a token switched to it');
     // Pinboard's login is Test connection (nothing leaves the browser: the
     // check is answered here). A rejected or unreachable token, autosaved as
     // typed, switches nothing; one that passes switches and is recorded.
