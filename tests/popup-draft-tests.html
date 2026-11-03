@@ -335,7 +335,9 @@ await test('a restored AI paragraph is adopted from the cache, otherwise kept as
        const two=await openWorker(pageUrl,'linkding',()=>{},viaRestore?{}:{settings:{optShowAiSummary:false}});
        const box=two.elements['linkding-description-input'];
        assert(box.value===first,label+': restored '+JSON.stringify(box.value));
-       if(viaRestore)assert(two.api.restoreLinkdingSummary(null),label+': the restored AI paragraph offers no Regenerate or Remove');
+       // The restore itself claims the paragraph, so Regenerate and Remove show
+       // with no further call: asking again finds it already this session's.
+       if(viaRestore){const claimed=two.api.restoreLinkdingSummary(null);assert(claimed==='session',label+': the restore did not claim the AI paragraph itself (offers no Regenerate or Remove until the next summary), got '+JSON.stringify(claimed));}
        assert(two.api.upsertSummary('S2')!==false&&box.value===second,label+': another summary gave '+JSON.stringify(box.value));
        // What the box held before the first summary is not drafted: Remove
        // takes out the AI paragraph and leaves the rest.
