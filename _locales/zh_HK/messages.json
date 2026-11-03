@@ -657,6 +657,28 @@
       }
     }
   },
+  "offlineQueueNeedsAttention": {
+    "message": "$COUNT$ 個需要處理",
+    "description": "Popup offline queue bar: how many queued bookmarks of the current connection failed for a reason a retry cannot change, so automatic retry stopped for them. $COUNT$ is the number.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineQueueAttention": {
+    "message": "$REASON$已停止自動重試。請在彈出視窗改好後重新儲存這個頁面，再移除這一項。",
+    "description": "Popup offline queue row of a bookmark that needs attention. $REASON$ is the failure message (a full sentence); the rest says automatic retry stopped and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineQueueRecordInvalid": {
+    "message": "這個排隊中的書籤無法按原樣傳送。",
+    "description": "Popup offline queue: the reason shown for a queued bookmark whose stored fields the extension can no longer send (it does not validate)."
+  },
   "saveQueuedNetwork": {
     "message": "無法連接書籤伺服器。已加入離線佇列，稍後自動重試。"
   },

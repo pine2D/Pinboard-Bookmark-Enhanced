@@ -657,6 +657,28 @@
       }
     }
   },
+  "offlineQueueNeedsAttention": {
+    "message": "$COUNT$ mit Handlungsbedarf",
+    "description": "Popup offline queue bar: how many queued bookmarks of the current connection failed for a reason a retry cannot change, so automatic retry stopped for them. $COUNT$ is the number.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineQueueAttention": {
+    "message": "$REASON$ Es wird nicht mehr automatisch erneut gesendet. Korrigiere die Angaben, speichere die Seite im Popup erneut und entferne dann diesen Eintrag.",
+    "description": "Popup offline queue row of a bookmark that needs attention. $REASON$ is the failure message (a full sentence); the rest says automatic retry stopped and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineQueueRecordInvalid": {
+    "message": "Dieses Lesezeichen in der Warteschlange kann so nicht gesendet werden.",
+    "description": "Popup offline queue: the reason shown for a queued bookmark whose stored fields the extension can no longer send (it does not validate)."
+  },
   "saveQueuedNetwork": {
     "message": "Server nicht erreichbar. Die Speicherung wartet in der Warteschlange und wird automatisch erneut versucht."
   },

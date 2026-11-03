@@ -1406,7 +1406,7 @@ test("an over-long tag already in the offline queue stays queued on replay and i
 // linkding on PostgreSQL inserts the bookmark before its tags (G3), so the
 // failed create leaves this untagged record behind; /check/ finds it next time.
 const ldUntaggedLeftover = {...ldUnscraped,id:23,title:"Title",notes:"Note",tag_names:[],date_added:"2026-11-02T08:00:00.000000Z",date_modified:"2026-11-02T08:00:00.000000Z"};
-test("a queued skip-mode save that hit an over-long tag keeps trying to tag the bookmark it left behind instead of skipping it",async()=>{
+test("a queued skip-mode save that hit an over-long tag needs attention, and a manual retry tags the bookmark it left behind instead of skipping it",async()=>{
   const tag=overlongTags[0];
   const sources=[
     ["quick save",async h=>(await producers(h,{autoNotes:"",summary:"",settings:{_aiSummary:false,bgSaveMode:"skip",_defaultTags:tag}})).quickSave()],
@@ -1415,21 +1415,81 @@ test("a queued skip-mode save that hit an over-long tag keeps trying to tag the 
   ];
   for(const [label,enqueue] of sources){
     // A proxy outage queues the save; the first replay's create then fails
-    // on the tag after PostgreSQL stored the bookmark; the next replay finds it.
+    // on the tag after PostgreSQL stored the bookmark. The item turns into a
+    // merge and needs attention, so the next tick sends nothing; a manual
+    // retry finds the bookmark left behind and tags it.
     const h=await workerHarness("linkding",[[200,{bookmark:null}],proxyError(502),
       [200,{bookmark:null}],djangoServerError(),
-      [200,{bookmark:ldUntaggedLeftover,metadata:{},auto_tags:[]}],djangoServerError(),
       [200,{bookmark:ldUntaggedLeftover,metadata:{},auto_tags:[]}],djangoServerError()]);
     await enqueue(h);
     equal([label,h.state.queue.map(item=>item.mode)],[label,["skip"]]);
     await h.processOfflineQueue();
     await h.processOfflineQueue();
-    equal([label,h.state.calls.map(c=>c.method)],[label,["GET","POST","GET","POST","GET","PATCH"]]);
-    equal([label,h.state.calls[5].body.tag_names],[label,[tag]]);
-    equal([label,h.state.queue.length],[label,1]);
+    equal([label,h.state.calls.map(c=>c.method)],[label,["GET","POST","GET","POST"]]);
+    equal([label,h.state.queue.map(item=>[item.mode,item.failure?.code])],[label,[["merge","tag_too_long"]]]);
     const retried=await h.retryOfflineItem(h.state.queue[0].queueId);
     equal([label,retried.ok,retried.result.reason],[label,false,"tag_too_long"]);
+    equal([label,h.state.calls.slice(4).map(c=>c.method),h.state.calls[5].body.tag_names],[label,["GET","PATCH"],[tag]]);
+    equal([label,h.state.queue.map(item=>item.failure?.code)],[label,["tag_too_long"]]);
   }
+});
+// The record fields a queued save may hold (CLAUDE.md, storage boundaries),
+// plus the replay failure marker.
+const QUEUE_RECORD_KEYS = ["account","mode","url","title","notes","summary","sharedExplicit","tags","private","toread","archive","time","queueId","queuedAt","failure"];
+const linkdingRejected = () => new Response(JSON.stringify({title:["Ensure this field has no more than 512 characters."]}), {status:400, headers:{"Content-Type":"application/json"}});
+test("a failure a retry cannot change is replayed once, marked, and not sent again until a manual retry",async()=>{
+  const replies=[new TypeError("offline"),[200,{bookmark:null}],linkdingRejected()];
+  const h=await workerHarness("linkding",replies);
+  equal((await h.submitSaveIntent(saveIntent)).status,"queued");
+  const queueId=h.state.queue[0].queueId;
+  ok(!("failure" in h.state.queue[0]));
+  h.state.calls=[];
+  const before=Date.now();
+  await h.processOfflineQueue();
+  equal(h.state.calls.map(c=>c.method),["GET","POST"]);
+  const [record]=h.state.queue;
+  equal(record.queueId,queueId);
+  ok(Object.keys(record).every(key=>QUEUE_RECORD_KEYS.includes(key)),"queue record keys: "+Object.keys(record).join());
+  equal(Object.keys(record.failure).sort(),["at","code","status"]);
+  equal([record.failure.code,record.failure.status],["remote",400]);
+  ok(record.failure.at>=before && record.failure.at<=Date.now());
+  ok(!JSON.stringify(record).includes("fixture-secret") && !JSON.stringify(record).includes("Ensure this field"));
+  h.state.calls=[]; h.state.sends=0;
+  await h.processOfflineQueue();
+  await h.processOfflineQueue();
+  equal([h.state.calls.length,h.state.sends,h.state.queue.length],[0,0,1]);
+  // A manual retry clears the marker and sends exactly one attempt.
+  replies.push([200,{bookmark:null}],linkdingRejected());
+  const failed=await h.retryOfflineItem(queueId);
+  equal([failed.ok,failed.result.reason,h.state.calls.map(c=>c.method)],[false,"remote",["GET","POST"]]);
+  equal(h.state.queue[0].failure.code,"remote");
+  replies.push([200,{bookmark:null}],[201,ld]); h.state.calls=[];
+  equal((await h.retryOfflineItem(queueId)).ok,true);
+  equal([h.state.calls.map(c=>c.method),h.state.queue],[["GET","POST"],[]]);
+});
+test("only failures a retry cannot change mark a record; a transient one clears an old marker",async()=>{
+  for(const [result,marked] of [
+    [{reason:"remote",httpStatus:400},true],[{reason:"remote",httpStatus:422},true],[{reason:"remote"},true],
+    [{reason:"remote",httpStatus:408},false],[{reason:"remote",httpStatus:425},false],[{reason:"http",httpStatus:429},false],
+    [{reason:"http",httpStatus:404},true],[{reason:"http",httpStatus:503},false],[{reason:"http"},false],
+    [{reason:"too_long",limit:512},true],[{reason:"url_invalid",httpStatus:400},true],[{reason:"tag_too_long",tag:"x",httpStatus:500},true],
+    [{reason:"payload_too_large",httpStatus:413},true],[{reason:"invalid_response"},true],[{reason:"invalid"},true],
+    ...["network","timeout","server","rate_limited","partial","conflict","account_mismatch","not_logged_in","permission","auth",...PBP_BOOKMARK_GATEWAY_CODES].map(reason=>[{reason},false]),
+  ]){
+    const mark=pbpOfflineQueueFailureMark({status:"failed",...result},5);
+    equal([result.reason,result.httpStatus,!!mark],[result.reason,result.httpStatus,marked]);
+    if(mark){
+      ok(Object.keys(mark).every(key=>["code","at","status"].includes(key)));
+      equal([mark.code,mark.at],[result.reason,5]);
+    }
+  }
+  const replies=[new TypeError("offline")];
+  const h=await workerHarness("linkding",replies);
+  equal((await h.submitSaveIntent(saveIntent)).status,"queued");
+  h.state.queue[0]={...h.state.queue[0],failure:{code:"remote",at:1,status:400}};
+  replies.push(new TypeError("offline"));
+  equal((await h.retryOfflineItem(h.state.queue[0].queueId)).result.reason,"network");
+  ok(!("failure" in h.state.queue[0]),"a network failure kept the old marker");
 });
 test("quick save and Batch notify which linkding tag is too long and queue nothing",async()=>{
   const tag=overlongTags[1], shown="標".repeat(40)+"…";

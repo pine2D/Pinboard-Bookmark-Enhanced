@@ -75,8 +75,10 @@
     bar.classList.remove("hidden");
     const paused = pauseText(q, pause);
     const other = q.filter((item) => fromOtherConnection(item, current)).length;
+    const attention = q.filter((item) => !fromOtherConnection(item, current) && pbpOfflineQueueNeedsAttention(item)).length;
     const parts = [];
-    if (q.length > other) parts.push(t("offlineQueued", String(q.length - other)));
+    if (q.length > other + attention) parts.push(t("offlineQueued", String(q.length - other - attention)));
+    if (attention) parts.push(t("offlineQueueNeedsAttention", String(attention)));
     if (other) parts.push(t("offlineQueueOtherConnection", String(other)));
     if (paused) parts.push(paused);
     text.textContent = parts.join(" · ");
@@ -131,6 +133,13 @@
 
       body.appendChild(title);
       body.appendChild(meta);
+      // A record replay stopped on: why, and what the user can do about it.
+      if (pbpOfflineQueueNeedsAttention(item)) {
+        const reason = document.createElement("div");
+        reason.className = "error-text";
+        reason.textContent = t("offlineQueueAttention", attentionReason(item));
+        body.appendChild(reason);
+      }
 
       const actions = document.createElement("div");
       actions.className = "actions";
@@ -190,6 +199,24 @@
     // storage.local is emptied from Settings, not from the router.
     if (reason && reason !== "network") return t("offlineRetryFailed");
     return t("networkError");
+  }
+
+  // The cause a record was marked with, in the copy the save path uses. The
+  // marker holds only its code (and HTTP status); the over-long tag and the
+  // title limit are read back from the record and the service.
+  function attentionReason(item) {
+    const failure = item.failure;
+    if (failure.code === "invalid" || failure.code === "invalid_request") return t("offlineQueueRecordInvalid");
+    const service = pbpBookmarkAccountService(pbpOfflineQueueAccount(item));
+    const result = { reason: failure.code, ...(Number.isInteger(failure.status) ? { httpStatus: failure.status } : {}) };
+    if (failure.code === "tag_too_long") {
+      try { result.tag = pbpLinkdingOverlongTag(pbpBookmarkParseTags(item.tags)); } catch (_) { /* unparsable tags: the copy shows "?" */ }
+    }
+    if (failure.code === "too_long") {
+      if (service === "pinboard") result.detail = "?";
+      else result.limit = pbpBookmarkLimits(service).title;
+    }
+    return retryFailureMessage(result, service);
   }
 
   // One queued item, sent now. Resolves to background's { ok, result } or

@@ -80,7 +80,9 @@ async function renderQueueBar(response) {
   byId("offline-queue-toggle").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
   for (let i = 0; i < 20 && !byId("offline-queue-list").querySelector(".offline-queue-item"); i++) await new Promise((r) => setTimeout(r, 0));
   const rows = [...byId("offline-queue-list").querySelectorAll(".offline-queue-item")].map((row) => ({
-    id: row.dataset.queueId, meta: row.querySelector(".offline-queue-meta").textContent, html: row.outerHTML }));
+    id: row.dataset.queueId, meta: row.querySelector(".offline-queue-meta").textContent, html: row.outerHTML,
+    reason: row.querySelector(".error-text")?.textContent || "",
+    buttons: [...row.querySelectorAll(".actions button")].map((button) => button.getAttribute("aria-label")) }));
   host.remove();
   return { text, rows };
 }
@@ -125,6 +127,19 @@ await suite("offline queue", async () => {
       assert(kept[0].mode === mode, mode + " stays " + mode);
     }
     assert(JSON.stringify(pbpOfflineQueueReduce(input, { kind: "skip_to_merge", queueId: "zzz" })) === JSON.stringify(input), "unknown id is a no-op");
+  });
+  await test("mark_failure stores only a valid marker on the named record and clear_failure removes it", () => {
+    const input = Q();
+    const marked = pbpOfflineQueueReduce(input, { kind: "mark_failure", queueId: "b", failure: { code: "remote", at: 7, status: 400, body: "<html>", token: "x" } });
+    assert(JSON.stringify(marked[1].failure) === JSON.stringify({ code: "remote", at: 7, status: 400 }), "marker: " + JSON.stringify(marked[1].failure));
+    assert(!("failure" in marked[0]) && !("failure" in marked[2]) && !("failure" in input[1]), "other records or the input changed");
+    for (const failure of [null, {}, { code: "", at: 1 }, { code: "remote" }, { code: "remote", at: 1, status: "400" }, { code: "remote", at: 1, status: 99 }]) {
+      assert(JSON.stringify(pbpOfflineQueueReduce(input, { kind: "mark_failure", queueId: "b", failure })) === JSON.stringify(input), "invalid marker written: " + JSON.stringify(failure));
+    }
+    const cleared = pbpOfflineQueueReduce(marked, { kind: "clear_failure", queueId: "b" });
+    assert(JSON.stringify(cleared) === JSON.stringify(input), "clear_failure left " + JSON.stringify(cleared[1]));
+    assert(pbpOfflineQueueNeedsAttention(marked[1]) && !pbpOfflineQueueNeedsAttention(cleared[1]), "attention predicate");
+    assert(!pbpOfflineQueueNeedsAttention({ failure: { code: "network", at: 1 } }), "a transient code needs attention");
   });
   await test("new queue payload does not persist credentials", () => {
     const out = pbpOfflineQueueReduce([], { kind: "enqueue", item: { queueId: "a", account: "alice", url: "https://a.com", token: "secret" } });
@@ -389,6 +404,33 @@ await suite("offline queue", async () => {
     // No answer from the worker: nothing is split off, every row is labelled.
     const unknown = await renderQueueBar(null);
     assert(unknown.text === "", "an empty fallback queue showed text");
+  });
+  // A record replay stopped on is counted on its own and says why, with the
+  // row's Retry and Remove still there (user decision 2026-11-02).
+  await test("the queue bar counts records that need attention and each such row names its cause", async () => {
+    const LD = "linkding:https://ld.example/:conn-ld-77";
+    const KK = "karakeep:https://kk.example/:user-kk-99";
+    const long = "x".repeat(65);
+    const item = (queueId, account, extra = {}) => ({ queueId, account, url: "https://page.example/" + queueId, title: queueId, tags: "work", queuedAt: Date.now(), ...extra });
+    const { text, rows } = await renderQueueBar({ ok: true, pause: null, account: LD, queue: [
+      item("plain", LD),
+      item("tag", LD, { tags: 'work "' + long + '"', mode: "merge", failure: { code: "tag_too_long", at: 1 } }),
+      item("remote", LD, { failure: { code: "remote", at: 1, status: 422 } }),
+      item("title", LD, { failure: { code: "too_long", at: 1 } }),
+      item("broken", LD, { failure: { code: "invalid", at: 1 } }),
+      item("other", KK, { failure: { code: "remote", at: 1, status: 400 } }),
+      item("pin", "alice", { failure: { code: "http", at: 1, status: 400 } }),
+    ] });
+    assert(text === "offlineQueued:1 · offlineQueueNeedsAttention:4 · offlineQueueOtherConnection:2", "bar text: " + text);
+    const by = Object.fromEntries(rows.map((row) => [row.id, row]));
+    assert(by.plain.reason === "", "a plain row shows a cause");
+    assert(by.tag.reason === "offlineQueueAttention:bookmarkErrTagTooLong:" + "x".repeat(40) + "\u2026:64", "tag row: " + by.tag.reason);
+    assert(by.remote.reason === "offlineQueueAttention:bookmarkErrRemote:422", "remote row: " + by.remote.reason);
+    assert(by.title.reason === "offlineQueueAttention:titleTooLong:512", "title row: " + by.title.reason);
+    assert(by.broken.reason === "offlineQueueAttention:offlineQueueRecordInvalid", "invalid row: " + by.broken.reason);
+    assert(by.other.reason === "offlineQueueAttention:bookmarkErrRemote:400", "another connection's row: " + by.other.reason);
+    assert(by.pin.reason === "offlineQueueAttention:HTTP 400", "Pinboard row: " + by.pin.reason);
+    for (const row of rows) assert(row.buttons.join() === "offlineRetry,offlineRemove", row.id + " buttons: " + row.buttons.join());
   });
   await test("drain skips items the hook marks and reports failures to onFailure", async () => {
     const run = async (hooks) => {

@@ -657,6 +657,28 @@
       }
     }
   },
+  "offlineQueueNeedsAttention": {
+    "message": "要対応 $COUNT$ 件",
+    "description": "Popup offline queue bar: how many queued bookmarks of the current connection failed for a reason a retry cannot change, so automatic retry stopped for them. $COUNT$ is the number.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineQueueAttention": {
+    "message": "$REASON$自動再送は停止しました。ポップアップで修正してページを保存し直してから、この項目を削除してください。",
+    "description": "Popup offline queue row of a bookmark that needs attention. $REASON$ is the failure message (a full sentence); the rest says automatic retry stopped and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineQueueRecordInvalid": {
+    "message": "キュー内のこのブックマークは、このままでは送信できません。",
+    "description": "Popup offline queue: the reason shown for a queued bookmark whose stored fields the extension can no longer send (it does not validate)."
+  },
   "saveQueuedNetwork": {
     "message": "サーバーに接続できません。保存をキューに追加し、後で自動再試行します。"
   },

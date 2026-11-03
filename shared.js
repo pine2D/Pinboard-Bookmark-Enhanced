@@ -2040,6 +2040,19 @@ function pbpOfflineQueueReduce(queue, action) {
     case "skip_to_merge":
       return q.map((it) => it && it.queueId === action.queueId && (it.mode === "skip" || it.mode === undefined)
         ? { ...it, mode: "merge" } : it);
+    // A replay failure's marker (pbpOfflineQueueFailureMark) on one record,
+    // or its removal; an invalid marker is never written.
+    case "mark_failure": {
+      const failure = pbpOfflineQueueFailureShape(action.failure);
+      if (!failure) return q.slice();
+      return q.map((it) => it && it.queueId === action.queueId ? { ...it, failure } : it);
+    }
+    case "clear_failure":
+      return q.map((it) => {
+        if (!it || it.queueId !== action.queueId || !Object.prototype.hasOwnProperty.call(it, "failure")) return it;
+        const { failure: _cleared, ...rest } = it;
+        return rest;
+      });
     case "ensure_ids":
       if (!action.prefix) return q.slice();
       return q.map((it, index) =>
@@ -2049,6 +2062,48 @@ function pbpOfflineQueueReduce(queue, action) {
     default:
       return q.slice();
   }
+}
+
+// Replay failures a second attempt meets again: the record, or the server's
+// answer to it, has to change first (G11's table: a 4xx other than 408, 425
+// and 429, a title, address or tag the service cannot store, a body a proxy
+// refuses, a reply that is not the API's, a record that does not validate).
+// The queue marks such a record as needing attention and stops retrying it
+// automatically; the user retries or removes it (user decision 2026-11-02).
+// Connection-level failures pause the connection instead (G8).
+const PBP_OFFLINE_QUEUE_ATTENTION_CODES = Object.freeze(["too_long", "url_invalid", "tag_too_long", "payload_too_large",
+  "invalid_response", "invalid", "invalid_request", "remote", "http"]);
+const PBP_OFFLINE_QUEUE_TRANSIENT_STATUSES = Object.freeze([408, 425, 429]);
+function pbpOfflineQueueAttentionFailure(result) {
+  const reason = result?.reason;
+  if (!PBP_OFFLINE_QUEUE_ATTENTION_CODES.includes(reason)) return false;
+  if (reason !== "remote" && reason !== "http") return true;
+  const status = result.httpStatus;
+  // A self-hosted "remote" is a 4xx by definition; Pinboard's "http" names
+  // every status the worker did not classify, 5xx included.
+  if (!Number.isInteger(status)) return reason === "remote";
+  return status >= 400 && status < 500 && !PBP_OFFLINE_QUEUE_TRANSIENT_STATUSES.includes(status);
+}
+// The record's failure marker, the queue's only field about a failure: the
+// product code, the HTTP status when the copy names it, and when it
+// happened. No response body, header or credential.
+function pbpOfflineQueueFailureMark(result, now = Date.now()) {
+  if (!pbpOfflineQueueAttentionFailure(result)) return null;
+  const status = result.httpStatus;
+  return { code: result.reason, at: now,
+    ...((result.reason === "remote" || result.reason === "http") && Number.isInteger(status) ? { status } : {}) };
+}
+function pbpOfflineQueueFailureShape(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const { code, at, status } = value;
+  if (typeof code !== "string" || !code || !Number.isFinite(at)) return null;
+  if (status !== undefined && !(Number.isInteger(status) && status >= 100 && status <= 599)) return null;
+  return { code, at, ...(status !== undefined ? { status } : {}) };
+}
+// A record replay leaves alone until the user retries or removes it.
+function pbpOfflineQueueNeedsAttention(item) {
+  const failure = pbpOfflineQueueFailureShape(item?.failure);
+  return !!failure && PBP_OFFLINE_QUEUE_ATTENTION_CODES.includes(failure.code);
 }
 
 function pbpCreateRecoveringTail() {

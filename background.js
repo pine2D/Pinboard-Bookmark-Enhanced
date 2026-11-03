@@ -1344,7 +1344,8 @@ function pbpOfflinePauseOnCredentialChange(changes) {
 }
 
 // manual: a user-initiated retry ignores the pause (and lifts it first); the
-// automatic path skips paused accounts, starting from the stored pause.
+// automatic path skips paused accounts, starting from the stored pause, and
+// records that need attention (pbpOfflineQueueNeedsAttention).
 function drainOfflineQueueIds(queueIds, { manual = false, pausedAccount = "" } = {}) {
   const paused = new Set(pausedAccount ? [pausedAccount] : []);
   return pbpDrainOfflineQueue(queueIds, {
@@ -1354,7 +1355,7 @@ function drainOfflineQueueIds(queueIds, { manual = false, pausedAccount = "" } =
         ? offlineQueue.find((item) => item?.queueId === queueId) || null
         : null;
     }),
-    ...(manual ? {} : { skipItem: (item) => typeof item.account === "string" && paused.has(item.account) }),
+    ...(manual ? {} : { skipItem: (item) => (typeof item.account === "string" && paused.has(item.account)) || pbpOfflineQueueNeedsAttention(item) }),
     // noteActivity: replay work is activity (same rationale as batch progress —
     // a long drain driven by the keepalive alarm must not idle-terminate
     // mid-run). typeof-guarded: source-slice test pages execute this function
@@ -1379,6 +1380,13 @@ function drainOfflineQueueIds(queueIds, { manual = false, pausedAccount = "" } =
       if (reason === "tag_too_long" && delivered?.mode === "skip") {
         await mutateOfflineQueue({ kind: "skip_to_merge", queueId: item.queueId });
       }
+      // A failure a second attempt meets again marks the record: automatic
+      // replay leaves it until the user retries or removes it. Any other
+      // failure drops a marker the record still carries. A record queued
+      // before markers existed is simply replayed once and marked then.
+      const mark = pbpOfflineQueueFailureMark(delivered?.result || delivered);
+      if (mark) await mutateOfflineQueue({ kind: "mark_failure", queueId: item.queueId, failure: mark });
+      else if (item.failure !== undefined) await mutateOfflineQueue({ kind: "clear_failure", queueId: item.queueId });
       // Pinboard items never pause: nothing on that path would lift it.
       const service = pbpBookmarkAccountService(item.account);
       const cause = pbpBookmarkStopCause(delivered?.result || delivered, service);
@@ -1413,6 +1421,9 @@ function retryOfflineItem(queueId) {
   return runOfflineQueueConsumer(async () => {
     try {
       await readOfflineQueueWithIds();
+      // A manual retry starts clean: the attempt's own outcome marks the
+      // record again if the failure is still there.
+      await mutateOfflineQueue({ kind: "clear_failure", queueId });
       const outcomes = await drainOfflineQueueIds([queueId], { manual: true });
       const outcome = outcomes[0];
       return outcome
