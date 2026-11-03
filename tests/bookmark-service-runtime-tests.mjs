@@ -1392,18 +1392,26 @@ try{
     for(const id of ['opt-private-default','opt-private-incognito'])assert(await options.locator('#'+id).evaluate(el=>el.closest('.pref-row').hidden),'Karakeep still shows '+id);
     // The first visible row of a group carries no hairline, hidden rows above it or not.
     assert.equal(await options.locator('#opt-readlater-default').evaluate(el=>getComputedStyle(el.closest('.pref-row')).borderTopWidth),'0px','the first visible row under the heading draws a hairline');
-    // A row that follows a parent-note hint (inserted at runtime between a parent and its first dependent row)
-    // is not directly below a row, so it draws no hairline, Pinboard or not.
-    for(const service of ['pinboard','karakeep']){
+    // Every visible settings row, on every panel and for every service: it draws the
+    // hairline exactly when, skipping hidden rows above it, the nearest sibling is a
+    // visible row. A heading, a parent-note hint or nothing above it means no line.
+    const hairlines=()=>options.evaluate(()=>[...document.querySelectorAll('.pref-row:not([hidden])')].map(row=>{
+      let prev=row.previousElementSibling;
+      while(prev&&prev.matches('.pref-row[hidden]'))prev=prev.previousElementSibling;
+      return {at:row.id||row.querySelector('[id]')?.id||row.textContent.trim().replace(/\s+/g,' ').slice(0,48),want:prev&&prev.matches('.pref-row')?'1px':'0px',got:getComputedStyle(row).borderTopWidth};
+    }));
+    const shownRows={};
+    for(const service of ['pinboard','karakeep','linkding']){
       await options.locator('input[name="bookmark-service"][value="'+service+'"]').check();
-      for(const id of ['opt-urlclean-on-open','opt-wayback-batch','opt-sync-api-keys']){
-        const r=await options.locator('#'+id).evaluate(el=>{const row=el.closest('.pref-row');return {w:getComputedStyle(row).borderTopWidth,prev:!!(row.previousElementSibling&&row.previousElementSibling.matches('[data-parent-note]'))};});
-        assert(r.prev,id+' no longer follows a parent note; update this test');
-        assert.equal(r.w,'0px',id+' on '+service+' draws a hairline under a parent note');
-      }
+      const rows=await hairlines();
+      assert(rows.length>20,'the hairline scan found almost no settings rows');
+      assert(rows.some(r=>r.want==='0px')&&rows.some(r=>r.want==='1px'),'the hairline scan covers only one case');
+      for(const r of rows)assert.equal(r.got,r.want,service+': '+r.at+' hairline');
+      shownRows[service]=new Set(rows.map(r=>r.at));
     }
+    // Pinboard is the service every row applies to: off Pinboard rows may hide, never the other way.
+    for(const service of ['karakeep','linkding'])for(const at of shownRows[service])assert(shownRows.pinboard.has(at)||/linkding|karakeep/.test(at),'Pinboard hides '+at+' that '+service+' shows');
     await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
-    assert.equal(await options.locator('#opt-readlater-default').evaluate(el=>getComputedStyle(el.closest('.pref-row')).borderTopWidth),'1px','a row under a visible row lost its hairline');
     await options.close();
   }finally{
     await worker.evaluate(saved=>chrome.storage.local.set({bookmarkService:saved.bookmarkService,bookmarkServiceActive:saved.bookmarkServiceActive,karakeepToken:saved.karakeepToken,linkdingToken:saved.linkdingToken,offlineQueue:saved.offlineQueue||[]}),saved);
