@@ -715,13 +715,16 @@ async function pbpReadTagVocab(account, loaded) {
     return null;
   }
 }
-// prefetched: a duplicate check this save already made (Batch in skip mode),
-// used instead of asking the server again.
+// prefetched: a duplicate check this save already made (Batch in skip mode,
+// or quick save and Batch for an over-long title), used instead of asking the
+// server again.
 async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched) {
-  // Without a check in hand a title the service cannot store stops before any
-  // request (quick save, Batch and replay share this point); with one, only a
-  // title the write would actually send (a new bookmark's) is held to it.
-  const titleFailure = prefetched ? null : pbpBookmarkTitleFailure(intent.title, auth.service);
+  // A create or an update always sends the intent's own title, so one the
+  // service cannot store stops before any request. A merge, skip or overwrite
+  // sends it only when the page is not saved yet (an existing bookmark keeps
+  // the server's title), which only the check below can tell.
+  const sendsOwnTitle = intent.mode === "create" || intent.mode === "update";
+  const titleFailure = sendsOwnTitle ? pbpBookmarkTitleFailure(intent.title, auth.service) : null;
   if (titleFailure) return {result:titleFailure, persisted:null, retryable:false};
   try {
     const lookup = prefetched || await fetchExistingBookmark(intent.url, auth.token, auth);
@@ -734,6 +737,7 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched
     if (plan.action === "skip") return {result:{status:"skipped"}, persisted:pbpSkippedPersisted(plan, lookup), retryable:false};
     // Only a new bookmark's title is the page's; an existing one keeps the
     // server's own (Karakeep's may be a crawled title it never re-sends).
+    // Nothing has been written yet: the check above is the only request.
     const sentTitleFailure = lookup.exists ? null : pbpBookmarkTitleFailure(plan.fields.title, auth.service);
     if (sentTitleFailure) return {result:sentTitleFailure, persisted:null, retryable:false};
     const incomingTags = pbpBookmarkParseTags(intent.tags);
@@ -763,6 +767,17 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched
     if (error?.code === "tag_too_long") statusCache.delete(intent.url);
     return {result:pbpBookmarkFailure(error), persisted:null, retryable:pbpBookmarkFailureRetryable(error?.code)};
   }
+}
+// A quick save or Batch page whose title the service cannot store: it is sent
+// only if the page is not saved yet (a merge, skip or overwrite keeps the
+// server's title), so the server is asked. {failure} for a page not saved, else
+// {lookup} ({url, account, found}) for delivery to reuse, including a check
+// that got no answer (delivery queues or stops on it as for any other check).
+async function pbpCheckOverlongTitle(url, title, auth) {
+  const failure = pbpBookmarkTitleFailure(title, auth.service);
+  const found = await fetchExistingBookmark(url, auth.token, auth);
+  if (failure && !found.exists && !found.lookupFailed) return { failure };
+  return { lookup: { url, account: auth.account, found } };
 }
 const PBP_POPUP_SAVE_MODES = new Set(["create", "update", "merge"]);
 
@@ -1766,13 +1781,22 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     notifySaveFailure(notifyId, result, startAuth.service);
     return result;
   }
-  // A title the service cannot store fails every attempt: stop before reading
-  // the page, paying for AI or queueing anything.
-  const titleFailure = pbpBookmarkTitleFailure(title, startAuth.service);
-  if (titleFailure) {
-    await pbpI18nReady();
-    notifySaveFailure(notifyId, titleFailure, startAuth.service);
-    return titleFailure;
+  // A title the service cannot store fails every attempt, but quick save
+  // sends the page's title only when it creates the bookmark: a merge, skip
+  // or overwrite into one already saved keeps the server's title. So an
+  // over-long title is checked against the server first, before reading the
+  // page or paying for AI; a new page stops here, and the answer is handed to
+  // delivery so the server is asked once. A check that got no answer goes on
+  // to be queued like an outage (decision 2026-11-02, 5a).
+  let titleLookup;
+  if (pbpBookmarkTitleFailure(title, startAuth.service)) {
+    const checked = await pbpCheckOverlongTitle(url, title, startAuth);
+    if (checked.failure) {
+      await pbpI18nReady();
+      notifySaveFailure(notifyId, checked.failure, startAuth.service);
+      return checked.failure;
+    }
+    titleLookup = checked.lookup;
   }
   const loadedSettings = await loadSettings();
   const s = pbpBookmarkDeliverySettings({ ...loadedSettings, ...(settingsOverrides || {}) }, startAuth);
@@ -1962,7 +1986,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     private: isPrivate,
     toread: toread === true ? true : undefined,
     archive: undefined,
-  }, { expectedAccount: startAuth.account, summaryRange, tagVocab });
+  }, { expectedAccount: startAuth.account, summaryRange, tagVocab, lookup: titleLookup });
 
   if (result.status === "saved") {
     const undoInfo = result.mutation === "created" && result.account
@@ -5250,17 +5274,20 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         await requireAccount();
         const mode = s.batchSkipExisting ? "skip" : "merge";
         const title = tab.title || tab.url;
+        const titleTooLong = !!pbpBookmarkTitleFailure(title, currentAuth.service);
         // Skip mode asks first (user decision 2026-11-02): a page already saved
         // is skipped without reading it or paying for AI, and so is one whose
         // check met a cause every request meets (it stops the run below). The
         // answer goes to delivery, so the server is asked once per page; a
-        // check that got no answer is queued there like an outage.
+        // check that got no answer is queued there like an outage. A page
+        // whose title the service cannot store is asked first in merge mode
+        // too: only a new bookmark is sent that title (a merge keeps the
+        // server's), so only a page not saved yet is counted too long.
         let lookup;
-        if (mode === "skip") lookup = { url: tab.url, account, found: await fetchExistingBookmark(tab.url, currentAuth.token, currentAuth) };
-        const settled = !!lookup && (lookup.found.exists || (lookup.found.lookupFailed && !lookup.found.retryable));
-        // A title the service cannot store fails every attempt: count it before
-        // any page read, AI request or write.
-        if (!settled && pbpBookmarkTitleFailure(title, currentAuth.service)) { tooLong++; continue; }
+        if (mode === "skip" || titleTooLong) lookup = { url: tab.url, account, found: await fetchExistingBookmark(tab.url, currentAuth.token, currentAuth) };
+        const settled = !!lookup && ((mode === "skip" && lookup.found.exists) || (lookup.found.lookupFailed && !lookup.found.retryable));
+        // Counted before any page read, AI request or write.
+        if (titleTooLong && !lookup.found.exists && !lookup.found.lookupFailed) { tooLong++; continue; }
         let tags = [...baseTags];
         let notes = "";
         let linkdingSummary = "";

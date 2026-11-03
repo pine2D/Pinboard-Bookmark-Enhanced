@@ -400,7 +400,7 @@ async function workerHarness(service, replies, options = {}) {
       remove:async keys=>{for(const k of [].concat(keys)){if(k==="offlineQueue")state.queue=[];else delete state.local[k];}}
     }}}
   };
-  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,submitPopupSaveIntent,sendOfflineItem,fetchExistingBookmark,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient,mutateOfflineQueue,pbpReadTagVocab,pbpLoadTagVocab};")(...Object.values(deps));
+  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,submitPopupSaveIntent,sendOfflineItem,fetchExistingBookmark,pbpCheckOverlongTitle,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient,mutateOfflineQueue,pbpReadTagVocab,pbpLoadTagVocab};")(...Object.values(deps));
   return {...api,state,auth,chrome:deps.chrome};
 }
 const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"work",private:true,toread:false};
@@ -418,7 +418,7 @@ async function producers(h, {autoNotes, summary, settings: overrides = {}, realV
     batchAiSummary:true, batchAiTags:false, optBatchTagEnabled:false, batchSkipExisting:false, waybackArchiveBatch:false, ...overrides};
   const deps = {
     loadSettings:async()=>({...settings}), getCurrentBookmarkAuth:h.auth, submitSaveIntent:(...args)=>h.submitSaveIntent(...args),
-    fetchExistingBookmark:(...args)=>h.fetchExistingBookmark(...args),
+    fetchExistingBookmark:(...args)=>h.fetchExistingBookmark(...args), pbpCheckOverlongTitle:(...args)=>h.pbpCheckOverlongTitle(...args),
     hasAIKey:()=>true, buildAutoNotes:()=>autoNotes,
     getAICache:async()=>null, setAICache:async()=>{}, callAI:async()=>{h.state.aiCalls=(h.state.aiCalls||0)+1;return summary;}, buildSummaryPrompt:()=>"summary prompt",
     getPageInfoFromTab:async()=>{h.state.extractions=(h.state.extractions||0)+1;return {pageText:"article body"};},
@@ -1454,16 +1454,43 @@ test("a skip-mode quick save stopped by an over-long tag says the page was saved
   }
 });
 // Title limits (pbpBookmarkLimits): linkding counts code points, Karakeep
-// UTF-16 units. A title the server cannot store is refused before any
-// request: nothing is sent, queued or billed to the AI key.
+// UTF-16 units. A title the server cannot store is never written, queued or
+// billed to the AI key. Quick save and Batch send only the page's title on a
+// create (a merge keeps the server's), so an over-long one is checked once
+// against the server first: that answer is reused by the delivery.
 const titleCases=[["linkding","😀".repeat(513),"😀".repeat(512),"512"],["karakeep","x".repeat(1001),"x".repeat(1000),"1000"]];
-test("a quick save whose title the service cannot store sends, queues and pays for nothing and names the limit",async()=>{
+const noBookmark={linkding:[200,{bookmark:null}],karakeep:[200,{bookmarkId:null}]};
+const isWrite=c=>c.method!=="GET";
+test("a quick save whose title the service cannot store writes, queues and pays for nothing and names the limit",async()=>{
   for(const [service,long,,limit] of titleCases){
-    const h=await workerHarness(service,[]);
+    const h=await workerHarness(service,[noBookmark[service]]);
     const result=await (await producers(h,{autoNotes:"Auto notes",summary:"A summary."})).quickSave({title:long});
     equal([service,result.status,result.reason,result.retryable],[service,"failed","too_long",undefined]);
-    equal([service,h.state.calls.length,h.state.queue,h.state.aiCalls||0,h.state.extractions||0],[service,0,[],0,0]);
+    equal([service,h.state.calls.map(c=>c.method),h.state.queue,h.state.aiCalls||0,h.state.extractions||0],[service,["GET"],[],0,0]);
     equal([service,h.state.notifications.at(-1)?.slice(1,3)],[service,["bgSaveFailed","titleTooLong:"+limit]]);
+  }
+});
+test("a quick save with an over-long page title still merges into or skips a bookmark already saved",async()=>{
+  const longLd="😀".repeat(513), longKk="x".repeat(1001);
+  for(const [label,service,long,replies,mode,methods,notice] of [
+    ["linkding merge","linkding",longLd,[[200,{bookmark:ld,metadata:{},auto_tags:[]}],[200,{...ld,date_modified:"2026-11-03T10:00:00.000000Z"}]],"merge",["GET","PATCH"],"bgTitleSaved"],
+    ["linkding overwrite","linkding",longLd,[[200,{bookmark:ld,metadata:{},auto_tags:[]}],[200,{...ld,date_modified:"2026-11-03T10:00:00.000000Z"}]],"overwrite",["GET","PATCH"],"bgTitleSaved"],
+    ["linkding skip","linkding",longLd,[[200,{bookmark:ld,metadata:{},auto_tags:[]}]],"skip",["GET"],"bgSkippedTitle"],
+    ["karakeep skip","karakeep",longKk,[[200,{bookmarkId:"bk1"}],[200,kk]],"skip",["GET","GET"],"bgSkippedTitle"],
+  ]){
+    const h=await workerHarness(service,replies);
+    const result=await (await producers(h,{autoNotes:"",summary:"",settings:{_aiSummary:false,bgSaveMode:mode}})).quickSave({title:long});
+    equal([label,result.status,h.state.calls.map(c=>c.method),h.state.queue],[label,mode==="skip"?"skipped":"saved",methods,[]]);
+    ok(h.state.calls.filter(isWrite).every(c=>c.body?.title!==long),label+": the page title is not sent");
+    ok(String(h.state.notifications.at(-1)?.[1]).startsWith(notice)||String(h.state.notifications.at(-1)?.[2]).startsWith(notice),label+": "+JSON.stringify(h.state.notifications.at(-1)));
+  }
+});
+test("a quick save with an over-long page title whose check gets no answer is queued, not refused",async()=>{
+  for(const [service,long] of titleCases){
+    const h=await workerHarness(service,[new TypeError("offline")]);
+    const result=await (await producers(h,{autoNotes:"",summary:"",settings:{_aiSummary:false}})).quickSave({title:long});
+    equal([service,result.status,h.state.calls.map(c=>c.method),h.state.queue.length],[service,"queued",["GET"],1]);
+    equal([service,h.state.notifications.at(-1)?.[1]],[service,"bgQueuedOffline"]);
   }
 });
 test("a quick save whose title is exactly at the limit is sent whole",async()=>{
@@ -1477,28 +1504,56 @@ test("a quick save whose title is exactly at the limit is sent whole",async()=>{
 test("Batch counts an over-long title as too long before AI and a partial save as partial, not failed",async()=>{
   const tabs=[{id:31,url:pageUrl+"?b=0",title:"x".repeat(1001),incognito:false},{id:32,url:pageUrl+"?b=1",title:"T1",incognito:false}];
   // Karakeep 0.34.1: the bookmark is created, then its tag request fails.
-  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[201,kkRecord("bk-new","")],[400,{code:"invalid_request"}]]);
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[200,{bookmarkId:null}],[201,kkRecord("bk-new","")],[400,{code:"invalid_request"}]]);
   await (await producers(h,{autoNotes:"",summary:"A summary.",settings:{optBatchTagEnabled:true,optBatchTag:"work"}})).batchSave(tabs);
   const last=h.state.progress.at(-1);
   equal([last.done,last.error,last.saved,last.failed,last.tooLong,last.partial,last.queued],[true,null,0,0,1,1,0]);
-  equal([h.state.aiCalls,h.state.calls.map(c=>c.method+" "+new URL(c.url).pathname.replace(/^\/base\/api\/v1\//,""))],[1,["GET bookmarks/check-url","POST bookmarks","POST bookmarks/bk-new/tags"]]);
+  equal([h.state.aiCalls,h.state.calls.map(c=>c.method+" "+new URL(c.url).pathname.replace(/^\/base\/api\/v1\//,""))],[1,["GET bookmarks/check-url","GET bookmarks/check-url","POST bookmarks","POST bookmarks/bk-new/tags"]]);
+  equal(h.state.calls.filter(c=>c.method==="GET").map(c=>new URL(c.url).searchParams.get("url")),tabs.map(tab=>tab.url));
   equal(h.state.queue,[]);
   const [, , body]=h.state.notifications.at(-1)||[];
   ok(body.startsWith("batchDone:0:0")&&body.includes("batchTooLong:1")&&body.includes("batchPartial:1"));
 });
-test("a queued save whose title the service cannot store is never sent on replay or on a manual retry",async()=>{
+test("merge-mode Batch with an over-long page title merges into a bookmark already saved and checks it once",async()=>{
+  const long="😀".repeat(513), tabs=[{id:33,url:pageUrl,title:long,incognito:false}];
+  const h=await workerHarness("linkding",[[200,{bookmark:ld,metadata:{},auto_tags:[]}],[200,{...ld,date_modified:"2026-11-03T10:00:00.000000Z"}]]);
+  await (await producers(h,{autoNotes:"",summary:"A summary.",settings:{optBatchTagEnabled:true,optBatchTag:"batch"}})).batchSave(tabs);
+  const last=h.state.progress.at(-1);
+  equal([last.saved,last.tooLong,last.failed,last.queued,h.state.aiCalls],[1,0,0,0,1]);
+  equal(h.state.calls.map(c=>c.method),["GET","PATCH"]);
+  ok(h.state.calls[1].body?.title!==long);
+});
+// A queued create replays as a merge, so the replay asks whether the page is
+// saved by now; for a page that is not, nothing is written.
+test("a queued save whose title the service cannot store is never written on replay or on a manual retry",async()=>{
   for(const [service,long,,limit] of titleCases){
-    const h=await workerHarness(service,[new TypeError("offline")]);
+    const h=await workerHarness(service,[new TypeError("offline"),noBookmark[service],noBookmark[service]]);
     equal((await h.submitSaveIntent({...saveIntent})).status,"queued");
     // An item queued before this check existed.
     h.state.queue[0].title=long;
     const queueId=h.state.queue[0].queueId;
     await h.processOfflineQueue();
-    equal([service,h.state.calls.length,h.state.queue.map(item=>item.queueId)],[service,1,[queueId]]);
+    equal([service,h.state.calls.filter(isWrite).length,h.state.calls.length,h.state.queue.map(item=>item.queueId)],[service,0,2,[queueId]]);
     const retried=await h.retryOfflineItem(queueId);
     equal([service,retried.ok,retried.result.reason,pbpBookmarkFailureText(retried.result,service,(key,...args)=>[key,...args].join(":"))],[service,false,"too_long","titleTooLong:"+limit]);
-    equal([service,h.state.calls.length,h.state.queue.map(item=>item.queueId)],[service,1,[queueId]]);
+    equal([service,h.state.calls.filter(isWrite).length,h.state.calls.length,h.state.queue.map(item=>item.queueId)],[service,0,3,[queueId]]);
   }
+});
+test("a queued merge with an over-long page title writes nothing for a new page and merges into a saved one",async()=>{
+  for(const [service,long] of titleCases){
+    const h=await workerHarness(service,[new TypeError("offline"),noBookmark[service]]);
+    equal((await h.submitSaveIntent({...saveIntent,mode:"merge"})).status,"queued");
+    h.state.queue[0].title=long;
+    const queueId=h.state.queue[0].queueId;
+    await h.processOfflineQueue();
+    equal([service,h.state.calls.filter(isWrite).length,h.state.queue.map(item=>item.queueId)],[service,0,[queueId]]);
+  }
+  const h=await workerHarness("linkding",[new TypeError("offline"),[200,{bookmark:ld,metadata:{},auto_tags:[]}],[200,{...ld,date_modified:"2026-11-03T10:00:00.000000Z"}]]);
+  equal((await h.submitSaveIntent({...saveIntent,mode:"merge"})).status,"queued");
+  h.state.queue[0].title="😀".repeat(513);
+  await h.processOfflineQueue();
+  equal([h.state.calls.map(c=>c.method),h.state.queue],[["GET","GET","PATCH"],[]]);
+  ok(h.state.calls[2].body?.title!=="😀".repeat(513));
 });
 // linkding v1.47 Bookmark.url: CharField(max_length=2048) with Django's
 // URLValidator, which needs a dotted host unless it is localhost or an IP.
