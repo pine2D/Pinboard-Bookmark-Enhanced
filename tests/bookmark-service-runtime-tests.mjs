@@ -271,9 +271,12 @@ try{
   // Between blocks of a filtered run: everything a block may leave behind in
   // the worker, the server fixture and the browser, so a block never depends on
   // the one before it. Every block runs it, in a full run too, so a full run is exactly the blocks' lone runs in order.
+  // Forget every cached bookmark lookup: the worker's memory and the
+  // storage.session copy that outlives a stopped worker (linkding entries).
+  const forgetLookups=()=>worker.evaluate(async()=>{statusCache.clear();await _statusMirrorTail;await chrome.storage.session.remove('_linkdingStatus');});
   const resetForBlock=async()=>{
+    await forgetLookups();
     await worker.evaluate(async()=>{
-      statusCache.clear();
       const rows=await chrome.storage.session.get(null);
       const drafts=Object.entries(rows).filter(([,row])=>row?.pageUrl).map(([key])=>key);
       if(drafts.length)await chrome.storage.session.remove(drafts);
@@ -692,9 +695,10 @@ try{
   // loaded line restored it as the user's: the lookup then left the box alone
   // and the save overwrote a Description changed elsewhere in the meantime.
   {
-    // Drop the worker's cached lookups, as five minutes or a worker restart
-    // would, so the reopened popup reads what the server holds now.
-    const clearLookups=()=>worker.evaluate(()=>statusCache.clear());
+    // Drop the worker's cached lookups, as five minutes would (a worker
+    // restart keeps the storage.session copy of linkding's), so the reopened
+    // popup reads what the server holds now.
+    const clearLookups=forgetLookups;
     const storedDraft=()=>worker.evaluate(async url=>Object.values(await chrome.storage.session.get(null)).find(row=>row?.pageUrl===url)?.draft||null,multiUrl);
     const openPopup=async()=>{await article.bringToFront();const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
       await popup.waitForFunction(()=>document.getElementById('existing-banner')&&!document.getElementById('existing-banner').classList.contains('hidden')&&!document.getElementById('submit-btn').disabled);return popup;};
@@ -839,7 +843,7 @@ try{
     assert.deepEqual(queue.map(item=>[item.url,item.tags]),[[tagUrl,fits+' work']],'a server error without an over-long tag was not queued');
     await worker.evaluate(()=>chrome.storage.local.set({offlineQueue:[]}));down.linkding=false;
     await popup.close();records.linkding.delete(String(kept.id));postgres.linkding=false;
-    await worker.evaluate(()=>statusCache.clear());await article.goto(origin+'/article');
+    await forgetLookups();await article.goto(origin+'/article');
     console.log('linkding over-long tag on PostgreSQL: the 500 names the tag, nothing is queued or offered for retry, the form updates the kept bookmark with a 64-code-point tag, and the same 500 without an over-long tag is queued');
   });
   // A page the extension may not read (the localhost name was never granted)
@@ -929,7 +933,7 @@ try{
     await until(async()=>{const d=await draftFor(tabUrl);return d?.url===recentUrl&&d.tags.includes('drafted');},'recent-bookmark edit drafted for the tab');
     assert(!Object.hasOwn(await draftFor(tabUrl),'summary'),'the draft kept the Description the lookup filled in');
     await popup.close();
-    records.linkding.delete(recentId);await worker.evaluate(()=>statusCache.clear());
+    records.linkding.delete(recentId);await forgetLookups();
     popup=await openOnTab();
     assert.equal(await popup.locator('#url-input').inputValue(),recentUrl,'the draft for the tab was not restored');
     await settled(popup,'missing');
@@ -982,7 +986,7 @@ try{
     const box=popup=>popup.locator('#linkding-description-input').inputValue();
     const createFrom=async(popup,label)=>{const before=requests.length;await popup.locator('#submit-btn').click();await until(()=>linkdingCreates(before).length>0,label);
       await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));return linkdingCreates(before)[0];};
-    await worker.evaluate(()=>statusCache.clear());
+    await forgetLookups();
     await article.goto(tabUrl);
     let popup=await openOnTab();
     assert.equal(await box(popup),'Server-scraped description','a first open did not take its own page description');
@@ -1015,7 +1019,7 @@ try{
     assert.equal(await draftFor(tabUrl),null,'the typed address stayed drafted for the tab');
     await popup.close();
     for(const row of [...records.linkding.values()].filter(b=>[tabUrl,awayUrl,otherUrl].includes(b.url)))records.linkding.delete(String(row.id));
-    await worker.evaluate(()=>statusCache.clear());await article.goto(origin+'/article');
+    await forgetLookups();await article.goto(origin+'/article');
     console.log("linkding address typed after the popup opened: another page leaves the Description to linkding, the page's own address brings its text back, a stored Description stays");
   });
   // URL cleaning can remove more than the same-page check ignores: aggressive
@@ -1052,7 +1056,7 @@ try{
     // hand-edited storage or an old backup can leave it): opening runs every
     // cleaning step of showMain, and the form must still open, keep the page's
     // own address, log the failure and save.
-    await worker.evaluate(()=>{statusCache.clear();return chrome.storage.local.set({urlClean:{enabled:true,onPopupOpen:true,onPaste:true,aggressiveMode:true,customParams:'campaign',excludeParams:[]}});});
+    await forgetLookups();await worker.evaluate(()=>{return chrome.storage.local.set({urlClean:{enabled:true,onPopupOpen:true,onPaste:true,aggressiveMode:true,customParams:'campaign',excludeParams:[]}});});
     await worker.evaluate(async()=>{const drafts=Object.entries(await chrome.storage.session.get(null)).filter(([,row])=>row?.pageUrl).map(([key])=>key);if(drafts.length)await chrome.storage.session.remove(drafts);});
     const warnings=[],onPage=page=>page.on('console',message=>{if(message.type()==='warning')warnings.push(message.text());});
     ctx.on('page',onPage);
@@ -1066,7 +1070,7 @@ try{
       assert.equal(create.data.url,tabUrl,'the form opened on unusable cleaning settings did not save the page address');
     }finally{ctx.off('page',onPage);}
     for(const row of [...records.linkding.values()].filter(b=>b.url===tabUrl))records.linkding.delete(String(row.id));
-    await worker.evaluate(()=>{statusCache.clear();return chrome.storage.local.remove('urlClean');});
+    await forgetLookups();await worker.evaluate(()=>{return chrome.storage.local.remove('urlClean');});
     await article.goto(origin+'/article');await ctx.unroute(cleanOrigin+'/**');
     console.log("linkding page address cleaned by aggressive mode and a custom parameter: a first open and a restored draft still take the page's description and send it with ?disable_scraping; unusable cleaning settings leave the address as it is and the form saves");
   });
@@ -1709,7 +1713,7 @@ try{
     const writesSince=since=>requests.slice(since).filter(r=>r.service==='linkding'&&(r.method==='POST'||r.method==='PATCH')&&r.path.startsWith('bookmarks/')&&!r.path.startsWith('bookmarks/check'));
     const seed=()=>{const now=serverNow();records.linkding.set('41',{id:41,url:base,title:'Saved original',description:'Original description',notes:'Original notes',web_archive_snapshot_url:null,is_archived:false,unread:false,shared:false,tag_names:['kept'],date_added:now,date_modified:now});};
     const notice=popup=>popup.locator('.form-body > .feedback-card',{hasText:'This page is already saved under its address without the # part.'});
-    const openAt=async address=>{await worker.evaluate(()=>statusCache.clear());await article.goto(address);const since=requests.length;const popup=await openOnTab();return {popup,since};};
+    const openAt=async address=>{await forgetLookups();await article.goto(address);const since=requests.length;const popup=await openOnTab();return {popup,since};};
     // 1. Not saved with the fragment, saved without it: one more lookup, the notice.
     seed();
     let {popup,since}=await openAt(hashed);
@@ -1831,7 +1835,7 @@ try{
     assert.equal(writesSince(since).length,0,'a save went out after the duplicate check failed');
     checkDown.linkding=false;
     await popup.evaluate(()=>pbpDiscardPopupDraft());await popup.close();
-    records.linkding.clear();await worker.evaluate(()=>statusCache.clear());await article.goto(origin+'/article');
+    records.linkding.clear();await forgetLookups();await article.goto(origin+'/article');
     console.log('linkding #fragment address: one more lookup without it, a notice with Edit and Save as new; no fragment or a failed lookup asks once');
   });
   await block('linkding browsing checks',['linkding'],async()=>{
@@ -1916,7 +1920,7 @@ try{
     await until(async()=>await stored()===true,'switching on was stored');
     await options.close();
     // Forget earlier answers, in memory and in the storage.session copy.
-    const forget=()=>worker.evaluate(async()=>{statusCache.clear();await _statusMirrorTail;await chrome.storage.session.remove('_linkdingStatus');});
+    const forget=forgetLookups;
     const openSpa=async()=>{await forget();await article.goto(spa);await article.waitForFunction(()=>document.title==='Browser title');const since=requests.length;const popup=await openOnTab();await settled(popup,'missing');return {popup,since};};
     // On (default): the browser's page, as today.
     let {popup,since}=await openSpa();
