@@ -2453,9 +2453,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // looks like a new document: Chromium reports an in-page route change
   // (history.pushState) as status "loading" with the new url too, and keeps
   // the earlier page's icon then; after a real new document the icon is
-  // already the default, so that reset changes nothing. A route change with
-  // no record yet (a restarted worker) becomes "describes another page".
-  if (sameDocument && !_iconPageUrl.has(tabId)) _iconPageUrl.set(tabId, null);
+  // already the default, so that reset changes nothing. An address change with
+  // no record yet (a restarted worker) becomes "describes another page" in
+  // either shape: the browser still shows the stopped worker's icon after a
+  // pushState reported as "loading", and on a real new document the extra
+  // default setIcon is a no-op. A bare "complete" (no url) adds nothing.
+  if (changeInfo.url && !_iconPageUrl.has(tabId)) _iconPageUrl.set(tabId, null);
   _scheduleCurrentTabRefresh(tabId, tab.url);
 });
 

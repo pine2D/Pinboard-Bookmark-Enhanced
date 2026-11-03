@@ -1877,7 +1877,9 @@ try{
     let since=requests.length;
     await visit(origin+'/article?off');await visit(origin+'/article?saved');
     assert.deepEqual(checksSince(since),[],'linkding was asked while browsing with the switch off');
-    assert.equal(await articleIcon(),null,'the toolbar icon was set with the switch off');
+    // A new document with no record of the icon may get the default icon set
+    // again (the browser already reset it: no visible change); never a state.
+    assert.ok([null,'default'].includes(await articleIcon()),'the toolbar icon showed a state with the switch off: '+await articleIcon());
     let popup=await openOnTab();await settled(popup,'found');
     assert.deepEqual(checksSince(since),[origin+'/article?saved'],'the popup did not ask exactly once');
     await popup.close();
@@ -1893,6 +1895,16 @@ try{
     await until(()=>worker.evaluate(({routed,routedAt})=>chrome.storage.session.get('_currentTab').then(row=>row._currentTab?.url===routed&&row._currentTab.ts>=routedAt),{routed,routedAt}),'the worker handled the route change');
     assert.equal(await articleIcon(),'default','the saved page\'s icon stayed up on another page');
     assert.deepEqual(checksSince(since),[],'linkding was asked on a route change with the switch off');
+    // The same after the worker that set "saved" was stopped: the browser
+    // keeps the tab's icon, the next worker starts with no record of it.
+    await worker.evaluate(({id,url})=>setIcon(id,'saved',url),{id:articleTab,url:routed});
+    await worker.evaluate(()=>{_iconPageUrl.clear();_lastIconState.clear();_lastCheckedUrl.clear();});
+    since=requests.length;
+    const rerouted=origin+'/article?rerouted',reroutedAt=Date.now();
+    await article.evaluate(address=>history.pushState(null,'',address),rerouted);
+    await until(()=>worker.evaluate(({rerouted,reroutedAt})=>chrome.storage.session.get('_currentTab').then(row=>row._currentTab?.url===rerouted&&row._currentTab.ts>=reroutedAt),{rerouted,reroutedAt}),'the restarted worker handled the route change');
+    assert.equal(await articleIcon(),'default','after a worker restart the saved page\'s icon stayed up on another page');
+    assert.deepEqual(checksSince(since),[],'linkding was asked on a route change after a worker restart');
     // 3. On, with the general status icon off: each page is asked once, the
     // icon follows, and the popup opened there asks nothing more.
     await setSettings({optCheckBookmarkStatus:false,linkdingPreload:true});

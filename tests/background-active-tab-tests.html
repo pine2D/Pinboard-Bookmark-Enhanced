@@ -1103,10 +1103,10 @@ async function run() {
       }
       // A worker that restarted holds no record of what the toolbar shows: an
       // in-page route change still means the icon is the page before it.
-      {
+      for (const shape of [{ sameDocument: true }, { sameDocument: false, loading: true }]) {
         const h = buildStatusFailureHarness(source, { service, failure: G14_FAILURES[0] });
-        await h.navigate(OTHER, { sameDocument: true });
-        assert(h.icons.length === 1 && h.icons[0].state === "default", service + " (restarted worker): the route change kept the earlier icon: " + JSON.stringify(h.icons));
+        await h.navigate(OTHER, shape);
+        assert(h.icons.length === 1 && h.icons[0].state === "default", service + " " + JSON.stringify(shape) + " (restarted worker): the route change kept the earlier icon: " + JSON.stringify(h.icons));
       }
       // A route change while the tab is in the background runs no check, and
       // the worker may be recycled before the user comes back: the icon the
@@ -1252,6 +1252,15 @@ async function run() {
       await h.navigate(OTHER, shape);
       assert(h.lookups.length === 0, JSON.stringify(shape) + ": linkding was asked " + JSON.stringify(h.lookups));
       assert(h.icons.at(-1)?.state === "default", JSON.stringify(shape) + ": the saved icon stayed on another page " + JSON.stringify(h.icons));
+    }
+    // The worker that set "saved" was stopped: the browser still shows that
+    // icon, and the new worker has no record of it. A route change in either
+    // shape must still drop it, without asking linkding.
+    for (const shape of [{ sameDocument: true }, { sameDocument: false, loading: true }]) {
+      const restarted = buildStatusFailureHarness(source, { bookmark: G14_BOOKMARK, linkdingPreload: false });
+      await restarted.navigate(OTHER, shape);
+      assert(restarted.lookups.length === 0, JSON.stringify(shape) + " (restarted worker): linkding was asked " + JSON.stringify(restarted.lookups));
+      assert(restarted.icons.at(-1)?.state === "default", JSON.stringify(shape) + " (restarted worker): the earlier page's icon stayed " + JSON.stringify(restarted.icons));
     }
   });
 
