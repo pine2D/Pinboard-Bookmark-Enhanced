@@ -88,6 +88,18 @@ function pbpStatusCacheGet(url, auth) {
   return cached?.account === auth.account ? cached : null;
 }
 
+// The cached posts a form may load, or null: within the TTL, and for a
+// self-hosted service only with the state an update is checked against
+// (pbpBookmarkVersion). An entry from before that, in memory or restored from
+// the session copy, is read again instead of loading a form that could not
+// be checked.
+function pbpStatusCacheFormPosts(cached, auth) {
+  if (!cached || !(Date.now() - cached.timestamp < CACHE_TTL) || !Array.isArray(cached.posts)) return null;
+  const selfHosted = auth?.service === "karakeep" || auth?.service === "linkding";
+  if (selfHosted && !cached.posts.every((post) => typeof post?.version === "string")) return null;
+  return cached.posts;
+}
+
 // The key MUST be the exact URL whose posts/get produced `value` — never a
 // raw tracking URL's payload under its cleaned key, nor the reverse. Pinboard
 // stores a bookmark under one of the two spellings only, so the other key's
@@ -758,7 +770,12 @@ async function pbpReadTagVocab(account, loaded) {
 // server again.
 // singleFile: the popup or quick save will run SingleFile on this page after
 // a create, so linkding makes no HTML snapshot of its own.
-async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched, singleFile = false) {
+// verify: {expectedVersion}, for an update from a form the user loaded (popup,
+// reader editor): the bookmark as that form loaded it (pbpBookmarkVersion).
+// The duplicate check below is the read it is compared with, so checking adds
+// no request. Quick save, Batch and offline replay have no loaded form and
+// pass none.
+async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched, singleFile = false, verify) {
   // A create or an update always sends the intent's own title, so one the
   // service cannot store stops before any request. A merge, skip or overwrite
   // sends it only when the page is not saved yet (an existing bookmark keeps
@@ -772,6 +789,15 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched
     // instead of queueing (submitSaveIntent).
     if (lookup.lookupFailed) return {result:pbpSaveFailure(lookup.reason || "lookup", {httpStatus:lookup.httpStatus, retryAfter:lookup.retryAfter}), persisted:null, retryable:lookup.retryable, lookupFailed:true};
     if ((intent.mode === "create" && lookup.exists) || (intent.mode === "update" && !lookup.exists)) return {result:pbpSaveFailure("conflict"), persisted:null, retryable:false};
+    // Changed elsewhere (another device, the service's web page, Karakeep's
+    // own AI tags) since the form loaded it, or a form that cannot say what it
+    // loaded: nothing is written (user decision 2026-11-02). latestPost is the
+    // bookmark as this check found it, so the form shows it without another
+    // request; unverified marks a form that had no loaded state to compare.
+    if (verify && intent.mode === "update" && lookup.post?.version !== verify.expectedVersion) {
+      return {result:{...pbpSaveFailure("changed_elsewhere"), ...(typeof verify.expectedVersion !== "string" ? {unverified:true} : {}),
+        ...(lookup.post ? {latestPost:lookup.post} : {})}, persisted:null, retryable:false};
+    }
     const plan = pbpResolveSavePlan(intent, lookup);
     if (plan.action === "failed") return {result:plan.result, persisted:null, retryable:false};
     if (plan.action === "skip") return {result:{status:"skipped"}, persisted:pbpSkippedPersisted(plan, lookup), retryable:false};
@@ -803,7 +829,11 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched
         ...(result.failedStep === "read_later" && result.error === "read_later_list" ? {error:"read_later_list"} : {})}, persisted:null, retryable:false,
         ...(result.failedStep !== "bookmark" ? {notesDelivered:{notes:fields.notes, mutation:result.mutation}} : {})};
     }
-    return {result:{status:"saved", mutation:result.mutation}, persisted:{...plan.fields, private:result.bookmark.private, toread:result.bookmark.toread}, retryable:false};
+    // linkding answers an update or a create with the whole bookmark as it now
+    // stands, so a form can take this as what it has loaded. Karakeep changes
+    // tags and Read Later after its answer: the form loads it again instead.
+    const version = auth.service === "linkding" ? pbpBookmarkAsPost(result.bookmark).version : undefined;
+    return {result:{status:"saved", mutation:result.mutation, ...(version !== undefined ? {version} : {})}, persisted:{...plan.fields, private:result.bookmark.private, toread:result.bookmark.toread}, retryable:false};
   } catch (error) {
     // linkding writes a new bookmark before its tags, so a tag the server
     // could not store may have left the bookmark behind without them.
@@ -995,10 +1025,12 @@ async function pbpSendResolvedPlan(plan, settings) {
 
 // lookup: a fresh duplicate check the caller already made for intent.url under
 // this connection (Batch in skip mode). It stands in for the first read only.
-async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth(settings), { tagVocab, lookup: prefetched, singleFile = false } = {}) {
+// verify: an interactive update's loaded state (pbpDeliverSelfHosted). Pinboard
+// has no modification stamp to compare and keeps its behaviour.
+async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth(settings), { tagVocab, lookup: prefetched, singleFile = false, verify } = {}) {
   const invalid = validateSaveIntent(intent);
   if (invalid) return { result: invalid, persisted: null, retryable: false };
-  if (pbpSelfHostedAuth(auth)) return pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched, singleFile);
+  if (pbpSelfHostedAuth(auth)) return pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched, singleFile, verify);
   if (!settings?.pinboardToken) {
     return { result: pbpSaveFailure("not_logged_in"), persisted: null, retryable: false };
   }
@@ -1350,7 +1382,8 @@ async function pbpRunSingleFile(singleFileTab) {
 // SingleFile then saves the tab (pbpRunSingleFile); every other save leaves it
 // out. SingleFile runs after the save transaction, so a slow answer never holds
 // the saves queued behind this one.
-function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, readerExpectBookmarked = false, summaryRange, tagVocab, interactive = false, lookup, singleFileTab } = {}) {
+// verify: {expectedVersion} for an update made from a loaded form (popup, reader editor).
+function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, readerExpectBookmarked = false, summaryRange, tagVocab, interactive = false, lookup, singleFileTab, verify } = {}) {
   let singleFileRun = false;
   return runSaveDeliveryTransaction(async () => {
     let settings;
@@ -1413,7 +1446,7 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
     if (!envelope) {
       const prefetched = !readerAction && lookup?.found && lookup.url === intent.url && lookup.account === deliveryAuth.account
         ? lookup.found : undefined;
-      try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth, { tagVocab, lookup: prefetched, singleFile }); }
+      try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth, { tagVocab, lookup: prefetched, singleFile, verify }); }
       catch (e) {
         console.warn("save intent failed:", e?.name, e?.message);
         return pbpSaveFailure("internal");
@@ -1638,7 +1671,9 @@ function retryOfflineItem(queueId) {
 // summaryRange: the popup's AI summary block in intent.notes; null when its
 // ownership check found none of its own; absent when it cannot tell, which
 // leaves the page's receipt alone.
-function submitPopupSaveIntent(intent, expectedAccount, summaryRange, singleFileTab) {
+// expectedVersion: the bookmark as the popup's form loaded it, for an update
+// (pbpBookmarkVersion); a missing one is never taken as a match.
+function submitPopupSaveIntent(intent, expectedAccount, summaryRange, singleFileTab, expectedVersion) {
   if (!expectedAccount || typeof expectedAccount !== "string") {
     return Promise.resolve(pbpSaveFailure("account_changed"));
   }
@@ -1652,10 +1687,16 @@ function submitPopupSaveIntent(intent, expectedAccount, summaryRange, singleFile
     return Promise.resolve(pbpSaveFailure("invalid"));
   }
   return submitSaveIntent(intent, { expectedAccount, summaryRange, interactive: true,
+    ...(intent.mode === "update" ? { verify: { expectedVersion: pbpLoadedVersion(expectedVersion) } } : {}),
     ...(pbpSingleFileTabValid(singleFileTab) ? { singleFileTab } : {}) });
 }
 
 // ---- Reader bookmark workflow ----
+// A loaded-state string (pbpBookmarkVersion) from a popup or reader message,
+// or undefined. Here so the reader's own block has it; the popup uses it too.
+function pbpLoadedVersion(value) {
+  return typeof value === "string" && value.length <= 8192 ? value : undefined;
+}
 // Persisted preview slots survive SW restarts. Only the exact top-level reader
 // document may consume its slot; source-tab liveness is deliberately irrelevant.
 function pbpReaderDocumentUrl(raw) {
@@ -1922,6 +1963,18 @@ async function pbpBookmarkApiRequest(message) {
   return {ok:true,status:200,data,account:auth.account};
 }
 
+// The reader's view of a found bookmark, from its posts/get-shaped post; null
+// when it cannot be shown. tagNames: the bookmark's tags as names, which the
+// reader's export metadata takes over after a save (self-hosted names may
+// hold spaces). version: what the editor loaded, sent back with its edit.
+function pbpReaderStateBookmark(context, post) {
+  const plan = pbpResolveSavePlan({ mode: "overwrite", url: context.bookmarkUrl, tags: post?.tags }, { exists: true, post });
+  if (plan.action !== "send") return null;
+  const tagNames = Array.isArray(post?.tagNames) ? post.tagNames.slice()
+    : String(post?.tags || "").split(/\s+/).filter(Boolean);
+  return { ...plan.fields, tagNames, ...(typeof post?.version === "string" ? { version: post.version } : {}) };
+}
+
 async function pbpReaderBookmarkRequest(message, sender) {
   const context = await pbpReaderBookmarkContext(sender, message.account);
   if (!context) return pbpSaveFailure("account_changed");
@@ -1937,12 +1990,8 @@ async function pbpReaderBookmarkRequest(message, sender) {
     if (!lookup.lookupFailed && !lookup.exists) {
       result = { known: true, bookmarked: false, bookmark: pbpReaderInitialIntent(context, await loadSettings(), "save"), account: context.account };
     } else if (!lookup.lookupFailed) {
-      const plan = pbpResolveSavePlan({ mode: "overwrite", url: context.bookmarkUrl, tags: lookup.post?.tags }, lookup);
-      // tagNames: the bookmark's tags as names, which the reader's export
-      // metadata takes over after a save (self-hosted names may hold spaces).
-      const tagNames = Array.isArray(lookup.post?.tagNames) ? lookup.post.tagNames.slice()
-        : String(lookup.post?.tags || "").split(/\s+/).filter(Boolean);
-      if (plan.action === "send") result = { known: true, bookmarked: true, bookmark: { ...plan.fields, tagNames }, account: context.account };
+      const bookmark = pbpReaderStateBookmark(context, lookup.post);
+      if (bookmark) result = { known: true, bookmarked: true, bookmark, account: context.account };
     }
     // Token rotation under the same owner does not invalidate display metadata.
     // Re-read the effective owner after every await before returning it to UI.
@@ -1973,10 +2022,16 @@ async function pbpReaderBookmarkRequest(message, sender) {
   const summaryRange = typeof context.bookmarkDraft?.notes === "string"
     && Number.isInteger(handed?.start) && Number.isInteger(handed?.end)
     ? { start: handed.start, end: handed.end } : undefined;
-  const result = await submitSaveIntent(intent, { expectedAccount: context.account, readerAction: action, readerDraft: draft, readerExpectBookmarked: message.expectBookmarked === true, summaryRange });
+  // Only an edit sends the editor's own text. Save keeps an existing bookmark
+  // as it is, and Read Later changes the flag on the bookmark it reads now.
+  const result = await submitSaveIntent(intent, { expectedAccount: context.account, readerAction: action, readerDraft: draft, readerExpectBookmarked: message.expectBookmarked === true, summaryRange,
+    ...(action === "edit" ? { verify: { expectedVersion: pbpLoadedVersion(message.expectedVersion) } } : {}) });
   const current = await pbpReadFreshBookmarkAuthForAccount(context.account);
   if (!current) return pbpSaveFailure("account_changed");
-  return { ...result, account: context.account };
+  // Changed elsewhere: the reader takes the bookmark as the check found it.
+  const { latestPost, ...answer } = result || {};
+  const latest = result?.reason === "changed_elsewhere" && latestPost ? pbpReaderStateBookmark(context, latestPost) : null;
+  return { ...answer, ...(latest ? { bookmark: latest } : {}), account: context.account };
 }
 
 async function pbpRouteReaderSaveCommand(command, tab) {
@@ -4509,6 +4564,7 @@ async function pbpRunPopupDraft(message) {
     if ((d.summary !== undefined && typeof d.summary !== "string")
         || (d.summaryTouched !== undefined && typeof d.summaryTouched !== "boolean")
         || (d.sharedExplicit !== undefined && typeof d.sharedExplicit !== "boolean")
+        || (d.baseVersion !== undefined && (typeof d.baseVersion !== "string" || d.baseVersion.length > 8192))
         || (d.changed !== undefined && (!Array.isArray(d.changed) || d.changed.length > 64
           || !d.changed.every((k) => changedKeys.includes(k))))) return null;
     const out = { url: d.url, title: d.title, notes: d.notes, tags: d.tags.slice(), tagInput: d.tagInput,
@@ -4517,6 +4573,9 @@ async function pbpRunPopupDraft(message) {
     if (d.summaryTouched !== undefined) out.summaryTouched = d.summaryTouched;
     if (d.sharedExplicit !== undefined) out.sharedExplicit = d.sharedExplicit;
     if (d.changed !== undefined) out.changed = [...new Set(d.changed)].sort();
+    // The self-hosted bookmark the edits were made on (popup.js
+    // pbpPopupExpectedVersion); not an edit of its own.
+    if (d.baseVersion !== undefined) out.baseVersion = d.baseVersion;
     return JSON.stringify(out).length <= 65536 ? out : null;
   };
   // What a row holds of the user's (popup.js pbpPopupDraftEdits has the same shape).
@@ -4830,9 +4889,9 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       }
       await pbpStatusCacheRestore(message.url, auth);
       const cached = pbpStatusCacheGet(message.url, auth);
-      const fresh = cached && Date.now() - cached.timestamp < CACHE_TTL && cached.posts;
+      const fresh = pbpStatusCacheFormPosts(cached, auth);
       sendResponse({
-        posts: fresh ? cached.posts : null,
+        posts: fresh || null,
         // The page as linkding read it, when the check that filled this entry did.
         metadata: fresh ? cached.metadata ?? null : null,
         account: auth.account,
@@ -4865,10 +4924,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       const auth = await getCurrentBookmarkAuth();
       if (!message.account || message.account !== auth.account) { refuse(); return; }
       if (!auth.token) { refuse(); return; }
-      const freshPosts = () => {
-        const cached = pbpStatusCacheGet(url, auth);
-        return cached && Date.now() - cached.timestamp < CACHE_TTL && cached.posts ? cached.posts : null;
-      };
+      const freshPosts = () => pbpStatusCacheFormPosts(pbpStatusCacheGet(url, auth), auth);
       const freshMetadata = () => pbpStatusCacheGet(url, auth)?.metadata ?? null;
       await pbpStatusCacheRestore(url, auth);
       let posts = freshPosts();
@@ -4963,7 +5019,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     // offline-queue row on next popup open, and the other two are not
     // failures. minimum_chrome_version is 123, so getContexts (Chrome 116+)
     // needs no feature-detection fallback.
-    submitPopupSaveIntent(message.intent, message.account, message.summaryRange, message.singleFileTab)
+    submitPopupSaveIntent(message.intent, message.account, message.summaryRange, message.singleFileTab, message.expectedVersion)
       .then(async (result) => {
         if (result.status === "saved" && message.popupDraft) {
           await pbpRunPopupDraft({ ...message.popupDraft, account: message.account, action: "clear" });

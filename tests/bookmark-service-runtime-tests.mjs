@@ -42,6 +42,8 @@ const BLOCKS=[
   'linkding browsing checks',
   'linkding page information from the browser or the server',
   'linkding SingleFile after a new bookmark',
+  'linkding changed elsewhere since loaded',
+  'Karakeep changed elsewhere since loaded',
 ];
 // Self-check before any browser starts: the list above and the block() calls
 // below must name exactly the same blocks, so a block added to one place only
@@ -77,6 +79,10 @@ const pageMetadata=pathname=>pathname==='/article-meta'
   :{title:'Runtime article',description:null};
 // linkding v1.47 serializer timestamps carry microseconds.
 const serverNow=()=>new Date().toISOString().replace(/Z$/,'000Z');
+// Karakeep 0.34.1 keeps modifiedAt in whole seconds (db/schema.ts
+// modifiedAtField: integer mode "timestamp"), stamped by every bookmark
+// update and by updateTags (trpc/routers/bookmarks.ts).
+const karakeepNow=()=>new Date(Math.floor(Date.now()/1000)*1000).toISOString();
 const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'bookmark',type:'manual',public:false,hasCollaborators:false,userRole:'owner'};
 let listCreated=false;
 let holdLinkdingPatch = null;
@@ -204,13 +210,14 @@ const server=createServer(async(req,res)=>{
     }
     const id='b'+(store.size+1);
     // Hand-authored API record schema, independently filled from HTTP input.
-    const row={id,title:data.title,note:data.note,summary:null,archived:false,favourited:false,createdAt:'2026-10-01T00:00:00Z',userId:'u1',tags:[],content:{type:'link',url:data.url,title:'Site title'},assets:[]};
+    const row={id,title:data.title,note:data.note,summary:null,archived:false,favourited:false,createdAt:'2026-10-01T00:00:00Z',modifiedAt:karakeepNow(),userId:'u1',tags:[],content:{type:'link',url:data.url,title:'Site title'},assets:[]};
     store.set(String(id),row);return reply(201,row);
   }
   const id=path.split('/')[1],row=store.get(id);
   if(!row)return reply(404,{});
   if(path.endsWith('/lists'))return reply(200,{lists:membership.has(id)?[list]:[]});
   if(path.endsWith('/tags')){
+    row.modifiedAt=karakeepNow();
     if(req.method==='POST'){for(const tag of data.tags)row.tags.push({id:'tag'+row.tags.length,name:tag.tagName,attachedBy:'human'});return reply(200,{attached:row.tags.map(t=>t.id)});}
     row.tags=row.tags.filter(t=>!data.tags.some(x=>x.tagId===t.id));return reply(200,{detached:data.tags.map(t=>t.tagId)});
   }
@@ -224,7 +231,7 @@ const server=createServer(async(req,res)=>{
     row.date_modified=serverNow();
     return reply(200,serialize(row));
   }
-  if(req.method==='PATCH')Object.assign(row,data);
+  if(req.method==='PATCH'){Object.assign(row,data);row.modifiedAt=karakeepNow();}
   return reply(200,service==='linkding'?serialize(row):row);
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
@@ -651,6 +658,7 @@ try{
   console.log('linkding equal, near-equal, two-second and unparseable server dates remain created');
   });
   await block('linkding multi-line Description',['linkding'],async()=>{
+  const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
   // A Description written elsewhere keeps its line breaks. The popup and the
   // reader show it as one line; a save that leaves that line alone must not
   // flatten it. Hand-written v1.47 record for a URL no lookup has cached yet.
@@ -664,22 +672,31 @@ try{
     await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
     assert.equal(await popup.locator('#linkding-description-input').inputValue(),'First line Second line','the popup did not show the stored Description as one line');
     // Another client rewrites the Description after the popup loaded it, and
-    // again after the popup's first update. A tag-only update leaves it alone
-    // each time: the popup compares with the line it showed, so it neither
-    // flattens the stored value nor writes back the one it loaded.
+    // again after the popup's first update. The first press of each round
+    // stops and shows the new line (user decision 2026-11-02); the tag-only
+    // update then leaves it alone: the popup compares with the line it showed,
+    // so it neither flattens the stored value nor writes back the one it loaded.
+    const pressStoppedThenSaved=async(label,shownLine)=>{
+      const stoppedAt=multiPatches().length;await popup.locator('#submit-btn').click();
+      await popup.locator('#status-msg').filter({hasText:en.bookmarkChangedElsewhere.message}).waitFor({timeout:10000}).catch(error=>{throw new Error(label+': no changed-elsewhere stop ('+error.message+')');});
+      assert.equal(multiPatches().length,stoppedAt,label+': an update changed elsewhere since it loaded was written');
+      assert.equal(await popup.locator('#linkding-description-input').inputValue(),shownLine,label+': the stop did not show the new Description');
+      await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+      const before=multiPatches().length;await popup.locator('#submit-btn').click();
+      await until(()=>multiPatches().length>before,label);
+    };
     const elsewhere=['Changed\n\n  elsewhere','Changed  again'];
     Object.assign(records.linkding.get(multiId),{description:elsewhere[0],date_modified:serverNow()});
     await popup.locator('#tags-input').fill('added');await popup.locator('#tags-input').press('Enter');
-    let before=multiPatches().length;await popup.locator('#submit-btn').click();
-    await until(()=>multiPatches().length>before,'popup tag-only update');
+    let before;
+    await pressStoppedThenSaved('popup tag-only update','Changed elsewhere');
     assert(!Object.hasOwn(multiPatches().at(-1).data,'description'),'a tag-only popup update rewrote the Description');
     assert.equal(records.linkding.get(multiId).description,elsewhere[0],'a tag-only popup update flattened or overwrote the Description');
     assert.deepEqual(records.linkding.get(multiId).tag_names,['kept','added']);
     await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
     Object.assign(records.linkding.get(multiId),{description:elsewhere[1],date_modified:serverNow()});
     await popup.locator('#tags-input').fill('again');await popup.locator('#tags-input').press('Enter');
-    before=multiPatches().length;await popup.locator('#submit-btn').click();
-    await until(()=>multiPatches().length>before,'second popup tag-only update');
+    await pressStoppedThenSaved('second popup tag-only update','Changed again');
     assert(!Object.hasOwn(multiPatches().at(-1).data,'description'),'a second tag-only popup update wrote the Description it loaded');
     assert.equal(records.linkding.get(multiId).description,elsewhere[1],'a second tag-only popup update overwrote a Description changed elsewhere');
     await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
@@ -709,12 +726,20 @@ try{
     await popup.locator('#title-input').fill('Drafted title');
     await until(async()=>(await storedDraft())?.title==='Drafted title','title edit drafted');
     assert(!Object.hasOwn(await storedDraft(),'summary'),'the draft kept the Description the lookup filled in');
+    assert.equal(typeof (await storedDraft()).baseVersion,'string','the draft does not say which bookmark its edits were made on');
     await popup.close();
     const elsewhere='Changed\n\n  in another client';
     Object.assign(records.linkding.get(multiId),{description:elsewhere,date_modified:serverNow()});await clearLookups();
     popup=await openPopup();await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
     assert.equal(await popup.locator('#title-input').inputValue(),'Drafted title','the title draft was not restored');
     assert.equal(await popup.locator('#linkding-description-input').inputValue(),'Changed in another client','the reopened popup did not show the current Description');
+    // The draft's title was typed on the bookmark as the first open loaded it,
+    // which has changed since: the first press stops, keeping the title.
+    const stoppedAt=multiPatches().length;await popup.locator('#submit-btn').click();
+    await popup.locator('#status-msg').filter({hasText:en.bookmarkChangedElsewhere.message}).waitFor({timeout:10000});
+    assert.equal(multiPatches().length,stoppedAt,'a restored draft made on an older version was written');
+    assert.equal(await popup.locator('#title-input').inputValue(),'Drafted title','the stop dropped the restored title');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
     const before=multiPatches().length;await popup.locator('#submit-btn').click();
     await until(()=>multiPatches().length>before,'update from a restored title draft');
     assert.equal(multiPatches().at(-1).data.title,'Drafted title');
@@ -2028,6 +2053,146 @@ try{
       await popup.evaluate(()=>pbpDiscardPopupDraft());await popup.close();
     }finally{worker.off('console',onConsole);}
     console.log('linkding SingleFile: a popup create skips linkding\'s snapshot, asks SingleFile once, says so when it does not answer; an update or a typed address does not');
+  });
+  // User decision 2026-11-02 (A01, B02): an update from the popup or the reader
+  // editor is checked against the bookmark as that form loaded it. Changed
+  // elsewhere since, nothing is written; the form shows the new bookmark and
+  // keeps the user's edits, and the next press saves on top of it. The check
+  // is the duplicate check the save makes anyway: no other read is added.
+  const formTags=popup=>popup.evaluate(()=>currentTags.slice());
+  const pressStopped=async(popup,writes,key,label)=>{
+    const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
+    const before=writes().length;await popup.locator('#submit-btn').click();
+    await popup.locator('#status-msg').filter({hasText:en[key].message}).waitFor({timeout:10000}).catch(error=>{throw new Error(label+': the update did not stop ('+error.message+')');});
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    assert.equal(writes().length,before,label+': an update made on an older version was written');
+  };
+  const pressSaved=async(popup,writes,label)=>{
+    const before=writes().length;await popup.locator('#submit-btn').click();
+    await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),label).catch(async error=>{console.error({status:await popup.locator('#status-msg').textContent()});throw error;});
+    assert(writes().length>before,label+': nothing was written');
+  };
+  await block('linkding changed elsewhere since loaded',['linkding'],async()=>{
+    const id='51',pageAt=origin+'/article';
+    records.linkding.set(id,{id:51,url:pageAt,title:'Loaded title',description:'Loaded description',notes:'Loaded notes',web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:['kept'],date_added:'2026-10-30T03:01:22.656384Z',date_modified:'2026-10-30T03:01:22.656384Z',website_title:null,website_description:null});
+    const row=()=>records.linkding.get(id);
+    const patches=()=>requests.filter(r=>r.service==='linkding'&&r.method==='PATCH');
+    // Every linkding read: a /check/ (which also makes linkding fetch the page) or a read by ID.
+    const reads=()=>requests.filter(r=>r.service==='linkding'&&r.method==='GET'&&/^bookmarks\//.test(r.path));
+    const readsSince=n=>reads().slice(n).map(r=>r.path);
+    // Another client's PATCH (serializers.py update) stamps date_modified.
+    const elsewhere=fields=>Object.assign(row(),fields,{date_modified:serverNow()});
+    // A form that loaded fresh from the server.
+    let popup=await openOnTab();await settled(popup,'found');
+    elsewhere({notes:'Notes from elsewhere',tag_names:['kept','theirs']});
+    await popup.locator('#title-input').fill('My title');
+    await popup.locator('#tags-input').fill('mine');await popup.locator('#tags-input').press('Enter');
+    let readAt=reads().length;
+    await pressStopped(popup,patches,'bookmarkChangedElsewhere','linkding popup');
+    assert.deepEqual(readsSince(readAt),['bookmarks/check/'],'the check added a read');
+    assert.equal(await popup.locator('#title-input').inputValue(),'My title','the stop dropped the edited title');
+    assert.equal(await popup.locator('#description-input').inputValue(),'Notes from elsewhere','the stop did not show the notes written elsewhere');
+    assert.deepEqual(await formTags(popup),['kept','theirs','mine'],'the tag edit was not made on the tags written elsewhere');
+    readAt=reads().length;
+    await pressSaved(popup,patches,'linkding popup after the stop');
+    assert.deepEqual(readsSince(readAt),['bookmarks/check/']);
+    assert.deepEqual([patches().at(-1).data.title,patches().at(-1).data.notes,patches().at(-1).data.tag_names],['My title','Notes from elsewhere',['kept','theirs','mine']]);
+    // Unchanged since (linkding answered the update with the bookmark): one read, one write.
+    await popup.locator('#title-input').fill('Third title');
+    readAt=reads().length;const patchAt=patches().length;
+    await pressSaved(popup,patches,'linkding popup, unchanged');
+    assert.deepEqual([readsSince(readAt),patches().length-patchAt,row().title],[['bookmarks/check/'],1,'Third title']);
+    await popup.close();
+    // Within the five-minute cache: the popup loads the cached lookup, and the
+    // save's own check finds the newer bookmark.
+    await forgetLookups();
+    popup=await openOnTab();await settled(popup,'found');await popup.close();
+    elsewhere({notes:'Cache-era notes'});
+    readAt=reads().length;
+    popup=await openOnTab();await settled(popup,'found');
+    assert.deepEqual(readsSince(readAt),[],'the reopened popup did not load the cached lookup');
+    assert.equal(await popup.locator('#description-input').inputValue(),'Notes from elsewhere','setup: the cached lookup is not the older one');
+    await popup.locator('#title-input').fill('Cached title');
+    await pressStopped(popup,patches,'bookmarkChangedElsewhere','linkding popup from the cache');
+    assert.deepEqual([await popup.locator('#title-input').inputValue(),await popup.locator('#description-input').inputValue()],['Cached title','Cache-era notes']);
+    await pressSaved(popup,patches,'linkding popup from the cache, after the stop');
+    assert.deepEqual([row().title,row().notes],['Cached title','Cache-era notes']);
+    await popup.close();
+    // A cached lookup from before the loaded state was kept (a worker from an
+    // earlier version, or its storage.session copy) is read again on open.
+    await forgetLookups();
+    popup=await openOnTab();await settled(popup,'found');await popup.close();
+    const stripped=await worker.evaluate(url=>{const entry=statusCache.get(url);if(!entry?.posts?.length)return false;entry.posts=entry.posts.map(({version,...post})=>post);return true;},pageAt);
+    assert(stripped,'setup: no cached lookup of the page');
+    readAt=reads().length;
+    popup=await openOnTab();await settled(popup,'found');
+    assert.deepEqual(readsSince(readAt),['bookmarks/check/'],'a cached lookup without its loaded state was used');
+    await popup.locator('#title-input').fill('Reloaded title');
+    await pressSaved(popup,patches,'linkding popup after reading an old cache entry again');
+    await popup.close();
+    // The reader editor: Apply is checked against the bookmark it opened on.
+    const account=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
+    await worker.evaluate(async data=>chrome.storage.local.set({md_preview_data_changed:{markdown:'# Runtime article',title:'Runtime article',url:data.url,baseUrl:data.url,account:data.account,tags:[],description:'',source:'local',ts:Date.now()}}),{url:pageAt,account});
+    const reader=await ctx.newPage();await reader.goto(pageUrl+'md-preview.html?k=changed');
+    try{
+      const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
+      await reader.locator('#reader-bookmark-edit[aria-busy="false"]').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
+      elsewhere({title:'Retitled elsewhere',notes:'Reader-era notes'});
+      await reader.locator('#reader-bookmark-tags').fill('kept theirs reader');
+      const stoppedAt=patches().length;await reader.locator('#reader-bookmark-apply').click();
+      await reader.locator('#reader-bookmark-editor-status').filter({hasText:en.bookmarkChangedElsewhere.message}).waitFor({timeout:10000});
+      assert.equal(patches().length,stoppedAt,'a reader edit made on an older version was written');
+      assert(await reader.locator('#reader-bookmark-editor:popover-open').count(),'the stop closed the editor');
+      assert.deepEqual(await reader.evaluate(()=>['title','notes','tags'].map(name=>document.getElementById('reader-bookmark-'+name).value)),
+        ['Retitled elsewhere','Reader-era notes','kept theirs reader'],'the editor did not take the new bookmark around the user\'s edit');
+      await reader.locator('#reader-bookmark-apply').click();
+      await until(()=>patches().length>stoppedAt,'reader edit after the stop');
+      assert.deepEqual([row().title,row().notes,row().tag_names],['Retitled elsewhere','Reader-era notes',['kept','theirs','reader']]);
+    }finally{await reader.close();}
+    console.log('linkding: popup (fresh, cached, old cache entry) and reader updates stop when the bookmark changed elsewhere, keep the user\'s edits, and save on the next press; no read added');
+  });
+  await block('Karakeep changed elsewhere since loaded',['karakeep'],async()=>{
+    const id='kk51';
+    records.karakeep.set(id,{id,title:'Loaded title',note:'Loaded note',summary:null,archived:false,favourited:false,createdAt:'2026-10-30T03:05:10.000Z',modifiedAt:'2026-10-30T03:05:10.000Z',userId:'u1',
+      tags:[{id:'tagk',name:'kept',attachedBy:'human'}],content:{type:'link',url:origin+'/article',title:'Site title'},assets:[]});
+    const row=()=>records.karakeep.get(id);
+    const writes=()=>requests.filter(r=>r.service==='karakeep'&&r.method!=='GET');
+    const reads=()=>requests.filter(r=>r.service==='karakeep'&&r.method==='GET'&&/^bookmarks\/(check-url|kk51)$/.test(r.path));
+    // Karakeep's AI tags the bookmark: tagging.ts inserts the tag, modifiedAt stays.
+    let popup=await openOnTab();await settled(popup,'found');
+    row().tags.push({id:'tagai',name:'ai-tag',attachedBy:'ai'});
+    await popup.locator('#title-input').fill('My title');
+    let readAt=reads().length;
+    await pressStopped(popup,writes,'bookmarkChangedElsewhere','Karakeep AI tag');
+    assert.deepEqual(reads().slice(readAt).map(r=>r.path),['bookmarks/check-url','bookmarks/kk51'],'the check added a read');
+    assert.deepEqual(await formTags(popup),['kept','ai-tag'],'the form did not take the AI tag');
+    await pressSaved(popup,writes,'Karakeep after the AI tag');
+    assert(!requests.some(r=>r.service==='karakeep'&&r.method==='DELETE'&&r.path==='bookmarks/kk51/tags'),'the update removed the AI tag');
+    assert.deepEqual([row().title,row().tags.map(tag=>tag.name)],['My title',['kept','ai-tag']]);
+    // Karakeep changes tags and Read Later after it answers, so a second
+    // update from the same form loads the bookmark again first.
+    await popup.locator('#title-input').fill('Same-form title');
+    await pressStopped(popup,writes,'saveNeedsReview','Karakeep second update from one form');
+    await pressSaved(popup,writes,'Karakeep second update after loading again');
+    assert.equal(row().title,'Same-form title');
+    await popup.close();
+    // A client edits the note: modifiedAt is stamped.
+    popup=await openOnTab();await settled(popup,'found');
+    Object.assign(row(),{note:'Note from elsewhere',modifiedAt:'2026-10-30T04:00:00.000Z'});
+    await popup.locator('#title-input').fill('Second title');
+    await pressStopped(popup,writes,'bookmarkChangedElsewhere','Karakeep note edit');
+    assert.equal(await popup.locator('#description-input').inputValue(),'Note from elsewhere');
+    await pressSaved(popup,writes,'Karakeep after the note edit');
+    assert.deepEqual([row().title,row().note],['Second title','Note from elsewhere']);
+    await popup.close();
+    // Unchanged since loading: the same reads as before, one PATCH.
+    popup=await openOnTab();await settled(popup,'found');
+    await popup.locator('#title-input').fill('Third title');
+    readAt=reads().length;const writeAt=writes().length;
+    await pressSaved(popup,writes,'Karakeep, unchanged');
+    assert.deepEqual([reads().slice(readAt).map(r=>r.path),writes().slice(writeAt).map(r=>r.method+' '+r.path)],[['bookmarks/check-url','bookmarks/kk51'],['PATCH bookmarks/kk51']]);
+    await popup.close();
+    console.log('Karakeep: popup updates stop on an AI tag or an edit made elsewhere, keep the user\'s edits, save on the next press; no read added');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));

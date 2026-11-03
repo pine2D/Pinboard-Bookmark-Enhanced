@@ -271,6 +271,7 @@
     "message": "Already bookmarked. Check the fields, then press Update again."
   },
   "bookmarkDeletedElsewhere": {"message": "This bookmark was deleted elsewhere, so your changes were not saved. To bookmark the page again, press Save."},
+  "bookmarkChangedElsewhere": {"message": "This bookmark was changed elsewhere after you opened it, so your changes were not saved. Check the latest version, then save again."},
   "recentEditTitle": {
     "message": "Load for editing"
   },

@@ -39,6 +39,11 @@
   // the user changed it: an untouched line keeps a stored multi-line value as
   // it is, and an unknown one (shown empty) stays for linkding to fill in.
   let shownSummary = "";
+  // The bookmark the open editor was filled from: {version, shown}. version
+  // (pbpBookmarkVersion) goes with Apply, so an edit is not saved over changes
+  // made elsewhere since (user decision 2026-11-02); shown is what each field
+  // held then, so a field the user left alone can take the newer value.
+  let editorBase = null;
   const buttons = [];
   const text = (key, ...args) => typeof t === "function" ? t(key, ...args) : key;
   const id = name => document.getElementById("reader-bookmark-" + name);
@@ -305,6 +310,32 @@
     });
   }
 
+  // What each editor field shows for a bookmark's values.
+  function editorFields(values) {
+    return {
+      title: typeof values.title === "string" ? values.title : context.title || "",
+      tags: typeof values.tags === "string" ? values.tags : pbpBookmarkFormatTags(context.bookmark?.tags || []),
+      summary: state.descriptionSupported === true && typeof values.summary === "string" ? pbpBookmarkDescriptionLine(values.summary) : "",
+      notes: typeof values.notes === "string" ? values.notes : context.bookmark?.notes || "",
+      private: state.sharingSupported === true ? values.private === false : state.privacySupported === false || values.private === true,
+      toread: values.toread === true,
+    };
+  }
+
+  // The bookmark changed elsewhere since the editor opened: the fields the
+  // user left alone take its new values, the ones they changed keep their
+  // text, and Apply now saves on top of this version.
+  function rebaseEditor() {
+    if (!editor || !state.known || !state.bookmarked) return;
+    const shown = editorBase?.shown || {};
+    const latest = editorFields(state.bookmark || {});
+    for (const name of ["title", "tags", "summary", "notes"]) if (id(name).value === shown[name]) id(name).value = latest[name];
+    for (const name of ["private", "toread"]) if (id(name).checked === shown[name]) id(name).checked = latest[name];
+    if (!sharedExplicit) sharingChoice = id("private").checked;
+    shownSummary = latest.summary;
+    editorBase = { version: state.bookmark?.version, shown: latest };
+  }
+
   // The tags the server holds for this page's bookmark, "" for none or no bookmark.
   function storedTags() {
     return state.known && state.bookmarked && typeof state.bookmark?.tags === "string" ? state.bookmark.tags.trim() : "";
@@ -351,17 +382,16 @@
     const values = { ...(state.bookmark || context.bookmark?.draft || {}),
       ...(typeof tagFix?.tags === "string" ? { tags: tagFix.tags } : {}) };
     if (tagFix) { failureArgs.set("bookmarkErrTagTooLong", tagFix.args); editorStatusKey = "bookmarkErrTagTooLong"; paint(); }
-    id("title").value = typeof values.title === "string" ? values.title : context.title || "";
+    const fields = editorFields(values);
     label(id("tags").closest("label").firstElementChild, state.quotedTags === true ? "readerBookmarkTagsQuoted" : "readerBookmarkTags");
-    id("tags").value = typeof values.tags === "string" ? values.tags : pbpBookmarkFormatTags(context.bookmark?.tags || []);
     id("summary").closest("label").hidden = state.descriptionSupported !== true;
-    id("summary").value = state.descriptionSupported === true && typeof values.summary === "string" ? pbpBookmarkDescriptionLine(values.summary) : "";
-    shownSummary = id("summary").value;
-    id("notes").value = typeof values.notes === "string" ? values.notes : context.bookmark?.notes || "";
     const privacyLabel = id("private").closest("label");
     privacyLabel.hidden = state.privacySupported === false && state.sharingSupported !== true;
     label(privacyLabel.lastElementChild, state.sharingSupported === true ? "bookmarkShare" : "readerBookmarkPrivate");
-    id("private").checked = state.sharingSupported === true ? values.private === false : state.privacySupported === false || values.private === true; id("toread").checked = values.toread === true;
+    for (const name of ["title", "tags", "summary", "notes"]) id(name).value = fields[name];
+    for (const name of ["private", "toread"]) id(name).checked = fields[name];
+    shownSummary = fields.summary;
+    editorBase = { version: state.known && state.bookmarked ? state.bookmark?.version : undefined, shown: fields };
     // Only a click on this Share box records a sharing choice; the popup's
     // draft never shares a bookmark the reader creates.
     sharedExplicit = false;
@@ -448,7 +478,8 @@
     // An edit or Read Later changes the bookmark the bar showed. If it has been
     // deleted elsewhere since, the worker stops instead of creating it again.
     const result = await request({ type: "mdReaderBookmarkSave", action, ...(draft ? { draft } : {}),
-      ...(action === "edit" || action === "later" ? { expectBookmarked: wasBookmarked } : {}) });
+      ...(action === "edit" || action === "later" ? { expectBookmarked: wasBookmarked } : {}),
+      ...(action === "edit" && typeof editorBase?.version === "string" ? { expectedVersion: editorBase.version } : {}) });
     if (gen !== generation) return;
     if (result?.account && result.account !== context.account) {
       inflight = false; showStatus("readerBookmarkAccountChanged"); return;
@@ -471,6 +502,19 @@
       await refresh(gen);
       if (gen !== generation) return;
       statusKey = "readerBookmarkDeletedElsewhere";
+      if (action === "edit") editorStatusKey = statusKey;
+    } else if (result?.reason === "changed_elsewhere") {
+      // Nothing was written. The worker's check found the bookmark as it is
+      // now; the bar and the open editor take it, keeping the user's edits.
+      if (result.bookmark && typeof result.bookmark === "object") {
+        state = { ...state, known: true, bookmarked: true, bookmark: result.bookmark };
+        publishState();
+      } else {
+        await refresh(gen);
+        if (gen !== generation) return;
+      }
+      if (action === "edit") rebaseEditor();
+      statusKey = "bookmarkChangedElsewhere";
       if (action === "edit") editorStatusKey = statusKey;
     } else if (result?.reason === "partial") {
       await refresh(gen);

@@ -4823,6 +4823,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const deps = {
         getCurrentBookmarkAuth: async () => auth,
         pbpStatusCacheGet: () => null,
+        // Nothing is cached here, so there are no posts a form could load.
+        pbpStatusCacheFormPosts: () => null,
         pbpStatusCacheSet: () => true,
         pbpStatusCacheRestore: async () => {},
         CACHE_TTL: 300000,

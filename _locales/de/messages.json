@@ -268,6 +268,7 @@
     "message": "Bereits als Lesezeichen gespeichert. Prüfe die Felder und klicke erneut auf „Aktualisieren“."
   },
   "bookmarkDeletedElsewhere": {"message": "Dieses Lesezeichen wurde an anderer Stelle gelöscht, deine Änderungen wurden daher nicht gespeichert. Um die Seite erneut zu speichern, klicke auf „Speichern“."},
+  "bookmarkChangedElsewhere": {"message": "Dieses Lesezeichen wurde an anderer Stelle geändert, nachdem du es geöffnet hast. Deine Änderungen wurden daher nicht gespeichert. Prüfe die aktuelle Fassung und speichere dann erneut."},
   "recentEditTitle": {
     "message": "Zum Bearbeiten laden"
   },

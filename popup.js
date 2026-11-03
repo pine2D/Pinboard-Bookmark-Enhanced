@@ -89,6 +89,21 @@ function pbpPopupFormIsDirty() {
   return Object.values(fieldDirtyFlags).some(Boolean) || _tagsUserTouched || _popupDraftEdited;
 }
 
+// An update stopped because the bookmark changed elsewhere: the user's tag
+// changes (against the tags the form loaded) made on the server's tags now,
+// so a tag added there, by hand or by Karakeep's AI, stays. Without the
+// loaded tags (they came from a draft) the user's list stands as it is.
+function pbpPopupRebaseLoadedTags(loaded, mine, latest) {
+  const theirs = Array.isArray(latest) ? latest : [];
+  if (!Array.isArray(loaded)) return mine.slice();
+  const loadedKeys = new Set(loaded.map(pbpTagTwinKey));
+  const mineKeys = new Set(mine.map(pbpTagTwinKey));
+  const removed = new Set(loaded.filter((tag) => !mineKeys.has(pbpTagTwinKey(tag))).map(pbpTagTwinKey));
+  const kept = theirs.filter((tag) => !removed.has(pbpTagTwinKey(tag)));
+  const keptKeys = new Set(kept.map(pbpTagTwinKey));
+  return [...kept, ...mine.filter((tag) => !loadedKeys.has(pbpTagTwinKey(tag)) && !keptKeys.has(pbpTagTwinKey(tag)))];
+}
+
 function pbpRebasePopupTags(serverTags, submittedTags, liveTags) {
   if (Array.isArray(serverTags)) {
     const baseline = Array.isArray(submittedTags) ? submittedTags : [];
@@ -367,17 +382,37 @@ const _popupDraftChangedFields = new Set();
 // a save or a discard; the fields outside it stay with the page and the
 // bookmark lookup instead of a frozen copy (A02 P29).
 let _popupDraftRestoredFields = new Set();
+// The self-hosted bookmark a restored draft's edits were made on: {url,
+// version} (pbpBookmarkVersion), version undefined for a draft that does not
+// say. It stands for this form's loaded state until an update is checked
+// against the server, which then shows the bookmark as it is now.
+let _popupDraftBase = null;
+// What an update from this form is checked against: the bookmark as the form
+// loaded it (user decision 2026-11-02). undefined when that is not known,
+// which the worker never takes as a match.
+function pbpPopupExpectedVersion(url) {
+  if (_popupDraftBase && _popupDraftBase.url === url) return _popupDraftBase.version;
+  return existingBookmark && bookmarkLookup.url === url && typeof existingBookmark.version === "string"
+    ? existingBookmark.version : undefined;
+}
 function pbpPopupDraftRestoredField(key) {
   return _popupDraftRestored && (_popupDraftRestoredFields === null || _popupDraftRestoredFields.has(key));
 }
 function pbpPopupDraftSnapshot() {
+  const baseVersion = typeof pbpPopupExpectedVersion === "function" ? pbpPopupExpectedVersion($id("url-input").value.trim()) : undefined;
   const changed = _popupDraftRestoredFields === null ? null
     : [...new Set([..._popupDraftRestoredFields, ..._popupDraftChangedFields, ...(_tagsUserTouched ? ["tags"] : [])])].sort();
   return { url: $id("url-input").value, title: $id("title-input").value,
     notes: $id("description-input").value,
     ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(_linkdingDescriptionPending ? { summary: $id("linkding-description-input").value } : {}), summaryTouched: _linkdingDescriptionTouched, sharedExplicit: _linkdingSharedExplicit } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
     private: $id("private-check").checked, toread: $id("readlater-check").checked,
-    archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched, ...(changed ? { changed } : {}) };
+    archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched, ...(changed ? { changed } : {}),
+    ...(baseVersion !== undefined ? { baseVersion } : {}) };
+}
+// A draft write is needed when the user's edits change, or the loaded state
+// they were made on does (the lookup answered after the first keystroke).
+function pbpPopupDraftKey(d) {
+  return pbpPopupDraftEdits(d) + "\n" + (d.baseVersion ?? "");
 }
 // What a draft holds of the user's: the changed fields and their values (the
 // worker's clear compares the same shape). The rest of a snapshot is the form
@@ -396,7 +431,7 @@ function pbpRememberPopupDraft() {
   if (!pbpPopupFormIsDirty() && !_popupDraftEdited && !$id("tags-input").value) return;
   if (_tagsUserTouched) _popupDraftChangedFields.add("tags");
   const draft = pbpPopupDraftSnapshot();
-  const snapshot = pbpPopupDraftEdits(draft);
+  const snapshot = pbpPopupDraftKey(draft);
   if (snapshot === _popupDraftLastSnapshot) return;
   _popupDraftLastSnapshot = snapshot;
   _popupDraftEdited = true;
@@ -562,6 +597,9 @@ async function initPopupDraft(account, tab) {
       }
       _popupDraftRestored = true;
       _popupDraftRestoredFields = restored;
+      // The restored edits were made on the bookmark as that open loaded it,
+      // not on what this open's lookup shows (A01).
+      _popupDraftBase = { url: String(d.url || "").trim(), version: typeof d.baseVersion === "string" ? d.baseVersion : undefined };
       // Only the drafted fields count as edited; the rest still take the
       // page's values and the bookmark lookup's.
       for (const id of Object.keys(fieldDirtyFlags)) {
@@ -572,7 +610,7 @@ async function initPopupDraft(account, tab) {
         if (!_popupDraftChangedFields.has("tags")) currentTags = d.tags.slice();
       }
       // Rendering a restored form does not refresh its expiry timestamp.
-      if (revision === _popupDraftRevision) _popupDraftLastSnapshot = pbpPopupDraftEdits(pbpPopupDraftSnapshot());
+      if (revision === _popupDraftRevision) _popupDraftLastSnapshot = pbpPopupDraftKey(pbpPopupDraftSnapshot());
       context.ready = true;
       renderTags();
       showStatus("status-msg", t("popupDraftRestored"), "info");
@@ -1977,6 +2015,9 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
           banner.classList.remove("hidden");
         }
         bookmarkLookup = { status: "found", url: lookupUrl, generation, promise: null, formLoaded: true };
+        // Edits typed before this answer were made on this bookmark: their
+        // draft now records it as the loaded state.
+        if (typeof _popupDraftContext !== "undefined" && _popupDraftContext?.ready && typeof pbpRememberPopupDraft === "function") pbpRememberPopupDraft();
         // Cached AI chips may have rendered before this lookup supplied the
         // bookmark's own tag spelling. Refresh those chips from their raw
         // result; this does not request AI or write the shared cache.
@@ -2423,6 +2464,17 @@ function setupSubmit(token) {
         && currentTags.length === tags.length
         && currentTags.every((tag, index) => tag === tags[index])
       );
+      // An update is checked against the bookmark as this form loaded it. If it
+      // has changed elsewhere since, the form takes the new one and keeps what
+      // the user edited, so the edits made so far are put back then.
+      const expectedVersion = savePolicy.mode === "update" && pbpBookmarkServiceId(settings) !== "pinboard"
+        && typeof pbpPopupExpectedVersion === "function" ? pbpPopupExpectedVersion(url) : undefined;
+      const dirtyAtSubmit = { ...fieldDirtyFlags };
+      const tagsTouchedAtSubmit = _tagsUserTouched;
+      // The tag list the form loaded, which the user's tag changes are made on;
+      // null when restored tags came from a draft of an earlier open.
+      const loadedTagsAtSubmit = !(typeof pbpPopupDraftRestoredField === "function" && pbpPopupDraftRestoredField("tags")) && Array.isArray(existingBookmark?.tagNames)
+        ? existingBookmark.tagNames.slice() : null;
       Object.keys(fieldDirtyFlags).forEach((id) => { fieldDirtyFlags[id] = false; });
       _tagsUserTouched = false;
 
@@ -2456,7 +2508,7 @@ function setupSubmit(token) {
         && typeof pbpPopupFormHoldsOpenedPage === "function" && pbpPopupFormHoldsOpenedPage()
         ? { id: openedTab.id, url: openedTab.url } : null;
       const result = await chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft, summaryRange: summaryOwnership,
-        ...(singleFileTab ? { singleFileTab } : {}) });
+        ...(singleFileTab ? { singleFileTab } : {}), ...(expectedVersion !== undefined ? { expectedVersion } : {}) });
       if (!result || typeof result !== "object" || typeof result.status !== "string") {
         throw new Error("invalid save response");
       }
@@ -2469,6 +2521,36 @@ function setupSubmit(token) {
       }
       if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
         if (ownsSubmitUi()) setSubmitState("idle");
+        return;
+      }
+
+      if (result.status === "failed" && result.reason === "changed_elsewhere") {
+        // Nothing was written. The form takes the bookmark as the server holds
+        // it now (the worker's own check found it, so no request is made
+        // here): the fields the user left alone show the new values, the ones
+        // they changed keep their text, and their tag changes are made on the
+        // new tags. Their next press saves on top of that version.
+        for (const id of Object.keys(fieldDirtyFlags)) fieldDirtyFlags[id] = fieldDirtyFlags[id] || dirtyAtSubmit[id] === true;
+        _tagsUserTouched = _tagsUserTouched || tagsTouchedAtSubmit;
+        const mineTags = currentTags.slice();
+        const latest = result.latestPost && typeof result.latestPost === "object" ? result.latestPost : null;
+        const reloadPromise = checkExistingBookmark(token, url,
+          latest ? { prefetchUrl: url, prefetchPromise: Promise.resolve({ posts: [latest], account: submitAccount }) } : null, !latest);
+        const reloadGeneration = bookmarkLookup.generation;
+        const reloaded = await reloadPromise;
+        if (!ownsSubmitUi()) return;
+        if (bookmarkLookup.generation !== reloadGeneration || bookmarkLookup.url !== url || $id("url-input").value.trim() !== url) {
+          setSubmitState("idle");
+          return;
+        }
+        if (reloaded.status === "found") {
+          currentTags = pbpPopupRebaseLoadedTags(loadedTagsAtSubmit, mineTags, existingBookmark?.tagNames);
+          renderTags();
+          _popupDraftBase = null;
+          pbpRememberPopupDraft();
+        }
+        showStatus("status-msg", t(result.unverified ? "saveNeedsReview" : "bookmarkChangedElsewhere"), "info");
+        setSubmitState("idle");
         return;
       }
 
@@ -2487,12 +2569,16 @@ function setupSubmit(token) {
         // bookmark so Retry updates it instead of repeating a create or skip.
         Object.keys(fieldDirtyFlags).forEach(id => { fieldDirtyFlags[id] = true; });
         _tagsUserTouched = true;
+        // This save wrote part of the bookmark: the reload is the form's
+        // loaded state now, not a restored draft's.
+        _popupDraftBase = null;
         await checkExistingBookmark(token, url, null, true);
         if (ownsSubmitUi()) { setSubmitState("idle"); showSaveError(result); }
         return;
       }
 
       if (result.status === "skipped" || (result.status === "failed" && result.reason === "conflict")) {
+        _popupDraftBase = null;
         const conflictLookupPromise = checkExistingBookmark(token, url, null, true, tags);
         const conflictLookupGeneration = bookmarkLookup.generation;
         const conflictLookup = await conflictLookupPromise;
@@ -2555,6 +2641,7 @@ function setupSubmit(token) {
           pbpRememberPopupDraft();
         }
         if (typeof saveLastUsedTags === "function") saveLastUsedTags(tags, submitAccount);
+        _popupDraftBase = null;
         if (savePolicy.mode === "update") {
           existingBookmark = {
             href: url,
@@ -2568,6 +2655,9 @@ function setupSubmit(token) {
             shared: isPrivate ? "no" : "yes",
             toread: isReadLater ? "yes" : "no",
             time: intent.time,
+            // The bookmark as linkding answered this update; without it (Karakeep)
+            // a further update here loads the bookmark again first.
+            ...(typeof result.version === "string" ? { version: result.version } : {}),
           };
         } else {
           checkExistingBookmark(token, url, null, true, tags);
@@ -2853,6 +2943,7 @@ async function loadBookmarkForEdit(url, token) {
   _popupDraftUserUrl = false;
   _popupDraftRestored = false;
   _popupDraftRestoredFields = new Set();
+  _popupDraftBase = null;
   _popupDraftEdited = false;
   // Reset current form state
   invalidateBookmarkLookup();

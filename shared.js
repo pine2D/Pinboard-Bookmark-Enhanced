@@ -2361,7 +2361,8 @@ const PBP_BOOKMARK_FAILURE_KEYS = Object.freeze({
   server:"bookmarkErrServer", rate_limited:"bookmarkErrRateLimit", remote:"bookmarkErrRemote",
   payload_too_large:"bookmarkErrTooLarge", invalid_response:"bookmarkErrInvalidResponse",
   account_changed:"bookmarkErrAccountChanged", duplicate_unknown:"bookmarkErrDuplicateUnknown",
-  too_long:"titleTooLong", url_invalid:"bookmarkErrUrlInvalid", read_later_list:"bookmarkErrReadLaterList"});
+  too_long:"titleTooLong", url_invalid:"bookmarkErrUrlInvalid", read_later_list:"bookmarkErrReadLaterList",
+  changed_elsewhere:"bookmarkChangedElsewhere"});
 // The only self-hosted causes a second attempt can get past. Everything else
 // (a 4xx, a 413, a gateway, a token, a grant, an unreadable reply) meets the
 // same answer again, so no outlet offers a retry for it.

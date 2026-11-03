@@ -14,7 +14,11 @@ const pageUrl = "https://example.com/article";
 const ld = {id:7, url:pageUrl, title:"Saved title", description:"Website summary", notes:"My note", tag_names:["work"], unread:true, shared:false, is_archived:false, date_added:"2026-10-01T10:00:00Z", date_modified:"2026-10-01T10:00:00Z"};
 // linkding 1.47 POST serializer (T7): an existing URL keeps date_added.
 const ldMergedPost = {id:11,url:pageUrl,title:"T",description:"",notes:"",web_archive_snapshot_url:"https://web.archive.org/web/20261030030122/https://example.com/article",favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:["pbp-research","second"],date_added:"2026-10-30T03:01:22.656384Z",date_modified:"2026-10-30T04:01:22.656384Z",website_title:null,website_description:null};
-const kk = {id:"bk1", createdAt:"2026-10-01T10:00:00Z", modifiedAt:null, title:"Saved title", archived:true, favourited:false, note:"My note", summary:null, userId:"user1", tags:[{id:"tag1",name:"work",attachedBy:"human"}], content:{type:"link",url:pageUrl,title:"Crawled title",description:"Website summary"}, assets:[]};
+const kk = {id:"bk1", createdAt:"2026-10-01T10:00:00Z", modifiedAt:"2026-10-01T10:00:00.000Z", title:"Saved title", archived:true, favourited:false, note:"My note", summary:null, userId:"user1", tags:[{id:"tag1",name:"work",attachedBy:"human"}], content:{type:"link",url:pageUrl,title:"Crawled title",description:"Website summary"}, assets:[]};
+// What a popup that loaded ld / kk has as their loaded state: the read-side
+// projection of those server answers, as a lookup gives it to the form.
+const LD_LOADED = pbpBookmarkAsPost(pbpBookmarkNormalize("linkding", ld)).version;
+const KK_LOADED = pbpBookmarkAsPost(pbpBookmarkNormalize("karakeep", kk)).version;
 // Django 6.0 with DEBUG off answers an unhandled database error with its stock
 // page (django/views/defaults.py server_error; linkding v1.47 ships no
 // 500.html). linkding on PostgreSQL meets a tag longer than Tag.name's
@@ -571,7 +575,7 @@ test("a Karakeep popup update owns the note it wrote; a live merge into an ident
   const notes="Auto notes\n\n" + KK_SUMMARY, range={start:"Auto notes\n\n".length, end:notes.length};
   await pbpFixtureClearSummaryOwnership();
   const updated=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[200,{id:"bk1",title:"Title",note:notes}]]);
-  const result=await updated.submitPopupSaveIntent({...saveIntent,mode:"update",time:kk.createdAt,tags:"work",notes},(await updated.auth()).account,range);
+  const result=await updated.submitPopupSaveIntent({...saveIntent,mode:"update",time:kk.createdAt,tags:"work",notes},(await updated.auth()).account,range,undefined,KK_LOADED);
   equal([result.status, updated.state.calls.map(c=>c.method), updated.state.calls[2]?.body?.note],["saved",["GET","GET","PATCH"],notes]);
   const popup=await kkPopup(updated, notes);
   const owner=await popup.restore();
@@ -639,7 +643,7 @@ test("a Karakeep update that cannot say which block it owns leaves the page's re
     const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[200,{id:"bk1",title:"Title",note:notes}]]);
     const account=(await h.auth()).account;
     await pbpAiSaveSummaryOwnership(account, saveIntent.url, notes, range);
-    const result=await h.submitPopupSaveIntent({...saveIntent,mode:"update",time:kk.createdAt,tags:"work",notes},account,snapshot);
+    const result=await h.submitPopupSaveIntent({...saveIntent,mode:"update",time:kk.createdAt,tags:"work",notes},account,snapshot,undefined,KK_LOADED);
     equal([label, result.status, h.state.calls.map(c=>c.method)],[label, "saved", ["GET","GET","PATCH"]]);
     equal([label, (await pbpFixtureSummaryOwnershipEntries()).length],[label, receipts]);
   }
@@ -683,11 +687,69 @@ test("a save stopped by duplicate Read Later lists keeps the cause in its result
     equal([label,result.reason,result.failedStep,result.error],[label,"partial","read_later",want]);
   }
 });
+// User decision 2026-11-02 (A01, B02): an update from a loaded form is checked
+// against the bookmark as the server holds it at delivery, in the duplicate
+// check delivery makes anyway, and stops when it differs.
+test("the loaded state follows each server's own last-modified stamp, tags and Read Later", ()=>{
+  const version=(service,row)=>pbpBookmarkAsPost(pbpBookmarkNormalize(service,row)).version;
+  equal([pbpBookmarkNormalize("linkding",ld).modified, pbpBookmarkNormalize("karakeep",kk).modified],[ld.date_modified, kk.modifiedAt]);
+  // Karakeep 0.34.1 lets modifiedAt be null; that is a value, not a missing state.
+  equal(pbpBookmarkNormalize("karakeep",{...kk,modifiedAt:null}).modified,null);
+  equal(version("linkding",{...ld}),LD_LOADED,"the same answer gives the same state");
+  equal(version("linkding",{...ld,tag_names:[...ld.tag_names].reverse()}),LD_LOADED,"tag order is not a change");
+  for (const [label, service, row, loaded] of [
+    ["linkding stamp", "linkding", {...ld,date_modified:"2026-10-01T10:00:01.000001Z"}, LD_LOADED],
+    ["linkding unread", "linkding", {...ld,unread:false}, LD_LOADED],
+    ["Karakeep stamp", "karakeep", {...kk,modifiedAt:"2026-10-01T10:00:01.000Z"}, KK_LOADED],
+    // tagging.ts attaches AI tags without touching modifiedAt.
+    ["Karakeep AI tag", "karakeep", {...kk,tags:[...kk.tags,{id:"tag2",name:"ai-tag",attachedBy:"ai"}]}, KK_LOADED],
+  ]) ok(version(service,row)!==loaded, label+" did not change the loaded state");
+});
+test("a popup update stops, writing nothing, when the bookmark changed elsewhere since it was loaded", async()=>{
+  const update={...saveIntent,mode:"update",time:ld.date_added,title:"My title",tags:"work",notes:"My note"};
+  const methods=h=>h.state.calls.map(c=>c.method+" "+new URL(c.url).pathname.replace("/base/api/","").replace("v1/",""));
+  // linkding: another client changed the notes; its PATCH stamped date_modified.
+  const elsewhere={...ld,notes:"Changed elsewhere",date_modified:"2026-10-02T08:00:00.123456Z"};
+  const ldStopped=await workerHarness("linkding",[[200,{bookmark:elsewhere,metadata:null,auto_tags:[]}]]);
+  const stopped=await ldStopped.submitPopupSaveIntent(update,(await ldStopped.auth()).account,null,undefined,LD_LOADED);
+  equal([stopped.status,stopped.reason,stopped.unverified,methods(ldStopped)],["failed","changed_elsewhere",undefined,["GET bookmarks/check/"]]);
+  equal([stopped.latestPost?.extended,stopped.latestPost?.version],["Changed elsewhere",pbpBookmarkAsPost(pbpBookmarkNormalize("linkding",elsewhere)).version],"the stop does not carry the bookmark as it is now");
+  equal(ldStopped.state.queue.length,0,"a stopped update was queued");
+  // The state it carries is the next press's base: that press is written.
+  const ldSaved=await workerHarness("linkding",[[200,{bookmark:elsewhere,metadata:null,auto_tags:[]}],[200,{...elsewhere,title:"My title",date_modified:"2026-10-02T08:01:00.000001Z"}]]);
+  const saved=await ldSaved.submitPopupSaveIntent(update,(await ldSaved.auth()).account,null,undefined,stopped.latestPost.version);
+  equal([saved.status,methods(ldSaved)],["saved",["GET bookmarks/check/","PATCH bookmarks/7/"]]);
+  // linkding's answer is the bookmark as it now stands: the popup's next base.
+  equal(saved.version,pbpBookmarkAsPost(pbpBookmarkNormalize("linkding",{...elsewhere,title:"My title",date_modified:"2026-10-02T08:01:00.000001Z"})).version);
+  // No loaded state is never a match: the form loads the bookmark again first.
+  const ldBlind=await workerHarness("linkding",[[200,{bookmark:ld,metadata:null,auto_tags:[]}]]);
+  const blind=await ldBlind.submitPopupSaveIntent(update,(await ldBlind.auth()).account,null);
+  equal([blind.reason,blind.unverified,methods(ldBlind)],["changed_elsewhere",true,["GET bookmarks/check/"]]);
+  // Karakeep: its AI tagged the bookmark (modifiedAt unchanged), or a client edited it.
+  for (const [label, row] of [["AI tag",{...kk,tags:[...kk.tags,{id:"tag2",name:"ai-tag",attachedBy:"ai"}]}],["edited",{...kk,note:"Changed elsewhere",modifiedAt:"2026-10-02T08:00:00.000Z"}]]) {
+    const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,row]]);
+    const result=await h.submitPopupSaveIntent({...update,time:kk.createdAt},(await h.auth()).account,null,undefined,KK_LOADED);
+    equal([label,result.reason,methods(h)],[label,"changed_elsewhere",["GET bookmarks/check-url","GET bookmarks/bk1"]]);
+    equal([label,result.latestPost?.tagNames,result.latestPost?.extended],[label,row.tags.map(tag=>tag.name),row.note]);
+  }
+  // Unchanged: delivered as before, with no read beyond the duplicate check.
+  const kkSaved=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[200,{id:"bk1",title:"My title",note:"My note"}]]);
+  const kkResult=await kkSaved.submitPopupSaveIntent({...update,time:kk.createdAt},(await kkSaved.auth()).account,null,undefined,KK_LOADED);
+  equal([kkResult.status,kkResult.version,methods(kkSaved)],["saved",undefined,["GET bookmarks/check-url","GET bookmarks/bk1","PATCH bookmarks/bk1"]]);
+});
+test("saves without a loaded form keep their rules when the bookmark changed elsewhere", async()=>{
+  // A quick save, Batch or replay merges into the bookmark as it is now.
+  const changed={...kk,tags:[...kk.tags,{id:"tag2",name:"ai-tag",attachedBy:"ai"}],modifiedAt:"2026-10-02T08:00:00.000Z"};
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,changed],[200,{id:"bk1",title:changed.title,note:changed.note}],[200,{attached:["tag3"]}]]);
+  const result=await h.submitSaveIntent({...saveIntent,mode:"merge",tags:"extra"},{expectedAccount:(await h.auth()).account});
+  equal([result.status,h.state.calls.map(c=>c.method)],["saved",["GET","GET","PATCH","POST"]]);
+  equal(h.state.calls.some(c=>c.method==="DELETE"),false,"a merge removed a tag added elsewhere");
+});
 test("a Karakeep update whose note PATCH fails owns nothing", async()=>{
   const notes="Auto notes\n\n" + KK_SUMMARY, range={start:"Auto notes\n\n".length, end:notes.length};
   await pbpFixtureClearSummaryOwnership();
   const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[500,{}]]);
-  const result=await h.submitPopupSaveIntent({...saveIntent,mode:"update",time:kk.createdAt,tags:"work",notes},(await h.auth()).account,range);
+  const result=await h.submitPopupSaveIntent({...saveIntent,mode:"update",time:kk.createdAt,tags:"work",notes},(await h.auth()).account,range,undefined,KK_LOADED);
   equal([result.status, result.reason, result.failedStep, h.state.calls.at(-1).method],["failed","partial","bookmark","PATCH"]);
   equal((await pbpFixtureSummaryOwnershipEntries()).length,0);
   equal(await (await kkPopup(h, notes)).restore(),null);

@@ -2819,6 +2819,20 @@ await suite("summary ownership after worker saves", async () => {
     equal(popup.field.value, "Auto notes\n\n<blockquote>Second summary</blockquote>", "Regenerate did not replace the block in place");
   });
 
+  // Pinboard has no modification stamp to check (user decision 2026-11-02):
+  // a popup update goes out as one posts/add, with no lookup before it and
+  // whatever loaded state the message carries.
+  await test("a Pinboard popup update is sent as before, without a loaded-state check", async () => {
+    for (const expectedVersion of [undefined, "a state no Pinboard post has"]) {
+      const core = await createHarness({ pinboardFetch: pinboard(postsGet("Changed on pinboard.in")) });
+      const result = await core.submitPopupSaveIntent(
+        intent({ mode: "update", time: "2026-11-01T09:00:00Z", notes: QUICK_NOTES }), "alice", QUICK_RANGE, undefined, expectedVersion);
+      equal(result.status, "saved", String(expectedVersion));
+      equal(core.fetchCalls.map((url) => new URL(url).pathname).join(","), "/v1/posts/add", String(expectedVersion));
+      equal(extendedSent(core), QUICK_NOTES, String(expectedVersion));
+    }
+  });
+
   await test("a live save that keeps server notes identical to its own owns nothing in them", async () => {
     for (const mode of ["merge", "overwrite", "skip"]) {
       await pbpFixtureClearSummaryOwnership();

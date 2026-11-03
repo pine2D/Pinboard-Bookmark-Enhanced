@@ -268,6 +268,7 @@
     "message": "此頁已收藏，核對欄位後再按一次更新"
   },
   "bookmarkDeletedElsewhere": {"message": "這個書籤已在別處刪除，這次的修改沒有儲存。如要重新收藏這一頁，請按「儲存」。"},
+  "bookmarkChangedElsewhere": {"message": "這個書籤在你開啟後已在別處修改，這次的修改沒有儲存。請核對最新內容後再儲存。"},
   "recentEditTitle": {
     "message": "載入並編輯"
   },

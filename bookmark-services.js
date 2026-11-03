@@ -73,8 +73,22 @@ function pbpBookmarkNormalize(service, value) {
     private: service !== "linkding" || value.shared !== true,
     archived: (service === "linkding" ? value.is_archived : value.archived) === true,
     time: String((service === "linkding" ? value.date_added : value.createdAt) || ""),
+    // The server's own last-modified stamp, as it wrote it (linkding
+    // date_modified, Karakeep modifiedAt; null when the answer has none).
+    modified: (value => typeof value === "string" ? value : null)(service === "linkding" ? value.date_modified : value.modifiedAt),
     nativeTags: service === "karakeep" ? value.tags.map(tag => ({id:pbpBookmarkRecordId(tag.id),name:tag.name})) : []
   };
+}
+
+// What a form loaded the bookmark as, compared before an update is sent
+// (user decision 2026-11-02): the server's last-modified stamp, plus the tags
+// and Read Later state. Karakeep 0.34.1 attaches its AI tags without touching
+// modifiedAt (workers/inference/tagging.ts) and keeps Read Later in a list,
+// so the stamp alone would miss both. Only the server's own values: never a
+// local clock.
+function pbpBookmarkVersion(bookmark) {
+  return JSON.stringify([typeof bookmark?.modified === "string" ? bookmark.modified : null,
+    [...(bookmark?.tags || [])].sort(), bookmark?.toread === true]);
 }
 
 // The current save planner/UI consumes this projection. Provider-specific IDs
@@ -84,7 +98,7 @@ function pbpBookmarkAsPost(bookmark) {
     href: bookmark.url, description: bookmark.title, extended: bookmark.notes, summary: bookmark.summary,
     tags: pbpBookmarkFormatTags(bookmark.tags), tagNames:bookmark.tags.slice(), shared: bookmark.private ? "no" : "yes",
     toread: bookmark.toread ? "yes" : "no", time: bookmark.time,
-    bookmarkId: bookmark.id
+    bookmarkId: bookmark.id, version: pbpBookmarkVersion(bookmark)
   };
 }
 
