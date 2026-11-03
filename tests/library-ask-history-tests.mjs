@@ -105,15 +105,21 @@ try {
     check('Continue under ' + service + ' hands over the current connection, matching what the reader compares', handoff.slot && handoff.connection === service + ':https://' + service + '.example/:' + userId && handoff.slot.account === handoff.connection && handoff.slot.account !== '', handoff);
   }
   await page.evaluate(() => askStubs.set.call(chrome.storage.local, { bookmarkService: 'pinboard' }));
-  // An unreadable urlClean setting is traced and the reader still opens, with the page address as the bookmark address.
+  // An unreadable urlClean setting is traced and the reader still opens, with the unchanged page address (tracking parameters included) as the bookmark address.
   await page.evaluate(() => {
     window.warnings = []; window.warnStub = console.warn; console.warn = (...args) => warnings.push(args.join(' '));
     window.settingsStub = window.getSettingsStorage;
     window.getSettingsStorage = async () => ({ get: async () => { throw new Error('storage unavailable'); } });
   });
-  handoff = await continueSlot();
+  handoff = await page.evaluate(async () => {
+    const tracked = 'https://example.test/reading?utm_source=x';
+    window.continueUrl = tracked; readerSlots.length = 0;
+    const session = _libAskSessions.find(row => row.id === 'render-session-main'); const saved = session.url; session.url = tracked;
+    try { await _pbpLibAskContinue(session, document.querySelector('.ask-library-actions button')); } finally { session.url = saved; }
+    return { slot: readerSlots[0] || null };
+  });
   await page.evaluate(() => { window.getSettingsStorage = settingsStub; console.warn = warnStub; });
-  check('Continue still opens the reader when the urlClean read throws', handoff.slot && handoff.slot.bookmarkUrl === 'https://example.test/reading' && await page.evaluate(() => warnings.some(line => line.includes('urlClean'))), handoff);
+  check('Continue still opens the reader when the urlClean read throws', handoff.slot && handoff.slot.bookmarkUrl === 'https://example.test/reading?utm_source=x' && handoff.slot.url === handoff.slot.bookmarkUrl && await page.evaluate(() => warnings.some(line => line.includes('urlClean'))), handoff);
   await page.evaluate(async () => {
     Object.assign(chrome.tabs, { query: askStubs.query, get: askStubs.get, create: askStubs.create });
     chrome.permissions.contains = askStubs.contains; chrome.storage.local.set = askStubs.set;
