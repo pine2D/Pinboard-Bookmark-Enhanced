@@ -206,6 +206,9 @@
   "singleFileNoResponse": {
     "message": "SingleFileが応答しなかったため、ページのコピーは保存されていません。"
   },
+  "linkdingDescriptionServerFills": {
+    "message": "空欄のままならlinkdingがページから入力します"
+  },
   "savedSuccess": {
     "message": "保存しました！"
   },

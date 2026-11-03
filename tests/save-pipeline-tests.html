@@ -392,6 +392,7 @@ async function createBatchSaveHarness(options) {
     hasAIKey: () => opts.hasAIKey === true,
     getPageInfoFromTab: async (...args) => { extractionCalls.push(args); return opts.pageInfo === undefined ? null : opts.pageInfo; },
     pbpNotesDescription: (info) => info.metaDescription || "",
+    pbpPageInfoReadable:info=>!!info&&info._pbpUnavailable!==true&&["","text/html","application/xhtml+xml"].includes(String(info.contentType||"").split(";")[0].trim()),
     getAICache: async (_url, kind) => opts.cached?.[kind] ?? null,
     setAICache: async (...args) => { cacheWrites.push(args); },
     callAI: opts.callAI || (async () => "AI summary"),

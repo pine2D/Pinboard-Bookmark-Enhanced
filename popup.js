@@ -205,12 +205,15 @@ function pbpPopupFillPageDescription() {
   // it is not loaded the popup cannot tell, which counts as another page.
   const ownPage = typeof pbpPopupFormHoldsOpenedPage === "function" && pbpPopupFormHoldsOpenedPage();
   const input = $id("linkding-description-input");
-  input.value = auto && browser && ownPage ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
-  // A page that could not be read has no known description of its own, and
-  // nothing has read another URL: an empty box is known only with auto-fill off.
-  _linkdingDescriptionKnown = !auto || (browser && ownPage && pageInfo?._pbpUnavailable !== true);
+  // A page that could not be read (or a PDF) has no known description of its
+  // own, and nothing has read another URL: an empty box is known only with
+  // auto-fill off.
+  const readable = pbpPageInfoReadable(pageInfo);
+  input.value = auto && browser && ownPage && readable ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
+  _linkdingDescriptionKnown = !auto || (browser && ownPage && readable);
   _linkdingDescriptionPending = false;
   _linkdingPageDescription = input.value;
+  pbpPopupRenderDescriptionHint(ownPage);
 }
 // The address can change after the popup opened (typed, pasted, put back by
 // Undo). For as long as the box holds only what the page put there it follows
@@ -457,7 +460,7 @@ function pbpPopupDraftFieldEdited(id, { manual = true } = {}) {
   if (id === "url-input") _popupDraftUserUrl = true;
   if (id === "archive-check") _archiveUserTouched = true;
   if (id === "linkding-description-input" && manual) _linkdingDescriptionTouched = true;
-  if (id === "linkding-description-input") { _linkdingDescriptionKnown = true; _linkdingDescriptionPending = true; }
+  if (id === "linkding-description-input") { _linkdingDescriptionKnown = true; _linkdingDescriptionPending = true; pbpPopupRenderDescriptionHint(); }
   const key = { "url-input": "url", "title-input": "title", "description-input": "notes", "linkding-description-input": "summary", "tags-input": "tagInput",
     "private-check": "private", "share-check": "private", "readlater-check": "toread", "archive-check": "archive" }[id];
   _popupDraftChangedFields.add(key);
@@ -543,7 +546,7 @@ async function initPopupDraft(account, tab) {
       if (take("summaryTouched")) _linkdingDescriptionTouched = d.summaryTouched === true;
       // Only a written Description was drafted; it is still waiting to be saved.
       const draftedSummary = typeof d.summary === "string" && drafted("summary");
-      if (draftedSummary) { _linkdingDescriptionKnown = true; _linkdingDescriptionPending = true; }
+      if (draftedSummary) { _linkdingDescriptionKnown = true; _linkdingDescriptionPending = true; pbpPopupRenderDescriptionHint(); }
       if (take("sharedExplicit")) _linkdingSharedExplicit = pbpBookmarkServiceId(settings) === "linkding" && pbpBookmarkConnection(settings).sharingEnabled && d.sharedExplicit === true;
       if (drafted("url")) {
         _popupDraftUserUrl = true;
@@ -1919,6 +1922,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
           _linkdingDescriptionPending = false;
           // The bookmark's own Description, not the page's: no address edit takes it out.
           _linkdingPageDescription = null;
+          pbpPopupRenderDescriptionHint();
         }
         if (shouldUpdateField("private-check")) {
           $id("private-check").checked = existingBookmark.shared === "no";
@@ -2091,6 +2095,21 @@ function pbpPopupApplyServerMetadata(metadata) {
   _linkdingPageDescription = input.value;
 }
 
+// The grey hint in an empty Description box: the popup could not read the
+// opened page (or it is a PDF), so nothing will be sent and linkding fills the
+// Description in from the page itself. Only where that is so: linkding, the
+// browser's page information in use, auto-fill on, the box still the page's
+// own. A placeholder never shows over text, so a filled box hides it.
+// ownPage: the caller's pbpPopupFormHoldsOpenedPage() answer, if it has one.
+function pbpPopupRenderDescriptionHint(ownPage) {
+  const input = $id("linkding-description-input");
+  if (!input) return;
+  const show = pbpBookmarkServiceId(settings) === "linkding"
+    && settings.linkdingBrowserMetadata !== false && settings.optAutoDescription !== false
+    && !_linkdingDescriptionKnown && _linkdingPageDescription !== null
+    && (ownPage ?? (typeof pbpPopupFormHoldsOpenedPage === "function" && pbpPopupFormHoldsOpenedPage()));
+  input.placeholder = show ? t("linkdingDescriptionServerFills") : "";
+}
 // The duplicate check's own request, without any form work: the cache or the
 // prefetch, then the worker's shared lookup, then a direct call. Resolves the
 // posts/get-shaped body ({posts}); a failure throws with its status and the
@@ -2844,6 +2863,7 @@ async function loadBookmarkForEdit(url, token) {
   _linkdingDescriptionPending = false;
   // The form now belongs to that bookmark: the opened page's text no longer applies.
   _linkdingPageDescription = null;
+  pbpPopupRenderDescriptionHint();
   $id("private-check").checked = pbpBookmarkServiceId(settings) !== "pinboard";
   $id("share-check").checked = false;
   _linkdingSharedExplicit = false;

@@ -235,6 +235,8 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     pbpSaveFailure: (reason) => ({ status: "failed", reason }),
     getPageInfoFromTab: async (...args) => { extractionCalls.push(args); return { pageText: "article body", ...(overrides.pageInfo || {}) }; },
     buildAutoNotes: () => "",
+    // ai.js's: a page read as HTML (or with no recorded type).
+    pbpPageInfoReadable:info=>!!info&&info._pbpUnavailable!==true&&["","text/html","application/xhtml+xml"].includes(String(info.contentType||"").split(";")[0].trim()),
     hasAIKey: () => hasKey,
     getAICache: async (_url, kind) => cached[kind] ?? null,
     callAI,
@@ -629,6 +631,28 @@ async function run() {
         });
       await h.save({ url, title: "Article", tab, notifyId: "qs", notifyCategory: "quickSave" });
       const where = JSON.stringify({ globalOn, quickOn, aiSummary, tab: !!tab });
+      assert(h.intents.length === 1, where + ": nothing was saved");
+      assert(Object.hasOwn(h.intents[0], "summary") === (expected !== undefined) && h.intents[0].summary === expected,
+        where + ": Description " + JSON.stringify(h.intents[0].summary));
+    }
+  });
+
+  // A PDF opens in Chrome's viewer, which the worker can read, but it has no
+  // page description: like an unread page, the Description is left to linkding.
+  await test("linkding quick saves leave a PDF's Description to linkding, unless a description preference is off", async () => {
+    for (const [globalOn, quickOn, contentType, expected] of [
+      [true, true, "application/pdf", undefined], [true, true, "text/plain", undefined],
+      [true, true, "text/html", "Meta description"],
+      [false, true, "application/pdf", ""], [true, false, "application/pdf", ""],
+    ]) {
+      const h = buildBackgroundSaveHarness(source, async () => "unused", {},
+        { _aiTags: false, _aiSummary: false, _autoNotes: quickOn, optAutoDescription: globalOn }, true, {
+          getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1, baseUrl: "https://bookmarks.example/" }),
+          pageInfo: { title: "paper.pdf", metaDescription: "Meta description", contentType },
+          pbpNotesDescription: (info) => info.metaDescription || "",
+        });
+      await h.save({ url: "https://example.com/paper", title: "paper.pdf", tab: { id: 7 }, notifyId: "qs", notifyCategory: "quickSave" });
+      const where = JSON.stringify({ globalOn, quickOn, contentType });
       assert(h.intents.length === 1, where + ": nothing was saved");
       assert(Object.hasOwn(h.intents[0], "summary") === (expected !== undefined) && h.intents[0].summary === expected,
         where + ": Description " + JSON.stringify(h.intents[0].summary));

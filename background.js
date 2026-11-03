@@ -2155,11 +2155,12 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // linkding Description: the AI summary, else the page's meta description
   // (possibly none) when the page was read. With the page description turned
   // off it is a known "", so linkding adds none either; a page that could not
-  // be read leaves it out, and linkding fills it in from the page itself.
+  // be read (or is a PDF or other non-HTML document) leaves it out, and
+  // linkding fills it in from the page itself.
   const description = !linkding ? undefined
     : pbpBookmarkDescriptionLine(linkdingSummary)
       || (!(s._autoNotes && s.optAutoDescription !== false) ? ""
-        : pageInfo ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : undefined);
+        : pbpPageInfoReadable(pageInfo) ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : undefined);
 
   const result = await submitSaveIntent({
     mode,
@@ -5609,11 +5610,11 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         const dedupedTags = pbpCanonicalTagList(tags, tagContext);
         const isPrivate = pbpServiceEffectivePrivate(s, { incognito: tab.incognito });
         // Same rule as quick save: a tab Batch could not read (no site
-        // access without AI) leaves the Description to linkding.
+        // access without AI), or a PDF, leaves the Description to linkding.
         const description = !linkding ? undefined
           : pbpBookmarkDescriptionLine(linkdingSummary)
             || (s.optAutoDescription === false ? ""
-              : pageInfo ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : undefined);
+              : pbpPageInfoReadable(pageInfo) ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : undefined);
         await requireAccount();
         // Batch notes hold the summary block and nothing else (null: no block).
         const summaryRange = !linkding && notes ? { start: 0, end: notes.length } : null;

@@ -206,6 +206,9 @@
   "singleFileNoResponse": {
     "message": "SingleFile не ответил, поэтому копия страницы не сохранена."
   },
+  "linkdingDescriptionServerFills": {
+    "message": "Если оставить пустым, linkding возьмёт его со страницы"
+  },
   "savedSuccess": {
     "message": "Сохранено!"
   },

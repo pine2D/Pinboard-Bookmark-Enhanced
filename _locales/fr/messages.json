@@ -206,6 +206,9 @@
   "singleFileNoResponse": {
     "message": "SingleFile n’a pas répondu : aucune copie de la page n’a été enregistrée."
   },
+  "linkdingDescriptionServerFills": {
+    "message": "Si vous laissez vide, linkding la reprend de la page"
+  },
   "savedSuccess": {
     "message": "Enregistré !"
   },

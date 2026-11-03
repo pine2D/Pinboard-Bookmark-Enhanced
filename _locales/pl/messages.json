@@ -206,6 +206,9 @@
   "singleFileNoResponse": {
     "message": "SingleFile nie odpowiedział, więc kopia strony nie została zapisana."
   },
+  "linkdingDescriptionServerFills": {
+    "message": "Jeśli zostawisz puste, linkding pobierze go ze strony"
+  },
   "savedSuccess": {
     "message": "Zapisano!"
   },

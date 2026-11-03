@@ -155,7 +155,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     ]);
     const aiJsSource = await (await fetch("../ai.js")).text();
     const aiCacheSource = await (await fetch("../ai-cache.js")).text();
-    const pbpNotesDescription = new Function(aiJsSource.slice(aiJsSource.indexOf("function pbpNotesDescription("),aiJsSource.indexOf("function buildAutoNotes("))+";return pbpNotesDescription;")();
+    const [pbpPageInfoReadable, pbpNotesDescription] = new Function(aiJsSource.slice(aiJsSource.indexOf("function pbpPageInfoReadable("),aiJsSource.indexOf("function buildAutoNotes("))+";return [pbpPageInfoReadable, pbpNotesDescription];")();
     // The one place a sliced popup/popup-ai fragment becomes runnable code.
     // The body runs in strict mode, so a module-level name the fragment needs
     // but nobody declared throws a ReferenceError the first time it runs (sloppy
@@ -2371,17 +2371,19 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // sloppy-mode implicit global. `initial` seeds the Description state
     // (default: known, nothing pending, no page text); the returned function
     // runs the prefill once and reports the state it left behind.
+    const hintStart = source.indexOf("// The grey hint in an empty Description box:");
+    const hintSource = source.slice(hintStart, source.indexOf("\n}\n", hintStart) + 3);
     const prefillHarness = ({ known = true, pending = false, pageText = null } = {}) => {
       const start = source.indexOf("function pbpPopupPrefillDescription("), end = source.indexOf("function recomputeArchiveCheck(", start);
       assert(start >= 0 && end > start, "prefill source not found");
       const run = (pageInfo, settings, shouldUpdateField, $id) => sliceRuntime({
-        pageInfo, settings, shouldUpdateField, $id, pbpNotesDescription, _aiUrlEquivalent: aiUrlEquivalent, _initial: { known, pending, pageText }
+        pageInfo, settings, shouldUpdateField, $id, pbpNotesDescription, pbpPageInfoReadable, t: key => key, _aiUrlEquivalent: aiUrlEquivalent, _initial: { known, pending, pageText }
       },
         "let _linkdingDescriptionKnown = _initial.known;\n" +
         "let _linkdingDescriptionPending = _initial.pending;\n" +
         "let _linkdingPageDescription = _initial.pageText;\n" +
         "let _popupDraftUserUrl = false;\n" +
-        loadUrlCleanSource + "\n" + source.slice(start, end) +
+        loadUrlCleanSource + "\n" + source.slice(start, end) + "\n" + hintSource +
         "\npbpPopupPrefillDescription();\nreturn { known: _linkdingDescriptionKnown, pending: _linkdingDescriptionPending, pageText: _linkdingPageDescription };");
       return run;
     };
@@ -2425,6 +2427,32 @@ test("posts/add default remains replace=yes for existing callers", () => {
         [read,{optAutoDescription:false},false,other,true,""],[unread,{optAutoDescription:false},false,other,true,""],[read,{},true,other,"untouched","Typed"]]){
         const got=run(pageInfo,settings,dirty,formUrl),where=JSON.stringify({pageInfo,settings,dirty,formUrl});
         assert(got.known===known&&got.value===value&&got.pending===(dirty?"untouched":false),where+": "+JSON.stringify(got));
+      }
+    });
+
+    // A PDF (or other non-HTML document) reads like a page but has no page
+    // description: nothing is sent, so linkding fills it, and the empty box
+    // says so in grey. Decided by document.contentType, not the address.
+    test("an unread page or a PDF leaves the Description to linkding and the empty box says so", () => {
+      const run=(pageInfo,settings,formUrl=pageInfo.url)=>{
+        const elements={"description-input":{value:""},"linkding-description-input":document.createElement("input"),"linkding-description-row":document.createElement("div"),"url-input":{value:formUrl}};
+        const {known}=prefillHarness({known:"untouched",pending:"untouched"})
+          (pageInfo,{bookmarkService:"linkding",...settings},()=>true,id=>elements[id]);
+        const box=elements["linkding-description-input"];
+        return {known,value:box.value,hint:box.placeholder};
+      };
+      const HINT="linkdingDescriptionServerFills";
+      const html={url:URL,title:"Article",metaDescription:"Meta",contentType:"text/html"},xhtml={...html,contentType:"application/xhtml+xml; charset=utf-8"};
+      const pdf={url:URL+".pdf",title:"paper.pdf",metaDescription:"Not a page description",contentType:"application/pdf"};
+      const pdfAtHtmlAddress={...pdf,url:URL+"/view.html"},text={...html,contentType:"text/plain"},unread={url:URL,title:"Article",metaDescription:"",_pbpUnavailable:true};
+      for(const [pageInfo,settings,formUrl,known,value,hint] of [
+        [html,{},undefined,true,"Meta",""],[xhtml,{},undefined,true,"Meta",""],
+        [pdf,{},undefined,false,"",HINT],[pdfAtHtmlAddress,{},undefined,false,"",HINT],[text,{},undefined,false,"",HINT],[unread,{},undefined,false,"",HINT],
+        // Not said where it is not so, or not the reason.
+        [pdf,{optAutoDescription:false},undefined,true,"",""],[pdf,{linkdingBrowserMetadata:false},undefined,false,"",""],
+        [pdf,{},URL+"/other",false,"",""],[pdf,{bookmarkService:"karakeep"},undefined,"untouched","",""]]){
+        const got=run(pageInfo,settings,formUrl),where=JSON.stringify({pageInfo,settings,formUrl});
+        assert(got.known===known&&got.value===value&&got.hint===hint,where+": "+JSON.stringify(got));
       }
     });
 
@@ -3102,6 +3130,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         ensurePageText: async () => o.source || "local",
         upsertSummary: (text) => calls.summary.push(text),
         showSummaryActions: () => {},
+        pbpPopupRenderDescriptionHint: () => {},
         renderAITags: (tags, cached) => { container.chips = tags.map(tag=>({dataset:{tag}})); calls.rendered.push({ tags, cached }); },
         _aiClearTagsOutput: () => {},
         _aiParkTagsBtn: () => {},

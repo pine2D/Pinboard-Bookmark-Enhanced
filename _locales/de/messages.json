@@ -206,6 +206,9 @@
   "singleFileNoResponse": {
     "message": "SingleFile hat nicht reagiert, deshalb wurde keine Kopie der Seite gespeichert."
   },
+  "linkdingDescriptionServerFills": {
+    "message": "Leer gelassen, übernimmt linkding sie von der Seite"
+  },
   "savedSuccess": {
     "message": "Gespeichert!"
   },

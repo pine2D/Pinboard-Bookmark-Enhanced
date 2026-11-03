@@ -458,7 +458,7 @@ async function producers(h, {autoNotes, summary, settings: overrides = {}, realV
     getAICache:async()=>null, setAICache:async()=>{}, callAI:async()=>{h.state.aiCalls=(h.state.aiCalls||0)+1;return summary;}, buildSummaryPrompt:()=>"summary prompt",
     getPageInfoFromTab:async()=>{h.state.extractions=(h.state.extractions||0)+1;return {pageText:"article body"};},
     pbpLoadTagVocab:realVocab ? h.pbpLoadTagVocab : async account=>({account,timestamp:undefined,counts:null,index:null}),
-    pbpServiceEffectivePrivate:()=>true, pbpNotesDescription:()=>"",
+    pbpServiceEffectivePrivate:()=>true, pbpNotesDescription:()=>"", pbpPageInfoReadable:info=>!!info&&info._pbpUnavailable!==true&&["","text/html","application/xhtml+xml"].includes(String(info.contentType||"").split(";")[0].trim()),
     showNotification:(...args)=>h.state.notifications.push(args), t:(key,...args)=>args.length?key+":"+args.join(":"):key,
     pbpI18nReady:async()=>{}, processOfflineQueue:async()=>{}, updateBadge:async()=>{},
     _newBatchRunId:()=>"run-1", _removeBatchRecordIfOwned:async()=>true, _writeBatchProgress:async row=>{(h.state.progress||=[]).push(row);},

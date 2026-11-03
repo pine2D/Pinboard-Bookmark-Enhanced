@@ -206,6 +206,9 @@
   "singleFileNoResponse": {
     "message": "SingleFile didn't respond, so no copy of the page was saved."
   },
+  "linkdingDescriptionServerFills": {
+    "message": "Left empty, linkding fills it in from the page"
+  },
   "savedSuccess": {
     "message": "Saved!"
   },

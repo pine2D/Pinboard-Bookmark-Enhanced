@@ -57,7 +57,9 @@ async function getPageInfoFromTab(tabId, opts = {}) {
       // to be a plain JSON-serialisable value or it arrives as null in the page.
       args: [withDefuddle, AI_CONTENT_HEAD, AI_CONTENT_TAIL],
       func: (useDefuddle, headChars, tailChars) => {
-        const info = { url: location.href, title: document.title, selectedText: "", metaDescription: "", referrer: document.referrer || "", pageText: "" };
+        // contentType: a PDF or other non-HTML document shows in a viewer the
+        // script can reach, but it has no page description (pbpPageInfoReadable).
+        const info = { url: location.href, title: document.title, selectedText: "", metaDescription: "", referrer: document.referrer || "", pageText: "", contentType: document.contentType || "" };
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) { const t = sel.toString().trim(); if (t) info.selectedText = t; }
         const md = document.querySelector('meta[name="description"]') || document.querySelector('meta[property="og:description"]');
@@ -2603,6 +2605,16 @@ async function setAICache(url, type, result, cacheDuration, source, account, s) 
 // ignored, after dropping GitHub's stock "Contribute to owner/repo development
 // by creating an account on GitHub." tail (signed-out repo pages append it to
 // the About line the title already carries).
+// Whether the page info describes a page that was actually read: not a
+// placeholder for a tab that could not be read (_pbpUnavailable), and not a
+// PDF or other non-HTML document (by document.contentType, not the address,
+// which says nothing reliable about it). Info without a content type comes
+// from callers that never recorded one and counts as read.
+function pbpPageInfoReadable(pageInfo) {
+  if (!pageInfo || pageInfo._pbpUnavailable === true) return false;
+  const type = typeof pageInfo.contentType === "string" ? pageInfo.contentType.split(";")[0].trim().toLowerCase() : "";
+  return !type || type === "text/html" || type === "application/xhtml+xml";
+}
 function pbpNotesDescription(pageInfo) {
   const raw = String((pageInfo && pageInfo.metaDescription) || "").trim();
   if (!raw) return "";

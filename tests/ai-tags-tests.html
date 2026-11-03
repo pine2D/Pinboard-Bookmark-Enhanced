@@ -875,6 +875,21 @@ suite("custom provider entries", () => {
       }
     });
 
+    // The page's own content type travels with the form fields: Chrome's PDF
+    // viewer is scriptable, so only document.contentType tells a PDF apart.
+    await atest("page info records the document's content type", async () => {
+      const realURL = window.URL, realShim = window.__pp_urlShimInstalled;
+      try {
+        window.chrome = k90RunsInjected("https://k90.test/page");
+        const info = await getPageInfoFromTab(7);
+        assertEq(info.contentType, document.contentType, "content type of the document the script ran in");
+        assertEq(info.contentType, "text/html", "this test page is HTML");
+      } finally {
+        window.URL = realURL;
+        window.__pp_urlShimInstalled = realShim;
+      }
+    });
+
     await atest("vendored Defuddle returns the whole page as content HTML, not textContent", async () => {
       // The page-text extractor must consume the shape the REAL library returns.
       // A card grid wraps each card in its own <article>; the legacy fallback's
@@ -1867,6 +1882,19 @@ suite("custom provider entries", () => {
 </script>
 <script>
 // Notes default: the meta description only when it adds to the title.
+// A page whose description can be read: HTML that was reached. A PDF or other
+// non-HTML document, whatever its address, and a tab that could not be read
+// have none; info that never recorded a type (older callers) counts as read.
+test("pbpPageInfoReadable: HTML that was read, never a PDF or an unread tab", () => {
+  for (const [info, expected] of [
+    [{ contentType: "text/html" }, true], [{ contentType: "application/xhtml+xml; charset=utf-8" }, true], [{ contentType: "TEXT/HTML" }, true],
+    [{ url: "https://example.com/a" }, true], [{ contentType: "" }, true],
+    [{ url: "https://example.com/paper.pdf", contentType: "application/pdf" }, false],
+    [{ url: "https://example.com/paper.html", contentType: "application/pdf" }, false],
+    [{ contentType: "text/plain" }, false], [{ contentType: "image/png" }, false],
+    [{ contentType: "text/html", _pbpUnavailable: true }, false], [null, false], [undefined, false],
+  ]) assertEq(pbpPageInfoReadable(info), expected, JSON.stringify(info));
+});
 test("pbpNotesDescription: a description the title already carries is dropped", () => {
   const gh = "艺术动画skill：35种艺术风格、9种解说语法，用代码让画动起来。";
   // signed-out GitHub: About line + stock tail, title carries the About line

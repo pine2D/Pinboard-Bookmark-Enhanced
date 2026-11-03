@@ -206,6 +206,9 @@
   "singleFileNoResponse": {
     "message": "SingleFile 没有响应，网页副本未保存"
   },
+  "linkdingDescriptionServerFills": {
+    "message": "留空时由 linkding 从网页读取"
+  },
   "savedSuccess": {
     "message": "已保存！"
   },
