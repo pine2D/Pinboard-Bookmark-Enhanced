@@ -270,7 +270,7 @@
   "bookmarkDeletedElsewhere": {"message": "このブックマークは別の場所で削除されたため、変更は保存されていません。もう一度ブックマークするには「保存」を押してください。"},
   "bookmarkChangedElsewhere": {"message": "開いた後にこのブックマークが別の場所で変更されたため、変更は保存されていません。最新の内容を確認してから、もう一度保存してください。"},
   "bookmarkFieldReadsThere": {
-    "message": "別の場所での$FIELD$は現在「$VALUE$」です。もう一度保存すると、入力した内容に置き換わります。",
+    "message": "別の場所の$FIELD$は現在「$VALUE$」です。もう一度保存すると、入力した内容に置き換わります。",
     "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
     "placeholders": {
       "field": {
@@ -282,8 +282,8 @@
     }
   },
   "bookmarkFieldEmptyThere": {
-    "message": "別の場所で$FIELD$が空になりました。もう一度保存すると、入力した内容が入ります。",
-    "description": "Follows bookmarkChangedElsewhere when an update stopped, the user had also edited this field, and the bookmark service now holds it empty. $FIELD$ is the field's label.",
+    "message": "別の場所の$FIELD$は現在空です。もう一度保存すると、入力した内容が入ります。",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped, the user had also edited this field, and the bookmark service now holds it empty. $FIELD$ is the field's label. Say what the field holds now, not that someone cleared it: after a restored draft it may never have been changed there. Word it so it reads right whether the label is singular or plural.",
     "placeholders": {
       "field": {
         "content": "$1"

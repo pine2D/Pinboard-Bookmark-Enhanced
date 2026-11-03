@@ -282,8 +282,8 @@
     }
   },
   "bookmarkFieldEmptyThere": {
-    "message": "别处已清空$FIELD$，再次保存会填入你填写的内容。",
-    "description": "Follows bookmarkChangedElsewhere when an update stopped, the user had also edited this field, and the bookmark service now holds it empty. $FIELD$ is the field's label.",
+    "message": "别处的$FIELD$现在是空的，再次保存会填入你填写的内容。",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped, the user had also edited this field, and the bookmark service now holds it empty. $FIELD$ is the field's label. Say what the field holds now, not that someone cleared it: after a restored draft it may never have been changed there. Word it so it reads right whether the label is singular or plural.",
     "placeholders": {
       "field": {
         "content": "$1"

@@ -282,8 +282,8 @@
     }
   },
   "bookmarkFieldEmptyThere": {
-    "message": "Sur le serveur, le champ $FIELD$ est désormais vide. Enregistrer de nouveau y place votre saisie.",
-    "description": "Follows bookmarkChangedElsewhere when an update stopped, the user had also edited this field, and the bookmark service now holds it empty. $FIELD$ is the field's label.",
+    "message": "Sur le serveur, le champ $FIELD$ est actuellement vide. Enregistrer de nouveau y place votre saisie.",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped, the user had also edited this field, and the bookmark service now holds it empty. $FIELD$ is the field's label. Say what the field holds now, not that someone cleared it: after a restored draft it may never have been changed there. Word it so it reads right whether the label is singular or plural.",
     "placeholders": {
       "field": {
         "content": "$1"
