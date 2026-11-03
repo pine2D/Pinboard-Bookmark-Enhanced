@@ -664,9 +664,9 @@ try{
   });
   await block('linkding multi-line Description',['linkding'],async()=>{
   const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
-  // A Description written elsewhere keeps its line breaks. The popup and the
-  // reader show it as one line; a save that leaves that line alone must not
-  // flatten it. Hand-written v1.47 record for a URL no lookup has cached yet.
+  // A Description written elsewhere keeps its line breaks. The popup shows
+  // them (G24: its Description box is multi-line); a save that leaves the
+  // text alone must not flatten it. Hand-written v1.47 record for a URL no lookup has cached yet.
   const multiUrl=origin+'/article-multiline', multiId='40', multiLine='First line\n\n  Second   line';
   await article.goto(multiUrl);
   records.linkding.set(multiId,{id:40,url:multiUrl,title:'Stored title',description:multiLine,notes:'Stored notes',web_archive_snapshot_url:'https://web.archive.org/web/20261030030122/'+multiUrl,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:['kept'],date_added:'2026-10-30T03:01:22.656384Z',date_modified:'2026-10-30T03:01:22.656384Z',website_title:null,website_description:null});
@@ -675,11 +675,11 @@ try{
     await article.bringToFront();const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
     await popup.waitForFunction(()=>document.getElementById('existing-banner')&&!document.getElementById('existing-banner').classList.contains('hidden')&&!document.getElementById('submit-btn').disabled);
     await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
-    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'First line Second line','the popup did not show the stored Description as one line');
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),multiLine,'the popup did not show the stored Description with its line breaks');
     // Another client rewrites the Description after the popup loaded it, and
     // again after the popup's first update. The first press of each round
-    // stops and shows the new line (user decision 2026-11-02); the tag-only
-    // update then leaves it alone: the popup compares with the line it showed,
+    // stops and shows the new text (user decision 2026-11-02); the tag-only
+    // update then leaves it alone: the popup compares with the text it showed,
     // so it neither flattens the stored value nor writes back the one it loaded.
     const pressStoppedThenSaved=async(label,shownLine)=>{
       const stoppedAt=multiPatches().length;await popup.locator('#submit-btn').click();
@@ -694,21 +694,21 @@ try{
     Object.assign(records.linkding.get(multiId),{description:elsewhere[0],date_modified:serverNow()});
     await popup.locator('#tags-input').fill('added');await popup.locator('#tags-input').press('Enter');
     let before;
-    await pressStoppedThenSaved('popup tag-only update','Changed elsewhere');
+    await pressStoppedThenSaved('popup tag-only update',elsewhere[0]);
     assert(!Object.hasOwn(multiPatches().at(-1).data,'description'),'a tag-only popup update rewrote the Description');
     assert.equal(records.linkding.get(multiId).description,elsewhere[0],'a tag-only popup update flattened or overwrote the Description');
     assert.deepEqual(records.linkding.get(multiId).tag_names,['kept','added']);
     await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
     Object.assign(records.linkding.get(multiId),{description:elsewhere[1],date_modified:serverNow()});
     await popup.locator('#tags-input').fill('again');await popup.locator('#tags-input').press('Enter');
-    await pressStoppedThenSaved('second popup tag-only update','Changed again');
+    await pressStoppedThenSaved('second popup tag-only update',elsewhere[1]);
     assert(!Object.hasOwn(multiPatches().at(-1).data,'description'),'a second tag-only popup update wrote the Description it loaded');
     assert.equal(records.linkding.get(multiId).description,elsewhere[1],'a second tag-only popup update overwrote a Description changed elsewhere');
     await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
-    await popup.locator('#linkding-description-input').fill('Edited   description ');
+    await popup.locator('#linkding-description-input').fill('Edited   description\n\nSecond paragraph ');
     before=multiPatches().length;await popup.locator('#submit-btn').click();
     await until(()=>multiPatches().length>before,'popup Description edit');
-    assert.equal(multiPatches().at(-1).data.description,'Edited description','an edited Description was not written as its one line');
+    assert.equal(multiPatches().at(-1).data.description,'Edited   description\n\nSecond paragraph','an edited Description was not written as the box showed it');
     await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
     await popup.close();
   }
@@ -727,7 +727,7 @@ try{
     Object.assign(records.linkding.get(multiId),{description:multiLine,date_modified:serverNow()});await clearLookups();
     assert.equal(await storedDraft(),null,'an earlier popup left a draft of this page');
     let popup=await openPopup();
-    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'First line Second line');
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),multiLine);
     await popup.locator('#title-input').fill('Drafted title');
     await until(async()=>(await storedDraft())?.title==='Drafted title','title edit drafted');
     assert(!Object.hasOwn(await storedDraft(),'summary'),'the draft kept the Description the lookup filled in');
@@ -737,7 +737,7 @@ try{
     Object.assign(records.linkding.get(multiId),{description:elsewhere,date_modified:serverNow()});await clearLookups();
     popup=await openPopup();await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
     assert.equal(await popup.locator('#title-input').inputValue(),'Drafted title','the title draft was not restored');
-    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'Changed in another client','the reopened popup did not show the current Description');
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),elsewhere,'the reopened popup did not show the current Description');
     // The draft's title was typed on the bookmark as the first open loaded it,
     // which has changed since: the first press stops, keeping the title.
     const stoppedAt=multiPatches().length;await popup.locator('#submit-btn').click();
@@ -775,7 +775,7 @@ try{
     await reader.close();
   }
   records.linkding.delete(multiId);await article.goto(origin+'/article');
-  console.log('linkding multi-line Description: tag-only popup updates keep it, also after a change elsewhere; a reopened title draft shows and keeps the current one; a title-only reader update keeps it; an edit writes its one line');
+  console.log('linkding multi-line Description: tag-only popup updates keep it, also after a change elsewhere; a reopened title draft shows and keeps the current one; a title-only reader update keeps it; a popup edit writes its line breaks, a reader edit its one line');
   });
   // A tag longer than PostgreSQL's 64-character column, typed in the popup:
   // the error names it, nothing is queued or offered for a retry, and the

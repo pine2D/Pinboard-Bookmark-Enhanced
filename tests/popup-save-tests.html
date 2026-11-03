@@ -482,7 +482,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         const saving = h.click(); await flushMicrotasks();
         const message = h.messages.find(m => m.type === "save_intent");
         assert(message, "save was not dispatched for " + service);
-        assert(service === "linkding" ? message.intent.summary === "First second third" : !Object.hasOwn(message.intent,"summary"), "Description service scope or normalization failed");
+        assert(service === "linkding" ? message.intent.summary === "First\n  second\t third" : !Object.hasOwn(message.intent,"summary"), "Description service scope or normalization failed");
         assert(!Object.hasOwn(message.intent,"summaryTouched"), "manual draft state leaked into intent");
         h.elements["linkding-description-input"].value = "New edit";
         h.resolveSave({ok:true,status:"saved",data:{}}); await saving;
@@ -491,12 +491,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
     });
     // The popup could not read the page and nothing filled the Description box:
     // the save leaves the Description out, so a create lets linkding fetch it.
-    // Whatever the box shows otherwise, an empty value included, is sent as its
-    // one line. The draft snapshot the save clears holds the Description only
+    // Whatever the box shows otherwise, an empty value included, is sent as
+    // shown, trimmed. The draft snapshot the save clears holds the Description only
     // when the user or an AI summary wrote it (pending), like every draft.
     await testAsync("linkding submits no Description the popup cannot vouch for", async () => {
-      for (const [known, pending, box, expected] of [[false, false, "", undefined], [false, false, " \n\t ", undefined], [false, true, "  Typed\n line ", "Typed line"],
-        [true, false, "", ""], [true, true, "", ""], [true, false, " Meta  text ", "Meta text"], [true, true, " Typed  text ", "Typed text"]]) {
+      for (const [known, pending, box, expected] of [[false, false, "", undefined], [false, false, " \n\t ", undefined], [false, true, "  Typed\n line ", "Typed\n line"],
+        [true, false, "", ""], [true, true, "", ""], [true, false, " Meta  text ", "Meta  text"], [true, true, " Typed  text ", "Typed  text"]]) {
         const h = createSubmitHarness({ service: "linkding", draftContext: true, descriptionKnown: known, descriptionPending: pending });
         h.elements["linkding-description-input"].value = box;
         const saving = h.click(); await flushMicrotasks();
@@ -525,12 +525,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
           (newer ? "a newer Description edit left the draft: " : "a delivered Description stayed in the draft: ") + JSON.stringify(later.summary));
       }
     });
-    await testAsync("linkding updates carry a Description only when the user changed the line it was shown as", async () => {
-      // The form showed the loaded Description as one line. Leaving that line
+    await testAsync("linkding updates carry a Description only when the user changed the text it was shown as", async () => {
+      // The form shows the loaded Description with its line breaks. Leaving it
       // alone sends nothing, so a value another client wrote after the lookup
       // is not overwritten with the one this popup loaded.
-      for (const [stored, box, expected] of [["First line\n\n  Second   line", "First line Second line", undefined], ["Stored", "Stored", undefined], ["", "", undefined],
-        ["Stored", "  Edited\n value ", "Edited value"], ["Stored", "", ""], ["", "Typed", "Typed"]]) {
+      for (const [stored, box, expected] of [["First line\n\n  Second   line", "First line\n\n  Second   line", undefined],
+        ["First line\n\n  Second   line", "First line Second line", undefined], ["Stored", "Stored", undefined], ["", "", undefined],
+        ["Stored", "  Edited\n value ", "Edited\n value"], ["Mine", "Mine\n\nAI summary", "Mine\n\nAI summary"], ["Stored", "", ""], ["", "Typed", "Typed"]]) {
         const loaded = { href: URL, description: "Stored title", extended: "", summary: stored, tags: "", tagNames: [], shared: "no", toread: "no", time: "2026-10-30T03:01:22Z" };
         const h = createSubmitHarness({ service: "linkding", draftContext: true, loaded });
         h.elements["linkding-description-input"].value = box;
@@ -2471,6 +2472,19 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(registrations.length===1&&registrations[0].id==="pp-text","Description does not match the actual field registry");
       const descriptionStyle=iframe.contentWindow.getComputedStyle(input),titleStyle=iframe.contentWindow.getComputedStyle(title);
       for(const property of ["backgroundColor","borderTopColor","borderBottomColor","borderRadius","height"])assert(descriptionStyle[property]===titleStyle[property],"Description field recipe differs: "+property+" "+descriptionStyle[property]+" vs "+titleStyle[property]);
+      // G24: the box keeps line breaks and grows with them (an AI summary is
+      // its own paragraph), and keeps the one-line height while it holds one
+      // line or only a placeholder that wraps.
+      const one=input.getBoundingClientRect().height,width=input.getBoundingClientRect().width;
+      input.placeholder="A placeholder long enough to wrap onto several lines in a field this narrow, as long locales do";
+      assert(input.getBoundingClientRect().height===one,"a wrapping placeholder grew the empty Description: "+input.getBoundingClientRect().height);
+      input.placeholder="";input.value="Mine\n\nAI summary";
+      assert(input.value==="Mine\n\nAI summary","the Description box dropped line breaks");
+      const three=input.getBoundingClientRect().height;
+      assert(three>=one+2*16&&input.scrollHeight<=input.clientHeight,"the Description did not grow with its paragraphs: "+one+" -> "+three);
+      assert(input.getBoundingClientRect().width===width,"the Description changed width");
+      input.value="x\n".repeat(40);
+      assert(input.getBoundingClientRect().height<=106,"the Description grew past its cap: "+input.getBoundingClientRect().height);
       iframe.remove();
     });
 
@@ -4472,7 +4486,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "url-input": createElementStub({ value: URL }),
         "title-input": createElementStub(),
         "description-input": createElementStub(),
-        "linkding-description-input": realDescription ? Object.assign(document.createElement("input"),{type:"text",value:"Manual"}) : createElementStub({value:"Manual"}),
+        "linkding-description-input": realDescription ? Object.assign(document.createElement("textarea"),{value:"Manual"}) : createElementStub({value:"Manual"}),
         "private-check": createElementStub(),
         "readlater-check": createElementStub(),
         "submit-btn": createElementStub(),
@@ -4707,9 +4721,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
+    // The box keeps the stored line breaks: an AI summary follows them as its
+    // own paragraph, and an untouched value is never flattened.
     await testAsync("existing linkding summary refills Description but a later user edit wins",async()=>{
       const response={ok:true,status:200,data:{posts:[{href:URL,description:"Saved title",extended:"Saved notes",summary:"Saved\ndescription",tags:"",shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}};
-      for(const dirtyDescription of [false,true]){const h=createLookupHarness(response,{service:"linkding",dirtyDescription,realDescription:true});assert((await h.run()).status==="found",JSON.stringify({statuses:h.statuses,warns:h.warns}));assert(h.elements["linkding-description-input"].value===(dirtyDescription?"Manual":"Saved description"),"wrong Description "+h.elements["linkding-description-input"].value);assert(h.elements["description-input"].value==="Saved notes");
+      for(const dirtyDescription of [false,true]){const h=createLookupHarness(response,{service:"linkding",dirtyDescription,realDescription:true});assert((await h.run()).status==="found",JSON.stringify({statuses:h.statuses,warns:h.warns}));assert(h.elements["linkding-description-input"].value===(dirtyDescription?"Manual":"Saved\ndescription"),"wrong Description "+h.elements["linkding-description-input"].value);assert(h.elements["description-input"].value==="Saved notes");
         // The stored Description is a value the popup can vouch for, and not one
         // waiting to be saved (so no draft keeps it); a box the user owns keeps
         // its own provenance.

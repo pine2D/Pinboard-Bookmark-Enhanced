@@ -394,7 +394,7 @@ function pbpPopupServerFieldNotes(dirty, loaded) {
   const fields = [["title-input", "labelTitle", existingBookmark.description],
     ["description-input", "labelNotes", existingBookmark.extended],
     ...(pbpBookmarkServiceId(settings) === "linkding" && typeof existingBookmark.summary === "string"
-      ? [["linkding-description-input", "labelDescription", pbpBookmarkDescriptionLine(existingBookmark.summary)]] : [])];
+      ? [["linkding-description-input", "labelDescription", pbpBookmarkDescriptionText(existingBookmark.summary)]] : [])];
   return fields.filter(([id, , server]) => dirty[id] === true && typeof server === "string" && $id(id).value !== server
       && (!loaded || loaded[id] === undefined || loaded[id] !== server))
     .map(([, label, server]) => pbpBookmarkServerFieldNote(t, t(label), server)).join(" ");
@@ -575,8 +575,7 @@ async function initPopupDraft(account, tab) {
         "private-check": "private", "readlater-check": "toread", "archive-check": "archive" };
       for (const [id, key] of Object.entries(keys)) {
         if (take(key) && d[key] !== undefined) {
-          // Text inputs strip line breaks themselves; preserve word boundaries first.
-          const value = key === "summary" ? pbpBookmarkDescriptionLine(d[key]) : d[key];
+          const value = key === "summary" ? pbpBookmarkDescriptionText(d[key]) : d[key];
           $id(id)[id.endsWith("check") ? "checked" : "value"] = value;
         }
       }
@@ -1509,7 +1508,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 bookmarkDraft: {
                   ...handoff.flags,
                   ...(pbpBookmarkServiceId(settings) === "linkding"
-                    ? (pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {})
+                    ? (pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionText($id("linkding-description-input")?.value) } : {})
                     : handoffSummaryRange ? { notes: handoffNotes, summaryRange: handoffSummaryRange } : {}),
                 },
                 ts: Date.now()
@@ -1656,7 +1655,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 notes: handoffNotes,
                 ...(handoffSummaryRange ? { summaryRange: handoffSummaryRange } : {}),
                 ...(pbpBookmarkServiceId(settings) === "linkding" && pbpPopupDescriptionKnown()
-                  ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {}),
+                  ? { summary: pbpBookmarkDescriptionText($id("linkding-description-input")?.value) } : {}),
                 ...handoff.flags,
               },
               account: sessionAccount,
@@ -1961,7 +1960,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         if (shouldUpdateField("title-input")) $id("title-input").value = existingBookmark.description;
         if (shouldUpdateField("description-input")) $id("description-input").value = existingBookmark.extended;
         if (pbpBookmarkServiceId(settings) === "linkding" && shouldUpdateField("linkding-description-input")) {
-          $id("linkding-description-input").value = pbpBookmarkDescriptionLine(existingBookmark.summary);
+          $id("linkding-description-input").value = pbpBookmarkDescriptionText(existingBookmark.summary);
           _linkdingDescriptionKnown = true;
           _linkdingDescriptionPending = false;
           // The bookmark's own Description, not the page's: no address edit takes it out.
@@ -2436,17 +2435,17 @@ function setupSubmit(token) {
         typeof pbpAiSummaryOwnershipSnapshot === "function"
           ? pbpAiSummaryOwnershipSnapshot(extended)
           : undefined;
-      // An update writes the Description only when the user changed the line
+      // An update writes the Description only when the user changed the text
       // the loaded one was shown as, so a value another client wrote after the
       // lookup is not overwritten with the one this popup loaded.
       const descriptionUnchanged = savePolicy.mode === "update" && typeof existingBookmark?.summary === "string"
-        && pbpBookmarkDescriptionLine(summary) === pbpBookmarkDescriptionLine(existingBookmark.summary);
+        && !pbpBookmarkDescriptionChanged(summary, existingBookmark.summary);
       const intent = {
         mode: savePolicy.mode,
         url: saveUrl,
         title,
         notes: extended,
-        ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(descriptionKnown && !descriptionUnchanged ? { summary: pbpBookmarkDescriptionLine(summary) } : {}), sharedExplicit } : {}),
+        ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(descriptionKnown && !descriptionUnchanged ? { summary: pbpBookmarkDescriptionText(summary) } : {}), sharedExplicit } : {}),
         tags: pbpSerializeIntentTags(tags, pbpBookmarkServiceId(settings)),
         private: isPrivate,
         toread: isReadLater,
@@ -2484,7 +2483,7 @@ function setupSubmit(token) {
       // both sides; unknown (null) for a restored draft's edits.
       const loadedFieldsAtSubmit = expectedVersion !== undefined && !(_popupDraftBase && _popupDraftBase.url === url) && existingBookmark
         ? { "title-input": existingBookmark.description, "description-input": existingBookmark.extended,
-          "linkding-description-input": typeof existingBookmark.summary === "string" ? pbpBookmarkDescriptionLine(existingBookmark.summary) : undefined }
+          "linkding-description-input": typeof existingBookmark.summary === "string" ? pbpBookmarkDescriptionText(existingBookmark.summary) : undefined }
         : null;
       Object.keys(fieldDirtyFlags).forEach((id) => { fieldDirtyFlags[id] = false; });
       _tagsUserTouched = false;

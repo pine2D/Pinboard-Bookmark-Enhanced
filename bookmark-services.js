@@ -298,13 +298,13 @@ function pbpCreateBookmarkServiceClient(config) {
       // server, which then fills it in from the page itself.
       const described = typeof fields.summary === "string";
       const body = {...(existing ? {} : {url:fields.url}), title:fields.title || "", notes:fields.notes || "",tag_names:tags,
-        ...(!existing ? described ? {description:pbpBookmarkDescriptionLine(fields.summary)} : {}
-          // The popup and reader show a stored Description as one line. Compare
-          // that line, so a multi-line value the user left alone is never
-          // flattened, and write only the line the user saw.
-          : described
-            && pbpBookmarkDescriptionLine(fields.summary) !== pbpBookmarkDescriptionLine(existing.summary)
-            ? {description:pbpBookmarkDescriptionLine(fields.summary)} : {}),
+        ...(!existing ? described ? {description:pbpBookmarkDescriptionText(fields.summary)} : {}
+          // The reader shows a stored Description as one line, the popup with
+          // its line breaks (shared.js pbpBookmarkDescriptionChanged), so a
+          // multi-line value the user left alone is never flattened, and only
+          // the text the user saw is written.
+          : described && pbpBookmarkDescriptionChanged(fields.summary, existing.summary)
+            ? {description:pbpBookmarkDescriptionText(fields.summary)} : {}),
         ...(typeof fields.toread === "boolean" ? {unread:fields.toread} : {}),
         ...(!existing ? {shared:config.sharingEnabled === true && fields.sharedExplicit === true && fields.private === false}
           : config.sharingEnabled === true && fields.sharedExplicit === true && typeof fields.private === "boolean" && fields.private !== existing.private ? {shared:!fields.private} : {})};

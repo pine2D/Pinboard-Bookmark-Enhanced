@@ -77,10 +77,11 @@ test("service post projection keeps summary separate from title and notes",()=>{
 });
 test("linkding create sends a known Description with disable_scraping and leaves an unknown one to the server",async()=>{
   // A string is a value the extension vouches for, an empty one included: it
-  // goes out as the one line the form shows, and linkding is told not to
-  // scrape. Anything else means the extension could not tell, so the request
-  // carries neither and the server's own scrape fills the field (id 18).
-  for(const [summary,description] of [["",""],["Custom description","Custom description"],["  Custom\n\n  description ","Custom description"]]){
+  // goes out as the form shows it, line breaks kept and the outer whitespace
+  // trimmed (as linkding trims it), and linkding is told not to scrape.
+  // Anything else means the extension could not tell, so the request carries
+  // neither and the server's own scrape fills the field (id 18).
+  for(const [summary,description] of [["",""],["Custom description","Custom description"],["  Custom\n\n  description ","Custom\n\n  description"],["Mine\r\n\r\nAI","Mine\n\nAI"]]){
     const h=harness("linkding",[[201,{...ldUnscraped,description}]]);
     const result=await h.client.save({url:pageUrl,title:"T",notes:"Meta description\nMy note",tags:[],summary});
     equal(h.calls[0].url,"https://bookmarks.example/base/api/bookmarks/?disable_scraping");
@@ -106,13 +107,16 @@ test("linkding PATCH sends Description only for changed strings and supports cle
     equal(result.bookmark.summary,changed?summary:"Meta description");
   }
 });
-test("linkding PATCH leaves a multi-line Description the form showed as one line untouched",async()=>{
+test("linkding PATCH leaves a multi-line Description the form showed unchanged untouched",async()=>{
   // Written by linkding's own editor or another client: line breaks and runs
-  // of spaces that the extension's one-line field cannot show.
+  // of spaces. The reader shows it as one line, the popup with its breaks;
+  // either one left alone sends no change, and a changed one is written with
+  // the line breaks the popup's box holds.
   const stored={...ldScraped,description:"First line\n\n  Second   line",tag_names:["kept"]};
   const existing=pbpBookmarkNormalize("linkding",stored);
-  for(const [summary,sent] of [["First line Second line",undefined],[" First line\nSecond line ",undefined],
-    ["First line Second line, edited","First line Second line, edited"],["  Edited \n description ","Edited description"],["",""]]){
+  for(const [summary,sent] of [["First line Second line",undefined],[" First line\n\n  Second   line\n",undefined],
+    [" First line\nSecond line ","First line\nSecond line"],
+    ["First line Second line, edited","First line Second line, edited"],["  Edited \n description ","Edited \n description"],["",""]]){
     const reply=sent===undefined?{...stored,tag_names:["kept","added"],date_modified:"2026-10-30T05:00:00.000000Z"}
       :{...stored,description:sent,tag_names:["kept","added"],date_modified:"2026-10-30T05:00:00.000000Z"};
     const h=harness("linkding",[[200,reply]]);

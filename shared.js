@@ -2251,13 +2251,29 @@ function pbpBookmarkTitleFailure(title, service) {
   return { status: "failed", reason: "too_long", limit: pbpBookmarkLimits(service).title };
 }
 
-// linkding's Description is shown and edited as one line in the popup and the
-// reader. This is the only definition of that line: every producer (form
-// fill, AI summary, page meta, drafts, reader hand-off, shortcut and batch
-// saves) and the adapter's "did the user change it" check go through it, so
-// the value a user sees and the value compared before a write can never drift.
+// linkding's Description as one line: how the reader shows and edits it, and
+// what single-line producers (page meta, an AI summary on its own, shortcut
+// and batch saves) send. The adapter's "did the user change it" check
+// compares this line, so a multi-line value a one-line editor left alone is
+// never flattened.
 function pbpBookmarkDescriptionLine(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+// linkding's Description with its line breaks: the popup edits it in a
+// multi-line box, where an AI summary follows the user's own words as its
+// own paragraph (user decision 2026-11-02 #4). Only line endings and the
+// outer whitespace are normalized (linkding trims it too).
+function pbpBookmarkDescriptionText(value) {
+  return String(value ?? "").replace(/\r\n?/g, "\n").trim();
+}
+// Whether a Description sent for an existing bookmark changes the stored one.
+// A one-line value equal to the stored one as a line is no change (the reader
+// shows a multi-line value as one line); a value with line breaks (the
+// popup's box) is compared with them.
+function pbpBookmarkDescriptionChanged(next, stored) {
+  const text = pbpBookmarkDescriptionText(next);
+  if (pbpBookmarkDescriptionLine(text) !== pbpBookmarkDescriptionLine(stored)) return true;
+  return text.includes("\n") && text !== pbpBookmarkDescriptionText(stored);
 }
 
 function pbpBookmarkEndpoint(raw) {

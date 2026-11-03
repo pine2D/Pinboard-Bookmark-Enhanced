@@ -935,6 +935,22 @@ html[data-section="login"] .quick-actions { display: none !important; }
   max-height: 300px;
   overflow-y: auto;
 }
+/* linkding's Description: one line until it holds more, like the field it
+   replaced (the 26px md rung), then it grows with its text -- an AI summary
+   follows the user's words as its own paragraph (decision 2026-11-02 #4).
+   Empty, it keeps one line: field-sizing would size it to the placeholder,
+   which wraps in long locales. */
+#linkding-description-input {
+  field-sizing: content;
+  resize: none;
+  min-height: var(--pp-control-h);
+  max-height: 106px;
+}
+#linkding-description-input:placeholder-shown {
+  field-sizing: fixed;
+  height: var(--pp-control-h);
+  overflow: hidden;
+}
 
 .notes-bar { display: flex; justify-content: space-between; align-items: center; margin-top: var(--pp-sp-1); }
 #desc-char-count { font-size: 11px; color: var(--pp-fg-hint); white-space: nowrap; }

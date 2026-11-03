@@ -856,7 +856,7 @@ await test("Pinboard and Karakeep reader bookmarks keep the popup's privacy draf
 await test("popup preview payloads leave out a Description the popup cannot vouch for", async () => {
   const { normal, pending, describedBy } = await popupPreviewDrafts();
   const account = "linkding:fixture", settings = { bookmarkService: "linkding" };
-  for (const [known, box, expected] of [[false, "", undefined], [false, " \n ", undefined], [true, "", ""], [false, "  Typed\n  line ", "Typed line"], [true, "Meta", "Meta"]]) {
+  for (const [known, box, expected] of [[false, "", undefined], [false, " \n ", undefined], [true, "", ""], [false, "  Typed\n  line ", "Typed\n  line"], [true, "Meta", "Meta"]]) {
     const fields = { "title-input": "T", "description-input": "Note", "linkding-description-input": box, "private-check": true, "readlater-check": false };
     const $id = name => ({ value: fields[name], checked: fields[name] });
     const vouch = describedBy(known, $id), where = JSON.stringify({ known, box });
@@ -974,12 +974,12 @@ await test("reader initial linkding Description follows the owner-bound preview 
   const account = "linkding:fixture";
   const h = await harness({ account, service: "linkding", post: null, slot: { account, bookmarkDraft: { title: "T", tags: "one", notes: "Note", summary: "first\nsecond", summaryTouched: true } } });
   const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
-  equal(state.descriptionSupported, true); equal(state.bookmark.summary, "first second");
+  equal(state.descriptionSupported, true); equal(state.bookmark.summary, "first\nsecond");
   for (const sharedExplicit of [null,1,"true"]) equal((await h.pbpReaderBookmarkRequest({type:"mdReaderBookmarkSave",account,action:"edit",draft:{...state.bookmark,sharedExplicit}},SENDER)).reason,"invalid");
   const invalid = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "edit", draft: { ...state.bookmark, summary: 7 } }, SENDER);
   equal(invalid.reason, "invalid");
   const saved = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "edit", draft: { ...state.bookmark, summary: "changed\nvalue" } }, SENDER);
-  equal(saved.status, "saved"); equal(h.env.submitted.intent.summary, "first second");
+  equal(saved.status, "saved"); equal(h.env.submitted.intent.summary, "first\nsecond");
   equal(h.env.submitted.opts.readerDraft.summary, "changed value");
   assert(!("summaryTouched" in h.env.submitted.intent) && !("summaryTouched" in h.env.submitted.opts.readerDraft));
   h.env.account = "linkding:other";
@@ -1006,7 +1006,7 @@ await test("reader linkding creates leave an unknown Description to linkding", a
     [{ optAutoDescription: false }, undefined, ""],
     [{}, { title: "T", tags: "one", notes: "N" }, undefined],
     [{}, { title: "T", tags: "one", notes: "N", summary: "" }, ""],
-    [{ optAutoDescription: false }, { title: "T", tags: "one", notes: "N", summary: "Kept\nline" }, "Kept line"],
+    [{ optAutoDescription: false }, { title: "T", tags: "one", notes: "N", summary: "Kept\nline" }, "Kept\nline"],
   ]) {
     const where = JSON.stringify({ settings, bookmarkDraft });
     const has = (value, label) => assert(Object.hasOwn(value, "summary") === (expected !== undefined) && value.summary === expected,

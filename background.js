@@ -1804,7 +1804,7 @@ function pbpReaderInitialIntent(context, settings, action) {
   // Description, sends a known "" when auto-fill is off, and otherwise leaves
   // it out so linkding fills it in from the page.
   const summary = !linkding ? undefined
-    : typeof originalDraft?.summary === "string" ? pbpBookmarkDescriptionLine(originalDraft.summary)
+    : typeof originalDraft?.summary === "string" ? pbpBookmarkDescriptionText(originalDraft.summary)
       : settings.optAutoDescription === false ? "" : undefined;
   return {
     mode: "skip", url: context.bookmarkUrl,
