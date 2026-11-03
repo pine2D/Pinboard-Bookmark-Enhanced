@@ -778,6 +778,33 @@ await suite("unified save pipeline", async () => {
     equal(slot.description, "A notes\nline 2");
   });
 
+  // G10: the reader's bookmark address is the handoff's. A Jina pass rewrites
+  // url to its own canonical address and a message cannot name another; a
+  // slot from before bookmarkUrl existed gains none.
+  await test("preview re-extraction keeps the handoff's bookmark address", async () => {
+    const source = await getBackgroundSource();
+    const start = source.indexOf('if (message.type === "reextractMarkdown")');
+    const end = source.indexOf('if (message.type === "mdPreviewBookmarkInfo"', start);
+    assert(start >= 0 && end > start, "reextract branch not found");
+    const key = "md_preview_data_bookmark-url";
+    const page = "https://example.com/post?utm_source=feed", canonical = "https://example.com/post/";
+    for (const handed of ["https://example.com/post", undefined]) {
+      let slot = { pending: true, url: page, tabId: 7, account: "alice", tags: [], description: "",
+        ...(handed === undefined ? {} : { bookmarkUrl: handed }) };
+      const chrome = { storage: { local: { get: async () => ({ [key]: slot }), set: async (values) => { slot = values[key]; } } } };
+      const invoke = new Function("chrome", "extractForPreview", `
+        return function invoke(message, sendResponse) { ${source.slice(start, end)} };
+      `)(chrome, async ({ engine }) => ({ source: engine, markdown: "# rebuilt", contentHtml: "", title: "Rebuilt", url: canonical }));
+      const result = await new Promise((resolve) => {
+        equal(invoke({ type: "reextractMarkdown", url: page, tabId: 7, engine: "jina", k: "bookmark-url", bookmarkUrl: "https://evil.test/" }, resolve), true);
+      });
+      equal(result.ok, true);
+      equal(slot.url, canonical, "the Jina pass did not rewrite url");
+      if (handed === undefined) assert(!("bookmarkUrl" in slot), "a legacy slot gained " + slot.bookmarkUrl);
+      else equal(slot.bookmarkUrl, handed);
+    }
+  });
+
   await test("refresh-then-extract reloads only the unchanged source tab, with the page grant, before extracting", async () => {
     const source = await getBackgroundSource();
     const start = source.indexOf('if (message.type === "reextractMarkdown")');
@@ -886,7 +913,7 @@ await suite("unified save pipeline", async () => {
     assert(popupPayload.includes("account: sessionAccount"), "popup preview payload has no owner");
     assert(popupPayload.includes('description: $id("description-input")?.value || ""'), "popup preview drops notes");
     assert(previewSource.includes("account: bookmarkAccount, tags, description, ts: Date.now()"), "restore record drops owner metadata");
-    assert(previewSource.includes("if (url && bookmarkAccount)"), "ownerless preview still requests bookmark data");
+    assert(previewSource.includes("if (bookmarkUrl && bookmarkAccount)"), "ownerless preview still requests bookmark data");
     const shortcut = source.slice(source.indexOf("async function openMarkdownPreviewFromShortcut"));
     assert(shortcut.includes('account: auth.account || ""'), "shortcut preview payload has no owner field");
   });

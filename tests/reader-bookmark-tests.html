@@ -72,7 +72,9 @@ async function pipelineHarness(options = {}) {
       if (env.networkDown) throw new Error("offline");
       if (url.pathname.endsWith("/get")) {
         if (env.onLookup) await env.onLookup();
-        return { ok: true, status: 200, json: async () => ({ date: "2026-10-23T00:00:00Z", user: "alice", posts: env.post ? [{ ...env.post }] : [] }) };
+        // posts/get?url= answers only the bookmark stored under exactly that address.
+        const held = env.post && env.post.href === url.searchParams.get("url");
+        return { ok: true, status: 200, json: async () => ({ date: "2026-10-23T00:00:00Z", user: "alice", posts: held ? [{ ...env.post }] : [] }) };
       }
       if (url.pathname.endsWith("/delete")) {
         if (env.onDelete) await env.onDelete();
@@ -357,28 +359,126 @@ await test("popup privacy draft remains an explicit choice when opening the read
     equal(result.status, "saved"); equal(h.env.post.shared, isPrivate ? "no" : "yes");
   }
 });
+// G10: the reader looks the bookmark up and saves it under the address the
+// toolbar icon and the popup use (shared.js pbpBookmarkLookupUrl), not under
+// the page address its slot records. A page reached through a tracking link
+// keeps that page address (highlights are keyed by it).
+const TRACKED = URL_ARTICLE + "?utm_source=x&utm_medium=social";
+// The keyboard shortcut's reader opener (background.js), run against a stub
+// tab and the stored cleaning settings; answers the slot it wrote.
+async function shortcutSlot(tab, urlClean) {
+  background ||= await (await fetch("../background.js")).text();
+  const at = background.indexOf("async function openMarkdownPreviewFromShortcut");
+  assert(at >= 0, "shortcut opener not found");
+  const body = background.slice(at, background.indexOf("\n}\n", at) + 2);
+  const written = [];
+  const chrome = { tabs: { query: async () => [tab], create: async () => ({}) }, storage: { local: { set: async values => { written.push(values); } } } };
+  const stored = { aiContentSource: "local", ...(urlClean === undefined ? {} : { urlClean }) };
+  const settingsStorage = { get: async defaults => ({ ...defaults, ...stored }) };
+  const open = new Function("chrome", "pbpSweepPreviewOrphans", "getSettingsStorage", "SETTINGS_DEFAULTS", "getCurrentBookmarkAuth", "pbpVideoDetect", "showNotification", "t", "pbpBookmarkLookupUrl",
+    body + "\nreturn openMarkdownPreviewFromShortcut;")(chrome, () => {}, async () => settingsStorage, SETTINGS_DEFAULTS, async () => ({ account: "alice" }), () => null, () => { throw new Error("shortcut failed"); }, key => key, pbpBookmarkLookupUrl);
+  await open();
+  equal(written.length, 1);
+  const [[key, slot]] = Object.entries(written[0]);
+  assert(key.startsWith("md_preview_data_"), "shortcut wrote " + key);
+  return slot;
+}
+async function readerOn(slot, options = {}) {
+  const h = await pipelineHarness({ post: { ...POST }, ...options, slot: { bookmarkDraft: undefined, ...slot } });
+  const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER);
+  return { h, state };
+}
+const lookedUp = h => h.env.calls.filter(url => url.pathname.endsWith("/get")).map(url => url.searchParams.get("url"));
+const written = h => h.env.calls.filter(url => url.pathname.endsWith("/add")).map(url => url.searchParams.get("url"));
+await test("a tracked page shows and saves the bookmark stored under its cleaned address", async () => {
+  for (const action of ["save", "later"]) {
+    const { h, state } = await readerOn({ url: TRACKED, baseUrl: TRACKED, sourceTabUrl: TRACKED, bookmarkUrl: URL_ARTICLE }, { post: { ...POST, toread: "no" } });
+    equal(state.bookmarked, true, action + ": the reader showed a saved page as unsaved");
+    const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action }, SENDER);
+    assert(result.status === "saved" || result.status === "skipped", action + ": " + JSON.stringify(result));
+    assert(lookedUp(h).every(url => url === URL_ARTICLE), action + " looked up " + lookedUp(h).join());
+    assert(written(h).every(url => url === URL_ARTICLE), action + " wrote " + written(h).join());
+    equal(h.env.post.href, URL_ARTICLE);
+    if (action === "later") { equal(written(h).length, 1); equal(h.env.post.toread, "yes"); equal(h.env.post.time, POST.time); }
+    else equal(written(h).length, 0);
+  }
+});
+await test("a new reader bookmark of a tracked page is created under its cleaned address, and deleted there", async () => {
+  const { h, state } = await readerOn({ url: TRACKED, sourceTabUrl: TRACKED, bookmarkUrl: URL_ARTICLE }, { post: null });
+  equal(state.bookmarked, false);
+  equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER)).status, "saved");
+  assert(written(h).length === 1 && written(h)[0] === URL_ARTICLE, "created under " + written(h).join());
+  equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkDelete", account: "alice" }, SENDER)).status, "deleted");
+  equal(h.env.calls.filter(url => url.pathname.endsWith("/delete")).map(url => url.searchParams.get("url")).join(), URL_ARTICLE);
+  equal(h.env.post, null);
+});
+await test("a slot written before bookmarkUrl existed keeps using its url", async () => {
+  const { h, state } = await readerOn({ url: TRACKED, sourceTabUrl: TRACKED });
+  equal(state.bookmarked, false, "a legacy slot changed its lookup address");
+  equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER)).status, "saved");
+  assert(lookedUp(h).every(url => url === TRACKED) && written(h).join() === TRACKED, "legacy slot used " + lookedUp(h).concat(written(h)).join());
+});
+await test("a slot's bookmark address that is not a web address fails closed", async () => {
+  for (const bookmarkUrl of ["javascript:alert(1)", "", 7, null]) {
+    const h = await harness({ slot: { bookmarkUrl } });
+    equal(await h.pbpReaderBookmarkContext(SENDER, "alice"), null, JSON.stringify(bookmarkUrl));
+  }
+});
+await test("the shortcut reader takes the toolbar icon's cleaning rule, and keeps the page address for highlights", async () => {
+  const tab = { id: 4, url: TRACKED, title: "Tracked", incognito: false };
+  for (const [label, urlClean, expected] of [
+    ["default settings", undefined, URL_ARTICLE],
+    ["cleaning on open", { ...SETTINGS_DEFAULTS.urlClean, enabled: true, onPopupOpen: true }, URL_ARTICLE],
+    ["cleaning off", { ...SETTINGS_DEFAULTS.urlClean, enabled: false }, TRACKED],
+    ["not on open", { ...SETTINGS_DEFAULTS.urlClean, onPopupOpen: false }, TRACKED],
+    ["settings the cleaner cannot apply", { ...SETTINGS_DEFAULTS.urlClean, customParams: "utm_source" }, TRACKED],
+  ]) {
+    const slot = await shortcutSlot(tab, urlClean);
+    equal(slot.bookmarkUrl, expected, label);
+    // The same address the toolbar icon asks about for this tab.
+    equal(slot.bookmarkUrl, pbpBookmarkLookupUrl(tab.url, urlClean === undefined ? SETTINGS_DEFAULTS.urlClean : urlClean), label + ": differs from the icon's rule");
+    // The page's own address, which highlights are keyed by, does not move.
+    assert(slot.url === TRACKED && slot.baseUrl === TRACKED && slot.sourceTabUrl === TRACKED, label + ": page address became " + [slot.url, slot.baseUrl, slot.sourceTabUrl].join());
+    const { state } = await readerOn({ ...slot, account: "alice" });
+    equal(state.bookmarked, expected === URL_ARTICLE, label + ": reader state");
+  }
+});
 // The bookmarkDraft objects the popup writes into a preview slot: the normal
 // preview's literal and the pending (embedded-frame) preview's one line,
 // evaluated with the popup's form fields and the notes / summary range it
 // reads just before writing the slot.
 async function popupPreviewDrafts() {
   const source = await (await fetch("../popup.js")).text();
+  // The bookmarkDraft object literal last written inside one slot write.
+  const draftIn = (region, label) => {
+    const objectAt = region.lastIndexOf("bookmarkDraft: {");
+    assert(objectAt >= 0, label + " preview has no bookmark draft");
+    const opening = region.indexOf("{", objectAt);
+    let depth = 0, closing = -1;
+    for (let i = opening; i < region.length; i++) {
+      if (region[i] === "{") depth++;
+      else if (region[i] === "}" && --depth === 0) { closing = i; break; }
+    }
+    assert(closing > opening, label + " draft object did not close");
+    return region.slice(opening, closing + 1);
+  };
   const opener = source.slice(source.indexOf("const openPreview"), source.indexOf("const downloadMd"));
-  const objectAt = opener.lastIndexOf("bookmarkDraft: {");
-  assert(objectAt >= 0, "normal preview has no bookmark draft");
-  const opening = opener.indexOf("{", objectAt);
-  let depth = 0, closing = -1;
-  for (let i = opening; i < opener.length; i++) {
-    if (opener[i] === "{") depth++;
-    else if (opener[i] === "}" && --depth === 0) { closing = i; break; }
-  }
-  assert(closing > opening, "normal draft object did not close");
-  const normal = new Function("$id", "settings", "currentTags", "pbpBookmarkServiceId", "pbpBookmarkFormatTags", "result", "_linkdingSharedExplicit",
-    "handoffNotes", "handoffSummaryRange", "pbpPopupDescriptionKnown", "return (" + opener.slice(opening, closing + 1) + ");");
-  const pendingLine = source.split("\n").find(line => line.includes('=== "linkding" ? { bookmarkDraft: {'));
-  assert(pendingLine, "pending preview has no Description draft");
-  const pending = new Function("$id", "settings", "pbpBookmarkServiceId", "_linkdingSharedExplicit",
-    "handoffNotes", "handoffSummaryRange", "pbpPopupDescriptionKnown", "return ({" + pendingLine.trim() + "}).bookmarkDraft;");
+  const pendingAt = source.indexOf("pending: true, engine, source: engine");
+  assert(pendingAt >= 0, "pending preview slot not found");
+  const pendingSlot = source.slice(pendingAt, source.indexOf("await chrome.tabs.create", pendingAt));
+  // The popup's reader handoff helper, run on the given form, settings and
+  // cleaning settings (popup.js pbpPopupReaderHandoff).
+  const handoffAt = source.indexOf("function pbpPopupReaderHandoff(");
+  assert(handoffAt >= 0, "popup has no reader handoff helper");
+  const readerHandoff = ($id, settings, urlClean) => new Function("$id", "settings", "pbpBookmarkServiceId", "pbpBookmarkLookupUrl", "_loadUrlCleanSettings",
+    source.slice(handoffAt, source.indexOf("\n}\n", handoffAt) + 2) + "\nreturn pbpPopupReaderHandoff;")($id, settings, pbpBookmarkServiceId, pbpBookmarkLookupUrl, () => urlClean);
+  const normalDraft = new Function("$id", "settings", "currentTags", "pbpBookmarkServiceId", "pbpBookmarkFormatTags", "result", "_linkdingSharedExplicit",
+    "handoffNotes", "handoffSummaryRange", "pbpPopupDescriptionKnown", "handoff", "return (" + draftIn(opener, "normal") + ");");
+  const pendingDraft = new Function("$id", "settings", "pbpBookmarkServiceId", "_linkdingSharedExplicit",
+    "handoffNotes", "handoffSummaryRange", "pbpPopupDescriptionKnown", "handoff", "return (" + draftIn(pendingSlot, "pending") + ");");
+  const handoffFor = ($id, settings) => readerHandoff($id, settings, SETTINGS_DEFAULTS.urlClean)(URL_ARTICLE, { incognito: false });
+  const normal = ($id, settings, ...rest) => normalDraft($id, settings, ...rest, handoffFor($id, settings));
+  const pending = ($id, settings, ...rest) => pendingDraft($id, settings, ...rest, handoffFor($id, settings));
   // The popup's own answer to "can I vouch for the Description box?".
   const knownAt = source.indexOf("function pbpPopupDescriptionKnown(");
   assert(knownAt >= 0, "popup has no Description provenance helper");
@@ -388,7 +488,7 @@ async function popupPreviewDrafts() {
   assert(helperAt >= 0, "popup has no handoff summary range helper");
   const handoffRange = (snapshot) => new Function("pbpAiSummaryOwnershipSnapshot",
     source.slice(helperAt, source.indexOf("\n}\n", helperAt) + 2) + "\nreturn pbpPopupHandoffSummaryRange;")(snapshot);
-  return { normal, pending, handoffRange, describedBy };
+  return { normal, pending, handoffRange, describedBy, readerHandoff };
 }
 await test("normal and pending popup preview payloads carry linkding Description into reader state", async () => {
   const { normal, pending } = await popupPreviewDrafts();
@@ -697,6 +797,40 @@ await test("popup preview payloads leave out a Description the popup cannot vouc
 // bookmarkDraft right beside those notes, and only a range does: null ("none
 // of mine") and undefined ("cannot tell") both travel as nothing. linkding
 // keeps the summary out of Notes, so its pending draft carries neither.
+// Both popup handoffs (the normal preview and the pending one an embedded
+// frame leaves) carry what the reader needs to create the bookmark the popup
+// would have: its address, the source tab's incognito state and the form's
+// Private and Read Later boxes. A pending preview used to carry none of them.
+await test("popup handoffs carry the cleaned address, incognito source, privacy and Read Later into a reader create", async () => {
+  const { normal, pending, readerHandoff } = await popupPreviewDrafts();
+  for (const [label, urlClean, expected] of [["cleaning on open", SETTINGS_DEFAULTS.urlClean, URL_ARTICLE],
+    ["cleaning off", { ...SETTINGS_DEFAULTS.urlClean, enabled: false }, TRACKED], ["not on open", { ...SETTINGS_DEFAULTS.urlClean, onPopupOpen: false }, TRACKED]]) {
+    equal(readerHandoff(() => null, { bookmarkService: "pinboard" }, urlClean)(TRACKED, { incognito: false }).bookmarkUrl, expected, label);
+  }
+  for (const incognito of [false, true]) for (const readLater of [false, true]) for (const which of ["normal", "pending"]) {
+    // The popup ticks Private for an incognito page (optPrivateIncognito).
+    const fields = { "title-input": "T", "description-input": "Note", "private-check": incognito, "readlater-check": readLater };
+    const $id = name => ({ value: fields[name], checked: fields[name] });
+    const settings = { bookmarkService: "pinboard" };
+    const handoff = readerHandoff($id, settings, SETTINGS_DEFAULTS.urlClean)(TRACKED, { incognito });
+    const where = which + " incognito=" + incognito + " readLater=" + readLater;
+    equal(handoff.sourceIncognito, incognito, where);
+    const draft = which === "normal"
+      ? normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, false, "Note", undefined, () => true)
+      : pending($id, settings, pbpBookmarkServiceId, false, "Note", undefined, () => true);
+    // The reader worker's settings: private only by the incognito default.
+    const h = await pipelineHarness({ post: null, slot: { url: TRACKED, bookmarkUrl: handoff.bookmarkUrl, sourceIncognito: handoff.sourceIncognito, bookmarkDraft: draft },
+      settings: { optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false } });
+    const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER);
+    assert(state.bookmark.private === incognito && state.bookmark.toread === readLater, where + ": reader state " + JSON.stringify(state.bookmark));
+    equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER)).status, "saved", where);
+    assert(h.env.post.href === URL_ARTICLE && h.env.post.shared === (incognito ? "no" : "yes") && h.env.post.toread === (readLater ? "yes" : "no"), where + ": created " + JSON.stringify(h.env.post));
+  }
+  // Without a draft the incognito source alone keeps it private (the shortcut's slot).
+  const h = await pipelineHarness({ post: null, slot: { sourceIncognito: true }, settings: { optPrivateDefault: false, optPrivateIncognito: true } });
+  equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER)).status, "saved");
+  equal(h.env.post.shared, "no");
+});
 await test("popup preview payloads carry the summary range the popup vouches for beside the notes", async () => {
   const { normal, pending, handoffRange } = await popupPreviewDrafts();
   const range = { start: 0, end: 4 };
@@ -715,7 +849,9 @@ await test("popup preview payloads carry the summary range the popup vouches for
     if (handed) equal(JSON.stringify(plain.summaryRange), JSON.stringify(range));
     const framed = pending($id, settings, pbpBookmarkServiceId, false, "Note", handed, () => true);
     if (service === "linkding") assert(framed && !("notes" in framed) && !("summaryRange" in framed), "linkding pending draft gained Notes ownership");
-    else if (!handed) equal(framed, undefined);
+    // Without a range the draft vouches for no notes: the reader saves the
+    // slot's description, and the draft only carries the form's flags.
+    else if (!handed) assert(!("notes" in framed) && !("summaryRange" in framed), service + " pending draft without a range: " + JSON.stringify(framed));
     else { equal(framed.notes, "Note"); equal(JSON.stringify(framed.summaryRange), JSON.stringify(range)); }
   }
 });

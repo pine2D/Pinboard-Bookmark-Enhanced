@@ -4567,6 +4567,21 @@ function stripTrackingParams(urlStr, settings = {}) {
   return { cleaned: result, removedCount: removed, original };
 }
 
+// The address a page's bookmark is looked up and saved under: the cleaned page
+// address when the popup cleans on open (urlClean.enabled && onPopupOpen),
+// else the page address itself. The toolbar icon, the popup's prefetch and
+// every reader handoff share this one rule, so a page reached through a
+// utm_* link reads as saved wherever the popup saved it. Settings the cleaner
+// cannot apply leave the address as it is, as the popup does.
+function pbpBookmarkLookupUrl(pageUrl, urlClean) {
+  if (!urlClean || !urlClean.enabled || !urlClean.onPopupOpen) return pageUrl;
+  try { return stripTrackingParams(pageUrl, urlClean).cleaned || pageUrl; }
+  catch (e) {
+    console.warn("URL cleaning failed:", e?.name, e?.message);
+    return pageUrl;
+  }
+}
+
 // True when two URLs refer to the same bookmark ignoring tracking params.
 // Used by background.js to avoid flipping the active tab's icon for an
 // unrelated saved/deleted bookmark.

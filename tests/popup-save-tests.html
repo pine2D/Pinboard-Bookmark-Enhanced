@@ -4517,6 +4517,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const stripEnd = sharedSource.indexOf("// True when two URLs refer to the same bookmark", stripStart);
     assert(stripStart >= 0 && stripEnd > stripStart, "stripTrackingParams source not found");
     const realStripTrackingParams = new Function("URL", sharedSource.slice(stripStart, stripEnd) + "\nreturn stripTrackingParams;")(window.URL);
+    // The icon's cleaning rule (pbpBookmarkLookupUrl), over that same real strip.
+    const realBookmarkLookupUrl = new Function("URL", sharedSource.slice(stripStart, stripEnd) + "\nreturn pbpBookmarkLookupUrl;")(window.URL);
     assert(realStripTrackingParams(K1_TRACKED, { enabled: true }).cleaned === K1_CLEAN,
       "the re-scoped stripTrackingParams is still degraded -- the tracked-URL cases below would pass vacuously");
 
@@ -4550,6 +4552,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const workerDeps = {
         SETTINGS_DEFAULTS,
         stripTrackingParams: realStripTrackingParams,
+        pbpBookmarkLookupUrl: realBookmarkLookupUrl,
         pbpPinboardAccountFromToken,
         getCurrentBookmarkAuth: async () => workerAuth,
         getSettingsStorage: async () => ({ get: async (defaults) => ({ ...defaults, optCheckBookmarkStatus: true, urlClean }) }),

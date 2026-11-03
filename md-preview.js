@@ -1159,6 +1159,14 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // it (the restore record carries this same fallback value forward); only
   // opening a fresh preview from the popup/shortcut seeds the real tab URL.
   const sourceTabUrl = (typeof info.sourceTabUrl === "string" && info.sourceTabUrl) || url || "";
+  // The address the handoff looked this page's bookmark up under (shared.js
+  // pbpBookmarkLookupUrl: the cleaned page address). The bookmark badge, the
+  // reader's bookmark bar and the export metadata refresh speak in it; url
+  // stays the page's own, which highlights are keyed by. Every rewrite of the
+  // slot below forwards the handoff's value; a slot written before it
+  // existed falls back to url, as the worker does.
+  const handedBookmarkUrl = typeof info.bookmarkUrl === "string" ? { bookmarkUrl: info.bookmarkUrl } : {};
+  const bookmarkUrl = handedBookmarkUrl.bookmarkUrl || url || "";
   // Common boot path for popup and shortcut, before extraction or the lazy
   // video module. This runs once per reader document, not on track/view
   // switches, and a missing source tab never delays rendering.
@@ -1218,13 +1226,13 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // Ownerless previews never ask: background.js answers {bookmarked:false}
     // without a lookup, and asking anyway would spend a Pinboard call on a
     // signed-out page.
-    if (url && bookmarkAccount) {
-      chrome.runtime.sendMessage({ type: "mdPreviewBookmarkInfo", url, account: bookmarkAccount })
+    if (bookmarkUrl && bookmarkAccount) {
+      chrome.runtime.sendMessage({ type: "mdPreviewBookmarkInfo", url: bookmarkUrl, account: bookmarkAccount })
         .then((resp) => {
           // Compared against the LIVE account, not the one this call was sent
           // with: a second switch while it was in flight must not paint a
           // stale answer.
-          if (resp?.account === bookmarkAccount) renderBookmarkBadge(resp, url);
+          if (resp?.account === bookmarkAccount) renderBookmarkBadge(resp, bookmarkUrl);
         })
         .catch(() => {});
     }
@@ -1252,7 +1260,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           if (gen !== accountGen) return;
           if (stored) await chrome.storage.local.set({[key]:{...stored,account:bookmarkAccount,tags:[],description:"",bookmarkDraft:null}});
           if (_badgeArmed) refreshBookmarkBadge(); else pbpClearBookmarkBadge();
-          document.dispatchEvent(new CustomEvent("pbp:bookmark-account-changed", {detail:{url,title,account:bookmarkAccount}}));
+          document.dispatchEvent(new CustomEvent("pbp:bookmark-account-changed", {detail:{url,bookmarkUrl,title,account:bookmarkAccount}}));
         }
       } catch (error) { console.warn("[preview] identity refresh failed:", error?.name, error?.message); }
     });
@@ -1423,7 +1431,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
             videoDescriptionMd: descMd,
             url, baseUrl, sourceTabUrl, tabId: srcTabId,
             source: source === "jina" ? "jina" : "local",
-            sourceIncognito, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
+            sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
             nonce: _pageNonce
           }
         });
@@ -1654,7 +1662,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
             await chrome.storage.local.set({ [MP_KEY]: {
               markdown: "", title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
               source: attemptedEngine === "jina" ? "jina" : "local",
-              sourceIncognito, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(), nonce: _pageNonce
+              sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(), nonce: _pageNonce
             } });
           }
           location.reload();
@@ -1886,7 +1894,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         videoDescriptionMd: (window.pbpVideoDoc && window.pbpVideoDoc.descriptionMarkdown) || "",
         title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
         source: source === "jina" ? "jina" : "local",
-        sourceIncognito, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
+        sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
       }
     : {
@@ -1894,7 +1902,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         // while re-extracting, and a failed attempt otherwise read "Untitled".
         restore: true, title: title || "", url, tabId: srcTabId, sourceTabUrl,
         engine: source === "jina" ? "jina" : "local",
-        sourceIncognito, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
+        sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
       };
   try {
@@ -2222,7 +2230,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   window.addEventListener("focus", refreshExportCount);
   window.addEventListener("pagehide", () => exportHistoryChannel?.close(), { once: true });
   document.addEventListener("pbp:bookmark-changed", (e) => {
-    if (e.detail?.account === bookmarkAccount && e.detail?.url === url) refreshBookmarkBadge();
+    if (e.detail?.account === bookmarkAccount && e.detail?.url === bookmarkUrl) refreshBookmarkBadge();
   });
   document.addEventListener("pbp:rendered", refreshExportCount, { once: true });
   updateExportSummary();
@@ -3255,7 +3263,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   const _isForumPage = (typeof pbpForumShouldMark === "function")
     ? !!pbpForumShouldMark(info, renderedView) : !!info.forum;
   await pbpDeferredScriptsReady;
-  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title, forum: _isForumPage, account: previewAccount, bookmarkAccount, bookmark: { tags, notes: description, sourceTabId: srcTabId, sourceTabUrl, draft: bookmarkDraft } } }));
+  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, bookmarkUrl, title, forum: _isForumPage, account: previewAccount, bookmarkAccount, bookmark: { tags, notes: description, sourceTabId: srcTabId, sourceTabUrl, draft: bookmarkDraft } } }));
 
   // Raw view populated lazily on first switch
 

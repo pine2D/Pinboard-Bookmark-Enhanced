@@ -235,10 +235,7 @@ async function debouncedCheck(url) {
   // URL now reads as not-bookmarked. Only the query URL, the dedup key and the
   // cache key move — tab identity (_lastCheckedUrl, _getFocusedActiveTab,
   // _writeCurrentTabMirror) keeps speaking in raw tab URLs.
-  let target = url;
-  if (urlCleanSettings && urlCleanSettings.enabled && urlCleanSettings.onPopupOpen) {
-    try { target = stripTrackingParams(url, urlCleanSettings).cleaned || url; } catch (_) { target = url; }
-  }
+  const target = pbpBookmarkLookupUrl(url, urlCleanSettings);
   // The caller needs `target` to read the cache entry back: it is the only key
   // this check wrote, so reading back by the raw tab URL would find nothing.
   return { bookmarked: await _dedupedBookmarkCheck(target), target };
@@ -1500,9 +1497,16 @@ async function pbpReaderBookmarkContext(sender, account) {
   const stored = (await chrome.storage.local.get(storageKey))[storageKey];
   const auth = await pbpReadFreshBookmarkAuthForAccount(account);
   if (!stored || stored.account !== account || !auth?.token) return null;
-  try { if (!/^https?:$/.test(new URL(stored.url).protocol)) return null; }
-  catch (_) { return null; }
-  return { ...stored, account };
+  // bookmarkUrl: the address the handoff looked the bookmark up under (the
+  // cleaned page address, pbpBookmarkLookupUrl). url stays the page's own:
+  // highlights are keyed by it. A slot written before bookmarkUrl existed
+  // keeps using url.
+  const bookmarkUrl = stored.bookmarkUrl === undefined ? stored.url : stored.bookmarkUrl;
+  try {
+    if (!/^https?:$/.test(new URL(stored.url).protocol)) return null;
+    if (typeof bookmarkUrl !== "string" || !/^https?:$/.test(new URL(bookmarkUrl).protocol)) return null;
+  } catch (_) { return null; }
+  return { ...stored, bookmarkUrl, account };
 }
 
 async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth) {
@@ -1568,8 +1572,8 @@ function pbpReaderInitialIntent(context, settings, action) {
     : typeof originalDraft?.summary === "string" ? pbpBookmarkDescriptionLine(originalDraft.summary)
       : settings.optAutoDescription === false ? "" : undefined;
   return {
-    mode: "skip", url: context.url,
-    title: typeof originalDraft?.title === "string" ? originalDraft.title : context.title || context.url,
+    mode: "skip", url: context.bookmarkUrl,
+    title: typeof originalDraft?.title === "string" ? originalDraft.title : context.title || context.bookmarkUrl,
     notes: typeof originalDraft?.notes === "string" ? originalDraft.notes : typeof context.description === "string" ? context.description : "",
     ...(summary !== undefined ? { summary } : {}),
     tags: typeof originalDraft?.tags === "string" ? originalDraft.tags : Array.isArray(context.tags) ? pbpSerializeIntentTags(context.tags, pbpBookmarkServiceId(settings)) : "",
@@ -1599,7 +1603,7 @@ function pbpDeleteReaderBookmark(context) {
         if (Array.isArray(offlineQueue)) {
           // Only this exact bookmark and owner. Other URLs and accounts are
           // untouched; legacy queue records may still carry a token binding.
-          const next = offlineQueue.filter(item => item?.url !== context.url
+          const next = offlineQueue.filter(item => item?.url !== context.bookmarkUrl
             || (item.account || pbpPinboardAccountFromToken(item.token)) !== context.account);
           if (next.length !== offlineQueue.length) {
             await chrome.storage.local.set({ offlineQueue: next });
@@ -1611,17 +1615,17 @@ function pbpDeleteReaderBookmark(context) {
       auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
       if (!cleared || !auth) return pbpSaveFailure("account_changed");
       failure = "network";
-      const resp = await pbpBookmarkDeleteResponse(auth, context.url);
+      const resp = await pbpBookmarkDeleteResponse(auth, context.bookmarkUrl);
       if (!resp.ok) return pbpSaveFailure(resp.status === 401 || resp.status === 403 ? "not_logged_in" : "http", { httpStatus: resp.status });
       const data = await resp.json();
       auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
       if (!auth) return pbpSaveFailure("account_changed");
       if (data?.result_code !== "done" && data?.result_code !== "item not found") return pbpSaveFailure("api");
       try {
-        if (pbpStatusCacheSet(context.url, auth, { bookmarked: false, timestamp: Date.now(), posts: [] })) {
+        if (pbpStatusCacheSet(context.bookmarkUrl, auth, { bookmarked: false, timestamp: Date.now(), posts: [] })) {
           const tabs = await chrome.tabs.query({});
           for (const tab of tabs) {
-            if (pbpBookmarkAuthIsCurrent(auth) && tab.id && pbpSameBookmark(tab.url, context.url)) setIcon(tab.id, "default");
+            if (pbpBookmarkAuthIsCurrent(auth) && tab.id && pbpSameBookmark(tab.url, context.bookmarkUrl)) setIcon(tab.id, "default");
           }
         }
         await updateBadge();
@@ -1646,7 +1650,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
   if (message.type === "mdReaderBookmarkState") {
     const auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
     if (!auth) return pbpSaveFailure("account_changed");
-    const lookup = await fetchExistingBookmark(context.url, auth.token, auth);
+    const lookup = await fetchExistingBookmark(context.bookmarkUrl, auth.token, auth);
     let result = { known: false, account: context.account };
     // A non-secret product code, so the reader can name why status is unknown.
     if (lookup.lookupFailed && typeof lookup.reason === "string") result.reason = lookup.reason;
@@ -1654,7 +1658,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
     if (!lookup.lookupFailed && !lookup.exists) {
       result = { known: true, bookmarked: false, bookmark: pbpReaderInitialIntent(context, await loadSettings(), "save"), account: context.account };
     } else if (!lookup.lookupFailed) {
-      const plan = pbpResolveSavePlan({ mode: "overwrite", url: context.url, tags: lookup.post?.tags }, lookup);
+      const plan = pbpResolveSavePlan({ mode: "overwrite", url: context.bookmarkUrl, tags: lookup.post?.tags }, lookup);
       if (plan.action === "send") result = { known: true, bookmarked: true, bookmark: plan.fields, account: context.account };
     }
     // Token rotation under the same owner does not invalidate display metadata.
@@ -4802,6 +4806,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         description: typeof stored.description === "string" ? stored.description : "",
         sourceIncognito: stored.sourceIncognito === true,
         bookmarkDraft: stored.bookmarkDraft,
+        bookmarkUrl: stored.bookmarkUrl,
       };
       // sourceTabUrl is IMMUTABLE tab identity (hotlink round): prefer the
       // slot's own record, else the message's, else the legacy url. It must
@@ -4866,6 +4871,8 @@ function handleRuntimeMessage(message, sender, sendResponse) {
           description: owner.description,
           sourceIncognito: owner.sourceIncognito,
           ...(owner.bookmarkDraft ? { bookmarkDraft: owner.bookmarkDraft } : {}),
+          // A Jina pass rewrites url; the bookmark address stays the handoff's.
+          ...(typeof owner.bookmarkUrl === "string" ? { bookmarkUrl: owner.bookmarkUrl } : {}),
           ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
         }
       });
@@ -5714,7 +5721,7 @@ async function openMarkdownPreviewFromShortcut() {
   // responsive; the preview page drives extraction via reextractMarkdown (the same
   // path as the in-preview toggle). Follow the aiContentSource setting (fresh read).
   const [raw, auth] = await Promise.all([
-    (await getSettingsStorage()).get({ aiContentSource: SETTINGS_DEFAULTS.aiContentSource }),
+    (await getSettingsStorage()).get({ aiContentSource: SETTINGS_DEFAULTS.aiContentSource, urlClean: SETTINGS_DEFAULTS.urlClean }),
     getCurrentBookmarkAuth().catch(() => ({ account: "" })),
   ]);
   const engine = raw.aiContentSource === "jina" ? "jina" : "local";
@@ -5726,6 +5733,9 @@ async function openMarkdownPreviewFromShortcut() {
       ["md_preview_data_" + k]: {
         pending: true, engine, source: engine,
         tabId: tab.id, url: tab.url, baseUrl: tab.url, sourceTabUrl: tab.url, title: tab.title || "",
+        // The address the toolbar icon asks about for this tab (K0): the
+        // reader's bookmark bar looks up and saves under it, not under url.
+        bookmarkUrl: pbpBookmarkLookupUrl(tab.url, raw.urlClean),
         sourceIncognito: tab.incognito === true,
         account: auth.account || "", tags: [], description: "", ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
       }

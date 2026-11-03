@@ -164,6 +164,12 @@
     article.insertAdjacentElement("afterend", footer);
   }
 
+  // pbp:bookmark-changed names the bookmark by its own address (the handoff's
+  // bookmarkUrl; a slot from before it existed has only url) and owner.
+  function changedDetail() {
+    return { url: context.bookmarkUrl || context.url, account: context.account };
+  }
+
   async function request(message) {
     try { return await chrome.runtime.sendMessage({ ...message, account: context?.account || "" }); }
     catch (e) {
@@ -342,7 +348,7 @@
       state = { known: true, bookmarked: false, account: context.account };
       editorStatusKey = ""; statusKey = "readerBookmarkDeleted"; tagFix = null;
       closeEditor();
-      document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: { url: context.url, account: context.account } }));
+      document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: changedDetail() }));
     } else {
       const foreign = !!(result?.account && result.account !== context.account);
       editorStatusKey = foreign ? "readerBookmarkAccountChanged" : failureKey(result)
@@ -387,7 +393,7 @@
       if (gen !== generation) return;
       statusKey = result.mutation === "merged" ? "saveMergedExisting"
         : result.status === "saved" ? "readerBookmarkUpdated" : "readerBookmarkSaved";
-      document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: { url: context.url, account: context.account } }));
+      document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: changedDetail() }));
     } else if (result?.status === "queued") {
       closeEditor(); statusKey = "readerBookmarkQueued";
     } else if (result?.reason === "partial") {

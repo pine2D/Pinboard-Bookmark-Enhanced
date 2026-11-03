@@ -237,6 +237,25 @@ function invalidateBookmarkLookup() {
   }
 }
 
+// What every reader handoff carries about the bookmark beside the page:
+// bookmarkUrl, the address the toolbar icon and this popup look the bookmark
+// up under (pbpBookmarkLookupUrl of the page address the slot records), the
+// source tab's incognito state (the private default follows it), and the
+// form's Read Later box and, outside linkding, its Private box. A linkding
+// bookmark the reader creates starts unshared whatever the Share box says
+// (user decision 2026-11-01), so a linkding handoff carries no privacy choice.
+function pbpPopupReaderHandoff(pageUrl, tab) {
+  const linkding = pbpBookmarkServiceId(settings) === "linkding";
+  return {
+    bookmarkUrl: pbpBookmarkLookupUrl(pageUrl, _loadUrlCleanSettings()),
+    sourceIncognito: tab?.incognito === true,
+    flags: {
+      ...(linkding ? {} : { private: $id("private-check")?.checked === true }),
+      toread: $id("readlater-check")?.checked === true,
+    },
+  };
+}
+
 // The popup's own AI summary block in the notes it hands the reader, when it
 // can vouch for one (pbpAiSummaryOwnershipSnapshot): it rides in the preview
 // slot's bookmarkDraft beside exactly those notes, and the worker records it
@@ -1334,17 +1353,24 @@ async function htmlToMarkdownAsync(html, opts) {
             const engine = settings.aiContentSource === "jina" ? "jina" : "local";
             const handoffNotes = $id("description-input")?.value || "";
             const handoffSummaryRange = pbpPopupHandoffSummaryRange(handoffNotes);
+            const handoff = pbpPopupReaderHandoff(url, tab);
             await chrome.storage.local.set({
               ["md_preview_data_" + k]: {
                 pending: true, engine, source: engine,
                 tabId: tab.id, url, baseUrl: url, sourceTabUrl: tab.url || url,
+                bookmarkUrl: handoff.bookmarkUrl, sourceIncognito: handoff.sourceIncognito,
                 title: $id("title-input")?.value || "",
                 account: sessionAccount,
                 tags: Array.isArray(currentTags) ? currentTags.slice() : [],
                 description: handoffNotes,
                 // Without a draft the reader saves `description`; a summary
                 // range needs the notes it describes beside it.
-                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { ...(pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {}) } } : handoffSummaryRange ? { bookmarkDraft: { notes: handoffNotes, summaryRange: handoffSummaryRange } } : {}),
+                bookmarkDraft: {
+                  ...handoff.flags,
+                  ...(pbpBookmarkServiceId(settings) === "linkding"
+                    ? (pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {})
+                    : handoffSummaryRange ? { notes: handoffNotes, summaryRange: handoffSummaryRange } : {}),
+                },
                 ts: Date.now()
               }
             });
@@ -1458,6 +1484,7 @@ async function htmlToMarkdownAsync(html, opts) {
           const k = crypto.randomUUID();
           const handoffNotes = $id("description-input")?.value || "";
           const handoffSummaryRange = pbpPopupHandoffSummaryRange(handoffNotes);
+          const handoff = pbpPopupReaderHandoff(result.url || url, tab);
           await chrome.storage.local.set({
             ["md_preview_data_" + k]: {
               markdown: markdown || "",
@@ -1477,19 +1504,16 @@ async function htmlToMarkdownAsync(html, opts) {
               // next local re-extract (Codex acceptance HIGH-3). It is also the
               // Referer origin source, which must be the real page.
               sourceTabUrl: tab.url || url,
-              sourceIncognito: tab.incognito === true,
+              bookmarkUrl: handoff.bookmarkUrl,
+              sourceIncognito: handoff.sourceIncognito,
               bookmarkDraft: {
                 title: $id("title-input")?.value || result.title || "",
                 tags: Array.isArray(currentTags) ? (pbpBookmarkServiceId(settings) === "pinboard" ? currentTags.join(" ") : pbpBookmarkFormatTags(currentTags)) : "",
                 notes: handoffNotes,
                 ...(handoffSummaryRange ? { summaryRange: handoffSummaryRange } : {}),
-                // A linkding bookmark the reader creates starts unshared whatever
-                // the Share box says (user decision 2026-11-01), so a linkding
-                // handoff carries no privacy or sharing choice.
-                ...(pbpBookmarkServiceId(settings) === "linkding"
-                  ? (pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {})
-                  : { private: $id("private-check")?.checked === true }),
-                toread: $id("readlater-check")?.checked === true,
+                ...(pbpBookmarkServiceId(settings) === "linkding" && pbpPopupDescriptionKnown()
+                  ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {}),
+                ...handoff.flags,
               },
               account: sessionAccount,
               tags: Array.isArray(currentTags) ? currentTags.slice() : [],
