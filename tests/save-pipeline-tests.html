@@ -413,6 +413,11 @@ async function createBatchSaveHarness(options) {
   const notifyEnd = background.indexOf("// Helper: resolve prefix-specific settings", notifyStart);
   assert(notifyStart >= 0 && notifyEnd > notifyStart, "notifySaveFailure source not found");
   deps.notifySaveFailure = new Function("showNotification", "t", background.slice(notifyStart, notifyEnd) + "\nreturn notifySaveFailure;")(deps.showNotification, deps.t);
+  // The worker's real host grant pre-check, bound to this harness's chrome.
+  const grantStart = background.indexOf("async function pbpBookmarkHostGranted(");
+  const grantEnd = background.indexOf("// Failure-reason -> showNotification", grantStart);
+  assert(grantStart >= 0 && grantEnd > grantStart, "pbpBookmarkHostGranted source not found");
+  deps.pbpBookmarkHostGranted = new Function("chrome", background.slice(grantStart, grantEnd) + "\nreturn pbpBookmarkHostGranted;")(deps.chrome);
   const source = await getBatchSaveSource();
   const factory = new Function(...Object.keys(deps), `let _batchRunning = false;\n${source}\nreturn handleBatchSave;`);
   return {

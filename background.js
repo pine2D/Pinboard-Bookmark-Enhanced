@@ -1715,17 +1715,11 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // Delivery re-checks the exact host grant before every request; without it
   // the save cannot land, so stop before reading the page or paying for AI.
   // A check only: an automatic path never requests a permission.
-  if (pbpSelfHostedAuth(startAuth)) {
-    const origin = pbpEndpointOriginPattern(startAuth.baseUrl);
-    let granted = false;
-    try { granted = !!origin && await chrome.permissions.contains({ origins: [origin] }); }
-    catch (e) { console.warn(`${notifyCategory} host permission check failed:`, e?.name, e?.message); }
-    if (!granted) {
-      const result = { status: "failed", reason: "permission" };
-      await pbpI18nReady();
-      notifySaveFailure(notifyId, result, startAuth.service);
-      return result;
-    }
+  if (pbpSelfHostedAuth(startAuth) && !await pbpBookmarkHostGranted(startAuth, notifyCategory)) {
+    const result = { status: "failed", reason: "permission" };
+    await pbpI18nReady();
+    notifySaveFailure(notifyId, result, startAuth.service);
+    return result;
   }
   const loadedSettings = await loadSettings();
   const s = pbpBookmarkDeliverySettings({ ...loadedSettings, ...(settingsOverrides || {}) }, startAuth);
@@ -1942,6 +1936,21 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   }
   notifySaveFailure(notifyId, result, startAuth.service, mode);
   return result;
+}
+
+// Pre-flight exact host grant check shared by quick save and Batch, run before
+// any extraction or AI request. Fail-closed: a missing origin or a platform
+// error counts as not granted (the error is logged). A check only: it never
+// requests a permission. It sits here, inside the source slice the test
+// harnesses take for saveFromBackground.
+async function pbpBookmarkHostGranted(auth, logTag) {
+  const origin = pbpEndpointOriginPattern(auth?.baseUrl);
+  if (!origin) return false;
+  try { return !!await chrome.permissions.contains({ origins: [origin] }); }
+  catch (e) {
+    console.warn(`${logTag} host permission check failed:`, e?.name, e?.message);
+    return false;
+  }
 }
 
 // Failure-reason -> showNotification mapping, shared by the background
@@ -5126,12 +5135,8 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     }
     // Same grant check as quick save: without it no tab can land, so the run
     // stops before any extraction or AI request. Never requests a permission.
-    if (pbpSelfHostedAuth(currentAuth)) {
-      const origin = pbpEndpointOriginPattern(currentAuth.baseUrl);
-      let granted = false;
-      try { granted = !!origin && await chrome.permissions.contains({ origins: [origin] }); }
-      catch (e) { console.warn("[batch] host permission check failed:", e?.name, e?.message); }
-      if (!granted) throw Object.assign(new Error("permission"), { code: "permission", result: { status: "failed", reason: "permission" } });
+    if (pbpSelfHostedAuth(currentAuth) && !await pbpBookmarkHostGranted(currentAuth, "[batch]")) {
+      throw Object.assign(new Error("permission"), { code: "permission", result: { status: "failed", reason: "permission" } });
     }
 
     // One read for the whole run: the owned counts anchor the tag prompts
