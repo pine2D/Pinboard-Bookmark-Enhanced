@@ -5147,6 +5147,12 @@
   "bookmarkDisconnectDetailLinkding": {"message": "API トークンとアクセスゲートウェイの認証情報をこのブラウザーから削除します。同じアドレスとトークンで再接続しても新しい接続として扱われ、以前の接続で待機中の保存は自動で再試行されません。"},
   "bookmarkDisconnected": {"message": "接続を解除しました"},
   "bookmarkDisconnectFailed": {"message": "接続を解除できませんでした。変更が保存されませんでした。もう一度お試しください。"},
+  "bookmarkServicePending": {"message": "$SERVICE$ に接続するまで、ブックマークは引き続き $ACTIVE$ に保存されます。", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
+  "bookmarkServicePendingPinboard": {"message": "Pinboard のトークンが接続テストに通るまで、ブックマークは引き続き $ACTIVE$ に保存されます。", "placeholders": {"active": {"content": "$1"}}},
+  "bookmarkServiceChosenNotConnected": {"message": "設定では $SERVICE$ が選ばれていますが、このデバイスはまだ接続していません。ブックマークは引き続き $ACTIVE$ に保存されます。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "bookmarkServiceConnectChosen": {"message": "$SERVICE$ に接続", "placeholders": {"service": {"content": "$1"}}},
+  "backupBookmarkServiceNotConnected": {"message": "バックアップでは $SERVICE$ が選ばれていますが、このデバイスでは接続していません。$SERVICE$ に接続するまで、ブックマークは引き続き $ACTIVE$ に保存されます。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "backupBookmarkServiceNeedsCredentials": {"message": "バックアップでは $SERVICE$ が選ばれていますが、このデバイスでは接続していません。復元した認証情報で接続できた場合にだけ切り替わり、それ以外はブックマークは引き続き $ACTIVE$ に保存されます。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
     "message": "セキュリティチェック（ボット判定）でリクエストがブロックされました。よくある原因はCloudflareのセキュリティルールです。ルールでAPIのパスを許可してください。"
   },

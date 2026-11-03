@@ -216,23 +216,29 @@ try {
     }
     return route.fulfill({ contentType: "text/html", body: `<!doctype html><html lang="en"><head>
       <script>window.chrome = { storage: {
-        local: { get: (d) => Promise.resolve({ ...d, optSyncEnabled: false, bookmarkService: window.__stored }) },
+        local: { get: (d) => Promise.resolve({ ...d, optSyncEnabled: false, bookmarkService: window.__stored,
+          ...(window.__active ? { bookmarkServiceActive: window.__active } : {}) }) },
         sync: { get: (d) => Promise.resolve({ ...d, bookmarkService: window.__stored }) } } };
-        window.__stored = new URL(location.href).searchParams.get("stored");</script>
+        window.__stored = new URL(location.href).searchParams.get("stored");
+        window.__active = new URL(location.href).searchParams.get("active");</script>
       <script src="/popup-theme-early.js"></script>
       </head><body></body></html>` });
   });
-  for (const [mirror, stored] of [["pinboard", "linkding"], ["linkding", "karakeep"], ["linkding", "pinboard"]]) {
+  // A stored device service (bookmarkServiceActive) wins over the chosen
+  // service: the chosen one may be another device's choice not connected here.
+  for (const [mirror, stored, active] of [["pinboard", "linkding", ""], ["linkding", "karakeep", ""], ["linkding", "pinboard", ""],
+    ["pinboard", "linkding", "karakeep"], ["karakeep", "karakeep", "pinboard"]]) {
+    const want = active || stored;
     await page.goto(`${ORIGIN}/blank`);
     await page.evaluate((v) => { localStorage.clear(); localStorage.setItem("pp-bookmark-service", v); }, mirror);
-    await page.goto(`${ORIGIN}/popup?stored=${stored}`);
+    await page.goto(`${ORIGIN}/popup?stored=${stored}&active=${active}`);
     checked++;
     try {
       await page.waitForFunction((want) => document.documentElement.getAttribute("data-bookmark-service") === want
-        && localStorage.getItem("pp-bookmark-service") === want, stored, { timeout: 5000 });
+        && localStorage.getItem("pp-bookmark-service") === want, want, { timeout: 5000 });
     } catch {
       const got = await page.evaluate(() => [document.documentElement.getAttribute("data-bookmark-service"), localStorage.getItem("pp-bookmark-service")]);
-      fail.push(`stale mirror ${mirror}, stored ${stored}: attribute/mirror became ${JSON.stringify(got)}`);
+      fail.push(`stale mirror ${mirror}, chosen ${stored}, device ${active || "(none)"}: attribute/mirror became ${JSON.stringify(got)}`);
     }
   }
 } finally {

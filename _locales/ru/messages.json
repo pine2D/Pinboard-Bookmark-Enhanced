@@ -5147,6 +5147,12 @@
   "bookmarkDisconnectDetailLinkding": {"message": "API-токен и учётные данные шлюза доступа будут удалены из этого браузера. Повторное подключение, даже с тем же адресом и токеном, считается новым подключением, поэтому ожидающие сохранения прежнего не будут повторяться автоматически."},
   "bookmarkDisconnected": {"message": "Отключено"},
   "bookmarkDisconnectFailed": {"message": "Не удалось отключиться: изменение не сохранено. Повторите попытку."},
+  "bookmarkServicePending": {"message": "Закладки по-прежнему сохраняются в $ACTIVE$, пока $SERVICE$ не подключён.", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
+  "bookmarkServicePendingPinboard": {"message": "Закладки по-прежнему сохраняются в $ACTIVE$, пока токен Pinboard не пройдёт проверку соединения.", "placeholders": {"active": {"content": "$1"}}},
+  "bookmarkServiceChosenNotConnected": {"message": "В настройках выбран $SERVICE$, но это устройство к нему ещё не подключено, поэтому закладки по-прежнему сохраняются в $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "bookmarkServiceConnectChosen": {"message": "Подключить $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
+  "backupBookmarkServiceNotConnected": {"message": "В резервной копии выбран $SERVICE$, но на этом устройстве он не подключён. Закладки по-прежнему сохраняются в $ACTIVE$, пока вы не подключите $SERVICE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "backupBookmarkServiceNeedsCredentials": {"message": "В резервной копии выбран $SERVICE$, но на этом устройстве он не подключён. Переключение произойдёт, только если восстановленные учётные данные позволят подключиться; иначе закладки по-прежнему сохраняются в $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
     "message": "Запрос остановила проверка безопасности (защита от ботов). Частая причина — правила безопасности Cloudflare; разрешите в них путь API."
   },

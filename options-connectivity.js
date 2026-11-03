@@ -752,6 +752,8 @@ function setupApiTests() {
         setStatusResult(statusEl, true, t("testConnected", token.split(":")[0]));
         recordHealth("pinboard", true, "connected");
         scheduleStatusClear("pinboard", statusEl, 5000);
+        // A tested token is the Settings page's Pinboard login (options.js switches to it).
+        document.dispatchEvent(new CustomEvent("pbp:pinboard-token-ok", {detail:{token}}));
       } else if (resp?.error === "timeout") {
         setStatusResult(statusEl, false, t("pinboardErrorTimeout"));
         recordHealth("pinboard", false, "timeout");

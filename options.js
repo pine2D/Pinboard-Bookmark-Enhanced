@@ -1602,11 +1602,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   let tagGovAiPendingSettings = null;
   // The bookmark service decides whether the Pinboard token counts at all
   // (getTagGovToken), so choosing Pinboard again, here or in another tab, is
-  // an account change for this panel too. bookmarkService is an ordinary
-  // setting: it lives in sync when settings sync is on, otherwise in local.
+  // an account change for this panel too. The chosen bookmarkService is an
+  // ordinary setting (sync when settings sync is on, otherwise local); the
+  // service this device uses is the local PBP_BOOKMARK_ACTIVE_KEY.
   chrome.storage.onChanged.addListener((changes, area) => {
     if (!_tagGovInited || (area !== "sync" && area !== "local")
-        || !(changes.pinboardToken || changes.syncApiKeys || changes.optSyncEnabled || changes.bookmarkService)) return;
+        || !(changes.pinboardToken || changes.syncApiKeys || changes.optSyncEnabled || changes.bookmarkService
+          || changes[PBP_BOOKMARK_ACTIVE_KEY])) return;
     _tagGovAccountReloadTail = _tagGovAccountReloadTail.then(async () => {
       let state;
       try {
@@ -1614,8 +1616,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       } catch (_) {
         state = null;
       }
-      const serviceChanged = !!changes.bookmarkService
-        && area === (state?.optSyncEnabled === true ? "sync" : "local");
+      // The device's own service is a local key; the chosen one lives in the settings area.
+      const serviceChanged = (!!changes[PBP_BOOKMARK_ACTIVE_KEY] && area === "local") || (!!changes.bookmarkService
+        && area === (state?.optSyncEnabled === true ? "sync" : "local"));
       if (state && !serviceChanged && !pbpAuthStorageChangeIsRelevant(changes, area, state)) return;
       const auth = state ? await getTagGovAuth() : null;
       const nextAccount = auth?.account || "";
@@ -2854,14 +2857,92 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     pbpSyncPinboardOnlyRows(service);
   }
+  // ---- Switching the bookmark service: connect first ----
+  // The radios pick which service's connection form this page shows; that is
+  // page state only. This device switches only to a service it has connected:
+  // at once when the picked one is already connected here, otherwise on a
+  // successful Connect, or a Pinboard token that passes Test connection. Until
+  // then the note under the radios says where bookmarks still go. It also
+  // says when the chosen service (synced from another device, or left by an
+  // older release) is not connected here, with a way to its form.
+  const pbpOptViewedBookmarkService = () => document.querySelector('input[name="bookmark-service"]:checked')?.value || "pinboard";
+  let _bookmarkServiceNoteTail = Promise.resolve();
+  function pbpOptSyncBookmarkServiceNote() {
+    _bookmarkServiceNoteTail = _bookmarkServiceNoteTail.then(async () => {
+      const state = await pbpReadBookmarkServiceState();
+      const viewed = pbpOptViewedBookmarkService();
+      const label = service => pbpBookmarkServiceLabel({bookmarkService:service});
+      const note = $id("bookmark-service-note");
+      const actions = $id("bookmark-service-chosen-actions");
+      const connectChosen = $id("bookmark-service-connect-chosen");
+      let text = "";
+      let chosenPending = false;
+      if (viewed !== state.active) {
+        text = viewed === "pinboard" ? t("bookmarkServicePendingPinboard", label(state.active))
+          : t("bookmarkServicePending", label(state.active), label(viewed));
+      } else if (state.chosen !== state.active && !state.ready[state.chosen]) {
+        text = t("bookmarkServiceChosenNotConnected", label(state.chosen), label(state.active));
+        chosenPending = true;
+        connectChosen.textContent = t("bookmarkServiceConnectChosen", label(state.chosen));
+        connectChosen.dataset.service = state.chosen;
+      }
+      note.textContent = text;
+      note.hidden = !text;
+      actions.hidden = !chosenPending;
+    }).catch(error => console.warn("[bookmark-service] note update failed:", error?.name, error?.message));
+    return _bookmarkServiceNoteTail;
+  }
+  async function pbpOptBookmarkServicePicked(event) {
+    const service = event.target.value;
+    try {
+      const state = await pbpReadBookmarkServiceState();
+      // Between services this device has connected, picking one is the switch.
+      if (pbpOptViewedBookmarkService() === service && service !== state.active && state.ready[service]) {
+        const saved = await pbpSwitchBookmarkService(service);
+        if (!saved.ok) console.warn("[bookmark-service] switch failed:", saved.error?.name, saved.error?.message);
+      }
+    } catch (error) {
+      console.warn("[bookmark-service] switch failed:", error?.name, error?.message);
+    }
+    await pbpOptSyncBookmarkServiceNote();
+  }
+  // Pinboard has no Connect button: a token that passes Test connection while
+  // its form shows is the login (options-connectivity.js fires the event).
+  document.addEventListener("pbp:pinboard-token-ok", async (event) => {
+    const token = event.detail?.token;
+    if (typeof token !== "string" || pbpOptViewedBookmarkService() !== "pinboard"
+        || $id("opt-pinboard-token").value.trim() !== token) return;
+    try {
+      if ((await pbpReadBookmarkServiceState()).active === "pinboard") return;
+      const saved = await pbpSwitchBookmarkService("pinboard", {pinboardToken:obfuscateKey(token)});
+      if (!saved.ok) console.warn("[bookmark-service] Pinboard switch failed:", saved.error?.name, saved.error?.message);
+    } catch (error) {
+      console.warn("[bookmark-service] Pinboard switch failed:", error?.name, error?.message);
+    }
+    await pbpOptSyncBookmarkServiceNote();
+  });
+  $id("bookmark-service-connect-chosen").addEventListener("click", (event) => {
+    const radio = document.querySelector(`input[name="bookmark-service"][value="${event.currentTarget.dataset.service}"]`);
+    if (!radio) return;
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change", {bubbles:true}));
+    radio.focus();
+  });
+  chrome.storage.onChanged?.addListener((changes, area) => {
+    if ((area === "sync" || area === "local")
+        && (pbpBookmarkSettingsChanged(changes) || changes.optSyncEnabled || changes.syncApiKeys)) void pbpOptSyncBookmarkServiceNote();
+  });
+  document.addEventListener("pbp:i18n-applied", () => { void pbpOptSyncBookmarkServiceNote(); });
   for (const radio of document.querySelectorAll('input[name="bookmark-service"]')) {
     radio.checked = radio.value === pbpBookmarkServiceId(s);
     radio.addEventListener("change", refreshBookmarkServiceFields);
+    radio.addEventListener("change", pbpOptBookmarkServicePicked);
     radio.addEventListener("change", pbpSyncTagGovServiceSelection);
     // The overview's bookmark card and the "set up AI" nudge follow the chosen service.
     radio.addEventListener("change", () => scheduleConnectionOverview());
   }
   refreshBookmarkServiceFields();
+  void pbpOptSyncBookmarkServiceNote();
   // A deep link (#tags) can open the Tags panel before the stored service is
   // checked above; its no-auth explanation read no service then.
   pbpSyncTagGovServiceSelection();
@@ -3024,7 +3105,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         const connectionId = pbpBookmarkReusableConnectionId(fresh, service, baseUrl, token) || crypto.randomUUID();
         const patch = {[service + "Url"]:baseUrl,
           [service + "Token"]:pbpBookmarkCredentialSeal({baseUrl, token, connectionId, userId:result.identity.id, gateway, ...(service === "linkding" ? {sharing:result.identity.sharing === true} : {})})};
-        if (document.querySelector('input[name="bookmark-service"]:checked')?.value === service) patch.bookmarkService = service;
+        // A successful Connect is what switches this device to the service
+        // (unless the user has moved to another service's form meanwhile).
+        if (document.querySelector('input[name="bookmark-service"]:checked')?.value === service) {
+          patch.bookmarkService = service;
+          patch[PBP_BOOKMARK_ACTIVE_KEY] = service;
+        }
         if (service === "karakeep") Object.assign(patch, pbpKarakeepConnectBindingPatch(fresh,
           pbpBookmarkConnection({...fresh,bookmarkService:service}).account, "karakeep:" + baseUrl + ":" + result.identity.id, result.readLaterListId));
         const saved = await persistSettings(patch);
@@ -4151,7 +4237,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const _ets = collectExportTargets();
     return {
       // Bookmarks
-      bookmarkService: document.querySelector('input[name="bookmark-service"]:checked')?.value || "pinboard",
+      // No bookmarkService: the radios only pick which connection form shows.
+      // The service switches on Connect / Pinboard login (pbpSwitchBookmarkService).
       pinboardToken: obfuscateKey($id("opt-pinboard-token").value.trim()),
       optPrivateDefault: $id("opt-private-default").checked,
       optPrivateIncognito: $id("opt-private-incognito").checked,

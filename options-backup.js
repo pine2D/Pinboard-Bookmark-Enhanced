@@ -289,6 +289,18 @@ const PBP_BACKUP_DROPPED_LABELS = Object.freeze({
   customProtocol: "backupFieldProviderChoice",
 });
 
+// A restored bookmarkService is the chosen service, not a switch: this device
+// moves to it only when it is connected here (shared.js
+// PBP_BOOKMARK_ACTIVE_KEY). The case the preview and the result name: the
+// backup chooses a service this device is not connected to and does not use
+// now. `state` is pbpReadBookmarkServiceState(); null when unknown.
+function pbpBackupBookmarkServicePlan(safeData, state) {
+  const wanted = safeData && Object.prototype.hasOwnProperty.call(safeData, "bookmarkService")
+    ? pbpBookmarkServiceId({bookmarkService:safeData.bookmarkService}) : "";
+  if (!wanted || !state || wanted === state.active || state.ready?.[wanted]) return null;
+  return {wanted, active:state.active};
+}
+
 function pbpBackupImportResultKey(result) {
   const statuses = ["settings", "themes", "highlights", "vocabulary", "secrets"]
     .map((key) => result && result[key]);
@@ -519,6 +531,10 @@ async function pbpApplyBackupPayload(data, {
 
   const hasSettings = Object.keys(safeData).length ||
     customCSS !== undefined || customOverlayCSS !== undefined;
+  // Applied after the credentials below, which may be what connects it.
+  const wantedService = Object.prototype.hasOwnProperty.call(safeData, "bookmarkService")
+    ? safeData.bookmarkService : undefined;
+  delete safeData.bookmarkService;
   if (selected.settings && hasSettings) {
     try {
       // A v1 restore needs the preset registry before its first write.
@@ -602,6 +618,21 @@ async function pbpApplyBackupPayload(data, {
     } catch (error) {
       console.warn("[backup] credential import failed:", error && error.name, error && error.message);
       result.secrets = "failed";
+    }
+  }
+
+  if (wantedService !== undefined && (result.settings === "applied" || result.settings === "local-only")) {
+    try {
+      const state = await pbpReadBookmarkServiceState();
+      const kept = pbpBackupBookmarkServicePlan({bookmarkService:wantedService}, state);
+      if (kept) result.bookmarkServiceKept = kept;
+      else if (state.ready[wantedService] && (wantedService !== state.active || wantedService !== state.chosen)) {
+        const switched = await pbpSwitchBookmarkService(wantedService);
+        if (!switched.ok) throw switched.error || new Error("bookmark service switch failed");
+      }
+    } catch (error) {
+      console.warn("[backup] bookmark service import failed:", error && error.name, error && error.message);
+      result.settings = "failed";
     }
   }
 
@@ -853,6 +884,11 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     if (preview.ownerMismatch) warnings.push(t("backupPreviewOwnerMismatch"));
     if (preview.highlightOwnerMismatch) warnings.push(t("backupPreviewHighlightOwnerMismatch"));
     if (preview.syncWarning) warnings.push(t("backupPreviewSyncWarning"));
+    if (preview.bookmarkServiceKept) {
+      const {wanted, active, withCredentials} = preview.bookmarkServiceKept;
+      warnings.push(t(withCredentials ? "backupBookmarkServiceNeedsCredentials" : "backupBookmarkServiceNotConnected",
+        pbpBookmarkServiceLabel({bookmarkService:wanted}), pbpBookmarkServiceLabel({bookmarkService:active})));
+    }
     if (preview.droppedKeys.length) warnings.push(t("backupPreviewDroppedFields", preview.droppedKeys
       .map((key) => (PBP_BACKUP_DROPPED_LABELS[key] ? t(PBP_BACKUP_DROPPED_LABELS[key]) : key))
       .join(", ")));
@@ -903,8 +939,11 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     // it looked at -- an import that found every record already up to date
     // passes 0. No published locale spends the placeholder today; a copy that
     // starts to has to read as "applied", never as "restored from the file".
-    const keptNote = result.secretsSkipped > 0
-      ? " " + t("backupImportKeptCustomKeys", String(result.secretsSkipped)) : "";
+    const keptNote = (result.secretsSkipped > 0
+      ? " " + t("backupImportKeptCustomKeys", String(result.secretsSkipped)) : "")
+      + (result.bookmarkServiceKept ? " " + t("backupBookmarkServiceNotConnected",
+        pbpBookmarkServiceLabel({bookmarkService:result.bookmarkServiceKept.wanted}),
+        pbpBookmarkServiceLabel({bookmarkService:result.bookmarkServiceKept.active})) : "");
     setStatusIcon(status, resultKey === "backupImportComplete", t(
       resultKey,
       String(result.vocabularyApplied || 0)
@@ -1135,6 +1174,14 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
         localFallbackKeys: pbpDetectLargeLocalFallbacks(local),
       });
       preview.libraryAdoption = !!adoptOwner;
+      let serviceState = null;
+      try { serviceState = await pbpReadBookmarkServiceState(); }
+      catch (error) { console.warn("[import] bookmark service read failed:", error?.name, error?.message); }
+      if (token !== selectionToken) return;
+      const serviceKept = pbpBackupBookmarkServicePlan(prepared.safeData, serviceState);
+      // Restored credentials can connect it: say so instead of "keeps going to".
+      preview.bookmarkServiceKept = serviceKept && {...serviceKept,
+        withCredentials:!!prepared.secretData?.keys?.[serviceKept.wanted + "Token"]};
       const warningCount = renderPreview(preview);
       const status = $id("import-status");
       if (warningCount === 0) {

@@ -4175,6 +4175,7 @@ pbpSweepPreviewOrphans();
 // Startup: process offline queue + update badge + prime settings (cheap no-op when already primed)
 chrome.runtime.onStartup.addListener(() => {
   primeSettings().catch(() => {});
+  pbpReconcileBookmarkService().catch(error => console.warn("[bookmark-service] startup reconcile failed:", error?.name, error?.message));
   processOfflineQueue().catch(() => {});
   updateBadge().catch(() => {});
 });
@@ -4184,7 +4185,20 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === "install" || reason === "update") {
     primeSettings().catch(() => {});
+    // Records the service this device used before the device key existed.
+    pbpReconcileBookmarkService().catch(error => console.warn("[bookmark-service] install reconcile failed:", error?.name, error?.message));
     readOfflineQueueWithIds().catch(() => {});
+  }
+});
+
+// The chosen bookmark service, or credentials for it, changed here or arrived
+// from another device (Chrome Sync): follow it onto this device only once it
+// is connected here (shared.js pbpReconcileBookmarkService).
+chrome.storage.onChanged.addListener((changes, area) => {
+  if ((area === "sync" || area === "local")
+      && (pbpBookmarkSettingsChanged(changes) || changes.optSyncEnabled || changes.syncApiKeys)) {
+    pbpReconcileBookmarkService(changes, area)
+      .catch(error => console.warn("[bookmark-service] reconcile failed:", error?.name, error?.message));
   }
 });
 
@@ -5620,7 +5634,7 @@ async function handleSaveTabSet(tabsData) {
 
 // ---- Storage change listener ----
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.optShowBadge || changes.bookmarkService) {
+  if (changes.optShowBadge || changes.bookmarkService || changes[PBP_BOOKMARK_ACTIVE_KEY]) {
     // The event can come from an inactive storage area. Resolve the effective
     // setting instead of trusting this area's candidate value. A service
     // change matters too: the poll exists only for Pinboard.

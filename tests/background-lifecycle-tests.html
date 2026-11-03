@@ -907,6 +907,7 @@ function buildUndoHarness(source, opts) {
         storage: { onChanged: { addListener: (fn) => listeners.push(fn) } },
       };
       const deps = { chrome, loadSettings: async () => settings, pbpBookmarkServiceId: bookmarkServiceOf,
+        PBP_BOOKMARK_ACTIVE_KEY: "bookmarkServiceActive",
         updateBadge: async () => { badgeUpdates.push(1); } };
       const factory = new Function(...Object.keys(deps), `${source.slice(aStart, aEnd)}\n${source.slice(lStart, lEnd)}
         return { _syncBadgeAlarm };`);
@@ -928,6 +929,12 @@ function buildUndoHarness(source, opts) {
       h.fire({ bookmarkService: { newValue: service } });
       await settle();
       check("switching Pinboard -> " + service + " clears the alarm from the storage event", !h.alarms.has("badge-refresh") && h.badgeUpdates.length === 2);
+      // This device's own service is a local key of its own (a synced choice
+      // alone does not switch it): its change re-syncs the poll too.
+      settings.bookmarkService = "pinboard";
+      h.fire({ bookmarkServiceActive: { newValue: "pinboard" } });
+      await settle();
+      check("this device switching " + service + " -> Pinboard creates the alarm from the device-service change", h.alarms.has("badge-refresh") && h.badgeUpdates.length === 3);
     }
     {
       const h = build({ optShowBadge: false, bookmarkService: "pinboard" });

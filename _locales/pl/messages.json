@@ -5147,6 +5147,12 @@
   "bookmarkDisconnectDetailLinkding": {"message": "Token API i dane uwierzytelniające bramki dostępu zostaną usunięte z tej przeglądarki. Ponowne połączenie, nawet z tym samym adresem i tokenem, jest traktowane jako nowe połączenie, więc zapisy czekające z poprzedniego nie będą ponawiane automatycznie."},
   "bookmarkDisconnected": {"message": "Rozłączono"},
   "bookmarkDisconnectFailed": {"message": "Nie udało się rozłączyć: zmiana nie została zapisana. Spróbuj ponownie."},
+  "bookmarkServicePending": {"message": "Zakładki nadal trafiają do $ACTIVE$, dopóki nie połączysz $SERVICE$.", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
+  "bookmarkServicePendingPinboard": {"message": "Zakładki nadal trafiają do $ACTIVE$, dopóki token Pinboard nie przejdzie testu połączenia.", "placeholders": {"active": {"content": "$1"}}},
+  "bookmarkServiceChosenNotConnected": {"message": "W ustawieniach wybrano $SERVICE$, ale to urządzenie nie jest jeszcze z nim połączone, więc zakładki nadal trafiają do $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "bookmarkServiceConnectChosen": {"message": "Połącz z $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
+  "backupBookmarkServiceNotConnected": {"message": "Kopia zapasowa wybiera $SERVICE$, z którym to urządzenie nie jest połączone. Zakładki nadal trafiają do $ACTIVE$, dopóki nie połączysz $SERVICE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "backupBookmarkServiceNeedsCredentials": {"message": "Kopia zapasowa wybiera $SERVICE$, z którym to urządzenie nie jest połączone. Zmiana nastąpi tylko wtedy, gdy przywrócone poświadczenia pozwolą się połączyć; w przeciwnym razie zakładki nadal trafiają do $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
     "message": "Kontrola bezpieczeństwa (test antybotowy) zablokowała żądanie. Częstą przyczyną są reguły bezpieczeństwa Cloudflare; zezwól w nich na ścieżkę API."
   },

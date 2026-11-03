@@ -96,12 +96,26 @@ const PBP_POPUP_BOOKMARK_SERVICES = ["pinboard", "karakeep", "linkding"];
 // original two-hop chain unchanged.
 let _optSyncMirror = null;
 try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
+// The service this device uses is bookmarkServiceActive, always in local; the
+// settings-area bookmarkService is only the chosen one (shared.js
+// PBP_BOOKMARK_ACTIVE_KEY). Both ride on a local read the chain already makes,
+// so no hop is added: the first hop of a mirror miss, or the one read of a
+// sync-off device. A sync-on device with a mirror makes no local read here and
+// leaves the attribute to the mirror and popup.js.
 (_optSyncMirror === "1" || _optSyncMirror === "0"
   ? Promise.resolve({ optSyncEnabled: _optSyncMirror === "1" })
-  : chrome.storage.local.get({ optSyncEnabled: false })
-).then(({ optSyncEnabled }) => {
+  : chrome.storage.local.get({ optSyncEnabled: false, bookmarkServiceActive: "" })
+).then(({ optSyncEnabled, bookmarkServiceActive }) => {
   return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
-    .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, popupWidth: 550, bookmarkService: "pinboard" });
+    .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, popupWidth: 550,
+      ...(optSyncEnabled ? {} : { bookmarkService: "pinboard", bookmarkServiceActive: "" }) })
+    .then(s => {
+      const active = bookmarkServiceActive || s.bookmarkServiceActive;
+      // A missing device key (an older release) falls back to the chosen
+      // service, which that release used: readable here only from local.
+      return { ...s, bookmarkService: PBP_POPUP_BOOKMARK_SERVICES.includes(active) ? active
+        : optSyncEnabled ? undefined : s.bookmarkService };
+    });
 }).then(s => {
   // Update localStorage mirror for next popup boot
   try {
@@ -110,7 +124,7 @@ try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
     localStorage.setItem("pp-theme-follow", s.optPopupFollowTheme === false ? "0" : "1");
     localStorage.setItem("pp-popup-width", String(s.popupWidth || 550));
   } catch (_) {}
-  pbpPopupApplyBookmarkService(s.bookmarkService);
+  if (s.bookmarkService !== undefined) pbpPopupApplyBookmarkService(s.bookmarkService);
 
   // Re-apply in case the mirror was stale. Compute the target first and write
   // ONLY on a real difference: the old delete-then-reset invalidated every
@@ -145,7 +159,7 @@ try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
   root.style.setProperty("--pp-popup-width", w + "px");
 }).catch(() => { /* storage unavailable: localStorage mirror already applied */ });
 
-// The bookmark service attribute and its mirror, from the stored setting.
+// The bookmark service attribute and its mirror, from the service this device uses.
 // popup.js calls it too, with the settings it renders the form from.
 function pbpPopupApplyBookmarkService(value) {
   const service = PBP_POPUP_BOOKMARK_SERVICES.includes(value) ? value : "";

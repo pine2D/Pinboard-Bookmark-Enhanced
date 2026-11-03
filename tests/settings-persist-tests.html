@@ -6431,6 +6431,187 @@ async function run() {
     }
   })();
 
+  // ---------- G28: this device switches bookmark service only once connected ----------
+  // bookmarkService is the chosen service (synced, backed up); the device's
+  // own service is the local bookmarkServiceActive. Real storage-shaped areas,
+  // no test storage seam, so persistSettings and the reads route for real.
+  await (async () => {
+    const previousChrome = globalThis.chrome;
+    const previousStorage = globalThis.__pbpTestStorage;
+    const previousLarge = globalThis.__pbpTestSyncSetLarge;
+    const previousCache = _settingsStorageCache;
+    const makeArea = (backing) => ({
+      get: async (keys) => {
+        if (keys === null || keys === undefined) return { ...backing };
+        if (typeof keys === "string") return keys in backing ? { [keys]: backing[keys] } : {};
+        const out = Array.isArray(keys) ? {} : { ...keys };
+        (Array.isArray(keys) ? keys : Object.keys(keys)).forEach((key) => { if (key in backing) out[key] = backing[key]; });
+        return out;
+      },
+      set: async (data) => { Object.assign(backing, JSON.parse(JSON.stringify(data))); },
+      remove: async (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete backing[key]); },
+    });
+    const KK = "https://keep.example/", LD = "https://links.example/";
+    const karakeep = () => ({ karakeepUrl: KK, karakeepToken: pbpBookmarkCredentialSeal({ baseUrl: KK, token: "kk", connectionId: "k1", userId: "u1" }) });
+    const linkding = () => ({ linkdingUrl: LD, linkdingToken: pbpBookmarkCredentialSeal({ baseUrl: LD, token: "ld", connectionId: "l1" }) });
+    const install = (local, sync) => {
+      globalThis.chrome = { storage: { local: makeArea(local), sync: makeArea(sync), onChanged: { addListener() {} } } };
+      _settingsStorageCache = null;
+    };
+    const service = async (query = SETTINGS_DEFAULTS) => pbpBookmarkServiceId(await pbpReadSettingsWithSecrets(query));
+    try {
+      delete globalThis.__pbpTestStorage;
+      delete globalThis.__pbpTestSyncSetLarge;
+
+      // Upgrade: no device key yet. The connected Karakeep user keeps Karakeep,
+      // before and after the first reconcile records it.
+      {
+        const local = { bookmarkService: "karakeep", ...karakeep() }, sync = {};
+        install(local, sync);
+        const before = await service();
+        await pbpReconcileBookmarkService();
+        check("G28 upgrade: a connected Karakeep user stays on Karakeep (read before and after the device key is recorded)",
+          before === "karakeep" && local.bookmarkServiceActive === "karakeep" && await service() === "karakeep"
+          && (await pbpReadBookmarkConnection()).account.startsWith("karakeep:"));
+      }
+      // Upgrade of a Pinboard-only user: nothing changes, and the key reads Pinboard.
+      {
+        const local = { pinboardToken: obfuscateKey("pin:0123456789ABCDEF0123") }, sync = {};
+        install(local, sync);
+        await pbpReconcileBookmarkService();
+        check("G28 upgrade: a Pinboard-only user stays on Pinboard", local.bookmarkServiceActive === "pinboard" && await service() === "pinboard");
+      }
+
+      // Settings sync on: another device chose linkding (sync area). This
+      // device has no linkding connection, so it stays on Karakeep, and every
+      // reader shape (full read, connection read, one-key read) says Karakeep.
+      {
+        // Sync on: addresses are ordinary settings (sync), tokens stay local.
+        const local = { optSyncEnabled: true, bookmarkServiceActive: "karakeep", karakeepToken: karakeep().karakeepToken };
+        const sync = { syncApiKeys: false, bookmarkService: "linkding", karakeepUrl: KK };
+        install(local, sync);
+        const result = await pbpReconcileBookmarkService({ bookmarkService: { oldValue: "karakeep", newValue: "linkding" } }, "sync");
+        const state = await pbpReadBookmarkServiceState();
+        check("G28 sync: an unconnected service chosen on another device does not switch this device",
+          !result.changed && local.bookmarkServiceActive === "karakeep" && await service() === "karakeep"
+          && await service({ bookmarkService: "pinboard" }) === "karakeep"
+          && (await pbpReadBookmarkConnection()).service === "karakeep"
+          && state.chosen === "linkding" && state.active === "karakeep" && state.ready.linkding === false);
+        // The credentials arrive later (credential sync, or a Connect here): now it follows.
+        sync.linkdingUrl = LD;
+        local.linkdingToken = linkding().linkdingToken;
+        await pbpReconcileBookmarkService({ linkdingToken: { newValue: local.linkdingToken } }, "local");
+        check("G28 sync: the chosen service is followed once this device is connected to it",
+          local.bookmarkServiceActive === "linkding" && await service() === "linkding" && sync.bookmarkServiceActive === undefined);
+      }
+      {
+        const local = { optSyncEnabled: true, bookmarkServiceActive: "karakeep", karakeepToken: karakeep().karakeepToken, linkdingToken: linkding().linkdingToken };
+        const sync = { syncApiKeys: false, bookmarkService: "linkding", karakeepUrl: KK, linkdingUrl: LD };
+        install(local, sync);
+        const result = await pbpReconcileBookmarkService({ bookmarkService: { oldValue: "karakeep", newValue: "linkding" } }, "sync");
+        check("G28 sync: a service chosen on another device and connected here switches this device",
+          result.changed && local.bookmarkServiceActive === "linkding" && await service() === "linkding");
+      }
+      // The first event after an upgrade is itself the synced change: the
+      // device keeps what it used (the old value), not the unconnected new one.
+      {
+        const local = { optSyncEnabled: true, karakeepToken: karakeep().karakeepToken };
+        const sync = { syncApiKeys: false, bookmarkService: "linkding", karakeepUrl: KK };
+        install(local, sync);
+        await pbpReconcileBookmarkService({ bookmarkService: { oldValue: "karakeep", newValue: "linkding" } }, "sync");
+        check("G28 upgrade + sync in one event: the device keeps the service it was using",
+          local.bookmarkServiceActive === "karakeep" && await service() === "karakeep");
+      }
+      // Sync off: a change in the sync area is another device's setting, not this one's.
+      {
+        const local = { bookmarkService: "karakeep", bookmarkServiceActive: "karakeep", ...karakeep(), ...linkding() };
+        const sync = { bookmarkService: "linkding" };
+        install(local, sync);
+        await pbpReconcileBookmarkService({ bookmarkService: { oldValue: "karakeep", newValue: "linkding" } }, "sync");
+        check("G28 sync off: another device's choice in the sync area is ignored", local.bookmarkServiceActive === "karakeep" && await service() === "karakeep");
+      }
+      // The write: the device key goes to local only, the choice to the settings area.
+      {
+        const local = { optSyncEnabled: true, bookmarkServiceActive: "karakeep" }, sync = { syncApiKeys: false, bookmarkService: "karakeep" };
+        install(local, sync);
+        const saved = await pbpSwitchBookmarkService("linkding", linkding());
+        check("G28 switch: the device service is written to local only and the choice to sync",
+          saved.ok && local.bookmarkServiceActive === "linkding" && !("bookmarkServiceActive" in sync)
+          && sync.bookmarkService === "linkding" && local.linkdingToken && !("linkdingToken" in sync));
+        const unknown = await pbpSwitchBookmarkService("other");
+        check("G28 switch: an unknown service is refused without a write", !unknown.ok && local.bookmarkServiceActive === "linkding");
+      }
+      // A query without bookmarkService gets no bookmarkService back.
+      {
+        install({ bookmarkServiceActive: "linkding" }, {});
+        const read = await pbpReadSettingsWithSecrets({ optTheme: "auto" });
+        check("G28 read: the device service is added only when bookmarkService is asked for", !("bookmarkService" in read));
+      }
+
+      // JSON backup: the restored choice switches only to a connected service.
+      const exportableKeys = ["bookmarkService", "optPrivateDefault", "linkdingUrl"];
+      {
+        const local = { bookmarkService: "karakeep", bookmarkServiceActive: "karakeep", ...karakeep() }, sync = {};
+        install(local, sync);
+        check("G28 backup plan: an unconnected service that is not in use is named",
+          JSON.stringify(pbpBackupBookmarkServicePlan({ bookmarkService: "linkding" }, await pbpReadBookmarkServiceState()))
+            === JSON.stringify({ wanted: "linkding", active: "karakeep" })
+          && pbpBackupBookmarkServicePlan({ bookmarkService: "karakeep" }, await pbpReadBookmarkServiceState()) === null
+          && pbpBackupBookmarkServicePlan({ optPrivateDefault: true }, await pbpReadBookmarkServiceState()) === null
+          && pbpBackupBookmarkServicePlan({ bookmarkService: "linkding" }, null) === null);
+        const result = await pbpApplyBackupPayload({ _schemaVersion: 3, _backup: { createdAt: "2026-10-01T00:00:00.000Z", extensionVersion: "2.0.0", source: "manual" }, bookmarkService: "linkding", optPrivateDefault: true }, {
+          exportableKeys, saveOverlayWithFallback: async () => {}, sections: { settings: true, themes: false, highlights: false, vocabulary: false, secrets: false },
+        });
+        check("G28 backup: an unconnected service is not switched to, and the result names it",
+          result.settings === "applied" && local.optPrivateDefault === true
+          && local.bookmarkService === "karakeep" && local.bookmarkServiceActive === "karakeep"
+          && result.bookmarkServiceKept?.wanted === "linkding" && result.bookmarkServiceKept?.active === "karakeep");
+      }
+      {
+        const local = { bookmarkService: "karakeep", bookmarkServiceActive: "karakeep", ...karakeep(), ...linkding() }, sync = {};
+        install(local, sync);
+        const result = await pbpApplyBackupPayload({ _schemaVersion: 3, _backup: { createdAt: "2026-10-01T00:00:00.000Z", extensionVersion: "2.0.0", source: "manual" }, bookmarkService: "linkding" }, {
+          exportableKeys, saveOverlayWithFallback: async () => {}, sections: { settings: true, themes: false, highlights: false, vocabulary: false, secrets: false },
+        });
+        check("G28 backup: a service connected here is switched to",
+          result.settings === "applied" && !result.bookmarkServiceKept && local.bookmarkService === "linkding" && local.bookmarkServiceActive === "linkding");
+      }
+      {
+        // Credentials restored in the same import are what connects it.
+        const local = { bookmarkService: "karakeep", bookmarkServiceActive: "karakeep", ...karakeep() }, sync = {};
+        install(local, sync);
+        const restored = linkding();
+        const result = await pbpApplyBackupPayload({ _schemaVersion: 3, _backup: { createdAt: "2026-10-01T00:00:00.000Z", extensionVersion: "2.0.0", source: "manual" }, bookmarkService: "linkding", linkdingUrl: restored.linkdingUrl, linkdingToken: restored.linkdingToken }, {
+          exportableKeys, saveOverlayWithFallback: async () => {}, sections: { settings: true, themes: false, highlights: false, vocabulary: false, secrets: true },
+        });
+        check("G28 backup: restored credentials that connect the chosen service switch to it",
+          result.secrets === "applied" && !result.bookmarkServiceKept && local.bookmarkServiceActive === "linkding");
+      }
+      {
+        const messages = {};
+        for (const lang of ["de", "en", "fr", "ja", "pl", "ru", "zh_CN", "zh_HK", "zh_TW"]) {
+          messages[lang] = await fetch("../_locales/" + lang + "/messages.json").then((response) => response.json());
+        }
+        const keys = { bookmarkServicePending: ["ACTIVE", "SERVICE"], bookmarkServicePendingPinboard: ["ACTIVE"],
+          bookmarkServiceChosenNotConnected: ["SERVICE", "ACTIVE"], bookmarkServiceConnectChosen: ["SERVICE"],
+          backupBookmarkServiceNotConnected: ["SERVICE", "ACTIVE"], backupBookmarkServiceNeedsCredentials: ["SERVICE", "ACTIVE"] };
+        const missing = [];
+        for (const [lang, table] of Object.entries(messages)) {
+          for (const [key, names] of Object.entries(keys)) {
+            const entry = table[key];
+            if (!entry || names.some((name) => !entry.message.includes("$" + name + "$") || !entry.placeholders?.[name.toLowerCase()])) missing.push(lang + ":" + key);
+          }
+        }
+        check("G28 copy: the switch notes exist in all nine locales with both service names: " + missing.join(", "), missing.length === 0);
+      }
+    } finally {
+      globalThis.chrome = previousChrome;
+      if (previousStorage === undefined) delete globalThis.__pbpTestStorage; else globalThis.__pbpTestStorage = previousStorage;
+      if (previousLarge === undefined) delete globalThis.__pbpTestSyncSetLarge; else globalThis.__pbpTestSyncSetLarge = previousLarge;
+      _settingsStorageCache = previousCache;
+    }
+  })();
+
   const summary = document.createElement("h2");
   summary.id = "summary";
   summary.textContent = `${pass} passed, ${fail} failed`;

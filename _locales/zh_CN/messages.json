@@ -5141,6 +5141,12 @@
   "bookmarkDisconnectDetailLinkding": {"message": "API Token 和访问网关凭据将从此浏览器移除。之后即使用同一地址和 Token 再次连接，也会视为新连接，原连接中尚未发出的保存不再自动重试。"},
   "bookmarkDisconnected": {"message": "已断开连接"},
   "bookmarkDisconnectFailed": {"message": "未能断开连接：更改没有保存下来，请重试。"},
+  "bookmarkServicePending": {"message": "连接 $SERVICE$ 之前，书签仍保存到 $ACTIVE$。", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
+  "bookmarkServicePendingPinboard": {"message": "Pinboard Token 通过「测试连接」之前，书签仍保存到 $ACTIVE$。", "placeholders": {"active": {"content": "$1"}}},
+  "bookmarkServiceChosenNotConnected": {"message": "设置里选的是 $SERVICE$，但本设备还没有连接它，书签仍保存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "bookmarkServiceConnectChosen": {"message": "连接 $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
+  "backupBookmarkServiceNotConnected": {"message": "备份选的是 $SERVICE$，本设备没有连接它。连接 $SERVICE$ 之前，书签仍保存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "backupBookmarkServiceNeedsCredentials": {"message": "备份选的是 $SERVICE$，本设备没有连接它。只有恢复的凭据能连上它时才会切换，否则书签仍保存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
     "message": "请求被安全验证（人机验证）拦下。常见来源是 Cloudflare 的安全规则，请在规则里为接口路径放行。"
   },

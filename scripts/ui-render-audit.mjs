@@ -9816,7 +9816,9 @@ async function runSweep(page, sw, extBase) {
     // surface then runs signed out of Pinboard (the reader's bookmark fixture
     // loses its owner). Each pass therefore flushes the restore and checks
     // the stored service is the one it started from.
-    const storedService = async () => (await sw.evaluate(() => chrome.storage.local.get("bookmarkService"))).bookmarkService;
+    // The chosen service and this device's own one (bookmarkServiceActive):
+    // picking a connected service's radio switches both.
+    const storedService = async () => JSON.stringify(await sw.evaluate(() => chrome.storage.local.get(["bookmarkService", "bookmarkServiceActive"])));
     const serviceBefore = await storedService();
     for (const [name, service, type] of GATEWAY_CONTEXTS) {
       const isPendingBase = wantsPending && name === "bookmark-linkding-cloudflare";
@@ -9860,7 +9862,7 @@ async function runSweep(page, sw, extBase) {
     // Bookmarks panel with the Pinboard-only Private rows hidden.
     const DISCONNECT_CONTEXTS = ["bookmark-linkding-connected", "bookmark-disconnect-confirm", "bookmarks-selfhosted"];
     if (DISCONNECT_CONTEXTS.some((name) => wants("options", name))) {
-      const savedLinkding = await sw.evaluate(() => chrome.storage.local.get(["linkdingUrl", "linkdingToken"]));
+      const savedLinkding = await sw.evaluate(() => chrome.storage.local.get(["linkdingUrl", "linkdingToken", "bookmarkService", "bookmarkServiceActive"]));
       const serviceStart = await storedService();
       await sw.evaluate(() => chrome.storage.local.set({
         linkdingUrl: "https://links.example.com/",
@@ -9897,7 +9899,9 @@ async function runSweep(page, sw, extBase) {
       });
       const flushedBack = await page.evaluate(async () => (await window.pbpOptionsFlushAutoSave?.())?.ok === true);
       await sw.evaluate(async (saved) => {
-        const absent = ["linkdingUrl", "linkdingToken"].filter((key) => saved[key] === undefined);
+        // The seeded linkding is connected, so its radio switched this device to
+        // it; Pinboard may have no token here, so its radio cannot switch back.
+        const absent = ["linkdingUrl", "linkdingToken", "bookmarkService", "bookmarkServiceActive"].filter((key) => saved[key] === undefined);
         await chrome.storage.local.set(Object.fromEntries(Object.entries(saved).filter(([, v]) => v !== undefined)));
         if (absent.length) await chrome.storage.local.remove(absent);
       }, savedLinkding);

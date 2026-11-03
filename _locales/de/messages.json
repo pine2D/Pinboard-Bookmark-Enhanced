@@ -5147,6 +5147,12 @@
   "bookmarkDisconnectDetailLinkding": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden aus diesem Browser entfernt. Eine erneute Verbindung gilt auch mit gleicher Adresse und gleichem Token als neue Verbindung; noch wartende Speicherungen der bisherigen werden nicht automatisch wiederholt."},
   "bookmarkDisconnected": {"message": "Getrennt"},
   "bookmarkDisconnectFailed": {"message": "Trennen fehlgeschlagen: Die Änderung wurde nicht gespeichert. Bitte erneut versuchen."},
+  "bookmarkServicePending": {"message": "Lesezeichen werden weiter in $ACTIVE$ gespeichert, bis $SERVICE$ verbunden ist.", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
+  "bookmarkServicePendingPinboard": {"message": "Lesezeichen werden weiter in $ACTIVE$ gespeichert, bis der Pinboard-Token „Verbindung testen“ besteht.", "placeholders": {"active": {"content": "$1"}}},
+  "bookmarkServiceChosenNotConnected": {"message": "In deinen Einstellungen ist $SERVICE$ gewählt, aber dieses Gerät ist noch nicht damit verbunden. Lesezeichen werden deshalb weiter in $ACTIVE$ gespeichert.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "bookmarkServiceConnectChosen": {"message": "Mit $SERVICE$ verbinden", "placeholders": {"service": {"content": "$1"}}},
+  "backupBookmarkServiceNotConnected": {"message": "Die Sicherung wählt $SERVICE$, das auf diesem Gerät nicht verbunden ist. Lesezeichen werden weiter in $ACTIVE$ gespeichert, bis du $SERVICE$ verbindest.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "backupBookmarkServiceNeedsCredentials": {"message": "Die Sicherung wählt $SERVICE$, das auf diesem Gerät nicht verbunden ist. Gewechselt wird nur, wenn die wiederhergestellten Zugangsdaten die Verbindung herstellen; sonst werden Lesezeichen weiter in $ACTIVE$ gespeichert.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
     "message": "Eine Sicherheitsprüfung (Bot-Challenge) hat die Anfrage blockiert. Häufige Ursache sind die Sicherheitsregeln von Cloudflare; dort den API-Pfad freigeben."
   },

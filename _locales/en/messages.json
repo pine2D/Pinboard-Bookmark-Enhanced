@@ -5158,6 +5158,12 @@
   "bookmarkDisconnectDetailLinkding": {"message": "Your API token and any access gateway credential will be removed from this browser. Connecting again, even with the same address and token, counts as a new connection, so saves still waiting from this one are not retried automatically."},
   "bookmarkDisconnected": {"message": "Disconnected"},
   "bookmarkDisconnectFailed": {"message": "Couldn't disconnect: the change wasn't saved. Try again."},
+  "bookmarkServicePending": {"message": "Bookmarks keep going to $ACTIVE$ until $SERVICE$ is connected.", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
+  "bookmarkServicePendingPinboard": {"message": "Bookmarks keep going to $ACTIVE$ until the Pinboard token passes Test connection.", "placeholders": {"active": {"content": "$1"}}},
+  "bookmarkServiceChosenNotConnected": {"message": "Your settings choose $SERVICE$, but this device isn't connected to it yet, so bookmarks keep going to $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "bookmarkServiceConnectChosen": {"message": "Connect $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
+  "backupBookmarkServiceNotConnected": {"message": "The backup chooses $SERVICE$, which isn't connected on this device. Bookmarks keep going to $ACTIVE$ until you connect $SERVICE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "backupBookmarkServiceNeedsCredentials": {"message": "The backup chooses $SERVICE$, which isn't connected on this device. Bookmarks switch to it only if the credentials you restore connect it; otherwise they keep going to $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
     "message": "A security check (bot challenge) blocked the request. Cloudflare security rules are a common cause; allow the API path there."
   },

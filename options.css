@@ -1885,7 +1885,7 @@ html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-
    preset" note) puts the row padding back under that caption as padding: a
    margin would collapse into the trims above and land 12px short. */
 :is(.settings-section, .disclosure-body) > .pref-group > :not(.pref-row):last-child,
-.fg > .pref-group:last-child > :not(.pref-row):last-child { padding-bottom: var(--opt-row-pad-y); }
+.fg > .pref-group:nth-last-child(1 of :not([hidden], .hidden)) > :not(.pref-row):last-child { padding-bottom: var(--opt-row-pad-y); }
 /* First in a disclosure body: the header's own bottom padding sits right
    above, and a negative margin would slide the row under it, where the
    switch would take clicks meant for the header. */
@@ -1895,8 +1895,9 @@ html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-
 /* A row group inside a field block (Batch Save's AI group, the radio groups)
    ends the block: its last row's padding comes out of the block's own 16px
    margin. In a block-flow .fg the margin collapses through; in a grid help
-   host it shrinks the last track by the same amount. */
-.fg > .pref-group:last-child { margin-bottom: calc(-1 * var(--opt-row-pad-y)); }
+   host it shrinks the last track by the same amount. Last among the shown
+   children: a hidden note after it (the bookmark service block) is not there. */
+.fg > .pref-group:nth-last-child(1 of :not([hidden], .hidden)) { margin-bottom: calc(-1 * var(--opt-row-pad-y)); }
 /* Group subhead -> its first row (critique 6, SP-02): 12 between the two
    texts everywhere, as under Chrome Sync. The row's own padding already
    supplies 12 (compact 8), so the group's top margin is what is left of

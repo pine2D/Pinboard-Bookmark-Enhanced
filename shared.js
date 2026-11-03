@@ -742,7 +742,7 @@ function pbpLargeFallbackFieldLabel(key) {
 function pbpSettingsKeysChanged(changes) {
   if (!changes || typeof changes !== "object") return false;
   for (const k of Object.keys(changes)) {
-    if (k === "syncApiKeys" || k === "optSyncEnabled" || Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, k)) return true;
+    if (k === "syncApiKeys" || k === "optSyncEnabled" || k === PBP_BOOKMARK_ACTIVE_KEY || Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, k)) return true;
     if (PBP_CHUNKED_SETTING_KEYS.some((key) => k.startsWith(`${key}_`))) return true;
   }
   return false;
@@ -2169,9 +2169,24 @@ function pbpCreateRecoveringTail() {
   };
 }
 
+// ---- Which bookmark service this device saves to ----
+// bookmarkService is the CHOSEN service: an ordinary setting that Chrome Sync
+// and JSON backups carry. bookmarkServiceActive is the service THIS device
+// saves to; it lives only in chrome.storage.local and is never synced or
+// backed up. It changes only when the chosen service is connected here
+// (Pinboard login, Karakeep or linkding Connect, or a switch between services
+// this device already has connected), so a choice made on another device or
+// restored from a backup never points this device at a service it holds no
+// credentials for. pbpReadSettingsWithSecrets() returns it AS bookmarkService,
+// so every reader (popup, reader, quick save, Batch, offline replay, Settings)
+// gets the device's service from that one read. A missing key (a release
+// before this one) falls back to the chosen service, which is what that
+// release used.
+const PBP_BOOKMARK_SERVICES = Object.freeze(["pinboard", "karakeep", "linkding"]);
+const PBP_BOOKMARK_ACTIVE_KEY = "bookmarkServiceActive";
 function pbpBookmarkServiceId(settings) {
   const id = settings?.bookmarkService === undefined ? "pinboard" : settings.bookmarkService;
-  return ["pinboard", "karakeep", "linkding"].includes(id) ? id : "";
+  return PBP_BOOKMARK_SERVICES.includes(id) ? id : "";
 }
 
 // Title limits mirror the service validators: Django counts Unicode code
@@ -2478,8 +2493,67 @@ async function pbpReadBookmarkConnection() {
   return pbpBookmarkConnection(await pbpReadSettingsWithSecrets(query));
 }
 function pbpBookmarkSettingsChanged(changes) {
-  return !!changes && PBP_BOOKMARK_SETTING_KEYS.some(key => !key.startsWith("karakeepReadLaterList") && changes[key]);
+  return !!changes && (!!changes[PBP_BOOKMARK_ACTIVE_KEY] ||
+    PBP_BOOKMARK_SETTING_KEYS.some(key => !key.startsWith("karakeepReadLaterList") && changes[key]));
 }
+// Whether `service` has a usable connection in these (secret-overlaid) settings.
+function pbpBookmarkServiceReady(settings, service) {
+  return PBP_BOOKMARK_SERVICES.includes(service) && !!pbpBookmarkConnection({...settings, bookmarkService:service}).account;
+}
+// One locked read of everything the switch rules need: the service this
+// device uses (active), the chosen one (the synced / backed-up setting),
+// whether the device key exists yet, and which services are connected here.
+async function pbpReadBookmarkServiceState() {
+  return pbpWithSecretStorageLock(async () => {
+    const query = Object.fromEntries(PBP_BOOKMARK_SETTING_KEYS.map(key => [key, SETTINGS_DEFAULTS[key]]));
+    const settings = await pbpReadSettingsUnlocked(query);
+    const flags = await pbpReadSecretSyncStateUnlocked();
+    const mainArea = flags.optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+    const raw = await mainArea.get("bookmarkService");
+    const local = await chrome.storage.local.get(PBP_BOOKMARK_ACTIVE_KEY);
+    const stored = local && local[PBP_BOOKMARK_ACTIVE_KEY];
+    const chosen = pbpBookmarkServiceId(raw || {}) || "pinboard";
+    return {
+      active: pbpBookmarkServiceId(settings) || "pinboard",
+      chosen,
+      activeStored: PBP_BOOKMARK_SERVICES.includes(stored),
+      area: flags.optSyncEnabled ? "sync" : "local",
+      ready: Object.fromEntries(PBP_BOOKMARK_SERVICES.map(service => [service, pbpBookmarkServiceReady(settings, service)])),
+    };
+  });
+}
+// Makes `service` this device's service and the chosen one, in one write
+// with any credential patch that made it usable (`extra`).
+function pbpSwitchBookmarkService(service, extra = {}) {
+  if (!PBP_BOOKMARK_SERVICES.includes(service)) return Promise.resolve({ok:false, error:new Error("unknown bookmark service")});
+  return persistSettings({...extra, bookmarkService:service, [PBP_BOOKMARK_ACTIVE_KEY]:service});
+}
+// Follows the chosen service onto this device once it is connected here:
+// a choice synced from another device, or credentials for it that arrived
+// after the choice. An unconnected choice leaves this device where it is;
+// Settings says so. The first run (no device key yet: an upgrade) records
+// the service the device used until now. `changes`/`area` are the storage
+// event that prompted the run, if any: when that event itself replaced the
+// chosen service before the device key existed, the old value is what this
+// device was using.
+const pbpReconcileBookmarkService = (() => {
+  const queue = pbpCreateRecoveringTail();
+  return (changes, area) => queue(async () => {
+    const state = await pbpReadBookmarkServiceState();
+    let active = state.active;
+    if (!state.activeStored) {
+      const change = area === state.area && changes ? changes.bookmarkService : null;
+      const previous = change && Object.prototype.hasOwnProperty.call(change, "oldValue")
+        ? pbpBookmarkServiceId({bookmarkService:change.oldValue}) : "";
+      active = previous && !state.ready[state.chosen] ? previous : state.chosen;
+    }
+    if (state.chosen !== active && state.ready[state.chosen]) active = state.chosen;
+    if (state.activeStored && active === state.active) return {changed:false, active};
+    const saved = await persistSettings({[PBP_BOOKMARK_ACTIVE_KEY]:active});
+    if (!saved.ok) throw saved.error || new Error("bookmark service write failed");
+    return {changed:active !== state.active, active};
+  });
+})();
 function pbpSelfHostedAuth(auth) { return auth?.service === "karakeep" || auth?.service === "linkding"; }
 function pbpBookmarkDeliverySettings(settings, auth) {
   return pbpSelfHostedAuth(auth) ? {...settings} : {...settings, pinboardToken:auth.token};
@@ -3271,6 +3345,13 @@ async function persistSettings(data) {
           await storage.set({personalLibraryAccount:pbpPinboardAccountFromToken(old.pinboardToken) || "personal:default"});
         }
       }
+      // This device's bookmark service never reaches Chrome Sync. It is
+      // written last, after the credentials and the chosen service it follows.
+      const deviceLocal = {};
+      if (Object.hasOwn(batch, PBP_BOOKMARK_ACTIVE_KEY)) {
+        deviceLocal[PBP_BOOKMARK_ACTIVE_KEY] = batch[PBP_BOOKMARK_ACTIVE_KEY];
+        delete batch[PBP_BOOKMARK_ACTIVE_KEY];
+      }
       if (routingActive) {
         const { main, secrets } = pbpSplitSecretBatch(batch);
         batch = main;
@@ -3295,6 +3376,9 @@ async function persistSettings(data) {
       // save whose chunked key actually landed into a reported failure with a
       // standing error banner behind it.
       if (Object.keys(batch).length) await storage.set(batch);
+      if (Object.keys(deviceLocal).length) {
+        await (typeof chrome !== "undefined" && chrome.storage?.local ? chrome.storage.local : storage).set(deviceLocal);
+      }
       // MV3 promise-based storage.set() rejects on failure (handled by catch below);
       // it never sets chrome.runtime.lastError (a callback-API artifact). Mirrors the
       // try/catch-only convention in options.js saveOverlayWithFallback (F4).
@@ -3865,30 +3949,48 @@ async function pbpApplySecretOverlay(s) {
 // Atomic settings read: storage-area selection, main read, and optional local
 // secret overlay all share the same origin lock as migrations/toggles.
 async function pbpReadSettingsWithSecrets(query) {
-  return pbpWithSecretStorageLock(async () => {
-    const state = await pbpReadSecretSyncStateUnlocked();
-    const mainArea = state.optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
-    _settingsStorageCache = mainArea;
-    try { localStorage.setItem("pp-sync-enabled", state.optSyncEnabled ? "1" : "0"); } catch (_) {}
-    let settings = await mainArea.get(query);
-    // Object-form get inserts defaults, so resolve this migration from raw
-    // keys in the SAME locked storage area. Reads before startup prime and
-    // late-arriving synced legacy preferences retain their original behavior.
-    const wantsDictView = query == null || query === "dictDefaultView" ||
-      (Array.isArray(query) ? query.includes("dictDefaultView") :
-        typeof query === "object" && Object.prototype.hasOwnProperty.call(query, "dictDefaultView"));
-    if (wantsDictView) {
-      const rawView = await mainArea.get(["dictDefaultView", "dictAiAutoGenerate"]);
-      settings.dictDefaultView = pbpDictDefaultView(rawView);
-    }
-    settings = await pbpResolveChunkedSettings(settings, mainArea, query);
-    if (pbpSecretRoutingActive(state.optSyncEnabled, state.syncApiKeys)) {
-      const requested = pbpRequestedSecretKeys(query, settings);
-      const localSecrets = await chrome.storage.local.get([...requested]);
-      settings = pbpOverlaySecrets(pbpClearSecrets(settings), localSecrets, requested);
-    }
-    return settings;
-  });
+  return pbpWithSecretStorageLock(() => pbpReadSettingsUnlocked(query));
+}
+
+// True when a storage.get-shaped query (null, a key, a key list or a
+// defaults object) asks for `key`.
+function pbpQueryRequestsKey(query, key) {
+  if (query == null) return true;
+  if (typeof query === "string") return query === key;
+  if (Array.isArray(query)) return query.includes(key);
+  return typeof query === "object" && Object.prototype.hasOwnProperty.call(query, key);
+}
+
+// The body of pbpReadSettingsWithSecrets; callers hold the secret lock.
+async function pbpReadSettingsUnlocked(query) {
+  const state = await pbpReadSecretSyncStateUnlocked();
+  const mainArea = state.optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+  _settingsStorageCache = mainArea;
+  try { localStorage.setItem("pp-sync-enabled", state.optSyncEnabled ? "1" : "0"); } catch (_) {}
+  let settings = await mainArea.get(query);
+  // Object-form get inserts defaults, so resolve this migration from raw
+  // keys in the SAME locked storage area. Reads before startup prime and
+  // late-arriving synced legacy preferences retain their original behavior.
+  const wantsDictView = query == null || query === "dictDefaultView" ||
+    (Array.isArray(query) ? query.includes("dictDefaultView") :
+      typeof query === "object" && Object.prototype.hasOwnProperty.call(query, "dictDefaultView"));
+  if (wantsDictView) {
+    const rawView = await mainArea.get(["dictDefaultView", "dictAiAutoGenerate"]);
+    settings.dictDefaultView = pbpDictDefaultView(rawView);
+  }
+  settings = await pbpResolveChunkedSettings(settings, mainArea, query);
+  if (pbpSecretRoutingActive(state.optSyncEnabled, state.syncApiKeys)) {
+    const requested = pbpRequestedSecretKeys(query, settings);
+    const localSecrets = await chrome.storage.local.get([...requested]);
+    settings = pbpOverlaySecrets(pbpClearSecrets(settings), localSecrets, requested);
+  }
+  // The device's own service replaces the chosen one (PBP_BOOKMARK_ACTIVE_KEY).
+  if (pbpQueryRequestsKey(query, "bookmarkService")) {
+    const local = await chrome.storage.local.get(PBP_BOOKMARK_ACTIVE_KEY);
+    const active = local && local[PBP_BOOKMARK_ACTIVE_KEY];
+    if (PBP_BOOKMARK_SERVICES.includes(active)) settings.bookmarkService = active;
+  }
+  return settings;
 }
 
 // Builds the only safe routing-active migration plan. Sync is an old source:
