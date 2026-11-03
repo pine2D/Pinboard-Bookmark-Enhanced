@@ -698,6 +698,28 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     }
   });
 
+  await test("an unconnected Pinboard row still reads Token needed, in the warning tier", async () => {
+    // Pinboard's overview is unchanged by the self-hosted wording: no token
+    // there is "Token needed", never "Not connected".
+    const radio = document.createElement("input");
+    radio.type = "radio"; radio.name = "bookmark-service"; radio.value = "pinboard"; radio.checked = true;
+    document.body.appendChild(radio);
+    // The Pinboard row reads the token field itself, not storage.
+    const field = $id("opt-pinboard-token"), stored = field.value;
+    try {
+      field.value = "";
+      await renderConnectionOverview();
+      const row = document.querySelector(".connection-health-row");
+      assert(row && row.textContent.includes("Pinboard") && row.textContent.includes("connectionTokenNeeded") && !row.textContent.includes("connectionNotConnected"),
+        "an unconnected Pinboard row must read Token needed: " + (row ? row.textContent : "no row"));
+      assert(row.querySelector(".warn, .status-warn, [class*=warn]"), "Token needed lost its warning tier: " + row.innerHTML);
+    } finally {
+      radio.remove();
+      field.value = stored;
+      await renderConnectionOverview();
+    }
+  });
+
   await test("Pinboard-only private rows are hidden, not disabled, off Pinboard and come back on Pinboard", async () => {
     const host = document.createElement("div");
     host.innerHTML = '<div class="pref-row"><input type="checkbox" id="opt-private-default" checked></div>' +

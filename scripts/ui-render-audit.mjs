@@ -9855,6 +9855,58 @@ async function runSweep(page, sw, extBase) {
       }
     }
 
+    // A connected linkding (seeded straight into storage; nothing is ever
+    // contacted): the Disconnect button, its confirm popover, and the
+    // Bookmarks panel with the Pinboard-only Private rows hidden.
+    const DISCONNECT_CONTEXTS = ["bookmark-linkding-connected", "bookmark-disconnect-confirm", "bookmarks-selfhosted"];
+    if (DISCONNECT_CONTEXTS.some((name) => wants("options", name))) {
+      const savedLinkding = await sw.evaluate(() => chrome.storage.local.get(["linkdingUrl", "linkdingToken"]));
+      const serviceStart = await storedService();
+      await sw.evaluate(() => chrome.storage.local.set({
+        linkdingUrl: "https://links.example.com/",
+        linkdingToken: obfuscateKey(JSON.stringify({ v: 1, baseUrl: "https://links.example.com/", token: "render-fixture-token", connectionId: "render-fixture-connection", userId: "render-fixture-connection" })),
+      }));
+      await page.click("#tab-general");
+      await page.waitForTimeout(150);
+      await page.evaluate(() => {
+        const radio = document.querySelector('input[name="bookmark-service"][value="linkding"]');
+        radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await page.waitForSelector("#disconnect-linkding:not([hidden])");
+      await scan("options", "bookmark-linkding-connected");
+      if (wants("options", "bookmark-disconnect-confirm")) {
+        await scan("options", "bookmark-disconnect-confirm", async () => {
+          await page.locator("#disconnect-linkding").scrollIntoViewIfNeeded();
+          await page.waitForTimeout(100);
+          await page.click("#disconnect-linkding");
+          await page.waitForSelector(".confirm-popover .confirm-msg");
+          return true;
+        });
+        await page.locator(".confirm-popover .confirm-no").click();
+      }
+      if (wants("options", "bookmarks-selfhosted")) {
+        await scan("options", "bookmarks-selfhosted", async () => {
+          await page.click("#tab-bookmarks");
+          await page.waitForTimeout(150);
+          return true;
+        });
+      }
+      await page.evaluate(() => {
+        const radio = document.querySelector('input[name="bookmark-service"][value="pinboard"]');
+        radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      const flushedBack = await page.evaluate(async () => (await window.pbpOptionsFlushAutoSave?.())?.ok === true);
+      await sw.evaluate(async (saved) => {
+        const absent = ["linkdingUrl", "linkdingToken"].filter((key) => saved[key] === undefined);
+        await chrome.storage.local.set(Object.fromEntries(Object.entries(saved).filter(([, v]) => v !== undefined)));
+        if (absent.length) await chrome.storage.local.remove(absent);
+      }, savedLinkding);
+      const serviceEnd = await storedService();
+      if (!flushedBack || serviceEnd !== serviceStart) {
+        throw new Error(`SETUP: the connected-linkding states left the stored bookmark service at ${JSON.stringify(serviceEnd)} (was ${JSON.stringify(serviceStart)}; flush ${flushedBack ? "ran" : "failed"})`);
+      }
+    }
+
     // Alibaba Cloud Model Studio's region list box and workspace field only
     // render while that provider is selected; the warning only once the pair
     // forms no request host (Tokyo has no shared address and needs an ID).

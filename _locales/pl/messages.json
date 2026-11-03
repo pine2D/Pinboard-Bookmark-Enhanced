@@ -5138,14 +5138,15 @@
   "bookmarkPartialSavePopupReadLater": {"message": "Zakładka została zapisana, ale nie zmieniono stanu „przeczytaj później”. Naciśnij ponownie „Aktualizuj”, aby to dokończyć."},
   "bookmarkPartialSavePopupBookmark": {"message": "Tytuł i notki nie zostały zaktualizowane, więc zakładka się nie zmieniła. Naciśnij ponownie „Aktualizuj”, aby zastosować zmiany."},
   "bookmarkErrGatewayRedirect": {
-    "message": "Serwer przekierował żądanie. Najpierw sprawdź adres i port: muszą wskazywać samego Karakeepa lub linkdinga. Jeśli są poprawne, przekierowanie może wynikać z bramki dostępu wymagającej logowania, np. Cloudflare Access. Dodaj token usługi w sekcji „Bramka dostępu” lub zezwól w bramce na ścieżkę API."
+    "message": "Serwer przekierował żądanie. Najpierw sprawdź adres i port: muszą wskazywać bezpośrednio na usługę Karakeep lub linkding. Jeśli są poprawne, przekierowanie może wynikać z bramki dostępu wymagającej logowania, np. Cloudflare Access. Dodaj token usługi w sekcji „Bramka dostępu” lub zezwól w bramce na ścieżkę API."
   },
   "bgTabSetPinboardOnly": {"message": "Zestawy kart działają tylko z Pinboardem. Aby ich używać, wybierz w ustawieniach Pinboard jako usługę zakładek."},
   "bookmarkDisconnect": {"message": "Rozłącz"},
-  "bookmarkDisconnectConfirm": {"message": "Rozłączyć z tą usługą?"},
+  "bookmarkDisconnectConfirm": {"message": "Rozłączyć się z tą usługą?"},
   "bookmarkDisconnectDetail": {"message": "Token API i dane uwierzytelniające bramki dostępu zostaną usunięte z tej przeglądarki. Przyciskiem Połącz możesz połączyć się ponownie w dowolnej chwili."},
   "bookmarkDisconnectDetailLinkding": {"message": "Token API i dane uwierzytelniające bramki dostępu zostaną usunięte z tej przeglądarki. Ponowne połączenie, nawet z tym samym adresem i tokenem, jest traktowane jako nowe połączenie, więc zapisy czekające z poprzedniego nie będą ponawiane automatycznie."},
   "bookmarkDisconnected": {"message": "Rozłączono"},
+  "bookmarkDisconnectFailed": {"message": "Nie udało się rozłączyć: zmiana nie została zapisana. Spróbuj ponownie."},
   "bookmarkErrGatewayChallenge": {
     "message": "Kontrola bezpieczeństwa (test antybotowy) zablokowała żądanie. Częstą przyczyną są reguły bezpieczeństwa Cloudflare; zezwól w nich na ścieżkę API."
   },

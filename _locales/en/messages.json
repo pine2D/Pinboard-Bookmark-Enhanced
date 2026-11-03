@@ -5157,6 +5157,7 @@
   "bookmarkDisconnectDetail": {"message": "Your API token and any access gateway credential will be removed from this browser. Click Connect to connect again."},
   "bookmarkDisconnectDetailLinkding": {"message": "Your API token and any access gateway credential will be removed from this browser. Connecting again, even with the same address and token, counts as a new connection, so saves still waiting from this one are not retried automatically."},
   "bookmarkDisconnected": {"message": "Disconnected"},
+  "bookmarkDisconnectFailed": {"message": "Couldn't disconnect: the change wasn't saved. Try again."},
   "bookmarkErrGatewayChallenge": {
     "message": "A security check (bot challenge) blocked the request. Cloudflare security rules are a common cause; allow the API path there."
   },

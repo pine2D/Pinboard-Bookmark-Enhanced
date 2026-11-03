@@ -5146,6 +5146,7 @@
   "bookmarkDisconnectDetail": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés de ce navigateur. Cliquez sur Connecter pour vous reconnecter à tout moment."},
   "bookmarkDisconnectDetailLinkding": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés de ce navigateur. Se reconnecter, même avec la même adresse et le même jeton, crée une nouvelle connexion : les enregistrements encore en attente de l’ancienne ne seront pas relancés automatiquement."},
   "bookmarkDisconnected": {"message": "Déconnecté"},
+  "bookmarkDisconnectFailed": {"message": "Déconnexion impossible : la modification n’a pas été enregistrée. Réessayez."},
   "bookmarkErrGatewayChallenge": {
     "message": "Une vérification de sécurité (test anti-robot) a bloqué la requête. Elle vient souvent des règles de sécurité de Cloudflare ; autorisez-y le chemin de l’API."
   },

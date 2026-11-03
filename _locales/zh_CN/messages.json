@@ -5140,6 +5140,7 @@
   "bookmarkDisconnectDetail": {"message": "API Token 和访问网关凭据将从此浏览器移除。需要时点击「连接」即可重新连接。"},
   "bookmarkDisconnectDetailLinkding": {"message": "API Token 和访问网关凭据将从此浏览器移除。之后即使用同一地址和 Token 再次连接，也会视为新连接，原连接中尚未发出的保存不再自动重试。"},
   "bookmarkDisconnected": {"message": "已断开连接"},
+  "bookmarkDisconnectFailed": {"message": "未能断开连接：更改没有保存下来，请重试。"},
   "bookmarkErrGatewayChallenge": {
     "message": "请求被安全验证（人机验证）拦下。常见来源是 Cloudflare 的安全规则，请在规则里为接口路径放行。"
   },

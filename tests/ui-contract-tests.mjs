@@ -10312,27 +10312,38 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
 // Critique 6 batch 1: the self-hosted Connect status line states its outcome.
 // .save-status defaults to the success colour, so a bare textContent write
 // painted "Connecting…" and every error green (the 10-15 regression class).
+// Two handlers may address the line, both only through the shared
+// setConnectStatus helper defined once per service before them: Connect and
+// Disconnect.
 {
+  const helperStart = optionsJs.indexOf('const status = $id("connect-" + service + "-status");');
   const start = optionsJs.indexOf('$id("connect-" + service).addEventListener("click"');
+  const disStart = optionsJs.indexOf('disconnectButton.addEventListener("click"');
   const end = optionsJs.indexOf("// ---- Custom AI provider entries ----", start);
-  const handler = start >= 0 && end > start ? optionsJs.slice(start, end) : "";
-  check(handler.length > 0, "options.js: the bookmark Connect handler moved; the status-state gate cannot find it");
-  const helper = handler.match(/const setConnectStatus = \(state, text\) => \{[\s\S]*?\n      \};/)?.[0] || "";
+  const handler = start >= 0 && disStart > start && end > disStart ? optionsJs.slice(start, disStart) : "";
+  const disconnect = start >= 0 && disStart > start && end > disStart ? optionsJs.slice(disStart, end) : "";
+  check(handler.length > 0 && disconnect.length > 0, "options.js: the bookmark Connect or Disconnect handler moved; the status-state gate cannot find it");
+  check(helperStart >= 0 && helperStart < start, "options.js: setConnectStatus must be defined before the Connect and Disconnect handlers that share it");
+  const helper = optionsJs.slice(helperStart, start).match(/const setConnectStatus = \(state, text\) => \{[\s\S]*?\n    \};/)?.[0] || "";
   check(/classList\.add\("pending"\)/.test(helper) && /setStatusIcon\(status, state === "ok"/.test(helper) && /classList\.remove\([^)]*"bad"/.test(helper),
     "options.js: setConnectStatus must set .pending, .ok or .bad (via setStatusIcon) and clear the stale ones");
-  const outside = handler.replace(helper, "");
+  const outside = handler + "\n" + disconnect;
   // Every DOM write form, on the cached element or re-fetched by id; comments are stripped so a commented-out line cannot satisfy or trip a gate.
   const stripComments = (src) => src.replace(/^\s*\/\/.*$/gm, "");
-  check(!/(\bstatus|\$id\(statusId\)|\$id\("connect-[^"]*status"\))\??\.(textContent|innerHTML|innerText|outerHTML)\s*=|(\bstatus|\$id\(statusId\))\??\.(replaceChildren|append|prepend|before|after|insertAdjacent\w+)\(/.test(stripComments(outside)),
-    "options.js: the Connect handler writes its status line without a state class; use setConnectStatus(state, text)");
-  // The status ids are only reachable through that handler: nothing else in the options scripts may address them.
+  check(!/(\bstatus|\bstatusEl|\$id\(statusId\)|\$id\("connect-[^"]*status"\))\??\.(textContent|innerHTML|innerText|outerHTML)\s*=|(\bstatus|\bstatusEl|\$id\(statusId\))\??\.(replaceChildren|append|prepend|before|after|insertAdjacent\w+|classList)\b|setStatusIcon\(/.test(stripComments(outside)),
+    "options.js: the Connect and Disconnect handlers write their status line without a state class; use setConnectStatus(state, text)");
+  // The status ids are only reachable through the helper's own definition: nothing else in the options scripts may address them.
   const addressing = /connect-(?:karakeep|linkding)-status|"connect-" \+ service \+ "-status"/g;
-  const outsideHandler = stripComments(optionsJs.slice(0, start) + optionsJs.slice(end)).match(addressing)?.length || 0;
+  const rest = optionsJs.slice(0, helperStart) + optionsJs.slice(end);
+  const outsideHandler = stripComments(rest).match(addressing)?.length || 0;
+  const inHelperRegion = (stripComments(optionsJs.slice(helperStart, end)).match(addressing) || []).length;
   const elsewhere = [optionsConnectivityJs, optionsVocabJs, read("options-backup.js")].reduce((n, src) => n + (stripComments(src).match(addressing) || []).length, 0);
-  check(outsideHandler + elsewhere === 0, `options scripts: the Connect status line must be addressed only by the Connect handler (found ${outsideHandler + elsewhere} other references)`);
+  check(outsideHandler + elsewhere === 0 && inHelperRegion === 2, `options scripts: the Connect status line must be addressed only by the helper's own lookup and the Connect handler's statusId (found ${outsideHandler + elsewhere} other references, ${inHelperRegion} in the handler region)`);
   const states = [...outside.matchAll(/setConnectStatus\("(\w+)"/g)].map((m) => m[1]);
   check(states.length > 0 && states.every((state) => ["pending", "ok", "bad", "clear"].includes(state)),
     "options.js: setConnectStatus called with a state other than pending / ok / bad / clear");
+  check(/setConnectStatus\("bad", t\("bookmarkDisconnectFailed"\)\)/.test(disconnect) && /setConnectStatus\("ok", t\("bookmarkDisconnected"\)\)/.test(disconnect),
+    "options.js: the Disconnect handler must report through setConnectStatus: bookmarkDisconnected on success, bookmarkDisconnectFailed on a failed write");
   check(/radio\.addEventListener\("change", \(\) => scheduleConnectionOverview\(\)\)/.test(stripComments(optionsJs)),
     "options.js: choosing a bookmark service must refresh the connection overview and the AI nudge");
   // Each gateway type owns exactly one help paragraph; the ? itself is never hidden.

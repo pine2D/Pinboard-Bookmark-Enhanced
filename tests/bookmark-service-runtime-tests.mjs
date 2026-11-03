@@ -1312,12 +1312,27 @@ try{
       assert.equal((await options.locator('.confirm-msg').textContent()).trim(),en.bookmarkDisconnectConfirm.message);
       await options.locator('.confirm-no').click();await options.locator('.confirm-popover').waitFor({state:'detached'});
       assert((await worker.evaluate(s=>chrome.storage.local.get(s+'Token'),service))[service+'Token'],'cancelling the confirm still removed the credential');
+      // A failed credential write says so (not "check the URL and token"), paints
+      // the error state and leaves the credential and the drafts alone.
+      const draftKey='pbp-popup-draft:'+encodeURIComponent(account)+':normal:'+encodeURIComponent(origin+'/draft-'+service);
+      await until(async()=>(await worker.evaluate(()=>chrome.storage.local.get('bookmarkService'))).bookmarkService===service,'the chosen service was not stored');
+      await options.evaluate(()=>{window.__realDisconnect=pbpBookmarkDisconnect;window.pbpBookmarkDisconnect=async()=>({ok:false});});
+      await button.click();await options.locator('.confirm-yes').click();
+      await status.filter({hasText:en.bookmarkDisconnectFailed.message}).waitFor({timeout:10000});
+      assert(await status.evaluate(el=>el.classList.contains('bad')&&!el.classList.contains('ok')),'a failed disconnect is not painted as an error');
+      assert((await worker.evaluate(s=>chrome.storage.local.get(s+'Token'),service))[service+'Token'],'a failed disconnect still removed the credential');
+      await options.locator('.confirm-popover').waitFor({state:'detached'});
+      await options.evaluate(()=>{window.pbpBookmarkDisconnect=window.__realDisconnect;});
+      // Like the popup's Log out, a disconnect drops this connection's saved popup drafts.
+      await worker.evaluate(async key=>chrome.storage.session.set({[key]:{owner:'x',updatedAt:Date.now(),draft:{}}}),draftKey);
       await button.click();await options.locator('.confirm-yes').click();
       await status.filter({hasText:en.bookmarkDisconnected.message}).waitFor({timeout:10000});
       assert.equal((await worker.evaluate(s=>chrome.storage.local.get(s+'Token'),service))[service+'Token'],'','the credential envelope (token and gateway) was not emptied');
       assert.equal(await options.evaluate(async service=>pbpBookmarkConnection({...await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),bookmarkService:service}).account,service),'');
       assert.equal(await options.locator('#opt-'+service+'-token').inputValue(),'');
       assert(await button.isHidden(),'Disconnect stayed after disconnecting');
+      assert(!(await worker.evaluate(key=>chrome.storage.session.get(key).then(r=>key in r),draftKey)),'disconnecting left the connection\'s saved popup draft behind');
+      assert(await status.evaluate(el=>el.classList.contains('ok')&&!el.classList.contains('bad')),'a successful disconnect is not painted as a success');
       assert.equal((await worker.evaluate(()=>chrome.storage.local.get('bookmarkService'))).bookmarkService,service,'disconnecting changed the chosen service');
       const queue=await worker.evaluate(()=>chrome.storage.local.get('offlineQueue').then(r=>r.offlineQueue||[]));
       assert.deepEqual(queue.map(item=>item.queueId),['disc-'+service],'the queued save of the disconnected connection was dropped');
@@ -1332,13 +1347,17 @@ try{
     for(const id of ['opt-private-default','opt-private-incognito'])assert(!(await options.locator('#'+id).evaluate(el=>el.closest('.pref-row').hidden)),'Pinboard hides '+id);
     await options.locator('input[name="bookmark-service"][value="karakeep"]').check();
     for(const id of ['opt-private-default','opt-private-incognito'])assert(await options.locator('#'+id).evaluate(el=>el.closest('.pref-row').hidden),'Karakeep still shows '+id);
+    // The first visible row of a group carries no hairline, hidden rows above it or not.
+    assert.equal(await options.locator('#opt-readlater-default').evaluate(el=>getComputedStyle(el.closest('.pref-row')).borderTopWidth),'0px','the first visible row under the heading draws a hairline');
+    await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
+    assert.equal(await options.locator('#opt-readlater-default').evaluate(el=>getComputedStyle(el.closest('.pref-row')).borderTopWidth),'1px','a row under a visible row lost its hairline');
     await options.close();
   }finally{
     await worker.evaluate(saved=>chrome.storage.local.set({bookmarkService:saved.bookmarkService,karakeepToken:saved.karakeepToken,linkdingToken:saved.linkdingToken,offlineQueue:saved.offlineQueue||[]}),saved);
   }
   for(const lang of ['de','en','fr','ja','pl','ru','zh_CN','zh_HK','zh_TW']){
     const messages=JSON.parse(readFileSync(new URL('../_locales/'+lang+'/messages.json',import.meta.url),'utf8'));
-    for(const key of ['bookmarkDisconnect','bookmarkDisconnectConfirm','bookmarkDisconnectDetail','bookmarkDisconnectDetailLinkding','bookmarkDisconnected','bgTabSetPinboardOnly'])assert(messages[key]?.message,lang+' lacks '+key);
+    for(const key of ['bookmarkDisconnect','bookmarkDisconnectConfirm','bookmarkDisconnectDetail','bookmarkDisconnectDetailLinkding','bookmarkDisconnected','bookmarkDisconnectFailed','bgTabSetPinboardOnly'])assert(messages[key]?.message,lang+' lacks '+key);
   }
   console.log('settings Disconnect: credentials cleared, service and queue kept, Pinboard-only rows hidden off Pinboard');
   });

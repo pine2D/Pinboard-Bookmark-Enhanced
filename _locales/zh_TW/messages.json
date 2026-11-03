@@ -5146,6 +5146,7 @@
   "bookmarkDisconnectDetail": {"message": "API Token 和存取閘道憑證將從此瀏覽器移除。需要時按一下「連線」即可重新連線。"},
   "bookmarkDisconnectDetailLinkding": {"message": "API Token 和存取閘道憑證將從此瀏覽器移除。之後即使用同一位址和 Token 再次連線，也會視為新連線，原連線中尚未送出的儲存不再自動重試。"},
   "bookmarkDisconnected": {"message": "已中斷連線"},
+  "bookmarkDisconnectFailed": {"message": "無法中斷連線：變更未能儲存，請再試一次。"},
   "bookmarkErrGatewayChallenge": {
     "message": "請求遭安全性驗證（人機驗證）攔截。常見來源是 Cloudflare 的安全性規則，請在規則中允許 API 路徑通過。"
   },

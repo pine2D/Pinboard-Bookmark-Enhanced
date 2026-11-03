@@ -1768,7 +1768,11 @@ html.motion-ready .backup-import-result:not([hidden]) {
    8px instead of the row model's 12. Mirror the same margin here so the
    two title shapes stay in lockstep. */
 .context-help-section { margin: 0 0 var(--opt-sp-5); }
-.pref-row + .pref-row { border-top: 1px solid var(--opt-border-section); }
+/* Only a row with a visible row above it draws the hairline: a [hidden] first
+   row (the Pinboard-only switches off Pinboard) must not hand it to the next.
+   :where() keeps the old (0,2,0) specificity, so .pref-row + .pref-row-sub
+   below still wins. */
+.pref-row:where(:not([hidden])) ~ .pref-row { border-top: 1px solid var(--opt-border-section); }
 .pref-row > label {
   display: flex; align-items: center; gap: var(--opt-sp-5);
   min-height: var(--opt-row-min-h); padding: var(--opt-row-pad-y) 0; margin: 0;

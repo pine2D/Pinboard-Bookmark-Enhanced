@@ -5146,6 +5146,7 @@
   "bookmarkDisconnectDetail": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden aus diesem Browser entfernt. Mit „Verbinden“ kannst du dich jederzeit neu verbinden."},
   "bookmarkDisconnectDetailLinkding": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden aus diesem Browser entfernt. Eine erneute Verbindung gilt auch mit gleicher Adresse und gleichem Token als neue Verbindung; noch wartende Speicherungen der bisherigen werden nicht automatisch wiederholt."},
   "bookmarkDisconnected": {"message": "Getrennt"},
+  "bookmarkDisconnectFailed": {"message": "Trennen fehlgeschlagen: Die Änderung wurde nicht gespeichert. Bitte erneut versuchen."},
   "bookmarkErrGatewayChallenge": {
     "message": "Eine Sicherheitsprüfung (Bot-Challenge) hat die Anfrage blockiert. Häufige Ursache sind die Sicherheitsregeln von Cloudflare; dort den API-Pfad freigeben."
   },

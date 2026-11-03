@@ -2955,28 +2955,29 @@ document.addEventListener("DOMContentLoaded", async () => {
       pbpOptGatewaySync(service);
     });
     for (const field of gatewayFields(service)) field.addEventListener("input", () => pbpOptGatewaySync(service));
+    // The one writer of the Connect status line, shared by Connect and
+    // Disconnect below. Every write sets a state class (pending / ok / bad); a
+    // bare textContent would paint an error in the success colour.
+    const status = $id("connect-" + service + "-status");
+    const setConnectStatus = (state, text) => {
+      if (state === "pending") {
+        status.classList.remove("ok", "bad", "warn");
+        status.classList.add("pending");
+        status.textContent = text;
+      } else if (state === "clear") {
+        status.classList.remove("pending", "ok", "bad", "warn");
+        status.textContent = "";
+      } else {
+        status.classList.remove("pending", "warn");
+        setStatusIcon(status, state === "ok", text);
+      }
+    };
     $id("connect-" + service).addEventListener("click", async () => {
       const baseUrl = pbpBookmarkEndpoint($id("opt-" + service + "-url").value);
       const token = $id("opt-" + service + "-token").value.trim();
-      const status = $id("connect-" + service + "-status");
       const button = $id("connect-" + service);
       const urlField = $id("opt-" + service + "-url"), tokenField = $id("opt-" + service + "-token");
       const statusId = "connect-" + service + "-status";
-      // Every write below sets a state class (pending / ok / bad); a bare
-      // textContent would paint an error in the success colour.
-      const setConnectStatus = (state, text) => {
-        if (state === "pending") {
-          status.classList.remove("ok", "bad", "warn");
-          status.classList.add("pending");
-          status.textContent = text;
-        } else if (state === "clear") {
-          status.classList.remove("pending", "ok", "bad", "warn");
-          status.textContent = "";
-        } else {
-          status.classList.remove("pending", "warn");
-          setStatusIcon(status, state === "ok", text);
-        }
-      };
       pbpOptClearFieldInvalid?.(urlField);
       pbpOptClearFieldInvalid?.(tokenField);
       if (!baseUrl || !token) {
@@ -3049,7 +3050,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
     disconnectButton.addEventListener("click", () => {
-      const statusEl = $id("connect-" + service + "-status");
       // Same anchored confirm as the popup's Log out, so it keeps that
       // popover's default styling.
       showConfirmPopover(disconnectButton, {
@@ -3058,14 +3058,23 @@ document.addEventListener("DOMContentLoaded", async () => {
         yesText: t("bookmarkDisconnect"),
         noText: t("cancel"),
         onConfirm: async () => {
+          // Like the popup's Log out, drop this connection's saved popup drafts
+          // first: the worker only clears for the account it currently serves,
+          // so this must precede the credential removal. Best effort (the popup
+          // does not stop on it either); a service that is not the chosen one
+          // answers account_changed, and has no draft the popup could restore.
+          try {
+            const before = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
+            const account = pbpBookmarkConnection({...before, bookmarkService:service}).account;
+            if (account) await chrome.runtime.sendMessage({type:"PBP_POPUP_DRAFT", action:"clearOwner", account});
+          } catch (error) { console.warn("[bookmark-disconnect] draft clear failed:", error?.name, error?.message); }
           const result = await pbpBookmarkDisconnect(service);
-          if (!result.ok) { statusEl.classList.remove("pending", "ok", "warn"); setStatusIcon(statusEl, false, t("bookmarkConnectFailed")); return; }
+          if (!result.ok) { setConnectStatus("bad", t("bookmarkDisconnectFailed")); return; }
           $id("opt-" + service + "-token").value = "";
           connectStored[service] = {url:connectStored[service].url, token:""};
           pbpOptGatewayFill(service, null);
           pbpOptConnectPendingSync(service);
-          statusEl.classList.remove("pending", "bad", "warn");
-          setStatusIcon(statusEl, true, t("bookmarkDisconnected"));
+          setConnectStatus("ok", t("bookmarkDisconnected"));
           disconnectButton.hidden = true;
           void renderConnectionOverview();
         },

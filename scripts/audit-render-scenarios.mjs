@@ -56,6 +56,12 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('bookmark-linkding-cloudflare', [], { target: '#linkding-gateway-cloudflare:not([hidden]) #opt-linkding-cf-secret' }),
     context('bookmark-linkding-custom', [], { target: '#linkding-gateway-custom:not([hidden]) #opt-linkding-gw-value-4' }),
     context('bookmark-gateway-pending', ['bookmark-linkding-cloudflare'], { target: '#linkding-connect-pending:not([hidden])' }),
+    // A connected linkding shows Disconnect beside Connect; its confirm is the
+    // anchored popover. With a self-hosted service chosen the Bookmarks panel
+    // hides the Pinboard-only Private rows (the first rows of its group).
+    context('bookmark-linkding-connected', [], { target: '#disconnect-linkding:not([hidden])' }),
+    context('bookmark-disconnect-confirm', ['bookmark-linkding-connected'], { target: '.confirm-popover .confirm-msg' }),
+    context('bookmarks-selfhosted', ['bookmark-linkding-connected'], { target: '#panel-bookmarks.active #opt-readlater-default' }),
     context('ai-qwen-fields', [], { target: '#fields-qwen:not([hidden]) #opt-qwen-region-btn' }),
     context('ai-qwen-workspace-warn', ['ai-qwen-fields'], { target: '#qwen-workspace-warn:not([hidden])' }),
     context('ai-provider-ark', [], { target: '#fields-ark:not([hidden]) #opt-ark-region-btn' }),
