@@ -28,6 +28,7 @@ const BLOCKS=[
   'linkding address typed after open',
   'linkding cleaned page address',
   'reader export metadata follows its bookmark',
+  'reader slot rewrites keep the bookmark address',
   'linkding Description server semantics',
   'gateway probes',
   'settings Connect names the failure cause',
@@ -1033,6 +1034,56 @@ try{
       assert.deepEqual(await frontMatter('after the reader save'),{tags:'["fresh", "extra"]',description:'"Reader description"',notes:'"Stored notes"',url:trackedUrl},'the export metadata did not take over the saved bookmark');
     }finally{await reader.close();records.linkding.delete(id);}
     console.log('reader of a tracked page: badge, bookmark bar and edit use the cleaned bookmark address; linkding exports Description and Notes apart and takes them over after a reader save; foreign announcements change nothing');
+  });
+  // Every place the reader rewrites its own slot (md-preview.js) forwards the
+  // handoff's bookmarkUrl: the boot-time restore record of an article page and
+  // of a committed transcript page, the transcript commit itself, and the
+  // video error shell's rebuild-and-reload. A rewrite that drops it sends the
+  // next load back to the tracked url (the legacy-slot fallback), where the
+  // bookmark is not found and a save creates a duplicate.
+  await block('reader slot rewrites keep the bookmark address',['linkding'],async()=>{
+    const account=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
+    const slot=key=>worker.evaluate(async k=>(await chrome.storage.local.get(k))[k]||null,'md_preview_data_'+key);
+    const put=(key,value)=>worker.evaluate(async([k,v])=>chrome.storage.local.set({[k]:v}),['md_preview_data_'+key,value]);
+    const kept=(row,url,bookmarkUrl,label)=>{
+      assert(row,label+': the slot is gone');
+      assert.equal(row.bookmarkUrl,bookmarkUrl,label+': the rewrite dropped the bookmark address');
+      assert.equal(row.url,url,label+': the rewrite changed the page address highlights are keyed by');
+    };
+    const cleanUrl=origin+'/article-rewrite', trackedUrl=cleanUrl+'?utm_source=feed';
+    const ts=Date.now()-1000;
+    await put('rewrite',{markdown:'# Rewrite article\n\nBody.',title:'Rewrite article',url:trackedUrl,baseUrl:trackedUrl,sourceTabUrl:trackedUrl,bookmarkUrl:cleanUrl,
+      account,tags:[],description:'',sourceIncognito:false,source:'local',ts});
+    const reader=await ctx.newPage();
+    try{
+      await reader.goto(pageUrl+'md-preview.html?k=rewrite');
+      await until(async()=>(await slot('rewrite'))?.restore===true,'the article restore record');
+      kept(await slot('rewrite'),trackedUrl,cleanUrl,'article restore record');
+      await reader.waitForFunction(()=>typeof window.pbpVideoCommitTranscript==='function');
+      assert.equal(await reader.evaluate(()=>window.pbpVideoCommitTranscript('# Transcript\n\nFirst cue.','Rewrite article',{reason:'video-promotion'})),true,'the transcript commit was refused');
+      const committed=await slot('rewrite');
+      assert.equal(committed?.videoTranscript,true,'the commit wrote no transcript record');
+      kept(committed,trackedUrl,cleanUrl,'transcript commit');
+      await reader.reload();
+      await until(async()=>{const row=await slot('rewrite');return row?.videoTranscript===true&&row.ts>committed.ts;},'the transcript restore record');
+      kept(await slot('rewrite'),trackedUrl,cleanUrl,'transcript restore record');
+    }finally{await reader.close();await worker.evaluate(()=>chrome.storage.local.remove('md_preview_data_rewrite'));}
+    // A video page whose extraction dead-ends and whose captions are not
+    // granted: the error shell rebuilds the page as the synthesized article
+    // and reloads.
+    const videoClean='https://www.youtube.com/watch?v=dQw4w9WgXcQ', videoTracked=videoClean+'&utm_source=feed';
+    await put('rewrite-video',{pending:true,engine:'local',source:'local',tabId:987654,url:videoTracked,baseUrl:videoTracked,sourceTabUrl:videoTracked,bookmarkUrl:videoClean,
+      title:'Video',sourceIncognito:false,account,tags:[],description:'',ts});
+    const video=await ctx.newPage();
+    try{
+      await video.goto(pageUrl+'md-preview.html?k=rewrite-video');
+      // Only the shell's rebuild turns this pending slot into a full one; the
+      // reloaded page may at once replace that with its restore record, which
+      // copies what the rebuild handed it.
+      await until(async()=>{const row=await slot('rewrite-video');return row&&row.pending!==true;},'the video error shell rebuild record');
+      kept(await slot('rewrite-video'),videoTracked,videoClean,'video error shell rebuild');
+    }finally{await video.close();await worker.evaluate(()=>chrome.storage.local.remove('md_preview_data_rewrite-video'));}
+    console.log('reader slot rewrites (article and transcript restore records, transcript commit, video error shell rebuild) keep the bookmark address and the page address');
   });
   await block('linkding Description server semantics',['linkding'],async()=>{
   // linkding Description against the server's own v1.47 create and update
