@@ -602,7 +602,14 @@ async function pbpVerifyBookmarkConnection({service, baseUrl, token, gateway}) {
       return {token, headers};
     }});
     const identity = await client.verify();
-    return {ok:true, identity};
+    // Read-only: an existing Read Later list of ours, for the settings page to
+    // bind. Its failure never fails the connection.
+    let readLaterListId = "";
+    if (service === "karakeep") {
+      try { readLaterListId = await client.findReadLaterList(); }
+      catch (error) { console.warn("[bookmark-connect] list lookup failed:", error?.code, error?.status); }
+    }
+    return {ok:true, identity, ...(service === "karakeep" ? {readLaterListId} : {})};
   } catch (error) {
     // Product codes are already classified; keep unclassified platform failures observable.
     if (typeof error?.code !== "string") console.warn("[bookmark-connect] failed:", error?.name, error?.message);
@@ -713,7 +720,9 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched
       // Past the bookmark step the note is on the server (a create posts it,
       // an update patches it before tags and Read Later), so summary
       // ownership treats it as written while the save still reports failure.
-      return {result:{status:"failed", reason:"partial", failedStep:result.failedStep, httpStatus:result.httpStatus}, persisted:null, retryable:false,
+      return {result:{status:"failed", reason:"partial", failedStep:result.failedStep, httpStatus:result.httpStatus,
+        // Only this cause has copy of its own; every other one stays unnamed.
+        ...(result.failedStep === "read_later" && result.error === "read_later_list" ? {error:"read_later_list"} : {})}, persisted:null, retryable:false,
         ...(result.failedStep !== "bookmark" ? {notesDelivered:{notes:fields.notes, mutation:result.mutation}} : {})};
     }
     return {result:{status:"saved", mutation:result.mutation}, persisted:{...plan.fields, private:result.bookmark.private, toread:result.bookmark.toread}, retryable:false};
@@ -2128,7 +2137,7 @@ function notifySaveFailure(notifyId, result, service, mode) {
   } else if (result.reason === "permission") {
     showNotification(notifyId + "-error", t("bgSaveFailed"), t("bookmarkPermissionDenied"), "error");
   } else if (result.reason === "partial") {
-    showNotification(notifyId + "-error", t("bgSaveFailed"), t("bookmarkPartialSave"), "error");
+    showNotification(notifyId + "-error", t("bgSaveFailed"), t(pbpBookmarkPartialKey(result) || "bookmarkPartialSave"), "error");
   } else {
     // Only Pinboard's own API message and an HTTP status are user-readable;
     // any other reason is an internal code and gets the generic copy.

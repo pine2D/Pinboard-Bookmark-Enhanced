@@ -425,7 +425,9 @@
     } else if (result?.reason === "partial") {
       await refresh(gen);
       if (gen !== generation) return;
-      statusKey = "bookmarkPartialSave";
+      const named = typeof pbpBookmarkPartialKey === "function" ? pbpBookmarkPartialKey(result) : "";
+      if (named) failureKeys.add(named);
+      statusKey = named || "bookmarkPartialSave";
     } else if (result?.reason === "tag_too_long") {
       // linkding writes a new bookmark before its tags, so read it again. An
       // open editor stays open to shorten the tag the copy names; a plain

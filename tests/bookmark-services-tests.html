@@ -639,6 +639,14 @@ test("a Karakeep save that fails after its bookmark step still owns the note it 
     equal([label, (await pbpFixtureSummaryOwnershipEntries()).length],[label, 1]);
   }
 });
+test("a save stopped by duplicate Read Later lists keeps the cause in its result, other partials stay unnamed",async()=>{
+  for(const [label,lists,want] of [["duplicate lists",[kkList("a"),kkList("b")],"read_later_list"],["server error",[503,{}],undefined]]){
+    const second=Array.isArray(lists)&&typeof lists[0]==="number"?lists:[200,{lists}];
+    const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[201,{...kk,tags:[]}],[200,{attached:["tag1"]}],second]);
+    const result=await h.submitPopupSaveIntent({...saveIntent,toread:true},(await h.auth()).account,null);
+    equal([label,result.reason,result.failedStep,result.error],[label,"partial","read_later",want]);
+  }
+});
 test("a Karakeep update whose note PATCH fails owns nothing", async()=>{
   const notes="Auto notes\n\n" + KK_SUMMARY, range={start:"Auto notes\n\n".length, end:notes.length};
   await pbpFixtureClearSummaryOwnership();
@@ -1185,6 +1193,71 @@ test("deleted Karakeep read-later list does not block ordinary bookmark lookup",
   let reset;
   const h=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[404,{}]],{readLaterListId:"gone",saveReadLaterList:async id=>reset=id});
   equal((await h.client.lookup(pageUrl)).id,"bk1");equal(reset,"");equal(h.calls.length,3);
+});
+// Lists as GET /api/v1/lists answers (karakeep v0.34.1 shape).
+const kkList=(id,patch={})=>({id,name:"Read later",icon:"\u{1F516}",description:"Pinboard Bookmark Enhanced: Read Later",type:"manual",public:false,hasCollaborators:false,userRole:"owner",...patch});
+test("two private lists carrying our marker leave Read Later unsaved and name the cause",async()=>{
+  const h=harness("karakeep",[[201,{...kk,tags:[]}],[200,{lists:[kkList("a"),kkList("b")]}]],{saveReadLaterList:async()=>{throw new Error("must not bind");}});
+  const result=await h.client.save({url:pageUrl,title:"Title",notes:"",tags:[],toread:true},null);
+  equal([result.status,result.failedStep,result.error],["partial","read_later","read_later_list"]);
+  equal(h.calls.map(c=>c.method),["POST","GET"]);
+});
+test("other partial causes keep their own codes",async()=>{
+  const h=harness("karakeep",[[201,{...kk,tags:[]}],[503,{message:"down"}]]);
+  const result=await h.client.save({url:pageUrl,title:"Title",notes:"",tags:["new"]},null);
+  equal([result.failedStep,result.error],["tags","server"]);
+});
+test("a newly created Read Later list gets the bookmark emoji as its icon",async()=>{
+  const h=harness("karakeep",[[200,{lists:[]}],[201,kkList("later")],[204,null]],{saveReadLaterList:async()=>{}});
+  await h.client.setReadLater({id:"bk1"},true);
+  equal(h.calls[1].body.icon,"\u{1F516}");equal(h.calls[1].body.type,"manual");
+});
+test("finding the Read Later list is read-only and binds only a single private marked list",async()=>{
+  const other=kkList("x",{description:"mine"}),pub=kkList("y",{public:true}),smart=kkList("z",{type:"smart"});
+  const one=harness("karakeep",[[200,{lists:[other,pub,smart,kkList("later")]}]],{saveReadLaterList:async()=>{throw new Error("must not save");}});
+  equal(await one.client.findReadLaterList(),"later");equal(one.calls.map(c=>c.method),["GET"]);
+  for(const lists of [[],[other,pub],[kkList("a"),kkList("b")]]){
+    const h=harness("karakeep",[[200,{lists}]],{saveReadLaterList:async()=>{throw new Error("must not save");}});
+    equal(await h.client.findReadLaterList(),"");equal(h.calls.map(c=>c.method),["GET"]);
+  }
+  await rejects(()=>harness("karakeep",[[200,{}]]).client.findReadLaterList(),"invalid_response");
+  equal(await harness("linkding",[]).client.findReadLaterList(),"");
+});
+test("Connect reports the existing Read Later list so lookup can read membership, never creating one",async()=>{
+  const connect={service:"karakeep",baseUrl:"https://keep.example/base/",token:"tok",gateway:null};
+  const me={id:"user1",name:"Ada",email:"ada@example.com",localUser:true,role:"user"};
+  const found=await workerHarness("karakeep",[[200,me],[200,{lists:[kkList("later")]}]]);
+  const good=await found.verifyConnection(connect);
+  equal([good.ok,good.identity.id,good.readLaterListId],[true,"user1","later"]);
+  equal(found.state.calls.map(c=>c.method),["GET","GET"]);
+  for(const lists of [[],[kkList("a"),kkList("b")]]){
+    const h=await workerHarness("karakeep",[[200,me],[200,{lists}]]);
+    const result=await h.verifyConnection(connect);
+    equal([result.ok,result.readLaterListId],[true,""]);equal(h.state.calls.map(c=>c.method),["GET","GET"]);
+  }
+  // A list lookup that fails does not fail the connection.
+  const failing=await workerHarness("karakeep",[[200,me],[500,{}]]);
+  const soft=await failing.verifyConnection(connect);
+  equal([soft.ok,soft.readLaterListId],[true,""]);
+  const ld=await workerHarness("linkding",[[200,{theme:"auto"}]]);
+  equal((await ld.verifyConnection({service:"linkding",baseUrl:"https://bookmarks.example/base/",token:"tok",gateway:null})).readLaterListId,undefined);
+});
+test("Connect binds a found list unless this connection already has a binding",()=>{
+  const acct="karakeep:https://keep.example/base/:user1";
+  equal(pbpKarakeepReadLaterBinding({},acct,"later"),{karakeepReadLaterListId:"later",karakeepReadLaterListOwner:acct});
+  // A binding left by another connection does not count for this one.
+  equal(pbpKarakeepReadLaterBinding({karakeepReadLaterListId:"old",karakeepReadLaterListOwner:"karakeep:https://other/:u"},acct,"later"),{karakeepReadLaterListId:"later",karakeepReadLaterListOwner:acct});
+  equal(pbpKarakeepReadLaterBinding({karakeepReadLaterListId:"mine",karakeepReadLaterListOwner:acct},acct,"later"),{});
+  for(const none of ["",undefined,null,5])equal(pbpKarakeepReadLaterBinding({},acct,none),{});
+});
+test("a bound list makes lookup read the bookmark's Read Later membership",async()=>{
+  const h=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[200,kkList("later")],[200,{lists:[kkList("later")]}]],{readLaterListId:"later"});
+  equal((await h.client.lookup(pageUrl)).toread,true);
+});
+test("read_later_list has its own failure copy, reached from a partial save result",()=>{
+  equal(PBP_BOOKMARK_FAILURE_KEYS.read_later_list,"bookmarkErrReadLaterList");
+  equal(pbpBookmarkPartialKey({reason:"partial",failedStep:"read_later",error:"read_later_list"}),"bookmarkErrReadLaterList");
+  for(const r of [{reason:"partial",failedStep:"read_later",error:"server"},{reason:"partial",failedStep:"tags"},{reason:"partial",error:"read_later_list",failedStep:"tags"},{reason:"network",error:"read_later_list"},null])equal(pbpBookmarkPartialKey(r),"");
 });
 test("unsafe Karakeep list is retired and an explicit later action creates a private replacement",async()=>{
   let saved;

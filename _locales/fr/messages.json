@@ -5183,6 +5183,7 @@
     "message": "Le serveur de signets reçoit trop de requêtes. Réessayez plus tard."
   },
   "bookmarkErrUrlInvalid": { "message": "linkding refuse cette adresse. Elle ne doit pas dépasser 2048 caractères, et son hôte doit avoir une extension de domaine comme .com, sauf pour localhost ou une adresse IP. Réessayer n’y changera rien." },
+  "bookmarkErrReadLaterList": { "message": "Karakeep contient plusieurs listes « À lire plus tard » créées par cette extension : le signet est enregistré, mais sans son état « À lire plus tard ». Supprimez les listes en trop pour n’en garder qu’une, puis réessayez." },
   "bookmarkErrRemote": {
     "message": "Le serveur de signets a refusé la requête (HTTP $STATUS$). Réessayer n’y changera rien. Vérifiez le signet et la configuration du serveur.",
     "placeholders": {

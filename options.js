@@ -3013,6 +3013,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           patch.karakeepReadLaterListId = "";
           patch.karakeepReadLaterListOwner = "";
         }
+        if (service === "karakeep") Object.assign(patch, pbpKarakeepReadLaterBinding(fresh, "karakeep:" + baseUrl + ":" + result.identity.id, result.readLaterListId));
         const saved = await persistSettings(patch);
         setConnectStatus(saved.ok ? "ok" : "bad", t(saved.ok ? "bookmarkConnected" : "bookmarkConnectFailed"));
         if (saved.ok) { gatewayStored[service] = gateway; connectStored[service] = {url:baseUrl, token}; pbpOptGatewaySync(service); }

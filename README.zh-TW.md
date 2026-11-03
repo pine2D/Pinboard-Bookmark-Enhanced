@@ -74,7 +74,7 @@
 
 原始碼目錄使用獨立且固定的開發版本 ID，可與 Chrome 線上應用程式商店版本並存，方便測試。release ZIP 使用 Chrome 線上應用程式商店 ID，無法與商店版本同時安裝在同一個 Chrome 個人資料中。在每台裝置開啟設定同步後，Chrome Sync 即可共用設定。如果要取代較早的解壓縮安裝版本，先在舊版設定頁按「匯出備份」，載入新版本後再按「匯入備份」。
 
-安裝後開啟**設定 → 帳號**，選擇書籤服務。使用 Karakeep 或 linkding 時，填入網站網址與 API Token，按下**連線**並允許存取該伺服器。網址需包含部署子路徑；除本機 localhost 外，必須使用 HTTPS。使用 Pinboard 時，在彈出視窗貼上 [API Token](https://pinboard.in/settings/password) 後登入。
+安裝後開啟**設定 → 帳號**，選擇書籤服務。使用 Karakeep 或 linkding 時，填入網站網址與 API Token，按下**連線**並允許存取該伺服器。網址需包含部署子路徑；除本機 localhost 外，必須使用 HTTPS。Karakeep 需要 0.31 或更新版本（已在 0.34.1 上測試）。使用 Pinboard 時，在彈出視窗貼上 [API Token](https://pinboard.in/settings/password) 後登入。
 
 彈出視窗、閱讀器、快捷鍵及批次儲存均使用所選服務。Karakeep 的「稍後閱讀」使用專用私人清單；標為已讀會從清單移除，不改變封存狀態。linkding 使用未讀標記。Pinboard 建議、標籤治理、未讀數量、網站搜尋及分頁集僅供 Pinboard 使用。
 

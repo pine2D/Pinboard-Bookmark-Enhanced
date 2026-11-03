@@ -721,6 +721,14 @@ test("posts/add default remains replace=yes for existing callers", () => {
         }
       }
     });
+    test("duplicate Read Later lists get their own popup copy and no retry; other read_later partials keep the step copy", () => {
+      const got = bookmarkErrorView("karakeep")({ status: "failed", reason: "partial", failedStep: "read_later", error: "read_later_list" });
+      assert(got.message === "bookmarkErrReadLaterList" && got.retry === false, JSON.stringify(got));
+      for (const error of ["server", undefined]) {
+        const other = bookmarkErrorView("karakeep")({ status: "failed", reason: "partial", failedStep: "read_later", ...(error ? { error } : {}) });
+        assert(other.message === "bookmarkPartialSavePopupReadLater" && other.retry === true, JSON.stringify(other));
+      }
+    });
     test("a linkding tag the server cannot store is named with its limit and offers no retry", () => {
       const view = bookmarkErrorView("linkding");
       for (const [tag, shown] of [["x".repeat(65), "x".repeat(40) + "\u2026"], ["\u{1F600}".repeat(70), "\u{1F600}".repeat(40) + "\u2026"]]) {

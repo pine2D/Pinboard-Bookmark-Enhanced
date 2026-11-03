@@ -3073,6 +3073,9 @@ function pbpSaveErrorView(result) {
   // so the next Save patches what is missing; the reader and notifications
   // keep bookmarkPartialSave, which sends the user to Edit.
   if (reason === "partial") {
+    // Several Read Later lists: pressing Update again meets the same answer.
+    const named = pbpBookmarkPartialKey(result);
+    if (named) return {message:t(named), retry:false};
     const key = {tags:"bookmarkPartialSavePopupTags", read_later:"bookmarkPartialSavePopupReadLater",
       bookmark:"bookmarkPartialSavePopupBookmark"}[result.failedStep] || "bookmarkPartialSavePopup";
     return {message:t(key), retry:true};

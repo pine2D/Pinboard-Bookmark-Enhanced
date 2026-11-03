@@ -2322,7 +2322,7 @@ const PBP_BOOKMARK_FAILURE_KEYS = Object.freeze({
   server:"bookmarkErrServer", rate_limited:"bookmarkErrRateLimit", remote:"bookmarkErrRemote",
   payload_too_large:"bookmarkErrTooLarge", invalid_response:"bookmarkErrInvalidResponse",
   account_changed:"bookmarkErrAccountChanged", duplicate_unknown:"bookmarkErrDuplicateUnknown",
-  too_long:"titleTooLong", url_invalid:"bookmarkErrUrlInvalid"});
+  too_long:"titleTooLong", url_invalid:"bookmarkErrUrlInvalid", read_later_list:"bookmarkErrReadLaterList"});
 // The only self-hosted causes a second attempt can get past. Everything else
 // (a 4xx, a 413, a gateway, a token, a grant, an unreadable reply) meets the
 // same answer again, so no outlet offers a retry for it.
@@ -2413,6 +2413,21 @@ function pbpBookmarkAccountService(account) {
   if (account.startsWith("karakeep:")) return "karakeep";
   if (account.startsWith("linkding:")) return "linkding";
   return "pinboard";
+}
+// Connect found an existing Read Later list of ours (read-only; "" for none or
+// several). It is bound to this connection only when the connection has no
+// binding of its own; a binding it already has is kept, and nothing is created.
+function pbpKarakeepReadLaterBinding(settings, account, foundId) {
+  if (typeof foundId !== "string" || !foundId) return {};
+  if (settings?.karakeepReadLaterListOwner === account && settings.karakeepReadLaterListId) return {};
+  return {karakeepReadLaterListId:foundId, karakeepReadLaterListOwner:account};
+}
+// A partial save reports the step that failed; one cause inside it has its own
+// copy: Karakeep holds several of our Read Later lists, so Read Later was left
+// unsaved. "" for any other partial (those keep the step copy of each outlet).
+function pbpBookmarkPartialKey(result) {
+  return result?.reason === "partial" && result.failedStep === "read_later" && result.error === "read_later_list"
+    ? PBP_BOOKMARK_FAILURE_KEYS.read_later_list : "";
 }
 // Key for a failed self-hosted result ({reason, httpStatus}, or a raw SW code).
 // "" means the caller keeps its own copy; Pinboard never uses this table.

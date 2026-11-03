@@ -2265,6 +2265,7 @@ await suite("unified save pipeline", async () => {
         [{ reason: "http" }, "saveFailedGeneric"],
         [{ reason: "api" }, "saveFailedGeneric"],
         [{ reason: "partial", failedStep: "tags", httpStatus: 500 }, "bookmarkPartialSave"],
+        ...(auth.service === "pinboard" ? [] : [[{ reason: "partial", failedStep: "read_later", error: "read_later_list" }, "bookmarkErrReadLaterList"]]),
       ];
       for (const [failure, expected] of cases) {
         const h = await createBackgroundSaveHarness({ auth, result: { status: "failed", ...failure } });

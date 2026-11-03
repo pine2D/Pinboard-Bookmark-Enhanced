@@ -5183,6 +5183,7 @@
     "message": "Der Lesezeichenserver erhält zu viele Anfragen. Später erneut versuchen."
   },
   "bookmarkErrUrlInvalid": { "message": "linkding nimmt diese Adresse nicht an. Sie darf höchstens 2048 Zeichen lang sein, und der Host braucht eine Domainendung wie .com, außer bei localhost oder einer IP-Adresse. Ein neuer Versuch ändert daran nichts." },
+  "bookmarkErrReadLaterList": { "message": "In Karakeep gibt es mehrere „Später lesen“-Listen, die von dieser Erweiterung angelegt wurden. Das Lesezeichen wurde gespeichert, aber ohne Später-lesen-Status. Lösche die überzähligen Listen, sodass nur eine übrig bleibt, und versuche es dann erneut." },
   "bookmarkErrRemote": {
     "message": "Der Lesezeichenserver hat die Anfrage abgelehnt (HTTP $STATUS$). Ein neuer Versuch ändert daran nichts. Das Lesezeichen und die Servereinstellungen prüfen.",
     "placeholders": {

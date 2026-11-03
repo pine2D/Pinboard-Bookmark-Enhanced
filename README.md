@@ -74,7 +74,7 @@ Or load unpacked from a release ZIP:
 
 The source checkout has a separate fixed development ID, so it can coexist with the Chrome Web Store version for testing. A release ZIP uses the Chrome Web Store ID, so those two versions cannot coexist in one Chrome profile. Chrome Sync can share settings after you enable settings sync on each device. Before replacing an older unpacked release, click **Export backup** in its settings; after loading the new release, use **Import backup**.
 
-After installing, open **Settings → Account** and choose your bookmark service. For Karakeep or linkding, enter the site URL and API token, then click **Connect** and allow access to that server. Include any site subpath; HTTPS is required except on localhost. For Pinboard, paste your [API token](https://pinboard.in/settings/password) in the popup and log in.
+After installing, open **Settings → Account** and choose your bookmark service. For Karakeep or linkding, enter the site URL and API token, then click **Connect** and allow access to that server. Include any site subpath; HTTPS is required except on localhost. Karakeep needs version 0.31 or later (tested on 0.34.1). For Pinboard, paste your [API token](https://pinboard.in/settings/password) in the popup and log in.
 
 Popup, reader, shortcut and batch saves use the selected service. Karakeep uses a dedicated private list for Read Later; marking an item as read removes it from the list without archiving it. linkding uses its unread flag. Pinboard suggestions, tag cleanup, unread counts, site search and Tab Sets remain Pinboard-only.
 

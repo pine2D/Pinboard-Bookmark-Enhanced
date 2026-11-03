@@ -5200,6 +5200,7 @@
     "description": "A self-hosted bookmark server answered with HTTP 429."
   },
   "bookmarkErrUrlInvalid": { "message": "linkding won’t accept this address. It can be at most 2048 characters, and its host needs a domain ending such as .com unless it is localhost or an IP address. Trying again won’t help." },
+  "bookmarkErrReadLaterList": { "message": "Karakeep has more than one Read Later list made by this extension, so the bookmark was saved without its Read Later state. Delete the extra lists so only one is left, then try again." },
   "bookmarkErrRemote": {
     "message": "The bookmark server refused the request (HTTP $STATUS$). Trying again won't help; check the bookmark and the server's settings.",
     "description": "A self-hosted bookmark server refused the request with an HTTP 4xx that has no more specific copy. Not retryable. $STATUS$ is the HTTP status code.",

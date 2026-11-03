@@ -5183,6 +5183,7 @@
     "message": "書籤伺服器收到的請求過多，請稍後再試。"
   },
   "bookmarkErrUrlInvalid": { "message": "linkding 不接受這個網址：網址最多 2048 個字元，主機名稱需有 .com 這類網域字尾（localhost 與 IP 位址除外）。重試也不會成功。" },
+  "bookmarkErrReadLaterList": { "message": "Karakeep 裡有多個由本擴充功能建立的「稍後閱讀」清單，書籤已儲存，但稍後閱讀狀態沒有設定。請刪掉多餘的清單，只留一個，再試一次。" },
   "bookmarkErrRemote": {
     "message": "書籤伺服器拒絕了這次請求（HTTP $STATUS$）。重試也不會成功，請檢查書籤內容與伺服器設定。",
     "placeholders": {

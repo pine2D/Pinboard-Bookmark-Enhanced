@@ -163,6 +163,19 @@ function pbpCreateBookmarkServiceClient(config) {
   };
   const validList = list => list && list.type === "manual" && list.public === false &&
     list.hasCollaborators === false && list.userRole === "owner";
+  // Our private manual lists, found by the marker in their description.
+  const markedLists = async () => {
+    const {data} = await request("lists");
+    if (!Array.isArray(data?.lists)) throw pbpBookmarkServiceError("invalid_response");
+    return data.lists.filter(list => validList(list) && list.description === listMarker);
+  };
+  // Read-only: the id of the one marked list, or "" for none or several.
+  // Nothing is created, changed or stored.
+  const findReadLaterList = async () => {
+    if (service !== "karakeep") return "";
+    const found = await markedLists();
+    return found.length === 1 ? pbpBookmarkRecordId(found[0].id) : "";
+  };
   const ensureReadLaterList = async create => {
     if (readLaterListId) {
       const id = pbpBookmarkRecordId(readLaterListId);
@@ -179,12 +192,12 @@ function pbpCreateBookmarkServiceClient(config) {
       await guard();
     }
     if (!create) return "";
-    const {data} = await request("lists");
-    if (!Array.isArray(data?.lists)) throw pbpBookmarkServiceError("invalid_response");
-    const candidates = data.lists.filter(list => validList(list) && list.description === listMarker);
-    if (candidates.length > 1) throw pbpBookmarkServiceError("read_later_list");
-    let list = candidates[0];
-    if (!list) list = (await request("lists", "POST", {name:config.readLaterListName || "Read later",icon:"bookmark",description:listMarker,type:"manual"})).data;
+    // More than one of ours is never guessed between; the user deletes extras.
+    let list = await markedLists();
+    if (list.length > 1) throw pbpBookmarkServiceError("read_later_list");
+    list = list[0];
+    // icon is a character Karakeep shows as-is: U+1F516, the bookmark emoji.
+    if (!list) list = (await request("lists", "POST", {name:config.readLaterListName || "Read later",icon:"\u{1F516}",description:listMarker,type:"manual"})).data;
     if (!validList(list)) throw pbpBookmarkServiceError("read_later_list");
     readLaterListId = pbpBookmarkRecordId(list.id);
     if (typeof config.saveReadLaterList !== "function") throw pbpBookmarkServiceError("local_store");
@@ -381,7 +394,7 @@ function pbpCreateBookmarkServiceClient(config) {
     return rows.filter(row=>service === "linkding" || row.content?.type === "link").map(row=>pbpBookmarkNormalize(service,row));
   };
   return {
-    lookup, save, tags, recent, setReadLater,
+    lookup, save, tags, recent, setReadLater, findReadLaterList,
     async verify() {
       const {data} = await request(service === "linkding" ? "user/profile/" : "users/me");
       if (!data || typeof data !== "object" || Array.isArray(data) ||

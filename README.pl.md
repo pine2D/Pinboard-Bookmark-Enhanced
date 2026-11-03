@@ -74,7 +74,7 @@ Lub załaduj rozpakowane z ZIP-a release:
 
 Katalog źródłowy ma osobny, stały identyfikator deweloperski, dlatego podczas testów może działać obok wersji z Chrome Web Store. ZIP z release używa identyfikatora Chrome Web Store i nie może działać jednocześnie z wersją sklepową w tym samym profilu Chrome. Ustawienia będą wspólne dzięki Chrome Sync, gdy na każdym urządzeniu włączysz ich synchronizację. Przed zastąpieniem starszego release wczytanego ręcznie kliknij w jego ustawieniach **Eksportuj kopię zapasową**, a po wczytaniu nowego release użyj **Importuj kopię zapasową**.
 
-Po instalacji otwórz **Ustawienia → Konto** i wybierz usługę. Dla Karakeep lub linkding podaj adres witryny oraz token API, kliknij **Połącz** i zezwól na dostęp do serwera. Uwzględnij podścieżkę adresu, jeśli istnieje; poza localhost wymagany jest HTTPS. Dla Pinboard wklej [token API](https://pinboard.in/settings/password) w okienku i zaloguj się.
+Po instalacji otwórz **Ustawienia → Konto** i wybierz usługę. Dla Karakeep lub linkding podaj adres witryny oraz token API, kliknij **Połącz** i zezwól na dostęp do serwera. Uwzględnij podścieżkę adresu, jeśli istnieje; poza localhost wymagany jest HTTPS. Karakeep wymaga wersji 0.31 lub nowszej (testowane na 0.34.1). Dla Pinboard wklej [token API](https://pinboard.in/settings/password) w okienku i zaloguj się.
 
 Okienko, czytnik, skróty i zapis zbiorczy korzystają z wybranej usługi. Karakeep używa osobnej prywatnej listy „Przeczytaj później”; oznaczenie zakładki jako przeczytanej usuwa ją z listy bez zmiany stanu archiwizacji. linkding używa znacznika nieprzeczytanych. Podpowiedzi Pinboard, porządkowanie tagów, licznik nieprzeczytanych, wyszukiwanie w witrynie i zestawy kart pozostają funkcjami Pinboard.
 
