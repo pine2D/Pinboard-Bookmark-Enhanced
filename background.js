@@ -210,14 +210,24 @@ const _pendingChecks = new Map(); // auth epoch + URL -> Promise
 
 function invalidateBookmarkAuthState() {
   _pinboardAuthEpoch++;
-  const epoch = _pinboardAuthEpoch;
   _cachedToken = null;
+  try { Promise.resolve(chrome.storage.session.remove("_currentTab")).catch(() => {}); } catch (_) {}
+  pbpResetBookmarkStatusView();
+  chrome.action.setBadgeText({ text: "" });
+  updateBadge().catch(() => {});
+}
+
+// Everything the toolbar shows about bookmark status, and the lookups behind
+// it, without touching the auth epoch: a connection change does both, while a
+// display setting (linkding's browsing checks) only needs this half, so saves
+// already on their way keep the connection they were sent with.
+function pbpResetBookmarkStatusView() {
+  const epoch = _pinboardAuthEpoch;
   statusCache.clear();
   _pendingChecks.clear();
   _lastIconState.clear();
   _iconPageUrl.clear();
   _lastCheckedUrl.clear();
-  try { Promise.resolve(chrome.storage.session.remove("_currentTab")).catch(() => {}); } catch (_) {}
   pbpStatusMirrorClear();
   chrome.tabs.query({}).then((tabs) => {
     if (epoch !== _pinboardAuthEpoch) return;
@@ -226,8 +236,6 @@ function invalidateBookmarkAuthState() {
       if (tab?.active && tab.url?.startsWith("http")) _scheduleCurrentTabRefresh(tab.id, tab.url);
     }
   }).catch(() => {});
-  chrome.action.setBadgeText({ text: "" });
-  updateBadge().catch(() => {});
 }
 
 let _authChangeTail = Promise.resolve();
@@ -4188,7 +4196,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   // show: drop every state and copy, and let the active tab ask again (or not).
   if ((area === "sync" || area === "local") && changes.linkdingPreload) {
     pbpReadBookmarkConnection().then((connection) => {
-      if (connection.service === "linkding") invalidateBookmarkAuthState();
+      if (connection.service === "linkding") pbpResetBookmarkStatusView();
     }).catch((e) => console.warn("[bookmark-status] connection read failed:", e?.name, e?.message));
   }
   if (area === "sync" || area === "local") {

@@ -1914,9 +1914,13 @@ try{
     popup=await openOnTab();await settled(popup,'found');
     assert.deepEqual(checksSince(beforePopup),[],'the popup asked again once the memory cache was gone');
     await popup.close();
-    // 5. Switching it off drops the copy and the icon.
+    // 5. Switching it off drops the copy and the icon. It is a display
+    // setting, not a connection change: saves already on their way keep
+    // the connection they were sent with (the auth epoch stays).
+    const epochBefore=await worker.evaluate(()=>_pinboardAuthEpoch);
     await worker.evaluate(()=>chrome.storage.local.set({linkdingPreload:false}));
     await until(async()=>!(await worker.evaluate(()=>chrome.storage.session.get('_linkdingStatus').then(row=>!!row._linkdingStatus)))&&await articleIcon()==='default','switching off dropped the copy and the icon');
+    assert.equal(await worker.evaluate(()=>_pinboardAuthEpoch),epochBefore,'switching browsing checks counted as a connection change');
     console.log('linkding browsing checks: off asks only on popup open; on asks once per page, shows the icon and serves the popup, across a worker restart');
   });
   await block('linkding page information from the browser or the server',['linkding'],async()=>{
