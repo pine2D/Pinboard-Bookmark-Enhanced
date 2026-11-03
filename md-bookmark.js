@@ -9,9 +9,11 @@
   let state = { known: false };
   let statusKey = "readerBookmarkChecking";
   let editorStatusKey = "";
-  // Placeholder values for a failure key whose copy names something (the tag
-  // linkding could not store); set together with that key.
-  let failureArgs = [];
+  // Placeholder values for each failure key whose copy names something (the
+  // tag linkding could not store, an HTTP status), stored per key: the rail
+  // and the editor can show different keys at once, and each paints its own.
+  const failureArgs = new Map();
+  const argsFor = key => failureArgs.get(key) || [];
   // Keys whose copy takes failureArgs.
   const ARG_KEYS = ["bookmarkErrTagTooLong", "bookmarkErrRemote"];
   // Every self-hosted failure copy failureKey() has handed out paints the
@@ -90,7 +92,7 @@
           el.textContent = pbpBookmarkMergedText(pbpBookmarkAccountService(context?.account), text);
         } else if (ARG_KEYS.includes(statusKey)) {
           el.removeAttribute("data-i18n");
-          el.textContent = text(statusKey, ...failureArgs);
+          el.textContent = text(statusKey, ...argsFor(statusKey));
         }
       }
     }
@@ -108,7 +110,7 @@
         id("editor-status").textContent = text("titleTooLong", String(pbpBookmarkLimits(pbpBookmarkAccountService(context?.account)).title));
       } else if (ARG_KEYS.includes(editorStatusKey)) {
         id("editor-status").removeAttribute("data-i18n");
-        id("editor-status").textContent = text(editorStatusKey, ...failureArgs);
+        id("editor-status").textContent = text(editorStatusKey, ...argsFor(editorStatusKey));
       }
       id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "readerBookmarkTagsQuoteError", "titleTooLong", "submitUriTooLong"].includes(editorStatusKey) || failureCopy(editorStatusKey) ? "error" : "";
     }
@@ -177,7 +179,7 @@
       ? pbpBookmarkFailureKey(result, pbpBookmarkAccountService(context?.account)) : "";
     if (key) {
       failureKeys.add(key);
-      failureArgs = typeof pbpBookmarkFailureArgs === "function" ? pbpBookmarkFailureArgs(result) : [];
+      failureArgs.set(key, typeof pbpBookmarkFailureArgs === "function" ? pbpBookmarkFailureArgs(result) : []);
     }
     return key;
   }
@@ -285,13 +287,13 @@
     // and stop naming the long tag in the rail and footer status.
     if (tagFix && storedTags() !== "" && storedTags() !== tagFix.stored) {
       tagFix = null;
-      if (statusKey === "bookmarkErrTagTooLong") { statusKey = ""; failureArgs = []; }
+      if (statusKey === "bookmarkErrTagTooLong") statusKey = "";
     }
     ensureEditor();
     editorStatusKey = ""; paint();
     const values = { ...(state.bookmark || context.bookmark?.draft || {}),
       ...(typeof tagFix?.tags === "string" ? { tags: tagFix.tags } : {}) };
-    if (tagFix) { failureArgs = tagFix.args; editorStatusKey = "bookmarkErrTagTooLong"; paint(); }
+    if (tagFix) { failureArgs.set("bookmarkErrTagTooLong", tagFix.args); editorStatusKey = "bookmarkErrTagTooLong"; paint(); }
     id("title").value = typeof values.title === "string" ? values.title : context.title || "";
     label(id("tags").closest("label").firstElementChild, state.quotedTags === true ? "readerBookmarkTagsQuoted" : "readerBookmarkTags");
     id("tags").value = typeof values.tags === "string" ? values.tags : pbpBookmarkFormatTags(context.bookmark?.tags || []);
@@ -400,7 +402,7 @@
       if (gen !== generation) return;
       statusKey = failureKey(result) || "readerBookmarkFailed";
       if (statusKey === "bookmarkErrTagTooLong") {
-        tagFix = { tags: sentTags, args: failureArgs, stored: storedTags() };
+        tagFix = { tags: sentTags, args: argsFor(statusKey), stored: storedTags() };
         reopen = action !== "edit";
       }
       if (action === "edit") editorStatusKey = statusKey;

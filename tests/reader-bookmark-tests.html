@@ -1129,6 +1129,49 @@ await test("reader save, delete and lookup name every self-hosted cause from the
   equal(await run("alice", m => m.type === "mdReaderBookmarkState" ? known("alice") : { status: "failed", reason: "account_changed", account: "alice" },
     w => w.pbpReaderBookmarkAction("later")), "readerBookmarkAccountChanged");
 });
+await test("each reader status keeps the placeholders of its own copy after a tag fix and a later remote failure", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  const account = "linkding:https://ld.example:c1", long = "x".repeat(65), shown = "x".repeat(40) + "…";
+  const tagCopy = "bookmarkErrTagTooLong:" + shown + ":64", remoteCopy = "bookmarkErrRemote:400";
+  const same = (a, b) => equal(JSON.stringify(a), JSON.stringify(b));
+  // later: the follow-up write after the tag failure, run from the open editor.
+  for (const later of ["apply", "delete"]) {
+    const frame = document.createElement("iframe"); document.body.append(frame);
+    try {
+      const w = frame.contentWindow, pending = [];
+      let writes = 0;
+      const handler = msg => {
+        if (msg.type === "mdReaderBookmarkState") return { known: true, bookmarked: writes > 0, account, descriptionSupported: true, bookmark: { title: "Article", tags: "", notes: "" } };
+        writes++;
+        return writes === 1 ? { status: "failed", reason: "tag_too_long", tag: long, account }
+          : { status: "failed", reason: "remote", httpStatus: 400, account };
+      };
+      w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.eval(await (await fetch("../shared.js")).text());
+      w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
+        sendMessage: msg => { const r = Promise.resolve(handler(msg)); pending.push(r); return r; }, onMessage: { addListener() {} } } };
+      w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; w.eval(runtime);
+      w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "", draft: { title: "Article", tags: long, notes: "" } } } }));
+      await settle(pending);
+      const el = name => w.document.getElementById("reader-bookmark-" + name);
+      const rail = () => [el("status").textContent, el("footer-status")?.textContent ?? el("status").textContent];
+      await w.pbpReaderBookmarkAction("save"); await settle(pending);
+      same(rail(), [tagCopy, tagCopy]);
+      assert(el("editor").matches(":popover-open"), "the tag failure did not open the editor");
+      if (later === "apply") el("apply").click();
+      else { el("delete").click(); await settle(pending); w.document.querySelector(".confirm-yes")?.click(); }
+      await settle(pending); await settle(pending);
+      equal(writes, 2);
+      same([later, ...rail()], [later, remoteCopy, remoteCopy]);
+      el("cancel").click();
+      await w.pbpReaderBookmarkAction("edit"); await settle(pending);
+      assert(el("editor").matches(":popover-open"), "the editor did not reopen");
+      // The editor reopens on the tag that still needs shortening; the rail and
+      // footer keep naming the HTTP status of the write that failed last.
+      same([later, ...rail(), el("editor-status").textContent], [later, remoteCopy, remoteCopy, tagCopy]);
+    } finally { frame.remove(); }
+  }
+});
 await test("reader lookup of a rejected self-hosted token names the token, not a missing connection", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();
   const frame = document.createElement("iframe"); document.body.append(frame);
