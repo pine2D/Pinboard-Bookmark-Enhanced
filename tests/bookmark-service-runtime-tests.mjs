@@ -1078,6 +1078,20 @@ try{
       await reader.locator('#reader-bookmark-edit[aria-busy="false"]').waitFor();
       await reader.locator('.bookmark-badge').waitFor({timeout:10000});
       assert.equal(await reader.locator('#reader-bookmark-later').getAttribute('aria-pressed'),'false');
+      // One open of the reader, one lookup of the address: the badge reuses the bar's answer (linkding fetches the page on every /check/).
+      const checks=()=>requests.filter(r=>r.service==='linkding'&&r.path.startsWith('bookmarks/check')&&new URLSearchParams(r.query).get('url')===cleanUrl).length;
+      assert.equal(checks(),1,'opening the reader looked the address up more than once');
+      assert.equal(await reader.locator('.bookmark-badge').getAttribute('href'),(await worker.evaluate(()=>pbpReadBookmarkConnection())).baseUrl,'the badge does not open the connected service');
+      assert.equal(await reader.locator('.bookmark-badge .bb-lock').count(),0,'a linkding badge shows a padlock');
+      // The same connection with other settings looks the address up once more.
+      const credential=await worker.evaluate(async()=>(await loadSettings()).linkdingToken);
+      try{
+        await worker.evaluate(async c=>{const v=JSON.parse(deobfuscateKey(c));v.sharing=!v.sharing;await persistSettings({linkdingToken:JSON.stringify(v)});},credential);
+        await until(()=>checks()===2,'the reader did not look the address up again after a same-connection change');
+        await reader.locator('#reader-bookmark-edit[aria-busy="false"]').waitFor();
+      }finally{await worker.evaluate(async c=>persistSettings({linkdingToken:c}),credential);}
+      await reader.locator('#reader-bookmark-edit[aria-busy="false"]').waitFor();
+      await until(()=>checks()===3,'restoring the connection settings did not look the address up');
       await reader.evaluate(()=>{window.__copied=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copied.push(text);}}});});
       const frontMatter=async label=>{
         const before=await reader.evaluate(()=>window.__copied.length);

@@ -984,6 +984,17 @@ await test("reader initial linkding Description follows the owner-bound preview 
   h.env.account = "linkding:other";
   equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER)).reason, "account_changed");
 });
+await test("a new bookmark with a blank popup draft title falls back to the page title, then the address", async () => {
+  for (const service of ["pinboard", "linkding"]) for (const blank of ["", "   ", "\t\n"]) {
+    const account = service === "linkding" ? "linkding:fixture" : "alice";
+    const h = await harness({ account, service, post: null, slot: { account, bookmarkDraft: { title: blank, tags: "", notes: "", private: false, toread: false } } });
+    const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
+    assert(String(state.bookmark.title ?? "").trim() !== "", service + " " + JSON.stringify(blank) + ": the draft title stayed blank");
+    const saved = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "save" }, SENDER);
+    equal(saved.status, "saved");
+    assert(String(h.env.submitted.intent.title).trim() !== "", service + " " + JSON.stringify(blank) + ": a blank title was submitted");
+  }
+});
 // The reader has no page description of its own. Without a popup draft value
 // its creates leave the Description out, so linkding fetches it; with
 // auto-fill off they send a known "", and a draft's value (even "") is kept.
@@ -1994,6 +2005,76 @@ await test("a connection change under the same account looks the bookmark up aga
     r.w.document.dispatchEvent(new r.w.CustomEvent("pbp:bookmark-connection-changed", { detail: { url: URL_ARTICLE, account: "linkding:https://other.example:c9" } }));
     await wait(30); equal(r.requests.length, 2);
   } finally { r.frame.remove(); }
+});
+await test("a connection change during a request waits for it, then looks the address up again", async () => {
+  const account = "linkding:https://ld.example:c1";
+  const gatewayError = { known: false, reason: "gateway_redirect", account };
+  const ok = { known: true, bookmarked: true, account, bookmark: { tags: [], notes: "" } };
+  const fire = r => r.w.document.dispatchEvent(new r.w.CustomEvent("pbp:bookmark-connection-changed", { detail: { url: URL_ARTICLE, title: "Article", account } }));
+  // 1. While the first lookup is still waiting on a slow server.
+  let release, slow = true;
+  const first = await barFrame(account, m => slow ? new Promise(res => { release = () => res(gatewayError); }) : ok);
+  try {
+    equal(first.requests.length, 1); fire(first); await wait(20); equal(first.requests.length, 1, "looked up before the first answer");
+    slow = false; release(); await wait(60);
+    equal(first.requests.length, 2); equal(first.status(), ""); equal(first.node("save").dataset.saved, "true");
+  } finally { first.frame.remove(); }
+  // 2. While a save is failing on the old settings.
+  let phase = "known", releaseSave;
+  const second = await barFrame(account, m => m.type === "mdReaderBookmarkState" ? (phase === "known" ? ok : { ...ok, bookmark: { tags: [], notes: "", title: "x" } })
+    : new Promise(res => { releaseSave = () => res({ status: "failed", reason: "gateway_redirect", account }); }));
+  try {
+    second.w.pbpReaderBookmarkAction("later"); await wait(20);
+    const lookups = () => second.requests.filter(m => m.type === "mdReaderBookmarkState").length;
+    const before = lookups(); fire(second); await wait(20); equal(lookups(), before);
+    releaseSave(); await wait(60);
+    equal(lookups(), before + 1, "no lookup after the failed save");
+    equal(second.node("save").getAttribute("aria-busy"), "false");
+  } finally { second.frame.remove(); }
+});
+await test("the bar publishes its lookup once for the badge, and nothing else queries the address", async () => {
+  const r = await barFrame("alice", m => ({ known: true, bookmarked: true, account: "alice", bookmark: { tags: "a b", tagNames: ["a", "b"], notes: "", private: true } }));
+  try {
+    equal(r.requests.filter(m => m.type === "mdReaderBookmarkState").length, 1);
+    equal(r.requests.filter(m => m.type === "mdPreviewBookmarkInfo").length, 0);
+    equal(r.states.length, 1);
+    equal(r.states[0].account, "alice"); equal(r.states[0].url, URL_ARTICLE); equal(r.states[0].bookmarked, true);
+    equal(r.states[0].tagNames.join(" "), "a b"); equal(r.states[0].shared, "no");
+  } finally { r.frame.remove(); }
+  const miss = await barFrame("alice", () => ({ known: false, reason: "network", account: "alice" }));
+  try { equal(miss.states.length, 1); equal(miss.states[0].bookmarked, false); } finally { miss.frame.remove(); }
+  const bookmarkUrl = await barFrame("alice", () => ({ known: true, bookmarked: false, account: "alice", bookmark: {} }), { bookmarkUrl: "https://example.com/canonical" });
+  try { equal(bookmarkUrl.states[0].url, "https://example.com/canonical"); } finally { bookmarkUrl.frame.remove(); }
+});
+await test("bookmark badge links to the connected service and shows the lock only for Pinboard", async () => {
+  const source = await (await fetch("../md-preview.js")).text();
+  const start = source.indexOf("const PBP_BOOKMARK_LOCK_SVG"), end = source.indexOf("// Fills #preview-url", start);
+  assert(start >= 0 && end > start);
+  const render = async (resp, service, home) => {
+    const frame = document.createElement("iframe"); document.body.append(frame);
+    try {
+      const w = frame.contentWindow;
+      w.document.body.innerHTML = '<a id="preview-url"></a>';
+      w.eval(await (await fetch("../shared.js")).text()); w.t = k => k;
+      w.PBP_ICONS = { pin: "<svg></svg>", lock: "<svg></svg>" };
+      w.eval(source.slice(start, end) + "\nwindow.renderBookmarkBadge = renderBookmarkBadge;");
+      w.renderBookmarkBadge(resp, URL_ARTICLE, service, home);
+      const a = w.document.querySelector(".bookmark-badge");
+      return a ? { href: a.getAttribute("href"), lock: !!a.querySelector(".bb-lock"), tag: a.tagName, label: a.getAttribute("aria-label") } : null;
+    } finally { frame.remove(); }
+  };
+  const mine = (shared) => ({ bookmarked: true, tagNames: ["x"], shared });
+  const ld = await render(mine("no"), "linkding", "https://ld.example/");
+  equal(ld.tag, "A"); equal(ld.href, "https://ld.example/"); equal(ld.lock, false); assert(!/Private/i.test(ld.label));
+  const kk = await render(mine("no"), "karakeep", "https://kk.example/");
+  equal(kk.href, "https://kk.example/"); equal(kk.lock, false);
+  const pb = await render(mine("no"), "pinboard", "");
+  assert(pb.href.startsWith("https://pinboard.in/"), pb.href); equal(pb.lock, true);
+  equal((await render(mine("yes"), "pinboard", "")).lock, false);
+  for (const service of ["linkding", "karakeep"]) {
+    const bad = await render(mine("yes"), service, "");
+    assert(bad === null || !bad.href.includes("pinboard.in"), service + " badge pointed at Pinboard");
+  }
 });
 document.body.dataset.complete = "true";
 })();

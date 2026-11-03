@@ -766,7 +766,7 @@ await suite("unified save pipeline", async () => {
   await test("preview re-extraction preserves immutable opener owner, tags, and description", async () => {
     const source = await getBackgroundSource();
     const start = source.indexOf('if (message.type === "reextractMarkdown")');
-    const end = source.indexOf('if (message.type === "mdPreviewBookmarkInfo"', start);
+    const end = source.indexOf("\n}\nchrome.runtime.onMessage.addListener(handleRuntimeMessage);", start);
     assert(start >= 0 && end > start, "reextract branch not found");
     const key = "md_preview_data_owner-test";
     let slot = {
@@ -802,7 +802,7 @@ await suite("unified save pipeline", async () => {
   await test("preview re-extraction keeps the handoff's bookmark address", async () => {
     const source = await getBackgroundSource();
     const start = source.indexOf('if (message.type === "reextractMarkdown")');
-    const end = source.indexOf('if (message.type === "mdPreviewBookmarkInfo"', start);
+    const end = source.indexOf("\n}\nchrome.runtime.onMessage.addListener(handleRuntimeMessage);", start);
     assert(start >= 0 && end > start, "reextract branch not found");
     const key = "md_preview_data_bookmark-url";
     const page = "https://example.com/post?utm_source=feed", canonical = "https://example.com/post/";
@@ -826,7 +826,7 @@ await suite("unified save pipeline", async () => {
   await test("refresh-then-extract reloads only the unchanged source tab, with the page grant, before extracting", async () => {
     const source = await getBackgroundSource();
     const start = source.indexOf('if (message.type === "reextractMarkdown")');
-    const end = source.indexOf('if (message.type === "mdPreviewBookmarkInfo"', start);
+    const end = source.indexOf("\n}\nchrome.runtime.onMessage.addListener(handleRuntimeMessage);", start);
     assert(start >= 0 && end > start, "reextract branch not found");
     const key = "md_preview_data_refresh-test";
     const page = "https://laohuangniu.net/apps/text-audio";
@@ -863,64 +863,6 @@ await suite("unified save pipeline", async () => {
       "order must be grant check -> reload -> extract -> write");
   });
 
-  await test("preview bookmark lookup never crosses from captured account A into B", async () => {
-    const source = await getBackgroundSource();
-    const start = source.indexOf('if (message.type === "mdPreviewBookmarkInfo"');
-    // End anchor: this is the named router's LAST branch (roadmap #35 made
-    // the listener a named function, so the old "\n});" arrow-closer anchor
-    // no longer exists) — stop right before the branch's own "return true".
-    const endAnchor = "return true;\n  }\n}\nchrome.runtime.onMessage.addListener(handleRuntimeMessage);";
-    const anchorAt = source.indexOf(endAnchor, start);
-    // Include the branch's own "return true;\n  }" so the sliced if-block closes.
-    const end = anchorAt + "return true;\n  }".length;
-    assert(start >= 0 && anchorAt > start, "preview bookmark branch not found");
-    const authA = { token: "alice:old", account: "alice", epoch: 1 };
-    let current = authA;
-    let checks = 0;
-    const factory = new Function(
-      "getCurrentBookmarkAuth", "pbpBookmarkAuthIsCurrent", "checkBookmarked",
-      "pbpStatusCacheGet", "pbpStatusCacheSet", "pinboardFetch", "chrome", `
-        return function invoke(message, sendResponse) { ${source.slice(start, end)} };
-      `
-    );
-    const invoke = factory(
-      async () => { current = { token: "bob:new", account: "bob", epoch: 2 }; return authA; },
-      (candidate) => candidate === current,
-      async (_url, captured) => { checks++; return captured === current; },
-      () => null,
-      () => false,
-      async () => { throw new Error("cross-account fetch"); },
-      { storage: { local: {} } }
-    );
-    const stale = await new Promise((resolve) => invoke({
-      type: "mdPreviewBookmarkInfo", url: BASE_INTENT.url, account: "alice",
-    }, resolve));
-    equal(checks, 1, "captured lookup was not invoked once");
-    equal(stale.bookmarked, false);
-    equal(stale.account, "", "stale preview learned the new account");
-
-    checks = 0;
-    const legacy = await new Promise((resolve) => invoke({
-      type: "mdPreviewBookmarkInfo", url: BASE_INTENT.url, account: "",
-    }, resolve));
-    equal(checks, 0, "ownerless legacy preview performed a Pinboard lookup");
-    equal(legacy.account, "");
-  });
-  await test("preview bookmark info carries exact self-hosted tag names and splits Pinboard tags", async () => {
-    const source = await getBackgroundSource();
-    const start = source.indexOf('if (message.type === "mdPreviewBookmarkInfo"');
-    const anchor = source.indexOf('return true;\n  }\n}\nchrome.runtime.onMessage.addListener(handleRuntimeMessage);', start);
-    assert(start >= 0 && anchor > start, "preview bookmark branch missing");
-    const branch = source.slice(start, anchor + 'return true;\n  }'.length);
-    for (const post of [{tags:'"machine learning" web-design',tagNames:["machine learning","web-design"]},{tags:"one two"}]) {
-      const auth={account:"alice",token:"token"};
-      const run = new Function("getCurrentBookmarkAuth","checkBookmarked","pbpBookmarkAuthIsCurrent","pbpStatusCacheGet", "pbpSelfHostedAuth", "chrome", "pinboardFetch", "pbpStatusCacheSet", "pbpBookmarkPostsResponse", "return function(message,sendResponse){"+branch+"}")
-        (async()=>auth,async()=>true,()=>true,()=>({posts:[post]}),()=>false,{},async()=>{throw Error("unexpected")},()=>true,async()=>{throw Error("unexpected")});
-      const response = await new Promise(resolve=>run({type:"mdPreviewBookmarkInfo",url:BASE_INTENT.url,account:"alice"},resolve));
-      equal(JSON.stringify(response.tagNames),JSON.stringify(post.tagNames||["one","two"]));
-    }
-  });
-
   await test("preview opener and restore payloads carry account, tags, and description", async () => {
     const [popupSource, previewSource, source] = await Promise.all([
       fetch("../popup.js").then((r) => r.text()),
@@ -931,7 +873,9 @@ await suite("unified save pipeline", async () => {
     assert(popupPayload.includes("account: sessionAccount"), "popup preview payload has no owner");
     assert(popupPayload.includes('description: $id("description-input")?.value || ""'), "popup preview drops notes");
     assert(previewSource.includes("account: bookmarkAccount, tags, description, ts: Date.now()"), "restore record drops owner metadata");
-    assert(previewSource.includes("if (bookmarkUrl && bookmarkAccount)"), "ownerless preview still requests bookmark data");
+    // The reader bar owns the lookup (owner-checked there); the preview page sends no lookup of its own.
+    const previewCode = previewSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    assert(!/mdPreviewBookmarkInfo/.test(previewCode), "preview page still sends its own bookmark lookup");
     const shortcut = source.slice(source.indexOf("async function openMarkdownPreviewFromShortcut"));
     assert(shortcut.includes('account: auth.account || ""'), "shortcut preview payload has no owner field");
   });

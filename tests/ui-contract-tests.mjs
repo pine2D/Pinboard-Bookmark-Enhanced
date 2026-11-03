@@ -5054,7 +5054,7 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
   check(predBodies["background.js"] && predBodies["background.js"] === predBodies["popup.js"],
     "background.js and popup.js carry the same extractionLooksEmpty predicate (isolated-context twins must not drift)");
   const hStart = backgroundJs.indexOf('message.type === "reextractMarkdown"');
-  const hEnd = backgroundJs.indexOf('message.type === "mdPreviewBookmarkInfo"', hStart);
+  const hEnd = backgroundJs.indexOf("\n}\nchrome.runtime.onMessage.addListener(handleRuntimeMessage);", hStart);
   const handler = stripComments(backgroundJs.slice(hStart, hEnd));
   const containsAt = handler.indexOf("held = await chrome.permissions.contains({ origins: [frameOrigin + \"/*\"] })");
   const refuseAt = handler.indexOf('if (!held) { sendResponse({ ok: false, error: "host_permission" }); return; }');

@@ -5,6 +5,8 @@
   let context = null;
   let generation = 0;
   let inflight = false;
+  // A connection change that arrived while a request was in flight: look again once it ends.
+  let recheckConnection = false;
   let deleting = false;
   let state = { known: false };
   let statusKey = "readerBookmarkChecking";
@@ -201,6 +203,19 @@
     return key;
   }
 
+  // The bar's one lookup of this address is also the rail badge's: md-preview.js
+  // draws the badge from this event instead of asking the worker a second time
+  // (linkding fetches the page on every check).
+  function publishState() {
+    const saved = state.known && state.bookmarked ? state.bookmark : null;
+    const detail = { url: context.bookmarkUrl || context.url, account: context.account, bookmarked: !!saved };
+    if (saved && typeof saved === "object") {
+      detail.tagNames = Array.isArray(saved.tagNames) ? saved.tagNames.slice() : String(saved.tags || "").split(/\s+/).filter(Boolean);
+      detail.shared = saved.private === true ? "no" : "yes";
+    }
+    document.dispatchEvent(new CustomEvent("pbp:bookmark-state", { detail }));
+  }
+
   async function refresh(expectedGeneration) {
     const result = await request({ type: "mdReaderBookmarkState" });
     if (expectedGeneration !== generation || result?.account !== context?.account) {
@@ -210,6 +225,7 @@
     state = result?.known ? result : { known: false };
     if (!state.known) showStatus(failureKey({reason:result?.reason, httpStatus:result?.httpStatus}) || "readerBookmarkLookupFailed");
     else paint();
+    publishState();
     return state.known;
   }
 
@@ -293,7 +309,21 @@
     return state.known && state.bookmarked && typeof state.bookmark?.tags === "string" ? state.bookmark.tags.trim() : "";
   }
 
+  // The reader looks the address up again for a connection change that arrived
+  // while a request was in flight, once that request has ended (success or not).
+  function recheckIfPending() {
+    if (!recheckConnection || inflight || !context?.account) return;
+    recheckConnection = false;
+    inflight = true; showStatus("readerBookmarkChecking");
+    const gen = generation;
+    refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); recheckIfPending(); } });
+  }
+
   async function edit() {
+    try { return await editImpl(); } finally { recheckIfPending(); }
+  }
+
+  async function editImpl() {
     if (inflight || !context?.account) return;
     inflight = true; paint(); const gen = generation;
     const known = await refresh(gen);
@@ -346,6 +376,10 @@
   }
 
   async function deleteBookmark() {
+    try { return await deleteBookmarkImpl(); } finally { recheckIfPending(); }
+  }
+
+  async function deleteBookmarkImpl() {
     if (inflight || !context?.account || !state.known || !state.bookmarked) return;
     const gen = generation;
     inflight = true; deleting = true; editorStatusKey = "readerBookmarkDeleting";
@@ -359,6 +393,7 @@
       state = { known: true, bookmarked: false, account: context.account };
       editorStatusKey = ""; statusKey = "readerBookmarkDeleted"; tagFix = null;
       closeEditor();
+      publishState();
       document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: changedDetail() }));
     } else {
       const foreign = !!(result?.account && result.account !== context.account);
@@ -370,6 +405,10 @@
   }
 
   async function save(action, draft) {
+    try { return await saveImpl(action, draft); } finally { recheckIfPending(); }
+  }
+
+  async function saveImpl(action, draft) {
     if (inflight || !context?.account) return;
     if (action === "edit" && draft) {
       if (state.quotedTags === true) {
@@ -485,30 +524,29 @@
     // A second render of the same article must not unlock an in-flight write.
     if (context?.url === next?.url && context?.account === next?.account) return;
     closeEditor();
-    generation++; context = next; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
+    generation++; recheckConnection = false; context = next; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
     mount();
     // No bookmark connection: nothing to look up. The buttons stay disabled and
     // the bar says where to connect (it is not an account switch).
     if (!context?.account) { inflight = false; showStatus("bgSetToken"); return; }
     showStatus("readerBookmarkChecking"); const gen = generation;
-    refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); } });
+    refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); recheckIfPending(); } });
   });
   // The same account with other connection settings (a new gateway, a rotated
   // token, a Connect again): look the address up once more so an earlier error
-  // does not outlive the fix. A write in flight finishes first and looks again.
+  // does not outlive the fix. A request in flight finishes first, then this looks again.
   document.addEventListener("pbp:bookmark-connection-changed", event => {
-    if (!context?.account || event.detail?.account !== context.account || inflight) return;
-    inflight = true; showStatus("readerBookmarkChecking");
-    const gen = generation;
-    refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); } });
+    if (!context?.account || event.detail?.account !== context.account) return;
+    recheckConnection = true;
+    recheckIfPending();
   });
   document.addEventListener("pbp:bookmark-account-changed", event => {
-    generation++; context = event.detail || null; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
+    generation++; recheckConnection = false; context = event.detail || null; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
     closeEditor();
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) { input.value = ""; input.checked = false; }
     if (!context?.account) { inflight = false; showStatus("bgSetToken"); return; }
     showStatus("readerBookmarkChecking");
     const gen = generation;
-    refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); } });
+    refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); recheckIfPending(); } });
   });
 })();

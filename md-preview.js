@@ -472,18 +472,20 @@ function ensureKatex() {
 // wrapping span in renderBookmarkBadge, not the SVG itself).
 const PBP_BOOKMARK_LOCK_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.lock : "";
 
-// Pure: turns the background.js mdPreviewBookmarkInfo response into the
+// Pure: turns the reader bar's pbp:bookmark-state detail into the
 // badge's render model. No DOM/chrome access — kept side-effect-free even
 // though md-preview.js has no test harness to exercise it directly (the
 // file's top-level IIFE below depends on chrome.storage/real DOM ids, so
 // it isn't loaded by tests/md-ai-tests.html; see the task note).
-function pbpBuildBookmarkBadgeModel(resp) {
+function pbpBuildBookmarkBadgeModel(resp, service) {
   if (!resp || resp.bookmarked !== true) return { show: false, tagsShown: [], tagsFull: "", isPrivate: false };
   const names = Array.isArray(resp.tagNames) ? resp.tagNames
     : typeof resp.tags === "string" ? resp.tags.trim().split(/\s+/).filter(Boolean) : [];
   const tagsFull = names.join(" ");
   const tagsShown = names.slice(0, 3);
-  return { show: true, tagsShown, tagsFull, isPrivate: resp.shared === "no" };
+  // Karakeep bookmarks are always private and a linkding one is private unless
+  // shared, so the padlock says something only for Pinboard.
+  return { show: true, tagsShown, tagsFull, isPrivate: service === "pinboard" && resp.shared === "no" };
 }
 
 // Takes the badge off screen. It is account-derived data (a private bookmark's
@@ -494,14 +496,16 @@ function pbpClearBookmarkBadge() {
   document.querySelectorAll(".bookmark-badge").forEach((el) => el.remove());
 }
 
-// Builds the bookmarked-badge DOM from a mdPreviewBookmarkInfo response and
+// Builds the bookmarked-badge DOM from that bookmark-state detail and
 // inserts it right after #preview-url. Clears any badge already there when
 // the model says not to show (unbookmarked / offline / no token / any
 // exception — all collapse to {bookmarked:false} in background.js).
 // Tags are remote data (Pinboard-stored, not this extension's own strings)
 // so they're only ever set via textContent/title, never innerHTML.
-function renderBookmarkBadge(resp, url) {
-  const model = pbpBuildBookmarkBadgeModel(resp);
+// `home` is the connected self-hosted service's address (the badge opens it);
+// Pinboard keeps its add page for the address.
+function renderBookmarkBadge(resp, url, service, home) {
+  const model = pbpBuildBookmarkBadgeModel(resp, service);
   // Idempotent: a re-render after an account switch REPLACES the previous
   // account's badge instead of stacking a second one after #preview-url, and a
   // {bookmarked:false} answer clears rather than silently keeping the old one.
@@ -512,7 +516,9 @@ function renderBookmarkBadge(resp, url) {
 
   const a = document.createElement("a");
   a.className = "bookmark-badge";
-  a.href = "https://pinboard.in/add?url=" + encodeURIComponent(url);
+  if (service === "pinboard") a.href = "https://pinboard.in/add?url=" + encodeURIComponent(url);
+  else if (home) a.href = home;
+  else return; // no known destination: no badge rather than one that points elsewhere
   a.target = "_blank";
   a.rel = "noopener noreferrer";
   // Spec X2 i18n key group: an explicit aria-label on the anchor becomes the
@@ -1219,29 +1225,27 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   const site = info.site || "";
   const image = info.image || "";
 
-  // X2 bookmarked badge, one lookup per account. Armed only once the article
-  // runtime asks for the first time (far below): the pending/error shells
-  // return long before that, and an account switch must not conjure a badge
-  // onto a shell that never had one. Clearing first is the fail-closed half --
-  // an offline/no-token/rejected lookup for the NEW account leaves nothing on
-  // screen rather than the previous account's tags and padlock.
-  let _badgeArmed = false;
-  function refreshBookmarkBadge() {
-    pbpClearBookmarkBadge();
-    // Ownerless previews never ask: background.js answers {bookmarked:false}
-    // without a lookup, and asking anyway would spend a Pinboard call on a
-    // signed-out page.
-    if (bookmarkUrl && bookmarkAccount) {
-      chrome.runtime.sendMessage({ type: "mdPreviewBookmarkInfo", url: bookmarkUrl, account: bookmarkAccount })
-        .then((resp) => {
-          // Compared against the LIVE account, not the one this call was sent
-          // with: a second switch while it was in flight must not paint a
-          // stale answer.
-          if (resp?.account === bookmarkAccount) renderBookmarkBadge(resp, bookmarkUrl);
-        })
-        .catch(() => {});
-    }
-  }
+  // X2 bookmarked badge. It asks nobody: the reader's bookmark bar (md-bookmark.js)
+  // looks the address up once per open and publishes pbp:bookmark-state, which is
+  // drawn here (linkding fetches the page on every check, so a second query of
+  // the same address would fetch it twice). An account switch clears the badge
+  // at once -- the fail-closed half: the previous account's tags and padlock
+  // never wait on the new account's lookup -- and the bar's next answer redraws.
+  let _badgeSeq = 0;
+  document.addEventListener("pbp:bookmark-state", (e) => {
+    const d = e.detail;
+    const seq = ++_badgeSeq;
+    // Compared against the LIVE account and address: a switch while the answer
+    // was in flight must not paint it.
+    if (!d || d.account !== bookmarkAccount || d.url !== bookmarkUrl) return;
+    if (d.bookmarked !== true) { pbpClearBookmarkBadge(); return; }
+    const service = pbpBookmarkAccountService(d.account);
+    if (service === "pinboard") { renderBookmarkBadge(d, bookmarkUrl, service, ""); return; }
+    pbpReadBookmarkConnection().then((connection) => {
+      if (seq !== _badgeSeq || connection.account !== d.account || d.account !== bookmarkAccount) return;
+      renderBookmarkBadge(d, bookmarkUrl, service, connection.baseUrl);
+    }).catch(() => {});
+  });
 
   // Reading data and bookmark metadata have independent live identities.
   if (chrome.storage.onChanged) {
@@ -1264,7 +1268,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           const stored = (await chrome.storage.local.get(key))[key];
           if (gen !== accountGen) return;
           if (stored) await chrome.storage.local.set({[key]:{...stored,account:bookmarkAccount,tags:[],description:"",bookmarkDraft:null}});
-          if (_badgeArmed) refreshBookmarkBadge(); else pbpClearBookmarkBadge();
+          pbpClearBookmarkBadge(); ++_badgeSeq;
           document.dispatchEvent(new CustomEvent("pbp:bookmark-account-changed", {detail:{url,bookmarkUrl,title,account:bookmarkAccount}}));
         } else if (bookmarkAccount && pbpBookmarkSettingsChanged(changes)) {
           // Same account, other connection settings (gateway, rotated token,
@@ -2248,7 +2252,6 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // hands none and the export keeps what it had.
   document.addEventListener("pbp:bookmark-changed", (e) => {
     if (e.detail?.account !== bookmarkAccount || e.detail?.url !== bookmarkUrl) return;
-    refreshBookmarkBadge();
     const saved = e.detail.bookmark;
     if (!saved || typeof saved !== "object") return;
     if (Array.isArray(saved.tags)) tags = saved.tags.filter(tag => typeof tag === "string");
@@ -2402,16 +2405,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   articleTitleEl.textContent = title || t("mdPreviewUntitled");
   fillPreviewUrl(url);
 
-  // X2: bookmarked badge. Fire-and-forget against the same checkBookmarked/
-  // statusCache the toolbar icon uses (background.js) — never blocks first
-  // paint. Skipped entirely when there's no URL to look up; every failure
-  // path (offline/no token/exception) resolves to {bookmarked:false} in the
-  // handler, so renderBookmarkBadge's model.show stays false and nothing
-  // renders — no console noise, no visible error state. Arming it here (and
-  // only here) is what lets an account switch re-run the same lookup: the
-  // helper lives up beside the account listener that re-fires it.
-  _badgeArmed = true;
-  refreshBookmarkBadge();
+  // X2: the bookmarked badge is drawn from the bookmark bar's lookup (above).
 
   const tokenEl = document.getElementById("token-count");
   if (source === "jina" && tokens && info.hasApiKey) {

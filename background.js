@@ -1621,7 +1621,10 @@ function pbpReaderInitialIntent(context, settings, action) {
       : settings.optAutoDescription === false ? "" : undefined;
   return {
     mode: "skip", url: context.bookmarkUrl,
-    title: typeof originalDraft?.title === "string" ? originalDraft.title : context.title || context.bookmarkUrl,
+    // A blank draft title (spaces, or a page without one) would be stored as an
+    // empty title; fall back to the page title, then the address.
+    title: typeof originalDraft?.title === "string" && originalDraft.title.trim() ? originalDraft.title
+      : String(context.title ?? "").trim() || context.bookmarkUrl,
     notes: typeof originalDraft?.notes === "string" ? originalDraft.notes : typeof context.description === "string" ? context.description : "",
     ...(summary !== undefined ? { summary } : {}),
     tags: typeof originalDraft?.tags === "string" ? originalDraft.tags : Array.isArray(context.tags) ? pbpSerializeIntentTags(context.tags, pbpBookmarkServiceId(settings)) : "",
@@ -4671,8 +4674,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   // whether this page is saved. _dedupedBookmarkCheck is the shared half.
   // The URL is the popup's verbatim (already-cleaned) lookup URL — the worker
   // must not re-derive it, or the key would stop matching the caller's query.
-  // Shape copied from mdPreviewBookmarkInfo below, including BOTH account
-  // guards and the "TTL hit without .posts -> one fresh posts/get" rule: the
+  // Shape: BOTH account guards and the "TTL hit without .posts -> one fresh posts/get" rule: the
   // save / quick-save / batch / skip / offline-queue call sites write status
   // entries carrying `bookmarked` and no posts, and the popup needs
   // description/extended/tags/shared/toread to fill its form.
@@ -5090,50 +5092,6 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       sendResponse({ ok: true });
     })()
       .catch(e => sendResponse({ ok: false, error: e.message }));
-    return true;
-  }
-
-  if (message.type === "mdPreviewBookmarkInfo" && message.url) {
-    // Same checkBookmarked()/statusCache the toolbar icon uses (X2: badge = one
-    // cache, one source of truth). checkBookmarked()'s TTL-hit branch can return
-    // bookmarked:true from a cache entry that was populated WITHOUT .posts (see
-    // save pipeline / quick-save / batch-save / skip-mode / offline-queue call
-    // sites) — so the boolean alone isn't enough to read tags/shared/toread from.
-    // Mirror get_bookmark_data's guard (background.js:845-846: require
-    // cached.posts, not just cached.bookmarked) and force one fresh posts/get
-    // lookup when .posts is missing, same shape as fetchExistingBookmark
-    // (background.js:242). Any failure collapses to bookmarked:false.
-    const url = message.url;
-    (async () => {
-        const auth = await getCurrentBookmarkAuth();
-        if (!message.account || message.account !== auth.account) {
-          sendResponse({ bookmarked: false, account: "" });
-          return;
-        }
-        const bookmarked = await checkBookmarked(url, auth);
-        if (!pbpBookmarkAuthIsCurrent(auth)) {
-          sendResponse({ bookmarked: false, account: "" });
-          return;
-        }
-        if (!bookmarked) { sendResponse({ bookmarked: false, account: auth.account }); return; }
-        let post = pbpStatusCacheGet(url, auth)?.posts?.[0];
-        if (!post) {
-          if (!auth.token) { sendResponse({ bookmarked: false, account: auth.account }); return; }
-          const resp = await (pbpSelfHostedAuth(auth) ? pbpBookmarkPostsResponse(auth, url) : pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`));
-          const posts = resp.ok ? (await resp.json()).posts || [] : [];
-          if (!pbpBookmarkAuthIsCurrent(auth)) {
-            sendResponse({ bookmarked: false, account: "" });
-            return;
-          }
-          if (!pbpStatusCacheSet(url, auth, { bookmarked: posts.length > 0, timestamp: Date.now(), posts })) {
-            sendResponse({ bookmarked: false, account: "" }); return;
-          }
-          post = posts[0];
-        }
-        if (!post) { sendResponse({ bookmarked: false, account: auth.account }); return; }
-        sendResponse({ bookmarked: true, tags: post.tags || "", tagNames: Array.isArray(post.tagNames) ? post.tagNames.slice() : String(post.tags || "").split(/\s+/).filter(Boolean), shared: post.shared, toread: post.toread, account: auth.account });
-      })()
-      .catch(() => sendResponse({ bookmarked: false, account: "" }));
     return true;
   }
 }
