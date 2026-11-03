@@ -41,6 +41,7 @@ const BLOCKS=[
   'linkding #fragment address saved without it',
   'linkding browsing checks',
   'linkding page information from the browser or the server',
+  'linkding SingleFile after a new bookmark',
 ];
 // Self-check before any browser starts: the list above and the block() calls
 // below must name exactly the same blocks, so a block added to one place only
@@ -276,7 +277,7 @@ try{
       const rows=await chrome.storage.session.get(null);
       const drafts=Object.entries(rows).filter(([,row])=>row?.pageUrl).map(([key])=>key);
       if(drafts.length)await chrome.storage.session.remove(drafts);
-      await chrome.storage.local.set({offlineQueue:[],optCheckBookmarkStatus:false,linkdingPreload:false,linkdingBrowserMetadata:true});await chrome.storage.local.remove('urlClean');
+      await chrome.storage.local.set({offlineQueue:[],optCheckBookmarkStatus:false,linkdingPreload:false,linkdingBrowserMetadata:true,linkdingSingleFile:false});await chrome.storage.local.remove('urlClean');
     });
     for(const page of ctx.pages())if(page!==article)await page.close();
     records.linkding.clear();records.karakeep.clear();membership.clear();raceCreates.clear();
@@ -1948,6 +1949,40 @@ try{
     assert.deepEqual([await popup.locator('#title-input').inputValue(),await popup.locator('#linkding-description-input').inputValue()],['My title','Served description']);
     await popup.evaluate(()=>pbpDiscardPopupDraft());await popup.close();
     console.log('linkding page information: the browser\'s by default, linkding\'s from the same check (sent with disable_scraping) when switched off');
+  });
+  await block('linkding SingleFile after a new bookmark',['linkding'],async()=>{
+    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    await options.locator('#tab-general').click();
+    assert.equal(await options.locator('#opt-linkding-singlefile').isChecked(),false,'the SingleFile switch does not start off');
+    await options.locator('#opt-linkding-singlefile').check();
+    await until(()=>worker.evaluate(()=>chrome.storage.local.get('linkdingSingleFile').then(row=>row.linkdingSingleFile===true)),'switching SingleFile on was stored');
+    await options.close();
+    // This browser has no SingleFile: the message finds no receiver.
+    const warnings=[];const onConsole=message=>{if(message.type()==='warning')warnings.push(message.text());};worker.on('console',onConsole);
+    try{
+      let popup=await openOnTab();await settled(popup,'missing');
+      await popup.evaluate(()=>{settings.optAutoCloseAfterSave=true;});
+      const before=requests.length;
+      await popup.locator('#submit-btn').click();
+      await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),'the create succeeded');
+      const create=linkdingCreates(before)[0];
+      assert(new URLSearchParams(create.query).has('disable_html_snapshot'),'the create still asked linkding for its own snapshot: '+create.query);
+      const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
+      await until(()=>popup.evaluate(text=>document.getElementById('status-msg').textContent.includes(text),en.singleFileNoResponse.message),'the popup said SingleFile did not respond');
+      assert.equal(await popup.locator('.auto-close-bar').count(),0,'the popup closes over the SingleFile note');
+      await until(()=>warnings.some(text=>text.startsWith('[singlefile] no response')),'the worker left no trace');
+      assert(!warnings.some(text=>text.includes(origin)),'the trace names the page');
+      await popup.close();
+      // Updating that bookmark runs nothing and says nothing.
+      popup=await openOnTab();await settled(popup,'found');
+      const beforeUpdate=warnings.length;
+      await popup.locator('#title-input').fill('Edited');await popup.locator('#submit-btn').click();
+      await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),'the update succeeded');
+      assert(!(await popup.locator('#status-msg').textContent()).includes(en.singleFileNoResponse.message),'an update mentioned SingleFile');
+      assert(!warnings.slice(beforeUpdate).some(text=>text.startsWith('[singlefile]')),'an update ran SingleFile');
+      await popup.close();
+    }finally{worker.off('console',onConsole);}
+    console.log('linkding SingleFile: a popup create skips linkding\'s snapshot, asks SingleFile once, says so when it does not answer; an update does not');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));

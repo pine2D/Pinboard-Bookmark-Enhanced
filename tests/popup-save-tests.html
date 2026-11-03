@@ -183,7 +183,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const snapshotIndex = submit.indexOf('url: $id("url-input").value.trim()', policyIndex);
     const ownershipIndex = submit.indexOf("saveUrl !== url", snapshotIndex);
     const intentIndex = submit.indexOf("const intent = {", ownershipIndex);
-    const sendIndex = submit.indexOf('chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft, summaryRange: summaryOwnership })', intentIndex);
+    const sendIndex = submit.indexOf('chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft, summaryRange: summaryOwnership,', intentIndex);
     const snapshot = submit.slice(snapshotIndex, ownershipIndex);
     const intentBlock = submit.slice(intentIndex, sendIndex);
     const tagHelperStart = source.indexOf("function pbpRebasePopupTags(");

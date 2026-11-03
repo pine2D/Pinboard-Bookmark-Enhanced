@@ -203,6 +203,9 @@
   "tagDraftUnsaved": {
     "message": "Text left in the tag box was not added as a tag."
   },
+  "singleFileNoResponse": {
+    "message": "SingleFile didn't respond, so no copy of the page was saved."
+  },
   "savedSuccess": {
     "message": "Saved!"
   },
@@ -5047,6 +5050,15 @@
   },
   "optLinkdingBrowserMetadataHint": {
     "message": "A new bookmark starts with the page's title and description as your browser shows them. When this is off, it starts with what your linkding server read from the page instead, which can differ on pages that change after loading or that need you to sign in."
+  },
+  "optLinkdingSingleFile": {
+    "message": "Run SingleFile after adding a bookmark"
+  },
+  "optLinkdingSingleFileHint": {
+    "message": "When the popup or a quick save adds a new bookmark, SingleFile saves a full copy of the page, and linkding skips its own HTML snapshot for it. You need the SingleFile extension, set in its options to upload to linkding with the REST form API at your linkding address followed by /api/bookmarks/singlefile/, and linkding 1.39 or later. SingleFile uploads the page to your linkding itself; this extension never handles the file."
+  },
+  "optLinkdingSingleFileDocs": {
+    "message": "linkding guide to archiving with SingleFile"
   },
   "optCheckBookmarkStatusLinkding": {
     "message": "With linkding, the toolbar icon shows whether a page is bookmarked only while \"Load page information while browsing\" is on. That switch is in the linkding connection settings on the Account tab."

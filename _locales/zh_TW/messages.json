@@ -203,6 +203,9 @@
   "tagDraftUnsaved": {
     "message": "標籤框裡的文字沒有加入標籤"
   },
+  "singleFileNoResponse": {
+    "message": "SingleFile 沒有回應，網頁副本未儲存"
+  },
   "savedSuccess": {
     "message": "已儲存！"
   },
@@ -5036,6 +5039,15 @@
   },
   "optLinkdingBrowserMetadataHint": {
     "message": "新增書籤時，標題和簡介取自瀏覽器中顯示的網頁。關閉後改用你的 linkding 伺服器從網頁讀到的內容；載入後會變動或需要登入的網頁，兩者可能不同。"
+  },
+  "optLinkdingSingleFile": {
+    "message": "新增書籤後執行 SingleFile"
+  },
+  "optLinkdingSingleFileHint": {
+    "message": "用彈出式視窗或快速儲存新增書籤後，由 SingleFile 儲存網頁的完整副本，linkding 不再為它另做 HTML 快照。需要安裝 SingleFile 擴充功能，並在它的設定中選擇以 REST 表單 API 上傳到 linkding（網址為你的 linkding 網址加上 /api/bookmarks/singlefile/）；linkding 需要 1.39 以上版本。網頁由 SingleFile 直接上傳到你的 linkding，本擴充功能不經手檔案。"
+  },
+  "optLinkdingSingleFileDocs": {
+    "message": "linkding 官方文件：用 SingleFile 封存"
   },
   "optCheckBookmarkStatusLinkding": {
     "message": "使用 linkding 時，只有開啟「瀏覽時預先讀取網頁資訊」，工具列圖示才會顯示網頁是否已收藏。這個開關在「帳號」頁的 linkding 連線設定裡。"

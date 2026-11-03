@@ -2426,7 +2426,11 @@ function setupSubmit(token) {
         if (ownsSubmitUi()) setSubmitState("idle");
         return;
       }
-      const result = await chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft, summaryRange: summaryOwnership });
+      // The opened tab: with linkding's SingleFile switch on, the worker runs
+      // SingleFile on it after a create, if it still shows the saved page.
+      const openedTabId = typeof _activeTabAtOpen === "object" ? _activeTabAtOpen?.id : undefined;
+      const result = await chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft, summaryRange: summaryOwnership,
+        ...(Number.isInteger(openedTabId) ? { singleFileTabId: openedTabId } : {}) });
       if (!result || typeof result !== "object" || typeof result.status !== "string") {
         throw new Error("invalid save response");
       }
@@ -2582,9 +2586,23 @@ function setupSubmit(token) {
             }
           } catch (_) {}
         }
+        // The bookmark is saved either way; SingleFile not answering only
+        // means no snapshot, so say it beside the success and stay open.
+        const singleFileSilent = result.singleFile === "failed";
+        if (singleFileSilent) {
+          try {
+            const statusEl = $id("status-msg");
+            if (statusEl) {
+              const singleFileNote = document.createElement("span");
+              singleFileNote.textContent = t("singleFileNoResponse");
+              statusEl.appendChild(document.createTextNode(" · "));
+              statusEl.appendChild(singleFileNote);
+            }
+          } catch (_) {}
+        }
         // A merge tells the user what the service did to a bookmark it already
         // had, so the popup stays open for it (user decision 2026-11-02).
-        if (settings.optAutoCloseAfterSave && !tagDraftAtClick && result.mutation !== "merged" && formMatchesSubmitted()) {
+        if (settings.optAutoCloseAfterSave && !tagDraftAtClick && !singleFileSilent && result.mutation !== "merged" && formMatchesSubmitted()) {
           const autoCloseGeneration = bookmarkLookup.generation;
           const bar = document.createElement("div");
           bar.className = "auto-close-bar";

@@ -203,6 +203,9 @@
   "tagDraftUnsaved": {
     "message": "Le texte resté dans le champ des tags n'a pas été ajouté comme tag."
   },
+  "singleFileNoResponse": {
+    "message": "SingleFile n’a pas répondu : aucune copie de la page n’a été enregistrée."
+  },
   "savedSuccess": {
     "message": "Enregistré !"
   },
@@ -5036,6 +5039,15 @@
   },
   "optLinkdingBrowserMetadataHint": {
     "message": "Un nouveau signet reprend le titre et la description de la page tels que votre navigateur les affiche. Option désactivée, il reprend ce que votre serveur linkding a lu sur la page, ce qui peut différer pour les pages qui changent après leur chargement ou qui demandent une connexion."
+  },
+  "optLinkdingSingleFile": {
+    "message": "Lancer SingleFile après l’ajout d’un signet"
+  },
+  "optLinkdingSingleFileHint": {
+    "message": "Quand le popup ou un enregistrement rapide ajoute un signet, SingleFile enregistre une copie complète de la page, et linkding ne crée pas son propre instantané HTML pour ce signet. Il vous faut l’extension SingleFile, réglée dans ses options pour envoyer la page à linkding via l’API de formulaire REST (adresse de votre linkding suivie de /api/bookmarks/singlefile/), et linkding 1.39 ou ultérieur. SingleFile envoie lui-même la page à votre linkding ; cette extension ne manipule jamais le fichier."
+  },
+  "optLinkdingSingleFileDocs": {
+    "message": "Guide linkding sur l’archivage avec SingleFile"
   },
   "optCheckBookmarkStatusLinkding": {
     "message": "Avec linkding, l’icône de la barre d’outils n’indique si une page figure dans vos signets que lorsque « Charger les infos de la page pendant la navigation » est activé. Cette option se trouve dans les réglages de connexion linkding, onglet Compte."

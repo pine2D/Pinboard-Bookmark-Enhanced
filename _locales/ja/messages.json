@@ -203,6 +203,9 @@
   "tagDraftUnsaved": {
     "message": "タグ入力欄に残っているテキストは、タグとして追加されていません。"
   },
+  "singleFileNoResponse": {
+    "message": "SingleFileが応答しなかったため、ページのコピーは保存されていません。"
+  },
   "savedSuccess": {
     "message": "保存しました！"
   },
@@ -5036,6 +5039,15 @@
   },
   "optLinkdingBrowserMetadataHint": {
     "message": "新しいブックマークには、ブラウザーに表示されているページのタイトルと説明が入ります。オフにすると、linkdingサーバーがページから読み取った内容が入ります。読み込み後に内容が変わるページや、ログインが必要なページでは、両者が異なることがあります。"
+  },
+  "optLinkdingSingleFile": {
+    "message": "ブックマークの追加後にSingleFileを実行"
+  },
+  "optLinkdingSingleFileHint": {
+    "message": "ポップアップまたはクイック保存で新しいブックマークを追加すると、SingleFileがページの完全なコピーを保存し、linkdingはそのブックマークのHTMLスナップショットを作りません。SingleFile拡張機能を入れ、そのオプションでREST形式APIによるlinkdingへのアップロード（linkdingのアドレスの後に /api/bookmarks/singlefile/）を設定しておく必要があります。linkdingは1.39以降が必要です。ページはSingleFileが直接linkdingにアップロードし、この拡張機能はファイルを扱いません。"
+  },
+  "optLinkdingSingleFileDocs": {
+    "message": "SingleFileによるアーカイブ（linkdingのガイド）"
   },
   "optCheckBookmarkStatusLinkding": {
     "message": "linkdingでは、「閲覧中にページ情報を先に読み込む」がオンのときだけ、ページがブックマーク済みかどうかをツールバーのアイコンに表示します。この設定は「アカウント」タブのlinkding接続設定にあります。"

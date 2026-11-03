@@ -649,6 +649,9 @@ const SETTINGS_DEFAULTS = {
   // linkding only: a new bookmark's title and Description come from the
   // browser's page (on) or from what linkding read in its check (off).
   linkdingBrowserMetadata: true,
+  // linkding only: after the popup or quick save creates a bookmark, ask the
+  // SingleFile extension to save the page (it uploads to linkding itself).
+  linkdingSingleFile: false,
   optShowAiSummary: true, optShowAiTags: true,
   optShowQuickLinks: true, optShowQuickRow: true,
   tagPresets: "", optAutoCloseAfterSave: true,

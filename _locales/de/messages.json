@@ -203,6 +203,9 @@
   "tagDraftUnsaved": {
     "message": "Der Text im Tag-Feld wurde nicht als Tag übernommen."
   },
+  "singleFileNoResponse": {
+    "message": "SingleFile hat nicht reagiert, deshalb wurde keine Kopie der Seite gespeichert."
+  },
   "savedSuccess": {
     "message": "Gespeichert!"
   },
@@ -5036,6 +5039,15 @@
   },
   "optLinkdingBrowserMetadataHint": {
     "message": "Ein neues Lesezeichen übernimmt Titel und Beschreibung so, wie dein Browser die Seite zeigt. Ist die Option aus, kommen sie stattdessen aus dem, was dein linkding-Server auf der Seite gelesen hat. Das kann abweichen, wenn sich eine Seite nach dem Laden ändert oder eine Anmeldung verlangt."
+  },
+  "optLinkdingSingleFile": {
+    "message": "Nach dem Hinzufügen eines Lesezeichens SingleFile ausführen"
+  },
+  "optLinkdingSingleFileHint": {
+    "message": "Wenn das Popup oder ein Schnellspeichern ein neues Lesezeichen anlegt, speichert SingleFile eine vollständige Kopie der Seite, und linkding legt dafür keinen eigenen HTML-Snapshot an. Du brauchst die Erweiterung SingleFile, in deren Optionen der Upload zu linkding über die REST-Formular-API eingestellt ist (deine linkding-Adresse gefolgt von /api/bookmarks/singlefile/), und linkding ab Version 1.39. SingleFile lädt die Seite selbst zu deinem linkding hoch; diese Erweiterung bekommt die Datei nie zu sehen."
+  },
+  "optLinkdingSingleFileDocs": {
+    "message": "linkding-Anleitung zum Archivieren mit SingleFile"
   },
   "optCheckBookmarkStatusLinkding": {
     "message": "Mit linkding zeigt das Symbol in der Symbolleiste nur dann, ob eine Seite gespeichert ist, wenn „Seiteninfos schon beim Surfen laden“ eingeschaltet ist. Den Schalter findest du in den linkding-Verbindungseinstellungen im Tab „Konto“."

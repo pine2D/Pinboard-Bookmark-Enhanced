@@ -203,6 +203,9 @@
   "tagDraftUnsaved": {
     "message": "Tekst pozostawiony w polu tagów nie został dodany jako tag."
   },
+  "singleFileNoResponse": {
+    "message": "SingleFile nie odpowiedział, więc kopia strony nie została zapisana."
+  },
   "savedSuccess": {
     "message": "Zapisano!"
   },
@@ -5036,6 +5039,15 @@
   },
   "optLinkdingBrowserMetadataHint": {
     "message": "Nowa zakładka dostaje tytuł i opis strony w takiej postaci, w jakiej pokazuje je przeglądarka. Gdy opcja jest wyłączona, dostaje to, co z tej strony odczytał Twój serwer linkding. Może się to różnić na stronach, które zmieniają się po wczytaniu albo wymagają zalogowania."
+  },
+  "optLinkdingSingleFile": {
+    "message": "Uruchamiaj SingleFile po dodaniu zakładki"
+  },
+  "optLinkdingSingleFileHint": {
+    "message": "Gdy okienko albo szybki zapis doda nową zakładkę, SingleFile zapisze pełną kopię strony, a linkding nie utworzy dla niej własnej migawki HTML. Potrzebujesz rozszerzenia SingleFile z ustawionym w jego opcjach przesyłaniem do linkding przez REST API formularza (adres Twojego linkding, a po nim /api/bookmarks/singlefile/) oraz linkding w wersji 1.39 lub nowszej. SingleFile sam przesyła stronę do Twojego linkding; to rozszerzenie nie ma do czynienia z plikiem."
+  },
+  "optLinkdingSingleFileDocs": {
+    "message": "Przewodnik linkding o archiwizacji z SingleFile"
   },
   "optCheckBookmarkStatusLinkding": {
     "message": "W linkding ikona na pasku narzędzi pokazuje, czy strona jest zapisana, tylko gdy włączona jest opcja „Wczytuj informacje o stronie już podczas przeglądania”. Znajdziesz ją w ustawieniach połączenia z linkding na karcie Konto."

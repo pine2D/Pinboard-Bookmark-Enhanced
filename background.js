@@ -744,7 +744,9 @@ async function pbpReadTagVocab(account, loaded) {
 // prefetched: a duplicate check this save already made (Batch in skip mode,
 // or quick save and Batch for an over-long title), used instead of asking the
 // server again.
-async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched) {
+// singleFile: the popup or quick save will run SingleFile on this page after
+// a create, so linkding makes no HTML snapshot of its own.
+async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched, singleFile = false) {
   // A create or an update always sends the intent's own title, so one the
   // service cannot store stops before any request. A merge, skip or overwrite
   // sends it only when the page is not saved yet (an existing bookmark keeps
@@ -776,7 +778,8 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched
     const fields = {...plan.fields, tags:names, sharedExplicit:intent.sharedExplicit === true && auth.sharingEnabled === true && (intent.mode === "update" || !lookup.exists)};
     const alignCreatedTags = auth.service === "karakeep" ? (tags, bookmark) =>
       pbpAlignIncomingTags(tags, bookmark.tags, index, respectCase, true) : undefined;
-    const result = await pbpBookmarkClient(auth, alignCreatedTags).save(fields, lookup.bookmark);
+    const result = await pbpBookmarkClient(auth, alignCreatedTags).save(fields, lookup.bookmark,
+      singleFile && auth.service === "linkding" ? { htmlSnapshot: false } : {});
     if (!pbpBookmarkAuthIsCurrent(auth)) return {result:pbpSaveFailure("account_changed"), persisted:null, retryable:false};
     if (result.status === "partial") {
       pbpStatusCacheDelete(intent.url, auth);
@@ -980,10 +983,10 @@ async function pbpSendResolvedPlan(plan, settings) {
 
 // lookup: a fresh duplicate check the caller already made for intent.url under
 // this connection (Batch in skip mode). It stands in for the first read only.
-async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth(settings), { tagVocab, lookup: prefetched } = {}) {
+async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth(settings), { tagVocab, lookup: prefetched, singleFile = false } = {}) {
   const invalid = validateSaveIntent(intent);
   if (invalid) return { result: invalid, persisted: null, retryable: false };
-  if (pbpSelfHostedAuth(auth)) return pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched);
+  if (pbpSelfHostedAuth(auth)) return pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched, singleFile);
   if (!settings?.pinboardToken) {
     return { result: pbpSaveFailure("not_logged_in"), persisted: null, retryable: false };
   }
@@ -1277,7 +1280,40 @@ async function pbpReleaseDroppedSummaryHolds(before, after) {
 // self-hosted duplicate check failing stops the save (pbpLookupStopFailure).
 // lookup: {url, account, found} from a duplicate check the caller made before
 // paying for AI (Batch in skip mode); used only for that URL and account.
-function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, readerExpectBookmarked = false, summaryRange, tagVocab, interactive = false, lookup } = {}) {
+// SingleFile for Chrome (the ID linkding's own extension sends to). It saves
+// the tab that is current for it, and uploads the page to linkding itself if
+// the user set that up there; this extension never handles the page file.
+// Messaging another extension needs no permission.
+const PBP_SINGLEFILE_EXTENSION_ID = "mpiodijhokgodhhofbcjdecpffjipkle";
+// "sent", "skipped" (the saved page is no longer the focused window's active
+// tab, so SingleFile would save another page) or "failed" (not installed, or
+// no answer). Logs name the outcome only, never the address.
+async function pbpRunSingleFile(tabId, url) {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (tab?.id !== tabId || !pbpSameBookmark(tab.url, url)) {
+      console.warn("[singlefile] the saved page is no longer the current tab; not run");
+      return "skipped";
+    }
+  } catch (e) {
+    console.warn("[singlefile] current tab read failed:", e?.name, e?.message);
+    return "skipped";
+  }
+  try {
+    await chrome.runtime.sendMessage(PBP_SINGLEFILE_EXTENSION_ID, "save-page");
+    return "sent";
+  } catch (e) {
+    // A listener that took the message without answering still received it.
+    if (/message port closed before a response was received/i.test(String(e?.message || ""))) return "sent";
+    console.warn("[singlefile] no response:", e?.name, e?.message);
+    return "failed";
+  }
+}
+
+// singleFileTabId: the tab the popup or quick save saves from. With linkding's
+// SingleFile switch on, a create asks for no server snapshot and SingleFile
+// then saves that tab (pbpRunSingleFile); every other save leaves it out.
+function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, readerExpectBookmarked = false, summaryRange, tagVocab, interactive = false, lookup, singleFileTabId } = {}) {
   return runSaveDeliveryTransaction(async () => {
     let settings;
     try { settings = await loadSettings(); }
@@ -1325,13 +1361,15 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
       }
     }
 
+    const singleFile = !readerAction && Number.isInteger(singleFileTabId) && deliveryAuth.service === "linkding"
+      && settings.linkdingSingleFile === true;
     // A reader action that found the bookmark already in its state (kept)
     // finishes on that lookup's skip: nothing is delivered or queued.
     let envelope = readerKept;
     if (!envelope) {
       const prefetched = !readerAction && lookup?.found && lookup.url === intent.url && lookup.account === deliveryAuth.account
         ? lookup.found : undefined;
-      try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth, { tagVocab, lookup: prefetched }); }
+      try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth, { tagVocab, lookup: prefetched, singleFile }); }
       catch (e) {
         console.warn("save intent failed:", e?.name, e?.message);
         return pbpSaveFailure("internal");
@@ -1341,9 +1379,10 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
     if (envelope.result.status === "saved" || envelope.result.status === "skipped") {
       await pbpRecordSummaryOwnership(intent, envelope, deliveryAuth, ownershipRange);
       await applySaveResultSideEffects(envelope, deliverySettings, { deferBadge, auth: deliveryAuth });
-      return envelope.result.status === "saved" && envelope.result.mutation === "created"
-        ? { ...envelope.result, account: deliveryAuth.account }
-        : envelope.result;
+      if (envelope.result.status !== "saved" || envelope.result.mutation !== "created") return envelope.result;
+      // Only a new bookmark: an update, merge or skip already has its page.
+      const singleFileResult = singleFile ? await pbpRunSingleFile(singleFileTabId, intent.url) : "";
+      return { ...envelope.result, account: deliveryAuth.account, ...(singleFileResult ? { singleFile: singleFileResult } : {}) };
     }
     // The user is looking at the form: a self-hosted duplicate check that got
     // no answer stops here, before anything is written or queued (user
@@ -1555,7 +1594,7 @@ function retryOfflineItem(queueId) {
 // summaryRange: the popup's AI summary block in intent.notes; null when its
 // ownership check found none of its own; absent when it cannot tell, which
 // leaves the page's receipt alone.
-function submitPopupSaveIntent(intent, expectedAccount, summaryRange) {
+function submitPopupSaveIntent(intent, expectedAccount, summaryRange, singleFileTabId) {
   if (!expectedAccount || typeof expectedAccount !== "string") {
     return Promise.resolve(pbpSaveFailure("account_changed"));
   }
@@ -1568,7 +1607,8 @@ function submitPopupSaveIntent(intent, expectedAccount, summaryRange) {
   if (intent.mode === "create" && intent.time !== undefined) {
     return Promise.resolve(pbpSaveFailure("invalid"));
   }
-  return submitSaveIntent(intent, { expectedAccount, summaryRange, interactive: true });
+  return submitSaveIntent(intent, { expectedAccount, summaryRange, interactive: true,
+    ...(Number.isInteger(singleFileTabId) ? { singleFileTabId } : {}) });
 }
 
 // ---- Reader bookmark workflow ----
@@ -2131,7 +2171,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     private: isPrivate,
     toread: toread === true ? true : undefined,
     archive: undefined,
-  }, { expectedAccount: startAuth.account, summaryRange, tagVocab, lookup: titleLookup });
+  }, { expectedAccount: startAuth.account, summaryRange, tagVocab, lookup: titleLookup, singleFileTabId: tab?.id });
 
   if (result.status === "saved") {
     const undoInfo = result.mutation === "created" && result.account
@@ -4870,7 +4910,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     // offline-queue row on next popup open, and the other two are not
     // failures. minimum_chrome_version is 123, so getContexts (Chrome 116+)
     // needs no feature-detection fallback.
-    submitPopupSaveIntent(message.intent, message.account, message.summaryRange)
+    submitPopupSaveIntent(message.intent, message.account, message.summaryRange, message.singleFileTabId)
       .then(async (result) => {
         if (result.status === "saved" && message.popupDraft) {
           await pbpRunPopupDraft({ ...message.popupDraft, account: message.account, action: "clear" });

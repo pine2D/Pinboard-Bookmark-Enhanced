@@ -203,6 +203,9 @@
   "tagDraftUnsaved": {
     "message": "标签框里的文字没有加入标签"
   },
+  "singleFileNoResponse": {
+    "message": "SingleFile 没有响应，网页副本未保存"
+  },
   "savedSuccess": {
     "message": "已保存！"
   },
@@ -5030,6 +5033,15 @@
   },
   "optLinkdingBrowserMetadataHint": {
     "message": "新建书签时，标题和简介取自浏览器里显示的网页。关闭后改用你的 linkding 服务器从网页读到的内容；加载后会变化或需要登录的网页，两者可能不同。"
+  },
+  "optLinkdingSingleFile": {
+    "message": "新建书签后运行 SingleFile"
+  },
+  "optLinkdingSingleFileHint": {
+    "message": "用弹窗或快捷保存新建书签后，由 SingleFile 保存网页的完整副本，linkding 不再为它另做 HTML 快照。需要安装 SingleFile 扩展，并在它的设置里选择以 REST 表单 API 上传到 linkding（地址为你的 linkding 地址加上 /api/bookmarks/singlefile/）；linkding 需要 1.39 及以上版本。网页由 SingleFile 直接上传到你的 linkding，本扩展不经手文件。"
+  },
+  "optLinkdingSingleFileDocs": {
+    "message": "linkding 官方文档：用 SingleFile 存档"
   },
   "optCheckBookmarkStatusLinkding": {
     "message": "使用 linkding 时，只有开启「浏览时预先读取页面信息」，工具栏图标才会显示页面是否已收藏。这个开关在「账号」页的 linkding 连接设置里。"

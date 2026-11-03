@@ -255,7 +255,9 @@ function pbpCreateBookmarkServiceClient(config) {
     }
     return true;
   };
-  const save = async (fields, existing) => {
+  // options.htmlSnapshot false: a linkding create skips the server's own HTML
+  // snapshot (disable_html_snapshot), for SingleFile to upload one instead.
+  const save = async (fields, existing, options = {}) => {
     if (!fields || !pbpBookmarkWebUrl(fields.url) || !Array.isArray(fields.tags) ||
         fields.tags.some(tag => typeof tag !== "string" || !tag.trim())) throw pbpBookmarkServiceError("invalid_request");
     let tags = [...new Set(fields.tags)];
@@ -279,8 +281,9 @@ function pbpCreateBookmarkServiceClient(config) {
           : config.sharingEnabled === true && fields.sharedExplicit === true && typeof fields.private === "boolean" && fields.private !== existing.private ? {shared:!fields.private} : {})};
       let data;
       try {
+        const query = [...(described ? ["disable_scraping"] : []), ...(options.htmlSnapshot === false ? ["disable_html_snapshot"] : [])];
         ({data} = await request(existing ? "bookmarks/" + pbpBookmarkRecordId(existing.id) + "/"
-          : described ? "bookmarks/?disable_scraping" : "bookmarks/", existing ? "PATCH" : "POST", body));
+          : "bookmarks/" + (query.length ? "?" + query.join("&") : ""), existing ? "PATCH" : "POST", body));
       } catch (error) {
         // Django answers PostgreSQL's DataError with a 500: with a tag longer
         // than linkding's column that is the rejection, so name the tag and
