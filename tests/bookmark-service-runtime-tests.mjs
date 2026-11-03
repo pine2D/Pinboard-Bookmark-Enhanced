@@ -725,6 +725,7 @@ try{
   // the error names it, nothing is queued or offered for a retry, and the
   // form keeps the tag and the bookmark the create left behind, so a shorter
   // tag of 64 code points (128 UTF-16 units) updates that bookmark.
+  const STAG_H=18;
   await block('linkding over-long tag',['linkding'],async()=>{
     postgres.linkding=true;
     const tagUrl=origin+'/article-tag-limit', long='research-'+'x'.repeat(56), fits='\u{1F600}'.repeat(64);
@@ -752,6 +753,22 @@ try{
     const fit=await popup.evaluate(()=>{const rm=document.querySelector('#tags-display .tag-remove').getBoundingClientRect(),hit=document.elementFromPoint(rm.left+rm.width/2,rm.top+rm.height/2);return{scroll:document.documentElement.scrollWidth,inner:innerWidth,left:rm.left,right:rm.right,hitIsRemove:!!hit&&!!hit.closest('.tag-remove')};});
     assert(fit.scroll<=fit.inner&&fit.left>=0&&fit.right<=fit.inner&&fit.hitIsRemove,'a long tag chip overflowed the popup: '+JSON.stringify(fit));
     await popup.locator('#tags-input').press('Backspace');
+    // Short tags are not shortened: no ellipsis, the chip is only as high as before (20px), and the remove button
+    // sits inside it. ASCII and CJK both, since a CJK glyph's descender is what a too-tight overflow would clip.
+    for(const short of ['ab','\u4e2d\u6587\u6807\u7b7e']){
+      await popup.locator('#tags-input').fill(short);await popup.locator('#tags-input').press('Enter');
+      const chip=await popup.evaluate(()=>{const item=document.querySelector('#tags-display .tag-item'),text=item.querySelector('.tag-text'),rm=item.querySelector('.tag-remove').getBoundingClientRect(),box=item.getBoundingClientRect();return{h:box.height,truncated:text.scrollWidth>text.clientWidth,rmInside:rm.left>=box.left&&rm.right<=box.right};});
+      assert(Math.abs(chip.h-20)<=0.5&&!chip.truncated&&chip.rmInside,'a short tag chip changed: '+short+' '+JSON.stringify(chip));
+      await popup.locator('#tags-input').press('Backspace');
+    }
+    // Suggested-tag chips (.stag, here the AI row) share the root cause: a name with no space must not push the chip out.
+    await popup.evaluate(tag=>{document.getElementById('ai-tags-row').classList.remove('hidden');renderAITags([tag,'ab'],false);},long);
+    const stags=await popup.evaluate(()=>[...document.querySelectorAll('#ai-suggest-tags .stag')].map(el=>{const box=el.getBoundingClientRect();return{right:box.right,left:box.left,w:box.width,h:box.height,clipped:el.scrollWidth>el.clientWidth};}));
+    assert.equal(stags.length,2);
+    assert(stags.every(c=>c.left>=0&&c.right<=550),'a long suggested tag chip left the popup: '+JSON.stringify(stags));
+    assert(stags[0].clipped,'the long suggested tag was not ellipsized '+JSON.stringify(stags));
+    assert(!stags[1].clipped&&Math.abs(stags[1].h-STAG_H)<=0.5,'a short suggested tag chip changed: '+JSON.stringify(stags[1]));
+    assert((await popup.evaluate(()=>document.documentElement.scrollWidth))<=550,'a long suggested tag widened the popup');
     await popup.locator('#tags-input').fill(fits);await popup.locator('#tags-input').press('Enter');
     const before=requests.length;await popup.locator('#submit-btn').click();
     await until(()=>JSON.stringify(kept.tag_names)===JSON.stringify([fits]),'the shortened tag updated the kept bookmark');

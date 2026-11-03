@@ -1231,6 +1231,12 @@ html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display:
    toolbar keyboard contract they share a DOM node with). Chip-to-chip
    spacing is the container's `gap` above now, not a per-chip margin. */
 .stag { border: 0; font-family: inherit; cursor: pointer; white-space: nowrap; transition: background var(--pp-motion-state), color var(--pp-motion-state); }
+/* A suggested name with no space (a 60-character tag) must not outgrow the
+   popup: the chip is capped at its row and its text ellipsizes. block-level
+   inline content is what text-overflow needs (an inline-flex box's text is
+   an anonymous flex item it cannot clip), and with one line of 14px text the
+   chip is the same height as the flex version. */
+.stag { display: inline-block; max-width: 100%; min-width: 0; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; }
 .stag:hover { background: var(--pp-btn-hover); }
 /* AI-suggested chip text (Task 4, D9): --pp-ai-chip-fg is gated against BOTH
    the chip's rest fill (chip-bg) and its hover fill (btn-hover, painted by
