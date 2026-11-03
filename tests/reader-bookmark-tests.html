@@ -1281,12 +1281,16 @@ await test("reader save results say saved, updated, merged or partial as the wor
       w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
       w.eval(await (await fetch("../shared.js")).text());
       const state = { known: true, bookmarked, account, bookmark: { tags: "", notes: "", toread: false } };
+      const pending = [];
       w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
-        sendMessage: async msg => msg.type === "mdReaderBookmarkState" ? state : { ...result, account }, onMessage: { addListener() {} } } };
+        sendMessage: msg => { const reply = Promise.resolve(msg.type === "mdReaderBookmarkState" ? state : { ...result, account }); pending.push(reply); return reply; },
+        onMessage: { addListener() {} } } };
       w.t = k => k; w.eval(runtime);
       w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "" } } }));
-      await new Promise(r => setTimeout(r, 30));
-      w.pbpReaderBookmarkAction(action); await new Promise(r => setTimeout(r, 30));
+      await settle(pending);
+      const saves = pending.length;
+      await w.pbpReaderBookmarkAction(action); await settle(pending);
+      assert(pending.length > saves, account + " " + action + ": the reader sent no save");
       return w.document.getElementById("reader-bookmark-status").textContent;
     } finally { frame.remove(); }
   };
