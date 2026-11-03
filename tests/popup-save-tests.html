@@ -778,6 +778,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const auth = await runDeleteHandlers("linkding", { ok: false, status: 401, error: "not_logged_in" });
       assert(auth.main.join() === "bookmarkErrAuth", "main delete: " + auth.main.join());
       assert(auth.recent.join() === "bookmarkErrAuth", "recent delete: " + auth.recent.join());
+      // Real SW shape: pbpBookmarkResponseFailure gives code "auth" for 401/403.
+      for (const [svc, st] of [["linkding", 401], ["karakeep", 403]]) {
+        const r = await runDeleteHandlers(svc, { ok: false, status: st, error: "auth" });
+        assert(r.main.join() === "bookmarkErrAuth" && r.recent.join() === "bookmarkErrAuth", svc + " auth: " + JSON.stringify(r));
+      }
       const gw = await runDeleteHandlers("karakeep", { ok: false, status: 403, error: "gateway_denied" });
       assert(gw.main.join() === "bookmarkErrGatewayDenied" && gw.recent.join() === "bookmarkErrGatewayDenied", JSON.stringify(gw));
       // bookmark_api's delete failure shape: {ok:false, status:httpStatus||0, error:reason}.
@@ -5865,6 +5870,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
     await testAsync("recent panel names a self-hosted failure and stays silent only for Pinboard 401", async () => {
       for (const [service, resp, shown] of [
         ["linkding", { ok: false, status: 401, error: "not_logged_in", json: async () => ({}) }, "bookmarkErrAuth"],
+        ["linkding", { ok: false, status: 401, error: "auth", json: async () => ({}) }, "bookmarkErrAuth"],
+        ["karakeep", { ok: false, status: 403, error: "auth", json: async () => ({}) }, "bookmarkErrAuth"],
         ["karakeep", { ok: false, status: 503, error: "server", json: async () => ({}) }, "bookmarkErrServer"],
         ["linkding", { ok: false, status: 0, error: "network", json: async () => ({}) }, "bookmarkErrNetwork"],
       ]) {
