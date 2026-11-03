@@ -158,14 +158,23 @@ try {
   await page.evaluate(async () => { await pbpAskArchiveDelete({ owner: _libAskOwner, sessionId: _libAskSelected }); await pbpLibAskRefresh(); });
   check('remote deletion of selected session leaves no blank narrow detail', await page.evaluate(() => !_libAskSelected && !document.body.classList.contains('lib-narrow-ask') && !document.getElementById('ask-library-empty').hidden));
   await installAskHistoryFixture(page); await page.setViewportSize({ width: 1280, height: 900 });
-  await page.evaluate(() => { window.oldRows = _libAskSessions; window.staleOwner = _libAskOwner; _pbpAskArchiveDefaultStore().read = async args => args.owner === staleOwner ? new Promise(resolve => { window.finishOldRead = resolve; }) : []; pbpLibAskRefresh(); });
-  await page.waitForFunction(() => typeof finishOldRead === 'function');
+  // Both reads hang, so the order is ours: the previous owner's read is
+  // released while the new owner's is still pending, and the history must
+  // stay empty at that moment. (If the new read finished first, or the check
+  // ran after it, a stale write would be overwritten and go unnoticed.)
+  await page.evaluate(() => {
+    window.oldRows = _libAskSessions; window.staleOwner = _libAskOwner; window.pendingReads = {};
+    _pbpAskArchiveDefaultStore().read = args => new Promise(resolve => { pendingReads[args.owner === staleOwner ? 'old' : 'new'] = resolve; });
+    window.oldRefresh = pbpLibAskRefresh();
+  });
+  await page.waitForFunction(() => typeof pendingReads.old === 'function');
   // The library owner is the fixed personal-library identity, not the current
   // bookmark login: switching it (not the Pinboard token) is what changes owner.
   await sw.evaluate(() => chrome.storage.local.set({ personalLibraryAccount: 'different-library:test-only' }));
-  await page.waitForFunction(() => _libAskOwner !== staleOwner && _libAskSessions.length === 0);
-  await page.evaluate(() => finishOldRead(oldRows)); await page.waitForTimeout(50);
-  check('late previous-account read cannot repopulate history', await page.locator('.ask-library-hit').count() === 0);
+  await page.waitForFunction(() => typeof pendingReads.new === 'function');
+  await page.evaluate(async () => { pendingReads.old(oldRows); await oldRefresh; });
+  check('late previous-account read cannot repopulate history', await page.locator('.ask-library-hit').count() === 0 && await page.evaluate(() => _libAskSessions.length === 0));
+  await page.evaluate(() => pendingReads.new([]));
   check('no browser exceptions', errors.length === 0, errors);
   console.log(JSON.stringify({ checks: checks.length, ok: true, out }));
 } catch (error) {
