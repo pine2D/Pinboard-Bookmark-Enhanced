@@ -85,10 +85,25 @@ function pbpBookmarkNormalize(service, value) {
 // and Read Later state. Karakeep 0.34.1 attaches its AI tags without touching
 // modifiedAt (workers/inference/tagging.ts) and keeps Read Later in a list,
 // so the stamp alone would miss both. Only the server's own values: never a
-// local clock.
+// local clock. The tags go in as their count and a 64-bit digest, so the state
+// stays a few dozen characters however many tags the bookmark has (a full
+// list outgrew the message and draft limits and stopped every update).
 function pbpBookmarkVersion(bookmark) {
-  return JSON.stringify([typeof bookmark?.modified === "string" ? bookmark.modified : null,
-    [...(bookmark?.tags || [])].sort(), bookmark?.toread === true]);
+  const tags = [...(bookmark?.tags || [])].sort();
+  return JSON.stringify([typeof bookmark?.modified === "string" ? bookmark.modified.slice(0, 64) : null,
+    tags.length, pbpBookmarkTagDigest(JSON.stringify(tags)), bookmark?.toread === true]);
+}
+// Two 32-bit FNV-1a passes with different offsets: stable across workers and
+// pages, synchronous, and a change to any tag changes it.
+function pbpBookmarkTagDigest(text) {
+  let a = 0x811c9dc5, b = 0x050c5d1f;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    a = Math.imul(a ^ code, 0x01000193) >>> 0;
+    b = Math.imul(b ^ code, 0x01000193) >>> 0;
+    b = (b ^ (b >>> 15)) >>> 0;
+  }
+  return a.toString(16).padStart(8, "0") + b.toString(16).padStart(8, "0");
 }
 
 // The current save planner/UI consumes this projection. Provider-specific IDs
