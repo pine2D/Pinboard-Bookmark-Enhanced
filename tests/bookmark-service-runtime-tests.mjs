@@ -1349,6 +1349,16 @@ try{
     for(const id of ['opt-private-default','opt-private-incognito'])assert(await options.locator('#'+id).evaluate(el=>el.closest('.pref-row').hidden),'Karakeep still shows '+id);
     // The first visible row of a group carries no hairline, hidden rows above it or not.
     assert.equal(await options.locator('#opt-readlater-default').evaluate(el=>getComputedStyle(el.closest('.pref-row')).borderTopWidth),'0px','the first visible row under the heading draws a hairline');
+    // A row that follows a parent-note hint (inserted at runtime between a parent and its first dependent row)
+    // is not directly below a row, so it draws no hairline, Pinboard or not.
+    for(const service of ['pinboard','karakeep']){
+      await options.locator('input[name="bookmark-service"][value="'+service+'"]').check();
+      for(const id of ['opt-urlclean-on-open','opt-wayback-batch','opt-sync-api-keys']){
+        const r=await options.locator('#'+id).evaluate(el=>{const row=el.closest('.pref-row');return {w:getComputedStyle(row).borderTopWidth,prev:!!(row.previousElementSibling&&row.previousElementSibling.matches('[data-parent-note]'))};});
+        assert(r.prev,id+' no longer follows a parent note; update this test');
+        assert.equal(r.w,'0px',id+' on '+service+' draws a hairline under a parent note');
+      }
+    }
     await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
     assert.equal(await options.locator('#opt-readlater-default').evaluate(el=>getComputedStyle(el.closest('.pref-row')).borderTopWidth),'1px','a row under a visible row lost its hairline');
     await options.close();
