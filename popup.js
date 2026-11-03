@@ -2446,11 +2446,17 @@ function setupSubmit(token) {
         if (ownsSubmitUi()) setSubmitState("idle");
         return;
       }
-      // The opened tab: with linkding's SingleFile switch on, the worker runs
-      // SingleFile on it after a create, if it still shows the saved page.
-      const openedTabId = typeof _activeTabAtOpen === "object" ? _activeTabAtOpen?.id : undefined;
+      // The opened tab, as it showed its page: with linkding's SingleFile
+      // switch on, the worker runs SingleFile on it after a create, if it still
+      // shows that page. Only when the form holds that page: a typed address or
+      // a restored draft of another one is not what SingleFile would save, so
+      // linkding keeps making its own snapshot of it.
+      const openedTab = typeof _activeTabAtOpen === "object" ? _activeTabAtOpen : null;
+      const singleFileTab = Number.isInteger(openedTab?.id) && typeof openedTab.url === "string"
+        && typeof pbpPopupFormHoldsOpenedPage === "function" && pbpPopupFormHoldsOpenedPage()
+        ? { id: openedTab.id, url: openedTab.url } : null;
       const result = await chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft, summaryRange: summaryOwnership,
-        ...(Number.isInteger(openedTabId) ? { singleFileTabId: openedTabId } : {}) });
+        ...(singleFileTab ? { singleFileTab } : {}) });
       if (!result || typeof result !== "object" || typeof result.status !== "string") {
         throw new Error("invalid save response");
       }

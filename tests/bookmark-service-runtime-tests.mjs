@@ -1985,8 +1985,21 @@ try{
       assert(!(await popup.locator('#status-msg').textContent()).includes(en.singleFileNoResponse.message),'an update mentioned SingleFile');
       assert(!warnings.slice(beforeUpdate).some(text=>text.startsWith('[singlefile]')),'an update ran SingleFile');
       await popup.close();
+      // An address typed over the page is not what SingleFile would save:
+      // linkding keeps its own snapshot of it, and SingleFile is not asked.
+      popup=await openOnTab();await settled(popup,'found');
+      const typed=origin+'/article-singlefile-typed',beforeTyped=requests.length,warningsBefore=warnings.length;
+      await popup.locator('#url-input').fill(typed);
+      await popup.locator('#submit-btn').click();
+      await until(()=>linkdingCreates(beforeTyped).length>0,'the create for a typed address');
+      await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+      const typedCreate=linkdingCreates(beforeTyped)[0];
+      assert.equal(typedCreate.data.url,typed);
+      assert(!new URLSearchParams(typedCreate.query).has('disable_html_snapshot'),'a typed address asked linkding for no snapshot: '+typedCreate.query);
+      assert(!warnings.slice(warningsBefore).some(text=>text.startsWith('[singlefile]')),'SingleFile was asked for a typed address');
+      await popup.evaluate(()=>pbpDiscardPopupDraft());await popup.close();
     }finally{worker.off('console',onConsole);}
-    console.log('linkding SingleFile: a popup create skips linkding\'s snapshot, asks SingleFile once, says so when it does not answer; an update does not');
+    console.log('linkding SingleFile: a popup create skips linkding\'s snapshot, asks SingleFile once, says so when it does not answer; an update or a typed address does not');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));

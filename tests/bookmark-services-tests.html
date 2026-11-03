@@ -423,9 +423,10 @@ async function workerHarness(service, replies, options = {}) {
     // noteActivity runs once per replay attempt, so it counts sendOfflineItem calls.
     noteActivity:()=>{state.sends++;},
     // tabs: what tabs.query answers; sendMessage records each message to
-    // another extension and fails with state.sendMessageError when set.
+    // another extension and fails with state.sendMessageError when set, or
+    // never answers with state.sendMessageHang.
     chrome:{permissions:{contains:async()=>state.permitted},tabs:{query:async()=>state.tabs||[]},
-      runtime:{sendMessage:async(...args)=>{(state.messages||=[]).push(args);if(state.sendMessageError)throw state.sendMessageError;}},storage:{local:{
+      runtime:{sendMessage:async(...args)=>{(state.messages||=[]).push(args);if(state.sendMessageHang)return new Promise(()=>{});if(state.sendMessageError)throw state.sendMessageError;}},storage:{local:{
       // Generic key-value store; offlineQueue stays mirrored in state.queue.
       get:async keys=>{(state.reads||=[]).push(...(typeof keys==="string"||Array.isArray(keys)?[].concat(keys):keys==null?["<all>"]:Object.keys(keys)));
         const all={...state.local,offlineQueue:state.queue};if(keys==null)return all;
@@ -703,35 +704,37 @@ test("linkding saves never gain a Notes receipt or hold", async()=>{
 // SingleFile (Chrome ID mpiodijhokgodhhofbcjdecpffjipkle) is asked to save the
 // tab only after a create from the popup or quick save, with the switch on.
 const SINGLEFILE=["mpiodijhokgodhhofbcjdecpffjipkle","save-page"];
+// The tab the save came from, as it showed the page.
+const TAB7={id:7,url:pageUrl};
 const singleFileHarness=async(service,replies,{settings={linkdingSingleFile:true},tabs=[{id:7,url:pageUrl,active:true}],...rest}={})=>{
   const h=await workerHarness(service,replies,{tabs,...rest});Object.assign(h.state.settings,settings);return h;};
 const createQuery=h=>{const call=h.state.calls.find(c=>c.method==="POST"&&/\/api\/bookmarks\/(\?|$)/.test(c.url));return call?[...new URL(call.url).searchParams.keys()]:null;};
 test("SingleFile runs exactly once after a linkding create, and linkding makes no snapshot of its own", async()=>{
   const h=await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld]]);
-  const result=await h.submitPopupSaveIntent({...saveIntent,summary:""},(await h.auth()).account,undefined,7);
+  const result=await h.submitPopupSaveIntent({...saveIntent,summary:""},(await h.auth()).account,undefined,TAB7);
   equal([result.status,result.mutation,result.singleFile],["saved","created","sent"]);
   equal(h.state.messages,[SINGLEFILE]);
   equal(createQuery(h),["disable_scraping","disable_html_snapshot"]);
   // Quick save hands its tab the same way; an unknown Description adds only the snapshot flag.
   const quick=await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld]]);
-  equal((await quick.submitSaveIntent(saveIntent,{expectedAccount:(await quick.auth()).account,singleFileTabId:7})).singleFile,"sent");
+  equal((await quick.submitSaveIntent(saveIntent,{expectedAccount:(await quick.auth()).account,singleFileTab:TAB7})).singleFile,"sent");
   equal([quick.state.messages,createQuery(quick)],[[SINGLEFILE],["disable_html_snapshot"]]);
   // A listener that took the message without answering still received it.
   const silent=await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld]],{sendMessageError:new Error("The message port closed before a response was received.")});
-  equal((await silent.submitSaveIntent(saveIntent,{expectedAccount:(await silent.auth()).account,singleFileTabId:7})).singleFile,"sent");
+  equal((await silent.submitSaveIntent(saveIntent,{expectedAccount:(await silent.auth()).account,singleFileTab:TAB7})).singleFile,"sent");
 });
 test("SingleFile is not asked for an update, a merge, a skip, a save without a tab, Karakeep, or with the switch off", async()=>{
   const cases=[
-    ["update",await singleFileHarness("linkding",[[200,{bookmark:ld}],[200,ld]]),{...saveIntent,mode:"update",time:ld.date_added},7],
-    ["merged create",await singleFileHarness("linkding",[[200,{bookmark:null}],[201,{...ld,date_modified:"2026-10-01T10:05:00Z"}]]),saveIntent,7],
-    ["skip",await singleFileHarness("linkding",[[200,{bookmark:ld}]]),{...saveIntent,mode:"skip"},7],
+    ["update",await singleFileHarness("linkding",[[200,{bookmark:ld}],[200,ld]]),{...saveIntent,mode:"update",time:ld.date_added},TAB7],
+    ["merged create",await singleFileHarness("linkding",[[200,{bookmark:null}],[201,{...ld,date_modified:"2026-10-01T10:05:00Z"}]]),saveIntent,TAB7],
+    ["skip",await singleFileHarness("linkding",[[200,{bookmark:ld}]]),{...saveIntent,mode:"skip"},TAB7],
     // Batch, the reader and offline replay hand no tab.
     ["no tab",await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld]]),saveIntent,undefined],
-    ["switch off",await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld]],{settings:{linkdingSingleFile:false}}),saveIntent,7],
-    ["Karakeep",await singleFileHarness("karakeep",[[200,{bookmarkId:null}],[201,kk],[200,{attached:[]}]]),saveIntent,7],
+    ["switch off",await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld]],{settings:{linkdingSingleFile:false}}),saveIntent,TAB7],
+    ["Karakeep",await singleFileHarness("karakeep",[[200,{bookmarkId:null}],[201,kk],[200,{attached:[]}]]),saveIntent,TAB7],
   ];
   for(const [name,h,intent,tab] of cases){
-    const result=await h.submitSaveIntent(intent,{expectedAccount:(await h.auth()).account,...(tab===undefined?{}:{singleFileTabId:tab})});
+    const result=await h.submitSaveIntent(intent,{expectedAccount:(await h.auth()).account,...(tab===undefined?{}:{singleFileTab:tab})});
     ok(["saved","skipped"].includes(result.status)||(()=>{throw new Error(name+": "+JSON.stringify(result));})());
     equal([name,h.state.messages||[],result.singleFile],[name,[],undefined]);
     // A create that linkding answers as a merge was sent as a create, flag
@@ -741,23 +744,61 @@ test("SingleFile is not asked for an update, a merge, a skip, a save without a t
   }
   // A replayed queue item never runs it either.
   const replay=await singleFileHarness("linkding",[new TypeError("offline")]);
-  equal((await replay.submitSaveIntent(saveIntent,{expectedAccount:(await replay.auth()).account,singleFileTabId:7})).status,"queued");
+  equal((await replay.submitSaveIntent(saveIntent,{expectedAccount:(await replay.auth()).account,singleFileTab:TAB7})).status,"queued");
   replay.state.calls.length=0;
   await replay.processOfflineQueue();
   equal(replay.state.messages||[],[]);
 });
 test("SingleFile is not run on another page, and its silence leaves the save saved with a trace", async()=>{
-  // The user moved on: the focused tab is no longer the saved page.
-  const moved=await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld]],{tabs:[{id:8,url:"https://example.com/other",active:true}]});
-  const movedResult=await moved.submitSaveIntent(saveIntent,{expectedAccount:(await moved.auth()).account,singleFileTabId:7});
-  equal([movedResult.status,movedResult.singleFile,moved.state.messages||[]],["saved","skipped",[]]);
+  // The user already moved on before the create (another tab, or the same tab
+  // at another address): linkding keeps its own snapshot and SingleFile is not asked.
+  for(const tabs of [[{id:8,url:pageUrl,active:true}],[{id:7,url:"https://example.com/other",active:true}],[]]){
+    const early=await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld]],{tabs});
+    const earlyResult=await early.submitSaveIntent(saveIntent,{expectedAccount:(await early.auth()).account,singleFileTab:TAB7});
+    equal([JSON.stringify(tabs),earlyResult.status,earlyResult.mutation,earlyResult.singleFile,early.state.messages||[],createQuery(early)],
+      [JSON.stringify(tabs),"saved","created",undefined,[],[]]);
+  }
+  // Moved on while the create was on its way: the snapshot flag went out, and
+  // SingleFile is not asked for the page now showing.
+  const moved=await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld]]);
+  moved.state.beforeResponse=async()=>{if(moved.state.calls.length===2)moved.state.tabs=[{id:8,url:"https://example.com/other",active:true}];};
+  const movedResult=await moved.submitSaveIntent(saveIntent,{expectedAccount:(await moved.auth()).account,singleFileTab:TAB7});
+  equal([movedResult.status,movedResult.singleFile,moved.state.messages||[],createQuery(moved)],["saved","skipped",[],["disable_html_snapshot"]]);
   const warns=[],warn=console.warn;console.warn=(...args)=>warns.push(args.map(String).join(" "));
   try{
     const missing=await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld]],{sendMessageError:new Error("Could not establish connection. Receiving end does not exist.")});
-    const result=await missing.submitSaveIntent(saveIntent,{expectedAccount:(await missing.auth()).account,singleFileTabId:7});
+    const result=await missing.submitSaveIntent(saveIntent,{expectedAccount:(await missing.auth()).account,singleFileTab:TAB7});
     equal([result.status,result.mutation,result.singleFile],["saved","created","failed"]);
     ok(warns.some(line=>line.startsWith("[singlefile] no response"))||(()=>{throw new Error("no trace: "+JSON.stringify(warns));})());
     ok(!warns.some(line=>line.includes(pageUrl))||(()=>{throw new Error("the trace names the page");})());
+  }finally{console.warn=warn;}
+});
+// The save cleans its URL with the user's own settings (here ?ref= under the
+// aggressive tier); the tab still shows the address it was opened on. That tab
+// at that address (a #fragment aside) is the saved page.
+test("SingleFile runs on the saved page while its address differs from the cleaned bookmark URL", async()=>{
+  for(const [opened,shown] of [[pageUrl+"?ref=hn",pageUrl+"?ref=hn"],[pageUrl,pageUrl+"#section"]]){
+    const h=await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld]],{tabs:[{id:7,url:shown,active:true}]});
+    const result=await h.submitSaveIntent(saveIntent,{expectedAccount:(await h.auth()).account,singleFileTab:{id:7,url:opened}});
+    equal([shown,result.singleFile,h.state.messages,createQuery(h)],[shown,"sent",[SINGLEFILE],["disable_html_snapshot"]]);
+  }
+});
+// SingleFile may answer only after it saved and uploaded the page, or never.
+// The save does not wait on it: a later save goes through meanwhile, and a
+// silence past the short wait counts as delivered.
+test("a SingleFile that does not answer holds neither this save for long nor the saves behind it", async()=>{
+  const warns=[],warn=console.warn;console.warn=(...args)=>warns.push(args.map(String).join(" "));
+  try{
+    const h=await singleFileHarness("linkding",[[200,{bookmark:null}],[201,ld],[200,{bookmark:null}],[201,{...ld,id:2,url:pageUrl+"/second"}]],{sendMessageHang:true});
+    const account=(await h.auth()).account,started=Date.now();
+    let firstDone=false;
+    const first=h.submitSaveIntent(saveIntent,{expectedAccount:account,singleFileTab:TAB7}).then(r=>{firstDone=true;return r;});
+    const second=await h.submitSaveIntent({...saveIntent,url:pageUrl+"/second"},{expectedAccount:account});
+    equal([second.status,firstDone],["saved",false]);
+    const result=await first;
+    equal([result.status,result.mutation,result.singleFile,h.state.messages],["saved","created","sent",[SINGLEFILE]]);
+    ok(Date.now()-started<5000||(()=>{throw new Error("the save waited "+(Date.now()-started)+"ms on SingleFile");})());
+    ok(warns.some(line=>line.startsWith("[singlefile]"))||(()=>{throw new Error("no trace of the late answer");})());
   }finally{console.warn=warn;}
 });
 test("worker saves to linkding without a Pinboard credential", async()=>{
