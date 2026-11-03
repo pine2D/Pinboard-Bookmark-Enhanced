@@ -68,8 +68,8 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    const recentStart=uiSource.indexOf('async function loadBookmarkForEdit('),recentEnd=uiSource.indexOf('// ===================== Recent Bookmarks',recentStart);
    const aiSlice=name=>{const s=aiSource.indexOf('function '+name+'(');return aiSource.slice(s,aiSource.indexOf('\n}',s)+2);};
    const cacheSlice=name=>{const s=cacheSource.indexOf('function '+name+'(');return cacheSource.slice(s,cacheSource.indexOf('\n}',s)+2);};
-   const names=Object.keys(deps);let api;api=new Function(...names,[uiSource.slice(a,b),sliceFn('pbpPopupFormIsDirty'),sliceFn('updateCharCount'),sliceFn('recomputeArchiveCheck'),uiSource.slice(recentStart,recentEnd),aiSlice('pbpAiWrapSummary'),aiSlice('upsertSummary'),aiSlice('removeSummary'),sliceFn('shouldUpdateField'),aiSlice('_aiUrlEquivalent'),cacheSlice('pbpAiPageUrlNorm'),sliceFn('_loadUrlCleanSettings'),aiSlice('pbpPopupFormHoldsOpenedPage'),sliceFn('pbpPopupPrefillDescription'),sliceFn('pbpPopupFillPageDescription'),sliceFn('pbpPopupSyncPageDescription'),sliceFn('pbpPopupUrlEdited'),sliceFn('setupUrlInput'),
-     'return {shouldUpdateField,prefill:pbpPopupPrefillDescription,syncPageDescription:pbpPopupSyncPageDescription,setupUrlInput,initPopupDraft,setupPopupDraftTracking,pbpPopupDraftSnapshot,pbpRememberPopupDraft,pbpPopupDescriptionKnown,forgetDescription(){_linkdingDescriptionKnown=false;},pbpDiscardPopupDraft,updateCharCount,recomputeArchiveCheck,loadBookmarkForEdit,exitEditMode,pbpPopupFormIsDirty,upsertSummary,removeSummary,chip(){_tagsUserTouched=true;currentTags.push("Chip");renderTags();},failedSubmit(){'+uiSource.slice(uiSource.indexOf('      Object.keys(fieldDirtyFlags).forEach',uiSource.indexOf('function setupSubmit(')),uiSource.indexOf('      // Host permission first:',uiSource.indexOf('function setupSubmit(')))+'}};'].join('\n'))(...names.map(n=>deps[n]));api.setupPopupDraftTracking();
+   const names=Object.keys(deps);let api;api=new Function(...names,[uiSource.slice(a,b),sliceFn('pbpPopupFormIsDirty'),sliceFn('updateCharCount'),sliceFn('recomputeArchiveCheck'),uiSource.slice(recentStart,recentEnd),aiSlice('pbpAiWrapSummary'),aiSlice('upsertSummary'),aiSlice('removeSummary'),sliceFn('shouldUpdateField'),aiSlice('_aiUrlEquivalent'),cacheSlice('pbpAiPageUrlNorm'),sliceFn('_loadUrlCleanSettings'),aiSlice('pbpPopupFormHoldsOpenedPage'),sliceFn('pbpPopupPrefillDescription'),sliceFn('pbpPopupPrefillTitle'),sliceFn('pbpPopupFormHoldsPage'),sliceFn('pbpPopupFillPageDescription'),sliceFn('pbpPopupSyncPageDescription'),sliceFn('pbpPopupUrlEdited'),sliceFn('setupUrlInput'),
+     'return {prefillTitle:pbpPopupPrefillTitle,shouldUpdateField,prefill:pbpPopupPrefillDescription,syncPageDescription:pbpPopupSyncPageDescription,setupUrlInput,initPopupDraft,setupPopupDraftTracking,pbpPopupDraftSnapshot,pbpRememberPopupDraft,pbpPopupDescriptionKnown,forgetDescription(){_linkdingDescriptionKnown=false;},pbpDiscardPopupDraft,updateCharCount,recomputeArchiveCheck,loadBookmarkForEdit,exitEditMode,pbpPopupFormIsDirty,upsertSummary,removeSummary,chip(){_tagsUserTouched=true;currentTags.push("Chip");renderTags();},failedSubmit(){'+uiSource.slice(uiSource.indexOf('      Object.keys(fieldDirtyFlags).forEach',uiSource.indexOf('function setupSubmit(')),uiSource.indexOf('      // Host permission first:',uiSource.indexOf('function setupSubmit(')))+'}};'].join('\n'))(...names.map(n=>deps[n]));api.setupPopupDraftTracking();
    return {api,elements,flags,sent,statuses,delayClears(){delayClear=true;},releaseClear:ok=>resolveClear({ok}),delayWrites(){delayWrite=true;},failWrite(){resolveWrite({ok:false});},rejectRestore:()=>rejectRead(new Error('Synthetic IPC failure')),failRestore:()=>resolveRead({ok:false,error:'storage'}),release:(d=draft)=>resolveRead({ok:true,account:'alice',draft:d}),owner:o=>{currentOwner=o;}};
  }
  await test('restore applies the full form and guards later prefills',async()=>{const h=uiHarness();const pending=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release();await pending;assert(JSON.stringify(h.api.pbpPopupDraftSnapshot())===JSON.stringify(draft));assert(Object.entries(h.flags).filter(([id])=>id!=='linkding-description-input').every(([,v])=>v));});
@@ -356,7 +356,27 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    const first=await openWorker(pageUrl);await first.api.loadBookmarkForEdit('https://example.com/g15-recent','alice:fake');typeInto(first,'description-input','Recent note');await settle();
    const second=await openWorker(pageUrl,'pinboard',h=>{h.elements['url-input'].value=pageUrl;h.elements['title-input'].value='Opened page title';});
    assert(second.elements['url-input'].value==='https://example.com/g15-recent'&&second.elements['description-input'].value==='Recent note','the recent edit reopened on the wrong address: '+second.elements['url-input'].value);
-   assert(second.elements['title-input'].value==='Opened page title'&&!second.flags['title-input'],'an unchanged title was frozen by the recent draft');
+   assert(!second.flags['title-input'],'an unchanged title was frozen by the recent draft');
+   await second.api.pbpDiscardPopupDraft();});
+ // The opened page describes itself, not a recent bookmark a draft reopened:
+ // with that bookmark gone elsewhere (lookup missing) nothing would put its
+ // own title or notes back, and Save would recreate it with the page's.
+ for(const [label,edit] of [['notes',h=>typeInto(h,'description-input','Recent note')],['tags',h=>h.api.chip()]])
+ await test('a recent-bookmark draft ('+label+' changed) takes no title or notes from the opened page',async()=>{const pageUrl='https://example.com/article';const info={url:pageUrl,title:'Opened page title',metaDescription:'Opened page meta'};
+   const first=await openWorker(pageUrl);await first.api.loadBookmarkForEdit('https://example.com/g15-recent-'+label,'alice:fake');edit(first);await settle();
+   const second=uiHarness('pinboard',{worker:true,pageInfo:info});second.elements['url-input'].value=pageUrl;second.api.prefillTitle(info.title,pageUrl);
+   await second.api.initPopupDraft('alice',{url:pageUrl});await settle();
+   second.api.prefillTitle(info.title,info.url);second.api.prefill();
+   assert(second.elements['url-input'].value==='https://example.com/g15-recent-'+label,'the draft did not reopen on the recent bookmark');
+   assert(second.elements['title-input'].value==='','the opened page title was put on the recent bookmark: '+second.elements['title-input'].value);
+   if(label==='tags')assert(second.elements['description-input'].value==='','the opened page notes were put on the recent bookmark: '+second.elements['description-input'].value);
+   else assert(second.elements['description-input'].value==='Recent note','the drafted notes were lost');
+   await second.api.pbpDiscardPopupDraft();});
+ await test('the opened page still fills title and notes when the form holds that page',async()=>{const pageUrl='https://example.com/g15-own-page';const info={url:pageUrl,title:'Own title',metaDescription:'Own meta'};
+   const first=await openWorker(pageUrl);first.api.chip();await settle();
+   const second=uiHarness('pinboard',{worker:true,pageInfo:info});second.elements['url-input'].value=pageUrl;second.api.prefillTitle('Tab title',pageUrl);
+   await second.api.initPopupDraft('alice',{url:pageUrl});await settle();second.api.prefillTitle(info.title,info.url);second.api.prefill();
+   assert(second.elements['title-input'].value==='Own title'&&second.elements['description-input'].value==='Own meta','own-page prefill was suppressed: '+JSON.stringify([second.elements['title-input'].value,second.elements['description-input'].value]));
    await second.api.pbpDiscardPopupDraft();});
  // Only a user's change renews the 24-hour lifetime: the page and the lookup
  // refilling unchanged fields of a reopened form must not keep a draft alive.

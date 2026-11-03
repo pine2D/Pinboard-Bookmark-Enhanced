@@ -2361,6 +2361,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "let _linkdingDescriptionKnown = _initial.known;\n" +
         "let _linkdingDescriptionPending = _initial.pending;\n" +
         "let _linkdingPageDescription = _initial.pageText;\n" +
+        "let _popupDraftUserUrl = false;\n" +
         loadUrlCleanSource + "\n" + source.slice(start, end) +
         "\npbpPopupPrefillDescription();\nreturn { known: _linkdingDescriptionKnown, pending: _linkdingDescriptionPending, pageText: _linkdingPageDescription };");
       return run;

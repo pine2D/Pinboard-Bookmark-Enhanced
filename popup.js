@@ -147,7 +147,19 @@ function pbpPopupPrefillDescription() {
     notes = settings.optBlockquote ? pbpFormatQuote(pageInfo.selectedText, pbpBookmarkServiceId(settings)) : pageInfo.selectedText;
   } else if (!linkding && settings.optAutoDescription !== false) { notes = pbpNotesDescription(pageInfo); }
   if (settings.optIncludeReferrer && pageInfo.referrer) { notes += (notes ? "\n\n" : "") + `via: ${pageInfo.referrer}`; }
-  if (shouldUpdateField("description-input")) $id("description-input").value = notes;
+  if (shouldUpdateField("description-input") && pbpPopupFormHoldsPage(pageInfo.url)) $id("description-input").value = notes;
+}
+// The opened page's title and notes describe that page, not another address
+// the form holds: a restored draft of a recent bookmark, a typed URL. For that
+// address the bookmark lookup fills them in, or they stay empty.
+function pbpPopupFormHoldsPage(pageUrl) {
+  if (!_popupDraftUserUrl) return true;
+  // The same-page check is popup-ai.js's; where it is not loaded the popup
+  // cannot tell, which counts as another page.
+  return typeof pbpPopupFormHoldsOpenedPage === "function" && pbpPopupFormHoldsOpenedPage(pageUrl);
+}
+function pbpPopupPrefillTitle(title, pageUrl) {
+  if (shouldUpdateField("title-input") && pbpPopupFormHoldsPage(pageUrl)) $id("title-input").value = title || "";
 }
 // The Description box for the address the form holds. The meta description
 // describes the page the popup opened on, not whatever URL the form holds (a
@@ -500,7 +512,14 @@ async function initPopupDraft(account, tab) {
       const draftedSummary = typeof d.summary === "string" && drafted("summary");
       if (draftedSummary) { _linkdingDescriptionKnown = true; _linkdingDescriptionPending = true; }
       if (take("sharedExplicit")) _linkdingSharedExplicit = pbpBookmarkServiceId(settings) === "linkding" && pbpBookmarkConnection(settings).sharingEnabled && d.sharedExplicit === true;
-      if (drafted("url")) _popupDraftUserUrl = true;
+      if (drafted("url")) {
+        _popupDraftUserUrl = true;
+        // The tab filled the title before the draft brought another address
+        // back; that address's own title and notes come from its lookup.
+        for (const [id, key] of [["title-input", "title"], ["description-input", "notes"]]) {
+          if (!drafted(key) && !_popupDraftChangedFields.has(key) && !pbpPopupFormHoldsPage(context.pageUrl)) $id(id).value = "";
+        }
+      }
       _popupDraftRestored = true;
       _popupDraftRestoredFields = restored;
       // Only the drafted fields count as edited; the rest still take the
@@ -968,7 +987,7 @@ async function showMain(token) {
   // (slow) content-script injection runs. Tracking-param strip + selectedText/meta arrive later.
   if (tab) {
     if (!_popupDraftUserUrl) $id("url-input").value = tab.url || "";
-    if (shouldUpdateField("title-input")) $id("title-input").value = tab.title || "";
+    pbpPopupPrefillTitle(tab.title, tab.url);
   }
   // Seed defaults before any await so the first input snapshot has the same
   // privacy/read-later values the user sees after page-info arrives.
@@ -1023,7 +1042,7 @@ async function showMain(token) {
   } else {
     if (!_popupDraftUserUrl) $id("url-input").value = pageInfo.url;
   }
-  if (shouldUpdateField("title-input")) $id("title-input").value = pageInfo.title;
+  pbpPopupPrefillTitle(pageInfo.title, pageInfo.url);
 
   // Check if URL is supported by Pinboard
   // Tab set, batch save, and the offline-queue bar all work regardless of
