@@ -211,6 +211,14 @@ test("linkding tags cap at 10000 with one count-only warning",async()=>{
 test("linkding tags with a context-path root page through",async()=>{
   const h=harness("linkding",[[200,{count:2,next:"http://h:1/base/api/tags/?limit=1000&offset=1000",previous:null,results:[ldTag(1,"a")]}],[200,{count:2,next:null,previous:null,results:[ldTag(2,"b")]}]]);
   equal((await h.client.tags()).length,2);
+  equal(h.calls.length,2);
+  equal(h.calls[1].url,"https://bookmarks.example/base/api/tags/?limit=1000&offset=1000");
+});
+test("linkding tags with a root without a context path page through",async()=>{
+  const h=harness("linkding",[[200,{count:2,next:"http://ld:9090/api/tags/?limit=1000&offset=1000",previous:null,results:[ldTag(1,"a")]}],[200,{count:2,next:null,previous:null,results:[ldTag(2,"b")]}]],{baseUrl:"https://ld.example/"});
+  equal((await h.client.tags()).length,2);
+  equal(h.calls.length,2);
+  equal(h.calls[1].url,"https://ld.example/api/tags/?limit=1000&offset=1000");
 });
 test("linkding tags follow three next links and report unavailable counts as zero",async()=>{
   const h=harness("linkding",[

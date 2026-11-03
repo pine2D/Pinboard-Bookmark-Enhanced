@@ -312,7 +312,7 @@ function pbpCreateBookmarkServiceClient(config) {
   // behind a TLS-terminating or host-rewriting proxy it carries another scheme
   // or host. Only its path and two integers are trusted; the request is
   // rebuilt under the configured root so nothing is ever sent elsewhere.
-  const linkdingNext = (data, dir, size) => {
+  const linkdingNext = (data, dir) => {
     const next = data?.next;
     if (next === null || next === undefined || next === "") return "";
     if (typeof next !== "string") throw pbpBookmarkServiceError("invalid_response");
