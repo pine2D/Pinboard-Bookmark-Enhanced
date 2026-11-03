@@ -6176,6 +6176,25 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(/new connection/i.test(linkding) && /not retried/i.test(linkding), "linkding logout detail omits the reconnect consequence");
       assert(!/new connection/i.test(karakeep), "Karakeep keeps its connection ID across reconnects (user ID based); the warning would be false");
     });
+    // The three cases above run the extracted helpers on stand-in elements, so they cannot see
+    // whether the popup actually uses them. Pin the wiring: showMain applies the hints right
+    // after the privacy pass, and the logout popover takes its detail from the service-keyed
+    // helper. (The Karakeep "href still points at the home page" half of the entry-title case
+    // is covered by bookmark-services-tests.html, which exercises pbpBookmarkHome itself.)
+    test("showMain applies the service hints and the logout popover takes its detail from the service key", () => {
+      // Whole-line comments only: a block-comment regex would be fooled by regex literals in popup.js.
+      const code = source.split("\n").filter((line) => !/^\s*\/\//.test(line)).join("\n");
+      const start = code.indexOf("async function showMain(");
+      assert(start >= 0, "showMain is missing from popup.js");
+      const body = code.slice(start, code.indexOf("\n}", start));
+      const privacyAt = body.indexOf("pbpPopupBookmarkPrivacy();"), hintsAt = body.indexOf("pbpPopupServiceHints();");
+      assert(privacyAt >= 0 && hintsAt > privacyAt, "showMain no longer calls pbpPopupServiceHints() after pbpPopupBookmarkPrivacy(): self-hosted popups would show Pinboard-only hints again");
+      const logoutAt = code.indexOf('$id("logout-link"), {');
+      assert(logoutAt >= 0, "logout confirm popover call not found");
+      const popover = code.slice(logoutAt, code.indexOf("onConfirm", logoutAt));
+      assert(/detail:\s*t\(\s*pbpLogoutDetailKey\(/.test(popover), "logout confirm detail is no longer taken from pbpLogoutDetailKey(service)");
+      assert(!/t\(\s*["']confirmLogoutDetail["']\s*\)/.test(popover), "logout confirm detail is hard-wired to the Pinboard wording");
+    });
 
     test("Alt+P ignores hidden linkding Private and preserves visible Pinboard keyboard behavior", () => {
       for(const sharingSupported of [true,false]) {
