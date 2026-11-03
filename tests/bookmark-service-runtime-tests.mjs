@@ -747,6 +747,10 @@ try{
     assert(kept,'the PostgreSQL create left no bookmark');assert.deepEqual(kept.tag_names,[]);
     await popup.waitForFunction(()=>!document.getElementById('existing-banner').classList.contains('hidden'));
     assert.deepEqual(await popup.locator('#tags-display .tag-item').allTextContents(),[long],'the form lost the tag to shorten');
+    // A 66-character tag with no space must not push its chip or its remove button out of a 550px popup.
+    await popup.setViewportSize({width:550,height:600});
+    const fit=await popup.evaluate(()=>{const rm=document.querySelector('#tags-display .tag-remove').getBoundingClientRect(),hit=document.elementFromPoint(rm.left+rm.width/2,rm.top+rm.height/2);return{scroll:document.documentElement.scrollWidth,inner:innerWidth,left:rm.left,right:rm.right,hitIsRemove:!!hit&&!!hit.closest('.tag-remove')};});
+    assert(fit.scroll<=fit.inner&&fit.left>=0&&fit.right<=fit.inner&&fit.hitIsRemove,'a long tag chip overflowed the popup: '+JSON.stringify(fit));
     await popup.locator('#tags-input').press('Backspace');
     await popup.locator('#tags-input').fill(fits);await popup.locator('#tags-input').press('Enter');
     const before=requests.length;await popup.locator('#submit-btn').click();

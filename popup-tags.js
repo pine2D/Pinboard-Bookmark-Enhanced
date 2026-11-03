@@ -640,7 +640,12 @@ function renderTags() {
     // which can fall back to a slow emoji font on Windows hi-DPI Chrome.
     handle.setAttribute("aria-hidden", "true");
     el.appendChild(handle);
-    const text = document.createTextNode(tag);
+    // Its own element so a long name can ellipsize inside the chip while the
+    // remove button stays whole (a bare text node cannot take overflow rules).
+    const text = document.createElement("span");
+    text.className = "tag-text";
+    text.textContent = tag;
+    text.title = tag;
     const rm = document.createElement("button");
     rm.type = "button";
     rm.className = "tag-remove";

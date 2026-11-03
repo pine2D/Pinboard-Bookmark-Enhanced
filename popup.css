@@ -1026,7 +1026,11 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
      transform on .tag-item (drag state is opacity, the drop marker is a
      ::before bar). */
   position: relative; transition: background var(--pp-motion-state);
+  /* A chip never outgrows the field: the name ellipsizes (.tag-text) and the
+     handle and remove button keep their size. */
+  max-width: 100%; min-width: 0; box-sizing: border-box;
 }
+.tag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag-remove {
   display: inline-flex; align-items: center; justify-content: center;
   border: 0; background: none; padding: 0; cursor: pointer;
@@ -1036,7 +1040,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
      was 2.999:1 there). Before that it was fg-muted, which replaced a #888
      literal that fell to 2.57-2.93:1 on --pp-tag-bg. */
   color: var(--pp-tag-chip-icon); line-height: 1; transition: color var(--pp-motion-state);
-  position: relative;
+  position: relative; flex-shrink: 0;
 }
 /* Out-of-flow hit pad: 10px glyph -> ~24px target without touching the chip's
    18px line rhythm. Overlapping the tag text is harmless (text has no
