@@ -226,7 +226,7 @@
   },
   "confirmLogoutDetail": {"message": "Votre jeton API sera supprimé. Les brouillons de signets non enregistrés seront abandonnés."},
   "confirmLogoutDetailKarakeep": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés. Les brouillons de signets non enregistrés seront abandonnés."},
-  "confirmLogoutDetailLinkding": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés. Les brouillons de signets non enregistrés seront abandonnés. Une nouvelle connexion, même avec la même adresse et le même jeton, compte comme une nouvelle connexion : les enregistrements encore en attente de l’ancienne ne seront pas relancés automatiquement."},
+  "confirmLogoutDetailLinkding": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés. Les brouillons de signets non enregistrés seront abandonnés. Se reconnecter, même avec la même adresse et le même jeton, crée une nouvelle connexion : les enregistrements encore en attente de l’ancienne ne seront pas relancés automatiquement."},
   "hintCtrlEnter": {
     "message": "Ctrl+Entrée"
   },
