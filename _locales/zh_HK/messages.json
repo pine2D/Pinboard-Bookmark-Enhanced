@@ -5151,6 +5151,8 @@
   "bookmarkServicePendingPinboard": {"message": "Pinboard Token 通過「測試連接」之前，書籤仍會儲存到 $ACTIVE$。", "placeholders": {"active": {"content": "$1"}}},
   "bookmarkServiceChosenNotConnected": {"message": "設定中選的是 $SERVICE$，但本裝置還沒有連線，書籤仍會儲存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkServiceConnectChosen": {"message": "連線 $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
+  "bookmarkServiceConnectedNotActive": {"message": "本裝置已連線 $SERVICE$，但書籤仍會儲存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "bookmarkServiceUseViewed": {"message": "改用 $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
   "backupBookmarkServiceNotConnected": {"message": "備份選的是 $SERVICE$，本裝置沒有連線。連線 $SERVICE$ 之前，書籤仍會儲存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "備份選的是 $SERVICE$，本裝置沒有連線。只有還原的憑證能連線時才會切換，否則書籤仍會儲存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {

@@ -5145,6 +5145,8 @@
   "bookmarkServicePendingPinboard": {"message": "Pinboard Token 通过「测试连接」之前，书签仍保存到 $ACTIVE$。", "placeholders": {"active": {"content": "$1"}}},
   "bookmarkServiceChosenNotConnected": {"message": "设置里选的是 $SERVICE$，但本设备还没有连接它，书签仍保存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkServiceConnectChosen": {"message": "连接 $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
+  "bookmarkServiceConnectedNotActive": {"message": "本设备已连接 $SERVICE$，但书签仍保存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "bookmarkServiceUseViewed": {"message": "改用 $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
   "backupBookmarkServiceNotConnected": {"message": "备份选的是 $SERVICE$，本设备没有连接它。连接 $SERVICE$ 之前，书签仍保存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "备份选的是 $SERVICE$，本设备没有连接它。只有恢复的凭据能连上它时才会切换，否则书签仍保存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {

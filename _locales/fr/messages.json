@@ -5151,6 +5151,8 @@
   "bookmarkServicePendingPinboard": {"message": "Les favoris continuent d’être enregistrés dans $ACTIVE$ tant que le jeton Pinboard n’a pas réussi « Tester la connexion ».", "placeholders": {"active": {"content": "$1"}}},
   "bookmarkServiceChosenNotConnected": {"message": "Vos paramètres choisissent $SERVICE$, mais cet appareil n’y est pas encore connecté : les favoris continuent d’être enregistrés dans $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkServiceConnectChosen": {"message": "Connecter $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
+  "bookmarkServiceConnectedNotActive": {"message": "Cet appareil est connecté à $SERVICE$, mais les favoris sont toujours enregistrés dans $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "bookmarkServiceUseViewed": {"message": "Passer à $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
   "backupBookmarkServiceNotConnected": {"message": "La sauvegarde choisit $SERVICE$, qui n’est pas connecté sur cet appareil. Les favoris continuent d’être enregistrés dans $ACTIVE$ jusqu’à ce que vous connectiez $SERVICE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "La sauvegarde choisit $SERVICE$, qui n’est pas connecté sur cet appareil. Le changement n’a lieu que si les identifiants restaurés permettent de s’y connecter ; sinon, les favoris continuent d’être enregistrés dans $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {

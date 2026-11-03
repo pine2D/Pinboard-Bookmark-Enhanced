@@ -5162,6 +5162,8 @@
   "bookmarkServicePendingPinboard": {"message": "Bookmarks keep going to $ACTIVE$ until the Pinboard token passes Test connection.", "placeholders": {"active": {"content": "$1"}}},
   "bookmarkServiceChosenNotConnected": {"message": "Your settings choose $SERVICE$, but this device isn't connected to it yet, so bookmarks keep going to $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkServiceConnectChosen": {"message": "Connect $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
+  "bookmarkServiceConnectedNotActive": {"message": "$SERVICE$ is connected on this device, but bookmarks still go to $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "bookmarkServiceUseViewed": {"message": "Use $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
   "backupBookmarkServiceNotConnected": {"message": "The backup chooses $SERVICE$, which isn't connected on this device. Bookmarks keep going to $ACTIVE$ until you connect $SERVICE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "The backup chooses $SERVICE$, which isn't connected on this device. Bookmarks switch to it only if the credentials you restore connect it; otherwise they keep going to $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {

@@ -5151,6 +5151,8 @@
   "bookmarkServicePendingPinboard": {"message": "Закладки по-прежнему сохраняются в $ACTIVE$, пока токен Pinboard не пройдёт проверку соединения.", "placeholders": {"active": {"content": "$1"}}},
   "bookmarkServiceChosenNotConnected": {"message": "В настройках выбран $SERVICE$, но это устройство к нему ещё не подключено, поэтому закладки по-прежнему сохраняются в $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkServiceConnectChosen": {"message": "Подключить $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
+  "bookmarkServiceConnectedNotActive": {"message": "Это устройство подключено к $SERVICE$, но закладки по-прежнему сохраняются в $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
+  "bookmarkServiceUseViewed": {"message": "Перейти на $SERVICE$", "placeholders": {"service": {"content": "$1"}}},
   "backupBookmarkServiceNotConnected": {"message": "В резервной копии выбран $SERVICE$, но на этом устройстве он не подключён. Закладки по-прежнему сохраняются в $ACTIVE$, пока вы не подключите $SERVICE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "В резервной копии выбран $SERVICE$, но на этом устройстве он не подключён. Переключение произойдёт, только если восстановленные учётные данные позволят подключиться; иначе закладки по-прежнему сохраняются в $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {

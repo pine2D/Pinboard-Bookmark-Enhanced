@@ -1444,6 +1444,15 @@ try{
     // Between two connected services, picking one is the switch.
     await options.locator('input[name="bookmark-service"][value="linkding"]').check();
     await until(async()=>(await stored()).bookmarkServiceActive==='linkding','picking a connected service did not switch to it');
+    // Another tab (or a followed sync choice) switches this device while the
+    // page shows the service in use: the radios follow, no stale note.
+    const checkedNow=()=>options.evaluate(()=>document.querySelector('input[name="bookmark-service"]:checked')?.value);
+    for(const service of ['karakeep','linkding']){
+      await worker.evaluate(service=>chrome.storage.local.set({bookmarkService:service,bookmarkServiceActive:service}),service);
+      await until(async()=>await checkedNow()===service&&await options.locator('#bookmark-'+service+'-fields').isVisible(),'the radios did not follow '+service+' switched elsewhere');
+      await note.waitFor({state:'hidden',timeout:5000});
+      assert(await options.locator('#bookmark-service-chosen-actions').isHidden(),'an action shows for the service in use');
+    }
     // Pinboard without a token: its form, a note, no switch.
     await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
     await note.filter({hasText:fill('bookmarkServicePendingPinboard',{ACTIVE:'linkding'})}).waitFor({timeout:5000});
@@ -1561,8 +1570,9 @@ try{
       await until(async()=>(await state())===want&&(await stats.textContent()).trim()===wantText,label).catch(async e=>{throw new Error(e.message+' '+await panelNow());});
       assert.equal(await options.evaluate(()=>!document.getElementById('tag-gov-need-token').hidden),want==='no-token',label+': token prompt shown');
     };
-    await elsewhere({service:'linkding'},'pinboard-only','linkding chosen elsewhere while this page still shows Pinboard selected');
-    assert.equal(await options.evaluate(()=>document.querySelector('input[name="bookmark-service"]:checked')?.value),'pinboard','the page radios followed storage, so this step proves nothing');
+    await elsewhere({service:'linkding'},'pinboard-only','linkding chosen elsewhere while this page still showed Pinboard selected');
+    // The radios showed the service in use, so they follow it too.
+    await until(async()=>await options.evaluate(()=>document.querySelector('input[name="bookmark-service"]:checked')?.value)==='linkding','the page radios did not follow the service switched elsewhere');
     await elsewhere({removeToken:true},'pinboard-only','Pinboard token removed elsewhere under linkding');
     await elsewhere({service:'pinboard'},'no-token','Pinboard chosen elsewhere without a token');
     await options.locator('#tab-general').click();

@@ -6672,7 +6672,8 @@ async function run() {
         }
         const keys = { bookmarkServicePending: ["ACTIVE", "SERVICE"], bookmarkServicePendingPinboard: ["ACTIVE"],
           bookmarkServiceChosenNotConnected: ["SERVICE", "ACTIVE"], bookmarkServiceConnectChosen: ["SERVICE"],
-          backupBookmarkServiceNotConnected: ["SERVICE", "ACTIVE"], backupBookmarkServiceNeedsCredentials: ["SERVICE", "ACTIVE"] };
+          backupBookmarkServiceNotConnected: ["SERVICE", "ACTIVE"], backupBookmarkServiceNeedsCredentials: ["SERVICE", "ACTIVE"],
+          bookmarkServiceConnectedNotActive: ["SERVICE", "ACTIVE"], bookmarkServiceUseViewed: ["SERVICE"] };
         const missing = [];
         for (const [lang, table] of Object.entries(messages)) {
           for (const [key, names] of Object.entries(keys)) {
