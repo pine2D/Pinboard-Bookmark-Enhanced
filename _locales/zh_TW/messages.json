@@ -5110,6 +5110,38 @@
       }
     }
   },
+  "bookmarkErrNetwork": {
+    "message": "無法連線到書籤伺服器。請檢查網路與伺服器網址。伺服器使用自我簽署或已過期的 HTTPS 憑證時，也會出現這個狀況。"
+  },
+  "bookmarkErrTimeout": {
+    "message": "書籤伺服器未及時回應，請稍後再試。"
+  },
+  "bookmarkErrServer": {
+    "message": "書籤伺服器發生錯誤，請稍後再試。"
+  },
+  "bookmarkErrRateLimit": {
+    "message": "書籤伺服器收到的請求過多，請稍後再試。"
+  },
+  "bookmarkErrRemote": {
+    "message": "書籤伺服器拒絕了這次請求（HTTP $STATUS$）。重試也不會成功，請檢查書籤內容與伺服器設定。",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkErrTooLarge": {
+    "message": "請求內容過大而遭拒收（HTTP 413）。伺服器前方的反向代理伺服器可能限制了請求大小，例如 nginx 的 client_max_body_size。請縮短備註或描述，或調高代理伺服器的限制。"
+  },
+  "bookmarkErrInvalidResponse": {
+    "message": "書籤伺服器傳回了無法辨識的資料。請確認網址是否指向 Karakeep 或 linkding 本身，以及伺服器版本是否受支援。"
+  },
+  "bookmarkErrAccountChanged": {
+    "message": "請求過程中書籤連線有所變更，結果尚未確認。請重新開啟彈出視窗，確認這筆書籤。"
+  },
+  "bgSaveUnconfirmed": {
+    "message": "儲存結果未確認"
+  },
   "bookmarkConnectErrAuth": {
     "message": "伺服器拒絕了 API Token。請確認上方的 Token，再重新連線。"
   },

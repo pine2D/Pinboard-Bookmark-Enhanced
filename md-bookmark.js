@@ -12,6 +12,12 @@
   // Placeholder values for a failure key whose copy names something (the tag
   // linkding could not store); set together with that key.
   let failureArgs = [];
+  // Keys whose copy takes failureArgs.
+  const ARG_KEYS = ["bookmarkErrTagTooLong", "bookmarkErrRemote"];
+  // Every self-hosted failure copy failureKey() has handed out paints the
+  // editor status as an error.
+  const failureKeys = new Set();
+  const failureCopy = key => failureKeys.has(key);
   // Tags linkding could not store, with their copy's placeholders, until a
   // save stores them. A plain Save sends the popup draft's tags, which the
   // reader never shows, and a PostgreSQL create keeps the bookmark without
@@ -82,7 +88,7 @@
         if (statusKey === "saveMergedExisting") {
           el.removeAttribute("data-i18n");
           el.textContent = pbpBookmarkMergedText(pbpBookmarkAccountService(context?.account), text);
-        } else if (statusKey === "bookmarkErrTagTooLong") {
+        } else if (ARG_KEYS.includes(statusKey)) {
           el.removeAttribute("data-i18n");
           el.textContent = text(statusKey, ...failureArgs);
         }
@@ -100,11 +106,11 @@
       if (editorStatusKey === "titleTooLong") {
         id("editor-status").removeAttribute("data-i18n");
         id("editor-status").textContent = text("titleTooLong", String(pbpBookmarkLimits(pbpBookmarkAccountService(context?.account)).title));
-      } else if (editorStatusKey === "bookmarkErrTagTooLong") {
+      } else if (ARG_KEYS.includes(editorStatusKey)) {
         id("editor-status").removeAttribute("data-i18n");
         id("editor-status").textContent = text(editorStatusKey, ...failureArgs);
       }
-      id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "readerBookmarkTagsQuoteError", "titleTooLong", "submitUriTooLong", "bookmarkErrTagTooLong"].includes(editorStatusKey) ? "error" : "";
+      id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "readerBookmarkTagsQuoteError", "titleTooLong", "submitUriTooLong"].includes(editorStatusKey) || failureCopy(editorStatusKey) ? "error" : "";
     }
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) input.disabled = deleting;
   }
@@ -165,9 +171,15 @@
   }
 
   // Self-hosted failure key for a background result; "" keeps the default copy.
+  // Also takes the copy's placeholders (a tag, an HTTP status) into failureArgs.
   function failureKey(result) {
-    return typeof pbpBookmarkFailureKey === "function" && typeof pbpBookmarkAccountService === "function"
+    const key = typeof pbpBookmarkFailureKey === "function" && typeof pbpBookmarkAccountService === "function"
       ? pbpBookmarkFailureKey(result, pbpBookmarkAccountService(context?.account)) : "";
+    if (key) {
+      failureKeys.add(key);
+      failureArgs = typeof pbpBookmarkFailureArgs === "function" ? pbpBookmarkFailureArgs(result) : [];
+    }
+    return key;
   }
 
   async function refresh(expectedGeneration) {
@@ -386,7 +398,6 @@
       // Save opens it on the tags it sent.
       await refresh(gen);
       if (gen !== generation) return;
-      failureArgs = typeof pbpBookmarkFailureArgs === "function" ? pbpBookmarkFailureArgs(result) : [];
       statusKey = failureKey(result) || "readerBookmarkFailed";
       if (statusKey === "bookmarkErrTagTooLong") {
         tagFix = { tags: sentTags, args: failureArgs, stored: storedTags() };

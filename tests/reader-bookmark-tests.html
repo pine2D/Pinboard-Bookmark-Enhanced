@@ -1089,6 +1089,46 @@ await test("reader save, delete and lookup show self-hosted causes", async () =>
   equal(await run("alice", m => m.type === "mdReaderBookmarkState" ? known("alice") : { status: "failed", reason: "not_logged_in", account: "alice" },
     w => w.pbpReaderBookmarkAction("later")), "readerBookmarkAccountChanged");
 });
+await test("reader save, delete and lookup name every self-hosted cause from the shared table; Pinboard keeps its copy", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  const run = async (account, handler, act) => {
+    const frame = document.createElement("iframe"); document.body.append(frame);
+    try {
+      const w = frame.contentWindow;
+      w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.eval(await (await fetch("../shared.js")).text());
+      w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p, sendMessage: async msg => handler(msg), onMessage: { addListener() {} } } };
+      w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; w.eval(runtime);
+      w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "" } } }));
+      await new Promise(r => setTimeout(r, 30));
+      await act(w); await new Promise(r => setTimeout(r, 30));
+      return w.document.getElementById("reader-bookmark-status").textContent;
+    } finally { frame.remove(); }
+  };
+  const same = (a, b) => equal(JSON.stringify(a), JSON.stringify(b));
+  const known = (account) => ({ known: true, bookmarked: true, account, bookmark: { tags: [], notes: "" } });
+  const del = async w => { w.pbpReaderBookmarkAction("edit"); await new Promise(r => setTimeout(r, 20)); w.document.getElementById("reader-bookmark-delete").click(); await new Promise(r => setTimeout(r, 20)); w.document.querySelector(".confirm-yes")?.click(); };
+  const cases = [
+    ["permission", undefined, "bookmarkPermissionDenied"], ["network", undefined, "bookmarkErrNetwork"], ["timeout", undefined, "bookmarkErrTimeout"],
+    ["server", 503, "bookmarkErrServer"], ["remote", 400, "bookmarkErrRemote:400"], ["payload_too_large", 413, "bookmarkErrTooLarge"],
+    ["account_changed", undefined, "bookmarkErrAccountChanged"],
+  ];
+  for (const account of ["linkding:https://ld.example:c1", "karakeep:https://kk.example:u1"]) {
+    for (const [reason, httpStatus, copy] of cases) {
+      const failed = { status: "failed", reason, ...(httpStatus ? { httpStatus } : {}), account };
+      same([account, reason, "save", await run(account, m => m.type === "mdReaderBookmarkState" ? known(account) : failed, w => w.pbpReaderBookmarkAction("later"))], [account, reason, "save", copy]);
+      same([account, reason, "delete", await run(account, m => m.type === "mdReaderBookmarkState" ? known(account) : failed, del)], [account, reason, "delete", copy]);
+      if (reason !== "account_changed")
+        same([account, reason, "lookup", await run(account, () => ({ known: false, reason, ...(httpStatus ? { httpStatus } : {}), account }), () => {})], [account, reason, "lookup", copy]);
+    }
+  }
+  for (const [reason, httpStatus] of [["network"], ["remote", 400], ["payload_too_large", 413]]) {
+    const failed = { status: "failed", reason, ...(httpStatus ? { httpStatus } : {}), account: "alice" };
+    same([reason, await run("alice", m => m.type === "mdReaderBookmarkState" ? known("alice") : failed, w => w.pbpReaderBookmarkAction("later"))], [reason, "readerBookmarkFailed"]);
+  }
+  equal(await run("alice", m => m.type === "mdReaderBookmarkState" ? known("alice") : { status: "failed", reason: "account_changed", account: "alice" },
+    w => w.pbpReaderBookmarkAction("later")), "readerBookmarkAccountChanged");
+});
 await test("reader lookup of a rejected self-hosted token names the token, not a missing connection", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();
   const frame = document.createElement("iframe"); document.body.append(frame);

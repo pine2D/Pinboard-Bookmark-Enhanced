@@ -2993,12 +2993,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (pbpBookmarkEndpoint($id("opt-" + service + "-url").value) !== baseUrl || $id("opt-" + service + "-token").value.trim() !== token ||
           !gatewayNow.ok || JSON.stringify(gatewayNow.gateway) !== gatewayJson) { setConnectStatus("clear"); return; }
         if (!result?.ok) {
-          const failureKey = pbpBookmarkFailureKey({reason:result?.error, httpStatus:result?.status}, service);
+          const failure = {reason:result?.error, httpStatus:result?.status};
+          const failureKey = pbpBookmarkFailureKey(failure, service);
           // The shared auth copy says "check the token in Settings", which points
           // at the page the user is already on; here the token field is just above.
           const authRejected = failureKey === "bookmarkErrAuth";
-          setConnectStatus("bad", t(authRejected ? "bookmarkConnectErrAuth" : failureKey || (result?.error === "permission" ? "bookmarkPermissionDenied"
-            : result?.error === "invalid_request" ? "bookmarkInvalidConfig" : "bookmarkConnectFailed")));
+          setConnectStatus("bad", authRejected ? t("bookmarkConnectErrAuth") : failureKey ? t(failureKey, ...pbpBookmarkFailureArgs(failure))
+            : t(result?.error === "invalid_request" ? "bookmarkInvalidConfig" : "bookmarkConnectFailed"));
           if (authRejected) pbpOptMarkFieldInvalid?.(tokenField, statusId);
           return;
         }

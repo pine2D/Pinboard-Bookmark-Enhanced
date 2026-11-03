@@ -2183,12 +2183,27 @@ function pbpBookmarkReusableConnectionId(settings, service, baseUrl, token) {
 // Codes a self-hosted request can fail with when an access gateway, not the
 // bookmark server, answered. They are never retryable and never queued.
 const PBP_BOOKMARK_GATEWAY_CODES = Object.freeze(["gateway_redirect", "gateway_challenge", "gateway_basic", "gateway_denied", "not_api"]);
-// Self-hosted failure code -> i18n key. Every error outlet (notification,
-// popup, reader, offline row, batch, options) reads this one table.
+// Self-hosted failure code -> i18n key. Every error outlet (popup lookup,
+// save, delete and tags, notification, reader, offline row, batch, options
+// Connect) reads this one table before any copy of its own. A browser reports
+// a certificate error as the same TypeError as a dropped connection, so
+// "network" names both; there is no code for a certificate.
 const PBP_BOOKMARK_FAILURE_KEYS = Object.freeze({
   gateway_redirect:"bookmarkErrGatewayRedirect", gateway_challenge:"bookmarkErrGatewayChallenge",
   gateway_basic:"bookmarkErrGatewayBasic", gateway_denied:"bookmarkErrGatewayDenied",
-  not_api:"bookmarkErrNotApi", auth:"bookmarkErrAuth", tag_too_long:"bookmarkErrTagTooLong"});
+  not_api:"bookmarkErrNotApi", auth:"bookmarkErrAuth", tag_too_long:"bookmarkErrTagTooLong",
+  permission:"bookmarkPermissionDenied", network:"bookmarkErrNetwork", timeout:"bookmarkErrTimeout",
+  server:"bookmarkErrServer", rate_limited:"bookmarkErrRateLimit", remote:"bookmarkErrRemote",
+  payload_too_large:"bookmarkErrTooLarge", invalid_response:"bookmarkErrInvalidResponse",
+  account_changed:"bookmarkErrAccountChanged"});
+// The only self-hosted causes a second attempt can get past. Everything else
+// (a 4xx, a 413, a gateway, a token, a grant, an unreadable reply) meets the
+// same answer again, so no outlet offers a retry for it.
+const PBP_BOOKMARK_RETRYABLE_CODES = Object.freeze(["network", "timeout", "rate_limited", "server"]);
+function pbpBookmarkFailureRetryable(result) {
+  const reason = typeof result === "string" ? result : result?.reason;
+  return PBP_BOOKMARK_RETRYABLE_CODES.includes(reason);
+}
 // Failures every later request of the same connection meets too: a gateway,
 // a token the server rejects (or no connection), a host grant that is gone.
 // Batch stops at the first one, before its next AI request; offline replay
@@ -2227,10 +2242,17 @@ function pbpBookmarkTagShown(tag) {
   return chars.length > 40 ? chars.slice(0, 40).join("") + "…" : chars.join("");
 }
 // Placeholder values for the key pbpBookmarkFailureKey returned: [tag, limit]
-// for tag_too_long, none for every other cause.
+// for tag_too_long, [HTTP status] for remote, none for every other cause.
 function pbpBookmarkFailureArgs(result) {
+  if (result?.reason === "remote") return [Number.isInteger(result.httpStatus) && result.httpStatus > 0 ? String(result.httpStatus) : "?"];
   if (result?.reason !== "tag_too_long") return [];
   return [typeof result.tag === "string" && result.tag ? pbpBookmarkTagShown(result.tag) : "?", String(PBP_LINKDING_TAG_MAX)];
+}
+// Copy for a failed self-hosted result, or "" so the caller keeps its own
+// (Pinboard, or a cause the table does not name). t: the outlet's lookup.
+function pbpBookmarkFailureText(result, service, t) {
+  const key = pbpBookmarkFailureKey(result, service);
+  return key ? t(key, ...pbpBookmarkFailureArgs(typeof result === "string" ? {reason:result} : result)) : "";
 }
 // Service named by a non-secret owner string: self-hosted owners carry their
 // service prefix, any other non-empty owner is a Pinboard username.

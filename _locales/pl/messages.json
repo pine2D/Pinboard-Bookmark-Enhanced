@@ -5110,6 +5110,38 @@
       }
     }
   },
+  "bookmarkErrNetwork": {
+    "message": "Nie można połączyć się z serwerem zakładek. Sprawdź sieć i adres serwera. Ten sam błąd pojawia się, gdy serwer używa certyfikatu HTTPS z podpisem własnym lub wygasłego."
+  },
+  "bookmarkErrTimeout": {
+    "message": "Serwer zakładek nie odpowiedział na czas. Spróbuj ponownie później."
+  },
+  "bookmarkErrServer": {
+    "message": "Na serwerze zakładek wystąpił błąd. Spróbuj ponownie później."
+  },
+  "bookmarkErrRateLimit": {
+    "message": "Serwer zakładek otrzymuje zbyt wiele żądań. Spróbuj ponownie później."
+  },
+  "bookmarkErrRemote": {
+    "message": "Serwer zakładek odrzucił żądanie (HTTP $STATUS$). Ponowna próba nic nie zmieni. Sprawdź zakładkę i ustawienia serwera.",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkErrTooLarge": {
+    "message": "Żądanie było za duże i zostało odrzucone (HTTP 413). Odwrotne proxy przed serwerem może ograniczać rozmiar żądań, np. client_max_body_size w nginx. Skróć notki lub opis albo zwiększ limit w proxy."
+  },
+  "bookmarkErrInvalidResponse": {
+    "message": "Serwer zakładek zwrócił dane, których rozszerzenie nie potrafi odczytać. Sprawdź, czy adres prowadzi bezpośrednio do Karakeep lub linkding i czy ta wersja jest obsługiwana."
+  },
+  "bookmarkErrAccountChanged": {
+    "message": "Połączenie z usługą zakładek zmieniło się w trakcie żądania, więc wynik nie jest potwierdzony. Otwórz ponownie popup i sprawdź tę zakładkę."
+  },
+  "bgSaveUnconfirmed": {
+    "message": "Zapis niepotwierdzony"
+  },
   "bookmarkConnectErrAuth": {
     "message": "Serwer odrzucił token API. Sprawdź token powyżej i połącz ponownie."
   },

@@ -711,6 +711,14 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     const other = await createUiHarness(null, 5000);
     other.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, error: "boom" });
     equal(other.statuses[0].message, "batchFailed:boom");
+    // Only the stop codes read the shared table: a thrown message that happens
+    // to spell another table code (a Pinboard run's own error) is not
+    // relabelled as a self-hosted server cause.
+    for (const code of Object.keys(PBP_BOOKMARK_FAILURE_KEYS).filter((code) => code !== "auth" && !PBP_BOOKMARK_STOP_CODES.includes(code) && code !== "account_changed")) {
+      const thrown = await createUiHarness(null, 5000);
+      thrown.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, error: code });
+      equal(thrown.statuses[0].message, "batchFailed:" + code);
+    }
   });
 
   await test("reopen restores fresh running/done progress but ignores stale done", async () => {

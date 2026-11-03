@@ -751,7 +751,7 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab) {
     // linkding writes a new bookmark before its tags, so a tag the server
     // could not store may have left the bookmark behind without them.
     if (error?.code === "tag_too_long") statusCache.delete(intent.url);
-    return {result:pbpBookmarkFailure(error), persisted:null, retryable:["network","timeout","rate_limited","server"].includes(error?.code)};
+    return {result:pbpBookmarkFailure(error), persisted:null, retryable:pbpBookmarkFailureRetryable(error?.code)};
   }
 }
 const PBP_POPUP_SAVE_MODES = new Set(["create", "update", "merge"]);
@@ -841,7 +841,7 @@ async function fetchExistingBookmark(url, token, auth = pbpCaptureBookmarkAuth(t
       post,
     };
   } catch (error) {
-    if (pbpSelfHostedAuth(auth)) return {exists:false, lookupFailed:true, reason:error?.code === "auth" ? "not_logged_in" : error?.code || "lookup", httpStatus:error?.status, retryable:["network","timeout","rate_limited","server"].includes(error?.code)};
+    if (pbpSelfHostedAuth(auth)) return {exists:false, lookupFailed:true, reason:error?.code === "auth" ? "not_logged_in" : error?.code || "lookup", httpStatus:error?.status, retryable:pbpBookmarkFailureRetryable(error?.code)};
     if (error?.code === "account_changed") {
       return { exists: false, lookupFailed: true, reason: "account_changed", retryable: false };
     }
@@ -1967,7 +1967,10 @@ function notifySaveFailure(notifyId, result, service, mode) {
   // and the next skip-mode shortcut save would skip it: say where to add it.
   if (key === "bookmarkErrTagTooLong" && mode === "skip") key = "bgTagTooLongSkip";
   if (key) {
-    showNotification(notifyId + "-error", t("bgSaveFailed"), t(key, ...pbpBookmarkFailureArgs(result)), "error");
+    // A connection that changed mid-save may have let the first write
+    // through, so that title must not claim the save failed.
+    const title = result?.reason === "account_changed" ? "bgSaveUnconfirmed" : "bgSaveFailed";
+    showNotification(notifyId + "-error", t(title), t(key, ...pbpBookmarkFailureArgs(result)), "error");
   } else if (result.reason === "not_logged_in") {
     showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("bgSetToken"), "error");
   } else if (result.reason === "too_long") {
@@ -4509,8 +4512,11 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     })().catch((e) => {
       // Fold to the proxy's own failure shape (status 0 + reason) so the popup
       // names the cause the same way it does for every other proxied call.
+      // The server's HTTP status rides apart: status stays 0 so a self-hosted
+      // 401 never reaches the popup's Pinboard login reset, while the copy for
+      // a refused request can still name it.
       console.warn("[lookup_bookmark] failed:", e && e.name, e && e.message);
-      sendResponse({ ok: false, status: 0, error: e?.code || "Failed to fetch", posts: null, account: "" });
+      sendResponse({ ok: false, status: 0, error: e?.code || "Failed to fetch", ...(Number.isInteger(e?.status) ? { httpStatus: e.status } : {}), posts: null, account: "" });
     });
     return true;
   }

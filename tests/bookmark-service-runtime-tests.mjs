@@ -29,6 +29,7 @@ const BLOCKS=[
   'linkding cleaned page address',
   'linkding Description server semantics',
   'gateway probes',
+  'settings Connect names the failure cause',
   'settings tag panel follows the service',
   'archive log follows the bookmark connection',
 ];
@@ -89,6 +90,12 @@ const server=createServer(async(req,res)=>{
     // Karakeep's own token rejection shape (Hono default text/plain).
     if(kind==='plain'){res.writeHead(401,{'Content-Type':'text/plain;charset=UTF-8'});res.end('Unauthorized');return;}
     if(kind==='page'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('<html><title>Sign in</title></html>');return;}
+    // A URL that reaches some other web server: Django 6.0's stock not-found page (DEBUG off).
+    if(kind==='notfound'){res.writeHead(404,{'Content-Type':'text/html; charset=utf-8'});res.end('\n<!doctype html>\n<html lang="en">\n<head>\n  <title>Not Found</title>\n</head>\n<body>\n  <h1>Not Found</h1><p>The requested resource was not found on this server.</p>\n</body>\n</html>\n');return;}
+    // The connection drops before any answer (what the browser also reports for a bad certificate).
+    if(kind==='drop'){req.socket.destroy();return;}
+    // No answer within the client's deadline; closed later so shutdown is not held.
+    if(kind==='hang'){setTimeout(()=>req.socket.destroy(),3000);return;}
     if(kind==='headers'){
       if(req.headers['x-probe-gateway']==='probe-value'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({theme:'auto',version:'1.44.0'}));}
       else{res.writeHead(400).end();}
@@ -1029,6 +1036,35 @@ try{
   assert(!wire.some(w=>w.path.startsWith('/cdn-cgi/')),'redirect was followed');
   assert(wire.every(w=>!w.hasCookie),'a request carried cookies');
   console.log('gateway probes classified; no preflight; redirect not followed');
+  });
+  await block('settings Connect names the failure cause',[],async()=>{
+  // A wrong address, a dropped connection and a server that never answers are
+  // three different fixes, so Connect must not fold them into one message.
+  const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
+  // Shorten the worker's 20s request deadline for this block only.
+  await worker.evaluate(()=>{self.__pbpRealTimeout=AbortSignal.timeout;AbortSignal.timeout=ms=>self.__pbpRealTimeout.call(AbortSignal,Math.min(ms,800));});
+  try{
+    for(const service of ['linkding','karakeep']){
+      const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+      await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
+      await options.locator('#opt-'+service+'-token').fill('fixture-key');
+      const shown=new Set();
+      for(const [kind,key] of [['notfound','bookmarkErrNotApi'],['drop','bookmarkErrNetwork'],['hang','bookmarkErrTimeout']]){
+        await options.locator('#opt-'+service+'-url').fill(origin+'/probe/'+kind+'/');
+        await options.locator('#connect-'+service).click();
+        const status=options.locator('#connect-'+service+'-status');
+        await status.filter({hasText:en[key].message}).waitFor({timeout:10000}).catch(async error=>{console.error({service,kind,status:await status.textContent()});throw error;});
+        assert.equal((await status.textContent()).trim(),en[key].message,service+' '+kind);
+        assert(await options.locator('#connect-'+service+'-status.bad').count(),service+' '+kind+' status is not an error');
+        assert.notEqual((await status.textContent()).trim(),en.bookmarkConnectFailed.message);
+        shown.add((await status.textContent()).trim());
+      }
+      assert.equal(shown.size,3,service+' Connect folded different causes into one message');
+      assert(!(await options.evaluate(async service=>{const c=await pbpReadBookmarkConnection();return c.service===service&&c.baseUrl.includes('/probe/');},service)),service+' a failed Connect was saved');
+      await options.close();
+    }
+  }finally{await worker.evaluate(()=>{if(self.__pbpRealTimeout)AbortSignal.timeout=self.__pbpRealTimeout;});}
+  console.log('settings Connect: wrong address, dropped connection and timeout each named');
   });
   await block('settings tag panel follows the service',[],async()=>{
   // The Tags panel opened by a deep link while linkding is chosen explains it

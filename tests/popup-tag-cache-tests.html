@@ -480,6 +480,16 @@ function typeInto(value) {
         await fetchAllUserTags("ignored");
         assert(statusCalls.length === 1 && statusCalls[0].msg === key, error + " -> " + JSON.stringify(statusCalls));
       }
+      // bookmark_api's failure shape {status: httpStatus || 0, error: code}:
+      // a lost grant or a 5xx is not "offline", a 4xx names its status.
+      for (const [error, status, key] of [["permission", 0, "bookmarkPermissionDenied"], ["server", 503, "bookmarkErrServer"],
+        ["network", 0, "bookmarkErrNetwork"], ["timeout", 0, "bookmarkErrTimeout"], ["remote", 400, "bookmarkErrRemote:400"], ["account_changed", 0, "bookmarkErrAccountChanged"]]) {
+        resetInput(undefined, false);
+        suggestRow.classList.add("hidden");
+        window.pbpPopupBookmarkApi = async () => ({ ok: false, status, error, json: async () => ({}) });
+        await fetchAllUserTags("ignored");
+        assert(statusCalls.length === 1 && statusCalls[0].msg === key, error + " -> " + JSON.stringify(statusCalls));
+      }
     } finally {
       window.pbpPopupBookmarkApi = realApi;
       for (const k of Object.keys(settings)) delete settings[k];

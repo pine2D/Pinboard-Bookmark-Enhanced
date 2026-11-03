@@ -5110,6 +5110,38 @@
       }
     }
   },
+  "bookmarkErrNetwork": {
+    "message": "Der Lesezeichenserver ist nicht erreichbar. Netzwerk und Server-URL prüfen. Dasselbe passiert, wenn der Server ein selbstsigniertes oder abgelaufenes HTTPS-Zertifikat verwendet."
+  },
+  "bookmarkErrTimeout": {
+    "message": "Der Lesezeichenserver hat nicht rechtzeitig geantwortet. Später erneut versuchen."
+  },
+  "bookmarkErrServer": {
+    "message": "Auf dem Lesezeichenserver ist ein Fehler aufgetreten. Später erneut versuchen."
+  },
+  "bookmarkErrRateLimit": {
+    "message": "Der Lesezeichenserver erhält zu viele Anfragen. Später erneut versuchen."
+  },
+  "bookmarkErrRemote": {
+    "message": "Der Lesezeichenserver hat die Anfrage abgelehnt (HTTP $STATUS$). Ein neuer Versuch ändert daran nichts. Das Lesezeichen und die Servereinstellungen prüfen.",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkErrTooLarge": {
+    "message": "Die Anfrage war zu groß und wurde abgelehnt (HTTP 413). Ein Reverse Proxy vor dem Server begrenzt womöglich die Anfragegröße, etwa mit client_max_body_size in nginx. Notizen oder Beschreibung kürzen oder das Limit im Proxy erhöhen."
+  },
+  "bookmarkErrInvalidResponse": {
+    "message": "Der Lesezeichenserver hat Daten geliefert, die die Erweiterung nicht lesen kann. Prüfen, ob die URL direkt auf Karakeep bzw. linkding zeigt und die Version unterstützt wird."
+  },
+  "bookmarkErrAccountChanged": {
+    "message": "Die Verbindung zum Lesezeichendienst hat sich während der Anfrage geändert, daher ist das Ergebnis nicht bestätigt. Das Popup erneut öffnen und dieses Lesezeichen prüfen."
+  },
+  "bgSaveUnconfirmed": {
+    "message": "Speichern nicht bestätigt"
+  },
   "bookmarkConnectErrAuth": {
     "message": "Der Server hat das API-Token abgelehnt. Das Token oben prüfen und erneut verbinden."
   },

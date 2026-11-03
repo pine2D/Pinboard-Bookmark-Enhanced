@@ -1204,7 +1204,7 @@ test("gateway form error keys exist in all nine locales", async () => {
 });
 test("failure keys apply only to self-hosted services",()=>{
   equal([pbpBookmarkAccountService("karakeep:https://k.example/:u1"),pbpBookmarkAccountService("linkding:https://l.example/:c1"),pbpBookmarkAccountService("alice"),pbpBookmarkAccountService(""),pbpBookmarkAccountService(undefined)],["karakeep","linkding","pinboard","",""]);
-  const reasons=[...PBP_BOOKMARK_GATEWAY_CODES,"auth","not_logged_in","remote","network","made_up"];
+  const reasons=[...Object.keys(PBP_BOOKMARK_FAILURE_KEYS),"not_logged_in","made_up"];
   for(const service of ["pinboard","",undefined,"typo"])for(const reason of reasons){
     equal(pbpBookmarkFailureKey({reason,httpStatus:401},service),"");equal(pbpBookmarkFailureKey({reason},service),"");equal(pbpBookmarkFailureKey(reason,service),"");
   }
@@ -1214,9 +1214,38 @@ test("failure keys apply only to self-hosted services",()=>{
     equal(pbpBookmarkFailureKey({reason:"not_logged_in",httpStatus:401},service),"bookmarkErrAuth");
     equal(pbpBookmarkFailureKey({reason:"not_logged_in",httpStatus:403},service),"bookmarkErrAuth");
     equal(pbpBookmarkFailureKey({reason:"not_logged_in"},service),"bgSetToken");
-    for(const reason of ["remote","network","permission","made_up","","toString","__proto__","constructor"])equal(pbpBookmarkFailureKey({reason},service),"");
+    const named={permission:"bookmarkPermissionDenied",network:"bookmarkErrNetwork",timeout:"bookmarkErrTimeout",server:"bookmarkErrServer",
+      rate_limited:"bookmarkErrRateLimit",remote:"bookmarkErrRemote",payload_too_large:"bookmarkErrTooLarge",invalid_response:"bookmarkErrInvalidResponse",
+      account_changed:"bookmarkErrAccountChanged"};
+    for(const [reason,key] of Object.entries(named))equal([reason,pbpBookmarkFailureKey({reason},service),pbpBookmarkFailureKey(reason,service)],[reason,key,key]);
+    for(const reason of ["made_up","lookup","","toString","__proto__","constructor"])equal(pbpBookmarkFailureKey({reason},service),"");
     equal(pbpBookmarkFailureKey(null,service),"");
   }
+});
+test("every code the adapter or worker can fail a self-hosted request with has copy, and only transient ones are retryable",async()=>{
+  // Codes produced by the real classifier and client, not a hand-copied list.
+  const produced=new Set();
+  const code=async(reply,service)=>{try{await harness(service,[reply]).client.verify();}catch(error){produced.add(error.code);}};
+  for(const service of ["linkding","karakeep"]){
+    for(const status of [400,401,404,409,413,422,429,500,502,503])await code(new Response("{}",{status,headers:{"Content-Type":"application/json"}}),service);
+    await code(new Response("<html></html>",{status:404,headers:{"Content-Type":"text/html"}}),service);
+    await code(new Response("<html>",{status:200}),service);
+    await code(new TypeError("Failed to fetch"),service);
+    await code(new DOMException("signal timed out","TimeoutError"),service);
+    await code(gwRedirect(),service);await code(gwChallenge(),service);await code(gwBasic(),service);await code(gwHtml(403),service);
+  }
+  // The worker's own causes: a host grant gone, a connection that changed.
+  for(const reason of ["permission","account_changed"])produced.add(reason);
+  for(const reason of produced){
+    for(const service of ["linkding","karakeep"])ok(pbpBookmarkFailureKey({reason,httpStatus:400},service));
+  }
+  const retryable=[...produced].filter(reason=>pbpBookmarkFailureRetryable({reason})).sort();
+  equal(retryable,["network","rate_limited","server","timeout"]);
+  equal(pbpBookmarkFailureArgs({reason:"remote",httpStatus:422}),["422"]);
+  equal(pbpBookmarkFailureArgs({reason:"remote"}),["?"]);
+  equal(pbpBookmarkFailureArgs({reason:"server",httpStatus:503}),[]);
+  equal(pbpBookmarkFailureText({reason:"remote",httpStatus:400},"linkding",(key,...args)=>[key,...args].join(":")),"bookmarkErrRemote:400");
+  equal(pbpBookmarkFailureText({reason:"remote",httpStatus:400},"pinboard",()=>"x"),"");
 });
 // What nginx in front of linkding answers while gunicorn restarts or times
 // out (ngx_http_special_response.c): the request never reached Django.

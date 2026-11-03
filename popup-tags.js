@@ -264,8 +264,9 @@ async function fetchAllUserTags(token) {
     // Self-hosted never redirects to the Pinboard login, so only Pinboard may stay silent on 401.
     if (resp.status === 401 && tagService === "pinboard") return; // pinboardFetch already redirected to login
     if (!resp.ok) {
-      const tagFailureKey = pbpBookmarkFailureKey({reason:resp.error, httpStatus:resp.status}, tagService);
-      showTagSyncError(tagFailureKey || classifyPinboardError(resp));
+      const tagFailure = {reason:resp.error, httpStatus:resp.status};
+      const tagFailureKey = pbpBookmarkFailureKey(tagFailure, tagService);
+      showTagSyncError(tagFailureKey || classifyPinboardError(resp), tagFailureKey ? pbpBookmarkFailureArgs(tagFailure) : []);
       return;
     }
     const data = await resp.json();
@@ -297,7 +298,7 @@ async function fetchAllUserTags(token) {
 // already filled it — fall back to the popup's .feedback-card error, the surface the save and
 // batch failures use. tags/get is the only source for autocomplete, tag counts, case folding and
 // the AI prompt's "existing tags", so its failure must never be silent.
-function showTagSyncError(i18nKey) {
+function showTagSyncError(i18nKey, args = []) {
   const container = $id("pinboard-suggest-tags");
   const rowHidden = !!$id("suggest-row")?.classList.contains("hidden");
   // .tag-skel counts as occupied: suggest is still in flight and will replace
@@ -305,10 +306,10 @@ function showTagSyncError(i18nKey) {
   const occupied = !!container
     && !!(container.querySelector(".suggest-group, .tag-skel") || container.textContent.trim());
   if (!container || rowHidden || occupied) {
-    showStatus("status-msg", t(i18nKey), "error");
+    showStatus("status-msg", t(i18nKey, ...args), "error");
     return;
   }
-  container.textContent = t(i18nKey);
+  container.textContent = t(i18nKey, ...args);
   container.classList.add("muted");
 }
 

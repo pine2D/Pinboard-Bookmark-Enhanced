@@ -2191,10 +2191,11 @@ await suite("unified save pipeline", async () => {
   await test("unknown and internal reasons notify generic copy", async () => {
     const services = [{ service: "pinboard" }, ...Object.values(SELF_HOSTED_AUTH)];
     for (const auth of services) {
+      // remote and invalid_response are self-hosted causes with their own
+      // copy (next test); Pinboard never produces them and keeps the generic one.
       const cases = [
         [{ reason: "permission" }, "bookmarkPermissionDenied"],
-        [{ reason: "remote" }, "saveFailedGeneric"],
-        [{ reason: "invalid_response" }, "saveFailedGeneric"],
+        ...(auth.service === "pinboard" ? [[{ reason: "remote" }, "saveFailedGeneric"], [{ reason: "invalid_response" }, "saveFailedGeneric"]] : []),
         [{ reason: "storage" }, "saveFailedGeneric"],
         [{ reason: "made_up" }, "saveFailedGeneric"],
         [{ reason: "http", httpStatus: 503 }, "HTTP 503"],
@@ -2213,6 +2214,45 @@ await suite("unified save pipeline", async () => {
     const pinboardApi = await createBackgroundSaveHarness({ result: { status: "failed", reason: "api", detail: "item already exists" } });
     await runBackgroundSave(pinboardApi);
     equal(pinboardApi.notifications[0][2], "item already exists", "Pinboard api detail is the server's own message");
+  });
+
+  await test("every self-hosted cause notifies its own copy; a changed connection is not called a failed save", async () => {
+    // Shapes pbpBookmarkFailure builds from the adapter's codes.
+    const cases = [
+      [{ reason: "permission" }, "bgSaveFailed", "bookmarkPermissionDenied"],
+      [{ reason: "network" }, "bgSaveFailed", "bookmarkErrNetwork"],
+      [{ reason: "timeout" }, "bgSaveFailed", "bookmarkErrTimeout"],
+      [{ reason: "server", httpStatus: 503 }, "bgSaveFailed", "bookmarkErrServer"],
+      [{ reason: "rate_limited", httpStatus: 429 }, "bgSaveFailed", "bookmarkErrRateLimit"],
+      [{ reason: "remote", httpStatus: 400 }, "bgSaveFailed", "bookmarkErrRemote:400"],
+      [{ reason: "remote" }, "bgSaveFailed", "bookmarkErrRemote:?"],
+      [{ reason: "payload_too_large", httpStatus: 413 }, "bgSaveFailed", "bookmarkErrTooLarge"],
+      [{ reason: "invalid_response" }, "bgSaveFailed", "bookmarkErrInvalidResponse"],
+      [{ reason: "account_changed" }, "bgSaveUnconfirmed", "bookmarkErrAccountChanged"],
+    ];
+    for (const auth of Object.values(SELF_HOSTED_AUTH)) {
+      for (const [failure, title, body] of cases) {
+        const h = await createBackgroundSaveHarness({ auth, result: { status: "failed", ...failure } });
+        await runBackgroundSave(h);
+        equal(h.notifications.length, 1, `${auth.service} ${failure.reason} notification count`);
+        equal(h.notifications[0][1], title, `${auth.service} ${failure.reason} title`);
+        equal(h.notifications[0][2], body, `${auth.service} ${failure.reason} body`);
+        assert(!h.notifications.flat().some((part) => /^pinboardError|^bgNotLoggedIn$|^bgNetworkError$/.test(String(part))), `${auth.service} ${failure.reason} fell into Pinboard copy`);
+      }
+    }
+    // Pinboard keeps its own copy for the same inputs.
+    const pinboard = [
+      [{ reason: "network" }, "bgNetworkError", "pinboardErrorOffline"],
+      [{ reason: "account_changed" }, "bgNotLoggedIn", "pinboardErrorAuth"],
+      [{ reason: "timeout" }, "bgSaveFailed", "saveFailedGeneric"],
+      [{ reason: "payload_too_large", httpStatus: 413 }, "bgSaveFailed", "saveFailedGeneric"],
+    ];
+    for (const [failure, title, body] of pinboard) {
+      const h = await createBackgroundSaveHarness({ result: { status: "failed", ...failure } });
+      await runBackgroundSave(h);
+      equal(h.notifications[0][1], title, `pinboard ${failure.reason} title`);
+      equal(h.notifications[0][2], body, `pinboard ${failure.reason} body`);
+    }
   });
 
   await test("K100: not-logged-in notification waits for pbpI18nReady before reading text", async () => {

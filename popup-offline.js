@@ -40,11 +40,9 @@
   function pauseText(queue, pause) {
     if (!pause || typeof pause.account !== "string" || !pause.account || typeof pause.reason !== "string") return "";
     if (!queue.some((item) => item?.account === pause.account)) return "";
-    // Every cause pbpBookmarkStopCause records names its copy; a missing host
-    // grant has no row in the shared failure table.
-    const key = pause.reason === "permission" ? "bookmarkPermissionDenied"
-      : pbpBookmarkFailureKey({ reason: pause.reason }, pbpBookmarkAccountService(pause.account));
-    return key ? t("offlineQueuePaused", t(key)) : "";
+    // Every cause pbpBookmarkStopCause records has a row in the shared table.
+    const text = pbpBookmarkFailureText({ reason: pause.reason }, pbpBookmarkAccountService(pause.account), t);
+    return text ? t("offlineQueuePaused", text) : "";
   }
   // NOTE: no setQueue() here — the offline queue is mutated ONLY by the SW
   // (background.js mutateOfflineQueue, single-writer mutex, D1). The popup reads
@@ -159,8 +157,8 @@
   // Same reason -> message table the save path uses in popup.js.
   function retryFailureMessage(result, service) {
     const reason = result && typeof result === "object" ? result.reason : "";
-    const failureKey = pbpBookmarkFailureKey(result, service);
-    if (failureKey) return t(failureKey, ...pbpBookmarkFailureArgs(result));
+    const failureText = pbpBookmarkFailureText(result, service, t);
+    if (failureText) return failureText;
     if (reason === "account_mismatch") return t("offlineRetryWrongAccount");
     if (reason === "not_logged_in") return t("batchNotLoggedIn");
     if (reason === "account_changed") return t("offlineRetryAccountChanged");

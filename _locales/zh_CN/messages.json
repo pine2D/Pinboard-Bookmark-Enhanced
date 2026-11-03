@@ -5104,6 +5104,38 @@
       }
     }
   },
+  "bookmarkErrNetwork": {
+    "message": "无法连接书签服务器。请检查网络和服务器地址。服务器使用自签名或已过期的 HTTPS 证书时也会这样。"
+  },
+  "bookmarkErrTimeout": {
+    "message": "书签服务器没有及时响应，请稍后重试。"
+  },
+  "bookmarkErrServer": {
+    "message": "书签服务器出错，请稍后重试。"
+  },
+  "bookmarkErrRateLimit": {
+    "message": "书签服务器收到的请求过多，请稍后重试。"
+  },
+  "bookmarkErrRemote": {
+    "message": "书签服务器拒绝了这次请求（HTTP $STATUS$）。重试不会改变结果，请检查书签内容和服务器设置。",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkErrTooLarge": {
+    "message": "请求内容太大，被拒收（HTTP 413）。服务器前的反向代理可能限制了请求大小，例如 nginx 的 client_max_body_size。请缩短备注或描述，或调高代理的限制。"
+  },
+  "bookmarkErrInvalidResponse": {
+    "message": "书签服务器返回了无法识别的数据。请检查地址是否指向 Karakeep 或 linkding 本身，以及服务器版本是否受支持。"
+  },
+  "bookmarkErrAccountChanged": {
+    "message": "请求过程中书签连接发生了变化，结果未确认。请重新打开弹窗核对这条书签。"
+  },
+  "bgSaveUnconfirmed": {
+    "message": "保存结果未确认"
+  },
   "bookmarkConnectErrAuth": {
     "message": "服务器拒绝了 API Token。请检查上方的 Token，然后重新连接。"
   },

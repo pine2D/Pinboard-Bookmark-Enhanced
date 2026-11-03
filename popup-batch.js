@@ -394,8 +394,9 @@ function renderBatchProgress(p, currentAccount) {
     // The SW stops a run on the first gateway, token or host-grant failure
     // (pbpBookmarkStopCause) and records its code; show the cause rather than
     // the raw code inside batchFailed.
-    else if (p.error === "permission") showStatus("status-msg", t("bookmarkPermissionDenied"), "error");
-    else if (PBP_BOOKMARK_GATEWAY_CODES.includes(p.error) || p.error === "auth") showStatus("status-msg", t(PBP_BOOKMARK_FAILURE_KEYS[p.error]), "error");
+    // Only those stop codes: a Pinboard run's thrown message is not a
+    // self-hosted cause and keeps batchFailed.
+    else if (p.error === "auth" || PBP_BOOKMARK_STOP_CODES.includes(p.error)) showStatus("status-msg", t(PBP_BOOKMARK_FAILURE_KEYS[p.error]), "error");
     else if (p.error) showStatus("status-msg", t("batchFailed", p.error), "error");
     else {
       const hasFailure = (p.failed || 0) > 0 || (p.tooLong || 0) > 0 || (p.tagTooLong || 0) > 0;

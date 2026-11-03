@@ -647,8 +647,45 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
       const auth = view({ reason: "not_logged_in", httpStatus: 401 });
       assert(auth.message === "bookmarkErrAuth" && auth.retry === false, JSON.stringify(auth));
-      const remote = view({ reason: "remote" });
-      assert(remote.message === "saveFailedGeneric" && remote.retry === true, JSON.stringify(remote));
+    });
+    test("every self-hosted save cause names itself and only a transient one offers Retry", () => {
+      // pbpBookmarkFailure's shapes for the adapter's and the worker's codes.
+      const cases = [
+        [{ reason: "permission" }, "bookmarkPermissionDenied", false],
+        [{ reason: "network" }, "bookmarkErrNetwork", true],
+        [{ reason: "timeout" }, "bookmarkErrTimeout", true],
+        [{ reason: "server", httpStatus: 503 }, "bookmarkErrServer", true],
+        [{ reason: "rate_limited", httpStatus: 429 }, "bookmarkErrRateLimit", true],
+        [{ reason: "remote", httpStatus: 400 }, "bookmarkErrRemote(400)", false],
+        [{ reason: "remote" }, "bookmarkErrRemote(?)", false],
+        [{ reason: "payload_too_large", httpStatus: 413 }, "bookmarkErrTooLarge", false],
+        [{ reason: "invalid_response" }, "bookmarkErrInvalidResponse", false],
+        [{ reason: "account_changed" }, "bookmarkErrAccountChanged", false],
+        [{ reason: "not_logged_in" }, "bgSetToken", false],
+        [{ reason: "storage" }, "saveFailedGeneric", true],
+      ];
+      for (const service of ["linkding", "karakeep"]) {
+        const view = bookmarkErrorView(service);
+        for (const [result, message, retry] of cases) {
+          const got = view(result);
+          assert(got.message === message && got.retry === retry, service + " " + JSON.stringify(result) + " -> " + JSON.stringify(got));
+          const key = message.replace(/\(.*$/, "");
+          assert(enMessages[key]?.message, "en catalogue lacks " + key);
+        }
+      }
+      // The same inputs on Pinboard keep today's copy and retry.
+      const pinboard = bookmarkErrorView("pinboard");
+      for (const [result, message, retry] of [
+        [{ reason: "network" }, "pinboardErrorOffline", true],
+        [{ reason: "account_changed" }, "pinboardErrorAuth", false],
+        [{ reason: "permission" }, "bookmarkPermissionDenied", false],
+        [{ reason: "timeout" }, "saveFailedGeneric", true],
+        [{ reason: "remote", httpStatus: 400 }, "saveFailedGeneric", true],
+        [{ reason: "payload_too_large", httpStatus: 413 }, "saveFailedGeneric", true],
+      ]) {
+        const got = pinboard(result);
+        assert(got.message === message && got.retry === retry, "pinboard " + JSON.stringify(result) + " -> " + JSON.stringify(got));
+      }
     });
     test("a linkding tag the server cannot store is named with its limit and offers no retry", () => {
       const view = bookmarkErrorView("linkding");
@@ -701,8 +738,18 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(auth.recent.join() === "bookmarkErrAuth", "recent delete: " + auth.recent.join());
       const gw = await runDeleteHandlers("karakeep", { ok: false, status: 403, error: "gateway_denied" });
       assert(gw.main.join() === "bookmarkErrGatewayDenied" && gw.recent.join() === "bookmarkErrGatewayDenied", JSON.stringify(gw));
-      const other = await runDeleteHandlers("linkding", { ok: false, status: 500, error: "remote" });
-      assert(other.main.join() === "saveFailedGeneric" && other.recent.join() === "saveFailedGeneric", JSON.stringify(other));
+      // bookmark_api's delete failure shape: {ok:false, status:httpStatus||0, error:reason}.
+      for (const [service, resp, copy] of [
+        ["linkding", { ok: false, status: 503, error: "server" }, "bookmarkErrServer"],
+        ["karakeep", { ok: false, status: 400, error: "remote" }, "bookmarkErrRemote(400)"],
+        ["linkding", { ok: false, status: 0, error: "permission" }, "bookmarkPermissionDenied"],
+        ["karakeep", { ok: false, status: 0, error: "network" }, "bookmarkErrNetwork"],
+        ["linkding", { ok: false, status: 0, error: "account_changed" }, "bookmarkErrAccountChanged"],
+        ["karakeep", { ok: false, status: 0, error: "made_up" }, "saveFailedGeneric"],
+      ]) {
+        const got = await runDeleteHandlers(service, resp);
+        assert(got.main.join() === copy && got.recent.join() === copy, service + " " + resp.error + ": " + JSON.stringify(got));
+      }
     });
     test("Pinboard save errors are unchanged", () => {
       const view = bookmarkErrorView("pinboard");
@@ -721,6 +768,17 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(message({ reason: "gateway_basic" }, "linkding") === "bookmarkErrGatewayBasic", "gateway failure not named");
       assert(message({ reason: "not_logged_in" }, "pinboard") === "batchNotLoggedIn", "pinboard copy changed");
       assert(message({ reason: "tag_too_long", tag: "y".repeat(65), httpStatus: 500 }, "linkding") === "bookmarkErrTagTooLong:" + "y".repeat(40) + "\u2026:64", "the over-long tag is not named");
+      for (const service of ["linkding", "karakeep"]) {
+        for (const [result, copy] of [
+          [{ reason: "permission" }, "bookmarkPermissionDenied"], [{ reason: "network" }, "bookmarkErrNetwork"], [{ reason: "timeout" }, "bookmarkErrTimeout"],
+          [{ reason: "server", httpStatus: 503 }, "bookmarkErrServer"], [{ reason: "remote", httpStatus: 400 }, "bookmarkErrRemote:400"],
+          [{ reason: "payload_too_large", httpStatus: 413 }, "bookmarkErrTooLarge"], [{ reason: "account_changed" }, "bookmarkErrAccountChanged"],
+        ]) assert(message(result, service) === copy, service + " " + result.reason + " -> " + message(result, service));
+      }
+      // Pinboard keeps its own copy for the same inputs.
+      assert(message({ reason: "network" }, "pinboard") === "networkError", "pinboard network copy changed");
+      assert(message({ reason: "account_changed" }, "pinboard") === "offlineRetryAccountChanged", "pinboard account copy changed");
+      assert(message({ reason: "remote", httpStatus: 400 }, "pinboard") === "offlineRetryFailed", "pinboard remote copy changed");
     });
 
     await testAsync("the queue bar shows the pause cause", async () => {
@@ -4188,7 +4246,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // and feed them worker replies, so the whole chain has to carry the cause.
     const proxySource = source.slice(source.indexOf("function _pbpProxyPinboardFetch"), source.indexOf("let currentTags"));
 
-    function createLookupHarness(workerReply, { nullField = "", service = "pinboard", dirtyDescription = false, realDescription = false, onRefresh = () => {} } = {}) {
+    function createLookupHarness(workerReply, { nullField = "", service = "pinboard", dirtyDescription = false, realDescription = false, onRefresh = () => {}, tArgs = false } = {}) {
       const statuses = [];
       const warns = [];
       const sent = [];
@@ -4217,7 +4275,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         },
         resetPinboardSession() { resets++; },
         $id: (id) => (id === nullField ? null : (elements[id] ||= createElementStub())),
-        t: (key) => key,
+        t: tArgs ? (key, ...args) => args.length ? key + ":" + args.join(":") : key : (key) => key,
         showStatus: (...args) => statuses.push(args),
         clearSaveError() {},
         showSaveError: (result) => statuses.push(["status-msg", "save-error:" + (result?.reason || "thrown"), "error"]),
@@ -4261,7 +4319,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       ].join("\n");
       const names = Object.keys(dependencies);
       const built = new Function(...names, body)(...names.map((name) => dependencies[name]));
-      return { elements, descriptionKnown: built.descriptionKnown, descriptionPending: built.descriptionPending, pageDescription: built.pageDescription, run: (...args) => built.checkExistingBookmark("alice:token", URL, null, true, ...args), getLookup: built.getLookup, getBookmark: built.getBookmark, getTags: built.getTags, touchTags: built.touchTags, statuses, warns, sent, resets: () => resets };
+      return { elements, descriptionKnown: built.descriptionKnown, descriptionPending: built.descriptionPending, pageDescription: built.pageDescription, run: (...args) => built.checkExistingBookmark("alice:token", URL, null, true, ...args),
+        runCold: () => built.checkExistingBookmark("alice:token", URL, null, false), getLookup: built.getLookup, getBookmark: built.getBookmark, getTags: built.getTags, touchTags: built.touchTags, statuses, warns, sent, resets: () => resets };
     }
 
     const FOUND_BODY = JSON.stringify({ posts: [{ description: "Saved title", extended: "", tags: "alpha", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] });
@@ -4368,6 +4427,62 @@ test("posts/add default remains replace=yes for existing callers", () => {
         plain.touchTags(["alpha"]);
         assert((await plain.run()).status === "found", service + ": the plain lookup did not find the bookmark");
         assert(JSON.stringify(plain.getTags()) === JSON.stringify(["alpha"]), service + ": a lookup with no baseline overwrote the user's tags: " + JSON.stringify(plain.getTags()));
+      }
+    });
+
+    // The worker's shipped lookup_bookmark branch, with the self-hosted client
+    // failing the way bookmark-services.js fails it (code + HTTP status on the
+    // error). Its reply is what the cold popup lookup reads.
+    function selfHostedLookupWorker(service, failure) {
+      const branchStart = backgroundSource.indexOf('if (message.type === "lookup_bookmark" && message.url) {');
+      const branchEnd = backgroundSource.indexOf('if (message.type === "PBP_POPUP_DRAFT")', branchStart);
+      assert(branchStart >= 0 && branchEnd > branchStart, "worker lookup_bookmark branch not found");
+      const auth = { service, account: service + ":https://bookmarks.example/:id-1", token: "fixture-token", baseUrl: "https://bookmarks.example/" };
+      const deps = {
+        getCurrentBookmarkAuth: async () => auth,
+        pbpStatusCacheGet: () => null,
+        pbpStatusCacheSet: () => true,
+        CACHE_TTL: 300000,
+        _dedupedBookmarkCheck: async () => false,
+        pbpBookmarkAuthIsCurrent: () => true,
+        pbpSelfHostedAuth,
+        pinboardFetch: async () => { throw new Error("unexpected Pinboard request"); },
+        pbpBookmarkPostsResponse: async () => { throw Object.assign(new Error(failure.code), failure); },
+        console: { warn() {} },
+      };
+      const handle = new Function(...Object.keys(deps), "return function (message, sendResponse) {\n" + backgroundSource.slice(branchStart, branchEnd) + "\nreturn false;\n};")(...Object.values(deps));
+      return { account: auth.account, ask: (message) => new Promise((resolve) => handle({ ...message, account: auth.account }, resolve)) };
+    }
+    await testAsync("a self-hosted lookup names its cause: a lost host grant or a 5xx is not called offline", async () => {
+      const cases = [
+        [{ code: "permission" }, "bookmarkPermissionDenied"],
+        [{ code: "server", status: 503 }, "bookmarkErrServer"],
+        [{ code: "rate_limited", status: 429 }, "bookmarkErrRateLimit"],
+        [{ code: "network" }, "bookmarkErrNetwork"],
+        [{ code: "timeout" }, "bookmarkErrTimeout"],
+        [{ code: "remote", status: 400 }, "bookmarkErrRemote:400"],
+        [{ code: "payload_too_large", status: 413 }, "bookmarkErrTooLarge"],
+        [{ code: "invalid_response" }, "bookmarkErrInvalidResponse"],
+        [{ code: "account_changed" }, "bookmarkErrAccountChanged"],
+      ];
+      for (const service of ["linkding", "karakeep"]) {
+        for (const [failure, copy] of cases) {
+          const worker = selfHostedLookupWorker(service, failure);
+          const reply = await worker.ask({ type: "lookup_bookmark", url: URL });
+          // status stays 0 so the popup's Pinboard 401 reset never fires.
+          assert(reply.ok === false && reply.status === 0 && reply.error === failure.code, service + " worker reply " + JSON.stringify(reply));
+          // Cold path (worker) and forced path (bookmark_api's {status:httpStatus||0, error}) alike.
+          for (const [path, harness] of [
+            ["cold", createLookupHarness((message) => message.type === "lookup_bookmark" ? reply : { ok: false, status: 0, error: "unexpected" }, { service, tArgs: true })],
+            ["fresh", createLookupHarness({ ok: false, status: failure.status || 0, error: failure.code }, { service, tArgs: true })],
+          ]) {
+            const result = await (path === "cold" ? harness.runCold() : harness.run());
+            assert(result.status === "failed", service + " " + path + " " + failure.code + ": " + JSON.stringify(result));
+            const shown = harness.statuses.map((row) => row[1]);
+            assert(shown.length === 1 && shown[0] === copy, service + " " + path + " " + failure.code + " showed " + JSON.stringify(shown));
+            assert(harness.resets() === 0, service + " " + path + " " + failure.code + " reset the Pinboard session");
+          }
+        }
       }
     });
 
@@ -5519,7 +5634,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const block = source.slice(start, end);
       assert(/showFeedback\(\{[^}]*target: container/.test(block), "failure card must mount in the recent list (target: container)");
       assert(!/showStatus\(/.test(block), "no failure path may fall back to the form's status card");
-      assert((block.match(/reportDeleteFailure\(t\(/g) || []).length === 3, "all failure paths (self-hosted result, API result, network) must use the in-list report");
+      assert((block.match(/reportDeleteFailure\(/g) || []).length === 3, "all failure paths (self-hosted result, API result, network) must use the in-list report");
     });
 
     // ===================== Shift+Enter: AI shortcut, never in the notes =====================

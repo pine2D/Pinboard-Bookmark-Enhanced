@@ -5110,6 +5110,38 @@
       }
     }
   },
+  "bookmarkErrNetwork": {
+    "message": "Impossible de joindre le serveur de signets. Vérifiez la connexion réseau et l’URL du serveur. Un certificat HTTPS autosigné ou expiré sur le serveur produit aussi cette erreur."
+  },
+  "bookmarkErrTimeout": {
+    "message": "Le serveur de signets n’a pas répondu à temps. Réessayez plus tard."
+  },
+  "bookmarkErrServer": {
+    "message": "Le serveur de signets a rencontré une erreur. Réessayez plus tard."
+  },
+  "bookmarkErrRateLimit": {
+    "message": "Le serveur de signets reçoit trop de requêtes. Réessayez plus tard."
+  },
+  "bookmarkErrRemote": {
+    "message": "Le serveur de signets a refusé la requête (HTTP $STATUS$). Réessayer n’y changera rien. Vérifiez le signet et la configuration du serveur.",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkErrTooLarge": {
+    "message": "La requête était trop volumineuse et a été refusée (HTTP 413). Un proxy inverse placé devant le serveur limite peut-être la taille des requêtes, par exemple client_max_body_size dans nginx. Raccourcissez les notes ou la description, ou relevez la limite du proxy."
+  },
+  "bookmarkErrInvalidResponse": {
+    "message": "Le serveur de signets a renvoyé des données que l’extension ne sait pas lire. Vérifiez que l’URL pointe directement vers Karakeep ou linkding et que sa version est prise en charge."
+  },
+  "bookmarkErrAccountChanged": {
+    "message": "La connexion au service de signets a changé pendant la requête, le résultat n’est donc pas confirmé. Rouvrez le popup pour vérifier ce signet."
+  },
+  "bgSaveUnconfirmed": {
+    "message": "Enregistrement non confirmé"
+  },
   "bookmarkConnectErrAuth": {
     "message": "Le serveur a refusé le jeton API. Vérifiez le jeton ci-dessus, puis reconnectez-vous."
   },

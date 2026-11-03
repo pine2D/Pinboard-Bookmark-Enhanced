@@ -5122,6 +5122,47 @@
       }
     }
   },
+  "bookmarkErrNetwork": {
+    "message": "Couldn't reach the bookmark server. Check your network and the server URL. A self-signed or expired HTTPS certificate on the server also causes this.",
+    "description": "A self-hosted bookmark server could not be reached. Browsers report a certificate error the same way, so the copy names it."
+  },
+  "bookmarkErrTimeout": {
+    "message": "The bookmark server didn't respond in time. Try again later.",
+    "description": "A self-hosted bookmark server did not answer within the request deadline."
+  },
+  "bookmarkErrServer": {
+    "message": "The bookmark server ran into an error. Try again later.",
+    "description": "A self-hosted bookmark server answered with HTTP 5xx."
+  },
+  "bookmarkErrRateLimit": {
+    "message": "The bookmark server is receiving too many requests. Try again later.",
+    "description": "A self-hosted bookmark server answered with HTTP 429."
+  },
+  "bookmarkErrRemote": {
+    "message": "The bookmark server refused the request (HTTP $STATUS$). Trying again won't help; check the bookmark and the server's settings.",
+    "description": "A self-hosted bookmark server refused the request with an HTTP 4xx that has no more specific copy. Not retryable. $STATUS$ is the HTTP status code.",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkErrTooLarge": {
+    "message": "The request was too large and was refused (HTTP 413). A reverse proxy in front of the server may cap the request size, such as nginx's client_max_body_size. Shorten the notes or description, or raise the proxy's limit.",
+    "description": "A self-hosted bookmark server, or a reverse proxy in front of it, answered HTTP 413."
+  },
+  "bookmarkErrInvalidResponse": {
+    "message": "The bookmark server sent data the extension can't read. Check that the URL points to Karakeep or linkding itself and that its version is supported.",
+    "description": "A self-hosted bookmark server answered with data the extension cannot parse."
+  },
+  "bookmarkErrAccountChanged": {
+    "message": "The bookmark connection changed during the request, so the result isn't confirmed. Reopen the popup to check this bookmark.",
+    "description": "The bookmark connection changed while a request was under way. A write may already have gone through, so the copy must not say the save failed."
+  },
+  "bgSaveUnconfirmed": {
+    "message": "Save not confirmed",
+    "description": "Notification title when the outcome of a save is unknown."
+  },
   "bookmarkConnectErrAuth": {
     "message": "The server rejected the API token. Check the token above, then connect again."
   },

@@ -5110,6 +5110,38 @@
       }
     }
   },
+  "bookmarkErrNetwork": {
+    "message": "ブックマークサーバーに接続できません。ネットワークとサーバーのURLを確認してください。サーバーのHTTPS証明書が自己署名または期限切れの場合も、この状態になります。"
+  },
+  "bookmarkErrTimeout": {
+    "message": "ブックマークサーバーから時間内に応答がありませんでした。しばらくしてからもう一度お試しください。"
+  },
+  "bookmarkErrServer": {
+    "message": "ブックマークサーバーでエラーが発生しました。しばらくしてからもう一度お試しください。"
+  },
+  "bookmarkErrRateLimit": {
+    "message": "ブックマークサーバーへのリクエストが多すぎます。しばらくしてからもう一度お試しください。"
+  },
+  "bookmarkErrRemote": {
+    "message": "ブックマークサーバーがリクエストを拒否しました（HTTP $STATUS$）。再試行しても結果は変わりません。ブックマークの内容とサーバーの設定を確認してください。",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkErrTooLarge": {
+    "message": "リクエストが大きすぎるため拒否されました（HTTP 413）。サーバーの手前にあるリバースプロキシがリクエストサイズを制限している可能性があります（nginxのclient_max_body_sizeなど）。メモや説明を短くするか、プロキシの上限を引き上げてください。"
+  },
+  "bookmarkErrInvalidResponse": {
+    "message": "ブックマークサーバーから読み取れないデータが返されました。URLがKarakeepまたはlinkding本体を指しているか、サポート対象のバージョンかを確認してください。"
+  },
+  "bookmarkErrAccountChanged": {
+    "message": "リクエストの途中でブックマークの接続が変わったため、結果を確認できていません。ポップアップを開き直して、このブックマークを確認してください。"
+  },
+  "bgSaveUnconfirmed": {
+    "message": "保存を確認できません"
+  },
   "bookmarkConnectErrAuth": {
     "message": "サーバーがAPIトークンを拒否しました。上のトークンを確認して、もう一度接続してください。"
   },

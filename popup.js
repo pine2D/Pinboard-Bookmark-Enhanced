@@ -1710,6 +1710,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
             workerError = new Error(`HTTP ${resolved.status || 0}`);
             workerError.status = resolved.status || 0;
             if (resolved.error) workerError.code = resolved.error;
+            if (Number.isInteger(resolved.httpStatus)) workerError.httpStatus = resolved.httpStatus;
           }
           // Deliberate: an `ok:false` reply here always throws below rather than
           // falling through to the direct call, even for reasons the popup could
@@ -1858,12 +1859,16 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         // below -- exactly the misattribution this branch exists to avoid. The
         // worker's reason string is the one detail that survives the flattening,
         // which is why the throw above copies it onto .code.
-        const lookupFailureKey = typeof settings === "object"
-          ? pbpBookmarkFailureKey({reason:e?.code, httpStatus:e?.status}, pbpBookmarkServiceId(settings)) : "";
-        if (lookupFailureKey) {
-          // Self-hosted: name the gateway or token cause; classifyPinboardError
-          // would read a 403 challenge as a Pinboard auth failure.
-          showStatus("status-msg", t(lookupFailureKey), "error");
+        // The worker folds its own failures to status 0 and sends the HTTP
+        // status apart (httpStatus); a direct call carries it as status.
+        const lookupFailure = {reason:e?.code, httpStatus:Number.isInteger(e?.httpStatus) ? e.httpStatus : e?.status};
+        const lookupFailureText = typeof settings === "object"
+          ? pbpBookmarkFailureText(lookupFailure, pbpBookmarkServiceId(settings), t) : "";
+        if (lookupFailureText) {
+          // Self-hosted: every cause has its own copy. classifyPinboardError
+          // would read a 403 challenge as a Pinboard auth failure, and a lost
+          // host grant or a 5xx (status 0 from the worker) as "offline".
+          showStatus("status-msg", lookupFailureText, "error");
         } else if (e?.code === "account_changed") {
           // The worker refuses to dispatch once the stored token stops matching
           // the one it authorised this call with (background.js's
@@ -2431,7 +2436,7 @@ function setupSubmit(token) {
           // "undefined" instead of the login redirect already under way.
           const deleteService = pbpBookmarkServiceId(settings);
           if (!resp.ok && deleteService !== "pinboard") {
-            if (ownsDeleteForm()) showStatus("status-msg", t(pbpBookmarkFailureKey({reason:resp.error, httpStatus:resp.status}, deleteService) || "saveFailedGeneric"), "error");
+            if (ownsDeleteForm()) showStatus("status-msg", pbpBookmarkFailureText({reason:resp.error, httpStatus:resp.status}, deleteService, t) || t("saveFailedGeneric"), "error");
             return;
           }
           if (resp.status === 401) return; // pinboardFetch already redirected to login
@@ -2615,7 +2620,7 @@ async function fetchRecentBookmarks(token) {
               const resp = await pbpPopupBookmarkApi("delete", p.href);
               const deleteService = pbpBookmarkServiceId(settings);
               if (!resp.ok && deleteService !== "pinboard") {
-                reportDeleteFailure(t(pbpBookmarkFailureKey({reason:resp.error, httpStatus:resp.status}, deleteService) || "saveFailedGeneric"));
+                reportDeleteFailure(pbpBookmarkFailureText({reason:resp.error, httpStatus:resp.status}, deleteService, t) || t("saveFailedGeneric"));
                 return;
               }
               if (resp.status === 401) return; // pinboardFetch already redirected to login
@@ -2793,9 +2798,10 @@ function pbpSaveErrorView(result) {
   if (reason === "permission") return {message:t("bookmarkPermissionDenied"), retry:false};
   if (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard") {
     const key = pbpBookmarkFailureKey(result, pbpBookmarkServiceId(settings));
-    // The same over-long tag would fail again: the copy asks to shorten it.
-    if (key) return {message:t(key, ...pbpBookmarkFailureArgs(result)), retry:!PBP_BOOKMARK_GATEWAY_CODES.includes(reason) && !["bookmarkErrAuth", "bgSetToken", "bookmarkErrTagTooLong"].includes(key)};
-    return {message:t(["account_changed","not_logged_in"].includes(reason) ? "bookmarkConnectFailed" : "saveFailedGeneric"), retry:!["account_changed","not_logged_in"].includes(reason)};
+    // Only a cause a second attempt can get past keeps the retry button: the
+    // same 4xx, 413, gateway, token or over-long tag would fail again.
+    if (key) return {message:t(key, ...pbpBookmarkFailureArgs(result)), retry:pbpBookmarkFailureRetryable(result)};
+    return {message:t("saveFailedGeneric"), retry:true};
   }
   if (reason === "too_long") {
     return { message: t("uriTooLong", String(result.detail || ""), String(POSTS_ADD_URI_BUDGET)), retry: false };
