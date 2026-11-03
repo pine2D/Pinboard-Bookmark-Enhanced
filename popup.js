@@ -239,7 +239,7 @@ function invalidateBookmarkLookup() {
 
 // What every reader handoff carries about the bookmark beside the page:
 // bookmarkUrl, the address the toolbar icon and this popup look the bookmark
-// up under (pbpBookmarkLookupUrl of the page address the slot records), the
+// up under (pbpBookmarkLookupUrl of the tab's address, the icon's rule), the
 // source tab's incognito state (the private default follows it), and the
 // form's Read Later box and, outside linkding, its Private box. A linkding
 // bookmark the reader creates starts unshared whatever the Share box says
@@ -1353,7 +1353,8 @@ async function htmlToMarkdownAsync(html, opts) {
             const engine = settings.aiContentSource === "jina" ? "jina" : "local";
             const handoffNotes = $id("description-input")?.value || "";
             const handoffSummaryRange = pbpPopupHandoffSummaryRange(handoffNotes);
-            const handoff = pbpPopupReaderHandoff(url, tab);
+            // The tab's own address, as the toolbar icon reads it.
+            const handoff = pbpPopupReaderHandoff(tab.url || url, tab);
             await chrome.storage.local.set({
               ["md_preview_data_" + k]: {
                 pending: true, engine, source: engine,
@@ -1484,7 +1485,10 @@ async function htmlToMarkdownAsync(html, opts) {
           const k = crypto.randomUUID();
           const handoffNotes = $id("description-input")?.value || "";
           const handoffSummaryRange = pbpPopupHandoffSummaryRange(handoffNotes);
-          const handoff = pbpPopupReaderHandoff(result.url || url, tab);
+          // The tab's own address, as the toolbar icon reads it: result.url
+          // is what the extractor reports (Jina's d.url can be normalised or a
+          // redirect's end), so it stays the slot's url and nothing more.
+          const handoff = pbpPopupReaderHandoff(tab.url || url, tab);
           await chrome.storage.local.set({
             ["md_preview_data_" + k]: {
               markdown: markdown || "",

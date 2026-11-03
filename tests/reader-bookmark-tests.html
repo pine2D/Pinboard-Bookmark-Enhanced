@@ -488,7 +488,17 @@ async function popupPreviewDrafts() {
   assert(helperAt >= 0, "popup has no handoff summary range helper");
   const handoffRange = (snapshot) => new Function("pbpAiSummaryOwnershipSnapshot",
     source.slice(helperAt, source.indexOf("\n}\n", helperAt) + 2) + "\nreturn pbpPopupHandoffSummaryRange;")(snapshot);
-  return { normal, pending, handoffRange, describedBy, readerHandoff };
+  // The page address each popup handoff passes pbpPopupReaderHandoff, read
+  // from the call itself and evaluated against the given extraction result,
+  // url-input value and tab.
+  const handoffArgIn = (region, label) => {
+    const call = region.match(/const handoff = pbpPopupReaderHandoff\(([^;]*)\);/);
+    assert(call, label + " preview builds no reader handoff");
+    return (result, url, tab) => new Function("result", "url", "tab", "pbpPopupReaderHandoff", call[0] + "\nreturn handoff;")(result, url, tab, pageUrl => pageUrl);
+  };
+  const handoffPage = { normal: handoffArgIn(opener, "normal"),
+    pending: handoffArgIn(source.slice(source.lastIndexOf("typeof result.frameOrigin", pendingAt), pendingAt), "pending") };
+  return { normal, pending, handoffRange, describedBy, readerHandoff, handoffPage };
 }
 await test("normal and pending popup preview payloads carry linkding Description into reader state", async () => {
   const { normal, pending } = await popupPreviewDrafts();
@@ -866,6 +876,24 @@ await test("popup handoffs carry the cleaned address, incognito source, privacy 
   const h = await pipelineHarness({ post: null, slot: { sourceIncognito: true }, settings: { optPrivateDefault: false, optPrivateIncognito: true } });
   equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER)).status, "saved");
   equal(h.env.post.shared, "no");
+});
+// The toolbar icon looks the bookmark up under the tab's own address
+// (pbpBookmarkLookupUrl(tab.url)); both popup handoffs derive bookmarkUrl from
+// that address too, never from the extraction result. Jina reports its own
+// d.url (normalised, or the address a redirect ended on), so a bookmarkUrl
+// read from result.url misses the bookmark the popup saved.
+await test("popup handoffs derive the bookmark address from the tab, not the extraction result", async () => {
+  const { handoffPage, readerHandoff } = await popupPreviewDrafts();
+  const tab = { url: TRACKED, incognito: false };
+  for (const resultUrl of [URL_ARTICLE + "/", "https://example.com/redirected?utm_source=x", TRACKED, undefined]) {
+    for (const which of ["normal", "pending"]) {
+      const page = handoffPage[which]({ url: resultUrl }, URL_ARTICLE, tab);
+      for (const [label, urlClean] of [["cleaning on open", SETTINGS_DEFAULTS.urlClean], ["cleaning off", { ...SETTINGS_DEFAULTS.urlClean, enabled: false }]]) {
+        const where = which + " result.url=" + resultUrl + " " + label;
+        equal(readerHandoff(() => null, { bookmarkService: "pinboard" }, urlClean)(page, tab).bookmarkUrl, pbpBookmarkLookupUrl(tab.url, urlClean), where);
+      }
+    }
+  }
 });
 await test("popup preview payloads carry the summary range the popup vouches for beside the notes", async () => {
   const { normal, pending, handoffRange } = await popupPreviewDrafts();
