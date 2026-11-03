@@ -271,7 +271,7 @@
   "bookmarkChangedElsewhere": {"message": "開いた後にこのブックマークが別の場所で変更されたため、変更は保存されていません。最新の内容を確認してから、もう一度保存してください。"},
   "bookmarkFieldReadsThere": {
     "message": "別の場所の$FIELD$は現在「$VALUE$」です。もう一度保存すると、入力した内容に置き換わります。",
-    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long). Say what the field holds now, not that it changed: after a restored draft it may never have been changed there.",
     "placeholders": {
       "field": {
         "content": "$1"

@@ -271,7 +271,7 @@
   "bookmarkChangedElsewhere": {"message": "Dieses Lesezeichen wurde an anderer Stelle geändert, nachdem du es geöffnet hast. Deine Änderungen wurden daher nicht gespeichert. Prüfe die aktuelle Fassung und speichere dann erneut."},
   "bookmarkFieldReadsThere": {
     "message": "Im Feld „$FIELD$“ steht dort jetzt „$VALUE$“. Speicherst du erneut, wird das durch deine Eingabe ersetzt.",
-    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long). Say what the field holds now, not that it changed: after a restored draft it may never have been changed there.",
     "placeholders": {
       "field": {
         "content": "$1"

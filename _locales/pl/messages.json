@@ -271,7 +271,7 @@
   "bookmarkChangedElsewhere": {"message": "Ta zakładka została zmieniona gdzie indziej po jej otwarciu, więc zmian nie zapisano. Sprawdź najnowszą wersję i zapisz ponownie."},
   "bookmarkFieldReadsThere": {
     "message": "Pole $FIELD$ ma teraz tam wartość „$VALUE$”. Ponowny zapis zastąpi ją tym, co wpisano.",
-    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long). Say what the field holds now, not that it changed: after a restored draft it may never have been changed there.",
     "placeholders": {
       "field": {
         "content": "$1"

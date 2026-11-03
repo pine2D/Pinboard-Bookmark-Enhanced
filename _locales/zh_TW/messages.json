@@ -271,7 +271,7 @@
   "bookmarkChangedElsewhere": {"message": "這個書籤在你開啟後已在別處修改，這次的修改沒有儲存。請核對最新內容後再儲存。"},
   "bookmarkFieldReadsThere": {
     "message": "別處的$FIELD$現在是「$VALUE$」，再次儲存會改成你填寫的內容。",
-    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long). Say what the field holds now, not that it changed: after a restored draft it may never have been changed there.",
     "placeholders": {
       "field": {
         "content": "$1"

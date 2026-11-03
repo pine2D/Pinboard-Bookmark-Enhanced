@@ -270,8 +270,8 @@
   "bookmarkDeletedElsewhere": {"message": "Ce signet a été supprimé ailleurs : vos modifications n’ont pas été enregistrées. Pour ajouter de nouveau la page à vos signets, appuyez sur « Enregistrer »."},
   "bookmarkChangedElsewhere": {"message": "Ce signet a été modifié ailleurs depuis que vous l’avez ouvert : vos modifications n’ont pas été enregistrées. Vérifiez la version la plus récente, puis enregistrez de nouveau."},
   "bookmarkFieldReadsThere": {
-    "message": "Sur le serveur, le champ $FIELD$ indique désormais « $VALUE$ ». Enregistrer de nouveau le remplace par votre saisie.",
-    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
+    "message": "Sur le serveur, le champ $FIELD$ indique actuellement « $VALUE$ ». Enregistrer de nouveau le remplace par votre saisie.",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long). Say what the field holds now, not that it changed: after a restored draft it may never have been changed there.",
     "placeholders": {
       "field": {
         "content": "$1"

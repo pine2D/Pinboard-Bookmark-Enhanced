@@ -270,8 +270,8 @@
   "bookmarkDeletedElsewhere": {"message": "Эта закладка была удалена в другом месте, поэтому изменения не сохранены. Чтобы снова добавить страницу в закладки, нажмите «Сохранить»."},
   "bookmarkChangedElsewhere": {"message": "Эта закладка была изменена в другом месте после того, как вы её открыли, поэтому изменения не сохранены. Проверьте последнюю версию и сохраните снова."},
   "bookmarkFieldReadsThere": {
-    "message": "Там поле «$FIELD$» теперь содержит «$VALUE$». При повторном сохранении его заменит ваш текст.",
-    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
+    "message": "Там поле «$FIELD$» сейчас содержит «$VALUE$». При повторном сохранении его заменит ваш текст.",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long). Say what the field holds now, not that it changed: after a restored draft it may never have been changed there.",
     "placeholders": {
       "field": {
         "content": "$1"
