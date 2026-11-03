@@ -308,7 +308,27 @@ function pbpCreateBookmarkServiceClient(config) {
       return {status:"partial",bookmark,mutation,failedStep:step,error:error.code || "remote",httpStatus:error.status};
     }
   };
-  const pages = async (path, readRows, nextPage, limit = 10000) => {
+  // linkding's DRF `next` is built from the request as the server saw it, so
+  // behind a TLS-terminating or host-rewriting proxy it carries another scheme
+  // or host. Only its path and two integers are trusted; the request is
+  // rebuilt under the configured root so nothing is ever sent elsewhere.
+  const linkdingNext = (data, dir, size) => {
+    const next = data?.next;
+    if (next === null || next === undefined || next === "") return "";
+    if (typeof next !== "string") throw pbpBookmarkServiceError("invalid_response");
+    let url;
+    try { url = new URL(next); } catch { throw pbpBookmarkServiceError("invalid_response"); }
+    if (url.pathname !== new URL(dir, root).pathname) throw pbpBookmarkServiceError("invalid_response");
+    const readInt = name => {
+      const value = url.searchParams.get(name);
+      return value !== null && /^\d{1,9}$/.test(value) ? Number(value) : NaN;
+    };
+    const offset = readInt("offset");
+    const pageSize = readInt("limit");
+    if (!Number.isInteger(offset) || !Number.isInteger(pageSize) || pageSize < 1) throw pbpBookmarkServiceError("invalid_response");
+    return dir + "?limit=" + pageSize + "&offset=" + offset;
+  };
+  const pages = async (path, readRows, nextPage, limit = 10000, warnOnCap = false) => {
     const rows = [];
     const seen = new Set();
     while (path) {
@@ -318,15 +338,20 @@ function pbpCreateBookmarkServiceClient(config) {
       const page = readRows(data);
       if (!Array.isArray(page)) throw pbpBookmarkServiceError("invalid_response");
       rows.push(...page);
-      if (rows.length >= limit) return rows.slice(0,limit);
-      path = nextPage(data);
-      if (path && typeof path !== "string") throw pbpBookmarkServiceError("invalid_response");
+      const following = nextPage(data);
+      if (following && typeof following !== "string") throw pbpBookmarkServiceError("invalid_response");
+      if (rows.length >= limit) {
+        // Count only: never the names.
+        if (warnOnCap && (rows.length > limit || following)) console.warn("[bookmark-services] result capped at " + limit + " rows");
+        return rows.slice(0,limit);
+      }
+      path = following;
     }
     return rows;
   };
   const tags = async () => {
     const rows = service === "linkding"
-      ? await pages("tags/?limit=100",data=>data?.results,data=>data.next)
+      ? await pages("tags/?limit=1000",data=>data?.results,data=>linkdingNext(data,"tags/"),10000,true)
       : await pages("tags?limit=1000",data=>data?.tags,data=>data.nextCursor ? "tags?limit=1000&cursor=" + encodeURIComponent(data.nextCursor) : "");
     if (!Array.isArray(rows) || rows.some(tag=>typeof tag?.name !== "string")) throw pbpBookmarkServiceError("invalid_response");
     const seen = new Set();
@@ -339,7 +364,7 @@ function pbpCreateBookmarkServiceClient(config) {
   const recent = async (limit = 5) => {
     limit = Math.max(1,Math.min(100,Number(limit)||5));
     const rows = service === "linkding"
-      ? await pages("bookmarks/?limit=" + limit,data=>data?.results,data=>data.next,limit)
+      ? await pages("bookmarks/?limit=" + limit,data=>data?.results,data=>linkdingNext(data,"bookmarks/"),limit)
       : await pages("bookmarks?limit=" + limit,data=>data?.bookmarks,data=>data.nextCursor ? "bookmarks?limit=" + limit + "&cursor=" + encodeURIComponent(data.nextCursor) : "",limit);
     return rows.filter(row=>service === "linkding" || row.content?.type === "link").map(row=>pbpBookmarkNormalize(service,row));
   };

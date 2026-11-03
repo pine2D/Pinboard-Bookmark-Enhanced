@@ -158,18 +158,62 @@ test("linkding uses canonical tags returned by its server",async()=>{
   const result=await h.client.save({url:pageUrl,title:"Title",notes:"",tags:["machine learning"],toread:false,private:true},null);
   equal(h.calls[0].body.tag_names,["machine learning"]);equal(result.bookmark.tags,["machine-learning"]);
 });
-test("linkding pagination refuses to send credentials to another origin",async()=>{const {client,calls}=harness("linkding",[[200,{count:2,next:"https://evil.example/api/tags/",results:[{id:1,name:"a"}]}]]);await rejects(()=>client.tags(),"invalid_response");equal(calls.length,1);});
+const ldTag=(id,name)=>({id,name,date_added:"2026-10-30T03:01:22.656384Z"});
+test("linkding pagination never requests a host the user did not configure",async()=>{
+  const {client,calls}=harness("linkding",[[200,{count:2,next:"https://other.example/steal",previous:null,results:[ldTag(1,"a")]}]]);
+  await rejects(()=>client.tags(),"invalid_response");
+  equal(calls.map(c=>c.url),["https://bookmarks.example/base/api/tags/?limit=1000"]);
+  const h=harness("linkding",[[200,{count:2,next:"https://other.example/base/api/tags/?limit=1000&offset=1000",previous:null,results:[ldTag(1,"a")]}],[200,{count:2,next:null,previous:null,results:[ldTag(2,"b")]}]]);
+  equal(await h.client.tags(),[{name:"a",count:0},{name:"b",count:0}]);
+  ok(h.calls.every(c=>c.url.startsWith("https://bookmarks.example/base/api/tags/")));
+});
+test("linkding pagination rebuilds next under the root when a proxy changes scheme or host",async()=>{
+  for(const origin of ["http://bookmarks.example","http://linkding:9090","https://bookmarks.example:8443"]){
+    const h=harness("linkding",[[200,{count:2,next:origin+"/base/api/tags/?limit=1000&offset=1000",previous:null,results:[ldTag(1,"a")]}],[200,{count:2,next:null,previous:null,results:[ldTag(2,"b")]}]]);
+    equal(await h.client.tags(),[{name:"a",count:0},{name:"b",count:0}]);
+    equal(h.calls.map(c=>c.url),["https://bookmarks.example/base/api/tags/?limit=1000","https://bookmarks.example/base/api/tags/?limit=1000&offset=1000"]);
+  }
+});
+test("linkding pagination rejects a next whose path or numbers are wrong",async()=>{
+  for(const next of ["https://bookmarks.example/base/api/bookmarks/?limit=1000&offset=1000","https://bookmarks.example/api/tags/?limit=1000&offset=1000","https://bookmarks.example/base/api/tags/?limit=x&offset=1000","https://bookmarks.example/base/api/tags/?limit=1000","/base/api/tags/?limit=1000&offset=1000",5]){
+    const h=harness("linkding",[[200,{count:2,next,previous:null,results:[ldTag(1,"a")]}]]);
+    await rejects(()=>h.client.tags(),"invalid_response");
+    equal(h.calls.length,1);
+  }
+});
+test("linkding recent shares the same next handling",async()=>{
+  const row={...ld};
+  const h=harness("linkding",[[200,{count:9,next:"http://linkding:9090/base/api/bookmarks/?limit=2&offset=2",previous:null,results:[row,row]}],[200,{count:9,next:null,previous:null,results:[row]}]]);
+  equal((await h.client.recent(3)).length,3);
+  equal(h.calls.map(c=>c.url),["https://bookmarks.example/base/api/bookmarks/?limit=3","https://bookmarks.example/base/api/bookmarks/?limit=2&offset=2"]);
+});
+test("linkding tags cap at 10000 with one count-only warning",async()=>{
+  const warns=[],original=console.warn;console.warn=(...a)=>warns.push(a);
+  try{
+    const page=n=>Array.from({length:1000},(_,i)=>ldTag(n*1000+i,"secret-tag-"+(n*1000+i)));
+    const replies=Array.from({length:10},(_,n)=>[200,{count:11000,next:"http://linkding:9090/base/api/tags/?limit=1000&offset="+(n+1)*1000,previous:null,results:page(n)}]);
+    const h=harness("linkding",replies);
+    equal((await h.client.tags()).length,10000);
+    equal(h.calls[0].url,"https://bookmarks.example/base/api/tags/?limit=1000");
+    equal(warns.length,1);
+    ok(!JSON.stringify(warns).includes("secret-tag"));
+  }finally{console.warn=original;}
+});
+test("linkding tags with a context-path root page through",async()=>{
+  const h=harness("linkding",[[200,{count:2,next:"http://h:1/base/api/tags/?limit=1000&offset=1000",previous:null,results:[ldTag(1,"a")]}],[200,{count:2,next:null,previous:null,results:[ldTag(2,"b")]}]]);
+  equal((await h.client.tags()).length,2);
+});
 test("linkding tags follow three next links and report unavailable counts as zero",async()=>{
   const h=harness("linkding",[
-    [200,{count:3,next:"https://bookmarks.example/base/api/tags/?limit=100&offset=1",previous:null,results:[{id:1,name:"a",date_added:"2026-10-30T03:01:22.656384Z"}]}],
-    [200,{count:3,next:"https://bookmarks.example/base/api/tags/?limit=100&offset=2",previous:"https://bookmarks.example/base/api/tags/?limit=100",results:[{id:2,name:"b",date_added:"2026-10-30T03:02:22.656384Z"}]}],
-    [200,{count:3,next:null,previous:"https://bookmarks.example/base/api/tags/?limit=100&offset=1",results:[{id:3,name:"c",date_added:"2026-10-30T03:03:22.656384Z"}]}]
+    [200,{count:3,next:"https://bookmarks.example/base/api/tags/?limit=1000&offset=1",previous:null,results:[{id:1,name:"a",date_added:"2026-10-30T03:01:22.656384Z"}]}],
+    [200,{count:3,next:"https://bookmarks.example/base/api/tags/?limit=1000&offset=2",previous:"https://bookmarks.example/base/api/tags/?limit=1000",results:[{id:2,name:"b",date_added:"2026-10-30T03:02:22.656384Z"}]}],
+    [200,{count:3,next:null,previous:"https://bookmarks.example/base/api/tags/?limit=1000&offset=1",results:[{id:3,name:"c",date_added:"2026-10-30T03:03:22.656384Z"}]}]
   ]);
   equal(await h.client.tags(),[{name:"a",count:0},{name:"b",count:0},{name:"c",count:0}]);
   equal(h.calls.map(call=>call.url),[
-    "https://bookmarks.example/base/api/tags/?limit=100",
-    "https://bookmarks.example/base/api/tags/?limit=100&offset=1",
-    "https://bookmarks.example/base/api/tags/?limit=100&offset=2"
+    "https://bookmarks.example/base/api/tags/?limit=1000",
+    "https://bookmarks.example/base/api/tags/?limit=1000&offset=1",
+    "https://bookmarks.example/base/api/tags/?limit=1000&offset=2"
   ]);
 });
 test("Karakeep lookup fetches full bookmark after URL check",async()=>{const {client,calls}=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk]]);const b=await client.lookup(pageUrl);equal([b.id,b.title,b.notes,b.tags,b.toread,b.archived],["bk1","Saved title","My note",["work"],false,true]);equal(calls[0].headers.get("Authorization"),"Bearer fixture-token");equal(calls[1].url,"https://bookmarks.example/base/api/v1/bookmarks/bk1");});
