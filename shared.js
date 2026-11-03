@@ -2422,6 +2422,17 @@ function pbpKarakeepReadLaterBinding(settings, account, foundId) {
   if (settings?.karakeepReadLaterListOwner === account && settings.karakeepReadLaterListId) return {};
   return {karakeepReadLaterListId:foundId, karakeepReadLaterListOwner:account};
 }
+// The whole Connect-time patch for the Read Later binding: a changed identity
+// clears the old binding first, and the found list is then judged against that
+// cleared state, so a stale same-owner binding cannot swallow the found one.
+function pbpKarakeepConnectBindingPatch(settings, oldAccount, newAccount, foundId) {
+  const patch = {};
+  if (oldAccount !== newAccount) {
+    patch.karakeepReadLaterListId = "";
+    patch.karakeepReadLaterListOwner = "";
+  }
+  return Object.assign(patch, pbpKarakeepReadLaterBinding({...settings, ...patch}, newAccount, foundId));
+}
 // A partial save reports the step that failed; one cause inside it has its own
 // copy: Karakeep holds several of our Read Later lists, so Read Later was left
 // unsaved. "" for any other partial (those keep the step copy of each outlet).

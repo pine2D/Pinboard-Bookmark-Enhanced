@@ -3009,11 +3009,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const patch = {[service + "Url"]:baseUrl,
           [service + "Token"]:pbpBookmarkCredentialSeal({baseUrl, token, connectionId, userId:result.identity.id, gateway, ...(service === "linkding" ? {sharing:result.identity.sharing === true} : {})})};
         if (document.querySelector('input[name="bookmark-service"]:checked')?.value === service) patch.bookmarkService = service;
-        if (service === "karakeep" && pbpBookmarkConnection({...fresh,bookmarkService:service}).account !== "karakeep:" + baseUrl + ":" + result.identity.id) {
-          patch.karakeepReadLaterListId = "";
-          patch.karakeepReadLaterListOwner = "";
-        }
-        if (service === "karakeep") Object.assign(patch, pbpKarakeepReadLaterBinding(fresh, "karakeep:" + baseUrl + ":" + result.identity.id, result.readLaterListId));
+        if (service === "karakeep") Object.assign(patch, pbpKarakeepConnectBindingPatch(fresh,
+          pbpBookmarkConnection({...fresh,bookmarkService:service}).account, "karakeep:" + baseUrl + ":" + result.identity.id, result.readLaterListId));
         const saved = await persistSettings(patch);
         setConnectStatus(saved.ok ? "ok" : "bad", t(saved.ok ? "bookmarkConnected" : "bookmarkConnectFailed"));
         if (saved.ok) { gatewayStored[service] = gateway; connectStored[service] = {url:baseUrl, token}; pbpOptGatewaySync(service); }

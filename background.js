@@ -607,7 +607,10 @@ async function pbpVerifyBookmarkConnection({service, baseUrl, token, gateway}) {
     let readLaterListId = "";
     if (service === "karakeep") {
       try { readLaterListId = await client.findReadLaterList(); }
-      catch (error) { console.warn("[bookmark-connect] list lookup failed:", error?.code, error?.status); }
+      catch (error) {
+        if (typeof error?.code === "string") console.warn("[bookmark-connect] list lookup failed:", error.code, error.status);
+        else console.warn("[bookmark-connect] list lookup failed:", error?.name, error?.message);
+      }
     }
     return {ok:true, identity, ...(service === "karakeep" ? {readLaterListId} : {})};
   } catch (error) {
@@ -5301,6 +5304,8 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
   // A Karakeep save that created the bookmark but not every later step: it is
   // on the server, so it is not a failure, and a rerun updates it in place.
   let partial = Number(rc.partial) || 0;
+  // Some of those partials were the duplicate Read Later list; the summary names it once.
+  let partialList = rc.partialList === true;
   // The first tag linkding could not store, as the summary names it. It rides
   // with the counts so a resumed run can still name it.
   let longTag = typeof rc.longTag === "string" ? rc.longTag : "";
@@ -5309,7 +5314,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
   let longTagSkip = rc.longTagSkip === true;
   const startIndex = resumeState ? Math.max(0, Number(resumeState.startIndex) || 0) : 0;
   const resumeCount = Number(resumeState?.resumeCount) || 0;
-  const base = () => ({ runId, resumeCount, account, total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, partial, longTag, longTagSkip });
+  const base = () => ({ runId, resumeCount, account, total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, partial, partialList, longTag, longTagSkip });
   // Persist the job snapshot BEFORE the first item: everything a resume needs
   // (public tab identity + cursor + counts), never a token. The per-item
   // checkpoint below rewrites cursor+counts; every terminal path removes it.
@@ -5318,7 +5323,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     account,
     tabs: tabs.map((tb) => ({ id: tb.id, url: tb.url, title: tb.title, incognito: !!tb.incognito })),
     next: processed,
-    counts: { processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, partial, longTag, longTagSkip },
+    counts: { processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, partial, partialList, longTag, longTagSkip },
     resumeCount,
     ts: Date.now(),
   });
@@ -5545,7 +5550,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         else if (result.status === "queued") queued++;
         else if (result.status === "skipped") skipped++;
         else if (result.reason === "too_long") tooLong++;
-        else if (result.reason === "partial") partial++;
+        else if (result.reason === "partial") { partial++; if (pbpBookmarkPartialKey(result)) partialList = true; }
         else if (result.reason === "tag_too_long") {
           tagTooLong++; longTag ||= pbpBookmarkFailureArgs(result)[0];
           if (mode === "skip") longTagSkip = true;
@@ -5573,7 +5578,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     const tagsSuffix = baseTags.length ? t("batchTaggedSuffix", baseTags.join(", ")) : "";
     const skippedMsg = skipped > 0 ? t("batchSkipped", String(skipped)) : "";
     const tooLongMsg = tooLong > 0 ? t("batchTooLong", String(tooLong)) : "";
-    const partialMsg = partial > 0 ? t("batchPartial", String(partial)) : "";
+    const partialMsg = partial > 0 ? t("batchPartial", String(partial)) + (partialList ? " · " + t(PBP_BOOKMARK_FAILURE_KEYS.read_later_list) : "") : "";
     const queuedMsg = queued > 0 ? ` · ${t("offlineQueued", String(queued))}` : "";
     // A sentence of its own after the summary: which tag, the limit, what to do.
     const tagTooLongMsg = tagTooLong > 0

@@ -1250,6 +1250,19 @@ test("Connect binds a found list unless this connection already has a binding",(
   equal(pbpKarakeepReadLaterBinding({karakeepReadLaterListId:"mine",karakeepReadLaterListOwner:acct},acct,"later"),{});
   for(const none of ["",undefined,null,5])equal(pbpKarakeepReadLaterBinding({},acct,none),{});
 });
+test("Connect's clear-then-bind patch judges the found list against the cleared state",()=>{
+  const acct="karakeep:https://keep.example/base/:user1";
+  // A synced binding of the same owner on a device whose token is missing: the old
+  // connection is not ready (account ""), yet the found list must still be bound.
+  const synced={karakeepReadLaterListId:"L1",karakeepReadLaterListOwner:acct};
+  equal(pbpKarakeepConnectBindingPatch(synced,"",acct,"L1"),{karakeepReadLaterListId:"L1",karakeepReadLaterListOwner:acct});
+  // Nothing found: the stale binding of a different identity is cleared, not kept.
+  equal(pbpKarakeepConnectBindingPatch(synced,"",acct,""),{karakeepReadLaterListId:"",karakeepReadLaterListOwner:""});
+  // Same identity with its own binding: nothing changes.
+  equal(pbpKarakeepConnectBindingPatch(synced,acct,acct,"L2"),{});
+  // Another identity: old binding replaced by the found list.
+  equal(pbpKarakeepConnectBindingPatch({karakeepReadLaterListId:"old",karakeepReadLaterListOwner:"karakeep:https://o/:u"},"karakeep:https://o/:u",acct,"L3"),{karakeepReadLaterListId:"L3",karakeepReadLaterListOwner:acct});
+});
 test("a bound list makes lookup read the bookmark's Read Later membership",async()=>{
   const h=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[200,kkList("later")],[200,{lists:[kkList("later")]}]],{readLaterListId:"later"});
   equal((await h.client.lookup(pageUrl)).toread,true);
@@ -1713,6 +1726,17 @@ test("a Batch that only partly saved its pages is not titled a failure",async()=
   const [id, title, body, category]=h.state.notifications.at(-1)||[];
   equal([id,title,category],["batch-saved","bgBatchSaved","batchSave"]);
   ok(body.includes("batchPartial:2"),body);
+});
+test("a Batch whose pages all hit duplicate Read Later lists names that cause once in the summary",async()=>{
+  const tabs=[0,1].map(i=>({id:70+i,url:pageUrl+"?d="+i,title:"T"+i,incognito:false}));
+  const dup={lists:[kkList("a"),kkList("b")]};
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[201,kkRecord("bk-a","")],[200,dup],[200,{bookmarkId:null}],[201,kkRecord("bk-b","")],[200,dup]]);
+  await (await producers(h,{autoNotes:"",summary:"",settings:{batchAiSummary:false,optReadlaterDefault:true}})).batchSave(tabs);
+  const last=h.state.progress.at(-1);
+  equal([last.saved,last.failed,last.partial],[0,0,2]);
+  const body=(h.state.notifications.at(-1)||[])[2];
+  ok(body.includes("batchPartial:2"),body);
+  equal(body.split("bookmarkErrReadLaterList").length-1,1,body);
 });
 test("merge-mode Batch with an over-long page title merges into a bookmark already saved and checks it once",async()=>{
   const long="😀".repeat(513), tabs=[{id:33,url:pageUrl,title:long,incognito:false}];
