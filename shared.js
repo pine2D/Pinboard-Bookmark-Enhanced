@@ -2073,7 +2073,10 @@ function pbpOfflineQueueReduce(queue, action) {
 // automatically; the user retries or removes it (user decision 2026-11-02).
 // Connection-level failures pause the connection instead (G8).
 const PBP_OFFLINE_QUEUE_ATTENTION_CODES = Object.freeze(["too_long", "url_invalid", "tag_too_long", "payload_too_large",
-  "invalid_response", "invalid", "invalid_request", "remote", "http"]);
+  "invalid_response", "invalid", "invalid_request", "remote", "http",
+  // Karakeep holds several of our Read Later lists: a partial save the next
+  // replay repeats until the user removes the extra list (G16b).
+  "read_later_list"]);
 const PBP_OFFLINE_QUEUE_TRANSIENT_STATUSES = Object.freeze([408, 425, 429]);
 function pbpOfflineQueueAttentionFailure(result) {
   const reason = result?.reason;
@@ -2118,6 +2121,7 @@ function pbpOfflineQueueFailureMark(result, now = Date.now()) {
     if (!Number.isSafeInteger(delay) || delay <= 0) return null;
     return { code: result.reason, at: now, ...withStatus, retryAfter: now + Math.min(delay, PBP_OFFLINE_QUEUE_RETRY_AFTER_MAX) };
   }
+  if (pbpBookmarkPartialKey(result)) return { code: "read_later_list", at: now };
   if (!pbpOfflineQueueAttentionFailure(result)) return null;
   return { code: result.reason, at: now, ...withStatus };
 }

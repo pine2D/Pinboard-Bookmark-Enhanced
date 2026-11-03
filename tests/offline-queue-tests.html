@@ -174,6 +174,31 @@ await suite("offline queue", async () => {
     assert(pbpOfflineQueueHeld({ failure: { code: "remote", at: now } }, now + 1e9), "attention is held for good");
     assert(!pbpOfflineQueueHeld({}, now) && !pbpOfflineQueueHeld({ failure: { code: "rate_limited", at: now, retryAfter: "x" } }, now), "no or invalid marker held");
   });
+  // G16b: a Karakeep replay that stops on several Read Later lists meets the
+  // same answer every time, so it is marked like any other dead end.
+  await test("a partial replay blocked by duplicate Read Later lists is marked and held; other partials are not", () => {
+    const now = Date.parse("2026-11-03T10:00:00Z");
+    const partial = (extra = {}) => ({ status: "failed", reason: "partial", failedStep: "read_later", httpStatus: undefined, ...extra });
+    const dup = pbpOfflineQueueFailureMark(partial({ error: "read_later_list" }), now);
+    assert(JSON.stringify(dup) === JSON.stringify({ code: "read_later_list", at: now }), "duplicate-list marker: " + JSON.stringify(dup));
+    const stored = pbpOfflineQueueReduce([{ queueId: "a" }], { kind: "mark_failure", queueId: "a", failure: dup });
+    assert(JSON.stringify(stored[0].failure) === JSON.stringify(dup), "marker survives the reducer: " + JSON.stringify(stored[0].failure));
+    assert(pbpOfflineQueueNeedsAttention(stored[0]) && pbpOfflineQueueHeld(stored[0], now + 1e9), "marked record is held for good");
+    assert(!pbpOfflineQueueAutoRetries(stored, { until: now + 1e9 }), "no automatic replay is left to schedule");
+    for (const result of [partial(), partial({ error: "other" }), partial({ failedStep: "tags", error: "read_later_list" }),
+      partial({ failedStep: "bookmark" }), { status: "failed", reason: "partial", failedStep: "read_later", httpStatus: 500 }]) {
+      assert(pbpOfflineQueueFailureMark(result, now) === null, "marked another partial: " + JSON.stringify(result));
+    }
+  });
+  await test("a row marked read_later_list names the duplicate lists and offers retry and remove", async () => {
+    const KK = "karakeep:https://kk.example/:user-kk-99";
+    const { rows } = await renderQueueBar({ ok: true, pause: null, account: KK, queue: [
+      { queueId: "dup", account: KK, url: "https://page.example/dup", title: "dup", tags: "work", queuedAt: Date.now(), failure: { code: "read_later_list", at: 1 } },
+    ] });
+    const row = rows.find((r) => r.id === "dup");
+    assert(row && row.reason === PBP_BOOKMARK_FAILURE_KEYS.read_later_list, "row reason: " + (row && row.reason));
+    assert(row.buttons.join() === "offlineRetry,offlineRemove" && row.hint === "offlineQueueAttentionHint", "row buttons/hint: " + row.buttons.join() + " / " + row.hint);
+  });
   await test("new queue payload does not persist credentials", () => {
     const out = pbpOfflineQueueReduce([], { kind: "enqueue", item: { queueId: "a", account: "alice", url: "https://a.com", token: "secret" } });
     assert(out.length === 1 && !("token" in out[0]), "new item strips token");
