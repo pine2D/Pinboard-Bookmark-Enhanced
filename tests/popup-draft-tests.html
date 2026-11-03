@@ -68,7 +68,7 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    const recentStart=uiSource.indexOf('async function loadBookmarkForEdit('),recentEnd=uiSource.indexOf('// ===================== Recent Bookmarks',recentStart);
    const aiSlice=name=>{const s=aiSource.indexOf('function '+name+'(');return aiSource.slice(s,aiSource.indexOf('\n}',s)+2);};
    const cacheSlice=name=>{const s=cacheSource.indexOf('function '+name+'(');return cacheSource.slice(s,cacheSource.indexOf('\n}',s)+2);};
-   const names=Object.keys(deps);let api;api=new Function(...names,[uiSource.slice(a,b),sliceFn('pbpPopupFormIsDirty'),sliceFn('updateCharCount'),sliceFn('recomputeArchiveCheck'),uiSource.slice(recentStart,recentEnd),aiSlice('pbpAiWrapSummary'),aiSlice('upsertSummary'),aiSlice('removeSummary'),aiSlice('_aiLinkdingSummaryRange'),aiSlice('_aiUpsertLinkdingSummary'),aiSlice('_aiRemoveLinkdingSummary'),aiSlice('_aiRestoreLinkdingSummary'),aiSlice('pbpAiRemoveSummaryRange'),cacheSlice('pbpAiSummaryRangeValid'),sliceFn('shouldUpdateField'),aiSlice('_aiUrlEquivalent'),cacheSlice('pbpAiPageUrlNorm'),sliceFn('_loadUrlCleanSettings'),aiSlice('pbpPopupFormHoldsOpenedPage'),sliceFn('pbpPopupPrefillDescription'),sliceFn('pbpPopupPrefillTitle'),sliceFn('pbpPopupFormHoldsPage'),sliceFn('pbpPopupFillPageDescription'),sliceFn('pbpPopupRenderDescriptionHint'),sliceFn('pbpPopupSyncPageDescription'),sliceFn('pbpPopupUrlEdited'),sliceFn('setupUrlInput'),
+   const names=Object.keys(deps);let api;api=new Function(...names,[uiSource.slice(a,b),sliceFn('pbpPopupFormIsDirty'),sliceFn('updateCharCount'),sliceFn('recomputeArchiveCheck'),uiSource.slice(recentStart,recentEnd),aiSlice('pbpAiWrapSummary'),aiSlice('upsertSummary'),aiSlice('removeSummary'),aiSlice('_aiLinkdingSummaryRange'),aiSlice('_aiUpsertLinkdingSummary'),aiSlice('_aiRemoveLinkdingSummary'),aiSlice('_aiRestoreLinkdingSummary'),aiSlice('_aiLinkdingClaimedRange'),aiSlice('pbpAiLinkdingSummaryText'),aiSlice('pbpAiRemoveSummaryRange'),cacheSlice('pbpAiSummaryRangeValid'),sliceFn('shouldUpdateField'),aiSlice('_aiUrlEquivalent'),cacheSlice('pbpAiPageUrlNorm'),sliceFn('_loadUrlCleanSettings'),aiSlice('pbpPopupFormHoldsOpenedPage'),sliceFn('pbpPopupPrefillDescription'),sliceFn('pbpPopupPrefillTitle'),sliceFn('pbpPopupFormHoldsPage'),sliceFn('pbpPopupFillPageDescription'),sliceFn('pbpPopupRenderDescriptionHint'),sliceFn('pbpPopupSyncPageDescription'),sliceFn('pbpPopupUrlEdited'),sliceFn('setupUrlInput'),
      'return {prefillTitle:pbpPopupPrefillTitle,shouldUpdateField,prefill:pbpPopupPrefillDescription,syncPageDescription:pbpPopupSyncPageDescription,setupUrlInput,initPopupDraft,setupPopupDraftTracking,pbpPopupDraftSnapshot,pbpRememberPopupDraft,pbpPopupDescriptionKnown,forgetDescription(){_linkdingDescriptionKnown=false;},pbpDiscardPopupDraft,updateCharCount,recomputeArchiveCheck,loadBookmarkForEdit,exitEditMode,pbpPopupFormIsDirty,upsertSummary,removeSummary,restoreLinkdingSummary:_aiRestoreLinkdingSummary,chip(){_tagsUserTouched=true;currentTags.push("Chip");renderTags();},failedSubmit(){'+uiSource.slice(uiSource.indexOf('      Object.keys(fieldDirtyFlags).forEach',uiSource.indexOf('function setupSubmit(')),uiSource.indexOf('      // Host permission first:',uiSource.indexOf('function setupSubmit(')))+'}};'].join('\n'))(...names.map(n=>deps[n]));api.setupPopupDraftTracking();
    return {api,elements,flags,sent,statuses,delayClears(){delayClear=true;},releaseClear:ok=>resolveClear({ok}),delayWrites(){delayWrite=true;},failWrite(){resolveWrite({ok:false});},rejectRestore:()=>rejectRead(new Error('Synthetic IPC failure')),failRestore:()=>resolveRead({ok:false,error:'storage'}),release:(d=draft)=>resolveRead({ok:true,account:'alice',draft:d}),owner:o=>{currentOwner=o;}};
  }
@@ -313,8 +313,57 @@ await test('a restored AI paragraph is adopted from the cache, otherwise kept as
  // A draft restores only the fields some open actually changed; the rest stay
  // free for the page and the bookmark lookup (A02 P29).
  const settle=()=>navigator.locks.request('pbp-popup-drafts',()=>{});
- const openWorker=async(pageUrl,service='pinboard',before=()=>{})=>{const h=uiHarness(service,{worker:true});before(h);await h.api.initPopupDraft('alice',{url:pageUrl});await settle();return h;};
+ const openWorker=async(pageUrl,service='pinboard',before=()=>{},opts={})=>{const h=uiHarness(service,{worker:true,...opts});before(h);await h.api.initPopupDraft('alice',{url:pageUrl});await settle();return h;};
  const typeInto=(h,id,value)=>{h.elements[id].value=value;h.elements[id].dispatchEvent(new Event('input'));};
+ // G24: the AI cache (default 60 minutes) outlives no 24-hour draft, so a
+ // restored Description cannot rely on it to tell its AI paragraph from the
+ // user's words. The draft keeps that paragraph's text (never the box before
+ // it); a restored box that still ends with it owns it again, so another
+ // summary replaces it instead of stacking a second copy.
+ await test('a drafted AI paragraph is claimed back without the AI cache',async()=>{
+   for(const [name,start,first,second,removed] of [['an empty box','','S1','S2',''],['the user\'s words','Mine','Mine\n\nS1','Mine\n\nS2','Mine']]){
+     for(const viaRestore of [true,false]){
+       const label=name+(viaRestore?' (restore)':' (click)');
+       const pageUrl='https://example.com/g24-claim-'+(start?'words':'empty')+(viaRestore?'-r':'-c');
+       const one=await openWorker(pageUrl,'linkding');
+       if(start)typeInto(one,'linkding-description-input',start);
+       one.api.upsertSummary('S1');await settle();
+       assert(one.api.pbpPopupDraftSnapshot().summaryAi==='S1',label+': the AI paragraph was not drafted: '+JSON.stringify(one.api.pbpPopupDraftSnapshot()));
+       // The click variant has the restore leave the paragraph unclaimed (as
+       // when the AI setup ran before the draft arrived): the next summary
+       // still claims it itself.
+       const two=await openWorker(pageUrl,'linkding',()=>{},viaRestore?{}:{settings:{optShowAiSummary:false}});
+       const box=two.elements['linkding-description-input'];
+       assert(box.value===first,label+': restored '+JSON.stringify(box.value));
+       if(viaRestore)assert(two.api.restoreLinkdingSummary(null),label+': the restored AI paragraph offers no Regenerate or Remove');
+       assert(two.api.upsertSummary('S2')!==false&&box.value===second,label+': another summary gave '+JSON.stringify(box.value));
+       // What the box held before the first summary is not drafted: Remove
+       // takes out the AI paragraph and leaves the rest.
+       assert(two.api.removeSummary()===true&&box.value===removed,label+': Remove gave '+JSON.stringify(box.value));
+     }
+   }
+   // A restored box whose last paragraph is no longer the drafted AI text is
+   // the user's: the next summary follows it, nothing is replaced or removed.
+   const pageUrl='https://example.com/g24-claim-edited';
+   await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,summary:'Mine\n\nS1, edited',summaryAi:'S1',changed:['summary']}}));
+   const h=await openWorker(pageUrl,'linkding');const box=h.elements['linkding-description-input'];
+   assert(box.value==='Mine\n\nS1, edited','restored '+JSON.stringify(box.value));
+   assert(!h.api.restoreLinkdingSummary(null),'an edited AI paragraph was claimed');
+   assert(h.api.upsertSummary('S2')!==false&&box.value==='Mine\n\nS1, edited\n\nS2','the edited paragraph was replaced: '+JSON.stringify(box.value));
+   // A draft row without the marker (older rows) claims nothing either.
+   const legacyUrl='https://example.com/g24-claim-legacy';
+   await run(msg('write',{pageUrl:legacyUrl,draft:{...draft,url:legacyUrl,summary:'S1',changed:['summary']}}));
+   const legacy=await openWorker(legacyUrl,'linkding');
+   assert(legacy.api.upsertSummary('S2')!==false&&legacy.elements['linkding-description-input'].value==='S1\n\nS2','a row without the AI marker was claimed');
+ });
+ await test('the drafted AI paragraph is stored only as text beside a drafted Description',async()=>{
+   const pageUrl='https://example.com/g24-claim-worker';
+   for(const summaryAi of [null,1,['S1']])assert(!(await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,summary:'S1',summaryAi}}))).ok,'invalid AI paragraph accepted: '+JSON.stringify(summaryAi));
+   await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,summary:'S1',summaryAi:'S1'}}));
+   assert((await run(msg('read',{pageUrl}))).draft.summaryAi==='S1','the AI paragraph was dropped');
+   await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,summaryAi:'S1'}}));
+   assert(!Object.hasOwn((await run(msg('read',{pageUrl}))).draft,'summaryAi'),'an AI paragraph without a drafted Description was kept');
+ });
  await test('a tag-only draft leaves the other fields to the page and the bookmark lookup',async()=>{const pageUrl='https://example.com/g15-tag-only';
    const first=await openWorker(pageUrl);first.api.chip();await settle();
    const second=await openWorker(pageUrl,'pinboard',h=>{h.elements['title-input'].value='Page title now';h.elements['url-input'].value=pageUrl;});

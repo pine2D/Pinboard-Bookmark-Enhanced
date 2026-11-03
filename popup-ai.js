@@ -829,7 +829,10 @@ function _aiUpsertLinkdingSummary(summary, userEdit) {
   const cur = input.value;
   const line = pbpBookmarkDescriptionLine(summary);
   if (!line) return false;
-  const owned = _aiLinkdingSummaryRange(cur);
+  // A restored draft's AI paragraph counts as this popup's even before the
+  // restore offered Regenerate (the two finish in either order).
+  const claimed = _aiLinkdingSummaryRange(cur) ? null : _aiLinkdingClaimedRange(cur, null);
+  const owned = _aiLinkdingSummaryRange(cur) || (claimed && { ...claimed, written: undefined, before: undefined });
   let next, start, before;
   if (owned) {
     // Regenerate: only the summary paragraph changes. The box before the
@@ -891,10 +894,34 @@ function _aiRemoveLinkdingSummary() {
   return true;
 }
 
-// A Description that already ends with the cached summary as its own
-// paragraph (a restored draft, a stored bookmark) owns that paragraph again,
-// so a click neither stacks a second copy nor loses Remove. What the box held
-// before it is not known here: Remove takes out the paragraph alone.
+// The AI paragraph of the box as this popup tracks it, for the draft ("" when
+// none): a restored draft claims it back by its text (_aiLinkdingClaimedRange).
+function pbpAiLinkdingSummaryText() {
+  const value = $id("linkding-description-input")?.value ?? "";
+  const owned = _aiLinkdingSummaryRange(value);
+  return owned ? value.slice(owned.start, owned.end) : "";
+}
+
+// A Description that still ends with a known AI paragraph -- the one a
+// restored draft recorded (_popupDraftSummaryAi), or the cached summary -- as
+// its own paragraph owns that paragraph again. The draft's record does not
+// expire with the AI cache, so a restored summary is replaced rather than
+// followed by a second copy. Returns the range and where it came from.
+function _aiLinkdingClaimedRange(value, cachedSummary) {
+  const drafted = typeof _popupDraftSummaryAi === "string" ? _popupDraftSummaryAi : "";
+  for (const [text, from] of [[drafted, "draft"], [cachedSummary, "cache"]]) {
+    const line = text ? pbpBookmarkDescriptionLine(text) : "";
+    if (!line) continue;
+    const start = value === line ? 0 : value.endsWith("\n\n" + line) ? value.length - line.length : -1;
+    if (start >= 0) return { start, end: value.length, from };
+  }
+  return null;
+}
+
+// A restored draft or a stored bookmark whose Description ends with a known
+// AI paragraph gets Regenerate and Remove back, so a click neither stacks a
+// second copy nor loses Remove. What the box held before it is not known
+// here: Remove takes out the paragraph alone.
 function _aiRestoreLinkdingSummary(cachedSummary) {
   const input = $id("linkding-description-input");
   const value = input.value;
@@ -902,14 +929,12 @@ function _aiRestoreLinkdingSummary(cachedSummary) {
     showSummaryActions(false);
     return "session";
   }
-  const line = cachedSummary ? pbpBookmarkDescriptionLine(cachedSummary) : "";
-  if (!line) return null;
-  const start = value === line ? 0 : value.endsWith("\n\n" + line) ? value.length - line.length : -1;
-  if (start < 0) return null;
-  _aiSummaryRange = { start, end: value.length, written: value, before: undefined };
+  const claimed = _aiLinkdingClaimedRange(value, cachedSummary);
+  if (!claimed) return null;
+  _aiSummaryRange = { start: claimed.start, end: claimed.end, written: value, before: undefined };
   _aiSummaryValue = value;
-  showSummaryActions(true);
-  return "cache";
+  showSummaryActions(claimed.from === "cache");
+  return claimed.from;
 }
 
 // The note for a summary that can no longer be told apart from the user's

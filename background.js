@@ -4562,6 +4562,7 @@ async function pbpRunPopupDraft(message) {
         || !d.tags.every((s) => typeof s === "string")
         || !["private", "toread", "archive", "archiveTouched"].every((k) => typeof d[k] === "boolean")) return null;
     if ((d.summary !== undefined && typeof d.summary !== "string")
+        || (d.summaryAi !== undefined && typeof d.summaryAi !== "string")
         || (d.summaryTouched !== undefined && typeof d.summaryTouched !== "boolean")
         || (d.sharedExplicit !== undefined && typeof d.sharedExplicit !== "boolean")
         || (d.baseVersion !== undefined && (typeof d.baseVersion !== "string" || d.baseVersion.length > 8192))
@@ -4571,6 +4572,9 @@ async function pbpRunPopupDraft(message) {
     const out = { url: d.url, title: d.title, notes: d.notes, tags: d.tags.slice(), tagInput: d.tagInput,
       private: d.private, toread: d.toread, archive: d.archive, archiveTouched: d.archiveTouched };
     if (d.summary !== undefined) out.summary = d.summary;
+    // The Description's AI paragraph (popup.js _popupDraftSummaryAi): kept
+    // only beside the Description it belongs to, and never an edit itself.
+    if (d.summary !== undefined && d.summaryAi !== undefined) out.summaryAi = d.summaryAi;
     if (d.summaryTouched !== undefined) out.summaryTouched = d.summaryTouched;
     if (d.sharedExplicit !== undefined) out.sharedExplicit = d.sharedExplicit;
     if (d.changed !== undefined) out.changed = [...new Set(d.changed)].sort();

@@ -365,6 +365,11 @@ const _popupDraftChangedFields = new Set();
 // a save or a discard; the fields outside it stay with the page and the
 // bookmark lookup instead of a frozen copy (A02 P29).
 let _popupDraftRestoredFields = new Set();
+// The AI paragraph a restored linkding Description ended with when it was
+// drafted ("" when none). Only that paragraph's text is drafted, never the
+// box before the first summary; popup-ai.js claims the paragraph back while
+// the box still ends with it, the AI cache having expired or not.
+let _popupDraftSummaryAi = "";
 // The self-hosted bookmark a restored draft's edits were made on: {url,
 // version, tags} (version: pbpBookmarkVersion; tags: its tag list, which the
 // drafted tag changes are made on), each undefined for a draft that does not
@@ -405,9 +410,11 @@ function pbpPopupDraftSnapshot() {
   const baseTags = baseVersion !== undefined && typeof pbpPopupLoadedTagNames === "function" ? pbpPopupLoadedTagNames($id("url-input").value.trim()) : null;
   const changed = _popupDraftRestoredFields === null ? null
     : [...new Set([..._popupDraftRestoredFields, ..._popupDraftChangedFields, ...(_tagsUserTouched ? ["tags"] : [])])].sort();
+  // The Description's AI paragraph, beside the Description it is part of.
+  const summaryAi = typeof pbpAiLinkdingSummaryText === "function" ? pbpAiLinkdingSummaryText() : "";
   return { url: $id("url-input").value, title: $id("title-input").value,
     notes: $id("description-input").value,
-    ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(_linkdingDescriptionPending ? { summary: $id("linkding-description-input").value } : {}), sharedExplicit: _linkdingSharedExplicit } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
+    ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(_linkdingDescriptionPending ? { summary: $id("linkding-description-input").value, ...(summaryAi ? { summaryAi } : {}) } : {}), sharedExplicit: _linkdingSharedExplicit } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
     private: $id("private-check").checked, toread: $id("readlater-check").checked,
     archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched, ...(changed ? { changed } : {}),
     ...(baseVersion !== undefined ? { baseVersion } : {}), ...(baseTags ? { baseTags } : {}) };
@@ -581,6 +588,8 @@ async function initPopupDraft(account, tab) {
       // Only a written Description was drafted; it is still waiting to be saved.
       const draftedSummary = typeof d.summary === "string" && drafted("summary");
       if (draftedSummary) { _linkdingDescriptionKnown = true; _linkdingDescriptionPending = true; pbpPopupRenderDescriptionHint(); }
+      _popupDraftSummaryAi = draftedSummary && take("summary") && typeof d.summaryAi === "string" ? d.summaryAi : "";
+      if (_popupDraftSummaryAi && settings.optShowAiSummary !== false && typeof _aiRestoreLinkdingSummary === "function") _aiRestoreLinkdingSummary(null);
       if (take("sharedExplicit")) _linkdingSharedExplicit = pbpBookmarkServiceId(settings) === "linkding" && pbpBookmarkConnection(settings).sharingEnabled && d.sharedExplicit === true;
       if (drafted("url")) {
         _popupDraftUserUrl = true;
@@ -2641,6 +2650,7 @@ function setupSubmit(token) {
           _popupDraftEdited = false;
           _popupDraftRestored = false;
           _popupDraftRestoredFields = new Set();
+          _popupDraftSummaryAi = "";
           _popupDraftLastSnapshot = "";
           _popupDraftChangedFields.clear();
         } else if (pbpBookmarkServiceId(settings) === "linkding" && typeof pbpRememberPopupDraft === "function") {
@@ -2950,6 +2960,7 @@ async function loadBookmarkForEdit(url, token) {
   _popupDraftUserUrl = false;
   _popupDraftRestored = false;
   _popupDraftRestoredFields = new Set();
+  _popupDraftSummaryAi = "";
   _popupDraftBase = null;
   _popupDraftEdited = false;
   // Reset current form state
