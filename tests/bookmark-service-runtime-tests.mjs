@@ -29,6 +29,8 @@ const BLOCKS=[
   'linkding cleaned page address',
   'reader export metadata follows its bookmark',
   'reader slot rewrites keep the bookmark address',
+  'reader handoff slot: linkding connection account',
+  'reader handoff slot: Karakeep connection account',
   'linkding Description server semantics',
   'gateway probes',
   'settings Connect names the failure cause',
@@ -1139,6 +1141,42 @@ try{
     }finally{await video.close();await worker.evaluate(()=>chrome.storage.local.remove('md_preview_data_rewrite-video'));}
     console.log('reader slot rewrites (article and transcript restore records, transcript commit, video error shell rebuild) keep the bookmark address and the page address');
   });
+  // The handoff slot's account is the bookmark connection. A reader opening
+  // on a slot of the current connection keeps its tags, description and
+  // draft; a slot of any other connection (another service, or a Pinboard
+  // user) is retired and rewritten to the current connection.
+  async function readerHandoffAccountChecks(service){
+    const account=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
+    assert(account&&account.length,'no current connection account');
+    const slot=key=>worker.evaluate(async k=>(await chrome.storage.local.get(k))[k]||null,'md_preview_data_'+key);
+    const url=origin+'/article-handoff-'+service;
+    const open=async(key,slotAccount)=>{
+      const ts=Date.now()-1000;
+      await worker.evaluate(async([k,v])=>chrome.storage.local.set({[k]:v}),['md_preview_data_'+key,{markdown:'# Handoff article\n\nBody.',title:'Handoff article',url,baseUrl:url,sourceTabUrl:url,bookmarkUrl:url,account:slotAccount,tags:['handoff-tag'],description:'handoff note',bookmarkDraft:{summary:'draft summary'},sourceIncognito:false,source:'local',ts}]);
+      const reader=await ctx.newPage();
+      try{
+        await reader.goto(pageUrl+'md-preview.html?k='+key);
+        await until(async()=>(await slot(key))?.restore===true,'the '+key+' restore record');
+        return await slot(key);
+      }finally{await reader.close();await worker.evaluate(k=>chrome.storage.local.remove(k),'md_preview_data_'+key);}
+    };
+    const kept=await open('handoff-same',account);
+    assert.equal(kept.account,account,service+': a matching slot lost its account');
+    assert.deepEqual(kept.tags,['handoff-tag'],service+': the current connection\'s slot lost its tags');
+    assert.equal(kept.description,'handoff note',service+': the current connection\'s slot lost its description');
+    assert.deepEqual(kept.bookmarkDraft,{summary:'draft summary'},service+': the current connection\'s slot lost its draft');
+    for(const [label,foreign] of [['another service',(service==='linkding'?'karakeep:https://karakeep.example/:user-7':'linkding:https://linkding.example/:conn-9')],['a Pinboard user','pinboard-user']]){
+      assert.notEqual(foreign,account);
+      const retired=await open('handoff-foreign',foreign);
+      assert.equal(retired.account,account,service+': a slot of '+label+' was not rewritten to the current connection');
+      assert.deepEqual(retired.tags,[],service+': a slot of '+label+' kept its tags');
+      assert.equal(retired.description,'',service+': a slot of '+label+' kept its description');
+      assert(!retired.bookmarkDraft,service+': a slot of '+label+' kept its draft');
+    }
+    console.log(service+' reader handoff: a slot of the current connection keeps its bookmark data; slots of another service or a Pinboard user are retired');
+  }
+  await block('reader handoff slot: linkding connection account',['linkding'],()=>readerHandoffAccountChecks('linkding'));
+  await block('reader handoff slot: Karakeep connection account',['karakeep'],()=>readerHandoffAccountChecks('karakeep'));
   await block('linkding Description server semantics',['linkding'],async()=>{
   // linkding Description against the server's own v1.47 create and update
   // semantics (the mock above). /article-meta publishes a meta description,
