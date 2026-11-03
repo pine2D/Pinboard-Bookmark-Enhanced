@@ -377,7 +377,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
         authEvents.push("persist-empty");
         return { ok: true };
       };
+      // The shipped wait on the #fragment probe, over this harness's lookup:
+      // none of these lookups carries a probe, so it only closes the miss.
+      const awaitStart = source.indexOf("const PBP_FRAGMENT_PROBE_SAVE_WAIT_MS");
+      const awaitEnd = source.indexOf("// ===================== Existing Bookmark", awaitStart);
+      assert(awaitStart >= 0 && awaitEnd > awaitStart, "the #fragment probe wait was not found");
+      const pbpFragmentProbeWait = new Function("bookmarkLookup", "setTimeout", "clearTimeout", "pbpDismissFragmentMatch", "_fragmentMatchFeedback",
+        source.slice(awaitStart, awaitEnd) + "\nreturn pbpFragmentProbeWait;")(bookmarkLookup, setTimeoutStub, clearTimeoutStub, () => {}, null);
       const dependencies = {
+        pbpFragmentProbeWait,
         $id: (id) => (elements[id] ||= createElementStub()),
         t: (key) => key,
         clearTimeout: clearTimeoutStub,

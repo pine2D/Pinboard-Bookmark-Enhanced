@@ -71,6 +71,10 @@ const serverNow=()=>new Date().toISOString().replace(/Z$/,'000Z');
 const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'bookmark',type:'manual',public:false,hasCollaborators:false,userRole:'owner'};
 let listCreated=false;
 let holdLinkdingPatch = null;
+// holdLinkdingCheck: {url, promise}: a linkding /check/ for that address waits on the promise.
+let holdLinkdingCheck = null;
+// holdLinkdingCreate: a promise every linkding create (POST bookmarks/) waits on before it is handled.
+let holdLinkdingCreate = null;
 // gate.linkding puts a Cloudflare Access-shaped gateway in front of /linkding/.
 const gate={linkding:false}, acceptedKeys=new Set(['fixture-key']);
 // linkding on PostgreSQL: Tag.name holds 64 characters (models.py; varchar
@@ -145,6 +149,7 @@ const server=createServer(async(req,res)=>{
   if(path==='users/me')return reply(200,{id:'u1',name:'Fixture',email:null,localUser:true});
   if(path.startsWith('bookmarks/check')){
     if(service==='linkding'&&checkDown.linkding)return serverError();
+    if(service==='linkding'&&holdLinkdingCheck&&holdLinkdingCheck.url===url.searchParams.get('url'))await holdLinkdingCheck.promise;
     const row=[...store.values()].find(b=>(b.url||b.content?.url)===url.searchParams.get('url'));
     if(service!=='linkding')return reply(200,{bookmarkId:row?.id||null});
     // routes.py check(): the page's metadata is loaded whether or not it is saved.
@@ -163,6 +168,7 @@ const server=createServer(async(req,res)=>{
     if(req.method==='GET')return reply(200,service==='linkding'?{count:store.size,next:null,previous:null,results:[...store.values()].sort((a,b)=>(Date.parse(b.date_added)||0)-(Date.parse(a.date_added)||0)).map(serialize)}:{bookmarks:[...store.values()],nextCursor:null});
     const race=raceCreates.get(service+':'+data.url);
     if(race){store.set(String(race.record.id),structuredClone(race.record));return reply(race.status,race.record);}
+    if(service==='linkding'&&holdLinkdingCreate)await holdLinkdingCreate;
     if(service==='linkding'){
       // linkding v1.47 POST (serializers.py create, services/bookmarks.py):
       // an existing URL is merged into (201, same id, date_added kept, tags
@@ -266,7 +272,7 @@ try{
     });
     for(const page of ctx.pages())if(page!==article)await page.close();
     records.linkding.clear();records.karakeep.clear();membership.clear();raceCreates.clear();
-    postgres.linkding=false;down.linkding=false;checkDown.linkding=false;gate.linkding=false;holdLinkdingPatch=null;
+    postgres.linkding=false;down.linkding=false;checkDown.linkding=false;gate.linkding=false;holdLinkdingPatch=null;holdLinkdingCheck=null;holdLinkdingCreate=null;
     await article.goto(origin+'/article');
   };
   // The connection a block needs, made through the settings page like a user.
@@ -1444,6 +1450,63 @@ try{
     assert.equal(records.linkding.get('41').title,'Saved original','Save as new changed the original bookmark');
     assert.deepEqual([...records.linkding.values()].map(b=>b.url).sort(),[base,hashed].sort());
     await notice(popup).waitFor({state:'detached',timeout:5000}).catch(()=>{throw new Error('the notice stayed after Save as new');});
+    await popup.close();
+    // Save pressed while the probe is still out: it waits for the probe, and a
+    // hit stops it there (nothing sent) so the notice decides; Save as new then
+    // creates only the #fragment address.
+    records.linkding.clear();seed();
+    let releaseCheck;holdLinkdingCheck={url:base,promise:new Promise(resolve=>{releaseCheck=resolve;})};
+    ({popup,since}=await openAt(hashed));
+    await settled(popup,'missing');
+    await until(()=>checkedSince(since).includes(base),'the probe asked without the fragment');
+    const beforeRace=requests.length;
+    await popup.locator('#submit-btn').click();
+    await popup.waitForFunction(()=>document.getElementById('submit-btn').classList.contains('loading'));
+    releaseCheck();holdLinkdingCheck=null;
+    await notice(popup).waitFor({timeout:10000});
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    assert.equal(writesSince(beforeRace).length,0,'a save pressed during the probe went out before the user chose');
+    assert.equal(await popup.locator('#url-input').inputValue(),hashed,'the stopped save changed the address');
+    await notice(popup).getByRole('button',{name:'Save as new bookmark'}).click();
+    await until(()=>linkdingCreates(beforeRace).length>0,'Save as new after a stopped save sent a create');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    assert.deepEqual(linkdingCreates(beforeRace).map(r=>r.data.url),[hashed],'Save as new after a stopped save did not create the #fragment address');
+    assert.equal(records.linkding.get('41').title,'Saved original');
+    await popup.close();
+    // A probe slower than the save's bound: the save goes on with the #fragment
+    // address, and no notice comes up after it (nothing to edit mid-save).
+    records.linkding.clear();seed();
+    holdLinkdingCheck={url:base,promise:new Promise(resolve=>{releaseCheck=resolve;})};
+    ({popup,since}=await openAt(hashed));
+    await settled(popup,'missing');
+    await until(()=>checkedSince(since).includes(base),'the slow probe asked without the fragment');
+    await popup.evaluate(()=>{window.__slowProbe=bookmarkLookup.fragmentProbe;});
+    // The create is held too, so the probe answers while the save is still out.
+    let releaseCreate;holdLinkdingCreate=new Promise(resolve=>{releaseCreate=resolve;});
+    const beforeSlow=requests.length;
+    await popup.locator('#submit-btn').click();
+    await until(()=>linkdingCreates(beforeSlow).length>0,'the save went on past a slow probe');
+    releaseCheck();holdLinkdingCheck=null;
+    // The released probe answers "saved without the fragment": no notice may follow mid-save.
+    await popup.waitForFunction(()=>window.__slowProbe?.settled===true);
+    assert(await popup.locator('#submit-btn').evaluate(b=>b.classList.contains('loading')),'the save was no longer out when the probe answered');
+    assert.equal(await notice(popup).count(),0,'a notice came up while the save was out');
+    releaseCreate();holdLinkdingCreate=null;
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    assert.deepEqual(linkdingCreates(beforeSlow).map(r=>r.data.url),[hashed]);
+    assert.equal(await notice(popup).count(),0,'a notice came up after the save');
+    await popup.close();
+    // The notice was up when Save was pressed: that press is the user's choice
+    // (as Save as new), the #fragment address is saved and the notice goes.
+    records.linkding.clear();seed();
+    ({popup,since}=await openAt(hashed));
+    await notice(popup).waitFor({timeout:10000});
+    const beforeInformed=requests.length;
+    await popup.locator('#submit-btn').click();
+    await until(()=>linkdingCreates(beforeInformed).length>0,'Save with the notice up sent a create');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    assert.deepEqual(linkdingCreates(beforeInformed).map(r=>r.data.url),[hashed]);
+    await notice(popup).waitFor({state:'detached',timeout:5000}).catch(()=>{throw new Error('the notice stayed up after the save it was passed by');});
     await popup.close();
     // 2. An address without a fragment: one lookup, no notice.
     records.linkding.clear();seed();

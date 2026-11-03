@@ -1714,9 +1714,11 @@ async function pbpProbeFragmentlessBookmark(token, lookupUrl, generation) {
   if (!PBP_FRAGMENT_PROBE_SERVICES.includes(service)) return;
   const baseUrl = pbpFragmentlessUrl(lookupUrl);
   if (!baseUrl) return;
-  // Still the answered miss this probe was started for, on the same address.
+  // Still the answered miss this probe was started for, on the same address,
+  // and no save has gone ahead past it (pbpFragmentProbeWait closes it).
   const stillMissing = () => bookmarkLookup.generation === generation && bookmarkLookup.status === "missing"
-    && bookmarkLookup.url === lookupUrl && $id("url-input").value.trim() === lookupUrl;
+    && bookmarkLookup.url === lookupUrl && $id("url-input").value.trim() === lookupUrl
+    && !bookmarkLookup.fragmentProbeClosed;
   let data;
   try {
     data = await pbpPopupLookupPosts(token, baseUrl, null, false);
@@ -1760,6 +1762,42 @@ async function pbpProbeFragmentlessBookmark(token, lookupUrl, generation) {
   });
   $id("existing-banner").after(feedback.element);
   _fragmentMatchFeedback = feedback;
+  return true;
+}
+// A save pressed while the probe for this miss was still out waits for it,
+// up to this long: a hit stops that save so the user can choose (no silent
+// second bookmark under the #fragment address). Pinboard queues the probe
+// one rate-limit slot (3.1s) behind the open lookup; a probe slower than the
+// bound lets the save go on, and no notice follows it.
+const PBP_FRAGMENT_PROBE_SAVE_WAIT_MS = 6000;
+// The probe record of a miss: { promise, settled }. Called with the record
+// the click saw (and whether it had settled then). Nothing to wait for:
+// answers null at once, so a save that never met a pending probe keeps its
+// synchronous path. Otherwise a promise of true when the save must stop
+// because the notice came up during this wait. Either way a save that goes
+// on closes the probe and takes its notice down, so neither "Edit that
+// bookmark" nor a late notice can land while the save is out.
+function pbpFragmentProbeWait(probeAtClick, settledAtClick) {
+  const probe = bookmarkLookup.status === "missing" ? bookmarkLookup.fragmentProbe : null;
+  const goOn = () => {
+    if (bookmarkLookup.status === "missing") bookmarkLookup.fragmentProbeClosed = true;
+    pbpDismissFragmentMatch();
+    return false;
+  };
+  if (!probe || (probe === probeAtClick && settledAtClick)) {
+    goOn();
+    return null;
+  }
+  return (async () => {
+    let timer = null;
+    const hit = await Promise.race([
+      probe.promise.then((shown) => shown === true, () => false),
+      new Promise((resolve) => { timer = setTimeout(() => resolve(false), PBP_FRAGMENT_PROBE_SAVE_WAIT_MS); }),
+    ]);
+    clearTimeout(timer);
+    if (hit && bookmarkLookup.fragmentProbe === probe && _fragmentMatchFeedback) return true;
+    return goOn();
+  })();
 }
 
 // ===================== Existing Bookmark =====================
@@ -1854,9 +1892,14 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         existingBookmark = null;
         bookmarkLookup = { status: "missing", url: lookupUrl, generation, promise: null, formLoaded: false };
         // Only an answered "not saved" asks again without the #fragment: a
-        // failed lookup above never gets here. Not awaited, so a save waiting
-        // on this lookup is not held by the second request.
-        if (prefetch?.fragmentProbe) pbpProbeFragmentlessBookmark(token, lookupUrl, generation);
+        // failed lookup above never gets here. Not awaited here: a save
+        // pressed meanwhile waits for it, bounded, in pbpFragmentProbeWait.
+        if (prefetch?.fragmentProbe) {
+          const probe = { settled: false, promise: null };
+          probe.promise = pbpProbeFragmentlessBookmark(token, lookupUrl, generation)
+            .finally(() => { probe.settled = true; });
+          bookmarkLookup.fragmentProbe = probe;
+        }
       }
 
       // B4: Write only public page identity for next-popup prefill. Existing-bookmark
@@ -2092,6 +2135,11 @@ function setupSubmit(token) {
     const reviewedAtClick = bookmarkLookup.status === "found"
       && bookmarkLookup.url === url
       && bookmarkLookup.formLoaded;
+    // Whether the #fragment probe had already answered when this press came:
+    // a notice the user could see (or chose past with "Save as new") does
+    // not stop the save; one that comes up while this save waits does.
+    const fragmentProbeAtClick = bookmarkLookup.url === url ? bookmarkLookup.fragmentProbe || null : null;
+    const fragmentProbeSettledAtClick = !!fragmentProbeAtClick?.settled;
     clearTimeout(submitErrorResetTimer);
     clearSaveError();
     setSubmitState("loading");
@@ -2116,6 +2164,19 @@ function setupSubmit(token) {
       if (bookmarkLookup.generation !== lookupGenerationAtWait || bookmarkLookup.url !== url || $id("url-input").value.trim() !== url) {
         setSubmitState("idle");
         return;
+      }
+      // The same page saved without its #fragment: the notice decides, not this press.
+      const fragmentProbeWait = pbpFragmentProbeWait(fragmentProbeAtClick, fragmentProbeSettledAtClick);
+      if (fragmentProbeWait) {
+        if (await fragmentProbeWait) {
+          if (ownsSubmitUi()) setSubmitState("idle");
+          return;
+        }
+        if (!ownsSubmitUi()) return;
+        if (bookmarkLookup.generation !== lookupGenerationAtWait || bookmarkLookup.url !== url || $id("url-input").value.trim() !== url) {
+          setSubmitState("idle");
+          return;
+        }
       }
 
       const savePolicy = pbpPopupSavePolicy({
