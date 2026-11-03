@@ -110,7 +110,7 @@ async function test(name,fn){const d=document.createElement('div');d.className='
  await test('input dispatches immediately with the scoped incognito owner',async()=>{const h=uiHarness();const pending=h.api.initPopupDraft('alice',{url:'https://example.com/article',incognito:true});h.release();await pending;h.elements['description-input'].value='Fast close';h.elements['description-input'].dispatchEvent(new Event('input'));assert(h.sent.at(-1).action==='write'&&h.sent.at(-1).incognito===true&&h.sent.at(-1).account==='alice');await h.api.pbpDiscardPopupDraft(true);assert(h.sent.at(-1).action==='clearOwner');});
  await test('input dispatches a field patch before the restore response arrives',async()=>{const h=uiHarness();const pending=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.elements['title-input'].value='Fast close';h.elements['title-input'].dispatchEvent(new Event('input'));const m=h.sent.find(m=>m.action==='write');assert(m&&m.draft.title==='Fast close'&&m.fields.length===1&&m.fields[0]==='title');h.release();await pending;});
  await test('passive restore does not write or extend draft retention',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release();await p;h.api.updateCharCount();assert(!h.sent.some(m=>m.action==='write'));});
- await test('programmatic summary and default archive changes update an edited draft',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release(null);await p;h.elements['description-input'].value='Manual note';h.elements['description-input'].dispatchEvent(new Event('input'));h.elements['description-input'].value='AI summary';h.elements['private-check'].checked=true;h.elements['readlater-check'].checked=true;h.api.updateCharCount();assert(h.sent.at(-1).draft.notes==='AI summary'&&h.sent.at(-1).draft.private&&h.sent.at(-1).draft.toread);h.elements['private-check'].checked=false;h.api.recomputeArchiveCheck();assert(h.sent.at(-1).draft.archive===true);});
+ await test('programmatic summary and default archive changes update an edited draft',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release(null);await p;h.elements['description-input'].value='Manual note';h.elements['description-input'].dispatchEvent(new Event('input'));h.elements['description-input'].value='AI summary';h.elements['private-check'].checked=true;h.elements['readlater-check'].checked=true;h.api.updateCharCount();assert(h.sent.at(-1).draft.notes==='AI summary'&&h.sent.at(-1).draft.private&&h.sent.at(-1).draft.toread);h.elements['private-check'].checked=false;const writes=h.sent.length;h.api.recomputeArchiveCheck();assert(h.api.pbpPopupDraftSnapshot().archive===true,'the default archive change is missing from the form snapshot');assert(h.sent.length===writes,'a default archive change, which no restore brings back, rewrote the draft');});
  await test('chip-only edits remain dirty after a failed submit resets the lookup baseline',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release(null);await p;h.api.chip();h.api.failedSubmit();assert(h.api.pbpPopupFormIsDirty());});
  await test('recent edit retains the source scope and cancel clears before reload',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release(null);await p;await h.api.loadBookmarkForEdit('https://example.com/recent','alice:fake');h.elements['description-input'].value='Recent draft';h.elements['description-input'].dispatchEvent(new Event('input'));assert(h.sent.at(-1).pageUrl==='https://example.com/article'&&h.sent.at(-1).draft.url==='https://example.com/recent');await h.api.exitEditMode();assert(h.sent.at(-2).action==='clear'&&h.sent.at(-1).action==='reload');});
  await test('duplicate input/change events do not hide an asynchronous write failure',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release(null);await p;h.delayWrites();const el=h.elements['private-check'];el.checked=true;el.dispatchEvent(new Event('input'));el.dispatchEvent(new Event('change'));assert(h.sent.filter(m=>m.action==='write').length===1);h.failWrite();await Promise.resolve();assert(h.statuses.some(s=>s[1]==='popupDraftFailed'));h.api.pbpRememberPopupDraft();assert(h.sent.filter(m=>m.action==='write').length===2);});
@@ -139,7 +139,10 @@ async function test(name,fn){const d=document.createElement('div');d.className='
  // Only a Description the user or an AI summary wrote belongs in the draft.
  // One the page or the stored bookmark filled in is read again on the next
  // open, so a Description changed elsewhere meanwhile is shown, not overwritten.
- await test('a Description the page filled in is not drafted, one an AI summary wrote is',async()=>{const h=uiHarness('linkding',{pageInfo:{metaDescription:'Page meta'}});const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release(null);await p;h.api.prefill();assert(h.elements['linkding-description-input'].value==='Page meta'&&h.api.pbpPopupDescriptionKnown(),'the page did not fill the Description');h.elements['title-input'].value='Edited title';h.elements['title-input'].dispatchEvent(new Event('input'));const written=h.sent.at(-1).draft;assert(written.title==='Edited title'&&!Object.hasOwn(written,'summary'),'the page Description was drafted as the user\'s: '+JSON.stringify(written.summary));h.api.upsertSummary('Cached AI summary',{userEdit:false});assert(h.sent.at(-1).draft.summary==='Cached AI summary','an AI summary shown in the box was not drafted');});
+ await test('a Description the page filled in is not drafted, one an AI summary wrote is',async()=>{const h=uiHarness('linkding',{pageInfo:{metaDescription:'Page meta'}});const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release(null);await p;h.api.prefill();assert(h.elements['linkding-description-input'].value==='Page meta'&&h.api.pbpPopupDescriptionKnown(),'the page did not fill the Description');h.elements['title-input'].value='Edited title';h.elements['title-input'].dispatchEvent(new Event('input'));const written=h.sent.at(-1).draft;assert(written.title==='Edited title'&&!Object.hasOwn(written,'summary'),'the page Description was drafted as the user\'s: '+JSON.stringify(written.summary));const writes=h.sent.length;h.api.upsertSummary('Cached AI summary',{userEdit:false});const form=h.api.pbpPopupDraftSnapshot();assert(form.summary==='Cached AI summary','an AI summary shown in the box was not drafted');
+   // A cached summary is not a change of the user's: the next open's cache restore puts it back, the draft does not.
+   assert(!form.changed.includes('summary')&&h.sent.length===writes,'a cached AI summary counted as the user\'s change');
+   h.api.upsertSummary('Requested AI summary');assert(h.sent.at(-1).draft.summary==='Requested AI summary'&&h.sent.at(-1).draft.changed.includes('summary'),'a requested AI summary was not drafted as a change');});
  // A draft made by editing a recent bookmark belongs to the tab the popup was
  // opened on but holds that bookmark's URL. The page's meta description
  // describes the tab, not the bookmark: filling the box with it saved the other
@@ -348,12 +351,40 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    assert((await run(msg('read',{pageUrl}))).draft,'a save with a different change list cleared the draft');
    await run(msg('clear',{pageUrl,expectedDraft:{...draft,url:pageUrl,tagInput:'',title:'Refilled by lookup',tags:[],private:false,notes:'Mine',changed:['notes']}}));
    assert((await run(msg('read',{pageUrl}))).draft===null,'a delivered draft survived because unchanged fields were refilled');});
+ const rowFor=pageUrl=>rows[Object.keys(rows).find(k=>k.startsWith('pbp-popup-draft:')&&rows[k].pageUrl===pageUrl)];
  await test('a draft of a recent bookmark brings its address back with the edit',async()=>{const pageUrl='https://example.com/article';
    const first=await openWorker(pageUrl);await first.api.loadBookmarkForEdit('https://example.com/g15-recent','alice:fake');typeInto(first,'description-input','Recent note');await settle();
    const second=await openWorker(pageUrl,'pinboard',h=>{h.elements['url-input'].value=pageUrl;h.elements['title-input'].value='Opened page title';});
    assert(second.elements['url-input'].value==='https://example.com/g15-recent'&&second.elements['description-input'].value==='Recent note','the recent edit reopened on the wrong address: '+second.elements['url-input'].value);
    assert(second.elements['title-input'].value==='Opened page title'&&!second.flags['title-input'],'an unchanged title was frozen by the recent draft');
    await second.api.pbpDiscardPopupDraft();});
+ // Only a user's change renews the 24-hour lifetime: the page and the lookup
+ // refilling unchanged fields of a reopened form must not keep a draft alive.
+ await test('reopening and refilling unchanged fields leaves the draft expiry alone',async()=>{const pageUrl='https://example.com/g15-expiry';
+   const first=await openWorker(pageUrl);typeInto(first,'title-input','My title');await settle();
+   const aged=Date.now()-23*60*60*1000;rowFor(pageUrl).updatedAt=aged;
+   const second=uiHarness('pinboard',{worker:true,pageInfo:{url:pageUrl,title:'Page title',metaDescription:'Meta from page'}});second.elements['url-input'].value=pageUrl;
+   await second.api.initPopupDraft('alice',{url:pageUrl});await settle();
+   second.api.prefill();second.api.recomputeArchiveCheck();
+   for(const [id,value] of [['description-input','Notes from lookup']])if(second.api.shouldUpdateField(id))second.elements[id].value=value;
+   second.elements['readlater-check'].checked=true;second.api.pbpRememberPopupDraft();await settle();
+   assert(second.elements['title-input'].value==='My title','the drafted title was not restored');
+   assert(!second.sent.some(m=>m.action==='write'),'refilling unchanged fields wrote the draft '+second.sent.filter(m=>m.action==='write').length+' time(s)');
+   assert(rowFor(pageUrl).updatedAt===aged,'the draft expiry was renewed without a user change');
+   typeInto(second,'title-input','My newer title');await settle();
+   assert(rowFor(pageUrl).updatedAt>aged&&rowFor(pageUrl).draft.title==='My newer title','a real change did not renew the draft');
+   await second.api.pbpDiscardPopupDraft();});
+ await test('worker keeps the expiry of a row whose changed fields hold the same values',async()=>{const pageUrl='https://example.com/g15-expiry-worker';
+   await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,title:'Mine',changed:['title']}}));const aged=Date.now()-23*60*60*1000;rowFor(pageUrl).updatedAt=aged;
+   assert((await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,title:'Mine',notes:'Refilled',toread:false,changed:['title']}}))).ok);
+   assert(rowFor(pageUrl).updatedAt===aged,'unchanged edits renewed the expiry');
+   await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,title:'Mine again',changed:['title']}}));
+   assert(rowFor(pageUrl).updatedAt>aged,'a changed value did not renew the expiry');
+   rowFor(pageUrl).updatedAt=aged;await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,title:'Mine again',changed:['notes','title']}}));
+   assert(rowFor(pageUrl).updatedAt>aged,'a longer change list did not renew the expiry');
+   rowFor(pageUrl).updatedAt=aged;await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl}}));await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,notes:'legacy edit'}}));
+   assert(rowFor(pageUrl).updatedAt>aged,'a legacy row write did not renew the expiry');
+   await run(msg('clear',{pageUrl}));});
  await test('worker keeps a valid change list and rejects anything outside the draft fields',async()=>{const pageUrl='https://example.com/g15-worker';
    assert((await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,changed:['title','tags','title']}}))).ok,'a valid change list was rejected');
    assert(JSON.stringify((await run(msg('read',{pageUrl}))).draft.changed)==='["tags","title"]','the change list was not stored canonically');

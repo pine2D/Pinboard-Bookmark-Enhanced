@@ -4322,6 +4322,8 @@ async function pbpRunPopupDraft(message) {
     if (d.changed !== undefined) out.changed = [...new Set(d.changed)].sort();
     return JSON.stringify(out).length <= 65536 ? out : null;
   };
+  // What a row holds of the user's (popup.js pbpPopupDraftEdits has the same shape).
+  const edits = (d) => JSON.stringify(d?.changed ? [d.changed, d.changed.map((k) => d[k])] : d);
   if (!message.account || !["read", "write", "clear", "clearOwner"].includes(message.action)
       || (message.action !== "clearOwner" && !safeUrl(message.pageUrl))) return { ok: false, error: "invalid" };
   try {
@@ -4350,7 +4352,6 @@ async function pbpRunPopupDraft(message) {
         // of a stored row is the form as it was then, not what was submitted.
         if (message.expectedDraft) {
           const expected = clean(message.expectedDraft);
-          const edits = (d) => JSON.stringify(d?.changed ? [d.changed, d.changed.map((k) => d[k])] : d);
           if (!expected || expected.tagInput.trim() || edits(clean(row?.draft)) !== edits(expected)) return { ok: true, account: message.account };
         }
         await chrome.storage.session.remove(key);
@@ -4369,8 +4370,12 @@ async function pbpRunPopupDraft(message) {
             changed: previous.changed && draft.changed ? [...previous.changed, ...draft.changed] : undefined });
           if (!draft) return { ok: false, error: "invalid" };
         }
+        // Only a change of the user's renews the 24-hour lifetime; the page or
+        // the lookup refilling the other fields of a reopened form does not.
+        const kept = draft.changed && valid(row) && row.owner === message.account && row.pageUrl === message.pageUrl
+          && row.incognito === (message.incognito === true) && edits(clean(row.draft)) === edits(draft);
         await chrome.storage.session.set({ [key]: { owner: message.account, pageUrl: message.pageUrl,
-          incognito: message.incognito === true, updatedAt: now, draft } });
+          incognito: message.incognito === true, updatedAt: kept ? row.updatedAt : now, draft } });
         const others = Object.keys(rows).filter((k) => k.startsWith(prefix) && k !== key)
           .sort((a, b) => (rows[b]?.updatedAt || 0) - (rows[a]?.updatedAt || 0));
         const expired = others.filter((k, i) => !valid(rows[k]) || i >= 19);

@@ -331,6 +331,14 @@ function pbpPopupDraftSnapshot() {
     private: $id("private-check").checked, toread: $id("readlater-check").checked,
     archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched, ...(changed ? { changed } : {}) };
 }
+// What a draft holds of the user's: the changed fields and their values (the
+// worker's clear compares the same shape). The rest of a snapshot is the form
+// as the page and the lookup filled it, so refilling those fields neither
+// writes the draft nor renews its 24-hour lifetime. A legacy draft without a
+// change list is all the user's.
+function pbpPopupDraftEdits(d) {
+  return JSON.stringify(d.changed ? [d.changed, d.changed.map((k) => d[k])] : d);
+}
 // Text in the box is always the user's to send; an empty box only once known.
 function pbpPopupDescriptionKnown() {
   return _linkdingDescriptionKnown || pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) !== "";
@@ -340,7 +348,7 @@ function pbpRememberPopupDraft() {
   if (!pbpPopupFormIsDirty() && !_popupDraftEdited && !$id("tags-input").value) return;
   if (_tagsUserTouched) _popupDraftChangedFields.add("tags");
   const draft = pbpPopupDraftSnapshot();
-  const snapshot = JSON.stringify(draft);
+  const snapshot = pbpPopupDraftEdits(draft);
   if (snapshot === _popupDraftLastSnapshot) return;
   _popupDraftLastSnapshot = snapshot;
   _popupDraftEdited = true;
@@ -505,7 +513,7 @@ async function initPopupDraft(account, tab) {
         if (!_popupDraftChangedFields.has("tags")) currentTags = d.tags.slice();
       }
       // Rendering a restored form does not refresh its expiry timestamp.
-      if (revision === _popupDraftRevision) _popupDraftLastSnapshot = JSON.stringify(pbpPopupDraftSnapshot());
+      if (revision === _popupDraftRevision) _popupDraftLastSnapshot = pbpPopupDraftEdits(pbpPopupDraftSnapshot());
       context.ready = true;
       renderTags();
       showStatus("status-msg", t("popupDraftRestored"), "info");
