@@ -38,11 +38,20 @@ function batchAiPermissionRows(origins, s) {
   });
 }
 
+// What the run does to pages already saved, as batchSkipExisting decides in
+// the worker: skip mode passes them by (and checks before paying for AI),
+// the default merges this run's tags and flags into them.
+function batchConfirmDetailKey(s, useAi) {
+  const skip = s?.batchSkipExisting === true;
+  return useAi ? (skip ? "batchConfirmDetailAi" : "batchConfirmDetailAiMerge")
+    : (skip ? "batchConfirmDetail" : "batchConfirmDetailMerge");
+}
+
 function showBatchAiPermission(origins, s) {
   showBatchPreflight({
     title: t("batchPermConfirm", String(origins.length)),
     rows: batchAiPermissionRows(origins, s),
-    detail: t("batchConfirmDetailAi"),
+    detail: t(batchConfirmDetailKey(s, true)),
     grantText: t("batchPermGrant"),
   });
 }
@@ -52,11 +61,11 @@ function showBatchAiPermission(origins, s) {
 // 2026-10-21): one click used to write the whole window to Pinboard and
 // bill the AI key per tab without a word. Not the shared confirm popover --
 // that one is the destructive confirm, its button solid danger red.
-function showBatchConfirm(count, useAi) {
+function showBatchConfirm(count, useAi, s) {
   showBatchPreflight({
     title: t("batchConfirmMsg", String(count)),
     rows: [],
-    detail: t(useAi ? "batchConfirmDetailAi" : "batchConfirmDetail"),
+    detail: t(batchConfirmDetailKey(s, useAi)),
     grantText: t("submit"),
   });
 }
@@ -296,7 +305,7 @@ function setupTabSet() {
       if (current.account !== startAuth.account) throw new Error("account_changed");
       if (validTabs.length > 3 || useAiTags || useAiSummary) {
         batchAiPermissionPending = { mode: "confirm", tabs: snapshot, origins: [], account: startAuth.account };
-        showBatchConfirm(validTabs.length, useAiTags || useAiSummary);
+        showBatchConfirm(validTabs.length, useAiTags || useAiSummary, settings);
         setBtnIcon(batchBtn, "pin", t("batchSaveBtn"));
         return;
       }

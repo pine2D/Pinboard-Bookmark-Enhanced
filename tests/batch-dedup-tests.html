@@ -192,7 +192,7 @@ function fakeButton() {
   return el;
 }
 
-async function createBatchClickHarness({ ai = true, contains = false, request = true, tabs } = {}) {
+async function createBatchClickHarness({ ai = true, contains = false, request = true, tabs, skip = false } = {}) {
   const elements = {
     "save-tabset-btn": fakeButton(),
     "batch-bookmark-btn": fakeButton(),
@@ -257,7 +257,7 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
     async (value) => value,
     async () => ({ service:"pinboard", token:"alice:token", account:"alice" }),
     (value) => value,
-    { aiProvider: "openai", batchAiTags: ai, batchAiSummary: false },
+    { aiProvider: "openai", batchAiTags: ai, batchAiSummary: false, batchSkipExisting: skip },
     () => true,
     () => {},
     () => 0,
@@ -432,7 +432,7 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     equal(h.calls.messages.length, 0, "AI batch started without a confirm");
     equal(h.elements["batch-permission"].classList.contains("hidden"), false);
     equal(h.elements["batch-permission-title"].textContent, "batchConfirmMsg:2");
-    equal(h.elements["batch-permission-detail"].textContent, "batchConfirmDetailAi");
+    equal(h.elements["batch-permission-detail"].textContent, "batchConfirmDetailAiMerge");
     equal(h.elements["batch-permission-list"].classList.contains("hidden"), true);
     equal(h.elements["batch-permission-grant"].textContent, "submit");
     equal(h.elements["batch-permission-grant"].focused, true, "Enter should confirm");
@@ -452,7 +452,7 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     await many.click();
     equal(many.calls.messages.length, 0);
     equal(many.elements["batch-permission-title"].textContent, "batchConfirmMsg:4");
-    equal(many.elements["batch-permission-detail"].textContent, "batchConfirmDetail");
+    equal(many.elements["batch-permission-detail"].textContent, "batchConfirmDetailMerge");
     many.cancel();
     equal(many.calls.messages.length, 0);
     equal(many.calls.writes, 0);
@@ -462,9 +462,37 @@ async function createUiHarness(storedProgress, now, opts = {}) {
   await test("the grant card also says AI bills per tab", async () => {
     const h = await createBatchClickHarness();
     await h.click();
-    equal(h.elements["batch-permission-detail"].textContent, "batchConfirmDetailAi");
+    equal(h.elements["batch-permission-detail"].textContent, "batchConfirmDetailAiMerge");
     equal(h.elements["batch-permission-detail"].classList.contains("hidden"), false);
     equal(h.elements["batch-permission-grant"].textContent, "batchPermGrant");
+  });
+
+  // P26: the cards say what the run does to pages already saved, as
+  // batchSkipExisting decides in the worker (default false: merged into).
+  await test("every confirm card names skip or merge from the setting, and only skip mode says pages are skipped", async () => {
+    const tabs = Array.from({ length: 4 }, (_, i) => ({ id: i + 1, url: `https://site-${i + 1}.example/p` }));
+    const shown = {};
+    for (const skip of [false, true]) for (const [card, options] of [["grant", {}], ["confirm-ai", { contains: true }], ["confirm", { ai: false, tabs }]]) {
+      const h = await createBatchClickHarness({ ...options, skip });
+      await h.click();
+      shown[card + ":" + skip] = h.elements["batch-permission-detail"].textContent;
+    }
+    equal(JSON.stringify(shown), JSON.stringify({
+      "grant:false": "batchConfirmDetailAiMerge", "confirm-ai:false": "batchConfirmDetailAiMerge", "confirm:false": "batchConfirmDetailMerge",
+      "grant:true": "batchConfirmDetailAi", "confirm-ai:true": "batchConfirmDetailAi", "confirm:true": "batchConfirmDetail",
+    }));
+    // The copy behind the keys, in every locale: merge never says skipped, no
+    // card bills AI for "new" tabs only, and skip mode's says saved pages get none.
+    const skippedWord = { en: /skipped/i, de: /übersprungen/i, fr: /ignorées/i, ja: /スキップ/, pl: /pominięte/i, ru: /пропущены/i, zh_CN: /跳过/, zh_HK: /略過|跳過/, zh_TW: /略過|跳過/ };
+    const newWord = { en: /\bnew tab/i, de: /neuen Tab/i, fr: /nouvel onglet/i, ja: /新しいタブ/, pl: /nowej karty/i, ru: /новой вкладки/i, zh_CN: /新标签页/, zh_HK: /新標籤頁/, zh_TW: /新分頁/ };
+    for (const loc of Object.keys(skippedWord)) {
+      const messages = await (await fetch(`../_locales/${loc}/messages.json`)).json();
+      const text = (key) => messages[key]?.message || "";
+      for (const key of ["batchConfirmDetailMerge", "batchConfirmDetailAiMerge"]) assert(text(key) && !skippedWord[loc].test(text(key)), `${loc} ${key} says skipped: ${text(key)}`);
+      for (const key of ["batchConfirmDetail", "batchConfirmDetailAi"]) assert(skippedWord[loc].test(text(key)), `${loc} ${key} lost the skip: ${text(key)}`);
+      for (const key of ["batchConfirmDetailAi", "batchConfirmDetailAiMerge"]) assert(!newWord[loc].test(text(key)), `${loc} ${key} bills only new tabs: ${text(key)}`);
+      for (const key of ["batchConfirmDetailAi", "batchConfirmDetailAiMerge"]) assert(/AI|KI|IA/.test(text(key)), `${loc} ${key} lost the AI sentence: ${text(key)}`);
+    }
   });
 
   await test("Batch without AI starts with zero permission work", async () => {

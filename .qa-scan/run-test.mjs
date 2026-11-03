@@ -89,7 +89,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/anki-connect-tests.html": 62,
   "tests/background-active-tab-tests.html": 44,
   "tests/background-lifecycle-tests.html": 53,
-  "tests/batch-dedup-tests.html": 38,
+  "tests/batch-dedup-tests.html": 39,
   "tests/bookmark-services-tests.html": 141,
   "tests/bili-bridge-tests.html": 3,
   "tests/contrast-tests.html": 6,
