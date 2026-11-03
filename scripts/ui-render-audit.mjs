@@ -10430,8 +10430,10 @@ async function runSweep(page, sw, extBase) {
       input.readOnly = false;
       input.value = "Manual description";
       input.dispatchEvent(new Event("input", { bubbles:true }));
+      // G24: the summary follows the user's words as its own paragraph, so
+      // the scan below measures the box grown to three lines.
       upsertSummary("Generated summary");
-      if (input.value !== "Manual description") throw new Error("AI replaced a manual Description");
+      if (input.value !== "Manual description\n\nGenerated summary") throw new Error("AI summary did not follow a manual Description: " + JSON.stringify(input.value));
       if (document.getElementById("description-input").value.includes("Generated summary")) throw new Error("AI entered Notes");
     });
     await scan("popup", "linkding-description");

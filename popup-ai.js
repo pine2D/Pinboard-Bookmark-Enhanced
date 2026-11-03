@@ -390,6 +390,9 @@ let _aiSummaryOwnershipChecked = null;
 // and it owns none, undefined when it cannot tell -- the worker then leaves the
 // page's receipt alone instead of retiring one this popup never looked at.
 function pbpAiSummaryOwnershipSnapshot(description) {
+  // linkding's summary lives in the Description; the session range below
+  // tracks that box, never the Notes this snapshot describes.
+  if (pbpBookmarkServiceId(settings) === "linkding") return undefined;
   if (_aiSummaryValue === description && pbpAiSummaryRangeValid(description, _aiSummaryRange)) {
     return { start: _aiSummaryRange.start, end: _aiSummaryRange.end };
   }
@@ -667,26 +670,7 @@ function setupAIFeatures() {
 
   const descriptionInput = $id(pbpBookmarkServiceId(settings) === "linkding" ? "linkding-description-input" : "description-input");
   _aiSummaryValue = descriptionInput.value;
-  descriptionInput.addEventListener("input", () => {
-    const nextValue = descriptionInput.value;
-    if (!_aiSummaryRange) {
-      _aiSummaryValue = nextValue;
-      if (pbpBookmarkServiceId(settings) === "linkding") _aiResetSummaryActions();
-      return;
-    }
-    const tracked = pbpAiTrackSummaryRange(_aiSummaryRange, _aiSummaryValue, nextValue);
-    _aiSummaryValue = nextValue;
-    if (tracked.kind === "owned") {
-      _aiSummaryRange = { start: tracked.start, end: tracked.end };
-      return;
-    }
-    _aiSummaryRange = null;
-    _aiResetSummaryActions();
-    if (tracked.kind === "merged") {
-      // Information, not failure: the user's own edit merged it (critique 2026-10-19).
-      showStatus("status-msg", t("aiSummaryMerged"), "info");
-    }
-  });
+  descriptionInput.addEventListener("input", () => _aiTrackSummaryEdit(descriptionInput.value));
 
   // Auto-restore cached summary only for fresh (non-bookmarked) pages whose
   // description doesn't already contain a summary. For existing bookmarks,
@@ -763,7 +747,7 @@ function _aiAdoptSummaryRange(value, range, fromCache) {
 // receipt key than pageInfo.url. The AI cache stays keyed by pageInfo.url.
 async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
   // linkding Description is plain text, separate from legacy Notes ownership.
-  if (pbpBookmarkServiceId(settings) === "linkding") return null;
+  if (pbpBookmarkServiceId(settings) === "linkding") return _aiRestoreLinkdingSummary(cachedSummary);
   const input = $id("description-input");
   const value = input.value;
   const bookmark = existingBookmark;
@@ -798,23 +782,7 @@ async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
 // Replace the session-owned range, migrate the last legacy block in place,
 // or append a new block without rewriting surrounding notes.
 function upsertSummary(summary, { userEdit = true } = {}) {
-  if (pbpBookmarkServiceId(settings) === "linkding") {
-    if (_linkdingDescriptionTouched) {
-      if (userEdit) showStatus("status-msg", t("aiSummaryKeptDescription"), "info");
-      return false;
-    }
-    const input = $id("linkding-description-input");
-    const next = pbpBookmarkDescriptionLine(summary);
-    const changed = input.value !== next;
-    input.value = next;
-    // An AI summary is a Description to save, also one restored from the cache.
-    _linkdingDescriptionPending = true;
-    _aiSummaryValue = next;
-    _aiSummaryRange = null;
-    if (userEdit && changed && typeof pbpPopupDraftFieldEdited === "function") pbpPopupDraftFieldEdited("linkding-description-input", { manual: false });
-    updateCharCount();
-    return true;
-  }
+  if (pbpBookmarkServiceId(settings) === "linkding") return _aiUpsertLinkdingSummary(summary, userEdit);
   const di = $id("description-input");
   const cur = di.value;
   const wrapped = pbpAiWrapSummary(summary, pbpBookmarkServiceId(settings));
@@ -844,19 +812,134 @@ function upsertSummary(summary, { userEdit = true } = {}) {
   return true;
 }
 
+// linkding's Description is plain text (user decision 2026-11-02 #4). An
+// empty box, or one holding only the page's own meta description, takes the
+// summary in its place; anything else is the user's words (typed here or
+// stored on the server), which the summary follows as its own paragraph after
+// one blank line. The session range tracks that paragraph through edits; it
+// also remembers what the box held before the first summary (before) and
+// the value the popup last wrote (written), so Remove can put the box back
+// exactly while nothing was edited since. Nothing of this is persisted.
+function _aiLinkdingSummaryRange(value) {
+  return _aiSummaryValue === value && pbpAiSummaryRangeValid(value, _aiSummaryRange) ? _aiSummaryRange : null;
+}
+
+function _aiUpsertLinkdingSummary(summary, userEdit) {
+  const input = $id("linkding-description-input");
+  const cur = input.value;
+  const line = pbpBookmarkDescriptionLine(summary);
+  if (!line) return false;
+  const owned = _aiLinkdingSummaryRange(cur);
+  let next, start, before;
+  if (owned) {
+    // Regenerate: only the summary paragraph changes. The box before the
+    // first summary is kept only while the box is still what the popup
+    // wrote; after an edit Remove takes out the summary paragraph alone.
+    next = cur.slice(0, owned.start) + line + cur.slice(owned.end);
+    start = owned.start;
+    before = cur === owned.written ? owned.before : undefined;
+  } else {
+    const own = pbpBookmarkDescriptionLine(cur);
+    const meta = pbpBookmarkDescriptionLine(typeof pageInfo === "undefined" ? "" : pageInfo?.metaDescription);
+    if (!own || own === meta) {
+      next = line;
+      start = 0;
+    } else {
+      const head = cur.replace(/\s+$/, "");
+      next = head + "\n\n" + line;
+      start = head.length + 2;
+    }
+    before = { value: cur, pending: _linkdingDescriptionPending, known: _linkdingDescriptionKnown,
+      dirty: typeof fieldDirtyFlags === "object" ? fieldDirtyFlags["linkding-description-input"] === true : undefined };
+  }
+  const changed = next !== cur;
+  input.value = next;
+  // An AI summary is a Description to save, also one restored from the cache.
+  _linkdingDescriptionPending = true;
+  _linkdingDescriptionKnown = true;
+  _aiSummaryRange = { start, end: start + line.length, written: next, before };
+  _aiSummaryValue = next;
+  if (userEdit && changed && typeof pbpPopupDraftFieldEdited === "function") pbpPopupDraftFieldEdited("linkding-description-input");
+  updateCharCount();
+  return true;
+}
+
+function _aiRemoveLinkdingSummary() {
+  const input = $id("linkding-description-input");
+  const cur = input.value;
+  const owned = _aiLinkdingSummaryRange(cur);
+  // A box the popup cannot account for (the summary merged into the user's
+  // edit, or rewritten by something else) is left alone.
+  if (!owned) return false;
+  const before = cur === owned.written ? owned.before : undefined;
+  const next = before ? before.value : pbpAiRemoveSummaryRange(cur, owned).value;
+  input.value = next;
+  _aiSummaryRange = null;
+  _aiSummaryValue = next;
+  if (before && before.pending === false) {
+    // Back to the box as it was before the first summary: a page or stored
+    // Description is again not the user's to draft.
+    _linkdingDescriptionPending = false;
+    _linkdingDescriptionKnown = before.known;
+    if (typeof fieldDirtyFlags === "object" && typeof before.dirty === "boolean") fieldDirtyFlags["linkding-description-input"] = before.dirty;
+    if (typeof pbpPopupRenderDescriptionHint === "function") pbpPopupRenderDescriptionHint();
+    if (typeof pbpRememberPopupDraft === "function") pbpRememberPopupDraft();
+  } else if (typeof pbpPopupDraftFieldEdited === "function") {
+    pbpPopupDraftFieldEdited("linkding-description-input");
+  }
+  updateCharCount();
+  return true;
+}
+
+// A Description that already ends with the cached summary as its own
+// paragraph (a restored draft, a stored bookmark) owns that paragraph again,
+// so a click neither stacks a second copy nor loses Remove. What the box held
+// before it is not known here: Remove takes out the paragraph alone.
+function _aiRestoreLinkdingSummary(cachedSummary) {
+  const input = $id("linkding-description-input");
+  const value = input.value;
+  if (_aiLinkdingSummaryRange(value)) {
+    showSummaryActions(false);
+    return "session";
+  }
+  const line = cachedSummary ? pbpBookmarkDescriptionLine(cachedSummary) : "";
+  if (!line) return null;
+  const start = value === line ? 0 : value.endsWith("\n\n" + line) ? value.length - line.length : -1;
+  if (start < 0) return null;
+  _aiSummaryRange = { start, end: value.length, written: value, before: undefined };
+  _aiSummaryValue = value;
+  showSummaryActions(true);
+  return "cache";
+}
+
+// The user edited the box the summary lives in (Notes, or linkding's
+// Description): follow the summary range through the edit, or let it go.
+function _aiTrackSummaryEdit(nextValue) {
+  if (!_aiSummaryRange) {
+    _aiSummaryValue = nextValue;
+    if (pbpBookmarkServiceId(settings) === "linkding") _aiResetSummaryActions();
+    return;
+  }
+  const tracked = pbpAiTrackSummaryRange(_aiSummaryRange, _aiSummaryValue, nextValue);
+  _aiSummaryValue = nextValue;
+  if (tracked.kind === "owned") {
+    // A linkding range also carries the box before the first summary
+    // (before) and the value the popup wrote (written); see upsertSummary.
+    _aiSummaryRange = { ..._aiSummaryRange, start: tracked.start, end: tracked.end };
+    return;
+  }
+  _aiSummaryRange = null;
+  _aiResetSummaryActions();
+  if (tracked.kind === "merged") {
+    // Information, not failure: the user's own edit merged it (critique 2026-10-19).
+    showStatus("status-msg", t("aiSummaryMerged"), "info");
+  }
+}
+
 // ---- Remove AI summary block from description ----
 // Remove only the session-owned range, or the last identifiable legacy block.
 function removeSummary() {
-  if (pbpBookmarkServiceId(settings) === "linkding") {
-    const input = $id("linkding-description-input");
-    if (_linkdingDescriptionTouched || !input.value || input.value !== _aiSummaryValue) return false;
-    input.value = "";
-    _aiSummaryValue = "";
-    _aiSummaryRange = null;
-    if (typeof pbpPopupDraftFieldEdited === "function") pbpPopupDraftFieldEdited("linkding-description-input", { manual: false });
-    updateCharCount();
-    return true;
-  }
+  if (pbpBookmarkServiceId(settings) === "linkding") return _aiRemoveLinkdingSummary();
   const di = $id("description-input");
   const cur = di.value;
   let removed = { value: cur, removed: false };
@@ -1207,7 +1290,7 @@ async function doAISummary(forceRefresh, sOverride) {
         const adopted = await _aiRestoreSummaryOwnership(account, $id("url-input").value, cached);
         if (!_aiOpStillCurrent(account)) return;
         if (adopted) return;
-        if (upsertSummary(cached) === false) return "kept";
+        if (upsertSummary(cached) === false) { showStatus("status-msg", t("aiEmptyResult"), "error"); return; }
         showSummaryActions(true);
         return;
       }
@@ -1236,8 +1319,9 @@ async function doAISummary(forceRefresh, sOverride) {
     if (!_aiOpStillCurrent(account)) return;
     // The page text was there (checked above); an empty reply is the model's.
     if (!summary) { showStatus("status-msg", t("aiEmptyResult"), "error"); return; }
-    // A protected Description is a completed request, but no summary was written.
-    if (upsertSummary(summary) === false) return "kept";
+    // Every summary paid for is written: a linkding Description the user
+    // wrote is followed, not replaced (decision 2026-11-02 #4).
+    if (upsertSummary(summary) === false) { showStatus("status-msg", t("aiEmptyResult"), "error"); return; }
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");
     return true;

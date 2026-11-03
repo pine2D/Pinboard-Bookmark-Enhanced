@@ -328,8 +328,6 @@ let _activeTabAtOpen = null;
 // bookmark URL. Dispatch edits immediately; the SW owns the storage write so
 // closing this short-lived document does not cancel queued work.
 let _popupDraftContext = null;
-// Draft-only provenance: AI/meta writes must remain regenerable after reopening.
-let _linkdingDescriptionTouched = false;
 // Whether the Description box holds a value the popup can vouch for: the
 // page's meta description or the fact it has none (for the opened page itself,
 // not for another URL in the form), an AI summary, the user's edit, a restored
@@ -409,7 +407,7 @@ function pbpPopupDraftSnapshot() {
     : [...new Set([..._popupDraftRestoredFields, ..._popupDraftChangedFields, ...(_tagsUserTouched ? ["tags"] : [])])].sort();
   return { url: $id("url-input").value, title: $id("title-input").value,
     notes: $id("description-input").value,
-    ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(_linkdingDescriptionPending ? { summary: $id("linkding-description-input").value } : {}), summaryTouched: _linkdingDescriptionTouched, sharedExplicit: _linkdingSharedExplicit } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
+    ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(_linkdingDescriptionPending ? { summary: $id("linkding-description-input").value } : {}), sharedExplicit: _linkdingSharedExplicit } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
     private: $id("private-check").checked, toread: $id("readlater-check").checked,
     archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched, ...(changed ? { changed } : {}),
     ...(baseVersion !== undefined ? { baseVersion } : {}), ...(baseTags ? { baseTags } : {}) };
@@ -476,7 +474,7 @@ async function pbpDiscardPopupDraft(allOwner = false) {
   _popupDraftLastSnapshot = "";
   return true;
 }
-function pbpPopupDraftFieldEdited(id, { manual = true } = {}) {
+function pbpPopupDraftFieldEdited(id) {
   if (id === "share-check") {
     const share = $id(id);
     if (pbpBookmarkServiceId(settings) !== "linkding" || !pbpBookmarkConnection(settings).sharingEnabled
@@ -499,13 +497,11 @@ function pbpPopupDraftFieldEdited(id, { manual = true } = {}) {
   if (id in fieldDirtyFlags) fieldDirtyFlags[id] = true;
   if (id === "url-input") _popupDraftUserUrl = true;
   if (id === "archive-check") _archiveUserTouched = true;
-  if (id === "linkding-description-input" && manual) _linkdingDescriptionTouched = true;
   if (id === "linkding-description-input") { _linkdingDescriptionKnown = true; _linkdingDescriptionPending = true; pbpPopupRenderDescriptionHint(); }
   const key = { "url-input": "url", "title-input": "title", "description-input": "notes", "linkding-description-input": "summary", "tags-input": "tagInput",
     "private-check": "private", "share-check": "private", "readlater-check": "toread", "archive-check": "archive" }[id];
   _popupDraftChangedFields.add(key);
   if (id === "archive-check") _popupDraftChangedFields.add("archiveTouched");
-  if (id === "linkding-description-input") _popupDraftChangedFields.add("summaryTouched");
   pbpRememberPopupDraft();
 }
 function setupPopupDraftTracking() {
@@ -582,7 +578,6 @@ async function initPopupDraft(account, tab) {
       if (pbpBookmarkServiceId(settings) === "linkding" && !pbpBookmarkConnection(settings).sharingEnabled) $id("private-check").checked = true;
       $id("share-check").checked = !$id("private-check").checked;
       if (take("archiveTouched")) _archiveUserTouched = d.archiveTouched;
-      if (take("summaryTouched")) _linkdingDescriptionTouched = d.summaryTouched === true;
       // Only a written Description was drafted; it is still waiting to be saved.
       const draftedSummary = typeof d.summary === "string" && drafted("summary");
       if (draftedSummary) { _linkdingDescriptionKnown = true; _linkdingDescriptionPending = true; pbpPopupRenderDescriptionHint(); }
@@ -2846,9 +2841,7 @@ function setupSubmit(token) {
       // (critique 2026-10-20); a cache hit or a failure keeps its own line.
       if (runs.length === 2) {
         Promise.all(runs).then(([summaryDone, tagsDone]) => {
-          if (summaryDone === "kept" && tagsDone === true) {
-            showStatus("status-msg", t("aiSummaryKeptDescription"), "info");
-          } else if (summaryDone === true && tagsDone === true) {
+          if (summaryDone === true && tagsDone === true) {
             showStatus("status-msg", t("aiSummaryTagsGenerated"), "success");
           }
         }, () => {});
@@ -2969,7 +2962,6 @@ async function loadBookmarkForEdit(url, token) {
   $id("title-input").value = "";
   $id("description-input").value = "";
   $id("linkding-description-input").value = "";
-  _linkdingDescriptionTouched = false;
   // Nothing has read that bookmark's page; the lookup refills a stored one.
   _linkdingDescriptionKnown = settings.optAutoDescription === false;
   _linkdingDescriptionPending = false;

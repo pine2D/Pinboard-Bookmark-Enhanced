@@ -332,9 +332,6 @@
   "aiGenerateBtn": {
     "message": "生成"
   },
-  "aiSummaryKeptDescription": {
-    "message": "説明が編集されているため、AI 要約では上書きしませんでした。"
-  },
   "aiSummaryGenerated": {
     "message": "要約を生成しました"
   },

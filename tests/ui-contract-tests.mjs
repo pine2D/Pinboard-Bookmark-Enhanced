@@ -4177,13 +4177,18 @@ check(popupCss.includes("html[data-theme] .confirm-popover .confirm-no:hover { b
     popupAiJs.indexOf("// ---- Remove AI summary"));
   const setupAi = popupAiJs.slice(popupAiJs.indexOf("function setupAIFeatures"),
     popupAiJs.indexOf("function _aiSummaryBlockMatches"));
+  // The box's input listener hands every edit to _aiTrackSummaryEdit (G24
+  // named it so the linkding Description and Notes share one tracker).
+  const trackEdit = popupAiJs.slice(popupAiJs.indexOf("function _aiTrackSummaryEdit"),
+    popupAiJs.indexOf("// ---- Remove AI summary"));
   check(!popupAiJs.includes('const AI_SUMMARY_TAG = "[AI Summary]"') &&
     !upsert.includes("AI_SUMMARY_TAG") &&
     popupAiJs.includes("function pbpAiTrackSummaryRange") &&
     popupAiJs.includes("function pbpAiRemoveSummaryRange") &&
-    setupAi.includes("pbpAiTrackSummaryRange") &&
-    setupAi.includes("_aiResetSummaryActions()") &&
-    setupAi.includes('t("aiSummaryMerged")') &&
+    setupAi.includes("_aiTrackSummaryEdit(") &&
+    trackEdit.includes("pbpAiTrackSummaryRange") &&
+    trackEdit.includes("_aiResetSummaryActions()") &&
+    trackEdit.includes('t("aiSummaryMerged")') &&
     sharedJs.includes("const _AI_BQ_REGEX_SHARED") &&
     sharedJs.includes("legacy"),
     "popup AI summary ownership still writes a marker, lacks fail-closed range tracking, or dropped legacy recognition");

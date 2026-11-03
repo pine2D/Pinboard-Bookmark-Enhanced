@@ -27,7 +27,7 @@ async function pbpFixturePopupSummary({ service = "pinboard", account, url, note
   const api = new Function(
     "$id", "pbpPopupAiAccountIsCurrent", "pageInfo", "existingBookmark",
     "showSummaryActions", "settings", "updateCharCount", "autoResizeTextarea",
-    "let _linkdingDescriptionTouched = false;\n" + source.slice(start, end) +
+    source.slice(start, end) +
     "\nreturn { _aiRestoreSummaryOwnership, upsertSummary, removeSummary, pbpAiSummaryOwnershipSnapshot };"
   )(
     (id) => fields[id] || null,

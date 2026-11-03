@@ -332,9 +332,6 @@
   "aiGenerateBtn": {
     "message": "générer"
   },
-  "aiSummaryKeptDescription": {
-    "message": "Vous avez modifié la description. Le résumé IA ne l’a pas remplacée."
-  },
   "aiSummaryGenerated": {
     "message": "Résumé généré"
   },

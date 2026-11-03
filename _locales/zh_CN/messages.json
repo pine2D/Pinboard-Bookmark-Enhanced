@@ -332,9 +332,6 @@
   "aiGenerateBtn": {
     "message": "生成"
   },
-  "aiSummaryKeptDescription": {
-    "message": "你改过描述，AI 摘要没有覆盖它。"
-  },
   "aiSummaryGenerated": {
     "message": "摘要已生成"
   },

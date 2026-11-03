@@ -404,7 +404,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
         _linkdingSharedExplicit: sharedExplicit,
         _linkdingSharedRevision: 0,
         _popupDraftContext: draftContext ? {pageUrl: URL, incognito: false} : null,
-        _linkdingDescriptionTouched: false,
         _linkdingDescriptionKnown: descriptionKnown,
         _linkdingDescriptionPending: descriptionPending,
         _popupDraftEdited: false,
@@ -2536,7 +2535,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       });
     }
 
-    function summaryOwnershipRuntime(description) {
+    function summaryOwnershipRuntime(description, service = "pinboard") {
       const receipts = summaryReceiptApi();
       const start = popupAiSource.indexOf("function _aiUrlEquivalent");
       const end = popupAiSource.indexOf("// ---- Setup AI feature listeners ----", start);
@@ -2544,7 +2543,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const api = sliceRuntime({
         pbpAiPageUrlNorm: receipts.pbpAiPageUrlNorm,
         pbpAiSummaryRangeValid: receipts.pbpAiSummaryRangeValid,
-        _AI_BQ_REGEX_SHARED: /$a/g
+        _AI_BQ_REGEX_SHARED: /$a/g,
+        settings: { bookmarkService: service }
       }, popupAiSource.slice(start, end) +
         "; function setSummaryState(value, range) { _aiSummaryValue = value; _aiSummaryRange = range; }" +
         "; return { pbpAiSummaryOwnershipSnapshot, setSummaryState };");
@@ -2646,6 +2646,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
       h.setSummaryState(h.field.value, { start: 0, end: 0 });
       assert(h.pbpAiSummaryOwnershipSnapshot(h.field.value) === undefined,
         "invalid range was snapshotted");
+      // linkding's range tracks its Description box, never the Notes: equal
+      // text in both still vouches for no block in the Notes.
+      const ld = summaryOwnershipRuntime(description, "linkding");
+      ld.setSummaryState(description, { start: 0, end: description.length });
+      assert(ld.pbpAiSummaryOwnershipSnapshot(description) === undefined, "a linkding Description range was snapshotted for the Notes");
     });
 
     // A null snapshot tells the worker these notes hold no block of the
@@ -2868,10 +2873,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const createRuntime = (description, service = "pinboard") => {
         const field = { value: description };
         const api = sliceFn("_AI_BQ_REGEX_SHARED", "escapeForExtended", "$id",
-          "updateCharCount", "autoResizeTextarea", "settings", "_linkdingDescriptionTouched", "pbpAiSummaryRangeValid",
+          "updateCharCount", "autoResizeTextarea", "settings", "pbpAiSummaryRangeValid",
           popupAiSource.slice(runtimeStart, runtimeEnd) +
           "; return { upsertSummary, removeSummary };"
-        )(_AI_BQ_REGEX_SHARED, (text) => text, () => field, () => {}, () => {}, { bookmarkService: service }, false,
+        )(_AI_BQ_REGEX_SHARED, (text) => text, () => field, () => {}, () => {}, { bookmarkService: service },
           summaryReceiptApi().pbpAiSummaryRangeValid);
         return { field, ...api };
       };
@@ -3076,14 +3081,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
         PBP_AI_VIA_SW: o.viaSW !== false,
         settings: o.globalSettings ? { ...snapshot, ...o.globalSettings } : snapshot,
         pbpBookmarkServiceId,
-        _linkdingDescriptionTouched: false,
         _linkdingDescriptionPending: false,
         fieldsEdit: value => { fields["linkding-description-input"].value = value; },
         pbpPopupDraftFieldEdited() {}, updateCharCount() {},
-        ...(o.realSummary ? { _popupDraftRevision:0, _popupDraftEdited:false, _popupDraftUserUrl:false, _linkdingDescriptionKnown:true,
+        ...(o.realSummary ? { pbpAiSummaryRangeValid: summaryReceiptApi().pbpAiSummaryRangeValid,
+          pbpAiRemoveSummaryRange: summaryHelpers().pbpAiRemoveSummaryRange, pbpAiTrackSummaryRange: summaryHelpers().pbpAiTrackSummaryRange,
+          _aiResetSummaryActions() { calls.reset = (calls.reset || 0) + 1; }, _popupDraftRevision:0, _popupDraftEdited:false, _popupDraftUserUrl:false, _linkdingDescriptionKnown:true,
           _popupDraftChangedFields:new Set(), fieldDirtyFlags:{"linkding-description-input":false},
           _archiveUserTouched:false, pbpRememberPopupDraft() {} } : {}),
-        pageInfo: { url: o.pageUrl === undefined ? URL : o.pageUrl, pageText: "extracted body" },
+        pageInfo: { url: o.pageUrl === undefined ? URL : o.pageUrl, pageText: "extracted body",
+          metaDescription: o.metaDescription === undefined ? "Meta description" : o.metaDescription },
         bookmarkLookup: lookupState,
         allUserTags: [],
         pbpPopupTagContext: (s) => ({ service: pbpBookmarkServiceId(s), separator: s.aiTagSeparator,
@@ -3156,7 +3163,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       // With the real card appended, its declaration shadows the showAIError
       // parameter above - the cases that want rendered text opt in, the rest
       // keep the recording stub.
-      const realSummary = o.realSummary ? popupAiSource.slice(popupAiSource.indexOf("function upsertSummary("), popupAiSource.indexOf("// ---- Remove AI summary block")) : "";
+      const realSummary = o.realSummary ? popupAiSource.slice(popupAiSource.indexOf("function upsertSummary("), popupAiSource.indexOf('// Unified "no AI key"')) : "";
       const realDraftEdit = o.realSummary ? source.slice(source.indexOf("function pbpPopupDraftFieldEdited("),source.indexOf("function setupPopupDraftTracking(")) : "";
       // realPageGuard: the same-page check itself is real (popup-ai.js's guard
       // functions over the real cleaning and the stored urlClean settings), so
@@ -3170,21 +3177,110 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const body = summaryState + k44SliceA + "\n" + k44SliceB + "\n" + realSummary + "\n" + realDraftEdit + (o.realErrorCard ? "\n" + k44SliceC : "")
         + (o.realPageGuard ? "\n" + pageGuardSource : "");
       const api = sliceFn(...Object.keys(deps),
-        body + "\n; return { fetchAIArtifacts, doAISummary, doAITags, refreshAITags: typeof pbpRefreshDisplayedAITagsForBookmark === 'function' ? pbpRefreshDisplayedAITagsForBookmark : null, syncUrlEditState: typeof pbpAiSyncUrlEditState === 'function' ? pbpAiSyncUrlEditState : null, editDescription(value) { fieldsEdit(value); pbpPopupDraftFieldEdited('linkding-description-input'); } };"
+        body + "\n; return { fetchAIArtifacts, doAISummary, doAITags, refreshAITags: typeof pbpRefreshDisplayedAITagsForBookmark === 'function' ? pbpRefreshDisplayedAITagsForBookmark : null, syncUrlEditState: typeof pbpAiSyncUrlEditState === 'function' ? pbpAiSyncUrlEditState : null, removeSummary: typeof removeSummary === 'function' ? removeSummary : null, editDescription(value) { fieldsEdit(value); if (typeof _aiTrackSummaryEdit === 'function') _aiTrackSummaryEdit(value); pbpPopupDraftFieldEdited('linkding-description-input'); } };"
       )(...Object.values(deps));
       return { ...api, calls, snapshot, account, el: fields, lookupState };
     }
 
-    await testAsync("manual Description edited during the actual summary request keeps visible completion feedback", async () => {
+    // G24 (user decision 2026-11-02 #4): a paid summary is always written. A
+    // Description typed while the request was out is the user's: the summary
+    // follows it as its own paragraph, one blank line between.
+    await testAsync("a Description typed during the summary request is followed by the summary, never left unwritten", async () => {
       let resolveResponse;
       const pendingResponse = new Promise(resolve => { resolveResponse = resolve; });
       const h = makePopupAi({ realSummary:true, settings:{bookmarkService:"linkding"}, respond:() => pendingResponse });
       const pending = h.doAISummary(true); await flushMicrotasks();
       h.editDescription("Manual while waiting");
-      resolveResponse({ok:true,summary:"Generated result",tags:null}); await pending;
-      assert(h.el["linkding-description-input"].value === "Manual while waiting", "completion replaced manual input");
+      resolveResponse({ok:true,summary:"Generated result",tags:null});
+      assert(await pending === true, "a paid summary was not reported written");
+      assert(h.el["linkding-description-input"].value === "Manual while waiting\n\nGenerated result", "completion did not follow the typed words: " + JSON.stringify(h.el["linkding-description-input"].value));
       assert(h.el["description-input"].value === "Notes", "AI changed linkding Notes");
-      assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryKeptDescription"), "generic completion hid kept feedback");
+      assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryRegenerated"), "completion feedback missing: " + JSON.stringify(h.calls.status));
+      assert(h.calls.sent.length === 1, "summary requests: " + h.calls.sent.length);
+    });
+
+    // G24: where the summary goes in a linkding Description. An empty box or
+    // the page's own meta description (equal once whitespace is normalized)
+    // is replaced; the user's or the server's words are followed. Regenerate
+    // changes only the summary paragraph, Remove puts back the box as it was
+    // before the first summary, and every summary paid for is written.
+    await testAsync("linkding AI summary replaces an empty or meta Description and follows the user's words", async () => {
+      const cases = [
+        ["", "", "S1", "S2"],
+        ["meta", " Meta \n description ", "S1", "S2"],
+        ["user", "My own words.", "My own words.\n\nS1", "My own words.\n\nS2"],
+        ["user, trailing blank lines", "My own words.\n\n\n", "My own words.\n\nS1", "My own words.\n\nS2"],
+        ["server, multi-line", "Line one\nLine two", "Line one\nLine two\n\nS1", "Line one\nLine two\n\nS2"],
+        ["text containing the meta", "Meta description, and more", "Meta description, and more\n\nS1", "Meta description, and more\n\nS2"],
+      ];
+      for (const [name, start, first, second] of cases) {
+        let n = 0;
+        const h = makePopupAi({ realSummary:true, settings:{bookmarkService:"linkding"}, metaDescription:"Meta description",
+          respond: async () => ({ ok:true, summary:"S" + (++n), tags:null }) });
+        const box = h.el["linkding-description-input"];
+        box.value = start;
+        assert(await h.doAISummary(true) === true, name + ": first summary not written");
+        assert(box.value === first, name + ": first summary gave " + JSON.stringify(box.value));
+        assert(await h.doAISummary(true) === true, name + ": regenerated summary not written");
+        assert(box.value === second, name + ": regenerate gave " + JSON.stringify(box.value));
+        assert(h.removeSummary() === true && box.value === start, name + ": Remove did not restore " + JSON.stringify(start) + ", got " + JSON.stringify(box.value));
+        assert(h.calls.sent.length === 2 && n === 2, name + ": paid calls " + h.calls.sent.length);
+        assert(h.el["description-input"].value === "Notes", name + ": the summary touched Notes");
+        assert(!h.calls.status.some(row => row[2] === "error"), name + ": " + JSON.stringify(h.calls.status));
+      }
+    });
+
+    await testAsync("linkding Remove after the user edited the box takes out only the summary paragraph, or refuses", async () => {
+      const make = async (start) => {
+        const h = makePopupAi({ realSummary:true, settings:{bookmarkService:"linkding"}, metaDescription:"Meta description",
+          respond: async () => ({ ok:true, summary:"AI part", tags:null }) });
+        h.el["linkding-description-input"].value = start;
+        assert(await h.doAISummary(true) === true, "summary not written");
+        return h;
+      };
+      for (const [name, start, edit, removed] of [
+        ["typed after the summary", "Mine", v => v + "\n\nMore of mine", "Mine\n\nMore of mine"],
+        ["edited the words before it", "Mine", v => "Mine, edited" + v.slice(4), "Mine, edited"],
+        ["typed after a replaced summary", "", v => v + "\n\nNext", "Next"],
+        ["edited inside the summary", "Mine", v => v.replace("AI part", "AI pa rt"), "Mine"],
+      ]) {
+        const h = await make(start);
+        const box = h.el["linkding-description-input"];
+        h.editDescription(edit(box.value));
+        assert(h.removeSummary() === true, name + ": Remove refused a tracked summary");
+        assert(box.value === removed, name + ": Remove gave " + JSON.stringify(box.value));
+      }
+      // An edit across the boundary merges the summary into the user's words:
+      // nothing can tell them apart, so Remove leaves the box and says so.
+      const h = await make("Mine");
+      const box = h.el["linkding-description-input"];
+      h.editDescription("Mine plus AI");
+      const merged = box.value;
+      assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryMerged"), "a merged summary was not reported");
+      assert(h.removeSummary() === false && box.value === merged, "Remove guessed at a merged summary: " + JSON.stringify(box.value));
+      // A box rewritten without an input event (a lookup, a form reset) is not
+      // the one the popup wrote either.
+      const g = await make("Mine");
+      g.el["linkding-description-input"].value = "Mine\n\nAI part!";
+      assert(g.removeSummary() === false && g.el["linkding-description-input"].value === "Mine\n\nAI part!", "Remove touched a box rewritten elsewhere");
+      // Regenerating after an edit keeps the edit, and Remove then keeps it too.
+      const r = await make("Mine");
+      r.editDescription("Mine, edited\n\nAI part");
+      assert(await r.doAISummary(true) === true && r.el["linkding-description-input"].value === "Mine, edited\n\nAI part", "regeneration lost the edit");
+      assert(r.removeSummary() === true && r.el["linkding-description-input"].value === "Mine, edited", "Remove after regeneration restored a stale original");
+    });
+
+    // A merged summary leaves no owned range; the next summary is written all
+    // the same, after the user's (merged) words.
+    await testAsync("a linkding summary after a merged edit is still written, after the user's words", async () => {
+      let n = 0;
+      const h = makePopupAi({ realSummary:true, settings:{bookmarkService:"linkding"}, metaDescription:"Meta description",
+        respond: async () => ({ ok:true, summary:"S" + (++n), tags:null }) });
+      h.el["linkding-description-input"].value = "Mine";
+      await h.doAISummary(true);
+      h.editDescription("Mine S1 merged");
+      assert(await h.doAISummary(true) === true && h.el["linkding-description-input"].value === "Mine S1 merged\n\nS2", JSON.stringify(h.el["linkding-description-input"].value));
+      assert(h.calls.sent.length === 2, "paid calls " + h.calls.sent.length);
     });
     // The popup's own URL cleaning (aggressive mode, custom parameters) can
     // take more off the page's address than the default cleaning the AI cache
@@ -3441,7 +3537,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     }
 
     for (const first of ["summary", "tags"]) {
-      await testAsync("Shift+Enter keeps the manual Description feedback when " + first + " completes first", async () => {
+      await testAsync("Shift+Enter writes the summary after a Description typed meanwhile when " + first + " completes first", async () => {
         const releases = {};
         const h = makePopupAi({ realSummary:true,
           settings:{bookmarkService:"linkding",customSummaryPrompt:"summary fixture",customTagPrompt:"tags fixture"},
@@ -3455,10 +3551,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
         complete(first); await runs[first];
         const second = first === "summary" ? "tags" : "summary";
         complete(second); await runs[second]; await flushMicrotasks();
-        assert(h.el["linkding-description-input"].value === "Manual while both requests wait","Description was replaced");
+        assert(h.el["linkding-description-input"].value === "Manual while both requests wait\n\nGenerated summary","the summary did not follow the typed words: " + JSON.stringify(h.el["linkding-description-input"].value));
         assert(h.calls.rendered.at(-1).tags.length > 0,"valid tags were not rendered");
-        assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryKeptDescription"),"Shift+Enter aggregate hid kept feedback: " + JSON.stringify(h.calls.status));
-        assert(!h.calls.status.some(row=>row[1] === tEn("aiSummaryTagsGenerated")),"kept Description was reported as written");
+        assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryTagsGenerated"),"Shift+Enter aggregate hid combined success: " + JSON.stringify(h.calls.status));
       });
     }
 

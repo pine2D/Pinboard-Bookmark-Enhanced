@@ -335,9 +335,6 @@
   "aiGenerateBtn": {
     "message": "generate"
   },
-  "aiSummaryKeptDescription": {
-    "message": "You edited the description, so the AI summary did not replace it."
-  },
   "aiSummaryGenerated": {
     "message": "Summary generated"
   },
