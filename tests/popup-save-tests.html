@@ -409,6 +409,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
         _linkdingDescriptionPending: descriptionPending,
         _popupDraftEdited: false,
         _popupDraftRestored: false,
+        pbpPopupDraftRestoredField: () => false,
+        _popupDraftRestoredFields: new Set(),
+        _tagsUserTouched: false,
         _popupDraftLastSnapshot: "",
         _popupDraftChangedFields: new Set(),
         pbpDiscardPopupDraft: async () => {},
@@ -1903,7 +1906,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const lookupEnd = popupAiSource.indexOf("function _aiOpStillCurrent", lookupStart);
       const blockStart = popupAiSource.indexOf("  const restoreAccount = pbpPopupAiAccount();");
       const blockEnd = popupAiSource.indexOf('  $id("ai-tags-btn").addEventListener', blockStart);
-      const run = async ({ notes, adopt, draftRestored }) => {
+      const run = async ({ notes, adopt, restored = [] }) => {
         const events = [];
         sliceRuntime({
           pbpPopupAiAccount: () => "alice",
@@ -1916,18 +1919,21 @@ test("posts/add default remains replace=yes for existing callers", () => {
           $id: () => ({ value: notes }),
           upsertSummary: () => { events.push("upsert"); },
           showSummaryActions: () => {},
-          _popupDraftRestored: draftRestored
+          pbpPopupDraftRestoredField: (key) => restored.includes(key)
         }, "let bookmarkLookup = { promise: null }; let existingBookmark = null;" +
           popupAiSource.slice(lookupStart, lookupEnd) + popupAiSource.slice(blockStart, blockEnd));
         await new Promise((resolve) => setTimeout(resolve, 0));
         return events.join(",");
       };
-      const inDraft = await run({ notes: "<blockquote>cached summary</blockquote>", adopt: "cache", draftRestored: true });
+      const inDraft = await run({ notes: "<blockquote>cached summary</blockquote>", adopt: "cache", restored: ["notes"] });
       assert(inDraft === "adopt-check", "a summary already in the notes must be adopted, not appended: " + inDraft);
-      const removedInDraft = await run({ notes: "my own words", adopt: null, draftRestored: true });
+      const removedInDraft = await run({ notes: "my own words", adopt: null, restored: ["notes"] });
       assert(removedInDraft === "adopt-check", "a restored draft without the summary must stay as the user left it: " + removedInDraft);
-      const fresh = await run({ notes: "", adopt: null, draftRestored: false });
+      const fresh = await run({ notes: "", adopt: null });
       assert(fresh === "adopt-check,upsert", "a fresh, empty page still gets the cached summary: " + fresh);
+      // A draft that changed only other fields does not speak for the notes.
+      const otherFields = await run({ notes: "", adopt: null, restored: ["tags", "title"] });
+      assert(otherFields === "adopt-check,upsert", "a draft that left the notes alone blocked the cached summary: " + otherFields);
       const hs = popupAiSource.indexOf("function pbpAiWrapSummary");
       const he = popupAiSource.indexOf("const AI_BQ_REGEX", hs);
       const helpers = sliceRuntime({ escapeForExtended: (v) => v }, popupAiSource.slice(hs, he) +
@@ -2101,7 +2107,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         popupAiSource.slice(renderStart, renderEnd + 2) + "\n" +
         "return { renderAITags, addTag, removeTag, provenance: _aiSessionAddedTags, tags: () => currentTags.slice()," +
         " touched: () => _tagsUserTouched, account: pbpPopupAiAccount, show: pbpShowAITagResult, refresh: pbpRefreshDisplayedAITagsForBookmark," +
-        " setLookup: state => {bookmarkLookup=state;}, acceptLookup: post => { const existingBookmark=post; let submittedTags; const _popupDraftRestored=false; " +
+        " setLookup: state => {bookmarkLookup=state;}, acceptLookup: post => { const existingBookmark=post; let submittedTags; const pbpPopupDraftRestoredField=()=>false; " +
         source.slice(source.indexOf("        const ownTagNames ="), source.indexOf('        $id("submit-btn").textContent = t("update");', source.indexOf("        const ownTagNames ="))) + "} };"
       );
 
@@ -4467,6 +4473,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "let pinboardFetch, pinboardFetchImmediate;",
         proxySource,
         "let _popupDraftRestored = false;",
+        "function pbpPopupDraftRestoredField() { return false; }",
         "let _tagsUserTouched = false;",
         "let _linkdingDescriptionKnown = false;",
         // As after a save that did not land: the box may still hold a pending value.
@@ -4540,6 +4547,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "let _fragmentMatchFeedback = null;",
         "let pinboardFetch, pinboardFetchImmediate;",
         proxySource,
+        "function pbpPopupDraftRestoredField() { return false; }",
         "let _popupDraftRestored = false, _tagsUserTouched = false, _linkdingDescriptionKnown = false, _linkdingDescriptionPending = false, _linkdingPageDescription = null;",
         // popup.js's invalidateBookmarkLookup, for the parts this flow reads:
         // a new generation, and the hint of the lookup it ends goes with it.
@@ -4967,6 +4975,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "let pinboardFetch, pinboardFetchImmediate;",
         proxySource,
         "let _popupDraftRestored = false;",
+        "function pbpPopupDraftRestoredField() { return false; }",
         "let _tagsUserTouched = false;",
         lookupSource,
         "return { checkExistingBookmark, getTags: () => currentTags };",

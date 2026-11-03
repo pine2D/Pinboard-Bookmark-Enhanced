@@ -69,7 +69,7 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    const aiSlice=name=>{const s=aiSource.indexOf('function '+name+'(');return aiSource.slice(s,aiSource.indexOf('\n}',s)+2);};
    const cacheSlice=name=>{const s=cacheSource.indexOf('function '+name+'(');return cacheSource.slice(s,cacheSource.indexOf('\n}',s)+2);};
    const names=Object.keys(deps);let api;api=new Function(...names,[uiSource.slice(a,b),sliceFn('pbpPopupFormIsDirty'),sliceFn('updateCharCount'),sliceFn('recomputeArchiveCheck'),uiSource.slice(recentStart,recentEnd),aiSlice('pbpAiWrapSummary'),aiSlice('upsertSummary'),aiSlice('removeSummary'),sliceFn('shouldUpdateField'),aiSlice('_aiUrlEquivalent'),cacheSlice('pbpAiPageUrlNorm'),sliceFn('_loadUrlCleanSettings'),aiSlice('pbpPopupFormHoldsOpenedPage'),sliceFn('pbpPopupPrefillDescription'),sliceFn('pbpPopupFillPageDescription'),sliceFn('pbpPopupSyncPageDescription'),sliceFn('pbpPopupUrlEdited'),sliceFn('setupUrlInput'),
-     'return {prefill:pbpPopupPrefillDescription,syncPageDescription:pbpPopupSyncPageDescription,setupUrlInput,initPopupDraft,setupPopupDraftTracking,pbpPopupDraftSnapshot,pbpRememberPopupDraft,pbpPopupDescriptionKnown,forgetDescription(){_linkdingDescriptionKnown=false;},pbpDiscardPopupDraft,updateCharCount,recomputeArchiveCheck,loadBookmarkForEdit,exitEditMode,pbpPopupFormIsDirty,upsertSummary,removeSummary,chip(){_tagsUserTouched=true;currentTags.push("Chip");renderTags();},failedSubmit(){'+uiSource.slice(uiSource.indexOf('      Object.keys(fieldDirtyFlags).forEach',uiSource.indexOf('function setupSubmit(')),uiSource.indexOf('      // Host permission first:',uiSource.indexOf('function setupSubmit(')))+'}};'].join('\n'))(...names.map(n=>deps[n]));api.setupPopupDraftTracking();
+     'return {shouldUpdateField,prefill:pbpPopupPrefillDescription,syncPageDescription:pbpPopupSyncPageDescription,setupUrlInput,initPopupDraft,setupPopupDraftTracking,pbpPopupDraftSnapshot,pbpRememberPopupDraft,pbpPopupDescriptionKnown,forgetDescription(){_linkdingDescriptionKnown=false;},pbpDiscardPopupDraft,updateCharCount,recomputeArchiveCheck,loadBookmarkForEdit,exitEditMode,pbpPopupFormIsDirty,upsertSummary,removeSummary,chip(){_tagsUserTouched=true;currentTags.push("Chip");renderTags();},failedSubmit(){'+uiSource.slice(uiSource.indexOf('      Object.keys(fieldDirtyFlags).forEach',uiSource.indexOf('function setupSubmit(')),uiSource.indexOf('      // Host permission first:',uiSource.indexOf('function setupSubmit(')))+'}};'].join('\n'))(...names.map(n=>deps[n]));api.setupPopupDraftTracking();
    return {api,elements,flags,sent,statuses,delayClears(){delayClear=true;},releaseClear:ok=>resolveClear({ok}),delayWrites(){delayWrite=true;},failWrite(){resolveWrite({ok:false});},rejectRestore:()=>rejectRead(new Error('Synthetic IPC failure')),failRestore:()=>resolveRead({ok:false,error:'storage'}),release:(d=draft)=>resolveRead({ok:true,account:'alice',draft:d}),owner:o=>{currentOwner=o;}};
  }
  await test('restore applies the full form and guards later prefills',async()=>{const h=uiHarness();const pending=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release();await pending;assert(JSON.stringify(h.api.pbpPopupDraftSnapshot())===JSON.stringify(draft));assert(Object.entries(h.flags).filter(([id])=>id!=='linkding-description-input').every(([,v])=>v));});
@@ -296,5 +296,72 @@ async function test(name,fn){const d=document.createElement('div');d.className='
  await test('linkding regeneration and removal touch only generated Description',async()=>{const h=uiHarness('linkding');const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release({...draft,summary:'Generated',summaryTouched:false});await p;h.api.upsertSummary('Replacement');assert(h.api.removeSummary()===true);assert(h.elements['linkding-description-input'].value===''&&h.elements['description-input'].value===draft.notes);h.api.upsertSummary('Another');h.elements['linkding-description-input'].value='Manual';h.elements['linkding-description-input'].dispatchEvent(new Event('input'));assert(h.api.removeSummary()===false&&h.elements['linkding-description-input'].value==='Manual');});
  await test('cancel prevents late programmatic writes from recreating the discarded draft',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release();await p;h.delayClears();const clearing=h.api.exitEditMode();h.elements['description-input'].value='Late AI result';h.api.updateCharCount();assert(!h.sent.some(m=>m.action==='write'));h.releaseClear(true);await clearing;assert(h.sent.at(-1).action==='reload');});
  await test('failed cancel leaves the draft editable without reloading',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release();await p;h.delayClears();const clearing=h.api.exitEditMode();h.releaseClear(false);await clearing;assert(!h.sent.some(m=>m.action==='reload'));assert(h.statuses.some(s=>s[1]==='popupDraftDiscardFailed')&&!h.statuses.some(s=>s[1]==='popupDraftFailed'),'discard failure must not tell the user the draft was lost');h.elements['description-input'].value='Retry edit';h.elements['description-input'].dispatchEvent(new Event('input'));assert(h.sent.at(-1).action==='write');});
+ // A draft restores only the fields some open actually changed; the rest stay
+ // free for the page and the bookmark lookup (A02 P29).
+ const settle=()=>navigator.locks.request('pbp-popup-drafts',()=>{});
+ const openWorker=async(pageUrl,service='pinboard',before=()=>{})=>{const h=uiHarness(service,{worker:true});before(h);await h.api.initPopupDraft('alice',{url:pageUrl});await settle();return h;};
+ const typeInto=(h,id,value)=>{h.elements[id].value=value;h.elements[id].dispatchEvent(new Event('input'));};
+ await test('a tag-only draft leaves the other fields to the page and the bookmark lookup',async()=>{const pageUrl='https://example.com/g15-tag-only';
+   const first=await openWorker(pageUrl);first.api.chip();await settle();
+   const second=await openWorker(pageUrl,'pinboard',h=>{h.elements['title-input'].value='Page title now';h.elements['url-input'].value=pageUrl;});
+   assert(second.statuses.some(s=>s[1]==='popupDraftRestored'),'the tag draft was not restored');
+   assert(JSON.stringify(second.api.pbpPopupDraftSnapshot().tags)==='["Chip"]','the drafted tag was not restored');
+   assert(second.elements['title-input'].value==='Page title now','an unchanged title was overwritten by the draft');
+   assert(Object.values(second.flags).every(v=>!v),'unchanged fields were marked edited: '+JSON.stringify(second.flags));
+   for(const [id,value] of [['description-input','Notes edited elsewhere'],['title-input','Title edited elsewhere']]){assert(second.api.shouldUpdateField(id),id+' refuses the bookmark lookup');second.elements[id].value=value;}
+   second.api.pbpRememberPopupDraft();await settle();
+   const third=await openWorker(pageUrl,'pinboard',h=>{h.elements['description-input'].value='Notes edited later';});
+   assert(third.elements['description-input'].value==='Notes edited later','a lookup value the user never touched was frozen into the draft');});
+ await test('a title-only draft marks only the title as edited',async()=>{const pageUrl='https://example.com/g15-title-only';
+   const first=await openWorker(pageUrl);typeInto(first,'title-input','My title');await settle();
+   const second=await openWorker(pageUrl);
+   assert(second.elements['title-input'].value==='My title','the edited title was not restored');
+   assert(JSON.stringify(second.flags)===JSON.stringify({'title-input':true,'description-input':false,'linkding-description-input':false,'private-check':false,'readlater-check':false}),'flags: '+JSON.stringify(second.flags));
+   assert(second.api.pbpPopupFormIsDirty(),'the restored title no longer counts as an edit');
+   // Values stored beside the change list are a snapshot, not the user's edits.
+   await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,tags:['Stale'],tagInput:'stale',private:false,toread:true,changed:['title']}}));
+   const third=await openWorker(pageUrl);const form=third.api.pbpPopupDraftSnapshot();
+   assert(form.title===draft.title&&form.tags.length===0&&form.tagInput===''&&form.toread===false&&form.url==='','fields outside the change list were restored: '+JSON.stringify(form));});
+ await test('changes made across several opens accumulate and all come back',async()=>{const pageUrl='https://example.com/g15-accumulate';
+   const first=await openWorker(pageUrl);typeInto(first,'title-input','Title from open one');await settle();
+   const second=await openWorker(pageUrl);typeInto(second,'description-input','Notes from open two');await settle();
+   const third=await openWorker(pageUrl,'pinboard',h=>{h.elements['readlater-check'].checked=true;});
+   assert(third.elements['title-input'].value==='Title from open one'&&third.elements['description-input'].value==='Notes from open two','an earlier change was dropped: '+JSON.stringify([third.elements['title-input'].value,third.elements['description-input'].value]));
+   assert(third.flags['title-input']&&third.flags['description-input']&&!third.flags['readlater-check']&&!third.flags['private-check'],'flags: '+JSON.stringify(third.flags));
+   assert(third.elements['readlater-check'].checked===true,'an unchanged checkbox was reset by the draft');});
+ await test('a change made before the restore answers is merged with the stored change list',async()=>{const pageUrl='https://example.com/g15-early';
+   const first=await openWorker(pageUrl);typeInto(first,'title-input','Stored title');await settle();
+   const second=uiHarness('pinboard',{worker:true});second.elements['description-input'].value='Typed before init';second.elements['description-input'].dispatchEvent(new Event('input'));await second.api.initPopupDraft('alice',{url:pageUrl});await settle();
+   const third=await openWorker(pageUrl);
+   assert(third.elements['title-input'].value==='Stored title'&&third.elements['description-input'].value==='Typed before init','merged change list lost a field');
+   assert(third.flags['title-input']&&third.flags['description-input']&&!third.flags['private-check'],'flags: '+JSON.stringify(third.flags));});
+ await test('a draft written before change lists existed still restores the whole form',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.elements['title-input'].value='Page title';h.release({...draft,private:false,toread:false});await p;
+   assert(h.elements['title-input'].value===draft.title&&h.elements['description-input'].value===draft.notes&&h.elements['tags-input'].value===draft.tagInput,'a legacy draft was not restored in full');
+   assert(JSON.stringify(h.api.pbpPopupDraftSnapshot().tags)===JSON.stringify(draft.tags),'legacy tags were not restored');
+   assert(Object.entries(h.flags).filter(([id])=>id!=='linkding-description-input').every(([,v])=>v),'legacy restore did not mark every field: '+JSON.stringify(h.flags));
+   h.elements['description-input'].value='Next';h.elements['description-input'].dispatchEvent(new Event('input'));assert(!Object.hasOwn(h.sent.at(-1).draft,'changed'),'a legacy draft was narrowed to a change list');});
+ await test('a save clears a draft whose unchanged fields were refilled, and keeps one with a newer change',async()=>{const pageUrl='https://example.com/g15-clear';
+   await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,tagInput:'',title:'Stored then',notes:'Mine',changed:['notes']}}));
+   await run(msg('clear',{pageUrl,expectedDraft:{...draft,url:pageUrl,tagInput:'',title:'Refilled by lookup',notes:'Newer',changed:['notes']}}));
+   assert((await run(msg('read',{pageUrl}))).draft?.notes==='Mine','a save of other notes cleared the newer draft');
+   await run(msg('clear',{pageUrl,expectedDraft:{...draft,url:pageUrl,tagInput:'',title:'Stored then',notes:'Mine',changed:['notes','title']}}));
+   assert((await run(msg('read',{pageUrl}))).draft,'a save with a different change list cleared the draft');
+   await run(msg('clear',{pageUrl,expectedDraft:{...draft,url:pageUrl,tagInput:'',title:'Refilled by lookup',tags:[],private:false,notes:'Mine',changed:['notes']}}));
+   assert((await run(msg('read',{pageUrl}))).draft===null,'a delivered draft survived because unchanged fields were refilled');});
+ await test('a draft of a recent bookmark brings its address back with the edit',async()=>{const pageUrl='https://example.com/article';
+   const first=await openWorker(pageUrl);await first.api.loadBookmarkForEdit('https://example.com/g15-recent','alice:fake');typeInto(first,'description-input','Recent note');await settle();
+   const second=await openWorker(pageUrl,'pinboard',h=>{h.elements['url-input'].value=pageUrl;h.elements['title-input'].value='Opened page title';});
+   assert(second.elements['url-input'].value==='https://example.com/g15-recent'&&second.elements['description-input'].value==='Recent note','the recent edit reopened on the wrong address: '+second.elements['url-input'].value);
+   assert(second.elements['title-input'].value==='Opened page title'&&!second.flags['title-input'],'an unchanged title was frozen by the recent draft');
+   await second.api.pbpDiscardPopupDraft();});
+ await test('worker keeps a valid change list and rejects anything outside the draft fields',async()=>{const pageUrl='https://example.com/g15-worker';
+   assert((await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,changed:['title','tags','title']}}))).ok,'a valid change list was rejected');
+   assert(JSON.stringify((await run(msg('read',{pageUrl}))).draft.changed)==='["tags","title"]','the change list was not stored canonically');
+   for(const changed of [['token'],['title','apiKey'],'title',[1],[null],['__proto__'],['changed']])assert(!(await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,changed}}))).ok,'accepted change list '+JSON.stringify(changed));
+   assert((await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,notes:'n2',changed:['notes']},fields:['notes']}))).ok);
+   assert(JSON.stringify((await run(msg('read',{pageUrl}))).draft.changed)==='["notes","tags","title"]','a patch did not merge the change lists');
+   await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl}}));
+   assert((await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,notes:'n3',changed:['notes']},fields:['notes']}))).ok);
+   assert(!Object.hasOwn((await run(msg('read',{pageUrl}))).draft,'changed'),'a patch narrowed a legacy draft to the patched fields');});
 })().catch(e=>test('suite initialization',()=>{throw e;}));
 </script></body></html>

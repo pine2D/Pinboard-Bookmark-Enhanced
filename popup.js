@@ -313,12 +313,23 @@ let _popupDraftRestored = false;
 let _popupDraftEdited = false;
 let _popupDraftLastSnapshot = "";
 const _popupDraftChangedFields = new Set();
+// The draft fields a restored draft says earlier opens changed; null for a
+// draft that predates the list, which counts every field as changed. Each
+// write carries these plus this open's changes, so the list only grows until
+// a save or a discard; the fields outside it stay with the page and the
+// bookmark lookup instead of a frozen copy (A02 P29).
+let _popupDraftRestoredFields = new Set();
+function pbpPopupDraftRestoredField(key) {
+  return _popupDraftRestored && (_popupDraftRestoredFields === null || _popupDraftRestoredFields.has(key));
+}
 function pbpPopupDraftSnapshot() {
+  const changed = _popupDraftRestoredFields === null ? null
+    : [...new Set([..._popupDraftRestoredFields, ..._popupDraftChangedFields, ...(_tagsUserTouched ? ["tags"] : [])])].sort();
   return { url: $id("url-input").value, title: $id("title-input").value,
     notes: $id("description-input").value,
     ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(_linkdingDescriptionPending ? { summary: $id("linkding-description-input").value } : {}), summaryTouched: _linkdingDescriptionTouched, sharedExplicit: _linkdingSharedExplicit } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
     private: $id("private-check").checked, toread: $id("readlater-check").checked,
-    archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched };
+    archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched, ...(changed ? { changed } : {}) };
 }
 // Text in the box is always the user's to send; an empty box only once known.
 function pbpPopupDescriptionKnown() {
@@ -457,11 +468,17 @@ async function initPopupDraft(account, tab) {
       showStatus("status-msg", t("popupDraftRestoreFailed"), "error");
       return;
     }
-    if (result?.ok && result.draft) {
+    // A draft whose change list is empty has nothing of the user's to restore.
+    if (result?.ok && result.draft && (!Array.isArray(result.draft.changed) || result.draft.changed.length)) {
       const d = result.draft;
-      for (const [id, key] of Object.entries({ "url-input": "url", "title-input": "title", "description-input": "notes", "linkding-description-input": "summary", "tags-input": "tagInput",
-        "private-check": "private", "readlater-check": "toread", "archive-check": "archive" })) {
-        if (!_popupDraftChangedFields.has(key) && d[key] !== undefined) {
+      const restored = Array.isArray(d.changed) ? new Set(d.changed) : null;
+      const drafted = (key) => restored === null || restored.has(key);
+      // A field this open already changed keeps the value typed here.
+      const take = (key) => drafted(key) && !_popupDraftChangedFields.has(key);
+      const keys = { "url-input": "url", "title-input": "title", "description-input": "notes", "linkding-description-input": "summary", "tags-input": "tagInput",
+        "private-check": "private", "readlater-check": "toread", "archive-check": "archive" };
+      for (const [id, key] of Object.entries(keys)) {
+        if (take(key) && d[key] !== undefined) {
           // Text inputs strip line breaks themselves; preserve word boundaries first.
           const value = key === "summary" ? pbpBookmarkDescriptionLine(d[key]) : d[key];
           $id(id)[id.endsWith("check") ? "checked" : "value"] = value;
@@ -469,18 +486,24 @@ async function initPopupDraft(account, tab) {
       }
       if (pbpBookmarkServiceId(settings) === "linkding" && !pbpBookmarkConnection(settings).sharingEnabled) $id("private-check").checked = true;
       $id("share-check").checked = !$id("private-check").checked;
-      if (!_popupDraftChangedFields.has("archiveTouched")) _archiveUserTouched = d.archiveTouched;
-      if (!_popupDraftChangedFields.has("summaryTouched")) _linkdingDescriptionTouched = d.summaryTouched === true;
+      if (take("archiveTouched")) _archiveUserTouched = d.archiveTouched;
+      if (take("summaryTouched")) _linkdingDescriptionTouched = d.summaryTouched === true;
       // Only a written Description was drafted; it is still waiting to be saved.
-      if (typeof d.summary === "string") { _linkdingDescriptionKnown = true; _linkdingDescriptionPending = true; }
-      if (!_popupDraftChangedFields.has("sharedExplicit")) _linkdingSharedExplicit = pbpBookmarkServiceId(settings) === "linkding" && pbpBookmarkConnection(settings).sharingEnabled && d.sharedExplicit === true;
-      _popupDraftUserUrl = true;
+      const draftedSummary = typeof d.summary === "string" && drafted("summary");
+      if (draftedSummary) { _linkdingDescriptionKnown = true; _linkdingDescriptionPending = true; }
+      if (take("sharedExplicit")) _linkdingSharedExplicit = pbpBookmarkServiceId(settings) === "linkding" && pbpBookmarkConnection(settings).sharingEnabled && d.sharedExplicit === true;
+      if (drafted("url")) _popupDraftUserUrl = true;
       _popupDraftRestored = true;
+      _popupDraftRestoredFields = restored;
+      // Only the drafted fields count as edited; the rest still take the
+      // page's values and the bookmark lookup's.
       for (const id of Object.keys(fieldDirtyFlags)) {
-        fieldDirtyFlags[id] = id === "linkding-description-input" ? typeof d.summary === "string" || _popupDraftChangedFields.has("summary") : true;
+        fieldDirtyFlags[id] = fieldDirtyFlags[id] || (id === "linkding-description-input" ? draftedSummary : drafted(keys[id]));
       }
-      _tagsUserTouched = true;
-      if (!_popupDraftChangedFields.has("tags")) currentTags = d.tags.slice();
+      if (drafted("tags")) {
+        _tagsUserTouched = true;
+        if (!_popupDraftChangedFields.has("tags")) currentTags = d.tags.slice();
+      }
       // Rendering a restored form does not refresh its expiry timestamp.
       if (revision === _popupDraftRevision) _popupDraftLastSnapshot = JSON.stringify(pbpPopupDraftSnapshot());
       context.ready = true;
@@ -1847,7 +1870,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         currentTags = Array.isArray(submittedTags)
           ? pbpRebasePopupTags(pbpBookmarkServiceId(settings) === "pinboard"
             ? existingBookmark.tags || "" : existingBookmark.tagNames || [], submittedTags, currentTags)
-          : (_popupDraftRestored || _tagsUserTouched) ? currentTags : Array.isArray(existingBookmark.tagNames) ? [...new Set([...existingBookmark.tagNames, ...currentTags])] : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
+          : (pbpPopupDraftRestoredField("tags") || _tagsUserTouched) ? currentTags : Array.isArray(existingBookmark.tagNames) ? [...new Set([...existingBookmark.tagNames, ...currentTags])] : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
         renderTags();
         $id("submit-btn").textContent = t("update");
         $id("delete-btn").classList.remove("hidden");
@@ -2403,6 +2426,7 @@ function setupSubmit(token) {
         if (formMatchesSubmitted()) {
           _popupDraftEdited = false;
           _popupDraftRestored = false;
+          _popupDraftRestoredFields = new Set();
           _popupDraftLastSnapshot = "";
           _popupDraftChangedFields.clear();
         } else if (pbpBookmarkServiceId(settings) === "linkding" && typeof pbpRememberPopupDraft === "function") {
@@ -2690,8 +2714,12 @@ async function loadBookmarkForEdit(url, token) {
     ? { account: pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account, pageUrl: sourceUrl, incognito: _activeTabAtOpen?.incognito === true, ready: true } : null;
   _popupDraftLastSnapshot = "";
   _popupDraftChangedFields.clear();
+  // The form now edits that bookmark, not the opened page: a draft of it must
+  // bring the address back, or its edits would reopen on the page's address.
+  _popupDraftChangedFields.add("url");
   _popupDraftUserUrl = false;
   _popupDraftRestored = false;
+  _popupDraftRestoredFields = new Set();
   _popupDraftEdited = false;
   // Reset current form state
   invalidateBookmarkLookup();

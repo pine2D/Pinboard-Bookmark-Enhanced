@@ -4300,6 +4300,10 @@ async function pbpRunPopupDraft(message) {
     try { const u = new URL(s); return typeof s === "string" && s.length <= 16384 && /^https?:$/.test(u.protocol) && !u.username && !u.password; }
     catch (_) { return false; }
   };
+  // The draft fields some popup open actually changed. Only those are restored;
+  // a row without the list predates it and restores the whole form.
+  const changedKeys = ["url", "title", "notes", "summary", "summaryTouched", "sharedExplicit", "tags", "tagInput",
+    "private", "toread", "archive", "archiveTouched"];
   const clean = (d) => {
     if (!d || typeof d.url !== "string" || d.url.length > 16384 || typeof d.title !== "string" || typeof d.notes !== "string"
         || typeof d.tagInput !== "string" || !Array.isArray(d.tags) || d.tags.length > 1000
@@ -4307,12 +4311,15 @@ async function pbpRunPopupDraft(message) {
         || !["private", "toread", "archive", "archiveTouched"].every((k) => typeof d[k] === "boolean")) return null;
     if ((d.summary !== undefined && typeof d.summary !== "string")
         || (d.summaryTouched !== undefined && typeof d.summaryTouched !== "boolean")
-        || (d.sharedExplicit !== undefined && typeof d.sharedExplicit !== "boolean")) return null;
+        || (d.sharedExplicit !== undefined && typeof d.sharedExplicit !== "boolean")
+        || (d.changed !== undefined && (!Array.isArray(d.changed) || d.changed.length > 64
+          || !d.changed.every((k) => changedKeys.includes(k))))) return null;
     const out = { url: d.url, title: d.title, notes: d.notes, tags: d.tags.slice(), tagInput: d.tagInput,
       private: d.private, toread: d.toread, archive: d.archive, archiveTouched: d.archiveTouched };
     if (d.summary !== undefined) out.summary = d.summary;
     if (d.summaryTouched !== undefined) out.summaryTouched = d.summaryTouched;
     if (d.sharedExplicit !== undefined) out.sharedExplicit = d.sharedExplicit;
+    if (d.changed !== undefined) out.changed = [...new Set(d.changed)].sort();
     return JSON.stringify(out).length <= 65536 ? out : null;
   };
   if (!message.account || !["read", "write", "clear", "clearOwner"].includes(message.action)
@@ -4339,9 +4346,12 @@ async function pbpRunPopupDraft(message) {
       } else if (message.action === "clear") {
         // Save completion clears only the snapshot actually submitted. A newer
         // edit, or pending tag text that was never submitted, must survive.
+        // With a change list only the changed fields are the user's: the rest
+        // of a stored row is the form as it was then, not what was submitted.
         if (message.expectedDraft) {
           const expected = clean(message.expectedDraft);
-          if (!expected || expected.tagInput.trim() || JSON.stringify(clean(row?.draft)) !== JSON.stringify(expected)) return { ok: true, account: message.account };
+          const edits = (d) => JSON.stringify(d?.changed ? [d.changed, d.changed.map((k) => d[k])] : d);
+          if (!expected || expected.tagInput.trim() || edits(clean(row?.draft)) !== edits(expected)) return { ok: true, account: message.account };
         }
         await chrome.storage.session.remove(key);
       } else {
@@ -4354,7 +4364,9 @@ async function pbpRunPopupDraft(message) {
           if (!Array.isArray(message.fields) || !message.fields.length
               || !message.fields.every((k) => Object.hasOwn(draft, k))) return { ok: false, error: "invalid" };
           const previous = valid(row) && row.owner === message.account ? clean(row.draft) : null;
-          if (previous) draft = clean({ ...previous, ...Object.fromEntries(message.fields.map((k) => [k, draft[k]])) });
+          // Both opens' changes count; a legacy row counts as all changed.
+          if (previous) draft = clean({ ...previous, ...Object.fromEntries(message.fields.map((k) => [k, draft[k]])),
+            changed: previous.changed && draft.changed ? [...previous.changed, ...draft.changed] : undefined });
           if (!draft) return { ok: false, error: "invalid" };
         }
         await chrome.storage.session.set({ [key]: { owner: message.account, pageUrl: message.pageUrl,

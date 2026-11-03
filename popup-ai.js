@@ -713,9 +713,11 @@ function setupAIFeatures() {
       // reopen stack one more copy (2026-10-19 report).
       const adopted = await _aiRestoreSummaryOwnership(restoreAccount, $id("url-input").value, cached);
       if (!_aiOpStillCurrent(restoreAccount) || adopted || !cached) return;
-      // A restored draft is the user's last state of this form: a summary
-      // missing from it was removed or rewritten on purpose -- never put back.
-      if (typeof _popupDraftRestored !== "undefined" && _popupDraftRestored) return;
+      // A restored draft is the user's last state of the field it changed: a
+      // summary missing from it was removed or rewritten on purpose -- never
+      // put back. A draft that left that field alone does not speak for it.
+      if (typeof pbpPopupDraftRestoredField === "function"
+          && pbpPopupDraftRestoredField(pbpBookmarkServiceId(settings) === "linkding" ? "summary" : "notes")) return;
       if (pbpBookmarkServiceId(settings) === "linkding" || pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
         if (upsertSummary(cached, { userEdit: false }) !== false) showSummaryActions(true);
       }
