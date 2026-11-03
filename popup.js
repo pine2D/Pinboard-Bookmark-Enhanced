@@ -2707,7 +2707,7 @@ function setupSubmit(token) {
           // "undefined" instead of the login redirect already under way.
           const deleteService = pbpBookmarkServiceId(settings);
           if (!resp.ok && deleteService !== "pinboard") {
-            if (ownsDeleteForm()) showStatus("status-msg", pbpBookmarkFailureText({reason:resp.error, httpStatus:resp.status}, deleteService, t) || t("saveFailedGeneric"), "error");
+            if (ownsDeleteForm()) showStatus("status-msg", pbpBookmarkFailureText({reason:resp.error, httpStatus:resp.status}, deleteService, t) || t("readerBookmarkDeleteFailed"), "error");
             return;
           }
           if (resp.status === 401) return; // pinboardFetch already redirected to login
@@ -2818,8 +2818,14 @@ async function fetchRecentBookmarks(token) {
   if (!container) return;
   try {
     const resp = await (pbpBookmarkServiceId(typeof settings === "object" ? settings : null) === "pinboard" ? pinboardFetch(`https://api.pinboard.in/v1/posts/recent?auth_token=${token}&format=json&count=5`) : pbpPopupBookmarkApi("recent"));
-    if (resp.status === 401) return; // pinboardFetch already redirected to login
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const recentService = pbpBookmarkServiceId(typeof settings === "object" ? settings : null);
+    // Only Pinboard stays silent on 401: pinboardFetch already redirected to login.
+    if (resp.status === 401 && recentService === "pinboard") return;
+    if (!resp.ok) {
+      const failure = new Error(`HTTP ${resp.status}`);
+      failure.shownText = pbpBookmarkFailureText({reason:resp.error, httpStatus:resp.status}, recentService, t);
+      throw failure;
+    }
     const data = await resp.json();
     const posts = data.posts || [];
     if (!posts.length) {
@@ -2895,7 +2901,7 @@ async function fetchRecentBookmarks(token) {
               const resp = await pbpPopupBookmarkApi("delete", p.href);
               const deleteService = pbpBookmarkServiceId(settings);
               if (!resp.ok && deleteService !== "pinboard") {
-                reportDeleteFailure(pbpBookmarkFailureText({reason:resp.error, httpStatus:resp.status}, deleteService, t) || t("saveFailedGeneric"));
+                reportDeleteFailure(pbpBookmarkFailureText({reason:resp.error, httpStatus:resp.status}, deleteService, t) || t("readerBookmarkDeleteFailed"));
                 return;
               }
               if (resp.status === 401) return; // pinboardFetch already redirected to login
@@ -2931,7 +2937,7 @@ async function fetchRecentBookmarks(token) {
     label.textContent = t("recentLabel");
     const msg = document.createElement("span");
     msg.className = "muted";
-    msg.textContent = t("recentFailed", e.message || String(e));
+    msg.textContent = e.shownText || t("recentFailed", e.message || String(e));
     container.appendChild(label);
     container.appendChild(msg);
   }

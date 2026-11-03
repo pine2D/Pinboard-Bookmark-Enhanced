@@ -196,6 +196,25 @@ test("linkding recent stops at its limit without validating a next it will not r
     equal(h.calls.length,1);
   }
 });
+const kkRecent=(id,type="link",extra={})=>({id,createdAt:"2026-11-01T09:00:00Z",modifiedAt:null,title:null,archived:false,favourited:false,note:null,summary:null,userId:"user1",tags:[],content:type==="link"?{type,url:"https://e.example/"+id,title:"T"+id}:{type,text:"body"},assets:[],...extra});
+test("karakeep recent asks for unarchived bookmarks and tops up past non-link rows",async()=>{
+  const page1=[kkRecent("a"),kkRecent("b","text"),kkRecent("c"),kkRecent("d","text"),kkRecent("e")];
+  const h=harness("karakeep",[[200,{bookmarks:page1,nextCursor:"c1"}],[200,{bookmarks:[kkRecent("f"),kkRecent("g")],nextCursor:null}]]);
+  const rows=await h.client.recent(5);
+  equal(rows.map(r=>r.id),["a","c","e","f","g"]);
+  equal(h.calls.map(c=>c.url),["https://bookmarks.example/base/api/v1/bookmarks?archived=false&limit=5","https://bookmarks.example/base/api/v1/bookmarks?archived=false&limit=5&cursor=c1"]);
+});
+test("karakeep recent never lists an archived row even if the server returns one",async()=>{
+  const h=harness("karakeep",[[200,{bookmarks:[kkRecent("a"),kkRecent("b","link",{archived:true})],nextCursor:null}]]);
+  equal((await h.client.recent(5)).map(r=>r.id),["a"]);
+});
+test("karakeep recent stops after three requests and returns what it has",async()=>{
+  let n=0;const id=()=>"r"+(n++);
+  const page=()=>[200,{bookmarks:[kkRecent(id(),"text"),kkRecent(id(),"text"),kkRecent(id()),kkRecent(id(),"text"),kkRecent(id(),"text")],nextCursor:"more"}];
+  const h=harness("karakeep",[page(),page(),page(),page(),page()]);
+  equal((await h.client.recent(5)).length,3);
+  equal(h.calls.length,3);
+});
 test("linkding tags cap at 10000 with one count-only warning",async()=>{
   const warns=[],original=console.warn;console.warn=(...a)=>warns.push(a);
   try{

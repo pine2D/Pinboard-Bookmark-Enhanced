@@ -787,7 +787,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         ["linkding", { ok: false, status: 0, error: "permission" }, "bookmarkPermissionDenied"],
         ["karakeep", { ok: false, status: 0, error: "network" }, "bookmarkErrNetwork"],
         ["linkding", { ok: false, status: 0, error: "account_changed" }, "bookmarkErrAccountChanged"],
-        ["karakeep", { ok: false, status: 0, error: "made_up" }, "saveFailedGeneric"],
+        ["karakeep", { ok: false, status: 0, error: "made_up" }, "readerBookmarkDeleteFailed"],
       ]) {
         const got = await runDeleteHandlers(service, resp);
         assert(got.main.join() === copy && got.recent.join() === copy, service + " " + resp.error + ": " + JSON.stringify(got));
@@ -5786,7 +5786,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "doEdit's confirm does not use the new editDiscardDraftConfirm i18n key");
     });
 
-    function createRecentBookmarksHarness({ posts, formIsDirty }) {
+    function createRecentBookmarksHarness({ posts, formIsDirty, service = "pinboard", resp = null }) {
       const container = document.createElement("div");
       document.body.appendChild(container);
       const confirmCalls = [];
@@ -5798,7 +5798,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
         showStatus: () => {},
         esc: (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])),
         enc: (s) => encodeURIComponent(s),
-        pinboardFetch: async () => ({ status: 200, ok: true, json: async () => ({ posts }) }),
+        pinboardFetch: async () => resp || ({ status: 200, ok: true, json: async () => ({ posts }) }),
+        pbpPopupBookmarkApi: async () => resp,
+        pbpBookmarkServiceId: () => service,
+        settings: { bookmarkService: service },
         showConfirmPopover: (anchor, opts) => { confirmCalls.push({ anchor, opts }); },
         loadBookmarkForEdit: async (url, token) => { editCalls.push({ url, token }); },
         pbpPopupFormIsDirty: () => formIsDirty,
@@ -5857,6 +5860,26 @@ test("posts/add default remains replace=yes for existing callers", () => {
       } finally {
         harness.cleanup();
       }
+    });
+
+    await testAsync("recent panel names a self-hosted failure and stays silent only for Pinboard 401", async () => {
+      for (const [service, resp, shown] of [
+        ["linkding", { ok: false, status: 401, error: "not_logged_in", json: async () => ({}) }, "bookmarkErrAuth"],
+        ["karakeep", { ok: false, status: 503, error: "server", json: async () => ({}) }, "bookmarkErrServer"],
+        ["linkding", { ok: false, status: 0, error: "network", json: async () => ({}) }, "bookmarkErrNetwork"],
+      ]) {
+        const harness = createRecentBookmarksHarness({ posts: [], formIsDirty: false, service, resp });
+        try {
+          await harness.run();
+          const text = harness.container.textContent;
+          assert(text.includes(shown) && !/HTTP/.test(text), service + " " + resp.error + ": " + text);
+        } finally { harness.cleanup(); }
+      }
+      const pin = createRecentBookmarksHarness({ posts: [], formIsDirty: false, service: "pinboard", resp: { ok: false, status: 401, json: async () => ({}) } });
+      try {
+        await pin.run();
+        assert(pin.container.textContent === "", "Pinboard 401 must show nothing: " + pin.container.textContent);
+      } finally { pin.cleanup(); }
     });
 
     // Critique 2026-10-19: Save -> Saving… -> Saved! -> Save made the

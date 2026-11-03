@@ -388,10 +388,23 @@ function pbpCreateBookmarkServiceClient(config) {
   };
   const recent = async (limit = 5) => {
     limit = Math.max(1,Math.min(100,Number(limit)||5));
-    const rows = service === "linkding"
-      ? await pages("bookmarks/?limit=" + limit,data=>data?.results,data=>linkdingNext(data,"bookmarks/"),limit)
-      : await pages("bookmarks?limit=" + limit,data=>data?.bookmarks,data=>data.nextCursor ? "bookmarks?limit=" + limit + "&cursor=" + encodeURIComponent(data.nextCursor) : "",limit);
-    return rows.filter(row=>service === "linkding" || row.content?.type === "link").map(row=>pbpBookmarkNormalize(service,row));
+    if (service === "linkding") {
+      const rows = await pages("bookmarks/?limit=" + limit,data=>data?.results,data=>linkdingNext(data,"bookmarks/"),limit);
+      return rows.map(row=>pbpBookmarkNormalize(service,row));
+    }
+    // Karakeep filters non-link types after paging, so a page can come back short.
+    // Top up from the next pages, at most 3 requests (3 x limit rows fetched).
+    // archived=false: archived bookmarks are not "recent", as in linkding and Karakeep's home.
+    const links = [];
+    let path = "bookmarks?archived=false&limit=" + limit;
+    for (let page = 0; path && page < 3 && links.length < limit; page++) {
+      const {data} = await request(path);
+      if (!Array.isArray(data?.bookmarks)) throw pbpBookmarkServiceError("invalid_response");
+      links.push(...data.bookmarks.filter(row=>row.content?.type === "link" && row.archived !== true));
+      if (data.nextCursor && typeof data.nextCursor !== "string") throw pbpBookmarkServiceError("invalid_response");
+      path = data.nextCursor ? "bookmarks?archived=false&limit=" + limit + "&cursor=" + encodeURIComponent(data.nextCursor) : "";
+    }
+    return links.slice(0,limit).map(row=>pbpBookmarkNormalize(service,row));
   };
   return {
     lookup, save, tags, recent, setReadLater, findReadLaterList,
