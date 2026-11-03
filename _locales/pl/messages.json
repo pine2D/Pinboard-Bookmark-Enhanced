@@ -666,11 +666,15 @@
       }
     }
   },
-  "offlineQueueAttention": {
-    "message": "$REASON$ Automatyczne ponawianie zostało zatrzymane. Popraw zakładkę i zapisz stronę ponownie w popupie, a potem usuń ten wpis.",
-    "description": "Popup offline queue row of a bookmark that needs attention. $REASON$ is the failure message (a full sentence); the rest says automatic retry stopped and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons.",
+  "offlineQueueAttentionHint": {
+    "message": "Automatyczne ponawianie zostało zatrzymane. Popraw zakładkę i zapisz stronę ponownie w popupie, a potem usuń ten wpis.",
+    "description": "Popup offline queue row of a bookmark that needs attention, shown on its own line under the failure message: automatic retry stopped, and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons."
+  },
+  "pinboardErrRejected": {
+    "message": "Pinboard odrzucił żądanie (HTTP $STATUS$). Ponowna próba nic nie zmieni. Sprawdź zakładkę.",
+    "description": "Pinboard rejected a save with an HTTP 4xx the extension has no more specific copy for (shown on a queued bookmark that needs attention, and after its Retry). Not retryable. $STATUS$ is the HTTP status code.",
     "placeholders": {
-      "reason": {
+      "status": {
         "content": "$1"
       }
     }

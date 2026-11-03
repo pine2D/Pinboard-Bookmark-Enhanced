@@ -666,11 +666,15 @@
       }
     }
   },
-  "offlineQueueAttention": {
-    "message": "$REASON$自動再送は停止しました。ポップアップで修正してページを保存し直してから、この項目を削除してください。",
-    "description": "Popup offline queue row of a bookmark that needs attention. $REASON$ is the failure message (a full sentence); the rest says automatic retry stopped and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons.",
+  "offlineQueueAttentionHint": {
+    "message": "自動再送は停止しました。ポップアップで修正してページを保存し直してから、この項目を削除してください。",
+    "description": "Popup offline queue row of a bookmark that needs attention, shown on its own line under the failure message: automatic retry stopped, and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons."
+  },
+  "pinboardErrRejected": {
+    "message": "Pinboard がリクエストを拒否しました（HTTP $STATUS$）。再試行しても結果は変わりません。ブックマークの内容を確認してください。",
+    "description": "Pinboard rejected a save with an HTTP 4xx the extension has no more specific copy for (shown on a queued bookmark that needs attention, and after its Retry). Not retryable. $STATUS$ is the HTTP status code.",
     "placeholders": {
-      "reason": {
+      "status": {
         "content": "$1"
       }
     }

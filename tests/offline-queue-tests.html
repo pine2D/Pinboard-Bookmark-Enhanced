@@ -60,14 +60,29 @@ const Q = () => ([
 // The popup's queue bar (popup-offline.js) on real DOM, answered by a stub
 // worker. Returns the bar text and, once expanded, each row's meta line.
 let popupOfflineSource;
-async function renderQueueBar(response) {
+// A translator over a real _locales file, with chrome.i18n's positional
+// placeholder substitution: renders rows in the copy users see.
+async function localeTranslator(locale) {
+  const messages = await (await fetch("../_locales/" + locale + "/messages.json")).json();
+  return (key, ...args) => {
+    const entry = messages[key];
+    if (!entry) throw new Error("missing message " + key);
+    return entry.message.replace(/\$([A-Z_]+)\$/g, (_, name) => {
+      const content = entry.placeholders?.[name.toLowerCase()]?.content || "";
+      const index = Number((/^\$(\d)$/.exec(content) || [])[1]);
+      return index ? String(args[index - 1]) : content;
+    });
+  };
+}
+
+async function renderQueueBar(response, translate) {
   popupOfflineSource ||= await (await fetch("../popup-offline.js")).text();
   const host = document.createElement("div");
   host.innerHTML = '<div id="oq-bar" class="hidden"><span id="oq-text"></span><button id="oq-toggle" aria-expanded="false"></button></div><div id="oq-list" class="hidden"></div>';
   document.body.appendChild(host);
   const ids = { "offline-queue-bar": "oq-bar", "offline-queue-text": "oq-text", "offline-queue-toggle": "oq-toggle", "offline-queue-list": "oq-list" };
   const byId = (id) => host.querySelector("#" + (ids[id] || id));
-  const tr = (key, ...args) => args.length ? key + ":" + args.join(":") : key;
+  const tr = translate || ((key, ...args) => args.length ? key + ":" + args.join(":") : key);
   const chromeStub = {
     runtime: { lastError: null, sendMessage: (message, callback) => callback(message.type === "get_offline_queue" ? response : null) },
     storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } },
@@ -81,7 +96,8 @@ async function renderQueueBar(response) {
   for (let i = 0; i < 20 && !byId("offline-queue-list").querySelector(".offline-queue-item"); i++) await new Promise((r) => setTimeout(r, 0));
   const rows = [...byId("offline-queue-list").querySelectorAll(".offline-queue-item")].map((row) => ({
     id: row.dataset.queueId, meta: row.querySelector(".offline-queue-meta").textContent, html: row.outerHTML,
-    reason: row.querySelector(".error-text")?.textContent || "",
+    reason: row.querySelector(".error-text > :first-child")?.textContent || "",
+    hint: row.querySelector(".error-text > :nth-child(2)")?.textContent || "",
     buttons: [...row.querySelectorAll(".actions button")].map((button) => button.getAttribute("aria-label")) }));
   host.remove();
   return { text, rows };
@@ -441,13 +457,41 @@ await suite("offline queue", async () => {
     assert(text === "offlineQueued:1 · offlineQueueNeedsAttention:4 · offlineQueueOtherConnection:2", "bar text: " + text);
     const by = Object.fromEntries(rows.map((row) => [row.id, row]));
     assert(by.plain.reason === "", "a plain row shows a cause");
-    assert(by.tag.reason === "offlineQueueAttention:bookmarkErrTagTooLong:" + "x".repeat(40) + "\u2026:64", "tag row: " + by.tag.reason);
-    assert(by.remote.reason === "offlineQueueAttention:bookmarkErrRemote:422", "remote row: " + by.remote.reason);
-    assert(by.title.reason === "offlineQueueAttention:titleTooLong:512", "title row: " + by.title.reason);
-    assert(by.broken.reason === "offlineQueueAttention:offlineQueueRecordInvalid", "invalid row: " + by.broken.reason);
-    assert(by.other.reason === "offlineQueueAttention:bookmarkErrRemote:400", "another connection's row: " + by.other.reason);
-    assert(by.pin.reason === "offlineQueueAttention:HTTP 400", "Pinboard row: " + by.pin.reason);
+    assert(by.tag.reason === "bookmarkErrTagTooLong:" + "x".repeat(40) + "\u2026:64", "tag row: " + by.tag.reason);
+    assert(by.remote.reason === "bookmarkErrRemote:422", "remote row: " + by.remote.reason);
+    assert(by.title.reason === "titleTooLong:512", "title row: " + by.title.reason);
+    assert(by.broken.reason === "offlineQueueRecordInvalid", "invalid row: " + by.broken.reason);
+    assert(by.other.reason === "bookmarkErrRemote:400", "another connection's row: " + by.other.reason);
+    assert(by.pin.reason === "pinboardErrRejected:400", "Pinboard row: " + by.pin.reason);
     for (const row of rows) assert(row.buttons.join() === "offlineRetry,offlineRemove", row.id + " buttons: " + row.buttons.join());
+    for (const row of rows) assert(row.hint === (row.id === "plain" ? "" : "offlineQueueAttentionHint"), row.id + " hint: " + row.hint);
+  });
+  // The cause and the "retry stopped" line render apart, so a cause without
+  // a closing full stop (Chinese titleTooLong, a Pinboard status) never runs
+  // into the next sentence; no row shows a guessed number or a placeholder.
+  await test("attention rows in real locale copy keep the cause and the stopped line as separate full sentences", async () => {
+    const LD = "linkding:https://ld.example/:conn-ld-77";
+    const item = (queueId, account, failure) => ({ queueId, account, url: "https://page.example/" + queueId, title: queueId, tags: "work", queuedAt: Date.now(), failure });
+    const queue = [
+      item("ld-title", LD, { code: "too_long", at: 1 }),
+      item("pin-long", "alice", { code: "too_long", at: 1 }),
+      item("pin-404", "alice", { code: "http", at: 1, status: 404 }),
+      item("pin-400", "alice", { code: "http", at: 1, status: 400 }),
+    ];
+    for (const locale of ["zh_CN", "zh_TW", "ja", "en", "de"]) {
+      const tr = await localeTranslator(locale);
+      const { rows } = await renderQueueBar({ ok: true, pause: null, account: LD, queue }, tr);
+      for (const row of rows) {
+        assert(row.hint === tr("offlineQueueAttentionHint"), locale + " " + row.id + " hint: " + row.hint);
+        assert(row.reason && !row.reason.includes(row.hint), locale + " " + row.id + " cause: " + row.reason);
+        assert(!/[?$]/.test(row.reason), locale + " " + row.id + " shows a guess or a placeholder: " + row.reason);
+        if (/^pin-\d/.test(row.id)) assert(/[.。]$/.test(row.reason), locale + " " + row.id + " is not a full sentence: " + row.reason);
+      }
+      const by = Object.fromEntries(rows.map((row) => [row.id, row.reason]));
+      assert(by["ld-title"] === tr("titleTooLong", "512"), locale + " title: " + by["ld-title"]);
+      assert(by["pin-long"] === tr("submitUriTooLong"), locale + " Pinboard too long: " + by["pin-long"]);
+      assert(by["pin-404"].includes("404") && by["pin-404"] === tr("pinboardErrRejected", "404"), locale + " Pinboard 404: " + by["pin-404"]);
+    }
   });
   // The production keepalive check and release (background.js), with only
   // the queue, pause, connection and alarm stores stubbed.

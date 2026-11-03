@@ -134,10 +134,16 @@
       body.appendChild(title);
       body.appendChild(meta);
       // A record replay stopped on: why, and what the user can do about it.
+      // Two lines, not one sentence: the cause comes from the save path's
+      // copy, and not every such message ends with its language's full stop.
       if (pbpOfflineQueueNeedsAttention(item)) {
         const reason = document.createElement("div");
         reason.className = "error-text";
-        reason.textContent = t("offlineQueueAttention", attentionReason(item));
+        const cause = document.createElement("div");
+        cause.textContent = attentionReason(item);
+        const hint = document.createElement("div");
+        hint.textContent = t("offlineQueueAttentionHint");
+        reason.append(cause, hint);
         body.appendChild(reason);
       }
 
@@ -189,7 +195,12 @@
     if (reason === "account_mismatch") return t("offlineRetryWrongAccount");
     if (reason === "not_logged_in") return t("batchNotLoggedIn");
     if (reason === "account_changed") return t("offlineRetryAccountChanged");
-    if (reason === "too_long") return t("uriTooLong", String(result.detail || ""), String(POSTS_ADD_URI_BUDGET));
+    // A queued record keeps no URI length (only its marker), so its copy
+    // leaves the number out rather than print a guess.
+    if (reason === "too_long") {
+      return result.detail ? t("uriTooLong", String(result.detail), String(POSTS_ADD_URI_BUDGET)) : t("submitUriTooLong");
+    }
+    if (reason === "http" && pbpOfflineQueueAttentionFailure(result)) return t("pinboardErrRejected", String(result.httpStatus));
     if (reason === "http" && result.httpStatus) return `HTTP ${result.httpStatus}`;
     if (reason === "api" && result.detail) return t("pinboardApiError", String(result.detail));
     // Only reason "network" (and an answerless send -- a service worker that
@@ -212,10 +223,7 @@
     if (failure.code === "tag_too_long") {
       try { result.tag = pbpLinkdingOverlongTag(pbpBookmarkParseTags(item.tags)); } catch (_) { /* unparsable tags: the copy shows "?" */ }
     }
-    if (failure.code === "too_long") {
-      if (service === "pinboard") result.detail = "?";
-      else result.limit = pbpBookmarkLimits(service).title;
-    }
+    if (failure.code === "too_long" && service !== "pinboard") result.limit = pbpBookmarkLimits(service).title;
     return retryFailureMessage(result, service);
   }
 
