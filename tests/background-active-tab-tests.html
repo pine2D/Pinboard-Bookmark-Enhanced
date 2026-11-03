@@ -153,11 +153,12 @@ function buildTabUpdateHarness(source) {
   const listener = source.match(/chrome\.tabs\.onUpdated\.addListener\(\(tabId, changeInfo, tab\) => \{[\s\S]*?\n\}\);/);
   assert(helperStart >= 0 && helperEnd > helperStart && listener, "tabs.onUpdated listener not found");
   const calls = { refresh: [] };
-  const state = { icons: new Map(), checked: new Map() };
+  const state = { icons: new Map(), checked: new Map(), iconPages: new Map() };
   let handler = null;
   const deps = {
     chrome: { tabs: { onUpdated: { addListener: (fn) => { handler = fn; } } } },
     _lastIconState: state.icons,
+    _iconPageUrl: state.iconPages,
     _lastCheckedUrl: state.checked,
     _scheduleCurrentTabRefresh: (tabId, tabUrl) => calls.refresh.push({ tabId, url: tabUrl }),
   };
@@ -286,6 +287,10 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
   const lookups = [];
   const pinboardRequests = [];
   const icons = [];
+  const listeners = {};
+  // The lookup's answer can change between steps (a page saved, a server down).
+  const answer = { failure, bookmark };
+  const activeTab = { id: 7, url: G14_URL, title: "Article", active: true };
   let scheduled = Promise.resolve();
   // epoch 0 matches the `let _pinboardAuthEpoch = 0` the sliced cache block declares.
   const auth = service === "pinboard"
@@ -298,18 +303,29 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
     getSettingsStorage: async () => ({ get: async (defaults) => ({ ...defaults }) }),
     pbpBookmarkClient: () => ({ lookup: async (url) => {
       lookups.push(url);
-      if (failure) throw pbpBookmarkServiceError(failure.code, failure.status);
-      return bookmark;
+      if (answer.onLookup) answer.onLookup(url);
+      if (answer.failure) throw pbpBookmarkServiceError(answer.failure.code, answer.failure.status);
+      return answer.bookmark && answer.bookmark.url === url ? answer.bookmark : null;
     } }),
     pinboardFetch: async (url) => {
       pinboardRequests.push(url);
       if (pinboardStatus !== 200) return { ok: false, status: pinboardStatus, json: async () => ({}) };
       return { ok: true, status: 200, json: async () => ({ posts: [] }) };
     },
-    chrome: { tabs: { query: async () => [{ id: 7, url: G14_URL, title: "Article", active: true }] } },
+    // The real setIcon runs; the platform call records the state it was given.
+    chrome: {
+      tabs: {
+        query: async () => [{ ...activeTab }],
+        onActivated: { addListener: (fn) => { listeners.activated = fn; } },
+        onUpdated: { addListener: (fn) => { listeners.updated = fn; } },
+      },
+      action: { setIcon: (details, done) => { icons.push({ tabId: details.tabId, state: details.path }); if (done) done(); } },
+      runtime: { lastError: undefined },
+    },
+    ICONS_DEFAULT: "default", ICON_PATHS: { default: "default", saved: "saved", toread: "toread" },
+    _iconImageData: {}, _ensureIconDecode: () => {},
     _scheduleTabCheck: (tabId, fn) => { scheduled = fn(); },
     noteActivity: () => {},
-    setIcon: (tabId, state) => icons.push({ tabId, state }),
     _writeCurrentTabMirror: async () => {},
     console: { warn: () => {} },
   };
@@ -321,14 +337,25 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
     slice("async function checkBookmarked(url, capturedAuth = null) {", "// ---- Badge: unread count ----"),
     slice("async function pbpBookmarkPostsResponse(", "async function pbpBookmarkDeleteResponse("),
     slice("async function fetchExistingBookmark(", "async function pbpSendResolvedPlan("),
-    slice("async function _getFocusedActiveTab", "// ---- 标签页激活/更新时刷新图标"),
+    slice("const _lastIconState = new Map();", "// ---- 检查 URL 是否已收藏"),
+    slice("async function _getFocusedActiveTab", "chrome.windows.onFocusChanged"),
     "function handleMessage(message, sendResponse) {\n" + slice('if (message.type === "lookup_bookmark" && message.url) {', 'if (message.type === "PBP_POPUP_DRAFT")') + "\n  return false;\n}",
     "return { handleMessage, _scheduleCurrentTabRefresh, statusCache, pbpStatusCacheSet, CACHE_TTL };",
   ].join("\n");
   const api = new Function(...Object.keys(deps), body)(...Object.values(deps));
   return {
-    api, auth, lookups, pinboardRequests, icons,
-    refresh: async () => { api._scheduleCurrentTabRefresh(7, G14_URL); await scheduled; },
+    api, auth, lookups, pinboardRequests, icons, answer,
+    refresh: async () => { api._scheduleCurrentTabRefresh(7, activeTab.url); await scheduled; },
+    // The tab moves to `url` the way tabs.onUpdated reports it: an in-page
+    // route change (pushState) carries only changeInfo.url, a new document
+    // its "complete" status; the scheduled check then runs to its end.
+    setTabUrl: (url) => { activeTab.url = url; },
+    navigate: async (url, { sameDocument }) => {
+      activeTab.url = url;
+      scheduled = Promise.resolve();
+      listeners.updated(7, sameDocument ? { url } : { status: "complete" }, { ...activeTab });
+      await scheduled;
+    },
     lookup: () => new Promise((resolve) => {
       assert(api.handleMessage({ type: "lookup_bookmark", url: G14_URL, account: auth.account }, resolve) === true, "lookup_bookmark did not keep the channel open");
     }),
@@ -978,6 +1005,72 @@ async function run() {
         const h = buildStatusFailureHarness(source, { service, bookmark });
         await h.refresh();
         assert(h.icons.length === 1 && h.icons[0].state === state, service + ": an answered check set " + JSON.stringify(h.icons) + ", expected " + state);
+      }
+    }
+  });
+
+  await test("G14: a failed check after the tab moves to another page does not keep that page's icon", async () => {
+    const OTHER = "https://example.com/other-video";
+    for (const service of ["linkding", "karakeep"]) {
+      for (const failure of G14_FAILURES) {
+        // An in-page route change (SPA) leaves the toolbar showing the page
+        // before it; a new document has the icon reset by the browser.
+        for (const sameDocument of [true, false]) {
+          const where = service + " " + failure.code + (sameDocument ? " (route change)" : " (new document)");
+          const h = buildStatusFailureHarness(source, { service, bookmark: G14_BOOKMARK });
+          await h.refresh();
+          assert(h.icons.length === 1 && h.icons[0].state === "saved", where + ": the saved page did not show saved: " + JSON.stringify(h.icons));
+          h.answer.failure = failure;
+          await h.navigate(OTHER, { sameDocument });
+          assert(h.lookups.at(-1) === OTHER, where + ": the new page was not checked");
+          const last = h.icons.at(-1);
+          // A new document's icon is already the browser default; setting it again is harmless.
+          if (sameDocument) assert(h.icons.length === 2 && last.state === "default", where + ": the page before it still shows its icon: " + JSON.stringify(h.icons));
+          else assert(h.icons.every((icon, i) => i === 0 || icon.state === "default"), where + ": a failure set " + JSON.stringify(h.icons));
+          // Back on a page whose icon the toolbar shows: a further failure keeps it.
+          const shown = h.icons.length;
+          await h.refresh();
+          assert(h.icons.length === shown, where + ": a repeat failure on the same page set the icon again: " + JSON.stringify(h.icons));
+        }
+      }
+      // The same page under a #fragment (back on the tab after an anchor
+      // jump): the icon still describes it, so a failure keeps it.
+      {
+        const h = buildStatusFailureHarness(source, { service, bookmark: G14_BOOKMARK });
+        await h.refresh();
+        h.answer.failure = G14_FAILURES[0];
+        h.setTabUrl(G14_URL + "#comments");
+        await h.refresh();
+        assert(h.icons.length === 1 && h.icons[0].state === "saved", service + ": a failure under a #fragment of the saved page set " + JSON.stringify(h.icons));
+      }
+      // A route away and straight back before the first check answered: the
+      // toolbar never left the saved page's icon, and it is that page again.
+      {
+        const h = buildStatusFailureHarness(source, { service, bookmark: G14_BOOKMARK });
+        await h.refresh();
+        h.answer.failure = G14_FAILURES[0];
+        h.answer.onLookup = (url) => { if (url === OTHER) h.setTabUrl(G14_URL); };
+        await h.navigate(OTHER, { sameDocument: true });
+        h.answer.onLookup = null;
+        h.api.statusCache.clear(); // its entry has expired by now
+        await h.navigate(G14_URL, { sameDocument: true });
+        assert(h.lookups.join("|") === [G14_URL, OTHER, G14_URL].join("|"), service + ": checks " + JSON.stringify(h.lookups));
+        assert(h.icons.length === 1 && h.icons[0].state === "saved", service + ": back on the saved page a failure set " + JSON.stringify(h.icons));
+      }
+      // A worker that restarted holds no record of what the toolbar shows: an
+      // in-page route change still means the icon is the page before it.
+      {
+        const h = buildStatusFailureHarness(source, { service, failure: G14_FAILURES[0] });
+        await h.navigate(OTHER, { sameDocument: true });
+        assert(h.icons.length === 1 && h.icons[0].state === "default", service + " (restarted worker): the route change kept the earlier icon: " + JSON.stringify(h.icons));
+      }
+      // Control: the route change of a check that answers still sets the new page's state.
+      {
+        const h = buildStatusFailureHarness(source, { service, bookmark: G14_BOOKMARK });
+        await h.refresh();
+        h.answer.bookmark = { ...G14_BOOKMARK, url: OTHER };
+        await h.navigate(OTHER, { sameDocument: true });
+        assert(h.icons.length === 1 && h.icons[0].state === "saved", service + ": a saved -> saved route change changed the icon: " + JSON.stringify(h.icons));
       }
     }
   });

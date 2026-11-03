@@ -162,6 +162,7 @@ function invalidateBookmarkAuthState() {
   statusCache.clear();
   _pendingChecks.clear();
   _lastIconState.clear();
+  _iconPageUrl.clear();
   _lastCheckedUrl.clear();
   try { Promise.resolve(chrome.storage.session.remove("_currentTab")).catch(() => {}); } catch (_) {}
   chrome.tabs.query({}).then((tabs) => {
@@ -466,9 +467,19 @@ chrome.notifications.onButtonClicked.addListener((notifId, btnIndex) => {
 // Symptoms otherwise: "Unchecked runtime.lastError: No tab with id: X"
 // with Context: Unknown and Stack: :0 (anonymous function).
 const _lastIconState = new Map(); // tabId -> last state string set (dedup)
-function setIcon(tabId, state) {
+// tabId -> the page (URL without its #fragment) the toolbar icon describes, or
+// null once an in-page route change has moved the tab off that page. Memory
+// only, like _lastIconState: it decides whether a failed self-hosted check may
+// keep the icon (only for the very page it describes). No entry: the worker
+// has not set this tab's icon since it started, or a new document reset it.
+const _iconPageUrl = new Map();
+// pageUrl: the tab URL this state is for. Omitted (the auth-change reset to
+// default) leaves no record, which a failed check reads as "keep".
+function setIcon(tabId, state, pageUrl) {
   if (typeof tabId !== "number" || tabId < 0) return;
   if (typeof state === "boolean") state = state ? "saved" : "default"; // legacy guard
+  if (typeof pageUrl === "string") _iconPageUrl.set(tabId, _urlWithoutFragment(pageUrl));
+  else _iconPageUrl.delete(tabId);
   // Dedup: skip if this tab's icon is already in the desired state. A tab that
   // re-fires onUpdated "complete" repeatedly would otherwise re-set the same icon
   // over and over — this guard eliminates that storm regardless of trigger frequency.
@@ -1064,7 +1075,7 @@ async function applySaveResultSideEffects(envelope, settings, {
     if (cacheUpdated) {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (pbpBookmarkAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, persisted.url)) {
-        setIcon(tab.id, iconStateFor(pbpStatusCacheGet(persisted.url, auth)));
+        setIcon(tab.id, iconStateFor(pbpStatusCacheGet(persisted.url, auth)), tab.url);
       }
     }
   } catch (_) { /* status/icon are best-effort */ }
@@ -1652,7 +1663,7 @@ function pbpDeleteBookmarkInOrder(account, url) {
         if (pbpStatusCacheSet(url, auth, { bookmarked: false, timestamp: Date.now(), posts: [] })) {
           const tabs = await chrome.tabs.query({});
           for (const tab of tabs) {
-            if (pbpBookmarkAuthIsCurrent(auth) && tab.id && pbpSameBookmark(tab.url, url)) setIcon(tab.id, "default");
+            if (pbpBookmarkAuthIsCurrent(auth) && tab.id && pbpSameBookmark(tab.url, url)) setIcon(tab.id, "default", tab.url);
           }
         }
         await updateBadge();
@@ -2201,7 +2212,14 @@ function _scheduleCurrentTabRefresh(tabId, expectedUrl) {
         // never the raw tab URL — reading back a key nothing wrote returns null and
         // would reset a saved page's icon to "default".
         const auth = await getCurrentBookmarkAuth();
-        setIcon(currentTab.id, iconStateFor(pbpStatusCacheGet(status.target, auth)));
+        setIcon(currentTab.id, iconStateFor(pbpStatusCacheGet(status.target, auth)), currentTab.url);
+      } else if (status && status.bookmarked === null && _iconPageUrl.has(currentTab.id)
+          && _iconPageUrl.get(currentTab.id) !== _urlWithoutFragment(currentTab.url)) {
+        // A failed self-hosted check keeps the icon only for the page it
+        // describes. After an in-page route change (SPA) the browser leaves the
+        // previous page's icon up: "saved" there must not read as this page
+        // saved, so it falls back to not-known-saved.
+        setIcon(currentTab.id, "default", currentTab.url);
       }
       await _writeCurrentTabMirror(currentTab.id, currentTab.url, currentTab.title);
     } catch (_) {
@@ -2240,6 +2258,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // leave the default pin up. Same rule invalidateBookmarkAuthState follows:
   // when the truth behind the dedup moves, the dedup entry goes first.
   if (!sameDocument) _lastIconState.delete(tabId);
+  // The icon's page record follows the same truth: a new document reset the
+  // icon (no record: nothing stale to keep); a route change left the earlier
+  // page's icon up, so a record that does not exist yet (a restarted worker)
+  // becomes "describes another page". A known record stays exact as it is.
+  if (!sameDocument) _iconPageUrl.delete(tabId);
+  else if (!_iconPageUrl.has(tabId)) _iconPageUrl.set(tabId, null);
   _scheduleCurrentTabRefresh(tabId, tab.url);
 });
 
@@ -2255,6 +2279,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   const timer = _checkDebounceTimers.get(tabId);
   if (timer) { clearTimeout(timer); _checkDebounceTimers.delete(tabId); }
   _lastIconState.delete(tabId); // prevent Map leak over long sessions
+  _iconPageUrl.delete(tabId);
   _lastCheckedUrl.delete(tabId);
   pbpImgFixSweepRules(tabId);
 });
@@ -4748,7 +4773,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       if (updated) {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (pbpBookmarkAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, message.url)) {
-          setIcon(tab.id, "default");
+          setIcon(tab.id, "default", tab.url);
         }
       }
       sendResponse({ ok: updated });
