@@ -777,6 +777,10 @@
   "bgUndoFailed": {
     "message": "Undo failed"
   },
+  "bgUndoFailedLocal": {
+    "message": "The bookmark is still saved. The extension couldn't update its local data; try again.",
+    "description": "Body of the Undo failed notification when the extension's own local storage failed (for example while cancelling a queued save of the same page) before any request was sent. The bookmark was not removed."
+  },
   "bgBookmarkRemoved": {
     "message": "Bookmark removed."
   },

@@ -770,6 +770,10 @@
   "bgUndoFailed": {
     "message": "Échec de l'annulation"
   },
+  "bgUndoFailedLocal": {
+    "message": "Le signet est toujours enregistré. L’extension n’a pas pu mettre à jour ses données locales. Réessayez.",
+    "description": "Body of the Undo failed notification when the extension's own local storage failed (for example while cancelling a queued save of the same page) before any request was sent. The bookmark was not removed."
+  },
   "bgBookmarkRemoved": {
     "message": "Signet supprimé."
   },

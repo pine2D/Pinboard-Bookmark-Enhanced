@@ -770,6 +770,10 @@
   "bgUndoFailed": {
     "message": "Cofnięcie nie powiodło się"
   },
+  "bgUndoFailedLocal": {
+    "message": "Zakładka nadal jest zapisana. Rozszerzenie nie mogło zaktualizować danych lokalnych. Spróbuj ponownie.",
+    "description": "Body of the Undo failed notification when the extension's own local storage failed (for example while cancelling a queued save of the same page) before any request was sent. The bookmark was not removed."
+  },
   "bgBookmarkRemoved": {
     "message": "Zakładka usunięta."
   },

@@ -1667,6 +1667,9 @@ function pbpNotifyUndoFailed(cause) {
   showNotification("undo-error", t("bgUndoFailed"), message, "error");
 }
 function pbpNotifyUndoFailedResult(result, account) {
+  // A local read or write stopped the Undo (cancelling a queued save of
+  // this address, say) before any request: the network is not the cause.
+  if (result?.reason === "storage" || result?.reason === "internal") return pbpNotifyUndoFailed(t("bgUndoFailedLocal"));
   const text = pbpBookmarkFailureText(result, pbpBookmarkAccountService(account), t);
   if (text) return pbpNotifyUndoFailed(text);
   if (result?.reason === "api" && result.detail) return pbpNotifyUndoFailed(result.detail);

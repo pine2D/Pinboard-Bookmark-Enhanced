@@ -770,6 +770,10 @@
   "bgUndoFailed": {
     "message": "撤销失败"
   },
+  "bgUndoFailedLocal": {
+    "message": "书签仍然保存着。扩展没能更新本机数据，请重试。",
+    "description": "Body of the Undo failed notification when the extension's own local storage failed (for example while cancelling a queued save of the same page) before any request was sent. The bookmark was not removed."
+  },
   "bgBookmarkRemoved": {
     "message": "书签已移除。"
   },

@@ -770,6 +770,10 @@
   "bgUndoFailed": {
     "message": "取り消しに失敗"
   },
+  "bgUndoFailedLocal": {
+    "message": "ブックマークは保存されたままです。拡張機能のローカルデータを更新できませんでした。もう一度お試しください。",
+    "description": "Body of the Undo failed notification when the extension's own local storage failed (for example while cancelling a queued save of the same page) before any request was sent. The bookmark was not removed."
+  },
   "bgBookmarkRemoved": {
     "message": "ブックマークを削除しました。"
   },
