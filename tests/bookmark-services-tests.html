@@ -779,6 +779,34 @@ test("HTML 401/403 are gateway_denied; JSON or untyped stay auth", async () => {
     const h = harness("linkding", [reply("text/html")]); try { await h.client.verify(); } catch (error) { equal(error.status, status); }
   }
 });
+// Karakeep 0.34.1 rejects a token from Hono HTTPExceptions (packages/api
+// middlewares/auth.ts "Unauthorized" / "Forbidden - Admin access required",
+// apiKeyScopes.ts, readOnlyMode.ts) and registers no app.onError, so the reply
+// is the message as plain text under Hono's default text/plain;charset=UTF-8.
+// Known residual, deliberately not guessed at: a reverse proxy in front of
+// Karakeep that itself answers 403 text/plain (Traefik ipAllowList) reads as
+// auth and shows the token copy.
+const kkPlain = (status, body, type = "text/plain;charset=UTF-8") => new Response(body, {status, headers:{"Content-Type":type}});
+test("Karakeep plain-text or other non-HTML 401/403 are auth; only gateway shapes are gateways", async () => {
+  equal(await gwCode(kkPlain(401, "Unauthorized"), "karakeep"), "auth");
+  equal(await gwCode(kkPlain(403, "Forbidden - Admin access required"), "karakeep"), "auth");
+  equal(await gwCode(kkPlain(403, "API key is missing required scope: bookmarks:write"), "karakeep"), "auth");
+  equal(await gwCode(kkPlain(403, "<error/>", "application/xml"), "karakeep"), "auth");
+  const h = harness("karakeep", [kkPlain(401, "Unauthorized")]); try { await h.client.verify(); } catch (error) { equal(error.status, 401); }
+  // linkding answers its own 401 as DRF JSON, so a plain-text one is still not linkding.
+  equal(await gwCode(kkPlain(401, "Unauthorized"), "linkding"), "gateway_denied");
+  equal(await gwCode(kkPlain(403, "Forbidden"), "linkding"), "gateway_denied");
+  for (const service of ["karakeep", "linkding"]) {
+    for (const status of [401, 403]) {
+      equal([service, status, await gwCode(gwHtml(status), service)], [service, status, "gateway_denied"]);
+      equal([service, status, await gwCode(kkPlain(status, "<html/>", "application/xhtml+xml"), service)], [service, status, "gateway_denied"]);
+      equal([service, status, await gwCode(new Response("{}", {status, headers:{"Content-Type":"application/json"}}), service)], [service, status, "auth"]);
+    }
+    equal([service, await gwCode(gwBasic(), service)], [service, "gateway_basic"]);
+    equal([service, await gwCode(gwChallenge(403), service)], [service, "gateway_challenge"]);
+    equal([service, await gwCode(gwRedirect(), service)], [service, "gateway_redirect"]);
+  }
+});
 test("HTML 200 is not_api; JSON with a wrong Content-Type still parses; untyped non-JSON stays invalid_response", async () => {
   equal(await gwCode(new Response("<html><title>Sign in</title></html>", {status:200, headers:{"Content-Type":"text/html; charset=utf-8"}})), "not_api");
   equal(await gwCode(new Response('{"theme":"auto","version":"1.44.0"}', {status:200, headers:{"Content-Type":"text/html"}})), "ok");

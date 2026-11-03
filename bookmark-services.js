@@ -12,17 +12,22 @@ function pbpBookmarkServiceError(code, status) {
 function pbpBookmarkContentKind(headers) {
   const type = String(headers?.get?.("Content-Type") || "").split(";")[0].trim().toLowerCase();
   if (!type) return "none";
+  if (type === "text/html" || type === "application/xhtml+xml") return "html";
   return type === "application/json" || type.endsWith("+json") ? "json" : "other";
 }
 
-function pbpBookmarkResponseFailure(response, phase) {
+// service: the adapter's own service. A 401/403 page names a gateway only when
+// the server itself never answers that way: linkding (DRF) always rejects a
+// token with JSON, so any other type is in front of it; Karakeep (Hono, no
+// app.onError) rejects with plain text, so only an HTML page is a gateway.
+function pbpBookmarkResponseFailure(response, phase, service) {
   const status = response.status;
   const challenged = String(response.headers?.get?.("cf-mitigated") || "").trim().toLowerCase() === "challenge";
   const kind = pbpBookmarkContentKind(response.headers);
   if (challenged) return "gateway_challenge";
-  if (phase === "body") return kind === "other" ? "not_api" : "invalid_response";
+  if (phase === "body") return kind === "html" || kind === "other" ? "not_api" : "invalid_response";
   if (status === 401 && /^basic(?:\s|$)/i.test(String(response.headers?.get?.("WWW-Authenticate") || "").trim())) return "gateway_basic";
-  if ((status === 401 || status === 403) && kind === "other") return "gateway_denied";
+  if ((status === 401 || status === 403) && (kind === "html" || (kind === "other" && service !== "karakeep"))) return "gateway_denied";
   if (status === 401 || status === 403) return "auth";
   if (status === 429) return "rate_limited";
   return status >= 500 ? "server" : "remote";
@@ -122,7 +127,7 @@ function pbpCreateBookmarkServiceClient(config) {
     }
     await guard();
     if (response.type === "opaqueredirect") throw pbpBookmarkServiceError("gateway_redirect");
-    if (!response.ok) throw pbpBookmarkServiceError(pbpBookmarkResponseFailure(response, "status"), response.status);
+    if (!response.ok) throw pbpBookmarkServiceError(pbpBookmarkResponseFailure(response, "status", service), response.status);
     if (response.status === 204) { responseOk(); return {status:204, data:null}; }
     let data;
     let text;
@@ -131,14 +136,14 @@ function pbpCreateBookmarkServiceClient(config) {
       // Name and message only: never the body, token or header values.
       console.warn("[bookmark-services] body read failed:", error?.name, error?.message);
       throw pbpBookmarkServiceError(error?.name === "TimeoutError" || error?.name === "AbortError"
-        ? "timeout" : pbpBookmarkResponseFailure(response, "body"));
+        ? "timeout" : pbpBookmarkResponseFailure(response, "body", service));
     }
     if (text.length > 4 * 1024 * 1024) throw pbpBookmarkServiceError("invalid_response");
     try { data = JSON.parse(text); }
     catch (error) {
       // V8's SyntaxError message quotes the start of the body, so log the name only.
       console.warn("[bookmark-services] body parse failed:", error?.name);
-      throw pbpBookmarkServiceError(pbpBookmarkResponseFailure(response, "body"));
+      throw pbpBookmarkServiceError(pbpBookmarkResponseFailure(response, "body", service));
     }
     await guard();
     responseOk();

@@ -86,6 +86,8 @@ const server=createServer(async(req,res)=>{
     if(kind==='challenge'){res.writeHead(403,{'Content-Type':'text/html; charset=UTF-8','cf-mitigated':'challenge'});res.end('<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title></head><body></body></html>');return;}
     if(kind==='basic'){res.writeHead(401,{'Content-Type':'text/plain','WWW-Authenticate':'Basic realm="Restricted"'});res.end('Unauthorized');return;}
     if(kind==='denied'){res.writeHead(403,{'Content-Type':'text/html'});res.end('<html><body>Forbidden</body></html>');return;}
+    // Karakeep's own token rejection shape (Hono default text/plain).
+    if(kind==='plain'){res.writeHead(401,{'Content-Type':'text/plain;charset=UTF-8'});res.end('Unauthorized');return;}
     if(kind==='page'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('<html><title>Sign in</title></html>');return;}
     if(kind==='headers'){
       if(req.headers['x-probe-gateway']==='probe-value'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({theme:'auto',version:'1.44.0'}));}
@@ -106,7 +108,15 @@ const server=createServer(async(req,res)=>{
   const reply=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(status===204?'':JSON.stringify(value));};
   const serverError=()=>{res.writeHead(500,{'Content-Type':'text/html; charset=utf-8'});res.end(DJANGO_500);};
   const scheme=service==='linkding'?'Token ':'Bearer ';
-  if(![...acceptedKeys].some(key=>req.headers.authorization===scheme+key)){reply(401,{});return;}
+  // Token rejections as each server writes them: linkding through DRF
+  // (TokenAuthentication: JSON detail plus a Token challenge), Karakeep 0.34.1
+  // through a Hono HTTPException with no app.onError (middlewares/auth.ts:
+  // the message as text/plain;charset=UTF-8).
+  if(![...acceptedKeys].some(key=>req.headers.authorization===scheme+key)){
+    if(service==='karakeep'){res.writeHead(401,{'Content-Type':'text/plain;charset=UTF-8'});res.end('Unauthorized');}
+    else{res.writeHead(401,{'Content-Type':'application/json','WWW-Authenticate':'Token'});res.end(JSON.stringify({detail:'Invalid token.'}));}
+    return;
+  }
   const store=records[service];
   // linkding v1.47 (website_loader): metadata of a page this server publishes,
   // under either loopback name; anything else could not be fetched, so the
@@ -316,7 +326,9 @@ try{
     assert.equal(await options.evaluate(()=>[document.querySelector('label[data-gw-header="2"]').textContent,document.querySelector('[data-gw-header-name="2"]').getAttribute('aria-label'),document.querySelector('[data-gw-header-value="2"]').getAttribute('aria-label')].join('|')),
       ['Header 2','Header 2 name','Header 2 value'].join('|'),'gateway header names stayed stale after pbp:i18n-applied');
     await options.locator('#opt-'+service+'-url').fill(origin+'/'+service+'/');
-    if(service==='linkding'){
+    {
+      // Both servers' own token rejection (linkding JSON, Karakeep plain text)
+      // is a token problem on the settings page, never a gateway.
       await options.locator('#opt-'+service+'-token').fill('wrong-key');
       await options.locator('#connect-'+service).click();
       const authMessage=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8')).bookmarkConnectErrAuth.message;
@@ -331,7 +343,8 @@ try{
       assert.equal((await options.locator('#connect-'+service+'-status').textContent()).trim(),JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8')).bookmarkUrlInvalid.message);
       assert.equal(await options.locator('#opt-'+service+'-url').getAttribute('aria-invalid'),'true');
       await options.locator('#opt-'+service+'-url').fill(origin+'/'+service+'/');
-      assert(!(await options.evaluate(async()=>(await pbpReadBookmarkConnection()).account)),'wrong-key connection was saved');
+      // The earlier service's connection may still be saved; this one must not be.
+      assert(!(await options.evaluate(async service=>{const c=await pbpReadBookmarkConnection();return c.service===service&&c.account;},service)),'wrong-key connection was saved');
     }
     await options.locator('#opt-'+service+'-token').fill('fixture-key');
     console.log(service+' permission:',await options.evaluate(origin=>chrome.permissions.contains({origins:[origin+'/*']}),origin));
@@ -999,14 +1012,17 @@ try{
   await block('gateway probes',[],async()=>{
   const probes=await worker.evaluate(async origin=>{
     const out={};
-    for(const kind of ['redirect','challenge','basic','denied','page','headers']){
-      const client=pbpCreateBookmarkServiceClient({service:'linkding',baseUrl:origin+'/probe/'+kind+'/',beforeRequest:async()=>({token:'probe',headers:[['X-Probe-Gateway','probe-value']]})});
-      try{await client.verify();out[kind]='ok';}catch(error){out[kind]=error.code;}
+    for(const service of ['linkding','karakeep'])for(const kind of ['redirect','challenge','basic','denied','plain','page','headers']){
+      if(service==='karakeep'&&kind==='headers')continue;
+      const client=pbpCreateBookmarkServiceClient({service,baseUrl:origin+'/probe/'+kind+'/',beforeRequest:async()=>({token:'probe',headers:[['X-Probe-Gateway','probe-value']]})});
+      try{await client.verify();out[service+':'+kind]='ok';}catch(error){out[service+':'+kind]=error.code;}
     }
     return out;
   },origin);
   console.log('probe results:',JSON.stringify(probes));
-  assert.deepEqual(probes,{redirect:'gateway_redirect',challenge:'gateway_challenge',basic:'gateway_basic',denied:'gateway_denied',page:'not_api',headers:'ok'});
+  // A plain-text 401 is Karakeep's own token rejection, but never linkding's.
+  assert.deepEqual(probes,{'linkding:redirect':'gateway_redirect','linkding:challenge':'gateway_challenge','linkding:basic':'gateway_basic','linkding:denied':'gateway_denied','linkding:plain':'gateway_denied','linkding:page':'not_api','linkding:headers':'ok',
+    'karakeep:redirect':'gateway_redirect','karakeep:challenge':'gateway_challenge','karakeep:basic':'gateway_basic','karakeep:denied':'gateway_denied','karakeep:plain':'auth','karakeep:page':'not_api'});
   const probeWire=wire.filter(w=>w.path.startsWith('/probe/')||w.path.startsWith('/cdn-cgi/'));
   console.log('probe wire:',JSON.stringify(probeWire.map(w=>w.method+' '+w.path+(w.hasCookie?' cookie':''))));
   assert.equal(wire.filter(w=>w.method==='OPTIONS').length,0,'custom headers triggered a preflight');
