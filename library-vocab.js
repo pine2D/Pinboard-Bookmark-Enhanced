@@ -957,7 +957,12 @@ function _pbpVocabRenderDetail(w, enterNarrow, reconcileOnly = false) {
     for (const group of currentGroups) {
       const chip = document.createElement("span");
       chip.className = "notes-meta-chip vocab-group-chip removable";
-      chip.textContent = group;
+      // The name sits in its own span: a bare text node in the inline-flex chip is an
+      // anonymous flex item, which text-overflow cannot ellipsize.
+      const nameEl = document.createElement("span");
+      nameEl.className = "vocab-group-chip-text";
+      nameEl.textContent = group;
+      chip.appendChild(nameEl);
       const removeChip = document.createElement("button");
       removeChip.type = "button";
       removeChip.className = "chip-remove";

@@ -2139,6 +2139,25 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("T7 Esc in the group box closes the editor and hands focus back to Edit groups",
         editor.hidden === true && edit.getAttribute("aria-expanded") === "false" && groupsText.hidden === false &&
         document.activeElement === edit);
+      // A 70-character group name with no space ellipsizes inside its chip: the chip stays in the detail pane, its remove
+      // button stays inside it, and the page does not scroll sideways.
+      {
+        const longGroup = "group-" + "g".repeat(64);
+        _pbpVocabRenderDetail({ ..._vocabRows[0], groups: [longGroup, "Reading"] });
+        const dl = $id("vocab-detail");
+        dl.querySelector(".vocab-edit-groups").click();
+        const pane = dl.getBoundingClientRect();
+        const chipEl = dl.querySelector(".vocab-group-chip.removable");
+        const cb = chipEl.getBoundingClientRect(), rm = chipEl.querySelector(".chip-remove"), rb = rm.getBoundingClientRect();
+        const txt = chipEl.querySelector(".vocab-group-chip-text");
+        check("T7 a long group name ellipsizes in its removable chip: inside the pane, remove button inside the chip, no sideways scroll",
+          cb.left >= pane.left - 0.5 && cb.right <= pane.right + 0.5 && rb.right <= pane.right + 0.5 &&
+          rb.left >= cb.left - 0.5 && rb.right <= cb.right + 0.5 && rb.width >= 14 && txt.scrollWidth > txt.clientWidth &&
+          document.documentElement.scrollWidth <= document.documentElement.clientWidth &&
+          rm.getAttribute("aria-label").endsWith(": " + longGroup),
+          JSON.stringify({ pane: [pane.left, pane.right], chip: [cb.left, cb.right], rm: rb.right,
+            scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+      }
       _pbpVocabRenderDetail(_vocabRows[1]);
       const bareDetail = $id("vocab-detail");
       const pron2 = bareDetail.querySelector(".vocab-pron-row");

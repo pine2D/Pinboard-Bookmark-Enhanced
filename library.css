@@ -1905,7 +1905,7 @@ html.motion-ready .vocab-note-save {
 }
 .vocab-group-editor[hidden] { display: none; }
 .vocab-group-editor > .vocab-group-unit { flex: none; width: 168px; }
-.vocab-group-editor > .vocab-detail-group-chips { flex: 0 1 auto; }
+.vocab-group-editor > .vocab-detail-group-chips { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 /* (0,3,0): outranks .vocab-group-chip .chip-remove's resting opacity 0
    whatever the source order -- in the editor the x is always shown (V5). */
 .vocab-group-editor .vocab-group-chip .chip-remove { opacity: 1; }
@@ -2031,6 +2031,7 @@ html.motion-ready .vocab-note-save {
    "this pill has an action" without claiming the whole pill is clickable --
    only .chip-remove itself is. */
 .vocab-group-chip { cursor: default; }
+.vocab-group-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 1px; margin: -2px -1px; }
 .vocab-group-chip.removable { padding-right: 4px; gap: 4px; }
 .vocab-group-chip.removable:hover { background: color-mix(in srgb, var(--lib-fg) 5%, var(--lib-chip-bg)); }
 /* Visual box is 14x14 -- exactly the chip's own line-height (COMPONENTS.md
