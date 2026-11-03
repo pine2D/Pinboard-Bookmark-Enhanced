@@ -1379,16 +1379,41 @@ try{
   // use; Karakeep has no credential and Pinboard no token for this block.
   const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
   const fill=(key,values)=>Object.entries(values).reduce((text,[name,value])=>text.replaceAll('$'+name+'$',value),en[key].message);
-  const saved=await worker.evaluate(()=>chrome.storage.local.get(['bookmarkService','bookmarkServiceActive','karakeepToken','karakeepUrl','pinboardToken']));
-  await worker.evaluate(async()=>{await chrome.storage.local.remove(['karakeepToken','pinboardToken']);});
+  const saved=await worker.evaluate(()=>chrome.storage.local.get(['bookmarkService','bookmarkServiceActive','karakeepToken','karakeepUrl','pinboardToken','pinboardTokenVerified']));
+  await worker.evaluate(async()=>{await chrome.storage.local.remove(['karakeepToken','pinboardToken','pinboardTokenVerified']);});
+  // "Nothing switched" is asserted only after everything that could switch
+  // has finished: this page's pending autosave is flushed, and a reconcile
+  // run here queues behind any the storage events started (same rules).
+  const settled=async page=>{if(page&&!page.isClosed())await page.evaluate(()=>window.pbpOptionsFlushAutoSave());await worker.evaluate(()=>pbpReconcileBookmarkService());};
   // Every reader of this device's service, read the way each surface reads it.
   const readers=async()=>{
     const popup=await ctx.newPage();await popup.goto(pageUrl+'popup.html');
-    await popup.waitForFunction(()=>typeof settings==='object'&&settings&&document.documentElement.dataset.bookmarkService);
+    // `settings` starts as {} and is replaced by the full read (which always carries bookmarkService).
+    await popup.waitForFunction(()=>typeof settings==='object'&&settings&&settings.bookmarkService!==undefined&&document.documentElement.dataset.bookmarkService);
     const popupService=await popup.evaluate(()=>[pbpBookmarkServiceId(settings),document.documentElement.dataset.bookmarkService]);
     await popup.close();
     const worker_=await worker.evaluate(async()=>[pbpBookmarkServiceId(await loadSettings()),(await pbpReadBookmarkConnection()).service]);
-    return [...popupService,...worker_];
+    // The reader binds its bookmark bar to the connection it reads: a handoff
+    // without an account is rewritten with it, so the stored account names the service.
+    await worker.evaluate(async url=>chrome.storage.local.set({md_preview_data_g28:{markdown:'# G28\n\nSynthetic.',title:'G28',url,baseUrl:url,account:'',tags:[],description:'',source:'local',ts:Date.now()}}),origin+'/article-g28');
+    const reader=await ctx.newPage();await reader.goto(pageUrl+'md-preview.html?k=g28');
+    let readerAccount='';
+    await until(async()=>(readerAccount=(await worker.evaluate(()=>chrome.storage.local.get('md_preview_data_g28'))).md_preview_data_g28?.account||''),'the reader did not bind a bookmark connection');
+    await reader.close();
+    await worker.evaluate(()=>chrome.storage.local.remove('md_preview_data_g28'));
+    return [...popupService,...worker_,readerAccount.split(':')[0]];
+  };
+  // Offline replay delivers a queued save of this device's connection to it.
+  const replays=async()=>{
+    const account=(await worker.evaluate(()=>pbpReadBookmarkConnection())).account;
+    const url=origin+'/article-g28-queued';
+    await worker.evaluate(item=>chrome.storage.local.set({offlineQueue:[item]}),{queueId:'g28-replay',queuedAt:1,account,mode:'merge',url,title:'Queued G28',notes:'',summary:'',tags:'g28',private:true,toread:false});
+    const before=requests.length;
+    const outcome=await worker.evaluate(()=>retryOfflineItem('g28-replay'));
+    const sent=requests.slice(before).filter(r=>r.method==='POST'&&r.data?.url===url).map(r=>r.service);
+    const row=[...records.linkding.values()].find(b=>b.url===url);if(row)records.linkding.delete(String(row.id));
+    await worker.evaluate(()=>chrome.storage.local.set({offlineQueue:[]}));
+    return {ok:outcome?.ok===true,sent};
   };
   const stored=()=>worker.evaluate(()=>chrome.storage.local.get(['bookmarkService','bookmarkServiceActive']));
   const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
@@ -1400,9 +1425,9 @@ try{
     await options.locator('input[name="bookmark-service"][value="karakeep"]').check();
     assert(await options.locator('#bookmark-karakeep-fields').isVisible(),'the Karakeep connection form is not shown');
     await note.filter({hasText:fill('bookmarkServicePending',{ACTIVE:'linkding',SERVICE:'Karakeep'})}).waitFor({timeout:5000});
-    await new Promise(r=>setTimeout(r,800)); // past the autosave debounce
+    await settled(options);
     assert.deepEqual(await stored(),{bookmarkService:'linkding',bookmarkServiceActive:'linkding'},'picking an unconnected service changed the service');
-    assert.deepEqual(await readers(),['linkding','linkding','linkding','linkding'],'a reader left linkding before Karakeep connected');
+    assert.deepEqual(await readers(),['linkding','linkding','linkding','linkding','linkding'],'a reader left linkding before Karakeep connected');
     // A failed Connect leaves everything where it was.
     await options.locator('#opt-karakeep-url').fill(origin+'/probe/notfound/');
     await options.locator('#opt-karakeep-token').fill('fixture-key');
@@ -1415,21 +1440,53 @@ try{
     await options.locator('#connect-karakeep-status').filter({hasText:en.bookmarkConnected.message}).waitFor({timeout:10000});
     await until(async()=>JSON.stringify(await stored())===JSON.stringify({bookmarkService:'karakeep',bookmarkServiceActive:'karakeep'}),'a successful Connect did not switch to Karakeep');
     await note.waitFor({state:'hidden',timeout:5000});
-    assert.deepEqual(await readers(),['karakeep','karakeep','karakeep','karakeep'],'a reader did not follow the Connect');
+    assert.deepEqual(await readers(),['karakeep','karakeep','karakeep','karakeep','karakeep'],'a reader did not follow the Connect');
     // Between two connected services, picking one is the switch.
     await options.locator('input[name="bookmark-service"][value="linkding"]').check();
     await until(async()=>(await stored()).bookmarkServiceActive==='linkding','picking a connected service did not switch to it');
     // Pinboard without a token: its form, a note, no switch.
     await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
     await note.filter({hasText:fill('bookmarkServicePendingPinboard',{ACTIVE:'linkding'})}).waitFor({timeout:5000});
-    await new Promise(r=>setTimeout(r,800));
+    await settled(options);
     assert.equal((await stored()).bookmarkServiceActive,'linkding','picking Pinboard without a token switched to it');
+    // Pinboard's login is Test connection (nothing leaves the browser: the
+    // check is answered here). A rejected or unreachable token, autosaved as
+    // typed, switches nothing; one that passes switches and is recorded.
+    const pinToken='g28user:0123456789ABCDEF0123';
+    const pinboardCheck=/^https:\/\/api\.pinboard\.in\/v1\/user\/api_token\//;
+    let answer='reject';
+    const handler=route=>answer==='ok'?route.fulfill({status:200,contentType:'application/json',body:'{"result":"0123456789ABCDEF0123"}'})
+      :answer==='reject'?route.fulfill({status:401,contentType:'text/plain',body:'401 Forbidden'}):route.abort('internetdisconnected');
+    await ctx.route(pinboardCheck,handler);
+    try{
+      await options.locator('#opt-pinboard-token').fill(pinToken);
+      for(const kind of ['reject','network']){
+        answer=kind;
+        await options.locator('#test-pinboard-token').click();
+        await options.locator('#test-pinboard-status.bad').waitFor({timeout:10000});
+        await settled(options);
+        assert.equal((await stored()).bookmarkServiceActive,'linkding','a Pinboard token that failed Test connection ('+kind+') switched to it');
+        assert(!(await worker.evaluate(()=>chrome.storage.local.get('pinboardTokenVerified'))).pinboardTokenVerified,'a failed test ('+kind+') was recorded as a login');
+        await options.locator('#test-pinboard-status').evaluate(node=>node.classList.remove('bad'));
+      }
+      answer='ok';
+      await options.locator('#test-pinboard-token').click();
+      await until(async()=>JSON.stringify(await stored())===JSON.stringify({bookmarkService:'pinboard',bookmarkServiceActive:'pinboard'}),'a Pinboard token that passed Test connection did not switch to it');
+      assert((await worker.evaluate(()=>chrome.storage.local.get('pinboardTokenVerified'))).pinboardTokenVerified,'the tested token was not recorded');
+      await note.waitFor({state:'hidden',timeout:5000});
+      // Back to linkding (connected): picking it is the switch.
+      await options.locator('input[name="bookmark-service"][value="linkding"]').check();
+      await until(async()=>(await stored()).bookmarkServiceActive==='linkding','picking linkding again did not switch back');
+    }finally{await ctx.unroute(pinboardCheck,handler);}
     await options.close();
     // A chosen service this device is not connected to (an older release left
     // it, or Chrome Sync carried it): Settings says so and leads to its form.
     await worker.evaluate(async()=>{await chrome.storage.local.remove('karakeepToken');await chrome.storage.local.set({bookmarkService:'karakeep'});});
-    await new Promise(r=>setTimeout(r,300));
-    assert.equal((await stored()).bookmarkServiceActive,'linkding','an unconnected chosen service switched this device');
+    await settled();
+    assert.deepEqual(await stored(),{bookmarkService:'karakeep',bookmarkServiceActive:'linkding'},'an unconnected chosen service switched this device');
+    // Chosen and used differ now: every consumer still uses this device's service.
+    assert.deepEqual(await readers(),['linkding','linkding','linkding','linkding','linkding'],'a reader followed the chosen service instead of this device\'s');
+    assert.deepEqual(await replays(),{ok:true,sent:['linkding']},'offline replay did not deliver to this device\'s service');
     const again=await ctx.newPage();await again.goto(pageUrl+'options.html');
     const note2=again.locator('#bookmark-service-note');
     await note2.filter({hasText:fill('bookmarkServiceChosenNotConnected',{SERVICE:'Karakeep',ACTIVE:'linkding'})}).waitFor({timeout:5000});
@@ -1454,7 +1511,7 @@ try{
     await again.close();
   }finally{
     if(!options.isClosed())await options.close();
-    await worker.evaluate(async saved=>{await chrome.storage.local.remove(['karakeepToken','pinboardToken']);await chrome.storage.local.set(saved);},saved);
+    await worker.evaluate(async saved=>{await chrome.storage.local.remove(['karakeepToken','pinboardToken','pinboardTokenVerified']);await chrome.storage.local.set(saved);},saved);
   }
   console.log('settings: the service switches on Connect or between connected services only; notes for an unconnected pick, chosen service and backup');
   });
@@ -1465,8 +1522,9 @@ try{
   // Pinboard account's tags (a synthetic token and a fresh owned tag cache,
   // so nothing leaves the browser), and choosing linkding again must clear
   // them. Before, the panel stayed on "add your Pinboard token" until reload.
-  const before=await worker.evaluate(()=>chrome.storage.local.get(['bookmarkService','bookmarkServiceActive','pinboardToken']));
-  await worker.evaluate(async()=>{await chrome.storage.local.set({bookmarkService:'linkding',bookmarkServiceActive:'linkding',pinboardToken:obfuscateKey('tagfixture:0123456789ABCDEF0123'),
+  const before=await worker.evaluate(()=>chrome.storage.local.get(['bookmarkService','bookmarkServiceActive','pinboardToken','pinboardTokenVerified']));
+  // The token counts as this device's Pinboard login (as after Test connection).
+  await worker.evaluate(async()=>{await chrome.storage.local.set({bookmarkService:'linkding',bookmarkServiceActive:'linkding',pinboardToken:obfuscateKey('tagfixture:0123456789ABCDEF0123'),...await pbpPinboardVerifiedPatch('tagfixture:0123456789ABCDEF0123'),
     cached_user_tags:{account:'tagfixture',counts:{reading:3,qa:2},timestamp:Date.now()}});});
   const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
   const overview=en.tagGovOverview.message.replace('$TAGS$','2').replace('$USES$','5');
@@ -1513,18 +1571,18 @@ try{
     await elsewhere({service:'pinboard'},'no-token','Pinboard chosen elsewhere while this page shows Karakeep selected');
   }finally{
     await options.close();
-    await worker.evaluate(async before=>{await chrome.storage.local.remove(['cached_user_tags','pinboardToken','bookmarkService','bookmarkServiceActive']);await chrome.storage.local.set(before);},before);
+    await worker.evaluate(async before=>{await chrome.storage.local.remove(['cached_user_tags','pinboardToken','pinboardTokenVerified','bookmarkService','bookmarkServiceActive']);await chrome.storage.local.set(before);},before);
   }
   // With settings sync on, the chosen bookmarkService is routed to
   // chrome.storage.sync (the Pinboard token stays local while syncApiKeys is
   // off), so another device's choice lands in the sync area. This device
   // follows it only to a service it is connected to; the panel follows this
   // device's service, and a local bookmarkService write is not the choice now.
-  const beforeSync=await worker.evaluate(async()=>({local:await chrome.storage.local.get(['optSyncEnabled','bookmarkService','bookmarkServiceActive','pinboardToken']),sync:await chrome.storage.sync.get(['bookmarkService','syncApiKeys','linkdingUrl'])}));
+  const beforeSync=await worker.evaluate(async()=>({local:await chrome.storage.local.get(['optSyncEnabled','bookmarkService','bookmarkServiceActive','pinboardToken','pinboardTokenVerified']),sync:await chrome.storage.sync.get(['bookmarkService','syncApiKeys','linkdingUrl'])}));
   await worker.evaluate(async()=>{
     await chrome.storage.sync.set({syncApiKeys:false,bookmarkService:'pinboard'});
     await chrome.storage.local.set({optSyncEnabled:true,bookmarkService:'pinboard',bookmarkServiceActive:'pinboard',pinboardToken:obfuscateKey('tagfixture:0123456789ABCDEF0123'),
-      cached_user_tags:{account:'tagfixture',counts:{reading:3,qa:2},timestamp:Date.now()}});
+      ...await pbpPinboardVerifiedPatch('tagfixture:0123456789ABCDEF0123'),cached_user_tags:{account:'tagfixture',counts:{reading:3,qa:2},timestamp:Date.now()}});
   });
   const synced=await ctx.newPage();await synced.goto(pageUrl+'options.html#tags');
   const syncedNow=()=>synced.evaluate(()=>({state:document.getElementById('panel-tags').dataset.tagGovState||'',stats:document.getElementById('tag-gov-stats').textContent.trim()}));
@@ -1553,7 +1611,7 @@ try{
   }finally{
     await synced.close();
     await worker.evaluate(async before=>{
-      await chrome.storage.local.remove(['cached_user_tags','pinboardToken','bookmarkService','bookmarkServiceActive','optSyncEnabled']);await chrome.storage.local.set(before.local);
+      await chrome.storage.local.remove(['cached_user_tags','pinboardToken','pinboardTokenVerified','bookmarkService','bookmarkServiceActive','optSyncEnabled']);await chrome.storage.local.set(before.local);
       await chrome.storage.sync.remove(['bookmarkService','syncApiKeys','linkdingUrl']);await chrome.storage.sync.set(before.sync);
     },beforeSync);
   }

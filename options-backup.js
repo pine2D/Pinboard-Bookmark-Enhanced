@@ -301,6 +301,21 @@ function pbpBackupBookmarkServicePlan(safeData, state) {
   return {wanted, active:state.active};
 }
 
+// Whether the backup's own credentials would connect `wanted` on this
+// device once restored, by the same rule the switch uses
+// (pbpBookmarkServiceReadyHere): a self-hosted address this device already
+// holds the host permission for, or a Pinboard token already tested here.
+async function pbpBackupCredentialsConnect(prepared, wanted) {
+  const restored = prepared?.secretData?.keys?.[wanted + "Token"];
+  if (!restored) return false;
+  const current = await pbpReadSettingsWithSecrets(
+    Object.fromEntries(PBP_BOOKMARK_SETTING_KEYS.map((key) => [key, SETTINGS_DEFAULTS[key]])));
+  const url = prepared.safeData?.[wanted + "Url"];
+  const merged = {...current, ...(url === undefined ? {} : {[wanted + "Url"]: url}), [wanted + "Token"]: restored};
+  const local = await chrome.storage.local.get(PBP_PINBOARD_VERIFIED_KEY);
+  return pbpBookmarkServiceReadyHere(merged, wanted, local && local[PBP_PINBOARD_VERIFIED_KEY]);
+}
+
 function pbpBackupImportResultKey(result) {
   const statuses = ["settings", "themes", "highlights", "vocabulary", "secrets"]
     .map((key) => result && result[key]);
@@ -1180,8 +1195,13 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       if (token !== selectionToken) return;
       const serviceKept = pbpBackupBookmarkServicePlan(prepared.safeData, serviceState);
       // Restored credentials can connect it: say so instead of "keeps going to".
-      preview.bookmarkServiceKept = serviceKept && {...serviceKept,
-        withCredentials:!!prepared.secretData?.keys?.[serviceKept.wanted + "Token"]};
+      let withCredentials = false;
+      if (serviceKept) {
+        try { withCredentials = await pbpBackupCredentialsConnect(prepared, serviceKept.wanted); }
+        catch (error) { console.warn("[import] bookmark credential check failed:", error?.name, error?.message); }
+        if (token !== selectionToken) return;
+      }
+      preview.bookmarkServiceKept = serviceKept && {...serviceKept, withCredentials};
       const warningCount = renderPreview(preview);
       const status = $id("import-status");
       if (warningCount === 0) {

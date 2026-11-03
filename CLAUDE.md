@@ -92,7 +92,7 @@ docs/superpowers/ DESIGN-IS-2026-07-22/ release/  # gitignored 本地产物（.q
 
 - **个人资料库**：`personalLibraryAccount` 首次采用当前 Pinboard 用户名，无账号时为 `personal:default`，随后不随书签服务/凭据切换；保留旧 owner 与 Drive hash，不自动合并其他历史账号。普通设置同步可携带此非秘密身份；普通 JSON 设置导入忽略它，资料分项仍核对所属资料库。阅读器的 library `account` 与 `bookmarkAccount` 分开，storage handoff 的 `account` 仍表示书签连接。
 - **自托管书签连接**：设置三选一；Connect 点击申请精确 origin 并只读验证，成功后才保存地址与绑定该地址的凭据封套。Karakeep owner 含服务、地址与验证后的用户 ID；linkding 无用户 ID，Connect 时地址与 Token 都未变则沿用连接 ID，任一变化才生成新 ID，旧队列不跨连接重放。访问网关凭据存于同一 `<service>Token` 封套的 `gateway` 字段，随封套走凭据路由、绑定地址，校验谓词唯一在 shared.js，非法即连接未就绪。Karakeep 稍后阅读只用本人独占的私有普通列表，不映射 archived。Pinboard 建议/标签治理/未读计数/站点搜索/Tab Set 保留专用。
-- **生效书签服务**：`bookmarkService` 是随 Chrome Sync 与 JSON 备份走的「所选服务」；本机实际保存到的服务是 `bookmarkServiceActive`，只存 local、不同步、不入备份，所有读取经 `pbpReadSettingsWithSecrets` 以它覆盖 `bookmarkService`（缺失时回落所选服务，即升级前的值，`pbpReconcileBookmarkService` 首次运行补记）。它只在 Pinboard 登录（设置页「测试连接」通过）、自托管 Connect 成功、或在本机已连接的服务之间点选时改变；设置页单选只切换显示的连接表单。同步或导入带来的所选服务若本机未连接则不切换、设置页与导入预览/结果提示，本机连上后自动跟随。
+- **生效书签服务**：`bookmarkService` 是随 Chrome Sync 与 JSON 备份走的「所选服务」；本机实际保存到的服务是 `bookmarkServiceActive`，只存 local、不同步、不入备份，所有读取经 `pbpReadSettingsWithSecrets` 以它覆盖 `bookmarkService`（缺失时回落所选服务，即升级前的值，`pbpReconcileBookmarkService` 首次运行补记）。它只在 Pinboard 登录（设置页「测试连接」通过）、自托管 Connect 成功、或在本机已连接的服务之间点选时改变；设置页单选只切换显示的连接表单。「本机已连接」由 `pbpBookmarkServiceReadyHere` 唯一判定：自托管服务要凭据有效且本机已授予其精确 origin 的 host 权限（凭据可随同步或备份到达，权限只能本机 Connect 点击申请）；Pinboard 要 Token 在本机测试通过（设置页「测试连接」或 popup 登录），凭证是只存 local、不同步、不入备份的 `pinboardTokenVerified`（Token 摘要，改 Token 即失效；升级时正在使用的 Token 视为已测试）。同步或导入带来的所选服务若本机未连接则不切换、设置页与导入预览/结果提示，本机连上后自动跟随。
 
 ## 跨领域安全铁律
 

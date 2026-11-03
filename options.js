@@ -2913,8 +2913,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (typeof token !== "string" || pbpOptViewedBookmarkService() !== "pinboard"
         || $id("opt-pinboard-token").value.trim() !== token) return;
     try {
-      if ((await pbpReadBookmarkServiceState()).active === "pinboard") return;
-      const saved = await pbpSwitchBookmarkService("pinboard", {pinboardToken:obfuscateKey(token)});
+      // The tested token is this device's Pinboard login (shared.js
+      // PBP_PINBOARD_VERIFIED_KEY), recorded even when Pinboard is in use already.
+      const patch = {pinboardToken:obfuscateKey(token), ...await pbpPinboardVerifiedPatch(token)};
+      const saved = (await pbpReadBookmarkServiceState()).active === "pinboard"
+        ? await persistSettings(patch) : await pbpSwitchBookmarkService("pinboard", patch);
       if (!saved.ok) console.warn("[bookmark-service] Pinboard switch failed:", saved.error?.name, saved.error?.message);
     } catch (error) {
       console.warn("[bookmark-service] Pinboard switch failed:", error?.name, error?.message);

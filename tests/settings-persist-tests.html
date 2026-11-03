@@ -6454,8 +6454,13 @@ async function run() {
     const KK = "https://keep.example/", LD = "https://links.example/";
     const karakeep = () => ({ karakeepUrl: KK, karakeepToken: pbpBookmarkCredentialSeal({ baseUrl: KK, token: "kk", connectionId: "k1", userId: "u1" }) });
     const linkding = () => ({ linkdingUrl: LD, linkdingToken: pbpBookmarkCredentialSeal({ baseUrl: LD, token: "ld", connectionId: "l1" }) });
-    const install = (local, sync) => {
-      globalThis.chrome = { storage: { local: makeArea(local), sync: makeArea(sync), onChanged: { addListener() {} } } };
+    // Host permissions are per device: by default this device holds both
+    // self-hosted origins (it connected them); a case passes its own set.
+    const ORIGINS = ["https://keep.example/*", "https://links.example/*"];
+    const install = (local, sync, granted = ORIGINS) => {
+      const held = new Set(granted);
+      globalThis.chrome = { storage: { local: makeArea(local), sync: makeArea(sync), onChanged: { addListener() {} } },
+        permissions: { contains: async ({ origins }) => origins.length > 0 && origins.every((origin) => held.has(origin)) } };
       _settingsStorageCache = null;
     };
     const service = async (query = SETTINGS_DEFAULTS) => pbpBookmarkServiceId(await pbpReadSettingsWithSecrets(query));
@@ -6586,6 +6591,79 @@ async function run() {
         });
         check("G28 backup: restored credentials that connect the chosen service switch to it",
           result.secrets === "applied" && !result.bookmarkServiceKept && local.bookmarkServiceActive === "linkding");
+      }
+      // Credentials are not a connection on their own: a self-hosted service
+      // also needs this device's host permission, which only a Connect click
+      // here grants. With credential sync on, another device's linkding
+      // credentials arrive with its choice, and this device stays put.
+      {
+        const restored = linkding();
+        // Credential sync on: the credentials live in the sync area with the settings.
+        const local = { optSyncEnabled: true, bookmarkServiceActive: "karakeep" };
+        const sync = { syncApiKeys: true, bookmarkService: "linkding", ...karakeep(), linkdingUrl: LD, linkdingToken: restored.linkdingToken };
+        install(local, sync, ["https://keep.example/*"]);
+        const result = await pbpReconcileBookmarkService({ bookmarkService: { oldValue: "karakeep", newValue: "linkding" } }, "sync");
+        const state = await pbpReadBookmarkServiceState();
+        check("G28 sync: synced credentials without this device's host permission do not switch it",
+          !result.changed && local.bookmarkServiceActive === "karakeep" && await service() === "karakeep"
+          && state.ready.linkding === false && state.ready.karakeep === true
+          && (await pbpReadBookmarkConnection()).account !== "");
+      }
+      {
+        // A backup with credentials, imported on a device that never connected the service.
+        const local = { bookmarkService: "karakeep", bookmarkServiceActive: "karakeep", ...karakeep() }, sync = {};
+        install(local, sync, ["https://keep.example/*"]);
+        const restored = linkding();
+        const payload = { _schemaVersion: 3, _backup: { createdAt: "2026-10-01T00:00:00.000Z", extensionVersion: "2.0.0", source: "manual" }, bookmarkService: "linkding", linkdingUrl: restored.linkdingUrl, linkdingToken: restored.linkdingToken };
+        const prepared = pbpPreflightBackupPayload(payload, exportableKeys);
+        const previewConnects = await pbpBackupCredentialsConnect(prepared, "linkding");
+        const result = await pbpApplyBackupPayload(payload, {
+          exportableKeys, saveOverlayWithFallback: async () => {}, sections: { settings: true, themes: false, highlights: false, vocabulary: false, secrets: true },
+        });
+        check("G28 backup: restored credentials without this device's host permission do not switch it, preview and result say so",
+          !previewConnects && result.secrets === "applied" && result.bookmarkServiceKept?.wanted === "linkding"
+          && local.bookmarkServiceActive === "karakeep" && local.linkdingToken === restored.linkdingToken);
+        install({ bookmarkService: "karakeep", bookmarkServiceActive: "karakeep", ...karakeep() }, {});
+        check("G28 backup preview: restored credentials for an origin this device holds can connect",
+          await pbpBackupCredentialsConnect(prepared, "linkding") === true
+          && await pbpBackupCredentialsConnect(pbpPreflightBackupPayload({ ...payload, linkdingToken: "" }, exportableKeys), "linkding") === false);
+      }
+      // Pinboard switches only on a login tested here. The token field
+      // autosaves as it is typed, so a stored token proves nothing.
+      {
+        const local = { optSyncEnabled: true, bookmarkServiceActive: "karakeep", karakeepToken: karakeep().karakeepToken };
+        const sync = { syncApiKeys: false, bookmarkService: "pinboard", karakeepUrl: KK };
+        install(local, sync);
+        const typed = await persistSettings({ pinboardToken: obfuscateKey("alice:1") });
+        const halfTyped = await pbpReconcileBookmarkService({ pinboardToken: { newValue: local.pinboardToken } }, "local");
+        check("G28 Pinboard: an untested token chosen on another device does not switch this device",
+          typed.ok && !halfTyped.changed && local.bookmarkServiceActive === "karakeep"
+          && (await pbpReadBookmarkServiceState()).ready.pinboard === false);
+        // Test connection passes for a token: that digest is the login.
+        await persistSettings({ pinboardToken: obfuscateKey("alice:0123456789ABCDEF0123"), ...await pbpPinboardVerifiedPatch("alice:0123456789ABCDEF0123") });
+        const tested = await pbpReconcileBookmarkService({ pinboardToken: { newValue: local.pinboardToken } }, "local");
+        check("G28 Pinboard: a token tested here is followed, and the proof stays local",
+          tested.changed && local.bookmarkServiceActive === "pinboard" && typeof local.pinboardTokenVerified === "string"
+          && local.pinboardTokenVerified.length > 0 && !("pinboardTokenVerified" in sync) && !local.pinboardTokenVerified.includes("0123456789ABCDEF"));
+        // Editing the token afterwards (autosave) invalidates the proof.
+        await persistSettings({ pinboardToken: obfuscateKey("alice:0123456789ABCDEF0124") });
+        check("G28 Pinboard: an edited token is no longer a tested one", (await pbpReadBookmarkServiceState()).ready.pinboard === false);
+      }
+      {
+        // Upgrade of a Pinboard user: the token in use counts as tested.
+        const local = { bookmarkService: "pinboard", pinboardToken: obfuscateKey("pin:0123456789ABCDEF0123"), ...karakeep() }, sync = {};
+        install(local, sync);
+        await pbpReconcileBookmarkService();
+        check("G28 upgrade: the Pinboard token a device was saving with counts as tested",
+          local.bookmarkServiceActive === "pinboard" && (await pbpReadBookmarkServiceState()).ready.pinboard === true);
+        // A restored backup token was never tested here: choosing Pinboard keeps Karakeep.
+        const kk = { bookmarkService: "karakeep", bookmarkServiceActive: "karakeep", ...karakeep() };
+        install(kk, {});
+        const restored = await pbpApplyBackupPayload({ _schemaVersion: 3, _backup: { createdAt: "2026-10-01T00:00:00.000Z", extensionVersion: "2.0.0", source: "manual" }, bookmarkService: "pinboard", pinboardToken: obfuscateKey("pin:0123456789ABCDEF0123") }, {
+          exportableKeys, saveOverlayWithFallback: async () => {}, sections: { settings: true, themes: false, highlights: false, vocabulary: false, secrets: true },
+        });
+        check("G28 backup: a restored Pinboard token that was never tested here does not switch",
+          restored.secrets === "applied" && restored.bookmarkServiceKept?.wanted === "pinboard" && kk.bookmarkServiceActive === "karakeep");
       }
       {
         const messages = {};

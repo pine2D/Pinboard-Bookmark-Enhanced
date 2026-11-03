@@ -2184,6 +2184,10 @@ function pbpCreateRecoveringTail() {
 // release used.
 const PBP_BOOKMARK_SERVICES = Object.freeze(["pinboard", "karakeep", "linkding"]);
 const PBP_BOOKMARK_ACTIVE_KEY = "bookmarkServiceActive";
+// Local-only proof that this device tested its Pinboard token
+// (pbpPinboardTokenDigest). Like the device's service, never synced or backed up.
+const PBP_PINBOARD_VERIFIED_KEY = "pinboardTokenVerified";
+const PBP_BOOKMARK_DEVICE_KEYS = Object.freeze([PBP_BOOKMARK_ACTIVE_KEY, PBP_PINBOARD_VERIFIED_KEY]);
 function pbpBookmarkServiceId(settings) {
   const id = settings?.bookmarkService === undefined ? "pinboard" : settings.bookmarkService;
   return PBP_BOOKMARK_SERVICES.includes(id) ? id : "";
@@ -2493,34 +2497,70 @@ async function pbpReadBookmarkConnection() {
   return pbpBookmarkConnection(await pbpReadSettingsWithSecrets(query));
 }
 function pbpBookmarkSettingsChanged(changes) {
-  return !!changes && (!!changes[PBP_BOOKMARK_ACTIVE_KEY] ||
+  return !!changes && (PBP_BOOKMARK_DEVICE_KEYS.some(key => !!changes[key]) ||
     PBP_BOOKMARK_SETTING_KEYS.some(key => !key.startsWith("karakeepReadLaterList") && changes[key]));
 }
-// Whether `service` has a usable connection in these (secret-overlaid) settings.
-function pbpBookmarkServiceReady(settings, service) {
-  return PBP_BOOKMARK_SERVICES.includes(service) && !!pbpBookmarkConnection({...settings, bookmarkService:service}).account;
+// A Pinboard token counts as connected on this device only after it passed
+// a real check here (Test connection in Settings, the popup's login): the
+// field autosaves every keystroke, and a synced or restored token was never
+// tested on this device. The proof is a digest of that token kept in local
+// only (never synced or backed up); editing the token invalidates it.
+async function pbpPinboardTokenDigest(token) {
+  const plain = deobfuscateKey(token) || "";
+  if (!pbpPinboardAccountFromToken(plain)) return "";
+  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("pbp-pinboard-login\n" + plain)));
+  return Array.from(bytes.slice(0, 16), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+async function pbpPinboardVerifiedPatch(token) {
+  return {[PBP_PINBOARD_VERIFIED_KEY]: await pbpPinboardTokenDigest(token)};
+}
+// Whether `service` is connected ON THIS DEVICE in these (secret-overlaid)
+// settings: usable credentials, plus what only this device can hold -- the
+// exact host permission a self-hosted service needs (granted per device, by
+// a click on Connect) or, for Pinboard, a token tested here. `verified` is
+// the stored PBP_PINBOARD_VERIFIED_KEY value.
+async function pbpBookmarkServiceReadyHere(settings, service, verified) {
+  if (!PBP_BOOKMARK_SERVICES.includes(service)) return false;
+  const connection = pbpBookmarkConnection({...settings, bookmarkService:service});
+  if (!connection.account) return false;
+  if (service === "pinboard") {
+    return typeof verified === "string" && !!verified && verified === await pbpPinboardTokenDigest(connection.token);
+  }
+  const origin = pbpEndpointOriginPattern(connection.baseUrl);
+  if (!origin || typeof chrome === "undefined" || typeof chrome.permissions?.contains !== "function") return false;
+  try { return await chrome.permissions.contains({origins:[origin]}) === true; }
+  catch (error) {
+    console.warn("[bookmark-service] permission check failed:", error?.name, error?.message);
+    return false;
+  }
 }
 // One locked read of everything the switch rules need: the service this
 // device uses (active), the chosen one (the synced / backed-up setting),
-// whether the device key exists yet, and which services are connected here.
+// whether the device key exists yet, and which services are connected here
+// (checked after the lock: permission lookups need no storage lock).
 async function pbpReadBookmarkServiceState() {
-  return pbpWithSecretStorageLock(async () => {
+  const read = await pbpWithSecretStorageLock(async () => {
     const query = Object.fromEntries(PBP_BOOKMARK_SETTING_KEYS.map(key => [key, SETTINGS_DEFAULTS[key]]));
     const settings = await pbpReadSettingsUnlocked(query);
     const flags = await pbpReadSecretSyncStateUnlocked();
     const mainArea = flags.optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
     const raw = await mainArea.get("bookmarkService");
-    const local = await chrome.storage.local.get(PBP_BOOKMARK_ACTIVE_KEY);
-    const stored = local && local[PBP_BOOKMARK_ACTIVE_KEY];
-    const chosen = pbpBookmarkServiceId(raw || {}) || "pinboard";
-    return {
-      active: pbpBookmarkServiceId(settings) || "pinboard",
-      chosen,
-      activeStored: PBP_BOOKMARK_SERVICES.includes(stored),
-      area: flags.optSyncEnabled ? "sync" : "local",
-      ready: Object.fromEntries(PBP_BOOKMARK_SERVICES.map(service => [service, pbpBookmarkServiceReady(settings, service)])),
-    };
+    const local = await chrome.storage.local.get([...PBP_BOOKMARK_DEVICE_KEYS]);
+    return {settings, flags, raw, local: local || {}};
   });
+  const stored = read.local[PBP_BOOKMARK_ACTIVE_KEY];
+  const verified = read.local[PBP_PINBOARD_VERIFIED_KEY];
+  const ready = {};
+  for (const service of PBP_BOOKMARK_SERVICES) ready[service] = await pbpBookmarkServiceReadyHere(read.settings, service, verified);
+  return {
+    active: pbpBookmarkServiceId(read.settings) || "pinboard",
+    chosen: pbpBookmarkServiceId(read.raw || {}) || "pinboard",
+    activeStored: PBP_BOOKMARK_SERVICES.includes(stored),
+    area: read.flags.optSyncEnabled ? "sync" : "local",
+    pinboardToken: read.settings.pinboardToken || "",
+    pinboardVerified: typeof verified === "string" && !!verified,
+    ready,
+  };
 }
 // Makes `service` this device's service and the chosen one, in one write
 // with any credential patch that made it usable (`extra`).
@@ -2549,7 +2589,13 @@ const pbpReconcileBookmarkService = (() => {
     }
     if (state.chosen !== active && state.ready[state.chosen]) active = state.chosen;
     if (state.activeStored && active === state.active) return {changed:false, active};
-    const saved = await persistSettings({[PBP_BOOKMARK_ACTIVE_KEY]:active});
+    const patch = {[PBP_BOOKMARK_ACTIVE_KEY]:active};
+    // Upgrade: a Pinboard token this device was already saving with counts
+    // as tested, so switching away and back later needs no new test.
+    if (!state.activeStored && active === "pinboard" && !state.pinboardVerified && state.pinboardToken) {
+      Object.assign(patch, await pbpPinboardVerifiedPatch(state.pinboardToken));
+    }
+    const saved = await persistSettings(patch);
     if (!saved.ok) throw saved.error || new Error("bookmark service write failed");
     return {changed:active !== state.active, active};
   });
@@ -3348,9 +3394,10 @@ async function persistSettings(data) {
       // This device's bookmark service never reaches Chrome Sync. It is
       // written last, after the credentials and the chosen service it follows.
       const deviceLocal = {};
-      if (Object.hasOwn(batch, PBP_BOOKMARK_ACTIVE_KEY)) {
-        deviceLocal[PBP_BOOKMARK_ACTIVE_KEY] = batch[PBP_BOOKMARK_ACTIVE_KEY];
-        delete batch[PBP_BOOKMARK_ACTIVE_KEY];
+      for (const key of PBP_BOOKMARK_DEVICE_KEYS) {
+        if (!Object.hasOwn(batch, key)) continue;
+        deviceLocal[key] = batch[key];
+        delete batch[key];
       }
       if (routingActive) {
         const { main, secrets } = pbpSplitSecretBatch(batch);

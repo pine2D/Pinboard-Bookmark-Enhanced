@@ -874,7 +874,8 @@ $id("login-form").addEventListener("submit", async (event) => {
       });
     });
     if (res.ok) {
-      const saved = await persistSettings({ pinboardToken: obfuscateKey(token) });
+      // A token Pinboard just accepted is this device's login (shared.js PBP_PINBOARD_VERIFIED_KEY).
+      const saved = await persistSettings({ pinboardToken: obfuscateKey(token), ...await pbpPinboardVerifiedPatch(token) });
       // Pinboard already accepted the token: a failed write is local storage,
       // not the network.
       if (!saved.ok) {
