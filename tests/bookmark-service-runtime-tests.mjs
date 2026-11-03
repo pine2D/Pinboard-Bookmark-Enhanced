@@ -924,16 +924,17 @@ try{
     assert.equal(await popup.locator('#url-input').inputValue(),recentUrl,'the draft for the tab was not restored');
     await settled(popup,'missing');
     assert.equal(await popup.locator('#linkding-description-input').inputValue(),'',"the tab's description filled another bookmark's Description");
-    // The draft changed only the tags: the tab's title is not that bookmark's
-    // either, and with the bookmark gone nothing else names it.
-    assert.equal(await popup.locator('#title-input').inputValue(),'',"the tab's title filled another bookmark's title");
+    // The draft changed only the tags: the tab's title and notes are not that
+    // bookmark's. With the bookmark gone the form keeps the title and notes
+    // the draft row held for it, unmarked, instead of the tab's or nothing.
+    assert.equal(await popup.locator('#title-input').inputValue(),'Recent title',"the recent bookmark's drafted title was not kept");
     assert.equal(await popup.locator('#description-input').inputValue(),'',"the tab's notes filled another bookmark's notes");
-    await popup.locator('#title-input').fill('Retyped recent title');
+    assert.equal(await popup.evaluate(()=>fieldDirtyFlags['title-input']),false,'the kept title was marked edited');
     const before=requests.length;await popup.locator('#submit-btn').click();
     await until(()=>linkdingCreates(before).length>0,'create from the restored recent-bookmark draft');
     const create=linkdingCreates(before)[0];
     assert.equal(create.data.url,recentUrl);
-    assert.equal(create.data.title,'Retyped recent title');
+    assert.equal(create.data.title,'Recent title');
     assert.equal(create.query,'',"the restored draft told linkding not to read the bookmark's own page");
     assert(!Object.hasOwn(create.data,'description'),"the tab's description was sent for another bookmark");
     assert.equal([...records.linkding.values()].find(b=>b.url===recentUrl)?.description,'Recent page description','linkding did not fill in the bookmark Description itself');

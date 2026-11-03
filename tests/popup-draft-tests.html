@@ -378,6 +378,18 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    await second.api.initPopupDraft('alice',{url:pageUrl});await settle();second.api.prefillTitle(info.title,info.url);second.api.prefill();
    assert(second.elements['title-input'].value==='Own title'&&second.elements['description-input'].value==='Own meta','own-page prefill was suppressed: '+JSON.stringify([second.elements['title-input'].value,second.elements['description-input'].value]));
    await second.api.pbpDiscardPopupDraft();});
+ // A draft that only changed the address of the opened page (a parameter
+ // dropped by hand) still has that page's title and notes: the row keeps them
+ // as the form held them, unmarked, for the lookup to replace or leave.
+ await test('an address edited on the opened page reopens with its title and notes',async()=>{const pageUrl='https://example.com/g15-probe?id=5&page=2',edited='https://example.com/g15-probe?id=5';const info={url:pageUrl,title:'Own title',metaDescription:'Own meta'};
+   const first=uiHarness('pinboard',{worker:true,pageInfo:info});first.elements['url-input'].value=pageUrl;first.api.prefillTitle('Own title',pageUrl);first.api.prefill();
+   await first.api.initPopupDraft('alice',{url:pageUrl});await settle();typeInto(first,'url-input',edited);await settle();
+   const second=uiHarness('pinboard',{worker:true,pageInfo:info});second.elements['url-input'].value=pageUrl;second.api.prefillTitle('Own title',pageUrl);
+   await second.api.initPopupDraft('alice',{url:pageUrl});await settle();second.api.prefillTitle(info.title,info.url);second.api.prefill();
+   const form=['url-input','title-input','description-input'].map(id=>second.elements[id].value);
+   assert(JSON.stringify(form)===JSON.stringify([edited,'Own title','Own meta']),'the edited-address draft lost the page title or notes: '+JSON.stringify(form));
+   assert(!second.flags['title-input']&&!second.flags['description-input'],'title or notes were marked edited: '+JSON.stringify(second.flags));
+   await second.api.pbpDiscardPopupDraft();});
  // Only a user's change renews the 24-hour lifetime: the page and the lookup
  // refilling unchanged fields of a reopened form must not keep a draft alive.
  await test('reopening and refilling unchanged fields leaves the draft expiry alone',async()=>{const pageUrl='https://example.com/g15-expiry';

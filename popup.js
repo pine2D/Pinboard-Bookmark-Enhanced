@@ -151,7 +151,8 @@ function pbpPopupPrefillDescription() {
 }
 // The opened page's title and notes describe that page, not another address
 // the form holds: a restored draft of a recent bookmark, a typed URL. For that
-// address the bookmark lookup fills them in, or they stay empty.
+// address the bookmark lookup fills them in, or they keep what the form (or
+// the restored draft row) already holds.
 function pbpPopupFormHoldsPage(pageUrl) {
   if (!_popupDraftUserUrl) return true;
   // The same-page check is popup-ai.js's; where it is not loaded the popup
@@ -515,9 +516,13 @@ async function initPopupDraft(account, tab) {
       if (drafted("url")) {
         _popupDraftUserUrl = true;
         // The tab filled the title before the draft brought another address
-        // back; that address's own title and notes come from its lookup.
+        // back, and the page prefills skip such a form. The row's title and
+        // notes are what the form held for that address when it was drafted:
+        // a recent bookmark's own, or the opened page's for an address edited
+        // by hand. They go back unmarked, so a found lookup still replaces
+        // them and a missing one leaves them instead of an empty form.
         for (const [id, key] of [["title-input", "title"], ["description-input", "notes"]]) {
-          if (!drafted(key) && !_popupDraftChangedFields.has(key) && !pbpPopupFormHoldsPage(context.pageUrl)) $id(id).value = "";
+          if (!drafted(key) && !_popupDraftChangedFields.has(key) && !pbpPopupFormHoldsPage(context.pageUrl)) $id(id).value = d[key];
         }
       }
       _popupDraftRestored = true;
