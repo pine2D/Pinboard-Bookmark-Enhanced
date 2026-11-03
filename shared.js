@@ -831,6 +831,33 @@ function pbpTagTwinKey(name) {
   return key ? `twin:${key}` : `exact:${name}`;
 }
 
+// An update stopped because the bookmark changed elsewhere (popup and reader
+// editor): the user's tag changes, against the tags the form loaded, made on
+// the server's tags now, so a tag added there, by hand or by Karakeep's AI,
+// stays. Without the loaded tags nothing counts as removed: the server's tags
+// stay and the user's are added, and the user removes again what they meant to.
+function pbpRebaseLoadedTags(loaded, mine, latest) {
+  const theirs = Array.isArray(latest) ? latest : [];
+  const base = Array.isArray(loaded) ? loaded : [];
+  const loadedKeys = new Set(base.map(pbpTagTwinKey));
+  const mineKeys = new Set(mine.map(pbpTagTwinKey));
+  const removed = new Set(base.filter((tag) => !mineKeys.has(pbpTagTwinKey(tag))).map(pbpTagTwinKey));
+  const kept = theirs.filter((tag) => !removed.has(pbpTagTwinKey(tag)));
+  const keptKeys = new Set(kept.map(pbpTagTwinKey));
+  return [...kept, ...mine.filter((tag) => !loadedKeys.has(pbpTagTwinKey(tag)) && !keptKeys.has(pbpTagTwinKey(tag)))];
+}
+
+// After an update stopped because the bookmark changed elsewhere (popup and
+// reader editor): the sentence naming what the server holds now in a field
+// the user also edited, so they can check it before saving over it. Long
+// values are cut, whitespace runs shown as one space.
+function pbpBookmarkServerFieldNote(translate, label, value) {
+  const line = String(value || "").replace(/\s+/g, " ").trim();
+  if (!line) return translate("bookmarkFieldEmptyThere", label);
+  const chars = Array.from(line);
+  return translate("bookmarkFieldReadsThere", label, chars.length > 120 ? chars.slice(0, 119).join("") + "\u2026" : line);
+}
+
 // The one dedupe key for tag lists in every context (popup, SW, reader): a
 // name whose group key is empty (only separators or zero-width characters)
 // is compared by its exact text, so "-" and "_" stay two tags.

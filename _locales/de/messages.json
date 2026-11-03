@@ -269,6 +269,27 @@
   },
   "bookmarkDeletedElsewhere": {"message": "Dieses Lesezeichen wurde an anderer Stelle gelöscht, deine Änderungen wurden daher nicht gespeichert. Um die Seite erneut zu speichern, klicke auf „Speichern“."},
   "bookmarkChangedElsewhere": {"message": "Dieses Lesezeichen wurde an anderer Stelle geändert, nachdem du es geöffnet hast. Deine Änderungen wurden daher nicht gespeichert. Prüfe die aktuelle Fassung und speichere dann erneut."},
+  "bookmarkFieldReadsThere": {
+    "message": "$FIELD$ lautet dort jetzt „$VALUE$“. Speicherst du erneut, wird das durch deine Eingabe ersetzt.",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
+    "placeholders": {
+      "field": {
+        "content": "$1"
+      },
+      "value": {
+        "content": "$2"
+      }
+    }
+  },
+  "bookmarkFieldEmptyThere": {
+    "message": "$FIELD$ ist dort jetzt leer. Speicherst du erneut, wird deine Eingabe übernommen.",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped, the user had also edited this field, and the bookmark service now holds it empty. $FIELD$ is the field's label.",
+    "placeholders": {
+      "field": {
+        "content": "$1"
+      }
+    }
+  },
   "recentEditTitle": {
     "message": "Zum Bearbeiten laden"
   },

@@ -417,6 +417,14 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    rowFor(pageUrl).updatedAt=aged;await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl}}));await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,notes:'legacy edit'}}));
    assert(rowFor(pageUrl).updatedAt>aged,'a legacy row write did not renew the expiry');
    await run(msg('clear',{pageUrl}));});
+ await test('worker keeps the tag list a draft was made on, beside its loaded state, for a long tag list too',async()=>{const pageUrl='https://example.com/g25-base-tags';
+  const baseTags=Array.from({length:130},(_,i)=>('long-tag-'+i+'-').padEnd(60,'x'));
+  const w=await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,tags:[...baseTags,'mine'],baseVersion:'["2026-10-30T03:01:22.656384Z",130,"0123456789abcdef",false]',baseTags,changed:['tags']}}));
+  const r=await run(msg('read',{pageUrl}));
+  assert(w.ok&&r.draft,'a draft with a long base tag list was dropped');
+  assert(JSON.stringify(r.draft.baseTags)===JSON.stringify(baseTags),'the base tags did not round-trip');
+  for(const bad of [['x',1],'kept',Array(1001).fill('t')]){await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,baseTags:bad}}));assert(JSON.stringify((await run(msg('read',{pageUrl}))).draft.baseTags)===JSON.stringify(baseTags),'a malformed base tag list was stored');}
+ });
  await test('worker keeps a valid change list and rejects anything outside the draft fields',async()=>{const pageUrl='https://example.com/g15-worker';
    assert((await run(msg('write',{pageUrl,draft:{...draft,url:pageUrl,changed:['title','tags','title']}}))).ok,'a valid change list was rejected');
    assert(JSON.stringify((await run(msg('read',{pageUrl}))).draft.changed)==='["tags","title"]','the change list was not stored canonically');

@@ -269,6 +269,27 @@
   },
   "bookmarkDeletedElsewhere": {"message": "这个书签已在别处删除，这次的修改没有保存。要重新收藏这一页，点「保存」。"},
   "bookmarkChangedElsewhere": {"message": "这个书签在你打开后已在别处修改，这次的修改没有保存。核对最新内容后再保存。"},
+  "bookmarkFieldReadsThere": {
+    "message": "别处的$FIELD$现在是「$VALUE$」，再次保存会改成你填写的内容。",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
+    "placeholders": {
+      "field": {
+        "content": "$1"
+      },
+      "value": {
+        "content": "$2"
+      }
+    }
+  },
+  "bookmarkFieldEmptyThere": {
+    "message": "别处已清空$FIELD$，再次保存会填入你填写的内容。",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped, the user had also edited this field, and the bookmark service now holds it empty. $FIELD$ is the field's label.",
+    "placeholders": {
+      "field": {
+        "content": "$1"
+      }
+    }
+  },
   "recentEditTitle": {
     "message": "加载并编辑"
   },

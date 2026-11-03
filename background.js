@@ -4565,6 +4565,7 @@ async function pbpRunPopupDraft(message) {
         || (d.summaryTouched !== undefined && typeof d.summaryTouched !== "boolean")
         || (d.sharedExplicit !== undefined && typeof d.sharedExplicit !== "boolean")
         || (d.baseVersion !== undefined && (typeof d.baseVersion !== "string" || d.baseVersion.length > 8192))
+        || (d.baseTags !== undefined && (!Array.isArray(d.baseTags) || d.baseTags.length > 1000 || !d.baseTags.every((s) => typeof s === "string")))
         || (d.changed !== undefined && (!Array.isArray(d.changed) || d.changed.length > 64
           || !d.changed.every((k) => changedKeys.includes(k))))) return null;
     const out = { url: d.url, title: d.title, notes: d.notes, tags: d.tags.slice(), tagInput: d.tagInput,
@@ -4576,6 +4577,8 @@ async function pbpRunPopupDraft(message) {
     // The self-hosted bookmark the edits were made on (popup.js
     // pbpPopupExpectedVersion); not an edit of its own.
     if (d.baseVersion !== undefined) out.baseVersion = d.baseVersion;
+    // Its tag list, which the drafted tag changes are made on.
+    if (d.baseTags !== undefined) out.baseTags = d.baseTags.slice();
     return JSON.stringify(out).length <= 65536 ? out : null;
   };
   // What a row holds of the user's (popup.js pbpPopupDraftEdits has the same shape).

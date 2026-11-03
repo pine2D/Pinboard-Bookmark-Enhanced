@@ -269,6 +269,27 @@
   },
   "bookmarkDeletedElsewhere": {"message": "Ta zakładka została usunięta gdzie indziej, więc zmian nie zapisano. Aby ponownie dodać stronę do zakładek, naciśnij „Zapisz”."},
   "bookmarkChangedElsewhere": {"message": "Ta zakładka została zmieniona gdzie indziej po jej otwarciu, więc zmian nie zapisano. Sprawdź najnowszą wersję i zapisz ponownie."},
+  "bookmarkFieldReadsThere": {
+    "message": "Pole $FIELD$ ma teraz tam wartość „$VALUE$”. Ponowny zapis zastąpi ją tym, co wpisano.",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
+    "placeholders": {
+      "field": {
+        "content": "$1"
+      },
+      "value": {
+        "content": "$2"
+      }
+    }
+  },
+  "bookmarkFieldEmptyThere": {
+    "message": "Pole $FIELD$ jest teraz tam puste. Ponowny zapis uzupełni je tym, co wpisano.",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped, the user had also edited this field, and the bookmark service now holds it empty. $FIELD$ is the field's label.",
+    "placeholders": {
+      "field": {
+        "content": "$1"
+      }
+    }
+  },
   "recentEditTitle": {
     "message": "Załaduj do edycji"
   },

@@ -272,6 +272,27 @@
   },
   "bookmarkDeletedElsewhere": {"message": "This bookmark was deleted elsewhere, so your changes were not saved. To bookmark the page again, press Save."},
   "bookmarkChangedElsewhere": {"message": "This bookmark was changed elsewhere after you opened it, so your changes were not saved. Check the latest version, then save again."},
+  "bookmarkFieldReadsThere": {
+    "message": "$FIELD$ there now reads \"$VALUE$\". Saving again replaces it with what you typed.",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
+    "placeholders": {
+      "field": {
+        "content": "$1"
+      },
+      "value": {
+        "content": "$2"
+      }
+    }
+  },
+  "bookmarkFieldEmptyThere": {
+    "message": "$FIELD$ is now empty there. Saving again fills it with what you typed.",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped, the user had also edited this field, and the bookmark service now holds it empty. $FIELD$ is the field's label.",
+    "placeholders": {
+      "field": {
+        "content": "$1"
+      }
+    }
+  },
   "recentEditTitle": {
     "message": "Load for editing"
   },

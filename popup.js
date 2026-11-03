@@ -89,21 +89,6 @@ function pbpPopupFormIsDirty() {
   return Object.values(fieldDirtyFlags).some(Boolean) || _tagsUserTouched || _popupDraftEdited;
 }
 
-// An update stopped because the bookmark changed elsewhere: the user's tag
-// changes (against the tags the form loaded) made on the server's tags now,
-// so a tag added there, by hand or by Karakeep's AI, stays. Without the
-// loaded tags (they came from a draft) the user's list stands as it is.
-function pbpPopupRebaseLoadedTags(loaded, mine, latest) {
-  const theirs = Array.isArray(latest) ? latest : [];
-  if (!Array.isArray(loaded)) return mine.slice();
-  const loadedKeys = new Set(loaded.map(pbpTagTwinKey));
-  const mineKeys = new Set(mine.map(pbpTagTwinKey));
-  const removed = new Set(loaded.filter((tag) => !mineKeys.has(pbpTagTwinKey(tag))).map(pbpTagTwinKey));
-  const kept = theirs.filter((tag) => !removed.has(pbpTagTwinKey(tag)));
-  const keptKeys = new Set(kept.map(pbpTagTwinKey));
-  return [...kept, ...mine.filter((tag) => !loadedKeys.has(pbpTagTwinKey(tag)) && !keptKeys.has(pbpTagTwinKey(tag)))];
-}
-
 function pbpRebasePopupTags(serverTags, submittedTags, liveTags) {
   if (Array.isArray(serverTags)) {
     const baseline = Array.isArray(submittedTags) ? submittedTags : [];
@@ -383,7 +368,8 @@ const _popupDraftChangedFields = new Set();
 // bookmark lookup instead of a frozen copy (A02 P29).
 let _popupDraftRestoredFields = new Set();
 // The self-hosted bookmark a restored draft's edits were made on: {url,
-// version} (pbpBookmarkVersion), version undefined for a draft that does not
+// version, tags} (version: pbpBookmarkVersion; tags: its tag list, which the
+// drafted tag changes are made on), each undefined for a draft that does not
 // say. It stands for this form's loaded state until an update is checked
 // against the server, which then shows the bookmark as it is now.
 let _popupDraftBase = null;
@@ -395,11 +381,30 @@ function pbpPopupExpectedVersion(url) {
   return existingBookmark && bookmarkLookup.url === url && typeof existingBookmark.version === "string"
     ? existingBookmark.version : undefined;
 }
+// The tag list this form's tag changes are made on: the restored draft's
+// bookmark's, or the one the lookup loaded; null when not known.
+function pbpPopupLoadedTagNames(url) {
+  if (_popupDraftBase && _popupDraftBase.url === url) return Array.isArray(_popupDraftBase.tags) ? _popupDraftBase.tags.slice() : null;
+  return existingBookmark && bookmarkLookup.url === url && Array.isArray(existingBookmark.tagNames)
+    ? existingBookmark.tagNames.slice() : null;
+}
+// After a stop: one sentence per edited text field whose text differs from
+// the server's now ("" when none), for the status line.
+function pbpPopupServerFieldNotes(dirty, loaded) {
+  const fields = [["title-input", "labelTitle", existingBookmark.description],
+    ["description-input", "labelNotes", existingBookmark.extended],
+    ...(pbpBookmarkServiceId(settings) === "linkding" && typeof existingBookmark.summary === "string"
+      ? [["linkding-description-input", "labelDescription", pbpBookmarkDescriptionLine(existingBookmark.summary)]] : [])];
+  return fields.filter(([id, , server]) => dirty[id] === true && typeof server === "string" && $id(id).value !== server
+      && (!loaded || loaded[id] === undefined || loaded[id] !== server))
+    .map(([, label, server]) => pbpBookmarkServerFieldNote(t, t(label), server)).join(" ");
+}
 function pbpPopupDraftRestoredField(key) {
   return _popupDraftRestored && (_popupDraftRestoredFields === null || _popupDraftRestoredFields.has(key));
 }
 function pbpPopupDraftSnapshot() {
   const baseVersion = typeof pbpPopupExpectedVersion === "function" ? pbpPopupExpectedVersion($id("url-input").value.trim()) : undefined;
+  const baseTags = baseVersion !== undefined && typeof pbpPopupLoadedTagNames === "function" ? pbpPopupLoadedTagNames($id("url-input").value.trim()) : null;
   const changed = _popupDraftRestoredFields === null ? null
     : [...new Set([..._popupDraftRestoredFields, ..._popupDraftChangedFields, ...(_tagsUserTouched ? ["tags"] : [])])].sort();
   return { url: $id("url-input").value, title: $id("title-input").value,
@@ -407,7 +412,7 @@ function pbpPopupDraftSnapshot() {
     ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(_linkdingDescriptionPending ? { summary: $id("linkding-description-input").value } : {}), summaryTouched: _linkdingDescriptionTouched, sharedExplicit: _linkdingSharedExplicit } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
     private: $id("private-check").checked, toread: $id("readlater-check").checked,
     archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched, ...(changed ? { changed } : {}),
-    ...(baseVersion !== undefined ? { baseVersion } : {}) };
+    ...(baseVersion !== undefined ? { baseVersion } : {}), ...(baseTags ? { baseTags } : {}) };
 }
 // A draft write is needed when the user's edits change, or the loaded state
 // they were made on does (the lookup answered after the first keystroke).
@@ -599,7 +604,8 @@ async function initPopupDraft(account, tab) {
       _popupDraftRestoredFields = restored;
       // The restored edits were made on the bookmark as that open loaded it,
       // not on what this open's lookup shows (A01).
-      _popupDraftBase = { url: String(d.url || "").trim(), version: typeof d.baseVersion === "string" ? d.baseVersion : undefined };
+      _popupDraftBase = { url: String(d.url || "").trim(), version: typeof d.baseVersion === "string" ? d.baseVersion : undefined,
+        tags: Array.isArray(d.baseTags) ? d.baseTags.slice() : undefined };
       // Only the drafted fields count as edited; the rest still take the
       // page's values and the bookmark lookup's.
       for (const id of Object.keys(fieldDirtyFlags)) {
@@ -2471,10 +2477,15 @@ function setupSubmit(token) {
         && typeof pbpPopupExpectedVersion === "function" ? pbpPopupExpectedVersion(url) : undefined;
       const dirtyAtSubmit = { ...fieldDirtyFlags };
       const tagsTouchedAtSubmit = _tagsUserTouched;
-      // The tag list the form loaded, which the user's tag changes are made on;
-      // null when restored tags came from a draft of an earlier open.
-      const loadedTagsAtSubmit = !(typeof pbpPopupDraftRestoredField === "function" && pbpPopupDraftRestoredField("tags")) && Array.isArray(existingBookmark?.tagNames)
-        ? existingBookmark.tagNames.slice() : null;
+      // The tag list the user's tag changes are made on (a restored draft's
+      // own base, else the lookup's); null when not known.
+      const loadedTagsAtSubmit = typeof pbpPopupLoadedTagNames === "function" ? pbpPopupLoadedTagNames(url) : null;
+      // The text fields as the form loaded them, to tell a field changed on
+      // both sides; unknown (null) for a restored draft's edits.
+      const loadedFieldsAtSubmit = expectedVersion !== undefined && !(_popupDraftBase && _popupDraftBase.url === url) && existingBookmark
+        ? { "title-input": existingBookmark.description, "description-input": existingBookmark.extended,
+          "linkding-description-input": typeof existingBookmark.summary === "string" ? pbpBookmarkDescriptionLine(existingBookmark.summary) : undefined }
+        : null;
       Object.keys(fieldDirtyFlags).forEach((id) => { fieldDirtyFlags[id] = false; });
       _tagsUserTouched = false;
 
@@ -2544,12 +2555,16 @@ function setupSubmit(token) {
           return;
         }
         if (reloaded.status === "found") {
-          currentTags = pbpPopupRebaseLoadedTags(loadedTagsAtSubmit, mineTags, existingBookmark?.tagNames);
+          currentTags = pbpRebaseLoadedTags(loadedTagsAtSubmit, mineTags, existingBookmark?.tagNames);
           renderTags();
           _popupDraftBase = null;
           pbpRememberPopupDraft();
         }
-        showStatus("status-msg", t(result.unverified ? "saveNeedsReview" : "bookmarkChangedElsewhere"), "info");
+        // A field the user edited that the server now holds differently (and,
+        // when known, differently from what the form loaded) keeps the user's
+        // text; the server's value is named so the next press is made knowing it.
+        const theirs = reloaded.status === "found" && existingBookmark ? pbpPopupServerFieldNotes(dirtyAtSubmit, loadedFieldsAtSubmit) : "";
+        showStatus("status-msg", t(result.unverified ? "saveNeedsReview" : "bookmarkChangedElsewhere") + (theirs ? " " + theirs : ""), "info");
         setSubmitState("idle");
         return;
       }

@@ -44,6 +44,9 @@
   // made elsewhere since (user decision 2026-11-02); shown is what each field
   // held then, so a field the user left alone can take the newer value.
   let editorBase = null;
+  // After a stop: what the server holds now in the fields the user also
+  // edited (pbpBookmarkServerFieldNote sentences), shown after the stop's copy.
+  let changedThere = "";
   const buttons = [];
   const text = (key, ...args) => typeof t === "function" ? t(key, ...args) : key;
   const id = name => document.getElementById("reader-bookmark-" + name);
@@ -119,6 +122,9 @@
       } else if (ARG_KEYS.includes(editorStatusKey)) {
         id("editor-status").removeAttribute("data-i18n");
         id("editor-status").textContent = text(editorStatusKey, ...argsFor(editorStatusKey));
+      } else if (editorStatusKey === "bookmarkChangedElsewhere" && changedThere) {
+        id("editor-status").removeAttribute("data-i18n");
+        id("editor-status").textContent = text(editorStatusKey) + " " + changedThere;
       }
       id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "readerBookmarkTagsQuoteError", "urlAndTitleRequired", "titleTooLong", "submitUriTooLong"].includes(editorStatusKey) || failureCopy(editorStatusKey) ? "error" : "";
     }
@@ -322,17 +328,52 @@
     };
   }
 
-  // The bookmark changed elsewhere since the editor opened: the fields the
-  // user left alone take its new values, the ones they changed keep their
-  // text, and Apply now saves on top of this version.
+  // The tag line as names, the way Apply reads it (pbpPrepareReaderSaveIntent);
+  // throws on an unclosed quote in a quoted tag line.
+  function tagNames(line) {
+    return state.quotedTags === true ? pbpBookmarkParseTags(line) : String(line || "").split(/\s+/).filter(Boolean);
+  }
+  function tagLine(names) {
+    return state.quotedTags === true ? pbpBookmarkFormatTags(names) : names.join(" ");
+  }
+
+  // The bookmark changed elsewhere since the editor opened, or a partial save
+  // wrote part of it: the fields the user left alone take its new values, the
+  // ones they changed keep their text, their tag changes are made on its
+  // tags (so a tag added there, by hand or by Karakeep's AI, stays), and Apply
+  // now saves on top of this version. A text field changed on both sides
+  // keeps the user's text and names the server's (changedThere).
   function rebaseEditor() {
     if (!editor || !state.known || !state.bookmarked) return;
     const shown = editorBase?.shown || {};
     const latest = editorFields(state.bookmark || {});
-    for (const name of ["title", "tags", "summary", "notes"]) if (id(name).value === shown[name]) id(name).value = latest[name];
+    const notes = [];
+    for (const [name, key] of [["title", "readerBookmarkTitle"], ["summary", "readerBookmarkDescription"], ["notes", "readerBookmarkNotes"]]) {
+      const mine = id(name).value;
+      if (mine === shown[name]) id(name).value = latest[name];
+      else if (mine !== latest[name] && shown[name] !== latest[name] && !(name === "summary" && state.descriptionSupported !== true)) {
+        notes.push(pbpBookmarkServerFieldNote(text, text(key), latest[name]));
+      }
+    }
     for (const name of ["private", "toread"]) if (id(name).checked === shown[name]) id(name).checked = latest[name];
     if (!sharedExplicit) sharingChoice = id("private").checked;
+    changedThere = notes.join(" ");
     shownSummary = latest.summary;
+    if (id("tags").value === shown.tags) id("tags").value = latest.tags;
+    else {
+      let mine, merged;
+      try {
+        mine = tagNames(id("tags").value);
+        merged = pbpRebaseLoadedTags(typeof shown.tags === "string" ? tagNames(shown.tags) : null, mine, tagNames(latest.tags));
+      } catch (_) {
+        // A tag line Apply cannot read yet: it stays as typed, and this
+        // version is not taken as the base, so the Apply after the fix
+        // stops once more and makes the tag change on the newest tags.
+        return;
+      }
+      const key = names => names.map(pbpTagTwinKey).sort().join("\n");
+      if (key(merged) !== key(mine)) id("tags").value = tagLine(merged);
+    }
     editorBase = { version: state.bookmark?.version, shown: latest };
   }
 
@@ -378,7 +419,7 @@
       if (statusKey === "bookmarkErrTagTooLong") statusKey = "";
     }
     ensureEditor();
-    editorStatusKey = ""; paint();
+    editorStatusKey = ""; changedThere = ""; paint();
     const values = { ...(state.bookmark || context.bookmark?.draft || {}),
       ...(typeof tagFix?.tags === "string" ? { tags: tagFix.tags } : {}) };
     if (tagFix) { failureArgs.set("bookmarkErrTagTooLong", tagFix.args); editorStatusKey = "bookmarkErrTagTooLong"; paint(); }
@@ -465,7 +506,7 @@
         return;
       }
     }
-    editorStatusKey = "";
+    editorStatusKey = ""; changedThere = "";
     const gen = generation;
     // The tags a plain Save sends: the popup draft's, for a page not yet saved.
     const sentTags = action === "edit" ? draft?.tags
@@ -519,6 +560,10 @@
     } else if (result?.reason === "partial") {
       await refresh(gen);
       if (gen !== generation) return;
+      // Part of the edit is on the server now: the open editor takes the
+      // bookmark this save wrote as its base, so the retry is not stopped as
+      // changed elsewhere by this save's own write.
+      if (action === "edit") rebaseEditor();
       const named = typeof pbpBookmarkPartialKey === "function" ? pbpBookmarkPartialKey(result) : "";
       if (named) { failureKeys.add(named); partialKeys.add(named); }
       statusKey = named || "bookmarkPartialSave";
@@ -528,6 +573,7 @@
       // Save opens it on the tags it sent.
       await refresh(gen);
       if (gen !== generation) return;
+      if (action === "edit") rebaseEditor();
       statusKey = failureKey(result) || "readerBookmarkFailed";
       if (statusKey === "bookmarkErrTagTooLong") {
         tagFix = { tags: sentTags, args: argsFor(statusKey), stored: storedTags() };

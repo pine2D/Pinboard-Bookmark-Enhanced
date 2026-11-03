@@ -269,6 +269,27 @@
   },
   "bookmarkDeletedElsewhere": {"message": "這個書籤已在別處刪除，今次的修改沒有儲存。如要重新收藏這一頁，請按「儲存」。"},
   "bookmarkChangedElsewhere": {"message": "這個書籤在你開啟後已在別處修改，今次的修改沒有儲存。請核對最新內容後再儲存。"},
+  "bookmarkFieldReadsThere": {
+    "message": "別處的$FIELD$現在是「$VALUE$」，再次儲存會改成你填寫的內容。",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped and the user had also edited this field. $FIELD$ is the field's label (Title, Notes, Description), $VALUE$ what the bookmark service holds in it now (cut with an ellipsis when long).",
+    "placeholders": {
+      "field": {
+        "content": "$1"
+      },
+      "value": {
+        "content": "$2"
+      }
+    }
+  },
+  "bookmarkFieldEmptyThere": {
+    "message": "別處已清空$FIELD$，再次儲存會填入你填寫的內容。",
+    "description": "Follows bookmarkChangedElsewhere when an update stopped, the user had also edited this field, and the bookmark service now holds it empty. $FIELD$ is the field's label.",
+    "placeholders": {
+      "field": {
+        "content": "$1"
+      }
+    }
+  },
   "recentEditTitle": {
     "message": "載入並編輯"
   },

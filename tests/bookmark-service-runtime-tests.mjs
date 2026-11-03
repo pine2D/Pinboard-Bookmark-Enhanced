@@ -44,6 +44,7 @@ const BLOCKS=[
   'linkding SingleFile after a new bookmark',
   'linkding changed elsewhere since loaded',
   'Karakeep changed elsewhere since loaded',
+  'changed elsewhere: tag merges, both-sided edits, long tag lists',
 ];
 // Self-check before any browser starts: the list above and the block() calls
 // below must name exactly the same blocks, so a block added to one place only
@@ -100,6 +101,9 @@ const gate={linkding:false}, acceptedKeys=new Set(['fixture-key']);
 const postgres={linkding:false}, down={linkding:false};
 // checkDown: every linkding /check/ meets the stock 500 page (the duplicate check fails).
 const checkDown={linkding:false};
+// tagsDown.karakeep: attaching tags (POST bookmarks/<id>/tags) meets a 500 as
+// Hono writes one with no app.onError (text/plain "Internal Server Error").
+const tagsDown={karakeep:false};
 const tooLongForPostgres=names=>postgres.linkding&&(names||[]).some(name=>String(name).split(',').some(part=>Array.from(part.trim()).length>64));
 const DJANGO_500='\n<!doctype html>\n<html lang="en">\n<head>\n  <title>Server Error (500)</title>\n</head>\n<body>\n  <h1>Server Error (500)</h1><p></p>\n</body>\n</html>\n';
 const server=createServer(async(req,res)=>{
@@ -217,6 +221,7 @@ const server=createServer(async(req,res)=>{
   if(!row)return reply(404,{});
   if(path.endsWith('/lists'))return reply(200,{lists:membership.has(id)?[list]:[]});
   if(path.endsWith('/tags')){
+    if(tagsDown.karakeep&&req.method==='POST'){res.writeHead(500,{'Content-Type':'text/plain;charset=UTF-8'});res.end('Internal Server Error');return;}
     row.modifiedAt=karakeepNow();
     if(req.method==='POST'){for(const tag of data.tags)row.tags.push({id:'tag'+row.tags.length,name:tag.tagName,attachedBy:'human'});return reply(200,{attached:row.tags.map(t=>t.id)});}
     row.tags=row.tags.filter(t=>!data.tags.some(x=>x.tagId===t.id));return reply(200,{detached:data.tags.map(t=>t.tagId)});
@@ -291,7 +296,7 @@ try{
     });
     for(const page of ctx.pages())if(page!==article)await page.close();
     records.linkding.clear();records.karakeep.clear();membership.clear();raceCreates.clear();
-    postgres.linkding=false;down.linkding=false;checkDown.linkding=false;gate.linkding=false;holdLinkdingPatch=null;holdLinkdingCheck=null;holdLinkdingCreate=null;
+    postgres.linkding=false;down.linkding=false;checkDown.linkding=false;tagsDown.karakeep=false;gate.linkding=false;holdLinkdingPatch=null;holdLinkdingCheck=null;holdLinkdingCreate=null;
     await article.goto(origin+'/article');
   };
   // The connection a block needs, made through the settings page like a user.
@@ -2193,6 +2198,118 @@ try{
     assert.deepEqual([reads().slice(readAt).map(r=>r.path),writes().slice(writeAt).map(r=>r.method+' '+r.path)],[['bookmarks/check-url','bookmarks/kk51'],['PATCH bookmarks/kk51']]);
     await popup.close();
     console.log('Karakeep: popup updates stop on an AI tag or an edit made elsewhere, keep the user\'s edits, save on the next press; no read added');
+  });
+  // Review of A01/B02: the user's tag changes are made on the server's newest
+  // tags wherever the form's tags came from (a restored draft, the reader's
+  // tag line), a field edited on both sides shows the server's value, a
+  // partial reader save is not then taken for a change made elsewhere, and a
+  // bookmark with a long tag list can still be updated.
+  await block('changed elsewhere: tag merges, both-sided edits, long tag lists',['karakeep'],async()=>{
+    const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
+    const id='kk61',pageAt=origin+'/article';
+    records.karakeep.set(id,{id,title:'Loaded title',note:'Loaded note',summary:null,archived:false,favourited:false,createdAt:'2026-10-30T03:05:10.000Z',modifiedAt:'2026-10-30T03:05:10.000Z',userId:'u1',
+      tags:[{id:'tagk',name:'kept',attachedBy:'human'},{id:'tag-gone',name:'gone',attachedBy:'human'}],content:{type:'link',url:pageAt,title:'Site title'},assets:[]});
+    const row=()=>records.karakeep.get(id);
+    const writes=()=>requests.filter(r=>r.service==='karakeep'&&r.method!=='GET');
+    const detached=name=>requests.some(r=>r.service==='karakeep'&&r.method==='DELETE'&&r.path===`bookmarks/${id}/tags`&&r.data.tags.some(tag=>tag.tagId==='tag-'+name));
+    const aiTag=name=>row().tags.push({id:'tag-'+name,name,attachedBy:'ai'});
+    const storedDraft=()=>worker.evaluate(async url=>Object.values(await chrome.storage.session.get(null)).find(r=>r?.pageUrl===url)?.draft||null,pageAt);
+    // A draft of a tag edit, restored in a later open after Karakeep's AI tagged the bookmark.
+    // The draft removes one tag and adds another.
+    let popup=await openOnTab();await settled(popup,'found');
+    await popup.locator('.tag-item').filter({hasText:'gone'}).locator('.tag-remove').click();
+    await popup.locator('#tags-input').fill('mine');await popup.locator('#tags-input').press('Enter');
+    await until(async()=>{const d=await storedDraft();return d?.tags?.includes('mine')&&!d.tags.includes('gone');},'tag edit drafted');
+    await popup.close();
+    aiTag('ai-tag');
+    popup=await openOnTab();await settled(popup,'found');
+    assert.deepEqual(await formTags(popup),['kept','mine'],'setup: the draft did not restore the tags');
+    await pressStopped(popup,writes,'bookmarkChangedElsewhere','Karakeep restored tag draft');
+    assert.deepEqual([...await formTags(popup)].sort(),['ai-tag','kept','mine'],'the stop did not make the drafted tag change (one removed, one added) on the AI-tagged bookmark');
+    await pressSaved(popup,writes,'Karakeep restored tag draft after the stop');
+    assert(!detached('ai-tag'),'the update from a restored tag draft removed the AI tag');
+    assert.deepEqual(row().tags.map(t=>t.name).sort(),['ai-tag','kept','mine']);
+    await popup.close();
+    // The reader editor: AI tags the bookmark while the user edits the tag line.
+    const kkAccount=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
+    const openReader=async(key,account)=>{
+      await worker.evaluate(async data=>chrome.storage.local.set({['md_preview_data_'+data.key]:{markdown:'# Runtime article',title:'Runtime article',url:data.url,baseUrl:data.url,account:data.account,tags:[],description:'',source:'local',ts:Date.now()}}),{url:pageAt,account,key});
+      const reader=await ctx.newPage();await reader.goto(pageUrl+'md-preview.html?k='+key);
+      await reader.locator('#reader-bookmark-edit[aria-busy="false"]').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
+      return reader;
+    };
+    const editorStatus=reader=>reader.locator('#reader-bookmark-editor-status');
+    let reader=await openReader('kkmerge',kkAccount);
+    try{
+      const shown=await reader.locator('#reader-bookmark-tags').inputValue();
+      aiTag('ai-two');
+      await reader.locator('#reader-bookmark-tags').fill(shown+' reader');
+      const stoppedAt=writes().length;await reader.locator('#reader-bookmark-apply').click();
+      await editorStatus(reader).filter({hasText:en.bookmarkChangedElsewhere.message}).waitFor({timeout:10000});
+      assert.equal(writes().length,stoppedAt,'a reader tag edit made on an older version was written');
+      const merged=(await reader.locator('#reader-bookmark-tags').inputValue()).split(/\s+/).sort();
+      assert.deepEqual(merged,['ai-tag','ai-two','kept','mine','reader'],'the reader stop did not make the tag edit on the newest tags');
+      await reader.locator('#reader-bookmark-apply').click();
+      await until(()=>row().tags.some(t=>t.name==='reader'),'reader tag edit after the stop');
+      assert(!detached('ai-two'),'the reader update removed the tag added elsewhere');
+      // A partial save (the note is written, attaching a tag fails) leaves the
+      // editor open on the bookmark it wrote: the next Apply is not stopped
+      // as changed elsewhere by the save's own write.
+      // Stamped earlier than this second, so the partial save's own write is
+      // what changes the bookmark's loaded state.
+      row().modifiedAt='2026-10-30T05:00:00.000Z';
+      await reader.locator('#reader-bookmark-edit[aria-busy="false"]').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
+      tagsDown.karakeep=true;
+      await reader.locator('#reader-bookmark-notes').fill('Partly saved note');
+      await reader.locator('#reader-bookmark-tags').fill((await reader.locator('#reader-bookmark-tags').inputValue())+' extra');
+      const partialAt=writes().length;await reader.locator('#reader-bookmark-apply').click();
+      await until(()=>reader.evaluate(()=>document.getElementById('reader-bookmark-apply')?.getAttribute('aria-busy')==='false')&&writes().length>partialAt,'partial reader save');
+      await until(()=>row().note==='Partly saved note','setup: the partial save did not write the note');
+      await reader.waitForFunction(()=>document.getElementById('reader-bookmark-apply').getAttribute('aria-busy')==='false');
+      assert(await reader.locator('#reader-bookmark-editor:popover-open').count(),'setup: the partial save closed the editor');
+      tagsDown.karakeep=false;
+      await reader.locator('#reader-bookmark-apply').click();
+      await until(()=>row().tags.some(t=>t.name==='extra')||reader.evaluate(t=>document.getElementById('reader-bookmark-editor-status').textContent.includes(t),en.bookmarkChangedElsewhere.message),'retry after the partial save');
+      assert(row().tags.some(t=>t.name==='extra'),'the retry after a partial reader save was stopped as changed elsewhere');
+    }finally{await reader.close();}
+    // linkding: a field edited here and elsewhere shows the server's value.
+    await ensureConnected('linkding');
+    records.linkding.set('61',{id:61,url:pageAt,title:'Loaded title',description:'',notes:'Loaded notes',web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:['kept'],date_added:'2026-10-30T03:01:22.656384Z',date_modified:'2026-10-30T03:01:22.656384Z',website_title:null,website_description:null});
+    const ldRow=()=>records.linkding.get('61');
+    const patches=()=>requests.filter(r=>r.service==='linkding'&&r.method==='PATCH');
+    await forgetLookups();
+    popup=await openOnTab();await settled(popup,'found');
+    Object.assign(ldRow(),{notes:'Notes written elsewhere',date_modified:serverNow()});
+    await popup.locator('#description-input').fill('Notes typed here');
+    await pressStopped(popup,patches,'bookmarkChangedElsewhere','linkding both-sided notes');
+    assert.equal(await popup.locator('#description-input').inputValue(),'Notes typed here','the stop dropped the notes typed here');
+    assert((await popup.locator('#status-msg').textContent()).includes('Notes written elsewhere'),'the stop did not show the notes written elsewhere');
+    await pressSaved(popup,patches,'linkding both-sided notes, saved after reading');
+    assert.equal(ldRow().notes,'Notes typed here');
+    await popup.close();
+    const ldAccount=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
+    reader=await openReader('ldboth',ldAccount);
+    try{
+      Object.assign(ldRow(),{title:'Title written elsewhere',date_modified:serverNow()});
+      await reader.locator('#reader-bookmark-title').fill('Title typed here');
+      const stoppedAt=patches().length;await reader.locator('#reader-bookmark-apply').click();
+      await editorStatus(reader).filter({hasText:'Title written elsewhere'}).waitFor({timeout:10000}).catch(error=>{throw new Error('the reader stop did not show the title written elsewhere ('+error.message+')');});
+      assert.equal(patches().length,stoppedAt);
+      assert.equal(await reader.locator('#reader-bookmark-title').inputValue(),'Title typed here');
+    }finally{await reader.close();}
+    // A bookmark with many long tags: its loaded state still fits, so an
+    // update is checked and written instead of being stopped every time.
+    const many=Array.from({length:130},(_,i)=>('long-tag-'+String(i).padStart(3,'0')+'-').padEnd(60,'x'));
+    Object.assign(ldRow(),{tag_names:many,date_modified:serverNow()});
+    await forgetLookups();
+    popup=await openOnTab();await settled(popup,'found');
+    await popup.locator('#title-input').fill('Many tags title');
+    await until(async()=>typeof (await storedDraft())?.title==='string','many-tag draft written');
+    assert.equal((await storedDraft()).title,'Many tags title','the draft of a bookmark with many long tags was dropped');
+    await pressSaved(popup,patches,'linkding with 130 long tags');
+    assert.equal(ldRow().title,'Many tags title');
+    await popup.close();
+    console.log('changed elsewhere: restored tag drafts and reader tag lines are merged onto the newest tags, both-sided edits show the server value, a partial reader save is not taken for a change elsewhere, long tag lists still update');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));
