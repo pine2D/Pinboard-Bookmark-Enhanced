@@ -387,7 +387,7 @@ function renderBatchProgress(p, currentAccount) {
   if (p.done) {
     const skipMsg = p.skipped > 0 ? t("batchSkipped", String(p.skipped)) : "";
     const tooLongMsg = p.tooLong > 0 ? t("batchTooLong", String(p.tooLong)) : "";
-    const partialMsg = p.partial > 0 ? t("batchPartial", String(p.partial)) : "";
+    const partialMsg = p.partial > 0 ? t("batchPartial", String(p.partial)) + (p.partialList === true ? " · " + t(PBP_BOOKMARK_FAILURE_KEYS.read_later_list) : "") : "";
     const queuedDoneMsg = p.queued > 0 ? ` · ${t("offlineQueued", String(p.queued))}` : "";
     const aiWarnMsg = p.aiFailed > 0 ? t("batchAiFailed", String(p.aiFailed)) : "";
     const tagTooLongMsg = p.tagTooLong > 0

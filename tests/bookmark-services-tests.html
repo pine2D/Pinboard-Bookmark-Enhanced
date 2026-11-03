@@ -1253,11 +1253,14 @@ test("Connect binds a found list unless this connection already has a binding",(
 test("Connect's clear-then-bind patch judges the found list against the cleared state",()=>{
   const acct="karakeep:https://keep.example/base/:user1";
   // A synced binding of the same owner on a device whose token is missing: the old
-  // connection is not ready (account ""), yet the found list must still be bound.
+  // connection is not ready (account ""); the binding is already this identity's and stays.
   const synced={karakeepReadLaterListId:"L1",karakeepReadLaterListOwner:acct};
-  equal(pbpKarakeepConnectBindingPatch(synced,"",acct,"L1"),{karakeepReadLaterListId:"L1",karakeepReadLaterListOwner:acct});
-  // Nothing found: the stale binding of a different identity is cleared, not kept.
-  equal(pbpKarakeepConnectBindingPatch(synced,"",acct,""),{karakeepReadLaterListId:"",karakeepReadLaterListOwner:""});
+  equal(pbpKarakeepConnectBindingPatch(synced,"",acct,"L1"),{});
+  equal(pbpKarakeepConnectBindingPatch({karakeepReadLaterListId:"",karakeepReadLaterListOwner:""},"",acct,"L1"),{karakeepReadLaterListId:"L1",karakeepReadLaterListOwner:acct});
+  // Nothing found (duplicate lists, failed request): a binding owned by this very identity stays.
+  equal(pbpKarakeepConnectBindingPatch(synced,"",acct,""),{});
+  // Nothing found: a binding of a different identity is cleared, not kept.
+  equal(pbpKarakeepConnectBindingPatch({karakeepReadLaterListId:"old",karakeepReadLaterListOwner:"karakeep:https://o/:u"},"",acct,""),{karakeepReadLaterListId:"",karakeepReadLaterListOwner:""});
   // Same identity with its own binding: nothing changes.
   equal(pbpKarakeepConnectBindingPatch(synced,acct,acct,"L2"),{});
   // Another identity: old binding replaced by the found list.

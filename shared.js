@@ -2422,12 +2422,16 @@ function pbpKarakeepReadLaterBinding(settings, account, foundId) {
   if (settings?.karakeepReadLaterListOwner === account && settings.karakeepReadLaterListId) return {};
   return {karakeepReadLaterListId:foundId, karakeepReadLaterListOwner:account};
 }
-// The whole Connect-time patch for the Read Later binding: a changed identity
-// clears the old binding first, and the found list is then judged against that
-// cleared state, so a stale same-owner binding cannot swallow the found one.
+// The whole Connect-time patch for the Read Later binding: a stored binding that
+// belongs to another identity is cleared first, and the found list is then judged
+// against that cleared state. A binding already owned by this identity stays
+// untouched even when nothing was found (duplicate lists, a failed lists request)
+// or the previous connection was not ready, so Connect never unbinds a device
+// that still works.
 function pbpKarakeepConnectBindingPatch(settings, oldAccount, newAccount, foundId) {
   const patch = {};
-  if (oldAccount !== newAccount) {
+  const owner = settings?.karakeepReadLaterListOwner;
+  if ((owner || settings?.karakeepReadLaterListId) && owner !== newAccount) {
     patch.karakeepReadLaterListId = "";
     patch.karakeepReadLaterListOwner = "";
   }

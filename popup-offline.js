@@ -190,6 +190,8 @@
   // Same reason -> message table the save path uses in popup.js.
   function retryFailureMessage(result, service) {
     const reason = result && typeof result === "object" ? result.reason : "";
+    const partialKey = pbpBookmarkPartialKey(result);
+    if (partialKey) return t(partialKey);
     const failureText = pbpBookmarkFailureText(result, service, t);
     if (failureText) return failureText;
     if (reason === "account_mismatch") return t("offlineRetryWrongAccount");

@@ -817,6 +817,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
           [{ reason: "payload_too_large", httpStatus: 413 }, "bookmarkErrTooLarge"], [{ reason: "account_changed" }, "bookmarkErrAccountChanged"],
         ]) assert(message(result, service) === copy, service + " " + result.reason + " -> " + message(result, service));
       }
+      // A partial retry whose Read Later step hit duplicate lists names the cause;
+      // any other partial keeps the generic copy.
+      for (const service of ["linkding", "karakeep"]) {
+        assert(message({ reason: "partial", failedStep: "read_later", error: "read_later_list" }, service) === "bookmarkErrReadLaterList", service + " duplicate-list partial not named");
+        assert(message({ reason: "partial", failedStep: "read_later" }, service) === "offlineRetryFailed", service + " other partial changed");
+      }
       // Pinboard keeps its own copy for the same inputs.
       assert(message({ reason: "network" }, "pinboard") === "networkError", "pinboard network copy changed");
       assert(message({ reason: "account_changed" }, "pinboard") === "offlineRetryAccountChanged", "pinboard account copy changed");
