@@ -291,6 +291,9 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
   // The lookup's answer can change between steps (a page saved, a server down).
   const answer = { failure, bookmark };
   const activeTab = { id: 7, url: G14_URL, title: "Article", active: true };
+  // tab.foreground false: tab 7 is not the focused window's active tab (the
+  // user is on tab 99), so a check scheduled for it does not run.
+  const tab = { foreground: true };
   let scheduled = Promise.resolve();
   // epoch 0 matches the `let _pinboardAuthEpoch = 0` the sliced cache block declares.
   const auth = service === "pinboard"
@@ -315,7 +318,8 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
     // The real setIcon runs; the platform call records the state it was given.
     chrome: {
       tabs: {
-        query: async () => [{ ...activeTab }],
+        query: async () => [tab.foreground ? { ...activeTab } : { id: 99, url: "https://elsewhere.example/", title: "Elsewhere", active: true }],
+        get: async (id) => { if (id !== 7) throw new Error("No tab with id: " + id); return { ...activeTab, active: tab.foreground }; },
         onActivated: { addListener: (fn) => { listeners.activated = fn; } },
         onUpdated: { addListener: (fn) => { listeners.updated = fn; } },
       },
@@ -344,7 +348,7 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
   ].join("\n");
   const api = new Function(...Object.keys(deps), body)(...Object.values(deps));
   return {
-    api, auth, lookups, pinboardRequests, icons, answer,
+    api, auth, lookups, pinboardRequests, icons, answer, tab,
     refresh: async () => { api._scheduleCurrentTabRefresh(7, activeTab.url); await scheduled; },
     // The tab moves to `url` the way tabs.onUpdated reports it: an in-page
     // route change (pushState) carries only changeInfo.url, a new document
@@ -1063,6 +1067,66 @@ async function run() {
         const h = buildStatusFailureHarness(source, { service, failure: G14_FAILURES[0] });
         await h.navigate(OTHER, { sameDocument: true });
         assert(h.icons.length === 1 && h.icons[0].state === "default", service + " (restarted worker): the route change kept the earlier icon: " + JSON.stringify(h.icons));
+      }
+      // A route change while the tab is in the background runs no check, and
+      // the worker may be recycled before the user comes back: the icon the
+      // browser keeps for the tab must not still be the earlier page's
+      // "saved" once a restarted worker's check fails on the new page.
+      for (const sameDocument of [true, false]) {
+        const where = service + (sameDocument ? " (background route change)" : " (background new document)");
+        const before = buildStatusFailureHarness(source, { service, bookmark: G14_BOOKMARK });
+        await before.refresh();
+        before.tab.foreground = false;
+        await before.navigate(OTHER, { sameDocument });
+        assert(before.lookups.length === 1, where + ": a background tab was checked: " + JSON.stringify(before.lookups));
+        const restarted = buildStatusFailureHarness(source, { service, failure: G14_FAILURES[0] });
+        restarted.setTabUrl(OTHER);
+        await restarted.refresh();
+        const shown = [...before.icons, ...restarted.icons];
+        // A new document: the browser itself reset the icon, so either way the
+        // toolbar must not end on "saved".
+        const finalState = sameDocument ? shown.at(-1)?.state : (restarted.icons.at(-1)?.state || "default");
+        assert(finalState === "default", where + ": after a restart the toolbar still shows " + JSON.stringify(shown));
+      }
+      // The same, when the user leaves the tab while the new page's check is
+      // still out: that check is dropped, and so is the earlier page's icon.
+      {
+        const before = buildStatusFailureHarness(source, { service, bookmark: G14_BOOKMARK });
+        await before.refresh();
+        before.answer.onLookup = (url) => { if (url === OTHER) before.tab.foreground = false; };
+        await before.navigate(OTHER, { sameDocument: true });
+        const restarted = buildStatusFailureHarness(source, { service, failure: G14_FAILURES[0] });
+        restarted.setTabUrl(OTHER);
+        await restarted.refresh();
+        const shown = [...before.icons, ...restarted.icons];
+        assert(shown.at(-1)?.state === "default", service + " (left mid-check): after a restart the toolbar still shows " + JSON.stringify(shown));
+      }
+      // Control: a background #fragment jump on the saved page leaves its icon alone.
+      {
+        const h = buildStatusFailureHarness(source, { service, bookmark: G14_BOOKMARK });
+        await h.refresh();
+        h.tab.foreground = false;
+        await h.navigate(G14_URL + "#comments", { sameDocument: true });
+        assert(h.icons.length === 1 && h.icons[0].state === "saved", service + ": a background anchor jump set " + JSON.stringify(h.icons));
+      }
+      // Control: a check that does not run for a background tab still on the
+      // saved page leaves its icon alone.
+      {
+        const h = buildStatusFailureHarness(source, { service, bookmark: G14_BOOKMARK });
+        await h.refresh();
+        h.tab.foreground = false;
+        await h.refresh();
+        assert(h.icons.length === 1 && h.icons[0].state === "saved", service + ": a background tab on the saved page set " + JSON.stringify(h.icons));
+      }
+      // Control: the focused tab moving on while its check is out keeps the
+      // icon for that move's own check (no saved -> default -> saved flash).
+      {
+        const h = buildStatusFailureHarness(source, { service, bookmark: G14_BOOKMARK });
+        await h.refresh();
+        h.api.statusCache.clear(); // its entry has expired by now
+        h.answer.onLookup = (url) => { if (url === G14_URL) h.setTabUrl(OTHER); };
+        await h.refresh();
+        assert(h.icons.length === 1 && h.icons[0].state === "saved", service + ": the focused tab moving on mid-check set " + JSON.stringify(h.icons));
       }
       // Control: the route change of a check that answers still sets the new page's state.
       {

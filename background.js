@@ -2189,12 +2189,33 @@ function _urlWithoutFragment(url) {
   return hash === -1 ? url : url.slice(0, hash);
 }
 
+// A check that does not run (the tab is not the focused window's active tab)
+// leaves the toolbar as it is. After an in-page route change that is still the
+// earlier page's icon, and Chromium keeps it for the tab past a worker restart,
+// while the record saying so lives only in this worker: a later failed check
+// in a fresh worker would then keep the earlier page's "saved". So a tab whose
+// icon describes another page drops back to the default icon right away. A
+// focused active tab is left alone (its own check is scheduled and sets the
+// state once, without a saved -> default -> saved flash).
+async function _resetIconForAnotherPage(tabId) {
+  if (!_iconPageUrl.has(tabId)) return;
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab?.url || (!tab.url.startsWith("http://") && !tab.url.startsWith("https://"))) return;
+    if (_iconPageUrl.get(tabId) === _urlWithoutFragment(tab.url)) return;
+    if (await _getFocusedActiveTab(tabId, tab.url)) return;
+    setIcon(tabId, "default", tab.url);
+  } catch (_) {
+    // Tab closed between event and lookup: nothing left to reset.
+  }
+}
+
 function _scheduleCurrentTabRefresh(tabId, expectedUrl) {
   if (typeof expectedUrl === "string") _lastCheckedUrl.set(tabId, expectedUrl);
   _scheduleTabCheck(tabId, async () => {
     try {
       const tab = await _getFocusedActiveTab(tabId, expectedUrl);
-      if (!tab) return;
+      if (!tab) { await _resetIconForAnotherPage(tabId); return; }
       // onActivated/onFocusChanged can arrive without an expected URL; record what
       // the check actually ran against so the fragment gate below has a baseline.
       _lastCheckedUrl.set(tabId, tab.url);
@@ -2204,7 +2225,7 @@ function _scheduleCurrentTabRefresh(tabId, expectedUrl) {
 
       // The tab may have navigated or lost focus while the API request was in flight.
       const currentTab = await _getFocusedActiveTab(tab.id, tab.url);
-      if (!currentTab) return;
+      if (!currentTab) { await _resetIconForAnotherPage(tab.id); return; }
       if (status && typeof status.bookmarked === "boolean") {
         // checkBookmarked (via debouncedCheck) just wrote the cache entry; re-derive
         // the current auth to read it back atomically (same account/epoch). The key
