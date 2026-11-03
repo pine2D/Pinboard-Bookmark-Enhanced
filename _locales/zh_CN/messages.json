@@ -192,9 +192,11 @@
   },
   "saveMergedExisting": {"message": "这个网址已在服务里存在，已合并到原书签。"},
   "saveMergedKarakeepNote": {"message": "Karakeep 已把它移出归档，并更新了保存时间。"},
+  "saveMergedLinkdingOverwrite": {"message": "这个网址在 linkding 里已有书签。原书签的标题、描述、备注、稍后阅读和共享状态已换成这次填写的内容，标签也换成了这次的标签。"},
   "bookmarkSaved": {
     "message": "书签已保存"
   },
+  "bookmarkUpdated": {"message": "书签已更新"},
   "tagDraftUnsaved": {
     "message": "标签框里的文字没有加入标签"
   },
@@ -245,6 +247,7 @@
   "saveNeedsReview": {
     "message": "此页已收藏，核对字段后再按一次更新"
   },
+  "bookmarkDeletedElsewhere": {"message": "这个书签已在别处删除，这次的修改没有保存。要重新收藏这一页，点「保存」。"},
   "recentEditTitle": {
     "message": "加载并编辑"
   },
@@ -5064,6 +5067,10 @@
   "bookmarkPartialSave": {
     "message": "书签可能已保存，但部分修改未完成。请打开编辑，核对后重新保存。"
   },
+  "bookmarkPartialSavePopup": {"message": "书签可能已保存，但部分修改未完成。再按一次「更新」，就会补上未完成的部分。"},
+  "bookmarkPartialSavePopupTags": {"message": "书签已保存，但标签没有全部更新。再按一次「更新」，就会补上标签。"},
+  "bookmarkPartialSavePopupReadLater": {"message": "书签已保存，但稍后阅读状态没有改过来。再按一次「更新」，就会补上这一步。"},
+  "bookmarkPartialSavePopupBookmark": {"message": "标题和备注没有更新，书签保持原样。再按一次「更新」，就会写入这些修改。"},
   "bookmarkErrGatewayRedirect": {
     "message": "服务器把请求重定向到了别处。常见原因是前面有要求登录的访问网关（如 Cloudflare Access），或地址填错。可在「访问网关」中填写 Service Token，或在网关里为接口路径放行。"
   },

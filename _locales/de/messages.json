@@ -192,9 +192,11 @@
   },
   "saveMergedExisting": {"message": "Diese URL war bereits gespeichert. Die Änderungen wurden mit dem vorhandenen Lesezeichen zusammengeführt."},
   "saveMergedKarakeepNote": {"message": "Karakeep hat es aus dem Archiv geholt und den Speicherzeitpunkt aktualisiert."},
+  "saveMergedLinkdingOverwrite": {"message": "Diese URL war in linkding bereits gespeichert. Titel, Beschreibung, Notizen, „Später lesen“ und Freigabe des vorhandenen Lesezeichens wurden durch deine Eingaben ersetzt, seine Tags durch diese hier."},
   "bookmarkSaved": {
     "message": "Lesezeichen gespeichert."
   },
+  "bookmarkUpdated": {"message": "Lesezeichen aktualisiert."},
   "tagDraftUnsaved": {
     "message": "Der Text im Tag-Feld wurde nicht als Tag übernommen."
   },
@@ -245,6 +247,7 @@
   "saveNeedsReview": {
     "message": "Bereits als Lesezeichen gespeichert. Prüfe die Felder und klicke erneut auf „Aktualisieren“."
   },
+  "bookmarkDeletedElsewhere": {"message": "Dieses Lesezeichen wurde an anderer Stelle gelöscht, deine Änderungen wurden daher nicht gespeichert. Um die Seite erneut zu speichern, klicke auf „Speichern“."},
   "recentEditTitle": {
     "message": "Zum Bearbeiten laden"
   },
@@ -5070,6 +5073,10 @@
   "bookmarkPartialSave": {
     "message": "Das Lesezeichen wurde möglicherweise gespeichert, aber nicht alle Änderungen. Unter „Bearbeiten“ prüfen und erneut speichern."
   },
+  "bookmarkPartialSavePopup": {"message": "Das Lesezeichen wurde möglicherweise gespeichert, aber nicht alle Änderungen. Klicke erneut auf „Aktualisieren“, um den Rest nachzuholen."},
+  "bookmarkPartialSavePopupTags": {"message": "Das Lesezeichen wurde gespeichert, die Tags aber nicht vollständig aktualisiert. Klicke erneut auf „Aktualisieren“, um sie nachzuholen."},
+  "bookmarkPartialSavePopupReadLater": {"message": "Das Lesezeichen wurde gespeichert, „Später lesen“ aber nicht geändert. Klicke erneut auf „Aktualisieren“, um es nachzuholen."},
+  "bookmarkPartialSavePopupBookmark": {"message": "Titel und Notizen wurden nicht aktualisiert, das Lesezeichen ist unverändert. Klicke erneut auf „Aktualisieren“, um deine Änderungen zu übernehmen."},
   "bookmarkErrGatewayRedirect": {
     "message": "Der Server hat die Anfrage umgeleitet. Häufige Ursache ist ein Zugangs-Gateway mit Anmeldung wie Cloudflare Access oder eine falsche URL. Unter „Zugangs-Gateway“ ein Service-Token eintragen oder den API-Pfad im Gateway freigeben."
   },

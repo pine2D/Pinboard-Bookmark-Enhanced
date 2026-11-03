@@ -391,6 +391,9 @@
     const sentTags = action === "edit" ? draft?.tags
       : state.known && !state.bookmarked && typeof state.bookmark?.tags === "string" ? state.bookmark.tags : undefined;
     let reopen = false;
+    // A result without a mutation (a Pinboard one) is told by the bar's state
+    // before this save: a bookmark that was not there yet has been saved.
+    const wasBookmarked = Boolean(state.known && state.bookmarked);
     inflight = true; showStatus("readerBookmarkSaving");
     const result = await request({ type: "mdReaderBookmarkSave", action, ...(draft ? { draft } : {}) });
     if (gen !== generation) return;
@@ -403,7 +406,8 @@
       await refresh(gen);
       if (gen !== generation) return;
       statusKey = result.mutation === "merged" ? "saveMergedExisting"
-        : result.status === "saved" ? "readerBookmarkUpdated" : "readerBookmarkSaved";
+        : result.status === "skipped" || result.mutation === "created" ? "readerBookmarkSaved"
+          : result.mutation === "updated" || wasBookmarked ? "readerBookmarkUpdated" : "readerBookmarkSaved";
       document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: changedDetail() }));
     } else if (result?.status === "queued") {
       closeEditor(); statusKey = "readerBookmarkQueued";

@@ -405,13 +405,13 @@ try{
       await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
       await popup.locator('#share-check').check();await popup.locator('#submit-btn').click();await until(()=>latestWrite().data.shared===true,'popup changed sharing');
       await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
-      assert.match(await popup.locator('#status-msg').textContent(),/saved/i,'popup did not confirm its completed save');
+      assert((await popup.locator('#status-msg').textContent()).startsWith(en.bookmarkUpdated.message),'popup did not confirm its completed update');
       [...records.linkding.values()][0].shared=false;
       await popup.locator('#title-input').fill('Second same-popup title edit');await popup.locator('#submit-btn').click();
       await until(()=>latestWrite().data.title==='Second same-popup title edit','second same-popup update');
       assert(!Object.hasOwn(latestWrite().data,'shared')&&![...records.linkding.values()][0].shared,'settled sharing intent leaked into later title edit');
       await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
-      assert.match(await popup.locator('#status-msg').textContent(),/saved/i,'popup did not confirm its completed save');
+      assert((await popup.locator('#status-msg').textContent()).startsWith(en.bookmarkUpdated.message),'popup did not confirm its completed update');
       [...records.linkding.values()][0].shared=true;
       let releasePatch;
       holdLinkdingPatch=new Promise(resolve=>{releasePatch=resolve;});
@@ -422,14 +422,14 @@ try{
       await popup.locator('#share-check').check();await popup.locator('#share-check').uncheck();
       holdLinkdingPatch=null;releasePatch();
       await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
-      assert.match(await popup.locator('#status-msg').textContent(),/saved/i,'popup did not confirm its completed save');
+      assert((await popup.locator('#status-msg').textContent()).startsWith(en.bookmarkUpdated.message),'popup did not confirm its completed update');
       assert(await popup.evaluate(()=>_linkdingSharedExplicit),'delivery cleared a later same-value sharing choice');
       [...records.linkding.values()][0].shared=true;
       await popup.locator('#title-input').fill('Apply later explicit choice');await popup.locator('#submit-btn').click();
       await until(()=>latestWrite().data.title==='Apply later explicit choice','later explicit choice delivery');
       assert.equal(latestWrite().data.shared,false,'later explicit choice was not delivered');
       await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
-      assert.match(await popup.locator('#status-msg').textContent(),/saved/i,'popup did not confirm its completed save');
+      assert((await popup.locator('#status-msg').textContent()).startsWith(en.bookmarkUpdated.message),'popup did not confirm its completed update');
       assert(!await popup.evaluate(()=>_linkdingSharedExplicit),'latest settled choice was not consumed');
       [...records.linkding.values()][0].shared=true;
 

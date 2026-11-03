@@ -293,7 +293,13 @@ function pbpFormatSummaryBlock(summary, service = "pinboard") {
   return service === "karakeep" ? String(summary || "").trim() : pbpFormatQuote(summary, service);
 }
 
+// A save that landed on a bookmark the service already had (a create that
+// met an existing URL). linkding's create_bookmark then overwrites title,
+// Description, Notes, unread and shared with this request's values and
+// replaces the tags (services/bookmarks.py _merge_bookmark_data, v1.47.0), so
+// its copy names what was replaced; Karakeep keeps the merge note of its own.
 function pbpBookmarkMergedText(service, translate) {
+  if (service === "linkding") return translate("saveMergedLinkdingOverwrite");
   return translate("saveMergedExisting") + (service === "karakeep" ? " " + translate("saveMergedKarakeepNote") : "");
 }
 

@@ -192,9 +192,11 @@
   },
   "saveMergedExisting": {"message": "這個網址已存在於服務中，變更已合併至原有書籤。"},
   "saveMergedKarakeepNote": {"message": "Karakeep 已將書籤移出封存，並更新儲存時間。"},
+  "saveMergedLinkdingOverwrite": {"message": "這個網址在 linkding 中已有書籤。原書籤的標題、描述、備註、稍後閱讀和分享狀態已改為這次填寫的內容，標籤也已換成這次的標籤。"},
   "bookmarkSaved": {
     "message": "書籤已儲存"
   },
+  "bookmarkUpdated": {"message": "書籤已更新"},
   "tagDraftUnsaved": {
     "message": "標籤框裡的文字沒有加入標籤"
   },
@@ -245,6 +247,7 @@
   "saveNeedsReview": {
     "message": "此頁已收藏，核對欄位後再按一次更新"
   },
+  "bookmarkDeletedElsewhere": {"message": "這個書籤已在別處刪除，這次的修改沒有儲存。如要重新收藏這一頁，請按「儲存」。"},
   "recentEditTitle": {
     "message": "載入並編輯"
   },
@@ -5070,6 +5073,10 @@
   "bookmarkPartialSave": {
     "message": "書籤可能已儲存，但部分變更未完成。請開啟編輯，確認後重新儲存。"
   },
+  "bookmarkPartialSavePopup": {"message": "書籤可能已儲存，但部分變更未完成。再按一次「更新」，就會補上未完成的部分。"},
+  "bookmarkPartialSavePopupTags": {"message": "書籤已儲存，但標籤沒有全部更新。再按一次「更新」，就會補上標籤。"},
+  "bookmarkPartialSavePopupReadLater": {"message": "書籤已儲存，但稍後閱讀狀態沒有改過來。再按一次「更新」，就會補上這一步。"},
+  "bookmarkPartialSavePopupBookmark": {"message": "標題和備註沒有更新，書籤維持原樣。再按一次「更新」，就會寫入這些修改。"},
   "bookmarkErrGatewayRedirect": {
     "message": "伺服器將請求重新導向。常見原因是前方有需要登入的存取閘道（例如 Cloudflare Access），或網址有誤。可在「存取閘道」中填入 Service Token，或在閘道中允許 API 路徑通過。"
   },

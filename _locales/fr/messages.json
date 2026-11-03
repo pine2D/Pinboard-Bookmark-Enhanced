@@ -192,9 +192,11 @@
   },
   "saveMergedExisting": {"message": "Cette URL était déjà enregistrée. Les modifications ont été fusionnées avec le signet existant."},
   "saveMergedKarakeepNote": {"message": "Karakeep l’a retiré des archives et a actualisé sa date d’enregistrement."},
+  "saveMergedLinkdingOverwrite": {"message": "Cette URL figurait déjà dans linkding. Le titre, la description, les notes, l’état « à lire » et le partage du signet existant ont été remplacés par ce que vous avez saisi ici, et ses tags par ceux-ci."},
   "bookmarkSaved": {
     "message": "Signet enregistré."
   },
+  "bookmarkUpdated": {"message": "Signet mis à jour."},
   "tagDraftUnsaved": {
     "message": "Le texte resté dans le champ des tags n'a pas été ajouté comme tag."
   },
@@ -245,6 +247,7 @@
   "saveNeedsReview": {
     "message": "Déjà dans vos signets. Vérifiez les champs, puis appuyez de nouveau sur « Mettre à jour »."
   },
+  "bookmarkDeletedElsewhere": {"message": "Ce signet a été supprimé ailleurs : vos modifications n’ont pas été enregistrées. Pour ajouter de nouveau la page à vos signets, appuyez sur « Enregistrer »."},
   "recentEditTitle": {
     "message": "Charger pour modifier"
   },
@@ -5070,6 +5073,10 @@
   "bookmarkPartialSave": {
     "message": "Le favori a peut-être été enregistré, mais certaines modifications ont échoué. Ouvrez la modification pour vérifier, puis enregistrez à nouveau."
   },
+  "bookmarkPartialSavePopup": {"message": "Le signet a peut-être été enregistré, mais certaines modifications n’ont pas abouti. Appuyez de nouveau sur « Mettre à jour » pour les terminer."},
+  "bookmarkPartialSavePopupTags": {"message": "Le signet a été enregistré, mais ses tags n’ont pas tous été mis à jour. Appuyez de nouveau sur « Mettre à jour » pour terminer."},
+  "bookmarkPartialSavePopupReadLater": {"message": "Le signet a été enregistré, mais son état « à lire » n’a pas été modifié. Appuyez de nouveau sur « Mettre à jour » pour terminer."},
+  "bookmarkPartialSavePopupBookmark": {"message": "Le titre et les notes n’ont pas été mis à jour : le signet est inchangé. Appuyez de nouveau sur « Mettre à jour » pour appliquer vos modifications."},
   "bookmarkErrGatewayRedirect": {
     "message": "Le serveur a redirigé la requête. Cause fréquente : une passerelle d’accès qui exige une connexion, comme Cloudflare Access, ou une URL erronée. Ajoutez un jeton de service dans « Passerelle d’accès » ou autorisez le chemin de l’API dans la passerelle."
   },

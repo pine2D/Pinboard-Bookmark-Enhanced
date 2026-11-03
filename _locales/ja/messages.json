@@ -192,9 +192,11 @@
   },
   "saveMergedExisting": {"message": "このURLはすでに保存されていたため、既存のブックマークに変更を統合しました。"},
   "saveMergedKarakeepNote": {"message": "Karakeepでアーカイブが解除され、保存日時が更新されました。"},
+  "saveMergedLinkdingOverwrite": {"message": "このURLはlinkdingにすでに保存されていました。既存のブックマークのタイトル、説明、メモ、「あとで読む」、共有の状態をここで入力した内容に置き換え、タグもこのタグに置き換えました。"},
   "bookmarkSaved": {
     "message": "ブックマークを保存しました。"
   },
+  "bookmarkUpdated": {"message": "ブックマークを更新しました。"},
   "tagDraftUnsaved": {
     "message": "タグ入力欄に残っているテキストは、タグとして追加されていません。"
   },
@@ -245,6 +247,7 @@
   "saveNeedsReview": {
     "message": "すでにブックマーク済みです。内容を確認して、もう一度「更新」を押してください。"
   },
+  "bookmarkDeletedElsewhere": {"message": "このブックマークは別の場所で削除されたため、変更は保存されていません。もう一度ブックマークするには「保存」を押してください。"},
   "recentEditTitle": {
     "message": "読み込んで編集"
   },
@@ -5070,6 +5073,10 @@
   "bookmarkPartialSave": {
     "message": "ブックマークは保存されている可能性がありますが、一部の変更に失敗しました。編集画面で確認し、もう一度保存してください。"
   },
+  "bookmarkPartialSavePopup": {"message": "ブックマークは保存されている可能性がありますが、一部の変更が完了していません。もう一度「更新」を押すと、残りを反映します。"},
+  "bookmarkPartialSavePopupTags": {"message": "ブックマークは保存されましたが、タグの更新が完了していません。もう一度「更新」を押すと、タグを反映します。"},
+  "bookmarkPartialSavePopupReadLater": {"message": "ブックマークは保存されましたが、「あとで読む」の状態は変更されていません。もう一度「更新」を押すと反映します。"},
+  "bookmarkPartialSavePopupBookmark": {"message": "タイトルとメモは更新されず、ブックマークは変更されていません。もう一度「更新」を押すと、変更を反映します。"},
   "bookmarkErrGatewayRedirect": {
     "message": "サーバーがリクエストをリダイレクトしました。よくある原因は、ログインを求めるアクセスゲートウェイ（Cloudflare Accessなど）か、URLの誤りです。「アクセスゲートウェイ」にサービストークンを入力するか、ゲートウェイでAPIのパスを許可してください。"
   },

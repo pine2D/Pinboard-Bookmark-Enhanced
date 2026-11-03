@@ -252,7 +252,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(elements["private-check"].checked && !elements["share-check"].checked,"new popup defaults to shared");
       }
     });
-    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null, ownershipKnown = true, descriptionKnown = true, descriptionPending = false, loaded = null } = {}) {
+    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null, ownershipKnown = true, descriptionKnown = true, descriptionPending = false, loaded = null, recheck } = {}) {
       const elements = {
         "submit-btn": createElementStub(),
         "delete-btn": createElementStub({ classes: ["hidden"] }),
@@ -350,13 +350,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
         const timer = timers.find((candidate) => candidate.id === id);
         if (timer) timer.cancelled = true;
       };
+      // recheck: what a lookup made after the click finds ("missing",
+      // "failed", ...); left out, the lookup keeps the old pending/found shape.
       const checkExistingBookmark = (...args) => {
         checkCalls.push(args);
         bookmarkLookup.generation++;
-        bookmarkLookup.status = lookupFailed ? "failed" : "pending";
+        bookmarkLookup.status = recheck ?? (lookupFailed ? "failed" : "pending");
         bookmarkLookup.url = args[1];
         bookmarkLookup.formLoaded = false;
-        return Promise.resolve({ status: lookupFailed ? "failed" : "found", url: args[1] });
+        return Promise.resolve({ status: recheck ?? (lookupFailed ? "failed" : "found"), url: args[1] });
       };
       const getSettingsStorage = async () => ({
         async remove(key) { syncRemovals.push(key); authEvents.push("settings-remove"); },
@@ -687,6 +689,18 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(got.message === message && got.retry === retry, "pinboard " + JSON.stringify(result) + " -> " + JSON.stringify(got));
       }
     });
+    test("a partial save in the popup names its step and says the next press finishes it", () => {
+      const steps = { tags: "bookmarkPartialSavePopupTags", read_later: "bookmarkPartialSavePopupReadLater",
+        bookmark: "bookmarkPartialSavePopupBookmark", undefined: "bookmarkPartialSavePopup", other: "bookmarkPartialSavePopup" };
+      for (const service of ["pinboard", "karakeep", "linkding"]) {
+        const view = bookmarkErrorView(service);
+        for (const [step, key] of Object.entries(steps)) {
+          const got = view({ status: "failed", reason: "partial", ...(step === "undefined" ? {} : { failedStep: step }), httpStatus: 500 });
+          assert(got.message === key && got.retry === true, service + " " + step + " -> " + JSON.stringify(got));
+          assert(enMessages[key]?.message && !/Open Edit/i.test(enMessages[key].message), "en " + key + " is missing or sends the user to Edit");
+        }
+      }
+    });
     test("a linkding tag the server cannot store is named with its limit and offers no retry", () => {
       const view = bookmarkErrorView("linkding");
       for (const [tag, shown] of [["x".repeat(65), "x".repeat(40) + "\u2026"], ["\u{1F600}".repeat(70), "\u{1F600}".repeat(40) + "\u2026"]]) {
@@ -908,6 +922,53 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(JSON.stringify(harness.statuses.at(-1)) === JSON.stringify(["status-msg", "save-queued:server", "warning"]), "queued did not hand its cause to the queued card");
       assert(!harness.elements["submit-btn"].classList.contains("save-error"), "queued fell through into the error state");
       assert(!harness.elements["submit-btn"].classList.contains("saved-success"), "queued entered the saved state");
+    });
+
+    // An update that meets a bookmark deleted elsewhere ends on a fresh lookup
+    // that finds nothing: the popup says so, offers no Retry and sends no second
+    // write; only the user's own next Save creates the bookmark again.
+    await testAsync("an update whose bookmark was deleted elsewhere is explained, never recreated", async () => {
+      for (const service of ["pinboard", "karakeep", "linkding"]) {
+        const loaded = { href: URL, description: "Stored title", extended: "", summary: "", tags: "", tagNames: [], shared: "no", toread: "no", time: "2026-10-30T03:01:22Z" };
+        const h = createSubmitHarness({ service, loaded, recheck: "missing" });
+        const pending = h.click();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        assert(h.messages.length === 1 && h.messages[0].intent.mode === "update", service + ": the update was not sent");
+        h.resolveSave({ status: "failed", reason: "conflict" });
+        await pending;
+        assert(h.messages.filter((m) => m.type === "save_intent").length === 1, service + ": a second write followed the conflict");
+        assert(JSON.stringify(h.statuses.at(-1)) === JSON.stringify(["status-msg", "bookmarkDeletedElsewhere", "info"]), service + ": " + JSON.stringify(h.statuses));
+        assert(!h.statuses.some(([, message]) => String(message).startsWith("save-error:")), service + ": a retryable save error was shown");
+        assert(!h.elements["submit-btn"].classList.contains("save-error"), service + ": the button was left in the error state");
+        assert(enMessages.bookmarkDeletedElsewhere?.message, "en catalogue lacks bookmarkDeletedElsewhere");
+        // The next press is the user's choice, made after reading the note.
+        const again = h.click();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        assert(h.messages.length === 2 && h.messages[1].intent.mode === "create" && h.messages[1].intent.time === undefined, service + ": the next Save did not create");
+        await again;
+      }
+    });
+
+    await testAsync("the popup reports a create as saved, an update as updated, and a merge by service", async () => {
+      const loaded = { href: URL, description: "Stored title", extended: "", summary: "", tags: "", tagNames: [], shared: "no", toread: "no", time: "2026-10-30T03:01:22Z" };
+      for (const [service, options, result, want] of [
+        ["pinboard", {}, { status: "saved", mutation: "created" }, "bookmarkSaved"],
+        ["linkding", {}, { status: "saved", mutation: "created" }, "bookmarkSaved"],
+        ["pinboard", { loaded }, { status: "saved", mutation: "updated" }, "bookmarkUpdated"],
+        ["karakeep", { loaded }, { status: "saved", mutation: "updated" }, "bookmarkUpdated"],
+        ["linkding", { loaded }, { status: "saved", mutation: "updated" }, "bookmarkUpdated"],
+        ["linkding", {}, { status: "saved", mutation: "merged" }, "saveMergedLinkdingOverwrite"],
+        ["karakeep", {}, { status: "saved", mutation: "merged" }, "saveMergedExisting saveMergedKarakeepNote"],
+      ]) {
+        const h = createSubmitHarness({ service, ...options });
+        const pending = h.click();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        h.resolveSave(result);
+        await pending;
+        const shown = h.statuses.find(([, , kind]) => kind === "success");
+        assert(shown?.[1] === want, service + " " + JSON.stringify(result) + " -> " + JSON.stringify(shown));
+        for (const key of want.split(" ")) assert(enMessages[key]?.message, "en catalogue lacks " + key);
+      }
     });
 
     await testAsync("real submit callback awaits Wayback snapshot before save_intent", async () => {

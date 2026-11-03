@@ -192,9 +192,11 @@
   },
   "saveMergedExisting": {"message": "This URL already existed in the service. Changes were merged into the existing bookmark."},
   "saveMergedKarakeepNote": {"message": "Karakeep moved it out of the archive and updated its save time."},
+  "saveMergedLinkdingOverwrite": {"message": "This URL was already in linkding. The existing bookmark's title, description, notes, read later and sharing now match what you entered here, and its tags were replaced with these."},
   "bookmarkSaved": {
     "message": "Bookmark saved."
   },
+  "bookmarkUpdated": {"message": "Bookmark updated."},
   "tagDraftUnsaved": {
     "message": "Text left in the tag box was not added as a tag."
   },
@@ -247,6 +249,7 @@
   "saveNeedsReview": {
     "message": "Already bookmarked. Check the fields, then press Update again."
   },
+  "bookmarkDeletedElsewhere": {"message": "This bookmark was deleted elsewhere, so your changes were not saved. To bookmark the page again, press Save."},
   "recentEditTitle": {
     "message": "Load for editing"
   },
@@ -5080,6 +5083,10 @@
   "bookmarkPartialSave": {
     "message": "The bookmark may be saved, but some changes failed. Open Edit to check and save again."
   },
+  "bookmarkPartialSavePopup": {"message": "The bookmark may be saved, but some changes didn't go through. Press Update again to finish them."},
+  "bookmarkPartialSavePopupTags": {"message": "The bookmark was saved, but its tags were not fully updated. Press Update again to finish them."},
+  "bookmarkPartialSavePopupReadLater": {"message": "The bookmark was saved, but its read later state was not changed. Press Update again to finish."},
+  "bookmarkPartialSavePopupBookmark": {"message": "The title and notes were not updated, so the bookmark is unchanged. Press Update again to apply your changes."},
   "bookmarkErrGatewayRedirect": {
     "message": "The server redirected the request. Common causes: a sign-in gateway such as Cloudflare Access, or a wrong URL. Add a service token under Access gateway, or allow the API path in the gateway."
   },

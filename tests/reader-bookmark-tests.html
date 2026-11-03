@@ -1263,6 +1263,46 @@ await test("runtime script implements guarded shared keyboard and action state",
   w.document.dispatchEvent(new w.CustomEvent("pbp:bookmark-account-changed", { detail: { account: "bob" } })); w.pbpReaderBookmarkAction("save"); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 1); equal(w.document.getElementById("reader-bookmark-status").textContent, "readerBookmarkChecking");
   assert(!w.document.getElementById("rendered-view").contains(w.document.getElementById("reader-bookmark-footer")), "footer must stay outside exported article"); frame.remove();
 });
+// The reader's result line follows what the worker did: a create is saved, an
+// update updated, a merge names its service's merge and a partial save keeps
+// the copy that sends the user to Edit. A result without a mutation (Pinboard)
+// is told by the bar's state before the save.
+await test("reader save results say saved, updated, merged or partial as the worker reports them", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  const run = async (account, bookmarked, result, action) => {
+    const frame = document.createElement("iframe"); document.body.append(frame);
+    try {
+      const w = frame.contentWindow;
+      w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.eval(await (await fetch("../shared.js")).text());
+      const state = { known: true, bookmarked, account, bookmark: { tags: "", notes: "", toread: false } };
+      w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
+        sendMessage: async msg => msg.type === "mdReaderBookmarkState" ? state : { ...result, account }, onMessage: { addListener() {} } } };
+      w.t = k => k; w.eval(runtime);
+      w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "" } } }));
+      await new Promise(r => setTimeout(r, 30));
+      w.pbpReaderBookmarkAction(action); await new Promise(r => setTimeout(r, 30));
+      return w.document.getElementById("reader-bookmark-status").textContent;
+    } finally { frame.remove(); }
+  };
+  const ld = "linkding:https://ld.example:c1", kk = "karakeep:https://keep.example/:user-1";
+  for (const [account, bookmarked, result, action, want] of [
+    [ld, false, { status: "saved", mutation: "created" }, "save", "readerBookmarkSaved"],
+    [kk, false, { status: "saved", mutation: "created" }, "later", "readerBookmarkSaved"],
+    [ld, true, { status: "saved", mutation: "updated" }, "later", "readerBookmarkUpdated"],
+    [kk, true, { status: "saved", mutation: "updated" }, "later", "readerBookmarkUpdated"],
+    [ld, false, { status: "skipped" }, "save", "readerBookmarkSaved"],
+    [ld, false, { status: "saved", mutation: "merged" }, "save", "saveMergedLinkdingOverwrite"],
+    [kk, false, { status: "saved", mutation: "merged" }, "save", "saveMergedExisting saveMergedKarakeepNote"],
+    ["alice", false, { status: "saved" }, "save", "readerBookmarkSaved"],
+    ["alice", true, { status: "saved" }, "later", "readerBookmarkUpdated"],
+    ["alice", false, { status: "saved", mutation: "created" }, "later", "readerBookmarkSaved"],
+    [kk, true, { status: "failed", reason: "partial", failedStep: "tags", httpStatus: 500 }, "later", "bookmarkPartialSave"],
+  ]) {
+    const got = await run(account, bookmarked, result, action);
+    assert(got === want, account + " bookmarked=" + bookmarked + " " + JSON.stringify(result) + " -> " + JSON.stringify(got));
+  }
+});
 await test("reader save, delete and lookup show self-hosted causes", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();
   const run = async (account, handler, act) => {

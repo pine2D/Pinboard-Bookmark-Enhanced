@@ -2203,6 +2203,14 @@ function setupSubmit(token) {
           setSubmitState("idle");
           return;
         }
+        if (savePolicy.mode === "update" && conflictLookup.status === "missing") {
+          // The bookmark being updated was deleted elsewhere. Say so and offer
+          // no Retry: the form is now a new bookmark's, and only the user's own
+          // next Save, after reading this, may create it again.
+          showStatus("status-msg", t("bookmarkDeletedElsewhere"), "info");
+          setSubmitState("idle");
+          return;
+        }
         showSaveError({ reason: "lookup" });
         setSubmitState("error");
         submitErrorResetTimer = setTimeout(() => { if (btn.classList.contains("save-error")) setSubmitState("idle"); }, 3000);
@@ -2253,7 +2261,8 @@ function setupSubmit(token) {
           checkExistingBookmark(token, url, null, true, tags);
         }
         showStatus("status-msg", result.mutation === "merged"
-          ? pbpBookmarkMergedText(pbpBookmarkServiceId(settings), t) : t("bookmarkSaved"), "success");
+          ? pbpBookmarkMergedText(pbpBookmarkServiceId(settings), t)
+          : savePolicy.mode === "update" && result.mutation === "updated" ? t("bookmarkUpdated") : t("bookmarkSaved"), "success");
         setSubmitState("success");
         // Optimistic archive indicator (cosmetic only, never blocks save or auto-close)
         // The dedup window is per Pinboard account, so probe _waybackAttempts with
@@ -2822,7 +2831,14 @@ function clearSaveError() {
 // when the save threw before a result came back.
 function pbpSaveErrorView(result) {
   const reason = result?.reason;
-  if (reason === "partial") return {message:t("bookmarkPartialSave"), retry:true};
+  // The popup has already reread the bookmark and marked every field changed,
+  // so the next Save patches what is missing; the reader and notifications
+  // keep bookmarkPartialSave, which sends the user to Edit.
+  if (reason === "partial") {
+    const key = {tags:"bookmarkPartialSavePopupTags", read_later:"bookmarkPartialSavePopupReadLater",
+      bookmark:"bookmarkPartialSavePopupBookmark"}[result.failedStep] || "bookmarkPartialSavePopup";
+    return {message:t(key), retry:true};
+  }
   if (reason === "permission") return {message:t("bookmarkPermissionDenied"), retry:false};
   if (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard") {
     const key = pbpBookmarkFailureKey(result, pbpBookmarkServiceId(settings));

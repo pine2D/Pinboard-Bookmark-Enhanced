@@ -192,9 +192,11 @@
   },
   "saveMergedExisting": {"message": "Ten adres URL był już zapisany. Zmiany zostały scalone z istniejącą zakładką."},
   "saveMergedKarakeepNote": {"message": "Karakeep usunął ją z archiwum i zaktualizował czas zapisu."},
+  "saveMergedLinkdingOverwrite": {"message": "Ten adres URL był już zapisany w linkding. Tytuł, opis, notki, stan „przeczytaj później” i udostępnianie istniejącej zakładki zastąpiono wpisanymi tutaj wartościami. Jej tagi również zastąpiono tymi tagami."},
   "bookmarkSaved": {
     "message": "Zakładka zapisana."
   },
+  "bookmarkUpdated": {"message": "Zakładka zaktualizowana."},
   "tagDraftUnsaved": {
     "message": "Tekst pozostawiony w polu tagów nie został dodany jako tag."
   },
@@ -245,6 +247,7 @@
   "saveNeedsReview": {
     "message": "Ta strona jest już w zakładkach. Sprawdź pola i naciśnij ponownie „Aktualizuj”."
   },
+  "bookmarkDeletedElsewhere": {"message": "Ta zakładka została usunięta gdzie indziej, więc zmian nie zapisano. Aby ponownie dodać stronę do zakładek, naciśnij „Zapisz”."},
   "recentEditTitle": {
     "message": "Załaduj do edycji"
   },
@@ -5070,6 +5073,10 @@
   "bookmarkPartialSave": {
     "message": "Zakładka mogła zostać zapisana, ale część zmian się nie powiodła. Otwórz edycję, sprawdź dane i zapisz ponownie."
   },
+  "bookmarkPartialSavePopup": {"message": "Zakładka mogła zostać zapisana, ale część zmian się nie powiodła. Naciśnij ponownie „Aktualizuj”, aby je dokończyć."},
+  "bookmarkPartialSavePopupTags": {"message": "Zakładka została zapisana, ale jej tagi nie zostały w pełni zaktualizowane. Naciśnij ponownie „Aktualizuj”, aby to dokończyć."},
+  "bookmarkPartialSavePopupReadLater": {"message": "Zakładka została zapisana, ale nie zmieniono stanu „przeczytaj później”. Naciśnij ponownie „Aktualizuj”, aby to dokończyć."},
+  "bookmarkPartialSavePopupBookmark": {"message": "Tytuł i notki nie zostały zaktualizowane, więc zakładka się nie zmieniła. Naciśnij ponownie „Aktualizuj”, aby zastosować zmiany."},
   "bookmarkErrGatewayRedirect": {
     "message": "Serwer przekierował żądanie. Częstą przyczyną jest bramka dostępu wymagająca logowania, np. Cloudflare Access, albo błędny adres. Dodaj token usługi w sekcji „Bramka dostępu” lub zezwól w bramce na ścieżkę API."
   },
