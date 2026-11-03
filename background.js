@@ -953,10 +953,13 @@ function mutateOfflineQueue(action) {
     } catch (e) {
       console.warn("offline queue pause cleanup failed:", e?.name, e?.message);
     }
-    // A non-empty queue needs the (conditional) keepalive alarm alive to drive
-    // replay. typeof-guarded: source-slice test pages run this without the
-    // alarm block in scope.
-    if (next.length && typeof _ensureKeepaliveAlarmOnce === "function") _ensureKeepaliveAlarmOnce();
+    // A queue the next tick has work in needs the (conditional) keepalive
+    // alarm alive to drive replay; records it holds (attention, a longer rate
+    // limit) do not. The tick's own release check also drops other
+    // connections' and paused records. typeof-guarded: source-slice test
+    // pages run this without the alarm block in scope.
+    if (typeof _ensureKeepaliveAlarmOnce === "function"
+        && next.some((item) => !pbpOfflineQueueHeld(item, Date.now() + KEEPALIVE_PERIOD_MIN * 60000))) _ensureKeepaliveAlarmOnce();
     return next;
   });
 }
@@ -2538,20 +2541,32 @@ function ensurePeriodicAlarm(name, periodInMinutes) {
 // on any wake), noteActivity, offline-queue writes, batch progress writes —
 // a missed wire is repaired on the next SW wake of any kind.
 let _keepaliveAlarmEnsured = false;
+const KEEPALIVE_PERIOD_MIN = 4;
 function _ensureKeepaliveAlarmOnce() {
   if (_keepaliveAlarmEnsured) return;
   _keepaliveAlarmEnsured = true;
-  ensurePeriodicAlarm("keepalive", 4);
+  ensurePeriodicAlarm("keepalive", KEEPALIVE_PERIOD_MIN);
 }
+// (b) counts only queued records the next tick would send
+// (pbpOfflineQueueAutoRetries); the current connection is read only when
+// the window and the batch leave the answer open. Unknown connection:
+// every connection's records count.
 async function _keepaliveAlarmStillNeeded() {
-  const [{ offlineQueue = [], batch_progress }, sess] = await Promise.all([
-    chrome.storage.local.get(["offlineQueue", "batch_progress"]),
+  const [stored, sess] = await Promise.all([
+    chrome.storage.local.get(["offlineQueue", "batch_progress", PBP_OFFLINE_QUEUE_PAUSE_KEY]),
     chrome.storage.session.get({ _lastActivityTs: 0 }).catch(() => ({ _lastActivityTs: 0 })),
   ]);
+  const { offlineQueue = [], batch_progress } = stored;
   const lastTs = Math.max(_lastActivityTs, Number(sess._lastActivityTs) || 0);
-  return (Date.now() - lastTs) < KEEPALIVE_WINDOW_MS ||
-    (Array.isArray(offlineQueue) && offlineQueue.length > 0) ||
-    !!(batch_progress && batch_progress.running);
+  if ((Date.now() - lastTs) < KEEPALIVE_WINDOW_MS || !!(batch_progress && batch_progress.running)) return true;
+  if (!Array.isArray(offlineQueue) || !offlineQueue.length) return false;
+  const auth = await getCurrentBookmarkAuth().catch(() => null);
+  const pause = pbpOfflineQueuePauseShape(stored[PBP_OFFLINE_QUEUE_PAUSE_KEY]);
+  return pbpOfflineQueueAutoRetries(offlineQueue, {
+    account: auth && typeof auth.account === "string" ? auth.account : null,
+    pausedAccount: pause?.account || "",
+    until: Date.now() + KEEPALIVE_PERIOD_MIN * 60000,
+  });
 }
 async function _syncKeepaliveAlarm() {
   try {

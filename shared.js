@@ -2134,6 +2134,20 @@ function pbpOfflineQueueNeedsAttention(item) {
   const failure = pbpOfflineQueueFailureShape(item?.failure);
   return !!failure && failure.retryAfter === undefined && PBP_OFFLINE_QUEUE_ATTENTION_CODES.includes(failure.code);
 }
+// Whether automatic replay has work in `queue` before `until` (the next
+// keepalive tick): a record of the current connection (account; null when
+// unknown counts every connection) that is not paused and not held then.
+// Records that need attention, belong to another connection, sit in a
+// paused connection or wait out a longer rate limit keep no alarm alive.
+function pbpOfflineQueueAutoRetries(queue, { account = null, pausedAccount = "", until = Date.now() } = {}) {
+  return (Array.isArray(queue) ? queue : []).some((item) => {
+    if (!item || typeof item !== "object") return false;
+    const owner = pbpOfflineQueueAccount(item);
+    if (account !== null && owner !== account) return false;
+    if (pausedAccount && owner === pausedAccount) return false;
+    return !pbpOfflineQueueHeld(item, until);
+  });
+}
 // A record automatic replay does not send at `now`: it needs attention, or
 // its server asked for a pause that has not ended yet.
 function pbpOfflineQueueHeld(item, now) {

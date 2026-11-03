@@ -449,6 +449,51 @@ await suite("offline queue", async () => {
     assert(by.pin.reason === "offlineQueueAttention:HTTP 400", "Pinboard row: " + by.pin.reason);
     for (const row of rows) assert(row.buttons.join() === "offlineRetry,offlineRemove", row.id + " buttons: " + row.buttons.join());
   });
+  // The production keepalive check and release (background.js), with only
+  // the queue, pause, connection and alarm stores stubbed.
+  await test("the keepalive alarm is released when only records replay will not send remain", async () => {
+    const source = await (await fetch("../background.js")).text();
+    const start = source.indexOf("let _keepaliveAlarmEnsured = false;");
+    const end = source.indexOf("// Badge refresh is its own", start);
+    assert(start >= 0 && end > start, "keepalive source not found");
+    const pauseStart = source.indexOf("const PBP_OFFLINE_QUEUE_PAUSE_KEY");
+    const pauseEnd = source.indexOf("function pbpReadOfflineQueuePause()", pauseStart);
+    assert(pauseStart >= 0 && pauseEnd > pauseStart, "pause source not found");
+    const LD = "linkding:https://ld.example/:c1", KK = "karakeep:https://kk.example/:u1";
+    const run = async (queue, pause) => {
+      const log = { ensured: 0, cleared: 0 };
+      const local = { offlineQueue: queue, ...(pause ? { offlineQueuePause: pause } : {}) };
+      const deps = {
+        chrome: { storage: { local: { get: async (keys) => Object.fromEntries([].concat(keys).filter((k) => local[k] !== undefined).map((k) => [k, local[k]])) },
+          session: { get: async () => ({ _lastActivityTs: 0 }) } }, alarms: { clear: async () => { log.cleared++; return true; } } },
+        ensurePeriodicAlarm: () => { log.ensured++; }, _lastActivityTs: 0, KEEPALIVE_WINDOW_MS: 600000,
+        getCurrentBookmarkAuth: async () => ({ account: LD, token: "fixture" }),
+      };
+      const api = new Function(...Object.keys(deps), source.slice(pauseStart, pauseEnd) + source.slice(start, end)
+        + "\nreturn { _keepaliveAlarmStillNeeded, _maybeReleaseKeepaliveAlarm };")(...Object.values(deps));
+      const needed = await api._keepaliveAlarmStillNeeded();
+      await api._maybeReleaseKeepaliveAlarm();
+      return { needed, ...log };
+    };
+    const now = Date.now();
+    const rec = (queueId, account, failure) => ({ queueId, account, url: "https://page.example/" + queueId, ...(failure ? { failure } : {}) });
+    const attention = rec("a", LD, { code: "remote", at: now, status: 400 });
+    const other = rec("o", KK);
+    const longHold = rec("l", LD, { code: "rate_limited", at: now, retryAfter: now + 30 * 60000 });
+    const paused = { account: LD, reason: "gateway_denied", ts: now };
+    for (const [label, queue, pause] of [["attention only", [attention]], ["other connection only", [other]],
+      ["paused connection only", [rec("p", LD)], paused], ["rate limit past the next tick", [longHold]],
+      ["all four", [attention, other, longHold, rec("p", LD)], paused], ["empty", []]]) {
+      const r = await run(queue, pause);
+      assert(!r.needed && r.cleared === 1 && r.ensured === 0, label + ": " + JSON.stringify(r));
+    }
+    for (const [label, queue] of [["a plain record", [attention, rec("x", LD)]],
+      ["a rate limit ending before the next tick", [rec("s", LD, { code: "rate_limited", at: now, retryAfter: now + 60000 })]],
+      ["a legacy record without a marker", [{ url: "https://page.example/legacy", account: LD }]]]) {
+      const r = await run(queue);
+      assert(r.needed && r.cleared === 0, label + ": " + JSON.stringify(r));
+    }
+  });
   await test("drain skips items the hook marks and reports failures to onFailure", async () => {
     const run = async (hooks) => {
       let queue = Q();
