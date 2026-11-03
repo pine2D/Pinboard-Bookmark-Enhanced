@@ -467,7 +467,10 @@ function setupTagPresets() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "preset-btn";
-    btn.textContent = p.name;
+    const nameEl = document.createElement("span");
+    nameEl.className = "preset-text";
+    nameEl.textContent = p.name;
+    btn.appendChild(nameEl);
     btn.title = p.tags.join(", ");
     btn.addEventListener("click", () => {
       p.tags.forEach(tag => addTag(tag));

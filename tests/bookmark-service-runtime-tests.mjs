@@ -798,6 +798,10 @@ try{
     const tight=await popup.evaluate(()=>['#ai-suggest-tags .stag','#tags-display .tag-item'].map(sel=>{const el=document.querySelector(sel),tx=el.querySelector('.stag-text,.tag-text'),w=()=>el.getBoundingClientRect(),a=w();const keep=[tx.style.padding,tx.style.margin];tx.style.padding='0';tx.style.margin='0';const b=w();tx.style.padding=keep[0];tx.style.margin=keep[1];return{sel,dw:a.width-b.width,dh:a.height-b.height};}));
     assert(tight.every(c=>Math.abs(c.dw)<=0.01&&Math.abs(c.dh)<=0.01),'the ink padding changed the chip size: '+JSON.stringify(tight));
     await popup.locator('#tags-input').press('Backspace');
+    // A custom preset name with no space ellipsizes inside the popup and the full name stays reachable.
+    await popup.evaluate(name=>{document.getElementById('tag-presets').textContent='';settings.tagPresets=name+': a, b';setupTagPresets();},'preset-'+'y'.repeat(70));
+    const preset=await popup.evaluate(()=>{const b=document.querySelector('#tag-presets .preset-btn'),r=b.getBoundingClientRect(),t=b.querySelector('.preset-text');return{right:r.right,left:r.left,clipped:t.scrollWidth>t.clientWidth,scroll:document.documentElement.scrollWidth,name:b.textContent.length};});
+    assert(preset.right<=550&&preset.left>=0&&preset.scroll<=550&&preset.clipped&&preset.name>70,'a long preset name left the popup: '+JSON.stringify(preset));
     await popup.locator('#tags-input').fill(fits);await popup.locator('#tags-input').press('Enter');
     const before=requests.length;await popup.locator('#submit-btn').click();
     await until(()=>JSON.stringify(kept.tag_names)===JSON.stringify([fits]),'the shortened tag updated the kept bookmark');

@@ -1241,6 +1241,10 @@ html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display:
    count stay whole flex items, so a short chip keeps its flex geometry. */
 .stag { max-width: 100%; min-width: 0; box-sizing: border-box; }
 .stag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 1px; margin: -2px -1px; }
+/* A custom preset name with no space ellipsizes the same way (.preset-text is the
+   flex item that can shrink; a bare text node in the inline-flex button cannot). */
+.preset-btn { max-width: 100%; min-width: 0; box-sizing: border-box; }
+.preset-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 1px; margin: -2px -1px; }
 .stag:hover { background: var(--pp-btn-hover); }
 /* AI-suggested chip text (Task 4, D9): --pp-ai-chip-fg is gated against BOTH
    the chip's rest fill (chip-bg) and its hover fill (btn-hover, painted by
