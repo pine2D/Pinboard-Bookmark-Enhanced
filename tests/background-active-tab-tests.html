@@ -357,7 +357,7 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
     slice("const _lastIconState = new Map();", "// ---- 检查 URL 是否已收藏"),
     slice("async function _getFocusedActiveTab", "chrome.windows.onFocusChanged"),
     "function handleMessage(message, sendResponse) {\n" + slice('if (message.type === "lookup_bookmark" && message.url) {', 'if (message.type === "PBP_POPUP_DRAFT")') + "\n  return false;\n}",
-    "return { handleMessage, _scheduleCurrentTabRefresh, statusCache, pbpStatusCacheSet, pbpStatusCacheDelete, CACHE_TTL, mirrorSettled: () => _statusMirrorTail };",
+    "return { handleMessage, _scheduleCurrentTabRefresh, setIcon, statusCache, pbpStatusCacheSet, pbpStatusCacheDelete, CACHE_TTL, mirrorSettled: () => _statusMirrorTail };",
   ].join("\n");
   const api = new Function(...Object.keys(deps), body)(...Object.values(deps));
   return {
@@ -366,11 +366,13 @@ function buildStatusFailureHarness(source, { service = "linkding", failure = nul
     // The tab moves to `url` the way tabs.onUpdated reports it: an in-page
     // route change (pushState) carries only changeInfo.url, a new document
     // its "complete" status; the scheduled check then runs to its end.
+    // loading: the shape Chromium also gives a pushState route change,
+    // status "loading" with the new url (the icon stays as it was).
     setTabUrl: (url) => { activeTab.url = url; },
-    navigate: async (url, { sameDocument }) => {
+    navigate: async (url, { sameDocument, loading = false }) => {
       activeTab.url = url;
       scheduled = Promise.resolve();
-      listeners.updated(7, sameDocument ? { url } : { status: "complete" }, { ...activeTab });
+      listeners.updated(7, loading ? { status: "loading", url } : sameDocument ? { url } : { status: "complete" }, { ...activeTab });
       await scheduled;
     },
     lookup: () => new Promise((resolve) => {
@@ -1226,10 +1228,30 @@ async function run() {
     for (const checkStatus of [true, false]) {
       const h = buildStatusFailureHarness(source, { bookmark: G14_BOOKMARK, checkStatus, linkdingPreload: false });
       await h.refresh();
-      await h.navigate(OTHER, { sameDocument: true });
+      await h.navigate(OTHER, { sameDocument: false });
       await h.navigate(G14_URL, { sameDocument: false });
       assert(h.lookups.length === 0, "status icon " + checkStatus + ": linkding was asked " + h.lookups.length + " times while browsing");
       assert(h.icons.length === 0, "status icon " + checkStatus + ": the icon was set " + JSON.stringify(h.icons));
+      // A route change the worker cannot place (no record yet) shows the default icon, never a state.
+      await h.navigate(OTHER, { sameDocument: true });
+      assert(h.lookups.length === 0 && h.icons.every((icon) => icon.state === "default"), "status icon " + checkStatus + ": " + JSON.stringify({ lookups: h.lookups, icons: h.icons }));
+    }
+  });
+
+  // A save marks its page saved (setIcon with the page). Moving within the
+  // document to another page, in either shape Chromium reports it, keeps the
+  // browser's icon up: with nothing asked, "saved" must not stay on that page.
+  // Back on the saved page nothing is undone or asked.
+  await test("G26: with browsing checks off a saved icon does not follow an in-page route change", async () => {
+    const OTHER = "https://example.com/other";
+    for (const shape of [{ sameDocument: true }, { sameDocument: false, loading: true }]) {
+      const h = buildStatusFailureHarness(source, { bookmark: G14_BOOKMARK, linkdingPreload: false });
+      h.api.setIcon(7, "saved", G14_URL);
+      await h.navigate(G14_URL + "#notes", { sameDocument: true });
+      assert(h.icons.at(-1)?.state === "saved", JSON.stringify(shape) + ": a #fragment jump dropped the saved icon " + JSON.stringify(h.icons));
+      await h.navigate(OTHER, shape);
+      assert(h.lookups.length === 0, JSON.stringify(shape) + ": linkding was asked " + JSON.stringify(h.lookups));
+      assert(h.icons.at(-1)?.state === "default", JSON.stringify(shape) + ": the saved icon stayed on another page " + JSON.stringify(h.icons));
     }
   });
 

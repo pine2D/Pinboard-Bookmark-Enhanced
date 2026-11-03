@@ -1881,6 +1881,18 @@ try{
     let popup=await openOnTab();await settled(popup,'found');
     assert.deepEqual(checksSince(since),[origin+'/article?saved'],'the popup did not ask exactly once');
     await popup.close();
+    // A save marks its page saved. An in-page route change to another page
+    // (Chromium keeps the icon, and reports the change as status "loading"
+    // with the new url, like a new document) asks nothing and must not keep
+    // that "saved".
+    const articleTab=await worker.evaluate(address=>chrome.tabs.query({url:address}).then(([tab])=>tab.id),article.url());
+    await worker.evaluate(({id,url})=>setIcon(id,'saved',url),{id:articleTab,url:article.url()});
+    since=requests.length;
+    const routed=origin+'/article?routed',routedAt=Date.now();
+    await article.evaluate(address=>history.pushState(null,'',address),routed);
+    await until(()=>worker.evaluate(({routed,routedAt})=>chrome.storage.session.get('_currentTab').then(row=>row._currentTab?.url===routed&&row._currentTab.ts>=routedAt),{routed,routedAt}),'the worker handled the route change');
+    assert.equal(await articleIcon(),'default','the saved page\'s icon stayed up on another page');
+    assert.deepEqual(checksSince(since),[],'linkding was asked on a route change with the switch off');
     // 3. On, with the general status icon off: each page is asked once, the
     // icon follows, and the popup opened there asks nothing more.
     await setSettings({optCheckBookmarkStatus:false,linkdingPreload:true});

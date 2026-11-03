@@ -269,7 +269,10 @@ async function debouncedCheck(url) {
   // linkding: every check makes the server fetch the page (and log its
   // address), so a tab event asks it only with "Check pages while browsing"
   // (linkdingPreload, default off) on, whatever optCheckBookmarkStatus says.
-  // Off, the toolbar keeps the icon it has; the popup still asks on open.
+  // Off, nothing is asked and the answer is "not known" (bookmarked null):
+  // the caller keeps an icon only for the page it describes (a save just
+  // marked it), so an in-page route change drops a "saved" left from the
+  // page before. The popup still asks on open.
   // Pinboard and Karakeep follow optCheckBookmarkStatus as before. A read
   // failure keeps the defaults: checks on, linkding preload off.
   let urlCleanSettings = SETTINGS_DEFAULTS.urlClean;
@@ -284,7 +287,8 @@ async function debouncedCheck(url) {
     console.warn("[bookmark-status] settings read failed:", e?.message || e);
   }
   const auth = await getCurrentBookmarkAuth();
-  if (auth.service === "linkding" ? !linkdingPreload : !checkStatus) return;
+  if (auth.service === "linkding" && !linkdingPreload) return { bookmarked: null };
+  if (auth.service !== "linkding" && !checkStatus) return;
   // K0: ask Pinboard about the URL the popup SAVES under, not the raw tab URL.
   // popup.js derives _bookmarkPrefetchUrl with exactly this condition, so a page
   // reached through a utm_*/fbclid link was stored under the cleaned URL while
@@ -2434,12 +2438,16 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // leave the default pin up. Same rule invalidateBookmarkAuthState follows:
   // when the truth behind the dedup moves, the dedup entry goes first.
   if (!sameDocument) _lastIconState.delete(tabId);
-  // The icon's page record follows the same truth: a new document reset the
-  // icon (no record: nothing stale to keep); a route change left the earlier
-  // page's icon up, so a record that does not exist yet (a restarted worker)
-  // becomes "describes another page". A known record stays exact as it is.
-  if (!sameDocument) _iconPageUrl.delete(tabId);
-  else if (!_iconPageUrl.has(tabId)) _iconPageUrl.set(tabId, null);
+  // The icon's page record stays as it is: it names the page the icon was set
+  // for, so on any other address it reads as "describes another page" and a
+  // check that learns nothing (a failed self-hosted check, linkding with
+  // browsing checks off) drops the icon to default. It is not dropped for what
+  // looks like a new document: Chromium reports an in-page route change
+  // (history.pushState) as status "loading" with the new url too, and keeps
+  // the earlier page's icon then; after a real new document the icon is
+  // already the default, so that reset changes nothing. A route change with
+  // no record yet (a restarted worker) becomes "describes another page".
+  if (sameDocument && !_iconPageUrl.has(tabId)) _iconPageUrl.set(tabId, null);
   _scheduleCurrentTabRefresh(tabId, tab.url);
 });
 
