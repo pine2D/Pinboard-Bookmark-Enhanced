@@ -295,6 +295,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const timers = [];
       const bars = [];
       const checkCalls = [];
+      const checkDirty = [];
       const savedTagCalls = [];
       const syncRemovals = [];
       const localTokenWrites = [];
@@ -363,6 +364,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       // "failed", ...); left out, the lookup keeps the old pending/found shape.
       const checkExistingBookmark = (...args) => {
         checkCalls.push(args);
+        checkDirty.push({ ...fieldDirtyFlags });
         bookmarkLookup.generation++;
         bookmarkLookup.status = recheck ?? (lookupFailed ? "failed" : "pending");
         bookmarkLookup.url = args[1];
@@ -440,7 +442,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const click = elements["submit-btn"]._listeners.click[0];
       return {
         elements, currentTags, fieldDirtyFlags, bookmarkLookup, settings, messages, statuses, timers, bars,
-        checkCalls, savedTagCalls, syncRemovals, localTokenWrites, authEvents, reloadTokenValues,
+        checkCalls, checkDirty, savedTagCalls, syncRemovals, localTokenWrites, authEvents, reloadTokenValues,
         ownershipReads, receiptWrites,
         click, resolveSave, resolveWayback,
         setCurrentToken: (token) => { effectiveToken = token; },
@@ -980,6 +982,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(!h.statuses.some(([, message]) => String(message).startsWith("save-error:")), service + ": a retryable save error was shown");
         assert(!h.elements["submit-btn"].classList.contains("save-error"), service + ": the button was left in the error state");
         assert(enMessages.bookmarkDeletedElsewhere?.message, "en catalogue lacks bookmarkDeletedElsewhere");
+        // The recheck may prefill a missing bookmark from server metadata; the
+        // title and notes the user edited must count as theirs by then.
+        const recheckDirty = h.checkDirty.at(-1) || {};
+        assert(recheckDirty["title-input"] === true && recheckDirty["description-input"] === true, service + ": the recheck ran with the user's edits marked untouched: " + JSON.stringify(recheckDirty));
         // The next press is the user's choice, made after reading the note.
         const again = h.click();
         await new Promise((resolve) => requestAnimationFrame(resolve));

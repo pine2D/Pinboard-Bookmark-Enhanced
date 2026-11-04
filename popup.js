@@ -2597,6 +2597,14 @@ function setupSubmit(token) {
 
       if (result.status === "skipped" || (result.status === "failed" && result.reason === "conflict")) {
         _popupDraftBase = null;
+        // An update's edits are put back before the recheck, as for
+        // changed_elsewhere: if the bookmark is gone, the missing lookup may
+        // prefill from server metadata, which must not replace what the user
+        // typed and is about to save again.
+        if (savePolicy.mode === "update") {
+          for (const id of Object.keys(fieldDirtyFlags)) fieldDirtyFlags[id] = fieldDirtyFlags[id] || dirtyAtSubmit[id] === true;
+          _tagsUserTouched = _tagsUserTouched || tagsTouchedAtSubmit;
+        }
         const conflictLookupPromise = checkExistingBookmark(token, url, null, true, tags);
         const conflictLookupGeneration = bookmarkLookup.generation;
         const conflictLookup = await conflictLookupPromise;
