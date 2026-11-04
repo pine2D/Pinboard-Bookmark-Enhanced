@@ -389,11 +389,11 @@ export const MODULES = [
   {
     id: 'core.save-paths',
     services: ['pinboard'],
-    surfaces: ['background'],
+    surfaces: ['background', 'popup'],
     features: ['pinboard-quick-save-format', 'pinboard-quote-tag', 'pinboard-batch-save-format'],
     fixRefs: ['G4b'],
     needs: needs(),
-    budget: { bookmarks: 2, urls: 2, node: 8, browser: 20, ai: 0, tags: 4, seconds: 100, calls: { pinboard: 8 } },
+    budget: { bookmarks: 2, urls: 2, node: 8, browser: 32, ai: 0, tags: 4, seconds: 120, calls: { pinboard: 14 } },
     files: [],
     settings: { aiTagSeparator: '-', optRespectTagCase: true, qsAutoNotes: true, qsBlockquote: true, qsAiTags: false, qsAiSummary: false, batchAiTags: false, batchAiSummary: false, batchSkipExisting: false, optReadlaterDefault: false },
     async steps(t) {
@@ -437,6 +437,21 @@ export const MODULES = [
       t.expect(tagNamesOf(t, quickRow).includes(quoteTagStored), 'quick_save_quote_tag');
       t.expectEq(quickRow.shared, 'no', 'privacy');
       t.expectEq(quickRow.toread, 'no', 'quick_save_toread');
+      // The extension decodes that entity at its read (shared.js), so the popup
+      // shows the quote as typed and an update sends it literally again: the
+      // stored tag stays one level deep instead of becoming &amp;quot;.
+      await t.phase('pinboard_quote_tag_update');
+      const quickForm = await t.openPopup(quickUrl);
+      await quickForm.popup.waitForFunction(tag => [...document.querySelectorAll('#tags-display .tag-item')].some(el => el.textContent.includes(tag)), prefix + '_qs');
+      const quickChips = (await quickForm.popup.locator('#tags-display .tag-item').allTextContents()).map(c => c.trim());
+      t.expect(quickChips.some(c => c.includes(quoteTag)) && !quickChips.some(c => c.includes('&quot;')), 'quick_popup_shows_typed_quote');
+      const updateSince = t.now();
+      await quickForm.popup.locator('#title-input').fill('联调样例 更新');
+      await t.savePopup(quickForm.popup);
+      await quickForm.close();
+      t.expect((pinboardAdds(t, updateSince).at(-1)?.tags || '').split(' ').includes(quoteTag), 'quick_update_sent_literal_quote');
+      const updatedRow = await t.ownRow(quickUrl);
+      t.expect(tagNamesOf(t, updatedRow).includes(quoteTagStored) && !updatedRow.tags.includes('&amp;quot;'), 'quick_update_no_double_entity');
       await quickPage.close();
 
       await t.phase('pinboard_batch_save');
@@ -2894,7 +2909,7 @@ export const H3C_MODULES = [
         await t.shot(reader, 'empty-title', { surface: 'reader' });
         await reader.close();
         t.expectEq(writes, 0, 'reader_empty_title_sent');
-        t.expectEq(status, t.message('urlAndTitleRequired'), 'reader_empty_title_copy');
+        t.expectEq(status, t.message('readerBookmarkTitleRequired'), 'reader_empty_title_copy');
       });
 
       // G19: no connection at all. The bar says where to connect (bgSetToken)
