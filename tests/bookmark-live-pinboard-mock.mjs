@@ -13,6 +13,7 @@
 //   posts/get     {"date","user","posts":[{href, description, extended, meta,
 //                 hash, time, shared, toread, tags}]} (shared/toread "yes"|"no",
 //                 tags one space-separated string); an unknown URL gives posts []
+//                 and a '"' inside tags comes back as &quot; (seen live 2026-11-04)
 //   tags/get      {"<tag>": count, ...} over the whole account
 //   user/api_token {"result":"<hex>"}
 //   a bad token   HTTP 401 with an HTML body; rate limiting HTTP 429 (HTML)
@@ -50,7 +51,9 @@ export function createPinboardMock({ token, user = String(token || '').split(':'
       case 'posts/get': {
         const target = q.get('url');
         const list = target ? (posts.has(target) ? [posts.get(target)] : []) : [...posts.values()].slice(-1);
-        return json({ date: list[0]?.time || stamp(), user, posts: list.map(p => ({ ...p })) });
+        // Observed live 2026-11-04: posts/get answers a '"' inside tags as
+        // &quot; (titles and notes come back verbatim).
+        return json({ date: list[0]?.time || stamp(), user, posts: list.map(p => ({ ...p, tags: p.tags.replace(/"/g, '&quot;') })) });
       }
       case 'posts/add': {
         const target = q.get('url');
