@@ -290,11 +290,18 @@ export const MODULES = [
       // Pinboard tags hold no spaces and quotes are literal there: its reader
       // field is whitespace-separated, as in the popup.
       await reader.locator('#reader-bookmark-tags').fill(t.service === 'pinboard' ? prefix + '_reader ' + prefix : JSON.stringify(prefix + ' 空格'));
+      const editSince = t.now();
       await t.applyReader(reader);
       row = await t.ownRow(url);
       t.expectEq(titleOf(t, row), prefix + ' 已编辑', 'reader_fields');
       t.expectEq(noteOf(t, row), '编辑后的笔记\n第二行', 'reader_fields');
-      if (t.service === 'pinboard') t.expectEq(row.tags, prefix + '_reader ' + prefix, 'reader_pinboard_tags');
+      if (t.service === 'pinboard') {
+        // Sent in the order typed; on replace=yes Pinboard keeps the tags the
+        // bookmark already had in place and appends new ones, so the stored
+        // order is Pinboard's and is compared as a set.
+        t.expectEq(pinboardAdds(t, editSince).at(-1)?.tags, prefix + '_reader ' + prefix, 'reader_pinboard_sent_tags');
+        t.expectEq(row.tags.split(' ').sort().join(' '), [prefix + '_reader', prefix].sort().join(' '), 'reader_pinboard_tags');
+      }
       else t.expect(tagNamesOf(t, row).includes(prefix + '_空格'), 'new_tag_separator');
       if (t.service === 'linkding') t.expectEq(row.description, '手工描述，与笔记分开', 'reader_preserves_description');
 
@@ -408,6 +415,7 @@ export const MODULES = [
       const quoteTag = prefix + '_q"uote';
       await t.settings({ qsDefaultTags: prefix + '_qs ' + quoteTag });
       const quickPage = await openArticle(quickUrl, true);
+      const quickSince = t.now();
       const quick = await t.sw(async url => {
         const tab = (await chrome.tabs.query({})).find(x => x.url === url);
         if (!tab) return { status: 'no_tab' };
@@ -418,8 +426,15 @@ export const MODULES = [
       const quickRow = await t.ownRow(quickUrl);
       t.expectEq(quickRow.description, '联调样例', 'quick_save_title');
       t.expectEq(quickRow.extended, '<blockquote>First line\n\n# Heading\n**bold** &lt;tag&gt;\n1. item</blockquote>', 'quick_save_quote_format');
-      t.expectEq(quickRow.tags, prefix + '_qs ' + quoteTag, 'quick_save_tags');
-      t.expect(tagNamesOf(t, quickRow).includes(quoteTag), 'quick_save_quote_tag');
+      // The extension sends the quote literally; Pinboard's posts/get answers
+      // it as &quot; inside tags (only there: titles and notes come back
+      // verbatim). The sent value is the product check; the read-back keeps
+      // Pinboard's encoding visible rather than decoding it away.
+      t.expectEq(pinboardAdds(t, quickSince)[0]?.tags, prefix + '_qs ' + quoteTag, 'quick_save_sent_tags');
+      const quoteTagStored = quoteTag.replace(/"/g, '&quot;');
+      t.note('pinboardQuoteTagStored', quickRow.tags.includes(quoteTagStored) ? 'entity' : quickRow.tags.includes(quoteTag) ? 'literal' : 'other');
+      t.expectEq(quickRow.tags, prefix + '_qs ' + quoteTagStored, 'quick_save_tags');
+      t.expect(tagNamesOf(t, quickRow).includes(quoteTagStored), 'quick_save_quote_tag');
       t.expectEq(quickRow.shared, 'no', 'privacy');
       t.expectEq(quickRow.toread, 'no', 'quick_save_toread');
       await quickPage.close();
@@ -1262,8 +1277,11 @@ export const SELFHOSTED_MODULES = [
         since = t.now();
         await t.activateTab(seeded);
         await t.until(async () => t.requests({ path: CHECK_PATH.linkding, since }).length > 0, 'preload_on_checks', 8000);
-        const icon = await t.sw(async url => { const tab = (await chrome.tabs.query({})).find(x => x.url === url); return tab ? _lastIconState.get(tab.id) || '' : 'no_tab'; }, seeded);
-        t.expectEq(icon, 'saved', 'preload_icon_saved');
+        // The request is counted when it leaves; the icon changes only once
+        // linkding answers (it fetches the page first), so wait for the icon.
+        const readIcon = () => t.sw(async url => { const tab = (await chrome.tabs.query({})).find(x => x.url === url); return tab ? _lastIconState.get(tab.id) || '' : 'no_tab'; }, seeded);
+        await t.until(async () => (await readIcon()) === 'saved', 'preload_icon_saved_wait', 8000).catch(() => {});
+        t.expectEq(await readIcon(), 'saved', 'preload_icon_saved');
         await first.close();
         await second.close();
         await t.settings({ [preloadKey]: false });
