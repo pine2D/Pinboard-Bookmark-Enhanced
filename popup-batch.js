@@ -226,7 +226,7 @@ function setupTabSet() {
       if (!current.account || current.account !== pending.account) {
         batchAiPermissionPending = null;
         hideBatchAiPermission();
-        showStatus("status-msg", t("pinboardErrorAuth"), "error");
+        showStatus("status-msg", t("pinboardErrorAuth"), "error", { remedy: true });
         restoreBatchButton(batchBtn);
         batchBtn.focus();
         return;
@@ -261,7 +261,7 @@ function setupTabSet() {
     try {
       const startAuth = await readBatchAccount();
       if (!startAuth.token || !startAuth.account) {
-        showStatus("status-msg", t("batchNotLoggedIn"), "error");
+        showStatus("status-msg", t("batchNotLoggedIn"), "error", { remedy: true });
         return;
       }
       // Re-entry guard is account-scoped: account B never renders or blocks on
@@ -393,12 +393,12 @@ function renderBatchProgress(p, currentAccount) {
     const tagTooLongMsg = p.tagTooLong > 0
       ? t(p.longTagSkip === true ? "batchTagTooLongSkip" : "batchTagTooLong", String(p.tagTooLong), ...pbpBookmarkFailureArgs({ reason: "tag_too_long", tag: p.longTag }))
       : "";
-    if (p.error === "not_logged_in") showStatus("status-msg", t("batchNotLoggedIn"), "error");
+    if (p.error === "not_logged_in") showStatus("status-msg", t("batchNotLoggedIn"), "error", { remedy: true });
     else if (p.error === "account_changed") showStatus("status-msg", t("batchAccountChanged"), "error");
     // The SW's interrupted-batch sweep writes this terminal record; without its
     // own branch the raw token would leak into the UI via batchFailed. Same
     // wording as the notification the sweep fires.
-    else if (p.error === "interrupted") showStatus("status-msg", t("batchInterrupted", String(cur), String(total)), "error");
+    else if (p.error === "interrupted") showStatus("status-msg", t("batchInterrupted", String(cur), String(total)), "error", { remedy: true });
     // User-requested cancel is an outcome, not a failure — info tone.
     else if (p.error === "cancelled") showStatus("status-msg", t("batchCancelled", String(p.saved || 0)), "info");
     // The SW stops a run on the first gateway, token or host-grant failure
@@ -406,12 +406,12 @@ function renderBatchProgress(p, currentAccount) {
     // the raw code inside batchFailed.
     // Only those stop codes: a Pinboard run's thrown message is not a
     // self-hosted cause and keeps batchFailed.
-    else if (p.error === "auth" || PBP_BOOKMARK_STOP_CODES.includes(p.error)) showStatus("status-msg", t(PBP_BOOKMARK_FAILURE_KEYS[p.error]), "error");
+    else if (p.error === "auth" || PBP_BOOKMARK_STOP_CODES.includes(p.error)) showStatus("status-msg", t(PBP_BOOKMARK_FAILURE_KEYS[p.error]), "error", { remedy: true });
     else if (p.error) showStatus("status-msg", t("batchFailed", p.error), "error");
     else {
       const hasFailure = (p.failed || 0) > 0 || (p.tooLong || 0) > 0 || (p.tagTooLong || 0) > 0 || (p.partial || 0) > 0;
       const kind = hasFailure ? "error" : (p.saved || 0) > 0 ? "success" : "info";
-      showStatus("status-msg", t("batchDone", String(p.saved || 0), String(p.failed || 0)) + skipMsg + tooLongMsg + partialMsg + queuedDoneMsg + aiWarnMsg + tagTooLongMsg, kind);
+      showStatus("status-msg", t("batchDone", String(p.saved || 0), String(p.failed || 0)) + skipMsg + tooLongMsg + partialMsg + queuedDoneMsg + aiWarnMsg + tagTooLongMsg, kind, p.tagTooLong > 0 ? { remedy: true } : undefined);
     }
     setBtnIcon(batchBtn, "pin", t("batchSavedCount", String(p.saved || 0)));
     // Timer handles live on the element (not module lets: the test pages

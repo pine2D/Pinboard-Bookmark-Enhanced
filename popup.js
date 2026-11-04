@@ -1231,12 +1231,12 @@ async function showMain(token) {
         if (!granted) {
           e.target.checked = false;
           pbpRememberPopupDraft();
-          showStatus("status-msg", t("waybackPermDenied"), "error");
+          showStatus("status-msg", t("waybackPermDenied"), "error", { remedy: true });
         }
       } catch (_) {
         e.target.checked = false;
         pbpRememberPopupDraft();
-        showStatus("status-msg", t("waybackPermDenied"), "error");
+        showStatus("status-msg", t("waybackPermDenied"), "error", { remedy: true });
       }
     }
   });
@@ -1489,7 +1489,7 @@ async function htmlToMarkdownAsync(html, opts) {
           granted = await chrome.permissions.request({ origins: [PBP_JINA_ORIGIN_PATTERN] });
         } catch (_) {}
         if (!granted) {
-          showStatus("status-msg", t("aiErrorHostPermission", PBP_JINA_ORIGIN_PATTERN.replace(/\/\*$/, "")), "error");
+          showStatus("status-msg", t("aiErrorHostPermission", PBP_JINA_ORIGIN_PATTERN.replace(/\/\*$/, "")), "error", { remedy: true });
           jinaMdBtn.disabled = false;
           return;
         }
@@ -1565,7 +1565,7 @@ async function htmlToMarkdownAsync(html, opts) {
         jinaMdBtn.title = extractMessage;
         // Persistent, specific status — so the user can tell API-key vs other failures
         if (settings.aiContentSource === "jina" && result.authFailed) {
-          showStatus("status-msg", t("jinaAuthFailed"), "error");
+          showStatus("status-msg", t("jinaAuthFailed"), "error", { remedy: true });
         } else {
           showStatus("status-msg", t("jinaFailedDetail", extractMessage), "error");
         }
@@ -2460,7 +2460,7 @@ function setupSubmit(token) {
         return;
       }
       if (pbpBookmarkTitleTooLong(title, pbpBookmarkServiceId(settings))) {
-        showStatus("status-msg", t("titleTooLong", String(pbpBookmarkLimits(pbpBookmarkServiceId(settings)).title)), "error");
+        showStatus("status-msg", t("titleTooLong", String(pbpBookmarkLimits(pbpBookmarkServiceId(settings)).title)), "error", { remedy: true });
         setSubmitState("idle");
         return;
       }
@@ -2562,7 +2562,7 @@ function setupSubmit(token) {
       }
       if (result.status === "failed" && result.reason === "not_logged_in" && pbpBookmarkServiceId(settings) === "pinboard") {
         if (!await resetPinboardSession(token) && ownsSubmitUi()) {
-          showStatus("status-msg", t("pinboardErrorAuth"), "error");
+          showStatus("status-msg", t("pinboardErrorAuth"), "error", { remedy: true });
           setSubmitState("idle");
         }
         return;
@@ -3292,13 +3292,17 @@ function updateCharCount() {
   if (typeof pbpRememberPopupDraft === "function") pbpRememberPopupDraft();
 }
 function showElement(id, text) { const el = $id(id); el.textContent = text; el.classList.remove("hidden"); }
-function showStatus(id, msg, kind) {
+// An error that tells the user what to do next (shorten a tag, grant access,
+// check a token, rerun in another mode) passes {remedy: true} and stays until
+// dismissed or replaced by the next status (user decision 2026-11-04); a plain
+// error hides after 4 s.
+function showStatus(id, msg, kind, opts) {
   if (kind === "error") {
     if (window._lastStatusFeedback) window._lastStatusFeedback.dismiss();
     window._lastStatusFeedback = showFeedback({
       variant: "error",
       message: msg,
-      autoHide: 4000,
+      autoHide: opts && opts.remedy === true ? 0 : 4000,
     });
     return;
   }
@@ -3409,7 +3413,7 @@ function showSaveQueued(result) {
           return;
         }
         if (btn) btn.disabled = false;
-        showStatus("status-msg", window.PPOffline.retryFailureMessage(resp && resp.result, pbpBookmarkServiceId(settings)), "error");
+        showStatus("status-msg", window.PPOffline.retryFailureMessage(resp && resp.result, pbpBookmarkServiceId(settings)), "error", { remedy: true });
       },
     });
   }

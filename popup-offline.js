@@ -258,7 +258,7 @@
         setTimeout(() => btn.classList.remove("offline-queue-failed"), 1200);
         // The pulse acknowledges the click in place; the reason goes to the
         // popup's error card, the same surface batch and save failures use.
-        showStatus("status-msg", retryFailureMessage(resp && resp.result, service), "error");
+        showStatus("status-msg", retryFailureMessage(resp && resp.result, service), "error", { remedy: true });
         return;
       }
       // Success — background has removed this item; refresh list

@@ -912,7 +912,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(net.log.cards[0].message === "saveQueuedNetwork", "a network failure was not named");
       await net.log.cards[0].actions[0].onClick(net.element);
       assert(net.btn.disabled === false, "a failed retry left the button disabled");
-      assert(JSON.stringify(net.log.status.at(-1)) === JSON.stringify(["status-msg", "fail:network", "error"]), "a failed retry gave no reason");
+      assert(JSON.stringify(net.log.status.at(-1)) === JSON.stringify(["status-msg", "fail:network", "error", { remedy: true }]), "a failed retry gave no reason, or its remedy hid on a timer");
       for (const key of ["saveQueuedServer", "saveQueuedNetwork", "offlineRetry", "bookmarkSaved"]) {
         assert(enMessages[key]?.message, "en catalogue lacks " + key);
       }
@@ -4801,6 +4801,20 @@ test("posts/add default remains replace=yes for existing callers", () => {
           assert(h.notice().length === 0 && h.submits() === 0, service + ": after Edit the notice stayed or a save started");
         } finally { h.cleanup(); }
       }
+    });
+
+    await testAsync("showStatus: an error with a remedy never auto-hides, a plain one hides after 4 s", async () => {
+      const start = source.indexOf("function showStatus(id, msg, kind, opts)");
+      const end = source.indexOf("// Save failures stay on screen", start);
+      assert(start >= 0 && end > start, "showStatus source was not found");
+      const cards = [];
+      const win = {};
+      const showStatus = new Function("window", "showFeedback", "$id", source.slice(start, end) + "\nreturn showStatus;")(
+        win, (options) => { cards.push(options); return { dismiss() {} }; }, () => null);
+      showStatus("status-msg", "plain", "error");
+      showStatus("status-msg", "fix it", "error", { remedy: true });
+      assert(cards[0].autoHide === 4000, "a plain error hides after 4000 ms, got " + cards[0].autoHide);
+      assert(cards[1].autoHide === 0, "a remedy error must not auto-hide, got " + cards[1].autoHide);
     });
 
     await testAsync("#fragment address: a save waits at most 3 s for a pending probe", async () => {

@@ -318,7 +318,7 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     (id) => elements[id] || null,
     PBP_ICONS,
     (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
-    (id, message, kind) => statuses.push({ id, message, kind }),
+    (id, message, kind, opts) => statuses.push({ id, message, kind, remedy: opts?.remedy === true }),
     (button, _icon, label) => { button.label = label; },
     (callback) => { timer = callback; return 0; },
     chromeStub,
@@ -721,6 +721,16 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     skip.renderBatchProgress({ running: false, done: true, total: 3, saved: 0, queued: 0, failed: 0, skipped: 2, tooLong: 0, tagTooLong: 1, longTag: shown, longTagSkip: true });
     assert(skip.statuses[0].message.endsWith("batchTagTooLongSkip:1:" + shown + ":64"), "skip-mode sentence missing: " + skip.statuses[0].message);
     assert(!skip.statuses[0].message.includes("batchTagTooLong:"), "skip mode still carries the rerun-only sentence: " + skip.statuses[0].message);
+  });
+
+  await test("batch outcomes with a remedy stay on screen; plain failures keep the 4 s card", async () => {
+    const run = async (progress) => { const h = await createUiHarness(null, 5000); h.renderBatchProgress({ running: false, done: true, total: 3, saved: 0, queued: 0, failed: 0, skipped: 0, tooLong: 0, ...progress }); return h.statuses[0]; };
+    equal((await run({ tagTooLong: 2, longTag: "x" })).remedy, true, "merge-mode long tag hides on a timer");
+    equal((await run({ tagTooLong: 1, longTag: "x", longTagSkip: true })).remedy, true, "skip-mode long tag hides on a timer");
+    equal((await run({ error: "not_logged_in" })).remedy, true, "not-logged-in hides on a timer");
+    equal((await run({ error: "interrupted" })).remedy, true, "interrupted hides on a timer");
+    equal((await run({ failed: 1 })).remedy, false, "a plain item failure must keep the 4 s hide");
+    equal((await run({ error: "something broke" })).remedy, false, "a raw batch error must keep the 4 s hide");
   });
 
   await test("completion copy is localized and names an account switch (B33/B51)", async () => {

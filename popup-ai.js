@@ -1298,7 +1298,7 @@ async function doAISummary(forceRefresh, sOverride) {
   if (!account) return;
   if (!hasAIKey(s)) { showSetKeyError(); return; }
   if (!pbpPopupFormHoldsOpenedPage()) {
-    showStatus("status-msg", t("aiUrlEdited"), "error");
+    showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true });
     return;
   }
   hideAIError();
@@ -1435,7 +1435,7 @@ function showSummaryActions(fromCache) {
     // this link stays clickable: swapping the label before the refusal left it
     // pinned on "Regenerating..." forever, with no request and no feedback.
     if (!pbpPopupFormHoldsOpenedPage()) {
-      showStatus("status-msg", t("aiUrlEdited"), "error");
+      showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true });
       return;
     }
     wrap.querySelectorAll(".regen-link").forEach(l => l.classList.add("loading"));
@@ -1472,7 +1472,7 @@ async function doAITags(forceRefresh, sOverride) {
 
   if (!hasAIKey(s)) { showSetKeyError(); return; }
   if (!pbpPopupFormHoldsOpenedPage()) {
-    showStatus("status-msg", t("aiUrlEdited"), "error");
+    showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true });
     return;
   }
 
@@ -1693,7 +1693,7 @@ function renderAITags(tags, fromCache) {
     // "Regenerating..." forever (these links are not covered by
     // pbpAiSyncUrlEditState's disabled-link pass), with no feedback.
     if (!pbpPopupFormHoldsOpenedPage()) {
-      showStatus("status-msg", t("aiUrlEdited"), "error");
+      showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true });
       return;
     }
     // The account this op belongs to, captured before the first await so
