@@ -2889,6 +2889,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   // outside (another tab, or following a synced choice) while its form was
   // the one in view, the radios follow it instead of describing a stale pick.
   let _bookmarkServiceShownActive = null;
+  // Declared before the service radios and the note's listeners that call it:
+  // a radio clicked while the rest of this init still awaits would otherwise
+  // throw on the not-yet-initialised binding.
+  let _connectionOverviewTimer = 0;
+  const scheduleConnectionOverview = () => {
+    clearTimeout(_connectionOverviewTimer);
+    _connectionOverviewTimer = setTimeout(() => renderConnectionOverview().catch((e) => {
+      console.warn("[connection-health] render failed:", e?.name, e?.message);
+    }), 120);
+  };
   function pbpOptSyncBookmarkServiceNote() {
     _bookmarkServiceNoteTail = _bookmarkServiceNoteTail.then(async () => {
       const state = await pbpReadBookmarkServiceState();
@@ -2901,8 +2911,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           viewed = state.active;
           refreshBookmarkServiceFields();
           pbpSyncTagGovServiceSelection();
-          // Declared further down this init; before then the first render follows anyway.
-          try { scheduleConnectionOverview(); } catch (_) { /* not initialized yet */ }
+          scheduleConnectionOverview();
         }
       }
       _bookmarkServiceShownActive = state.active;
@@ -4838,13 +4847,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
   });
   setupApiTests();
-  let _connectionOverviewTimer = 0;
-  const scheduleConnectionOverview = () => {
-    clearTimeout(_connectionOverviewTimer);
-    _connectionOverviewTimer = setTimeout(() => renderConnectionOverview().catch((e) => {
-      console.warn("[connection-health] render failed:", e?.name, e?.message);
-    }), 120);
-  };
   // The overview rows, its header count and the AI-unavailable hints are all
   // built with t(); a language that arrives after first paint (synced from
   // another device) would otherwise leave them in the old one.
