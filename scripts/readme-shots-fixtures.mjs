@@ -44,8 +44,10 @@ export function translate(text) {
   return text;
 }
 
+export const POPUP_QUOTE = "A clean page is a quiet room: the argument can finally be heard.";
+export const ARTICLE_DESCRIPTION ="Saving feels like reading, so the reading never happens. A short essay on attention, highlights, and keeping what you learn.";
 export const ARTICLE_HTML = (scheme) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${ARTICLE_TITLE} — Field Notes</title>
-<meta name="description" content="Saving feels like reading, so the reading never happens. A short essay on attention, highlights, and keeping what you learn.">
+<meta name="description" content="${ARTICLE_DESCRIPTION}">
 <style>
 :root{color-scheme:${scheme};--bg:${scheme === "dark" ? "#16181d" : "#fbfaf7"};--fg:${scheme === "dark" ? "#e6e3dc" : "#22201c"};--mute:${scheme === "dark" ? "#8d8a83" : "#77736b"};--rule:${scheme === "dark" ? "#2a2d34" : "#e7e3da"};--ad:${scheme === "dark" ? "#22252c" : "#efece4"}}
 body{margin:0;background:var(--bg);color:var(--fg);font:18px/1.7 Georgia,"Times New Roman",serif}
@@ -91,13 +93,25 @@ export const AI_TAGS_SUMMARY = JSON.stringify({
   summary: "Saving a link feels like reading it, so the reading rarely happens. The essay argues for choosing fewer pieces, reading them on a clean page, and leaving small traces (highlights, short notes, looked-up words) that turn bookmarks into a personal library of ideas.",
 });
 
+export const ASK_QUESTIONS = ["Why does the author say saving isn't reading?", "What does the author suggest doing instead?"];
 export function askAnswer(userPrompt) {
   const lines = String(userPrompt).split("\n");
   const find = (needle) => {
     for (const l of lines) { const m = l.match(/^\[P(\d+)\]/); if (m && l.includes(needle)) return Number(m[1]); }
     return 1;
   };
-  const a = find("receipt, not knowledge"), b = find("That trace can be small"), c = find("Slow reading does not mean");
+  const a = find("receipt, not knowledge"), b = find("That trace can be small"), c = find("Slow reading does not mean"), d = find("Over time, those small traces");
+  // The latest question is the last one in the prompt; earlier turns ride along as history.
+  const last = ASK_QUESTIONS.map((q) => [q, String(userPrompt).lastIndexOf(q)]).sort((x, y) => y[1] - x[1])[0];
+  if (last[1] >= 0 && last[0] === ASK_QUESTIONS[1]) return [
+    `Read fewer pieces, all the way to the end: pick a few each week and keep what you learn somewhere you will actually look again [P${c}].`,
+    "",
+    `Leave small traces as you go. Over time they add up to a personal library of ideas in your own words, something a list of links never becomes [P${d}].`,
+    "",
+    "CITES:",
+    `P${c}: "choosing a few pieces each week, reading them to the end"`,
+    `P${d}: "a personal library of ideas, in your own words."`,
+  ].join("\n");
   return [
     `Because saving gives the feeling of progress without the reading itself. A link that only sits in a list is "a receipt, not knowledge" [P${a}]; its value appears only when you come back, read with attention, and leave a trace of what mattered [P${a}].`,
     "",
@@ -109,6 +123,21 @@ export function askAnswer(userPrompt) {
     `P${c}: "choosing a few pieces each week, reading them to the end"`,
   ].join("\n");
 }
+
+// Earlier saved conversations on other articles (the production archive's
+// record shape, as the reader writes it after a completed answer).
+export const ASK_HISTORY = (now) => [
+  { sessionId: "readme-plain-text", url: "https://example.com/essays/why-plain-text-endures", title: "Why Plain Text Endures", ts: now - 26 * 3600_000,
+    q: "Why does the author trust plain text for notes?",
+    a: "Because it outlives the software that wrote it: a text file opened decades later still opens [P2]. The author argues the best archive is one you can read without special tools [P3].\n\nCITES:\nP2: \"a text file opened in 1995 still opens today\"\nP3: \"The best archive is the one you can read without the software that wrote it.\"",
+    cites: [{ p: 2, quote: "a text file opened in 1995 still opens today" }, { p: 3, quote: "The best archive is the one you can read without the software that wrote it." }] },
+  { sessionId: "readme-link-rot", url: "https://example.com/web/link-rot", title: "The Long Tail of Link Rot", ts: now - 6 * 86_400_000,
+    q: "How common is link rot in older papers?",
+    a: "Very common: about half the links cited in a decade-old paper no longer resolve [P1]. The piece recommends archiving anything worth citing [P4].\n\nCITES:\nP1: \"Half of the links cited in a decade-old paper no longer resolve.\"\nP4: \"archive anything worth citing\"",
+    cites: [{ p: 1, quote: "Half of the links cited in a decade-old paper no longer resolve." }, { p: 4, quote: "archive anything worth citing" }] },
+].map((r) => ({ sessionId: r.sessionId, url: r.url, title: r.title,
+  record: { q: r.q, a: r.a, cites: r.cites, ts: r.ts, model: "OpenAI (ChatGPT) · gpt-5.4-mini", blocksHash: "readme-" + r.sessionId,
+    evidence: r.cites.map((c) => ({ p: c.p, quote: c.quote, state: "matched", sourceUrl: r.url })) } }));
 
 // ---- Library: highlights + vocabulary ----
 const day = 86_400_000;
@@ -172,7 +201,71 @@ export const DICT = {
     }],
     source: { url: "https://en.wiktionary.org/wiki/serendipity", license: { name: "CC BY-SA", url: "https://creativecommons.org/licenses/by-sa/4.0" } },
   },
+  // Definitions below are our own wording in the API's response shape.
+  scarce: {
+    word: "scarce",
+    entries: [{
+      language: { code: "en", name: "English" }, partOfSpeech: "adjective",
+      pronunciations: [{ type: "ipa", text: "/skɛəs/", tags: ["UK"] }, { type: "ipa", text: "/skɛɹs/", tags: ["US"] }],
+      forms: [{ word: "scarcer", tags: ["comparative"] }, { word: "scarcest", tags: ["superlative"] }],
+      senses: [
+        { definition: "Not plentiful; harder to find than people need or want.", examples: ["Good bookshops are getting scarce."], tags: [], synonyms: ["rare", "sparse", "in short supply"], antonyms: ["plentiful"], subsenses: [] },
+        { definition: "Seldom seen or met with.", examples: [], tags: [], synonyms: [], antonyms: [], subsenses: [] },
+      ],
+    }, {
+      language: { code: "en", name: "English" }, partOfSpeech: "adverb",
+      pronunciations: [], forms: [],
+      senses: [{ definition: "Hardly; only just.", examples: [], tags: ["literary"], synonyms: [], antonyms: [], subsenses: [] }],
+    }],
+    source: { url: "https://en.wiktionary.org/wiki/scarce", license: { name: "CC BY-SA", url: "https://creativecommons.org/licenses/by-sa/4.0" } },
+  },
 };
+
+// ---- AI dictionary entries (reader + library lookups) ----
+// Parsed by the product's strict entry/supplement validators: explanations in
+// the requested language (Simplified Chinese), compared words in curly quotes.
+const DICT_AI = {
+  scarce: {
+    entry: { pronunciation: "/skɛəs/", meanings: [
+      { partOfSpeech: "形容词", definition: "稀少的，不够用的；指需求大而供应少。", examples: [{ text: "In a busy week, quiet time is scarce.", translation: "忙碌的一周里，安静的时间很稀缺。" }] },
+      { partOfSpeech: "形容词", definition: "罕见的，不常遇到的。", examples: [{ text: "Handwritten letters have become scarce.", translation: "手写信已经很少见了。" }] },
+    ] },
+    patterns: [
+      { sense: 1, head: "a scarce resource", note: "把某物看作有限、需要精打细算的资源，常用于时间、注意力、资金等。", example: "Treat your attention as a scarce resource.", translation: "把注意力当作稀缺资源来对待。" },
+      { sense: 1, head: "<something> is scarce", note: "多作表语，放在系动词之后；作定语时更常用 “rare”。", example: "Good questions are scarce in a crowded meeting.", translation: "人多的会上，好问题很少。" },
+    ],
+    confusables: { summary: "看稀少的原因：供不应求用 “scarce”，本来就少见用 “rare”。", items: [
+      { sense: 1, title: "scarce / rare", explanation: "“scarce” 强调眼下不够用，数量会随供需变化；“rare” 强调本身少见，常带珍贵的意味。", example: "Fresh bread is scarce after noon, but a good loaf is rare anywhere.", translation: "过了中午新鲜面包就不够了，而好面包在哪儿都难得。", sourceIndex: -1 },
+    ] },
+  },
+  serendipity: {
+    entry: { pronunciation: "/ˌsɛrənˈdɪpɪti/", meanings: [
+      { partOfSpeech: "名词", definition: "意外发现珍贵事物的运气；机缘巧合。", examples: [{ text: "Finding that old notebook was pure serendipity.", translation: "翻到那本旧笔记本纯属机缘巧合。" }] },
+      { partOfSpeech: "名词", definition: "善于在无意中发现有价值事物的天赋。", examples: [{ text: "A good library is built for serendipity.", translation: "好的图书馆本来就为意外发现而建。" }] },
+    ] },
+    patterns: [
+      { sense: 1, head: "by serendipity", note: "表示“机缘巧合地”，多放在句末，修饰整个动作。", example: "We found the café by serendipity.", translation: "我们是机缘巧合才发现这家咖啡馆的。" },
+      { sense: 2, head: "leave room for serendipity", note: "指刻意留出空间，让意外的发现有机会发生，常用于谈论学习和规划。", example: "A loose plan leaves room for serendipity.", translation: "宽松的计划给意外之喜留了余地。" },
+    ],
+    confusables: { summary: "关键在于有没有“意外发现”：“serendipity” 一定带有无心插柳的意味。", items: [
+      { sense: 1, title: "serendipity / luck", explanation: "“luck” 泛指好运气；“serendipity” 强调在找别的东西时意外碰到了好东西。", example: "It wasn't luck; it was serendipity: I was looking for a different book.", translation: "这不是运气，而是意外之喜：我本来在找另一本书。", sourceIndex: -1 },
+    ] },
+  },
+};
+const ZH = { lang: "zh-Hans" };
+export function dictAnswer(tail) {
+  const ai = DICT_AI[String(tail?.term || "").toLowerCase()];
+  if (!ai) return null;
+  const lang = tail.targetLanguage?.lang || ZH.lang;
+  if (tail.task === "usage-card") return JSON.stringify({ language: lang, patterns: ai.patterns });
+  if (tail.category === "confusables") return JSON.stringify({ language: lang, ...ai.confusables });
+  if (tail.category) return JSON.stringify({ language: lang, summary: "", items: [] });
+  return JSON.stringify({ word: tail.term, language: tail.sourceLanguage, ...ai.entry });
+}
+
+// ---- self-hosted linkding server (fictional host, every request is mocked) ----
+export const LINKDING_URL = "https://links.example.net/";
+export const LINKDING_TAGS = ["reading", "essay", "attention", "habits", "longform", "design", "writing", "notes", "learning", "productivity"];
 
 // ---- pinboard.in page (structure mirrors the live site; content is fake) ----
 const BOOKMARKS = [

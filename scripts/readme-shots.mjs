@@ -13,10 +13,13 @@
 //   node scripts/readme-shots.mjs --compose          # full rerun: shoot + compose + WebP
 //   node scripts/readme-shots.mjs --surfaces reader,ask   # light scheme, subset (no compose)
 //   node scripts/readme-shots.mjs --compose-only     # recompose from existing raw shots
-//   Options: --surfaces popup,reader,ask,notes,vocab,themes,video
+//   Options: --surfaces popup,popup-tags,popup-linkding,account,reader,ask,lookup,notes,
+//                       vocab,questions,themes,video
 //            --scheme light|dark   (with --surfaces; default light)
 //            --dsf 2   --video-t 95 (caption time shown in the video shot)
 //   Default (no --surfaces): light = popup..themes, dark = popup only (hero),
+//   (popup-tags, popup-linkding, account, lookup and questions feed
+//   scripts/cws-shots.mjs),
 //   video = its own light context (YouTube origin grant + relay stub).
 //
 // OUTPUT  .qa-scan/report/readme-shots/{raw/<scheme>,out}/ (gitignored);
@@ -40,7 +43,7 @@ const flag = (n, d) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] 
 const has = (n) => argv.includes(n);
 const DSF = Number(flag("--dsf", "2"));
 const START_T = Number(flag("--video-t", "95"));
-const ALL = ["popup", "reader", "ask", "notes", "vocab", "themes", "video"];
+const ALL = ["popup", "popup-tags", "popup-linkding", "account", "reader", "ask", "lookup", "notes", "vocab", "questions", "themes", "video"];
 const OUT_ROOT = join(REPO, ".qa-scan/report/readme-shots");
 const RAW = (scheme) => join(OUT_ROOT, "raw", scheme);
 const COMPOSED = join(OUT_ROOT, "out");
@@ -62,7 +65,7 @@ const jobs = (() => {
     return [...(rest.length ? [{ scheme, surfaces: rest }] : []), ...(s.includes("video") ? [{ scheme, surfaces: ["video"] }] : [])];
   }
   return [
-    { scheme: "light", surfaces: ["popup", "reader", "ask", "notes", "vocab", "themes"] },
+    { scheme: "light", surfaces: ["popup", "popup-tags", "popup-linkding", "account", "reader", "ask", "lookup", "notes", "vocab", "questions", "themes"] },
     { scheme: "dark", surfaces: ["popup"] },
     { scheme: "light", surfaces: ["video"] },
   ];
@@ -102,13 +105,17 @@ function aiAnswer(body) {
     return JSON.stringify({ translations: segs.map((s) => ({ id: s.id, text: F.translate(s.text) })) });
   }
   if (/numbered paragraphs/.test(system)) return F.askAnswer(user);
+  // Dictionary entry / supplement requests end with one line of JSON data.
+  const all = msgs.map((m) => m.content).join("\n");
+  let tail = null; try { tail = JSON.parse(all.slice(all.lastIndexOf("\n") + 1)); } catch {}
+  if (tail && typeof tail === "object" && tail.term && tail.sourceLanguage) { const d = F.dictAnswer(tail); if (d) return d; }
   if (/"tags"|tags/i.test(user) && /"summary"|summary/i.test(user)) return F.AI_TAGS_SUMMARY;
   return "OK";
 }
 const sse = (content) => {
   const step = Math.max(1, Math.ceil(content.length / 6)); let out = "";
   for (let i = 0; i < content.length; i += step) out += `data: ${JSON.stringify({ choices: [{ delta: { content: content.slice(i, i + step) } }] })}\n\n`;
-  return out + "data: [DONE]\n\n";
+  return out + `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`;
 };
 const ai = await new Promise((res) => {
   const server = createServer((req, rsp) => {
@@ -177,6 +184,16 @@ async function routes(context, { scheme, video }) {
         if (url.pathname === "/blue-pin.png") return route.fulfill({ status: 200, contentType: "image/png", body: readFileSync(join(PBCSS, "blue-pin.png")) });
         return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: F.pinboardHtml() });
       }
+      if (url.origin + "/" === F.LINKDING_URL) {
+        const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+        const page = (results) => json({ count: results.length, next: null, previous: null, results });
+        if (url.pathname === "/api/bookmarks/check/") return json({ bookmark: null, auto_tags: [],
+          metadata: { title: `${F.ARTICLE_TITLE} — Field Notes`, description: F.ARTICLE_DESCRIPTION } });
+        if (url.pathname === "/api/tags/") return page(F.LINKDING_TAGS.map((name, i) => ({ id: i + 1, name, date_added: "2026-10-01T09:00:00Z" })));
+        if (url.pathname === "/api/bookmarks/") return page([]);
+        if (url.pathname === "/api/user/profile/") return json({ theme: "auto", bookmark_date_display: "relative", web_archive_integration: "disabled" });
+        return route.abort("blockedbyclient");
+      }
       if (url.hostname === "freedictionaryapi.com") {
         const w = decodeURIComponent(url.pathname.split("/").pop() || "").toLowerCase();
         return route.fulfill({ status: 200, contentType: "application/json", body: !video && F.DICT[w] ? JSON.stringify(F.DICT[w]) : '{"entries":[]}' });
@@ -206,19 +223,30 @@ async function startSession({ scheme, video }) {
   let sw = await worker(ctx);
   const extId = new URL(sw.url()).hostname;
   await sleep(1200);
-  await sw.evaluate(async ({ token, scheme, video }) => {
+  await sw.evaluate(async ({ token, scheme, video, linkdingUrl }) => {
     if (typeof primeSettings === "function") await primeSettings();
-    await chrome.storage.local.set({
+    // The worker's own install-time prime fills missing keys under the
+    // settings lock; an unlocked write here can land between its read and its
+    // write and lose personalLibraryAccount (the library then opens empty).
+    const locked = typeof pbpWithSecretStorageLock === "function" ? pbpWithSecretStorageLock : (fn) => fn();
+    await locked(() => chrome.storage.local.set({
       optSyncEnabled: false, syncApiKeys: false, _hlOwnerClaimDone: true,
       pinboardToken: obfuscateKey(token), personalLibraryAccount: token.split(":")[0], optLang: "en", optTheme: scheme, themePresetKey: "", optPopupFollowTheme: true,
       aiProvider: "openai", openaiApiKey: obfuscateKey("sk-mock"), openaiModel: "gpt-5.4-mini",
       previewAiEnabled: true, previewSkimEnabled: false, optAiAutoTags: false, dictEchoEnabled: true,
       translateTargetLang: "zh-Hans", optShowSuggestTags: true,
+      dictDefaultView: "ai-generate", dictDefinitionLang: "zh-Hans",
       ...(video ? { mdVideoDarkScheme: false, mdVideoLangPref: "" } : {}),
-    });
-  }, { token: F.TOKEN, scheme, video });
+    }));
+    // A connected (but not selected) linkding server: Connect's envelope shape.
+    const baseUrl = pbpBookmarkEndpoint(linkdingUrl);
+    await locked(() => chrome.storage.local.set({ linkdingUrl: baseUrl,
+      linkdingToken: obfuscateKey(JSON.stringify({ v: 1, baseUrl, token: "ld-0000000000000000", connectionId: "readme-shots" })) }));
+  }, { token: F.TOKEN, scheme, video, linkdingUrl: F.LINKDING_URL });
   if (!video) {
     await sw.evaluate(async ({ words, user }) => {
+      const { personalLibraryAccount } = await chrome.storage.local.get("personalLibraryAccount");
+      if (personalLibraryAccount !== user) throw new Error(`library identity is ${personalLibraryAccount}, not ${user}`);
       const owner = pbpDictOwnerScope(user);
       for (const w of [...words].reverse()) {
         for (const c of w.contexts || [{}]) {
@@ -256,7 +284,8 @@ async function startSession({ scheme, video }) {
     const prefsPath = join(profile, "Default", "Preferences");
     const prefs = JSON.parse(readFileSync(prefsPath, "utf8"));
     const st = prefs.extensions.settings[extId];
-    const hosts = ["http://127.0.0.1/*", "https://api.openai.com/*", "https://freedictionaryapi.com/*", ...(video ? ["https://www.youtube.com/*"] : ["https://example.com/*"])];
+    const hosts = ["http://127.0.0.1/*", "https://api.openai.com/*", "https://freedictionaryapi.com/*",
+      ...(video ? ["https://www.youtube.com/*"] : ["https://example.com/*", F.LINKDING_URL + "*"])];
     for (const k of ["granted_permissions", "active_permissions"]) {
       const b = st[k] || (st[k] = { api: [], explicit_host: [], manifest_permissions: [], scriptable_host: [] });
       b.explicit_host = [...new Set([...(b.explicit_host || []), ...hosts])];
@@ -267,11 +296,12 @@ async function startSession({ scheme, video }) {
   ctx = await launch();
   await routes(ctx, { scheme, video });
   sw = await worker(ctx);
-  console.log("grants", await sw.evaluate(async () => ({
+  console.log("grants", await sw.evaluate(async (linkding) => ({
     ai: await chrome.permissions.contains({ origins: ["http://127.0.0.1/*"] }),
     yt: await chrome.permissions.contains({ origins: ["https://www.youtube.com/*"] }),
     ex: await chrome.permissions.contains({ origins: ["https://example.com/*"] }),
-  })));
+    ld: await chrome.permissions.contains({ origins: [`${linkding}*`] }),
+  }), F.LINKDING_URL));
   return { ctx, sw, extId, scheme, profile, out: RAW(scheme) };
 }
 
@@ -292,16 +322,24 @@ async function openReader(S, page) {
 // Opens the toolbar popup as a real action popup and drives it over a raw CDP
 // session (it is not a Playwright page). WSLg focus races occasionally make
 // openPopup fail with "Could not find an active browser window": retried.
-async function popupOnce(S, attempt) {
+async function popupOnce(S, attempt, name, select = "", summary = true) {
   const { ctx, sw, extId } = S;
   const active = await ctx.newPage();
   let cdp, target;
   try {
     await active.goto(F.ARTICLE_URL, { waitUntil: "load" });
+    if (select) await active.evaluate((text) => {
+      const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let n; (n = w.nextNode());) {
+        const i = n.data.indexOf(text); if (i < 0) continue;
+        const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + text.length);
+        getSelection().removeAllRanges(); getSelection().addRange(r); return;
+      }
+    }, select);
     await active.bringToFront();
     await (await ctx.newCDPSession(active)).send("Page.bringToFront").catch(() => {});
     await sleep(500);
-    await shot(S, active, "article-page");
+    if (name === "popup-ai-tagged") await shot(S, active, "article-page");
     cdp = await ctx.browser().newBrowserCDPSession();
     await cdp.send("Target.setDiscoverTargets", { discover: true });
     const popupUrl = `chrome-extension://${extId}/popup.html`;
@@ -340,26 +378,70 @@ async function popupOnce(S, attempt) {
       await sleep(100);
     }
     await sleep(1500);
-    await evalP(`document.getElementById("ai-tags-btn")?.click(); document.getElementById("ai-summary-btn")?.click();`);
+    await evalP(`document.getElementById("ai-tags-btn")?.click(); ${summary ? `document.getElementById("ai-summary-btn")?.click();` : ""}`);
     await sleep(3500);
     await evalP(`[...document.querySelectorAll(".add-all-link")].filter(a => a.id !== "add-all-suggest").pop()?.click(); document.activeElement?.blur();`);
     await sleep(600);
     const img = await send("Page.captureScreenshot", { format: "png" });
-    writeFileSync(join(S.out, "popup-ai-tagged.png"), Buffer.from(img.data, "base64"));
-    console.log("shot", S.scheme + "/popup-ai-tagged", await evalP(`JSON.stringify({w: innerWidth, h: innerHeight})`));
+    writeFileSync(join(S.out, name + ".png"), Buffer.from(img.data, "base64"));
+    console.log("shot", S.scheme + "/" + name, await evalP(`JSON.stringify({w: innerWidth, h: innerHeight})`));
   } finally {
     if (target) await cdp.send("Target.closeTarget", { targetId: target.targetId }).catch(() => {});
     await active.close().catch(() => {});
   }
 }
-async function popup(S) {
+async function popup(S, name = "popup-ai-tagged", select = "", summary = true) {
   for (let attempt = 1; ; attempt++) {
-    try { return await popupOnce(S, attempt); } catch (e) {
+    try { return await popupOnce(S, attempt, name, select, summary); } catch (e) {
       if (attempt >= 3) throw e;
       console.warn(`[popup] attempt ${attempt} failed (${e.message}); retrying`);
       await sleep(1500);
     }
   }
+}
+
+// Switch this device to the seeded linkding connection (the same two keys a
+// Settings click writes), run `fn`, then switch back to Pinboard.
+async function withLinkding(S, fn) {
+  const set = (service) => S.sw.evaluate(async (v) => chrome.storage.local.set({ bookmarkService: v, bookmarkServiceActive: v }), service);
+  await set("linkding"); await sleep(400);
+  try { return await fn(); } finally { await set("pinboard"); await sleep(400); }
+}
+// Pinboard keeps the AI summary as HTML in Notes; the store's save shot shows tags only.
+async function popupTags(S) {
+  // A fresh popup: no draft and no cached summary left by the "popup" surface.
+  await S.sw.evaluate(async () => {
+    const rows = await chrome.storage.session.get(null);
+    const drafts = Object.keys(rows).filter((k) => k.startsWith("pbp-popup-draft:"));
+    if (drafts.length) await chrome.storage.session.remove(drafts);
+    await new Promise((done) => {
+      const req = indexedDB.open("pbp-ai-cache");
+      req.onupgradeneeded = () => req.transaction.abort(); // absent: do not create an empty one
+      req.onerror = () => done();
+      req.onsuccess = () => {
+        const db = req.result, names = [...db.objectStoreNames];
+        if (!names.length) { db.close(); return done(); }
+        const tx = db.transaction(names, "readwrite");
+        for (const n of names) tx.objectStore(n).clear();
+        tx.oncomplete = tx.onerror = tx.onabort = () => { db.close(); done(); };
+      };
+    });
+  });
+  await popup(S, "popup-tags", "", false);
+}
+async function popupLinkding(S) { await withLinkding(S, () => popup(S, "popup-linkding", F.POPUP_QUOTE)); }
+
+async function account(S) {
+  await withLinkding(S, async () => {
+    const page = await S.ctx.newPage();
+    await page.goto(`chrome-extension://${S.extId}/options.html#general`, { waitUntil: "load" });
+    await page.waitForFunction(() => document.querySelector('input[name="bookmark-service"][value="linkding"]')?.checked, { timeout: T });
+    await sleep(1200);
+    await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
+    await page.mouse.move(1279, 799);
+    await shot(S, page, "options-account");
+    await page.close();
+  });
 }
 
 async function reader(S) {
@@ -377,14 +459,88 @@ async function reader(S) {
 
 async function ask(S) {
   const page = await S.ctx.newPage();
+  await page.setViewportSize({ width: 1440, height: 900 }); // above 1280 Ask docks beside the article
   await openReader(S, page);
+  // One idea per image: the article in its own language beside the answer.
+  await page.locator('#tr-view-toggle [data-tr-mode="original"]').click({ timeout: 3000 }).catch(() => {});
+  await sleep(300);
   await page.evaluate(() => getSelection().removeAllRanges());
   await page.locator("#ask-open").click();
   await sleep(400);
-  await page.locator("#ask-input").fill("Why does the author say saving isn't reading?");
+  await page.locator("#ask-input").fill(F.ASK_QUESTIONS[0]);
   await page.locator("#ask-send").click();
   await sleep(3500);
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.mouse.move(1439, 899);
+  await sleep(300);
   await shot(S, page, "ask-answer");
+  // A follow-up in the same conversation: the library's Questions view shows both.
+  await page.locator("#ask-input").fill(F.ASK_QUESTIONS[1]);
+  await page.locator("#ask-send").click();
+  await sleep(3500);
+  await page.close();
+}
+
+// Reader dictionary lookup: select a word, press d (the product shortcut). The
+// AI entry generates on open (dictDefaultView ai-generate), then the usage card.
+async function lookup(S) {
+  const page = await S.ctx.newPage();
+  await page.setViewportSize({ width: 1440, height: 900 }); // side panel, as for Ask
+  await openReader(S, page);
+  await page.locator('#tr-view-toggle [data-tr-mode="original"]').click({ timeout: 3000 }).catch(() => {});
+  await sleep(300);
+  const selectWord = (scroll) => page.evaluate((scroll) => {
+    const walker = document.createTreeWalker(document.getElementById("rendered-view"), NodeFilter.SHOW_TEXT);
+    for (let n; (n = walker.nextNode());) {
+      const i = n.data.indexOf("scarce");
+      if (i < 0) continue;
+      if (scroll) n.parentElement.scrollIntoView({ block: "center", behavior: "instant" });
+      const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 6);
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      return;
+    }
+    throw new Error("lookup word not found");
+  }, scroll);
+  await selectWord(true);
+  await sleep(300);
+  await page.keyboard.press("d");
+  await page.waitForSelector("#explain-pop .xp-dict-ai-content:not([hidden])", { timeout: 20_000 });
+  await sleep(800);
+  // "Move to side panel": the same lookup, full height beside the article.
+  await page.locator("#explain-pop .xp-dock").click();
+  await page.waitForSelector("#reader-dict-view .xp-dict-ai-content:not([hidden])", { timeout: T });
+  await sleep(600);
+  const patterns = page.locator('#reader-dict-view .xp-dict-supplement-generate[data-category="patterns"]');
+  if (await patterns.count()) {
+    await patterns.first().click();
+    await page.waitForSelector('#reader-dict-view [data-supplement-category="patterns"]', { timeout: 20_000 }).catch(() => console.warn("patterns slow"));
+  }
+  await sleep(1200);
+  await page.evaluate(() => { document.activeElement?.blur(); const b = document.querySelector("#reader-dict-view .reader-dict-session > .xp-body"); if (b) b.scrollTop = 0; });
+  await selectWord(false); // the looked-up word stays marked in the article
+  await page.mouse.move(1439, 899);
+  await sleep(400);
+  await shot(S, page, "reader-lookup");
+  await page.close();
+}
+
+async function questions(S) {
+  const page = await S.ctx.newPage();
+  await page.goto(`chrome-extension://${S.extId}/library.html#ask`, { waitUntil: "load" });
+  await page.waitForSelector("#ask-library-list .ask-library-hit", { timeout: T });
+  await page.evaluate(async (rows) => {
+    const owner = await pbpVocabCurrentOwner(), scope = owner === "ownerless" ? "" : owner;
+    for (const r of rows) await pbpAskArchiveAppend({ owner: scope, ...r });
+  }, F.ASK_HISTORY(Date.now()));
+  await page.reload({ waitUntil: "load" });
+  await page.waitForFunction(() => document.querySelectorAll("#ask-library-list .ask-library-hit").length >= 3, { timeout: T });
+  await sleep(500);
+  await page.locator("#ask-library-list .ask-library-hit").first().click();
+  await page.waitForSelector("#ask-library-detail:not([hidden])", { timeout: T });
+  await sleep(800);
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.mouse.move(1279, 799);
+  await shot(S, page, "library-questions");
   await page.close();
 }
 
@@ -406,10 +562,19 @@ async function vocab(S) {
   await page.waitForSelector("#vocab-list .vocab-card", { timeout: T }).catch(() => {});
   await sleep(500);
   await page.locator("#vocab-list .notes-card-head").filter({ hasText: "serendipity" }).first().click().catch((e) => console.warn("vocab click", e.message));
-  await sleep(2500);
+  await page.waitForSelector("#vocab-ref-result .xp-dict-ai-content:not([hidden])", { timeout: 20_000 }).catch(() => console.warn("vocab AI entry slow"));
+  await sleep(800);
+  const patterns = page.locator('#vocab-ref-result .xp-dict-supplement-generate[data-category="patterns"]');
+  if (await patterns.count()) {
+    await patterns.first().click();
+    await page.waitForSelector('#vocab-ref-result [data-supplement-category="patterns"]', { timeout: 20_000 }).catch(() => console.warn("vocab patterns slow"));
+  }
+  await sleep(1500);
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.mouse.move(2199, 959);
   await shot(S, page, "vocab-detail-2200");
   // detail + reference columns only (CSS px)
-  await shot(S, page, "vocab-detail-crop", { clip: { x: 500, y: 0, width: 1690, height: 650 } });
+  await shot(S, page, "vocab-detail-crop", { clip: { x: 500, y: 0, width: 1690, height: 664 } });
   await page.close();
 }
 
@@ -419,7 +584,11 @@ async function themes(S) {
   const page = await S.ctx.newPage();
   for (const [preset, mode] of THEME_SHOTS) {
     await S.sw.evaluate(async ({ p, m }) => chrome.storage.local.set({ themePresetKey: p, optTheme: m }), { p: preset, m: mode });
+    // The worker's settings cache can still answer with the previous preset
+    // right after the write: wait for this preset's stylesheet, reload once.
+    const themed = () => page.waitForFunction((p) => !p || (document.getElementById("pbp-injected")?.textContent || "").includes(`preset: ${p} ===`), preset, { timeout: 4000 }).then(() => true, () => false);
     await page.goto(`https://pinboard.in/u:${F.USER}/?_=${preset}${mode}`, { waitUntil: "load" });
+    if (!(await themed())) { await sleep(800); await page.reload({ waitUntil: "load" }); if (!(await themed())) console.warn(`theme ${preset} did not apply`); }
     await sleep(900);
     await shot(S, page, `site-${preset || "none"}-${mode}`);
   }
@@ -456,11 +625,12 @@ async function video(S) {
   await page.mouse.move(640, 400); await page.mouse.move(1279, 799);
   await setT(START_T);
   await sleep(3200); // row follow + zen bar idle fade (2s)
-  await shot(S, page, "video-workspace");
+  await page.evaluate(() => { const z = document.getElementById("zen-bar"); if (z) z.style.visibility = "hidden"; });
+  await shot(S, page, "video-workspace", { clip: { x: 0, y: 0, width: 1280, height: 540 } });
   await page.close();
 }
 
-const SURF = { popup, reader, ask, notes, vocab, themes, video };
+const SURF = { popup, "popup-tags": popupTags, "popup-linkding": popupLinkding, account, reader, ask, lookup, notes, vocab, questions, themes, video };
 
 // ---------- compose ----------
 const T_ = {
@@ -496,12 +666,13 @@ function windowHtml({ x, y, w, img, aspect, theme, url = "", pin = false, pinAct
 
 // name -> { w, h, needs: [raw files], html(), webp: README asset name }
 const PAGES = {};
-// hero: dark scene behind up-left, light scene in front down-right
-PAGES["hero-stacked"] = { webp: "hero", w: 1200, h: 820, needs: ["light/article-page", "light/popup-ai-tagged", "dark/article-page", "dark/popup-ai-tagged"], html: () => {
+// hero: dark scene behind up-left (Pinboard), light scene in front down-right
+// (a self-hosted linkding server: the AI summary lands in Description)
+PAGES["hero-stacked"] = { webp: "hero", w: 1200, h: 820, needs: ["light/article-page", "light/popup-linkding", "dark/article-page", "dark/popup-ai-tagged"], html: () => {
   const W = 860, s = W / 1280, pw = Math.round(683 * s);
-  const scene = (theme, x, y, z) => windowHtml({ x, y, w: W, img: raw(`${theme}/article-page.png`), aspect: "1280/800", theme, url: "example.com/essays/the-case-for-slow-reading", pin: true, pinActive: true, z })
-    + `<div class="pop" style="left:${x + W - pw - 14}px;top:${y + 42}px;width:${pw}px;box-shadow:${T_[theme].shadow};z-index:${z}"><img class="shot" src="${raw(`${theme}/popup-ai-tagged.png`)}"></div>`;
-  return `<div class="stage" style="background:linear-gradient(135deg,#1b1f27 0%,#1b1f27 50%,#e9edf3 50%,#e9edf3 100%)">${scene("dark", 50, 40, 1)}${scene("light", 290, 230, 5)}</div>`;
+  const scene = (theme, popupShot, x, y, z) => windowHtml({ x, y, w: W, img: raw(`${theme}/article-page.png`), aspect: "1280/800", theme, url: "example.com/essays/the-case-for-slow-reading", pin: true, pinActive: true, z })
+    + `<div class="pop" style="left:${x + W - pw - 14}px;top:${y + 42}px;width:${pw}px;box-shadow:${T_[theme].shadow};z-index:${z}"><img class="shot" src="${raw(`${theme}/${popupShot}.png`)}"></div>`;
+  return `<div class="stage" style="background:linear-gradient(135deg,#1b1f27 0%,#1b1f27 50%,#e9edf3 50%,#e9edf3 100%)">${scene("dark", "popup-ai-tagged", 50, 40, 1)}${scene("light", "popup-linkding", 290, 218, 5)}</div>`;
 } };
 // plain framed single screenshots
 const single = (name, webp, file, rw, rh, url, W = 1120) => {
@@ -509,15 +680,16 @@ const single = (name, webp, file, rw, rh, url, W = 1120) => {
   PAGES[name] = { webp, w: W + 80, h: h + 80, needs: [file], html: () => `<div class="stage" style="background:${T_.light.stage}">${windowHtml({ x: 40, y: 40, w: W, img: raw(file + ".png"), aspect: `${rw}/${rh}`, theme: "light", url })}</div>` };
 };
 single("reader", "reader", "light/reader-bilingual", 1280, 800, "Reader · The Case for Slow Reading");
-single("ask", "ask", "light/ask-answer", 1280, 800, "Reader · Ask the page");
-single("notes-flow", "notes", "light/notes-flow", 1280, 800, "Notes & Vocabulary");
-single("vocab-detail-crop", "vocab", "light/vocab-detail-crop", 1690, 650, "Notes & Vocabulary");
-single("video", "video", "light/video-workspace", 1280, 800, "Reader · YouTube");
+single("ask", "ask", "light/ask-answer", 1440, 900, "Reader · Ask the page");
+single("notes-flow", "notes", "light/notes-flow", 1280, 800, "Library · Notes");
+single("vocab-detail-crop", "vocab", "light/vocab-detail-crop", 1690, 664, "Library · Vocabulary");
+single("video", "video", "light/video-workspace", 1280, 540, "Reader · YouTube");
 // themes: four themed pinboard.in pages fanned diagonally
 PAGES["themes"] = { webp: "themes", w: 1200, h: 800, needs: ["light/site-none-light", "light/site-solarized-light", "light/site-dracula-dark", "light/site-terminal-dark"], html: () => {
-  const list = [["light/site-none-light.png", "light", "pinboard.in · default"], ["light/site-solarized-light.png", "light", "Solarized"], ["light/site-dracula-dark.png", "dark", "Dracula"], ["light/site-terminal-dark.png", "dark", "Terminal"]];
-  return `<div class="stage" style="background:${T_.light.stage}">` + list.map(([f, th, label], i) =>
-    windowHtml({ x: 40 + i * 130, y: 34 + i * 92, w: 700, img: raw(f), aspect: "1280/800", theme: th, url: label, z: i + 1 })).join("") + "</div>";
+  // Every window is the same site: the address bar says so, the page shows the theme.
+  const list = [["light/site-none-light.png", "light"], ["light/site-solarized-light.png", "light"], ["light/site-dracula-dark.png", "dark"], ["light/site-terminal-dark.png", "dark"]];
+  return `<div class="stage" style="background:${T_.light.stage}">` + list.map(([f, th], i) =>
+    windowHtml({ x: 40 + i * 130, y: 34 + i * 92, w: 700, img: raw(f), aspect: "1280/800", theme: th, url: "pinboard.in", z: i + 1 })).join("") + "</div>";
 } };
 
 // PNG -> 1800px-wide WebP (q86) via the browser's canvas encoder: the repo has
