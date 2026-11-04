@@ -678,6 +678,25 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
   };
 }
 
+// The popup's save-relevant state for a timeout note: button classes and
+// disabled, the existing-bookmark banner, the visible status and feedback copy,
+// and whether the form finished loading. No field values leave the page.
+function popupSaveState(popup) {
+  return popup.evaluate(() => {
+    const btn = document.getElementById('submit-btn');
+    const visible = el => !!el && el.offsetParent !== null && !el.classList.contains('hidden');
+    return {
+      at: Date.now(),
+      button: btn ? { classes: btn.className, disabled: btn.disabled, label: btn.innerText.trim().slice(0, 40) } : null,
+      existingBanner: visible(document.getElementById('existing-banner')),
+      editMode: document.body.dataset.editMode || '',
+      draftReady: typeof _popupDraftContext !== 'undefined' ? _popupDraftContext?.ready === true : null,
+      status: (document.getElementById('status-msg')?.innerText || '').trim().slice(0, 200),
+      cards: [...document.querySelectorAll('.feedback-card')].filter(visible).map(el => (el.dataset.variant || '') + ': ' + el.innerText.trim().slice(0, 200)),
+    };
+  }).catch(error => ({ error: error.message }));
+}
+
 // Rounds (E8): a selection over one run's caps is packed into as few runs
 // ("rounds") as the caps allow, each one a selection buildPlan accepts
 // whole (bookmarks, URLs, Node with the cleanup reserve, browser, tags,
@@ -3349,8 +3368,16 @@ export class LiveRun {
         return { popup, article, close: async () => { await popup.close().catch(() => {}); await article.close().catch(() => {}); } };
       },
       async savePopup(popup) {
+        const before = await popupSaveState(popup);
         await popup.locator('#submit-btn').click();
-        await run.until(() => popup.evaluate(() => document.getElementById('submit-btn').classList.contains('saved-success')), 'popup_save');
+        try {
+          await run.until(() => popup.evaluate(() => document.getElementById('submit-btn').classList.contains('saved-success')), 'popup_save');
+        } catch (error) {
+          // What the popup showed when the save never finished: the reason a
+          // timeout alone does not say (no field values, only state and copy).
+          t.note('popupSaveTimeout', { before, after: await popupSaveState(popup) });
+          throw error;
+        }
       },
       // Writes the reader's handoff slot itself: an old-style slot (url,
       // baseUrl, account), not what a product entry writes. No field the
@@ -3367,8 +3394,19 @@ export class LiveRun {
         return reader;
       },
       async applyReader(reader) {
+        const state = () => reader.evaluate(() => ({ busy: document.getElementById('reader-bookmark-save')?.getAttribute('aria-busy'),
+          editor: document.getElementById('reader-bookmark-editor-status')?.innerText.trim().slice(0, 200) || '',
+          editorState: document.getElementById('reader-bookmark-editor-status')?.dataset.state || '',
+          rail: document.getElementById('reader-bookmark-status')?.innerText.trim().slice(0, 200) || '',
+          apply: { disabled: !!document.getElementById('reader-bookmark-apply')?.disabled, busy: document.getElementById('reader-bookmark-apply')?.getAttribute('aria-busy') } })).catch(e => ({ error: e.message }));
+        const before = await state();
         await reader.locator('#reader-bookmark-apply').click();
-        await run.until(() => reader.evaluate(() => !document.getElementById('reader-bookmark-editor').matches(':popover-open')), 'reader_apply');
+        try {
+          await run.until(() => reader.evaluate(() => !document.getElementById('reader-bookmark-editor').matches(':popover-open')), 'reader_apply');
+        } catch (error) {
+          t.note('readerApplyTimeout', { before, after: await state() });
+          throw error;
+        }
       },
       async openOptions(hash = '') {
         const page = await run.ctx.newPage();
