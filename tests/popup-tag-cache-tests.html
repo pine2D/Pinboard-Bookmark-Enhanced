@@ -68,6 +68,27 @@ test("malformed or missing token fails closed", () => {
   assert(pbpPopupTagCacheEnvelope("", { tags: ["one"] }) === null);
 });
 
+test("a refused over-long tag chip is marked invalid and the mark leaves with the next tag change", () => {
+  const host = document.createElement("div");
+  host.id = "tags-display";
+  document.body.appendChild(host);
+  try {
+    currentTags = ["work", "Averyveryverylongtag"];
+    markInvalidTag("averyveryverylongtag");
+    const chips = () => [...host.querySelectorAll(".tag-item")].map((el) => el.getAttribute("aria-invalid") === "true");
+    equal(chips().join(), "false,true", "only the refused tag is marked");
+    currentTags = ["work"];
+    renderTags();
+    equal(chips().join(), "false", "the list changed");
+    currentTags = ["work", "Averyveryverylongtag"];
+    renderTags();
+    equal(chips().join(), "false,false", "the mark must not come back after the list changed");
+  } finally {
+    host.remove();
+    currentTags = [];
+  }
+});
+
 test("obfuscated current token resolves the same account", () => {
   const entry = { account: "alice", data: [{ popular: ["js"] }] };
   assert(pbpPopupTagCacheEntry(entry, obfuscateKey("alice:secret")) === entry);

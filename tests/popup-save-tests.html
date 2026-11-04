@@ -750,6 +750,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const api = async () => resp;
       const confirms = [];
       const showConfirmPopover = (anchor, opts) => confirms.push(opts);
+      const failFrom = source.indexOf("function pbpDeleteFailureText(");
+      const pbpDeleteFailureText = new Function("pbpBookmarkFailureText", "t",
+        source.slice(failFrom, source.indexOf("\n}\n", failFrom) + 3) + "\nreturn pbpDeleteFailureText;")(pbpBookmarkFailureText, t);
       // Main Delete button.
       const mainStart = source.indexOf('$id("delete-btn").addEventListener("click", () => {');
       const mainEnd = source.lastIndexOf("\n  });\n", source.indexOf("// ===================== Edit From Recent"));
@@ -758,8 +761,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const statuses = [];
       const els = {};
       const el = (id) => els[id] ||= { value: id === "url-input" ? url : "", textContent: "Delete", disabled: false, classList: { add() {}, remove() {} }, addEventListener(type, fn) { if (type === "click") this.click = fn; } };
-      new Function("$id", "t", "bookmarkLookup", "showConfirmPopover", "pbpPopupBookmarkApi", "settings", "pbpBookmarkServiceId", "pbpBookmarkFailureKey", "showStatus", "ownsGuard", "chrome", "setTimeout",
-        source.slice(mainStart, mainEnd + 6))(el, t, { status: "found", url, generation: 1, formLoaded: true }, showConfirmPopover, api, settingsStub, () => service, pbpBookmarkFailureKey,
+      new Function("$id", "t", "bookmarkLookup", "showConfirmPopover", "pbpPopupBookmarkApi", "settings", "pbpBookmarkServiceId", "pbpBookmarkFailureKey", "pbpBookmarkFailureText", "pbpDeleteFailureText", "showStatus", "ownsGuard", "chrome", "setTimeout",
+        source.slice(mainStart, mainEnd + 6))(el, t, { status: "found", url, generation: 1, formLoaded: true }, showConfirmPopover, api, settingsStub, () => service, pbpBookmarkFailureKey, pbpBookmarkFailureText, pbpDeleteFailureText,
         (id, msg, kind) => statuses.push([msg, kind]), null, { runtime: { sendMessage: async () => {} } }, () => {});
       els["delete-btn"].click();
       await confirms.pop().onConfirm();
@@ -770,23 +773,25 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(recStart >= 0 && recEnd > recStart, "recent delete handler source not found");
       const reports = [];
       const body = source.slice(recStart, recEnd).replace(/const reportDeleteFailure = [\s\S]*?\n      };\n/, "const reportDeleteFailure = (msg) => reports.push(msg);\n");
-      new Function("t", "p", "del", "row", "account", "container", "reports", "showConfirmPopover", "pbpPopupBookmarkApi", "settings", "pbpBookmarkServiceId", "pbpBookmarkFailureKey", "chrome",
-        body + "\ndoDelete();")(t, { href: url }, {}, { remove() {} }, "acct", {}, reports, showConfirmPopover, api, settingsStub, () => service, pbpBookmarkFailureKey, { runtime: { sendMessage: async () => {} } });
+      new Function("t", "p", "del", "row", "account", "container", "reports", "showConfirmPopover", "pbpPopupBookmarkApi", "settings", "pbpBookmarkServiceId", "pbpBookmarkFailureKey", "pbpBookmarkFailureText", "pbpDeleteFailureText", "chrome",
+        body + "\ndoDelete();")(t, { href: url }, {}, { remove() {} }, "acct", {}, reports, showConfirmPopover, api, settingsStub, () => service, pbpBookmarkFailureKey, pbpBookmarkFailureText, pbpDeleteFailureText, { runtime: { sendMessage: async () => {} } });
       await confirms.pop().onConfirm();
       results.recent = reports;
       return results;
     }
     await testAsync("self-hosted delete failures name the real cause from status and code", async () => {
+      // Every card leads with the fact that the delete failed, then the cause.
+      const L = (cause) => "bookmarkDeleteFailedReason(" + cause + ")";
       const auth = await runDeleteHandlers("linkding", { ok: false, status: 401, error: "not_logged_in" });
-      assert(auth.main.join() === "bookmarkErrAuth", "main delete: " + auth.main.join());
-      assert(auth.recent.join() === "bookmarkErrAuth", "recent delete: " + auth.recent.join());
+      assert(auth.main.join() === L("bookmarkErrAuth"), "main delete: " + auth.main.join());
+      assert(auth.recent.join() === L("bookmarkErrAuth"), "recent delete: " + auth.recent.join());
       // Real SW shape: pbpBookmarkResponseFailure gives code "auth" for 401/403.
       for (const [svc, st] of [["linkding", 401], ["karakeep", 403]]) {
         const r = await runDeleteHandlers(svc, { ok: false, status: st, error: "auth" });
-        assert(r.main.join() === "bookmarkErrAuth" && r.recent.join() === "bookmarkErrAuth", svc + " auth: " + JSON.stringify(r));
+        assert(r.main.join() === L("bookmarkErrAuth") && r.recent.join() === L("bookmarkErrAuth"), svc + " auth: " + JSON.stringify(r));
       }
       const gw = await runDeleteHandlers("karakeep", { ok: false, status: 403, error: "gateway_denied" });
-      assert(gw.main.join() === "bookmarkErrGatewayDenied" && gw.recent.join() === "bookmarkErrGatewayDenied", JSON.stringify(gw));
+      assert(gw.main.join() === L("bookmarkErrGatewayDenied") && gw.recent.join() === L("bookmarkErrGatewayDenied"), JSON.stringify(gw));
       // bookmark_api's delete failure shape: {ok:false, status:httpStatus||0, error:reason}.
       for (const [service, resp, copy] of [
         ["linkding", { ok: false, status: 503, error: "server" }, "bookmarkErrServer"],
@@ -797,7 +802,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         ["karakeep", { ok: false, status: 0, error: "made_up" }, "readerBookmarkDeleteFailed"],
       ]) {
         const got = await runDeleteHandlers(service, resp);
-        assert(got.main.join() === copy && got.recent.join() === copy, service + " " + resp.error + ": " + JSON.stringify(got));
+        const want = copy === "readerBookmarkDeleteFailed" ? copy : L(copy);
+        assert(got.main.join() === want && got.recent.join() === want, service + " " + resp.error + ": " + JSON.stringify(got));
       }
     });
     test("Pinboard save errors are unchanged", () => {
@@ -6875,6 +6881,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const flow = source.slice(source.indexOf("const singleFileSilent"), source.indexOf("const singleFileSilent") + 600);
       assert(flow.includes('showSaveWarning(t("singleFileNoResponse"))'), "the SingleFile note is not routed to the warning card");
       assert(!flow.includes("statusEl.appendChild"), "the SingleFile note is still appended to the success line");
+    });
+    test("a tag_too_long save failure marks the offending tag chip", () => {
+      const at = source.indexOf('result.reason === "tag_too_long") markInvalidTag(result.tag)');
+      assert(at >= 0, "popup.js does not mark the refused tag");
+      assert(source.lastIndexOf('result.reason === "partial" || result.reason === "tag_too_long"', at) > at - 900, "the mark is outside the partial/tag_too_long branch");
     });
   } catch (error) {
     test("popup submit source contracts load", () => { throw error; }, { always: true });

@@ -2591,7 +2591,10 @@ function setupSubmit(token) {
         // loaded state now, not a restored draft's.
         _popupDraftBase = null;
         await checkExistingBookmark(token, url, null, true);
-        if (ownsSubmitUi()) { setSubmitState("idle"); showSaveError(result); }
+        if (ownsSubmitUi()) {
+          setSubmitState("idle"); showSaveError(result);
+          if (result.reason === "tag_too_long") markInvalidTag(result.tag);
+        }
         return;
       }
 

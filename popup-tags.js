@@ -661,12 +661,23 @@ function removeTag(tag) {
   renderTags();
 }
 
+// The tag a self-hosted server refused as too long, kept with the tag list it
+// was refused in: any change to the list makes the signature differ, so the
+// mark leaves with the next render and never needs its own clearing hook.
+let _invalidTagMark = null;
+function markInvalidTag(name) {
+  _invalidTagMark = typeof name === "string" && name ? { key: pbpTagDedupeKey(name), sig: currentTags.join("\n") } : null;
+  renderTags();
+}
 function renderTags() {
   const d = $id("tags-display"); d.innerHTML = "";
+  const invalidKey = _invalidTagMark && _invalidTagMark.sig === currentTags.join("\n") ? _invalidTagMark.key : null;
+  if (!invalidKey) _invalidTagMark = null;
   currentTags.forEach((tag, idx) => {
     const el = document.createElement("span"); el.className = "tag-item";
     el.draggable = true;
     el.dataset.idx = idx;
+    if (invalidKey && pbpTagDedupeKey(tag) === invalidKey) el.setAttribute("aria-invalid", "true");
     const handle = document.createElement("span");
     handle.className = "tag-drag-handle";
     // Grip dots are CSS-drawn (radial-gradient), not a ⋮⋮ (U+22EE) glyph,
