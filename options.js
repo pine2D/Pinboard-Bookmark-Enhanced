@@ -1655,6 +1655,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       $id("tag-gov-groups")?.replaceChildren();
       $id("tag-gov-lowcount-list")?.replaceChildren();
       $id("tag-gov-problems")?.replaceChildren();
+      // The entity scan list is account data too: A's tag names and counts must
+      // not stay on screen (or in _tagGovEntityItems) once B is the account.
+      pbpResetTagGovEntitySection();
       const progress = $id("tag-gov-progress");
       if (progress) {
         progress.hidden = true;
@@ -6675,6 +6678,17 @@ function pbpSyncTagGovEntityBtnState() {
   if (boxes.length) _tagGovEntityStatus(t("tagGovSelectedCount", String(n)));
 }
 
+// Account change: drop the previous account's scan results, count and status.
+function pbpResetTagGovEntitySection() {
+  _tagGovEntityItems = [];
+  $id("tag-gov-entity-list")?.replaceChildren();
+  const badge = $id("tag-gov-entity-count");
+  if (badge) badge.textContent = "";
+  _tagGovEntityStatus("");
+  const btn = $id("tag-gov-entity-repair");
+  if (btn) btn.disabled = true;
+}
+
 function renderTagGovEntityList(items, account) {
   _tagGovEntityItems = items;
   const list = $id("tag-gov-entity-list");
@@ -6770,8 +6784,14 @@ function initTagGovEntityRepair() {
       onConfirm: async () => {
         repairBtn.disabled = true;
         const res = await runTagGovEntityRepair(items, expectedAccount);
-        if (!(await getTagGovAuth(expectedAccount))) return;
-        if (res && !res.aborted && !res.cancelled) {
+        if (!(await getTagGovAuth(expectedAccount))) {
+          // Signed out or switched account mid-run: never leave the button
+          // disabled for good, and say why via the section's shared explanation.
+          pbpSyncTagGovEntityBtnState();
+          _tagGovShowLoadFailed("no-token", await pbpTagGovStoredService());
+          return;
+        }
+        if (res && !res.aborted && !res.cancelled && !res.fail) {
           // tags/get may lag behind the writes, so a rescan right now could list
           // the old names again; ask for a later scan instead of repainting.
           _tagGovEntityItems = [];
@@ -6780,6 +6800,14 @@ function initTagGovEntityRepair() {
           if (badge) badge.textContent = "";
           pbpSyncTagGovEntityBtnState();
           _tagGovEntityStatus(t("tagGovEntityDone"));
+        } else if (res && !res.aborted && !res.cancelled) {
+          // Some rows failed: keep exactly those listed (problems carry the
+          // stored tag as `old`) so they can be retried or re-scanned.
+          const failedTags = new Set(_tagGovProblems.map((p) => p.old));
+          let rest = items.filter((it) => failedTags.has(it.tag));
+          if (!rest.length) rest = items;
+          renderTagGovEntityList(rest, expectedAccount);
+          _tagGovEntityStatus(t("tagGovEntityPartial"), true);
         } else {
           pbpSyncTagGovEntityBtnState();
         }

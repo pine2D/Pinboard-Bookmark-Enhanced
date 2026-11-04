@@ -2921,10 +2921,13 @@
     }
   },
   "tagGovEntityNoMatch": {
-    "message": "このタグのブックマークが Pinboard から返されなかったため、何も変更していません。"
+    "message": "このタグが付いたブックマークが Pinboard から返されなかったため、何も変更していません。"
   },
   "tagGovEntityDone": {
     "message": "完了しました。Pinboard のタグ一覧が更新されるまで時間がかかることがあります。しばらくしてから再度スキャンして確認してください。"
+  },
+  "tagGovEntityPartial": {
+    "message": "修復できなかったタグがあります。一覧に残してあるので、詳細は下の問題リストを確認してください。"
   },
   "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ 件のブックマークを再タグ付け",

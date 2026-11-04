@@ -2921,10 +2921,13 @@
     }
   },
   "tagGovEntityNoMatch": {
-    "message": "Pinboard n'a renvoyé aucun favori pour cette étiquette : rien n'a été modifié."
+    "message": "Pinboard n'a renvoyé aucun favori portant cette étiquette : rien n'a été modifié."
   },
   "tagGovEntityDone": {
     "message": "Terminé. Pinboard peut mettre un peu de temps à mettre à jour sa liste d'étiquettes ; relancez l'analyse plus tard pour vérifier."
+  },
+  "tagGovEntityPartial": {
+    "message": "Certaines étiquettes n'ont pas été réparées. Elles restent dans la liste ; voir la liste des problèmes plus bas."
   },
   "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ signets mis à jour",

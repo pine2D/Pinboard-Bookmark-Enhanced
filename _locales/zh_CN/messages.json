@@ -2926,6 +2926,9 @@
   "tagGovEntityDone": {
     "message": "已完成。Pinboard 更新标签列表可能需要一些时间，稍后可再次扫描确认。"
   },
+  "tagGovEntityPartial": {
+    "message": "部分标签未能修复，仍保留在列表中；详情见下方的问题列表。"
+  },
   "tagGovRetagProgress": {
     "message": "已更新 $DONE$/$TOTAL$ 个书签的标签",
     "placeholders": {

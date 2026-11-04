@@ -2921,10 +2921,13 @@
     }
   },
   "tagGovEntityNoMatch": {
-    "message": "Pinboard nie zwrócił zakładek dla tego tagu, więc nic nie zmieniono."
+    "message": "Pinboard nie zwrócił żadnej zakładki z tym tagiem, więc nic nie zmieniono."
   },
   "tagGovEntityDone": {
     "message": "Gotowe. Pinboard może chwilę aktualizować listę tagów; zeskanuj ponownie później, aby sprawdzić."
+  },
+  "tagGovEntityPartial": {
+    "message": "Nie wszystkie tagi zostały naprawione. Pozostają na liście; szczegóły są niżej na liście problemów."
   },
   "tagGovRetagProgress": {
     "message": "Przetworzono $DONE$/$TOTAL$ zakładek",

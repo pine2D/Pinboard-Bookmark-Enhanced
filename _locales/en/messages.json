@@ -2934,10 +2934,13 @@
     }
   },
   "tagGovEntityNoMatch": {
-    "message": "Pinboard returned no bookmarks for this tag, so nothing was changed."
+    "message": "Pinboard returned no bookmark carrying this tag, so nothing was changed."
   },
   "tagGovEntityDone": {
     "message": "Done. Pinboard may take a while to update its tag list; scan again later to check."
+  },
+  "tagGovEntityPartial": {
+    "message": "Some tags were not repaired. They stay listed; see the problems list below."
   },
   "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ bookmarks retagged",

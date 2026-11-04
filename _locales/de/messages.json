@@ -2921,10 +2921,13 @@
     }
   },
   "tagGovEntityNoMatch": {
-    "message": "Pinboard hat für diesen Tag keine Lesezeichen geliefert, daher wurde nichts geändert."
+    "message": "Pinboard hat kein Lesezeichen mit diesem Tag geliefert, daher wurde nichts geändert."
   },
   "tagGovEntityDone": {
     "message": "Fertig. Pinboard braucht eventuell etwas, bis die Tag-Liste aktualisiert ist; scanne später erneut zur Kontrolle."
+  },
+  "tagGovEntityPartial": {
+    "message": "Einige Tags wurden nicht repariert. Sie bleiben in der Liste; Details stehen unten bei den Problemen."
   },
   "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ Lesezeichen neu getaggt",
