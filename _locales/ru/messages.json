@@ -709,7 +709,7 @@
     }
   },
   "offlineQueueNeedsAttentionOne": {
-    "message": "Требует внимания: $COUNT$",
+    "message": "Требуют внимания: $COUNT$",
     "description": "Popup offline queue bar: singular form of the needs-attention count, used when exactly one queued bookmark needs attention. $COUNT$ is the number.",
     "placeholders": {
       "count": {

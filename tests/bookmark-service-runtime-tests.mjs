@@ -2043,7 +2043,8 @@ try{
       const create=linkdingCreates(before)[0];
       assert(new URLSearchParams(create.query).has('disable_html_snapshot'),'the create still asked linkding for its own snapshot: '+create.query);
       const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
-      await until(()=>popup.evaluate(text=>document.getElementById('status-msg').textContent.includes(text),en.singleFileNoResponse.message),'the popup said SingleFile did not respond');
+      await until(()=>popup.evaluate(text=>[...document.querySelectorAll('.feedback-card[data-variant="warning"]')].some(card=>card.textContent.includes(text)),en.singleFileNoResponse.message),'the popup said SingleFile did not respond in its own warning card');
+      assert(!(await popup.locator('#status-msg').textContent()).includes(en.singleFileNoResponse.message),'the SingleFile note sits inside the success line');
       assert.equal(await popup.locator('.auto-close-bar').count(),0,'the popup closes over the SingleFile note');
       await until(()=>warnings.some(text=>text.startsWith('[singlefile] no response')),'the worker left no trace');
       assert(!warnings.some(text=>text.includes(origin)),'the trace names the page');
@@ -2053,7 +2054,7 @@ try{
       const beforeUpdate=warnings.length;
       await popup.locator('#title-input').fill('Edited');await popup.locator('#submit-btn').click();
       await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),'the update succeeded');
-      assert(!(await popup.locator('#status-msg').textContent()).includes(en.singleFileNoResponse.message),'an update mentioned SingleFile');
+      assert(!(await popup.locator('body').textContent()).includes(en.singleFileNoResponse.message),'an update mentioned SingleFile');
       assert(!warnings.slice(beforeUpdate).some(text=>text.startsWith('[singlefile]')),'an update ran SingleFile');
       await popup.close();
       // An address typed over the page is not what SingleFile would save:
