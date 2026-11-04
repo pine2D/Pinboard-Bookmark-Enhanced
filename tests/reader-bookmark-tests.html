@@ -980,7 +980,7 @@ await test("reader initial linkding Description follows the owner-bound preview 
   equal(invalid.reason, "invalid");
   const saved = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "edit", draft: { ...state.bookmark, summary: "changed\nvalue" } }, SENDER);
   equal(saved.status, "saved"); equal(h.env.submitted.intent.summary, "first\nsecond");
-  equal(h.env.submitted.opts.readerDraft.summary, "changed value");
+  equal(h.env.submitted.opts.readerDraft.summary, "changed\nvalue");
   assert(!("summaryTouched" in h.env.submitted.intent) && !("summaryTouched" in h.env.submitted.opts.readerDraft));
   h.env.account = "linkding:other";
   equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER)).reason, "account_changed");
@@ -1185,7 +1185,7 @@ await test("a reader edit stops, writing nothing, when the bookmark changed else
 });
 await test("a queued reader edit replays a linkding Description only when the reader changed it", async () => {
   const account = "linkding:https://links.example/:conn-1";
-  for (const [label, typed, expected] of [["left alone", undefined, "Changed\n\n  in another client"], ["changed", "Mine\nnow", "Mine now"]]) {
+  for (const [label, typed, expected] of [["left alone", undefined, "Changed\n\n  in another client"], ["changed", "Mine\nnow", "Mine\nnow"]]) {
     const server = selfHostedServer("linkding", { id: 7, url: URL_ARTICLE, title: "Server title", description: "First line\n\nSecond  line",
       notes: "Server notes", is_archived: false, unread: false, shared: false, tag_names: ["server"],
       date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z" });
@@ -1194,7 +1194,7 @@ await test("a queued reader edit replays a linkding Description only when the re
     server.failures.push({ method: "PATCH", path: "/api/bookmarks/7/", skip: 0 });
     // The editor opens on the bar's lookup, and Apply sends what it loaded.
     const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
-    // md-bookmark.js sends a Description only when the reader's line changed.
+    // md-bookmark.js sends a Description only when the reader's text changed.
     const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "edit", expectedVersion: state.bookmark.version,
       draft: { title: "Edited title", tags: "server", notes: "Server notes", private: true, toread: false, ...(typed === undefined ? {} : { summary: typed }) } }, SENDER);
     equal(result.status, "queued"); equal(h.env.queue.length, 1);

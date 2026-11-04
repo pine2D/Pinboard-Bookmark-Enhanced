@@ -2049,7 +2049,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
     draft = { title: input.title, tags: input.tags, notes: input.notes, private: input.private, toread: input.toread,
       ...(input.sharedExplicit !== undefined ? { sharedExplicit: input.sharedExplicit } : {}),
       ...(input.summary !== undefined && (await pbpReadFreshBookmarkAuthForAccount(context.account))?.service === "linkding"
-        ? { summary: pbpBookmarkDescriptionLine(input.summary) } : {}) };
+        ? { summary: pbpBookmarkDescriptionText(input.summary) } : {}) };
   }
   const settings = await loadSettings();
   const intent = pbpReaderInitialIntent(context, settings, action);

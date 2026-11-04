@@ -765,23 +765,23 @@ try{
     await worker.evaluate(async data=>chrome.storage.local.set({md_preview_data_multiline:{markdown:'# Runtime article',title:'Runtime article',url:data.url,baseUrl:data.url,account:data.account,tags:[],description:'',source:'local',ts:Date.now()}}),{url:multiUrl,account});
     const reader=await ctx.newPage();await reader.goto(pageUrl+'md-preview.html?k=multiline');
     await reader.locator('#reader-bookmark-edit[aria-busy="false"]').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
-    assert.equal(await reader.locator('#reader-bookmark-summary').inputValue(),'First line Second line','the reader did not show the stored Description as one line');
+    assert.equal(await reader.locator('#reader-bookmark-summary').inputValue(),multiLine.replace(/\r\n?/g,'\n').trim(),'the reader did not show the stored Description with its line breaks');
     await reader.locator('#reader-bookmark-title').fill('Reader title edit');
     const before=multiPatches().length;await reader.locator('#reader-bookmark-apply').click();
     await until(()=>multiPatches().length>before,'reader title-only update');
     assert.equal(multiPatches().at(-1).data.title,'Reader title edit');
     assert(!Object.hasOwn(multiPatches().at(-1).data,'description'),'a title-only reader edit rewrote the Description');
     assert.equal(records.linkding.get(multiId).description,multiLine,'a title-only reader edit flattened the Description');
-    // Only a Description the user changed is sent, as the one line the editor shows.
+    // Only a Description the user changed is sent, with the line breaks the editor keeps.
     await reader.locator('#reader-bookmark-edit[aria-busy="false"]').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
-    await reader.locator('#reader-bookmark-summary').fill('Reader   edited ');
+    await reader.locator('#reader-bookmark-summary').fill('Reader   edited\n\nsecond paragraph ');
     const beforeEdit=multiPatches().length;await reader.locator('#reader-bookmark-apply').click();
     await until(()=>multiPatches().length>beforeEdit,'reader Description edit');
-    assert.equal(multiPatches().at(-1).data.description,'Reader edited','an edited reader Description was not written as its one line');
+    assert.equal(multiPatches().at(-1).data.description,'Reader   edited\n\nsecond paragraph','an edited reader Description lost its line breaks');
     await reader.close();
   }
   records.linkding.delete(multiId);await article.goto(origin+'/article');
-  console.log('linkding multi-line Description: tag-only popup updates keep it, also after a change elsewhere; a reopened title draft shows and keeps the current one; a title-only reader update keeps it; a popup edit writes its line breaks, a reader edit its one line');
+  console.log('linkding multi-line Description: tag-only popup updates keep it, also after a change elsewhere; a reopened title draft shows and keeps the current one; a title-only reader update keeps it; popup and reader edits write their line breaks');
   });
   // A tag longer than PostgreSQL's 64-character column, typed in the popup:
   // the error names it, nothing is queued or offered for a retry, and the
