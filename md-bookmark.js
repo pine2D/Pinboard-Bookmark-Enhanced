@@ -35,8 +35,8 @@
   let editorSource = null;
   let sharedExplicit = false;
   let sharingChoice = false;
-  // The one-line Description the editor opened with. Apply sends it only when
-  // the user changed it: an untouched line keeps a stored multi-line value as
+  // The Description (with its line breaks) the editor opened with. Apply sends it only when
+  // the user changed it: an untouched value keeps a stored multi-line value as
   // it is, and an unknown one (shown empty) stays for linkding to fill in.
   let shownSummary = "";
   // The bookmark the open editor was filled from: {version, shown}. version
@@ -269,7 +269,7 @@
     label(title, "readerBookmarkEdit"); head.appendChild(title); editor.appendChild(head);
     const options = document.createElement("div");
     options.id = "reader-bookmark-options"; options.className = "row";
-    for (const [name, key, type] of [["title", "readerBookmarkTitle", "text"], ["tags", "readerBookmarkTags", "text"], ["summary", "readerBookmarkDescription", "text"], ["notes", "readerBookmarkNotes", "textarea"], ["private", "readerBookmarkPrivate", "checkbox"], ["toread", "readerBookmarkLater", "checkbox"]]) {
+    for (const [name, key, type] of [["title", "readerBookmarkTitle", "text"], ["tags", "readerBookmarkTags", "text"], ["summary", "readerBookmarkDescription", "textarea"], ["notes", "readerBookmarkNotes", "textarea"], ["private", "readerBookmarkPrivate", "checkbox"], ["toread", "readerBookmarkLater", "checkbox"]]) {
       const field = document.createElement("label");
       const caption = document.createElement("span"); label(caption, key);
       const input = type === "textarea" ? document.createElement("textarea") : document.createElement("input");
@@ -306,8 +306,8 @@
     label(apply, "readerBookmarkApply");
     apply.addEventListener("click", () => save("edit", {
       title: id("title").value, tags: id("tags").value, notes: id("notes").value,
-      ...(state.descriptionSupported === true && pbpBookmarkDescriptionLine(id("summary").value) !== shownSummary
-        ? { summary: pbpBookmarkDescriptionLine(id("summary").value) } : {}),
+      ...(state.descriptionSupported === true && pbpBookmarkDescriptionText(id("summary").value) !== shownSummary
+        ? { summary: pbpBookmarkDescriptionText(id("summary").value) } : {}),
       ...(state.sharingSupported === true ? { sharedExplicit } : {}),
       private: state.sharingSupported === true ? !id("private").checked : state.privacySupported === false || id("private").checked, toread: id("toread").checked,
     }));
@@ -326,7 +326,7 @@
     return {
       title: typeof values.title === "string" ? values.title : context.title || "",
       tags: typeof values.tags === "string" ? values.tags : pbpBookmarkFormatTags(context.bookmark?.tags || []),
-      summary: state.descriptionSupported === true && typeof values.summary === "string" ? pbpBookmarkDescriptionLine(values.summary) : "",
+      summary: state.descriptionSupported === true && typeof values.summary === "string" ? pbpBookmarkDescriptionText(values.summary) : "",
       notes: typeof values.notes === "string" ? values.notes : context.bookmark?.notes || "",
       private: state.sharingSupported === true ? values.private === false : state.privacySupported === false || values.private === true,
       toread: values.toread === true,

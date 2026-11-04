@@ -1775,7 +1775,7 @@ await test("reader title-only edit does not fabricate sharing intent, but explic
     } finally {frame.remove();}
   }
 });
-await test("reader Description uses a text input, shows only for linkding, and preserves words on edit", async () => {
+await test("reader Description uses a textarea, shows only for linkding, and preserves words on edit", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();
   for (const [account, supported] of [["linkding:fixture", true], ["karakeep:fixture", false], ["alice", false]]) {
     const frame = document.createElement("iframe"); document.body.append(frame);
@@ -1792,7 +1792,7 @@ await test("reader Description uses a text input, shows only for linkding, and p
       await readerIdle(w); await w.pbpReaderBookmarkAction("edit");
       const input = w.document.getElementById("reader-bookmark-summary");
       if (!supported) { assert(!input || input.closest("label").hidden); continue; }
-      assert(input && input.type === "text"); equal(input.value, "first second");
+      assert(input && input.tagName === "TEXTAREA"); equal(input.value, "first\nsecond");
       input.value = "changed value"; w.document.getElementById("reader-bookmark-apply").click();
       await until(() => sentEdit(messages), "the edit request");
       const draft = messages.find(msg => msg.action === "edit")?.draft;
@@ -1800,16 +1800,19 @@ await test("reader Description uses a text input, shows only for linkding, and p
     } finally { frame.remove(); }
   }
 });
-// The editor shows a stored Description as one line, or nothing when the
-// page's is unknown. Apply sends it only when the user changed that line, so
+// The editor shows a stored Description with its line breaks, or nothing when
+// the page's is unknown. Apply sends it only when the user changed it, so
 // an untouched multi-line value stays as stored and an unknown one stays for
 // linkding to fill. Polls the editor's own busy state; no fixed waits.
-await test("reader edits send a Description only when the user changed its one line", async () => {
+await test("reader edits send a Description only when the user changed it, keeping its line breaks", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();
   for (const [bookmarked, stored, typed, sent] of [
-    [true, "first\nsecond", undefined, undefined], [true, "first\nsecond", "first   second", undefined],
-    [true, "first\nsecond", "", ""], [true, "first\nsecond", " changed \n value", "changed value"],
-    [false, undefined, undefined, undefined], [false, "", undefined, undefined], [false, undefined, "Typed  value ", "Typed value"],
+    [true, "first\nsecond", undefined, undefined], [true, "first\nsecond", "first   second", "first   second"],
+    [true, "first\nsecond", "", ""], [true, "first\nsecond", " changed \n value", "changed \n value"],
+    [true, "mine\n\nAI paragraph", undefined, undefined], [true, "mine\n\nAI paragraph", "mine\n\nAI paragraph!", "mine\n\nAI paragraph!"],
+    [true, "mine\r\n\r\nAI paragraph", undefined, undefined],
+    [false, undefined, undefined, undefined], [false, "", undefined, undefined], [false, undefined, "Typed  value ", "Typed  value"],
+    [false, undefined, "Mine\n\nSecond", "Mine\n\nSecond"],
   ]) {
     const frame = document.createElement("iframe"); document.body.append(frame);
     try {
@@ -1825,7 +1828,7 @@ await test("reader edits send a Description only when the user changed its one l
       await readerIdle(w);
       await w.pbpReaderBookmarkAction("edit");
       const input = w.document.getElementById("reader-bookmark-summary");
-      equal(input.value, stored === undefined ? "" : pbpBookmarkDescriptionLine(stored));
+      equal(input.value, stored === undefined ? "" : pbpBookmarkDescriptionText(stored));
       if (typed !== undefined) { input.value = typed; input.dispatchEvent(new w.Event("input", { bubbles: true })); }
       w.document.getElementById("reader-bookmark-apply").click();
       await until(() => sentEdit(messages), where + " apply");
