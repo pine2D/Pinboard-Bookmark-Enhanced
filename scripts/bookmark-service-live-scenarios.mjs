@@ -601,8 +601,13 @@ export const MODULES = [
         await form.popup.bringToFront();
         return form;
       };
+      // Only the write is cut at the transport: the popup's duplicate check
+      // must still answer, since a create whose check fails is never queued
+      // (it stops as duplicate_unknown and keeps the form).
+      let cut = null;
       const replay = async (form, label) => {
         await form.popup.locator('#offline-queue-toggle').click();
+        if (cut) { cut.clear(); cut = null; }
         await t.offline('');
         await form.popup.locator('.offline-queue-retry').click();
         await t.until(() => t.sw(async () => (await chrome.storage.local.get('offlineQueue')).offlineQueue?.length === 0), label);
@@ -617,7 +622,7 @@ export const MODULES = [
       await form.popup.locator('#tags-input').press('Enter');
       await form.popup.locator('#readlater-check').check();
       await t.phase('linkding_offline_create_queue');
-      await t.offline('self');
+      cut = t.inject({ method: 'POST', path: /^bookmarks\/(\?|$)/, abort: true });
       await form.popup.locator('#submit-btn').click();
       await form.popup.locator('#offline-queue-bar:not(.hidden)').waitFor();
       t.expect(await queueIsSafe('Offline description', 'Offline notes\nSecond line'), 'offline_create_queue_fields');
@@ -631,12 +636,19 @@ export const MODULES = [
       await form.close();
 
       await t.phase('linkding_offline_update');
+      // The queued create left its popup draft (a draft clears only on a
+      // saved result); restored, it would have the update's form claim it
+      // loaded no bookmark, and the worker then asks to review first.
+      await t.sw(async () => {
+        const rows = await chrome.storage.session.get(null);
+        await chrome.storage.session.remove(Object.keys(rows).filter(k => k.startsWith('pbp-popup-draft')));
+      });
       form = await open();
       await form.popup.locator('#description-input').fill('Updated offline notes');
       await form.popup.locator('#linkding-description-input').fill('');
       await form.popup.locator('#readlater-check').uncheck();
       await t.phase('linkding_offline_update_queue');
-      await t.offline('self');
+      cut = t.inject({ method: 'PATCH', path: /^bookmarks\/\d+\/?(\?|$)/, abort: true });
       await form.popup.locator('#submit-btn').click();
       await form.popup.locator('#offline-queue-bar:not(.hidden)').waitFor();
       t.expect(await queueIsSafe('', 'Updated offline notes'), 'offline_update_queue_fields');
@@ -645,7 +657,7 @@ export const MODULES = [
       row = await t.ownRow(url);
       t.expect(row.description === '' && row.notes === 'Updated offline notes' && !row.unread && !row.shared && row.tag_names.length === 1 && row.tag_names[0] === tag, 'offline_update_fields');
       await form.close();
-      t.check('linkding: offline popup create and update replay through queue UI; secret-free identity-bound records; explicit empty Description preserved; Notes/unread/default privacy preserved; changed separator does not remint queued tags');
+      t.check('linkding: a popup create and update whose write loses the network (the duplicate check answered) are queued and replay through queue UI; secret-free identity-bound records; explicit empty Description preserved; Notes/unread/default privacy preserved; changed separator does not remint queued tags');
     },
   },
 
@@ -981,6 +993,24 @@ const titleOfRow = (t, row) => row.title;
 const notesOfRow = (t, row) => (t.service === 'linkding' ? row.notes : row.note);
 const tagsOfRow = (t, row) => (t.service === 'linkding' ? row.tag_names : (row.tags || []).map(tag => tag.name));
 // "Changed elsewhere": a second client edits title and tags through the API.
+// Whether the product's own cleaner turns a utm variant of this page into
+// the page itself (G10). Loopback and IPv4 hosts are exempt by design (they
+// are OAuth callbacks), so a temp pool URL on localhost cannot be cleaned and
+// the utm-saved verdicts do not apply to it.
+async function utmCleanable(t, url) {
+  const utm = url + '&utm_source=pbp-it';
+  const cleaned = await t.sw(async variant => {
+    const stored = (await chrome.storage.local.get('urlClean')).urlClean;
+    return pbpBookmarkLookupUrl(variant, stored ?? SETTINGS_DEFAULTS.urlClean);
+  }, utm);
+  return cleaned !== utm;
+}
+// "The cached status entry expired": the memory cache and, for linkding, its
+// session-storage mirror (restored before every cache read, so clearing the
+// memory alone leaves a live copy that answers without asking the server).
+async function expireStatusCache(t) {
+  await t.sw(async () => { statusCache.clear(); await pbpStatusMirrorClear(); return true; });
+}
 async function editElsewhere(t, row, title, addTag) {
   if (t.service === 'linkding') {
     await t.api(t.recordPath(row.id), { method: 'PATCH', body: { title, tag_names: [...row.tag_names, addTag] } });
@@ -1207,6 +1237,8 @@ export const SELFHOSTED_MODULES = [
         const [metaCreate] = createsOf(t, meta, since);
         t.expect(!!metaCreate && /disable_scraping/.test(metaCreate.path), 'server_metadata_disable_scraping');
         await form.close();
+        // Back to the default for the parts after this one.
+        await t.settings({ [metaKey]: true });
       });
 
       // Pre-read off (the default): neither loading a page nor switching to
@@ -1234,6 +1266,7 @@ export const SELFHOSTED_MODULES = [
         t.expectEq(icon, 'saved', 'preload_icon_saved');
         await first.close();
         await second.close();
+        await t.settings({ [preloadKey]: false });
       });
 
       // A PDF served for the URL counts as a page that could not be read
@@ -1243,6 +1276,12 @@ export const SELFHOSTED_MODULES = [
       // linkding fetches the page itself.
       await t.part('unreadable_pdf', async () => {
         await t.phase('page_info_pdf');
+        // Browser page info on and pre-read off, whatever the parts before
+        // this one left (a PDF is judged by the browser's own read).
+        await t.settings({
+          [await t.productSetting(/linkding.*(browser|metadata)|browser.*meta/, 'linkding_browser_metadata')]: true,
+          [await t.productSetting(/linkding.*(preload|prefetch|preread|whilebrows|browsing)|(preload|prefetch).*page/, 'linkding_preload')]: false,
+        });
         const pdf = t.claimUrl();
         t.inject({ on: 'page', path: pdf, status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' });
         const r = await unread(pdf, 'pdf');
@@ -1706,11 +1745,14 @@ export const SELFHOSTED_MODULES = [
       await form.popup.locator('#tags-input').press('Enter');
       await t.savePopup(form.popup);
       await form.close();
-      await t.sleep(1100);
-      await editElsewhere(t, await t.ownRow(url), prefix + ' B', prefix + '_else');
 
       await t.phase('elsewhere_popup');
       form = await t.openPopup(url);
+      // The other client edits only after the form has loaded, so the form's
+      // loaded version is the stale one the save must refuse to overwrite.
+      t.expectEq(await form.popup.locator('#title-input').inputValue(), prefix + ' A', 'elsewhere_loaded_before_edit');
+      await t.sleep(1100);
+      await editElsewhere(t, await t.ownRow(url), prefix + ' B', prefix + '_else');
       await form.popup.locator('#description-input').fill('n2');
       const since = t.now();
       const seen = await clickSave(t, form.popup, 'elsewhere_outcome');
@@ -1868,9 +1910,14 @@ export const SELFHOSTED_MODULES = [
         await form.popup.bringToFront();
         await form.popup.locator('#offline-queue-bar:not(.hidden)').waitFor();
         await form.popup.locator('#offline-queue-toggle').click();
+        // The list renders after the worker answers the expand: wait for the
+        // attention row (the one with a reason) before reading it. The catch
+        // keeps a timeout reported as attention_row_actions.
+        const attentionRow = form.popup.locator('#offline-queue-list .offline-queue-item').filter({ has: form.popup.locator('.error-text') }).first();
+        await attentionRow.waitFor({ timeout: 5000 }).catch(() => {});
         const rowText = await form.popup.locator('#offline-queue-list').innerText();
         t.note('queueRow', rowText.slice(0, 200));
-        t.expect(rowText.trim().length > 0 && await form.popup.locator('#offline-queue-list .offline-queue-retry').count() >= 1, 'attention_row_actions');
+        t.expect(rowText.trim().length > 0 && await attentionRow.locator('.offline-queue-retry').count() === 1 && await attentionRow.locator('.offline-queue-remove').count() === 1, 'attention_row_actions');
         await t.shot(form.popup, 'queue-attention', { surface: 'popup', keys: ['#offline-queue-bar'] });
         await t.axe(form.popup, 'queue-attention');
         await form.close();
@@ -1980,12 +2027,26 @@ export const SELFHOSTED_MODULES = [
         const since = t.now();
         const form = await t.openPopup(hashed);
         t.expectEq(await form.popup.locator('#url-input').inputValue(), hashed, 'hash_save_url_changed');
+        // linkding asks again without # after the answered miss (not awaited
+        // by the popup): wait for that probe to settle. Karakeep's check-url
+        // ignores the fragment, so the first lookup already finds the
+        // bookmark and the product asks no second time.
+        if (t.service === 'linkding') {
+          await t.until(() => form.popup.evaluate(() => bookmarkLookup.status !== 'missing' || bookmarkLookup.fragmentProbe?.settled === true), 'hash_probe_settled', 8000);
+        }
         const checks = t.requests({ path: CHECK_PATH[t.service], since }).map(r => new URL('http://x/' + r.path).searchParams.get('url'));
         t.note('hashChecks', checks.map(u => (u === url ? 'plain' : u === hashed ? 'hashed' : 'other')));
-        t.expect(checks.includes(hashed) && checks.includes(url), 'hash_second_lookup');
-        const notice = await form.popup.evaluate(() => ['existing-banner', 'url-warning', 'status-msg'].map(id => document.getElementById(id)).filter(el => el && el.offsetParent !== null && el.innerText.trim()).map(el => el.id + ': ' + el.innerText.trim().slice(0, 160)));
+        const notice = await form.popup.evaluate(() => [...document.querySelectorAll('#existing-banner, #url-warning, #status-msg, #existing-banner ~ .feedback-card[data-variant="info"]')].filter(el => el.offsetParent !== null && el.innerText.trim()).map(el => (el.id || 'feedback-card') + ': ' + el.innerText.trim().slice(0, 160)));
         t.note('hashNotice', notice);
-        t.expect(notice.length > 0, 'hash_notice');
+        if (t.service === 'linkding') {
+          t.expect(checks.includes(hashed) && checks.includes(url), 'hash_second_lookup');
+          t.expect(notice.some(n => n.startsWith('feedback-card')), 'hash_notice');
+        } else {
+          t.expectEq(checks.length, 1, 'hash_check_count');
+          t.expect(checks[0] === hashed, 'hash_second_lookup');
+          t.expectEq(await form.popup.evaluate(() => bookmarkLookup.status), 'found', 'hash_found');
+          t.expect(notice.some(n => n.startsWith('existing-banner')), 'hash_notice');
+        }
         await t.shot(form.popup, 'hash-variant', { surface: 'popup', keys: ['#submit-btn'] });
         await form.close();
       });
@@ -2027,8 +2088,12 @@ export const SELFHOSTED_MODULES = [
           await opened.close();
         }
         t.note('readerUtm', verdicts);
-        t.expect(verdicts.popup, 'reader_utm_unsaved_popup');
-        t.expect(verdicts.shortcut, 'reader_utm_unsaved_shortcut');
+        if (await utmCleanable(t, url)) {
+          t.expect(verdicts.popup, 'reader_utm_unsaved_popup');
+          t.expect(verdicts.shortcut, 'reader_utm_unsaved_shortcut');
+        } else {
+          t.note('reader_utm_loopback_exempt', url);
+        }
       });
       t.check(`${t.service}: a # variant of a saved URL is looked up again without #, noticed and left as typed; the reader judges a utm variant saved`);
     },
@@ -2210,9 +2275,16 @@ export const SELFHOSTED_MODULES = [
       const conn = () => t.sw(async () => { const c = await pbpReadBookmarkConnection(); return { service: c.service, account: c.account || '' }; });
       const original = await conn();
       t.expectEq(original.service, s, 'connected_service');
-      // bookmarkService as another tab or a synced device changes it: a real
-      // storage event in the area ordinary settings live in.
+      // Another tab on this device switching the service: the product's own
+      // single write sets both the chosen and the device's active service
+      // (G28), a real storage event for the open options page.
       const storeService = value => t.sw(async value => {
+        const result = await pbpSwitchBookmarkService(value);
+        if (!result.ok) throw new Error('switch failed');
+      }, value);
+      // Only the chosen service, as a synced device would deliver it: the
+      // device does not follow while that service is not connected here.
+      const storeChosenOnly = value => t.sw(async value => {
         const { optSyncEnabled } = await chrome.storage.local.get('optSyncEnabled');
         await (optSyncEnabled === true ? chrome.storage.sync : chrome.storage.local).set({ bookmarkService: value });
       }, value);
@@ -2225,6 +2297,13 @@ export const SELFHOSTED_MODULES = [
         const options = await t.openOptions('tags');
         const state = () => options.evaluate(() => document.getElementById('panel-tags')?.dataset.tagGovState || '');
         await t.until(async () => (await state()) === 'pinboard-only', 'tag_panel_pinboard_only');
+        // G28: a chosen service this device is not connected to does not move
+        // the panel or the connection.
+        await storeChosenOnly('pinboard');
+        await t.sleep(800);
+        t.expectEq(await state(), 'pinboard-only', 'tag_panel_followed_unconnected_choice');
+        t.expectEq((await conn()).service, s, 'unconnected_choice_moved_connection');
+        await storeChosenOnly(s);
         await storeService('pinboard');
         await t.until(async () => (await state()) !== 'pinboard-only', 'tag_panel_followed_pinboard', 8000);
         t.note('tagPanelUnderPinboard', { state: await state(), tokenPrompt: await options.locator('#tag-gov-need-token').isVisible() });
@@ -2245,6 +2324,8 @@ export const SELFHOSTED_MODULES = [
         const writesBefore = await t.writes();
         const stored = await connectionDigest(t);
         const options = await t.openOptions();
+        // invalidSelector null: neither the address nor the token is marked
+        // (a wrong port is no single field's fault; the hint says so).
         const connectError = async (code, invalidSelector) => {
           const status = options.locator(`#connect-${s}-status`);
           await options.locator(`#connect-${s}`).click();
@@ -2252,7 +2333,11 @@ export const SELFHOSTED_MODULES = [
           const text = (await status.innerText()).trim();
           t.note(code, text.slice(0, 200));
           t.expect(!/^Connected/.test(text), code + '_connected');
-          t.expectEq(await options.locator(invalidSelector).getAttribute('aria-invalid'), 'true', code + '_aria_invalid');
+          if (invalidSelector) t.expectEq(await options.locator(invalidSelector).getAttribute('aria-invalid'), 'true', code + '_aria_invalid');
+          else {
+            t.expect(await options.locator(`#opt-${s}-url`).getAttribute('aria-invalid') !== 'true', code + '_url_marked');
+            t.expect(await options.locator(`#opt-${s}-token`).getAttribute('aria-invalid') !== 'true', code + '_token_marked');
+          }
           return text;
         };
         await t.phase('options_wrong_token');
@@ -2266,7 +2351,7 @@ export const SELFHOSTED_MODULES = [
         const other = t.otherBases().find(b => b.service !== s);
         if (other) {
           await options.locator(`#opt-${s}-url`).fill(other.base);
-          await connectError('wrong_port', `#opt-${s}-url`);
+          await connectError('wrong_port', null);
         } else t.note('wrong_port', 'skipped: no other instance in this run');
         await t.phase('options_gateway_empty');
         await options.locator(`#opt-${s}-url`).fill(t.base);
@@ -2309,7 +2394,7 @@ export const SELFHOSTED_MODULES = [
       // Whatever the parts did, the module ends connected as it began.
       if ((await conn()).service !== s || !(await t.sw(async key => !!(await pbpReadSettingsWithSecrets({ [key]: '' }))[key], s + 'Token'))) await t.reconnect();
       t.expectEq((await conn()).service, s, 'reconnected');
-      t.check(`${s}: the Tags panel follows a stored service change both ways and the popup opens after it; wrong token, wrong port and empty gateway fail with aria-invalid, no writes and the stored connection unchanged; choosing a service only opens its form; Disconnect asks first and removes the token`);
+      t.check(`${s}: the Tags panel follows a service switch made on this device both ways and the popup opens after it; a chosen service this device is not connected to does not move the panel; wrong token and empty gateway mark the field at fault, wrong port shows the address/port hint and marks neither field; all with no writes and the stored connection unchanged; choosing a service only opens its form; Disconnect asks first and removes the token`);
     },
   },
 
@@ -2328,7 +2413,7 @@ export const SELFHOSTED_MODULES = [
     // Temp only (user-target rounds): chip geometry and quote typing are
     // the popup's, not the server's; a temporary instance shows the same.
     needs: needs({ target: 'temp', writes: false, shots: true }),
-    budget: { bookmarks: 0, urls: 1, node: 2, browser: { linkding: 15, karakeep: 25 }, ai: 0, tags: 0, seconds: 45, tagReads: 1 },
+    budget: { bookmarks: 0, urls: 2, node: 2, browser: { linkding: 15, karakeep: 25 }, ai: 0, tags: 0, seconds: 45, tagReads: 1 },
     files: ['_locales/de/messages.json'],
     settings: {},
     async steps(t) {
@@ -2369,19 +2454,22 @@ export const SELFHOSTED_MODULES = [
 
       await t.part('long_chip', async () => {
         await t.phase('tag_input_long_chip');
-        form = await t.openPopup(url, { locale: 'de', width: 550 });
+        // Its own address: the popup's session draft is per tab URL, so the
+        // chip left behind by the part above would be restored here.
+        form = await t.openPopup(t.claimUrl(), { locale: 'de', width: 550 });
+        t.expectEq(await form.popup.locator('#tags-display .tag-item').count(), 0, 'long_chip_start_dirty');
         const long = (t.prefix + '_' + 'abcdefghijklmnopqrstuvwxyz').slice(0, 68);
         await form.popup.locator('#tags-input').fill(long);
         await form.popup.locator('#tags-input').press('Enter');
-        const g = await form.popup.evaluate(() => {
-          const chip = document.querySelector('#tags-display .tag-item');
+        const g = await form.popup.evaluate(long => {
+          const chip = [...document.querySelectorAll('#tags-display .tag-item')].find(el => el.querySelector('.tag-text')?.title === long);
           const wrap = chip?.closest('.tags-input-wrap') || document.getElementById('tags-display');
           const remove = chip?.querySelector('.tag-remove');
           if (!chip || !remove) return { missing: true };
           const c = chip.getBoundingClientRect(), w = wrap.getBoundingClientRect(), r = remove.getBoundingClientRect();
           const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
           return { scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth, chipRight: Math.round(c.right), wrapRight: Math.round(w.right), removeLeft: Math.round(r.left), removeRight: Math.round(r.right), hit: !!hit && (hit === remove || remove.contains(hit)) };
-        });
+        }, long);
         t.note('longChip', g);
         t.expect(!g.missing, 'long_chip_missing');
         t.expect(g.scrollWidth <= g.innerWidth, 'long_chip_page_overflow');
@@ -2389,7 +2477,7 @@ export const SELFHOSTED_MODULES = [
         t.expect(g.removeLeft >= 0 && g.removeRight <= g.innerWidth && g.hit, 'long_chip_remove_unreachable');
         await t.shot(form.popup, 'long-chip-de', { surface: 'popup', keys: ['#tags-display .tag-remove', '#submit-btn'] });
         await t.axe(form.popup, 'long-chip-de');
-        await form.popup.locator('#tags-display .tag-remove').first().click();
+        await form.popup.locator('#tags-display .tag-item', { has: form.popup.locator(`.tag-text[title="${long}"]`) }).locator('.tag-remove').click();
         t.expectEq(await form.popup.locator('#tags-display .tag-item').count(), 0, 'long_chip_not_removed');
         await form.close();
       });
@@ -2825,8 +2913,9 @@ export const H3C_MODULES = [
         }
       });
 
-      // G19 invariant 3: a Connect again with the same address and token
-      // (same account) clears the bar's old error and looks again.
+      // G19 invariant 3: a connection change on the same account (here a
+      // harmless custom gateway header; an unchanged Connect writes nothing
+      // and changes nothing) clears the bar's old error and looks again.
       await t.part('connection_refresh', async () => {
         await t.phase('reader_connection_refresh');
         const before = await connection(t);
@@ -2836,14 +2925,20 @@ export const H3C_MODULES = [
         const failed = await readerStatus(reader);
         fault.clear();
         const since = t.now();
-        await t.reconnect();
-        const after = await connection(t);
+        let after, refreshed = false, status, lookups;
+        try {
+          await t.reconnect({ gateway: { headers: [['X-Pbp-It', t.runId]] } });
+          after = await connection(t);
+          try { await t.until(async () => (await reader.locator('#reader-bookmark-save').getAttribute('data-saved')) === 'true', 'reader_refresh_saved', 10000); refreshed = true; } catch { refreshed = false; }
+          status = await readerStatus(reader);
+          lookups = t.requests({ path: CHECK_PATH[t.service], since }).length;
+        } finally {
+          await t.reconnect({ gateway: 'none' });
+          await reader.close().catch(() => {});
+        }
         t.expectEq(after.account, before.account, 'reader_reconnect_account');
-        let refreshed = false;
-        try { await t.until(async () => (await reader.locator('#reader-bookmark-save').getAttribute('data-saved')) === 'true', 'reader_refresh_saved', 10000); refreshed = true; } catch { refreshed = false; }
-        const status = await readerStatus(reader);
-        t.note('connectionRefresh', { failed, refreshed, status, lookups: t.requests({ path: CHECK_PATH[t.service], since }).length });
-        await reader.close();
+        t.note('connectionRefresh', { failed, refreshed, status, lookups });
+        t.expectEq(lookups, 1, 'reader_refresh_lookups');
         t.expect(refreshed, 'reader_connection_not_refreshed');
         t.expect(status !== failed, 'reader_old_error_kept');
       });
@@ -2853,6 +2948,7 @@ export const H3C_MODULES = [
       // create of the utm address would be a URL outside the run's pool.
       await t.part('cleaned_url_save', async () => {
         await t.phase('reader_cleaned_url');
+        if (!(await utmCleanable(t, b))) { t.note('reader_utm_loopback_exempt', b); return; }
         await t.seed({ url: b, title: prefix + ' cleaned', notes: 'before' });
         const variant = b + '&utm_source=pbp-it';
         // Through the shortcut entry, which writes G10's bookmark URL (an
@@ -2963,12 +3059,14 @@ export const H3C_MODULES = [
           await form.close();
           t.expect(!!(await t.lookup(d)), 'copy_delete_removed');
         }
-        // Judged after both locales ran, so each has its picture. The copy
-        // G18 names: the existing readerBookmarkDeleteFailed ("could not
-        // confirm deletion"), not just anything but "couldn't save".
+        // Judged after both locales ran, so each has its picture. A 503 is a
+        // server failure: G11's table gives it bookmarkErrServer, and
+        // readerBookmarkDeleteFailed only covers reasons outside the table
+        // (popup-save-tests). Not "couldn't save" either.
+        await t.phase('copy_delete_judge');
         for (const locale of LOCALES) {
           const shown = t.noted('deleteFailure_' + locale);
-          t.expect(shown.includes(t.message('readerBookmarkDeleteFailed', locale)), 'popup_delete_copy_' + locale);
+          t.expect(shown.includes(t.message('bookmarkErrServer', locale)), 'popup_delete_copy_' + locale);
           t.expect(!shown.includes(t.message('saveFailedGeneric', locale)), 'popup_delete_says_save_' + locale);
         }
       });
@@ -3116,7 +3214,7 @@ export const H3C_MODULES = [
         await pages[saved].bringToFront();
         await t.activateTab(saved);
         await t.until(async () => (await tabIcon(saved)) === 'saved', 'status_failure_baseline', 8000);
-        await t.sw(() => { statusCache.clear(); return true; });
+        await expireStatusCache(t);
         const fault = t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 503, contentType: 'application/json', body: { detail: 'unavailable' } });
         await pages[fresh].bringToFront();
         await t.activateTab(fresh);
@@ -3144,9 +3242,11 @@ export const H3C_MODULES = [
         // lookup_bookmark does not read the setting, so turning it off here
         // leaves just the lookup this step is about.
         await t.settings({ optCheckBookmarkStatus: false });
+        // linkding's toolbar check is the pre-read setting (3a) instead.
+        if (t.service === 'linkding') await t.settings({ [await t.productSetting(/linkding.*(preload|prefetch|preread|whilebrows|browsing)|(preload|prefetch).*page/, 'linkding_preload')]: false });
         await t.until(async () => t.sw(() => _settingsCache?.optCheckBookmarkStatus !== true), 'status_check_off', 5000);
         await checksSettled();
-        await t.sw(() => { statusCache.clear(); return true; });
+        await expireStatusCache(t);
         const fault = t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 503, contentType: 'application/json', body: { detail: 'unavailable' } });
         const popupSince = t.now();
         const form = await t.openPopup(saved, { settle: false });
@@ -3155,7 +3255,7 @@ export const H3C_MODULES = [
         const lookup = await form.popup.evaluate(() => bookmarkLookup.status);
         const checks = t.requests({ path: CHECK_PATH[t.service], since: popupSince }).length;
         const ms = t.now() - popupSince;
-        t.note('failurePopup', { lookup, checks, ms });
+        t.note('failurePopup', { lookup, checks, ms, at: t.requests({ path: CHECK_PATH[t.service], since: popupSince }).map(r => r.at - popupSince) });
         fault.clear();
         await form.close();
         t.expectEq(checks, 1, 'status_failure_popup_lookups');

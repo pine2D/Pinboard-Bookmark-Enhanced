@@ -1660,7 +1660,7 @@ try {
         await copyModule.steps(t);
         return [parts.popup_delete_failure, parts.lookup_5xx];
       };
-      const right = { popup_delete_failure: l => msg('readerBookmarkDeleteFailed', l), lookup_5xx: () => 'The server answered with an error (503)' };
+      const right = { popup_delete_failure: l => msg('bookmarkErrServer', l), lookup_5xx: () => 'The server answered with an error (503)' };
       assert.deepEqual(await drive(right), ['passed', 'passed']);
       assert.deepEqual(await drive({ ...right, popup_delete_failure: () => 'Bookmark deleted' }), ['popup_delete_copy_en', 'passed'], 'a delete failure reported as done fails');
       assert.deepEqual(await drive({ ...right, popup_delete_failure: l => msg('saveFailedGeneric', l) }), ['popup_delete_copy_en', 'passed']);

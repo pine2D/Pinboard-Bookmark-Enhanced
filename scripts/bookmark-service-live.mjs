@@ -3107,7 +3107,11 @@ export class LiveRun {
 
   // The options-page Connect flow; also re-run after a temporary instance's
   // sharing switch changes, since the extension reads it at Connect time.
-  async connectUi(instance, { keepOpen = true } = {}) {
+  // `gateway` (non-Pinboard): undefined leaves the form's gateway as loaded;
+  // 'none' selects no gateway; { headers: [[name, value]] } selects custom
+  // headers (a real change to the stored connection with the same address and
+  // token, so the same account).
+  async connectUi(instance, { keepOpen = true, gateway } = {}) {
     const inst = this.instances[instance];
     const options = await this.ctx.newPage();
     await options.goto(this.extension + 'options.html');
@@ -3127,6 +3131,17 @@ export class LiveRun {
     }
     await options.locator('#opt-' + inst.service + '-url').fill(inst.base);
     await options.locator('#opt-' + inst.service + '-token').fill(inst.token);
+    if (gateway !== undefined) {
+      const custom = gateway && gateway !== 'none';
+      await options.evaluate(({ service, type }) => { const sel = document.getElementById('opt-' + service + '-gateway'); sel.value = type; sel.dispatchEvent(new Event('change', { bubbles: true })); }, { service: inst.service, type: custom ? 'custom' : 'none' });
+      if (custom) {
+        const headers = gateway.headers || [];
+        for (let i = 0; i < headers.length; i++) {
+          await options.locator('#opt-' + inst.service + '-gw-name-' + (i + 1)).fill(headers[i][0]);
+          await options.locator('#opt-' + inst.service + '-gw-value-' + (i + 1)).fill(headers[i][1]);
+        }
+      }
+    }
     await options.locator('#connect-' + inst.service).click();
     await options.locator('#connect-' + inst.service + '-status').filter({ hasText: 'Connected' }).waitFor({ timeout: 25000 });
     await this.until(() => this.sw(async service => (await pbpReadBookmarkConnection()).service === service, inst.service), 'selected_service');
@@ -3396,7 +3411,7 @@ export class LiveRun {
       consoleSince: mark => [...run.report.console.slice(mark.page), ...run.report.swConsole.slice(mark.sw).map(c => ({ ...c, surface: 'worker' }))],
       // Connect this instance again through the options page (after a module
       // disconnected it or replaced its token).
-      reconnect: async () => { alive(); await run.connectUi(instance, { keepOpen: false }); },
+      reconnect: async opts => { alive(); await run.connectUi(instance, { keepOpen: false, ...(opts || {}) }); },
       // The other instances' bases in this run (a wrong-service port).
       otherBases: () => Object.entries(run.instances).filter(([id, i]) => id !== instance && i.base).map(([id, i]) => ({ instance: id, service: i.service, base: i.base })),
       // A message of the loaded tree's locale file (en by default).
