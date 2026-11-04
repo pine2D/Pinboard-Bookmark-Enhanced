@@ -1271,8 +1271,9 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           pbpClearBookmarkBadge(); ++_badgeSeq;
           document.dispatchEvent(new CustomEvent("pbp:bookmark-account-changed", {detail:{url,bookmarkUrl,title,account:bookmarkAccount}}));
         } else if (bookmarkAccount && pbpBookmarkSettingsChanged(changes)) {
-          // Same account, other connection settings (gateway, rotated token,
-          // Connect again): only the fact is passed on, never a credential.
+          // Same account, other connection settings (gateway, rotated token):
+          // only the fact is passed on, never a credential. A Connect that
+          // stores the same values changes nothing and fires no event.
           document.dispatchEvent(new CustomEvent("pbp:bookmark-connection-changed", {detail:{url,bookmarkUrl,title,account:bookmarkAccount}}));
         }
       } catch (error) { console.warn("[preview] identity refresh failed:", error?.name, error?.message); }

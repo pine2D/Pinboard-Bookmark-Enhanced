@@ -638,7 +638,8 @@
     refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); recheckIfPending(); } });
   });
   // The same account with other connection settings (a new gateway, a rotated
-  // token, a Connect again): look the address up once more so an earlier error
+  // token; a Connect that stores the same values fires nothing): look the
+  // address up once more so an earlier error
   // does not outlive the fix. A request in flight finishes first, then this looks again
   // unless the bar then shows that request's write outcome.
   document.addEventListener("pbp:bookmark-connection-changed", event => {
