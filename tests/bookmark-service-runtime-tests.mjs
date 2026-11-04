@@ -1471,6 +1471,7 @@ try{
     return {ok:outcome?.ok===true,sent};
   };
   const stored=()=>worker.evaluate(()=>chrome.storage.local.get(['bookmarkService','bookmarkServiceActive']));
+  const mark=()=>worker.evaluate(()=>chrome.storage.local.get('bookmarkConnectMark'));
   const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
   const note=options.locator('#bookmark-service-note');
   try{
@@ -1484,11 +1485,13 @@ try{
     assert.deepEqual(await stored(),{bookmarkService:'linkding',bookmarkServiceActive:'linkding'},'picking an unconnected service changed the service');
     assert.deepEqual(await readers(),['linkding','linkding','linkding','linkding','linkding'],'a reader left linkding before Karakeep connected');
     // A failed Connect leaves everything where it was.
+    const markBefore=(await mark()).bookmarkConnectMark;
     await options.locator('#opt-karakeep-url').fill(origin+'/probe/notfound/');
     await options.locator('#opt-karakeep-token').fill('fixture-key');
     await options.locator('#connect-karakeep').click();
     await options.locator('#connect-karakeep-status.bad').waitFor({timeout:10000});
     assert.deepEqual(await stored(),{bookmarkService:'linkding',bookmarkServiceActive:'linkding'},'a failed Connect switched the service');
+    assert.deepEqual((await mark()).bookmarkConnectMark,markBefore,'a failed Connect wrote the connect marker');
     // A successful Connect switches, and the note goes.
     await options.locator('#opt-karakeep-url').fill(origin+'/karakeep/');
     await options.locator('#connect-karakeep').click();
@@ -1496,6 +1499,15 @@ try{
     await until(async()=>JSON.stringify(await stored())===JSON.stringify({bookmarkService:'karakeep',bookmarkServiceActive:'karakeep'}),'a successful Connect did not switch to Karakeep');
     await note.waitFor({state:'hidden',timeout:5000});
     assert.deepEqual(await readers(),['karakeep','karakeep','karakeep','karakeep','karakeep'],'a reader did not follow the Connect');
+    // The marker is non-secret, local-only, and changes on every success, even when Connect stores the same address and token.
+    const first=(await mark()).bookmarkConnectMark;
+    assert.deepEqual(Object.keys(first||{}).sort(),['at','service'],'the connect marker has other content');
+    assert.equal(first.service,'karakeep');
+    assert(!JSON.stringify(first).includes('fixture-key')&&!JSON.stringify(first).includes(origin),'the connect marker carries a token or address');
+    assert.equal((await worker.evaluate(()=>chrome.storage.sync.get('bookmarkConnectMark'))).bookmarkConnectMark,undefined,'the connect marker reached sync');
+    await new Promise(resolve=>setTimeout(resolve,5));
+    await options.locator('#connect-karakeep').click();
+    await until(async()=>(await mark()).bookmarkConnectMark?.at>first.at,'a repeated Connect with the same values did not refresh the marker');
     // Between two connected services, picking one is the switch.
     await options.locator('input[name="bookmark-service"][value="linkding"]').check();
     await until(async()=>(await stored()).bookmarkServiceActive==='linkding','picking a connected service did not switch to it');

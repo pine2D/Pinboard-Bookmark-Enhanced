@@ -3178,6 +3178,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           patch.bookmarkService = service;
           patch[PBP_BOOKMARK_ACTIVE_KEY] = service;
         }
+        // Local-only; differs on every success so open readers re-check even when nothing else changed.
+        patch[PBP_BOOKMARK_CONNECT_MARK_KEY] = {service, at:Date.now()};
         if (service === "karakeep") Object.assign(patch, pbpKarakeepConnectBindingPatch(fresh,
           pbpBookmarkConnection({...fresh,bookmarkService:service}).account, "karakeep:" + baseUrl + ":" + result.identity.id, result.readLaterListId));
         const saved = await persistSettings(patch);

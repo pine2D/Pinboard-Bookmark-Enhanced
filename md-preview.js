@@ -1273,7 +1273,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         } else if (bookmarkAccount && pbpBookmarkSettingsChanged(changes)) {
           // Same account, other connection settings (gateway, rotated token):
           // only the fact is passed on, never a credential. A Connect that
-          // stores the same values changes nothing and fires no event.
+          // stores the same values still writes the local bookmarkConnectMark.
           document.dispatchEvent(new CustomEvent("pbp:bookmark-connection-changed", {detail:{url,bookmarkUrl,title,account:bookmarkAccount}}));
         }
       } catch (error) { console.warn("[preview] identity refresh failed:", error?.name, error?.message); }

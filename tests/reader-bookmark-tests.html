@@ -2179,6 +2179,21 @@ await test("bookmark badge links to the connected service and shows the lock onl
     assert(bad === null || !bad.href.includes("pinboard.in"), service + " badge pointed at Pinboard");
   }
 });
+await test("a Connect that changes no setting still reaches open readers through the local connect mark", async () => {
+  // The reader's storage.onChanged gate is pbpBookmarkSettingsChanged; the mark is its only trigger here.
+  equal(pbpBookmarkSettingsChanged({ bookmarkConnectMark: { newValue: { service: "linkding", at: 5 } } }), true);
+  equal(pbpBookmarkSettingsChanged({ someCache: { newValue: 1 } }), false);
+  const account = "linkding:https://ld.example:c1";
+  let answer = { known: false, reason: "network", account };
+  const r = await barFrame(account, m => m.type === "mdReaderBookmarkState" ? answer : {});
+  try {
+    const before = r.requests.filter(m => m.type === "mdReaderBookmarkState").length;
+    answer = { known: true, bookmarked: false, account, bookmark: {} };
+    r.w.document.dispatchEvent(new r.w.CustomEvent("pbp:bookmark-connection-changed", { detail: { url: URL_ARTICLE, title: "Article", account } }));
+    await wait(120);
+    assert(r.requests.filter(m => m.type === "mdReaderBookmarkState").length > before, "no new lookup after the connection event");
+  } finally { r.frame.remove(); }
+});
 document.body.dataset.complete = "true";
 })();
 </script></body></html>

@@ -6576,6 +6576,20 @@ async function run() {
         const unknown = await pbpSwitchBookmarkService("other");
         check("G28 switch: an unknown service is refused without a write", !unknown.ok && local.bookmarkServiceActive === "linkding");
       }
+      // Connect marker: local-only, carries no URL/credential, and is a storage change readers react to.
+      {
+        const local = { optSyncEnabled: true }, sync = {};
+        install(local, sync);
+        const saved = await persistSettings({ [PBP_BOOKMARK_CONNECT_MARK_KEY]: { service: "linkding", at: 1 }, linkdingUrl: LD });
+        check("G28 connect mark: written to local only, never to sync",
+          saved.ok && local.bookmarkConnectMark?.service === "linkding" && !("bookmarkConnectMark" in sync)
+          && JSON.stringify(local.bookmarkConnectMark) === JSON.stringify({ service: "linkding", at: 1 }));
+        check("G28 connect mark: a bare mark change counts as a bookmark settings change (open readers re-check)",
+          pbpBookmarkSettingsChanged({ bookmarkConnectMark: { newValue: { service: "linkding", at: 2 } } }) === true);
+        check("G28 connect mark: not an exportable or default setting",
+          !Object.hasOwn(SETTINGS_DEFAULTS, "bookmarkConnectMark") && PBP_BOOKMARK_DEVICE_KEYS.includes("bookmarkConnectMark")
+         );
+      }
       // A query without bookmarkService gets no bookmarkService back.
       {
         install({ bookmarkServiceActive: "linkding" }, {});

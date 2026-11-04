@@ -2255,7 +2255,12 @@ const PBP_BOOKMARK_ACTIVE_KEY = "bookmarkServiceActive";
 // Local-only proof that this device tested its Pinboard token
 // (pbpPinboardTokenDigest). Like the device's service, never synced or backed up.
 const PBP_PINBOARD_VERIFIED_KEY = "pinboardTokenVerified";
-const PBP_BOOKMARK_DEVICE_KEYS = Object.freeze([PBP_BOOKMARK_ACTIVE_KEY, PBP_PINBOARD_VERIFIED_KEY]);
+// Local-only "a Connect just succeeded" marker ({service, at}; no URL, no
+// credential). A Connect that stores the same address and token changes no
+// setting and fires no storage event; this value always differs, so an open
+// reader hears about it and looks the connection up again.
+const PBP_BOOKMARK_CONNECT_MARK_KEY = "bookmarkConnectMark";
+const PBP_BOOKMARK_DEVICE_KEYS = Object.freeze([PBP_BOOKMARK_ACTIVE_KEY, PBP_PINBOARD_VERIFIED_KEY, PBP_BOOKMARK_CONNECT_MARK_KEY]);
 function pbpBookmarkServiceId(settings) {
   const id = settings?.bookmarkService === undefined ? "pinboard" : settings.bookmarkService;
   return PBP_BOOKMARK_SERVICES.includes(id) ? id : "";
