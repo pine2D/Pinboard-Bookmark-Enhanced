@@ -2923,7 +2923,7 @@ function setupSubmit(token) {
           // "undefined" instead of the login redirect already under way.
           const deleteService = pbpBookmarkServiceId(settings);
           if (!resp.ok && deleteService !== "pinboard") {
-            if (ownsDeleteForm()) showStatus("status-msg", pbpBookmarkFailureText({reason:resp.error, httpStatus:resp.status}, deleteService, t) || t("readerBookmarkDeleteFailed"), "error");
+            if (ownsDeleteForm()) showStatus("status-msg", pbpDeleteFailureText(resp, deleteService), "error");
             return;
           }
           if (resp.status === 401) return; // pinboardFetch already redirected to login
@@ -3119,7 +3119,7 @@ async function fetchRecentBookmarks(token) {
               const resp = await pbpPopupBookmarkApi("delete", p.href);
               const deleteService = pbpBookmarkServiceId(settings);
               if (!resp.ok && deleteService !== "pinboard") {
-                reportDeleteFailure(pbpBookmarkFailureText({reason:resp.error, httpStatus:resp.status}, deleteService, t) || t("readerBookmarkDeleteFailed"));
+                reportDeleteFailure(pbpDeleteFailureText(resp, deleteService));
                 return;
               }
               if (resp.status === 401) return; // pinboardFetch already redirected to login
@@ -3326,6 +3326,13 @@ function pbpSaveErrorView(result) {
   }
   if (reason === "api" && result.detail) return { message: t("pinboardApiError", String(result.detail)), retry: true };
   return { message: t("saveFailedGeneric"), retry: true };
+}
+// A self-hosted delete that failed: lead with the fact, then the specific
+// cause (a bare cause like "Couldn't reach the server" never said the
+// bookmark was still there).
+function pbpDeleteFailureText(resp, service) {
+  const reason = pbpBookmarkFailureText({ reason: resp?.error, httpStatus: resp?.status }, service, t);
+  return reason ? t("bookmarkDeleteFailedReason", reason) : t("readerBookmarkDeleteFailed");
 }
 function showSaveError(result) {
   clearSaveError();

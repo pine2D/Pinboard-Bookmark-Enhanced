@@ -4757,6 +4757,15 @@
   "readerBookmarkDeleteFailed": {
     "message": "Nie udało się potwierdzić usunięcia. Spróbuj ponownie."
   },
+  "bookmarkDeleteFailedReason": {
+    "message": "Nie udało się usunąć zakładki. $REASON$",
+    "description": "Popup: a bookmark delete failed. Leads with the fact, then the specific cause. $REASON$ is the cause text, already a full sentence.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "readerBookmarkExport": {"message": "Eksportuj"},
   "kbdHelpSave": {"message": "Zapisz / oznacz jako przeczytane"},
   "kbdHelpReadLater": {"message": "Przeczytaj później"},

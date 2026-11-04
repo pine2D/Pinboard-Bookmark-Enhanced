@@ -4757,6 +4757,15 @@
   "readerBookmarkDeleteFailed": {
     "message": "無法確認刪除結果，請重試。"
   },
+  "bookmarkDeleteFailedReason": {
+    "message": "無法刪除書籤。$REASON$",
+    "description": "Popup: a bookmark delete failed. Leads with the fact, then the specific cause. $REASON$ is the cause text, already a full sentence.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "readerBookmarkExport": {"message": "匯出"},
   "kbdHelpSave": {"message": "儲存 / 標為已讀"},
   "kbdHelpReadLater": {"message": "稍後閱讀"},

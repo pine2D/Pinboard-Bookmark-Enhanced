@@ -4757,6 +4757,15 @@
   "readerBookmarkDeleteFailed": {
     "message": "Löschen konnte nicht bestätigt werden. Bitte erneut versuchen."
   },
+  "bookmarkDeleteFailedReason": {
+    "message": "Das Lesezeichen konnte nicht gelöscht werden. $REASON$",
+    "description": "Popup: a bookmark delete failed. Leads with the fact, then the specific cause. $REASON$ is the cause text, already a full sentence.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "readerBookmarkExport": {"message": "Exportieren"},
   "kbdHelpSave": {"message": "Speichern / als gelesen markieren"},
   "kbdHelpReadLater": {"message": "Später lesen"},

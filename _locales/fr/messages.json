@@ -4757,6 +4757,15 @@
   "readerBookmarkDeleteFailed": {
     "message": "Impossible de confirmer la suppression. Réessayez."
   },
+  "bookmarkDeleteFailedReason": {
+    "message": "Impossible de supprimer le signet. $REASON$",
+    "description": "Popup: a bookmark delete failed. Leads with the fact, then the specific cause. $REASON$ is the cause text, already a full sentence.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "readerBookmarkExport": {"message": "Exporter"},
   "kbdHelpSave": {"message": "Enregistrer / marquer comme lu"},
   "kbdHelpReadLater": {"message": "Lire plus tard"},

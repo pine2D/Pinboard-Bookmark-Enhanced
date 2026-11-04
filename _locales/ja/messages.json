@@ -4757,6 +4757,15 @@
   "readerBookmarkDeleteFailed": {
     "message": "削除を確認できませんでした。もう一度お試しください。"
   },
+  "bookmarkDeleteFailedReason": {
+    "message": "ブックマークを削除できませんでした。$REASON$",
+    "description": "Popup: a bookmark delete failed. Leads with the fact, then the specific cause. $REASON$ is the cause text, already a full sentence.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "readerBookmarkExport": {"message": "エクスポート"},
   "kbdHelpSave": {"message": "保存 / 既読にする"},
   "kbdHelpReadLater": {"message": "あとで読む"},

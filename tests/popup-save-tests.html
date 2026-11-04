@@ -6852,6 +6852,17 @@ test("posts/add default remains replace=yes for existing callers", () => {
     test("duplicate_unknown copy names no cause", () => {
       assert(!/network trouble/i.test(enMessages.bookmarkErrDuplicateUnknown.message), "en copy still blames the network");
     });
+    test("a failed self-hosted delete leads with the failure and then the cause", () => {
+      const from = source.indexOf("function pbpDeleteFailureText(");
+      assert(from >= 0, "pbpDeleteFailureText missing");
+      const body = source.slice(from, source.indexOf("\n}\n", from) + 3);
+      const fn = new Function("pbpBookmarkFailureText", "t", `${body}\nreturn pbpDeleteFailureText;`)(
+        pbpBookmarkFailureText, (key, ...args) => key + (args.length ? "(" + args.join(",") + ")" : ""));
+      assert(fn({ error: "network" }, "linkding") === "bookmarkDeleteFailedReason(bookmarkErrNetwork)", "network: " + fn({ error: "network" }, "linkding"));
+      assert(fn({ error: "weird_unknown_code" }, "linkding") === "readerBookmarkDeleteFailed", "unknown cause keeps the generic line");
+      const en = enMessages.bookmarkDeleteFailedReason.message;
+      assert(/^Couldn't delete the bookmark\. \$REASON\$$/.test(en), "en: " + en);
+    });
   } catch (error) {
     test("popup submit source contracts load", () => { throw error; }, { always: true });
   }

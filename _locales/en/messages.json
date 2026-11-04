@@ -4768,6 +4768,15 @@
   "readerBookmarkDeleteFailed": {
     "message": "Could not confirm deletion. Please retry."
   },
+  "bookmarkDeleteFailedReason": {
+    "message": "Couldn't delete the bookmark. $REASON$",
+    "description": "Popup: a bookmark delete failed. Leads with the fact, then the specific cause. $REASON$ is the cause text, already a full sentence.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "readerBookmarkExport": {"message": "Export"},
   "kbdHelpSave": {"message": "Save / mark as read"},
   "kbdHelpReadLater": {"message": "Read later"},

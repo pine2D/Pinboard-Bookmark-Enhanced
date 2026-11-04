@@ -4751,6 +4751,15 @@
   "readerBookmarkDeleteFailed": {
     "message": "无法确认删除结果，请重试。"
   },
+  "bookmarkDeleteFailedReason": {
+    "message": "没能删除书签。$REASON$",
+    "description": "Popup: a bookmark delete failed. Leads with the fact, then the specific cause. $REASON$ is the cause text, already a full sentence.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "readerBookmarkExport": {"message": "导出"},
   "kbdHelpSave": {"message": "保存 / 标为已读"},
   "kbdHelpReadLater": {"message": "稍后阅读"},

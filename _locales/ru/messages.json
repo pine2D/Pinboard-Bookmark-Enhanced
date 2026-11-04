@@ -4757,6 +4757,15 @@
   "readerBookmarkDeleteFailed": {
     "message": "Не удалось подтвердить удаление. Попробуйте ещё раз."
   },
+  "bookmarkDeleteFailedReason": {
+    "message": "Не удалось удалить закладку. $REASON$",
+    "description": "Popup: a bookmark delete failed. Leads with the fact, then the specific cause. $REASON$ is the cause text, already a full sentence.",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "readerBookmarkExport": {"message": "Экспорт"},
   "kbdHelpSave": {"message": "Сохранить / отметить как прочитанное"},
   "kbdHelpReadLater": {"message": "Прочитать позже"},
