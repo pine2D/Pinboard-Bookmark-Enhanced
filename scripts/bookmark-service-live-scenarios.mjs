@@ -2357,8 +2357,9 @@ export const SELFHOSTED_MODULES = [
         const writesBefore = await t.writes();
         const stored = await connectionDigest(t);
         const options = await t.openOptions();
-        // invalidSelector null: neither the address nor the token is marked
-        // (a wrong port is no single field's fault; the hint says so).
+        // invalidSelector null (a wrong port): the token is never marked; the
+        // address is marked exactly when the answer was a web page (not_api,
+        // user ruling 2026-11-04), not for any other wrong-port answer.
         const connectError = async (code, invalidSelector) => {
           const status = options.locator(`#connect-${s}-status`);
           await options.locator(`#connect-${s}`).click();
@@ -2368,7 +2369,10 @@ export const SELFHOSTED_MODULES = [
           t.expect(!/^Connected/.test(text), code + '_connected');
           if (invalidSelector) t.expectEq(await options.locator(invalidSelector).getAttribute('aria-invalid'), 'true', code + '_aria_invalid');
           else {
-            t.expect(await options.locator(`#opt-${s}-url`).getAttribute('aria-invalid') !== 'true', code + '_url_marked');
+            const notApi = t.message('bookmarkErrNotApi');
+            const pageAnswer = !!notApi && text.includes(notApi.split('$')[0].trim().slice(0, 20));
+            t.note(code + '_not_api', pageAnswer);
+            t.expectEq(await options.locator(`#opt-${s}-url`).getAttribute('aria-invalid') === 'true', pageAnswer, code + '_url_marked');
             t.expect(await options.locator(`#opt-${s}-token`).getAttribute('aria-invalid') !== 'true', code + '_token_marked');
           }
           return text;
