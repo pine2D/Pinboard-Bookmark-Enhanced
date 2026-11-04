@@ -4679,7 +4679,10 @@ async function pbpRunPopupDraft(message) {
               || !message.fields.every((k) => Object.hasOwn(draft, k))) return { ok: false, error: "invalid" };
           const previous = valid(row) && row.owner === message.account ? clean(row.draft) : null;
           // Both opens' changes count; a legacy row counts as all changed.
+          // The address's provenance travels with the address: a typed edit
+          // merged onto a recent draft must not keep "recent".
           if (previous) draft = clean({ ...previous, ...Object.fromEntries(message.fields.map((k) => [k, draft[k]])),
+            ...(message.fields.includes("url") ? { urlSource: draft.urlSource } : {}),
             changed: previous.changed && draft.changed ? [...previous.changed, ...draft.changed] : undefined });
           if (!draft) return { ok: false, error: "invalid" };
         }

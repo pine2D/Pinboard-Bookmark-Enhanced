@@ -266,6 +266,8 @@ function pbpAiSyncUrlEditState() {
   const edited = !pbpPopupFormHoldsOpenedPage();
   $id("ai-summary-btn")?.classList.toggle("disabled-link", edited);
   $id("ai-tags-btn")?.classList.toggle("disabled-link", edited);
+  // The refusal card describes this very condition; restoring the address ends it.
+  if (!edited && typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("aiUrlEdited");
 }
 
 // Settle any in-flight same-URL bookmark lookup before touching the
@@ -1298,7 +1300,7 @@ async function doAISummary(forceRefresh, sOverride) {
   if (!account) return;
   if (!hasAIKey(s)) { showSetKeyError(); return; }
   if (!pbpPopupFormHoldsOpenedPage()) {
-    showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true });
+    showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true, key: "aiUrlEdited" });
     return;
   }
   hideAIError();
@@ -1435,7 +1437,7 @@ function showSummaryActions(fromCache) {
     // this link stays clickable: swapping the label before the refusal left it
     // pinned on "Regenerating..." forever, with no request and no feedback.
     if (!pbpPopupFormHoldsOpenedPage()) {
-      showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true });
+      showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true, key: "aiUrlEdited" });
       return;
     }
     wrap.querySelectorAll(".regen-link").forEach(l => l.classList.add("loading"));
@@ -1472,7 +1474,7 @@ async function doAITags(forceRefresh, sOverride) {
 
   if (!hasAIKey(s)) { showSetKeyError(); return; }
   if (!pbpPopupFormHoldsOpenedPage()) {
-    showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true });
+    showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true, key: "aiUrlEdited" });
     return;
   }
 
@@ -1693,7 +1695,7 @@ function renderAITags(tags, fromCache) {
     // "Regenerating..." forever (these links are not covered by
     // pbpAiSyncUrlEditState's disabled-link pass), with no feedback.
     if (!pbpPopupFormHoldsOpenedPage()) {
-      showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true });
+      showStatus("status-msg", t("aiUrlEdited"), "error", { remedy: true, key: "aiUrlEdited" });
       return;
     }
     // The account this op belongs to, captured before the first await so

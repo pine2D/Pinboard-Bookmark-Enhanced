@@ -725,10 +725,10 @@ async function createUiHarness(storedProgress, now, opts = {}) {
 
   await test("batch outcomes with a remedy stay on screen; plain failures keep the 4 s card", async () => {
     const run = async (progress) => { const h = await createUiHarness(null, 5000); h.renderBatchProgress({ running: false, done: true, total: 3, saved: 0, queued: 0, failed: 0, skipped: 0, tooLong: 0, ...progress }); return h.statuses[0]; };
-    equal((await run({ tagTooLong: 2, longTag: "x" })).remedy, true, "merge-mode long tag hides on a timer");
-    equal((await run({ tagTooLong: 1, longTag: "x", longTagSkip: true })).remedy, true, "skip-mode long tag hides on a timer");
-    equal((await run({ error: "not_logged_in" })).remedy, true, "not-logged-in hides on a timer");
-    equal((await run({ error: "interrupted" })).remedy, true, "interrupted hides on a timer");
+    equal((await run({ tagTooLong: 2, longTag: "x" })).remedy, true, "merge-mode long tag must stay on screen (no 4 s hide)");
+    equal((await run({ tagTooLong: 1, longTag: "x", longTagSkip: true })).remedy, true, "skip-mode long tag must stay on screen (no 4 s hide)");
+    equal((await run({ error: "not_logged_in" })).remedy, true, "not-logged-in must stay on screen (no 4 s hide)");
+    equal((await run({ error: "interrupted" })).remedy, true, "interrupted must stay on screen (no 4 s hide)");
     equal((await run({ failed: 1 })).remedy, false, "a plain item failure must keep the 4 s hide");
     equal((await run({ error: "something broke" })).remedy, false, "a raw batch error must keep the 4 s hide");
   });

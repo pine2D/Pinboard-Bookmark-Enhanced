@@ -3048,7 +3048,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     })();
     function makePopupAi(opts) {
       const o = opts || {};
-      const calls = { sent: [], callAI: [], cache: [], rendered: [], summary: [], status: [], errors: [], order: [], progressCleared: [] };
+      const calls = { sent: [], callAI: [], cache: [], rendered: [], summary: [], status: [], errors: [], order: [], progressCleared: [], dismissedRemedy: [] };
       const inflight = new Map();
       // Fill EVERY whitelisted field, so "the snapshot's overrides travel" is a
       // rule about the shared list (which the worker suite pins to every
@@ -3154,6 +3154,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         hasAIKey: () => true,
         hideAIError: () => { card.classList.add("hidden"); },
         showStatus: (...a) => calls.status.push(a),
+        pbpDismissRemedyStatus: (key) => calls.dismissedRemedy.push(key),
         showAIError: (kind, e) => calls.errors.push({ kind, e }),
         t: tEn,
         AI_PROVIDER_LABEL, pbpAiProviderLabel, pbpAiModelNotFoundText: () => ({ msg: "", hint: "" }),
@@ -3345,6 +3346,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
             where + ": tags sent " + (h.calls.sent.length - sentBefore) + ", status " + JSON.stringify(h.calls.status));
         }
       }
+    });
+    await testAsync("popup AI: the aiUrlEdited card goes away once the address is restored", async () => {
+      const PAGE = "https://example.com/article";
+      const h = makePopupAi({ realPageGuard: true, settings: { bookmarkService: "pinboard", urlClean: { enabled: false, aggressiveMode: false, customParams: [], excludeParams: [] } }, pageUrl: PAGE, formUrl: PAGE + "?other=1" });
+      h.syncUrlEditState();
+      assert(h.calls.dismissedRemedy.length === 0, "the card was retired while the address is still edited");
+      h.el["url-input"].value = PAGE;
+      h.syncUrlEditState();
+      assert(h.calls.dismissedRemedy.includes("aiUrlEdited"), "restoring the address did not retire the aiUrlEdited card");
     });
     // The two links that start an AI op without the entry buttons -- the
     // summary's Regenerate and the tags' Replace -- ask the same same-page
@@ -4816,6 +4826,53 @@ test("posts/add default remains replace=yes for existing callers", () => {
       showStatus("status-msg", "fix it", "error", { remedy: true });
       assert(cards[0].autoHide === 4000, "a plain error hides after 4000 ms, got " + cards[0].autoHide);
       assert(cards[1].autoHide === 0, "a remedy error must not auto-hide, got " + cards[1].autoHide);
+    });
+
+    await testAsync("a remedy card is retired by a later success/info status, a new error, the next save, or its condition ending", async () => {
+      const start = source.indexOf("function showStatus(id, msg, kind, opts)");
+      const end = source.indexOf("// result: a save-intent failure", start);
+      assert(start >= 0 && end > start, "showStatus source was not found");
+      const make = () => {
+        const cards = [];
+        const win = {};
+        const inline = {};
+        const el = { classList: { remove() {} }, textContent: "", className: "" };
+        const api = new Function("window", "showFeedback", "$id", source.slice(start, end) + "\nreturn { showStatus, clearSaveError, pbpDismissRemedyStatus };")(
+          win, (o) => { const c = { ...o, dismissed: false, dismiss() { c.dismissed = true; } }; cards.push(c); return c; }, () => el);
+        return { ...api, cards, win, el };
+      };
+      for (const kind of ["success", "info"]) {
+        const h = make();
+        h.showStatus("status-msg", "title too long", "error", { remedy: true });
+        assert(h.cards[0].dismissed === false, "the remedy card was dismissed on its own");
+        h.showStatus("status-msg", "saved", kind);
+        assert(h.cards[0].dismissed === true, "a later " + kind + " status left the remedy card on screen");
+        assert(h.el.textContent === "saved", "the " + kind + " status was not shown");
+      }
+      { // a new error replaces it; a plain 4 s card is not a remedy and survives a success
+        const h = make();
+        h.showStatus("status-msg", "a", "error", { remedy: true });
+        h.showStatus("status-msg", "b", "error", { remedy: true });
+        assert(h.cards[0].dismissed && !h.cards[1].dismissed, "a new error did not replace the remedy card");
+        const g = make();
+        g.showStatus("status-msg", "plain", "error");
+        g.showStatus("status-msg", "saved", "success");
+        assert(!g.cards[0].dismissed, "a plain error card was dismissed by the success path");
+      }
+      { // the next save attempt starts by clearing the previous remedy card
+        const h = make();
+        h.showStatus("status-msg", "grant access", "error", { remedy: true });
+        h.clearSaveError();
+        assert(h.cards[0].dismissed === true, "starting the next save left the remedy card up");
+      }
+      { // keyed dismissal only retires the card it names
+        const h = make();
+        h.showStatus("status-msg", "x", "error", { remedy: true, key: "aiUrlEdited" });
+        h.pbpDismissRemedyStatus("other");
+        assert(!h.cards[0].dismissed, "a different key retired the card");
+        h.pbpDismissRemedyStatus("aiUrlEdited");
+        assert(h.cards[0].dismissed, "the keyed card was not retired");
+      }
     });
 
     await testAsync("#fragment address: a save waits at most 3 s for a pending probe", async () => {

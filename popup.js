@@ -3315,13 +3315,22 @@ function showElement(id, text) { const el = $id(id); el.textContent = text; el.c
 function showStatus(id, msg, kind, opts) {
   if (kind === "error") {
     if (window._lastStatusFeedback) window._lastStatusFeedback.dismiss();
+    const remedy = !!opts && opts.remedy === true;
     window._lastStatusFeedback = showFeedback({
       variant: "error",
       message: msg,
-      autoHide: opts && opts.remedy === true ? 0 : 4000,
+      autoHide: remedy ? 0 : 4000,
     });
+    // Remember what the card is about so the situation ending can retire it.
+    if (window._lastStatusFeedback && remedy) {
+      window._lastStatusFeedback.remedy = true;
+      window._lastStatusFeedback.remedyKey = (opts && opts.key) || "";
+    }
     return;
   }
+  // Any later success/info status means the situation a remedy card
+  // described is over; leaving it up showed "saved" beside "title too long".
+  pbpDismissRemedyStatus();
   const el = $id(id);
   if (!el) return;
   el.textContent = msg;
@@ -3334,7 +3343,17 @@ function showStatus(id, msg, kind, opts) {
 // 4s card above the checkboxes plus a button that turned back into "Save"
 // after 3s, so a failed save left no trace once you looked away.
 let _saveErrorFeedback = null;
+// Retire the persistent remedy card (when one is up, and when `key` is given,
+// only that one). Plain 4 s cards are left to their own timer.
+function pbpDismissRemedyStatus(key) {
+  const card = window._lastStatusFeedback;
+  if (!card || !card.remedy) return;
+  if (key && card.remedyKey !== key) return;
+  card.dismiss();
+  window._lastStatusFeedback = null;
+}
 function clearSaveError() {
+  pbpDismissRemedyStatus();
   if (_saveErrorFeedback) _saveErrorFeedback.dismiss();
   _saveErrorFeedback = null;
 }
