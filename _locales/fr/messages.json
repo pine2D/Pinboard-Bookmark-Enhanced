@@ -2891,6 +2891,41 @@
       }
     }
   },
+  "tagGovEntityTitle": {
+    "message": "Codes d'entité résiduels dans les étiquettes"
+  },
+  "tagGovEntityHint": {
+    "message": "D'anciennes versions pouvaient enregistrer une étiquette comme q\"uote sous la forme q&quot;uote. L'analyse liste les étiquettes contenant tels quels des codes comme &quot; ou &amp; et affiche le nom corrigé de chacune. Rien ne change tant que vous n'avez pas confirmé."
+  },
+  "tagGovEntityScan": {
+    "message": "Analyser les étiquettes"
+  },
+  "tagGovEntityScanFailed": {
+    "message": "Impossible de charger vos étiquettes. Réessayez plus tard."
+  },
+  "tagGovEntityNone": {
+    "message": "Aucune étiquette avec des codes d'entité résiduels."
+  },
+  "tagGovEntityRepair": {
+    "message": "Réparer la sélection"
+  },
+  "tagGovEntityMergeNote": {
+    "message": "rejoint une étiquette existante"
+  },
+  "tagGovEntityConfirm": {
+    "message": "Réparer $N$ étiquettes ? Leurs favoris seront réenregistrés avec le nom corrigé. Décochez toute étiquette qui doit réellement contenir ce texte.",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovEntityNoMatch": {
+    "message": "Pinboard n'a renvoyé aucun favori pour cette étiquette : rien n'a été modifié."
+  },
+  "tagGovEntityDone": {
+    "message": "Terminé. Pinboard peut mettre un peu de temps à mettre à jour sa liste d'étiquettes ; relancez l'analyse plus tard pour vérifier."
+  },
   "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ signets mis à jour",
     "placeholders": {

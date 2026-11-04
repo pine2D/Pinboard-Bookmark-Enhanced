@@ -2891,6 +2891,41 @@
       }
     }
   },
+  "tagGovEntityTitle": {
+    "message": "標籤中殘留的實體編碼"
+  },
+  "tagGovEntityHint": {
+    "message": "舊版本可能把 q\"uote 這樣的標籤存成 q&quot;uote。掃描會列出含 &quot;、&amp; 等字面編碼的標籤，並顯示每個標籤修復後的名稱。你確認之前不會變更任何內容。"
+  },
+  "tagGovEntityScan": {
+    "message": "掃描標籤"
+  },
+  "tagGovEntityScanFailed": {
+    "message": "無法載入標籤，請稍後再試。"
+  },
+  "tagGovEntityNone": {
+    "message": "沒有找到帶殘留實體編碼的標籤。"
+  },
+  "tagGovEntityRepair": {
+    "message": "修復所選"
+  },
+  "tagGovEntityMergeNote": {
+    "message": "併入既有標籤"
+  },
+  "tagGovEntityConfirm": {
+    "message": "修復 $N$ 個標籤？這些標籤下的書籤會以修復後的名稱重新儲存。確實應該包含此類文字的標籤，請先取消勾選。",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovEntityNoMatch": {
+    "message": "Pinboard 沒有回傳帶有此標籤的書籤，未做任何變更。"
+  },
+  "tagGovEntityDone": {
+    "message": "已完成。Pinboard 更新標籤清單可能需要一些時間，稍後可再次掃描確認。"
+  },
   "tagGovRetagProgress": {
     "message": "已更新 $DONE$/$TOTAL$ 個書籤的標籤",
     "placeholders": {

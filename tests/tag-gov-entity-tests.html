@@ -1,0 +1,259 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Tag Gov Entity Repair Tests</title>
+<style>body{font-family:monospace;padding:16px}.case{padding:5px;white-space:pre-wrap}.pass{color:#176}.fail{color:#b00}</style>
+</head><body>
+<!-- The repair UI the handlers bind to (ids as in options.html). -->
+<span id="tag-gov-entity-count"></span>
+<div id="tag-gov-entity-list"></div>
+<button id="tag-gov-entity-scan" type="button">Scan</button>
+<span id="tag-gov-entity-status"></span>
+<button id="tag-gov-entity-repair" type="button" disabled>Repair</button>
+<div id="results"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", (event) => event.stopImmediatePropagation(), { once:true });
+function area(data) {
+  return {
+    async get(keys) {
+      const list = typeof keys === "string" ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys || data);
+      const out = {};
+      for (const key of list) if (key in data) out[key] = structuredClone(data[key]);
+      return out;
+    },
+    async set(value) { Object.assign(data, structuredClone(value)); },
+    async remove(keys) { for (const key of [].concat(keys)) delete data[key]; },
+    async getBytesInUse() { return 0; },
+  };
+}
+const localData = {};
+window.chrome = {
+  storage:{ local:area(localData), sync:area({}), session:area({}), onChanged:{addListener(){}} },
+  permissions:{ async contains() { return true; } },
+  runtime:{ getManifest:()=>({version:"2.122"}), sendMessage:async()=>({}) },
+};
+function t(key, ...args) { return args.length ? key + ":" + args.join(":") : key; }
+function uiLangToBCP47() { return "en"; }
+</script>
+<script src="../shared.js"></script>
+<script src="../vocab-store.js"></script>
+<script src="../options-backup.js"></script>
+<script src="../export-targets.js"></script>
+<script src="../tag-gov.js"></script>
+<script src="../options.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+async function test(name, fn) {
+  let ok = true, detail = "";
+  try { await fn(); } catch (e) { ok = false; detail = e.message; }
+  ok ? pass++ : fail++;
+  const row = document.createElement("div"); row.className = "case " + (ok ? "pass" : "fail");
+  row.textContent = (ok ? "PASS " : "FAIL ") + name + (detail ? "\n  " + detail : ""); root.appendChild(row);
+}
+function assert(value, message) { if (!value) throw new Error(message || "assertion failed"); }
+
+// ---- Fake Pinboard, wire shapes only (hand-written from the 2026-11-04 live probe) ----
+// tags/get: {"tagname": count}. posts/all?format=json: a bare array of post objects.
+// posts/add: {"result_code":"done"}. posts/all passes through the REAL decode exit
+// (pbpPinboardDecodedPostsResponse), as shared.js's pinboardFetch does, so the wire
+// `&amp;quot;` reaches code as the stored `&quot;`.
+let wire;            // { tags, posts: {tagLiteral: [wirePost...]}, addResult(url, n) }
+let calls;           // every request URL, in order
+let onAdd;           // hook run before each posts/add response
+function wirePost(href, tags, over) {
+  return Object.assign({ href, description: "t " + href, extended: "note é", meta: "m", hash: "h", time: "2026-11-04T06:00:00Z",
+    shared: "no", toread: "yes", tags }, over || {});
+}
+function reset(tagsGet, posts) {
+  wire = { tags: tagsGet, posts: posts || {}, adds: 0 };
+  calls = [];
+  onAdd = null;
+  window.pinboardFetch = async (url) => {
+    calls.push(url);
+    const u = new URL(url);
+    if (u.pathname === "/v1/tags/get") return new Response(JSON.stringify(wire.tags), { status: 200 });
+    if (u.pathname === "/v1/posts/all") {
+      const list = wire.posts[u.searchParams.get("tag")] || [];
+      return pbpPinboardDecodedPostsResponse(url, new Response(JSON.stringify(list), { status: 200 }));
+    }
+    if (u.pathname === "/v1/posts/add") {
+      wire.adds++;
+      if (onAdd) await onAdd(u, wire.adds);
+      const r = wire.addResult ? wire.addResult(u, wire.adds) : "done";
+      return new Response(JSON.stringify({ result_code: r }), { status: 200 });
+    }
+    return new Response("{}", { status: 404 });
+  };
+}
+const adds = () => calls.filter((u) => new URL(u).pathname === "/v1/posts/add").map((u) => new URL(u).searchParams);
+
+async function setToken(tok) { localData.pinboardToken = obfuscateKey(tok); }
+let account;
+async function begin() {
+  await setToken("alice:TOK1");
+  account = (await getTagGovAuth()).account;
+  _tagGovSnapshotAccount = account;     // snapshot download is not under test
+  _tagGovProblems.length = 0;
+  _tagGovActiveTags.clear();
+}
+let confirmOpts;
+window.showConfirmPopover = (anchor, opts) => { confirmOpts = opts; return true; };
+
+(async () => {
+  initTagGovEntityRepair();
+
+  await test("scan lists corrupted tags from a verbatim tags/get snapshot, with repaired name and count", async () => {
+    await begin();
+    reset({ "q&quot;uote": 2, "q&amp;quot;uote": 1, plain: 9 });
+    const items = await scanTagGovEntities();
+    assert(items.length === 2, JSON.stringify(items));
+    const boxes = document.querySelectorAll(".tag-gov-entity-checkbox");
+    assert(boxes.length === 2 && [...boxes].every((b) => b.checked), "rows must start ticked");
+    const text = document.getElementById("tag-gov-entity-list").textContent;
+    assert(text.includes('q&quot;uote → q"uote') && text.includes('q&amp;quot;uote → q"uote'), "preview text: " + text);
+    assert(document.getElementById("tag-gov-entity-count").textContent === "2", "count badge");
+    assert(!document.getElementById("tag-gov-entity-repair").disabled, "repair enabled");
+  });
+
+  await test("nothing found is said, never silently empty (tags/get may not list corrupted tags)", async () => {
+    await begin();
+    reset({ plain: 9, "a&b": 1 });
+    const items = await scanTagGovEntities();
+    assert(items.length === 0, "found " + JSON.stringify(items));
+    assert(document.getElementById("tag-gov-entity-list").textContent === "tagGovEntityNone", "no 'none' message");
+    assert(document.getElementById("tag-gov-entity-repair").disabled, "repair must stay disabled");
+  });
+
+  await test("a repair re-saves every other field of the bookmark exactly and swaps only the tag (multi-layer decode)", async () => {
+    await begin();
+    // stored value (tags/get, and posts/all after the one decode) is q&amp;quot;uote: two layers;
+    // on the wire posts/all escapes it once more.
+    reset({ "q&amp;quot;uote": 1 }, {
+      "q&amp;quot;uote": [wirePost("https://example.com/x", "keep q&amp;amp;quot;uote other", { shared: "yes", toread: "no", extended: "nöte" })]
+    });
+    await scanTagGovEntities();
+    confirmOpts = null;
+    document.getElementById("tag-gov-entity-repair").click();
+    assert(confirmOpts && /tagGovEntityConfirm:1/.test(confirmOpts.msg), "confirm popover not shown");
+    assert(adds().length === 0, "must not write before confirmation");
+    await confirmOpts.onConfirm();
+    // The list request must carry the STORED literal (wire `&amp;quot;` decoded once).
+    const listCall = calls.find((u) => new URL(u).pathname === "/v1/posts/all");
+    assert(new URL(listCall).searchParams.get("tag") === "q&amp;quot;uote", "list tag " + new URL(listCall).searchParams.get("tag"));
+    const a = adds();
+    assert(a.length === 1, "adds " + a.length);
+    assert(a[0].get("tags") === 'keep q"uote other', "tags " + a[0].get("tags"));
+    assert(a[0].get("url") === "https://example.com/x" && a[0].get("description") === "t https://example.com/x", "url/title");
+    assert(a[0].get("extended") === "nöte" && a[0].get("shared") === "yes" && a[0].get("toread") === "no", "fields lost");
+    assert(a[0].get("dt") === "2026-11-04T06:00:00Z" && a[0].get("replace") === "yes", "dt/replace");
+    assert(!calls.some((u) => new URL(u).pathname === "/v1/tags/delete" || new URL(u).pathname === "/v1/tags/rename"), "must never delete or rename tags");
+    assert(document.getElementById("tag-gov-entity-status").textContent === "tagGovEntityDone", "done note");
+  });
+
+  await test("deselected rows are not touched (a legitimate tag may contain a literal &amp;)", async () => {
+    await begin();
+    reset({ "a&amp;b": 1, "c&quot;d": 1 }, {
+      "a&amp;b": [wirePost("https://example.com/a", "a&amp;amp;b")],
+      "c&quot;d": [wirePost("https://example.com/c", "c&amp;quot;d")]
+    });
+    await scanTagGovEntities();
+    const keep = [...document.querySelectorAll(".tag-gov-entity-checkbox")].find((b) => b.value === "a&amp;b");
+    keep.checked = false; keep.dispatchEvent(new Event("change"));
+    confirmOpts = null;
+    document.getElementById("tag-gov-entity-repair").click();
+    assert(/tagGovEntityConfirm:1/.test(confirmOpts.msg), "confirm must count only ticked rows: " + confirmOpts.msg);
+    await confirmOpts.onConfirm();
+    const lists = calls.filter((u) => new URL(u).pathname === "/v1/posts/all").map((u) => new URL(u).searchParams.get("tag"));
+    assert(lists.length === 1 && lists[0].startsWith("c"), "listed " + JSON.stringify(lists));
+    assert(adds().length === 1 && adds()[0].get("url") === "https://example.com/c", "wrong bookmark written");
+  });
+
+  await test("nothing ticked: the repair button is disabled and writes nothing", async () => {
+    await begin();
+    reset({ "c&quot;d": 1 });
+    await scanTagGovEntities();
+    const box = document.querySelector(".tag-gov-entity-checkbox");
+    box.checked = false; box.dispatchEvent(new Event("change"));
+    assert(document.getElementById("tag-gov-entity-repair").disabled, "button must be disabled");
+  });
+
+  await test("repaired name already exists: bookmarks merge into the existing tag, no duplicate when a bookmark has both", async () => {
+    await begin();
+    reset({ "q&quot;uote": 2, 'q"uote': 5 }, {
+      "q&quot;uote": [
+        wirePost("https://example.com/1", "q&amp;quot;uote z"),
+        wirePost("https://example.com/2", "q&amp;quot;uote q&quot;uote")   // already has the clean tag as well
+      ]
+    });
+    const items = await scanTagGovEntities();
+    assert(items.length === 1 && items[0].mergeInto === 'q"uote', "merge not detected");
+    assert(document.getElementById("tag-gov-entity-list").textContent.includes("tagGovEntityMergeNote"), "preview must say it merges");
+    const res = await runTagGovEntityRepair(items, account);
+    assert(res && res.ok === 1 && res.fail === 0, JSON.stringify(res));
+    const a = adds();
+    assert(a.length === 2 && a[0].get("tags") === 'q"uote z' && a[1].get("tags") === 'q"uote', JSON.stringify(a.map((p) => p.get("tags"))));
+  });
+
+  await test("partial failure: a failed bookmark is reported with its reason, the others are still saved", async () => {
+    await begin();
+    reset({ "q&quot;uote": 3 }, {
+      "q&quot;uote": [wirePost("https://example.com/1", "q&amp;quot;uote"), wirePost("https://example.com/2", "q&amp;quot;uote"), wirePost("https://example.com/3", "q&amp;quot;uote")]
+    });
+    wire.addResult = (u, n) => (n === 2 ? "something went wrong" : "done");
+    const items = pbpTagGovFindEntityTags(wire.tags);
+    const res = await runTagGovEntityRepair(items, account);
+    assert(res.ok === 0 && res.fail === 1, JSON.stringify(res));
+    assert(adds().length === 3, "run must continue after one failure, adds=" + adds().length);
+    const p = _tagGovProblems.find((x) => x.url === "https://example.com/2");
+    assert(p && p.kind === "failed" && p.reason === "something went wrong", JSON.stringify(_tagGovProblems));
+  });
+
+  await test("posts/all?tag=<literal> matching nothing is a FAILED row, not a silent success", async () => {
+    await begin();
+    reset({ "q&quot;uote": 3 }, {});            // the filter finds nothing
+    const res = await runTagGovEntityRepair(pbpTagGovFindEntityTags(wire.tags), account);
+    assert(res.ok === 0 && res.fail === 1, "silently succeeded: " + JSON.stringify(res));
+    assert(_tagGovProblems.some((x) => x.reason === "tagGovEntityNoMatch" && x.old === "q&quot;uote"), JSON.stringify(_tagGovProblems));
+    assert(adds().length === 0, "nothing should have been written");
+  });
+
+  await test("posts/all returning unrelated posts (no corrupted tag on them) is also a failed row", async () => {
+    await begin();
+    reset({ "q&quot;uote": 1 }, { "q&quot;uote": [wirePost("https://example.com/1", "other tags")] });
+    const res = await runTagGovEntityRepair(pbpTagGovFindEntityTags(wire.tags), account);
+    assert(res.fail === 1 && res.ok === 0 && adds().length === 0, JSON.stringify(res));
+  });
+
+  await test("account changes mid-run: the run aborts and never writes with the other account's token", async () => {
+    await begin();
+    reset({ "q&quot;uote": 2 }, {
+      "q&quot;uote": [wirePost("https://example.com/1", "q&amp;quot;uote"), wirePost("https://example.com/2", "q&amp;quot;uote")]
+    });
+    onAdd = async (u, n) => { if (n === 1) await setToken("bob:TOK2"); };
+    const res = await runTagGovEntityRepair(pbpTagGovFindEntityTags(wire.tags), account);
+    assert(res.aborted === true, "not aborted: " + JSON.stringify(res));
+    const a = adds();
+    assert(a.length === 1, "second bookmark was written after the account changed (" + a.length + ")");
+    assert(![...calls].slice(calls.findIndex((u) => new URL(u).pathname === "/v1/posts/add") + 1)
+      .some((u) => new URL(u).pathname === "/v1/posts/add" || new URL(u).searchParams.get("auth_token")?.startsWith("alice")), "alice token used after switch");
+  });
+
+  await test("overlapping repair of the same tag is refused while the first is running (reservations)", async () => {
+    await begin();
+    reset({ "q&quot;uote": 1 }, { "q&quot;uote": [wirePost("https://example.com/1", "q&amp;quot;uote")] });
+    const items = pbpTagGovFindEntityTags(wire.tags);
+    const first = runTagGovEntityRepair(items, account);
+    const second = await runTagGovEntityRepair(items, account);
+    await first;
+    assert(second === null, "second run was not refused");
+    assert(adds().length === 1, "bookmark written twice");
+    assert(_tagGovActiveTags.size === 0, "reservations leaked");
+  });
+
+  await test("entity table here matches shared.js's decoder table", async () => {
+    assert(JSON.stringify(PBP_TAG_GOV_ENTITY_MAP) === JSON.stringify(PBP_PINBOARD_TAG_ENTITIES), "tables diverged");
+  });
+
+  document.title = (fail ? "FAIL " : "PASS ") + "Tag Gov Entity Repair Tests";
+})();
+</script></body></html>

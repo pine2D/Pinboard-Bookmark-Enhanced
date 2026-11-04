@@ -422,3 +422,68 @@ function pbpTagGovApplyShiftRange(boxes, anchorIdx, clickIdx) {
   const state = boxes[clickIdx].checked;
   for (let i = lo; i <= hi; i++) boxes[i].checked = state;
 }
+
+// ---- Leftover HTML-entity tags (repair) ----
+// Before 04690fc3 the extension wrote tags read back from posts/get|recent|all
+// (which Pinboard returns HTML-escaped: `q"uote` -> `q&quot;uote`) straight back
+// with replace=yes, so Pinboard may now store the entity literally, one layer
+// deeper on every further write-back (`q&amp;quot;uote`). Same five names and the
+// same table as shared.js PBP_PINBOARD_TAG_ENTITIES (this file stays standalone
+// so the test page can load it alone; the options-side tests assert the two agree).
+//
+// UNVERIFIED LIVE (2026-11-04), both stated again at the call sites:
+//  (1) whether posts/all?tag=<stored literal> matches the corrupted tag, and
+//  (2) whether tags/get lists corrupted tags under their literal names.
+// The repair is designed to fail visibly if either guess is wrong: (2) shows up
+// as "nothing found", (1) as a row marked failed (op.expectMatch).
+const PBP_TAG_GOV_ENTITY_MAP = Object.freeze({ quot: '"', lt: "<", gt: ">", amp: "&", "#39": "'" });
+const PBP_TAG_GOV_ENTITY_RE = /&(quot|lt|gt|amp|#39);/;
+const PBP_TAG_GOV_ENTITY_RE_G = /&(quot|lt|gt|amp|#39);/g;
+
+// Decode until no entity is left (each layer of write-back added one).
+// Terminates: every changing pass strictly shortens the string.
+function pbpTagGovDecodeEntities(tag) {
+  let cur = String(tag);
+  for (;;) {
+    const next = cur.replace(PBP_TAG_GOV_ENTITY_RE_G, (_, name) => PBP_TAG_GOV_ENTITY_MAP[name]);
+    if (next === cur) return cur;
+    cur = next;
+  }
+}
+
+// counts: tags/get snapshot { tag: count }. Returns [{ tag, repaired, count,
+// mergeInto, mergeCount }] sorted by tag. `mergeInto` is the name of an
+// already-existing (entity-free) tag the repaired name collides with under
+// Pinboard's case-insensitive matching ("" when the repaired name is new); the
+// bookmarks are then written with THAT tag's spelling, i.e. a merge into it.
+function pbpTagGovFindEntityTags(counts) {
+  if (!counts || typeof counts !== "object") return [];
+  const clean = new Map(); // lowercase -> existing entity-free tag name
+  const dirty = [];
+  for (const tag of Object.keys(counts)) {
+    if (PBP_TAG_GOV_ENTITY_RE.test(tag)) dirty.push(tag);
+    else clean.set(tag.toLowerCase(), tag);
+  }
+  const out = [];
+  for (const tag of dirty.sort()) {
+    const repaired = pbpTagGovDecodeEntities(tag);
+    if (!repaired || repaired === tag) continue;
+    const existing = clean.get(repaired.toLowerCase()) || "";
+    out.push({
+      tag,
+      repaired: existing || repaired,
+      count: Number(counts[tag]) || 0,
+      mergeInto: existing,
+      mergeCount: existing ? Number(counts[existing]) || 0 : 0
+    });
+  }
+  return out;
+}
+
+// Rename ops for runTagGovOps. expectMatch makes "the re-save found nothing to
+// change" a visible failure instead of a silent success (see UNVERIFIED (1)).
+function pbpTagGovBuildEntityPlan(items) {
+  return (Array.isArray(items) ? items : [])
+    .filter((it) => it && typeof it.tag === "string" && it.tag && typeof it.repaired === "string" && it.repaired)
+    .map((it) => ({ op: "rename", old: it.tag, new: it.repaired, expectMatch: true }));
+}

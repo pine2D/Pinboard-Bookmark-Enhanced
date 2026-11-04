@@ -1426,6 +1426,22 @@
             </div>
           </div>
         </details>
+        <!-- Pinboard-only like the rest of the panel (hidden with it when there is no
+             tag data). The scan is a button, not automatic: it forces a fresh tags/get. -->
+        <details id="tag-gov-entities" class="disclosure">
+          <summary><span id="tag-gov-entity-title" data-i18n="tagGovEntityTitle">Leftover Entity Codes in Tags</span> <span id="tag-gov-entity-count" class="summary-state tag-gov-count"></span></summary>
+          <div class="disclosure-body">
+            <p class="hint" data-i18n="tagGovEntityHint">Older versions could save a tag such as q"uote as q&amp;quot;uote. Scan lists tags that contain literal entity codes and shows the repaired name for each. Nothing changes until you confirm.</p>
+            <div id="tag-gov-entity-list"></div>
+            <div class="fg">
+              <div class="fg-actions">
+                <button class="btn btn-sm" id="tag-gov-entity-scan" type="button"><span class="btn-ic" data-ic="search"></span><span data-i18n="tagGovEntityScan">Scan tags</span></button>
+                <span class="hint" id="tag-gov-entity-status"></span>
+                <button class="btn btn-sm" id="tag-gov-entity-repair" type="button" data-i18n="tagGovEntityRepair" disabled>Repair selected</button>
+              </div>
+            </div>
+          </div>
+        </details>
         <div id="tag-gov-progress" hidden>
           <div id="tag-gov-progress-bar" class="progress-bar" role="progressbar" aria-labelledby="tag-gov-progress-text" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <div id="tag-gov-progress-fill" class="progress-fill"></div>

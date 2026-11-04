@@ -2891,6 +2891,41 @@
       }
     }
   },
+  "tagGovEntityTitle": {
+    "message": "标签中残留的实体编码"
+  },
+  "tagGovEntityHint": {
+    "message": "旧版本可能把 q\"uote 这样的标签存成 q&quot;uote。扫描会列出含 &quot;、&amp; 等字面编码的标签，并给出每个标签修复后的名称。你确认之前不会改动任何内容。"
+  },
+  "tagGovEntityScan": {
+    "message": "扫描标签"
+  },
+  "tagGovEntityScanFailed": {
+    "message": "无法加载标签，请稍后再试。"
+  },
+  "tagGovEntityNone": {
+    "message": "没有发现带残留实体编码的标签。"
+  },
+  "tagGovEntityRepair": {
+    "message": "修复所选"
+  },
+  "tagGovEntityMergeNote": {
+    "message": "并入已有标签"
+  },
+  "tagGovEntityConfirm": {
+    "message": "修复 $N$ 个标签？这些标签下的书签会用修复后的名称重新保存。确实应该含有此类文字的标签，请先取消勾选。",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovEntityNoMatch": {
+    "message": "Pinboard 没有返回带此标签的书签，未做任何改动。"
+  },
+  "tagGovEntityDone": {
+    "message": "已完成。Pinboard 更新标签列表可能需要一些时间，稍后可再次扫描确认。"
+  },
   "tagGovRetagProgress": {
     "message": "已更新 $DONE$/$TOTAL$ 个书签的标签",
     "placeholders": {

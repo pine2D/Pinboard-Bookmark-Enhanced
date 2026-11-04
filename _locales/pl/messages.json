@@ -2891,6 +2891,41 @@
       }
     }
   },
+  "tagGovEntityTitle": {
+    "message": "Pozostałe kody encji w tagach"
+  },
+  "tagGovEntityHint": {
+    "message": "Starsze wersje mogły zapisać tag taki jak q\"uote jako q&quot;uote. Skanowanie wyświetla tagi zawierające dosłowne kody, np. &quot; lub &amp;, i pokazuje poprawioną nazwę każdego z nich. Nic się nie zmieni bez Twojego potwierdzenia."
+  },
+  "tagGovEntityScan": {
+    "message": "Skanuj tagi"
+  },
+  "tagGovEntityScanFailed": {
+    "message": "Nie udało się wczytać tagów. Spróbuj ponownie później."
+  },
+  "tagGovEntityNone": {
+    "message": "Nie znaleziono tagów z pozostałymi kodami encji."
+  },
+  "tagGovEntityRepair": {
+    "message": "Napraw zaznaczone"
+  },
+  "tagGovEntityMergeNote": {
+    "message": "łączy się z istniejącym tagiem"
+  },
+  "tagGovEntityConfirm": {
+    "message": "Naprawić tagi ($N$)? Ich zakładki zostaną zapisane ponownie z poprawioną nazwą. Odznacz tagi, które naprawdę mają zawierać taki tekst.",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovEntityNoMatch": {
+    "message": "Pinboard nie zwrócił zakładek dla tego tagu, więc nic nie zmieniono."
+  },
+  "tagGovEntityDone": {
+    "message": "Gotowe. Pinboard może chwilę aktualizować listę tagów; zeskanuj ponownie później, aby sprawdzić."
+  },
   "tagGovRetagProgress": {
     "message": "Przetworzono $DONE$/$TOTAL$ zakładek",
     "placeholders": {

@@ -2891,6 +2891,41 @@
       }
     }
   },
+  "tagGovEntityTitle": {
+    "message": "Остатки кодов сущностей в тегах"
+  },
+  "tagGovEntityHint": {
+    "message": "Старые версии могли сохранить тег q\"uote как q&quot;uote. Сканирование показывает теги с буквальными кодами вроде &quot; или &amp; и исправленное имя для каждого. Пока вы не подтвердите, ничего не изменится."
+  },
+  "tagGovEntityScan": {
+    "message": "Сканировать теги"
+  },
+  "tagGovEntityScanFailed": {
+    "message": "Не удалось загрузить теги. Повторите попытку позже."
+  },
+  "tagGovEntityNone": {
+    "message": "Тегов с остатками кодов сущностей не найдено."
+  },
+  "tagGovEntityRepair": {
+    "message": "Исправить выбранные"
+  },
+  "tagGovEntityMergeNote": {
+    "message": "сольётся с существующим тегом"
+  },
+  "tagGovEntityConfirm": {
+    "message": "Исправить теги: $N$? Их закладки будут сохранены заново с исправленным именем. Снимите отметку с тегов, которые действительно должны содержать такой текст.",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovEntityNoMatch": {
+    "message": "Pinboard не вернул закладок с этим тегом, поэтому ничего не изменено."
+  },
+  "tagGovEntityDone": {
+    "message": "Готово. Pinboard может не сразу обновить список тегов; просканируйте снова позже, чтобы проверить."
+  },
   "tagGovRetagProgress": {
     "message": "Обработано $DONE$/$TOTAL$ закладок",
     "placeholders": {

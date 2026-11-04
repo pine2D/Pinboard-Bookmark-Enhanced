@@ -2891,6 +2891,41 @@
       }
     }
   },
+  "tagGovEntityTitle": {
+    "message": "Übrig gebliebene Entity-Codes in Tags"
+  },
+  "tagGovEntityHint": {
+    "message": "Ältere Versionen konnten einen Tag wie q\"uote als q&quot;uote speichern. Der Scan listet Tags mit wörtlichen Codes wie &quot; oder &amp; und zeigt für jeden den reparierten Namen. Ohne deine Bestätigung ändert sich nichts."
+  },
+  "tagGovEntityScan": {
+    "message": "Tags scannen"
+  },
+  "tagGovEntityScanFailed": {
+    "message": "Die Tags konnten nicht geladen werden. Bitte später erneut versuchen."
+  },
+  "tagGovEntityNone": {
+    "message": "Keine Tags mit übrig gebliebenen Entity-Codes gefunden."
+  },
+  "tagGovEntityRepair": {
+    "message": "Ausgewählte reparieren"
+  },
+  "tagGovEntityMergeNote": {
+    "message": "wird mit vorhandenem Tag zusammengeführt"
+  },
+  "tagGovEntityConfirm": {
+    "message": "$N$ Tags reparieren? Die zugehörigen Lesezeichen werden mit dem reparierten Namen neu gespeichert. Tags, die solchen Text wirklich enthalten sollen, vorher abwählen.",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovEntityNoMatch": {
+    "message": "Pinboard hat für diesen Tag keine Lesezeichen geliefert, daher wurde nichts geändert."
+  },
+  "tagGovEntityDone": {
+    "message": "Fertig. Pinboard braucht eventuell etwas, bis die Tag-Liste aktualisiert ist; scanne später erneut zur Kontrolle."
+  },
   "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ Lesezeichen neu getaggt",
     "placeholders": {

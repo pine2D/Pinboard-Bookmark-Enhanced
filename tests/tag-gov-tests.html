@@ -690,5 +690,49 @@ suite("_findTypoGroups: bucketing", () => {
   });
 });
 
+// ============ leftover entity-code tags ============
+// Fixture names are the stored values the 2026-11-04 live probe produced
+// (`q"uote` written back from its escaped read-back became `q&quot;uote`; one
+// more write-back made `q&amp;quot;uote`), as tags/get returns tag names verbatim.
+suite("entity tags: decode + detect", () => {
+  test("decodes every layer until no entity is left", () => {
+    assert(pbpTagGovDecodeEntities("q&quot;uote") === 'q"uote', "one layer");
+    assert(pbpTagGovDecodeEntities("q&amp;quot;uote") === 'q"uote', "two layers");
+    assert(pbpTagGovDecodeEntities("q&amp;amp;amp;quot;uote") === 'q"uote', "four layers");
+    assert(pbpTagGovDecodeEntities("a&amp;lt;b&amp;gt;") === "a<b>", "lt/gt layers");
+    assert(pbpTagGovDecodeEntities("it&#39;s") === "it's", "apostrophe");
+    assert(pbpTagGovDecodeEntities("plain-tag") === "plain-tag", "clean tag untouched");
+    assert(pbpTagGovDecodeEntities("a&b") === "a&b", "bare ampersand untouched");
+  });
+
+  test("finds only tags containing a literal entity, with repaired name and count", () => {
+    const found = pbpTagGovFindEntityTags({ "q&quot;uote": 2, "q&amp;quot;uote": 1, "a&b": 4, plain: 9, "x&amp;y": 3 });
+    assert(found.length === 3, "expected 3, got " + JSON.stringify(found));
+    const by = Object.fromEntries(found.map((f) => [f.tag, f]));
+    assert(by["q&quot;uote"].repaired === 'q"uote' && by["q&quot;uote"].count === 2, "one layer row");
+    assert(by["q&amp;quot;uote"].repaired === 'q"uote' && by["q&amp;quot;uote"].count === 1, "two layer row");
+    assert(by["x&amp;y"].repaired === "x&y", "amp row");
+    assert(!by["a&b"] && !by.plain, "clean tags listed");
+  });
+
+  test("a repaired name that already exists is a merge into the existing spelling (case-insensitive)", () => {
+    const found = pbpTagGovFindEntityTags({ "Q&quot;Uote": 2, 'q"uote': 5 });
+    assert(found.length === 1 && found[0].mergeInto === 'q"uote' && found[0].repaired === 'q"uote' && found[0].mergeCount === 5,
+      JSON.stringify(found));
+    const fresh = pbpTagGovFindEntityTags({ "q&quot;uote": 2 });
+    assert(fresh[0].mergeInto === "", "no existing tag must not claim a merge");
+  });
+
+  test("empty / invalid snapshot yields nothing", () => {
+    assert(pbpTagGovFindEntityTags({}).length === 0 && pbpTagGovFindEntityTags(null).length === 0, "empty");
+  });
+
+  test("plan: one rename per item, expectMatch set, malformed items dropped", () => {
+    const plan = pbpTagGovBuildEntityPlan([{ tag: "q&quot;uote", repaired: 'q"uote' }, { tag: "", repaired: "x" }, null]);
+    assert(plan.length === 1 && plan[0].op === "rename" && plan[0].old === "q&quot;uote" && plan[0].new === 'q"uote' && plan[0].expectMatch === true,
+      JSON.stringify(plan));
+  });
+});
+
 </script>
 </body></html>

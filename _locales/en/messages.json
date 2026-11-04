@@ -2904,6 +2904,41 @@
       }
     }
   },
+  "tagGovEntityTitle": {
+    "message": "Leftover Entity Codes in Tags"
+  },
+  "tagGovEntityHint": {
+    "message": "Older versions could save a tag such as q\"uote as q&quot;uote. Scan lists tags that contain literal codes like &quot; or &amp; and shows the repaired name for each. Nothing changes until you confirm."
+  },
+  "tagGovEntityScan": {
+    "message": "Scan tags"
+  },
+  "tagGovEntityScanFailed": {
+    "message": "Couldn't load your tags. Try again later."
+  },
+  "tagGovEntityNone": {
+    "message": "No tags with leftover entity codes found."
+  },
+  "tagGovEntityRepair": {
+    "message": "Repair selected"
+  },
+  "tagGovEntityMergeNote": {
+    "message": "joins an existing tag"
+  },
+  "tagGovEntityConfirm": {
+    "message": "Repair $N$ tags? Their bookmarks are re-saved with the repaired name. Untick any tag that really should contain such text.",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovEntityNoMatch": {
+    "message": "Pinboard returned no bookmarks for this tag, so nothing was changed."
+  },
+  "tagGovEntityDone": {
+    "message": "Done. Pinboard may take a while to update its tag list; scan again later to check."
+  },
   "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ bookmarks retagged",
     "placeholders": {

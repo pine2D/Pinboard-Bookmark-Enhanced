@@ -1343,7 +1343,7 @@ function pbpSyncTagGovDeleteBtnState() {
 // ranges, the queued-row freeze that disables `button, input`) keeps working.
 // The face MUST be the input's next sibling: the checked / hover / focus looks
 // are all `input:… + .tag-gov-chip-face`.
-function pbpBuildTagGovChip({ type, name, value, count = null, checked = false, className = "" }) {
+function pbpBuildTagGovChip({ type, name, value, label: labelText = value, count = null, checked = false, className = "" }) {
   const label = document.createElement("label");
   label.className = "tag-gov-chip";
   const input = document.createElement("input");
@@ -1359,7 +1359,7 @@ function pbpBuildTagGovChip({ type, name, value, count = null, checked = false, 
   tick.setAttribute("aria-hidden", "true");
   tick.innerHTML = PBP_ICONS.check;   // static registry string, not user data
   const text = document.createElement("span");
-  text.textContent = value;
+  text.textContent = labelText;
   face.append(tick, text);
   if (count !== null) {
     const n = document.createElement("span");
@@ -5318,6 +5318,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (_) {}
 
   // ---- Tag governance event listeners ----
+  initTagGovEntityRepair();
   $id("tag-gov-reset-ignored")?.addEventListener("click", async (e) => {
     e.preventDefault();
     const startAuth = await getTagGovAuth();
@@ -5561,7 +5562,7 @@ function pbpSetTagGovHasData(hasData) {
   if (panel) panel.dataset.tagGovHasData = hasData ? "1" : "";
   const ai = $id("tag-gov-ai-btn");
   if (ai && !ai.dataset.running) ai.disabled = !hasData;
-  for (const id of ["tag-gov-lowcount", "tag-gov-irreversible", "tag-gov-bundles-warn"]) {
+  for (const id of ["tag-gov-lowcount", "tag-gov-entities", "tag-gov-irreversible", "tag-gov-bundles-warn"]) {
     const el = $id(id);
     if (el) el.hidden = !hasData;
   }
@@ -5892,10 +5893,14 @@ async function retagBookmarksViaResave(expectedAccount, oldTag, newTag, onProgre
 
   const oldLower = oldTag.toLowerCase();
   let saved = 0, failed = 0, skipped = 0;
+  // Bookmarks actually re-saved with a changed tag set (`saved` also counts posts that
+  // already lacked the old tag). The entity repair needs the difference: a posts/all
+  // filter that matched nothing, or only unrelated posts, must not look like success.
+  let written = 0;
   const problems = []; // { url, title, kind: "failed" | "skipped" } per bookmark
   for (let i = 0; i < posts.length; i++) {
     if (_tagGovCancelRequested) {
-      return { total: posts.length, saved, failed, skipped, problems, cancelled: true };
+      return { total: posts.length, saved, failed, skipped, problems, written, cancelled: true };
     }
     const auth = await requireTagGovAuth(expectedAccount);
     if (onProgress) onProgress(i, posts.length);
@@ -5937,7 +5942,7 @@ async function retagBookmarksViaResave(expectedAccount, oldTag, newTag, onProgre
         setWaitNote();
         await new Promise(rs => setTimeout(rs, TAG_GOV_RETRY_WAIT_MS));
         if (_tagGovCancelRequested) {
-          return { total: posts.length, saved, failed, skipped, problems, cancelled: true };
+          return { total: posts.length, saved, failed, skipped, problems, written, cancelled: true };
         }
         const retryAuth = await requireTagGovAuth(expectedAccount);
         const retryUri = buildPostsAddUri({
@@ -5970,6 +5975,7 @@ async function retagBookmarksViaResave(expectedAccount, oldTag, newTag, onProgre
       const data = await r.json();
       if (data.result_code === "done") {
         saved++;
+        written++;
       } else {
         failed++;
         problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: String(data.result_code || "unknown") });
@@ -5982,7 +5988,7 @@ async function retagBookmarksViaResave(expectedAccount, oldTag, newTag, onProgre
     }
   }
   if (onProgress) onProgress(posts.length, posts.length);
-  return { total: posts.length, saved, failed, skipped, problems, aborted: false };
+  return { total: posts.length, saved, failed, skipped, problems, written, aborted: false };
 }
 
 // Batches queue up instead of running concurrently: several confirmed merges would
@@ -6302,7 +6308,12 @@ async function _runTagGovBatch(ops, expectedAccount) {
           break;
         }
         // Skipped bookmarks don't fail the task — they are listed for manual editing.
-        if (res.failed === 0) {
+        if (res.failed === 0 && op.expectMatch && !(res.written > 0) && res.skipped === 0) {
+          // Entity repair: nothing was re-saved, so the posts/all?tag=<literal> guess
+          // (UNVERIFIED live, see tag-gov.js) did not hold for this tag. Say so.
+          fail++;
+          _tagGovProblems.push({ url: "", title: "", kind: "failed", reason: t("tagGovEntityNoMatch"), old: op.old, new: op.new });
+        } else if (res.failed === 0) {
           ok++;
         } else {
           fail++;
@@ -6631,6 +6642,150 @@ async function renderLowCountTags() {
       pbpSyncTagGovDeleteBtnState();
     };
   }
+}
+
+// ---- Leftover entity-code tags (repair) ----
+// Finds tags that contain literal `&quot;` / `&amp;` / `&lt;` / `&gt;` / `&#39;`
+// (left behind by pre-04690fc3 write-backs of entity-escaped read-backs; the
+// detection and decoding live in tag-gov.js), previews corrupted -> repaired with
+// the bookmark count, and re-saves only the ticked rows' bookmarks through the same
+// rename machinery as a merge (retagBookmarksViaResave via runTagGovOps). Tags are
+// never deleted: the corrupted name disappears once its last bookmark is re-saved.
+//
+// UNVERIFIED LIVE (2026-11-04), by design surfaced rather than assumed:
+//  (1) posts/all?tag=<stored literal> may not match the corrupted tag -> the op
+//      re-saves nothing, which runTagGovBatch reports as a failed row
+//      (op.expectMatch + res.written === 0), never as success;
+//  (2) tags/get may not list corrupted tags under their literal names -> the scan
+//      reports "nothing found" instead of repairing anything.
+let _tagGovEntityItems = [];
+
+function _tagGovEntityStatus(text, bad = false) {
+  const el = $id("tag-gov-entity-status");
+  if (!el) return;
+  if (bad) setStatusIcon(el, false, text);
+  else { el.classList.remove("ok", "bad"); el.textContent = text; }
+}
+
+function pbpSyncTagGovEntityBtnState() {
+  const boxes = [...document.querySelectorAll(".tag-gov-entity-checkbox")];
+  const n = boxes.filter((cb) => cb.checked).length;
+  const btn = $id("tag-gov-entity-repair");
+  if (btn) btn.disabled = n === 0;
+  if (boxes.length) _tagGovEntityStatus(t("tagGovSelectedCount", String(n)));
+}
+
+function renderTagGovEntityList(items, account) {
+  _tagGovEntityItems = items;
+  const list = $id("tag-gov-entity-list");
+  const badge = $id("tag-gov-entity-count");
+  if (badge) badge.textContent = items.length ? String(items.length) : "0";
+  if (!list) return;
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.textContent = t("tagGovEntityNone");
+    list.replaceChildren(empty);
+    _tagGovEntityStatus("");
+    pbpSyncTagGovEntityBtnState();
+    return;
+  }
+  const flow = document.createElement("div");
+  flow.className = "tag-gov-chipset";
+  flow.setAttribute("role", "group");
+  flow.setAttribute("aria-labelledby", "tag-gov-entity-title");
+  for (const item of items) {
+    const label = item.tag + " → " + item.repaired + (item.mergeInto ? " (" + t("tagGovEntityMergeNote") + ")" : "");
+    const chip = pbpBuildTagGovChip({
+      type: "checkbox", value: item.tag, label, count: item.count, checked: true,
+      className: "tag-gov-entity-checkbox"
+    });
+    const box = chip.querySelector("input");
+    box.dataset.account = account;
+    box.addEventListener("change", pbpSyncTagGovEntityBtnState);
+    flow.appendChild(chip);
+  }
+  list.replaceChildren(flow);
+  pbpSyncTagGovEntityBtnState();
+}
+
+async function scanTagGovEntities() {
+  const startAuth = await getTagGovAuth();
+  if (!startAuth) return null;
+  const btn = $id("tag-gov-entity-scan");
+  if (btn) btn.disabled = true;
+  try {
+    // Fresh tags/get, not the 5-minute cache: a repair preview built from stale
+    // counts would estimate and list the wrong things.
+    const counts = await loadTagCounts(true, startAuth.account);
+    if (!(await getTagGovAuth(startAuth.account))) return null;
+    if (!counts) { _tagGovEntityStatus(t("tagGovEntityScanFailed"), true); return null; }
+    const items = pbpTagGovFindEntityTags(counts);
+    renderTagGovEntityList(items, startAuth.account);
+    return items;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Reserve-before-await, snapshot, then the shared batch runner, exactly the shape
+// of the merge's onConfirm. Returns the runTagGovOps result, or null when nothing ran.
+async function runTagGovEntityRepair(items, expectedAccount) {
+  const plan = pbpTagGovBuildEntityPlan(items);
+  if (!plan.length) return null;
+  if (!(await getTagGovAuth(expectedAccount))) return null;
+  const planTags = [];
+  for (const op of plan) planTags.push(op.old.toLowerCase(), op.new.toLowerCase());
+  if (planTags.some((tg) => _tagGovActiveTags.has(tg))) return null;
+  planTags.forEach((tg) => _tagGovActiveTags.add(tg)); // reserve BEFORE await
+  try {
+    if (!(await ensureTagSnapshot(expectedAccount))) return null;
+    return await runTagGovOps(plan, expectedAccount);
+  } finally {
+    planTags.forEach((tg) => _tagGovActiveTags.delete(tg));
+  }
+}
+
+function initTagGovEntityRepair() {
+  $id("tag-gov-entity-scan")?.addEventListener("click", () => { scanTagGovEntities(); });
+  const repairBtn = $id("tag-gov-entity-repair");
+  repairBtn?.addEventListener("click", () => {
+    const boxes = [...document.querySelectorAll(".tag-gov-entity-checkbox:checked")];
+    const accounts = new Set(boxes.map((el) => el.dataset.account).filter(Boolean));
+    if (accounts.size !== 1 || !boxes.length) return;
+    const expectedAccount = accounts.values().next().value;
+    const picked = new Set(boxes.map((el) => el.value));
+    const items = _tagGovEntityItems.filter((it) => picked.has(it.tag));
+    if (!items.length) return;
+    const bookmarkCount = items.reduce((sum, it) => sum + it.count, 0);
+    // Same arithmetic as the merge: one posts/all per tag + one posts/add per
+    // bookmark, each spaced 3.1 s by the rate-limit queue.
+    const estStr = formatTagGovEst(Math.ceil((items.length + bookmarkCount) * 3.2));
+    const shown = items.slice(0, 10).map((it) => it.tag + " -> " + it.repaired).join(" | ")
+      + (items.length > 10 ? " | " + t("tagGovMoreCount", String(items.length - 10)) : "");
+    showConfirmPopover(repairBtn, {
+      msg: t("tagGovEntityConfirm", String(items.length)),
+      detail: [shown, t("tagGovMergeEstimate", estStr)].filter(Boolean).join("\n"),
+      yesText: t("tagGovEntityRepair"),
+      noText: t("cancel"),
+      onConfirm: async () => {
+        repairBtn.disabled = true;
+        const res = await runTagGovEntityRepair(items, expectedAccount);
+        if (!(await getTagGovAuth(expectedAccount))) return;
+        if (res && !res.aborted && !res.cancelled) {
+          // tags/get may lag behind the writes, so a rescan right now could list
+          // the old names again; ask for a later scan instead of repainting.
+          _tagGovEntityItems = [];
+          $id("tag-gov-entity-list")?.replaceChildren();
+          const badge = $id("tag-gov-entity-count");
+          if (badge) badge.textContent = "";
+          pbpSyncTagGovEntityBtnState();
+          _tagGovEntityStatus(t("tagGovEntityDone"));
+        } else {
+          pbpSyncTagGovEntityBtnState();
+        }
+      }
+    });
+  });
 }
 
 // ---- Wayback Log Viewer ----

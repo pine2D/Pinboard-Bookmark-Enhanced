@@ -2891,6 +2891,41 @@
       }
     }
   },
+  "tagGovEntityTitle": {
+    "message": "タグに残ったエンティティコード"
+  },
+  "tagGovEntityHint": {
+    "message": "古いバージョンでは、q\"uote のようなタグが q&quot;uote として保存されることがありました。スキャンすると、&quot; や &amp; などの文字列をそのまま含むタグを一覧し、修復後の名前を表示します。確認するまで何も変更されません。"
+  },
+  "tagGovEntityScan": {
+    "message": "タグをスキャン"
+  },
+  "tagGovEntityScanFailed": {
+    "message": "タグを読み込めませんでした。しばらくしてからもう一度お試しください。"
+  },
+  "tagGovEntityNone": {
+    "message": "エンティティコードが残っているタグは見つかりませんでした。"
+  },
+  "tagGovEntityRepair": {
+    "message": "選択したものを修復"
+  },
+  "tagGovEntityMergeNote": {
+    "message": "既存のタグに統合"
+  },
+  "tagGovEntityConfirm": {
+    "message": "$N$ 個のタグを修復しますか？該当するブックマークは修復後の名前で保存し直されます。こうした文字を本当に含めたいタグは、先にチェックを外してください。",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovEntityNoMatch": {
+    "message": "このタグのブックマークが Pinboard から返されなかったため、何も変更していません。"
+  },
+  "tagGovEntityDone": {
+    "message": "完了しました。Pinboard のタグ一覧が更新されるまで時間がかかることがあります。しばらくしてから再度スキャンして確認してください。"
+  },
   "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ 件のブックマークを再タグ付け",
     "placeholders": {

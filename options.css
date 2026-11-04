@@ -4000,7 +4000,7 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
    body weight) like every other disclosure header's state; it used to be its
    own 16/400 face (critique 6, TH-11). Only the digit alignment stays here. */
 .tag-gov-count { font-variant-numeric: tabular-nums; }
-#tag-gov-lowcount-list { margin-bottom: var(--opt-sp-4); }   /* list -> select-all row; an empty list still separates summary and row */
+#tag-gov-lowcount-list, #tag-gov-entity-list { margin-bottom: var(--opt-sp-4); }   /* list -> select-all row; an empty list still separates summary and row */
 /* .hint's own `margin: 2px 0 12px` (baseline-flow spacing) shifts this
    readout ~5px above the row centre inside .fg-actions (flex,
    align-items:center). Checked options.html and options.js for any OTHER
@@ -4008,7 +4008,7 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
    so this stays an ID rule scoped to this one readout rather than a general
    `.fg-actions > .hint` rule an unrelated future pairing would inherit
    without review. */
-#tag-gov-selected-count { margin: 0; }
+#tag-gov-selected-count, #tag-gov-entity-status { margin: 0; }
 /* Pinned to the viewport bottom while its natural position (end of the Tags panel)
    is below the fold, so batch progress is visible from any scroll position without
    yanking the view away from the groups list. Falls back into normal flow once the
