@@ -412,6 +412,11 @@ try{
     let popup=await popupPromise;await popup.waitForLoadState();
     await popup.locator('#main-section:not(.hidden)').waitFor({timeout:10000}).catch(async error=>{console.error({errors,popupUrl:popup.url(),body:(await popup.locator('body').innerText()).slice(0,1200),connection:await popup.evaluate(async()=>{const c=await pbpReadBookmarkConnection();return {service:c.service,connected:!!c.account};})});throw error;});
     await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
+    // Off Pinboard only the unread link stays; the Pinboard-only links and
+    // Tab Set are hidden, which their own display rules must not undo.
+    const pinboardOnly=await popup.evaluate(()=>[...document.querySelectorAll('.quick-links > *'),document.getElementById('save-tabset-btn')].filter(el=>el&&el.id!=='unread-link').map(el=>({id:el.id||el.textContent.trim(),hidden:el.hidden,display:getComputedStyle(el).display})));
+    assert(pinboardOnly.length>=2&&pinboardOnly.every(row=>row.hidden&&row.display==='none'),service+' popup still shows Pinboard-only links: '+JSON.stringify(pinboardOnly));
+    assert(await popup.locator('#unread-link').isVisible(),service+' popup hid the unread link');
     if(service==='linkding'){
       assert(await popup.locator('#private-check').isHidden());assert(await popup.locator('#share-check').isVisible());assert(!await popup.locator('#share-check').isChecked());
       await popup.keyboard.press('Alt+p');assert(await popup.locator('#private-check').isChecked(),'Alt+P toggled hidden supported Private');assert(!await popup.locator('#share-check').isChecked(),'Alt+P changed visible Share');

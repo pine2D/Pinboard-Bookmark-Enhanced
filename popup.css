@@ -1720,6 +1720,9 @@ html[data-theme] .batch-progress-text {
   text-decoration: underline;
 }
 .quick-links a:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
+/* popup.js hides the Pinboard-only links and the Tab Set button off Pinboard;
+   their own display:inline-flex would otherwise keep them on screen. */
+.quick-links > [hidden], .qbtn[hidden] { display: none; }
 .ql-sep {
   /* Decorative punctuation, not text: --pp-fg-hint alone out-weighed the
      links it separates (4.99:1 vs the links' 4.78:1 on the default surface,
