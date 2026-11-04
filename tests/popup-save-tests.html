@@ -4418,7 +4418,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(fetch401.includes("resetPinboardSession(") && !fetch401.includes("showLogin()"), "pinboardFetch 401 still mutates the live view");
       assert(resetSource.includes('type: "PBP_RESET_PINBOARD_AUTH", expectedToken') && resetSource.includes("if (!result?.ok) return false"), "session reset bypasses or ignores conditional worker reset");
       assert(!resetSource.includes("pbpDiscardPopupDraft"), "automatic auth reset discards a later session's drafts");
-      assert(logoutSource.includes('persistSettings({ [(pbpBookmarkServiceId(settings) || "pinboard") + "Token"]: "" })') && logoutSource.includes("if (!result.ok) return"), "logout bypasses or ignores unified persistence");
+      assert(logoutSource.includes("await pbpBookmarkDisconnect(pbpBookmarkServiceId(settings))") && logoutSource.includes("if (!result.ok) return"), "logout bypasses or ignores unified persistence");
+      const realPersist = window.persistSettings;
+      const patches = [];
+      window.persistSettings = (patch) => { patches.push(patch); return { ok: true }; };
+      try { for (const service of ["pinboard", "karakeep", "linkding", ""]) pbpBookmarkDisconnect(service); }
+      finally { window.persistSettings = realPersist; }
+      assert(JSON.stringify(patches) === JSON.stringify([{ pinboardToken: "" }, { karakeepToken: "" }, { linkdingToken: "" }, { pinboardToken: "" }]), "logout does not clear exactly the active service's token through persistSettings: " + JSON.stringify(patches));
       assert(!resetSource.includes("storage.local") && !logoutSource.includes("storage.local"), "token clear still hand-routes a storage area");
       assert(loginSource.includes("const saved = await persistSettings") && loginSource.indexOf("if (!saved.ok)") < loginSource.indexOf("settings.pinboardToken = token"), "login enters memory before persistence succeeds");
       assert(resetSource.includes('settings.pinboardToken = ""') && resetSource.includes("window.location.reload()"), "session reset does not clear memory and reload");
