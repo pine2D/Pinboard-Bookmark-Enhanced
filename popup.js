@@ -2120,11 +2120,12 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         // status apart (httpStatus); a direct call carries it as status.
         const lookupFailureText = typeof settings === "object"
           ? pbpBookmarkFailureText(lookupFailure, pbpBookmarkServiceId(settings), t) : "";
+        let lookupMessage = "";
         if (lookupFailureText) {
           // Self-hosted: every cause has its own copy. classifyPinboardError
           // would read a 403 challenge as a Pinboard auth failure, and a lost
           // host grant or a 5xx (status 0 from the worker) as "offline".
-          showStatus("status-msg", lookupFailureText, "error");
+          lookupMessage = lookupFailureText;
         } else if (e?.code === "account_changed") {
           // The worker refuses to dispatch once the stored token stops matching
           // the one it authorised this call with (background.js's
@@ -2132,13 +2133,19 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
           // "account_changed" }). The save path already names that cause with
           // the auth copy; classifyPinboardError has no branch for it and would
           // read the 0 as offline.
-          showStatus("status-msg", t("pinboardErrorAuth"), "error");
+          lookupMessage = t("pinboardErrorAuth");
         } else if (typeof e?.status === "number" && e.status !== 401) {
           // Pass the numeric status, not the Error: classifyPinboardError's
           // response branch requires !("name" in input), which no Error can
           // satisfy (name comes off the prototype), so an Error instance would
           // report every 5xx as "offline".
-          showStatus("status-msg", t(classifyPinboardError(e.status)), "error");
+          lookupMessage = t(classifyPinboardError(e.status));
+        }
+        if (lookupMessage) {
+          showStatus("status-msg", lookupMessage, "error");
+          // Marks the duplicate check's card: showSaveError replaces this one,
+          // and only this one (not the AI-key or storage card).
+          if (window._lastStatusFeedback) window._lastStatusFeedback.lookupFailure = true;
         }
         return { status: "failed", url: lookupUrl };
       }
@@ -3368,7 +3375,7 @@ function showSaveError(result) {
   clearSaveError();
   // The duplicate-check failure already put a status card on screen; this
   // card replaces it, so one failure never reads as two.
-  if (window._lastStatusFeedback) { window._lastStatusFeedback.dismiss(); window._lastStatusFeedback = null; }
+  if (window._lastStatusFeedback?.lookupFailure) { window._lastStatusFeedback.dismiss(); window._lastStatusFeedback = null; }
   const { message, retry } = pbpSaveErrorView(result);
   const feedback = showFeedback({
     variant: "error",

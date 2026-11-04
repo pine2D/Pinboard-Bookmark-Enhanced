@@ -6840,20 +6840,27 @@ test("posts/add default remains replace=yes for existing callers", () => {
     });
     // Selfhosted UX follow-up: a failed duplicate check leaves a status card; the
     // save-error card that Save then adds must replace it, not sit beside it.
-    test("save error card dismisses the earlier lookup status card", () => {
+    test("save error card dismisses the earlier lookup status card, and no other card", () => {
       const from = source.indexOf("function showSaveError(");
       const body = source.slice(from, source.indexOf("\n}\n", from) + 3);
       let dismissed = 0, shown = 0;
-      const win = { _lastStatusFeedback: { dismiss() { dismissed++; } } };
+      const win = { _lastStatusFeedback: null };
       const submitBar = { after() { shown++; } };
-      const api = new Function("window", "clearSaveError", "pbpSaveErrorView", "showFeedback", "t", "$id",
-        `let _saveErrorFeedback = null;\n${body}\nreturn showSaveError;`)(
+      const api = new Function("window", "clearSaveError", "pbpSaveErrorView", "showFeedback", "t", "$id", "showStatus",
+        `let _saveErrorFeedback = null;\n${body}\nreturn { showSaveError };`)(
         win, () => {}, () => ({ message: "m", retry: false }), () => ({ element: {}, dismiss() {} }), (k) => k,
-        () => ({ closest: () => submitBar, focus() {}, click() {} }));
-      api({ reason: "duplicate_unknown" });
+        () => ({ closest: () => submitBar, focus() {}, click() {} }), () => {});
+      // The lookup branch shows its card and marks it (checkExistingBookmark).
+      assert(/showStatus\("status-msg", lookupMessage, "error"\);\s*\/\/[^\n]*\n[^\n]*\n\s*if \(window\._lastStatusFeedback\) window\._lastStatusFeedback\.lookupFailure = true;/.test(source), "the lookup failure card is not marked");
+      win._lastStatusFeedback = { lookupFailure: true, dismiss() { dismissed++; } };
+      api.showSaveError({ reason: "duplicate_unknown" });
       assert(dismissed === 1, "the lookup status card was not dismissed (" + dismissed + ")");
       assert(shown === 1, "the save error card was not inserted");
       assert(win._lastStatusFeedback === null, "stale reference to the dismissed card kept");
+      // An unrelated status card (the AI-key or storage card) stays.
+      win._lastStatusFeedback = { dismiss() { dismissed++; } };
+      api.showSaveError({ reason: "remote" });
+      assert(dismissed === 1 && win._lastStatusFeedback !== null, "a save error closed a card that was not the lookup's");
     });
     test("duplicate_unknown copy names no cause", () => {
       assert(!/network trouble/i.test(enMessages.bookmarkErrDuplicateUnknown.message), "en copy still blames the network");
