@@ -381,6 +381,12 @@ let _linkdingSharedRevision = 0;
 let _popupDraftRevision = 0;
 let _popupDraftWriteRevision = 0;
 let _popupDraftUserUrl = false;
+// How the draft's address came to differ from the opened page: "typed" (edited
+// by hand in this form) or "recent" (a recent bookmark opened for editing);
+// null while the form holds the page's own address. It is stored with the
+// draft: a typed address leaves the title as the page's (see initPopupDraft),
+// a recent bookmark's title belongs to that bookmark.
+let _popupDraftUrlSource = null;
 let _popupDraftRestored = false;
 let _popupDraftEdited = false;
 let _popupDraftLastSnapshot = "";
@@ -443,6 +449,7 @@ function pbpPopupDraftSnapshot() {
     ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(_linkdingDescriptionPending ? { summary: $id("linkding-description-input").value, ...(summaryAi ? { summaryAi } : {}) } : {}), sharedExplicit: _linkdingSharedExplicit } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
     private: $id("private-check").checked, toread: $id("readlater-check").checked,
     archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched, ...(changed ? { changed } : {}),
+    ...(_popupDraftUrlSource ? { urlSource: _popupDraftUrlSource } : {}),
     ...(baseVersion !== undefined ? { baseVersion } : {}), ...(baseTags ? { baseTags } : {}) };
 }
 // A draft write is needed when the user's edits change, or the loaded state
@@ -528,7 +535,7 @@ function pbpPopupDraftFieldEdited(id) {
     fieldDirtyFlags["private-check"] = true;
   }
   if (id in fieldDirtyFlags) fieldDirtyFlags[id] = true;
-  if (id === "url-input") _popupDraftUserUrl = true;
+  if (id === "url-input") { _popupDraftUserUrl = true; if (_popupDraftUrlSource !== "recent") _popupDraftUrlSource = "typed"; }
   if (id === "archive-check") _archiveUserTouched = true;
   if (id === "linkding-description-input") { _linkdingDescriptionKnown = true; _linkdingDescriptionPending = true; pbpPopupRenderDescriptionHint(); }
   const key = { "url-input": "url", "title-input": "title", "description-input": "notes", "linkding-description-input": "summary", "tags-input": "tagInput",
@@ -619,13 +626,21 @@ async function initPopupDraft(account, tab) {
       if (take("sharedExplicit")) _linkdingSharedExplicit = pbpBookmarkServiceId(settings) === "linkding" && pbpBookmarkConnection(settings).sharingEnabled && d.sharedExplicit === true;
       if (drafted("url")) {
         _popupDraftUserUrl = true;
+        if (!_popupDraftChangedFields.has("url")) _popupDraftUrlSource = d.urlSource === "typed" || d.urlSource === "recent" ? d.urlSource : null;
         // The tab filled the title before the draft brought another address
         // back, and the page prefills skip such a form. The row's title and
         // notes are what the form held for that address when it was drafted:
         // a recent bookmark's own, or the opened page's for an address edited
         // by hand. They go back unmarked, so a found lookup still replaces
         // them and a missing one leaves them instead of an empty form.
+        // An address typed by hand keeps the page's title the user never
+        // edited: the row's title is the one the page had when it was drafted,
+        // and the tab (already in the box) has the current one.
         for (const [id, key] of [["title-input", "title"], ["description-input", "notes"]]) {
+          if (key === "title" && d.urlSource === "typed") {
+            if (!drafted(key) && !$id(id).value && _activeTabAtOpen?.title) $id(id).value = _activeTabAtOpen.title;
+            continue;
+          }
           if (!drafted(key) && !_popupDraftChangedFields.has(key) && !pbpPopupFormHoldsPage(context.pageUrl)) $id(id).value = d[key];
         }
       }
@@ -2995,6 +3010,7 @@ async function loadBookmarkForEdit(url, token) {
   // bring the address back, or its edits would reopen on the page's address.
   _popupDraftChangedFields.add("url");
   _popupDraftUserUrl = false;
+  _popupDraftUrlSource = "recent";
   _popupDraftRestored = false;
   _popupDraftRestoredFields = new Set();
   _popupDraftSummaryAi = "";

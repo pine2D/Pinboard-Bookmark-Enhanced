@@ -54,7 +54,7 @@ async function test(name,fn){const d=document.createElement('div');d.className='
      renderTags(){if(api)api.pbpRememberPopupDraft();},showStatus:(...args)=>statuses.push(args),t:k=>k,
      existingBookmark:null,settings:{waybackArchiveEnabled:true,...settings},pbpBookmarkServiceId:()=>service,pbpBookmarkConnection:()=>({account:currentOwner,sharingEnabled:true}),pbpReadBookmarkConnection:async()=>({account:currentOwner}),_waybackHostGranted:true,_pageInfoReady:true,
      buildPostsAddUri:()=>'',POSTS_ADD_URI_BUDGET:8192,pbpWaybackShouldArchive:({isPrivate})=>!isPrivate,
-     _activeTabAtOpen:{url:'https://example.com/article'},invalidateBookmarkLookup(){},
+     _activeTabAtOpen:{url:'https://example.com/article',title:'Tab title'},invalidateBookmarkLookup(){},
      _aiSummaryValue:'',_aiSummaryRange:null,_aiLastLegacySummaryRange:()=>null,showSummaryActions(){},
      autoResizeTextarea(){},
      pageInfo,pbpNotesDescription:info=>info.metaDescription||'',pbpPageInfoReadable:info=>!!info&&info._pbpUnavailable!==true,
@@ -452,6 +452,34 @@ await test('a restored AI paragraph is adopted from the cache, otherwise kept as
    assert(JSON.stringify(form)===JSON.stringify([edited,'Own title','Own meta']),'the edited-address draft lost the page title or notes: '+JSON.stringify(form));
    assert(!second.flags['title-input']&&!second.flags['description-input'],'title or notes were marked edited: '+JSON.stringify(second.flags));
    await second.api.pbpDiscardPopupDraft();});
+ // User decision 2026-11-04 (G15): a typed address marks the draft; the title the
+ // user never edited then follows the current page, one the user typed stays.
+ await test('a typed-address draft reopens with the current page title unless the user typed one',async()=>{const pageUrl='https://example.com/g15-title?id=5&page=2',edited='https://example.com/g15-title?id=5';const info={url:pageUrl,title:'Old page title',metaDescription:'Old meta'};
+   const first=uiHarness('pinboard',{worker:true,pageInfo:info});first.elements['url-input'].value=pageUrl;first.api.prefillTitle('Old page title',pageUrl);first.api.prefill();
+   await first.api.initPopupDraft('alice',{url:pageUrl});await settle();typeInto(first,'url-input',edited);typeInto(first,'description-input','My note');await settle();
+   assert(rowFor(pageUrl).draft.urlSource==='typed','the draft is not marked as a typed address: '+JSON.stringify(rowFor(pageUrl).draft.urlSource));
+   const second=uiHarness('pinboard',{worker:true,pageInfo:{...info,title:'New page title'}});second.elements['url-input'].value=pageUrl;second.api.prefillTitle('New page title',pageUrl);
+   await second.api.initPopupDraft('alice',{url:pageUrl});await settle();second.api.prefillTitle('New page title',pageUrl);second.api.prefill();
+   assert(second.elements['url-input'].value===edited&&second.elements['description-input'].value==='My note','the typed address or note was not restored');
+   assert(second.elements['title-input'].value==='New page title','the untouched title came from the draft, not the page: '+second.elements['title-input'].value);
+   assert(rowFor(pageUrl).draft.urlSource==='typed','reopening dropped the marker');
+   await second.api.pbpDiscardPopupDraft();
+   typeInto(first,'title-input','My own title');await settle();
+   const third=uiHarness('pinboard',{worker:true,pageInfo:{...info,title:'New page title'}});third.elements['url-input'].value=pageUrl;third.api.prefillTitle('New page title',pageUrl);
+   await third.api.initPopupDraft('alice',{url:pageUrl});await settle();third.api.prefillTitle('New page title',pageUrl);
+   assert(third.elements['title-input'].value==='My own title','a title the user typed was replaced by the page title: '+third.elements['title-input'].value);
+   await third.api.pbpDiscardPopupDraft();});
+ await test('a recent-bookmark draft is marked recent and keeps its own title',async()=>{const pageUrl='https://example.com/article';
+   const first=await openWorker(pageUrl);await first.api.loadBookmarkForEdit('https://example.com/g15-recent-t','alice:fake');first.elements['title-input'].value='Recent title';typeInto(first,'description-input','n');await settle();
+   assert(rowFor(pageUrl).draft.urlSource==='recent','recent draft marker: '+rowFor(pageUrl).draft.urlSource);
+   const second=uiHarness('pinboard',{worker:true,pageInfo:{url:pageUrl,title:'Page title'}});second.elements['url-input'].value=pageUrl;second.api.prefillTitle('Page title',pageUrl);
+   await second.api.initPopupDraft('alice',{url:pageUrl});await settle();
+   assert(second.elements['title-input'].value==='Recent title','the recent bookmark title was replaced by the page title: '+second.elements['title-input'].value);
+   await second.api.pbpDiscardPopupDraft();});
+ await test('the worker accepts only known address sources',async()=>{const pageUrl='https://example.com/g15-source';
+   for(const urlSource of ['typed','recent'])assert((await run(msg('write',{pageUrl,draft:{...draft,urlSource}}))).ok,urlSource+' rejected');
+   assert(!(await run(msg('write',{pageUrl,draft:{...draft,urlSource:'other'}}))).ok,'an unknown source was accepted');
+   await run(msg('clear',{pageUrl}));});
  // Only a user's change renews the 24-hour lifetime: the page and the lookup
  // refilling unchanged fields of a reopened form must not keep a draft alive.
  await test('reopening and refilling unchanged fields leaves the draft expiry alone',async()=>{const pageUrl='https://example.com/g15-expiry';
