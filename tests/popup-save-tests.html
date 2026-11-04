@@ -4803,6 +4803,19 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
+    await testAsync("#fragment address: a save waits at most 3 s for a pending probe", async () => {
+      const waitStart = source.indexOf("const PBP_FRAGMENT_PROBE_SAVE_WAIT_MS");
+      const waitEnd = source.indexOf("// ===================== Existing Bookmark", waitStart);
+      const delays = [];
+      const probe = { promise: new Promise(() => {}), settled: false };
+      const lookup = { status: "missing", fragmentProbe: probe };
+      const wait = new Function("bookmarkLookup", "setTimeout", "clearTimeout", "pbpDismissFragmentMatch", "_fragmentMatchFeedback",
+        source.slice(waitStart, waitEnd) + "\nreturn pbpFragmentProbeWait;")(lookup, (cb, ms) => { delays.push(ms); cb(); return 1; }, () => {}, () => {}, null);
+      const stopped = await wait(null, false);
+      assert(delays.length === 1 && delays[0] === 3000, "the save wait is 3000 ms, got " + JSON.stringify(delays));
+      assert(stopped === false && lookup.fragmentProbeClosed === true, "a probe slower than the bound lets the save go on");
+    });
+
     await testAsync("#fragment address: Save as new keeps the #fragment address", async () => {
       for (const service of ["pinboard", "linkding"]) {
         const h = createFragmentHarness(service, fragmentWorker({ [URL]: fragmentPost(service) }));

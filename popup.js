@@ -1933,8 +1933,9 @@ async function pbpProbeFragmentlessBookmark(token, lookupUrl, generation) {
 // up to this long: a hit stops that save so the user can choose (no silent
 // second bookmark under the #fragment address). Pinboard queues the probe
 // one rate-limit slot (3.1s) behind the open lookup; a probe slower than the
-// bound lets the save go on, and no notice follows it.
-const PBP_FRAGMENT_PROBE_SAVE_WAIT_MS = 6000;
+// bound (3 s, user decision 2026-11-04) lets the save go on, and no notice
+// follows it.
+const PBP_FRAGMENT_PROBE_SAVE_WAIT_MS = 3000;
 // The probe record of a miss: { promise, settled }. Called with the record
 // the click saw (and whether it had settled then). Nothing to wait for:
 // answers null at once, so a save that never met a pending probe keeps its
