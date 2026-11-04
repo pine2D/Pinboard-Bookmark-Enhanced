@@ -6863,6 +6863,19 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const en = enMessages.bookmarkDeleteFailedReason.message;
       assert(/^Couldn't delete the bookmark\. \$REASON\$$/.test(en), "en: " + en);
     });
+    test("a SingleFile caveat is its own warning card, not text inside the success line", () => {
+      const from = source.indexOf("function showSaveWarning(");
+      assert(from >= 0, "showSaveWarning missing");
+      const body = source.slice(from, source.indexOf("\n}\n", from) + 3);
+      let shown = null, inserted = 0;
+      new Function("clearSaveError", "showFeedback", "$id", `let _saveErrorFeedback = null;\n${body}\nshowSaveWarning("careful");`)(
+        () => {}, (opts) => { shown = opts; return { element: {}, dismiss() {} }; },
+        () => ({ closest: () => ({ after() { inserted++; } }) }));
+      assert(shown && shown.variant === "warning" && shown.message === "careful" && inserted === 1, "card: " + JSON.stringify(shown));
+      const flow = source.slice(source.indexOf("const singleFileSilent"), source.indexOf("const singleFileSilent") + 600);
+      assert(flow.includes('showSaveWarning(t("singleFileNoResponse"))'), "the SingleFile note is not routed to the warning card");
+      assert(!flow.includes("statusEl.appendChild"), "the SingleFile note is still appended to the success line");
+    });
   } catch (error) {
     test("popup submit source contracts load", () => { throw error; }, { always: true });
   }

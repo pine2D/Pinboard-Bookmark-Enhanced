@@ -2733,15 +2733,7 @@ function setupSubmit(token) {
         // means no snapshot, so say it beside the success and stay open.
         const singleFileSilent = result.singleFile === "failed";
         if (singleFileSilent) {
-          try {
-            const statusEl = $id("status-msg");
-            if (statusEl) {
-              const singleFileNote = document.createElement("span");
-              singleFileNote.textContent = t("singleFileNoResponse");
-              statusEl.appendChild(document.createTextNode(" · "));
-              statusEl.appendChild(singleFileNote);
-            }
-          } catch (_) {}
+          try { showSaveWarning(t("singleFileNoResponse")); } catch (_) {}
         }
         // A merge tells the user what the service did to a bookmark it already
         // had, so the popup stays open for it (user decision 2026-11-02).
@@ -3333,6 +3325,15 @@ function pbpSaveErrorView(result) {
 function pbpDeleteFailureText(resp, service) {
   const reason = pbpBookmarkFailureText({ reason: resp?.error, httpStatus: resp?.status }, service, t);
   return reason ? t("bookmarkDeleteFailedReason", reason) : t("readerBookmarkDeleteFailed");
+}
+// A caveat to a save that went through (SingleFile did not answer): its own
+// warning card under the Save button, so the green success line stays green.
+// It is the save card slot, so the next save attempt clears it.
+function showSaveWarning(message) {
+  clearSaveError();
+  const feedback = showFeedback({ variant: "warning", message });
+  $id("submit-btn").closest(".submit-bar").after(feedback.element);
+  _saveErrorFeedback = feedback;
 }
 function showSaveError(result) {
   clearSaveError();
