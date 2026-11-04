@@ -5248,7 +5248,7 @@
   "bookmarkErrNetwork": {
     "message": "Der Lesezeichenserver ist nicht erreichbar. Netzwerk und Server-URL prüfen. Dasselbe passiert, wenn der Server ein selbstsigniertes oder abgelaufenes HTTPS-Zertifikat verwendet."
   },
-  "bookmarkErrDuplicateUnknown": {"message": "Netzwerkproblem: Es ließ sich nicht prüfen, ob diese URL schon gespeichert ist, daher wurde nichts gespeichert. Klicke gleich noch einmal auf „Speichern“."},
+  "bookmarkErrDuplicateUnknown": {"message": "Es ließ sich nicht prüfen, ob diese URL schon gespeichert ist, daher wurde nichts gespeichert. Klicke gleich noch einmal auf „Speichern“."},
   "bookmarkErrTimeout": {
     "message": "Der Lesezeichenserver hat nicht rechtzeitig geantwortet. Später erneut versuchen."
   },

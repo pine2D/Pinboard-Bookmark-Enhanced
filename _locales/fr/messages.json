@@ -5248,7 +5248,7 @@
   "bookmarkErrNetwork": {
     "message": "Impossible de joindre le serveur de signets. Vérifiez la connexion réseau et l’URL du serveur. Un certificat HTTPS autosigné ou expiré sur le serveur produit aussi cette erreur."
   },
-  "bookmarkErrDuplicateUnknown": {"message": "Problème de réseau : impossible de vérifier si cette URL figure déjà dans vos signets, rien n’a donc été enregistré. Appuyez de nouveau sur « Enregistrer » dans un instant."},
+  "bookmarkErrDuplicateUnknown": {"message": "Impossible de vérifier si cette URL figure déjà dans vos signets, rien n’a donc été enregistré. Appuyez de nouveau sur « Enregistrer » dans un instant."},
   "bookmarkErrTimeout": {
     "message": "Le serveur de signets n’a pas répondu à temps. Réessayez plus tard."
   },

@@ -3329,6 +3329,9 @@ function pbpSaveErrorView(result) {
 }
 function showSaveError(result) {
   clearSaveError();
+  // The duplicate-check failure already put a status card on screen; this
+  // card replaces it, so one failure never reads as two.
+  if (window._lastStatusFeedback) { window._lastStatusFeedback.dismiss(); window._lastStatusFeedback = null; }
   const { message, retry } = pbpSaveErrorView(result);
   const feedback = showFeedback({
     variant: "error",

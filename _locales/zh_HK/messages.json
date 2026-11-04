@@ -5248,7 +5248,7 @@
   "bookmarkErrNetwork": {
     "message": "無法連線至書籤伺服器。請檢查網絡和伺服器網址。伺服器使用自簽或已過期的 HTTPS 證書時，也會出現這個情況。"
   },
-  "bookmarkErrDuplicateUnknown": {"message": "網絡有問題，未能確認這個網址是否已存在，今次沒有儲存。請稍後再按「儲存」。"},
+  "bookmarkErrDuplicateUnknown": {"message": "未能確認這個網址是否已存在，今次沒有儲存。請稍後再按「儲存」。"},
   "bookmarkErrTimeout": {
     "message": "書籤伺服器未有及時回應，請稍後再試。"
   },

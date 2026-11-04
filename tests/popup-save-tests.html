@@ -6832,6 +6832,26 @@ test("posts/add default remains replace=yes for existing callers", () => {
         else delete document.documentElement.dataset.section;
       }
     });
+    // Selfhosted UX follow-up: a failed duplicate check leaves a status card; the
+    // save-error card that Save then adds must replace it, not sit beside it.
+    test("save error card dismisses the earlier lookup status card", () => {
+      const from = source.indexOf("function showSaveError(");
+      const body = source.slice(from, source.indexOf("\n}\n", from) + 3);
+      let dismissed = 0, shown = 0;
+      const win = { _lastStatusFeedback: { dismiss() { dismissed++; } } };
+      const submitBar = { after() { shown++; } };
+      const api = new Function("window", "clearSaveError", "pbpSaveErrorView", "showFeedback", "t", "$id",
+        `let _saveErrorFeedback = null;\n${body}\nreturn showSaveError;`)(
+        win, () => {}, () => ({ message: "m", retry: false }), () => ({ element: {}, dismiss() {} }), (k) => k,
+        () => ({ closest: () => submitBar, focus() {}, click() {} }));
+      api({ reason: "duplicate_unknown" });
+      assert(dismissed === 1, "the lookup status card was not dismissed (" + dismissed + ")");
+      assert(shown === 1, "the save error card was not inserted");
+      assert(win._lastStatusFeedback === null, "stale reference to the dismissed card kept");
+    });
+    test("duplicate_unknown copy names no cause", () => {
+      assert(!/network trouble/i.test(enMessages.bookmarkErrDuplicateUnknown.message), "en copy still blames the network");
+    });
   } catch (error) {
     test("popup submit source contracts load", () => { throw error; }, { always: true });
   }
