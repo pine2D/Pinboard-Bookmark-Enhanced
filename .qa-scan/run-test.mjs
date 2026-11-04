@@ -1,7 +1,8 @@
 // Headless runner for the project's tests/*.html browser suites.
 // Serves the repo root over a local HTTP server (so tests that fetch() source
 // files work — file:// blocks fetch), loads the test in bundled Chromium, then
-// waits for the suite's declared number of structured result rows. Exit 0 =
+// waits for the suite's declared number of structured result rows, then for
+// one second with no new row (a later row is counted, not missed). Exit 0 =
 // green, 1 = red, 2 = unknown suite / invalid invocation.
 //
 // Usage: node .qa-scan/run-test.mjs tests/<file>.html
@@ -342,12 +343,16 @@ try {
         const enough = registered === undefined ? total > 0 : total >= registered;
         return enough && now - seen.since >= seen.windowMs;
       }, expected, { polling: 100, timeout: 0 })
+      // Normal: the registered count, then a short quiet window. Sampling the
+      // moment the count was reached missed a case rendered after it (a new
+      // case on a page whose count was not yet raised, seen 2026-11-04 on
+      // reader-bookmark), so the run said "match" over a page with more rows.
       : page.waitForFunction((resultCount) => {
-        let total = 0;
-        for (const el of document.querySelectorAll(".pass, .fail, .skip")) {
-          if (el.classList.contains("pass") || el.classList.contains("fail") || el.classList.contains("skip")) total++;
-        }
-        return total >= resultCount;
+        const now = performance.now();
+        const total = document.querySelectorAll(".pass, .fail, .skip").length;
+        const w = window.__pbpRunWatch || (window.__pbpRunWatch = { total: -1, since: now });
+        if (w.total !== total) { w.total = total; w.since = now; }
+        return total >= resultCount && now - w.since >= 1000;
       }, expected, { polling: 50, timeout: 0 });
     waitForRows.catch(() => {});
     try {
