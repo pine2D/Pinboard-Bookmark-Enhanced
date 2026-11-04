@@ -5135,7 +5135,7 @@
     "message": "Uruchamiaj SingleFile po dodaniu zakładki"
   },
   "optLinkdingSingleFileHint": {
-    "message": "Gdy okienko albo szybki zapis doda nową zakładkę, SingleFile zapisze pełną kopię strony, a linkding nie utworzy dla niej własnej migawki HTML. Potrzebujesz rozszerzenia SingleFile z ustawionym w jego opcjach przesyłaniem do linkding przez REST API formularza (adres Twojego linkding, a po nim /api/bookmarks/singlefile/) oraz linkding w wersji 1.39 lub nowszej. SingleFile sam przesyła stronę do Twojego linkding; to rozszerzenie nie ma do czynienia z plikiem."
+    "message": "Gdy okienko albo szybki zapis doda nową zakładkę, SingleFile zapisze pełną kopię strony, a linkding nie utworzy dla niej własnej migawki HTML. Potrzebujesz linkding w wersji 1.39 lub nowszej oraz rozszerzenia SingleFile. W jego opcjach ustaw miejsce docelowe (destination) na przesyłanie do REST API formularza i wpisz: jako URL adres Twojego linkding, a po nim /api/bookmarks/singlefile/ (z samym adresem linkding przesyłanie się nie powiedzie); jako token autoryzacji (authorization token) token API ze strony ustawień linkding, bez przedrostka „Token”; jako nazwę pola danych (data field name) file, a jako nazwę pola URL (URL field name) url. SingleFile sam przesyła stronę do Twojego linkding; to rozszerzenie nie ma do czynienia z plikiem."
   },
   "optLinkdingSingleFileDocs": {
     "message": "Przewodnik linkding o archiwizacji z SingleFile"

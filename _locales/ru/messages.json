@@ -5135,7 +5135,7 @@
     "message": "Запускать SingleFile после добавления закладки"
   },
   "optLinkdingSingleFileHint": {
-    "message": "Когда всплывающее окно или быстрое сохранение добавляет новую закладку, SingleFile сохраняет полную копию страницы, а linkding не делает для неё свой HTML-снимок. Нужны расширение SingleFile, в настройках которого включена отправка в linkding через REST API для форм (адрес вашего linkding, за ним /api/bookmarks/singlefile/), и linkding версии 1.39 или новее. SingleFile сам загружает страницу в ваш linkding; это расширение файл не обрабатывает."
+    "message": "Когда всплывающее окно или быстрое сохранение добавляет новую закладку, SingleFile сохраняет полную копию страницы, а linkding не делает для неё свой HTML-снимок. Нужны linkding версии 1.39 или новее и расширение SingleFile. В его настройках выберите местом назначения (destination) отправку через REST API для форм и укажите: URL — адрес вашего linkding, за которым следует /api/bookmarks/singlefile/ (с одним адресом linkding загрузка не пройдёт); токен авторизации (authorization token) — API-токен со страницы настроек linkding, без префикса «Token»; имя поля данных (data field name) — file, имя поля URL (URL field name) — url. SingleFile сам загружает страницу в ваш linkding; это расширение файл не обрабатывает."
   },
   "optLinkdingSingleFileDocs": {
     "message": "Руководство linkding по архивированию через SingleFile"

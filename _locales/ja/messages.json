@@ -5135,7 +5135,7 @@
     "message": "ブックマークの追加後にSingleFileを実行"
   },
   "optLinkdingSingleFileHint": {
-    "message": "ポップアップまたはクイック保存で新しいブックマークを追加すると、SingleFileがページの完全なコピーを保存し、linkdingはそのブックマークのHTMLスナップショットを作りません。SingleFile拡張機能を入れ、そのオプションでREST形式APIによるlinkdingへのアップロード（linkdingのアドレスの後に /api/bookmarks/singlefile/）を設定しておく必要があります。linkdingは1.39以降が必要です。ページはSingleFileが直接linkdingにアップロードし、この拡張機能はファイルを扱いません。"
+    "message": "ポップアップまたはクイック保存で新しいブックマークを追加すると、SingleFileがページの完全なコピーを保存し、linkdingはそのブックマークのHTMLスナップショットを作りません。linkding 1.39以降とSingleFile拡張機能が必要です。SingleFileのオプションで保存先（destination）をREST形式APIへのアップロードにして、次のように入力します。URLはlinkdingのアドレスの後に /api/bookmarks/singlefile/ を付けたもの（linkdingのアドレスだけではアップロードに失敗します）、認証トークン（authorization token）はlinkdingの設定ページにあるAPIトークンを「Token」を付けずに、データのフィールド名（data field name）は file、URLのフィールド名（URL field name）は url です。ページはSingleFileが直接linkdingにアップロードし、この拡張機能はファイルを扱いません。"
   },
   "optLinkdingSingleFileDocs": {
     "message": "SingleFileによるアーカイブ（linkdingのガイド）"

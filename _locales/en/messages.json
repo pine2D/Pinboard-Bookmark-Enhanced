@@ -5146,7 +5146,7 @@
     "message": "Run SingleFile after adding a bookmark"
   },
   "optLinkdingSingleFileHint": {
-    "message": "When the popup or a quick save adds a new bookmark, SingleFile saves a full copy of the page, and linkding skips its own HTML snapshot for it. You need the SingleFile extension, set in its options to upload to linkding with the REST form API at your linkding address followed by /api/bookmarks/singlefile/, and linkding 1.39 or later. SingleFile uploads the page to your linkding itself; this extension never handles the file."
+    "message": "When the popup or a quick save adds a new bookmark, SingleFile saves a full copy of the page, and linkding skips its own HTML snapshot for it. You need linkding 1.39 or later and the SingleFile extension. In SingleFile's options, set the destination to upload to a REST Form API, then fill in: the URL as your linkding address followed by /api/bookmarks/singlefile/ (the bare linkding address fails to upload); the authorization token as the API token from linkding's settings page, without a \"Token\" prefix; the data field name as file and the URL field name as url. SingleFile uploads the page to your linkding itself; this extension never handles the file."
   },
   "optLinkdingSingleFileDocs": {
     "message": "linkding guide to archiving with SingleFile"

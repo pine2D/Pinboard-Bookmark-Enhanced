@@ -5135,7 +5135,7 @@
     "message": "Lancer SingleFile après l’ajout d’un signet"
   },
   "optLinkdingSingleFileHint": {
-    "message": "Quand le popup ou un enregistrement rapide ajoute un signet, SingleFile enregistre une copie complète de la page, et linkding ne crée pas son propre instantané HTML pour ce signet. Il vous faut l’extension SingleFile, réglée dans ses options pour envoyer la page à linkding via l’API de formulaire REST (adresse de votre linkding suivie de /api/bookmarks/singlefile/), et linkding 1.39 ou ultérieur. SingleFile envoie lui-même la page à votre linkding ; cette extension ne manipule jamais le fichier."
+    "message": "Quand le popup ou un enregistrement rapide ajoute un signet, SingleFile enregistre une copie complète de la page, et linkding ne crée pas son propre instantané HTML pour ce signet. Il vous faut linkding 1.39 ou ultérieur et l’extension SingleFile. Dans ses options, choisissez comme destination l’envoi vers une API de formulaire REST, puis renseignez : l’URL, soit l’adresse de votre linkding suivie de /api/bookmarks/singlefile/ (avec la seule adresse de linkding, l’envoi échoue) ; le jeton d’autorisation (authorization token), soit le jeton d’API de la page des réglages de linkding, sans le préfixe « Token » ; le nom du champ de données (data field name), file, et le nom du champ d’URL (URL field name), url. SingleFile envoie lui-même la page à votre linkding ; cette extension ne manipule jamais le fichier."
   },
   "optLinkdingSingleFileDocs": {
     "message": "Guide linkding sur l’archivage avec SingleFile"

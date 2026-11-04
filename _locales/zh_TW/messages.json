@@ -5135,7 +5135,7 @@
     "message": "新增書籤後執行 SingleFile"
   },
   "optLinkdingSingleFileHint": {
-    "message": "用彈出式視窗或快速儲存新增書籤後，由 SingleFile 儲存網頁的完整副本，linkding 不再為它另做 HTML 快照。需要安裝 SingleFile 擴充功能，並在它的設定中選擇以 REST 表單 API 上傳到 linkding（網址為你的 linkding 網址加上 /api/bookmarks/singlefile/）；linkding 需要 1.39 以上版本。網頁由 SingleFile 直接上傳到你的 linkding，本擴充功能不經手檔案。"
+    "message": "用彈出式視窗或快速儲存新增書籤後，由 SingleFile 儲存網頁的完整副本，linkding 不再為它另做 HTML 快照。需要 linkding 1.39 以上版本，並安裝 SingleFile 擴充功能。在 SingleFile 的設定中將儲存目標（destination）選為上傳到 REST 表單 API，再填寫：網址（URL）為你的 linkding 網址加上 /api/bookmarks/singlefile/，只填 linkding 網址會上傳失敗；authorization token 填 linkding 設定頁中的 API Token，前面不加「Token」；資料欄位名稱（data field name）填 file，網址欄位名稱（URL field name）填 url。網頁由 SingleFile 直接上傳到你的 linkding，本擴充功能不經手檔案。"
   },
   "optLinkdingSingleFileDocs": {
     "message": "linkding 官方文件：用 SingleFile 封存"

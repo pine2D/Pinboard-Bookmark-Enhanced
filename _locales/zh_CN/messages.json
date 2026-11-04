@@ -5129,7 +5129,7 @@
     "message": "新建书签后运行 SingleFile"
   },
   "optLinkdingSingleFileHint": {
-    "message": "用弹窗或快捷保存新建书签后，由 SingleFile 保存网页的完整副本，linkding 不再为它另做 HTML 快照。需要安装 SingleFile 扩展，并在它的设置里选择以 REST 表单 API 上传到 linkding（地址为你的 linkding 地址加上 /api/bookmarks/singlefile/）；linkding 需要 1.39 及以上版本。网页由 SingleFile 直接上传到你的 linkding，本扩展不经手文件。"
+    "message": "用弹窗或快捷保存新建书签后，由 SingleFile 保存网页的完整副本，linkding 不再为它另做 HTML 快照。需要 linkding 1.39 及以上版本，并安装 SingleFile 扩展。在 SingleFile 的设置里把保存目标（destination）选为上传到 REST 表单 API，再填写：网址（URL）为你的 linkding 地址加上 /api/bookmarks/singlefile/，只填 linkding 地址会上传失败；authorization token 填 linkding 设置页里的 API Token，前面不加「Token」；数据字段名（data field name）填 file，网址字段名（URL field name）填 url。网页由 SingleFile 直接上传到你的 linkding，本扩展不经手文件。"
   },
   "optLinkdingSingleFileDocs": {
     "message": "linkding 官方文档：用 SingleFile 存档"
