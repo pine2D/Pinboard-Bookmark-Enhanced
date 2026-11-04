@@ -2790,6 +2790,155 @@ export const REGRESS_MODULES = [
 ];
 MODULES.push(...REGRESS_MODULES);
 
+// ---- Pinboard tag governance: leftover entity codes in tag names ---------
+// What 04690fc3-era write-backs left behind: a tag stored with a literal
+// entity (X&quot;y). The live facts of 2026-11-04 are that posts/get|recent|all
+// answer " & < > in tags as entities (a stored X&quot;y reads X&amp;quot;y),
+// tags/get answers names verbatim, a freshly created corrupted tag was not in
+// tags/get after ~20 s, and tags/rename answers 500. This module measures the
+// rest, end to end through the options page's Scan and Repair:
+//   (a) does tags/get list the corrupted tag at all, and after how long,
+//   (b) does posts/all?tag=<stored literal> match its bookmark,
+//   (c) does the repair then store the clean tag.
+// A tag that never shows up, or a posts/all that matches nothing, is a finding
+// (notes), not a failure: the product reports both honestly. A repair that
+// says done and leaves the tag corrupt fails.
+// The corrupted tag is made the way the bug made it: typed into the popup,
+// which sends it verbatim. The repair may touch only that bookmark: every row
+// but the run's own is unticked and asserted so before Repair is clicked.
+const decodeTagEntities = text => String(text).replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+export const ENTITY_REPAIR_POLLS = 3;
+export const ENTITY_REPAIR_POLL_INTERVALS = 6.7; // x the gate spacing = ~20 s live
+export const TAG_GOV_MODULES = [
+  {
+    id: 'tag-gov.entity-repair',
+    services: ['pinboard'],
+    surfaces: ['background', 'popup', 'options'],
+    features: ['pinboard-entity-tag-created', 'pinboard-entity-tag-scan', 'pinboard-entity-tag-repair'],
+    fixRefs: [],
+    needs: needs(),
+    // Requests, measured on the mock (14 with the tag listed at poll 2): the
+    // popup's lookup and tag list, posts/add and a read-back (4); node:
+    // tags/get polls (up to 3, one more than that run) and the final
+    // read-back; the options page's own posts/get, Scan tags/get, the
+    // repair's snapshot tags/get, posts/all, posts/add and its tail-refresh
+    // tags/get. Worst case 15; node 5 of 7 (a 429 retry counts), browser 9 of 20.
+    budget: { bookmarks: 1, urls: 1, node: 7, browser: 20, ai: 0, tags: 5, seconds: 120, calls: { pinboard: 18 } },
+    files: [],
+    settings: { optRespectTagCase: true },
+    async steps(t) {
+      const { prefix } = t;
+      const url = t.claimUrl();
+      const corrupt = prefix + '_c&quot;x', clean = prefix + '_c"x', plain = prefix + '_plain';
+      const sortedJoin = names => [...names].sort().join(' ');
+      const namesOf = row => String(row.tags || '').split(/\s+/).filter(Boolean).map(decodeTagEntities);
+
+      await t.phase('entity_create');
+      const form = await t.openPopup(url);
+      await pinboardPrefill(t, form.popup);
+      await form.popup.locator('#title-input').fill(prefix + ' entity tag');
+      await form.popup.locator('#description-input').fill('entity tag notes');
+      for (const tag of [corrupt, plain]) {
+        await form.popup.locator('#tags-input').fill(tag);
+        await form.popup.locator('#tags-input').press('Enter');
+      }
+      const createSince = t.now();
+      await t.savePopup(form.popup);
+      await form.close();
+      const savedAt = Date.now();
+      t.expectEq(sortedJoin(pinboardAdds(t, createSince)[0]?.tags.split(' ') || []), sortedJoin([corrupt, plain]), 'entity_sent_tags');
+      const created = await t.ownRow(url);
+      // The read-back decodes once, as the extension does: Pinboard's answer
+      // for the literal X&quot;y is X&amp;quot;y, so one decode shows what is stored.
+      t.note('storedTagsRead', namesOf(created).includes(corrupt) ? 'literal-entity' : 'other');
+      t.expectEq(sortedJoin(namesOf(created)), sortedJoin([corrupt, plain]), 'entity_stored_literally');
+      t.expectEq(created.shared, 'no', 'privacy');
+
+      await t.phase('entity_tags_get_poll');
+      const pollMs = Math.round(t.pinboardIntervalMs * ENTITY_REPAIR_POLL_INTERVALS);
+      let polls = 0, listedAfterMs = null, lastPoll = 0;
+      while (polls < ENTITY_REPAIR_POLLS && listedAfterMs === null) {
+        // Each poll starts about pollMs after the previous; the last one is
+        // skipped when the module's own time is nearly out.
+        if (polls > 0) {
+          if (t.remainingMs() < 50000 * (t.pinboardIntervalMs / 3000)) break;
+          const wait = pollMs - (Date.now() - lastPoll);
+          if (wait > 0) await t.sleep(wait);
+        }
+        lastPoll = Date.now();
+        const counts = await t.api('tags/get');
+        polls++;
+        if (counts && Object.hasOwn(counts, corrupt)) listedAfterMs = Date.now() - savedAt;
+      }
+      const scale = 3000 / t.pinboardIntervalMs;
+      t.note('tagsGetListsCorrupted', listedAfterMs !== null);
+      t.note('tagsGetPolls', polls);
+      if (listedAfterMs !== null) t.note('tagsGetListedAfterSec', Math.round(listedAfterMs * scale / 100) / 10);
+      else {
+        t.note('tagsGetUnlistedForSec', Math.round((Date.now() - savedAt) * scale / 100) / 10);
+        const unchanged = await t.ownRow(url);
+        t.expectEq(sortedJoin(namesOf(unchanged)), sortedJoin([corrupt, plain]), 'entity_unlisted_tags_unchanged');
+        t.check('pinboard: a bookmark tagged with a literal-entity tag (typed into the popup) is stored literally; tags/get did not list that tag within the polls, so the options Scan has nothing to repair (finding, no repair attempted)');
+        return;
+      }
+
+      await t.phase('entity_scan');
+      const options = await t.openOptions('tags');
+      await options.locator('#tag-gov-entities > summary').click();
+      await options.locator('#tag-gov-entity-scan').waitFor({ state: 'visible' });
+      await options.locator('#tag-gov-entity-scan').click();
+      await t.until(() => options.evaluate(() => (document.getElementById('tag-gov-entity-count')?.textContent || '') !== ''), 'entity_scan', 40000);
+      const rows = await options.evaluate(() => [...document.querySelectorAll('.tag-gov-entity-checkbox')].map(cb => ({ value: cb.value, checked: cb.checked })));
+      t.note('scanRows', rows.length);
+      t.expect(rows.some(r => r.value === corrupt), 'entity_scan_row');
+      t.expect(rows.every(r => r.checked), 'entity_rows_default_checked');
+      // The account may hold the user's own entity tags: only ours stays ticked.
+      await options.evaluate(ours => { for (const cb of document.querySelectorAll('.tag-gov-entity-checkbox')) if (cb.value !== ours && cb.checked) cb.click(); }, corrupt);
+      const ticked = await options.evaluate(() => [...document.querySelectorAll('.tag-gov-entity-checkbox:checked')].map(cb => cb.value));
+      t.expectEq(JSON.stringify(ticked), JSON.stringify([corrupt]), 'entity_only_ours_ticked');
+
+      await t.phase('entity_repair');
+      const repairSince = t.now();
+      await options.locator('#tag-gov-entity-repair').click();
+      await options.locator('.confirm-yes').click();
+      const done = t.message('tagGovEntityDone'), partial = t.message('tagGovEntityPartial'), noMatch = t.message('tagGovEntityNoMatch');
+      await t.until(() => options.evaluate(texts => texts.includes((document.getElementById('tag-gov-entity-status')?.textContent || '').trim()), [done, partial]), 'entity_repair_done', 60000);
+      const status = (await options.locator('#tag-gov-entity-status').textContent()).trim();
+      const problems = await options.evaluate(() => document.getElementById('tag-gov-problems')?.textContent || '');
+      const outcome = status === done ? 'success' : problems.includes(noMatch) ? 'tagGovEntityNoMatch' : 'failed';
+      await options.close();
+      const adds = pinboardAdds(t, repairSince);
+      t.note('repairRowOutcome', outcome);
+      t.note('postsAllRequests', t.requests({ path: /^posts\/all\?/, since: repairSince }).length);
+      t.note('postsAllMatchedLiteral', adds.length > 0 ? true : outcome === 'tagGovEntityNoMatch' ? false : 'unknown');
+      t.expect(adds.every(a => a.url === url), 'entity_repair_foreign_add');
+
+      await t.phase('entity_readback');
+      const after = await t.ownRow(url);
+      const names = namesOf(after);
+      const storedClean = names.includes(clean) && !names.includes(corrupt);
+      t.note('repairStoredClean', storedClean);
+      t.note('storedTagsAfter', names.map(n => n.startsWith(prefix) ? n.slice(prefix.length) : n).join(' '));
+      t.expectEq(after.description, created.description, 'entity_repair_title');
+      t.expectEq(after.extended, created.extended, 'entity_repair_extended');
+      t.expectEq(after.shared, 'no', 'privacy');
+      t.expectEq(after.toread, created.toread, 'entity_repair_toread');
+      if (adds.length) {
+        t.expectEq(adds.length, 1, 'entity_repair_one_add');
+        t.expectEq(sortedJoin(adds[0].tags.split(' ')), sortedJoin([clean, plain]), 'entity_repair_sent_tags');
+        t.expectEq(outcome, 'success', 'entity_repair_outcome');
+        t.expectEq(sortedJoin(names), sortedJoin([clean, plain]), 'entity_repair_stored_clean');
+      } else {
+        // Nothing was re-saved (posts/all matched nothing, or failed): the
+        // bookmark must be exactly as created.
+        t.expectEq(sortedJoin(names), sortedJoin([corrupt, plain]), 'entity_norepair_unchanged');
+      }
+      t.check('pinboard: literal-entity tag created through the popup, polled in tags/get, found by the options Scan, repaired only for the run-prefix row; posts/all?tag=<stored literal> and the stored result read back (title, notes, private, to-read unchanged)');
+    },
+  },
+];
+MODULES.push(...TAG_GOV_MODULES);
+
 // ---- H3c: reader, copy exits, status checks, screenshots -------------------
 
 // The visible text of the reader's bookmark status line ("" when hidden).
@@ -3373,6 +3522,7 @@ export const GROUPS = Object.freeze({
   ai: ['*.ai.*'],
   selfhosted: ['*.sh.*'],
   regress: ['*.regress.*'],
+  'tag-gov': ['*.tag-gov.*'],
   shots: ['*.shots.*'],
   // Reader, copy and status-check rows (H3c): outside selfhosted, so that
   // group still fits the three rounds of one user-target authorisation.

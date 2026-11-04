@@ -13,18 +13,31 @@
 //   posts/get     {"date","user","posts":[{href, description, extended, meta,
 //                 hash, time, shared, toread, tags}]} (shared/toread "yes"|"no",
 //                 tags one space-separated string); an unknown URL gives posts []
-//                 and a '"' inside tags comes back as &quot; (seen live 2026-11-04)
-//   tags/get      {"<tag>": count, ...} over the whole account
+//                 and tags come back with " & < > as entities (seen live
+//                 2026-11-04); a tag stored literally as X&quot;y therefore
+//                 reads X&amp;quot;y
+//   posts/all     with format=json a bare array of the same post objects;
+//                 ?tag=<name> lists the posts carrying exactly that stored tag
+//                 (hand-written from the live facts, not measured: whether the
+//                 real endpoint matches a literal-entity stored name is what
+//                 the entity-repair live module measures)
+//   tags/get      {"<tag>": count, ...} over the whole account, names verbatim
+//                 as stored; a freshly created tag holding a literal entity is
+//                 seen live to be missing for a while (entityTagLagMs)
 //   user/api_token {"result":"<hex>"}
 //   a bad token   HTTP 401 with an HTML body; rate limiting HTTP 429 (HTML)
 //   anything else HTTP 404 (HTML)
 import { createHash, randomBytes } from 'node:crypto';
 
+const ENTITY_TAG = /&(?:quot|amp|lt|gt|#39);/;
 export const PINBOARD_MOCK_ROOT = 'https://api.pinboard.in/v1/';
 
 // latencyMs delays every answer, as the real service does (a few hundred ms),
 // for the rehearsal at the real 3 s interval.
-export function createPinboardMock({ token, user = String(token || '').split(':')[0], libraryTags = { personal: 3, reading: 1 }, now = () => new Date(), latencyMs = 0 } = {}) {
+// entityTagLagMs: how long after a post was saved a tag holding a literal
+// entity code (&quot; &amp; &lt; &gt; &#39;) stays out of tags/get; Infinity
+// = never listed. seed() puts a post of the user's own in the account.
+export function createPinboardMock({ token, user = String(token || '').split(':')[0], libraryTags = { personal: 3, reading: 1 }, now = () => new Date(), latencyMs = 0, entityTagLagMs = 0 } = {}) {
   const hex = String(token || '').split(':')[1] || '';
   const posts = new Map();
   const calls = [];
@@ -34,9 +47,18 @@ export function createPinboardMock({ token, user = String(token || '').split(':'
   const stamp = () => now().toISOString().replace(/\.\d{3}Z$/, 'Z');
   const tagCounts = () => {
     const counts = { ...libraryTags };
-    for (const post of posts.values()) for (const tag of post.tags.split(' ').filter(Boolean)) counts[tag] = (counts[tag] || 0) + 1;
+    for (const post of posts.values()) {
+      for (const tag of post.tags.split(' ').filter(Boolean)) {
+        if (ENTITY_TAG.test(tag) && Date.now() - (post.savedAt || 0) < entityTagLagMs) continue;
+        counts[tag] = (counts[tag] || 0) + 1;
+      }
+    }
     return counts;
   };
+  // The read side's spelling of a stored tag string, as seen live: " & < >
+  // become entities (so a stored literal &quot; reads &amp;quot;).
+  const encodeTags = tags => tags.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const readPost = p => { const { savedAt, ...rest } = p; return { ...rest, tags: encodeTags(p.tags) }; };
   const yesNo = (value, fallback) => (value === 'yes' || value === 'no' ? value : fallback);
 
   function handle(raw) {
@@ -51,9 +73,14 @@ export function createPinboardMock({ token, user = String(token || '').split(':'
       case 'posts/get': {
         const target = q.get('url');
         const list = target ? (posts.has(target) ? [posts.get(target)] : []) : [...posts.values()].slice(-1);
-        // Observed live 2026-11-04: posts/get answers a '"' inside tags as
-        // &quot; (titles and notes come back verbatim).
-        return json({ date: list[0]?.time || stamp(), user, posts: list.map(p => ({ ...p, tags: p.tags.replace(/"/g, '&quot;') })) });
+        // Observed live 2026-11-04: posts/get answers " & < > inside tags as
+        // entities (titles and notes come back verbatim).
+        return json({ date: list[0]?.time || stamp(), user, posts: list.map(readPost) });
+      }
+      case 'posts/all': {
+        const wanted = q.get('tag');
+        const list = [...posts.values()].filter(p => !wanted || p.tags.split(' ').includes(wanted)).map(readPost);
+        return json(q.get('meta') === 'no' ? list.map(({ meta, ...rest }) => rest) : list);
       }
       case 'posts/add': {
         const target = q.get('url');
@@ -64,7 +91,7 @@ export function createPinboardMock({ token, user = String(token || '').split(':'
           href: target, description: q.get('description') || '', extended: q.get('extended') || '',
           meta: randomBytes(16).toString('hex'), hash: createHash('md5').update(target).digest('hex'),
           time: q.get('dt') || before?.time || stamp(), shared: yesNo(q.get('shared'), 'yes'), toread: yesNo(q.get('toread'), 'no'),
-          tags: String(q.get('tags') || '').split(/\s+/).filter(Boolean).join(' '),
+          tags: String(q.get('tags') || '').split(/\s+/).filter(Boolean).join(' '), savedAt: Date.now(),
         });
         return json({ result_code: 'done' });
       }
@@ -85,5 +112,9 @@ export function createPinboardMock({ token, user = String(token || '').split(':'
     // The runner's transport contract: async (url) -> { status, contentType, body }.
     transport: async url => { if (latencyMs > 0) await new Promise(r => setTimeout(r, latencyMs)); return handle(url); },
     rateLimit(n) { state.rateLimitNext = n; },
+    // A post of the user's own (old enough for every lag), tags stored as given.
+    seed({ url, description = 'seeded', extended = '', tags = '', shared = 'no', toread = 'no' }) {
+      posts.set(url, { href: url, description, extended, meta: randomBytes(16).toString('hex'), hash: createHash('md5').update(url).digest('hex'), time: '2020-01-01T00:00:00Z', shared, toread, tags, savedAt: 0 });
+    },
   };
 }

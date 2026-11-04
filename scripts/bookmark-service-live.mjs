@@ -89,16 +89,20 @@ export const PINBOARD_QUEUE_WARN_MS = 10000;
 // The endpoints a run may reach, by who sends them. The extension's save
 // chain under HARDENED_SETTINGS: posts/get (lookups), posts/add (every save
 // and edit), posts/delete (reader delete), tags/get (tag list) and
-// user/api_token (the options page's token test). The runner reads with
-// posts/get and tags/get and deletes its ledger with posts/delete. Anything
-// else under /v1/ (posts/all, posts/recent, posts/suggest, posts/update,
-// posts/dates, tags/rename, tags/delete, notes/*, user/secret) is refused as
-// a guard violation; pinboard.in pages are outside every instance and aborted.
+// user/api_token (the options page's token test), and posts/all for exactly
+// one thing: the tag-governance repair's list of the bookmarks carrying one
+// tag, allowed only as posts/all?tag=<a run-prefix tag> (plus meta, format,
+// auth_token), so it can only list this run's own bookmarks. The runner reads
+// with posts/get and tags/get and deletes its ledger with posts/delete.
+// Anything else under /v1/ (posts/all without such a tag, posts/recent,
+// posts/suggest, posts/update, posts/dates, tags/rename, tags/delete,
+// notes/*, user/secret) is refused as a guard violation; pinboard.in pages
+// are outside every instance and aborted.
 export const PINBOARD_ENDPOINTS = Object.freeze({
-  extension: Object.freeze(['posts/add', 'posts/get', 'posts/delete', 'tags/get', 'user/api_token']),
+  extension: Object.freeze(['posts/add', 'posts/get', 'posts/all', 'posts/delete', 'tags/get', 'user/api_token']),
   node: Object.freeze(['posts/get', 'posts/delete', 'tags/get']),
 });
-export const PINBOARD_REFUSED_EXAMPLES = Object.freeze(['posts/all', 'posts/recent', 'posts/suggest', 'posts/update', 'posts/dates', 'tags/rename', 'tags/delete', 'notes/list', 'user/secret', 'https://pinboard.in/']);
+export const PINBOARD_REFUSED_EXAMPLES = Object.freeze(['posts/recent', 'posts/suggest', 'posts/update', 'posts/dates', 'tags/rename', 'tags/delete', 'notes/list', 'user/secret', 'https://pinboard.in/']);
 // The endpoint a Pinboard v1 URL names: no query, no trailing slash
 // (user/api_token/ is how the extension spells that one).
 export const pinboardEndpoint = url => { try { const u = new URL(url); return u.origin + '/v1/' === PINBOARD_ROOT && u.pathname.startsWith('/v1/') ? u.pathname.slice(4).replace(/\/+$/, '') : ''; } catch { return ''; } };
@@ -866,7 +870,7 @@ export function liveGuardRule(cfg, view, req) {
     // act on the last, so a repeat could delete, save or publish a URL the
     // guard never judged. The fields a save carries (title, note, date) are
     // held to one value as well.
-    if (['url', 'shared', 'tags', 'auth_token', 'replace', 'toread', 'description', 'extended', 'dt'].some(key => params.getAll(key).length > 1)) return { ok: false, instance, code: 'live_guard_pinboard_params' };
+    if (['url', 'shared', 'tags', 'tag', 'auth_token', 'replace', 'toread', 'description', 'extended', 'dt'].some(key => params.getAll(key).length > 1)) return { ok: false, instance, code: 'live_guard_pinboard_params' };
     const endpoint = path.replace(/\/+$/, '');
     const target = params.get('url');
     const mine = created.some(r => r.instance === instance && r.url === target && !r.deleted);
@@ -879,6 +883,17 @@ export function liveGuardRule(cfg, view, req) {
     if (endpoint === 'posts/delete') {
       if (!cfg.writes) return { ok: false, instance, code: 'live_guard_read_only' };
       return created.some(r => r.instance === instance && r.url === target) ? capped({ ok: true, instance, kind: 'mutate' }, []) : { ok: false, instance, code: 'live_guard_mutation' };
+    }
+    if (endpoint === 'posts/all') {
+      // The repair's list of one tag's bookmarks (retagBookmarksViaResave):
+      // a read, and only for a run-prefix tag, so it lists run bookmarks
+      // alone; a bare posts/all, any other filter or another tag lists the
+      // user's own and is refused with the other bulk endpoints.
+      const runPrefix = String(cfg.prefix || '');
+      const tagKey = liveTagKey(inst.service, params.get('tag') || '');
+      const known = new Set(['tag', 'meta', 'format', 'auth_token']);
+      return runPrefix && tagKey && !/\s/.test(tagKey) && tagKey.toLowerCase().startsWith(runPrefix) && [...params.keys()].every(k => known.has(k))
+        ? { ok: true, instance, kind: 'read' } : { ok: false, instance, code: 'live_guard_pinboard_endpoint' };
     }
     return ['posts/get', 'tags/get', 'user/api_token'].includes(endpoint)
       ? { ok: true, instance, kind: 'read' } : { ok: false, instance, code: 'live_guard_pinboard_endpoint' };
@@ -3287,6 +3302,10 @@ export class LiveRun {
       sleep: async ms => { const started = Date.now(); try { await sleep(ms); } finally { run.noteWait('wait', Date.now() - started); } },
       // Time left before this module's own seconds budget runs out.
       remainingMs: () => Math.max(0, (mod.deadline || 0) - Date.now()),
+      // The gate's base spacing between Pinboard requests (3 s; shortened
+      // only for the in-process mock), for a module that waits in multiples
+      // of it, so the same module runs at both scales.
+      get pinboardIntervalMs() { return run.pinboardOpts?.mock === true && Number.isFinite(run.pinboardOpts.intervalMs) ? run.pinboardOpts.intervalMs : PINBOARD_MIN_INTERVAL_MS; },
       until: (read, label, timeout) => { alive(); return run.until(read, label, timeout); },
       claimUrl() {
         alive();

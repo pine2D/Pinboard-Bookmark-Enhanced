@@ -25,7 +25,7 @@ import vm from 'node:vm';
 // (case-insensitive); --list prints the names and exits. Neither set (as in
 // verify.sh): every section runs. Each section sets up what it reads, so one
 // run alone reaches the same verdict as in the full run.
-const SECTIONS = ['registry and selection', 'budgets', 'guard rule and caps', 'pure helpers', 'node api', 'linkding tag cleanup', 'karakeep tag cleanup', 'summary', 'fake ai', 'docker fake executor', 'signals', 'screenshot canary', 'spawned cli', 'karakeep user target', 'linkding user target', 'pinboard units', 'pinboard token', 'pinboard mock browser write round', 'pinboard cleanup resume'];
+const SECTIONS = ['registry and selection', 'budgets', 'guard rule and caps', 'pure helpers', 'node api', 'linkding tag cleanup', 'karakeep tag cleanup', 'summary', 'fake ai', 'docker fake executor', 'signals', 'screenshot canary', 'spawned cli', 'karakeep user target', 'linkding user target', 'pinboard units', 'pinboard token', 'pinboard mock browser write round', 'pinboard mock entity repair', 'pinboard cleanup resume'];
 const onlyParts = (process.env.PBP_PREFLIGHT_ONLY || '').split(',').map(part => part.trim().toLowerCase()).filter(Boolean);
 const only = name => {
   if (!SECTIONS.includes(name)) throw new Error('unlisted preflight section: ' + name);
@@ -848,7 +848,29 @@ try {
     }
     // The rule's endpoint list is the one --plan prints, minus what only the
     // runner may send.
-    for (const endpoint of live.PINBOARD_ENDPOINTS.extension) assert(cases.some(([req, ok]) => ok && live.pinboardEndpoint(req.url) === endpoint), endpoint + ' allowed');
+    // posts/all is the tag-governance repair's list and nothing else: a read,
+    // allowed only for one run-prefix tag (and meta, format, auth_token), so
+    // it can list this run's bookmarks alone. Every other shape is refused.
+    {
+      const prefixed = { ...cfg, prefix: 'pbp-it-x' };
+      const all = query => ({ url: live.PINBOARD_ROOT + 'posts/all?' + query, method: 'GET' });
+      const tag = name => 'tag=' + encodeURIComponent(name) + '&meta=no&format=json&auth_token=a%3A1';
+      const allowed = [tag('pbp-it-x_c&quot;x'), tag('pbp-it-x_c"x'), tag('PBP-IT-X_Upper'), tag('pbp-it-x')];
+      const refused = [
+        ['', 'live_guard_pinboard_endpoint'], ['format=json&auth_token=a%3A1', 'live_guard_pinboard_endpoint'], ['toread=yes&format=json', 'live_guard_pinboard_endpoint'],
+        [tag('mine&quot;tag'), 'live_guard_pinboard_endpoint'], [tag('other_pbp-it-x'), 'live_guard_pinboard_endpoint'], [tag(''), 'live_guard_pinboard_endpoint'],
+        [tag('pbp-it-x_a pbp-it-x_b'), 'live_guard_pinboard_endpoint'], [tag('pbp-it-x_a') + '&fromdt=2020-01-01', 'live_guard_pinboard_endpoint'],
+        [tag('pbp-it-x_a') + '&tag=' + encodeURIComponent('mine&quot;tag'), 'live_guard_pinboard_params'],
+      ];
+      for (const rule of [live.liveGuardRule, transported]) {
+        for (const query of allowed) { const d = rule(prefixed, view, all(query)); assert.equal(d.ok, true, query); assert.equal(d.kind, 'read', query); }
+        for (const [query, code] of refused) { const d = rule(prefixed, view, all(query)); assert.equal(d.ok, false, query); assert.equal(d.code, code, query); }
+        assert.equal(rule(cfg, view, all(allowed[0])).code, 'live_guard_pinboard_endpoint', 'no run prefix, no posts/all');
+        assert.equal(rule(prefixed, view, { ...all(allowed[0]), method: 'POST' }).code, 'live_guard_mutation');
+        assert.equal(rule({ ...prefixed, writes: false }, view, all(allowed[0])).ok, true, 'a read stays a read in a read-only module');
+      }
+    }
+    for (const endpoint of live.PINBOARD_ENDPOINTS.extension) assert(endpoint === 'posts/all' || cases.some(([req, ok]) => ok && live.pinboardEndpoint(req.url) === endpoint), endpoint + ' allowed');
     for (const endpoint of live.PINBOARD_REFUSED_EXAMPLES.filter(e => !e.startsWith('https:'))) assert(cases.some(([req, ok]) => !ok && live.pinboardEndpoint(req.url) === endpoint), endpoint + ' refused');
     assert.equal(live.pinboardEndpoint('https://api.pinboard.in/v1/user/api_token/?x=1'), 'user/api_token');
     assert.equal(live.pinboardEndpoint('https://api.pinboard.in.evil.test/v1/posts/get'), '');
@@ -4283,6 +4305,106 @@ try {
       assert.deepEqual(wmod.notes.duplicateResultCode, { code: 'duplicate URL', status: 200, recognizedAs: 'api' });
       assert.equal(worded.report.cleanup.complete, true);
       assert.equal(other.posts.size, 0);
+    }
+    // Pinboard tag governance, entity repair: the module end to end on the
+    // mock (popup creates a literal-entity tag, tags/get lists it after a
+    // lag, the options Scan finds it, Repair re-saves only the run bookmark),
+    // the branch where tags/get never lists it, and the branch where
+    // posts/all?tag=<stored literal> matches nothing. A user's own entity tag
+    // in the account (on a URL outside the pool) is listed by Scan and must
+    // never be written. The mock's behaviour is hand-written from the live
+    // facts of 2026-11-04 (tests/bookmark-live-pinboard-mock.mjs).
+    if (only('pinboard mock entity repair')) {
+      const MINE_URL = 'https://mine.example.org/own-entity-bookmark';
+      const entityRun = async (name, { lag, rewrite } = {}) => {
+        const mock = createPinboardMock({ token, entityTagLagMs: lag });
+        mock.seed({ url: MINE_URL, description: 'user bookmark', extended: 'user note', tags: 'mine&quot;tag', shared: 'yes' });
+        const transport = rewrite ? async url => (await rewrite(url, mock)) || mock.transport(url) : mock.transport;
+        const done = await inProcess(pbArgs(pbCredentials, 'pinboard.tag-gov.entity-repair', name), { transport });
+        const mod = done.report.modules.find(m => m.id === 'pinboard.tag-gov.entity-repair');
+        return { mock, done, mod, rep: done.report };
+      };
+      const callsTo = (mock, endpoint) => mock.calls.filter(c => c.path === endpoint);
+      const stageSum = (rep, name) => rep.stages.filter(st => st.name === name).reduce((n, st) => n + st.requests, 0);
+      const untouched = mock => {
+        const mine = mock.posts.get(MINE_URL);
+        assert.deepEqual([mine.tags, mine.description, mine.extended, mine.shared], ['mine&quot;tag', 'user bookmark', 'user note', 'yes'], 'the user\'s own entity-tag bookmark is never written');
+        assert.equal(callsTo(mock, 'posts/add').some(c => c.url === MINE_URL), false);
+        assert.equal(callsTo(mock, 'posts/delete').some(c => c.url === MINE_URL), false);
+        assert.equal(mock.posts.size, 1, 'only the user\'s bookmark is left in the account');
+      };
+
+      // Repair path: listed after a lag (about one poll at the mock's gate).
+      {
+        const { mock, done, mod, rep } = await entityRun('pb-entity', { lag: 300 });
+        assert.equal(done.code, 0, done.output);
+        assert.equal(mod.status, 'passed', done.output);
+        assert.equal(mod.notes.tagsGetListsCorrupted, true);
+        assert(mod.notes.tagsGetPolls >= 1 && mod.notes.tagsGetPolls <= 3);
+        assert.equal(mod.notes.storedTagsRead, 'literal-entity');
+        assert.equal(mod.notes.scanRows, 2, 'the scan lists ours and the user\'s own row');
+        assert.equal(mod.notes.repairRowOutcome, 'success');
+        assert.equal(mod.notes.postsAllMatchedLiteral, true);
+        assert.equal(mod.notes.repairStoredClean, true);
+        assert.equal(mod.notes.postsAllRequests, 1);
+        untouched(mock);
+        assert.equal(rep.cleanup.complete, true);
+        assert.equal(callsTo(mock, 'posts/all').length, 1);
+        assert.equal(rep.ledger.created.length, 1);
+        assert(rep.ledger.created.every(e => e.deleted), 'cleanup deletes by ledger');
+        const adds = callsTo(mock, 'posts/add');
+        assert.equal(adds.length, 2, 'create + repair');
+        assert(adds.every(c => c.url === rep.ledger.created[0].url));
+        // Budget: the module's own requests fit its declared calls and caps.
+        const row = MODULES.find(m => m.id === 'tag-gov.entity-repair');
+        const budget = live.resolveBudget({ ...row, service: 'pinboard' });
+        const moduleCalls = mock.calls.length - ['preflight', 'cleanup', 'connect', 'setup'].reduce((n, name) => n + stageSum(rep, name), 0);
+        assert(moduleCalls <= budget.calls, 'module calls ' + moduleCalls + ' > ' + budget.calls);
+        assert(mod.counts.node <= budget.node && mod.counts.browser <= budget.browser, JSON.stringify(mod.counts));
+        for (let i = 1; i < mock.calls.length; i++) assert(mock.calls[i].at - mock.calls[i - 1].at >= INTERVAL - 2, 'gap ' + i);
+        for (const s of secretsOf) assert(!readFileSync(done.reportPath, 'utf8').includes(s));
+      }
+      // tags/get never lists the corrupted tag: the module ends cleanly with its finding.
+      {
+        const { mock, done, mod, rep } = await entityRun('pb-entity-never', { lag: Infinity });
+        assert.equal(done.code, 0, done.output);
+        assert.equal(mod.status, 'passed', done.output);
+        assert.equal(mod.notes.tagsGetListsCorrupted, false);
+        assert.equal(mod.notes.tagsGetPolls, 3);
+        assert(mod.notes.tagsGetUnlistedForSec > 0);
+        assert.equal(mod.notes.repairRowOutcome, undefined, 'no repair attempted');
+        assert.equal(callsTo(mock, 'posts/all').length, 0);
+        assert.equal(callsTo(mock, 'posts/add').length, 1, 'only the create');
+        untouched(mock);
+        assert.equal(rep.cleanup.complete, true);
+      }
+      // posts/all?tag=<stored literal> matches nothing: reported, nothing written, the tag stays as created.
+      {
+        const { mock, done, mod, rep } = await entityRun('pb-entity-nomatch', { lag: 0, rewrite: async url => (live.pinboardEndpoint(url) === 'posts/all' ? { status: 200, contentType: 'application/json; charset=utf-8', body: '[]' } : null) });
+        assert.equal(done.code, 0, done.output);
+        assert.equal(mod.status, 'passed', done.output);
+        assert.equal(mod.notes.repairRowOutcome, 'tagGovEntityNoMatch');
+        assert.equal(mod.notes.postsAllMatchedLiteral, false);
+        assert.equal(mod.notes.repairStoredClean, false);
+        assert.equal(callsTo(mock, 'posts/add').length, 1, 'only the create');
+        untouched(mock);
+        assert.equal(rep.cleanup.complete, true);
+      }
+      // A repair that says done but stores nothing clean fails the module.
+      {
+        const { mock, done, mod } = await entityRun('pb-entity-lie', { lag: 0, rewrite: async (url, m) => {
+          if (live.pinboardEndpoint(url) !== 'posts/add') return null;
+          const u = new URL(url);
+          // Swallow the repair's save: answer done, store nothing.
+          if (m.posts.get(u.searchParams.get('url')) && u.searchParams.get('replace') === 'yes' && u.searchParams.get('tags').includes('"')) return { status: 200, contentType: 'application/json; charset=utf-8', body: JSON.stringify({ result_code: 'done' }) };
+          return null;
+        } });
+        assert.notEqual(done.code, 0);
+        assert.equal(mod.status, 'failed');
+        assert.equal(mod.failure.code, 'entity_repair_stored_clean');
+        assert.equal(mod.notes.repairStoredClean, false);
+        untouched(mock);
+      }
     }
     // The review's counterexample: a row that opens the popup but leaves it
     // out of `surfaces` (so --changed would never pick it for popup.js)
