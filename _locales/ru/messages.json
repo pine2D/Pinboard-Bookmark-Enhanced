@@ -700,7 +700,7 @@
     }
   },
   "offlineQueueNeedsAttention": {
-    "message": "Требуют внимания: $COUNT$",
+    "message": "Требуется внимание: $COUNT$",
     "description": "Popup offline queue bar: how many queued bookmarks of the current connection failed for a reason a retry cannot change, so automatic retry stopped for them. $COUNT$ is the number.",
     "placeholders": {
       "count": {
@@ -709,7 +709,7 @@
     }
   },
   "offlineQueueNeedsAttentionOne": {
-    "message": "Требуют внимания: $COUNT$",
+    "message": "Требуется внимание: $COUNT$",
     "description": "Popup offline queue bar: singular form of the needs-attention count, used when exactly one queued bookmark needs attention. $COUNT$ is the number.",
     "placeholders": {
       "count": {

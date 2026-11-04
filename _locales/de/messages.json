@@ -722,7 +722,7 @@
     "description": "Popup offline queue row of a bookmark that needs attention, shown on its own line under the failure message: automatic retry stopped, and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons."
   },
   "pinboardErrRejected": {
-    "message": "Pinboard hat die Anfrage abgelehnt (HTTP $STATUS$). Das Lesezeichen prüfen.",
+    "message": "Pinboard hat die Anfrage abgelehnt (HTTP $STATUS$). Prüfe das Lesezeichen.",
     "description": "Pinboard rejected a save with an HTTP 4xx the extension has no more specific copy for (shown on a queued bookmark that needs attention, and after its Retry). Not retryable. $STATUS$ is the HTTP status code.",
     "placeholders": {
       "status": {
@@ -5296,7 +5296,7 @@
   "bookmarkErrUrlInvalid": { "message": "linkding nimmt diese Adresse nicht an. Sie darf höchstens 2048 Zeichen lang sein, und der Host braucht eine Domainendung wie .com, außer bei localhost oder einer IP-Adresse." },
   "bookmarkErrReadLaterList": { "message": "In Karakeep gibt es mehrere „Später lesen“-Listen, die von dieser Erweiterung angelegt wurden. Das Lesezeichen wurde gespeichert, aber ohne Später-lesen-Status. Lösche die überzähligen Listen, sodass nur eine übrig bleibt, und versuche es dann erneut." },
   "bookmarkErrRemote": {
-    "message": "Der Lesezeichenserver hat die Anfrage abgelehnt (HTTP $STATUS$). Das Lesezeichen und die Servereinstellungen prüfen.",
+    "message": "Der Lesezeichenserver hat die Anfrage abgelehnt (HTTP $STATUS$). Prüfe das Lesezeichen und die Servereinstellungen.",
     "placeholders": {
       "status": {
         "content": "$1"
