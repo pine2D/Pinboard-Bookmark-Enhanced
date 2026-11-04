@@ -2895,7 +2895,7 @@
     "message": "标签中残留的实体编码"
   },
   "tagGovEntityHint": {
-    "message": "旧版本可能把 q\"uote 这样的标签存成 q&quot;uote。扫描会列出含 &quot;、&amp; 等字面编码的标签，并给出每个标签修复后的名称。你确认之前不会改动任何内容。"
+    "message": "修复会重新保存带有所选标签的每条书签，把标签换成修复后的名称，不可撤销。确认之前不会改动任何内容。"
   },
   "tagGovEntityScan": {
     "message": "扫描标签"

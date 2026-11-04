@@ -2895,7 +2895,7 @@
     "message": "Übrig gebliebene Entity-Codes in Tags"
   },
   "tagGovEntityHint": {
-    "message": "Ältere Versionen konnten einen Tag wie q\"uote als q&quot;uote speichern. Der Scan listet Tags mit wörtlichen Codes wie &quot; oder &amp; und zeigt für jeden den reparierten Namen. Ohne deine Bestätigung ändert sich nichts."
+    "message": "Beim Reparieren wird jedes Lesezeichen mit einem ausgewählten Tag neu gespeichert und der Tag durch den reparierten Namen ersetzt. Das lässt sich nicht rückgängig machen; vor deiner Bestätigung ändert sich nichts."
   },
   "tagGovEntityScan": {
     "message": "Tags scannen"

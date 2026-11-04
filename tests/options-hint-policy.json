@@ -16,7 +16,7 @@
       "bookmarkLinkdingSharingHint"
     ],
     "consequence": [
-      "connectionOverviewHint", "dictAnkiFormatHint", "multiPackLicenseHint", "tagGovIrreversibleWarn", "tagGovBundlesWarn",
+      "connectionOverviewHint", "dictAnkiFormatHint", "multiPackLicenseHint", "tagGovIrreversibleWarn", "tagGovBundlesWarn", "tagGovEntityHint",
       "vocabDriveScope", "backupPreviewSemantics", "waybackSelfHostedPrivateHint"
     ],
     "status": [
@@ -24,7 +24,7 @@
       "aiCustomFieldInvalid", "aiProtocolUnknown", "aiCustomBaseUrlInvalid", "aiCustomKeyRebind", "aiCustomKeyPending",
       "backupIncludeSecretsHint",
       "#preview-ai-model-provider", "#multi-pack-name", "#tag-gov-overview", "#tag-gov-ai-status",
-      "#tag-gov-selected-count", "#opt-theme-overridden", "optCheckBookmarkStatusLinkding"
+      "#tag-gov-selected-count", "#tag-gov-entity-status", "#opt-theme-overridden", "optCheckBookmarkStatusLinkding"
     ],
     "help": [
       "aiCacheHint", "aiContentSourceJinaHint", "aiContentSourceLocalHint", "archiveLogNote",

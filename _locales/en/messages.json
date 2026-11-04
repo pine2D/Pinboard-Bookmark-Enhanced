@@ -2908,7 +2908,7 @@
     "message": "Leftover Entity Codes in Tags"
   },
   "tagGovEntityHint": {
-    "message": "Older versions could save a tag such as q\"uote as q&quot;uote. Scan lists tags that contain literal codes like &quot; or &amp; and shows the repaired name for each. Nothing changes until you confirm."
+    "message": "Repairing re-saves every bookmark that carries a selected tag and puts the repaired name in its place. This cannot be undone; nothing changes until you confirm."
   },
   "tagGovEntityScan": {
     "message": "Scan tags"

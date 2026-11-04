@@ -2895,7 +2895,7 @@
     "message": "Codes d'entité résiduels dans les étiquettes"
   },
   "tagGovEntityHint": {
-    "message": "D'anciennes versions pouvaient enregistrer une étiquette comme q\"uote sous la forme q&quot;uote. L'analyse liste les étiquettes contenant tels quels des codes comme &quot; ou &amp; et affiche le nom corrigé de chacune. Rien ne change tant que vous n'avez pas confirmé."
+    "message": "La réparation réenregistre chaque favori portant une étiquette sélectionnée et remplace celle-ci par son nom corrigé. C'est irréversible ; rien ne change avant votre confirmation."
   },
   "tagGovEntityScan": {
     "message": "Analyser les étiquettes"

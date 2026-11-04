@@ -2895,7 +2895,7 @@
     "message": "Pozostałe kody encji w tagach"
   },
   "tagGovEntityHint": {
-    "message": "Starsze wersje mogły zapisać tag taki jak q\"uote jako q&quot;uote. Skanowanie wyświetla tagi zawierające dosłowne kody, np. &quot; lub &amp;, i pokazuje poprawioną nazwę każdego z nich. Nic się nie zmieni bez Twojego potwierdzenia."
+    "message": "Naprawa ponownie zapisuje każdą zakładkę z zaznaczonym tagiem i zastępuje tag poprawioną nazwą. Tej operacji nie można cofnąć; dopóki nie potwierdzisz, nic się nie zmieni."
   },
   "tagGovEntityScan": {
     "message": "Skanuj tagi"

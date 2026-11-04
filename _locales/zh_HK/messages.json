@@ -2895,7 +2895,7 @@
     "message": "標籤中殘留的實體編碼"
   },
   "tagGovEntityHint": {
-    "message": "舊版本可能把 q\"uote 這樣的標籤存成 q&quot;uote。掃描會列出含 &quot;、&amp; 等字面編碼的標籤，並顯示每個標籤修復後的名稱。你確認之前不會更改任何內容。"
+    "message": "修復會重新儲存帶有所選標籤的每條書籤，把標籤換成修復後的名稱，無法復原。確認之前不會改動任何內容。"
   },
   "tagGovEntityScan": {
     "message": "掃描標籤"
