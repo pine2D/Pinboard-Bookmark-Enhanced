@@ -953,6 +953,9 @@ html[data-section="login"] .quick-actions { display: none !important; }
 }
 
 .notes-bar { display: flex; justify-content: space-between; align-items: center; margin-top: var(--pp-sp-1); }
+/* linkding: the AI summary controls follow the Description they write into (pbpPopupPlaceSummaryControls); no char count shares this bar. */
+#linkding-summary-bar { justify-content: flex-end; gap: var(--pp-sp-4); }
+#linkding-summary-bar[hidden] { display: none; }
 #desc-char-count { font-size: 11px; color: var(--pp-fg-hint); white-space: nowrap; }
 /* Full title errors share this bar with AI summary; long locales must wrap. */
 #desc-char-count[data-title-limit="true"] { white-space: normal; }

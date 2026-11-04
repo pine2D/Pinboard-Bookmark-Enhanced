@@ -163,6 +163,31 @@ function pbpPopupBookmarkPrivacy() {
   $id("share-check").checked = false;
   _linkdingSharedExplicit = false;
 }
+// linkding writes the AI summary into the Description, so its button, hint and
+// the regenerate/remove group showSummaryActions hangs off the button's parent
+// sit under that field instead of under Notes. Pinboard and Karakeep keep them
+// in the Notes bar. Moving the nodes (never cloning) keeps ids, listeners and
+// the shortcut wiring intact.
+function pbpPopupPlaceSummaryControls(linkding) {
+  const btn = $id("ai-summary-btn");
+  const notesBar = $id("desc-char-count")?.parentElement;
+  const field = $id("linkding-description-row")?.querySelector(".field");
+  if (!btn || !notesBar || !field) return;
+  let target = notesBar;
+  if (linkding) {
+    target = $id("linkding-summary-bar");
+    if (!target) {
+      target = document.createElement("div");
+      target.id = "linkding-summary-bar";
+      target.className = "notes-bar";
+      field.appendChild(target);
+    }
+  }
+  const from = btn.parentElement;
+  if (from === target) return;
+  for (const node of [$id("ai-summary-hint"), btn, from.querySelector(".cache-hint-wrap")]) if (node) target.appendChild(node);
+  $id("linkding-summary-bar")?.toggleAttribute("hidden", !linkding);
+}
 function pbpPopupPrefillDescription() {
   const linkding = pbpBookmarkServiceId(settings) === "linkding";
   // The label column follows the row (popup-theme-early.js keeps the mirror).
@@ -170,6 +195,7 @@ function pbpPopupPrefillDescription() {
   const row = $id("linkding-description-row");
   row.hidden = !linkding;
   row.classList.toggle("hidden", !linkding);
+  if (typeof pbpPopupPlaceSummaryControls === "function") pbpPopupPlaceSummaryControls(linkding);
   if (linkding && shouldUpdateField("linkding-description-input")) pbpPopupFillPageDescription();
   let notes = "";
   if (pageInfo.selectedText) {

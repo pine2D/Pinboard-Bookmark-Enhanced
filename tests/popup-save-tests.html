@@ -6887,6 +6887,32 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(at >= 0, "popup.js does not mark the refused tag");
       assert(source.lastIndexOf('result.reason === "partial" || result.reason === "tag_too_long"', at) > at - 900, "the mark is outside the partial/tag_too_long branch");
     });
+    test("linkding moves the AI summary controls under Description and other services keep them under Notes", () => {
+      const from = source.indexOf("function pbpPopupPlaceSummaryControls(");
+      assert(from >= 0, "pbpPopupPlaceSummaryControls missing");
+      assert(source.includes("pbpPopupPlaceSummaryControls(linkding);"), "prefill does not place the controls");
+      const body = source.slice(from, source.indexOf("\n}\n", from) + 3);
+      const host = document.createElement("div");
+      host.innerHTML = '<div id="linkding-description-row"><div class="field"><textarea></textarea></div></div>'
+        + '<div class="field"><div class="notes-bar"><span id="desc-char-count"></span><span id="ai-summary-hint"></span>'
+        + '<button id="ai-summary-btn"></button></div></div>';
+      document.body.appendChild(host);
+      try {
+        const q = (id) => host.querySelector("#" + id);
+        const place = new Function("$id", "document", `${body}\nreturn pbpPopupPlaceSummaryControls;`)((id) => host.querySelector("#" + id), document);
+        const group = document.createElement("span");
+        group.className = "cache-hint-wrap";
+        q("ai-summary-btn").parentElement.appendChild(group);
+        place(true);
+        const bar = q("linkding-summary-bar");
+        assert(bar && q("linkding-description-row").contains(bar), "no summary bar under the Description");
+        assert(bar.contains(q("ai-summary-btn")) && bar.contains(q("ai-summary-hint")) && bar.contains(group), "button, hint and action group did not move together");
+        assert(!bar.hidden, "the linkding bar is hidden");
+        place(false);
+        const notesBar = q("desc-char-count").parentElement;
+        assert(notesBar.contains(q("ai-summary-btn")) && notesBar.contains(group) && bar.hidden, "controls did not return to Notes");
+      } finally { host.remove(); }
+    });
   } catch (error) {
     test("popup submit source contracts load", () => { throw error; }, { always: true });
   }
