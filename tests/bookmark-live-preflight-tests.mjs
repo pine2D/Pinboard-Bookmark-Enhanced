@@ -3876,6 +3876,15 @@ try {
       await Promise.all([1, 2, 3].map(n => gate.run(async () => { order.push([n, clock]); clock += 50; return { status: 200 }; })));
       assert.deepEqual(order.map(o => o[0]), [1, 2, 3]);
       assert(order[1][1] - order[0][1] >= 3050 && order[2][1] - order[1][1] >= 3050, 'serialised with the interval');
+      // A wait that ends early by the gate's own clock (a Node timer on the
+      // loop's cached time) is topped up, never taken as the full interval.
+      {
+        let early = 0;
+        const eStarts = [];
+        const eGate = live.createPinboardGate({ intervalMs: 3000, now: () => early, wait: async ms => { early += Math.max(1, ms - 3); } });
+        for (let i = 0; i < 3; i++) await eGate.run(() => { eStarts.push(early); early += 10; return { status: 200 }; });
+        assert(eStarts.slice(1).every((s, i) => s - (eStarts[i] + 10) >= 3000), 'early timer taken as the interval: ' + eStarts.join(','));
+      }
       // A thrown request still frees the queue and counts as an answer.
       await assert.rejects(gate.run(async () => { throw new Error('net'); }));
       assert.equal((await gate.run(async () => ({ status: 200 }))).status, 200);

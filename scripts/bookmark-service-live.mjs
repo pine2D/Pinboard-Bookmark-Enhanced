@@ -938,8 +938,12 @@ export function createPinboardGate({ intervalMs = PINBOARD_MIN_INTERVAL_MS, maxB
       depth++;
       stats.maxQueueDepth = Math.max(stats.maxQueueDepth, depth);
       const turn = tail.then(async () => {
-        const delay = lastEnd + interval - now();
-        if (delay > 0) { stats.waitedMs += delay; onWait(delay); await wait(delay); }
+        // Checked again after each wait: a Node timer runs on the event loop's
+        // cached clock and can fire a few ms before now() says the interval is
+        // over (the preflight's gap check failed 1 run in 6 that way).
+        for (let delay = lastEnd + interval - now(); delay > 0; delay = lastEnd + interval - now()) {
+          stats.waitedMs += delay; onWait(delay); await wait(delay);
+        }
         const queuedMs = now() - enqueued;
         stats.maxQueueMs = Math.max(stats.maxQueueMs, queuedMs);
         if (queuedMs > warnMs) { stats.slowQueued++; onSlow({ queuedMs, depth }); }
