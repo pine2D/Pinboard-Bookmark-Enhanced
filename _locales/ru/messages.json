@@ -1560,7 +1560,7 @@
     "message": "Метки (через запятую)"
   },
   "batchTagsHint": {
-    "message": "Разделяйте метки запятыми. Пробелы внутри новой метки заменяются разделителем составных меток. Например: batch_saved, research"
+    "message": "Разделяйте метки запятыми. Пробелы внутри новой метки заменяются разделителем составных меток (настраивается на вкладке «Поведение AI»). Например: batch_saved, research"
   },
   "batchAiTags": {
     "message": "Автоматически генерировать AI-метки для каждой вкладки"
@@ -4598,6 +4598,9 @@
   "connectionOverviewHint": { "message": "Состояние определяется настройками, выданными разрешениями и последними ручными проверками. При открытии настроек расширение не обращается к сервисам и не запрашивает разрешения." },
   "connectionNeverTested": { "message": "Ещё не проверялось" },
   "connectionConnected": { "message": "Подключено" },
+  "connectionPreviousStillActive": {
+    "message": "Не удалось подключиться; продолжает работать прежнее подключение"
+  },
   "connectionNotConnected": { "message": "Не подключено" },
   "connectionNotConfigured": { "message": "Не настроено" },
   "connectionPermissionMissing": { "message": "Разрешение не выдано" },
@@ -5054,6 +5057,12 @@
   "bookmarkServerUrl": {
     "message": "Адрес сервера"
   },
+  "bookmarkKarakeepConnection": {
+    "message": "Подключение к Karakeep"
+  },
+  "bookmarkLinkdingConnection": {
+    "message": "Подключение к linkding"
+  },
   "bookmarkServerHint": {
     "message": "Укажите адрес сайта, включая вложенный путь. Требуется HTTPS, кроме localhost."
   },
@@ -5182,6 +5191,14 @@
   },
   "bookmarkConnected": {
     "message": "Подключено"
+  },
+  "bookmarkConnectedHost": {
+    "message": "Подключено к $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkConnectFailed": {
     "message": "Не удалось подключиться. Проверьте адрес сервера, токен и разрешение доступа к сайту."

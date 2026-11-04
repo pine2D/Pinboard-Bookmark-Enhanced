@@ -1560,7 +1560,7 @@
     "message": "Tags (kommagetrennt)"
   },
   "batchTagsHint": {
-    "message": "Trenne mehrere Tags durch Kommas. Leerzeichen innerhalb eines neuen Tags werden durch das Trennzeichen für mehrteilige Tags ersetzt. Beispiel: batch_saved, research"
+    "message": "Trenne mehrere Tags durch Kommas. Leerzeichen innerhalb eines neuen Tags werden durch das Trennzeichen für mehrteilige Tags ersetzt (einstellbar unter KI-Verhalten). Beispiel: batch_saved, research"
   },
   "batchAiTags": {
     "message": "KI-Tags für jeden Tab automatisch generieren"
@@ -4598,6 +4598,9 @@
   "connectionOverviewHint": { "message": "Der Status beruht auf Konfiguration, erteilten Berechtigungen und den letzten manuellen Tests. Beim Öffnen der Einstellungen werden weder Dienste kontaktiert noch Berechtigungen angefordert." },
   "connectionNeverTested": { "message": "Noch nicht getestet" },
   "connectionConnected": { "message": "Verbunden" },
+  "connectionPreviousStillActive": {
+    "message": "Letzter Verbindungsversuch fehlgeschlagen; die bisherige Verbindung bleibt aktiv"
+  },
   "connectionNotConnected": { "message": "Nicht verbunden" },
   "connectionNotConfigured": { "message": "Nicht eingerichtet" },
   "connectionPermissionMissing": { "message": "Berechtigung nicht erteilt" },
@@ -5054,6 +5057,12 @@
   "bookmarkServerUrl": {
     "message": "Server-URL"
   },
+  "bookmarkKarakeepConnection": {
+    "message": "Karakeep-Verbindung"
+  },
+  "bookmarkLinkdingConnection": {
+    "message": "linkding-Verbindung"
+  },
   "bookmarkServerHint": {
     "message": "Die Website-URL einschließlich Unterpfad angeben. Außer für localhost ist HTTPS erforderlich."
   },
@@ -5182,6 +5191,14 @@
   },
   "bookmarkConnected": {
     "message": "Verbunden"
+  },
+  "bookmarkConnectedHost": {
+    "message": "Verbunden mit $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkConnectFailed": {
     "message": "Verbindung fehlgeschlagen. Server-URL, Token und Website-Berechtigung prüfen."

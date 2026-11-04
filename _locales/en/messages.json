@@ -1569,7 +1569,7 @@
     "message": "Tags (comma-separated)"
   },
   "batchTagsHint": {
-    "message": "Separate tags with commas. Spaces within a new tag become the multi-word tag separator. E.g. batch_saved, research"
+    "message": "Separate tags with commas. Spaces within a new tag become the multi-word tag separator (set under AI Behavior). E.g. batch_saved, research"
   },
   "batchAiTags": {
     "message": "Auto-generate AI tags for each tab"
@@ -4608,6 +4608,9 @@
   "connectionOverviewHint": { "message": "Status is based on configuration, granted permissions, and your latest manual tests. Opening Settings never contacts these services or requests permission." },
   "connectionNeverTested": { "message": "Not tested yet" },
   "connectionConnected": { "message": "Connected" },
+  "connectionPreviousStillActive": {
+    "message": "Last Connect failed; the previous connection is still in use"
+  },
   "connectionNotConnected": { "message": "Not connected" },
   "connectionNotConfigured": { "message": "Not configured" },
   "connectionPermissionMissing": { "message": "Permission not granted" },
@@ -5065,6 +5068,12 @@
   "bookmarkServerUrl": {
     "message": "Server URL"
   },
+  "bookmarkKarakeepConnection": {
+    "message": "Karakeep connection"
+  },
+  "bookmarkLinkdingConnection": {
+    "message": "linkding connection"
+  },
   "bookmarkServerHint": {
     "message": "Use the site URL, including any subpath. HTTPS is required except on localhost."
   },
@@ -5193,6 +5202,14 @@
   },
   "bookmarkConnected": {
     "message": "Connected"
+  },
+  "bookmarkConnectedHost": {
+    "message": "Connected to $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkConnectFailed": {
     "message": "Connection failed. Check the server URL, token and site permission."

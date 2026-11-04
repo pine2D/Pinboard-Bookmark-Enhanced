@@ -1560,7 +1560,7 @@
     "message": "標籤（逗號分隔）"
   },
   "batchTagsHint": {
-    "message": "多個標籤請用逗號分隔。新標籤內的空格會換成「多詞標籤分隔符」。例如 batch_saved, research"
+    "message": "多個標籤請用逗號分隔。新標籤內的空格會換成「多詞標籤分隔符」（在「AI 行為」中設定）。例如 batch_saved, research"
   },
   "batchAiTags": {
     "message": "為每個分頁自動產生 AI 標籤"
@@ -1757,7 +1757,7 @@
     "message": "多詞標籤分隔符"
   },
   "tagSeparatorHint": {
-    "message": "AI 產生的標籤和新建立的多詞標籤會用這個字元連接；現有標籤維持原本寫法。"
+    "message": "AI 產生的標籤和新建立的多詞標籤會用這個字元連接各個詞；現有標籤維持原本寫法。"
   },
   "sepHyphen": {
     "message": "連字符（machine-learning）"
@@ -4598,6 +4598,9 @@
   "connectionOverviewHint": { "message": "狀態來自目前設定、已授予權限與最近一次手動測試。開啟設定不會連線至這些服務，也不會要求權限。" },
   "connectionNeverTested": { "message": "尚未測試" },
   "connectionConnected": { "message": "已連線" },
+  "connectionPreviousStillActive": {
+    "message": "最近一次連線失敗，仍在使用先前的連線"
+  },
   "connectionNotConnected": { "message": "未連線" },
   "connectionNotConfigured": { "message": "未設定" },
   "connectionPermissionMissing": { "message": "尚未授權" },
@@ -5054,6 +5057,12 @@
   "bookmarkServerUrl": {
     "message": "伺服器網址"
   },
+  "bookmarkKarakeepConnection": {
+    "message": "Karakeep 連線"
+  },
+  "bookmarkLinkdingConnection": {
+    "message": "linkding 連線"
+  },
   "bookmarkServerHint": {
     "message": "填入網站網址，包含部署子路徑。除了本機位址，都必須使用 HTTPS。"
   },
@@ -5182,6 +5191,14 @@
   },
   "bookmarkConnected": {
     "message": "已連線"
+  },
+  "bookmarkConnectedHost": {
+    "message": "已連線至 $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkConnectFailed": {
     "message": "連線失敗。請檢查伺服器網址、Token 與網站存取權限。"

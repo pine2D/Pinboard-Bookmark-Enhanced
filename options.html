@@ -113,6 +113,7 @@
         </div>
         <div id="bookmark-karakeep-fields" hidden>
           <div class="fg entry-block">
+            <div class="bl subhead" id="bookmark-karakeep-heading" data-i18n="bookmarkKarakeepConnection">Karakeep connection</div>
             <label class="bl" for="opt-karakeep-url" data-i18n="bookmarkServerUrl">Server URL</label>
             <input type="text" inputmode="url" id="opt-karakeep-url" placeholder="https://bookmarks.example.com/" autocomplete="off" spellcheck="false" />
             <p class="hint" data-i18n="bookmarkServerHint">Use the site URL, including any subpath. HTTPS is required except on localhost.</p>
@@ -189,6 +190,7 @@
         </div>
         <div id="bookmark-linkding-fields" hidden>
           <div class="fg entry-block">
+            <div class="bl subhead" id="bookmark-linkding-heading" data-i18n="bookmarkLinkdingConnection">linkding connection</div>
             <label class="bl" for="opt-linkding-url" data-i18n="bookmarkServerUrl">Server URL</label>
             <input type="text" inputmode="url" id="opt-linkding-url" placeholder="https://bookmarks.example.com/" autocomplete="off" spellcheck="false" />
             <p class="hint" data-i18n="bookmarkServerHint">Use the site URL, including any subpath. HTTPS is required except on localhost.</p>
@@ -255,7 +257,7 @@
               </div>
           </div>
           <div class="fg entry-block">
-            <p class="hint" data-i18n="bookmarkLinkdingSharingHint">After changing sharing in linkding, click Connect again to refresh the sharing option here.</p>
+            <p class="hint" id="linkding-sharing-hint" data-i18n="bookmarkLinkdingSharingHint" hidden>After changing sharing in linkding, click Connect again to refresh the sharing option here.</p>
             <p class="hint hint-warn" id="linkding-connect-pending" data-i18n="bookmarkConnectPending" role="status" aria-live="polite" hidden>Changes to the URL, token or gateway aren't applied yet. Click Connect to apply them.</p>
             <div class="fg-actions">
               <button type="button" class="btn btn-sm" id="connect-linkding" data-i18n="bookmarkConnect">Connect</button>

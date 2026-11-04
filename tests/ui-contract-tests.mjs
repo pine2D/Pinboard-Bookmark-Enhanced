@@ -10329,7 +10329,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
   const disconnect = start >= 0 && disStart > start && end > disStart ? optionsJs.slice(disStart, end) : "";
   check(handler.length > 0 && disconnect.length > 0, "options.js: the bookmark Connect or Disconnect handler moved; the status-state gate cannot find it");
   check(helperStart >= 0 && helperStart < start, "options.js: setConnectStatus must be defined before the Connect and Disconnect handlers that share it");
-  const helper = optionsJs.slice(helperStart, start).match(/const setConnectStatus = \(state, text\) => \{[\s\S]*?\n    \};/)?.[0] || "";
+  const helper = optionsJs.slice(helperStart, start).match(/const setConnectStatus = \(state, makeText\) => \{[\s\S]*?\n    \};/)?.[0] || "";
   check(/classList\.add\("pending"\)/.test(helper) && /setStatusIcon\(status, state === "ok"/.test(helper) && /classList\.remove\([^)]*"bad"/.test(helper),
     "options.js: setConnectStatus must set .pending, .ok or .bad (via setStatusIcon) and clear the stale ones");
   const outside = handler + "\n" + disconnect;
@@ -10347,7 +10347,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
   const states = [...outside.matchAll(/setConnectStatus\("(\w+)"/g)].map((m) => m[1]);
   check(states.length > 0 && states.every((state) => ["pending", "ok", "bad", "clear"].includes(state)),
     "options.js: setConnectStatus called with a state other than pending / ok / bad / clear");
-  check(/setConnectStatus\("bad", t\("bookmarkDisconnectFailed"\)\)/.test(disconnect) && /setConnectStatus\("ok", t\("bookmarkDisconnected"\)\)/.test(disconnect),
+  check(/setConnectStatus\("bad", \(\) => t\("bookmarkDisconnectFailed"\)\)/.test(disconnect) && /setConnectStatus\("ok", \(\) => t\("bookmarkDisconnected"\)\)/.test(disconnect),
     "options.js: the Disconnect handler must report through setConnectStatus: bookmarkDisconnected on success, bookmarkDisconnectFailed on a failed write");
   check(/radio\.addEventListener\("change", \(\) => scheduleConnectionOverview\(\)\)/.test(stripComments(optionsJs)),
     "options.js: choosing a bookmark service must refresh the connection overview and the AI nudge");

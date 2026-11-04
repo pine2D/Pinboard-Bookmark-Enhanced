@@ -1560,7 +1560,7 @@
     "message": "Tags (séparés par des virgules)"
   },
   "batchTagsHint": {
-    "message": "Séparez les tags par des virgules. Dans un nouveau tag, les espaces sont remplacés par le séparateur de tags multi-mots. Ex. : batch_saved, research"
+    "message": "Séparez les tags par des virgules. Dans un nouveau tag, les espaces sont remplacés par le séparateur de tags multi-mots (réglage dans Comportement IA). Ex. : batch_saved, research"
   },
   "batchAiTags": {
     "message": "Générer automatiquement des tags IA pour chaque onglet"
@@ -4598,6 +4598,9 @@
   "connectionOverviewHint": { "message": "L’état repose sur la configuration, les autorisations accordées et vos derniers tests manuels. Ouvrir les paramètres ne contacte aucun service et ne demande aucune autorisation." },
   "connectionNeverTested": { "message": "Pas encore testé" },
   "connectionConnected": { "message": "Connecté" },
+  "connectionPreviousStillActive": {
+    "message": "Dernière connexion échouée ; l’ancienne connexion reste active"
+  },
   "connectionNotConnected": { "message": "Non connecté" },
   "connectionNotConfigured": { "message": "Non configuré" },
   "connectionPermissionMissing": { "message": "Autorisation non accordée" },
@@ -5054,6 +5057,12 @@
   "bookmarkServerUrl": {
     "message": "URL du serveur"
   },
+  "bookmarkKarakeepConnection": {
+    "message": "Connexion à Karakeep"
+  },
+  "bookmarkLinkdingConnection": {
+    "message": "Connexion à linkding"
+  },
   "bookmarkServerHint": {
     "message": "Indiquez l’URL du site, avec son sous-chemin éventuel. HTTPS est obligatoire, sauf sur localhost."
   },
@@ -5182,6 +5191,14 @@
   },
   "bookmarkConnected": {
     "message": "Connecté"
+  },
+  "bookmarkConnectedHost": {
+    "message": "Connecté à $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkConnectFailed": {
     "message": "Échec de la connexion. Vérifiez l’URL du serveur, le jeton et l’autorisation d’accès au site."

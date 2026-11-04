@@ -1560,7 +1560,7 @@
     "message": "标签（逗号分隔）"
   },
   "batchTagsHint": {
-    "message": "多个标签用逗号分隔，新标签内的空格会换成「多词标签分隔符」。如 batch_saved, research"
+    "message": "多个标签用逗号分隔，新标签内的空格会换成「多词标签分隔符」（在「AI 行为」中设置）。如 batch_saved, research"
   },
   "batchAiTags": {
     "message": "为每个标签页自动生成 AI 标签"
@@ -1757,7 +1757,7 @@
     "message": "多词标签分隔符"
   },
   "tagSeparatorHint": {
-    "message": "AI 生成的标签和新建的多词标签用这个字符连接；已有标签保持原写法。"
+    "message": "AI 生成的标签和新建的多词标签用这个字符连接各个词；已有标签保持原写法。"
   },
   "sepHyphen": {
     "message": "连字符（machine-learning）"
@@ -4592,6 +4592,9 @@
   "connectionOverviewHint": { "message": "状态来自当前配置、已授予权限和最近一次手动测试。打开设置不会连接这些服务，也不会申请权限。" },
   "connectionNeverTested": { "message": "尚未测试" },
   "connectionConnected": { "message": "已连接" },
+  "connectionPreviousStillActive": {
+    "message": "最近一次连接失败，仍在使用之前的连接"
+  },
   "connectionNotConnected": { "message": "未连接" },
   "connectionNotConfigured": { "message": "未配置" },
   "connectionPermissionMissing": { "message": "尚未授权" },
@@ -5048,6 +5051,12 @@
   "bookmarkServerUrl": {
     "message": "服务器地址"
   },
+  "bookmarkKarakeepConnection": {
+    "message": "Karakeep 连接"
+  },
+  "bookmarkLinkdingConnection": {
+    "message": "linkding 连接"
+  },
   "bookmarkServerHint": {
     "message": "填写站点地址，包含部署子路径。除本机地址外，必须使用 HTTPS。"
   },
@@ -5176,6 +5185,14 @@
   },
   "bookmarkConnected": {
     "message": "已连接"
+  },
+  "bookmarkConnectedHost": {
+    "message": "已连接到 $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkConnectFailed": {
     "message": "连接失败。请检查服务器地址、Token 和站点访问权限。"

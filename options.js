@@ -251,6 +251,10 @@ function pbpSyncPinboardOnlyRows(service) {
     if (row) row.hidden = service !== "pinboard";
   }
 }
+// Services whose latest Connect failed. The saved connection (if any) is
+// untouched by that, so the overview says the previous one is still in use.
+// Cleared by a success, a Disconnect, or the form returning to what is saved.
+const pbpConnectFailed = new Set();
 async function renderConnectionOverview() {
   const host = $id("connection-health");
   if (!host || typeof pbpLiveAiSettingsSnapshot !== "function") return;
@@ -327,11 +331,13 @@ async function renderConnectionOverview() {
   const bookmarkSettings = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
   const bookmarkConnection = pbpBookmarkConnection({...bookmarkSettings,bookmarkService:selectedService});
   const selfHosted = selectedService !== "pinboard";
+  const connectFailedHere = selfHosted && pbpConnectFailed.has(selectedService);
   const items = [
     { id: selectedService, name: pbpBookmarkServiceLabel({bookmarkService:selectedService}), panel: "general",
       target: selfHosted ? "connect-" + selectedService : "test-pinboard-token",
       configured: selfHosted ? !!bookmarkConnection.account : pbpIsValidTokenFormat($id("opt-pinboard-token")?.value.trim() || "") === true,
       connected: selfHosted && !!bookmarkConnection.account,
+      previousKept: connectFailedHere && !!bookmarkConnection.account,
       permission: selfHosted ? await permissionFor(bookmarkConnection.baseUrl ? {origins:[pbpEndpointOriginPattern(bookmarkConnection.baseUrl)]} : null) : true },
     { id: `ai:${provider}`, name: $id("opt-ai-provider")?.selectedOptions?.[0]?.textContent?.trim() || provider,
       panel: "ai", target: `test-${pbpOptAiDomId(provider)}`, configured: aiConfigured, permission: aiPermission },
@@ -384,6 +390,11 @@ async function renderConnectionOverview() {
     } else if (item.permission === false) {
       stateKey = "connectionPermissionMissing";
       stateClass = "bad";
+    } else if (item.previousKept) {
+      // The latest Connect failed but the saved connection is untouched and
+      // still the one in use: "no problems" would hide the failure.
+      stateKey = "connectionPreviousStillActive";
+      stateClass = "warn";
     } else if (item.connected) {
       stateKey = "connectionConnected";
       stateClass = "ok";
@@ -3029,6 +3040,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     pending.hidden = (pbpBookmarkEndpoint(urlRaw) || urlRaw) === connectStored[service].url &&
       $id("opt-" + service + "-token").value.trim() === connectStored[service].token &&
       read.ok && JSON.stringify(read.gateway) === JSON.stringify(gatewayStored[service] || null);
+    if (pending.hidden && pbpConnectFailed.delete(service)) void renderConnectionOverview();
   }
   function pbpOptGatewayFill(service, connection) {
     const type = connection?.gatewayType === "cloudflare" || connection?.gatewayType === "custom" ? connection.gatewayType : "none";
@@ -3071,8 +3083,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     // The one writer of the Connect status line, shared by Connect and
     // Disconnect below. Every write sets a state class (pending / ok / bad); a
     // bare textContent would paint an error in the success colour.
+    // The text may be a function: the line is kept as (state, text maker) so a
+    // language change (pbp:i18n-applied) can say the same thing in the new language.
     const status = $id("connect-" + service + "-status");
-    const setConnectStatus = (state, text) => {
+    let lastConnectStatus = null;
+    const setConnectStatus = (state, makeText) => {
+      lastConnectStatus = state === "clear" ? null : { state, makeText };
+      const text = typeof makeText === "function" ? makeText() : makeText;
       if (state === "pending") {
         status.classList.remove("ok", "bad", "warn");
         status.classList.add("pending");
@@ -3085,6 +3102,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         setStatusIcon(status, state === "ok", text);
       }
     };
+    document.addEventListener("pbp:i18n-applied", () => {
+      if (lastConnectStatus) setConnectStatus(lastConnectStatus.state, lastConnectStatus.makeText);
+    });
     $id("connect-" + service).addEventListener("click", async () => {
       const baseUrl = pbpBookmarkEndpoint($id("opt-" + service + "-url").value);
       const token = $id("opt-" + service + "-token").value.trim();
@@ -3098,25 +3118,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         // credentials in the URL, ...) is a URL problem, not a missing field.
         const urlRaw = urlField.value.trim();
         const urlBad = !baseUrl;
-        setConnectStatus("bad", t(urlBad && urlRaw ? "bookmarkUrlInvalid" : "bookmarkInvalidConfig"));
+        setConnectStatus("bad", () => t(urlBad && urlRaw ? "bookmarkUrlInvalid" : "bookmarkInvalidConfig"));
         pbpOptMarkFieldInvalid?.(urlBad ? urlField : tokenField, statusId);
         return;
       }
       // Validated before any permission prompt or request.
       const gatewayRead = pbpOptGatewayRead(service);
       if (!gatewayRead.ok) {
-        setConnectStatus("bad", t(PBP_BOOKMARK_GATEWAY_ERROR_KEYS[gatewayRead.error] || "bookmarkInvalidConfig"));
+        setConnectStatus("bad", () => t(PBP_BOOKMARK_GATEWAY_ERROR_KEYS[gatewayRead.error] || "bookmarkInvalidConfig"));
         pbpOptMarkFieldInvalid?.(gatewayRead.field, statusId);
         return;
       }
       const gateway = gatewayRead.gateway;
       const gatewayJson = JSON.stringify(gateway);
       button.disabled = true;
-      setConnectStatus("pending", t("bookmarkConnecting"));
+      setConnectStatus("pending", () => t("bookmarkConnecting"));
       try {
         // Called directly in the click handler to preserve Chrome's user gesture.
         const granted = await chrome.permissions.request({origins:[pbpEndpointOriginPattern(baseUrl)]});
-        if (!granted) { setConnectStatus("bad", t("bookmarkPermissionDenied")); return; }
+        if (!granted) { setConnectStatus("bad", () => t("bookmarkPermissionDenied")); pbpConnectFailed.add(service); void renderConnectionOverview(); return; }
         const result = await chrome.runtime.sendMessage({type:"bookmark_connect",service,baseUrl,token,gateway});
         const gatewayNow = pbpOptGatewayRead(service);
         if (pbpBookmarkEndpoint($id("opt-" + service + "-url").value) !== baseUrl || $id("opt-" + service + "-token").value.trim() !== token ||
@@ -3127,9 +3147,15 @@ document.addEventListener("DOMContentLoaded", async () => {
           // The shared auth copy says "check the token in Settings", which points
           // at the page the user is already on; here the token field is just above.
           const authRejected = failureKey === "bookmarkErrAuth";
-          setConnectStatus("bad", authRejected ? t("bookmarkConnectErrAuth") : failureKey ? t(failureKey, ...pbpBookmarkFailureArgs(failure))
+          setConnectStatus("bad", () => authRejected ? t("bookmarkConnectErrAuth") : failureKey ? t(failureKey, ...pbpBookmarkFailureArgs(failure))
             : t(result?.error === "invalid_request" ? "bookmarkInvalidConfig" : "bookmarkConnectFailed"));
           if (authRejected) pbpOptMarkFieldInvalid?.(tokenField, statusId);
+          // The server answered with a web page (wrong port or path): the
+          // address is what to fix. gateway_redirect points at the gateway
+          // instead, so it leaves the address unmarked.
+          else if (result?.error === "not_api") pbpOptMarkFieldInvalid?.(urlField, statusId);
+          pbpConnectFailed.add(service);
+          void renderConnectionOverview();
           return;
         }
         const fresh = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
@@ -3146,25 +3172,44 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (service === "karakeep") Object.assign(patch, pbpKarakeepConnectBindingPatch(fresh,
           pbpBookmarkConnection({...fresh,bookmarkService:service}).account, "karakeep:" + baseUrl + ":" + result.identity.id, result.readLaterListId));
         const saved = await persistSettings(patch);
-        setConnectStatus(saved.ok ? "ok" : "bad", t(saved.ok ? "bookmarkConnected" : "bookmarkConnectFailed"));
-        if (saved.ok) { gatewayStored[service] = gateway; connectStored[service] = {url:baseUrl, token}; pbpOptGatewaySync(service); $id("disconnect-" + service).hidden = false; }
+        setConnectStatus(saved.ok ? "ok" : "bad", () => t(saved.ok ? "bookmarkConnected" : "bookmarkConnectFailed"));
+        if (saved.ok) {
+          pbpConnectFailed.delete(service);
+          gatewayStored[service] = gateway; connectStored[service] = {url:baseUrl, token}; pbpOptGatewaySync(service); $id("disconnect-" + service).hidden = false;
+          syncConnectionState().catch(error => console.warn("[bookmark-connect] state read failed:", error?.name, error?.message));
+        }
         void renderConnectionOverview();
       } catch (error) {
         console.warn("[bookmark-connect] failed:", error?.name, error?.message);
-        setConnectStatus("bad", t("bookmarkConnectFailed"));
+        setConnectStatus("bad", () => t("bookmarkConnectFailed"));
+        pbpConnectFailed.add(service);
+        void renderConnectionOverview();
       } finally { button.disabled = false; }
     });
     // Disconnect: the same credential removal as the popup's Log out. The
     // button shows only while the service holds a usable connection.
     const disconnectButton = $id("disconnect-" + service);
-    const syncDisconnectButton = async () => {
+    // What the stored connection looks like here: the Disconnect button, the
+    // linkding sharing hint (which only makes sense once connected) and, on
+    // load, the status line -- a reopened page would otherwise show nothing
+    // but the Disconnect button. Never requests a permission.
+    const syncConnectionState = async ({ initial = false } = {}) => {
       const fresh = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
-      disconnectButton.hidden = !pbpBookmarkConnection({...fresh, bookmarkService:service}).account;
+      const connection = pbpBookmarkConnection({...fresh, bookmarkService:service});
+      disconnectButton.hidden = !connection.account;
+      const ready = !!connection.account && await pbpBookmarkServiceReadyHere(fresh, service);
+      const sharingHint = $id("linkding-sharing-hint");
+      if (sharingHint && service === "linkding") sharingHint.hidden = !ready;
+      if (initial && ready && !lastConnectStatus) {
+        let host = "";
+        try { host = new URL(connection.baseUrl).host; } catch (_) { /* unreadable address: no status */ }
+        if (host) setConnectStatus("ok", () => t("bookmarkConnectedHost", host));
+      }
     };
-    syncDisconnectButton().catch(error => console.warn("[bookmark-connect] state read failed:", error?.name, error?.message));
+    syncConnectionState({ initial: true }).catch(error => console.warn("[bookmark-connect] state read failed:", error?.name, error?.message));
     chrome.storage.onChanged?.addListener((changes, area) => {
       if ((area === "sync" || area === "local") && (changes[service + "Token"] || changes.optSyncEnabled || changes.syncApiKeys)) {
-        syncDisconnectButton().catch(() => {});
+        syncConnectionState().catch(() => {});
       }
     });
     disconnectButton.addEventListener("click", () => {
@@ -3187,12 +3232,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (account) await chrome.runtime.sendMessage({type:"PBP_POPUP_DRAFT", action:"clearOwner", account});
           } catch (error) { console.warn("[bookmark-disconnect] draft clear failed:", error?.name, error?.message); }
           const result = await pbpBookmarkDisconnect(service);
-          if (!result.ok) { setConnectStatus("bad", t("bookmarkDisconnectFailed")); return; }
+          if (!result.ok) { setConnectStatus("bad", () => t("bookmarkDisconnectFailed")); return; }
+          pbpConnectFailed.delete(service);
           $id("opt-" + service + "-token").value = "";
           connectStored[service] = {url:connectStored[service].url, token:""};
           pbpOptGatewayFill(service, null);
           pbpOptConnectPendingSync(service);
-          setConnectStatus("ok", t("bookmarkDisconnected"));
+          setConnectStatus("ok", () => t("bookmarkDisconnected"));
           disconnectButton.hidden = true;
           void renderConnectionOverview();
         },
@@ -4799,6 +4845,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.warn("[connection-health] render failed:", e?.name, e?.message);
     }), 120);
   };
+  // The overview rows, its header count and the AI-unavailable hints are all
+  // built with t(); a language that arrives after first paint (synced from
+  // another device) would otherwise leave them in the old one.
+  document.addEventListener("pbp:i18n-applied", scheduleConnectionOverview);
   for (const id of ["opt-pinboard-token", "opt-ai-provider", "opt-gemini-key", "opt-openai-key",
     "opt-claude-key", "opt-deepseek-key", "opt-qwen-key", "opt-minimax-key", "opt-openrouter-key",
     "opt-groq-key", "opt-mistral-key", "opt-cohere-key", "opt-siliconflow-key", "opt-zhipu-key",

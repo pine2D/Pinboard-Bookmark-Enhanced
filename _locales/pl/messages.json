@@ -1560,7 +1560,7 @@
     "message": "Tagi (rozdzielone przecinkami)"
   },
   "batchTagsHint": {
-    "message": "Oddzielaj tagi przecinkami. Spacje wewnątrz nowego tagu są zastępowane separatorem tagów wielowyrazowych. Przykład: batch_saved, research"
+    "message": "Oddzielaj tagi przecinkami. Spacje wewnątrz nowego tagu są zastępowane separatorem tagów wielowyrazowych (ustawianym w sekcji Zachowanie AI). Przykład: batch_saved, research"
   },
   "batchAiTags": {
     "message": "Automatycznie generuj tagi AI dla każdej karty"
@@ -4598,6 +4598,9 @@
   "connectionOverviewHint": { "message": "Stan wynika z konfiguracji, przyznanych uprawnień i ostatnich testów ręcznych. Otwarcie ustawień nie łączy się z usługami ani nie prosi o uprawnienia." },
   "connectionNeverTested": { "message": "Jeszcze nie testowano" },
   "connectionConnected": { "message": "Połączono" },
+  "connectionPreviousStillActive": {
+    "message": "Ostatnie łączenie nie powiodło się; nadal działa poprzednie połączenie"
+  },
   "connectionNotConnected": { "message": "Brak połączenia" },
   "connectionNotConfigured": { "message": "Nie skonfigurowano" },
   "connectionPermissionMissing": { "message": "Nie przyznano uprawnienia" },
@@ -5054,6 +5057,12 @@
   "bookmarkServerUrl": {
     "message": "Adres serwera"
   },
+  "bookmarkKarakeepConnection": {
+    "message": "Połączenie z Karakeep"
+  },
+  "bookmarkLinkdingConnection": {
+    "message": "Połączenie z linkding"
+  },
   "bookmarkServerHint": {
     "message": "Podaj adres witryny wraz z podścieżką, jeśli jest używana. Poza localhost wymagany jest HTTPS."
   },
@@ -5182,6 +5191,14 @@
   },
   "bookmarkConnected": {
     "message": "Połączono"
+  },
+  "bookmarkConnectedHost": {
+    "message": "Połączono z $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkConnectFailed": {
     "message": "Nie udało się połączyć. Sprawdź adres serwera, token i uprawnienia dostępu do witryny."

@@ -45,6 +45,7 @@ const BLOCKS=[
   'linkding changed elsewhere since loaded',
   'Karakeep changed elsewhere since loaded',
   'changed elsewhere: tag merges, both-sided edits, long tag lists',
+  'settings connection state and copy',
 ];
 // Self-check before any browser starts: the list above and the block() calls
 // below must name exactly the same blocks, so a block added to one place only
@@ -2324,6 +2325,72 @@ try{
     assert.equal(ldRow().title,'Many tags title');
     await popup.close();
     console.log('changed elsewhere: restored tag drafts and reader tag lines are merged onto the newest tags, both-sided edits show the server value, a partial reader save is not taken for a change elsewhere, long tag lists still update');
+  });
+  await block('settings connection state and copy',['linkding'],async()=>{
+    // A reopened page shows the stored connection, a failed Connect does not
+    // read as "no problems", the address field is marked for a web-page answer,
+    // and the dynamic lines follow a language that arrives after first paint.
+    const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
+    const zh=JSON.parse(readFileSync(new URL('../_locales/zh_CN/messages.json',import.meta.url),'utf8'));
+    const host=new URL(origin).host;
+    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    // The page's init ends by scheduling the first overview render; pick the radio only after it, or the change handler runs before the page is wired.
+    const initialised=()=>options.waitForFunction(()=>document.getElementById('opt-linkding-url').value!==''&&document.querySelector('#connection-health .connection-health-row'));
+    await initialised();
+    const pick=service=>options.evaluate(service=>{const radio=document.querySelector('input[name="bookmark-service"][value="'+service+'"]');radio.checked=true;radio.dispatchEvent(new Event('change',{bubbles:true}));},service);
+    await pick('linkding');
+    const status=options.locator('#connect-linkding-status');
+    const rowState=()=>options.evaluate(()=>document.querySelector('#connection-health .connection-health-state')?.textContent||'');
+    await status.filter({hasText:'Connected to '+host}).waitFor({timeout:10000}).catch(async error=>{console.error({status:await status.textContent()});throw error;});
+    assert(await options.locator('#connect-linkding-status.ok').count(),'reopened connected status is not in the ok state');
+    // Subheadings name the service whose fields follow.
+    assert.equal((await options.locator('#bookmark-linkding-heading').textContent()).trim(),'linkding connection');
+    assert(await options.locator('#bookmark-linkding-heading').isVisible());
+    await pick('karakeep');
+    assert.equal((await options.locator('#bookmark-karakeep-heading').textContent()).trim(),'Karakeep connection');
+    assert(await options.locator('#bookmark-karakeep-heading').isVisible()&&await options.locator('#bookmark-linkding-heading').isHidden());
+    await pick('linkding');
+    assert(await options.locator('#linkding-sharing-hint').isVisible(),'sharing hint is hidden while linkding is connected');
+    await until(async()=>(await rowState())===en.connectionConnected.message,'overview shows linkding connected');
+    // Language arriving after first paint: dynamic lines are redrawn.
+    try{
+      await options.evaluate(async()=>{await chrome.storage.local.set({optLang:'zh_CN'});await _refreshI18nAsync();});
+      await status.filter({hasText:'已连接到 '+host}).waitFor({timeout:10000}).catch(async error=>{console.error({status:await status.textContent()});throw error;});
+      await until(async()=>(await rowState())===zh.connectionConnected.message,'overview redrawn in the new language');
+    }finally{
+      await options.evaluate(async()=>{await chrome.storage.local.set({optLang:'en'});await _refreshI18nAsync();});
+    }
+    await status.filter({hasText:'Connected to '+host}).waitFor({timeout:10000});
+    // A web-page answer marks the address; the previous connection stays and the overview says so.
+    await options.locator('#opt-linkding-url').fill(origin+'/probe/notfound/');
+    await options.locator('#connect-linkding').click();
+    await status.filter({hasText:en.bookmarkErrNotApi.message}).waitFor({timeout:10000});
+    assert.equal(await options.locator('#opt-linkding-url').getAttribute('aria-invalid'),'true','not_api did not mark the address field');
+    assert.notEqual(await options.locator('#opt-linkding-token').getAttribute('aria-invalid'),'true');
+    await until(async()=>(await rowState())===en.connectionPreviousStillActive.message,'overview does not say the previous connection is still in use');
+    assert(!(await options.locator('#connection-overview-state').textContent()).includes(en.connectionSummaryNoIssues.message),'overview header claims no problems after a failed Connect');
+    await options.locator('#opt-linkding-url').fill(origin+'/linkding/');
+    assert.notEqual(await options.locator('#opt-linkding-url').getAttribute('aria-invalid'),'true','editing did not clear the address mark');
+    await until(async()=>(await rowState())===en.connectionConnected.message,'overview did not return once the form matched the saved connection');
+    // A gateway redirect points at the gateway: the address stays unmarked.
+    // Earlier blocks may have left a Cloudflare gateway on the saved connection, which the fixture's redirect does not apply to.
+    await options.evaluate(()=>{const select=document.getElementById('opt-linkding-gateway');select.value='none';select.dispatchEvent(new Event('change',{bubbles:true}));});
+    gate.linkding=true;
+    try{
+      await options.locator('#connect-linkding').click();
+      await status.filter({hasText:en.bookmarkErrGatewayRedirect.message}).waitFor({timeout:10000});
+      assert.notEqual(await options.locator('#opt-linkding-url').getAttribute('aria-invalid'),'true','gateway_redirect marked the address field');
+    }finally{gate.linkding=false;}
+    // Not connected: no sharing hint and no status after a reload.
+    await options.evaluate(()=>pbpBookmarkDisconnect('linkding'));
+    await options.reload();
+    await initialised();
+    await pick('linkding');
+    await new Promise(r=>setTimeout(r,500));
+    assert(await options.locator('#linkding-sharing-hint').isHidden(),'sharing hint shows while linkding is not connected');
+    assert.equal((await status.textContent()).trim(),'','a disconnected service shows a status after reload');
+    await options.close();
+    console.log('settings connection state: reopened status, subheadings, sharing hint, address mark, overview and language redraw passed');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));

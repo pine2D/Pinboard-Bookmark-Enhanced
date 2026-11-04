@@ -1560,7 +1560,7 @@
     "message": "タグ（カンマ区切り）"
   },
   "batchTagsHint": {
-    "message": "複数のタグはカンマで区切ります。新しいタグ内のスペースは「複数語タグの区切り文字」に置き換わります。例：batch_saved, research"
+    "message": "複数のタグはカンマで区切ります。新しいタグ内のスペースは「複数語タグの区切り文字」（「AI の動作」で設定）に置き換わります。例：batch_saved, research"
   },
   "batchAiTags": {
     "message": "各タブに AI タグを自動生成"
@@ -4598,6 +4598,9 @@
   "connectionOverviewHint": { "message": "現在の設定、許可済みの権限、直近の手動テストをもとに表示します。設定を開くだけではサービスへの接続や権限の要求は行いません。" },
   "connectionNeverTested": { "message": "未テスト" },
   "connectionConnected": { "message": "接続済み" },
+  "connectionPreviousStillActive": {
+    "message": "前回の接続に失敗しました。以前の接続を使用中です"
+  },
   "connectionNotConnected": { "message": "未接続" },
   "connectionNotConfigured": { "message": "未設定" },
   "connectionPermissionMissing": { "message": "権限未許可" },
@@ -5054,6 +5057,12 @@
   "bookmarkServerUrl": {
     "message": "サーバーURL"
   },
+  "bookmarkKarakeepConnection": {
+    "message": "Karakeep の接続"
+  },
+  "bookmarkLinkdingConnection": {
+    "message": "linkding の接続"
+  },
   "bookmarkServerHint": {
     "message": "サブパスを含むサイトのURLを入力してください。ローカルホスト以外はHTTPSが必要です。"
   },
@@ -5182,6 +5191,14 @@
   },
   "bookmarkConnected": {
     "message": "接続済み"
+  },
+  "bookmarkConnectedHost": {
+    "message": "$HOST$ に接続済み",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkConnectFailed": {
     "message": "接続できませんでした。サーバーURL、トークン、サイトへのアクセス権限を確認してください。"
