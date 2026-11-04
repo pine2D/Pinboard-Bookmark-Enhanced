@@ -96,6 +96,36 @@ async function run() {
     }
   }
 
+  // ---------- P0c: posts reads come back with the tags the user typed ----------
+  // Server shapes as Pinboard answered them live on 2026-11-04: posts/get and
+  // posts/recent wrap {"posts":[...]}, posts/all is a bare array; `"`, `&`, `<`
+  // and `>` inside tags arrive as entities, `'` and the title verbatim. A tag
+  // a merge already wrote back as `&quot;` arrives as `&amp;quot;`.
+  {
+    const previousFetch = globalThis.fetch;
+    const answer = (body) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const entityTags = "a_q&quot;uote a_a&amp;b a_l&lt;t a_g&gt;t a_ap'os a_old&amp;quot;x";
+    const typedTags = "a_q\"uote a_a&b a_l<t a_g>t a_ap'os a_old&quot;x";
+    const post = { href: "https://example.com/a", description: "T &amp; \"x\"", tags: entityTags };
+    const read = (url) => new Promise((resolve, reject) => _executePinboardFetch(url, {}, resolve, reject)).then(r => r.json());
+    try {
+      globalThis.fetch = () => answer({ date: "2026-11-04T00:00:00Z", user: "user", posts: [post] });
+      const got = await read("https://api.pinboard.in/v1/posts/get?auth_token=user:TOKEN0001&format=json&url=x");
+      check("P0c posts/get tags decode once, the title stays verbatim",
+        got.posts[0].tags === typedTags && got.posts[0].description === post.description && got.user === "user");
+      const recent = await read("https://api.pinboard.in/v1/posts/recent?auth_token=user:TOKEN0001&format=json&count=5");
+      check("P0c posts/recent tags decode", recent.posts[0].tags === typedTags);
+      globalThis.fetch = () => answer([post]);
+      const all = await read("https://api.pinboard.in/v1/posts/all?tag=x&auth_token=user:TOKEN0001&format=json");
+      check("P0c posts/all (a bare array) tags decode", Array.isArray(all) && all[0].tags === typedTags);
+      globalThis.fetch = () => answer({ "a_q&quot;uote": 1 });
+      const tags = await read("https://api.pinboard.in/v1/tags/get?auth_token=user:TOKEN0001&format=json");
+      check("P0c endpoints not seen to encode (tags/get) pass through untouched", Object.keys(tags)[0] === "a_q&quot;uote");
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  }
+
   // ---------- P0b2: every request-deadline rejection classifies as a timeout ----------
   // Two abort flavours reach classifyPinboardError: AbortSignal.timeout rejects
   // with TimeoutError, a caller-held AbortController with AbortError. Both are

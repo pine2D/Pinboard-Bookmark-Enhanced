@@ -1098,7 +1098,39 @@ function _executePinboardFetch(url, options, resolve, reject) {
   // redirect:"error" — auth_token rides the query string (Pinboard v1 is
   // GET-only), so following a redirect would replay it to the target. Normal
   // v1 responses never redirect; export senders already enforce the same.
-  fetch(url, { ...fetchOpts, signal, redirect: "error" }).then(resolve, reject);
+  fetch(url, { ...fetchOpts, signal, redirect: "error" })
+    .then(res => pbpPinboardDecodedPostsResponse(url, res)).then(resolve, reject);
+}
+
+// Pinboard answers `"`, `&`, `<` and `>` inside tags as HTML entities on
+// posts/get, posts/recent and posts/all (tested live 2026-11-04 on private
+// bookmarks; titles, notes and `'` come back verbatim). Every Pinboard read
+// passes this one exit, the popup's and options page's worker proxy too, so
+// decoding once here keeps the form, the reader, merges and tag governance on
+// the names the user typed. Without it each merge wrote the entity back and
+// Pinboard stored it one level deeper (`&amp;quot;`). One pass over the five
+// names: `&amp;quot;` decodes to the literal `&quot;` it stands for.
+const PBP_PINBOARD_TAG_ENTITY_PATH = /^\/v1\/posts\/(?:get|recent|all)\/?$/;
+const PBP_PINBOARD_TAG_ENTITIES = Object.freeze({ quot: '"', lt: "<", gt: ">", amp: "&", "#39": "'" });
+function pbpPinboardDecodeTagEntities(tags) {
+  return typeof tags === "string" && tags.includes("&")
+    ? tags.replace(/&(quot|lt|gt|amp|#39);/g, (_, name) => PBP_PINBOARD_TAG_ENTITIES[name])
+    : tags;
+}
+function pbpPinboardDecodePostsTags(data) {
+  const posts = Array.isArray(data) ? data : Array.isArray(data?.posts) ? data.posts : null;
+  if (!posts) return data;
+  const decoded = posts.map(post => (post && typeof post.tags === "string" ? { ...post, tags: pbpPinboardDecodeTagEntities(post.tags) } : post));
+  return Array.isArray(data) ? decoded : { ...data, posts: decoded };
+}
+async function pbpPinboardDecodedPostsResponse(url, res) {
+  let path = "";
+  try { path = new URL(url).pathname; } catch (_) {}
+  if (!res?.ok || typeof res.text !== "function" || !PBP_PINBOARD_TAG_ENTITY_PATH.test(path)) return res;
+  const text = await res.text();
+  let body = text;
+  try { body = JSON.stringify(pbpPinboardDecodePostsTags(JSON.parse(text))); } catch (_) {}
+  return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
 }
 
 // ---- Pinboard posts/add URI builder ----
