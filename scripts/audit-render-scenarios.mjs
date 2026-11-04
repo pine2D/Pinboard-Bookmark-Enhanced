@@ -45,6 +45,10 @@ export const DICT_SAVE_BAR_LOCALES = Object.freeze(['en', 'de', 'fr']);
 export const READER_BOOKMARK_QUOTE_LOCALES = Object.freeze(['en', 'de', 'fr', 'ja', 'pl', 'ru', 'zh_CN', 'zh_HK', 'zh_TW']);
 export const RENDER_SWEEP_CONTEXTS = Object.freeze({
   options: [...RENDER_OPTIONS_TABS.map((name) => context(name, [], { target: `#panel-${name.slice(4)}.active` })),
+    // Leftover entity codes in tags: the list exists only after Scan.
+    context('tag-gov-entity-scan', [], { target: '#tag-gov-entity-list .tag-gov-entity-checkbox' }),
+    context('tag-gov-entity-deselected', ['tag-gov-entity-scan'], { target: '.tag-gov-entity-checkbox:not(:checked)' }),
+    context('tag-gov-entity-partial', ['tag-gov-entity-scan'], { target: '#tag-gov-entity-status.bad' }),
     context('vocab-pack-preview', [], { target: '#multi-pack-preview:not([hidden])' }),
     context('vocab-pack-installed', ['vocab-pack-preview'], { target: '#multi-pack-list button[data-pack-action]' }),
     context('vocab-pack-delete-confirm', ['vocab-pack-installed'], { target: '.confirm-popover .confirm-subject' }),

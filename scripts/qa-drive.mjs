@@ -796,6 +796,44 @@ async function driveOptions(context, extId, rep) {
           } catch (e) {
             s.failures.push(`tab-tags-lowcount-open: ${e.message}`);
           }
+          // Scanned state of "Leftover Entity Codes in Tags": the list exists
+          // only after Scan. Hand-written tags/get body shaped like Pinboard's
+          // (names verbatim); routed at the context level for this step only.
+          const entityRoute = (route) => route.fulfill({ status: 200, contentType: "application/json",
+            body: JSON.stringify({ "q&quot;uote": 2, "a&amp;b": 1, "q\"uote": 3, "work": 10, "book": 5, "books": 3, "misc": 1 }) });
+          try {
+            await context.route(/\/v1\/tags\/get/, entityRoute);
+            await page.locator("#tag-gov-entities > summary").scrollIntoViewIfNeeded({ timeout: 3000 });
+            if (!(await page.locator("#tag-gov-entities").evaluate(el => el.open))) await page.locator("#tag-gov-entities > summary").click({ timeout: 3000 });
+            await page.locator("#tag-gov-entity-scan").click({ timeout: 3000 });
+            await page.waitForSelector("#tag-gov-entity-list .tag-gov-entity-checkbox", { timeout: 5000 });
+            await page.waitForTimeout(300);
+            await rep.shot(page, s, "tab-tags-entity-scanned", { fullPage: true });
+            const shotDir = process.env.QA_ENTITY_SHOTS_DIR;
+            if (shotDir) {
+              for (const lang of ["zh_CN", "en"]) for (const scheme of ["light", "dark"]) {
+                await page.emulateMedia({ colorScheme: scheme });
+                await page.evaluate(async (m) => { await chrome.storage.local.set({ themePresetKey: m === "dark" ? "flexoki-dark" : "", optTheme: m }); }, scheme);
+                await page.evaluate(async (l) => { await chrome.storage.local.set({ optLang: l }); }, lang);
+                await page.reload({ waitUntil: "load" });
+                await page.waitForFunction(() => document.documentElement.hasAttribute("data-options-ready"));
+                await page.locator("#tab-tags").click();
+                await page.evaluate(() => { document.getElementById("tag-gov-entities").open = true; });
+                await page.locator("#tag-gov-entity-scan").click();
+                await page.waitForSelector("#tag-gov-entity-list .tag-gov-entity-checkbox");
+                await page.waitForTimeout(400);
+                await page.locator("#tag-gov-entities").scrollIntoViewIfNeeded();
+                await page.screenshot({ path: `${shotDir}/entity-${lang}-${scheme}.png`, fullPage: true });
+                await page.locator("#tag-gov-entities").screenshot({ path: `${shotDir}/entity-section-${lang}-${scheme}.png` });
+              }
+              await page.emulateMedia({ colorScheme: "light" });
+              await page.evaluate(async () => { await chrome.storage.local.set({ optLang: "zh_CN", optTheme: "light" }); });
+            }
+          } catch (e) {
+            s.failures.push(`tab-tags-entity-scanned: ${e.message}`);
+          } finally {
+            await context.unroute(/\/v1\/tags\/get/, entityRoute).catch(() => {});
+          }
         }
         if (tab === "vocab") {
           await openVocabPackPreview(page);
@@ -1681,6 +1719,7 @@ async function driveThemes(context, worker, extId, rep) {
       for (const scheme of includesStep("popup-unset") ? axisValues("scheme", ["light", "dark"]) : []) {
         await clearTheme();
         await page.emulateMedia({ colorScheme: scheme });
+                await page.evaluate(async (m) => { await chrome.storage.local.set({ themePresetKey: m === "dark" ? "flexoki-dark" : "", optTheme: m }); }, scheme);
         await page.goto(`chrome-extension://${extId}/popup.html?_qa=unset-${scheme}`, { waitUntil: "load", timeout: TIMEOUT_MS });
         // Same reload the options/library unset loop above already does
         // (debt-sweep 2026-08-07, design-uplift Task 4 minor): without it

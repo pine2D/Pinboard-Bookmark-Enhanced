@@ -9772,6 +9772,58 @@ async function runSweep(page, sw, extBase) {
       await scan("options", tabId);
     }
 
+    // Leftover entity codes in tags (Tags tab, Pinboard only): the list exists
+    // only after Scan. The scan reads a hand-written tags/get body shaped like
+    // Pinboard's real one ({"name": count}, names verbatim), routed at the
+    // context level (see the suggest route below); nothing is contacted.
+    const ENTITY_CONTEXTS = ["tag-gov-entity-scan", "tag-gov-entity-deselected", "tag-gov-entity-partial"];
+    if (ENTITY_CONTEXTS.some((name) => wants("options", name))) {
+      const entityCtx = page.context();
+      const entityRoute = (route) => route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify({ "q&quot;uote": 2, "a&amp;b": 1, "q\"uote": 3, "work": 10, "book": 5, "books": 3, "misc": 1, "wip": 0 }) });
+      const savedTags = await sw.evaluate(() => chrome.storage.local.get("cached_user_tags"));
+      await entityCtx.route(/\/v1\/tags\/get/, entityRoute);
+      try {
+        await page.click("#tab-tags");
+        await page.waitForSelector("#tag-gov-groups .tag-gov-chip-face", { timeout: TIMEOUT_MS });
+        const openScanned = async () => {
+          await page.click("#tab-tags");
+          await page.evaluate(() => { document.getElementById("tag-gov-entities").open = true; });
+          await page.click("#tag-gov-entity-scan");
+          await page.waitForSelector("#tag-gov-entity-list .tag-gov-entity-checkbox", { timeout: TIMEOUT_MS });
+          await page.locator("#tag-gov-entities").scrollIntoViewIfNeeded();
+          await page.waitForTimeout(150);
+          return true;
+        };
+        await scan("options", "tag-gov-entity-scan", openScanned);
+        if (wants("options", "tag-gov-entity-deselected")) {
+          await scan("options", "tag-gov-entity-deselected", async () => {
+            await page.locator(".tag-gov-entity-checkbox").last().click();
+            await page.waitForTimeout(100);
+            return true;
+          });
+        }
+        if (wants("options", "tag-gov-entity-partial")) {
+          // Geometry fixture for the failed-row state: the real partial flow
+          // (runTagGovOps) is network-bound; this runs the production renderer
+          // and status writer on the one row it would leave listed.
+          await scan("options", "tag-gov-entity-partial", async () => {
+            await page.evaluate(() => {
+              const account = document.querySelector(".tag-gov-entity-checkbox").dataset.account;
+              renderTagGovEntityList(_tagGovEntityItems.slice(0, 1), account);
+              _tagGovEntityStatus(t("tagGovEntityPartial"), true);
+            });
+            await page.waitForTimeout(100);
+            return true;
+          });
+        }
+      } finally {
+        await entityCtx.unroute(/\/v1\/tags\/get/, entityRoute).catch(() => {});
+        await page.evaluate(() => { pbpResetTagGovEntitySection(); }).catch(() => {});
+        if (savedTags.cached_user_tags) await sw.evaluate((v) => chrome.storage.local.set({ cached_user_tags: v }), savedTags.cached_user_tags);
+      }
+    }
+
     if (wants("options", "vocab-pack-preview") || wants("options", "vocab-pack-installed")) {
       await openVocabPackPreview(page);
       await scan("options", "vocab-pack-preview");
