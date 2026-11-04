@@ -541,6 +541,43 @@ await suite("offline queue", async () => {
       assert(by["pin-404"].includes("404") && by["pin-404"] === tr("pinboardErrRejected", "404"), locale + " Pinboard 404: " + by["pin-404"]);
     }
   });
+  // A queued popup create that replays leaves no session draft behind, unless the
+  // draft holds a newer edit; other owners and other pages are never touched.
+  await test("a replayed queued save clears its popup session draft but keeps newer edits and other rows", async () => {
+    const source = await (await fetch("../background.js")).text();
+    const start = source.indexOf("async function pbpClearReplayedPopupDraft(");
+    const end = source.indexOf("// Connection-level replay pause. A gateway,", start);
+    assert(start >= 0 && end > start, "pbpClearReplayedPopupDraft source not found");
+    assert(/onSuccess:[\s\S]{0,400}pbpClearReplayedPopupDraft\(item\)/.test(source), "onSuccess does not clear the draft");
+    const LD = "linkding:https://ld.example/:c1";
+    const url = "https://page.example/a";
+    const draft = (over = {}) => ({ url, title: "T", notes: "N", tags: ["Work", "x y"], tagInput: "", private: false, toread: false, archive: false, archiveTouched: false, ...over });
+    const key = (owner, kind, u) => "pbp-popup-draft:" + encodeURIComponent(owner) + ":" + kind + ":" + encodeURIComponent(u);
+    const row = (owner, u, d) => ({ owner, pageUrl: u, incognito: false, updatedAt: Date.now(), draft: d });
+    const run = async (item, rows, currentAccount = LD) => {
+      const store = { ...rows };
+      const chromeStub = { storage: { session: { get: async () => ({ ...store }), remove: async (keys) => { for (const k of [].concat(keys)) delete store[k]; } } } };
+      const fn = new Function("chrome", "navigator", "getCurrentBookmarkAuth", "pbpBookmarkAccountService", "pbpBookmarkParseTags",
+        source.slice(start, end) + "\nreturn pbpClearReplayedPopupDraft;")(
+        chromeStub, { locks: { request: (name, cb) => cb() } }, async () => ({ account: currentAccount }), pbpBookmarkAccountService, pbpBookmarkParseTags);
+      await fn(item);
+      return Object.keys(store);
+    };
+    const item = { queueId: "q1", account: LD, url, title: "T", notes: "N", tags: 'work "x y"' };
+    const other = key("alice", "normal", url), otherPage = key(LD, "normal", "https://page.example/b");
+    const rows = {
+      [key(LD, "normal", url)]: row(LD, url, draft()),
+      [key(LD, "private", url)]: row(LD, url, draft()),
+      [other]: row("alice", url, draft()),
+      [otherPage]: row(LD, "https://page.example/b", draft({ url: "https://page.example/b" })),
+    };
+    assert((await run(item, rows)).sort().join("|") === [other, otherPage].sort().join("|"), "kept rows: " + (await run(item, rows)).join("|"));
+    const edited = { [key(LD, "normal", url)]: row(LD, url, draft({ notes: "N plus a newer edit" })) };
+    assert((await run(item, edited)).length === 1, "a newer edit was cleared");
+    const pending = { [key(LD, "normal", url)]: row(LD, url, draft({ tagInput: "typing" })) };
+    assert((await run(item, pending)).length === 1, "unsubmitted tag text was cleared");
+    assert((await run(item, rows, "linkding:https://other/:c9")).length === 4, "cleared while another connection is current");
+  });
   // The production keepalive check and release (background.js), with only
   // the queue, pause, connection and alarm stores stubbed.
   await test("the keepalive alarm is released when only records replay will not send remain", async () => {

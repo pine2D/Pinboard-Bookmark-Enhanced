@@ -1523,6 +1523,43 @@ function sendOfflineItem(item) {
   });
 }
 
+// A popup save that was queued offline keeps its session draft until the
+// popup sees a "saved" result, which it never does for a replay. Once the
+// replay lands, drop the draft rows of that owner and address, but only a row
+// that still holds what was queued: a newer edit of the same page survives.
+// Draft key format and owner checks are pbpRunPopupDraft's; same lock order.
+async function pbpClearReplayedPopupDraft(item) {
+  const account = typeof item?.account === "string" ? item.account : "";
+  const url = typeof item?.url === "string" ? item.url : "";
+  if (!account || !url) return;
+  const names = (text) => {
+    try {
+      return (pbpBookmarkAccountService(account) === "pinboard"
+        ? String(text || "").split(/\s+/).filter(Boolean) : pbpBookmarkParseTags(text)).map((n) => n.toLowerCase()).sort();
+    } catch (_) { return null; }
+  };
+  const holdsQueued = (draft) => {
+    if (!draft || draft.url !== url || typeof draft.tagInput !== "string" || draft.tagInput.trim()) return false;
+    const queued = names(item.tags);
+    const drafted = Array.isArray(draft.tags) ? draft.tags.map((n) => String(n).toLowerCase()).sort() : null;
+    return !!queued && !!drafted && draft.title === (item.title || "") && draft.notes === (item.notes || "")
+      && queued.join("\n") === drafted.join("\n");
+  };
+  try {
+    await navigator.locks.request("pbp-popup-drafts", async () => {
+      if ((await getCurrentBookmarkAuth()).account !== account) return;
+      const prefix = "pbp-popup-draft:" + encodeURIComponent(account) + ":";
+      const rows = await chrome.storage.session.get(null);
+      if ((await getCurrentBookmarkAuth()).account !== account) return;
+      const keys = Object.keys(rows).filter((key) => key.startsWith(prefix) && rows[key]?.owner === account
+        && rows[key]?.pageUrl === url && holdsQueued(rows[key]?.draft));
+      if (keys.length) await chrome.storage.session.remove(keys);
+    });
+  } catch (e) {
+    console.warn("[popup-draft] clearing a replayed draft failed:", e && e.name, e && e.message);
+  }
+}
+
 // Connection-level replay pause. A gateway, a rejected token or a missing host
 // grant that failed a queued item (PBP_BOOKMARK_STOP_CODES) will fail the rest
 // of that connection's items too, so automatic replay skips
@@ -1597,6 +1634,7 @@ function drainOfflineQueueIds(queueIds, { manual = false, pausedAccount = "" } =
     removeItem: (queueId) => mutateOfflineQueue({ kind: "remove", queueId }),
     onSuccess: async (item, delivered) => {
       await applySaveResultSideEffects(delivered, delivered.settings, { auth: delivered.auth });
+      if (delivered?.result?.status === "saved") await pbpClearReplayedPopupDraft(item);
       if (typeof item.account === "string" && item.account) await pbpClearOfflineQueuePause(item.account);
     },
     onFailure: async (item, delivered) => {
