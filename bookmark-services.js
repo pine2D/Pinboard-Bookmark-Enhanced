@@ -76,22 +76,34 @@ function pbpBookmarkNormalize(service, value) {
     // The server's own last-modified stamp, as it wrote it (linkding
     // date_modified, Karakeep modifiedAt; null when the answer has none).
     modified: (value => typeof value === "string" ? value : null)(service === "linkding" ? value.date_modified : value.modifiedAt),
+    // The stamp the loaded state carries: linkding's only. Karakeep moves
+    // modifiedAt when its crawler finishes the page (a couple of seconds after
+    // a create, longer for a slow page; seen live 2026-11-04), which is no edit.
+    versionStamp: service === "linkding" && typeof value.date_modified === "string" ? value.date_modified : null,
     nativeTags: service === "karakeep" ? value.tags.map(tag => ({id:pbpBookmarkRecordId(tag.id),name:tag.name})) : []
   };
 }
 
 // What a form loaded the bookmark as, compared before an update is sent
-// (user decision 2026-11-02): the server's last-modified stamp, plus the tags
-// and Read Later state. Karakeep 0.34.1 attaches its AI tags without touching
-// modifiedAt (workers/inference/tagging.ts) and keeps Read Later in a list,
-// so the stamp alone would miss both. Only the server's own values: never a
-// local clock. The tags go in as their count and a 64-bit digest, so the state
-// stays a few dozen characters however many tags the bookmark has (a full
-// list outgrew the message and draft limits and stopped every update).
+// (user decision 2026-11-02): linkding's last-modified stamp, plus the fields
+// an update writes back: title, notes, tags and Read Later. Karakeep's
+// modifiedAt is left out (user decision 2026-11-04): its crawler moves it
+// with no edit, which stopped an update made just after a save. Its AI tags
+// (attached without touching modifiedAt, workers/inference/tagging.ts) and
+// its Read Later list are in the fields anyway. Only the server's own values:
+// never a local clock. Tags, title and notes go in as digests, so the state
+// stays a few dozen characters however long they are (a full tag list
+// outgrew the message and draft limits and stopped every update). A title
+// Karakeep took from the crawled page counts as none: the crawler fills it
+// in after a save, which is no edit either. The "2"
+// prefix marks this form: a cached state from before it is read again
+// (pbpStatusCacheFormPosts) rather than compared.
+const PBP_BOOKMARK_VERSION_FORM = "2";
 function pbpBookmarkVersion(bookmark) {
   const tags = [...(bookmark?.tags || [])].sort();
-  return JSON.stringify([typeof bookmark?.modified === "string" ? bookmark.modified.slice(0, 64) : null,
-    tags.length, pbpBookmarkTagDigest(JSON.stringify(tags)), bookmark?.toread === true]);
+  return PBP_BOOKMARK_VERSION_FORM + JSON.stringify([typeof bookmark?.versionStamp === "string" ? bookmark.versionStamp.slice(0, 64) : null,
+    tags.length, pbpBookmarkTagDigest(JSON.stringify(tags)), bookmark?.toread === true,
+    pbpBookmarkTagDigest(JSON.stringify([bookmark?.titleFromContent ? "" : String(bookmark?.title ?? ""), String(bookmark?.notes ?? "")]))]);
 }
 // Two 32-bit FNV-1a passes with different offsets: stable across workers and
 // pages, synchronous, and a change to any tag changes it.

@@ -96,7 +96,7 @@ function pbpStatusCacheGet(url, auth) {
 function pbpStatusCacheFormPosts(cached, auth) {
   if (!cached || !(Date.now() - cached.timestamp < CACHE_TTL) || !Array.isArray(cached.posts)) return null;
   const selfHosted = auth?.service === "karakeep" || auth?.service === "linkding";
-  if (selfHosted && !cached.posts.every((post) => typeof post?.version === "string")) return null;
+  if (selfHosted && !cached.posts.every((post) => typeof post?.version === "string" && post.version.startsWith(PBP_BOOKMARK_VERSION_FORM + "["))) return null;
   return cached.posts;
 }
 

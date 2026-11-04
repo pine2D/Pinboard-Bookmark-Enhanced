@@ -694,7 +694,7 @@ test("a save stopped by duplicate Read Later lists keeps the cause in its result
 // User decision 2026-11-02 (A01, B02): an update from a loaded form is checked
 // against the bookmark as the server holds it at delivery, in the duplicate
 // check delivery makes anyway, and stops when it differs.
-test("the loaded state follows each server's own last-modified stamp, tags and Read Later", ()=>{
+test("the loaded state follows linkding's last-modified stamp and the fields an update writes back", ()=>{
   const version=(service,row)=>pbpBookmarkAsPost(pbpBookmarkNormalize(service,row)).version;
   equal([pbpBookmarkNormalize("linkding",ld).modified, pbpBookmarkNormalize("karakeep",kk).modified],[ld.date_modified, kk.modifiedAt]);
   // Karakeep 0.34.1 lets modifiedAt be null; that is a value, not a missing state.
@@ -704,10 +704,39 @@ test("the loaded state follows each server's own last-modified stamp, tags and R
   for (const [label, service, row, loaded] of [
     ["linkding stamp", "linkding", {...ld,date_modified:"2026-10-01T10:00:01.000001Z"}, LD_LOADED],
     ["linkding unread", "linkding", {...ld,unread:false}, LD_LOADED],
-    ["Karakeep stamp", "karakeep", {...kk,modifiedAt:"2026-10-01T10:00:01.000Z"}, KK_LOADED],
+    ["linkding title", "linkding", {...ld,title:"Edited elsewhere"}, LD_LOADED],
+    ["linkding notes", "linkding", {...ld,notes:"Edited elsewhere"}, LD_LOADED],
     // tagging.ts attaches AI tags without touching modifiedAt.
     ["Karakeep AI tag", "karakeep", {...kk,tags:[...kk.tags,{id:"tag2",name:"ai-tag",attachedBy:"ai"}]}, KK_LOADED],
+    ["Karakeep title", "karakeep", {...kk,title:"Edited elsewhere"}, KK_LOADED],
+    ["Karakeep note", "karakeep", {...kk,note:"Edited elsewhere"}, KK_LOADED],
+    ["Karakeep title set over a crawled one", "karakeep", {...kk,title:null}, KK_LOADED],
   ]) ok(version(service,row)!==loaded, label+" did not change the loaded state");
+  // Karakeep's crawler (seen live 2026-11-04, a couple of seconds after a
+  // create) moves modifiedAt and fills in the page's content and its title;
+  // none of that is an edit the update would overwrite.
+  const untitled={...kk,title:null,content:{...kk.content,title:undefined}};
+  for (const [label, row, loaded] of [
+    ["Karakeep stamp", {...kk,modifiedAt:"2026-10-01T10:00:02.000Z"}, KK_LOADED],
+    ["Karakeep crawl", {...kk,modifiedAt:"2026-10-01T10:00:02.000Z",content:{...kk.content,description:"Crawled",crawledAt:"2026-10-01T10:00:02.000Z"},assets:[{id:"a1",assetType:"screenshot"}]}, KK_LOADED],
+    ["Karakeep AI summary", {...kk,summary:"An AI summary"}, KK_LOADED],
+    ["Karakeep crawled title on an untitled bookmark", {...untitled,modifiedAt:"2026-10-01T10:00:02.000Z",content:{...kk.content,title:"Crawled later"}}, version("karakeep",untitled)],
+  ]) equal(version("karakeep",row),loaded,label+" changed the loaded state");
+  // A state cached before this form carries no prefix and is read again.
+  ok(KK_LOADED.startsWith(PBP_BOOKMARK_VERSION_FORM+"[") && LD_LOADED.startsWith(PBP_BOOKMARK_VERSION_FORM+"["), "the loaded state does not carry its form");
+});
+test("a form loads a self-hosted bookmark from the cache only with a state of the current form", async()=>{
+  workerSource ||= await (await fetch("../background.js")).text();
+  const start = workerSource.indexOf("function pbpStatusCacheFormPosts("), end = workerSource.indexOf("\n}\n", start) + 3;
+  ok(start >= 0 && end > start, "pbpStatusCacheFormPosts not found");
+  const formPosts = new Function("CACHE_TTL", "PBP_BOOKMARK_VERSION_FORM", workerSource.slice(start, end) + ";return pbpStatusCacheFormPosts;")(300000, PBP_BOOKMARK_VERSION_FORM);
+  const cached = version => ({timestamp:Date.now(), posts:[{href:pageUrl, ...(version !== undefined ? {version} : {})}]});
+  const karakeep = {service:"karakeep"};
+  ok(formPosts(cached(KK_LOADED), karakeep), "a current state was read again");
+  // The state before 2026-11-04 held Karakeep's modifiedAt, which a crawl moves.
+  for (const [label, version] of [["a state from before the form", JSON.stringify(["2026-10-01T10:00:00.000Z",1,"0011223344556677",false])], ["no state", undefined]])
+    equal(formPosts(cached(version), karakeep), null, label + " was loaded into a form");
+  ok(formPosts(cached(undefined), {service:"pinboard"}), "Pinboard has no loaded state to check");
 });
 test("the loaded state stays short however many tags the bookmark has, and any tag change changes it", ()=>{
   const version=row=>pbpBookmarkAsPost(pbpBookmarkNormalize("linkding",row)).version;
