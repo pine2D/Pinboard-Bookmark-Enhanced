@@ -1685,7 +1685,7 @@ try {
         const page = { status: '', editor: '' };
         if (world.held) later(300, () => { page.status = msg('bgSetToken'); });
         page.locator = sel => ({
-          click: async () => { if (sel === '#reader-bookmark-apply') later(300, () => { page.editor = msg('urlAndTitleRequired'); }); },
+          click: async () => { if (sel === '#reader-bookmark-apply') later(300, () => { page.editor = msg('readerBookmarkTitleRequired'); }); },
           fill: async () => {}, isDisabled: async () => true, count: async () => 0, getAttribute: async () => null,
         });
         page.evaluate = async fn => (String(fn).includes('reader-bookmark-editor-status') ? page.editor : page.status);

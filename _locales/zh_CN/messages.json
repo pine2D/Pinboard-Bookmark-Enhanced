@@ -4718,6 +4718,7 @@
   "readerBookmarkApply": {"message": "保存修改"},
   "readerBookmarkDeletedElsewhere": {"message": "这个书签已在别处删除，这次的修改没有保存。要重新收藏这一页，再保存一次即可。"},
   "readerBookmarkTitle": {"message": "标题"},
+  "readerBookmarkTitleRequired": {"message": "标题不能为空。"},
   "readerBookmarkTags": {"message": "标签（以空格分隔）"},
   "readerBookmarkTagsQuoted": {"message": "标签（以空格分隔；已有的带空格标签显示在英文双引号内）"},
   "readerBookmarkTagsQuoteError": {"message": "检查标签的英文双引号是否成对，然后重试。"},

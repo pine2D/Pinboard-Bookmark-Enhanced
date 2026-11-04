@@ -4724,6 +4724,7 @@
   "readerBookmarkApply": {"message": "変更を保存"},
   "readerBookmarkDeletedElsewhere": {"message": "このブックマークは別の場所で削除されたため、変更は保存されていません。ページを再びブックマークするには、もう一度保存してください。"},
   "readerBookmarkTitle": {"message": "タイトル"},
+  "readerBookmarkTitleRequired": {"message": "タイトルは必須です。"},
   "readerBookmarkTags": {"message": "タグ（スペース区切り）"},
   "readerBookmarkTagsQuoted": {"message": "タグ（スペース区切り。スペースを含む既存のタグは半角の二重引用符で囲んで表示）"},
   "readerBookmarkTagsQuoteError": {"message": "タグの半角二重引用符を確認して、もう一度保存してください。"},

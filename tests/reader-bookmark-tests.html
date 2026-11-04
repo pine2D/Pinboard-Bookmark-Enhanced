@@ -2033,7 +2033,7 @@ await test("reader editor and background both refuse a blank title", async () =>
       await r.w.pbpReaderBookmarkAction("edit"); await wait(20);
       const title = r.node("title"); title.value = blank; title.dispatchEvent(new r.w.Event("input", { bubbles: true }));
       r.node("apply").click(); await wait(30);
-      equal(r.node("editor-status").textContent, "urlAndTitleRequired"); equal(r.node("editor-status").dataset.state, "error");
+      equal(r.node("editor-status").textContent, "readerBookmarkTitleRequired"); equal(r.node("editor-status").dataset.state, "error");
       assert(!r.requests.some(m => m.type === "mdReaderBookmarkSave"), "a blank title was sent: " + JSON.stringify(blank));
       assert(r.node("editor").matches(":popover-open"), "the editor must stay open");
       title.value = "Fixed"; r.node("apply").click(); await wait(30);

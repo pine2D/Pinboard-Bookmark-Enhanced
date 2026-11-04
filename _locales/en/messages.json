@@ -4735,6 +4735,7 @@
   "readerBookmarkApply": {"message": "Save changes"},
   "readerBookmarkDeletedElsewhere": {"message": "This bookmark was deleted elsewhere, so your changes were not saved. To bookmark the page again, save once more."},
   "readerBookmarkTitle": {"message": "Title"},
+  "readerBookmarkTitleRequired": {"message": "Title is required."},
   "readerBookmarkTags": {"message": "Tags (space-separated)"},
   "readerBookmarkTagsQuoted": {"message": "Tags (space-separated; existing tags with spaces appear in double quotes)"},
   "readerBookmarkTagsQuoteError": {"message": "Check the double quotes around tags, then try again."},

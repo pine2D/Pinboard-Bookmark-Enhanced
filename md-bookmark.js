@@ -131,7 +131,7 @@
         id("editor-status").removeAttribute("data-i18n");
         id("editor-status").textContent = text(editorStatusKey) + " " + changedThere;
       }
-      id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "readerBookmarkTagsQuoteError", "urlAndTitleRequired", "titleTooLong", "submitUriTooLong"].includes(editorStatusKey) || failureCopy(editorStatusKey) ? "error" : "";
+      id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "readerBookmarkTagsQuoteError", "readerBookmarkTitleRequired", "titleTooLong", "submitUriTooLong"].includes(editorStatusKey) || failureCopy(editorStatusKey) ? "error" : "";
     }
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) input.disabled = deleting;
   }
@@ -503,7 +503,7 @@
       }
       const service = pbpBookmarkAccountService(context.account);
       const limits = pbpBookmarkLimits(service);
-      if (!String(draft.title ?? "").trim()) { editorStatusKey = "urlAndTitleRequired"; paint(); return; }
+      if (!String(draft.title ?? "").trim()) { editorStatusKey = "readerBookmarkTitleRequired"; paint(); return; }
       const titleOver = pbpBookmarkTitleTooLong(draft.title, service);
       if (titleOver || (limits.notesHard !== null && draft.notes.length > limits.notesHard)) {
         editorStatusKey = titleOver ? "titleTooLong" : "submitUriTooLong";

@@ -4724,6 +4724,7 @@
   "readerBookmarkApply": {"message": "Änderungen speichern"},
   "readerBookmarkDeletedElsewhere": {"message": "Dieses Lesezeichen wurde an anderer Stelle gelöscht, deine Änderungen wurden daher nicht gespeichert. Um die Seite wieder als Lesezeichen anzulegen, speichere noch einmal."},
   "readerBookmarkTitle": {"message": "Titel"},
+  "readerBookmarkTitleRequired": {"message": "Der Titel ist erforderlich."},
   "readerBookmarkTags": {"message": "Tags (durch Leerzeichen getrennt)"},
   "readerBookmarkTagsQuoted": {"message": "Tags (durch Leerzeichen getrennt; vorhandene Tags mit Leerzeichen stehen in doppelten Anführungszeichen)"},
   "readerBookmarkTagsQuoteError": {"message": "Prüfe die doppelten Anführungszeichen bei den Tags und versuche es erneut."},

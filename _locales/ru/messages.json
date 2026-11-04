@@ -4724,6 +4724,7 @@
   "readerBookmarkApply": {"message": "Сохранить изменения"},
   "readerBookmarkDeletedElsewhere": {"message": "Эта закладка была удалена в другом месте, поэтому изменения не сохранены. Чтобы снова добавить страницу в закладки, сохраните ещё раз."},
   "readerBookmarkTitle": {"message": "Заголовок"},
+  "readerBookmarkTitleRequired": {"message": "Укажите заголовок."},
   "readerBookmarkTags": {"message": "Метки (через пробел)"},
   "readerBookmarkTagsQuoted": {"message": "Метки (через пробел; существующие метки с пробелами показаны в двойных кавычках)"},
   "readerBookmarkTagsQuoteError": {"message": "Проверьте двойные кавычки в метках и попробуйте снова."},

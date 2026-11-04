@@ -4724,6 +4724,7 @@
   "readerBookmarkApply": {"message": "Zapisz zmiany"},
   "readerBookmarkDeletedElsewhere": {"message": "Ta zakładka została usunięta gdzie indziej, więc zmian nie zapisano. Aby ponownie dodać stronę do zakładek, zapisz jeszcze raz."},
   "readerBookmarkTitle": {"message": "Tytuł"},
+  "readerBookmarkTitleRequired": {"message": "Tytuł jest wymagany."},
   "readerBookmarkTags": {"message": "Tagi (oddzielone spacjami)"},
   "readerBookmarkTagsQuoted": {"message": "Tagi (oddzielone spacjami; istniejące tagi ze spacjami są ujęte w cudzysłów)"},
   "readerBookmarkTagsQuoteError": {"message": "Sprawdź cudzysłowy przy tagach i spróbuj ponownie."},
