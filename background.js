@@ -1526,8 +1526,11 @@ function sendOfflineItem(item) {
 // A popup save that was queued offline keeps its session draft until the
 // popup sees a "saved" result, which it never does for a replay. Once the
 // replay lands, drop the draft rows of that owner and address, but only a row
-// that still holds what was queued: a newer edit of the same page survives.
-// Draft key format and owner checks are pbpRunPopupDraft's; same lock order.
+// that still holds what was queued: a newer edit of the same page survives,
+// including one to the Description or a checkbox. The address is the form's
+// (draft.url), which is the cleaned one the queue holds; the row's pageUrl is
+// the tab's and may still carry tracking parameters. Keeping a row is the safe
+// side. Draft key format and owner checks are pbpRunPopupDraft's; same lock order.
 async function pbpClearReplayedPopupDraft(item) {
   const account = typeof item?.account === "string" ? item.account : "";
   const url = typeof item?.url === "string" ? item.url : "";
@@ -1542,8 +1545,13 @@ async function pbpClearReplayedPopupDraft(item) {
     if (!draft || draft.url !== url || typeof draft.tagInput !== "string" || draft.tagInput.trim()) return false;
     const queued = names(item.tags);
     const drafted = Array.isArray(draft.tags) ? draft.tags.map((n) => String(n).toLowerCase()).sort() : null;
+    const queuedToread = item.toread === true || item.toread === "yes";
     return !!queued && !!drafted && draft.title === (item.title || "") && draft.notes === (item.notes || "")
-      && queued.join("\n") === drafted.join("\n");
+      && queued.join("\n") === drafted.join("\n")
+      && (draft.summary === undefined || pbpBookmarkDescriptionText(draft.summary) === pbpBookmarkDescriptionText(item.summary))
+      && draft.private === (item.private === true) && draft.toread === queuedToread
+      && (draft.sharedExplicit === true) === (item.sharedExplicit === true)
+      && (!draft.archiveTouched || draft.archive === item.archive);
   };
   try {
     await navigator.locks.request("pbp-popup-drafts", async () => {
@@ -1552,7 +1560,7 @@ async function pbpClearReplayedPopupDraft(item) {
       const rows = await chrome.storage.session.get(null);
       if ((await getCurrentBookmarkAuth()).account !== account) return;
       const keys = Object.keys(rows).filter((key) => key.startsWith(prefix) && rows[key]?.owner === account
-        && rows[key]?.pageUrl === url && holdsQueued(rows[key]?.draft));
+        && holdsQueued(rows[key]?.draft));
       if (keys.length) await chrome.storage.session.remove(keys);
     });
   } catch (e) {

@@ -557,9 +557,9 @@ await suite("offline queue", async () => {
     const run = async (item, rows, currentAccount = LD) => {
       const store = { ...rows };
       const chromeStub = { storage: { session: { get: async () => ({ ...store }), remove: async (keys) => { for (const k of [].concat(keys)) delete store[k]; } } } };
-      const fn = new Function("chrome", "navigator", "getCurrentBookmarkAuth", "pbpBookmarkAccountService", "pbpBookmarkParseTags",
+      const fn = new Function("chrome", "navigator", "getCurrentBookmarkAuth", "pbpBookmarkAccountService", "pbpBookmarkParseTags", "pbpBookmarkDescriptionText",
         source.slice(start, end) + "\nreturn pbpClearReplayedPopupDraft;")(
-        chromeStub, { locks: { request: (name, cb) => cb() } }, async () => ({ account: currentAccount }), pbpBookmarkAccountService, pbpBookmarkParseTags);
+        chromeStub, { locks: { request: (name, cb) => cb() } }, async () => ({ account: currentAccount }), pbpBookmarkAccountService, pbpBookmarkParseTags, pbpBookmarkDescriptionText);
       await fn(item);
       return Object.keys(store);
     };
@@ -577,6 +577,19 @@ await suite("offline queue", async () => {
     const pending = { [key(LD, "normal", url)]: row(LD, url, draft({ tagInput: "typing" })) };
     assert((await run(item, pending)).length === 1, "unsubmitted tag text was cleared");
     assert((await run(item, rows, "linkding:https://other/:c9")).length === 4, "cleared while another connection is current");
+    // The tab's address may still carry tracking parameters the form cleaned
+    // away (URL cleaning is on by default); the queue holds the cleaned one.
+    const tracked = { [key(LD, "normal", url + "?utm_source=x")]: row(LD, url + "?utm_source=x", draft()) };
+    assert((await run(item, tracked)).length === 0, "a draft opened on a tracked address was kept after its replay");
+    // A newer edit to the Description or a checkbox survives as well.
+    const queuedLd = { ...item, summary: "Mine\n\nAI part", toread: false, private: false, sharedExplicit: false };
+    const same = { [key(LD, "normal", url)]: row(LD, url, draft({ summary: "Mine\r\n\r\nAI part  ", sharedExplicit: false })) };
+    assert((await run(queuedLd, same)).length === 0, "a draft equal to the queued Description was kept");
+    for (const [label, over] of [["Description", { summary: "Mine, edited later" }], ["Read Later", { toread: true }],
+      ["Private", { private: true }], ["Share", { sharedExplicit: true }], ["Archive", { archiveTouched: true, archive: true }]]) {
+      const newer = { [key(LD, "normal", url)]: row(LD, url, draft({ sharedExplicit: false, ...over })) };
+      assert((await run(queuedLd, newer)).length === 1, "a newer " + label + " edit was cleared");
+    }
   });
   // The production keepalive check and release (background.js), with only
   // the queue, pause, connection and alarm stores stubbed.
