@@ -1630,6 +1630,29 @@ await test("reader save, delete and lookup name every self-hosted cause from the
   equal(await run("alice", m => m.type === "mdReaderBookmarkState" ? known("alice") : { status: "failed", reason: "account_changed", account: "alice" },
     w => w.pbpReaderBookmarkAction("later")), "readerBookmarkAccountChanged");
 });
+await test("a Save or Read Later the worker refuses for an over-long title names the limit in the rail", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  for (const [service, limit] of [["linkding", 512], ["karakeep", 1000]]) for (const action of ["save", "later"]) {
+    const frame = document.createElement("iframe"); document.body.append(frame);
+    try {
+      const w = frame.contentWindow, pending = [], account = service + ":https://bm.example:c1";
+      const handler = msg => msg.type === "mdReaderBookmarkState"
+        ? { known: true, bookmarked: false, account, bookmark: null }
+        : { status: "failed", reason: "too_long", limit, account };
+      w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.eval(await (await fetch("../shared.js")).text());
+      w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
+        sendMessage: msg => { const r = Promise.resolve(handler(msg)); pending.push(r); return r; }, onMessage: { addListener() {} } } };
+      w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; w.eval(runtime);
+      w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "x".repeat(limit + 1), account } }));
+      await settle(pending);
+      await w.pbpReaderBookmarkAction(action); await settle(pending);
+      const el = name => w.document.getElementById("reader-bookmark-" + name);
+      equal(service + " " + action + " " + el("status").textContent, service + " " + action + " titleTooLong:" + limit);
+      if (el("footer-status")) equal(el("footer-status").textContent, "titleTooLong:" + limit);
+    } finally { frame.remove(); }
+  }
+});
 await test("each reader status keeps the placeholders of its own copy after a tag fix and a later remote failure", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();
   const account = "linkding:https://ld.example:c1", long = "x".repeat(65), shown = "x".repeat(40) + "…";

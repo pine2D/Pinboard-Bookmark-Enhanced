@@ -101,6 +101,11 @@
         if (statusKey === "saveMergedExisting") {
           el.removeAttribute("data-i18n");
           el.textContent = pbpBookmarkMergedText(pbpBookmarkAccountService(context?.account), text);
+        } else if (statusKey === "titleTooLong") {
+          // The worker refuses a Save / Read Later whose title is over the
+          // service's limit and sends the limit along; the copy needs it.
+          el.removeAttribute("data-i18n");
+          el.textContent = text("titleTooLong", String(argsFor(statusKey)[0] ?? pbpBookmarkLimits(pbpBookmarkAccountService(context?.account)).title));
         } else if (ARG_KEYS.includes(statusKey)) {
           el.removeAttribute("data-i18n");
           el.textContent = text(statusKey, ...argsFor(statusKey));
