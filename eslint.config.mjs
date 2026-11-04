@@ -71,6 +71,10 @@ export const PAGE_GLOBALS = [
 const browserGlobals = Object.fromEntries(PAGE_GLOBALS.map((g) => [g, "readonly"]));
 
 export default [
+  // Gitignored local work (research notes, a Python venv's bundled JS, design
+  // dumps, release builds) never reaches CI; without this, `eslint .` in a
+  // working tree that has them fails on files no commit contains.
+  { ignores: ["docs/superpowers/**", "DESIGN-IS-2026-07-22/**", "release/**"] },
   {
     files: ["*.js"],
     ignores: ["vendor/**"],
