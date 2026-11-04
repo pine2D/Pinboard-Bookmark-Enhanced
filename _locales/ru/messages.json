@@ -708,12 +708,21 @@
       }
     }
   },
+  "offlineQueueNeedsAttentionOne": {
+    "message": "Требует внимания: $COUNT$",
+    "description": "Popup offline queue bar: singular form of the needs-attention count, used when exactly one queued bookmark needs attention. $COUNT$ is the number.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "offlineQueueAttentionHint": {
-    "message": "Автоматический повтор остановлен. Исправьте закладку, сохраните страницу заново во всплывающем окне и удалите эту запись.",
+    "message": "Автоматически он повторяться не будет. Устраните проблему, затем повторите отправку или удалите запись.",
     "description": "Popup offline queue row of a bookmark that needs attention, shown on its own line under the failure message: automatic retry stopped, and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons."
   },
   "pinboardErrRejected": {
-    "message": "Pinboard отклонил запрос (HTTP $STATUS$). Повторная попытка не поможет. Проверьте закладку.",
+    "message": "Pinboard отклонил запрос (HTTP $STATUS$). Проверьте закладку.",
     "description": "Pinboard rejected a save with an HTTP 4xx the extension has no more specific copy for (shown on a queued bookmark that needs attention, and after its Retry). Not retryable. $STATUS$ is the HTTP status code.",
     "placeholders": {
       "status": {
@@ -5258,10 +5267,10 @@
   "bookmarkErrRateLimit": {
     "message": "Сервер закладок получает слишком много запросов. Попробуйте позже."
   },
-  "bookmarkErrUrlInvalid": { "message": "linkding не принимает этот адрес. Он может быть не длиннее 2048 символов, а у хоста должно быть доменное окончание вроде .com, если это не localhost и не IP-адрес. Повторная попытка не поможет." },
+  "bookmarkErrUrlInvalid": { "message": "linkding не принимает этот адрес. Он может быть не длиннее 2048 символов, а у хоста должно быть доменное окончание вроде .com, если это не localhost и не IP-адрес." },
   "bookmarkErrReadLaterList": { "message": "В Karakeep несколько списков «Прочитать позже», созданных этим расширением. Закладка сохранена, но без отметки «Прочитать позже». Удалите лишние списки, чтобы остался один, и повторите попытку." },
   "bookmarkErrRemote": {
-    "message": "Сервер закладок отклонил запрос (HTTP $STATUS$). Повторная попытка не поможет. Проверьте закладку и настройки сервера.",
+    "message": "Сервер закладок отклонил запрос (HTTP $STATUS$). Проверьте закладку и настройки сервера.",
     "placeholders": {
       "status": {
         "content": "$1"

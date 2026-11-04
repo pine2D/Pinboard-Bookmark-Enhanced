@@ -78,7 +78,7 @@
     const attention = q.filter((item) => !fromOtherConnection(item, current) && pbpOfflineQueueNeedsAttention(item)).length;
     const parts = [];
     if (q.length > other + attention) parts.push(t("offlineQueued", String(q.length - other - attention)));
-    if (attention) parts.push(t("offlineQueueNeedsAttention", String(attention)));
+    if (attention) parts.push(t(attention === 1 ? "offlineQueueNeedsAttentionOne" : "offlineQueueNeedsAttention", String(attention)));
     if (other) parts.push(t("offlineQueueOtherConnection", String(other)));
     if (paused) parts.push(paused);
     text.textContent = parts.join(" · ");

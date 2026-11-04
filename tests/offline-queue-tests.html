@@ -491,6 +491,29 @@ await suite("offline queue", async () => {
     for (const row of rows) assert(row.buttons.join() === "offlineRetry,offlineRemove", row.id + " buttons: " + row.buttons.join());
     for (const row of rows) assert(row.hint === (row.id === "plain" ? "" : "offlineQueueAttentionHint"), row.id + " hint: " + row.hint);
   });
+  await test("a single record that needs attention uses the singular bar copy, several the plural", async () => {
+    const LD = "linkding:https://ld.example/:conn-ld-77";
+    const item = (queueId, extra = {}) => ({ queueId, account: LD, url: "https://page.example/" + queueId, title: queueId, queuedAt: Date.now(), ...extra });
+    const failed = (queueId) => item(queueId, { failure: { code: "remote", at: 1, status: 422 } });
+    const one = await renderQueueBar({ ok: true, pause: null, account: LD, queue: [item("a"), failed("b")] });
+    assert(one.text === "offlineQueued:1 · offlineQueueNeedsAttentionOne:1", "one: " + one.text);
+    const two = await renderQueueBar({ ok: true, pause: null, account: LD, queue: [failed("b"), failed("c")] });
+    assert(two.text === "offlineQueueNeedsAttention:2", "two: " + two.text);
+    const en = await localeTranslator("en");
+    assert(en("offlineQueueNeedsAttentionOne", "1") === "1 needs attention", "en singular: " + en("offlineQueueNeedsAttentionOne", "1"));
+  });
+  await test("an attention row says it will not retry automatically and never claims retrying is pointless", async () => {
+    for (const locale of ["en", "de", "fr", "ja", "pl", "ru", "zh_CN", "zh_HK", "zh_TW"]) {
+      const tr = await localeTranslator(locale);
+      assert(tr("offlineQueueAttentionHint") && tr("offlineQueueAttentionHint") !== "offlineQueueAttentionHint", locale + " hint missing");
+    }
+    const en = await localeTranslator("en");
+    for (const key of ["pinboardErrRejected", "bookmarkErrRemote", "bookmarkErrUrlInvalid"]) {
+      assert(!/won.t help|trying again/i.test(en(key, "400")), key + " still says retrying is pointless: " + en(key, "400"));
+    }
+    const hint = en("offlineQueueAttentionHint");
+    assert(/retry or remove/i.test(hint) && /automatically/i.test(hint), "hint: " + hint);
+  });
   // The cause and the "retry stopped" line render apart, so a cause without
   // a closing full stop (Chinese titleTooLong, a Pinboard status) never runs
   // into the next sentence; no row shows a guessed number or a placeholder.

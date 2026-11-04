@@ -708,12 +708,21 @@
       }
     }
   },
+  "offlineQueueNeedsAttentionOne": {
+    "message": "Wymaga uwagi: $COUNT$",
+    "description": "Popup offline queue bar: singular form of the needs-attention count, used when exactly one queued bookmark needs attention. $COUNT$ is the number.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "offlineQueueAttentionHint": {
-    "message": "Automatyczne ponawianie zostało zatrzymane. Popraw zakładkę i zapisz stronę ponownie w popupie, a potem usuń ten wpis.",
+    "message": "Wpis nie będzie ponawiany automatycznie. Usuń przyczynę problemu, a potem ponów próbę lub usuń wpis.",
     "description": "Popup offline queue row of a bookmark that needs attention, shown on its own line under the failure message: automatic retry stopped, and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons."
   },
   "pinboardErrRejected": {
-    "message": "Pinboard odrzucił żądanie (HTTP $STATUS$). Ponowna próba nic nie zmieni. Sprawdź zakładkę.",
+    "message": "Pinboard odrzucił żądanie (HTTP $STATUS$). Sprawdź zakładkę.",
     "description": "Pinboard rejected a save with an HTTP 4xx the extension has no more specific copy for (shown on a queued bookmark that needs attention, and after its Retry). Not retryable. $STATUS$ is the HTTP status code.",
     "placeholders": {
       "status": {
@@ -5258,10 +5267,10 @@
   "bookmarkErrRateLimit": {
     "message": "Serwer zakładek otrzymuje zbyt wiele żądań. Spróbuj ponownie później."
   },
-  "bookmarkErrUrlInvalid": { "message": "linkding nie przyjmuje tego adresu. Może mieć najwyżej 2048 znaków, a host musi mieć końcówkę domeny, np. .com, chyba że to localhost lub adres IP. Ponowna próba nic nie zmieni." },
+  "bookmarkErrUrlInvalid": { "message": "linkding nie przyjmuje tego adresu. Może mieć najwyżej 2048 znaków, a host musi mieć końcówkę domeny, np. .com, chyba że to localhost lub adres IP." },
   "bookmarkErrReadLaterList": { "message": "W Karakeep jest kilka list „Przeczytaj później” utworzonych przez to rozszerzenie. Zakładka została zapisana, ale bez stanu „Przeczytaj później”. Usuń nadmiarowe listy, tak aby została jedna, i spróbuj ponownie." },
   "bookmarkErrRemote": {
-    "message": "Serwer zakładek odrzucił żądanie (HTTP $STATUS$). Ponowna próba nic nie zmieni. Sprawdź zakładkę i ustawienia serwera.",
+    "message": "Serwer zakładek odrzucił żądanie (HTTP $STATUS$). Sprawdź zakładkę i ustawienia serwera.",
     "placeholders": {
       "status": {
         "content": "$1"

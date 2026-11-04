@@ -708,12 +708,21 @@
       }
     }
   },
+  "offlineQueueNeedsAttentionOne": {
+    "message": "$COUNT$ à corriger",
+    "description": "Popup offline queue bar: singular form of the needs-attention count, used when exactly one queued bookmark needs attention. $COUNT$ is the number.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "offlineQueueAttentionHint": {
-    "message": "Les nouveaux essais automatiques sont arrêtés. Corrigez le signet et enregistrez à nouveau la page depuis le popup, puis retirez cet élément.",
+    "message": "Cet élément ne sera pas renvoyé automatiquement. Corrigez le problème, puis réessayez ou retirez-le.",
     "description": "Popup offline queue row of a bookmark that needs attention, shown on its own line under the failure message: automatic retry stopped, and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons."
   },
   "pinboardErrRejected": {
-    "message": "Pinboard a refusé la requête (HTTP $STATUS$). Réessayer n’y changera rien. Vérifiez le signet.",
+    "message": "Pinboard a refusé la requête (HTTP $STATUS$). Vérifiez le signet.",
     "description": "Pinboard rejected a save with an HTTP 4xx the extension has no more specific copy for (shown on a queued bookmark that needs attention, and after its Retry). Not retryable. $STATUS$ is the HTTP status code.",
     "placeholders": {
       "status": {
@@ -5258,10 +5267,10 @@
   "bookmarkErrRateLimit": {
     "message": "Le serveur de signets reçoit trop de requêtes. Réessayez plus tard."
   },
-  "bookmarkErrUrlInvalid": { "message": "linkding refuse cette adresse. Elle ne doit pas dépasser 2048 caractères, et son hôte doit avoir une extension de domaine comme .com, sauf pour localhost ou une adresse IP. Réessayer n’y changera rien." },
+  "bookmarkErrUrlInvalid": { "message": "linkding refuse cette adresse. Elle ne doit pas dépasser 2048 caractères, et son hôte doit avoir une extension de domaine comme .com, sauf pour localhost ou une adresse IP." },
   "bookmarkErrReadLaterList": { "message": "Karakeep contient plusieurs listes « À lire plus tard » créées par cette extension : le signet est enregistré, mais sans son état « À lire plus tard ». Supprimez les listes en trop pour n’en garder qu’une, puis réessayez." },
   "bookmarkErrRemote": {
-    "message": "Le serveur de signets a refusé la requête (HTTP $STATUS$). Réessayer n’y changera rien. Vérifiez le signet et la configuration du serveur.",
+    "message": "Le serveur de signets a refusé la requête (HTTP $STATUS$). Vérifiez le signet et la configuration du serveur.",
     "placeholders": {
       "status": {
         "content": "$1"

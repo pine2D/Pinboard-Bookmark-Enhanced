@@ -708,12 +708,21 @@
       }
     }
   },
+  "offlineQueueNeedsAttentionOne": {
+    "message": "要対応 $COUNT$ 件",
+    "description": "Popup offline queue bar: singular form of the needs-attention count, used when exactly one queued bookmark needs attention. $COUNT$ is the number.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "offlineQueueAttentionHint": {
-    "message": "自動再送は停止しました。ポップアップで修正してページを保存し直してから、この項目を削除してください。",
+    "message": "自動では再送されません。原因を直してから、再試行するか削除してください。",
     "description": "Popup offline queue row of a bookmark that needs attention, shown on its own line under the failure message: automatic retry stopped, and how to fix it: save the page again from the popup, then remove this queued item. The row also has Retry and Remove buttons."
   },
   "pinboardErrRejected": {
-    "message": "Pinboard がリクエストを拒否しました（HTTP $STATUS$）。再試行しても結果は変わりません。ブックマークの内容を確認してください。",
+    "message": "Pinboard がリクエストを拒否しました（HTTP $STATUS$）。ブックマークの内容を確認してください。",
     "description": "Pinboard rejected a save with an HTTP 4xx the extension has no more specific copy for (shown on a queued bookmark that needs attention, and after its Retry). Not retryable. $STATUS$ is the HTTP status code.",
     "placeholders": {
       "status": {
@@ -5258,10 +5267,10 @@
   "bookmarkErrRateLimit": {
     "message": "ブックマークサーバーへのリクエストが多すぎます。しばらくしてからもう一度お試しください。"
   },
-  "bookmarkErrUrlInvalid": { "message": "linkding はこのアドレスを受け付けません。アドレスは 2048 文字以内で、localhost や IP アドレス以外のホストには .com などのドメインが必要です。再試行しても結果は変わりません。" },
+  "bookmarkErrUrlInvalid": { "message": "linkding はこのアドレスを受け付けません。アドレスは 2048 文字以内で、localhost や IP アドレス以外のホストには .com などのドメインが必要です。" },
   "bookmarkErrReadLaterList": { "message": "Karakeep にこの拡張機能が作成した「後で読む」リストが複数あるため、ブックマークは保存されましたが、後で読むの状態は設定されていません。余分なリストを削除して 1 つだけ残し、もう一度お試しください。" },
   "bookmarkErrRemote": {
-    "message": "ブックマークサーバーがリクエストを拒否しました（HTTP $STATUS$）。再試行しても結果は変わりません。ブックマークの内容とサーバーの設定を確認してください。",
+    "message": "ブックマークサーバーがリクエストを拒否しました（HTTP $STATUS$）。ブックマークの内容とサーバーの設定を確認してください。",
     "placeholders": {
       "status": {
         "content": "$1"
