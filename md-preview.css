@@ -2415,6 +2415,15 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-src { font-size: 12px; color: var(--fg-muted); margin-top: var(--sp-2); }
 .xp-dict-src a { color: inherit; }
 .xp-dict-msg { color: var(--fg-muted); padding: var(--sp-1) 0; }
+/* Lookup status lines are live regions that stay in the accessibility tree
+   while empty (md-dict.js _pbpDictLiveSay): an empty line takes no height and
+   no margin instead of being hidden. A feedback box holds its line plus the
+   seconds and cancel, so it cannot be :empty; md-dict marks it
+   [data-live-empty] and it boxes nothing (display: contents), so its empty
+   line sits in the parent's flow with no height and the action row opens no
+   wrapped line or gap for it. */
+.xp-dict-msg[aria-live]:empty { padding: 0; margin: 0; }
+.xp-dict-usage-feedback[data-live-empty] { display: contents; }
 /* Tone (md-dict.js _pbpDictToneText): a failure is danger ink behind a
    warning icon; "nothing found / no such usage" is an answer, so it reads in
    body-secondary ink behind an info icon. */
@@ -2444,12 +2453,12 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 /* The AI entry's one action row: icon and text buttons on the md rung. */
 .xp-dict-ai-controls .xp-dict-connect { gap: var(--sp-1); max-inline-size: 100%; line-height: 18px; white-space: normal; overflow-wrap: anywhere; }
 .xp-dict-ai-controls .xp-dict-connect > svg { width: 14px; height: 14px; flex: none; }
-.xp-dict-ai-controls + .xp-dict-ai-status, .xp-dict-ai-controls ~ .xp-dict-usage-feedback, .xp-dict-ai-controls ~ .xp-dict-action-error { margin-top: var(--sp-2); }
+.xp-dict-ai-controls + .xp-dict-ai-status:not(:empty), .xp-dict-ai-controls ~ .xp-dict-usage-feedback:not([data-live-empty]), .xp-dict-ai-controls ~ .xp-dict-action-error { margin-top: var(--sp-2); }
 .xp-dict-ai-status, .xp-dict-ai-configure, .xp-dict-action-error { font-size: 12px; line-height: 18px; }
 .xp-dict-ai-configure { text-decoration: none; }
 /* The card's metadata line, once, after every AI block: the metadata step. */
 .xp-dict-ai-provenance { margin-top: var(--sp-4); font-size: 11px; }
-.xp-dict-ai-status, .xp-dict-ai > .xp-dict-action-error { margin-bottom: var(--sp-2); }
+.xp-dict-ai-status:not(:empty), .xp-dict-ai > .xp-dict-action-error { margin-bottom: var(--sp-2); }
 .xp-dict-ai-details { margin-top: var(--sp-2); }
 /* The title's text sits on the column edge like the text it discloses; the
    negative inline margin hands its sp-2 inset to the hover fill instead, so
@@ -2460,12 +2469,16 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
   padding: var(--sp-1) var(--sp-2); margin-inline: calc(-1 * var(--sp-2)); border-radius: var(--radius-md); box-sizing: border-box;
 }
 .xp-dict-ai-details > summary::-webkit-details-marker { display: none; }
+/* Lucide v0.525.0 chevron-down (the path of PBP_ICONS.chevronDown, stroke 2
+   on the 24 box) as a mask in the muted ink: an upright SVG stroke lands on
+   whole pixels at 125% / 150% zoom, where a 1.5px border rotated 45deg blurs. */
 .xp-dict-ai-details > summary::after {
-  content: ""; width: 5px; height: 5px; flex: none; margin-inline-start: auto;
-  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
-  color: var(--fg-muted); transform: translateY(-1px) rotate(45deg);
+  content: ""; width: 14px; height: 14px; flex: none; margin-inline-start: auto;
+  background-color: var(--fg-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
 }
-.xp-dict-ai-details[open] > summary::after { transform: translateY(1px) rotate(225deg); }
+.xp-dict-ai-details[open] > summary::after { transform: rotate(180deg); }
 .xp-dict-ai-details[open] > summary { color: var(--fg); }
 /* A height transition here would also move the bottom-anchored popover every
    frame. Settle layout once and fade the contents; library uses a flow fold. */
@@ -2575,7 +2588,7 @@ button.xp-dict-connect > .xp-dict-model:empty { display: none; }
 .xp-dict-usage-feedback[hidden], .xp-dict-usage-elapsed[hidden] { display: none; }
 /* The first entry generation reports at the top of the panel, where the
    status line sits. */
-.xp-dict-ai > .xp-dict-usage-feedback { margin-bottom: var(--sp-2); }
+.xp-dict-ai > .xp-dict-usage-feedback:not([data-live-empty]) { margin-bottom: var(--sp-2); }
 .xp-dict-retry-save { margin-top: var(--sp-2); }
 /* Save bar (dict redesign 3.2): the definition Save writes, as one line of
    plain text, and "Change" when there is another to pick. The preview takes

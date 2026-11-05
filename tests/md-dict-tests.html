@@ -1337,10 +1337,11 @@ async function runDictPermissionFeedbackTests() {
     const button = slot.querySelector(".xp-dict-connect");
     assert(button?.textContent === "dictConnect" && slot.textContent.includes("dictConnectHint"),
       "production permission gate explains the online dictionary before requesting access");
+    const quietFeedback = slot.querySelector('[role="status"]');
+    assert(quietFeedback && !quietFeedback.hidden && quietFeedback.getAttribute("aria-live") === "polite" && quietFeedback.textContent === "",
+      "the permission feedback line is in the accessibility tree, empty, before anything is said");
     button.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
-    // The hidden feedback row is laid out empty first and written after that
-    // frame (_pbpDictLiveSay, task 3d).
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const feedback = slot.querySelector('[role="status"]');
     assert(feedback && !feedback.hidden && feedback.textContent === "dictPermissionDenied" &&
@@ -2288,7 +2289,7 @@ async function runDictionaryEntryUiTests() {
       check("the lookup toolbar no longer carries a separate stop icon",!cancelled.host.querySelector('.xp-dict-ai-stop')&&[...cancelled.ui.controls.children].every(el=>!el.classList.contains('xp-dict-usage-stop')));
       check("base generation shows its phase, the seconds waited and a cancel in the panel's progress line",progress.box?.checkVisibility()&&progress.box.dataset.state==='busy'&&
         progress.text.textContent==='dictEntryGenerating'&&progress.elapsed.checkVisibility()&&progress.elapsed.textContent==='dictProgressElapsed:0'&&progress.cancel.checkVisibility()&&
-        cancelled.host.querySelector('.xp-dict-ai-status').hidden&&cancelled.host.querySelector('.xp-dict-ai-generate').hidden);
+        liveQuiet(cancelled.host.querySelector('.xp-dict-ai-status'))&&cancelled.host.querySelector('.xp-dict-ai-generate').hidden);
       check("keyboard generation keeps a visible focus target while waiting: the in-place cancel",document.activeElement===progress.cancel);
       check("the in-place cancel is its stop icon and its text, never icon-only or paid (3.3)",progress.cancel.querySelector(':scope > svg')?.dataset.icon==='stop'&&
         progress.cancel.querySelectorAll('svg').length===1&&progress.cancel.lastElementChild?.textContent==='askStop'&&progress.cancel.textContent==='askStop'&&
@@ -2311,10 +2312,10 @@ async function runDictionaryEntryUiTests() {
       const pending=calls.at(-1).signal;progress.cancel.click();release(record());await settle();
       check("cancelling generation returns focus to the available generation action",document.activeElement===cancelled.host.querySelector('.xp-dict-ai-generate'));
       check("Stop aborts the pending entry and discards late completion",pending.aborted&&cancelled.host.querySelector('.xp-dict-ai-content').hidden);
-      check("Stop leaves a usable generation entry and clears busy feedback and its clock",!cancelled.host.querySelector('.xp-dict-ai-generate').disabled&&progress.box.hidden&&
-        !progress.elapsed.textContent&&cancelled.host.querySelector('.xp-dict-ai-status').hidden&&clock.timers.size===0);
+      check("Stop leaves a usable generation entry and clears busy feedback and its clock",!cancelled.host.querySelector('.xp-dict-ai-generate').disabled&&liveQuiet(progress.box)&&
+        !progress.elapsed.textContent&&liveQuiet(cancelled.host.querySelector('.xp-dict-ai-status'))&&clock.timers.size===0);
       onStage('streaming');
-      check("a phase arriving after cancel does not revive the progress line",progress.box.hidden&&progress.cancel.hidden);
+      check("a phase arriving after cancel does not revive the progress line",liveQuiet(progress.box)&&progress.cancel.hidden);
       {
         // The user's cancel wins over a budget stop settling right after it:
         // no truncation text and no failure row.
@@ -2325,21 +2326,21 @@ async function runDictionaryEntryUiTests() {
           progressOf(racing.host.querySelector('.xp-dict-ai')).cancel.click();
           rejectBudget(Object.assign(new Error('fixture'),{code:'output_budget_exceeded',status:200}));await settle();
           check("a budget stop settling after the user's cancel shows no truncation and files nothing",rows.length===0&&
-            racing.host.querySelector('.xp-dict-ai-status').hidden&&!racing.host.textContent.includes('dictGenerationTruncated')&&clock.timers.size===0);
+            liveQuiet(racing.host.querySelector('.xp-dict-ai-status'))&&!racing.host.textContent.includes('dictGenerationTruncated')&&clock.timers.size===0);
         } finally {window.pbpDictLedgerRecord=realLedger;window.pbpDictEntryRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};}
       }
       // Every other way out also stops the clock.
       const done=mount();await done.ui.ready;done.host.querySelector('.xp-dict-ai-generate').click();await settle();
       const doneTimers=clock.timers.size;release(record());await settle();
-      check("a completed generation stops its clock and takes the progress line down",doneTimers===1&&clock.timers.size===0&&progressOf(done.host.querySelector('.xp-dict-ai')).box.hidden&&
+      check("a completed generation stops its clock and takes the progress line down",doneTimers===1&&clock.timers.size===0&&liveQuiet(progressOf(done.host.querySelector('.xp-dict-ai')).box)&&
         !done.host.querySelector('.xp-dict-ai-content').hidden);
       let rejectRun;window.pbpDictEntryRun=input=>{calls.push(input);return new Promise((_resolve,reject)=>{rejectRun=reject;});};
       const broken=mount();await broken.ui.ready;broken.host.querySelector('.xp-dict-ai-generate').click();await settle();
       rejectRun(Object.assign(new Error('fixture'),{name:'TimeoutError'}));await settle();
       const brokenError=broken.host.querySelector('.xp-dict-ai-generate').nextElementSibling;
-      check("a failed generation stops its clock and shows its error as an alert right after the generate button, not in the top status line",clock.timers.size===0&&progressOf(broken.host.querySelector('.xp-dict-ai')).box.hidden&&
+      check("a failed generation stops its clock and shows its error as an alert right after the generate button, not in the top status line",clock.timers.size===0&&liveQuiet(progressOf(broken.host.querySelector('.xp-dict-ai')).box)&&
         brokenError?.classList.contains('xp-dict-action-error')&&brokenError.getAttribute('role')==='alert'&&brokenError.textContent==='trErrTimeout'&&
-        broken.host.querySelector('.xp-dict-ai-status').hidden&&!broken.host.querySelector('.xp-dict-ai-status').textContent);
+        liveQuiet(broken.host.querySelector('.xp-dict-ai-status'))&&!broken.host.querySelector('.xp-dict-ai-status').textContent);
       const closing=mount();await closing.ui.ready;closing.host.querySelector('.xp-dict-ai-generate').click();await settle();
       const closingTimers=clock.timers.size;closing.ctrl.abort();
       check("closing the lookup stops the clock at once",closingTimers===1&&clock.timers.size===0);
@@ -2485,7 +2486,7 @@ async function runDictionaryEntryUiTests() {
         if(shown.length>1)return category+' slot holds '+shown.length+' untitled results';
         if(shown.length&&button?.checkVisibility())return category+' slot shows a result and its button';
       }
-      for(const note of host.querySelectorAll('[data-learning-block] :is(.xp-dict-usage-feedback:not([hidden]), .xp-dict-action-error)')){
+      for(const note of host.querySelectorAll('[data-learning-block] :is(.xp-dict-usage-feedback:not([data-live-empty]), .xp-dict-action-error)')){
         if(!note.closest('[data-slot]'))return 'a note outside every slot: '+note.textContent;
       }
       return '';
@@ -2698,7 +2699,7 @@ async function runDictionaryEntryUiTests() {
       const line=progressOf(submit.closest('.xp-dict-usage-actions'));
       check("supplement generation preserves a visible keyboard target on Stop",document.activeElement===line.cancel&&line.cancel.checkVisibility());
       check("supplement generation announces progress beside its own button and keeps the base progress line quiet",line.text?.textContent==='dictSupplementGenerating'&&
-        progressOf(usage.host.querySelector('.xp-dict-ai')).box.hidden&&usage.host.querySelector('.xp-dict-ai-status').hidden&&usage.host.querySelector('.xp-dict-ai').getAttribute('aria-busy')==='false');
+        liveQuiet(progressOf(usage.host.querySelector('.xp-dict-ai')).box)&&liveQuiet(usage.host.querySelector('.xp-dict-ai-status'))&&usage.host.querySelector('.xp-dict-ai').getAttribute('aria-busy')==='false');
       usageClock.advance(1000);usageClock.advance(1000);
       check("a supplement shows its seconds waited as plain text outside the live region",line.elapsed.checkVisibility()&&line.elapsed.textContent==='dictProgressElapsed:2'&&
         !line.elapsed.closest('[aria-live],[role="status"],[role="alert"]')&&usageClock.timers.size===1);
@@ -2737,7 +2738,7 @@ async function runDictionaryEntryUiTests() {
     const retryButton=retrySection.querySelector('.xp-dict-retry-save');
     const beforeRetryCalls=calls.length;
     window.pbpDictSupplementSave=async()=>{throw new Error('fixture storage failure');};retryButton.focus();retryButton.click();await settle();
-    check("failed supplement persistence reports beside its local retry without losing paid content",noteOf(retryButton)?.textContent==='dictSupplementSaveFailed'&&noteOf(retryButton).getAttribute('role')==='alert'&&retryButton.checkVisibility()&&retryUsage.host.querySelector('.xp-dict-ai-status').hidden&&retrySection.textContent.includes(addition.content)&&
+    check("failed supplement persistence reports beside its local retry without losing paid content",noteOf(retryButton)?.textContent==='dictSupplementSaveFailed'&&noteOf(retryButton).getAttribute('role')==='alert'&&retryButton.checkVisibility()&&liveQuiet(retryUsage.host.querySelector('.xp-dict-ai-status'))&&retrySection.textContent.includes(addition.content)&&
       noteOf(retryButton).closest('[data-slot]')===slotOf(retryUsage.host,'patterns')&&slotFault(retryUsage.host)==='');
     window.pbpDictSupplementSave=async(_input,value)=>({...value,archiveSaved:true});
     retryButton.focus();retryButton.click();await settle();
@@ -2747,10 +2748,10 @@ async function runDictionaryEntryUiTests() {
     window.pbpDictSupplementRun=async()=>{throw new Error('fixture failure');};
     submit=paid(failUi.host,'confusables');submit.focus();submit.click();await settle();
     check("failed supplement returns keyboard focus to its retryable action",document.activeElement===submit&&!submit.disabled);
-    check("failed supplement leaves a visible local message next to its retryable action",noteOf(submit)?.textContent==='dictSupplementUnavailable'&&noteOf(submit).checkVisibility()&&noteOf(submit).parentElement===submit.closest('.xp-dict-usage-actions')&&failUi.host.querySelector('.xp-dict-ai-status').hidden&&
+    check("failed supplement leaves a visible local message next to its retryable action",noteOf(submit)?.textContent==='dictSupplementUnavailable'&&noteOf(submit).checkVisibility()&&noteOf(submit).parentElement===submit.closest('.xp-dict-usage-actions')&&liveQuiet(failUi.host.querySelector('.xp-dict-ai-status'))&&
       noteOf(submit).closest('[data-slot]')===slotOf(failUi.host,'confusables')&&slotFault(failUi.host)==='');
     check("one usage point failing leaves the other usable and quiet",!paid(failUi.host,'patterns').disabled&&paid(failUi.host,'patterns').checkVisibility()&&
-      paid(failUi.host,'patterns').closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-feedback').hidden);
+      liveQuiet(paid(failUi.host,'patterns').closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-feedback')));
     // "Nothing usable" for a usage point has its own neutral copy, apart
     // from the retrieval no-sources one; etymology keeps its own.
     window.pbpDictSupplementRun=async()=>{throw Object.assign(new Error('fixture empty'),{code:'unsupported_usage'});};
@@ -2982,7 +2983,7 @@ async function runDictionaryEntryUiTests() {
       progressOf(reloadedMeaning.host.querySelector('.xp-dict-ai')).box!==updateLine.box);
     updateLine.cancel.click();releaseBase(structuredClone(replacementBase));await settle();
     check("cancelling a base update restores focus to the update button and keeps the paid entry",document.activeElement===baseUpdate&&baseUpdate.checkVisibility()&&
-      updateLine.box.hidden&&JSON.stringify(meaningLabels(reloadedMeaning.host))===JSON.stringify(expectedMeanings));
+      liveQuiet(updateLine.box)&&JSON.stringify(meaningLabels(reloadedMeaning.host))===JSON.stringify(expectedMeanings));
     window.pbpDictEntryRun=async()=>{throw Object.assign(new Error('fixture base update failure'),{code:'invalid_response'});};
     baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');
     baseUpdate.focus();baseUpdate.click();await settle();
@@ -3040,7 +3041,7 @@ async function runDictionaryEntryUiTests() {
         check("a failed save retry of the base entry leaves exactly one alert, right after the retry button",
           arrivedBeside&&
           after.length===1&&after[0]===baseRetry.nextElementSibling&&after[0].textContent.includes("dictEntryNotCached")&&
-          unpaidWrite.host.querySelector('.xp-dict-ai-status').hidden);
+          liveQuiet(unpaidWrite.host.querySelector('.xp-dict-ai-status')));
       } finally {window.pbpDictEntrySave=realSave;}
     }
     // A first generation fails, then a synced copy of the entry arrives: the
@@ -3201,7 +3202,7 @@ async function runDictionaryEntrySettingsTests() {
       const before={timers:timers.size,busy:line?.dataset.state};
       generating.listener({dictDefinitionLang:{newValue:"fr"}},"sync");await settle();
       check("a settings change aborts a running generation, stops its clock and takes its progress line down",
-        before.timers===1&&before.busy==="busy"&&timers.size===0&&signal?.aborted&&line.hidden&&line.querySelector('.xp-dict-usage-stop').hidden);
+        before.timers===1&&before.busy==="busy"&&timers.size===0&&signal?.aborted&&liveQuiet(line)&&line.querySelector('.xp-dict-usage-stop').hidden);
     } finally {window.setInterval=realInterval;window.clearInterval=realClear;}
   } finally {
     for(const{host,ctrl}of fixtures){ctrl.abort();host.remove();}
@@ -3568,7 +3569,7 @@ async function runDictionaryExamplesTests() {
   // row, with the warning icon; the polite status line stays empty.
   const exampleError=()=>{const el=button()?.nextElementSibling;
     return el?.classList.contains("xp-dict-action-error")&&el.getAttribute("role")==="alert"&&el.dataset.state==="error"&&
-      el.parentElement===button().parentElement&&block().querySelector(".xp-dict-usage-feedback").hidden?el:null;};
+      el.parentElement===button().parentElement&&liveQuiet(block().querySelector(".xp-dict-usage-feedback"))?el:null;};
   const run=async(settings,lang="en",term="provider")=>{_pbpDictResolveLang=async()=>lang;await pbpDictRun({text:term},{sentence:"A provider waits."},pop,ctrl,settings);await _pbpDictCurrent.ai?.ready;await settle();};
   try {
     _pbpDictLoadPack=async()=>false;_pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_examples";
@@ -3664,12 +3665,19 @@ async function runDictionaryExamplesTests() {
   }
 }
 
-// A status row is a live region: a hidden one is revealed empty first and
-// written only after a frame has laid it out empty, so its text is a change
-// to a region already in the accessibility tree (task 3d: a single frame was
-// not enough -- a rAF callback runs before its own frame's layout, so the
-// first layout after the reveal already held the text). A shown row is
-// written at once; a later call wins.
+// A lookup status row stays in the accessibility tree for its whole life
+// (2026-11-05): it is never [hidden], an empty row has no height, and
+// speaking only changes its text -- a region that enters the tree together
+// with its text is often not announced. liveQuiet(el) is the empty state:
+// present (not hidden), no text, and an empty feedback box is marked
+// [data-live-empty] so it leaves the flow.
+function liveQuiet(el) {
+  if (!el || el.hidden) return false;
+  // A feedback box also holds the seconds and the cancel; its line is what speaks.
+  if (!el.classList.contains("xp-dict-usage-feedback")) return !el.textContent;
+  const line = el.querySelector('[aria-live="polite"]');
+  return el.hasAttribute("data-live-empty") && !!line && !line.hidden && !line.textContent;
+}
 // liveRevealProbe(root) watches every polite live region under root and
 // records each one whose FIRST rendered layout already carries text. Its
 // look runs in a frame callback queued from a mutation observer, i.e. after
@@ -3691,43 +3699,87 @@ function liveRevealProbe(root) {
 }
 async function runDictLiveRowTests() {
   const frame = () => new Promise(resolve => requestAnimationFrame(() => resolve()));
-  const row = document.createElement("p"); row.hidden = true; document.body.appendChild(row);
+  const row = document.createElement("p"); row.setAttribute("role", "status"); row.setAttribute("aria-live", "polite");
+  document.body.appendChild(row);
   const paint = value => { row.textContent = value; };
+  const hiddenWrites = [];
+  const watch = new MutationObserver(list => { for (const m of list) if (m.attributeName === "hidden") hiddenWrites.push(m.target); });
+  watch.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
   try {
     _pbpDictLiveSay(row, paint, "Saved");
-    check("live row: a hidden row is shown empty before its text is written", row.hidden === false && row.textContent === "");
-    // Queued after the helper's own callback: it runs right before the first
-    // layout of the revealed row, which must still be empty.
-    const atFirstLayout = await new Promise(resolve => requestAnimationFrame(() => resolve({ hidden: row.hidden, text: row.textContent })));
-    check("live row: the first layout after the reveal holds the row empty", atFirstLayout.hidden === false && atFirstLayout.text === "");
-    await frame();
-    check("live row: the text lands after that layout", row.hidden === false && row.textContent === "Saved");
+    check("live row: a row already in the tree is written at once", row.hidden === false && row.textContent === "Saved");
     _pbpDictLiveSay(row, paint, "Updated");
-    check("live row: a shown row is written at once", row.textContent === "Updated");
+    check("live row: a new message only changes the text", row.hidden === false && row.textContent === "Updated" && _pbpDictLiveHas(row));
+    _pbpDictLiveSay(row, paint, "Updated");
+    check("live row: the same message again is cleared first", row.hidden === false && row.textContent === "" && _pbpDictLiveHas(row));
+    // Queued after the helper's own callback: it runs right before the
+    // first layout after the clear, which must still be empty.
+    const atFirstLayout = await new Promise(resolve => requestAnimationFrame(() => resolve(row.textContent)));
+    check("live row: the first layout after the clear holds the row empty", atFirstLayout === "");
+    await frame();
+    check("live row: the repeated text lands after that layout", row.textContent === "Updated");
     _pbpDictLiveSay(row, paint, "");
-    check("live row: empty text hides the row", row.hidden === true && row.textContent === "");
-    _pbpDictLiveSay(row, paint, "First");
+    check("live row: empty text empties the row but keeps it in the tree", row.hidden === false && row.textContent === "" &&
+      row.getAttribute("aria-live") === "polite" && row.hasAttribute("data-live-empty") && !_pbpDictLiveHas(row));
+    _pbpDictLiveSay(row, paint, "First"); _pbpDictLiveSay(row, paint, "First");
     _pbpDictLiveSay(row, paint, "");
     await frame(); await frame();
-    check("live row: a hide cancels a pending write", row.hidden === true && row.textContent === "");
-    _pbpDictLiveSay(row, paint, "Old");
+    check("live row: empty text cancels a pending write", row.textContent === "" && row.hidden === false);
+    _pbpDictLiveSay(row, paint, "Old"); _pbpDictLiveSay(row, paint, "Old");
     _pbpDictLiveSay(row, paint, "New");
-    check("live row: a write while the row is still entering waits for its layout too", row.hidden === false && row.textContent === "");
+    check("live row: a write while one is pending waits for it", row.textContent === "");
     await frame(); await frame();
-    check("live row: the last write wins", row.hidden === false && row.textContent === "New");
+    check("live row: the last write wins", row.textContent === "New");
+    // A row whose block is still hidden (revealed in the same task) waits
+    // two frames, so its text is not part of the reveal.
+    const block = document.createElement("div"); block.hidden = true;
+    const inner = document.createElement("p"); inner.setAttribute("aria-live", "polite"); block.appendChild(inner); document.body.appendChild(block);
+    _pbpDictLiveSay(inner, value => { inner.textContent = value; }, "Inside");
+    block.hidden = false;
+    check("live row: a row under a hidden block is not written in the revealing task", inner.textContent === "");
+    await frame(); await frame();
+    check("live row: it is written two frames later", inner.textContent === "Inside" && inner.hidden === false);
+    block.remove();
+    // A feedback box carries its line, so it is marked instead of :empty.
+    const box = document.createElement("div"); box.className = "xp-dict-usage-feedback"; box.toggleAttribute("data-live-empty", true);
+    const line = document.createElement("p"); line.setAttribute("aria-live", "polite"); box.appendChild(line); document.body.appendChild(box);
+    _pbpDictLiveSay(box, value => { line.textContent = value; }, "Busy");
+    check("live row: a feedback box drops its empty mark when it speaks", !box.hasAttribute("data-live-empty") && line.textContent === "Busy" && !box.hidden);
+    _pbpDictLiveSay(box, value => { line.textContent = value; }, "");
+    check("live row: an empty feedback box is marked empty and stays present", liveQuiet(box));
+    box.remove();
+    await frame();
+    check("live row: speaking never toggles hidden on a status row", !hiddenWrites.some(el => el === row || el === inner || el === box));
     // The probe itself must catch the bug it guards: a row revealed and
     // written in one task.
-    row.hidden = true; row.textContent = ""; row.setAttribute("aria-live", "polite");
+    row.hidden = true; row.textContent = "";
     const probe = liveRevealProbe(document.body);
     row.hidden = false; row.textContent = "Same task";
     await frame(); await frame();
     probe.stop();
     check("live row: the reveal probe catches a row revealed together with its text", probe.late.includes("Same task"));
-  } finally { row.remove(); }
+  } finally { watch.disconnect(); row.remove(); }
+}
+// High-DPI (2026-11-05): the choice list is placed from fractional client
+// rects; its left, top and width land on whole CSS pixels.
+async function runDictWholePixelTests() {
+  const frame = document.createElement("div");
+  frame.style.cssText = "position:fixed;left:20.4px;top:300.6px;width:333.3px;height:200.2px;padding:0 12.25px;border:1px solid;box-sizing:border-box";
+  const anchor = document.createElement("button"); anchor.style.cssText = "position:absolute;left:10.3px;top:150.7px;height:26.4px";
+  anchor.textContent = "Change"; frame.appendChild(anchor);
+  const menu = document.createElement("div"); menu.style.cssText = "position:fixed;height:80.35px";
+  document.body.append(frame, menu);
+  try {
+    _pbpDictPlaceMeaningMenu(menu, anchor, frame);
+    const px = value => Number.isInteger(parseFloat(value)) && /px$/.test(value);
+    check("whole pixels: the choice list's left, top and width are integers",
+      px(menu.style.left) && px(menu.style.top) && px(menu.style.width), [menu.style.left, menu.style.top, menu.style.width].join(" "));
+  } finally { frame.remove(); menu.remove(); }
 }
 
 (async function () {
   await runDictLiveRowTests();
+  await runDictWholePixelTests();
   await runDictionaryStructureUiTests();
   await runDictReviewRegressionTests();
   await runDictDefinitionLanguageTests();

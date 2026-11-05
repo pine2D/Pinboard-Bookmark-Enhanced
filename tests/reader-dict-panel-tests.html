@@ -179,5 +179,54 @@ async function withFixture(fn, ...args) { const f=await fixture(...args);try{awa
     assert(same(f.doc.querySelector('.xp-foot .xp-vocab'),'bookmarkPlus'),'save to vocabulary is not bookmarkPlus');
     assert(same(f.doc.querySelector('.xp-foot .xp-open-vocab'),'library'),'go to library is not the library icon');
   }));
+  // 2026-11-05: lookup status lines are live regions that stay in the
+  // accessibility tree while empty; an empty one takes no height or margin.
+  // Same structure md-dict.js builds (md-dict-tests checks it builds it).
+  await test('empty lookup status lines stay present with no height, margin or row gap',()=>withFixture(async f=>{
+    const ai=f.doc.createElement('div');ai.className='xp-dict-ai';
+    ai.innerHTML='<div class="xp-dict-ai-controls"><button class="xp-dict-connect" type="button">Generate</button></div>'+
+      '<div class="xp-dict-msg xp-dict-ai-status" role="status" aria-live="polite"></div>'+
+      '<div class="xp-dict-usage-feedback" data-live-empty><p class="xp-dict-msg xp-dict-usage-status" role="status" aria-live="polite"></p></div>'+
+      '<div class="xp-dict-usage-actions"><button class="xp-dict-connect" type="button">Find</button>'+
+      '<div class="xp-dict-usage-feedback" data-live-empty><p class="xp-dict-msg xp-dict-usage-status" role="status" aria-live="polite"></p></div></div>'+
+      '<div class="xp-dict-msg" role="status" aria-live="polite"></div>';
+    f.doc.querySelector('main').append(ai);await tick(f.win);
+    const cs=el=>f.win.getComputedStyle(el);
+    const status=ai.querySelector('.xp-dict-ai-status'),connect=ai.lastElementChild;
+    for(const line of [status,connect]){
+      const c=cs(line);
+      assert(!line.hidden&&c.display!=='none'&&line.getAttribute('aria-live')==='polite','empty status line left the tree');
+      assert(line.getBoundingClientRect().height===0,'empty status line has height '+line.getBoundingClientRect().height);
+      assert(['marginTop','marginBottom','paddingTop','paddingBottom'].every(k=>c[k]==='0px'),'empty status line keeps spacing '+[c.marginTop,c.marginBottom,c.paddingTop,c.paddingBottom]);
+    }
+    const [topBox,rowBox]=ai.querySelectorAll('.xp-dict-usage-feedback'),row=ai.querySelector('.xp-dict-usage-actions'),find=row.querySelector('button');
+    for(const box of [topBox,rowBox]){
+      const c=cs(box);
+      assert(c.display==='contents','empty feedback box still boxes its content: '+c.display);
+      assert(cs(box.firstElementChild).display!=='none'&&box.firstElementChild.getBoundingClientRect().height===0,'empty feedback line left the tree or takes height');
+    }
+    assert(Math.abs(row.getBoundingClientRect().height-find.getBoundingClientRect().height)<0.5,'an empty note opened the action row gap');
+    // Speaking only fills text: the same nodes take their line and spacing.
+    status.textContent='Syncing';rowBox.removeAttribute('data-live-empty');rowBox.firstElementChild.textContent='Saved';await tick(f.win);
+    assert(status.getBoundingClientRect().height>0&&cs(status).marginTop!=='0px','a status line with text has no line or spacing');
+    assert(cs(rowBox).display==='flex'&&row.getBoundingClientRect().height>find.getBoundingClientRect().height+8,'a note with text is not on its own line');
+  }));
+  // High-DPI: fractional anchors still put the card on whole CSS pixels.
+  await test('the lookup card lands on whole pixels from fractional anchors and resize rects',()=>withFixture(async f=>{
+    const cap=f.cap();cap.rect={left:60.37,top:30.61,bottom:50.29,right:130.4,width:70.03,height:19.68};
+    f.win._pbpExplainOpenPop(cap,'dict');await tick(f.win);
+    const pop=f.doc.querySelector('#explain-pop'),whole=v=>Number.isInteger(parseFloat(v));
+    const c=f.win.getComputedStyle(pop);
+    assert(whole(c.left)&&whole(c.top),'card at '+c.left+' '+c.top);
+    f.win._pbpExplainWriteDictRect(pop,{left:40.4,top:50.6,width:420.3,height:500.7});
+    const d=f.win.getComputedStyle(pop);
+    assert([d.left,d.top,d.width,d.height].every(whole),'resized card at '+[d.left,d.top,d.width,d.height].join(' '));
+  }));
+  await test('the AI disclosure chevron is the Lucide chevron, not a rotated border',()=>withFixture(async f=>{
+    await f.open();const summary=f.doc.querySelector('.xp-dict-ai-details > summary');
+    const after=f.win.getComputedStyle(summary,'::after');
+    const mask=after.maskImage||after.webkitMaskImage||'';
+    assert(/m6 9 6 6 6-6/.test(decodeURIComponent(mask))&&after.borderRightWidth==='0px'&&after.width==='14px','chevron is '+mask.slice(0,80)+' '+after.borderRightWidth);
+  }));
 })();
 </script></body></html>

@@ -2250,6 +2250,12 @@ html.motion-ready .vocab-note-save {
    that parts a source line from an entry -- message, exit and "Look up again" read as one
    group (critique round 4, 2026-10-20). */
 #vocab-ref-result .xp-dict-msg { padding: var(--lib-sp-1) 0; font-size: 13px; line-height: 18px; color: var(--lib-fg); }
+/* Lookup status lines stay in the accessibility tree while empty (md-dict.js
+   _pbpDictLiveSay): an empty line has no height or margin, and an empty
+   feedback box ([data-live-empty]) boxes nothing (display: contents), so the
+   action row opens no wrapped line or gap for it. */
+#vocab-ref-result .xp-dict-msg[aria-live]:empty { padding: 0; margin: 0; }
+#vocab-ref-result .xp-dict-usage-feedback[data-live-empty] { display: contents; }
 #vocab-ref-result .xp-dict-msg + .xp-dict-src { margin-top: var(--lib-sp-1); }
 /* Tone (md-dict.js _pbpDictToneText): a failure in danger ink behind a
    warning icon; "nothing found / no such usage" is an answer, muted ink
@@ -2315,18 +2321,16 @@ html.motion-ready .vocab-note-save {
 /* The settings link is a link, not a control: its inset stays on the scale. */
 #vocab-ref-result .xp-dict-ai-controls a.xp-dict-connect { padding-inline: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-ai-controls + .xp-dict-ai-status:not(:empty),
-#vocab-ref-result .xp-dict-ai-controls ~ .xp-dict-usage-feedback,
+#vocab-ref-result .xp-dict-ai-controls ~ .xp-dict-usage-feedback:not([data-live-empty]),
 #vocab-ref-result .xp-dict-ai-controls ~ .xp-dict-action-error { margin-top: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-ai[hidden],
 #vocab-ref-result .xp-dict-ai [hidden] { display: none; }
 /* The card's metadata line, once, after every AI block. */
 #vocab-ref-result .xp-dict-ai-provenance { margin-top: var(--lib-sp-4); }
 #vocab-ref-result .xp-dict-ai-content { min-width: 0; }
-/* No :empty collapse here: the status line is a polite live region that
-   md-dict's _pbpDictLiveSay reveals empty and fills a frame later, and
-   [hidden] (above) already removes it while there is nothing to say. An
-   empty line hidden by CSS would enter the accessibility tree with its text
-   after all (task 3d). */
+/* The status line is never [hidden] or display:none: it is a polite live
+   region that must already be in the accessibility tree when its text
+   arrives. Empty, it only drops its spacing (above). */
 #vocab-ref-result .xp-dict-ai-status:not(:empty),
 #vocab-ref-result .xp-dict-ai > .xp-dict-action-error { margin-bottom: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-ai-details { margin-top: var(--lib-sp-4); font-size: 14px; line-height: 23px; }
@@ -2455,7 +2459,7 @@ html.motion-ready .vocab-note-save {
    phase line, in fixed-width digits so the cancel beside it does not jitter.
    The first entry generation reports at the top of the panel. */
 #vocab-ref-result .xp-dict-usage-elapsed { flex: none; font-size: 13px; line-height: 18px; color: var(--lib-fg-muted); font-variant-numeric: tabular-nums; }
-#vocab-ref-result .xp-dict-ai > .xp-dict-usage-feedback { margin-bottom: var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-ai > .xp-dict-usage-feedback:not([data-live-empty]) { margin-bottom: var(--lib-sp-2); }
 /* The in-place cancel: its stop icon and its text, an sm control like the
    other lookup actions (no icon-only action in the lookup, plan 3.3). */
 #vocab-ref-result .xp-dict-usage-stop { display: inline-flex; align-items: center; gap: var(--lib-sp-1); margin: 0; }

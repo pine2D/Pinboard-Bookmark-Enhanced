@@ -1319,7 +1319,6 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
     feedback.className = "xp-dict-msg";
     feedback.setAttribute("role", "status");
     feedback.setAttribute("aria-live", "polite");
-    feedback.hidden = true;
     const say = text => _pbpDictLiveSay(feedback, value => { feedback.textContent = value; }, text);
     btn.addEventListener("click", async () => {
       if (btn.disabled) return;
@@ -1618,32 +1617,42 @@ function _pbpDictToneText(el, text, tone = "") {
   } else el.textContent = text;
   if (text && tone) el.dataset.state = tone; else delete el.dataset.state;
 }
-// A status row is a live region, and screen readers often skip a row that is
-// revealed and filled in the same rendering update (the change happens while
-// the node enters the accessibility tree). Every lookup status row therefore
-// goes through here: a hidden row is shown empty first and gets its text only
-// after a frame has laid it out empty; a row already shown is written at
-// once; empty text hides it. Two frames, not one: a requestAnimationFrame
-// callback runs BEFORE the style and layout of its own frame, so text written
-// in the first callback still enters the tree together with the row (task
-// 3d, measured with a ResizeObserver). The second callback runs after that
-// frame's layout, which is when Chromium has exposed the empty row. A write
-// while the row is still entering only replaces the pending text, and a hide
+// A status row is a live region, and a region that enters the accessibility
+// tree together with its text is often not announced (VoiceOver with Chrome
+// especially). Every lookup status row therefore stays in the tree for its
+// whole life: it is never [hidden], and an empty row takes no space (a bare
+// status line by its :empty rule, a feedback box by [data-live-empty]).
+// Speaking only changes its text: a different message is written at once, and
+// the same message again is cleared first and written two frames later, so
+// the repeat is a change too. Two frames because a requestAnimationFrame
+// callback runs BEFORE the style and layout of its own frame; the second one
+// runs after the cleared row has been laid out. A row whose ancestor is still
+// hidden (a block being revealed in the same task) waits the same two frames.
+// A write while one is pending only replaces the pending text, and empty text
 // cancels it, so the last call wins.
-const _pbpDictLivePending = new WeakMap();
+const _pbpDictLivePending = new WeakMap(), _pbpDictLiveText = new WeakMap();
+// What the row says or is about to say; "" when it is empty.
+function _pbpDictLiveHas(row) {
+  return !!(_pbpDictLivePending.get(row)?.text || _pbpDictLiveText.get(row));
+}
 function _pbpDictLiveSay(row, paint, text) {
+  text = text || "";
   const pending = _pbpDictLivePending.get(row);
   if (pending && text) { pending.paint = paint; pending.text = text; return; }
   _pbpDictLivePending.delete(row);
-  if (!text || !row.hidden) { paint(text || ""); row.hidden = !text; return; }
-  paint("");
-  row.hidden = false;
+  const rendered = row.isConnected && row.getClientRects().length > 0;
+  if (!text || (rendered && text !== _pbpDictLiveText.get(row))) {
+    paint(text); _pbpDictLiveText.set(row, text); row.toggleAttribute("data-live-empty", !text);
+    return;
+  }
+  paint(""); _pbpDictLiveText.set(row, "");
+  row.toggleAttribute("data-live-empty", false);
   const job = { paint, text };
   _pbpDictLivePending.set(row, job);
   requestAnimationFrame(() => requestAnimationFrame(() => {
     if (_pbpDictLivePending.get(row) !== job) return;
     _pbpDictLivePending.delete(row);
-    job.paint(job.text);
+    job.paint(job.text); _pbpDictLiveText.set(row, job.text);
   }));
 }
 // An action's failure (plan 3.4) is its own role=alert line placed right
@@ -1940,7 +1949,7 @@ function _pbpDictEntryMount(host, opts) {
   configure.href = "options.html#ai"; configure.target = "_blank"; configure.rel = "noopener noreferrer"; configure.hidden = true;
   controls.append(generate, reveal, configure);
   const status = document.createElement("div"); status.className = "xp-dict-msg xp-dict-ai-status";
-  status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.hidden = true;
+  status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite");
   const content = document.createElement("div"); content.className = "xp-dict-ai-content"; content.hidden = true;
   reveal.setAttribute("aria-controls", content.id = "xp-dict-ai-content-" + (++_pbpDictEntryMountSeq));
   // The card's one metadata line, after every AI block.
@@ -1998,7 +2007,7 @@ function _pbpDictEntryMount(host, opts) {
   // role=status node, so a screen reader is not interrupted every second --
   // and the in-place cancel. Phase changes speak; the seconds do not.
   const feedbackBox = anchor => {
-    const box = document.createElement("div"); box.className = "xp-dict-usage-feedback"; box.hidden = true;
+    const box = document.createElement("div"); box.className = "xp-dict-usage-feedback"; box.toggleAttribute("data-live-empty", true);
     const text = document.createElement("p"); text.className = "xp-dict-msg xp-dict-usage-status";
     text.setAttribute("role", "status"); text.setAttribute("aria-live", "polite"); text.setAttribute("aria-atomic", "true");
     const elapsed = document.createElement("span"); elapsed.className = "xp-dict-usage-elapsed"; elapsed.hidden = true;
@@ -2647,7 +2656,7 @@ function _pbpDictEntryMount(host, opts) {
         // Retrieval and AI judgement read differently; both are neutral answers
         // with the info icon, never errors, and never claim the usage is absent.
         // A remembered miss never covers a failure still shown beside the button.
-        if (remembered && feedback.box.hidden && !el.nextElementSibling?.classList.contains("xp-dict-action-error")) {
+        if (remembered && !_pbpDictLiveHas(feedback.box) && !el.nextElementSibling?.classList.contains("xp-dict-action-error")) {
           usageMessage(feedback, t(PBP_DICT_NEG_RETRIEVAL.includes(category) ? "dictSupplementNoSources" : PBP_DICT_NEG_NONE_KEYS[category]), "neutral");
           feedback.remembered = true;
         } else if (!remembered && feedback.remembered) {
@@ -2655,7 +2664,7 @@ function _pbpDictEntryMount(host, opts) {
         }
         // The row stays while it holds this button's error (a failed save
         // hides the button but must still be read beside it).
-        feedback.box.parentElement.hidden = el.hidden && feedback.box.hidden &&
+        feedback.box.parentElement.hidden = el.hidden && !_pbpDictLiveHas(feedback.box) &&
           !el.nextElementSibling?.classList.contains("xp-dict-action-error");
       }
       // The accessible names follow the faces just set (and the model).
@@ -2985,7 +2994,7 @@ function pbpDictExamplesView(opts) {
   icon.innerHTML = typeof PBP_ICONS === "object" ? PBP_ICONS.quote || "" : ""; // static shared icon
   const label = document.createElement("span"); label.textContent = t("dictExamplesFind");
   find.replaceChildren(...icon.childNodes, label);
-  const box = document.createElement("div"); box.className = "xp-dict-usage-feedback"; box.hidden = true;
+  const box = document.createElement("div"); box.className = "xp-dict-usage-feedback"; box.toggleAttribute("data-live-empty", true);
   const status = document.createElement("p"); status.className = "xp-dict-msg xp-dict-usage-status";
   status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.setAttribute("aria-atomic", "true");
   box.appendChild(status); row.append(find, box);
@@ -3447,14 +3456,16 @@ function _pbpDictPlaceMeaningMenu(menu, anchor, frame) {
   const vw = document.documentElement.clientWidth || window.innerWidth, vh = window.innerHeight;
   const f = frame.getBoundingClientRect(), cs = getComputedStyle(frame);
   const inset = side => (parseFloat(cs["border" + side + "Width"]) || 0) + (parseFloat(cs["padding" + side]) || 0);
-  const left = Math.max(0, f.left + inset("Left")), right = Math.min(vw, f.right - inset("Right"));
+  // Whole CSS pixels: fractional rects would smear the 1px border and text
+  // across device pixels at 125% / 150% zoom.
+  const left = Math.round(Math.max(0, f.left + inset("Left"))), right = Math.round(Math.min(vw, f.right - inset("Right")));
   menu.style.left = left + "px";
   menu.style.width = Math.max(0, right - left) + "px";
   // Measured after the width is set: the height follows the wrapped text.
   const a = anchor.getBoundingClientRect(), m = menu.getBoundingClientRect();
   const above = a.top - m.height - 8, below = a.bottom + 8;
   const top = above >= 16 ? above : below + m.height <= vh - 16 ? below : Math.max(16, vh - 16 - m.height);
-  menu.style.top = Math.max(16, top) + "px";
+  menu.style.top = Math.round(Math.max(16, top)) + "px";
 }
 
 function _pbpDictMountMeaningBar(cur, pop, box, signal) {

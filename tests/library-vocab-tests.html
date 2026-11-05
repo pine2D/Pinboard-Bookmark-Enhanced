@@ -4501,7 +4501,7 @@ await (async () => {
       pbpVocabSaveWord=async(owner,data,opts)=>{writes.push({owner,data,opts});return {...word,...data};};_pbpVocabReloadAfterMutation=async()=>false;
       _pbpVocabRenderDetail(word);_pbpVocabRelookup(word);await settle();
       const host=$id("vocab-ref-result");
-      check("AI entry: ordinary lookup makes no paid request by default",calls.length===0&&!!$id('vocab-ref').querySelector('.xp-dict-ai-generate')&&!$id('vocab-ref').querySelector('.xp-dict-ai-switch')&&!$id('vocab-ref').querySelector('.xp-dict-ai-stop')&&getComputedStyle(host.querySelector('.xp-dict-ai > .xp-dict-usage-feedback')).display==="none");
+      check("AI entry: ordinary lookup makes no paid request by default",calls.length===0&&!!$id('vocab-ref').querySelector('.xp-dict-ai-generate')&&!$id('vocab-ref').querySelector('.xp-dict-ai-switch')&&!$id('vocab-ref').querySelector('.xp-dict-ai-stop')&&(box=>!box.hidden&&box.hasAttribute('data-live-empty')&&getComputedStyle(box).display==="contents"&&box.querySelector('[aria-live="polite"]').getBoundingClientRect().height===0)(host.querySelector('.xp-dict-ai > .xp-dict-usage-feedback')));
       {
         // One column (3.1): heading, dictionary results, then the AI part
         // with its own action row; the heading row carries no AI control.

@@ -3362,11 +3362,13 @@ function _pbpExplainWriteDictRect(pop, rect, remember = false) {
     _pbpExplainSetPinned(pop, true);
   }
   pop.dataset.resized = "true";
-  pop.style.width = rect.width + "px";
-  pop.style.height = rect.height + "px";
-  pop.style.maxHeight = rect.height + "px";
-  pop.style.left = rect.left + "px";
-  pop.style.top = rect.top + "px";
+  // Whole CSS pixels, as in _pbpExplainPlace.
+  const width = Math.round(rect.width), height = Math.round(rect.height);
+  pop.style.width = width + "px";
+  pop.style.height = height + "px";
+  pop.style.maxHeight = height + "px";
+  pop.style.left = Math.round(rect.left) + "px";
+  pop.style.top = Math.round(rect.top) + "px";
 }
 
 function _pbpExplainFitDictSize(pop) {
@@ -3564,6 +3566,10 @@ function _pbpExplainPlace(pop, left, top) {
     left: Math.max(b.left, Math.min(left, b.right - pop.offsetWidth)),
     top: Math.max(b.top, Math.min(top, b.bottom - pop.offsetHeight))
   } : pbpExplainClampPosition(left, top, pop.offsetWidth, pop.offsetHeight, window.innerWidth, window.innerHeight);
+  // Whole CSS pixels: the anchors come from fractional client rects, and at
+  // 125% / 150% zoom a fractional origin smears the card's 1px border and
+  // text across device pixels.
+  pos.left = Math.round(pos.left); pos.top = Math.round(pos.top);
   const nextLeft = pos.left + "px";
   const nextTop = pos.top + "px";
   if (pop.style.left !== nextLeft) pop.style.left = nextLeft;
