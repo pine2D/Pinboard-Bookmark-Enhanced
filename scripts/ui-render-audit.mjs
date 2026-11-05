@@ -9799,6 +9799,9 @@ async function runSweep(page, sw, extBase) {
         if (wants("options", "tag-gov-entity-deselected")) {
           await scan("options", "tag-gov-entity-deselected", async () => {
             await page.locator(".tag-gov-entity-checkbox").last().click();
+            // Park the pointer: the click leaves it where a section summary can
+            // land after the list reflows, and the audit would read its hover face.
+            await page.mouse.move(0, 0);
             await page.waitForTimeout(100);
             return true;
           });
