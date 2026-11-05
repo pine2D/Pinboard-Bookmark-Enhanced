@@ -2247,8 +2247,9 @@ html.motion-ready .pf:not([hidden]) {
 /* Native details disclosure motion (height + opacity + content-visibility).
    Older Chromium versions that lack ::details-content simply keep native
    instant open/close behavior. Only a pointer-clicked <details> carries
-   .motion-toggle (options.js pbpMotionMark); first paint, tab switches,
-   keyboard toggles, restores and a sibling help closing all flip instantly. */
+   .motion-toggle (options.js pbpMotionMark), plus the help it closes as the
+   one-open sibling; first paint, tab switches, keyboard toggles and restores
+   all flip instantly. */
 details::details-content {
   height: 0;
   opacity: 0;

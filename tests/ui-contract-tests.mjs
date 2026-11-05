@@ -1820,20 +1820,34 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     // button may lead with an icon whose synthesized baseline is its bottom).
     /(?:^|\n)\.context-help-action-row\[data-help-role="action"\] > \.vocab-toolbar,\s*\.context-help-action-row\[data-help-role="action"\] > \.vocab-toolbar ~ \.context-help > summary\.context-help-toggle \{ align-self: last baseline; \}/.test(optionsCss),
     "options.css: contextual help lost its anchoring split (copy roles on the text baseline via the label span, the action row's wrapper and toggle on the button-text baseline, its container centred)");
-  check(/const det = summary && summary\.closest\("details"\);[\s\S]{0,800}details\.context-help\[open\]/.test(optionsJs),
+  check(/const det = summary && summary\.closest\("details"\);[\s\S]{0,1600}details\.context-help\[open\]/.test(optionsJs),
     "options.js: contextual help lost the native-details motion gate or one-open-per-panel behavior");
-  // Motion is for the one element the user pointed at: the closing sibling is
-  // unmarked (instant) with the clicked summary held in place by an instant
-  // scroll, and keyboard activations (click detail 0) never get the marker.
+  // Motion follows the pointer: on a pointer click (detail > 0, motion-ready,
+  // no reduced motion) the open sibling help folds shut with the normal
+  // collapse while the clicked one opens, and a bounded rAF loop holds the
+  // clicked summary's viewport top by scrolling the drift each frame, with
+  // scroll anchoring off on the scroller so the shift is not corrected twice.
+  // Without motion (keyboard, reduced motion) both flip at once and the scroll
+  // is fixed in one step. 2026-11-05 user ruling (the instant close jumped).
   {
     const at = optionsJs.indexOf('const det = summary && summary.closest("details");');
     const handler = at < 0 ? "" : optionsJs.slice(at, optionsJs.indexOf("}, true);", at));
-    check(/pbpMotionUnmark\(other\);\s*other\.open = false;/.test(handler) &&
-      !/pbpMotionMark\(other\)/.test(handler) &&
-      /summary\.getBoundingClientRect\(\)\.top[\s\S]{0,300}other\.open = false[\s\S]{0,200}summary\.getBoundingClientRect\(\)\.top[\s\S]{0,120}window\.scrollBy\(\{ top: shift, behavior: "instant" \}\)/.test(handler) &&
-      /if \(e\.detail > 0\) pbpMotionMark\(det\);/.test(handler) &&
+    const fnAt = optionsJs.indexOf("function pbpPinDuringFold(");
+    const pin = fnAt < 0 ? "" : optionsJs.slice(fnAt, optionsJs.indexOf("\n  }\n", fnAt));
+    const stopAt = optionsJs.indexOf("function pbpStopPinLoop(");
+    const stop = stopAt < 0 ? "" : optionsJs.slice(stopAt, optionsJs.indexOf("\n  }\n", stopAt));
+    check(/const animate = e\.detail > 0 && !pbpPrefersReducedMotion\(\)\s*&& document\.documentElement\.classList\.contains\("motion-ready"\);/.test(handler) &&
+      /if \(animate\) pbpMotionMark\(other\);\s*else pbpMotionUnmark\(other\);\s*other\.open = false;/.test(handler) &&
+      /const before = summary\.getBoundingClientRect\(\)\.top;[\s\S]{0,400}if \(animate\) \{\s*pbpPinDuringFold\(summary, before\);\s*\} else \{\s*const shift = summary\.getBoundingClientRect\(\)\.top - before;\s*if \(shift\) window\.scrollBy\(\{ top: shift, behavior: "instant" \}\);/.test(handler) &&
+      /if \(animate\) pbpMotionMark\(det\);\s*else pbpMotionUnmark\(det\);/.test(handler) &&
+      handler.indexOf("pbpStopPinLoop();") >= 0 && handler.indexOf("pbpStopPinLoop();") < handler.indexOf("const animate") &&
+      /--motion-collapse"\)\)[\s\S]{0,120}--motion-collapse-out"\)\)[\s\S]{0,120}performance\.now\(\) \+ longest \+ 17/.test(pin) &&
+      /style\.setProperty\("overflow-anchor", "none"\)/.test(pin) &&
+      /el\.getBoundingClientRect\(\)\.top - top;\s*if \(drift\) window\.scrollBy\(\{ top: drift, behavior: "instant" \}\);/.test(pin) &&
+      /requestAnimationFrame\(tick\)/.test(pin) &&
+      /cancelAnimationFrame\(_pbpPinLoop\.raf\);\s*document\.documentElement\.style\.removeProperty\("overflow-anchor"\);/.test(stop) &&
       /function pbpMotionUnmark\(el\) \{\s*clearTimeout\(el\._ppMotionT\);\s*el\.classList\.remove\("motion-toggle"\);/.test(optionsJs),
-      "options.js: the details click gate animates more than the clicked pointer toggle (sibling help must close instantly with scroll compensation; keyboard toggles must stay instant)");
+      "options.js: the details click gate lost its motion split (pointer: sibling help folds with the normal collapse while a bounded rAF loop with scroll anchoring off holds the clicked ? in place; keyboard / reduced motion: both instant, one-step scroll fix)");
   }
   check(/const det = e\.target\.matches\?\.\("details\[data-acc-key\]"\) \? e\.target : null/.test(optionsJs) &&
     !/const det = e\.target\.closest\?\.\("details\[data-acc-key\]"\)/.test(optionsJs),
@@ -6243,8 +6257,9 @@ check(!mdReaderJs.includes("function pbpTypoApplyVars") && !mdReaderJs.includes(
   check(JSON.stringify(whitelisted) === JSON.stringify(steps.filter((w) => w !== dflt).sort((x, y) => x - y)),
     `md-preview.js pre-paint width whitelist [${whitelisted}] must be exactly the non-default steps of [${steps}] (default ${dflt})`);
 }
-// (2) Scroll grab: tier changes settle the anchor SYNCHRONOUSLY -- the 300ms
-// second phase belongs to the width path's max-width transition only.
+// (2) Scroll grab: tier changes settle the anchor SYNCHRONOUSLY. No reader
+// path has a delayed second settle any more (2026-11-05: the width path's
+// 300ms two-phase settle was removed with it; md-reader.js settles once).
 {
   const typoSet = mdReaderJs.slice(mdReaderJs.indexOf("function _pbpTypoSet"), mdReaderJs.indexOf("function _pbpTypoSyncPop"));
   check(typoSet.includes("_pbpZenSettleAnchor(anchor)") && !typoSet.includes("_pbpZenSettleAfterLayout"),

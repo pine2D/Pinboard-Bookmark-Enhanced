@@ -2665,11 +2665,44 @@ document.addEventListener("DOMContentLoaded", async () => {
     el.classList.add("motion-toggle");
     el._ppMotionT = setTimeout(() => el.classList.remove("motion-toggle"), 400);
   }
-  // A sibling closing as a side effect is not what the user clicked: drop any
-  // motion marker it still carries so the close lands in one frame.
+  // Strip a live marker so the next flip of this <details> lands in one frame
+  // (keyboard toggles, reduced motion, a sibling closed by a keyboard open).
   function pbpMotionUnmark(el) {
     clearTimeout(el._ppMotionT);
     el.classList.remove("motion-toggle");
+  }
+  // Keeps one element at a fixed viewport top while folds above it animate:
+  // each frame measures it and scrolls by the drift, so the content above
+  // slides away smoothly instead of the target sliding off the pointer.
+  // Chrome's scroll anchoring would correct the same shift a second time, so
+  // it is switched off on the (window) scroller only while the loop runs.
+  // Where the page cannot scroll further the clamp simply lets the target
+  // move with the animation -- no end-of-run snap.
+  let _pbpPinLoop = null;
+  function pbpStopPinLoop() {
+    if (!_pbpPinLoop) return;
+    cancelAnimationFrame(_pbpPinLoop.raf);
+    document.documentElement.style.removeProperty("overflow-anchor");
+    _pbpPinLoop = null;
+  }
+  function pbpPinDuringFold(el, top) {
+    pbpStopPinLoop();
+    const root = getComputedStyle(document.documentElement);
+    const longest = Math.max(
+      parseFloat(root.getPropertyValue("--motion-collapse")) || 200,
+      parseFloat(root.getPropertyValue("--motion-collapse-out")) || 160);
+    const deadline = performance.now() + longest + 17; // + one frame
+    document.documentElement.style.setProperty("overflow-anchor", "none");
+    const loop = { raf: 0 };
+    const tick = (now) => {
+      if (_pbpPinLoop !== loop) return;
+      const drift = el.getBoundingClientRect().top - top;
+      if (drift) window.scrollBy({ top: drift, behavior: "instant" });
+      if (now >= deadline || !el.isConnected) { pbpStopPinLoop(); return; }
+      loop.raf = requestAnimationFrame(tick);
+    };
+    _pbpPinLoop = loop;
+    loop.raf = requestAnimationFrame(tick);
   }
   // Capture phase runs before the default toggle action renders
   // ::details-content, so the marker is in place for the entry frame.
@@ -2678,11 +2711,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const summary = e.target.closest("summary");
     const det = summary && summary.closest("details");
     if (!det) return;
+    pbpStopPinLoop();
+    // Only pointer clicks animate. Enter/Space on a summary dispatches a click
+    // with detail 0; a keyboard user gets the end state at once.
+    const animate = e.detail > 0 && !pbpPrefersReducedMotion()
+      && document.documentElement.classList.contains("motion-ready");
     // Context help is deliberately transient: keep at most one explanation
-    // open in a panel. The sibling closes INSTANTLY -- animating it alongside
-    // the new answer moved the clicked "?" out from under the pointer whenever
-    // the old answer sat above it -- and the scroll is corrected in the same
-    // frame so the clicked summary keeps its on-screen position.
+    // open in a panel. On a pointer click the sibling folds shut with the
+    // normal collapse while the new answer opens, and the clicked "?" is held
+    // under the pointer frame by frame. Without motion (keyboard, reduced
+    // motion) the sibling closes at once and the scroll is fixed in one step.
     if (det.matches("details.context-help") && !det.open) {
       const panel = det.closest(".panel");
       const others = [...(panel?.querySelectorAll("details.context-help[open]") || [])]
@@ -2690,16 +2728,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (others.length) {
         const before = summary.getBoundingClientRect().top;
         for (const other of others) {
-          pbpMotionUnmark(other);
+          if (animate) pbpMotionMark(other);
+          else pbpMotionUnmark(other);
           other.open = false;
         }
-        const shift = summary.getBoundingClientRect().top - before;
-        if (shift) window.scrollBy({ top: shift, behavior: "instant" });
+        if (animate) {
+          pbpPinDuringFold(summary, before);
+        } else {
+          const shift = summary.getBoundingClientRect().top - before;
+          if (shift) window.scrollBy({ top: shift, behavior: "instant" });
+        }
       }
     }
-    // Only pointer clicks animate. Enter/Space on a summary dispatches a click
-    // with detail 0; a keyboard user gets the end state at once.
-    if (e.detail > 0) pbpMotionMark(det);
+    if (animate) pbpMotionMark(det);
     else pbpMotionUnmark(det);
   }, true);
   document.addEventListener("toggle", (e) => {

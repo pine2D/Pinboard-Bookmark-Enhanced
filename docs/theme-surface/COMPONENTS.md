@@ -383,8 +383,11 @@ inline 元素的默认基线对齐在「图标 + 文字」场景下几乎总是�
   各跑一次，取两者都落在容差内的值。
 - `<details>` 继续复用全局 disclosure 的 `::details-content` 折叠配方（§3.5）与 one-open-per-panel 行为，
   组件层不另写折叠 transition；`?` 本身只有 `color` / `opacity` 的 `--motion-state` 悬停过渡。
-  打开一个 `?` 时，同面板已开的那个**瞬时**关闭（不动画），并在同一帧按被点 summary 的位移量
-  `scrollBy({behavior:"instant"})` 补偿，被点的 `?` 始终留在光标下（2026-11-05 用户裁决）。
+  指针点开一个 `?` 时，同面板已开的那个按正常收起动画同时关闭；options.js 的 `pbpPinDuringFold`
+  在过渡期间（最长过渡加一帧）逐帧量被点 summary 的 top，用 `scrollBy({behavior:"instant"})` 补上
+  位移，上方内容平滑上移，被点的 `?` 留在光标下。期间在滚动容器上临时设 `overflow-anchor: none`，
+  免得 Chrome 滚动锚定重复补偿；页面滚不动时 `?` 随动画移动，不在结尾跳位。键盘触发和减弱动效下
+  两者瞬时开合，滚动一步补齐（2026-11-05 用户裁决；瞬时关闭的初版被否，页面会跳）。
 - 门：`options-context-help-tests.html` 扫完整角色注册表、相邻锚点、24px 命中区、展开归属与间距；
   `options-help-render-audit.mjs` 用真实截图像素覆盖 zh-CN/en、DPR 1/1.25/1.5/2 和五种角色。
 
@@ -505,7 +508,8 @@ html.motion-ready details.motion-toggle[open]::details-content {
 - 进出都用 ease-out，退出比进入快。旧的 ease-in-out 200ms 前 60ms 只走 9%，读起来是「先卡后跳」。
 - 只动 transform / opacity。折叠与删除列表项可以动 height，但必须同时带 opacity，文字先于裁切线淡出、
   晚于裁切线淡入。会让正文重排的属性（margin、width、max-width 等）永不过渡。
-- 只动用户点的那一个；连带变化（同面板另一个 `?` 关闭等）瞬时完成，并在同一帧补偿滚动。
+- 动效跟着用户点的那一下走：连带关闭的同面板 `?` 和被点的一起动画，期间逐帧补偿滚动，让被点的元素
+  留在光标下（§2.5）；用户没点的东西不另起动画。
 - 永不动画：首屏、标签页切换、按压（§3.1）、键盘触发（`click.detail === 0`）、程序恢复（pp-acc 恢复、
   搜索跳转展开祖先）、筛选与排序。options 的 `.motion-toggle` 与 library 的 `.dict-motion` 只在指针点击时加上，
   400ms 后撤掉。
@@ -517,7 +521,7 @@ html.motion-ready details.motion-toggle[open]::details-content {
   `details::details-content { transition-duration: 0.01ms !important; }`，且不能并进 `*` 那条选择器列表
   （不支持该伪元素的 Chromium 会让整条规则失效）；library 查词折叠与阅读器折叠在 JS / 选择器里自行门控。
 - 门：`tests/ui-contract-tests.mjs` 钉住 options 折叠配方、`?` 悬停过渡、reduce 规则，以及 options.js
-  点击门（兄弟瞬时关闭 + 滚动补偿、仅 `e.detail > 0` 才加标记）。
+  点击门（指针点击时兄弟随收起动画关闭 + 逐帧滚动补偿并关滚动锚定；键盘与减弱动效瞬时、一步补齐）。
 
 ---
 
