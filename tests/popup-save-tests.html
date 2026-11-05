@@ -4706,7 +4706,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const fragmentProbeEnd = source.indexOf("// ===================== Existing Bookmark", fragmentProbeStart);
     assert(fragmentProbeStart >= 0 && fragmentProbeEnd > fragmentProbeStart, "the #fragment probe source was not found");
     const fragmentProbeSource = source.slice(fragmentProbeStart, fragmentProbeEnd);
-    function createFragmentHarness(service, answer) {
+    function createFragmentHarness(service, answer, { deletedRecentUrl = null } = {}) {
       const sent = [];
       const host = document.createElement("div");
       host.className = "form-body";
@@ -4753,10 +4753,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "let pinboardFetch, pinboardFetchImmediate;",
         proxySource,
         "function pbpPopupDraftRestoredField() { return false; }",
+        // popup.js's predicate, answered here: the form holds a restored draft
+        // of a recent bookmark at this address.
+        deletedRecentUrl ? "function pbpPopupDraftOfDeletedRecent(url) { return url === " + JSON.stringify(deletedRecentUrl) + "; }" : "",
         "let _popupDraftRestored = false, _tagsUserTouched = false, _linkdingDescriptionKnown = false, _linkdingDescriptionPending = false, _linkdingPageDescription = null;",
         // popup.js's invalidateBookmarkLookup, for the parts this flow reads:
         // a new generation, and the hint of the lookup it ends goes with it.
-        "function invalidateBookmarkLookup() { bookmarkLookup = { status: 'idle', url: '', generation: bookmarkLookup.generation + 1, promise: null, formLoaded: false }; existingBookmark = null; pbpDismissFragmentMatch(); }",
+        "function invalidateBookmarkLookup() { bookmarkLookup = { status: 'idle', url: '', generation: bookmarkLookup.generation + 1, promise: null, formLoaded: false }; existingBookmark = null; pbpDismissFragmentMatch(); const banner = $id('existing-banner'); banner.textContent = ''; banner.classList.add('hidden'); }",
         fragmentProbeSource,
         lookupSource,
         "return { checkExistingBookmark, invalidateBookmarkLookup, getLookup: () => bookmarkLookup };",
@@ -4875,6 +4878,30 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
+    // User decision 2026-11-05: an error that asks the user to do something
+    // stays until that action works again or the user dismisses it. Every
+    // call that shows one of these keys passes the remedy, and the source
+    // retires that same card where the action next succeeds.
+    test("errors that ask for an action stay up and are retired by that action's next success", () => {
+      const sites = [
+        [source, "popupDraftFailed"], [source, "popupDraftDiscardFailed"], [source, "mdPreviewOpenFailed"],
+        [source, "obsidianClipboardFailed"], [popupAiSource, "aiEmptyResult"],
+      ];
+      for (const [src, key] of sites) {
+        const calls = src.split('showStatus("status-msg", t("' + key + '")').slice(1).map((rest) => rest.slice(0, rest.indexOf(";")));
+        assert(calls.length > 0, key + ": no call shows it");
+        for (const call of calls) assert(call.includes('{ remedy: true, key: "' + key + '" }'), key + ": a call hides on a timer: " + call);
+        assert(src.includes('pbpDismissRemedyStatus("' + key + '")'), key + ": nothing retires the card when the action works");
+      }
+      const tagFallback = popupTagsSource.slice(popupTagsSource.indexOf("function showTagSyncError("), popupTagsSource.indexOf("// ---- Tags Input Setup"));
+      assert(tagFallback.includes('"error", { remedy: true, key: "tagSyncFailed" }'), "the tag sync fallback card hides on a timer");
+      const sync = popupTagsSource.slice(popupTagsSource.indexOf("async function fetchAllUserTags("), popupTagsSource.indexOf("function showTagSyncError("));
+      assert(/applyTagData\(data\);\s*if \(typeof pbpDismissRemedyStatus === "function"\) pbpDismissRemedyStatus\("tagSyncFailed"\);/.test(sync), "a sync that works leaves the failure card up");
+      // An AI summary served from the cache is a success too.
+      const cached = popupAiSource.slice(popupAiSource.indexOf("const cached = await pbpAiFastCached(\"summary\""), popupAiSource.indexOf("setAiProgress(\"ai-summary-btn\", { provider: s.aiProvider, stage: \"extracting\""));
+      assert(/pbpDismissRemedyStatus\("aiEmptyResult"\);\s*showSummaryActions\(true\)/.test(cached), "a cached summary leaves the empty-result card up");
+    });
+
     await testAsync("#fragment address: a save waits at most 3 s for a pending probe", async () => {
       const waitStart = source.indexOf("const PBP_FRAGMENT_PROBE_SAVE_WAIT_MS");
       const waitEnd = source.indexOf("// ===================== Existing Bookmark", waitStart);
@@ -4902,6 +4929,35 @@ test("posts/add default remains replace=yes for existing callers", () => {
           assert(h.getLookup().status === "missing" && h.getLookup().url === HASHED, service + ": Save as new changed the lookup it saves against");
           assert(h.notice().length === 0, service + ": the notice stayed after Save as new");
         } finally { h.cleanup(); }
+      }
+    });
+
+    // User decision 2026-11-05: a restored recent-bookmark draft whose bookmark
+    // was deleted elsewhere used to re-add it silently on Save.
+    await testAsync("a restored recent-bookmark draft whose bookmark is gone says Save adds it again, and keeps the text", async () => {
+      for (const service of ["pinboard", "linkding", "karakeep"]) {
+        const h = createFragmentHarness(service, fragmentWorker({}), { deletedRecentUrl: URL });
+        try {
+          h.real["title-input"].value = "Draft title";
+          assert((await h.open(URL)).status === "missing", service + ": lookup " + JSON.stringify(h.getLookup()));
+          const banner = h.real["existing-banner"];
+          assert(!banner.classList.contains("hidden") && banner.textContent === "popupDraftRecentDeleted", service + ": no deleted-bookmark line: " + banner.className + " " + banner.textContent);
+          assert(h.real["title-input"].value === "Draft title", service + ": the draft title was replaced");
+          // The line belongs to that lookup: an address edit takes it down.
+          h.real["url-input"].value = URL + "x";
+          h.real["url-input"].dispatchEvent(new Event("input"));
+          assert(banner.classList.contains("hidden") && banner.textContent === "", service + ": the line outlived its address");
+        } finally { h.cleanup(); }
+        const found = createFragmentHarness(service, fragmentWorker({ [URL]: fragmentPost(service) }), { deletedRecentUrl: URL });
+        try {
+          assert((await found.open(URL)).status === "found", service + ": found lookup");
+          assert(found.real["existing-banner"].textContent !== "popupDraftRecentDeleted", service + ": a bookmark still saved was called deleted");
+        } finally { found.cleanup(); }
+        const other = createFragmentHarness(service, fragmentWorker({}));
+        try {
+          await other.open(URL);
+          assert(other.real["existing-banner"].textContent !== "popupDraftRecentDeleted", service + ": an unsaved page that is no recent draft was called deleted");
+        } finally { other.cleanup(); }
       }
     });
 
@@ -6271,6 +6327,71 @@ test("posts/add default remains replace=yes for existing callers", () => {
       } finally { c.btn.remove(); }
     });
 
+    // User decision 2026-11-05: linkding has no rate limit, but a save on a
+    // #fragment address can wait up to 3 s for the duplicate probe with only
+    // "Saving…" showing. Past 800ms the line says what it is waiting for.
+    test("linkding: a save waiting on the #fragment probe says so after 800ms, and only then", () => {
+      const fnStart = source.indexOf("  let saveWaitNoteTimer = null;");
+      const fnEnd = source.indexOf("\n  }\n", source.indexOf("  function setSubmitState(state, label) {")) + 4;
+      assert(fnStart >= 0 && fnEnd > fnStart, "setSubmitState source not found");
+      const make = (service) => {
+        const btn = document.createElement("button");
+        document.body.appendChild(btn);
+        const status = document.createElement("p");
+        status.className = "status-msg hidden";
+        const timers = [];
+        const shown = [];
+        const showStatus = (id, msg, kind) => { shown.push([id, msg, kind]); status.textContent = msg; status.className = "status-msg " + kind; };
+        const api = new Function("btn", "t", "$id", "bookmarkLookup", "updateCharCount",
+          "showStatus", "setTimeout", "clearTimeout", "settings", "pbpBookmarkServiceId",
+          source.slice(fnStart, fnEnd) + "; return { setSubmitState, setSaveWaitingForProbe };")(
+          btn, (k) => k, (id) => (id === "status-msg" ? status : { value: "" }), { status: "none" }, () => {},
+          showStatus,
+          (fn, ms) => { timers.push({ fn, ms, live: true }); return timers.length; },
+          (id) => { if (id && timers[id - 1]) timers[id - 1].live = false; }, { bookmarkService: service }, (x) => x.bookmarkService);
+        return { btn, status, timers, shown, ...api };
+      };
+      const a = make("linkding");
+      try { // the probe wait starts first, then 800ms pass
+        a.setSubmitState("loading");
+        a.setSaveWaitingForProbe(true);
+        assert(a.shown.length === 0, "the hint showed before 800ms");
+        a.timers[0].fn();
+        assert(a.shown.length === 1 && a.shown[0][1] === "saveWaitFragmentProbe" && a.shown[0][2] === "info", "no probe hint at 800ms: " + JSON.stringify(a.shown));
+        a.setSaveWaitingForProbe(false);
+        assert(a.status.classList.contains("hidden"), "the hint stayed after the probe answered");
+      } finally { a.btn.remove(); }
+      const b = make("linkding");
+      try { // the lookup took the first 800ms; the probe wait starts after
+        b.setSubmitState("loading");
+        b.timers[0].fn();
+        assert(b.shown.length === 0, "linkding showed a wait line with no probe to wait for: " + JSON.stringify(b.shown));
+        b.setSaveWaitingForProbe(true);
+        assert(b.shown.length === 1 && b.shown[0][1] === "saveWaitFragmentProbe", "a probe wait starting after 800ms showed nothing");
+        b.setSubmitState("success");
+        assert(b.status.classList.contains("hidden"), "leaving loading left the hint up");
+      } finally { b.btn.remove(); }
+      const c = make("linkding");
+      try { // a fast probe answers before 800ms
+        c.setSubmitState("loading");
+        c.setSaveWaitingForProbe(true);
+        c.setSaveWaitingForProbe(false);
+        c.timers[0].fn();
+        assert(c.shown.length === 0, "a probe that answered in time still showed the hint");
+      } finally { c.btn.remove(); }
+      const d = make("pinboard");
+      try { // Pinboard keeps its rate-limit line, probe or not
+        d.setSubmitState("loading");
+        d.setSaveWaitingForProbe(true);
+        d.timers[0].fn();
+        assert(d.shown.length === 1 && d.shown[0][1] === "saveWaitRateLimit", "Pinboard lost its rate-limit line: " + JSON.stringify(d.shown));
+        d.setSaveWaitingForProbe(false);
+        assert(!d.status.classList.contains("hidden"), "the probe answering took Pinboard's rate-limit line down");
+      } finally { d.btn.remove(); }
+      const click = source.slice(source.indexOf("const fragmentProbeWait = pbpFragmentProbeWait("), source.indexOf("const savePolicy = pbpPopupSavePolicy(", source.indexOf("const fragmentProbeWait = pbpFragmentProbeWait(")));
+      assert(/setSaveWaitingForProbe\(true\)[\s\S]*await fragmentProbeWait[\s\S]*setSaveWaitingForProbe\(false\)/.test(click), "the save does not bracket its probe wait");
+    });
+
     // Critique 2026-10-19: a failed recent-list delete was reported by the
     // form's status card, far from the row that is still standing.
     test("recent-list delete failures report inside the recent list", () => {
@@ -6279,6 +6400,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(start >= 0 && end > start, "recent delete block not found");
       const block = source.slice(start, end);
       assert(/showFeedback\(\{[^}]*target: container/.test(block), "failure card must mount in the recent list (target: container)");
+      // User decision 2026-11-05: the row is still there and the user has to
+      // try again, so the card stays until the next delete goes through.
+      assert(/showFeedback\(\{[^}]*autoHide: 0[^}]*target: container/.test(block), "the delete failure card hides on a timer");
+      assert(/remedyKey = "recentDeleteFailed"/.test(block) && /pbpDismissRemedyStatus\("recentDeleteFailed"\);\s*row\.remove\(\)/.test(block),
+        "the delete failure card is not retired by the next delete that goes through");
       assert(!/showStatus\(/.test(block), "no failure path may fall back to the form's status card");
       assert((block.match(/reportDeleteFailure\(/g) || []).length === 3, "all failure paths (self-hosted result, API result, network) must use the in-list report");
     });

@@ -4681,6 +4681,9 @@
   "popupDraftDiscardFailed": {
     "message": "無法捨棄草稿，請重試。"
   },
+  "popupDraftRecentDeleted": {
+    "message": "這個書籤已被刪除，儲存後會依你的草稿重新加入。"
+  },
   "optRetrySave": { "message": "重試儲存" },
   "trRateLimitWaiting": {"message": "觸發限流，$SECONDS$ 秒後重試…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "已停止，保留 $DONE$ / $TOTAL$ 段譯文。", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
@@ -4735,6 +4738,7 @@
       "message": "有一筆標記或筆記過大，無法同步。請縮短或刪除該筆內容，然後按「立即同步」。"
     },
   "saveWaitRateLimit": { "message": "仍在儲存：Pinboard 每 3 秒只接受一次請求。" },
+  "saveWaitFragmentProbe": { "message": "正在檢查這個頁面是否已經儲存過…" },
   "batchConfirmMsg": { "message": "要儲存目前視窗的 $COUNT$ 個分頁嗎？", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "已收藏的頁面會略過。" },
   "batchConfirmDetailAi": { "message": "已收藏的頁面會略過，不會呼叫 AI。其餘每個分頁呼叫一次 AI，費用計入你的 API Key。" },

@@ -1324,7 +1324,9 @@ async function doAISummary(forceRefresh, sOverride) {
         const adopted = await _aiRestoreSummaryOwnership(account, $id("url-input").value, cached);
         if (!_aiOpStillCurrent(account)) return;
         if (adopted) return;
-        if (upsertSummary(cached) === false) { showStatus("status-msg", t("aiEmptyResult"), "error"); return; }
+        if (upsertSummary(cached) === false) { showStatus("status-msg", t("aiEmptyResult"), "error", { remedy: true, key: "aiEmptyResult" }); return; }
+        // A summary is in place now, so the empty-result card is over.
+        if (typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("aiEmptyResult");
         showSummaryActions(true);
         return;
       }
@@ -1352,10 +1354,10 @@ async function doAISummary(forceRefresh, sOverride) {
     if (summary) await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s);
     if (!_aiOpStillCurrent(account)) return;
     // The page text was there (checked above); an empty reply is the model's.
-    if (!summary) { showStatus("status-msg", t("aiEmptyResult"), "error"); return; }
+    if (!summary) { showStatus("status-msg", t("aiEmptyResult"), "error", { remedy: true, key: "aiEmptyResult" }); return; }
     // Every summary paid for is written: a linkding Description the user
     // wrote is followed, not replaced (decision 2026-11-02 #4).
-    if (upsertSummary(summary) === false) { showStatus("status-msg", t("aiEmptyResult"), "error"); return; }
+    if (upsertSummary(summary) === false) { showStatus("status-msg", t("aiEmptyResult"), "error", { remedy: true, key: "aiEmptyResult" }); return; }
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");
     return true;

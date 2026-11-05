@@ -434,6 +434,10 @@ function pbpPopupServerFieldNotes(dirty, loaded) {
       && (!loaded || loaded[id] === undefined || loaded[id] !== server))
     .map(([, label, server]) => pbpBookmarkServerFieldNote(t, t(label), server)).join(" ");
 }
+// Whether the form holds a restored draft of a recent bookmark at `url`.
+function pbpPopupDraftOfDeletedRecent(url) {
+  return _popupDraftRestored && _popupDraftUrlSource === "recent" && !!_popupDraftBase && _popupDraftBase.url === url;
+}
 function pbpPopupDraftRestoredField(key) {
   return _popupDraftRestored && (_popupDraftRestoredFields === null || _popupDraftRestoredFields.has(key));
 }
@@ -483,15 +487,17 @@ function pbpRememberPopupDraft() {
   const context = _popupDraftContext;
   chrome.runtime.sendMessage({ type: "PBP_POPUP_DRAFT", ...context,
     action: "write", draft, ...(!context.ready ? { fields: [..._popupDraftChangedFields] } : {}) }).then((result) => {
-    if (!result?.ok && context === _popupDraftContext && revision === _popupDraftWriteRevision) {
-      _popupDraftLastSnapshot = "";
-      showStatus("status-msg", t("popupDraftFailed"), "error");
-    }
+    if (context !== _popupDraftContext || revision !== _popupDraftWriteRevision) return;
+    // Losing the draft loses the user's text: the card stays until a later
+    // write keeps the draft again, a save, or a dismiss.
+    if (result?.ok) { if (typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("popupDraftFailed"); return; }
+    _popupDraftLastSnapshot = "";
+    showStatus("status-msg", t("popupDraftFailed"), "error", { remedy: true, key: "popupDraftFailed" });
   }).catch((e) => {
     console.warn("[popup-draft] dispatch failed:", e && e.name, e && e.message);
     if (context === _popupDraftContext && revision === _popupDraftWriteRevision) {
       _popupDraftLastSnapshot = "";
-      showStatus("status-msg", t("popupDraftFailed"), "error");
+      showStatus("status-msg", t("popupDraftFailed"), "error", { remedy: true, key: "popupDraftFailed" });
     }
   });
 }
@@ -508,9 +514,10 @@ async function pbpDiscardPopupDraft(allOwner = false) {
   });
   if (!result?.ok) {
     if (!_popupDraftContext) _popupDraftContext = context;
-    showStatus("status-msg", t("popupDraftDiscardFailed"), "error");
+    showStatus("status-msg", t("popupDraftDiscardFailed"), "error", { remedy: true, key: "popupDraftDiscardFailed" });
     return false;
   }
+  if (typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("popupDraftDiscardFailed");
   _popupDraftLastSnapshot = "";
   return true;
 }
@@ -1728,6 +1735,7 @@ async function htmlToMarkdownAsync(html, opts) {
           // 2026-08-25); the reader still decides video-mode from the payload.
           const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect(tab.url || url)) ? "&video=1" : "";
           await chrome.tabs.create({ url: "md-preview.html?k=" + k + videoQ });
+          pbpDismissRemedyStatus("mdPreviewOpenFailed");
         } catch (e) {
           // Quota-full is recoverable: offer a one-click path to the Storage
           // panel where the user can reclaim cache, then reopen the preview.
@@ -1742,7 +1750,7 @@ async function htmlToMarkdownAsync(html, opts) {
               }],
             });
           } else {
-            showStatus("status-msg", t("mdPreviewOpenFailed"), "error");
+            showStatus("status-msg", t("mdPreviewOpenFailed"), "error", { remedy: true, key: "mdPreviewOpenFailed" });
           }
         }
       };
@@ -1799,9 +1807,10 @@ async function htmlToMarkdownAsync(html, opts) {
           // reporting success while creating nothing. Report and stop instead
           // (matches md-export-send.js's "clipboard failure -> error, no data
           // loss" semantics).
-          showStatus("status-msg", t("obsidianClipboardFailed"), "error");
+          showStatus("status-msg", t("obsidianClipboardFailed"), "error", { remedy: true, key: "obsidianClipboardFailed" });
           return;
         }
+        pbpDismissRemedyStatus("obsidianClipboardFailed");
         const route = obsidianCfg.route === "append" || obsidianCfg.route === "daily" ? obsidianCfg.route : "new";
         const uri = buildObsidianUri({
           action: route === "daily" ? "daily" : "new",
@@ -2077,6 +2086,17 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         existingBookmark = null;
         bookmarkLookup = { status: "missing", url: lookupUrl, generation, promise: null, formLoaded: false };
         pbpPopupApplyServerMetadata(data.metadata);
+        // A restored draft of a recent bookmark that is gone now (deleted
+        // elsewhere): the form keeps the user's text, and the banner says
+        // Save adds it again. It goes with this lookup (address edited, a
+        // later lookup finds the bookmark).
+        if (typeof pbpPopupDraftOfDeletedRecent === "function" && pbpPopupDraftOfDeletedRecent(lookupUrl)) {
+          const banner = $id("existing-banner");
+          if (banner) {
+            banner.textContent = t("popupDraftRecentDeleted");
+            banner.classList.remove("hidden");
+          }
+        }
         // Only an answered "not saved" asks again without the #fragment: a
         // failed lookup above never gets here. Not awaited here: a save
         // pressed meanwhile waits for it, bounded, in pbpFragmentProbeWait.
@@ -2308,16 +2328,40 @@ function setupSubmit(token) {
   // Pinboard takes one API call per 3s and the bookmark lookup made on open
   // already spent the slot, so a save can sit at "Saving…" for 2-3s with
   // nothing wrong. Past 800ms the status line says why (critique 2026-10-21).
+  // linkding has no rate limit, but a save on a #fragment address can wait up
+  // to 3 s for the duplicate probe; past 800ms that wait is named too.
   let saveWaitNoteTimer = null;
-  function setSubmitState(state, label) {
-    clearTimeout(saveWaitNoteTimer);
-    saveWaitNoteTimer = null;
+  let saveWaitNoteDue = false;
+  let saveWaitingForProbe = false;
+  function hideSaveWaitNote() {
     const statusEl = $id("status-msg");
     if (statusEl?.dataset?.saveWait) {
       // Only take the note down if nothing has replaced it since.
-      if (statusEl.textContent === t("saveWaitRateLimit")) statusEl.classList.add("hidden");
+      if (statusEl.textContent === t("saveWaitRateLimit") || statusEl.textContent === t("saveWaitFragmentProbe")) statusEl.classList.add("hidden");
       delete statusEl.dataset.saveWait;
     }
+  }
+  function showSaveWaitNote() {
+    if (!btn.classList.contains("loading")) return;
+    const key = pbpBookmarkServiceId(settings) === "pinboard" ? "saveWaitRateLimit"
+      : saveWaitingForProbe ? "saveWaitFragmentProbe" : "";
+    if (!key) return;
+    showStatus("status-msg", t(key), "info");
+    const el = $id("status-msg");
+    if (el?.dataset) el.dataset.saveWait = "1";
+  }
+  // The click handler brackets its #fragment probe wait with these.
+  function setSaveWaitingForProbe(waiting) {
+    saveWaitingForProbe = waiting;
+    if (waiting) { if (saveWaitNoteDue) showSaveWaitNote(); }
+    else if (pbpBookmarkServiceId(settings) !== "pinboard") hideSaveWaitNote();
+  }
+  function setSubmitState(state, label) {
+    clearTimeout(saveWaitNoteTimer);
+    saveWaitNoteTimer = null;
+    saveWaitNoteDue = false;
+    saveWaitingForProbe = false;
+    hideSaveWaitNote();
     // The width stays content-adaptive, but a save cycle (Save -> Saving… ->
     // Saved! / Retry -> Save) must not make the button jump back and forth
     // under the pointer (critique 2026-10-19): min-width only ever grows to
@@ -2330,10 +2374,8 @@ function setupSubmit(token) {
       btn.textContent = label || t("saving");
       saveWaitNoteTimer = setTimeout(() => {
         saveWaitNoteTimer = null;
-        if (!btn.classList.contains("loading") || pbpBookmarkServiceId(settings) !== "pinboard") return;
-        showStatus("status-msg", t("saveWaitRateLimit"), "info");
-        const el = $id("status-msg");
-        if (el?.dataset) el.dataset.saveWait = "1";
+        saveWaitNoteDue = true;
+        showSaveWaitNote();
       }, 800);
     } else if (state === "success") {
       btn.disabled = false;
@@ -2399,7 +2441,11 @@ function setupSubmit(token) {
       // The same page saved without its #fragment: the notice decides, not this press.
       const fragmentProbeWait = pbpFragmentProbeWait(fragmentProbeAtClick, fragmentProbeSettledAtClick);
       if (fragmentProbeWait) {
-        if (await fragmentProbeWait) {
+        setSaveWaitingForProbe(true);
+        let probeStopped = false;
+        try { probeStopped = await fragmentProbeWait; }
+        finally { if (ownsSubmitUi()) setSaveWaitingForProbe(false); }
+        if (probeStopped) {
           if (ownsSubmitUi()) setSubmitState("idle");
           return;
         }
@@ -3148,9 +3194,16 @@ async function fetchRecentBookmarks(token) {
       // A failed delete is reported in the recent list itself, where the row
       // still stands -- showStatus mounts its card up in the form, far from
       // the row the user just acted on (critique 2026-10-19).
+      // It stays until the next delete from the list goes through, a later
+      // status replaces it, or the user dismisses it: the row is still there
+      // and the user has to try again.
       const reportDeleteFailure = (msg) => {
         if (window._lastStatusFeedback) window._lastStatusFeedback.dismiss();
-        window._lastStatusFeedback = showFeedback({ variant: "error", message: msg, autoHide: 4000, target: container });
+        window._lastStatusFeedback = showFeedback({ variant: "error", message: msg, autoHide: 0, target: container });
+        if (window._lastStatusFeedback) {
+          window._lastStatusFeedback.remedy = true;
+          window._lastStatusFeedback.remedyKey = "recentDeleteFailed";
+        }
       };
       const doDelete = () => {
         // Anchored confirm popover, matching the other destructive actions —
@@ -3170,6 +3223,7 @@ async function fetchRecentBookmarks(token) {
               if (resp.status === 401) return; // pinboardFetch already redirected to login
               const data = await resp.json();
               if (data.result_code === "done" || data.result_code === "item not found") {
+                pbpDismissRemedyStatus("recentDeleteFailed");
                 row.remove();
                 // Promise form: an unhandled rejection here (no receiver) would
                 // escape this handler entirely.

@@ -4681,6 +4681,9 @@
   "popupDraftDiscardFailed": {
     "message": "Не удалось удалить черновик. Повторите попытку."
   },
+  "popupDraftRecentDeleted": {
+    "message": "Эта закладка удалена. При сохранении она будет добавлена заново из черновика."
+  },
   "optRetrySave": { "message": "Повторить сохранение" },
   "trRateLimitWaiting": {"message": "Лимит запросов. Повтор через $SECONDS$ с…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "Остановлено. Сохранено $DONE$ / $TOTAL$ сегментов.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
@@ -4735,6 +4738,7 @@
       "message": "Выделение или заметка слишком велики для синхронизации. Сократите или удалите их, затем нажмите «Синхронизировать сейчас»."
     },
   "saveWaitRateLimit": { "message": "Сохранение продолжается: Pinboard принимает не больше одного запроса в 3 секунды." },
+  "saveWaitFragmentProbe": { "message": "Проверяем, сохранена ли уже эта страница…" },
   "batchConfirmMsg": { "message": "Сохранить вкладки этого окна ($COUNT$)?", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "Уже сохранённые страницы будут пропущены." },
   "batchConfirmDetailAi": { "message": "Уже сохранённые страницы будут пропущены без вызова AI. Для каждой из остальных вкладок AI запускается один раз, оплата идёт с вашего API-ключа." },

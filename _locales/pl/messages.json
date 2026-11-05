@@ -4681,6 +4681,9 @@
   "popupDraftDiscardFailed": {
     "message": "Nie udało się odrzucić szkicu. Spróbuj ponownie."
   },
+  "popupDraftRecentDeleted": {
+    "message": "Ta zakładka została usunięta. Zapisanie doda ją ponownie z tym szkicem."
+  },
   "optRetrySave": { "message": "Ponów zapis" },
   "trRateLimitWaiting": {"message": "Limit zapytań. Ponowna próba za $SECONDS$ s…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "Zatrzymano. Zachowano $DONE$ / $TOTAL$ fragmentów.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
@@ -4735,6 +4738,7 @@
       "message": "Zaznaczenie lub notatka ma zbyt duży rozmiar do synchronizacji. Skróć treść lub usuń zapis, a potem kliknij „Synchronizuj teraz”."
     },
   "saveWaitRateLimit": { "message": "Nadal zapisywanie: Pinboard przyjmuje jedno żądanie co 3 sekundy." },
+  "saveWaitFragmentProbe": { "message": "Sprawdzanie, czy ta strona jest już zapisana…" },
   "batchConfirmMsg": { "message": "Zapisać karty z tego okna ($COUNT$)?", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "Strony, które już zapisano, zostaną pominięte." },
   "batchConfirmDetailAi": { "message": "Strony, które już zapisano, zostaną pominięte bez wywołania AI. Dla każdej pozostałej karty AI uruchomi się raz, a koszt obciąży twój klucz API." },

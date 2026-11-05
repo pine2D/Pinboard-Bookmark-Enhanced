@@ -4681,6 +4681,9 @@
   "popupDraftDiscardFailed": {
     "message": "Der Entwurf konnte nicht verworfen werden. Versuche es erneut."
   },
+  "popupDraftRecentDeleted": {
+    "message": "Dieses Lesezeichen wurde gelöscht. Beim Speichern wird es mit deinem Entwurf neu angelegt."
+  },
   "optRetrySave": { "message": "Speichern erneut versuchen" },
   "trRateLimitWaiting": {"message": "Anfragelimit erreicht. Neuer Versuch in $SECONDS$ s…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "Gestoppt. $DONE$ / $TOTAL$ Abschnitte behalten.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
@@ -4735,6 +4738,7 @@
       "message": "Eine Markierung oder Notiz ist zu groß zum Synchronisieren. Kürze oder entferne sie und klicke auf „Jetzt synchronisieren“."
     },
   "saveWaitRateLimit": { "message": "Wird noch gespeichert: Pinboard nimmt nur alle 3 Sekunden eine Anfrage an." },
+  "saveWaitFragmentProbe": { "message": "Wird geprüft, ob diese Seite schon gespeichert ist…" },
   "batchConfirmMsg": { "message": "$COUNT$ Tabs aus diesem Fenster speichern?", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "Bereits gespeicherte Seiten werden übersprungen." },
   "batchConfirmDetailAi": { "message": "Bereits gespeicherte Seiten werden übersprungen, ohne KI-Aufruf. Für jeden anderen Tab läuft die KI einmal und wird über deinen API-Schlüssel abgerechnet." },

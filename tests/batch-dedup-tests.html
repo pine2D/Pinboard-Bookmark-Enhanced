@@ -295,6 +295,7 @@ async function createUiHarness(storedProgress, now, opts = {}) {
   elements["batch-progress"].focus = function () { this.focused = true; documentStub.activeElement = this; };
   const statuses = [];
   const writes = [];
+  const dismissed = [];
   let timer = null;
   const chromeStub = {
     storage: {
@@ -302,7 +303,10 @@ async function createUiHarness(storedProgress, now, opts = {}) {
       local: {
         get: async () => ({ batch_progress: storedProgress }),
         set: async (value) => {
-          if (opts.setReject) throw new Error("storage unavailable");
+          if (opts.setReject && !opts.setRejectOnce?.done) {
+            if (opts.setRejectOnce) opts.setRejectOnce.done = true;
+            throw new Error("storage unavailable");
+          }
           writes.push(value);
         },
       },
@@ -311,14 +315,14 @@ async function createUiHarness(storedProgress, now, opts = {}) {
   const source = await getPopupBatchProgressSource();
   const factory = new Function(
     "$id", "PBP_ICONS", "t", "showStatus", "setBtnIcon", "setTimeout",
-    "chrome", "batchIsRunning", "BATCH_STALE_TTL", "Date", "document", "readBatchAccount",
+    "chrome", "batchIsRunning", "BATCH_STALE_TTL", "Date", "document", "readBatchAccount", "pbpDismissRemedyStatus",
     source + "\nreturn { renderBatchProgress, wireBatchProgress };"
   );
   const api = factory(
     (id) => elements[id] || null,
     PBP_ICONS,
     (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
-    (id, message, kind, opts) => statuses.push({ id, message, kind, remedy: opts?.remedy === true }),
+    (id, message, kind, opts) => statuses.push({ id, message, kind, remedy: opts?.remedy === true, key: opts?.key }),
     (button, _icon, label) => { button.label = label; },
     (callback) => { timer = callback; return 0; },
     chromeStub,
@@ -326,12 +330,13 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     BATCH_STALE_TTL,
     { now: () => now },
     documentStub,
-    async () => ({ token: "alice:token", account: "alice" })
+    async () => ({ token: "alice:token", account: "alice" }),
+    (key) => dismissed.push(key)
   );
   return {
     ...api,
     renderBatchProgress: (progress) => api.renderBatchProgress({ account: "alice", ...progress }, "alice"),
-    elements, statuses, writes, runTimer: () => timer?.()
+    elements, statuses, writes, dismissed, runTimer: () => timer?.()
   };
 }
 
@@ -658,6 +663,19 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     equal(h.elements["batch-cancel-btn"].disabled, false, "cancel stayed disabled");
     assert(h.statuses.some((entry) => entry.message === "batchCancelFailed" && entry.kind === "error"),
       "cancel failure was silent");
+  });
+
+  // User decision 2026-11-05: the user has to press Cancel again, so the card
+  // stays until a cancel request is written or the user dismisses it.
+  await test("a failed cancel stays on screen until a cancel request goes through", async () => {
+    const h = await createUiHarness(null, 5000, { setReject: true, setRejectOnce: {} });
+    h.renderBatchProgress({ runId: "run-a", running: true, done: false, total: 4, i: 1, saved: 1, failed: 0 });
+    await h.elements["batch-cancel-btn"].handlers.click();
+    const card = h.statuses.find((entry) => entry.message === "batchCancelFailed");
+    assert(card && card.remedy === true && card.key === "batchCancelFailed", "cancel failure hides on a timer: " + JSON.stringify(card));
+    assert(!h.dismissed.includes("batchCancelFailed"), "the failure retired its own card");
+    await h.elements["batch-cancel-btn"].handlers.click();
+    assert(h.writes.length === 1 && h.dismissed.includes("batchCancelFailed"), "a cancel that went through left the failure card up");
   });
 
   await test("all-queued completion is informational", async () => {

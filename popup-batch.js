@@ -371,10 +371,11 @@ function renderBatchProgress(p, currentAccount) {
           await chrome.storage.local.set({
             batch_cancel_requested: { runId, account, ts: Date.now() },
           });
+          if (typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("batchCancelFailed");
         } catch (e) {
           console.warn("[batch] cancel request write failed:", e?.name, e?.message);
           cancelBtn.disabled = false;
-          showStatus("status-msg", t("batchCancelFailed"), "error");
+          showStatus("status-msg", t("batchCancelFailed"), "error", { remedy: true, key: "batchCancelFailed" });
         }
       });
     }

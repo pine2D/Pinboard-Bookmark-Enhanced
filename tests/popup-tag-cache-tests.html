@@ -20,7 +20,9 @@ let existingBookmark = null;
 let acIndex = -1;
 const statusCalls = [];
 function t(key, ...args) { return args.length ? key + ":" + args.join(",") : key; }
-function showStatus(id, msg, kind) { statusCalls.push({ id, msg, kind }); }
+function showStatus(id, msg, kind, opts) { statusCalls.push({ id, msg, kind, opts }); }
+const remedyDismissals = [];
+function pbpDismissRemedyStatus(key) { remedyDismissals.push(key); }
 </script>
 <script src="../shared.js"></script>
 <script src="../popup-tags.js"></script>
@@ -529,6 +531,24 @@ function typeInto(value) {
       "no error card was raised, got " + JSON.stringify(statusCalls));
     assert(statusCalls[0].msg === "pinboardErrorRateLimit", "wrong message: " + statusCalls[0].msg);
     assert(suggestBox.textContent === "", "wrote into the hidden container anyway");
+  });
+
+  // User decision 2026-11-05: autocomplete and counts stay missing until a
+  // sync works, so the card stays until then or until the user dismisses it.
+  await testAsync("the tag-sync error card stays until a sync works", async () => {
+    resetInput();
+    suggestRow.classList.add("hidden");
+    showTagSyncError("pinboardErrorRateLimit");
+    assert(statusCalls[0]?.opts?.remedy === true && statusCalls[0].opts.key === "tagSyncFailed",
+      "the tag-sync card hides on a timer: " + JSON.stringify(statusCalls[0]));
+    remedyDismissals.length = 0;
+    settings.pinboardToken = "alice:token";
+    settings.tagSyncMode = "fresh";
+    const realFetch = window.pinboardFetch;
+    window.pinboardFetch = async () => ({ ok: true, status: 200, json: async () => ({ js: 3 }) });
+    try { await fetchAllUserTags("alice:token"); }
+    finally { window.pinboardFetch = realFetch; delete settings.tagSyncMode; suggestRow.classList.remove("hidden"); }
+    assert(remedyDismissals.includes("tagSyncFailed"), "a sync that worked left the failure card up");
   });
 
   await test("an already-filled suggest container sends the tag-sync error to the error card", () => {

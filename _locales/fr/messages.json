@@ -4681,6 +4681,9 @@
   "popupDraftDiscardFailed": {
     "message": "Impossible de supprimer le brouillon. Réessayez."
   },
+  "popupDraftRecentDeleted": {
+    "message": "Ce signet a été supprimé. En l’enregistrant, vous le recréez avec votre brouillon."
+  },
   "optRetrySave": { "message": "Réessayer d’enregistrer" },
   "trRateLimitWaiting": {"message": "Limite atteinte. Nouvel essai dans $SECONDS$ s…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "Arrêté. $DONE$ / $TOTAL$ segments conservés.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
@@ -4735,6 +4738,7 @@
       "message": "Un surlignage ou une note est trop volumineux pour la synchronisation. Raccourcissez-le ou supprimez-le, puis cliquez sur « Synchroniser maintenant »."
     },
   "saveWaitRateLimit": { "message": "Enregistrement en cours : Pinboard n’accepte qu’une requête toutes les 3 secondes." },
+  "saveWaitFragmentProbe": { "message": "Vérification : cette page est-elle déjà enregistrée ?" },
   "batchConfirmMsg": { "message": "Enregistrer les $COUNT$ onglets de cette fenêtre ?", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "Les pages déjà enregistrées sont ignorées." },
   "batchConfirmDetailAi": { "message": "Les pages déjà enregistrées sont ignorées, sans appel à l’IA. L’IA s’exécute une fois pour chacun des autres onglets et est facturée sur votre clé API." },

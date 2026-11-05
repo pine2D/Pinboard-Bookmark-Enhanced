@@ -4692,6 +4692,9 @@
   "popupDraftDiscardFailed": {
     "message": "Couldn't discard the draft. Try again."
   },
+  "popupDraftRecentDeleted": {
+    "message": "This bookmark was deleted. Save to add it back with your draft."
+  },
   "optRetrySave": { "message": "Retry saving" },
   "trRateLimitWaiting": {"message": "Rate limited; retrying in $SECONDS$s…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "Stopped. $DONE$ / $TOTAL$ segments retained.", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
@@ -4746,6 +4749,7 @@
       "message": "A highlight or note is too large to sync. Shorten or remove it, then click Sync now."
     },
   "saveWaitRateLimit": { "message": "Still saving: Pinboard accepts one request every 3 seconds." },
+  "saveWaitFragmentProbe": { "message": "Checking whether this page is already saved…" },
   "batchConfirmMsg": { "message": "Save $COUNT$ tabs from this window?", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "Pages you’ve already saved are skipped." },
   "batchConfirmDetailAi": { "message": "Pages you’ve already saved are skipped, with no AI call. AI runs once on each other tab and bills your API key." },

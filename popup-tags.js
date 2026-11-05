@@ -276,6 +276,7 @@ async function fetchAllUserTags(token) {
     const data = await resp.json();
     if (!pbpPopupTagAccountIsCurrent(account)) return;
     applyTagData(data);
+    if (typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("tagSyncFailed");
     const entry = pbpPopupTagCacheEnvelope(token, { counts: allUserTagCounts, timestamp: Date.now() });
     // Caught here, not by the outer catch: applyTagData already ran, so
     // autocomplete, the counts and the AI prompt's "existing tags" are all
@@ -310,7 +311,9 @@ function showTagSyncError(i18nKey, args = []) {
   const occupied = !!container
     && !!(container.querySelector(".suggest-group, .tag-skel") || container.textContent.trim());
   if (!container || rowHidden || occupied) {
-    showStatus("status-msg", t(i18nKey, ...args), "error");
+    // Autocomplete and tag counts stay missing until a sync works, so the
+    // card stays until then or until the user dismisses it.
+    showStatus("status-msg", t(i18nKey, ...args), "error", { remedy: true, key: "tagSyncFailed" });
     return;
   }
   container.textContent = t(i18nKey, ...args);

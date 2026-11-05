@@ -4681,6 +4681,9 @@
   "popupDraftDiscardFailed": {
     "message": "下書きを破棄できませんでした。もう一度お試しください。"
   },
+  "popupDraftRecentDeleted": {
+    "message": "このブックマークは削除されています。保存すると下書きの内容で追加し直します。"
+  },
   "optRetrySave": { "message": "保存を再試行" },
   "trRateLimitWaiting": {"message": "レート制限中。$SECONDS$ 秒後に再試行…", "placeholders": {"seconds": {"content": "$1"}}},
   "trStopped": {"message": "停止しました。$DONE$ / $TOTAL$ 段落を保持。", "placeholders": {"done": {"content": "$1"}, "total": {"content": "$2"}}},
@@ -4735,6 +4738,7 @@
       "message": "ハイライトまたはメモが大きすぎるため同期できません。短くするか削除してから「今すぐ同期」をクリックしてください。"
     },
   "saveWaitRateLimit": { "message": "保存しています。Pinboard が受け付けるリクエストは 3 秒に 1 回です。" },
+  "saveWaitFragmentProbe": { "message": "このページが保存済みか確認しています…" },
   "batchConfirmMsg": { "message": "このウィンドウの $COUNT$ 個のタブを保存しますか？", "placeholders": {"count": {"content": "$1"}} },
   "batchConfirmDetail": { "message": "保存済みのページはスキップします。" },
   "batchConfirmDetailAi": { "message": "保存済みのページはスキップし、AI も呼び出しません。それ以外のタブごとに AI を 1 回呼び出し、料金は API キーに請求されます。" },
