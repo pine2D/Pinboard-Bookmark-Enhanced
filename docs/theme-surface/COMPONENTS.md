@@ -381,13 +381,15 @@ inline 元素的默认基线对齐在「图标 + 文字」场景下几乎总是�
   summary 的 margin box 仍是零高，两种锚定都不参与行高。
   校准时用 `PBP_HELP_RASTER_RANGES=1` 让栅格门在通过时也打印各角色区间，本机与 `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf"`
   各跑一次，取两者都落在容差内的值。
-- `<details>` 继续复用全局 disclosure 的 `::details-content` 折叠配方（§3.5）与 one-open-per-panel 行为，
+- `<details>` 继续复用全局 disclosure 的 `::details-content` 折叠配方（§3.5），
   组件层不另写折叠 transition；`?` 本身只有 `color` / `opacity` 的 `--motion-state` 悬停过渡。
-  指针点开一个 `?` 时，同面板已开的那个按正常收起动画同时关闭；options.js 的 `pbpPinDuringFold`
-  在过渡期间（最长过渡加一帧）逐帧量被点 summary 的 top，用 `scrollBy({behavior:"instant"})` 补上
-  位移，上方内容平滑上移，被点的 `?` 留在光标下。期间在滚动容器上临时设 `overflow-anchor: none`，
-  免得 Chrome 滚动锚定重复补偿；页面滚不动时 `?` 随动画移动，不在结尾跳位。键盘触发和减弱动效下
-  两者瞬时开合，滚动一步补齐（2026-11-05 用户裁决；瞬时关闭的初版被否，页面会跳）。
+  每个 `?` 各自开合，点开一个不会关掉别的（2026-11-05 用户裁决，取代 5aa9ba0c 的同面板只开一个；
+  为它服务的连带收起与逐帧滚动补偿一并删除）。
+  答案到下一个控件的间距开合不同（收起 0–4px、展开 8px，`.context-help[open] + *` 及收起态同伴规则），
+  这段 `margin-top` 在被点的 `?` 带 `.motion-toggle` 时按答案同一时长、同一曲线过渡，
+  否则它在动画第一帧一步跳 8px（2026-11-05 实测）。`.switch` 行的答案放在 label 里，
+  上 6px、下 -2px 的几何由 `::details-content` 自身的 `sp-1` / `-sp-1` 外边距加答案的 `sp-2` 给出，
+  不随开合变化（见 §3.5 flow-root）。
 - 门：`options-context-help-tests.html` 扫完整角色注册表、相邻锚点、24px 命中区、展开归属与间距；
   `options-help-render-audit.mjs` 用真实截图像素覆盖 zh-CN/en、DPR 1/1.25/1.5/2 和五种角色。
 
@@ -489,7 +491,7 @@ token 定义在各表面手写 `:root`（popup / options / library / md-preview�
 折叠配方（options `details::details-content`、library 查词 AI 详情、阅读器 `pbpFoldHeightAnimate`）：
 
 ```css
-details::details-content { height: 0; opacity: 0; overflow-y: clip; content-visibility: hidden; }
+details::details-content { display: flow-root; height: 0; opacity: 0; overflow-y: clip; content-visibility: hidden; }
 details[open]::details-content { height: auto; opacity: 1; content-visibility: visible; }
 /* 基础规则 = 收起；[open] 规则 = 展开 */
 html.motion-ready details.motion-toggle::details-content {
@@ -503,13 +505,20 @@ html.motion-ready details.motion-toggle[open]::details-content {
 }
 ```
 
+`display: flow-root` 不能省：`content-visibility: hidden` 自带布局包含，盒子只在收起时兜住子元素的外边距。
+展开第一帧它变 visible，首个子元素的上外边距穿出盒子，下方内容一步跳下（`.switch` 帮助答案 6px、
+折叠正文 2px）；末个子元素的负下外边距要等高度落回 `auto` 才穿出，于是最后一帧回弹（`.switch` 2px）。
+收起反过来：先跳 2px、最后一帧跳 6px，就是「收尾卡一下」。flow root 在任何状态都兜住外边距，
+高度就是全部位移（2026-11-05 逐帧实测，修后各角色开合单调、终态逐像素不变）。
+
 守则：
 
 - 进出都用 ease-out，退出比进入快。旧的 ease-in-out 200ms 前 60ms 只走 9%，读起来是「先卡后跳」。
 - 只动 transform / opacity。折叠与删除列表项可以动 height，但必须同时带 opacity，文字先于裁切线淡出、
-  晚于裁切线淡入。会让正文重排的属性（margin、width、max-width 等）永不过渡。
-- 动效跟着用户点的那一下走：连带关闭的同面板 `?` 和被点的一起动画，期间逐帧补偿滚动，让被点的元素
-  留在光标下（§2.5）；用户没点的东西不另起动画。
+  晚于裁切线淡入。会让正文重排的属性（margin、width、max-width 等）永不过渡。唯一例外：随折叠一起变的
+  `margin-top`（`?` 答案到下一个控件，§2.5）只在 `.motion-toggle` 期间、按折叠同一时长与曲线过渡，
+  它只平移、不让文字换行，否则会在动画起点一步跳位。
+- 动效跟着用户点的那一下走：只有被点的那个折叠动画，用户没点的东西不动。
 - 永不动画：首屏、标签页切换、按压（§3.1）、键盘触发（`click.detail === 0`）、程序恢复（pp-acc 恢复、
   搜索跳转展开祖先）、筛选与排序。options 的 `.motion-toggle` 与 library 的 `.dict-motion` 只在指针点击时加上，
   400ms 后撤掉。
@@ -520,8 +529,9 @@ html.motion-ready details.motion-toggle[open]::details-content {
 - `prefers-reduced-motion: reduce`：全局 reduce 块的 `*` 匹配不到 `::details-content`，options 单独写一条
   `details::details-content { transition-duration: 0.01ms !important; }`，且不能并进 `*` 那条选择器列表
   （不支持该伪元素的 Chromium 会让整条规则失效）；library 查词折叠与阅读器折叠在 JS / 选择器里自行门控。
-- 门：`tests/ui-contract-tests.mjs` 钉住 options 折叠配方、`?` 悬停过渡、reduce 规则，以及 options.js
-  点击门（指针点击时兄弟随收起动画关闭 + 逐帧滚动补偿并关滚动锚定；键盘与减弱动效瞬时、一步补齐）。
+- 门：`tests/ui-contract-tests.mjs` 钉住 options 折叠配方（含 flow-root、`.switch` 答案的固定外边距与
+  答案后间距的同曲线过渡）、`?` 悬停过渡、reduce 规则，以及 options.js 点击门（只标记被点的折叠，
+  不关闭其他 `<details>`、不做滚动补偿；键盘与减弱动效瞬时）。
 
 ---
 

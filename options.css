@@ -676,7 +676,8 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
    - top: a zero-size float (`label::before`) sits at the top of the first
      line box, i.e. the label's content-box top, whatever padding-top the row
      has (a padding-box 50% would miss any row that ever drops it);
-   - bottom: the answer copy's top minus its sp-3 top margin (rule below) is
+   - bottom: the answer copy's top minus the sp-3 above it (the fold box's
+     sp-1 plus the answer's own sp-2, rules below) is
      the copy's last line-box bottom. Closed, the answer is skipped content
      (content-visibility: hidden), which can never be an anchor, so anchor()
      takes its fallback: the label's own bottom padding, the same edge.
@@ -733,14 +734,24 @@ label.switch > .context-help { display: contents; }
    total height is unchanged (measured 57/73.5/40.5 before and after on
    #opt-sync-enabled / #opt-sync-api-keys / #opt-backup-include-highlights),
    only where line 2 sits inside it moves. Since the narrow-window fix the
-   label is block flow, not flex: the two margins now collapse through the
-   ::details-content block onto the copy's last line box (6px) and onto the
-   label's bottom padding edge (-2px), the same result -- measured unchanged
-   (copy line box -> answer 6px, open label heights identical). */
+   label is block flow, not flex.
+   Fold motion fix (2026-11-05): ::details-content is now a flow root
+   (folding recipe below), so the answer's margins stay inside it. The old
+   sp-3 / -sp-1 pair on the answer collapsed THROUGH the box only while it
+   was visible, and the -2px only once its height was auto: opening jumped
+   the row 6px on the first frame and 2px back up on the last, closing went
+   2px down first and 6px up last. The same geometry now comes from margins
+   that never change with the fold: sp-1 above and -sp-1 below the box
+   (net 0 while it is 0px tall) plus the answer's own sp-2 inside it, so the
+   copy line box -> answer gap is still 6px, the open label's bottom edge
+   still meets the answer's bottom, and the closed label is unchanged. */
 label.switch > .context-help > .context-help-body {
-  margin-top: var(--opt-sp-3);
-  margin-bottom: calc(var(--opt-sp-1) * -1);
+  margin-top: var(--opt-sp-2);
   cursor: auto;
+}
+label.switch > .context-help::details-content {
+  margin-top: var(--opt-sp-1);
+  margin-bottom: calc(var(--opt-sp-1) * -1);
 }
 /* Text -> help target = sp-1, as before Ruling 36's flex row: the target
    starts where the copy's 24px end margin starts (zero net advance, see the
@@ -2247,10 +2258,18 @@ html.motion-ready .pf:not([hidden]) {
 /* Native details disclosure motion (height + opacity + content-visibility).
    Older Chromium versions that lack ::details-content simply keep native
    instant open/close behavior. Only a pointer-clicked <details> carries
-   .motion-toggle (options.js pbpMotionMark), plus the help it closes as the
-   one-open sibling; first paint, tab switches, keyboard toggles and restores
-   all flip instantly. */
+   .motion-toggle (options.js pbpMotionMark); first paint, tab switches,
+   keyboard toggles and restores all flip instantly. */
 details::details-content {
+  /* Always its own formatting context. Without it the box only contained its
+     children's margins while closed (content-visibility: hidden implies
+     layout containment): the frame it turned visible, a first child's top
+     margin escaped above it and everything below jumped by that margin
+     (a .switch help's 6px answer gap, a fold body's 2px), and a negative
+     last-child margin only escaped once the height settled on auto, so the
+     row overshot and sprang back on the last frame. As a flow root the box
+     holds its margins in every state and its height is the whole story. */
+  display: flow-root;
   height: 0;
   opacity: 0;
   /* Full-width fields paint their focus glow outside the disclosure. Only
@@ -2277,6 +2296,23 @@ html.motion-ready details.motion-toggle::details-content {
 html.motion-ready details.motion-toggle[open]::details-content {
   transition-duration: var(--motion-collapse), var(--motion-pop), var(--motion-collapse);
   @starting-style { height: 0; opacity: 0; }
+}
+/* A help answer also changes the gap to the control after it (closed 0-4px,
+   open 8px: `.context-help[open] + *` and its closed-state companions). Set
+   in one frame, that gap moved the control by up to 8px at the very start of
+   both the open and the close while the answer itself was still 0-1px of
+   motion. It now travels on the answer's own duration and curve, so the
+   control's offset is the sum of two moves in the same direction. Only while
+   the clicked help carries .motion-toggle (about 400ms); the shorthand
+   briefly replaces that control's own state transitions, which nobody is
+   using in the instant after a click on the "?". */
+html.motion-ready .context-help-host > .context-help.motion-toggle + *,
+html.motion-ready .context-help-host > .context-help.motion-toggle + select[data-listbox] + .listbox {
+  transition: margin-top var(--motion-collapse-out) var(--ease-out);
+}
+html.motion-ready .context-help-host > .context-help.motion-toggle[open] + *,
+html.motion-ready .context-help-host > .context-help.motion-toggle[open] + select[data-listbox] + .listbox {
+  transition-duration: var(--motion-collapse);
 }
 
 /* ---- Details disclosures: one chevron family (2026-08 redesign) ----

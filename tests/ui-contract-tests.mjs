@@ -1779,7 +1779,15 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   // Fold language (COMPONENTS.md §3): collapse at --motion-collapse-out with a
   // faster opacity fade, expand at --motion-collapse with the fade-in, both
   // ease-out, and the entry grows from height 0 + opacity 0. Context help owns
-  // no fold transition of its own; its toggle only fades colour/opacity.
+  // no fold transition of its own beyond one companion: the gap to the control
+  // after an answer (margin-top) rides the answer's own duration and curve
+  // while the clicked help carries .motion-toggle; its toggle only fades
+  // colour/opacity.
+  // The fold box is a flow root in every state, so its children's margins
+  // never collapse through it only while it is visible (2026-11-05 measured:
+  // a .switch answer jumped 6px on the first frame of the open and sprang 2px
+  // back on the last; a fold body jumped 2px). The .switch answer keeps its
+  // 6px / -2px geometry from margins that do not change with the fold.
   {
     const ruleBody = (sel) => {
       const at = optionsCss.indexOf(sel + " {");
@@ -1797,9 +1805,16 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
       /@starting-style\s*\{\s*height:\s*0;\s*opacity:\s*0;\s*\}/.test(open) &&
       /(?:^|\n)details::details-content \{[^}]*opacity:\s*0;/.test(optionsCss) &&
       /(?:^|\n)details\[open\]::details-content \{[^}]*opacity:\s*1;/.test(optionsCss) &&
-      ![...optionsCss.matchAll(/\.context-help[^{]*\{([^}]*)\}/g)].some((m) => /transition\s*:[^;]*\b(?:height|all|grid|margin|padding)\b/.test(m[1])) &&
+      ![...optionsCss.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/(?:^|\n)([^{}\n][^{}]*\.context-help[^{]*)\{([^}]*)\}/g)].some((m) =>
+        /transition\s*:[^;]*\b(?:height|all|grid|margin|padding)\b/.test(m[2]) &&
+        !(/^html\.motion-ready \.context-help-host > \.context-help\.motion-toggle \+ \*,\s*html\.motion-ready \.context-help-host > \.context-help\.motion-toggle \+ select\[data-listbox\] \+ \.listbox$/.test(m[1].trim()) &&
+          /^\s*transition:\s*margin-top var\(--motion-collapse-out\) var\(--ease-out\);\s*$/.test(m[2]))) &&
+      /(?:^|\n)html\.motion-ready \.context-help-host > \.context-help\.motion-toggle\[open\] \+ \*,\s*html\.motion-ready \.context-help-host > \.context-help\.motion-toggle\[open\] \+ select\[data-listbox\] \+ \.listbox \{\s*transition-duration:\s*var\(--motion-collapse\);\s*\}/.test(optionsCss) &&
+      /(?:^|\n)details::details-content \{[^}]*display:\s*flow-root;/.test(optionsCss) &&
+      /(?:^|\n)label\.switch > \.context-help > \.context-help-body \{\s*margin-top:\s*var\(--opt-sp-2\);\s*cursor:\s*auto;\s*\}/.test(optionsCss) &&
+      /(?:^|\n)label\.switch > \.context-help::details-content \{\s*margin-top:\s*var\(--opt-sp-1\);\s*margin-bottom:\s*calc\(var\(--opt-sp-1\) \* -1\);\s*\}/.test(optionsCss) &&
       /\.context-help > summary\.context-help-toggle \{[^}]*transition:\s*color var\(--motion-state\) ease, opacity var\(--motion-state\) ease;/.test(optionsCss),
-      "options.css: the native-details fold lost its recipe (collapse 160ms + faster fade-out / expand 200ms + fade-in, ease-out, entry from height 0 + opacity 0), contextual help grew its own fold transition, or the ? toggle lost its colour/opacity hover fade");
+      "options.css: the native-details fold lost its recipe (collapse 160ms + faster fade-out / expand 200ms + fade-in, ease-out, entry from height 0 + opacity 0, a flow-root box, the .switch answer's fold-independent margins, the answer -> control gap riding the same curve), contextual help grew its own fold transition, or the ? toggle lost its colour/opacity hover fade");
     // `*` never matches ::details-content, so reduced motion must name it.
     const reduced = optionsCss.slice(optionsCss.indexOf("@media (prefers-reduced-motion: reduce) {\n  *, *::before, *::after"));
     check(/^[\s\S]{0,600}details::details-content \{ transition-duration: 0\.01ms !important; \}/.test(reduced),
@@ -1820,34 +1835,22 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     // button may lead with an icon whose synthesized baseline is its bottom).
     /(?:^|\n)\.context-help-action-row\[data-help-role="action"\] > \.vocab-toolbar,\s*\.context-help-action-row\[data-help-role="action"\] > \.vocab-toolbar ~ \.context-help > summary\.context-help-toggle \{ align-self: last baseline; \}/.test(optionsCss),
     "options.css: contextual help lost its anchoring split (copy roles on the text baseline via the label span, the action row's wrapper and toggle on the button-text baseline, its container centred)");
-  check(/const det = summary && summary\.closest\("details"\);[\s\S]{0,1600}details\.context-help\[open\]/.test(optionsJs),
-    "options.js: contextual help lost the native-details motion gate or one-open-per-panel behavior");
-  // Motion follows the pointer: on a pointer click (detail > 0, motion-ready,
-  // no reduced motion) the open sibling help folds shut with the normal
-  // collapse while the clicked one opens, and a bounded rAF loop holds the
-  // clicked summary's viewport top by scrolling the drift each frame, with
-  // scroll anchoring off on the scroller so the shift is not corrected twice.
-  // Without motion (keyboard, reduced motion) both flip at once and the scroll
-  // is fixed in one step. 2026-11-05 user ruling (the instant close jumped).
+  // Each ? toggles on its own (2026-11-05 user ruling, replacing the
+  // one-open-per-panel rule of 5aa9ba0c): the click gate never closes another
+  // <details>, and the scroll-pinning loop that only existed to hide the
+  // sibling's close is gone. Motion follows the pointer: a pointer click
+  // (detail > 0, motion-ready, no reduced motion) marks the clicked <details>;
+  // keyboard and reduced motion strip the marker so the flip is instant.
   {
     const at = optionsJs.indexOf('const det = summary && summary.closest("details");');
     const handler = at < 0 ? "" : optionsJs.slice(at, optionsJs.indexOf("}, true);", at));
-    const fnAt = optionsJs.indexOf("function pbpPinDuringFold(");
-    const pin = fnAt < 0 ? "" : optionsJs.slice(fnAt, optionsJs.indexOf("\n  }\n", fnAt));
-    const stopAt = optionsJs.indexOf("function pbpStopPinLoop(");
-    const stop = stopAt < 0 ? "" : optionsJs.slice(stopAt, optionsJs.indexOf("\n  }\n", stopAt));
-    check(/const animate = e\.detail > 0 && !pbpPrefersReducedMotion\(\)\s*&& document\.documentElement\.classList\.contains\("motion-ready"\);/.test(handler) &&
-      /if \(animate\) pbpMotionMark\(other\);\s*else pbpMotionUnmark\(other\);\s*other\.open = false;/.test(handler) &&
-      /const before = summary\.getBoundingClientRect\(\)\.top;[\s\S]{0,400}if \(animate\) \{\s*pbpPinDuringFold\(summary, before\);\s*\} else \{\s*const shift = summary\.getBoundingClientRect\(\)\.top - before;\s*if \(shift\) window\.scrollBy\(\{ top: shift, behavior: "instant" \}\);/.test(handler) &&
+    check(handler !== "" &&
+      /const animate = e\.detail > 0 && !pbpPrefersReducedMotion\(\)\s*&& document\.documentElement\.classList\.contains\("motion-ready"\);/.test(handler) &&
       /if \(animate\) pbpMotionMark\(det\);\s*else pbpMotionUnmark\(det\);/.test(handler) &&
-      handler.indexOf("pbpStopPinLoop();") >= 0 && handler.indexOf("pbpStopPinLoop();") < handler.indexOf("const animate") &&
-      /--motion-collapse"\)\)[\s\S]{0,120}--motion-collapse-out"\)\)[\s\S]{0,120}performance\.now\(\) \+ longest \+ 17/.test(pin) &&
-      /style\.setProperty\("overflow-anchor", "none"\)/.test(pin) &&
-      /el\.getBoundingClientRect\(\)\.top - top;\s*if \(drift\) window\.scrollBy\(\{ top: drift, behavior: "instant" \}\);/.test(pin) &&
-      /requestAnimationFrame\(tick\)/.test(pin) &&
-      /cancelAnimationFrame\(_pbpPinLoop\.raf\);\s*document\.documentElement\.style\.removeProperty\("overflow-anchor"\);/.test(stop) &&
+      !/\.open\s*=\s*false|querySelectorAll\(|scrollBy\(/.test(handler) &&
+      !/pbpPinDuringFold|pbpStopPinLoop|overflow-anchor/.test(optionsJs) &&
       /function pbpMotionUnmark\(el\) \{\s*clearTimeout\(el\._ppMotionT\);\s*el\.classList\.remove\("motion-toggle"\);/.test(optionsJs),
-      "options.js: the details click gate lost its motion split (pointer: sibling help folds with the normal collapse while a bounded rAF loop with scroll anchoring off holds the clicked ? in place; keyboard / reduced motion: both instant, one-step scroll fix)");
+      "options.js: the details click gate closes other <details> again (one-open), kept the scroll-pinning loop, or lost its motion split (pointer marks the clicked fold; keyboard / reduced motion flip instantly)");
   }
   check(/const det = e\.target\.matches\?\.\("details\[data-acc-key\]"\) \? e\.target : null/.test(optionsJs) &&
     !/const det = e\.target\.closest\?\.\("details\[data-acc-key\]"\)/.test(optionsJs),
