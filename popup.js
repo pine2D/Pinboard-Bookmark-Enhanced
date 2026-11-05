@@ -1735,7 +1735,7 @@ async function htmlToMarkdownAsync(html, opts) {
           // 2026-08-25); the reader still decides video-mode from the payload.
           const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect(tab.url || url)) ? "&video=1" : "";
           await chrome.tabs.create({ url: "md-preview.html?k=" + k + videoQ });
-          pbpDismissRemedyStatus("mdPreviewOpenFailed");
+          if (typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("mdPreviewOpenFailed");
         } catch (e) {
           // Quota-full is recoverable: offer a one-click path to the Storage
           // panel where the user can reclaim cache, then reopen the preview.
@@ -1810,7 +1810,7 @@ async function htmlToMarkdownAsync(html, opts) {
           showStatus("status-msg", t("obsidianClipboardFailed"), "error", { remedy: true, key: "obsidianClipboardFailed" });
           return;
         }
-        pbpDismissRemedyStatus("obsidianClipboardFailed");
+        if (typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("obsidianClipboardFailed");
         const route = obsidianCfg.route === "append" || obsidianCfg.route === "daily" ? obsidianCfg.route : "new";
         const uri = buildObsidianUri({
           action: route === "daily" ? "daily" : "new",
@@ -3223,7 +3223,7 @@ async function fetchRecentBookmarks(token) {
               if (resp.status === 401) return; // pinboardFetch already redirected to login
               const data = await resp.json();
               if (data.result_code === "done" || data.result_code === "item not found") {
-                pbpDismissRemedyStatus("recentDeleteFailed");
+                if (typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("recentDeleteFailed");
                 row.remove();
                 // Promise form: an unhandled rejection here (no receiver) would
                 // escape this handler entirely.
