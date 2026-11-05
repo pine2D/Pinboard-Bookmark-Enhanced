@@ -14127,8 +14127,14 @@ suite("_aiBodyDialect / _aiParamRepair (K133)", () => {
 // _pbpAskState.panel with a bare stub (no #ask-meta and no #ask-input in the document,
 // so the meta refresh and the focus handoff are both no-ops here), and md-reader.js's
 // two halves are swapped for recorders: what is under test is md-ask.js's WIRING of
-// them (capture before the class toggle, settle after, one-shot transitionend leg,
-// scroll-abandon), not their own math -- pbpReaderPickScrollAnchor has its own suite.
+// them (capture before the class toggle, one synchronous settle after), not their own
+// math -- pbpReaderPickScrollAnchor has its own suite.
+//
+// 2026-11-05 user decision: main's margin-right (the push) no longer transitions; the
+// article reflows once and only the panel slides. So the whole job is ONE settle in the
+// same task as the toggle, and nothing may stay armed afterwards: a transitionend
+// arriving later (main still transitions margin-left for zen, and descendant
+// transitions bubble) must never re-settle and yank a reader who has scrolled on.
 suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
   function setup(opts) {
     const o = opts || {};
@@ -14147,9 +14153,9 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
     pad.style.height = (window.innerHeight * 4) + "px";
     document.body.appendChild(pad);
     const anchor = o.anchor === undefined ? { n: 3, frac: 0.25 } : o.anchor;
-    // openAtCapture pins the ORDER: the anchor must be read while the class is
-    // still in its pre-toggle state, otherwise it describes the new layout.
-    const rec = { captures: 0, openAtCapture: [], settles: [] };
+    // openAtCapture / openAtSettle pin the ORDER: the anchor must be read while the
+    // class is still in its pre-toggle state, and settled once it is in the new one.
+    const rec = { captures: 0, openAtCapture: [], settles: [], openAtSettle: [] };
     _pbpAskState = { panel: panel, rounds: [], records: [], ctx: null, running: false, ctrl: null };
     if (!o.realCapture) {
       window._pbpZenCaptureAnchor = function () {
@@ -14158,7 +14164,10 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
         return anchor;
       };
     }
-    window._pbpZenSettleAnchor = function (a) { rec.settles.push(a); };
+    window._pbpZenSettleAnchor = function (a) {
+      rec.settles.push(a);
+      rec.openAtSettle.push(document.body.classList.contains("ask-open"));
+    };
     window.matchMedia = function (q) {
       return {
         matches: !!o.narrow && /max-width/.test(q), media: q,
@@ -14168,13 +14177,14 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
     window.scrollTo(0, 0);
     return {
       rec: rec, main: main, anchor: anchor,
-      end: function (prop) {
-        main.dispatchEvent(new TransitionEvent("transitionend", {
-          propertyName: prop || "margin-right", bubbles: true
-        }));
+      // Every property main could report: the push itself (if a transition ever
+      // came back), zen's margin-left, and a bubbled descendant opacity fade.
+      endAll: function () {
+        for (const prop of ["margin-right", "margin-left", "opacity"]) {
+          main.dispatchEvent(new TransitionEvent("transitionend", { propertyName: prop, bubbles: true }));
+        }
       },
       done: function () {
-        _pbpAskSettleClear();
         document.body.classList.remove("ask-open");
         document.body.classList.remove("raw-active");
         panel.remove();
@@ -14189,73 +14199,69 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
     };
   }
 
-  test("opening Ask on a wide viewport settles immediately, then once more when the push ends", () => {
+  test("opening Ask on a wide viewport settles exactly once, synchronously, against the post-toggle layout", () => {
     const f = setup();
     try {
       _pbpAskSetOpen(true);
       assertEq(f.rec.captures, 1, "the anchor is captured exactly once per toggle");
       assertEq(f.rec.openAtCapture[0], false, "capture ran BEFORE body.ask-open was added");
-      assertEq(f.rec.settles.length, 1, "leg 1: immediate settle (the only leg reduced motion ever gets)");
-      f.end();
-      assertEq(f.rec.settles.length, 2, "leg 2: the margin-right transition finishing re-settles the same anchor");
-      assertEq(f.rec.settles[1], f.anchor, "leg 2 replays the anchor captured before the toggle");
-      f.end();
-      assertEq(f.rec.settles.length, 2, "one-shot: a second transitionend does not settle again");
-      assertEq(_pbpAskSettleOff, null, "the listener tore itself down when it fired");
+      assertEq(f.rec.settles.length, 1, "one settle before _pbpAskSetOpen returns");
+      assertEq(f.rec.settles[0], f.anchor, "it replays the anchor captured before the toggle");
+      assertEq(f.rec.openAtSettle[0], true, "the settle ran AFTER body.ask-open was added");
+      f.endAll();
+      assertEq(f.rec.settles.length, 1, "no transitionend of any property settles a second time");
     } finally { f.done(); }
   });
 
-  test("closing Ask runs the same two legs (the close direction is not an if(open) branch)", () => {
+  test("closing Ask runs the same single settle (the close direction is not an if(open) branch)", () => {
     const f = setup();
     try {
       _pbpAskSetOpen(true);
-      f.end();
       f.rec.captures = 0;
       f.rec.openAtCapture.length = 0;
       f.rec.settles.length = 0;
+      f.rec.openAtSettle.length = 0;
       _pbpAskSetOpen(false);
       assertEq(f.rec.captures, 1, "closing captures an anchor too");
       assertEq(f.rec.openAtCapture[0], true, "capture ran BEFORE body.ask-open was removed");
-      assertEq(f.rec.settles.length, 1, "leg 1 on close");
-      f.end();
-      assertEq(f.rec.settles.length, 2, "leg 2 on close");
+      assertEq(f.rec.settles.length, 1, "one settle on close");
+      assertEq(f.rec.openAtSettle[0], false, "and it ran after the class was removed");
+      f.endAll();
+      assertEq(f.rec.settles.length, 1, "nothing armed on close either");
     } finally { f.done(); }
   });
 
-  test("a scroll during the 200ms push abandons the second settle", () => {
+  test("a scroll right after opening is never pulled back", () => {
     const f = setup();
     try {
       _pbpAskSetOpen(true);
-      assertEq(f.rec.settles.length, 1, "leg 1 ran");
+      assertEq(f.rec.settles.length, 1, "the synchronous settle ran");
       window.scrollTo(0, 500);
       assert(window.scrollY > 2, "fixture is actually scrollable, got scrollY " + window.scrollY);
-      f.end();
+      f.endAll();
       assertEq(f.rec.settles.length, 1,
-        "the reader moved themselves inside the transition window: no yank back (md-reader.js:1609-1614's regression)");
-      assertEq(_pbpAskSettleOff, null, "the listener is still torn down on the abandoned path");
+        "the reader moved themselves after the toggle: no yank back (md-reader.js's 300ms-fallback regression)");
     } finally { f.done(); }
   });
 
-  test("narrow viewports short-circuit: no capture, no listener (the panel is a bottom sheet there)", () => {
+  test("narrow viewports short-circuit: no capture, no settle (the panel is a bottom sheet there)", () => {
     const f = setup({ narrow: true });
     try {
       _pbpAskSetOpen(true);
-      assertEq(f.rec.captures, 0, "max-width:1000px means margin-right stays 0: nothing to preserve");
+      assertEq(f.rec.captures, 0, "max-width:1280px means margin-right stays 0: nothing to preserve");
       assertEq(f.rec.settles.length, 0, "no settle");
-      assertEq(_pbpAskSettleOff, null, "no transitionend listener armed");
-      f.end();
+      f.endAll();
       assertEq(f.rec.settles.length, 0, "a stray transitionend cannot settle either");
     } finally { f.done(); }
   });
 
-  test("at scrollY 0 the real capture returns null, so no leg runs", () => {
+  test("at scrollY 0 the real capture returns null, so nothing settles", () => {
     const f = setup({ realCapture: true });
     try {
       window.scrollTo(0, 0);
       _pbpAskSetOpen(true);
       assertEq(f.rec.settles.length, 0, "a layout change at the very top must leave the reader at the top");
-      assertEq(_pbpAskSettleOff, null, "no listener armed for a null anchor");
-      f.end();
+      f.endAll();
       assertEq(f.rec.settles.length, 0, "still nothing after a transitionend");
     } finally { f.done(); }
   });
@@ -14268,48 +14274,85 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
       assert(window.scrollY > 0, "fixture is actually scrolled, got scrollY " + window.scrollY);
       _pbpAskSetOpen(true);
       assertEq(f.rec.settles.length, 0, "raw view has no block rects to anchor to");
-      assertEq(_pbpAskSettleOff, null, "no listener armed for a null anchor");
     } finally { f.done(); }
   });
 
-  // The reason _pbpAskCaptureAnchor opens with _pbpAskSettleClear(): a second
-  // toggle inside the 200ms push must REPLACE the armed leg, not stack a
-  // second transitionend listener on the same <main>. Both would then fire on
-  // the one push that actually ends, and the first one's anchor describes a
-  // layout two toggles old. Deleting that call leaves every other row here
-  // green, so this is the one that makes it falsifiable.
-  test("a second toggle before the push ends replaces the armed leg instead of stacking one", () => {
+  test("two quick toggles settle once each, each against its own anchor", () => {
+    let calls = 0;
     const f = setup();
     try {
+      window._pbpZenCaptureAnchor = function () {
+        f.rec.captures++;
+        f.rec.openAtCapture.push(document.body.classList.contains("ask-open"));
+        return { n: ++calls, frac: 0 };
+      };
       _pbpAskSetOpen(true);
-      const firstOff = _pbpAskSettleOff;
-      assert(typeof firstOff === "function", "setup: the open armed a transitionend leg");
-      assertEq(f.rec.settles.length, 1, "leg 1 of the open");
-      _pbpAskSetOpen(false);                 // no f.end() in between: the push is still animating
-      assertEq(f.rec.captures, 2, "the close captured its own anchor");
-      assertEq(f.rec.settles.length, 2, "leg 1 of the close");
-      assert(_pbpAskSettleOff !== firstOff && typeof _pbpAskSettleOff === "function",
-        "the close armed a NEW leg (and the open's was torn down, not merely overwritten)");
-      f.end();
-      assertEq(f.rec.settles.length, 3,
-        "exactly ONE leg 2 fires: a stacked listener from the abandoned open would settle a stale anchor too");
-      assertEq(_pbpAskSettleOff, null, "and the surviving leg tore itself down");
-      f.end();
-      assertEq(f.rec.settles.length, 3, "still one-shot after the replacement");
-    } finally { f.done(); }
-  });
-
-  test("a transitionend for another property is ignored and does not disarm the leg", () => {
-    const f = setup();
-    try {
-      _pbpAskSetOpen(true);
-      f.end("opacity");
-      assertEq(f.rec.settles.length, 1, "opacity is not the push: no settle");
-      f.end("margin-right");
-      assertEq(f.rec.settles.length, 2, "and the real property still settles afterwards");
+      _pbpAskSetOpen(false);
+      assertEq(f.rec.captures, 2, "one capture per toggle");
+      assertEq(f.rec.settles.length, 2, "one settle per toggle, no carry-over between them");
+      assertEq(f.rec.settles[0].n, 1, "the open settled the open's anchor");
+      assertEq(f.rec.settles[1].n, 2, "the close settled the close's anchor");
+      f.endAll();
+      assertEq(f.rec.settles.length, 2, "and a late transitionend adds nothing");
     } finally { f.done(); }
   });
 });
+
+// Production CSS half of the same decision, measured in a frame under the real
+// md-preview.css at 1366 and 1440 (both above the 1280px sheet breakpoint, where
+// the push exists): main's margin-right reaches the pushed value in the same frame
+// as the class toggle (no transition on it), while the panel itself still slides
+// on transform. Reverting either half makes a row here fail.
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "Ask push is instant, the panel slides (async)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  for (const [width, video] of [[1366, false], [1440, false], [1440, true]]) {
+    const name = "width " + width + (video ? " video-mode" : "") +
+      ": main's margin-right jumps to the pushed value at once; #ask-panel transitions transform only";
+    const frame = document.createElement("iframe");
+    try {
+      frame.style.cssText = "position:absolute;left:-4000px;top:0;width:" + width + "px;height:800px";
+      frame.srcdoc = '<!doctype html><html class="motion-ready"><head><meta charset="utf-8"><link rel="stylesheet" href="../md-preview.css"></head>' +
+        '<body' + (video ? ' class="video-mode"' : '') + '><main><div class="doc-body"><p>text</p></div></main>' +
+        '<aside id="ask-panel" hidden></aside></body></html>';
+      await new Promise((res, rej) => { frame.onload = res; frame.onerror = rej; document.body.appendChild(frame); });
+      const fd = frame.contentDocument, fw = frame.contentWindow;
+      assert(fd.styleSheets.length && fw.getComputedStyle(fd.body).boxSizing === "border-box", "md-preview.css loaded in the frame");
+      const main = fd.querySelector("main"), panel = fd.getElementById("ask-panel");
+      const props = fw.getComputedStyle(main).transitionProperty.split(/\s*,\s*/);
+      assert(!props.includes("margin-right") && !props.includes("all") && !props.includes("margin"),
+        "main must not transition margin-right: " + props.join(","));
+      assertEq(fw.getComputedStyle(main).marginRight, "0px", "closed: no push");
+      void main.offsetWidth;
+      fd.body.classList.add("ask-open");
+      panel.hidden = false;
+      const mr = parseFloat(fw.getComputedStyle(main).marginRight);
+      assert(mr > 400, "open: the push lands in the toggle's own frame, got margin-right " + mr + "px");
+      const pp = fw.getComputedStyle(panel).transitionProperty;
+      // Closed-state rule carries the slide; read it there.
+      panel.hidden = true;
+      const ppClosed = fw.getComputedStyle(panel).transitionProperty.split(/\s*,\s*/);
+      assert(ppClosed.includes("transform"), "the panel still slides on transform: " + ppClosed.join(","));
+      assert(ppClosed.every((p) => p === "transform" || p === "visibility"),
+        "the panel animates transform (and the visibility flip) only: " + ppClosed.join(",") + " / open: " + pp);
+      report(name);
+    } catch (e) {
+      report(name, e);
+    } finally {
+      frame.remove();
+    }
+  }
+})();
 </script>
 
 <script>

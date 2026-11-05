@@ -590,14 +590,16 @@ function _pbpAskIsOpen() {
 
 // ---- K84: keep the reader's place across the panel's own relayout ----
 //
-// `body.ask-open` animates main's margin-right from 0 to `380px + --sp-4`
-// over 200ms (md-preview.css:366 + :2880). A margin change on an ancestor
-// is a CSS scroll-anchoring SUPPRESSION trigger, so the browser does NOT
-// hold the reader's line through it - and Ask was the one reader layout
-// change that did not compensate by hand. Every other one already does:
-// zen enter/exit, the width cycle, the typography tiers, Raw<->Rendered
-// and the three-state view all capture an anchor before the mutation and
-// settle it after.
+// `body.ask-open` sets main's margin-right from 0 to `480px + --sp-4`
+// (md-preview.css, body.ask-open main). That margin is applied INSTANTLY:
+// only the panel's transform slides (2026-11-05 user decision: the article
+// reflows once, in one frame, instead of re-wrapping every paragraph over
+// 200ms). A margin change on an ancestor is a CSS scroll-anchoring
+// SUPPRESSION trigger, so the browser does NOT hold the reader's line
+// through it; we compensate by hand, like every other reader layout change
+// (zen enter/exit, the width cycle, the typography tiers, Raw<->Rendered and
+// the three-state view all capture an anchor before the mutation and settle
+// it after).
 //
 // Direct cross-file calls, no new window.* export surface: md-reader.js
 // and this file are both no-IIFE deferred classic scripts
@@ -608,37 +610,24 @@ function _pbpAskIsOpen() {
 // the two (tests/) from throwing.
 //
 // Deliberately NOT _pbpZenSettleAfterLayout: its 300ms fallback leg is
-// exactly what md-reader.js:1609-1614 records as a real-machine regression
-// (it settled the reader back 300ms AFTER the user had already scrolled
-// away, which is why _pbpTypoSet dropped it), and "open Ask, then scroll
-// to find the paragraph I want to ask about" is the common next move here.
-// The local two legs below therefore arm ONLY the transitionend - the one
-// signal _pbpTypoSet could not use because a tier change has no transition
-// at all - and abandon the re-settle when scrollY moved meanwhile. Staying
-// local also keeps Ask out of _pbpZenSettleTimer/_pbpZenSettlePending
-// (md-reader.js:1253-1254), the single pending slot zen/width share: a zen
-// toggle and an Ask toggle landing within the same 300ms would otherwise
-// cancel each other's second phase.
-const PBP_ASK_SETTLE_SLOP = 2; // px: sub-pixel rounding between the two legs is not "the user scrolled"
-let _pbpAskSettleOff = null;   // teardown of an armed transitionend leg, or null when nothing is armed
-
-function _pbpAskSettleClear() {
-  if (!_pbpAskSettleOff) return;
-  const off = _pbpAskSettleOff;
-  _pbpAskSettleOff = null;
-  off();
-}
+// exactly what md-reader.js records as a real-machine regression (it settled
+// the reader back 300ms AFTER the user had already scrolled away), and
+// "open Ask, then scroll to find the paragraph I want to ask about" is the
+// common next move here. Because the reflow is instantaneous, one
+// synchronous settle against the final geometry is the whole job: no
+// transitionend second leg, nothing left armed after the toggle returns,
+// and no share of _pbpZenSettleTimer/_pbpZenSettlePending, the single
+// pending slot zen/width use.
 
 // The same breakpoint md-preview.css uses to turn the panel into a bottom
-// sheet: `@media (max-width: 1280px) { body.ask-open main { margin-right: 0 } }`
-// (md-preview.css:2983-2984). At or below it, opening Ask changes NOTHING
-// about the article's layout, so capturing an anchor and arming a document
-// listener would buy exactly nothing. Video mode is NOT special-cased in
-// either direction: that rule is a plain `body.ask-open main`, so the sheet
-// form drops the push there too, while above the breakpoint the video
-// workspace is the strongest case for this whole block - its `.doc-body` is
-// `min(2160px, 100%)` (md-preview.css:3990), so the push really re-wraps the
-// text at ANY window width, not just inside article mode's narrow
+// sheet: `@media (max-width: 1280px) { body.ask-open main { margin-right: 0 } }`.
+// At or below it, opening Ask changes NOTHING about the article's layout, so
+// capturing an anchor would buy exactly nothing. Video mode is NOT
+// special-cased in either direction: that rule is a plain `body.ask-open main`,
+// so the sheet form drops the push there too, while above the breakpoint the
+// video workspace is the strongest case for this whole block - its
+// `.doc-body` is `min(2160px, 100%)`, so the push really re-wraps the text at
+// ANY window width, not just inside article mode's narrow
 // 1200px..(--pbp-width + 724) band.
 function _pbpAskLayoutShifts() {
   if (typeof window.matchMedia !== "function") return true;
@@ -651,39 +640,20 @@ function _pbpAskLayoutShifts() {
 
 // Called BEFORE the class toggle, in both directions. Returns null - i.e.
 // "nothing to do" - in raw view and at scrollY === 0, which are
-// _pbpZenCaptureAnchor's own two early returns (md-reader.js:1203-1209): reading
+// _pbpZenCaptureAnchor's own two early returns (md-reader.js): reading
 // the raw source, or pressing `a` on a freshly opened preview before
 // scrolling at all, is unchanged by this whole block.
 function _pbpAskCaptureAnchor() {
-  _pbpAskSettleClear(); // a toggle landing before the previous one's transitionend must not stack listeners
   if (!_pbpAskLayoutShifts()) return null;
   return typeof _pbpZenCaptureAnchor === "function" ? _pbpZenCaptureAnchor() : null;
 }
 
-// Called AFTER the class toggle, in both directions.
-// Leg 1 is immediate: under reduced motion the blanket transition-duration
-// kill switches (md-preview.css ~:615 / ~:880) mean no transitionend will
-// ever fire and the post-toggle geometry is already the final one.
-// Leg 2 re-settles once against the FINAL geometry when the 200ms push
-// really does animate - unless the reader scrolled during it, in which case
-// their own position wins and we only tear the listener down.
+// Called AFTER the class toggle, in both directions, in the same synchronous
+// task. main's margin-right does not transition, so the geometry read here is
+// already the final one, with or without reduced motion.
 function _pbpAskSettleAnchor(anchor) {
   if (!anchor || typeof _pbpZenSettleAnchor !== "function") return;
   _pbpZenSettleAnchor(anchor);
-  const settledAt = window.scrollY;
-  const main = document.querySelector("main");
-  if (!main) return;
-  const onEnd = (e) => {
-    // main's transition list carries margin-left (zen) as well as
-    // margin-right (this panel), and descendant transitions bubble up here
-    // too - hence both filters.
-    if (e.target !== main || e.propertyName !== "margin-right") return;
-    _pbpAskSettleClear(); // one-shot: at most one leg-2 settle per toggle
-    if (Math.abs(window.scrollY - settledAt) > PBP_ASK_SETTLE_SLOP) return;
-    _pbpZenSettleAnchor(anchor);
-  };
-  main.addEventListener("transitionend", onEnd);
-  _pbpAskSettleOff = () => main.removeEventListener("transitionend", onEnd);
 }
 
 // NON-MODAL by design: the panel is supplementary - answers cite the
@@ -746,8 +716,8 @@ function _pbpAskSetOpen(open, view = "ask") {
   // K84, last on purpose: the focus handoffs above are the only other thing
   // in this function that can move the viewport, so settling after them means
   // a focus() that decides to scroll cannot undo the restore. Still the same
-  // synchronous task as the class toggle, so leg 1 sees the post-toggle
-  // geometry either way.
+  // synchronous task as the class toggle, so the settle sees the final
+  // post-toggle geometry.
   _pbpAskSettleAnchor(anchor);
 }
 

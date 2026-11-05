@@ -5,12 +5,21 @@
 /* Loading, article replacement and translation can cross root overflow. */
 html { scrollbar-gutter: stable; }
 :root {
+  /* Height folds (pbpFoldHeightAnimate in md-preview.js reads these and
+     --ease-out from here): expand at --motion-collapse, collapse at the
+     shorter --motion-collapse-out -- exits are faster than entrances, both
+     ease-out. Same values as options.css:root. */
   --motion-collapse: 200ms;
+  --motion-collapse-out: 160ms;
   --motion-pop: 140ms;
   --motion-pop-out: 100ms;
+  /* Colour-type state changes (hover, pressed, toggled, dimmed): one duration
+     for the whole reader, always written `var(--motion-state) ease`, as in
+     options.css. Replaces the 150ms / 120ms literals the reader used to mix. */
+  --motion-state: 150ms;
   /* Curve vocabulary; see the note in options.css:root for why each job gets its
-     own. --ease-in-out is read from JS too (pbpFoldHeightAnimate in
-     md-preview.js hands it to el.animate), so it must stay defined here. */
+     own. --ease-in-out is now only for on-screen shape changes (the chevron
+     rotations); folds and pops use --ease-out, drawers --ease-drawer. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
@@ -291,7 +300,7 @@ button, input, select, textarea { font-family: inherit; }
   /* Explicit list, not `all`: `all` tweened .toggle-btn.active's font-weight
      500->600 (the jitter this file's own comment at .exp-tgl warns about) and
      delayed the :active press by 150ms. Weight and transform now snap. */
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, color var(--motion-state) ease;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -371,7 +380,7 @@ button, input, select, textarea { font-family: inherit; }
   line-height: 16px;       /* fused-shell inner on the sm rung: 1+16+1 = 18 + the shell's border = 20px.
                               16 not 14: the 11px face's glyph box measures 14.67px and sits baseline-heavy,
                               so 14 + 2/2 left 1.33px above the text (textInset); 16 + 1/1 centres it 1.67/1.67 */
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: background-color var(--motion-state) ease, color var(--motion-state) ease;
 }
 .source-badge > .src-seg + .src-seg { border-left: 1px solid var(--btn-border); }
 /* In the rail the engine switch is the sibling of the Raw/Rendered .view-toggle,
@@ -457,25 +466,28 @@ button, input, select, textarea { font-family: inherit; }
 .view-toggle > .toggle-btn {
   border: 0;
   border-radius: 0;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: background-color var(--motion-state) ease, color var(--motion-state) ease;
 }
 .view-toggle > .toggle-btn + .toggle-btn { border-left: 1px solid var(--btn-border); }
 .view-toggle > .toggle-btn:focus-visible { outline-offset: -2px; }
 .view-toggle > .toggle-btn:active { transform: none; }
 
 /* ---- Layout: fixed left rail + centered doc body ---- */
-/* Transitions here (this batch, transition-round): animate zen enter/exit
-   (margin-left 264->0), the zen width cycle (.doc-body max-width), AND the
-   ask panel push (margin-right 0->396px, see body.ask-open main below) in
-   one coordinated motion -- covered by the two blanket reduced-motion kill
-   switches below (~:615 transition-duration:0s!important, ~:880 the same
-   at 0.01ms), no per-rule override needed: neither property here ever
-   carries a transition-delay, so forcing duration to ~0 is a complete,
-   instant cutover on its own. */
+/* Transitions here (transition-round): animate zen enter/exit
+   (margin-left 264->0) only. The Ask panel push (margin-right, see
+   body.ask-open main below) is deliberately NOT transitioned (2026-11-05
+   user decision): interpolating it re-wrapped every paragraph frame by
+   frame at 1280-1544px and in the video workspace -- the same reason
+   .doc-body's max-width never transitions. The article reflows once,
+   instantly; only the panel's own transform slides, and md-ask.js settles
+   the reading position in the same task. margin-left is covered by the two
+   blanket reduced-motion kill switches below (~:615 transition-duration:0s
+   !important, ~:880 the same at 0.01ms); it carries no transition-delay,
+   so forcing duration to ~0 is a complete, instant cutover on its own. */
 main {
   margin-left: 264px;
   padding: 48px 32px 96px;
-  transition: margin-left 200ms var(--ease-drawer), margin-right 200ms var(--ease-drawer);
+  transition: margin-left 200ms var(--ease-drawer);
 }
 /* --pbp-width is the ONE content-width control for BOTH normal and zen
    modes (unified-width round): a JS-driven custom property (three-step
@@ -534,8 +546,8 @@ body.zen #rail {
    already snapped off-screen. Same specificity (1,1,1) as the rule above,
    so it fully replaces (not just supplements) that transition, delay
    included -- exactly the "needs visibility-delay special-casing" case;
-   the plain margin-left/margin-right/max-width transitions above don't
-   carry a delay and don't get one of these. */
+   the plain margin-left transition above doesn't
+   carry a delay and doesn't get one of these. */
 @media (prefers-reduced-motion: reduce) {
   body.zen #rail { transition: none; }
 }
@@ -812,7 +824,7 @@ body.ask-open #zen-bar { right: calc(480px + 12px); }
   text-decoration-color: color-mix(in srgb, var(--link) 50%, transparent);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.22em;
-  transition: text-decoration-color 150ms ease;
+  transition: text-decoration-color var(--motion-state) ease;
 }
 #rendered-view a:hover {
   text-decoration-color: var(--link);
@@ -1006,7 +1018,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
   cursor: pointer;
   opacity: 0.65;
   user-select: none; /* drag-selecting code must not grab the button text */
-  transition: opacity 150ms ease, background-color 150ms ease;
+  transition: opacity var(--motion-state) ease, background-color var(--motion-state) ease;
 }
 .pb-copy-code:hover, .pb-copy-code:focus-visible { opacity: 1; background: var(--btn-hover); }
 .pb-copy-code svg { width: 12px; height: 12px; }
@@ -1438,7 +1450,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
   background-position: right 8px center;
   font-size: 13px; cursor: pointer;
   /* Explicit list, not `all` — the chevron background-image must not be tweened. */
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, color var(--motion-state) ease;
 }
 .exp-img-row select:hover, .xp-dict-lang:hover { background-color: var(--btn-hover); border-color: var(--border); }
 .exp-img-row select:focus-visible, .xp-dict-lang:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
@@ -1544,7 +1556,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
   display: block; padding: var(--sp-1) var(--sp-2); color: var(--fg-secondary); text-decoration: none;
   border-left: 2px solid transparent; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 13px; line-height: 1.45;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+  transition: color var(--motion-state) ease, border-color var(--motion-state) ease, background var(--motion-state) ease;
 }
 .toc-list a:hover { color: var(--fg); background: var(--border-light); }
 /* Deeper levels step DOWN in px. They used to be 0.95em / 0.9em, but an em
@@ -1587,7 +1599,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
   background: none; font: inherit; font-size: 11px; font-weight: 600;
   letter-spacing: 0.5px; text-transform: uppercase;
   color: var(--fg-secondary); cursor: pointer; text-align: left;
-  transition: color 120ms ease;
+  transition: color var(--motion-state) ease;
 }
 .rail-sec-head:hover { color: var(--fg); }
 /* 2026-08 redesign: thin right-aligned chevron (down when collapsed, a 180°
@@ -1927,7 +1939,7 @@ html.motion-ready .send-menu[hidden] {
 }
 .send-mi { display: flex; align-items: center; gap: var(--sp-2); width: 100%; padding: var(--sp-2);
   background: none; border: 0; border-radius: var(--radius-md); font: inherit; color: inherit;
-  text-align: left; cursor: pointer; transition: background-color 120ms ease; }
+  text-align: left; cursor: pointer; transition: background-color var(--motion-state) ease; }
 .send-mi:hover { background: var(--row-hover, rgba(127,127,127,.14)); }
 /* Ring comes from the shared soft-focus recipe (rail section above). */
 .send-mi:focus-visible { background: var(--row-hover, rgba(127,127,127,.14)); }
@@ -1958,7 +1970,9 @@ html.motion-ready .send-menu[hidden] {
 @keyframes msg-bar-busy-pulse {
   50% { border-left-color: color-mix(in srgb, var(--link) 30%, transparent); }
 }
-html.motion-ready .msg-bar { transition: opacity 0.3s; }
+/* 200ms: the reader's motion ceiling; the 4s/320ms timers in md-video.js
+   still remove the text after the fade either way. */
+html.motion-ready .msg-bar { transition: opacity 200ms var(--ease-out); }
 html.motion-ready .msg-bar[data-state="busy"] { animation: msg-bar-busy-pulse 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   html.motion-ready .msg-bar { transition: none; }
@@ -2169,7 +2183,7 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
   /* Same fade as the foot xp-* family, so the card's two button rows share
      one hover feel; the aria-pressed swap rides the same 150ms like the
      .toggle-btn precedent. */
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, color var(--motion-state) ease;
 }
 .xp-pin:hover, .xp-close:hover, .xp-dock:hover, .xp-resize-grip:hover { background: var(--btn-hover); border-color: var(--btn-border); }
 .xp-pin:focus-visible, .xp-close:focus-visible, .xp-dock:focus-visible, .xp-resize-grip:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
@@ -2192,7 +2206,7 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
   background: var(--btn-bg);
   color: var(--btn-fg);
   cursor: pointer;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, color var(--motion-state) ease;
 }
 .xp-act svg { width: 15px; height: 15px; }
 .xp-act:hover { background: var(--btn-hover); }
@@ -2258,7 +2272,7 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
   white-space: nowrap;
   /* Same hover treatment as the .action-btn family; :active transform below
      stays untransitioned so the press still reads instantly. */
-  transition: background-color 150ms ease;
+  transition: background-color var(--motion-state) ease;
 }
 .xp-retry:hover, .xp-ask:hover, .xp-save:hover:not(:disabled), .xp-vocab:hover:not(:disabled), .xp-open-vocab:hover, .xp-dict-connect:hover:not(:disabled) { background: var(--btn-hover); }
 .xp-retry:focus-visible, .xp-ask:focus-visible, .xp-save:focus-visible, .xp-vocab:focus-visible, .xp-open-vocab:focus-visible, .xp-dict-connect:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
@@ -2603,7 +2617,7 @@ button.xp-dict-connect > .xp-dict-model:empty { display: none; }
 .xp-dict-save-menu:popover-open { display: flex; flex-direction: column; gap: var(--sp-2); }
 .xp-dict-choice-help { color: var(--fg-secondary); font-size: 12px; line-height: 18px; white-space: normal; overflow-wrap: anywhere; }
 .xp-dict-save-options { display: flex; flex-direction: column; gap: var(--sp-1); }
-.xp-dict-save-option { padding: var(--sp-1) var(--sp-2); border-radius: var(--radius-md); cursor: pointer; line-height: 18px; transition: background-color 120ms ease; }
+.xp-dict-save-option { padding: var(--sp-1) var(--sp-2); border-radius: var(--radius-md); cursor: pointer; line-height: 18px; transition: background-color var(--motion-state) ease; }
 .xp-dict-save-option:hover, .xp-dict-save-option:focus-visible { background: var(--row-hover, rgba(127,127,127,.14)); }
 .xp-dict-save-option:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
 .xp-dict-save-option[aria-selected="true"] { background: var(--btn-hover); color: var(--link-on-raised); }
@@ -3284,7 +3298,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
-  transition: border-color 150ms ease;
+  transition: border-color var(--motion-state) ease;
 }
 .pb-tr-err-retry svg { width: 12px; height: 12px; flex-shrink: 0; }
 .pb-tr-err-retry:hover { border-color: var(--danger); }
@@ -3327,7 +3341,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 .rail-disclosure > summary {
   cursor: pointer; display: flex; align-items: center; gap: var(--sp-2); min-height: 24px;
   list-style: none; font-size: 12px; color: var(--fg-secondary);
-  transition: color 120ms ease;
+  transition: color var(--motion-state) ease;
 }
 .rail-disclosure > summary:hover { color: var(--fg); }
 .rail-disclosure > summary::-webkit-details-marker { display: none; }
@@ -3459,7 +3473,8 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   #ask-panel[hidden] { transition: none; }
 }
 
-/* Third column: push the centered doc body away from the open panel. */
+/* Third column: push the centered doc body away from the open panel.
+   Instant on purpose: main transitions margin-left only (see main above). */
 /* panel width (480) + panel padding (--sp-4) */
 body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 
@@ -3494,7 +3509,7 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
    fade -- one declaration keeps the whole family in step. */
 .ask-ic, .skim-ic, .srch-nav, .srch-regex, .typo-step, .typo-seg-btn,
 .xp-dict-speak, .fn-pop-jump, .rail-kbd-help-btn {
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, color var(--motion-state) ease;
 }
 #ask-section .ask-open-btn { width: 100%; justify-content: center; }
 .ask-open-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
@@ -3763,7 +3778,7 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   border: 2px solid transparent;
   cursor: pointer;
   position: relative;
-  transition: border-color 140ms var(--ease-out);
+  transition: border-color var(--motion-state) ease;
 }
 /* 22px swatch -> 24px hit area, same idiom as .pb-hl-dot above. -3px, not
    -1px: the inset resolves against the padding box, and the 2px transparent
@@ -3814,7 +3829,7 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 /* .action-btn's 150ms fade for all five card buttons (they share its look). */
 .hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask,
 .hl-card-save, .hl-card-delete {
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, color var(--motion-state) ease;
 }
 .hl-card-note {
   width: 100%;
@@ -3868,7 +3883,7 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   border: 1px solid rgba(128, 128, 128, 0.45); /* neutral gray: visible on light AND dark schemes (slate-tinted borders vanish on dark) */
   cursor: pointer;
   position: relative;
-  transition: opacity 140ms var(--ease-out);
+  transition: opacity var(--motion-state) ease;
 }
 /* Hit pad: a full 24px square. The pad is positioned from the PADDING box --
    the 12px dot minus its 1px border is 10px -- so -7px (not -6px) lands on 24
@@ -3929,7 +3944,7 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   color: inherit; font: inherit; text-align: left;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color var(--motion-state) ease, color var(--motion-state) ease;
 }
 /* Ring comes from the shared soft-focus recipe (rail section). */
 .hl-item-main:hover, .hl-item-main:focus-visible { background: var(--border-light); }
@@ -3954,7 +3969,7 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   color: var(--fg-muted);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color var(--motion-state) ease, color var(--motion-state) ease;
 }
 .hl-item-del:hover { color: var(--danger); background: var(--border-light); }
 /* Focus ring split out of :hover (same WCAG 2.4.11 fix as .rail-sec-open):
@@ -4627,8 +4642,10 @@ body.zen #tr-ask { top: calc(12px + 36px + var(--sp-2)); }
    doors as the rest of this file -- html.motion-ready (no first-paint
    tweens) and the reduced-motion opt-out. Correctness never depends on the
    animation: the fade timers in md-video.js remove the text either way. */
-html.motion-ready .pbv-toast { transition: opacity 0.3s; }
-html.motion-ready .pbv-ai-punct .pbv-ring circle { transition: stroke-dashoffset 0.3s; }
+/* 200ms ceiling (2026-11-05 motion pass, was 0.3s): the toast fade exits
+   ease-out; the progress ring is a progress indicator, so linear. */
+html.motion-ready .pbv-toast { transition: opacity 200ms var(--ease-out); }
+html.motion-ready .pbv-ai-punct .pbv-ring circle { transition: stroke-dashoffset 200ms linear; }
 @media (prefers-reduced-motion: reduce) {
   html.motion-ready .pbv-toast { transition: none; }
   html.motion-ready .pbv-ai-punct .pbv-ring circle { transition: none; }
