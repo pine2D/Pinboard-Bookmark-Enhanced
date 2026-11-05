@@ -19,47 +19,35 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in), Karakeep und linkd
 ## Funktionen
 
 ### Speichern
-- **Ein Klick, alles ausgefüllt**: Titel, Beschreibung und markierter Text werden übernommen, Tracking-Parameter aus der URL entfernt
-- **Tastenkürzel und Stapelspeicherung**: speichern, ohne das Popup zu öffnen, oder alle Tabs des Fensters auf einmal als Lesezeichen anlegen
-- **Funktioniert offline**: Gespeichertes landet in einer lokalen Warteschlange und wird gesendet, sobald du wieder online bist
-- **Entwürfe bleiben erhalten**: Popup schließen, wieder öffnen und genau dort weiterschreiben
-
-### Tags
-- **KI-Tags und Zusammenfassung**: gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 17 Anbieter oder ein beliebiger OpenAI- oder Anthropic-kompatibler Endpunkt
-- **Autovervollständigung**: aus deinen Tags, Pinboards Vorschlägen und Ein-Klick-Voreinstellungen
-- **Tags aufräumen**: ähnliche Tags zusammenführen und selten genutzte ausmisten
+- **Beim Dienst deiner Wahl speichern**: Pinboard, Karakeep oder linkding; Titel, Beschreibung und markierter Text werden automatisch übernommen.
+- **KI-Tags und Zusammenfassungen**: direkt aus dem Artikel vorgeschlagen, mit deinem eigenen API-Schlüssel.
+- **Nichts geht verloren**: Offline Gespeichertes wartet in einer Warteschlange und wird gesendet, sobald du wieder online bist.
 
 ### Lesen
-- **Jede Seite wird zur Leseansicht**: Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau; Formeln, Diagramme und Tabellen werden sauber dargestellt
-- **GitHub Discussions (Pilot)**: übernimmt den geladenen Ausgangsbeitrag und die Kommentare, erhält die Antwortstruktur und markiert die akzeptierte Antwort; zeigt den Umfang der erfassten Inhalte
-- **Lesezeichen beim Lesen verwalten**: Lesezeichen direkt im Reader speichern, bearbeiten oder löschen, ohne zum Popup zurückzukehren
-- **Markieren in fünf Farben, mit Notizen**: beide bleiben an ihrer Stelle, auch nach der Übersetzung und späteren Änderungen an der Seite
-- **Seite übersetzen oder befragen**: Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
-- **Fragen und Antworten mit Quellen behalten**: fertige Antworten werden automatisch gespeichert und über Google Drive synchronisiert. Gespräche in der Bibliothek lesen, im Lesemodus fortsetzen oder einzeln bzw. mit dem Artikel exportieren. Temporäre Gespräche bleiben ungespeichert.
-- **Wörter beim Lesen nachschlagen**: Definitionen und Aussprache im Wörterbuch anzeigen; gespeicherte Vokabeln gehen mit einem Klick an Anki oder Eudic, dazu auf Wunsch Offline-Wörterbücher für Chinesisch–Englisch und Englisch–Chinesisch. Wähle die Definitionssprache der KI-Einträge unabhängig von der Oberfläche und filtere gespeicherte Wörter nach Sprache. Ziehe an den Rändern, um das Nachschlagefenster zu vergrößern oder zu verkleinern, oder verschiebe es in die Seitenleiste; Ergebnisse, ausgewählte Definition und laufende Generierung bleiben dabei erhalten. Sieh Wörter in echten Sätzen aus Texten auf Wikisource, mit Autor und Quelle, ganz ohne KI.
-- **Mehrsprachige Offline-Wörterbücher**: schlage Wörter mit Definitionen und Ausspracheangaben aus selbst importierten Yomitan-v3-ZIP-Dateien auf diesem Gerät nach; Wörterbuchpakete sind von der Drive-Synchronisierung und JSON-Sicherungen ausgeschlossen. Alle Offline-Wörterbücher, auch Chinesisch–Englisch und Englisch–Chinesisch, lassen sich deaktivieren, ohne ihre Daten zu löschen. Bei erkannter Struktur werden einzelne Definitionen getrennt von Beispielen und Wortherkunft angezeigt; andere Inhalte bleiben als vollständige Einträge lesbar. Importiere ältere Pakete erneut, um ihre Struktur neu auszuwerten. Gespeicherte Vokabeln und der Aktivierungsstatus bleiben dabei unverändert.
-- **KI-Wörterbucheinträge**: Erhalte zunächst Definitionen, Aussprache und Beispiele in deiner Muttersprache oder einer gewählten Erklärungssprache und ergänze bei Bedarf Gebrauchshinweise und Wortherkunft. Gültige Teile einer unvollständigen Ergänzung bleiben erhalten und werden als unvollständig gekennzeichnet. Vollständige Ergebnisse werden bei verbundenem Google Drive synchronisiert, frühere Versionen bleiben bei Aktualisierungen erhalten. Wörterbuchergebnisse und KI-Inhalte stehen in einer Spalte, der Fortschritt der Erstellung ist laufend zu sehen, und die zu speichernde Definition bleibt unten sichtbar. Die automatische Erstellung von Basiseinträgen ist optional.
-- **Ausgewählten Text im Zusammenhang verstehen**: Nutze „Erklären“, um ein Wort oder einen Abschnitt im aktuellen Artikel zu verstehen; Wörterbucheinträge beschreiben allgemeine Bedeutungen und Verwendung.
-- **Deine Bibliothek**: Markierungen, Notizen, gespeicherte Wörter und Gespräche an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung von Vokabeln. Wörter direkt aus Wörterbucheinträgen speichern, eine Definition auswählen und Wortformen über eine bearbeitbare Grundform verknüpfen. Jedes Wort behält eigene Notizen und seinen Lernstatus.
-- **Vokabeln vollständig exportieren**: Ein eigener mehrsprachiger Anki-Notiztyp unterscheidet gleich geschriebene Wörter verschiedener Sprachen. Die vollständige TSV bewahrt Notizen, Grundformen und alle Kontexte mit ihren Quellen; die bisherigen Formate mit sechs Feldern bleiben verfügbar
-- **Senden oder herunterladen**: an [Obsidian](https://obsidian.md), Notion, NotebookLM, ein GitHub Gist oder einen beliebigen Webhook; als `.md`, `.html` oder `.epub` für den E-Reader
-- **Sehen beim Lesen**: YouTube- und Bilibili-Videos laufen neben einem Transkript, das der Wiedergabe folgt; KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel
+- **Eine saubere Leseansicht für jede Seite**: ohne Werbung und Seitenleisten, mit Markierungen in fünf Farben und Notizen.
+- **Zweisprachig lesen**: die ganze Seite übersetzen und das Original daneben behalten.
+- **Seite befragen**: Antworten zitieren den Artikel und führen direkt zum zitierten Satz.
+- **Wörter direkt nachschlagen**: Definitionen und Aussprache, ohne die Seite zu verlassen; gespeicherte Vokabeln gehen an Anki.
+- **Sehen beim Lesen**: YouTube- und Bilibili-Videos laufen neben einem Transkript, das der Wiedergabe folgt.
 
 ![Leseansicht mit zweisprachiger Übersetzung und Markierungen](docs/screenshots/readme/reader.webp)
 
 ![Die Seite befragen, Antworten zitieren die Quelle](docs/screenshots/readme/ask.webp)
 
+![YouTube-Vorschau mit mitlaufendem Transkript](docs/screenshots/readme/video.webp)
+
+### Behalten
+- **Eine Bibliothek für alles, was du behältst**: Markierungen, Notizen, gespeicherte Wörter und frühere Fragen, synchronisiert über dein eigenes Google Drive.
+- **Senden oder herunterladen**: an [Obsidian](https://obsidian.md), Notion und weitere Ziele oder als `.md`, `.html` oder `.epub`.
+
 ![Notizseite: die Markierungen eines Artikels als durchgehender Auszug](docs/screenshots/readme/notes.webp)
 
 ![Gespeichertes Wort mit Kontext und Wörterbuchspalte](docs/screenshots/readme/vocab.webp)
 
-![YouTube-Vorschau mit mitlaufendem Transkript](docs/screenshots/readme/video.webp)
-
 ### Pinboard nach deinem Geschmack
-- **13 Themes für pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus dein eigenes CSS
-- **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren**: von jeder gespeicherten Seite ein Snapshot, damit sie lesbar bleibt, auch wenn der Originallink tot ist
-- **Sichern und synchronisieren**: Einstellungen über Chrome Sync, Vokabeln, Markierungen, Notizen, KI-Wörterbucheinträge und Gespräche über dein eigenes Google Drive; JSON-Backups enthalten Einstellungen, Vokabeln, Markierungen und Notizen
-- **9 Sprachen** · anpassbare Tastenkürzel · Speicherung primär lokal · kein Tracking
+- **13 Themes für pinboard.in**: Dracula, Nord, Catppuccin und mehr, dazu dein eigenes CSS.
+- **Tags aufräumen**: ähnliche Tags zusammenführen und selten genutzte ausmisten.
+- **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren**: Gespeicherte Seiten bleiben lesbar, auch wenn der Originallink nicht mehr funktioniert.
 
 ![13 Themes für pinboard.in](docs/screenshots/readme/themes.webp)
 
@@ -72,21 +60,11 @@ Oder als entpackte Erweiterung aus einem Release-ZIP laden:
 2. Entpacken
 3. `chrome://extensions/` → **Entwicklermodus** aktivieren → **Entpackte Erweiterung laden** → entpackten Ordner auswählen
 
-Der Quellcode verwendet eine eigene feste Entwicklungs-ID und kann deshalb zu Testzwecken neben der Version aus dem Chrome Web Store installiert werden. Das Release-ZIP verwendet dagegen die ID des Chrome Web Store und kann nicht gleichzeitig mit der Store-Version im selben Chrome-Profil installiert sein. Chrome Sync gleicht die Einstellungen ab, sobald die Einstellungssynchronisierung auf jedem Gerät aktiviert ist. Vor dem Wechsel von einem älteren entpackten Release in dessen Einstellungen auf **Sicherung exportieren** klicken und nach dem Laden des neuen Releases **Sicherung importieren** verwenden.
-
-Öffne nach der Installation **Einstellungen → Konto** und wähle deinen Dienst. Für Karakeep oder linkding gibst du die Website-URL und den API-Token ein, klickst auf **Verbinden** und erlaubst den Serverzugriff. Ein Unterpfad gehört zur URL; außer für localhost ist HTTPS erforderlich. Karakeep benötigt Version 0.31 oder neuer (getestet mit 0.34.1). Für Pinboard fügst du deinen [API-Token](https://pinboard.in/settings/password) im Popup ein und meldest dich an.
-
-Popup, Reader, Tastenkürzel und Stapelspeicherung verwenden den ausgewählten Dienst. Karakeep verwaltet „Später lesen“ in einer eigenen privaten Liste. Als gelesen markierte Einträge werden daraus entfernt; ihr Archivstatus bleibt unverändert. linkding verwendet die Ungelesen-Markierung und kann jedes neue Lesezeichen an SingleFile übergeben, das eine vollständige Kopie der Seite ablegt; Statusprüfungen beim Surfen sind optional, weil jede die Adresse an deinen Server schickt. Pinboard-Vorschläge, Tag-Bereinigung, Ungelesen-Zähler, Website-Suche und Tab-Sets bleiben Pinboard vorbehalten.
-
-Vokabeln, Markierungen, Notizen, gespeicherte KI-Wörterbucheinträge und Ask-Verläufe gehören zu einer persönlichen Bibliothek für alle drei Dienste. Ein Dienstwechsel oder eine Abmeldung wechselt die Bibliothek nicht. Beim Update bleibt die aktuelle Pinboard-Bibliothek erhalten; ältere andere Konten werden nicht zusammengeführt. Lesezeichen-Caches, Entwürfe und Offline-Warteschlangen bleiben an ihre ursprüngliche Verbindung gebunden. Wer sich bei linkding abmeldet und sich erneut verbindet, startet eine neue Verbindung; noch wartende Speicherungen der früheren Verbindung werden nicht automatisch wiederholt.
+Öffne danach **Einstellungen → Konto** und verbinde deinen Lesezeichendienst: für Pinboard mit deinem [API-Token](https://pinboard.in/settings/password), für Karakeep (ab Version 0.31) oder linkding mit Serveradresse und API-Token.
 
 ## Datenschutz
 
-Kein Tracking, keine Analytik, keine Telemetrie. Für neue Nutzer werden Einstellungen und Zugangsdaten standardmäßig auf diesem Gerät gespeichert. Die Synchronisierung gewöhnlicher Einstellungen wird auf jedem Gerät separat aktiviert. Die Synchronisierung von Zugangsdaten ist eine kontoweite Chrome-Option, an der aber nur Geräte mit aktivierter Einstellungssynchronisierung teilnehmen; andere Geräte verwenden weiterhin ihre lokalen Zugangsdaten. Bei neuen Nutzern ist die Synchronisierung von Zugangsdaten standardmäßig deaktiviert. Sind bei einem Upgrade bereits nicht leere Zugangsdaten in Chrome Sync vorhanden, bleibt sie zur Vermeidung von Datenverlust aktiviert. Wenn sie aktiviert ist, werden API-Schlüssel, Tokens, Passwörter und Export-Zugangsdaten über Chrome Sync geteilt; sie sind nur verschleiert, nicht verschlüsselt. Gespeicherte Lesezeichen, Seiteninhalte und die Offline-Warteschlange gelangen nicht in Chrome Sync. KI-Anfragen entstehen **nur** durch KI-Funktionen, die du aktivierst oder nutzt, und gehen direkt an den von dir konfigurierten Anbieter. Bei der Installation wird nur der Zugriff auf Pinboard gewährt. Jede weitere Website, die die Erweiterung braucht (ein KI-Anbieter, ein Export- oder Archivierungsziel, ein Wörterbuch, Google Drive, Video-Untertitel oder die Websites einer Stapelspeicherung), wird erst angefragt, wenn du die jeweilige Funktion zum ersten Mal nutzt, und zwar einzeln und nur für genau diese Website. Benutzerdefinierte Netzwerkendpunkte müssen HTTPS verwenden; HTTP ist nur für `localhost`, `127.0.0.1` und `[::1]` zulässig. Die Seiten der Erweiterung setzen eine strikte Content-Security-Policy durch (kein Remote-Code). Vollständige Richtlinie: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
-
-Google Drive wird auf jedem Gerät separat verbunden und synchronisiert Vokabeln, Markierungen, Notizen, vollständige KI-Wörterbucheinträge samt Ergänzungen und gespeicherte Gespräche mit Quellenauszügen der persönlichen Bibliothek. Kopien im privaten appDataFolder liegen im Klartext vor, ohne Ende-zu-Ende-Verschlüsselung. Optionale Belege zur Wortherkunft stammen aus Wiktionary. Die Erweiterung gleicht sie mit dem Quelltext ab und sendet kurze Auszüge samt Quellenangaben an deinen KI-Anbieter. Die Beispiele in den Gebrauchshinweisen verfasst die KI. Originalbelege werden auf Wikisource gesucht und unverändert ohne Übersetzung angezeigt; sie gehen nie an die KI. Bereits bezahlte Ergebnisse bleiben erhalten; neue Versionen entstehen nur auf Anfrage.
-
-Aktualisiere die Erweiterung auf allen Geräten, die Vokabeln synchronisieren. Diese Version liest vorhandene Vokabeldaten; ältere Versionen können jedoch keine Vokabeländerungen empfangen, die mit dieser Version gespeichert wurden.
+Kein Tracking, keine Analytik, keine Telemetrie. Einstellungen und Schlüssel bleiben auf diesem Gerät, solange du die Synchronisierung nicht aktivierst; synchronisierte Schlüssel sind nur verschleiert, nicht verschlüsselt. KI-Anfragen gehen nur an den von dir eingerichteten Anbieter, und nur dann, wenn du eine KI-Funktion nutzt. Über Pinboard hinaus fragt die Erweiterung jede benötigte Website einzeln an, und zwar erst, wenn du die jeweilige Funktion zum ersten Mal nutzt. Kopien in Google Drive liegen im privaten App-Ordner der Erweiterung und sind nicht Ende-zu-Ende-verschlüsselt. Vollständige Richtlinie: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## Lizenz
 

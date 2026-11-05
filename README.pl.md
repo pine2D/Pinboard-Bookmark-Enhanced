@@ -19,47 +19,35 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in), Karakeep i linkding: ta
 ## Funkcje
 
 ### Zapisywanie
-- **Jedno kliknięcie i wszystko wypełnione** — tytuł, opis i zaznaczony tekst trafiają na miejsce, a z adresu URL znikają parametry śledzące
-- **Skróty klawiszowe i zapis zbiorczy** — zapisuj bez otwierania okienka albo dodaj naraz do zakładek wszystkie karty z bieżącego okna
-- **Działa offline** — zapisy trafiają do lokalnej kolejki i są ponawiane po odzyskaniu połączenia
-- **Szkice nie przepadają** — zamknij okno w trakcie edycji i wróć do pisania w tym samym miejscu
-
-### Tagi
-- **Tagi i streszczenie od AI** — AI czyta treść artykułu bez reklam, menu i pasków bocznych; własny klucz API, 17 dostawców lub dowolny endpoint zgodny z OpenAI albo Anthropic
-- **Autouzupełnianie** — z własnych tagów, podpowiedzi Pinboarda i gotowych zestawów na jedno kliknięcie
-- **Porządki w tagach** — scalaj prawie identyczne tagi i usuwaj te rzadko używane
+- **Zapis w wybranej usłudze** — Pinboard, Karakeep lub linkding, z gotowym tytułem, opisem i zaznaczonym tekstem.
+- **Tagi i streszczenia AI** — propozycje na podstawie samego artykułu, z użyciem Twojego klucza API.
+- **Żaden zapis nie przepada** — zakładki zapisane offline czekają w kolejce i trafiają na miejsce po odzyskaniu połączenia.
 
 ### Czytanie
-- **Każda strona staje się czytelna** — widok Markdown ze spisem treści, wyszukiwaniem i podglądem przypisów; wzory, diagramy i tabele wyświetlają się poprawnie
-- **GitHub Discussions (pilotaż)** — zachowuje wczytany wpis główny, komentarze, strukturę odpowiedzi i oznaczenie zaakceptowanej odpowiedzi; pokazuje zakres pobranej treści
-- **Zarządzaj zakładkami podczas czytania** — zapisuj, edytuj lub usuwaj zakładkę artykułu w wybranej usłudze bez wracania do okienka
-- **Zaznaczenia w pięciu kolorach, z notatkami** — zostają na swoim miejscu mimo tłumaczenia, a nawet późniejszych zmian na stronie
-- **Przetłumacz stronę albo zadaj jej pytanie** — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
-- **Zachowaj pytania i odpowiedzi z cytatami** — gotowe odpowiedzi zapisują się automatycznie i synchronizują przez Google Drive. Przeglądaj rozmowy w bibliotece, kontynuuj w czytniku lub eksportuj osobno albo wraz z artykułem. Rozmowy tymczasowe nie są zapisywane.
-- **Sprawdzaj słownictwo podczas czytania** — przeglądaj definicje i wymowę w słowniku; zapisane słówka wyślesz jednym kliknięciem do Anki lub Eudic, a do wyboru masz też słowniki offline chińsko-angielski i angielsko-chiński. Wybierz język definicji w hasłach AI niezależnie od języka interfejsu i filtruj zapisane słowa według języka. Zmieniaj rozmiar okna słownika, przeciągając jego krawędzie, lub przenieś je do panelu bocznego — wyniki, wybrana definicja i trwające generowanie zostaną zachowane. Zobacz słowo w prawdziwych zdaniach z tekstów w Wikisource, z autorem i źródłem, bez użycia AI.
-- **Wielojęzyczne słowniki offline** — sprawdzaj definicje i zapis wymowy na tym urządzeniu w samodzielnie zaimportowanych plikach ZIP Yomitan v3; pakiety słowników nie są synchronizowane z Dyskiem Google ani uwzględniane w kopiach JSON. Każdy słownik offline, także chińsko-angielski i angielsko-chiński, można wyłączyć bez usuwania danych. Rozpoznane definicje są wyświetlane osobno od przykładów i pochodzenia słowa; pozostałą treść można przeczytać jako pełne hasło. Ponowny import starszych pakietów pozwala ponownie rozpoznać ich strukturę bez zmiany zapisanego słownictwa ani ustawienia włączenia lub wyłączenia słownika.
-- **Hasła słownikowe AI** — najpierw definicje, wymowa i przykłady w języku ojczystym lub wybranym języku objaśnień, a w razie potrzeby także wskazówki użycia i etymologia. Jeśli uzupełnienie jest niepełne, poprawne elementy pozostają dostępne z oznaczeniem częściowego wyniku. Pełne wyniki synchronizują się po połączeniu z Google Drive; aktualizacje zachowują wcześniejsze wersje. Wyniki słownika i treści AI układają się w jednej kolumnie, postęp generowania widać na bieżąco, a definicja do zapisania pozostaje widoczna na dole; automatyczne generowanie podstawowych haseł jest opcjonalne.
-- **Zrozum zaznaczony tekst w kontekście** — użyj funkcji Wyjaśnij, by zrozumieć słowo lub fragment bieżącego artykułu; słownik opisuje ogólne znaczenia i zastosowania.
-- **Twoja biblioteka** — wyróżnienia, notatki, zapisane słówka i rozmowy w jednym miejscu, z wyszukiwaniem w słowniku i zbiorczym zarządzaniem słownictwem. Zapisuj słowa bezpośrednio z wyników słownika, wybieraj definicje i łącz formy słów przez edytowalną formę podstawową. Każde słowo zachowuje własne notatki i stan nauki.
-- **Pełny eksport słownictwa**: osobny wielojęzyczny typ notatek Anki rozróżnia słowa o tej samej pisowni w różnych językach. Pełny TSV zachowuje notatki, formy podstawowe i wszystkie konteksty ze źródłami; dotychczasowe formaty z sześcioma polami nadal są dostępne
-- **Wyślij albo pobierz** — do [Obsidiana](https://obsidian.md), Notion, NotebookLM, do serwisu GitHub Gist lub dowolnego webhooka; albo jako `.md`, `.html`, `.epub` na czytnik e-booków
-- **Oglądaj podczas czytania** — filmy z YouTube i Bilibili wyświetlają się obok transkrypcji, która podąża za odtwarzaniem; tagi i podsumowania AI mogą czytać napisy
+- **Czytelny widok każdej strony** — bez reklam i pasków bocznych, z zaznaczeniami w pięciu kolorach i notatkami.
+- **Czytaj w dwóch językach** — przetłumacz całą stronę i miej oryginał tuż obok.
+- **Zapytaj stronę** — odpowiedzi cytują artykuł i prowadzą prosto do przytoczonego zdania.
+- **Sprawdzaj słowa na miejscu** — definicje i wymowa bez opuszczania strony; zapisane słówka wyślesz do Anki.
+- **Oglądaj podczas czytania** — filmy z YouTube i bilibili odtwarzają się obok transkrypcji, która podąża za nagraniem.
 
 ![Czytelny widok z tłumaczeniem dwujęzycznym i zaznaczeniami](docs/screenshots/readme/reader.webp)
 
 ![Zadaj stronie pytanie — odpowiedzi cytują źródło](docs/screenshots/readme/ask.webp)
 
+![Podgląd YouTube z transkrypcją podążającą za odtwarzaniem](docs/screenshots/readme/video.webp)
+
+### Przechowywanie
+- **Jedna biblioteka na wszystko, co zachowasz** — zaznaczenia, notatki, zapisane słówka i wcześniejsze pytania, synchronizowane przez Twój własny Dysk Google.
+- **Wyślij albo pobierz** — do [Obsidiana](https://obsidian.md), Notion i innych usług albo jako plik `.md`, `.html` lub `.epub`.
+
 ![Strona notatek: zaznaczenia z jednego artykułu jako ciągły wypis](docs/screenshots/readme/notes.webp)
 
 ![Zapisane słówko z kontekstem i kolumną słownika](docs/screenshots/readme/vocab.webp)
 
-![Podgląd YouTube z transkrypcją podążającą za odtwarzaniem](docs/screenshots/readme/video.webp)
-
-### Personalizacja
-- **13 motywów dla pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) oraz własny CSS
-- **Automatyczna archiwizacja w [Wayback Machine](https://web.archive.org)** — każda zapisana strona dostaje migawkę, więc przeczytasz ją nawet wtedy, gdy oryginalny link przestanie działać
-- **Kopie zapasowe i synchronizacja** — Chrome Sync dla ustawień, własny Google Drive dla słownictwa, wyróżnień, notatek, haseł AI i rozmów; kopie JSON obejmują ustawienia, słownictwo, wyróżnienia i notatki
-- **9 języków** · konfigurowalne skróty · dane przede wszystkim lokalnie · zero śledzenia
+### Pinboard po Twojemu
+- **13 motywów dla pinboard.in** — Dracula, Nord, Catppuccin i inne, a do tego własny CSS.
+- **Porządki w tagach** — scalaj niemal identyczne tagi i usuwaj te, których rzadko używasz.
+- **Automatyczna archiwizacja w [Wayback Machine](https://web.archive.org)** — zapisane strony da się przeczytać nawet wtedy, gdy oryginalny link przestanie działać.
 
 ![13 motywów dla pinboard.in](docs/screenshots/readme/themes.webp)
 
@@ -72,21 +60,11 @@ Lub załaduj rozpakowane z ZIP-a release:
 2. Rozpakuj
 3. `chrome://extensions/` → włącz **Tryb dewelopera** → **Załaduj rozpakowane** → wybierz rozpakowany folder
 
-Katalog źródłowy ma osobny, stały identyfikator deweloperski, dlatego podczas testów może działać obok wersji z Chrome Web Store. ZIP z release używa identyfikatora Chrome Web Store i nie może działać jednocześnie z wersją sklepową w tym samym profilu Chrome. Ustawienia będą wspólne dzięki Chrome Sync, gdy na każdym urządzeniu włączysz ich synchronizację. Przed zastąpieniem starszego release wczytanego ręcznie kliknij w jego ustawieniach **Eksportuj kopię zapasową**, a po wczytaniu nowego release użyj **Importuj kopię zapasową**.
-
-Po instalacji otwórz **Ustawienia → Konto** i wybierz usługę. Dla Karakeep lub linkding podaj adres witryny oraz token API, kliknij **Połącz** i zezwól na dostęp do serwera. Uwzględnij podścieżkę adresu, jeśli istnieje; poza localhost wymagany jest HTTPS. Karakeep wymaga wersji 0.31 lub nowszej (testowane na 0.34.1). Dla Pinboard wklej [token API](https://pinboard.in/settings/password) w okienku i zaloguj się.
-
-Okienko, czytnik, skróty i zapis zbiorczy korzystają z wybranej usługi. Karakeep używa osobnej prywatnej listy „Przeczytaj później”; oznaczenie zakładki jako przeczytanej usuwa ją z listy bez zmiany stanu archiwizacji. linkding używa znacznika nieprzeczytanych i może przekazać każdą nową zakładkę do SingleFile, który zachowa pełną kopię strony; sprawdzanie stanu podczas przeglądania jest opcjonalne, bo każde wysyła adres do Twojego serwera. Podpowiedzi Pinboard, porządkowanie tagów, licznik nieprzeczytanych, wyszukiwanie w witrynie i zestawy kart pozostają funkcjami Pinboard.
-
-Słownictwo, wyróżnienia, notatki, zapisane hasła AI i historia Ask tworzą wspólną bibliotekę osobistą dla wszystkich trzech usług. Zmiana usługi ani wylogowanie nie przełącza biblioteki. Aktualizacja zachowuje obecną bibliotekę Pinboard bez łączenia dawnych kont. Pamięć podręczna zakładek, szkice i kolejki offline pozostają przypisane do pierwotnego połączenia. Ponowne połączenie z linkding po wylogowaniu tworzy nowe połączenie; zapisy, które czekały w poprzednim, nie są ponawiane automatycznie.
+Następnie otwórz **Ustawienia → Konto** i połącz usługę zakładek: dla Pinboard podaj [token API](https://pinboard.in/settings/password), a dla Karakeep (w wersji 0.31 lub nowszej) albo linkding adres serwera i token API.
 
 ## Prywatność
 
-Bez śledzenia, bez analityki, bez telemetrii. W przypadku nowych użytkowników ustawienia i dane uwierzytelniające pozostają domyślnie na tym urządzeniu. Synchronizację zwykłych ustawień włącza się osobno na każdym urządzeniu. Synchronizacja danych uwierzytelniających jest jednym wyborem dla całego konta Chrome, ale uczestniczą w niej tylko urządzenia z włączoną synchronizacją ustawień; pozostałe nadal używają lokalnych danych uwierzytelniających. Dla nowych użytkowników jest domyślnie wyłączona. Jeśli podczas aktualizacji w Chrome Sync są już niepuste dane uwierzytelniające, pozostaje włączona, aby uniknąć utraty danych. Po włączeniu klucze API, tokeny, hasła i dane uwierzytelniające eksportu są udostępniane przez Chrome Sync; są jedynie zaciemnione, a nie zaszyfrowane. Zapisane zakładki, zawartość stron i kolejka offline nigdy nie trafiają do Chrome Sync. Zapytania AI wysyłają **tylko** te funkcje AI, które włączysz lub uruchomisz, i trafiają one bezpośrednio do skonfigurowanego dostawcy. Podczas instalacji przyznawany jest tylko dostęp do Pinboard. O dostęp do każdej innej witryny (dostawcy AI, miejsca docelowego eksportu lub archiwizacji, słownika, Dysku Google, napisów wideo albo witryn objętych zapisem zbiorczym) rozszerzenie prosi przy pierwszym użyciu danej funkcji, zawsze dla jednej konkretnej witryny. Niestandardowe punkty końcowe sieci muszą używać HTTPS; HTTP jest dozwolone tylko dla `localhost`, `127.0.0.1` i `[::1]`. Strony rozszerzenia egzekwują restrykcyjną politykę Content-Security-Policy (bez zdalnego kodu). Pełna polityka: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
-
-Google Drive łączy się oddzielnie na każdym urządzeniu i synchronizuje słownictwo, wyróżnienia, notatki, pełne hasła AI z uzupełnieniami oraz zapisane rozmowy z fragmentami źródłowymi z biblioteki osobistej. Kopie w prywatnym folderze appDataFolder są zapisane jawnym tekstem, bez szyfrowania end-to-end. Opcjonalne źródła etymologii pochodzą z Wikisłownika. Rozszerzenie sprawdza tekst źródłowy i przesyła krótkie fragmenty wraz z danymi źródła do wybranego dostawcy AI. Przykłady we wskazówkach użycia tworzy AI. Przykłady z tekstów są wyszukiwane w Wikisource i pokazywane bez zmian i bez tłumaczenia; nigdy nie trafiają do AI. Opłacone wyniki pozostają zapisane; nowa wersja powstaje tylko na żądanie.
-
-Zaktualizuj rozszerzenie na wszystkich urządzeniach synchronizujących słownictwo. Ta wersja odczytuje dotychczasowe dane, ale starsze wersje nie odbierają zmian słownictwa zapisanych przez tę wersję.
+Bez śledzenia, bez analityki, bez telemetrii. Ustawienia i klucze pozostają na tym urządzeniu, dopóki nie włączysz synchronizacji; synchronizowane klucze są jedynie zaciemnione, a nie zaszyfrowane. Zapytania AI trafiają wyłącznie do skonfigurowanego przez Ciebie dostawcy i tylko wtedy, gdy korzystasz z funkcji AI. Poza Pinboard rozszerzenie prosi o dostęp do każdej potrzebnej witryny osobno, przy pierwszym użyciu danej funkcji. Kopie na Dysku Google są przechowywane w prywatnym folderze aplikacji rozszerzenia i nie są objęte szyfrowaniem end-to-end. Pełna polityka: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## Licencja
 
