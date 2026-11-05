@@ -4695,8 +4695,13 @@ function showConfirmPopover(anchor, opts) {
     pop.setAttribute("aria-hidden", "true");
     pop.classList.add("is-closing");
     const remove = () => pop.remove();
-    pop.addEventListener("transitionend", remove, { once: true });
-    const outMs = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--motion-pop-out")) || 100;
+    // Only the popover's own exit counts: a button's colour transition
+    // bubbling up from inside must not cut the fade short.
+    pop.addEventListener("transitionend", (ev) => { if (ev.target === pop) remove(); });
+    // options/library/reader name the token --motion-pop-out, popup --pp-motion-pop-out.
+    const rootStyle = getComputedStyle(document.documentElement);
+    const outMs = parseFloat(rootStyle.getPropertyValue("--motion-pop-out"))
+      || parseFloat(rootStyle.getPropertyValue("--pp-motion-pop-out")) || 100;
     setTimeout(remove, outMs + 50);
   }
   function onKey(ev) {

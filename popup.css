@@ -167,6 +167,11 @@
   --pp-motion-duration: 0.16s;
   /* Hover/focus/press feedback; shared value with options.css --motion-state. */
   --pp-motion-state: 150ms;
+  /* Popover enter / exit, same values as options.css --motion-pop /
+     --motion-pop-out: exit is faster than entry, both ease-out. shared.js
+     dismiss() reads --pp-motion-pop-out for its removal fallback timer. */
+  --pp-motion-pop: 140ms;
+  --pp-motion-pop-out: 100ms;
   /* Stacking ladder. Values are the ones already shipping — named, not renumbered,
      so this is inert at paint time. The point is that the next overlay picks a rung
      instead of inventing another magic number. Countdown sits on top of everything
@@ -764,7 +769,9 @@ html[data-section="login"] .quick-actions { display: none !important; }
   color: var(--pp-banner-fg);
   font-size: 11px;
   line-height: 1.4;
-  animation: fadeSlideDown var(--pp-motion-duration) var(--ease-out);
+  /* No entrance animation (motion audit 2026-11-05): the banner is part of the
+     popup's first render, and a keyframe on a class that lands while the strip
+     is already on screen replays. Do not add one back behind motion-ready. */
 }
 
 /* URL Warning */
@@ -784,7 +791,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
   color: var(--pp-fg);
   font-size: 11px;
   line-height: 1.4;
-  animation: fadeSlideDown var(--pp-motion-duration) var(--ease-out);
+  /* No entrance animation: same first-render reason as .existing-banner. */
 }
 /* One warning triangle, one language (2026-09-18 audit S12). The strip used to
    draw a `.hint-warn::before` data-URI with stroke='%23c0840a' baked in: an
@@ -1559,7 +1566,7 @@ input[type="text"].search-field:focus-visible:not(:disabled) { box-shadow: var(-
   /* linear, not ease: this is a determinate bar driven by JS ticks. An eased
      curve decelerates into a stall between ticks, so steady progress reads as
      stuttering — the curve lies about the rate. */
-  transition: width 0.25s linear;
+  transition: width 0.2s linear;
 }
 /* Cancel (roadmap #32): overlaid on the bar's right end; 24px hit area per the
    icon-button rule, 16px visual disc so it reads at the 14px bar height.
@@ -3256,7 +3263,19 @@ html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Cons
   padding: var(--pp-sp-5); font-size: 13px; line-height: 18px; color: var(--pp-fg); white-space: normal;
   background: var(--pp-bg); border: 1px solid var(--pp-border); border-radius: var(--pp-radius-lg);
   box-shadow: var(--pp-shadow-md);
-  animation: confirmFadeIn 0.12s var(--ease-out);
+}
+/* Enter/exit: the options.css recipe (@starting-style + pop tokens), not a
+   keyframe, so a re-triggered popover never replays and the exit can reverse
+   mid-flight. Gated on motion-ready so nothing animates on the first frame;
+   shared.js dismiss() uses the same gate before it waits for the exit.
+   `translate`, not `transform`: positioning reads getBoundingClientRect and
+   the press scale on buttons stays independent. */
+html.motion-ready .confirm-popover {
+  opacity: 1;
+  translate: 0 0;
+  transition: opacity var(--pp-motion-pop) var(--ease-out),
+              translate var(--pp-motion-pop) var(--ease-out);
+  @starting-style { opacity: 0; translate: 0 -4px; }
 }
 .confirm-popover .confirm-content { display: flex; flex-direction: column; gap: var(--pp-sp-4); min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .confirm-popover .confirm-content:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
@@ -3289,16 +3308,15 @@ html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Cons
 .confirm-popover .confirm-no { background: none; color: var(--pp-fg); border-color: var(--pp-border); }
 .confirm-popover .confirm-no:hover { background: var(--pp-btn-hover); }
 .confirm-popover button:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
-@keyframes confirmFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-/* Exit mirrors the entrance path (fade + 4px rise). shared.js dismiss() adds
-   .is-closing and removes the node on transitionend; 0.1s matches its 100ms
-   --motion-pop-out fallback — popup.css deliberately defines no --motion-pop-out,
-   so keep these two in sync by hand. */
-.confirm-popover.is-closing {
+/* Exit mirrors the entrance path (fade + 4px rise), faster than the entry.
+   shared.js dismiss() adds .is-closing (inert + aria-hidden first) and removes
+   the node on the popover's own transitionend, with a --pp-motion-pop-out
+   + 50ms timer as the backstop. */
+html.motion-ready .confirm-popover.is-closing {
   opacity: 0;
-  transform: translateY(-4px);
+  translate: 0 -4px;
   pointer-events: none;
-  transition: opacity 0.1s var(--ease-out), transform 0.1s var(--ease-out);
+  transition-duration: var(--pp-motion-pop-out);
 }
 
 /* Neutral card, matching options.css and library.css: the popover is a
