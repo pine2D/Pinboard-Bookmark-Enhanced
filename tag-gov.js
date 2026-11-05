@@ -435,8 +435,9 @@ function pbpTagGovApplyShiftRange(boxes, anchorIdx, clickIdx) {
 //  (1) posts/all?tag=<stored literal> matches the corrupted tag, and
 //  (2) tags/get lists corrupted tags under their literal names (in ~10s);
 // the repair saved clean tags and left the other bookmark fields unchanged.
-// Still UNVERIFIED live as of 2026-11-04: multi-level entities (`&amp;quot;`), a
-// repaired name colliding with an existing clean tag (merge), and cancelling midway.
+// Verified live 2026-11-05 (run a96bbc): a multi-level `&amp;quot;` tag is listed and
+// fully decoded in one repair, and a repaired name that collides with an existing clean
+// tag merges into it without duplicates. Still UNVERIFIED live: cancelling midway.
 // The repair still fails visibly if (1) ever stops holding (op.expectMatch).
 const PBP_TAG_GOV_ENTITY_MAP = Object.freeze({ quot: '"', lt: "<", gt: ">", amp: "&", "#39": "'" });
 const PBP_TAG_GOV_ENTITY_RE = /&(quot|lt|gt|amp|#39);/;

@@ -6659,9 +6659,9 @@ async function renderLowCountTags() {
 //
 // Verified live 2026-11-04 (run 2743a0db): tags/get listed the broken tags,
 // posts/all?tag=<literal> matched them, and the repair saved clean tags without
-// touching other fields. Still UNVERIFIED live as of 2026-11-04: multi-level
-// entities (`&amp;quot;`), a repaired name colliding with an existing clean tag,
-// and cancelling midway. If posts/all?tag= ever stops matching, the op re-saves
+// touching other fields. Verified live 2026-11-05 (run a96bbc): multi-level
+// entities (`&amp;quot;`) and a repaired name colliding with an existing clean
+// tag (merge). Still UNVERIFIED live: cancelling midway. If posts/all?tag= ever stops matching, the op re-saves
 // nothing, which runTagGovBatch reports as a failed row (op.expectMatch +
 // res.written === 0), never as success.
 let _tagGovEntityItems = [];
