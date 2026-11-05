@@ -22,7 +22,7 @@
 //   scripts/cws-shots.mjs),
 //   video = its own light context (YouTube origin grant + relay stub).
 //
-// OUTPUT  .qa-scan/report/readme-shots/{raw/<scheme>,out}/ (gitignored);
+// OUTPUT  $PBP_QA_REPORT_DIR/readme-shots/{raw/<scheme>,out}/ (default ~/.local/share/pbp-qa-report, outside the repo);
 //   --compose also writes 1800px-wide WebP (q86) to docs/screenshots/readme/:
 //   hero, reader, ask, notes, vocab, video, themes.
 //
@@ -31,6 +31,7 @@
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as F from "./readme-shots-fixtures.mjs";
@@ -44,7 +45,7 @@ const has = (n) => argv.includes(n);
 const DSF = Number(flag("--dsf", "2"));
 const START_T = Number(flag("--video-t", "95"));
 const ALL = ["popup", "popup-tags", "popup-linkding", "account", "reader", "ask", "lookup", "notes", "vocab", "questions", "themes", "video"];
-const OUT_ROOT = join(REPO, ".qa-scan/report/readme-shots");
+const OUT_ROOT = join(process.env.PBP_QA_REPORT_DIR || join(homedir(), ".local/share/pbp-qa-report"), "readme-shots"); // outside the repo, see CLAUDE.md "测试与夹具"
 const RAW = (scheme) => join(OUT_ROOT, "raw", scheme);
 const COMPOSED = join(OUT_ROOT, "out");
 const WEBP_DIR = join(REPO, "docs/screenshots/readme");

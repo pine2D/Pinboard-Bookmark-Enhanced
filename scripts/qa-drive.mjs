@@ -7,7 +7,7 @@
 // user-visible surfaces (options tabs, md-preview reader interactions,
 // toolbar popup, pinboard.in site theme, the library vocab/notes page)
 // taking screenshots and collecting console/pageerror evidence
-// into .qa-scan/report/<label>/ for human + AI review.
+// into $PBP_QA_REPORT_DIR/<label>/ (default ~/.local/share/pbp-qa-report) for human + AI review.
 //
 // Unlike zip-install-smoke.mjs (release gate: pass/fail) this is a REPORTER:
 // surface-level breakage is recorded as a finding, not an exit code. Only
@@ -42,7 +42,7 @@ import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isolatedFontconfigEnv, parityProbeEnv } from "./ci-fonts-env.mjs";
@@ -53,7 +53,9 @@ import { openVocabPackPreview, installVocabPackFixture } from "./audit-vocab-pac
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(SCRIPT_DIR, "..");
 const QA_SCAN = resolve(REPO, ".qa-scan");
-const REPORT_ROOT = resolve(QA_SCAN, "report");
+// Reports live outside the repo: Windows Chrome loads the repo root as the unpacked extension, and a big tree
+// there stalls its startup (2026-11-05). See CLAUDE.md "测试与夹具".
+const REPORT_ROOT = resolve(process.env.PBP_QA_REPORT_DIR || join(homedir(), ".local/share/pbp-qa-report"));
 const TIMEOUT_MS = 15_000;
 const argv = process.argv.slice(2);
 const flag = (name, fallback) => {

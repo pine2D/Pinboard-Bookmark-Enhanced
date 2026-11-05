@@ -5,7 +5,7 @@
 // rendered in Playwright's bundled Chromium.
 //
 // PREREQUISITES
-//   node scripts/readme-shots.mjs            # writes .qa-scan/report/readme-shots/raw/light/
+//   node scripts/readme-shots.mjs            # writes $PBP_QA_REPORT_DIR/readme-shots/raw/light/
 //
 // USAGE
 //   node scripts/cws-shots.mjs               # all screenshots + both promo tiles
@@ -29,6 +29,7 @@
 // Without them the stacks fall back to locally installed families.
 import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { crc32, deflateSync, inflateSync } from "node:zlib";
@@ -36,7 +37,7 @@ import { crc32, deflateSync, inflateSync } from "node:zlib";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "..");
 const { chromium } = createRequire(resolve(REPO, ".qa-scan/package.json"))("playwright");
-const RAW = join(REPO, ".qa-scan/report/readme-shots/raw/light");
+const RAW = join(process.env.PBP_QA_REPORT_DIR || join(homedir(), ".local/share/pbp-qa-report"), "readme-shots/raw/light");
 const OUT = join(REPO, "docs/cws-assets");
 const ORIG = join(OUT, "originals");
 const RAW_DSF = 2; // readme-shots captures at deviceScaleFactor 2
