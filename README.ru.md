@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | **Русский**
 
-Расширение Chrome для [Pinboard](https://pinboard.in), Karakeep и linkding: AI-теги и краткое содержание, режим чтения с переводом и выделениями, а также 13 тем для pinboard.in.
+Расширение Chrome для [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) и [linkding](https://linkding.link): AI-теги и краткое содержание, режим чтения с переводом и выделениями, а также 13 тем для pinboard.in.
 
 > **Примечание:** Выберите сервис закладок в настройках. Karakeep и linkding работают без аккаунта Pinboard. Pinboard — независимый **платный** сервис, для которого нужны собственный аккаунт и API-токен. Это стороннее расширение не связано с Pinboard, не спонсируется и не одобряется им.
 

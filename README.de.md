@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | **Deutsch** | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in), Karakeep und linkding: KI-Tags und Zusammenfassungen, ein Reader mit Übersetzung und Markierungen sowie 13 Themes für pinboard.in.
+Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) und [linkding](https://linkding.link): KI-Tags und Zusammenfassungen, ein Reader mit Übersetzung und Markierungen sowie 13 Themes für pinboard.in.
 
 > **Hinweis:** Wähle deinen Lesezeichendienst in den Einstellungen. Karakeep und linkding funktionieren ohne Pinboard-Konto. Pinboard ist ein unabhängiger, **kostenpflichtiger** Dienst und erfordert ein eigenes Konto mit API-Token. Diese Erweiterung stammt von einem Drittanbieter, steht in keiner Verbindung zu Pinboard und wird von Pinboard weder gesponsert noch befürwortet.
 

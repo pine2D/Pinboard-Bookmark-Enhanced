@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | **日本語** | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-[Pinboard](https://pinboard.in)、Karakeep、linkding に対応した Chrome 拡張機能。AI タグと要約、翻訳・ハイライト付きリーダー、pinboard.in 用テーマ 13 種を備えています。
+[Pinboard](https://pinboard.in)、[Karakeep](https://karakeep.app)、[linkding](https://linkding.link) に対応した Chrome 拡張機能。AI タグと要約、翻訳・ハイライト付きリーダー、pinboard.in 用テーマ 13 種を備えています。
 
 > **注意:** 設定でブックマークサービスを選択します。Karakeep と linkding は Pinboard アカウントなしで使えます。Pinboard は独立した**有料**サービスで、自分のアカウントと API トークンが必要です。本拡張機能は第三者製で、Pinboard との提携・出資・公式の承認はありません。
 

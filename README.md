@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-A Chrome extension for [Pinboard](https://pinboard.in), Karakeep and linkding: AI tags and summaries, a reader with translation and highlights, and 13 themes for pinboard.in.
+A Chrome extension for [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) and [linkding](https://linkding.link): AI tags and summaries, a reader with translation and highlights, and 13 themes for pinboard.in.
 
 > **Note:** Choose one bookmark service in Settings. Karakeep and linkding work without a Pinboard account. Pinboard is an independent **paid** service and requires your own account and API token. This third-party extension is not affiliated with, sponsored by, or endorsed by Pinboard.
 

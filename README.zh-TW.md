@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | **繁體中文** | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-支援 [Pinboard](https://pinboard.in)、Karakeep 和 linkding 的 Chrome 擴充功能：AI 標籤與摘要、支援翻譯與標記的閱讀器，以及 13 套 pinboard.in 佈景主題。
+支援 [Pinboard](https://pinboard.in)、[Karakeep](https://karakeep.app) 和 [linkding](https://linkding.link) 的 Chrome 擴充功能：AI 標籤與摘要、支援翻譯與標記的閱讀器，以及 13 套 pinboard.in 佈景主題。
 
 > **說明：** 在設定中選擇一種書籤服務。使用 Karakeep 或 linkding 不需要 Pinboard 帳號。Pinboard 是獨立的**付費**服務，使用時需自備帳號與 API Token。本擴充功能是第三方用戶端，與 Pinboard 無隸屬、贊助或背書關係。
 

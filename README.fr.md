@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | **Français** | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-Une extension Chrome pour [Pinboard](https://pinboard.in), Karakeep et linkding : étiquettes et résumés par IA, lecteur avec traduction et surlignage, et 13 thèmes pour pinboard.in.
+Une extension Chrome pour [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) et [linkding](https://linkding.link) : étiquettes et résumés par IA, lecteur avec traduction et surlignage, et 13 thèmes pour pinboard.in.
 
 > **Remarque :** Choisissez votre service de signets dans les paramètres. Karakeep et linkding fonctionnent sans compte Pinboard. Pinboard est un service indépendant **payant**, qui nécessite votre propre compte et votre jeton API. Cette extension tierce n’est ni affiliée à Pinboard, ni sponsorisée ou approuvée par Pinboard.
 
