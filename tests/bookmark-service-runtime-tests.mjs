@@ -254,6 +254,10 @@ const launch=()=>chromium.launchPersistentContext(profile,{headless:true,executa
 const getWorker=async ctx=>ctx.serviceWorkers().find(w=>w.url().startsWith('chrome-extension://'))||ctx.waitForEvent('serviceworker');
 let ctx;
 const errors=[];
+// "Saved" stays on the button for 1.2 s. Polling every 100 ms can miss it on a
+// busy runner, so watch the class from before the click and wait for the flag.
+const watchSaved=popup=>popup.evaluate(()=>{const b=document.getElementById('submit-btn');window.__pbpSavedSeen=false;window.__pbpSavedObs?.disconnect();window.__pbpSavedObs=new MutationObserver(()=>{if(b.classList.contains('saved-success'))window.__pbpSavedSeen=true;});window.__pbpSavedObs.observe(b,{attributes:true,attributeFilter:['class']});});
+const sawSaved=popup=>popup.evaluate(()=>window.__pbpSavedSeen===true||document.getElementById('submit-btn').classList.contains('saved-success'));
 async function until(read, label) {
   const deadline=Date.now()+15000;
   while(Date.now()<deadline){if(await read())return;await new Promise(r=>setTimeout(r,100));}
@@ -431,8 +435,8 @@ try{
     }
     await popup.locator('#title-input').fill(service+' title');await popup.locator('#description-input').fill('My note');
     await popup.locator('#tags-input').fill('reading');await popup.locator('#tags-input').press('Enter');
-    await popup.locator('#submit-btn').click();
-    await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),'popup save success').catch(async error=>{console.error({requests:requests.map(r=>({path:r.path,method:r.method})),status:await popup.locator('body').innerText()});throw error;});
+    await watchSaved(popup);await popup.locator('#submit-btn').click();
+    await until(()=>sawSaved(popup),'popup save success').catch(async error=>{console.error({requests:requests.map(r=>({path:r.path,method:r.method})),status:await popup.locator('body').innerText()});throw error;});
     assert.equal(records[service].size,1,service+' popup did not save');
     if(service==='linkding'){
       const latestWrite=()=>requests.filter(r=>r.service==='linkding'&&['POST','PATCH'].includes(r.method)).at(-1);
@@ -2052,8 +2056,8 @@ try{
       let popup=await openOnTab();await settled(popup,'missing');
       await popup.evaluate(()=>{settings.optAutoCloseAfterSave=true;});
       const before=requests.length;
-      await popup.locator('#submit-btn').click();
-      await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),'the create succeeded');
+      await watchSaved(popup);await popup.locator('#submit-btn').click();
+      await until(()=>sawSaved(popup),'the create succeeded');
       const create=linkdingCreates(before)[0];
       assert(new URLSearchParams(create.query).has('disable_html_snapshot'),'the create still asked linkding for its own snapshot: '+create.query);
       const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
@@ -2066,8 +2070,8 @@ try{
       // Updating that bookmark runs nothing and says nothing.
       popup=await openOnTab();await settled(popup,'found');
       const beforeUpdate=warnings.length;
-      await popup.locator('#title-input').fill('Edited');await popup.locator('#submit-btn').click();
-      await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),'the update succeeded');
+      await popup.locator('#title-input').fill('Edited');await watchSaved(popup);await popup.locator('#submit-btn').click();
+      await until(()=>sawSaved(popup),'the update succeeded');
       assert(!(await popup.locator('body').textContent()).includes(en.singleFileNoResponse.message),'an update mentioned SingleFile');
       assert(!warnings.slice(beforeUpdate).some(text=>text.startsWith('[singlefile]')),'an update ran SingleFile');
       await popup.close();
@@ -2101,8 +2105,8 @@ try{
     assert.equal(writes().length,before,label+': an update made on an older version was written');
   };
   const pressSaved=async(popup,writes,label)=>{
-    const before=writes().length;await popup.locator('#submit-btn').click();
-    await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),label).catch(async error=>{console.error({status:await popup.locator('#status-msg').textContent()});throw error;});
+    const before=writes().length;await watchSaved(popup);await popup.locator('#submit-btn').click();
+    await until(()=>sawSaved(popup),label).catch(async error=>{console.error({status:await popup.locator('#status-msg').textContent()});throw error;});
     assert(writes().length>before,label+': nothing was written');
   };
   await block('linkding changed elsewhere since loaded',['linkding'],async()=>{
