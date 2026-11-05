@@ -609,15 +609,11 @@ function _pbpAskIsOpen() {
 // pbpTrPeekPopPos. The typeof guards keep a page that loads only one of
 // the two (tests/) from throwing.
 //
-// Deliberately NOT _pbpZenSettleAfterLayout: its 300ms fallback leg is
-// exactly what md-reader.js records as a real-machine regression (it settled
-// the reader back 300ms AFTER the user had already scrolled away), and
-// "open Ask, then scroll to find the paragraph I want to ask about" is the
-// common next move here. Because the reflow is instantaneous, one
-// synchronous settle against the final geometry is the whole job: no
-// transitionend second leg, nothing left armed after the toggle returns,
-// and no share of _pbpZenSettleTimer/_pbpZenSettlePending, the single
-// pending slot zen/width use.
+// One synchronous settle against the final geometry is the whole job, the
+// same as zen and the width cycle: no transitionend second leg and no delayed
+// timer (a 300ms re-settle once dragged a reader who had already scrolled on
+// back to the old anchor, see _pbpTypoSet in md-reader.js), and nothing left
+// armed after the toggle returns.
 
 // The same breakpoint md-preview.css uses to turn the panel into a bottom
 // sheet: `@media (max-width: 1280px) { body.ask-open main { margin-right: 0 } }`.

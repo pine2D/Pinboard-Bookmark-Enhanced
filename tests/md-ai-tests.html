@@ -10552,7 +10552,6 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
         "the zen bar carries no width control of its own: width lives in Aa");
     } finally {
       document.removeEventListener("keydown", _pbpZenOnKeyDown);
-      _pbpZenSettleClearPending();
       if (_pbpTypoPopEl) _pbpTypoPopEl.remove();
       if (_pbpZenBarEl) _pbpZenBarEl.remove();
       _pbpZenInited = was.zenInited; _pbpTypoInited = was.typoInited; _pbpZenWidth = was.width; _pbpZenWidthTouched = was.touched;
@@ -14300,14 +14299,15 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
 
 // Production CSS half of the same decision, measured in a frame under the real
 // md-preview.css at 1366 and 1440 (both above the 1280px sheet breakpoint, where
-// the push exists): main's margin-right reaches the pushed value in the same frame
-// as the class toggle (no transition on it), while the panel itself still slides
-// on transform. Reverting either half makes a row here fail.
+// the push exists): main carries NO running transition on margin-left (zen) or
+// margin-right (Ask push), so both reach their new values in the same frame as
+// the class toggle, while #rail and #ask-panel still slide on transform. Putting
+// either margin transition back makes a row here fail.
 (async function () {
   const host = document.createElement("div");
   host.className = "suite";
   const h = document.createElement("h2");
-  h.textContent = "Ask push is instant, the panel slides (async)";
+  h.textContent = "Ask push and zen are instant, the panels slide (async)";
   host.appendChild(h);
   document.getElementById("results").appendChild(host);
   function report(name, err) {
@@ -14316,41 +14316,123 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
     else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
     host.appendChild(div);
   }
+  // Properties with a non-zero duration (the list repeats when shorter, per spec).
+  function animated(cs) {
+    const props = cs.transitionProperty.split(/\s*,\s*/);
+    const durs = cs.transitionDuration.split(/\s*,\s*/).map((d) => parseFloat(d) * (/ms$/.test(d) ? 1 : 1000));
+    return props.filter((p, i) => durs[i % durs.length] > 0);
+  }
+  const touchesMargin = (list) => list.filter((p) => p === "all" || p === "margin" || p === "margin-left" || p === "margin-right" || p === "margin-inline");
   for (const [width, video] of [[1366, false], [1440, false], [1440, true]]) {
-    const name = "width " + width + (video ? " video-mode" : "") +
-      ": main's margin-right jumps to the pushed value at once; #ask-panel transitions transform only";
     const frame = document.createElement("iframe");
+    const tag = "width " + width + (video ? " video-mode" : "");
     try {
       frame.style.cssText = "position:absolute;left:-4000px;top:0;width:" + width + "px;height:800px";
       frame.srcdoc = '<!doctype html><html class="motion-ready"><head><meta charset="utf-8"><link rel="stylesheet" href="../md-preview.css"></head>' +
-        '<body' + (video ? ' class="video-mode"' : '') + '><main><div class="doc-body"><p>text</p></div></main>' +
+        '<body' + (video ? ' class="video-mode"' : '') + '><aside id="rail" class="rail"></aside><main><div class="doc-body"><p>text</p></div></main>' +
         '<aside id="ask-panel" hidden></aside></body></html>';
       await new Promise((res, rej) => { frame.onload = res; frame.onerror = rej; document.body.appendChild(frame); });
       const fd = frame.contentDocument, fw = frame.contentWindow;
       assert(fd.styleSheets.length && fw.getComputedStyle(fd.body).boxSizing === "border-box", "md-preview.css loaded in the frame");
-      const main = fd.querySelector("main"), panel = fd.getElementById("ask-panel");
-      const props = fw.getComputedStyle(main).transitionProperty.split(/\s*,\s*/);
-      assert(!props.includes("margin-right") && !props.includes("all") && !props.includes("margin"),
-        "main must not transition margin-right: " + props.join(","));
-      assertEq(fw.getComputedStyle(main).marginRight, "0px", "closed: no push");
-      void main.offsetWidth;
-      fd.body.classList.add("ask-open");
-      panel.hidden = false;
-      const mr = parseFloat(fw.getComputedStyle(main).marginRight);
-      assert(mr > 400, "open: the push lands in the toggle's own frame, got margin-right " + mr + "px");
-      const pp = fw.getComputedStyle(panel).transitionProperty;
-      // Closed-state rule carries the slide; read it there.
-      panel.hidden = true;
-      const ppClosed = fw.getComputedStyle(panel).transitionProperty.split(/\s*,\s*/);
-      assert(ppClosed.includes("transform"), "the panel still slides on transform: " + ppClosed.join(","));
-      assert(ppClosed.every((p) => p === "transform" || p === "visibility"),
-        "the panel animates transform (and the visibility flip) only: " + ppClosed.join(",") + " / open: " + pp);
-      report(name);
+      const main = fd.querySelector("main"), panel = fd.getElementById("ask-panel"), rail = fd.getElementById("rail");
+
+      const askName = tag + ": main's margin-right jumps to the pushed value at once; #ask-panel transitions transform only";
+      try {
+        const bad = touchesMargin(animated(fw.getComputedStyle(main)));
+        assert(!bad.length, "main must not animate its margins: " + bad.join(","));
+        assertEq(fw.getComputedStyle(main).marginRight, "0px", "closed: no push");
+        void main.offsetWidth;
+        fd.body.classList.add("ask-open");
+        panel.hidden = false;
+        const mr = parseFloat(fw.getComputedStyle(main).marginRight);
+        assert(mr > 400, "open: the push lands in the toggle's own frame, got margin-right " + mr + "px");
+        panel.hidden = true; // the closed-state rule carries the slide
+        const pp = animated(fw.getComputedStyle(panel));
+        assert(pp.includes("transform"), "the panel still slides on transform: " + pp.join(","));
+        assert(pp.every((p) => p === "transform"), "the panel animates transform only (visibility is a 0s flip): " + pp.join(","));
+        fd.body.classList.remove("ask-open");
+        report(askName);
+      } catch (e) { report(askName, e); }
+
+      const zenName = tag + ": entering/leaving zen moves main's margin-left at once; #rail still slides on transform";
+      try {
+        void main.offsetWidth;
+        const ml0 = parseFloat(fw.getComputedStyle(main).marginLeft);
+        assert(ml0 > 200, "normal mode reserves the rail column, got margin-left " + ml0 + "px");
+        fd.body.classList.add("zen");
+        assertEq(fw.getComputedStyle(main).marginLeft, "0px", "zen: the article takes its new width in the toggle's own frame");
+        const rp = animated(fw.getComputedStyle(rail));
+        assert(rp.includes("transform"), "#rail still slides out on transform: " + rp.join(","));
+        void main.offsetWidth;
+        fd.body.classList.remove("zen");
+        assertEq(parseFloat(fw.getComputedStyle(main).marginLeft), ml0, "zen exit restores margin-left in the same frame");
+        report(zenName);
+      } catch (e) { report(zenName, e); }
     } catch (e) {
-      report(name, e);
+      report(tag + ": frame setup", e);
     } finally {
       frame.remove();
     }
+  }
+})();
+
+// Zen enter/exit (md-reader.js) settle the reading position exactly once, in the
+// same task, and arm nothing: with main's margin-left no longer transitioned, a
+// later transitionend or a 300ms timer re-settle could only drag back a reader
+// who has scrolled on. Waits past the old 300ms fallback to prove it is gone.
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "zen settles once, synchronously (async)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  const name = "_pbpZenEnter/_pbpZenExit: one synchronous settle each, nothing fires afterwards";
+  if (typeof _pbpZenEnter !== "function" || typeof _pbpZenExit !== "function") { report(name, new Error("md-reader.js zen API missing")); return; }
+  const saved = { capture: window._pbpZenCaptureAnchor, settle: window._pbpZenSettleAnchor, bar: _pbpZenBarEl };
+  const rec = { settles: [], zenAtSettle: [] };
+  const main = document.createElement("main");
+  try {
+    document.body.insertBefore(main, document.body.firstChild);
+    // Only anchors minted here are recorded; anything else (another async suite
+    // running during the wait below) goes to the real settle untouched.
+    let n = 0;
+    const mine = new Set();
+    window._pbpZenCaptureAnchor = () => { const a = { n: ++n, frac: 0 }; mine.add(a); return a; };
+    window._pbpZenSettleAnchor = (a) => {
+      if (!mine.has(a)) return saved.settle && saved.settle(a);
+      rec.settles.push(a); rec.zenAtSettle.push(document.body.classList.contains("zen"));
+    };
+    _pbpZenEnter();
+    assertEq(rec.settles.length, 1, "enter: one settle before it returns");
+    assertEq(rec.zenAtSettle[0], true, "enter: settled after body.zen was added");
+    _pbpZenExit();
+    assertEq(rec.settles.length, 2, "exit: one settle before it returns");
+    assertEq(rec.zenAtSettle[1], false, "exit: settled after body.zen was removed");
+    assertEq(rec.settles[0].n, 1, "enter settled its own anchor");
+    assertEq(rec.settles[1].n, 2, "exit settled its own anchor");
+    window._pbpZenCaptureAnchor = saved.capture; // nothing of ours can be captured during the wait
+    for (const prop of ["margin-left", "margin-right", "max-width"]) {
+      main.dispatchEvent(new TransitionEvent("transitionend", { propertyName: prop, bubbles: true }));
+    }
+    await new Promise((r) => setTimeout(r, 400));
+    assertEq(rec.settles.length, 2, "no transitionend or timer leg settles again");
+    report(name);
+  } catch (e) {
+    report(name, e);
+  } finally {
+    if (document.body.classList.contains("zen")) { try { _pbpZenExit(); } catch (_) {} }
+    document.body.classList.remove("zen");
+    window._pbpZenCaptureAnchor = saved.capture;
+    window._pbpZenSettleAnchor = saved.settle;
+    if (_pbpZenBarEl && _pbpZenBarEl !== saved.bar) { _pbpZenBarEl.remove(); _pbpZenBarEl = saved.bar; }
+    main.remove();
   }
 })();
 </script>

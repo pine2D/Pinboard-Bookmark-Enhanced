@@ -1322,68 +1322,15 @@ function _pbpZenSettleAnchor(anchor) {
   }
 }
 
-// Two-phase settle (transition-round): main/.doc-body now carry
-// margin-left/margin-right/max-width transitions (md-preview.css), so the
-// single immediate _pbpZenSettleAnchor() call above (still called first,
-// unchanged) can run against MID-ANIMATION geometry -- correct under
-// reduced motion (those transitions collapse to 0s there, so "immediately
-// after the class/style mutation" already IS the final geometry) and only
-// an approximation otherwise. This phase re-settles ONCE more after the
-// layout transition actually finishes, against the final geometry.
-// Harmless when it's redundant (reduced motion, or the immediate call
-// already nailed it): same "no R9 suppression needed" reasoning as
-// _pbpZenSettleAnchor's own call sites already document above (spec
-// sec.1.4) -- a second correct programmatic scroll can only re-arm R9's
-// save-scroll debounce (md-preview.js), never race its restore.
-//
-// Module-level handles (not per-call locals): a re-settle armed by one
-// call must be torn down if another zen action (enter/exit/width-cycle)
-// happens before it fires, so rapid repeated toggles never stack listeners
-// or timers -- _pbpZenSettleClearPending() is called at the start of every
-// _pbpZenSettleAfterLayout() for exactly this reason, in addition to being
-// the normal one-shot cleanup path.
-let _pbpZenSettleTimer = null;
-let _pbpZenSettlePending = null; // non-null (the anchor) while a re-settle is armed; also doubles as the "already fired" guard
-
-function _pbpZenSettleClearPending() {
-  if (_pbpZenSettleTimer !== null) {
-    clearTimeout(_pbpZenSettleTimer);
-    _pbpZenSettleTimer = null;
-  }
-  document.removeEventListener("transitionend", _pbpZenSettleOnTransitionEnd);
-  _pbpZenSettlePending = null;
-}
-
-function _pbpZenSettleFire() {
-  if (!_pbpZenSettlePending) return; // already fired via the other race leg (or nothing armed)
-  const anchor = _pbpZenSettlePending;
-  _pbpZenSettleClearPending();
-  _pbpZenSettleAnchor(anchor);
-}
-
-// Delegated on document rather than bound to a single element: the
-// transitioning properties live on two different elements (margin-left/
-// margin-right on `main`, max-width on `.doc-body`), and delegation is the
-// simplest reliable way to catch either without wiring two listeners.
-function _pbpZenSettleOnTransitionEnd(e) {
-  const el = e.target;
-  const isTracked = el && (el.tagName === "MAIN" || (el.classList && el.classList.contains("doc-body")));
-  if (!isTracked) return;
-  // `max-width` used to be here for .doc-body's reading-width tween. That
-  // transition is gone (interpolating the measure re-wrapped every paragraph),
-  // so the branch could never fire; the 300ms fallback covers width changes.
-  if (e.propertyName !== "margin-left" && e.propertyName !== "margin-right") return;
-  _pbpZenSettleFire();
-}
-
-function _pbpZenSettleAfterLayout(anchor) {
-  _pbpZenSettleAnchor(anchor); // phase 1: immediate, correct under reduced motion
-  _pbpZenSettleClearPending(); // repeated rapid toggles must not stack listeners/timers
-  if (!anchor) return;
-  _pbpZenSettlePending = anchor; // phase 2, armed: transitionend or the 300ms fallback, whichever fires first
-  document.addEventListener("transitionend", _pbpZenSettleOnTransitionEnd);
-  _pbpZenSettleTimer = setTimeout(_pbpZenSettleFire, 300);
-}
+// No second, delayed settle (2026-11-05 user decision): none of the layout
+// properties zen, the width cycle or the Ask panel change is transitioned any
+// more -- .doc-body's max-width never was, and main's margin-left/margin-right
+// now apply at once -- so the geometry right after the class/style mutation is
+// already the final one, with or without reduced motion. Every call site
+// therefore settles exactly once, synchronously, via _pbpZenSettleAnchor. The
+// old transitionend/300ms second phase is gone with it: its fallback leg was
+// the one that dragged a reader who had scrolled on within 300ms back to the
+// pre-scroll anchor (see _pbpTypoSet below).
 
 // Width persistence: chrome.storage.local, per-device, same shape as
 // pbp_srch_regex above. The storage key stays pbp_zen_width -- it predates the
@@ -1431,12 +1378,12 @@ function _pbpZenLoadWidth() {
 
 // Single apply path shared by load + both cycle buttons: sets the
 // mode-independent --pbp-width, relabels every width control, and re-settles
-// the scroll anchor through the max-width transition.
+// the scroll anchor once (max-width does not transition).
 function _pbpZenApplyWidth() {
   const anchor = _pbpZenCaptureAnchor();
   document.body.style.setProperty("--pbp-width", _pbpZenWidth + "px");
   _pbpZenUpdateWidthBtn();
-  _pbpZenSettleAfterLayout(anchor);
+  _pbpZenSettleAnchor(anchor);
 }
 
 // Width control sync: the "Aa" panel's measure row is the only width control
@@ -1560,7 +1507,7 @@ function _pbpZenEnter() {
   if (typeof pbpRailDrawerClose === "function") pbpRailDrawerClose();
   _pbpZenEnsureBar();
   _pbpZenUpdateWidthBtn();
-  _pbpZenSettleAfterLayout(anchor);
+  _pbpZenSettleAnchor(anchor);
   _pbpZenArmFade();
   if (focusWasInRail) {
     const exitBtn = document.getElementById("zen-exit-btn");
@@ -1573,7 +1520,7 @@ function _pbpZenExit() {
   const anchor = _pbpZenCaptureAnchor();
   document.body.classList.remove("zen");
   // --pbp-width deliberately survives exit (mode-independent width).
-  _pbpZenSettleAfterLayout(anchor);
+  _pbpZenSettleAnchor(anchor);
   _pbpZenDisarmFade();
   // Hand the timeline back if entering zen took it away (see
   // _pbpZenPrevStudyView). No persist argument: this is the programmatic half
@@ -1669,12 +1616,10 @@ function _pbpTypoPersist() {
 // the same preserve-position contract width cycling honors (and via the
 // scrollY=0 guard in _pbpZenCaptureAnchor, a change at the top of the page
 // leaves the reader at the top). Settle is the SYNC single-shot
-// _pbpZenSettleAnchor, NOT _pbpZenSettleAfterLayout: that helper's 300ms
-// second phase exists for the width path's max-width TRANSITION, which
-// font-size/line-height changes don't have -- reusing it here yanked a user
-// who scrolled within those 300ms back to the pre-scroll anchor (Codex
-// acceptance, reproduced live: settle 1834 -> user scrolls 2600 -> dragged
-// back to 1834).
+// _pbpZenSettleAnchor, never a delayed second phase: the removed
+// _pbpZenSettleAfterLayout's 300ms leg yanked a user who scrolled within those
+// 300ms back to the pre-scroll anchor (Codex acceptance, reproduced live:
+// settle 1834 -> user scrolls 2600 -> dragged back to 1834).
 function _pbpTypoSet(fontTier, leadingTier) {
   _pbpTypoTouched = true;
   const anchor = _pbpZenCaptureAnchor();
