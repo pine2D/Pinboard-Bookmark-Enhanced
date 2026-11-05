@@ -824,7 +824,8 @@ try{
       await popup.locator('#tags-input').press('Backspace');
     }
     // Suggested-tag chips (.stag, here the AI row) share the root cause: a name with no space must not push the chip out.
-    await popup.evaluate(tag=>{document.getElementById('ai-tags-row').classList.remove('hidden');renderAITags([tag,'ab'],false);},long);
+    // Twice the 68-character tag, so it overflows the row in any font: CI's narrower fallback fits 68 characters in 437px.
+    await popup.evaluate(tag=>{document.getElementById('ai-tags-row').classList.remove('hidden');renderAITags([tag,'ab'],false);},long+long);
     const stags=await popup.evaluate(()=>[...document.querySelectorAll('#ai-suggest-tags .stag')].map(el=>{const box=el.getBoundingClientRect();const tx=el.querySelector('.stag-text');return{right:box.right,left:box.left,w:box.width,h:box.height,clipped:tx.scrollWidth>tx.clientWidth,title:tx.title,tag:el.dataset.tag};}));
     assert.equal(stags.length,2);
     assert(stags.every(c=>c.title===c.tag&&c.tag),'a suggested tag chip does not carry its full name as a tooltip: '+JSON.stringify(stags));
@@ -861,7 +862,7 @@ try{
     assert(tight.every(c=>Math.abs(c.dw)<=0.01&&Math.abs(c.dh)<=0.01),'the ink padding changed the chip size: '+JSON.stringify(tight));
     await popup.locator('#tags-input').press('Backspace');
     // A custom preset name with no space ellipsizes inside the popup and the full name stays reachable.
-    await popup.evaluate(name=>{document.getElementById('tag-presets').textContent='';settings.tagPresets=name+': a, b';setupTagPresets();},'preset-'+'y'.repeat(70));
+    await popup.evaluate(name=>{document.getElementById('tag-presets').textContent='';settings.tagPresets=name+': a, b';setupTagPresets();},'preset-'+'y'.repeat(140));   // 140: fits no font's 550px popup
     const preset=await popup.evaluate(()=>{const b=document.querySelector('#tag-presets .preset-btn'),r=b.getBoundingClientRect(),t=b.querySelector('.preset-text');return{right:r.right,left:r.left,clipped:t.scrollWidth>t.clientWidth,scroll:document.documentElement.scrollWidth,name:b.textContent.length};});
     assert(preset.right<=550&&preset.left>=0&&preset.scroll<=550&&preset.clipped&&preset.name>70,'a long preset name left the popup: '+JSON.stringify(preset));
     await popup.locator('#tags-input').fill(fits);await popup.locator('#tags-input').press('Enter');
