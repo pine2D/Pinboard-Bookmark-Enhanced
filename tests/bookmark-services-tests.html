@@ -1763,7 +1763,7 @@ test("a queued skip-mode save that hit an over-long tag needs attention, and a m
     equal([label,h.state.queue.map(item=>item.failure?.code)],[label,["tag_too_long"]]);
   }
 });
-// The record fields a queued save may hold (CLAUDE.md, storage boundaries),
+// The record fields a queued save may hold (rules/storage-sync.md),
 // plus the replay failure marker.
 const QUEUE_RECORD_KEYS = ["account","mode","url","title","notes","summary","sharedExplicit","tags","private","toread","archive","time","queueId","queuedAt","failure"];
 const linkdingRejected = () => new Response(JSON.stringify({title:["Ensure this field has no more than 512 characters."]}), {status:400, headers:{"Content-Type":"application/json"}});

@@ -4739,7 +4739,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // a second, "fast" write path that skips that pipeline would have to
   // duplicate its secret-routing split (API keys / export-target tokens must
   // never reach the wrong storage area) and its sync-quota chunking -- exactly
-  // the kind of drift-prone second writer the storage boundary rules (CLAUDE.md)
+  // the kind of drift-prone second writer the storage boundary rules (rules/storage-sync.md)
   // warn about. So the fix is the same shape as this codebase's existing
   // teardown flush for exactly this problem, md-translate.js's ZH-0 §5
   // `_pbpTrFlushCache`: visibilitychange->hidden fires while the page is still

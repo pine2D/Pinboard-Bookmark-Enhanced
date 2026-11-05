@@ -9,7 +9,11 @@ release/
 
 # Claude Code local state
 .claude/settings.local.json
-.claude/skills/
+# Project skills under .claude/skills/ are tracked one by one; anything else
+# installed there stays local.
+.claude/skills/*
+!.claude/skills/release/
+!.claude/skills/live-ai-test/
 .claude/scheduled_tasks.lock
 
 # CodeGraph local index (regenerable; machine-local socket/pid/db)

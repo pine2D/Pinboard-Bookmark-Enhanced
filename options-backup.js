@@ -342,7 +342,7 @@ function pbpBackupImportResultKey(result) {
 // A fifth producer exists too:
 // background.js's pbpClaimLegacyHighlightOwners() one-shot legacy-owner
 // migration writes the same "pbp-hl:" + key inline; it is scheduled to
-// retire by 2026-12-31 (CLAUDE.md 临时事项) and must match until then.
+// retire by 2026-12-31 (.claude/expiring-items.md) and must match until then.
 // Duplicated rather than hoisted into shared.js for the same reason those
 // two are: isolated script contexts, and the shared thing is the string,
 // not the function.

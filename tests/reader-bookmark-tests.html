@@ -222,7 +222,7 @@ async function until(read, label) {
 // The reader has fetched the bookmark's state and is idle.
 const readerIdle = w => until(() => w.document.getElementById("reader-bookmark-edit")?.getAttribute("aria-busy") === "false", "the reader's initial state");
 const sentEdit = messages => messages.some(m => m.action === "edit");
-// CLAUDE.md: a queued save keeps only these fields, the Description only for linkding.
+// rules/storage-sync.md: a queued save keeps only these fields, the Description only for linkding.
 const QUEUE_FIELDS = ["account", "mode", "url", "title", "notes", "tags", "private", "toread", "archive", "sharedExplicit", "time", "queueId", "queuedAt"];
 function assertQueueFields(item, service) {
   const stored = JSON.parse(JSON.stringify(item));

@@ -727,7 +727,7 @@ function pbpLibWireNotesHeaderFit(pane) {
 // <time>", "connected, not synced yet", or -- when the connection or either
 // dataset reports an error -- a link into General settings, where the Drive
 // panel explains the error and holds every button that can fix it
-// (rules/vocab-sync.md: recovery always names an on-screen button, and that
+// (rules/drive-sync.md: recovery always names an on-screen button, and that
 // screen is settings). Not connected, unavailable or unreadable: nothing at
 // all; this page never suggests connecting.
 // Account isolation: the worker reports the Pinboard account its status is

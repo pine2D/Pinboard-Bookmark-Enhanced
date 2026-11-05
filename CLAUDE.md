@@ -1,9 +1,9 @@
 # Bookmark Enhanced 项目配置
 
 作者：pine2D
-更新：2026-10-28
+更新：2026-11-05
 
-> 本文件只保留每个会话都需要的跨领域约定。子系统深水区规则在 `.claude/rules/`（按 paths 匹配自动加载，见文末索引表）；机器可验证的铁律已由 pre-commit / verify.sh / release 硬门强制——prose 是提醒，lint 是底线。
+> 本文件只保留每个会话都需要的跨领域约定。子系统深水区规则在 `.claude/rules/`（按 paths 匹配自动加载），按任务的流程在 `.claude/skills/`（按描述触发），有到期日的一次性迁移在 `.claude/expiring-items.md`；三者都列在文末索引表。不自动加载 rules 或 skills 的工具（Codex 等）在改对应文件或执行对应任务前，按索引表先读。机器可验证的铁律已由 pre-commit / verify.sh / release 硬门强制——prose 是提醒，lint 是底线。
 
 ## 项目概述
 
@@ -22,46 +22,28 @@ Chrome Extension (Manifest V3)，将当前页面保存到可选主服务 Pinboar
 | 页面正文抽取 | Defuddle（vendor/ 本地化，懒注入）；备用 Jina Reader API |
 | 主题生产 | 自建 theme factory（`docs/theme-surface/`） |
 
-## 目录结构
+## 目录结构（速览）
+
+细节看各文件头注释与索引表里的规则；下表只给定位。
 
 ```
-manifest.json                # MV3 配置（permissions / host_permissions / 入口）
-background.js                # Service Worker：图标状态、书签检测、URL 缓存、storage 预热、DNR 防盗链规则、popup AI 调用代理（PBP_AI_CALL → pbpRunPopupAiCall，两道 getCurrentBookmarkAuth 门，覆盖白名单 PBP_AI_OVERRIDE_FIELDS 在 shared.js）
-popup.{html,css,js}          # 主弹窗 + popup-{ai,batch,offline,tags,theme-early}.js（AI 标签/摘要、批量、离线兜底、标签补全、防 FOUC）
-options.{html,css,js}        # 设置页 + options-{connectivity,backup,vocab,theme-early}.js（联通测试、JSON 备份、生词设置侧）
-library.{html,css,js}        # 资料库独立页 + library-{vocab,notes}.js（索引 + 详情平铺双栏，owner 隔离）
-listbox.js                   # options / library 共用的自绘列表框（select-only combobox，library 用 Popover 浮层）
-md-preview.{html,css,js}     # 阅读器弹窗 + md-preview-theme-early.js（明暗 bootstrap 防白闪）
-bili-player-bridge.js        # B 站播放器桥（动态内容脚本：授权 player.bilibili.com 后由 md-video.js 注册，仅回传进度/状态）
-md-*.js                      # 阅读器子模块：ai-core / translate / ask / highlight / reader / skim（默认关，花 token）
-                             #   / dict / vocab-echo（默认开，不花 token）/ convert（marked→DOMPurify 单点 sanitize）
-                             #   / embed / epub / export-send / mermaid / video
-vocab-store.js               # pbp-vocab IndexedDB 唯一写边界（words + vector/outbox/tombstone/sync 状态）
-vocab-gdrive.js              # SW-only Google Drive appDataFolder 同步
-dict-pack.js                 # 离线词典包导入（CC-CEDICT / ECDICT / 多语言 Yomitan v3；词包仅本机）
-dict-entry.js                # 可复用 AI 词条与按需补充（2026-10-26/27 裁决收为用法要点／原文用例／词源三块；原文用例是免费检索，不经 dict-entry.js：dict-evidence.js 的 pbpDictUsageExamplesFetch 取原句，md-dict.js 的 pbpDictExamplesView 在阅读器与资料库独立于 AI 面板显示，不调 AI、不翻译、不归档；生成走 callAIStream 流式，180 秒总期限与 8192 输出额度，完整通过校验才保存）
-dict-archive.js / dict-archive-gdrive.js  # 完整 AI 词条持久归档与独立 Drive 数据集（不属于生词本、不随缓存淘汰）
-ask-archive.js / ask-archive-gdrive.js  # Ask 完整问答、证据与版本持久归档及 Drive 同步
-library-ask.js              # 按文章与会话浏览、继续提问和删除 Ask 历史
-anki-connect.js / eudic-sync.js  # 生词外发（本机 AnkiConnect / 欧路 OpenAPI；纯层，测试页可载）
-ai.js / ai-cache.js          # AI 调用核心（popup/options/library/md-preview 共载）/ 结果 IDB 缓存
-bookmark-services.js        # Karakeep/linkding API 适配器；统一保存入口在 background.js
-export-targets.js            # Send-to 目标注册表（Obsidian / Notion / NotebookLM / Gist / Webhook；纯层）
-shared.js                    # 跨文件常量 + $id 记忆化 DOM 缓存
+manifest.json / background.js   # MV3 配置；Service Worker（图标状态、书签检测、URL 缓存、storage 预热、DNR 防盗链、popup AI 代理）
+popup.* + popup-{ai,batch,offline,tags,theme-early}.js       # 主弹窗（AI 标签/摘要、批量、离线兜底、标签补全、防 FOUC）
+options.* + options-{connectivity,backup,vocab,theme-early}.js  # 设置页（联通测试、JSON 备份、生词设置侧）
+library.* + library-{vocab,notes,ask}.js   # 资料库页（索引 + 详情平铺双栏，owner 隔离；library-ask.js 按文章与会话浏览、继续提问和删除 Ask 历史）；listbox.js 是 options/library 共用列表框
+md-preview.* + md-*.js           # 阅读器及其子模块；md-preview-theme-early.js 首帧明暗；bili-player-bridge.js 是 B 站播放器桥
+vocab-store.js / notes-sync.js / dict-archive.js / ask-archive.js  # 四类个人资料的本机写边界；各自的 *-gdrive.js 是 SW-only Drive 同步
+dict-pack.js / dict-entry.js / dict-evidence.js   # 离线词典包 / AI 词条与补充 / 原文用例检索
+ai.js / ai-cache.js              # AI 调用核心（popup/options/library/md-preview 共载）/ 结果 IDB 缓存
+bookmark-services.js / export-targets.js / anki-connect.js / eudic-sync.js / vocab-send.js  # Karakeep/linkding 适配（统一保存入口在 background.js）/ Send-to 注册表（纯层）/ 生词外发（本机 AnkiConnect / 欧路 OpenAPI；纯层，测试页可载）
+shared.js                        # 跨文件常量 + $id 记忆化 DOM 缓存
 jina.js / i18n.js / tag-gov.js / wayback.js / site-rules.js  # 兜底抽取 / 多语言 / 标签治理 / 归档队列 / 站点适配器
 pinboard-style.js / pinboard-sort.js / pinboard-themes.js    # pinboard.in 注入：主题 CSS（生成产物，勿手改）+ 标签热度排序
-icons/  _locales/（9 locale）  vendor/（Defuddle，由 update-vendor.sh 同步）
-README*.md ×9 / privacy-policy.md / LICENSE
-tests/                       # file:// 直开的 HTML 测试页 40+ 套（不入 release ZIP）
-                             # + render-audit-checklist.mjs（手写渲染 oracle，禁止从配方源生成）
-                             # + render-audit-known-failures.json（迁移期基线，现为空；查词重设计批 0 立门时登记的查词几何与 library 既有失败已随修复清零；登记项一旦通过即报 RESOLVED 失败）+ render-audit-spacing-baseline.json（spacingScale 只减不增账本）+ ui-contract-tests.mjs
-scripts/                     # 发布链：bump-version.sh / release.sh / zip-install-smoke.mjs
-                             # 质量门：verify.sh（门的权威清单以其自身的阶段 echo 为准）/ pre-commit-hook.sh / commit-msg-hook.sh / ui-consumer-lint.mjs（编辑期）
-                             # 工具：setup-hooks.sh / update-vendor.sh / sync-runtime.sh / qa-drive.mjs / perf 与截图辅助若干
-docs/                        # GitHub Pages：index.md / privacy.md / _layouts / assets / screenshots / cws-assets
-docs/theme-surface/          # 主题工厂：composers/ pilots/ tools/ qa-harness/ snapshots/ + COMPONENTS.md / NEW_THEME.md / README.md
-docs/site-rules/             # 站点适配器编写文档 + 调试脚本
-docs/superpowers/ DESIGN-IS-2026-07-22/ release/  # gitignored 本地产物（.qa-scan/ 仅 package*.json 与 run-test.mjs 入库）
+icons/  _locales/（9 locale）  vendor/（Defuddle 等，由 update-vendor.sh 同步）  README*.md ×9 / privacy-policy.md / LICENSE
+tests/                           # file:// 直开的 HTML 测试页 80+ 套 + render-audit / ui-contract 等 .mjs（不入 release ZIP）
+scripts/                         # 质量门：verify.sh（门的权威清单以其自身的阶段 echo 为准）/ pre-commit-hook.sh / commit-msg-hook.sh / ui-consumer-lint.mjs（编辑期）；发布链：bump-version.sh / release.sh / zip-install-smoke.mjs；工具：setup-hooks.sh / update-vendor.sh / sync-runtime.sh / qa-drive.mjs / perf 与截图辅助若干
+docs/                            # GitHub Pages（index.md / privacy.md / _layouts / assets / screenshots / cws-assets）；docs/theme-surface/ 主题工厂（composers/ pilots/ tools/ qa-harness/ snapshots/ + COMPONENTS.md / NEW_THEME.md / README.md）；docs/site-rules/ 站点适配器编写文档 + 调试脚本
+docs/superpowers/ DESIGN-IS-2026-07-22/ release/   # gitignored 本地产物（.qa-scan/ 仅 package*.json 与 run-test.mjs 入库）
 ```
 
 ## 开发约定
@@ -77,63 +59,39 @@ docs/superpowers/ DESIGN-IS-2026-07-22/ release/  # gitignored 本地产物（.q
 | 图标状态 | default（未收藏）/ saved（已收藏）两套 |
 | Commit message | conventional commits（feat / fix / refactor / perf / docs / style / chore），英文 |
 
-## 存储与同步边界（唯一权威表述）
+## 存储与同步边界（摘要）
 
-| 机制 | 数据 | 边界 |
-|------|------|------|
-| Chrome Sync | 普通设置；另行启用时含凭据 | `optSyncEnabled` 是**每设备** local 开关，普通设置据此路由 sync/local；不含生词、高亮、缓存、任务状态 |
-| Google Drive | 固定个人资料库 owner 的生词、高亮与笔记、完整 AI 词条及补充、Ask 问答记录 | 每设备单独连接；连接即同步四类、断开即停止，不设按类型开关；共享连接层状态 `driveConnState:<ownerHash>` 只存 local；只用 `drive.appdata`；不接管设置、凭据 |
-| 手工 JSON schema v3 | 设置、主题 + 用户分项选择的高亮/生词/凭据 | 明文文件；导入先预览分项选择；凭据两端默认关、fail-closed（详见 rules/backup.md） |
+唯一权威表述在 `.claude/rules/storage-sync.md`，改存储路由、同步、备份、书签连接或离线队列前先读。最要紧的几条：
 
-- 凭据（API key / token / password / 导出目标）不能硬编码。默认存 `chrome.storage.local`；仅当本机 `optSyncEnabled=true` 且账号级 `syncApiKeys=true` 时用 sync；旧云端已有非空 secret 时迁移保留 `syncApiKeys=true`，避免升级丢凭据。
-- sync 配额：单 item ≤8KB、总约 100KB、写入限流；写后检查 `lastError`。缓存、大对象、瞬态状态一律 local。
-- 生词及其 Drive 协议状态在 IndexedDB（vocab-store.js 是生词唯一写入口）；高亮与笔记及其 Drive 协议状态走 notes-sync.js 的统一写边界；逐设备连接标记与共享连接层状态（`driveConnState:<ownerHash>`）在 local。
-- **离线队列**只存 local：新记录**仅**保存保存模式、URL、标题、备注、描述（linkding Description）、标签、私密/稍后读/归档标志、可选布尔共享修改意图（`sharedExplicit`，只来自用户可见的共享操作）、书签时间、队列 ID/入队时间、非秘密书签连接身份绑定，以及重放失败后的非秘密失败标记（`failure`：失败码、HTTP 状态、发生时间与 429 限流截止时间；原因明确、重试也不会改变结果的失败据此标为需要处理，不再自动重试，由用户手动重试或删除；限流按 Retry-After 推迟，至多 1 小时）——此外一律不存（不存响应体），禁止保存 token；legacy token 记录读取时改写为账号绑定并删除 token。重放必须用当前登录 token 且服务和连接身份与队列绑定精确一致，否则保留队列并 fail-closed。
-
-- **个人资料库**：`personalLibraryAccount` 首次采用当前 Pinboard 用户名，无账号时为 `personal:default`，随后不随书签服务/凭据切换；保留旧 owner 与 Drive hash，不自动合并其他历史账号。普通设置同步可携带此非秘密身份；普通 JSON 设置导入忽略它，资料分项仍核对所属资料库。阅读器的 library `account` 与 `bookmarkAccount` 分开，storage handoff 的 `account` 仍表示书签连接。
-- **自托管书签连接**：设置三选一；Connect 点击申请精确 origin 并只读验证，成功后才保存地址与绑定该地址的凭据封套。Karakeep owner 含服务、地址与验证后的用户 ID；linkding 无用户 ID，Connect 时地址与 Token 都未变则沿用连接 ID，任一变化才生成新 ID，旧队列不跨连接重放。访问网关凭据存于同一 `<service>Token` 封套的 `gateway` 字段，随封套走凭据路由、绑定地址，校验谓词唯一在 shared.js，非法即连接未就绪。Karakeep 稍后阅读只用本人独占的私有普通列表，不映射 archived。Pinboard 建议/标签治理/未读计数/站点搜索/Tab Set 保留专用。
-- **生效书签服务**：`bookmarkService` 是随 Chrome Sync 与 JSON 备份走的「所选服务」；本机实际保存到的服务是 `bookmarkServiceActive`，只存 local、不同步、不入备份，所有读取经 `pbpReadSettingsWithSecrets` 以它覆盖 `bookmarkService`（缺失时回落所选服务，即升级前的值，`pbpReconcileBookmarkService` 首次运行补记）。它只在 Pinboard 登录（设置页「测试连接」通过）、自托管 Connect 成功、或在本机已连接的服务之间点选时改变；设置页单选只切换显示的连接表单。「本机已连接」由 `pbpBookmarkServiceReadyHere` 唯一判定：自托管服务要凭据有效且本机已授予其精确 origin 的 host 权限（凭据可随同步或备份到达，权限只能本机 Connect 点击申请）；Pinboard 要 Token 在本机测试通过（设置页「测试连接」或 popup 登录），凭证是只存 local、不同步、不入备份的 `pinboardTokenVerified`（Token 摘要，改 Token 即失效；升级时正在使用的 Token 视为已测试）。同步或导入带来的所选服务若本机未连接则不切换、设置页与导入预览/结果提示，本机连上后自动跟随。
+- 三条通道：Chrome Sync 只放普通设置（`optSyncEnabled` 是每设备 local 开关；凭据仅在 `syncApiKeys=true` 时随 sync）；Google Drive 只同步个人资料库的生词、高亮与笔记、完整 AI 词条及补充、Ask 问答记录（`drive.appdata`，不接管设置、凭据）；手工 JSON schema v3 是明文文件，凭据两端默认关、fail-closed。
+- 凭据（API key / token / password / 导出目标）不能硬编码，默认存 `chrome.storage.local`；缓存、大对象、瞬态状态一律 local，sync 写后检查 `lastError`；离线队列禁止保存 token。
+- 个人资料库 owner（`personalLibraryAccount`）与书签连接身份分开；本机实际保存到的服务是只存 local 的 `bookmarkServiceActive`，读取一律经 `pbpReadSettingsWithSecrets`。
 
 ## 跨领域安全铁律
 
 - **Pinboard 账号隔离**：所有 Pinboard v1 请求（`auth_token` 认证）在实际 dispatch 前原子重读有效凭据；同用户名 token 轮换时用新 token 重写请求，登出或跨用户名切换时取消且不得发网。账号数据派生的 cache / message / preview payload / 持久任务必须携带非秘密 owner，并在读取、异步回写、UI 提交时逐次校验 owner。
-- **网络端点与 host 权限**：required host 仅 Pinboard；Karakeep / linkding / AI / Jina / Wayback / Gist / Webhook / Notion / Free Dictionary / 欧路、AnkiConnect 精确回环 origin（`127.0.0.1:8765`）、YouTube/B 站字幕（www.youtube.com / api.bilibili.com；**首次**由视频页预览内的「启用字幕并加载视频」点击申请精确 origin；授权后打开视频页预览即自动抓取——字幕即正文的产品语义，自动路径仅 `permissions.contains` 判定绝不 request。YouTube 优先注入用户已开的 www.youtube.com 标签页 same-origin 取数——页内自带登录与 PO Token 语境，扩展页跨站 fetch 被 LOGIN_REQUIRED 常态拦截；无标签页时回退扩展页 fetch，仅该回退受 `mdVideoUseLogin` 控制，默认开；B 站三个字幕 API 以登录态 credentials:include 调用；**B 站播放进度**走 `player.bilibili.com` 精确 origin——与 api.bilibili.com 同一次点击申请，授权后 md-video.js 用 `scripting.registerContentScripts` 注册 `bili-player-bridge.js` 到该 origin 的所有 frame，脚本在预览页以扩展 origin 握手前完全静默，只回传 currentTime/状态/时长并执行 seek/play/pause/rate；caption 的 `contains` 门只看 api origin，早期只授过 api 的用户由工具条「启用播放跟随」按钮补授）与 Batch 所选站点，以及**内嵌框架抽取**（顶层文档无正文而存在单个占视口 ≥40% 的跨源 https iframe 时，阅读器错误态给「授权并重试」按钮，点击才请求该帧精确 origin，随后以 `allFrames` 重抽取；`sandbox` 无 `allow-same-origin` 的帧不作候选）——**首次授权**一律只能来自直接用户动作请求当前精确 origin。**YouTube 播放器经本项目自有 Pages 中继页内嵌**（扩展页不发 Referer，YouTube 播放器因此拒载；中继页是 iframe，与封面图 `i.ytimg.com` 同属子资源，均不需 host 权限）。后台/自动路径只做 `permissions.contains`，禁止运行时申请 wildcard。可配置端点必须 HTTPS，HTTP 仅允许字面 `localhost` / `127.0.0.1` / `[::1]`；LAN/public HTTP、凭据 URL 与无权限请求一律阻断并保留配置。升级时一次性清理 legacy all-sites grant。
+- **网络端点与 host 权限**：required host 仅 Pinboard；Karakeep / linkding / AI / Jina / Wayback / Gist / Webhook / Notion / Free Dictionary / 欧路、AnkiConnect 精确回环 origin（`127.0.0.1:<端口>`，端口在设置里可改、默认 8765）、YouTube/B 站字幕（www.youtube.com / api.bilibili.com；**首次**由视频页预览内的「启用字幕并加载视频」点击申请精确 origin；授权后打开视频页预览即自动抓取——字幕即正文的产品语义，自动路径仅 `permissions.contains` 判定绝不 request。YouTube 优先注入用户已开的 www.youtube.com 标签页 same-origin 取数——页内自带登录与 PO Token 语境，扩展页跨站 fetch 被 LOGIN_REQUIRED 常态拦截；无标签页时回退扩展页 fetch，仅该回退受 `mdVideoUseLogin` 控制，默认开；B 站三个字幕 API 以登录态 credentials:include 调用；**B 站播放进度**走 `player.bilibili.com` 精确 origin——与 api.bilibili.com 同一次点击申请，授权后 md-video.js 用 `scripting.registerContentScripts` 注册 `bili-player-bridge.js` 到该 origin 的所有 frame，脚本在预览页以扩展 origin 握手前完全静默，只回传 currentTime/状态/时长并执行 seek/play/pause/rate；caption 的 `contains` 门只看 api origin，早期只授过 api 的用户由工具条「启用播放跟随」按钮补授）与 Batch 所选站点，以及**内嵌框架抽取**（顶层文档无正文而存在单个占视口 ≥40% 的跨源 https iframe 时，阅读器错误态给「授权并重试」按钮，点击才请求该帧精确 origin，随后以 `allFrames` 重抽取；`sandbox` 无 `allow-same-origin` 的帧不作候选）——**首次授权**一律只能来自直接用户动作请求当前精确 origin。**YouTube 播放器经本项目自有 Pages 中继页内嵌**（扩展页不发 Referer，YouTube 播放器因此拒载；中继页是 iframe，与封面图 `i.ytimg.com` 同属子资源，均不需 host 权限）。后台/自动路径只做 `permissions.contains`，禁止运行时申请 wildcard。可配置端点必须 HTTPS，HTTP 仅允许字面 `localhost` / `127.0.0.1` / `[::1]`；LAN/public HTTP、凭据 URL 与无权限请求一律阻断并保留配置。升级时一次性清理 legacy all-sites grant。
 - AI 请求统一走各 provider 的 chat completion 接口（关思考方言勿凭记忆改，见 rules/ai-providers.md）。
 - Defuddle 在 popup 打开时**懒注入**；site-rules.js 与其成对注入且**先于** Defuddle 运行（命中站点规则即短路）。
+- **新增任何数据出口**（新 API 调用、新导出目标、新 AI 触发面）必须同步 privacy.md 的 Network Requests / Permissions / Third-Party 三处；发版文档硬门会拦（见 release skill）。
 
-## MV3 铁律（改 background.js / manifest / 存储代码前必读）
+## MV3 铁律（摘要）
 
-- **SW 无持久状态**：30s idle 即终止、全局变量清空。状态一律落 chrome.storage，每个 handler 开头重读；全局只作单次调用内的暖缓存。
-- **optional permission 的 API 在调用点现取**：权限未授予时 `chrome.identity` 等整个命名空间不存在，SW 顶层或默认参数捕获会把 `undefined` 钉死一整个 worker 世代（新用户首次连接的必经顺序，2026-07 真实事故；范式见 vocab-gdrive.js 的 `identityApi()`，测试注入的 fixture 仍优先）。调试注意：给 SW 开着 DevTools 会阻止它被回收，「重启一下就好了」的推理此时不成立。
+全文在 `.claude/rules/mv3.md`（改 background.js / manifest / SW 模块 / content script 前必读）。跨文件适用的三条：
+
+- **SW 无持久状态**：30s idle 即终止、全局变量清空；状态落 chrome.storage，每个 handler 开头重读。监听器与 importScripts 只能在 SW 顶层同步执行。
+- **optional permission 的 API 在调用点现取**（如 `chrome.identity`），不在顶层或默认参数里捕获。
 - **吞异常必须留痕**：把平台 API 异常折叠成产品错误码前，先 `console.warn` 出 `error.name` / `error.message`（不含 token、邮箱、生词内容）。
-- **监听器与 importScripts 只能在 SW 顶层同步执行**；async 注册在 MV3 不保证生效。
-- **onMessage 异步响应**：`return true` 保持通道，且该 listener 不能是 async 函数（二者只能取一）。
-- **CSP**：禁 eval / 远程代码；只能远程取数据（JSON/CSS）。Defuddle 因此本地 vendor。
-- **content script**：仅 pinboard.in 注入、保持瘦身；`document_start` 仅主题注入需要（pinboard-sort.js 是第二段注册，`document_idle`）。
-- **setIcon**：仅状态真正变化时调用 + 缓存 ImageData，别每个 tab 事件重新 fetch PNG（回归修复见 `9b689c1`）。
 
-## UI 性能铁律：字体回退（改任何 UI 文本/CSS 前必读）
+## UI 性能铁律：字体回退与图标（摘要）
 
-<!-- 机制依据：Blink fonts README、crbug 1266022/491556、developer.chrome.com（SW lifecycle / storage / CSP / alarms）、web.dev（content-visibility / style 计算） -->
-popup / options / library 三个扩展表面是短命单次渲染、无暖 shape cache——任何「UI 文本回退到大/慢字体」都会在高 DPI Windows 上造成 1-3s 首屏冻结。**作用域仅此三表面，不含 pinboard.in 站点主题**（`pinboard-themes.js` / `pilots/*.tokens.json`）：站点主题注入的是长命普通网页，性能模型不同；13/13 pilot 的 `typography.family` 均不列 CJK 字体，sans 栈与 mono 栈一视同仁，也无任何门禁检查它——据此报 Terminal / Solarized 违反下表形态 4 属误报。四种已踩形态：
-
-| 形态 | 铁律 |
-|------|------|
-| emoji / dingbat 字符 | UI 一律内联 SVG（`PBP_ICONS` / `setBtnIcon` / `setStatusIcon` / CSS 三角），**禁止字面 emoji/符号**——⚠ ✓ ✗ ✕ ↻ ▸ ▾ ℹ 这类单色 dingbat 同禁（回退 Segoe UI Emoji，首次加载 ~1.6s）。`U+FE0E` 与 `font-variant-emoji:text` 实测无效 |
-| CJK 正文 | body font-family 必须在 `sans-serif` 前显式列快 CJK 字体：`"PingFang SC","Microsoft YaHei","Hiragino Sans","Noto Sans CJK SC"`（CJK 名要列真实存在的全集：`"Noto Sans SC"` 与 `"Noto Sans CJK SC"` 是**不同 family**，另补 `"微软雅黑"` `"Source Han Sans SC"` `"WenQuanYi Micro Hei"` 覆盖 Win/Mac/Linux） |
-| 等宽（Latin） | 以命名字体打头（`"SF Mono",Consolas,Menlo,…`）；**禁止 `ui-monospace` 或裸 `monospace` 打头**（都会落到 profile 的 Fixed-width 字体） |
-| 等宽里的 CJK（最隐蔽） | monospace 栈在 `monospace` 之前必须再列快 CJK 字体，否则中文 placeholder 穿过 Latin 栈踩中 Fixed-width CJK |
-
-- 表单控件（button/input/select）默认**不继承** font-family → 必须 `button, input, select { font-family: inherit; }`（`.fg textarea` 凭更高 specificity 保 monospace）。
-- 图标契约：只从 Lucide v0.525.0（ISC）取 path（24-box、stroke 2，唯一例外 obsidian 品牌钻石；版本基准钉在 shared.js 顶部注释，勿从其他版本拷 path），新图标不手绘、SVG 内禁 `<text>` 节点；`eye/eyeOff` 独占密钥显隐、`refresh` 限定重跑同一动作、`cross` 是删除/移除/关闭家族、`extOpen` 限定真外链、`robot` 限定花 token 的 AI 动作（例外：查词的 AI 词条与补充生成沿用 `wandSparkles`，须带文字与模型名，2026-10-26 用户裁决；原文用例是免费动作，不用 `wandSparkles`，用 `quote` 加文字、不带模型名）；icon-only 按钮必须 `title` + `aria-label` + ≥24px 命中区。**唯一字面字符例外**：`×`（U+00D7）属 Latin-1 Supplement、无 emoji presentation，四处使用点（popup.html `#ai-error-dismiss`、popup.js `.edit-cancel`、shared.js `.fc-dismiss`、options.js `.saved-theme-del`）继承的 body 栈首个可解析家族即覆盖它、不触发回退，是安全字符、**勿迁 SVG**（2026-06-17 round-2 审计裁决，`80e3fe3` 已界定迁移范围；已两度重提，别再提第四次）。
-- 测量陷阱：暖态（chrome-dbg / 已打开页面）测不到冷首屏，只能在用户真实机器冷启动验证；卡顿计入 Rendering / Recalc+Layout 而 Paint 很小，第二次操作就快 = 一次性冷成本；idle 预热会阻塞主线程，不可取——根治慢字体回退本身。判断字体存在用 `document.fonts.check('16px "字体名"', '中')` 或 DevTools Rendered Fonts / `CSS.getPlatformFontsForNode`，别用测 ASCII 宽度的探针（对 CJK 字体误报）。
-- 热路径避免 `:has()` 等慢选择器；超长面板可考虑 `content-visibility:auto`。
+popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/dingbat 一律换内联 SVG（唯一例外 `×`），CJK 与等宽字体栈要先列快字体，图标只从 Lucide v0.525.0 取。全文与图标语义契约在 `.claude/rules/ui-fonts-icons.md`，改任何 UI 文本、CSS 或图标前必读。
 
 ## 设计精修工作流
 
 - 设计技能 [make-interfaces-feel-better](https://github.com/jakubkrehel/make-interfaces-feel-better) 与 [Impeccable](https://github.com/pbakaus/impeccable) 自 2026-10-02 起为用户级安装（`~/.agents/skills`，Claude Code 与 Codex 共用，由本机更新脚本跟随上游维护），不再随项目安装或锁定版本。
 - 采用 Impeccable 的 Operate 模式审视 popup/options/library，Read 模式审视阅读器；先检查实际界面的任务路径、层级和边界状态，再按 polish 工作流修正，最后用 make-interfaces-feel-better 检查排版、状态、图标、动效与性能。已有主题与 `COMPONENTS.md` 是设计依据。
-- 开发审计先用 `node scripts/audit.mjs --changed --plan` 检查影响推荐，再按 `--surface` / `--scenario` / `--kind` 与所需语言、窗口、主题等维度执行；popup、options、library、reader、site、background 均可选择。复用 `qa-drive` 隔离夹具，只检查受影响流程；纯逻辑修改选择逻辑/契约检查，不机械截图无关页面。推荐是有理由的保守估计，跨界面流程与共同前置由场景注册表保留；规则及例子见 `.claude/rules/theme-factory.md`。改完执行对应编辑期 lint、必需主题只读门与所选渲染门；检测器结合截图判断，不因通用建议改动已裁决的设计。
+- 开发审计先用 `node scripts/audit.mjs --changed --plan` 检查影响推荐，再按 `--surface` / `--scenario` / `--kind` 与所需语言、窗口、主题等维度执行；popup、options、library、reader、site、background 均可选择。复用 `qa-drive` 隔离夹具，只检查受影响流程；纯逻辑修改选择逻辑/契约检查，不机械截图无关页面。推荐是有理由的保守估计，跨界面流程与共同前置由场景注册表保留；规则及例子见 `.claude/rules/audit.md`。改完执行对应编辑期 lint、必需主题只读门与所选渲染门；检测器结合截图判断，不因通用建议改动已裁决的设计。
 - 本项目的快 CJK 字体栈、Lucide stroke 2、控件阶梯、主题 token 与冷启动要求优先于技能的通用字体、40/44px 命中区、按压缩放或装饰动效建议。高频操作保留即时反馈；不引入运行时依赖、远程字体或首屏入场动画。
 
 ## 测试与夹具
@@ -146,31 +104,16 @@ popup / options / library 三个扩展表面是短命单次渲染、无暖 shape
 
 ### 真实 AI API 测试（必须明确授权）
 
-- **任何真实 AI API 测试都必须事先取得用户明确授权。** 开发、修复、模拟测试的授权，或本机已有 Key，均不代表允许真实调用。调用前说明供应商、模型、发送内容、请求次数、重试次数、单次输出上限及各供应商费用上限；在已明确授权的范围内继续执行，超出任一边界必须重新确认。
-- 测试前先读 `~/.config/ai-dev/README.md`，遵循其中的配置维护与真实测试约定。地址、模型及协议以公开的 `providers.env` 和官方资料为准；保留用户自定义值，不擅自换模型或端点。
-- 价格查询和预算统一使用 `~/projects/scripts/ai-dev.sh prices` / `estimate` / `status`，不另写抓价逻辑或手动抓取价格；保留其来源、时效、地区和估算限制。unknown、stale 或与网关实际映射/计价不符时先停止核对，不能用其他模型或地区的价格代替。
-- 多模型对照用于验证同一套词典业务逻辑。所有模型使用同一提示词、响应规范化、校验、来源核对与展示/保存流程；不得按供应商或模型名为词条、补充用法添加特殊分支。协议兼容只留在 AI 传输适配层，以实际能力或服务端错误为依据；不能通过放过错误语言、截断内容或虚构引用来提高成功率。
-- 维护与准备期间禁止直接或间接读取、探测、复制或修改 `.env`，包括读取后脱敏、检查已配置平台或计算指纹。取得具体测试授权后，仅测试进程用 dotenv 解析器读取所需平台的 Key；禁止 shell source、导入智能体或全局环境。忽略 `.env` 中旧地址和模型参数，并明确同名环境变量的优先级或拒绝冲突。
-- 优先使用合成词条、例句和公开资料，不发送用户文章、生词库或问答记录。词典对照测试可覆盖 DeepSeek、MiniMax、Gemini、OpenRouter，但此名单不是长期调用许可；每轮以用户授权的实际供应商与模型为准。
-- 每个平台分别设置请求、重试、输入与输出、费用硬上限；重跑与重试累计计入同一轮预算，达到上限即停止。无法确认价格或约束费用时先说明并确认，不把 token 上限冒充金额保证，不自动扩大样本或切换付费服务。
-- 不向对话、日志或提交内容输出 Key、片段、指纹、认证头、完整环境及含凭据的异常；缺项只报告变量名。真实返回先检查敏感内容，再保存必要的本地测试证据；测试配置、凭据及未清理的原始返回不得入库或对外同步。
-- 用真实产品的请求、解析、展示与保存路径验证 AI 词条及补充，分别记录接口失败、空输出、截断、结构校验、语言校验与保存失败。模拟响应通过不等同于真实模型通过；可公开的回归夹具须经检查并移除敏感内容。
+- **任何真实 AI API 测试都必须事先取得用户明确授权。** 开发、修复、模拟测试的授权，或本机已有 Key，均不代表允许真实调用。授权、预算、`.env` 与留证的完整约定在 `.claude/skills/live-ai-test/SKILL.md`，任何真实调用前先读。
 
 ## Theme Factory（改主题源 / 三份 UI CSS / pinboard-themes.js 前必读 rules/theme-factory.md）
 
 13 套站点主题与扩展三表面（popup/options/library）主题均由 `docs/theme-surface/` token-driven 生成。**唯一工作流**：改 `composers/*.mjs` 或 `pilots/*.tokens.json` → `node docs/theme-surface/tools/sync-all.mjs` → commit。**禁止手工编辑** `pinboard-themes.js` 与三份 CSS 里的六个 `@generated:*` 区——pre-commit（含 css-region-audit / handedit-audit 的 8 道门）会拦截，但 `ui-token-coverage` 与 `contrast-audit` 只在 sync-all / verify.sh 里，改生成区前必须手动跑一次。组件原语 generated，页面级布局与间距 token 的 `:root` 定义手写。规范：COMPONENTS.md；新主题：NEW_THEME.md。
 
-## 发布流程
+## 提交、发布与对外文案
 
-```bash
-git commit -m "fix(...): ..."   # pre-commit 两组触发：主题源/三份 CSS → 8 道工厂门；UI 消费侧按文件分路——四个表面 HTML、popup/options/library(-*).js、listbox.js 与 md-dict.js → layout-lint + ui-contract + ui-vocabulary，md-preview.css 与 dict-*.js → layout-lint + ui-contract，其余 md-*.js、shared.js 与词汇注册表/基线 → ui-vocabulary；全套 verify 由 push 后 CI 兜底（禁止 --no-verify）
-                                # 其中 layout-lint + ui-vocabulary 两道静态门在 Claude Code 里由 .claude/settings.json 的 PostToolUse 钩子在编辑时即跑（JS 范围与 ui-vocabulary 触发组一致，含 md-dict.js；dict-*.js 不铸类名、两道门都不读它，不在编辑期钩子内，ui-contract 只在 commit 时跑）；该钩子另覆盖主题工厂生成物——popup/options/library.css 命中时改跑 layout-lint + css-region-audit，pinboard-themes.js 命中时改跑 handedit-audit（各按脚本实际读取的文件路由，不空跑），红了指向 sync-all；composers/pilots 源文件不在编辑期钩子内（中间态会误报，留给 commit 时的 8 道工厂门）。没有编辑期钩子的工具（Codex 等）改完文件后自行执行 node scripts/ui-consumer-lint.mjs --file <路径>
-bash scripts/bump-version.sh    # 按 commit 类型 bump manifest（feat→minor / fix→patch）
-git push origin main
-bash scripts/release.sh         # 打 ZIP + GH release + changelog；--build-only 仅构建+冒烟不发布，其余任何运行都会直接发布
-```
-
-- **发版前文档核查（release.sh 硬门）**：自上个 tag 有 feat commit 而 README×9 / CLAUDE.md / docs/privacy.md / docs/index.md / theme-surface 文档全未改动时直接中止；确认无需更新用 `--docs-ok` 显式跳过。新增任何数据出口（新 API 调用、新导出目标、新 AI 触发面）必须同步 privacy.md 的 Network Requests / Permissions / Third-Party 三处。privacy.md 与 index.md 走 GitHub Pages，push 即生效，不依赖扩展发版。
+- **提交**：pre-commit 按改动文件分路跑门，全套 verify 由 push 后 CI 兜底，禁止 `--no-verify`。Claude Code 由 `.claude/settings.json` 的 PostToolUse 钩子在编辑时跑 `scripts/ui-consumer-lint.mjs`；没有编辑期钩子的工具（Codex 等）改完文件后自行执行 `node scripts/ui-consumer-lint.mjs --file <路径>`。
+- **发版**：bump / push / release.sh、发版文档硬门、打包规则、扩展 ID 分层、ZIP smoke 与钩子分路详情都在 `.claude/skills/release/SKILL.md`。`bash scripts/release.sh` 只有带 `--build-only` 时不发布，其余任何运行都会直接发布。
 - **对外材料只讲核心（用户已反复强调，2026-11-05 第五次）**：README×9、`docs/index.md`、商店描述（`docs/cws-assets/store-descriptions.md`，由 README 生成）以及宣传图和视频，都写给潜在用户看。只写核心功能，每个功能一句话，最多两句。实现细节、选项名、数字规格、边界条件、试点功能和操作步骤都不写，这些放在设置页提示或 release notes 里。新功能默认不进 README：能并进已有条目就并，只有本身就是卖点时才单列一条。docs-lint 会检查条目数和每条长度；超限时删内容，不许调阈值。子代理写这些材料时，要把这一条原文写进它的提示词。
 - **用户看得到的文字都要说人话（2026-11-05 用户要求）**：适用于界面标签、设置提示、错误与状态信息、README、商店文案和宣传材料。
   - **写法**：用短句和常用词，直接说用户能做什么、会发生什么。不解释实现原理。
@@ -178,19 +121,10 @@ bash scripts/release.sh         # 打 ZIP + GH release + changelog；--build-onl
   - **设置页不配大段说明**：每个开关、输入框默认不配说明，标签本身说清楚就够。只有用户不知道就会出错、丢数据或多花钱时，才加一行提示。更长的说明放进 ? 帮助，分类规则见 `tests/options-hint-policy.json`。
   - **自查**：写完或改完，英文用 `humanizer` skill 检查，中文用 `humanizer-zh`，其他语种按 `content-l10n` 重写。子代理写这类文字时，要把这一条原文写进它的提示词。
 - **用户可见文案 / README 改动**：×9 locale 逐行镜像、同 commit 更新；按目标语言重写而非翻译——细则见 rules/l10n.md。
-- **打包规则**：root 的 `*.html` / `*.js` / `*.css` / `manifest.json` 自动进 ZIP，递归包含 `vendor/ icons/ _locales/`；`tests/ scripts/ docs/ release/ *.md` 与隐藏目录排除。新增非上述后缀/位置的运行时资源必须改 release.sh 的 INCLUDE_DIRS / TOP_LEVEL_PATTERNS；sanity check 断言 manifest 与所有 HTML 引用的文件都在 ZIP 内，少一个 exit 1。
-- **扩展 ID 分层**：源码 manifest 固定开发 ID `feoognahlmfmbllpmgailahcnjppiegb`（开发公钥 + 开发 OAuth client，可与 CWS 版并存）；release.sh 校验源码身份后只在 ZIP 内替换为 CWS 公钥与生产 OAuth client，正式版固定 CWS ID `pnjndmjhljjbdlbejeenkepdalokfooh`。严禁占位 client ID/secret。Drive 两个 OAuth client 对同一 Google 账号 appDataFolder 的互通性 smoke 测不到，发布前需人工实测（细则见 rules/vocab-sync.md）。
-- **ZIP smoke**（release.sh 内置，失败即中止）：Playwright 装解压后的 ZIP，校验 SW 注册、扩展 ID/OAuth client、vocab 模块加载、popup/options 无 pageerror、DNR 防盗链契约。`--skip-smoke` 仅限调试 release 脚本本身；单独跑 `node scripts/zip-install-smoke.mjs`。前置：`.qa-scan/` 已装 playwright + bundled Chromium。
 
-## 临时事项（有到期日，过期即清；到期日由 verify.sh 强制检查，超期 14 天内 WARN、超过 14 天 FAIL）
+## 临时事项
 
-- （`bgSaveMode` 迁移已于 2026-09-15 退役——自 v2.79 / 2026-06-10 起运行三个月，远超 10 个版本 / 33 天的先例；`PRIME_EXCLUDED_KEYS` 里的 `bgSaveMode` 保留，理由见 shared.js 该常量注释）
-- （WebDAV 遗留清理迁移已于 2026-08-26 退役——自 v2.98 起随 10 个版本运行 33 天）
-- **`pbpClaimLegacyHighlightOwners` 可退役（到期日 2026-12-31）**：background.js 的一次性认领（2026-08-29 上线，flag `_hlOwnerClaimDone`）——把无 owner 的存量高亮 item 认领给当前账号（高亮按账号过滤，用户拍板）。未登录用户的 flag 不落，到期删函数与调用行时若 flag 仍未落，存量保持无主（人人可见）属可接受终态。退役时还须把 `background.js` 从 tests/ui-contract-tests.mjs 的 `PBP_HL_LOCK_PREFIX_WRITERS` 移除（删掉那句 `"pbp-hl:"` 字面量就会让该门故意报红，直到注册表同步），并把 md-highlight.js / library-notes.js / options-backup.js 三处契约注释里的「第五个 producer」段落删掉，保留四个 writer（含 notes-sync.js）。
-- **`pbpScrubLegacySyncWebhookUrls` 可退役（到期日 2026-12-31）**：background.js 的一次性 scrub（2026-08-29 上线，flag `_webhookSyncScrubDone`）——keys-off 用户遗留在 chrome.storage.sync 的明文 webhook capability URL 先救进 local 再全剥。到期直接删函数与调用行；届时 `pbpStripExportTargetTokensOnly`（shared.js）若 migrate 路径仍在用则保留，其注释同步改。
-- （`migrateGithubModelsRetirement` 已于 2026-10-13 退役——GitHub Models provider 2026-08-29 下线后运行 45 天）
-- （`migrateRetiredProviderModels` 已于 2026-10-19 退役——2026-09-07 上线，运行 42 天；flag `_retiredModelDefaultsDone` 留在存量安装里无害）
-- **`pbpRetireDriveScopeKeys` 可退役（到期日 2027-01-15）**：background.js 的一次性迁移（随 Drive 同步合并批上线，flag `_driveScopeKeysRetiredDone`、常量 `PBP_DRIVE_SCOPE_RETIRE_FLAG` / `PBP_DRIVE_RETIRED_LOCAL_KEYS`、辅助 `pbpScrubDriveConnectionRows` / `pbpDriveScrubbedRow` / `pbpDriveHasConnectionError`）——数据范围开关取消（连接即同步生词 + 高亮与笔记，用户裁决 A）后，删本机 local 的 `driveSyncVocabulary` / `driveSyncNotes` / `_notesBootSyncTs`，清六个旧 alarm `vocab-sync-*` / `notes-sync-*`，把当前个人资料库 owner 两类 preflight 与账号行里遗留的连接层码（auth / permission / network / rate_limited / server）清零（数据层码原样保留，游标不动），已连接且权限在时补建 `drive-sync-periodic` 并触发一次不节流整轮。到期删常量、三个辅助、函数与调用行，同时删 background.js onAlarm 里 `PBP_DRIVE_LEGACY_ALARMS.includes(alarm.name)` 的旧名路由与 vocab-gdrive.js 的该常量（先 grep 确认已无引用）、`shared.js` `pbpIsNeverClearKey` 中的 `driveSyncVocabulary` / `driveSyncNotes` 两个旧 key；`tests/drive-migration-tests.html` 整页删除并撤 `.qa-scan/run-test.mjs` 对应一行（20）。锁旧名路由的另外三处断言同步撤：`tests/background-lifecycle-tests.html` 的「legacy vocab-sync-* and notes-sync-* alarms route to the unified boot」整条（计数减 1）及其 router harness 注入的 `PBP_DRIVE_LEGACY_ALARMS`，`tests/vocab-background-tests.html`「all three drive-sync alarm names and the legacy names are routed」与 `tests/vocab-gdrive-tests.html`「one drive schedule replaces the per-dataset alarms」各删掉 `PBP_DRIVE_LEGACY_ALARMS` 那一项（条数不变）；`PBP_DRIVE_CONNECTION_ERRORS` 仍被 runner 使用，保留。
+有到期日的一次性迁移与清扫登记在 `.claude/expiring-items.md`，到期日由 docs-lint（verify.sh / CI）检查：超期 14 天内 WARN、超过 14 天 FAIL。新增一次性迁移时在那里登记。
 
 ## 与 Claude Code 协作
 
@@ -210,18 +144,30 @@ bash scripts/release.sh         # 打 ZIP + GH release + changelog；--build-onl
 - 不要在 `pinboard-themes.js` 里手工加 CSS 规则
 - 不要 `--no-verify` 绕过 pre-commit
 
-## 子系统深水区规则索引（.claude/rules/）
+## 规则与技能索引
 
-读到匹配文件时自动加载；若本会话未触发（或你是不加载 rules 的工具），改下列文件前**必须先读对应规则文件**：
+`.claude/rules/` 读到匹配文件时自动加载，`.claude/skills/` 按任务触发；若本会话未触发（或你是不加载 rules / skills 的工具），改下列文件或做下列任务前**必须先读对应文件**：
 
-| 改这些文件 | 必读 |
+| 改这些文件 / 做这件事 | 必读 |
 |------|------|
-| docs/theme-surface/**、popup/options/library.css、pinboard-themes.js、audit / render-audit 家族、qa-drive | `.claude/rules/theme-factory.md` |
-| vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js、options-vocab.js、library-vocab.js、anki-connect.js、eudic-sync.js | `.claude/rules/vocab-sync.md` |
-| md-preview.*、md-translate / md-ask / md-reader / md-highlight / md-ai-core 等 md-*.js | `.claude/rules/md-preview.md` |
-| md-dict.js、dict-pack.js、md-vocab-echo.js、ai-cache.js | `.claude/rules/dict.md` |
+| shared.js、background.js、options.js、options-backup.js、bookmark-services.js、popup.js、popup-offline.js、popup-batch.js、md-bookmark.js、vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js（存储路由 / 同步 / 书签连接 / 离线队列） | `.claude/rules/storage-sync.md` |
+| background.js、manifest.json、SW 用 importScripts 载入的数据模块（bookmark-services / vocab-store / notes-sync / dict-archive / ask-archive 及其 *-gdrive.js、wayback.js）、pinboard-style.js、pinboard-sort.js、bili-player-bridge.js | `.claude/rules/mv3.md` |
+| 四个表面 HTML/CSS、popup / options / library 及其 *-*.js、listbox.js、shared.js、md-*.js（UI 文本、字体栈、图标） | `.claude/rules/ui-fonts-icons.md` |
+| 四个表面 HTML/CSS、shared.js、listbox.js、ui-vocabulary.json 与基线（新增任何 UI 元素；library 运行时创建值盒子的 library.js / library-vocab.js / library-notes.js 也要先读） | `.claude/rules/ui-primitives.md` |
+| docs/theme-surface/**、popup/options/library.css、pinboard-themes.js、render-audit 家族（ui-render-audit / audit-render-scenarios / render-audit-ledger / checklist / known-failures）、ui-contract-tests、theme-*-tests | `.claude/rules/theme-factory.md` |
+| scripts/audit*.mjs、tests/audit*-tests.mjs、qa-drive、ci-fonts、verify.sh、.qa-scan/run-test.mjs（选审计场景、`--font=ci`） | `.claude/rules/audit.md` |
+| vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js、options-vocab.js、library-vocab.js、library-notes.js、md-highlight.js、anki-connect.js、eudic-sync.js、vocab-send.js | `.claude/rules/vocab-sync.md` |
+| vocab-gdrive.js、notes-gdrive.js、dict-archive-gdrive.js、ask-archive-gdrive.js、options-vocab.js、library.js、background.js、Drive 相关测试页（连接层 / 身份缓存 / 错误码 / OAuth / 权限） | `.claude/rules/drive-sync.md` |
+| dict-archive.js、dict-archive-gdrive.js、ask-archive.js、ask-archive-gdrive.js、library-ask.js | `.claude/rules/archive-sync.md` |
+| md-preview.*、md-preview-theme-early.js、md-translate / md-ask / md-reader / md-highlight / md-ai-core / md-bookmark 等 md-*.js、bili-player-bridge.js | `.claude/rules/md-preview.md` |
+| md-dict.js、md-vocab-echo.js、ai-cache.js、library-vocab.js（查词界面） | `.claude/rules/dict.md` |
+| dict-entry.js、dict-evidence.js、md-dict.js（AI 词条与补充的生成） | `.claude/rules/dict-entry.md` |
+| dict-pack.js、options-vocab.js、md-dict.js、library-vocab.js（离线词典包） | `.claude/rules/dict-pack.md` |
 | options-backup.js（备份 schema v3 / 凭据 opt-in） | `.claude/rules/backup.md` |
-| md-embed.js、background.js（DNR 防盗链修复） | `.claude/rules/hotlink-dnr.md` |
-| ai.js、popup-ai.js、options-connectivity.js（关思考 provider 方言） | `.claude/rules/ai-providers.md` |
+| md-embed.js、background.js、zip-install-smoke.mjs（DNR 防盗链修复） | `.claude/rules/hotlink-dnr.md` |
+| ai.js、popup-ai.js、options-connectivity.js（关思考与参数方言、popup AI 代理） | `.claude/rules/ai-providers.md` |
+| ai.js、dict-entry.js（响应完整性、流式契约、任务输出要求、能力记录） | `.claude/rules/ai-response.md` |
 | README*.md、_locales/**、docs/privacy.md、docs/index.md | `.claude/rules/l10n.md` |
-| 四个表面 HTML/CSS、shared.js、ui-vocabulary.json（新增任何 UI 元素） | `.claude/rules/ui-primitives.md` |
+| 发版、bump 版本、打 tag、release.sh、ZIP / CWS、弄清 pre-commit 分路 | `.claude/skills/release/SKILL.md` |
+| 任何真实 AI API 调用或测试 | `.claude/skills/live-ai-test/SKILL.md` |
+| 新增、改期或退役一次性迁移 | `.claude/expiring-items.md` |

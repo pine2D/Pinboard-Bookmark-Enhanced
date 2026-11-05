@@ -8287,7 +8287,7 @@ function sweepProbe(cfg) {
     return r.width > 0 && r.height > 0;
   }
   // A button's LABEL text for the icon-only test. x (U+00D7) is the one literal
-  // glyph CLAUDE.md sanctions in place of an SVG (the four dismiss sites), so a
+  // glyph rules/ui-fonts-icons.md sanctions in place of an SVG (the four dismiss sites), so a
   // button whose only text is x is a close icon and is measured as one: the
   // 24px hit floor applies, the text rungs do not.
   const iconLabel = (el) => el.textContent.replace(/\u00D7/g, "").trim();
@@ -10818,7 +10818,7 @@ async function main() {
   // same IndexedDB as any extension page. Calling its own public functions
   // (pbpVocabSaveWord / pbpVocabBatchAddGroup) instead of touching the
   // "words" object store directly keeps the single-writer invariant intact
-  // (CLAUDE.md: "vocab-store.js 是 pbp-vocab 的唯一写入口"). ----
+  // (rules/vocab-sync.md: "vocab-store.js 是 pbp-vocab 的唯一写入口"). ----
   await sw.evaluate(async ({token, account}) => {
     await primeSettings();
     await pbpPersonalLibraryAccount();
@@ -11037,7 +11037,7 @@ async function main() {
 
   // One offline-queue record so popup's #offline-queue-bar (and its
   // #offline-queue-clear icon-only button) has something to render --
-  // CLAUDE.md's offlineQueue shape: save mode, url/title/tags/note,
+  // rules/storage-sync.md's offlineQueue shape: save mode, url/title/tags/note,
   // private/toread/archive flags, bookmark time, queue id/time, and the
   // non-secret Pinboard username it's bound to (no token).
   await sw.evaluate((owner) => chrome.storage.local.set({

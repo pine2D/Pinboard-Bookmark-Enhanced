@@ -1774,7 +1774,7 @@ function _pbpNotesLoadFailedText() {
 // A fifth producer exists too: background.js's
 // pbpClaimLegacyHighlightOwners() one-shot legacy-owner migration writes the
 // same "pbp-hl:" + key inline; it is scheduled to retire by 2026-12-31
-// (CLAUDE.md 临时事项) and must match until then. The helper is deliberately
+// (.claude/expiring-items.md) and must match until then. The helper is deliberately
 // duplicated rather than hoisted into shared.js: these are isolated script
 // contexts and the shared thing is the string, not the function.
 const PBP_NOTES_RECORD_LOCK_PREFIX = "pbp-hl:";

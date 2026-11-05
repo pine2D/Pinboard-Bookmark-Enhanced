@@ -187,7 +187,7 @@ fi
 echo "[options-help-render] checking semantic roles and raster alignment"
 node "scripts/options-help-render-audit.mjs"
 
-echo "[docs-lint] checking README x9 mirror + prose contracts + CLAUDE.md 临时事项 expiry dates"
+echo "[docs-lint] checking README x9 mirror + prose contracts + .claude/expiring-items.md 临时事项 expiry dates"
 node "scripts/docs-lint.mjs"
 
 echo "[store-descriptions] checking CWS store copy is regenerated from the READMEs"

@@ -2968,7 +2968,7 @@ sweepSuggestCache().catch(() => {});
 // logic has been shipping since v2.99 (2026-07-28) — far past the
 // two-release window it was waiting for — so every active device holds its
 // own local copy. Flag-gated one-shot; a failure retries on the next SW
-// evaluation. Retire by 2026-12-31 (CLAUDE.md 临时事项).
+// evaluation. Retire by 2026-12-31 (.claude/expiring-items.md).
 async function pbpScrubLegacySyncWebhookUrls() {
   try {
     const { _webhookSyncScrubDone } = await chrome.storage.local.get("_webhookSyncScrubDone");
@@ -3006,7 +3006,7 @@ pbpScrubLegacySyncWebhookUrls();
 // cheaply on later SW evaluations. Each record's read-modify-write holds the
 // same per-record Web Lock the reader's commit path uses ("pbp-hl:<key>"), so
 // a concurrent highlight save cannot be clobbered. Retire by 2026-12-31
-// (CLAUDE.md 临时事项, flag _hlOwnerClaimDone).
+// (.claude/expiring-items.md, flag _hlOwnerClaimDone).
 async function pbpClaimLegacyHighlightOwners() {
   try {
     const { _hlOwnerClaimDone } = await chrome.storage.local.get("_hlOwnerClaimDone");
@@ -4112,7 +4112,7 @@ pbpBootDriveSync({ throttleMs: PBP_VOCAB_BOOT_SYNC_MIN_MS }).catch((e) => {
 // connection. Placed after the top-level boot call on purpose: outside the
 // drive-scopes and boot test slices. Flag-gated; a refused or failed write
 // leaves the flag unset and the next worker generation retries (every step is
-// idempotent). Retire by 2027-01-15 (CLAUDE.md 临时事项).
+// idempotent). Retire by 2027-01-15 (.claude/expiring-items.md).
 const PBP_DRIVE_SCOPE_RETIRE_FLAG = "_driveScopeKeysRetiredDone";
 const PBP_DRIVE_RETIRED_LOCAL_KEYS = Object.freeze(["driveSyncVocabulary", "driveSyncNotes", "_notesBootSyncTs"]);
 function pbpDriveHasConnectionError(row) {

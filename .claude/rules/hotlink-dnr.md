@@ -2,6 +2,7 @@
 paths:
   - "md-embed.js"
   - "background.js"
+  - "scripts/zip-install-smoke.mjs"
 ---
 
 # 防盗链图片修复深水区（declarativeNetRequestWithHostAccess）

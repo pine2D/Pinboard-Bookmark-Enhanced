@@ -598,7 +598,7 @@ let _pbpHlLockWarned = false;
 // A fifth producer exists too: background.js's
 // pbpClaimLegacyHighlightOwners() one-shot legacy-owner migration writes the
 // same "pbp-hl:" + key inline; it is scheduled to retire by 2026-12-31
-// (CLAUDE.md 临时事项) and must match until then.
+// (.claude/expiring-items.md) and must match until then.
 //
 // Degrades to a bare call where Web Locks are missing (direct-open test pages,
 // insecure contexts): this page's own queue still orders its own writes, which

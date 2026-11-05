@@ -3907,7 +3907,7 @@ function pbpCountBackupSecrets(data) {
 // pbpScrubLegacySyncWebhookUrls (background.js, one-shot, flag-gated)
 // rescues any sync-only secret into local and then full-strips the sync
 // copy. This tokens-only variant remains for the in-flight migration path
-// until that scrub retires (2026-12-31, CLAUDE.md 临时事项).
+// until that scrub retires (2026-12-31, .claude/expiring-items.md).
 function pbpStripExportTargetTokensOnly(ets) {
   const cleaned = {};
   if (!ets || typeof ets !== "object") return cleaned;

@@ -7450,7 +7450,7 @@ check(/^\.pop-panel \{[\s\S]*?\}/m.test(mdCss) && !/#pb-hl-card \{[^}]*box-shado
 }
 
 // ===================== K113: icon-only button accessible name =====================
-// CLAUDE.md's icon contract requires every icon-only button to carry BOTH a
+// rules/ui-fonts-icons.md's icon contract requires every icon-only button to carry BOTH a
 // title and an aria-label (plus >=24px hit area, which ui-render-audit
 // family 4 already measures via its sweepProbe). Only three ids had a
 // regression pin for the name half (the #vocab-lookup-narrow checks above);
@@ -7541,7 +7541,7 @@ for (const [file, html] of [["popup.html", popupHtml], ["options.html", optionsH
     const id = (/\bid="([^"]*)"/.exec(attrs) || [])[1] || "";
     const label = id ? `#${id}` : `(${attrs.trim().slice(0, 60)})`;
     const hasName = /\baria-label="[^"]*"/.test(attrs) || /\bdata-i18n-aria="/.test(attrs) || /\baria-labelledby="/.test(attrs);
-    check(hasName, `${file}: icon-only button ${label} has no aria-label/data-i18n-aria/aria-labelledby -- icon-only buttons must carry an accessible name (CLAUDE.md icon contract)`);
+    check(hasName, `${file}: icon-only button ${label} has no aria-label/data-i18n-aria/aria-labelledby -- icon-only buttons must carry an accessible name (rules/ui-fonts-icons.md icon contract)`);
     const owner = id && ICON_BUTTON_RUNTIME_TITLE_OWNERS[id];
     if (owner) {
       check(owner(), `${file}: #${id} is allowlisted as a runtime-owned title, but the JS that is supposed to own it no longer matches that shape -- either restore the ownership or give it a static data-i18n-title and drop the allowlist entry`);
@@ -7551,7 +7551,7 @@ for (const [file, html] of [["popup.html", popupHtml], ["options.html", optionsH
     // title -- it is dead weight from a copy-pasted attribute list.
     const titleAttr = /\btitle="([^"]*)"/.exec(attrs);
     const hasTitle = (!!titleAttr && titleAttr[1] !== "") || /\bdata-i18n-title="/.test(attrs);
-    check(hasTitle, `${file}: icon-only button ${label} has no title/data-i18n-title -- icon-only buttons must carry both a title and an aria-label (CLAUDE.md icon contract)`);
+    check(hasTitle, `${file}: icon-only button ${label} has no title/data-i18n-title -- icon-only buttons must carry both a title and an aria-label (rules/ui-fonts-icons.md icon contract)`);
   }
 }
 
@@ -7683,7 +7683,7 @@ function enclosingBlock(code, index) {
   return null;
 }
 
-// The lone "×" glyph is CLAUDE.md's one literal-character exception for an
+// The lone "×" glyph is rules/ui-fonts-icons.md's one literal-character exception for an
 // icon-only close/cancel/delete button (it inherits a fast-loading fallback
 // font, unlike emoji/dingbats) -- but a bare "×" is still not an accessible
 // name by itself, so every JS-constructed button that sets textContent to
@@ -7767,7 +7767,7 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
 //
 // PBP_HL_LOCK_PREFIX_WRITERS below is the line that needs editing when
 // background.js's pbpClaimLegacyHighlightOwners() migration retires
-// (CLAUDE.md 临时事项, due 2026-12-31): deleting its inline "pbp-hl:"
+// (.claude/expiring-items.md, due 2026-12-31): deleting its inline "pbp-hl:"
 // literal from background.js is meant to make this gate fail on purpose
 // (background.js drops out of the detected set while still being
 // registered here) until "background.js" is removed from this array too.
@@ -9922,7 +9922,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
   check(/\bclass="btn"/.test(goTag) && /\bdata-i18n="libraryLookupGo"/.test(goTag),
     "library.html: #vocab-lookup-go must be the md text button \"Look up\" (spec §4.8), not an sm icon button");
   check(!/className = "xp-dict-(?:lang|head)"/.test(libraryVocabJs) && !/\bslot\.replaceChildren\(/.test(libraryVocabJs),
-    "library-vocab.js: the relookup language select / head is built again, or a slot is replaceChildren()'d (rules/dict.md slot invariant)");
+    "library-vocab.js: the relookup language select / head is built again, or a slot is replaceChildren()'d (rules/dict-pack.md slot invariant)");
   check(/detail\.replaceChildren\(frag\);\s*\n\s*\$id\("vocab-detail-tail"\)\.replaceChildren\(footer\);/.test(libraryVocabJs) &&
     /footer\.className = "vocab-detail-footer";/.test(libraryVocabJs),
     "library-vocab.js: the closing row is no longer the tail's own footer.vocab-detail-footer, rebuilt right after #vocab-detail (spec §4.1)");

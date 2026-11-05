@@ -2505,7 +2505,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     // its button on screen.
     const list = transcriptListEl();
     // Key NAMES, not arrow glyphs: the chips are rendered as text and a literal
-    // symbol risks the slow-font fallback (CLAUDE.md font iron rule).
+    // symbol risks the slow-font fallback (rules/ui-fonts-icons.md).
     if (list && !list.hidden && _relayAlive && _lastRelayTime != null) { s.add("Space"); s.add("Left"); s.add("Right"); }
     if (followOffered()) s.add("f"); // narrow stack hides it by class, not [hidden]
     if (_loopBtn && !_loopBtn.hidden) s.add("r");

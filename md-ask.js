@@ -3658,7 +3658,7 @@ const PBP_EXPLAIN_PIN_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.pin : "
 // Foot-action icons, all from the shared Lucide set (PBP_ICONS). Hand-drawn
 // shapes were the problem before: same stroke width and viewBox, but heavier,
 // denser silhouettes that read as a different icon set beside the rest.
-// Inline SVG rather than glyphs, per CLAUDE.md's font-fallback rules.
+// Inline SVG rather than glyphs, per rules/ui-fonts-icons.md.
 const PBP_EXPLAIN_NOTE_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.doc : "";
 const PBP_EXPLAIN_VOCAB_ADD_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.bookmarkPlus : "";
 const PBP_EXPLAIN_VOCAB_OPEN_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.library : "";

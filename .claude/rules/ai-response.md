@@ -1,0 +1,40 @@
+---
+paths:
+  - "ai.js"
+  - "dict-entry.js"
+---
+
+# AI 深水区：响应契约、任务输出要求与能力记录
+
+> 自 `ai-providers.md` 拆出（2026-11-05）；关思考与请求体参数方言仍在 `ai-providers.md`。
+
+## 公共响应契约（非流式与流式）
+
+OpenAI 兼容、Gemini、Claude、Ollama 只在协议适配层读取正文块与完成状态，再走同一完整性检查。排除思考、工具和拒答内容；区分空正文、未完成、拒答、坏 JSON 与坏响应结构。`requireComplete:true` 的词典生成不接受明确未完成的输出，即使其中 JSON 恰好闭合；其他消费者仍可使用非空部分文本。兼容端点缺少终止元数据时保留 unknown，不伪称确认完成，也不凭此拒绝有效正文。终止原因按协议分为完成、截断、拒答三张表（`_AI_FINISH_REASONS`），表外的显式原因一律算未完成；`_aiFinishState` 由非流式 envelope 与流式契约共用。
+
+流式（`callAIStream`）同一契约（2026-10-27，Q23/Q24 均选 A）：
+
+- **旁路采集，不改提取器**：每次尝试一个 `_pbpStreamContract`，从 onRaw 旁路读取终止状态，delta 提取器仍只返回 `string|null`（finish chunk 返回 null）。采集项：兼容协议 `finish_reason`、`delta.refusal`、`delta.tool_calls` / `function_call`；Gemini `finishReason`、`promptFeedback.blockReason`、`functionCall`；Claude `message_delta.delta.stop_reason`、`tool_use` 块；Ollama `done`、`done_reason`、`message.tool_calls`。只有显式原因会覆盖上一个，usage 块、role 块和 `stop_reason:null` 不清除已知状态；拒答与工具标志不会被后续普通块撤销。Ollama 中途的 `done:false` 是正常增量，只有断流时最后一个值仍为 `done:false` 才算未完成；全程没有 `done` 字段则保留 unknown。
+- **只在 `requireComplete` 路径判定**，错误码与非流式相同并都带 HTTP `status`：流内 `error` 成员（兼容网关、Gemini、Ollama）、Claude `type:"error"` 事件或 `finish_reason:"error"` → `stream_error`；字段类型错、事件 JSON 无法解析、响应没有 body → `invalid_response`（`reason` 为 `response_shape` / `response_json`）；拒答或安全拦截 → `output_refused`；截断、工具轮次、表外原因、停在 `done:false` → `output_truncated`；无正文 → `empty_response`。缺终止元数据而正文非空时按 unknown 接受，交给词典的严格 JSON 与 schema 校验。错误消息是固定文字，不带供应商错误正文。注释、`ping`、role-only、usage-only 块与 `[DONE]` 都不算坏响应，`[DONE]` 也不作为成功条件。2xx 的 `empty_response` / `output_truncated` 走 `_aiWithDialectFallback` 的接受分支（记住已接受的方言，不重试）；`stream_error`、`output_refused`、`invalid_response` 也不重试。词典把 `stream_error` 映射为“服务暂不可用”，账本记固定码 `stream_error`。
+- **其他消费者不变**：Ask、翻译、要点、解释不传 `requireComplete`，契约的 `finish` 不起作用。流内错误事件照旧跳过，已收到的非空部分文本照旧返回；四处 `new Error("<X> returned empty response")` 保持原形状（无 `code`、无 `status`），所以 `pbpAiStatusPageUrl` 仍按 `empty response` 给状态页链接；没有 body 时仍是 `<X> response has no stream body`。由 `tests/ai-completion-tests.html` 按 name、message、code/status/reason/paramHint 是否存在与构造类型逐项锁定，`tests/md-ai-tests.html` 用真实空流驱动 Ask 与翻译的错误再取状态页。
+- **思考内容不进正文**：Gemini `thought:true` 部分在 `_pbpGeminiDelta` 中排除，与非流式一致。这是对所有流式消费者的行为修正：只有 thought 的流不再把思考文本当答案返回，而是以该适配器原有的空响应 Error 失败。兼容网关扩展字段 `reasoning_content` / `reasoning`、Ollama `message.thinking` 不进正文；产品从不为 Claude 请求 extended thinking，若仍收到 `thinking_delta`（或其他非 `text_delta`）也只旁路识别、绝不当正文。思考文本不保存、不记日志、不进回调。
+- **进度旁路**：可选 `onProgress({phase})`，`phase` 为 `thinking`（确实收到上述思考字段时）或 `streaming`（首个可见正文）。同步调用、整次调用内每个阶段只报一次（方言重试不重复），进入 `streaming` 后不再回到 `thinking`；不带文本或 token 数。回调抛错或返回被拒的 Promise 时吞掉并 `console.warn` 错误类名，不影响结果。去重后的上报函数挂在 `ai.js` 私有的 Symbol 键上随 opts 传递，不占用公开选项名；调用方自带的 `onPhase` 等同名选项不会被当作进度回调调用。
+- **总期限（`deadlineMs`，词典传 180000）**：调用级绝对期限，`callAIStream` 建立控制对象，但 `deadlineAt` 只在**第一次**传输层 `beforeRequest` 守卫通过后设一次；权限检查、首次能力记录读取和首次守卫等待都不计时。此后每次尝试、后续守卫、协商期能力记录读写和错误响应 body 读取共用同一剩余时间，绝不重新加 180 秒；期限到时即使 storage 仍未返回也结束调用，晚到的 continuation 不再派发请求（`_aiWithDialectFallback` 的可选第五参 `control`，旧调用不传）。只记录既定结果的写入（`rememberAccepted`）不会把已得出的结果改判为超时。设了期限时关闭 30 秒空闲判死（慢模型可以长时间无输出，keep-alive 也不会延长期限）；超时以 `name = "TimeoutError"` 拒绝。没有期限或期限不在 1–180 秒内的调用方保持 `PBP_STREAM_IDLE_MS = 30000` 与原 `AI stream timeout` 错误。内部控制器从不冒充调用方 signal。
+- **输出额度客户端截停（只在 `totalOutputBudget:true`）**：按每次尝试的累计量估算 `ceil(思考 UTF-8 字节数 / 4) + ceil(答案 JS 字符串长度 / 4)`，只取整一次，所以分块方式和跨块代理对都不改变估值；严格大于 `maxTokens`（词典 8192）才截停，等于时继续。这是近似值，不是真实分词器，偏差方向因模型而异，也不是金额保证。**覆盖面照实说**：能计入的可见思考主要来自兼容网关的 `reasoning_content` / `reasoning`（同一块里是别名，只计一次）和 Ollama `message.thinking`，另外计入实际收到的 Gemini thought 部分与 Claude `thinking_delta`（产品不请求，收到只计数）；**不下发思考文本的隐藏推理无法计入**，只能靠总期限和服务端输出上限兜底。截停在同一次 read 内立即离开消费循环，越线的那一块和其后缓冲的正文都不会进 `onDelta`；抛 `{code:"output_budget_exceeded", status:200}`（固定消息），列入 `_aiWithDialectFallback` 的 2xx 接受分支（执行 `rememberAccepted`，不重试），不 flush usage，词典不解析、不保存、不归档。思考文本只计字节数，不保存。中止优先级：调用方 AbortError > `output_budget_exceeded` > TimeoutError > 原空闲超时，判定位于离线错误归类之前。词典把 `output_budget_exceeded` 映射为截断文案 `dictGenerationTruncated`，账本记固定码。
+
+新增模型不应要求词典业务层添加供应商或模型分支。通用响应修复用四协议独立手写 HTTP 夹具和生成→归档→重读链路验证；响应失败不自动增加付费重试。真实 API 测试仍须按 `.claude/skills/live-ai-test/SKILL.md` 逐轮取得明确授权，历史授权不续用。
+
+## 按任务声明输出要求（2026-10-26）
+
+词典生成统一声明 `requireComplete`、180 秒超时（流式为上述调用级期限）、8192 总输出额度（流式另有上述客户端近似截停）、低思考偏好及闭合字段 JSON Schema，不按模型名选择业务策略。180 秒是 2026-10-26 用户裁决（原 60 秒会截断仍在生成的慢模型），所有模型同一期限、不设按模型分支；`_aiCompletionTimeout` 只接受 1–180 秒，超出范围回落 30 秒默认值。8192 是上限，不要求模型用满；每类提示词仍限制条数和长度。其他消费者保留原有默认额度与超时。支持取消与派发前账号守卫，不因超时、空正文、截断或坏 JSON 自动重生成。
+
+- `totalOutputBudget` 在 OpenAI 兼容协议优先发送 `max_completion_tokens`，只有服务端明确拒绝字段时按既有机制回退。`max_tokens` 在部分接口只限制最终答案，不能普遍当作含思考总量保证；真实测试必须另核对回传用量并停机。
+- 已声明的原生思考字段不变；未知兼容端点收到任务的 `minimum` 偏好时先尝试 `reasoning_effort:none`，仅在明确拒绝后降为 `low`；旧 `low` 请求保持兼容，不修改 provider 注册表或创建模型名单。
+- 结构要求由适配器转换：OpenAI 原生端点使用 `response_format.json_schema`；未知兼容端点先用通用 JSON object，不假设支持 Schema；Gemini `generationConfig.responseJsonSchema` 配合 JSON MIME；Ollama `format` 对象。Claude 保持提示词及严格解析，不发送其他协议的字段。`callAIStream` 只在 `jsonMode` 下按同一表达式加同样的字段（兼容协议的 `response_format` 位于 temperature 之后、输出上限字段之前，Ollama 不发 `think`），因此带词典选项的流式与非流式请求体除 `stream` 外相同（Ollama 另有流式独有的 `options.temperature`，保持不变）；Gemini 流式除 `noThinking` 外，任务声明 `reasoningEffort` 为 `minimum`/`low` 时也进入 `_GEMINI_THINKING_CFG` 的零思考预算协商，与 `callGemini` 共用记忆。未传 `jsonMode` 的流式消费者不会得到任何结构字段。
+- 兼容服务端明确以 400/422 拒绝 `response_format` 时，依次降到 JSON object、无格式字段，记忆能力；包括明确点名格式的 unknown variant / 类型枚举拒绝，不把 schema 内容错误或数值越界当成能力拒绝。与 token、temperature 和思考字段修复共用四次总上限，每次执行 `beforeRequest`。成功 HTTP 的坏内容不触发回退。结构约束只是生成引导，解析、语言、引用及归档校验不能跳过；有效 JSON 也不等于完整、正确的解释。
+
+依据：[LiteLLM JSON schema](https://docs.litellm.ai/docs/completion/json_mode)、[Qwen 结构化输出](https://help.aliyun.com/zh/model-studio/qwen-structured-output)、[Qwen 思考与输出上限](https://help.aliyun.com/zh/model-studio/deep-thinking/)、[Gemini GenerateContent](https://ai.google.dev/api/generate-content)、[Ollama structured outputs](https://docs.ollama.com/capabilities/structured-outputs)。
+
+## 能力记录边界（2026-10-26）
+
+能力记录按版本、供应商、端点、模型隔离，7 天到期，每组最多 128 条；旧的不带端点／时间的记录不复用。取消、认证失败、限流、服务端错误、业务 Schema 错误不推断为参数拒绝；普通请求与流式请求共用这些边界。OpenAI 兼容协议的任务配置（`jsonMode`、`schemaMode` 的官方端点条件、`totalOutputBudget`、`reasoningEffort`）由 `_aiCompatCfg` 一处构造，`callAI` 与 `callAIStream` 共用，因此两条路径读写同一条能力记录；不传这些选项的流式消费者（Ask、翻译、要点）请求体逐字节不变，由 `tests/ai-completion-tests.html` 的原始请求体快照锁定。

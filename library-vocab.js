@@ -1486,7 +1486,7 @@ const PBP_VOCAB_AUTO_ONLINE_DELAY_MS = 250;
 let _pbpVocabAutoTimer = 0;
 
 // Zero-network: what the device already knows about this word. A pack that is
-// importing, deleted or failing says nothing in the UI (rules/dict.md -- the
+// importing, deleted or failing says nothing in the UI (rules/dict-pack.md -- the
 // local side is UI-silent) and the lookup falls through to the cache.
 async function _pbpVocabLocalProbe(term, lang, signal) {
   const exact = pbpDictNormalizeTerm(term);
@@ -1680,7 +1680,7 @@ function _pbpVocabSyncFootClearance() {
 }
 
 // The slot pair md-dict writes into, plus the column's own foot. Slot
-// invariant (rules/dict.md): two stable children, and nothing here ever
+// invariant (rules/dict-pack.md): two stable children, and nothing here ever
 // replaceChildren()s the slot itself -- only #vocab-ref-result is replaced.
 function _pbpVocabRefSlot() {
   const host = $id("vocab-ref-result");

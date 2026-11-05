@@ -199,7 +199,7 @@
 
   // Inline SVG up/down arrow for the fallback picker. Avoids the literal ⇳
   // (U+21F3) dingbat, which can fall back to Segoe UI Emoji and stall first
-  // paint on Windows hi-DPI Chrome (see CLAUDE.md font-fallback notes).
+  // paint on Windows hi-DPI Chrome (see rules/ui-fonts-icons.md).
   // currentColor → inherits the native picker text color across all 13 themes.
   function makeFallbackArrow() {
     const arrow = document.createElement("span");

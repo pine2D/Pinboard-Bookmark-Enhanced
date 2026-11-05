@@ -64,7 +64,7 @@ export const STATIC_SCENARIOS = [
   staticRow('layout', 'docs/theme-surface/tools/layout-lint.mjs', ui, ['*.html', '*.css'], ['layout', 'contract']),
   staticRow('network-exits', 'scripts/network-exits-check.mjs', ['background'], ['manifest.json', 'docs/network-exits.json', 'docs/privacy.md', '*.js'], ['security']),
   staticRow('vendor-lock', 'scripts/vendor-lock-check.mjs', ['tooling'], ['vendor/**']),
-  staticRow('docs', 'scripts/docs-lint.mjs', ['tooling'], ['README*.md', 'CLAUDE.md', 'docs/index.md', 'docs/privacy.md'], ['docs']),
+  staticRow('docs', 'scripts/docs-lint.mjs', ['tooling'], ['README*.md', '.claude/expiring-items.md', 'docs/index.md', 'docs/privacy.md'], ['docs']),
   staticRow('store-copy', 'scripts/sync-store-descriptions.mjs', ['tooling'], ['README*.md', 'docs/cws-assets/**'], ['docs'], ['--check']),
   staticRow('theme-sync', 'docs/theme-surface/tools/sync-all.mjs', ['popup', 'options', 'library', 'pinboard'], ['docs/theme-surface/**', 'pinboard-themes.js', 'popup.css', 'options.css', 'library.css'], ['generation'], ['--check']),
   ...['token-coverage', 'cascade-lint', 'override-drift', 'handedit-audit'].map(name => staticRow(name, `docs/theme-surface/tools/${name}.mjs`, ['popup', 'options', 'library', 'pinboard'], ['docs/theme-surface/**', 'pinboard-themes.js'], ['generation'])),

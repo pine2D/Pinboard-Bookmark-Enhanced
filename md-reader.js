@@ -1404,7 +1404,7 @@ function _pbpZenEnsureBar() {
   bar.id = "zen-bar";
 
   // "Aa" typography entry (plan B): text, not an inline SVG -- plain Latin
-  // glyphs carry no emoji/dingbat slow-font risk (CLAUDE.md font iron rule).
+  // glyphs carry no emoji/dingbat slow-font risk (rules/ui-fonts-icons.md).
   const typoBtn = document.createElement("button");
   typoBtn.type = "button";
   typoBtn.id = "zen-typo-btn";

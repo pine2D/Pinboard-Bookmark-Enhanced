@@ -15,6 +15,8 @@ paths:
   - "md-export-send.js"
   - "md-video.js"
   - "bili-player-bridge.js"
+  - "md-bookmark.js"
+  - "md-preview-theme-early.js"
 ---
 
 # md-preview 阅读器深水区

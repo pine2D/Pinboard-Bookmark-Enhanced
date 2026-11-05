@@ -1,0 +1,15 @@
+# 有到期日的临时事项
+
+> 自根 CLAUDE.md「临时事项」迁来（2026-11-05）。`scripts/docs-lint.mjs` 解析本文件下面以 `## 临时事项` 开头的那一节（verify.sh 与 CI 都跑）：顶层条目要么带 `到期日 YYYY-MM-DD`，要么写成已退役的括号历史行「（…已于 YYYY-MM-DD 退役…）」；超期 1–14 天 WARN，超过 14 天、日期非法或缺到期日标记 FAIL。新增一次性迁移/清扫时在这里登记，代码注释写 `(.claude/expiring-items.md)`。
+>
+> 放在 `.claude/` 根而不是 `docs/` 或 `.claude/rules/`：`docs/` 由 GitHub Pages 发布（pages.yml 的 `source: ./docs`）；`.claude/rules/` 下的文件会随匹配文件自动加载，而这些条目只在到期时才需要处理、到期由 docs-lint 提醒；隐藏目录也不进 release ZIP（release.sh 只收根目录的 `*.html` / `*.js` / `*.css` / `manifest.json` 与 `vendor/ icons/ _locales/`）。
+
+## 临时事项（有到期日，过期即清；到期日由 verify.sh 强制检查，超期 14 天内 WARN、超过 14 天 FAIL）
+
+- （`bgSaveMode` 迁移已于 2026-09-15 退役——自 v2.79 / 2026-06-10 起运行三个月，远超 10 个版本 / 33 天的先例；`PRIME_EXCLUDED_KEYS` 里的 `bgSaveMode` 保留，理由见 shared.js 该常量注释）
+- （WebDAV 遗留清理迁移已于 2026-08-26 退役——自 v2.98 起随 10 个版本运行 33 天）
+- **`pbpClaimLegacyHighlightOwners` 可退役（到期日 2026-12-31）**：background.js 的一次性认领（2026-08-29 上线，flag `_hlOwnerClaimDone`）——把无 owner 的存量高亮 item 认领给当前账号（高亮按账号过滤，用户拍板）。未登录用户的 flag 不落，到期删函数与调用行时若 flag 仍未落，存量保持无主（人人可见）属可接受终态。退役时还须把 `background.js` 从 tests/ui-contract-tests.mjs 的 `PBP_HL_LOCK_PREFIX_WRITERS` 移除（删掉那句 `"pbp-hl:"` 字面量就会让该门故意报红，直到注册表同步），并把 md-highlight.js / library-notes.js / options-backup.js 三处契约注释里的「第五个 producer」段落删掉，保留四个 writer（含 notes-sync.js）。
+- **`pbpScrubLegacySyncWebhookUrls` 可退役（到期日 2026-12-31）**：background.js 的一次性 scrub（2026-08-29 上线，flag `_webhookSyncScrubDone`）——keys-off 用户遗留在 chrome.storage.sync 的明文 webhook capability URL 先救进 local 再全剥。到期直接删函数与调用行；届时 `pbpStripExportTargetTokensOnly`（shared.js）若 migrate 路径仍在用则保留，其注释同步改。
+- （`migrateGithubModelsRetirement` 已于 2026-10-13 退役——GitHub Models provider 2026-08-29 下线后运行 45 天）
+- （`migrateRetiredProviderModels` 已于 2026-10-19 退役——2026-09-07 上线，运行 42 天；flag `_retiredModelDefaultsDone` 留在存量安装里无害）
+- **`pbpRetireDriveScopeKeys` 可退役（到期日 2027-01-15）**：background.js 的一次性迁移（随 Drive 同步合并批上线，flag `_driveScopeKeysRetiredDone`、常量 `PBP_DRIVE_SCOPE_RETIRE_FLAG` / `PBP_DRIVE_RETIRED_LOCAL_KEYS`、辅助 `pbpScrubDriveConnectionRows` / `pbpDriveScrubbedRow` / `pbpDriveHasConnectionError`）——数据范围开关取消（连接即同步生词 + 高亮与笔记，用户裁决 A）后，删本机 local 的 `driveSyncVocabulary` / `driveSyncNotes` / `_notesBootSyncTs`，清六个旧 alarm `vocab-sync-*` / `notes-sync-*`，把当前个人资料库 owner 两类 preflight 与账号行里遗留的连接层码（auth / permission / network / rate_limited / server）清零（数据层码原样保留，游标不动），已连接且权限在时补建 `drive-sync-periodic` 并触发一次不节流整轮。到期删常量、三个辅助、函数与调用行，同时删 background.js onAlarm 里 `PBP_DRIVE_LEGACY_ALARMS.includes(alarm.name)` 的旧名路由与 vocab-gdrive.js 的该常量（先 grep 确认已无引用）、`shared.js` `pbpIsNeverClearKey` 中的 `driveSyncVocabulary` / `driveSyncNotes` 两个旧 key；`tests/drive-migration-tests.html` 整页删除并撤 `.qa-scan/run-test.mjs` 对应一行（20）。锁旧名路由的另外三处断言同步撤：`tests/background-lifecycle-tests.html` 的「legacy vocab-sync-* and notes-sync-* alarms route to the unified boot」整条（计数减 1）及其 router harness 注入的 `PBP_DRIVE_LEGACY_ALARMS`，`tests/vocab-background-tests.html`「all three drive-sync alarm names and the legacy names are routed」与 `tests/vocab-gdrive-tests.html`「one drive schedule replaces the per-dataset alarms」各删掉 `PBP_DRIVE_LEGACY_ALARMS` 那一项（条数不变）；`PBP_DRIVE_CONNECTION_ERRORS` 仍被 runner 使用，保留。

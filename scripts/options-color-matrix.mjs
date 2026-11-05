@@ -9,7 +9,7 @@
 //     print every (theme, selector, prop) pair whose value changed
 //
 // Not wired into verify.sh / pre-commit -- this is a one-off review-response
-// artifact (matches CLAUDE.md's precedent for scripts/ecdict-import-perf.mjs).
+// artifact (matches rules/dict-pack.md's precedent for scripts/ecdict-import-perf.mjs).
 import { createServer } from "node:http";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve, dirname, extname } from "node:path";

@@ -10,7 +10,8 @@
 //   3. English prose dash ban: README.md and docs/privacy.md carry no
 //      spaced em dash (the loudest AI tell; per-locale files follow their
 //      own conventions and are exempt).
-//   4. CLAUDE.md temporary-item expiry: every item under the
+//   4. Temporary-item expiry (.claude/expiring-items.md, moved out of
+//      CLAUDE.md 2026-11-05): every item under the
 //      "## 临时事项" heading that carries a 到期日 must still be in the
 //      future. Prose plus a human memory was the only thing retiring
 //      one-time migrations; this makes the date machine-checkable.
@@ -27,7 +28,7 @@ const EN_PROSE_DASH_BAN = ["README.md", "docs/privacy.md"];
 const errors = [];
 const blocks = {};
 
-// 5. Core features only (user rule, repeated five times by 2026-11-05; CLAUDE.md 发布流程): outward-facing
+// 5. Core features only (user rule, repeated five times by 2026-11-05; CLAUDE.md 「对外材料只讲核心」): outward-facing
 //    feature lists name core features, one sentence each and two at most. The caps below hold today's copy
 //    with little room; a bullet over them gets cut, the caps do not get raised. Lengths are visible
 //    characters after stripping Markdown, by script: CJK runs about half the length of Latin.
@@ -92,8 +93,10 @@ for (const f of EN_PROSE_DASH_BAN) {
   });
 }
 
-// ---- 4. CLAUDE.md temporary items: expiry has a 14-day grace window ----
-// One-time migrations/sweeps are registered under "## 临时事项" with a 到期日.
+// ---- 4. Temporary items: expiry has a 14-day grace window ----
+// One-time migrations/sweeps are registered in TEMP_FILE under "## 临时事项"
+// with a 到期日 (the section left the always-loaded CLAUDE.md on 2026-11-05;
+// .claude/ is neither published by Pages nor packaged into the release ZIP).
 // Retired items are rewritten as a parenthetical history line with no 到期日
 // ("（... 已于 2026-08-26 退役 ...）"), which is why the date has to be read
 // off the 到期日 marker and not off any date in the line. Grace window: an
@@ -101,14 +104,15 @@ for (const f of EN_PROSE_DASH_BAN) {
 // fail the build; overdue by more than 14 days it FAILs, same as a bullet
 // whose 到期日 date is calendar-invalid, or one that carries no 到期日
 // marker at all and isn't the retired parenthetical history form.
+const TEMP_FILE = ".claude/expiring-items.md";
 const TEMP_HEADING = "## 临时事项";
 const TEMP_GRACE_DAYS = 14;
 const HISTORY_FORM = /^-\s*（.*已于\s*\d{4}-\d{2}-\d{2}\s*退役.*）\s*$/;
-const claude = readFileSync("CLAUDE.md", "utf8").split("\n");
+const claude = readFileSync(TEMP_FILE, "utf8").split("\n");
 const tempStart = claude.findIndex((l) => l.startsWith(TEMP_HEADING));
 const warnings = [];
 if (tempStart === -1) {
-  errors.push(`CLAUDE.md: "${TEMP_HEADING}" section is gone (expiry gate has nothing to check)`);
+  errors.push(`${TEMP_FILE}: "${TEMP_HEADING}" section is gone (expiry gate has nothing to check)`);
 } else {
   const rest = claude.slice(tempStart + 1);
   const end = rest.findIndex((l) => l.startsWith("## "));
@@ -127,13 +131,13 @@ if (tempStart === -1) {
     const title = (/^-\s+\*\*(.+?)\*\*/.exec(line) || [])[1] || line.trim().slice(0, 60);
     if (!line.includes("到期日")) {
       if (!HISTORY_FORM.test(line.trim())) {
-        errors.push(`CLAUDE.md:${lineNo}: 临时事项 "${title}" has no 到期日 marker and is not the retired parenthetical history form (（…已于 YYYY-MM-DD 退役…）)`);
+        errors.push(`${TEMP_FILE}:${lineNo}: 临时事项 "${title}" has no 到期日 marker and is not the retired parenthetical history form (（…已于 YYYY-MM-DD 退役…）)`);
       }
       continue;
     }
     const due = /到期日[：:\s]*(\d{4}-\d{2}-\d{2})/.exec(line);
     if (!due) {
-      errors.push(`CLAUDE.md:${lineNo}: 临时事项 "${title}" says 到期日 but carries no YYYY-MM-DD date`);
+      errors.push(`${TEMP_FILE}:${lineNo}: 临时事项 "${title}" says 到期日 but carries no YYYY-MM-DD date`);
       continue;
     }
     const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(due[1]);
@@ -142,15 +146,15 @@ if (tempStart === -1) {
     const calendarValid = new Date(dueUtc).getUTCFullYear() === y &&
       new Date(dueUtc).getUTCMonth() === mo - 1 && new Date(dueUtc).getUTCDate() === d;
     if (!calendarValid) {
-      errors.push(`CLAUDE.md:${lineNo}: 临时事项 "${title}" 到期日 ${due[1]} is not a valid calendar date`);
+      errors.push(`${TEMP_FILE}:${lineNo}: 临时事项 "${title}" 到期日 ${due[1]} is not a valid calendar date`);
       continue;
     }
     const overdueDays = Math.round((todayUtc - dueUtc) / 86400000);
     if (overdueDays <= 0) continue; // not yet due
     if (overdueDays <= TEMP_GRACE_DAYS) {
-      warnings.push(`CLAUDE.md:${lineNo}: 临时事项 "${title}" 到期日 ${due[1]} 已过期（今天 ${today}）：${overdueDays} days overdue; hard failure after ${TEMP_GRACE_DAYS} days`);
+      warnings.push(`${TEMP_FILE}:${lineNo}: 临时事项 "${title}" 到期日 ${due[1]} 已过期（今天 ${today}）：${overdueDays} days overdue; hard failure after ${TEMP_GRACE_DAYS} days`);
     } else {
-      errors.push(`CLAUDE.md:${lineNo}: 临时事项 "${title}" 到期日 ${due[1]} 已过期（今天 ${today}，超期 ${overdueDays} 天，超过 ${TEMP_GRACE_DAYS} 天宽限期），删它或改期`);
+      errors.push(`${TEMP_FILE}:${lineNo}: 临时事项 "${title}" 到期日 ${due[1]} 已过期（今天 ${today}，超期 ${overdueDays} 天，超过 ${TEMP_GRACE_DAYS} 天宽限期），删它或改期`);
     }
   }
 }
@@ -165,4 +169,4 @@ if (errors.length) {
   for (const e of errors) console.error("  - " + e);
   process.exit(1);
 }
-console.log(`[docs-lint] PASS - ${READMES.length} READMEs mirrored (${counts[0].bullets} bullets, ${counts[0].subs} subsections), delimiter policy + EN prose dash ban hold, CLAUDE.md 临时事项 到期日 all in the future`);
+console.log(`[docs-lint] PASS - ${READMES.length} READMEs mirrored (${counts[0].bullets} bullets, ${counts[0].subs} subsections), delimiter policy + EN prose dash ban hold, ${TEMP_FILE} 临时事项 到期日 all in the future`);
