@@ -6315,7 +6315,7 @@ async function _runTagGovBatch(ops, expectedAccount) {
         // Skipped bookmarks don't fail the task — they are listed for manual editing.
         if (res.failed === 0 && op.expectMatch && !(res.written > 0) && res.skipped === 0) {
           // Entity repair: nothing was re-saved, so the posts/all?tag=<literal> guess
-          // (UNVERIFIED live, see tag-gov.js) did not hold for this tag. Say so.
+          // (verified live 2026-11-04, see tag-gov.js) did not hold for this tag. Say so.
           fail++;
           _tagGovProblems.push({ url: "", title: "", kind: "failed", reason: t("tagGovEntityNoMatch"), old: op.old, new: op.new });
         } else if (res.failed === 0) {
@@ -6657,12 +6657,13 @@ async function renderLowCountTags() {
 // rename machinery as a merge (retagBookmarksViaResave via runTagGovOps). Tags are
 // never deleted: the corrupted name disappears once its last bookmark is re-saved.
 //
-// UNVERIFIED LIVE (2026-11-04), by design surfaced rather than assumed:
-//  (1) posts/all?tag=<stored literal> may not match the corrupted tag -> the op
-//      re-saves nothing, which runTagGovBatch reports as a failed row
-//      (op.expectMatch + res.written === 0), never as success;
-//  (2) tags/get may not list corrupted tags under their literal names -> the scan
-//      reports "nothing found" instead of repairing anything.
+// Verified live 2026-11-04 (run 2743a0db): tags/get listed the broken tags,
+// posts/all?tag=<literal> matched them, and the repair saved clean tags without
+// touching other fields. Still UNVERIFIED live as of 2026-11-04: multi-level
+// entities (`&amp;quot;`), a repaired name colliding with an existing clean tag,
+// and cancelling midway. If posts/all?tag= ever stops matching, the op re-saves
+// nothing, which runTagGovBatch reports as a failed row (op.expectMatch +
+// res.written === 0), never as success.
 let _tagGovEntityItems = [];
 
 function _tagGovEntityStatus(text, bad = false) {

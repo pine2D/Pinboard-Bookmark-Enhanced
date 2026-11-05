@@ -431,11 +431,13 @@ function pbpTagGovApplyShiftRange(boxes, anchorIdx, clickIdx) {
 // same table as shared.js PBP_PINBOARD_TAG_ENTITIES (this file stays standalone
 // so the test page can load it alone; the options-side tests assert the two agree).
 //
-// UNVERIFIED LIVE (2026-11-04), both stated again at the call sites:
-//  (1) whether posts/all?tag=<stored literal> matches the corrupted tag, and
-//  (2) whether tags/get lists corrupted tags under their literal names.
-// The repair is designed to fail visibly if either guess is wrong: (2) shows up
-// as "nothing found", (1) as a row marked failed (op.expectMatch).
+// Verified live 2026-11-04 (run 2743a0db, authorization 2026-11-04-pinboard-repair):
+//  (1) posts/all?tag=<stored literal> matches the corrupted tag, and
+//  (2) tags/get lists corrupted tags under their literal names (in ~10s);
+// the repair saved clean tags and left the other bookmark fields unchanged.
+// Still UNVERIFIED live as of 2026-11-04: multi-level entities (`&amp;quot;`), a
+// repaired name colliding with an existing clean tag (merge), and cancelling midway.
+// The repair still fails visibly if (1) ever stops holding (op.expectMatch).
 const PBP_TAG_GOV_ENTITY_MAP = Object.freeze({ quot: '"', lt: "<", gt: ">", amp: "&", "#39": "'" });
 const PBP_TAG_GOV_ENTITY_RE = /&(quot|lt|gt|amp|#39);/;
 const PBP_TAG_GOV_ENTITY_RE_G = /&(quot|lt|gt|amp|#39);/g;
@@ -481,7 +483,7 @@ function pbpTagGovFindEntityTags(counts) {
 }
 
 // Rename ops for runTagGovOps. expectMatch makes "the re-save found nothing to
-// change" a visible failure instead of a silent success (see UNVERIFIED (1)).
+// change" a visible failure instead of a silent success (guards the posts/all?tag= match verified 2026-11-04).
 function pbpTagGovBuildEntityPlan(items) {
   return (Array.isArray(items) ? items : [])
     .filter((it) => it && typeof it.tag === "string" && it.tag && typeof it.repaired === "string" && it.repaired)

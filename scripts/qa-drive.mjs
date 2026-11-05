@@ -682,14 +682,27 @@ class Reporter {
     const ev = (kind, text) => s._events.push({ kind, text });
     const onConsole = (m) => { if (m.type() === "error") { s.consoleErrors.push(m.text()); ev("console", m.text()); } };
     const onPageError = (e) => { s.pageErrors.push(e.message); ev("pageerror", e.message); };
+    // A reload right after load aborts the old document's in-flight fetches
+    // (e.g. i18n.js messages.json): that is the driver's own navigation, not a
+    // page error. Chromium reports no navigation request for extension pages, so
+    // we key off the main-frame commit time: an ERR_ABORTED within 500ms of one
+    // (or before the next one's load) is attributed to the navigation.
+    let lastNavAt = 0;
+    const onNavigated = (f) => { if (f === page.mainFrame()) lastNavAt = Date.now(); };
     const onRequestFailed = (r) => {
+      if (r.failure()?.errorText === "net::ERR_ABORTED" && Date.now() - lastNavAt < 500) {
+        const note = `aborted by navigation: ${r.url()}`;
+        s.notes.push(note); ev("note", note);
+        return;
+      }
       const line = `requestfailed: ${r.url()} (${r.failure()?.errorText || "?"})`;
       s.consoleErrors.push(line); ev("requestfailed", line);
     };
     page.on("console", onConsole);
     page.on("pageerror", onPageError);
     page.on("requestfailed", onRequestFailed);
-    return () => { page.off("console", onConsole); page.off("pageerror", onPageError); page.off("requestfailed", onRequestFailed); };
+    page.on("framenavigated", onNavigated);
+    return () => { page.off("console", onConsole); page.off("pageerror", onPageError); page.off("requestfailed", onRequestFailed); page.off("framenavigated", onNavigated); };
   }
   _record(s, state, file, page) {
     const cursor = s._lastCursor || 0;
