@@ -176,7 +176,7 @@
     "message": "KI-Tags"
   },
   "urlWarning": {
-    "message": "Diese URL wird nicht unterstützt und kann nicht als Lesezeichen gespeichert werden."
+    "message": "Diese Seite kann nicht als Lesezeichen gespeichert werden."
   },
   "urlCannotSave": {
     "message": "Speichern nicht möglich: nicht unterstützte URL"
@@ -195,7 +195,7 @@
   },
   "saveMergedExisting": {"message": "Diese URL war bereits gespeichert. Die Änderungen wurden mit dem vorhandenen Lesezeichen zusammengeführt."},
   "saveMergedKarakeepNote": {"message": "Karakeep hat es aus dem Archiv geholt und den Speicherzeitpunkt aktualisiert."},
-  "saveMergedLinkdingOverwrite": {"message": "Diese URL war in linkding bereits gespeichert. Titel, Beschreibung, Notizen, „Später lesen“ und Freigabe des vorhandenen Lesezeichens wurden durch deine Eingaben ersetzt, seine Tags durch diese hier."},
+  "saveMergedLinkdingOverwrite": {"message": "Diese URL war schon in linkding. Das Lesezeichen enthält jetzt alles, was du hier eingegeben hast, auch die Tags."},
   "bookmarkSaved": {
     "message": "Lesezeichen gespeichert."
   },
@@ -232,7 +232,7 @@
   },
   "confirmLogoutDetail": {"message": "Dein API-Token wird entfernt. Nicht gespeicherte Lesezeichenentwürfe werden verworfen."},
   "confirmLogoutDetailKarakeep": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden entfernt. Nicht gespeicherte Lesezeichenentwürfe werden verworfen."},
-  "confirmLogoutDetailLinkding": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden entfernt. Nicht gespeicherte Lesezeichenentwürfe werden verworfen. Eine erneute Verbindung gilt auch mit gleicher Adresse und gleichem Token als neue Verbindung; noch wartende Speicherungen der bisherigen werden nicht automatisch wiederholt."},
+  "confirmLogoutDetailLinkding": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden entfernt. Nicht gespeicherte Lesezeichenentwürfe werden verworfen. Noch wartende Speicherungen werden nicht wiederholt, auch wenn du dich neu verbindest."},
   "hintCtrlEnter": {
     "message": "Strg+Eingabe"
   },
@@ -604,7 +604,7 @@
     }
   },
   "batchTagTooLongSkip": {
-    "message": ". $COUNT$ ohne Tags gespeichert: Das Tag „$TAG$“ ist länger als die $MAX$ Zeichen, die linkding erlaubt. Das Tag kürzen, „Bereits gespeicherte URLs überspringen“ ausschalten und die Stapelspeicherung erneut starten oder das Tag im Popup für jede Seite einzeln ergänzen.",
+    "message": ". $COUNT$ ohne Tags gespeichert: „$TAG$“ ist länger als die $MAX$ Zeichen, die linkding erlaubt. Kürze das Tag, schalte „Bereits gespeicherte URLs überspringen“ aus und starte die Stapelspeicherung erneut.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -940,7 +940,7 @@
     "message": "Diese Seite konnte nicht extrahiert werden. Bitte erneut versuchen."
   },
   "mdSiteTargetMissing": {
-    "message": "Der gewünschte Beitrag ist noch nicht vollständig geladen oder konnte nicht eindeutig erkannt werden. Öffne die Originalseite und versuche es erneut, sobald der Beitrag angezeigt wird."
+    "message": "Der Beitrag ist noch nicht geladen oder wurde nicht gefunden. Öffne die Seite, warte, bis der Beitrag erscheint, und versuche es erneut."
   },
   "mdEngineTabGone": {
     "message": "Der ursprüngliche Tab ist nicht mehr verfügbar. Öffne die Seite erneut, um Defuddle zu nutzen."
@@ -1071,7 +1071,7 @@
     "message": "Keine Notizen entsprechen diesem Filter."
   },
   "notesHiddenByOwner": {
-    "message": "Einige Markierungen gehören zu früheren Bibliotheken und wurden nicht in diese persönliche Bibliothek übernommen."
+    "message": "Einige Markierungen gehören zu einer älteren Bibliothek und werden hier nicht angezeigt."
   },
   "notesUnknownPage": {
     "message": "Unbekannte Seite"
@@ -1194,7 +1194,10 @@
     "message": "Notizen im Popup"
   },
   "optAutoDescription": {
-    "message": "Seitenbeschreibung automatisch einfügen: in linkding als Beschreibung, sonst nur ohne Textauswahl als Notiz"
+    "message": "Seitenbeschreibung automatisch einfügen"
+  },
+  "optAutoDescriptionHint": {
+    "message": "In linkding kommt sie in die Beschreibung. Bei anderen Diensten kommt sie in die Notizen, aber nur, wenn kein Text ausgewählt ist."
   },
   "optBlockquote": {
     "message": "Ausgewählten Text als Zitat kennzeichnen"
@@ -1209,7 +1212,7 @@
     "message": "Schreibweise vorhandener Tags übernehmen"
   },
   "optRespectTagCaseHint": {
-    "message": "Unterscheiden sich Varianten eines Tags nur durch Groß- und Kleinschreibung, Leerzeichen, Bindestriche oder Unterstriche, wird die am häufigsten verwendete Schreibweise übernommen. Tags, die bereits am Lesezeichen stehen, bleiben unverändert."
+    "message": "Hat ein Tag mehrere Schreibweisen, etwa JavaScript und javascript, wird die verwendet, die du am häufigsten nutzt. Tags, die schon an einem Lesezeichen stehen, ändern sich nicht."
   },
   "optShowSuggestTags": {
     "message": "Pinboard-Tagvorschläge im Popup anzeigen"
@@ -1223,17 +1226,11 @@
   "optShowQuickLinks": {
     "message": "Schnelllinks im Popup anzeigen"
   },
-  "optShowQuickLinksHint": {
-    "message": "Links zu Sets, Netzwerk, Ungelesen, Notizen und Beliebt."
-  },
   "optShowQuickRow": {
     "message": "Schnellaktionsschaltflächen im Popup anzeigen"
   },
-  "optShowQuickRowHint": {
-    "message": "Die Schaltflächen „Tab-Set speichern“, „Stapelspeicherung“ und „Leseansicht“."
-  },
   "tagSyncLabel": {
-    "message": "Tag-Cache-Strategie"
+    "message": "Tags für die Autovervollständigung laden"
   },
   "tagSyncCached": {
     "message": "Zwischengespeichert"
@@ -1245,16 +1242,13 @@
     "message": "Immer aktuell"
   },
   "tagSyncFreshDesc": {
-    "message": "Wird bei jedem Öffnen des Popups abgerufen; langsamer."
+    "message": "Lädt bei jedem Öffnen des Popups neu. Langsamer."
   },
   "tagSyncPrewarmed": {
-    "message": "Vorgewärmt"
+    "message": "Im Hintergrund"
   },
   "tagSyncPrewarmedDesc": {
-    "message": "Wird alle 15 Minuten im Hintergrund abgerufen, das Popup öffnet sofort."
-  },
-  "tagSyncHint": {
-    "message": "Wähle, wann vorhandene Tags zur Autovervollständigung geladen werden. Dabei werden keine Tags auf dem Server geändert."
+    "message": "Aktualisiert alle 15 Minuten, damit das Popup sofort öffnet."
   },
   "labelTagPresets": {
     "message": "Tag-Vorlagen"
@@ -1292,14 +1286,11 @@
   "backupIncludeVocabularyLabel": {
     "message": "Vokabeln in Sicherungen einschließen"
   },
-  "backupIncludeVocabularyHint": {
-    "message": "Enthält nur Vokabeln der persönlichen Bibliothek."
-  },
   "backupIncludeSecretsLabel": {
     "message": "API-Schlüssel und Tokens in Sicherungen einschließen"
   },
   "backupIncludeSecretsHint": {
-    "message": "Schreibt sämtliche Zugangsdaten im Klartext in die Datei: deine API-Tokens für Pinboard, Karakeep und linkding, die Zugangsdaten des Zugangs-Gateways, alle API-Schlüssel der KI-Anbieter sowie die Zugangsdaten für Jina, Wayback, Anki, Eudic, Notion, Gist und Webhook. Wer die Datei öffnet, kann sie direkt verwenden. Bewahre die Datei wie ein Passwort auf."
+    "message": "Deine Tokens für Pinboard, Karakeep und linkding sowie alle anderen Schlüssel und Zugangsdaten werden im Klartext gespeichert. Wer die Datei hat, kann sie verwenden."
   },
   "backupSecretsExportTitle": {"message": "Sicherung mit Zugangsdaten exportieren?"},
   "backupSecretsExportConfirm": {
@@ -1321,13 +1312,13 @@
     "message": "Diese Sicherung enthält Zugangsdaten im Klartext. Nur importieren, wenn die Herkunft der Datei vertrauenswürdig ist."
   },
   "backupVocabOwnerMissing": {
-    "message": "Vokabeln wurden nicht einbezogen, weil keine persönliche Bibliothek verfügbar ist. Die anderen ausgewählten Daten wurden exportiert."
+    "message": "Vokabeln fehlen, weil die persönliche Bibliothek nicht verfügbar ist. Alles andere, was du ausgewählt hast, wurde exportiert."
   },
   "backupHighlightsOwnerMissing": {
-    "message": "Kontogebundene Markierungen und Notizen wurden nicht einbezogen, weil keine persönliche Bibliothek verfügbar ist. Die anderen ausgewählten Daten wurden exportiert."
+    "message": "Markierungen und Notizen aus der persönlichen Bibliothek fehlen, weil sie nicht verfügbar ist. Alles andere, was du ausgewählt hast, wurde exportiert."
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "Vokabeln sowie kontogebundene Markierungen und Notizen wurden nicht einbezogen, weil keine persönliche Bibliothek verfügbar ist. Die anderen ausgewählten Daten wurden exportiert."
+    "message": "Vokabeln, Markierungen und Notizen aus der persönlichen Bibliothek fehlen, weil sie nicht verfügbar ist. Alles andere, was du ausgewählt hast, wurde exportiert."
   },
   "backupPreviewTitle": {
     "message": "Importvorschau"
@@ -1530,7 +1521,7 @@
     "message": "Nicht festgelegt"
   },
   "qsAutoNotes": {
-    "message": "Seitenbeschreibung einfügen: in linkding als Beschreibung, sonst nur ohne Textauswahl als Notiz"
+    "message": "Seitenbeschreibung einfügen"
   },
   "qsBlockquote": {
     "message": "Ausgewählten Text als Zitat kennzeichnen"
@@ -1545,7 +1536,7 @@
     "message": "KI-Tags automatisch generieren"
   },
   "qsAiSummary": {
-    "message": "KI-Zusammenfassung automatisch einfügen: in linkding als Beschreibung, sonst als Notiz"
+    "message": "KI-Zusammenfassung automatisch erstellen"
   },
   "secReadLater": {
     "message": "Später lesen"
@@ -1560,7 +1551,7 @@
     "message": "Tags (kommagetrennt)"
   },
   "batchTagsHint": {
-    "message": "Trenne mehrere Tags durch Kommas. Leerzeichen innerhalb eines neuen Tags werden durch das Trennzeichen für mehrteilige Tags ersetzt (einstellbar unter KI-Verhalten). Beispiel: batch_saved, research"
+    "message": "Leerzeichen in einem neuen Tag werden durch das Trennzeichen für mehrteilige Tags ersetzt (einstellbar unter KI-Verhalten). Beispiel: batch_saved, research"
   },
   "batchAiTags": {
     "message": "KI-Tags für jeden Tab automatisch generieren"
@@ -1680,10 +1671,10 @@
     "message": "Workspace-ID (optional)"
   },
   "hintQwenRegion": {
-    "message": "Ein API-Schlüssel gilt nur in seiner Region: Ein Schlüssel aus einer anderen Region wird abgelehnt (401). Drittanbietermodelle wie DeepSeek und Kimi gibt es nur in Peking."
+    "message": "Wähle die Region, in der dein API-Schlüssel erstellt wurde. DeepSeek, Kimi und andere Drittanbietermodelle gibt es nur in Peking."
   },
   "hintQwenWorkspace": {
-    "message": "Mit einer Workspace-ID gehen Anfragen an deren eigene Adresse. Tokio hat keine gemeinsame Adresse und braucht eine ID."
+    "message": "Für die Region Tokio erforderlich."
   },
   "hintOpenAIBaseUrl": {
     "message": "Ändern, um einen Proxy oder einen kompatiblen Endpunkt zu nutzen"
@@ -1817,7 +1808,7 @@
     "message": "Erweiterungsseiten folgen dem Pinboard-Preset"
   },
   "popupFollowHint": {
-    "message": "Eingeschaltet verwenden Popup, diese Einstellungsseite und die Bibliothek die Farben des gewählten Pinboard-Presets; ausgeschaltet die Standardpalette im oben gewählten Hell-/Dunkelmodus. Die Leseansicht behält immer ihre eigene Lesepalette."
+    "message": "Popup, Einstellungen und Bibliothek übernehmen die Farben deines Pinboard-Presets. Die Leseansicht behält ihre eigenen Farben."
   },
   "optFollowNeedsPreset": {
     "message": "Wähle zuerst unten ein Pinboard-Preset. Bei „Kein Preset“ gibt es keine Palette zum Übernehmen."
@@ -1830,7 +1821,7 @@
       }
     }
   },
-  "optThemeHint": { "message": "Schaltet Popup, diese Einstellungsseite, die Bibliothek und die Leseansicht zwischen Hell und Dunkel um. Presets mit eigenem Farbschema (z. B. Dracula) überschreiben dies auf den Seiten, die dem Preset folgen; die Leseansicht kann es im „Aa“-Fenster je Gerät überschreiben." },
+  "optThemeHint": { "message": "Gilt für Popup, Einstellungen, Bibliothek und Leseansicht. Presets mit eigenem Hell- oder Dunkelschema wie Dracula haben Vorrang. Die Leseansicht kann es auch im „Aa“-Fenster festlegen." },
   "secPopupElements": {
     "message": "Popup-Elemente"
   },
@@ -2113,7 +2104,7 @@
     "message": "Bezeichnung"
   },
   "hintCustomBaseUrlAnthropic": {
-    "message": "An diese URL wird /messages angehängt. Gib den Versionsteil mit an, etwa …/v1"
+    "message": "Mit der Version enden, etwa …/v1. Kein /messages anhängen."
   },
   "aiCustomBaseUrlInvalid": {
     "message": "Verwende eine https://-Adresse (http:// nur für localhost). Diese Adresse wurde nicht gespeichert."
@@ -2563,14 +2554,8 @@
   "optUrlCleanOnOpen": {
     "message": "Beim Öffnen des Popups bereinigen"
   },
-  "optUrlCleanOnOpenHint": {
-    "message": "Geschieht still; über „Rückgängig“ im Popup bekommst du die ursprüngliche URL zurück."
-  },
   "optUrlCleanOnPaste": {
     "message": "Beim Einfügen einer URL bereinigen"
-  },
-  "optUrlCleanOnPasteHint": {
-    "message": "Ein Hinweis mit „Rückgängig“ erscheint, falls du die ursprüngliche URL behalten willst."
   },
   "optUrlCleanAggressive": {
     "message": "Aggressiver Modus: auch ref, si, igshid und Ähnliches entfernen (kann manche Links unbrauchbar machen)"
@@ -2672,7 +2657,7 @@
     "message": "Als privat gespeicherte Lesezeichen nie bei archive.org archivieren"
   },
   "waybackSelfHostedPrivateHint": {
-    "message": "Karakeep-Lesezeichen und nicht geteilte linkding-Lesezeichen gelten als privat und werden standardmäßig nicht automatisch archiviert. Beim Speichern kannst du „Archivieren“ manuell auswählen oder „Als privat gespeicherte Lesezeichen nie bei archive.org archivieren“ ausschalten."
+    "message": "Karakeep-Lesezeichen und nicht geteilte linkding-Lesezeichen gelten als privat und werden daher nicht automatisch archiviert. Wähle beim Speichern „Archivieren“ oder schalte „Als privat gespeicherte Lesezeichen nie bei archive.org archivieren“ aus."
   },
   "waybackPermDenied": {
     "message": "Zum Archivieren ist Zugriff auf web.archive.org nötig, der nicht erteilt wurde. Aktiviere das Archivieren erneut, um ihn anzufordern."
@@ -2895,7 +2880,7 @@
     "message": "Übrig gebliebene Entity-Codes in Tags"
   },
   "tagGovEntityHint": {
-    "message": "Beim Reparieren wird jedes Lesezeichen mit einem ausgewählten Tag neu gespeichert und der Tag durch den reparierten Namen ersetzt. Das lässt sich nicht rückgängig machen; vor deiner Bestätigung ändert sich nichts."
+    "message": "Beim Reparieren wird das Tag an allen Lesezeichen umbenannt, die es tragen. Das lässt sich nicht rückgängig machen."
   },
   "tagGovEntityScan": {
     "message": "Tags scannen"
@@ -2913,7 +2898,7 @@
     "message": "wird mit vorhandenem Tag zusammengeführt"
   },
   "tagGovEntityConfirm": {
-    "message": "$N$ Tags reparieren? Die zugehörigen Lesezeichen werden mit dem reparierten Namen neu gespeichert. Tags, die solchen Text wirklich enthalten sollen, vorher abwählen.",
+    "message": "$N$ Tags reparieren? Wähle Tags ab, die diesen Text behalten sollen.",
     "placeholders": {
       "N": {
         "content": "$1"
@@ -3055,7 +3040,7 @@
     "message": "Überspringen"
   },
   "optBgSaveModeSkipDesc": {
-    "message": "Nichts geschieht; das gespeicherte Lesezeichen bleibt unverändert."
+    "message": "Das Lesezeichen bleibt, wie es ist."
   },
   "optBgSaveModeOverwrite": {
     "message": "Überschreiben"
@@ -3785,11 +3770,11 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Nach dem Verbinden synchronisiert dieses Gerät Vokabeln, Markierungen und Notizen, vollständige KI-Wörterbucheinträge samt Ergänzungen sowie gespeicherte Gespräche mit ihren Quellenauszügen für die persönliche Bibliothek."
+      "message": "Synchronisiert deine Vokabeln, Markierungen, Notizen, KI-Wörterbucheinträge und gespeicherten Ask-Gespräche."
     },
     "vocabDriveConnectionHint": { "message": "Verbinde jedes Gerät einzeln. Google Drive synchronisiert keine Einstellungen oder Zugangsdaten." },
     "vocabDriveDisclosure": {
-      "message": "Kopien liegen im privaten Google-Drive-Ordner der Erweiterung als Klartext vor, ohne Ende-zu-Ende-Verschlüsselung. Neben den gespeicherten Inhalten können sie die für Ergänzungen verwendeten Lernpräferenzen, zitierte Auszüge, Quell-URLs, Titel und Zeitangaben enthalten."
+      "message": "Deine Daten liegen als Klartext ohne Ende-zu-Ende-Verschlüsselung in einem privaten Ordner in deinem Google Drive. Dazu gehören auch Quell-URLs, Titel, Zeitangaben und Lernpräferenzen."
     },
     "vocabDriveLoading": {
       "message": "Google-Drive-Synchronisierungsstatus wird geladen…"
@@ -4653,7 +4638,7 @@
   "diagnosticsCopied": { "message": "Diagnose kopiert" },
   "diagnosticsCopyFailed": { "message": "Die Diagnose konnte nicht kopiert werden. Prüfe den Zugriff auf die Zwischenablage und versuche es erneut." },
   "libraryVocabSignedOutTitle": { "message": "Für Vokabeln anmelden" },
-  "libraryVocabSignedOutHint": { "message": "Vokabeln, Markierungen, Notizen und Ask-Verlauf bleiben für alle Lesezeichendienste in derselben persönlichen Bibliothek." },
+  "libraryVocabSignedOutHint": { "message": "Deine Vokabeln, Markierungen, Notizen und dein Ask-Verlauf bleiben gleich, egal welchen Lesezeichendienst du nutzt." },
   "libraryVocabOpenSettings": { "message": "Kontoeinstellungen öffnen" },
   "libraryLookupSignedOutHint": { "message": "Schlag Wörter im Bereich „Wörterbuch“ nach. Melde dich an, um sie in den Vokabeln zu speichern." },
   "mdPreviewClose": { "message": "Leser schließen" },
@@ -4831,7 +4816,7 @@
   "mdExportContextChanged": {"message": "Das Konto, der Artikel oder das Gespräch hat sich geändert. Starte den Export erneut."},
   "themeGroupAdaptiveHint": {"message": "Adaptive Presets folgen der Hell-/Dunkeleinstellung oben unter „Darstellung der Erweiterung“."},
   "dictDefinitionLangLabel": { "message": "Definitionssprache der KI-Einträge" },
-  "dictDefinitionLangHint": {"message": "KI-Einträge und Ergänzungen werden standardmäßig in deiner Muttersprache erklärt. Ist keine angegeben, gilt die Oberflächensprache. Eine hier gewählte Sprache hat Vorrang. Wörterbuchdefinitionen und Zitate bleiben in ihrer Originalsprache."},
+  "dictDefinitionLangHint": {"message": "KI-Einträge verwenden standardmäßig deine Muttersprache, ohne Angabe die Oberflächensprache. Wörterbuchdefinitionen und Zitate bleiben in ihrer Originalsprache."},
   "dictDefinitionLangUi": {"message": "Muttersprache verwenden"},
   "vocabLanguageFilterAria": { "message": "Nach Sprache filtern" },
   "vocabAllLanguages": { "message": "Alle Sprachen" },
@@ -4848,13 +4833,13 @@
   "dictAnkiFormatLabel": { "message": "Anki-Notizformat" },
   "dictAnkiFormatLegacy": { "message": "Original (sechs Felder)" },
   "dictAnkiFormatMultilingual": { "message": "Mehrsprachig (vollständige Angaben)" },
-  "dictAnkiFormatHint": { "message": "Das mehrsprachige Format nutzt einen eigenen Notiztyp und kann zusätzliche Karten neben den bisherigen anlegen. Erneutes Senden überspringt vorhandene Notizen, statt sie zu aktualisieren." },
+  "dictAnkiFormatHint": { "message": "Das mehrsprachige Format hat einen eigenen Notiztyp, daher können vorhandene Wörter eine zweite Karte bekommen. Erneutes Senden überspringt vorhandene Notizen und aktualisiert sie nicht." },
   "dictExportCompleteTsv": { "message": "Vollständige TSV exportieren" },
   "dictExportLegacyTsv": { "message": "TSV mit sechs Feldern exportieren" },
   "vocabCompleteExportHint": { "message": "Die vollständige TSV enthält Sprache, Grundform, Notizen und alle Kontexte mit ihren Quellen. Zum Wiederherstellen in dieser Erweiterung dient die JSON-Sicherung." },
   "dictAnkiModelMismatchNamed": {"message": "Der Notiztyp „$MODEL$“ in Anki hat andere Felder. Stelle seine ursprünglichen Felder wieder her oder benenne ihn um, damit ein neuer Notiztyp erstellt werden kann. Versuche es dann erneut.", "placeholders": {"model": {"content": "$1"}}},
   "multiPackSection": {"message": "Mehrsprachige Offline-Wörterbücher"},
-  "multiPackHint": {"message": "Importiere ein ZIP-Wörterbuch im Format Yomitan v3. Definitionen und Ausspracheangaben bleiben auf diesem Gerät. Stile, Bilder und Audio werden nicht importiert."},
+  "multiPackHint": {"message": "Importiere ein Yomitan-v3-Wörterbuch (ZIP). Es bleibt auf diesem Gerät. Stile, Bilder und Audio werden nicht importiert."},
   "multiPackBrowse": {"message": "Wörterbuchdateien finden"},
   "multiPackChoose": {"message": "ZIP-Datei auswählen"},
   "multiPackEmpty": {"message": "Keine mehrsprachigen Wörterbücher installiert."},
@@ -4864,7 +4849,7 @@
   "multiPackLanguageHint": {"message": "Verwende Sprachcodes wie de, en oder zh-Hant. Prüfe vor dem Import beide Sprachen."},
   "multiPackSourceUrl": {"message": "Quell-URL (optional)"},
   "multiPackLicense": {"message": "Lizenzangabe (optional)"},
-  "multiPackLicenseHint": {"message": "Diese Angaben stammen aus der Datei oder deinen Änderungen. Prüfe die Bedingungen der Quelle, bevor du die Inhalte nutzt oder weitergibst."},
+  "multiPackLicenseHint": {"message": "Prüfe die Bedingungen des Wörterbuchs, bevor du seine Inhalte nutzt oder weitergibst."},
   "multiPackInspecting": {"message": "Wörterbuchangaben werden gelesen…"},
   "multiPackPreview": {"message": "Wörterbuch prüfen"},
   "multiPackInstall": {"message": "Wörterbuch importieren"},
@@ -4874,8 +4859,6 @@
   "multiPackDisable": {"message": "Deaktivieren"},
   "multiPackAllowAi": {"message": "KI-Nutzung erlauben"},
   "multiPackBlockAi": {"message": "KI-Nutzung stoppen"},
-  "multiPackAiHint": {"message": "Die KI-Nutzung ist standardmäßig ausgeschaltet. Erlaube sie nur, wenn die Bedingungen der Quelle das Senden von Definitionen an deinen konfigurierten KI-Anbieter gestatten."},
-  "multiPackAiConfirm": {"message": "Darf dieses Wörterbuch bei der Nutzung der KI-Unterstützung Definitionen an deinen konfigurierten KI-Anbieter senden? Prüfe, ob seine Bedingungen dies erlauben."},
   "multiPackSummary": {"message": "$SOURCE$ / $TARGET$ · Einträge: $COUNT$ · $REVISION$", "placeholders": {"source": {"content": "$1"}, "target": {"content": "$2"}, "count": {"content": "$3"}, "revision": {"content": "$4"}}},
   "multiPackNotDeclared": {"message": "Nicht angegeben"},
   "multiPackCancelled": {"message": "Import abgebrochen. Installierte Wörterbücher bleiben unverändert."},
@@ -4890,7 +4873,6 @@
   "dictOnlineLanguageUnavailable": {"message": "Die Online-Suche ist für diese Sprache nicht verfügbar."},
   "dictTagReading": {"message": "Aussprache"},
   "dictAssistRecommend": {"message": "Bedeutung mit KI finden"},
-  "dictAssistExplain": {"message": "Bedeutung mit KI erklären"},
   "dictAssistUseMeaning": {"message": "Diese Wörterbuchbedeutung auswählen"},
   "dictAssistNeedContext": {"message": "Um eine passende Bedeutung zu finden, schlage das Wort in einem Satz nach oder öffne ein gespeichertes Wort mit einem Quellsatz."},
   "dictAssistChooseMeaning": {"message": "Wähle eine Wörterbuchbedeutung aus, um sie erklären zu lassen."},
@@ -4907,7 +4889,6 @@
   "dictAssistFailed": {"message": "Die KI konnte diese Anfrage nicht abschließen. Versuche es erneut."},
   "dictAssistAllowedSources": {"message": "Es werden nur Wörterbuchquellen berücksichtigt, die für die KI freigegeben sind."},
   "dictAssistAnalyze": {"message": "Mit KI analysieren"},
-  "dictAssistAnalysisHint": {"message": "Analysiere den ausgewählten Ausdruck anhand seines Quellsatzes."},
   "dictAssistAnalysisNeedsMatch": {"message": "Der ausgewählte Ausdruck wurde in diesem Satz nicht gefunden. Schlage die dort verwendete Form nach."},
   "dictAssistAnalysisEmpty": {"message": "In diesem Satz wurde keine belegbare Grundform oder Wendung gefunden."},
   "dictAssistLemmaSuggestion": {"message": "Mögliche Grundform"},
@@ -4934,15 +4915,14 @@
   "dictEntryShowAi": {"message": "KI-Eintrag anzeigen"},
   "dictEntryNotCached": {"message": "Dieser Eintrag konnte nicht gespeichert werden. Lass die Suche geöffnet und versuche das Speichern erneut."},
   "dictAiAutoGenerateLabel": {"message": "KI-Einträge automatisch erstellen"},
-  "dictAiAutoGenerateHint": {"message": "Wenn kein KI-Eintrag zwischengespeichert ist, erstellt das KI-Modell der Leseansicht beim Nachschlagen einen neuen. Das verbraucht Tokens. Standardmäßig aus; Einträge lassen sich auch manuell erstellen."},
   "dictDefaultViewLabel": {"message": "Standardansicht beim Nachschlagen"},
-  "dictDefaultViewHint": {"message": "Wörterbuchergebnisse stehen immer oben. Hier legst du fest, wie der KI-Eintrag darunter zuerst erscheint: Eingeklappt ist ein gespeicherter Eintrag eine Zeile, die du aufklappen kannst; die beiden anderen Optionen zeigen ihn direkt an. Nur „bei Bedarf erstellen“ verbraucht automatisch Tokens."},
+  "dictDefaultViewHint": {"message": "Wörterbuchergebnisse stehen immer oben. Nur „bei Bedarf erstellen“ verbraucht von selbst Tokens."},
   "dictDefaultDictionary": {"message": "Gespeicherte KI-Einträge einklappen"},
   "dictDefaultAiSaved": {"message": "Gespeicherte KI-Einträge anzeigen"},
   "dictDefaultAiGenerate": {"message": "KI-Einträge anzeigen, bei Bedarf erstellen"},
   "dictLearnerNativeLanguageLabel": {"message": "Muttersprache (optional)"},
   "dictLearnerNativeLanguagePlaceholder": {"message": "Zum Beispiel Spanisch"},
-  "dictLearnerProfileHint": {"message": "Die Muttersprache bestimmt die voreingestellte KI-Erklärungssprache und hilft bei Wortvergleichen. Das Lernniveau beeinflusst Schwierigkeit und Beispiele. Diese Einstellungen lösen keine Generierung aus."},
+  "dictLearnerProfileHint": {"message": "Danach richten KI-Einträge Erklärungssprache und Schwierigkeit aus. Änderungen verbrauchen keine Tokens."},
   "dictLearnerLevelLabel": {"message": "Sprachniveau (optional)"},
   "dictLearnerLevelUnspecified": {"message": "Nicht angegeben"},
   "dictLearnerLevelBeginner": {"message": "Anfänger"},
@@ -4954,7 +4934,7 @@
   "dictLearningUsagePoints": {"message": "Gebrauchshinweise"},
   "dictLearningEtymology": {"message": "Herkunft"},
   "dictExamplesTitle": {"message": "Belege aus Originaltexten"},
-  "dictExamplesHint": {"message": "Sucht auf Wikisource nach Originalsätzen mit diesem Wort – ohne KI-Anfrage und ohne Übersetzung."},
+  "dictExamplesHint": {"message": "Sätze aus Wikisource, nicht übersetzt. Ohne KI."},
   "dictExamplesFind": {"message": "Belege in Originaltexten suchen"},
   "dictExamplesNone": {"message": "Bei dieser Suche wurde kein überprüfbarer Originaltext gefunden."},
   "dictNegRetry": {"message": "Zuletzt nichts gefunden · Erneut versuchen"},
@@ -4987,7 +4967,7 @@
   "dictEntryRetrySave": {"message": "Speichern erneut versuchen"},
   "driveDictionaryStatus": {"message": "KI-Einträge: $STATUS$", "placeholders": {"status": {"content": "$1"}}},
   "driveDictionaryErrorEntryTooLarge": {"message": "Ein KI-Eintrag ist zu groß zum Synchronisieren. Die lokale Kopie bleibt erhalten. Klicke zum Wiederholen auf „Jetzt synchronisieren“."},
-  "dictSupplementUnsupported": {"message": "Die KI konnte keine fundierte Ergänzung liefern. Eine KI-Anfrage wurde ausgeführt."},
+  "dictSupplementUnsupported": {"message": "Die KI konnte das nicht mit Quellen belegen. Die Anfrage hat trotzdem Tokens verbraucht."},
   "askNewConversation": {"message": "Neues Gespräch"},
   "askHistory": {"message": "Gesprächsverlauf"},
   "askTemporary": {"message": "Dieses temporäre Gespräch nicht speichern"},
@@ -5019,37 +4999,37 @@
   "driveAskErrorEntryTooLarge": {"message": "Eine Antwort überschreitet die Größenbegrenzung für die Synchronisierung. Sie bleibt auf diesem Gerät gespeichert."},
   "askHistoryUnavailable": {"message": "Dieses Gespräch wurde gelöscht oder ist auf diesem Gerät nicht verfügbar. Ein neues Gespräch starten, um fortzufahren."},
   "askHistoryKeysMove": {"message": "Vorheriges oder nächstes Gespräch"},
-  "dictMeaningDefaultHelp": {"message": "Eine Definition ist bereits ausgewählt und kann direkt gespeichert werden. Wählst du eine andere, bleibt deine Auswahl während dieser Suche erhalten."},
-  "dictMeaningManualHelp": {"message": "Die ausgewählte Definition wird gespeichert. Deine Auswahl bleibt während dieser Suche erhalten."},
-  "dictMeaningSavedHelp": {"message": "Die gespeicherte Definition wird nicht automatisch geändert. Wähle eine Definition aus, um dieses gespeicherte Wort zu aktualisieren."},
-  "dictMeaningChooseHelp": {"message": "Wähle eine Definition zum Speichern aus. Deine Auswahl bleibt während dieser Suche erhalten."},
+  "dictMeaningDefaultHelp": {"message": "Diese Definition wird gespeichert. Du kannst eine andere wählen."},
+  "dictMeaningManualHelp": {"message": "Die gewählte Definition wird gespeichert."},
+  "dictMeaningSavedHelp": {"message": "Wähle eine Definition, um die gespeicherte zu ersetzen."},
+  "dictMeaningChooseHelp": {"message": "Wähle eine Definition zum Speichern."},
   "dictMeaningChange": {"message": "Ändern"},
   "dictFullEntry": {"message": "Vollständiger Eintrag"},
-  "dictFullEntryOnlyHint": {"message": "Dieser Eintrag wurde noch nicht in einzelne Definitionen aufgeteilt. Du kannst den vollständigen Eintrag lesen oder eine Definition aus einem anderen Wörterbuch zum Speichern auswählen."},
-  "multiPackReimportHint": {"message": "Importiere dasselbe Wörterbuch erneut, um seine Bedeutungsstruktur neu auszuwerten. Gespeicherte Vokabeln und der Aktivierungsstatus des Wörterbuchs bleiben unverändert."},
+  "dictFullEntryOnlyHint": {"message": "Dieser Eintrag hat keine einzelnen Definitionen. Wähle zum Speichern ein anderes Wörterbuch."},
+  "multiPackReimportHint": {"message": "Importiere das Wörterbuch erneut, um seine Definitionen zu aktualisieren. Deine gespeicherten Vokabeln und ob es ein- oder ausgeschaltet ist, ändern sich nicht."},
   "dictEntryFormation": {"message": "Wortbildung"},
   "dictEntryHistory": {"message": "Historische Herkunft"},
-  "dictEntryNoHistory": {"message": "Keine überprüfbare Quelle zur Wortherkunft verfügbar. Angezeigt werden nur Wortbildung und Wortbeziehungen."},
+  "dictEntryNoHistory": {"message": "Keine verlässliche Quelle zur Herkunft dieses Worts gefunden. Angezeigt werden nur Wortbestandteile und verwandte Wörter."},
   "dictEntryRelationFamily": {"message": "Wortfamilie"},
   "dictEntryRelationCognate": {"message": "Gemeinsamer Ursprung"},
   "dictEntryRelationSynonym": {"message": "Ähnliche Bedeutung"},
   "dictEntryRelationTopic": {"message": "Gleiches Thema"},
   "dictSupplementLanguage": {"message": "Erklärungssprache: $LANGUAGE$", "placeholders": {"language": {"content": "$1"}}},
   "dictSupplementEtymology": {"message": "Wortherkunft und verwandte Wörter"},
-  "dictEtymologyHint": {"message": "Erklärt auf Anfrage Wortbildung, Herkunft und verwandte Wörter. Historische Aussagen stützen sich nur auf abgerufene Quellen."},
+  "dictEtymologyHint": {"message": "Wortbestandteile, Herkunft und verwandte Wörter. Die Herkunft stützt sich nur auf gefundene Quellen."},
   "dictEtymologyGenerating": {"message": "Wortherkunft wird erstellt…"},
   "dictSupplementPartial": {"message": "Beibehalten: $ACCEPTED$. Wegen nicht bestandener Prüfung ausgelassen: $OMITTED$.", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
   "dictSupplementOriginal": {"message": "KI-verfasste Beispiele"},
   "dictSupplementMeaning": {"message": "Hier gemeint: $MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "Ergänzung aktualisieren"},
-  "dictSupplementUpdateHint": {"message": "Erzeugt eine neue Version und verbraucht Tokens. Frühere Ergebnisse bleiben erhalten und werden bei verbundener Drive-Synchronisierung mitgespeichert."},
+  "dictSupplementUpdateHint": {"message": "Verbraucht Tokens. Das alte Ergebnis bleibt erhalten."},
   "dictSupplementPrevious": {"message": "Frühere Ergebnisse"},
-  "dictSupplementLegacy": {"message": "Früheres Ergebnis, noch nicht nach den neuen Inhaltskriterien geprüft."},
+  "dictSupplementLegacy": {"message": "Älteres Ergebnis. Es wurde nicht wie neue Ergebnisse geprüft."},
   "dictSupplementWrongLanguage": {"message": "Die Erklärung ist nicht in der eingestellten Sprache. Sie wurde nicht gespeichert; du kannst sie erneut erzeugen."},
-  "dictSupplementInvalid": {"message": "Erforderliche Inhalte fehlen oder ein Zitat ließ sich nicht überprüfen. Das Ergebnis wurde nicht gespeichert; versuche es erneut."},
+  "dictSupplementInvalid": {"message": "Das Ergebnis war unvollständig oder ein Zitat ließ sich nicht prüfen. Es wurde nicht gespeichert. Versuche es erneut."},
   "dictSupplementSourceVerified": {"message": "Mit dem Originaltext abgeglichen"},
   "dictEntryUpdate": {"message": "Eintrag aktualisieren"},
-  "dictEntryUpdateHint": {"message": "Erzeugt den Eintrag neu und verbraucht Tokens. Frühere Ergebnisse bleiben erhalten."},
+  "dictEntryUpdateHint": {"message": "Verbraucht Tokens. Der alte Eintrag bleibt erhalten."},
   "dictPaidActionHint": {"message": "Ruft die KI auf und verbraucht Tokens."},
   "dictResize": {"message": "Größe des Wörterbuchfensters ändern"},
   "dictResizeWidth": {"message": "Breite"},
@@ -5068,11 +5048,11 @@
   "dictSupplementRetrieving": {"message": "Quellen werden gesucht …"},
   "dictSupplementChecking": {"message": "Generierte Inhalte werden geprüft …"},
   "dictSupplementSaving": {"message": "Ergänzung wird gespeichert…"},
-  "dictGenerationTruncated": {"message": "Das Modell hat die Antwort nicht abgeschlossen. Das Ergebnis wurde nicht gespeichert. Versuche es erneut oder wähle in den Einstellungen ein anderes KI-Modell für den Reader."},
+  "dictGenerationTruncated": {"message": "Die Antwort brach ab und wurde nicht gespeichert. Versuche es erneut oder wähle in den Einstellungen ein anderes KI-Modell für die Leseansicht."},
   "dictGenerationRefused": {"message": "Das Modell hat die Anfrage abgelehnt oder die Ausgabe blockiert. Das Ergebnis wurde nicht gespeichert."},
-  "dictGenerationEmpty": {"message": "Das Modell hat keinen Antworttext geliefert. Dieses Ergebnis wurde nicht gespeichert. Versuche es erneut oder wähle in den Einstellungen ein anderes KI-Modell für die Leseansicht."},
-  "dictGenerationModelUnavailable": {"message": "Der Anbieter konnte das gewählte Modell nicht finden oder verwenden. Prüfe den Modellnamen und die Verfügbarkeit und passe das KI-Modell für die Leseansicht in den Einstellungen an."},
-  "dictGenerationBilling": {"message": "Der Anbieter hat diese Anfrage abgelehnt (HTTP 402). Prüfe dort dein Kontingent, den Abrechnungsstatus und die Zugriffsrechte deines Kontos, bevor du es erneut versuchst."},
+  "dictGenerationEmpty": {"message": "Das Modell hat nichts geliefert. Versuche es erneut oder wähle in den Einstellungen ein anderes KI-Modell für die Leseansicht."},
+  "dictGenerationModelUnavailable": {"message": "Der Anbieter kann dieses Modell nicht verwenden. Prüfe in den Einstellungen den Namen des KI-Modells für die Leseansicht."},
+  "dictGenerationBilling": {"message": "Der Anbieter hat die Anfrage abgelehnt (HTTP 402). Prüfe dort dein Guthaben oder deinen Tarif."},
   "dictGenerationServiceUnavailable": {"message": "Der Dienst des Anbieters ist vorübergehend nicht erreichbar. Versuche es später erneut."},
   "dictProgressThinking": {"message": "Das Modell denkt nach…"},
   "dictProgressStreaming": {"message": "Antwort wird empfangen…"},
@@ -5083,14 +5063,11 @@
   "bookmarkServiceChoose": {
     "message": "Speicherort für Lesezeichen wählen"
   },
-  "bookmarkServiceHint": {
-    "message": "Popup, Lesemodus, Tastenkürzel und Stapelspeicherung verwenden diesen Dienst."
-  },
   "personalLibraryTitle": {
     "message": "Persönliche Bibliothek"
   },
   "personalLibraryHint": {
-    "message": "Vokabeln, Markierungen, Notizen und Ask-Verlauf bleiben für alle Lesezeichendienste in derselben persönlichen Bibliothek."
+    "message": "Deine Vokabeln, Markierungen, Notizen und dein Ask-Verlauf bleiben gleich, egal welchen Lesezeichendienst du nutzt."
   },
   "bookmarkServerUrl": {
     "message": "Server-URL"
@@ -5105,7 +5082,7 @@
     "message": "Die Website-URL einschließlich Unterpfad angeben. Außer für localhost ist HTTPS erforderlich."
   },
   "bookmarkTokenLocalHint": {
-    "message": "Token und Gateway-Zugangsdaten bleiben in diesem Browser und gehen nur an diesen Server. Auf deine anderen Geräte gelangen sie nur, wenn du API-Schlüssel und Tokens synchronisierst."
+    "message": "Token und Gateway-Zugangsdaten bleiben in diesem Browser und gehen nur an diesen Server. Andere Geräte erhalten sie nur, wenn du API-Schlüssel und Tokens synchronisierst."
   },
   "bookmarkKarakeepTokenHelp": {
     "message": "Erstelle in Karakeep unter „Benutzereinstellungen → API-Schlüssel“ einen neuen Schlüssel mit vollem Zugriff. Er wird nur einmal angezeigt, kopiere ihn also sofort hierher."
@@ -5123,25 +5100,25 @@
     "message": "Seiteninfos schon beim Surfen laden"
   },
   "optLinkdingPreloadHint": {
-    "message": "Das Symbol in der Symbolleiste zeigt dann für jede geöffnete Seite, ob sie schon in linkding liegt, und das Popup öffnet ohne Wartezeit. Der Preis: Jede besuchte Adresse geht an deinen linkding-Server und landet in dessen Protokoll, und der Server ruft die Seite selbst auf. Ist die Option aus, fragt die Erweiterung linkding nur, wenn du das Popup öffnest."
+    "message": "Das Symbol in der Symbolleiste zeigt, ob eine Seite schon gespeichert ist. Dafür geht jede besuchte Adresse an deinen linkding-Server, der die Seite dann selbst aufruft."
   },
   "optLinkdingBrowserMetadata": {
     "message": "Seitentitel und Beschreibung aus dem Browser übernehmen"
   },
   "optLinkdingBrowserMetadataHint": {
-    "message": "Ein neues Lesezeichen übernimmt Titel und Beschreibung so, wie dein Browser die Seite zeigt. Ist die Option aus, kommen sie stattdessen aus dem, was dein linkding-Server auf der Seite gelesen hat. Das kann abweichen, wenn sich eine Seite nach dem Laden ändert oder eine Anmeldung verlangt."
+    "message": "Ist die Option aus, liest linkding Titel und Beschreibung selbst von der Seite. Bei Seiten mit Anmeldung oder Seiten, die sich nach dem Laden ändern, kann das Ergebnis abweichen."
   },
   "optLinkdingSingleFile": {
     "message": "Nach dem Hinzufügen eines Lesezeichens SingleFile ausführen"
   },
   "optLinkdingSingleFileHint": {
-    "message": "Wenn das Popup oder ein Schnellspeichern ein neues Lesezeichen anlegt, speichert SingleFile eine vollständige Kopie der Seite, und linkding legt dafür keinen eigenen HTML-Snapshot an. Du brauchst linkding ab Version 1.39 und die Erweiterung SingleFile. Stelle in deren Optionen als Ziel (destination) den Upload über eine REST-Formular-API ein und trage ein: als URL deine linkding-Adresse gefolgt von /api/bookmarks/singlefile/ (mit der bloßen linkding-Adresse schlägt der Upload fehl); als Autorisierungstoken (authorization token) das API-Token von der Einstellungsseite von linkding, ohne das Präfix „Token“; als Datenfeldname (data field name) file und als URL-Feldname (URL field name) url. SingleFile lädt die Seite selbst zu deinem linkding hoch; diese Erweiterung bekommt die Datei nie zu sehen."
+    "message": "Erfordert linkding ab Version 1.39 und die Erweiterung SingleFile. Stelle in den SingleFile-Optionen als Ziel (destination) den Upload über eine REST-Formular-API ein und trage ein: URL = deine linkding-Adresse + /api/bookmarks/singlefile/; Autorisierungstoken (authorization token) = dein linkding-API-Token ohne das Präfix „Token“; Datenfeldname (data field name) = file; URL-Feldname (URL field name) = url."
   },
   "optLinkdingSingleFileDocs": {
     "message": "linkding-Anleitung zum Archivieren mit SingleFile"
   },
   "optCheckBookmarkStatusLinkding": {
-    "message": "Mit linkding zeigt das Symbol in der Symbolleiste nur dann, ob eine Seite gespeichert ist, wenn „Seiteninfos schon beim Surfen laden“ eingeschaltet ist. Den Schalter findest du in den linkding-Verbindungseinstellungen im Tab „Konto“."
+    "message": "Schalte bei linkding zusätzlich „Seiteninfos schon beim Surfen laden“ im Tab „Konto“ ein."
   },
   "bookmarkGatewayLabel": {
     "message": "Zugangs-Gateway"
@@ -5184,7 +5161,7 @@
     "message": "Wert"
   },
   "bookmarkGatewayNoneHint": {
-    "message": "Nur nötig, wenn vor dem Server ein Gateway mit Anmeldung steht, etwa Cloudflare Access. Bei direktem Zugriff auf den Server bleibt die Einstellung auf „Keines“."
+    "message": "Nur nötig, wenn vor dem Server ein Anmelde-Gateway wie Cloudflare Access steht."
   },
   "bookmarkGatewayHeaderNameN": {
     "message": "Name von Header $N$",
@@ -5210,7 +5187,7 @@
     "message": "Ungültiger Header-Name. Bis zu 64 Buchstaben, Ziffern und Bindestriche verwenden, z. B. X-Auth-Token."
   },
   "bookmarkGatewayErrNameForbidden": {
-    "message": "Dieser Header lässt sich hier nicht festlegen: Der Browser verwaltet ihn, oder die Erweiterung sendet ihn selbst (z. B. Authorization oder Cookie)."
+    "message": "Header wie Authorization und Cookie sind hier nicht erlaubt."
   },
   "bookmarkGatewayErrDuplicate": {
     "message": "Jeder Header-Name darf nur einmal vorkommen (Groß- und Kleinschreibung zählt nicht)."
@@ -5251,7 +5228,7 @@
     "message": "In den Einstellungen den Zugriff auf diesen Server erlauben und erneut verbinden."
   },
   "bookmarkKarakeepHint": {
-    "message": "„Später lesen“ verwendet eine eigene private Liste. Als gelesen markierte Lesezeichen werden daraus entfernt. Der Archivstatus im Dienst bleibt unverändert."
+    "message": "„Später lesen“ ist eine private Liste in Karakeep. Als gelesen markierte Lesezeichen verschwinden aus der Liste, ihr Archivstatus bleibt gleich."
   },
   "bookmarkReadLaterListName": {
     "message": "Später lesen"
@@ -5264,13 +5241,13 @@
   "bookmarkPartialSavePopupReadLater": {"message": "Das Lesezeichen wurde gespeichert, „Später lesen“ aber nicht geändert. Klicke erneut auf „Aktualisieren“, um es nachzuholen."},
   "bookmarkPartialSavePopupBookmark": {"message": "Titel und Notizen wurden nicht aktualisiert, das Lesezeichen ist unverändert. Klicke erneut auf „Aktualisieren“, um deine Änderungen zu übernehmen."},
   "bookmarkErrGatewayRedirect": {
-    "message": "Der Server hat die Anfrage umgeleitet. Prüfe zuerst Adresse und Port: Sie müssen auf Karakeep oder linkding selbst zeigen. Stimmt beides, leitet vielleicht ein Zugangs-Gateway mit Anmeldung wie Cloudflare Access um. Dann unter „Zugangs-Gateway“ ein Service-Token eintragen oder den API-Pfad im Gateway freigeben."
+    "message": "Der Server hat die Anfrage umgeleitet. Prüfe, ob Adresse und Port auf Karakeep oder linkding selbst zeigen. Stimmt das, leitet vielleicht ein Anmelde-Gateway um: Trage unter „Zugangs-Gateway“ ein Service-Token ein oder gib den API-Pfad im Gateway frei."
   },
   "bgTabSetPinboardOnly": {"message": "Tab-Sets funktionieren nur mit Pinboard. Stelle dafür in den Einstellungen den Lesezeichen-Dienst auf Pinboard um."},
   "bookmarkDisconnect": {"message": "Trennen"},
   "bookmarkDisconnectConfirm": {"message": "Verbindung zu diesem Dienst trennen?"},
   "bookmarkDisconnectDetail": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden aus diesem Browser entfernt. Mit „Verbinden“ kannst du dich jederzeit neu verbinden."},
-  "bookmarkDisconnectDetailLinkding": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden aus diesem Browser entfernt. Eine erneute Verbindung gilt auch mit gleicher Adresse und gleichem Token als neue Verbindung; noch wartende Speicherungen der bisherigen werden nicht automatisch wiederholt."},
+  "bookmarkDisconnectDetailLinkding": {"message": "Dein API-Token und die Zugangsdaten des Zugangs-Gateways werden aus diesem Browser entfernt. Noch wartende Speicherungen werden nicht wiederholt, auch wenn du dich neu verbindest."},
   "bookmarkDisconnected": {"message": "Getrennt"},
   "bookmarkDisconnectFailed": {"message": "Trennen fehlgeschlagen: Die Änderung wurde nicht gespeichert. Bitte erneut versuchen."},
   "bookmarkServicePending": {"message": "Lesezeichen werden weiter in $ACTIVE$ gespeichert, bis $SERVICE$ verbunden ist.", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
@@ -5282,10 +5259,10 @@
   "backupBookmarkServiceNotConnected": {"message": "Die Sicherung wählt $SERVICE$, das auf diesem Gerät nicht verbunden ist. Lesezeichen werden weiter in $ACTIVE$ gespeichert, bis du $SERVICE$ verbindest.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "Die Sicherung wählt $SERVICE$, das auf diesem Gerät nicht verbunden ist. Gewechselt wird nur, wenn die wiederhergestellten Zugangsdaten die Verbindung herstellen; sonst werden Lesezeichen weiter in $ACTIVE$ gespeichert.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
-    "message": "Eine Sicherheitsprüfung (Bot-Challenge) hat die Anfrage blockiert. Häufige Ursache sind die Sicherheitsregeln von Cloudflare; dort den API-Pfad freigeben."
+    "message": "Eine Bot-Prüfung hat die Anfrage blockiert. Gib den API-Pfad in deinen Sicherheitsregeln frei, etwa bei Cloudflare."
   },
   "bookmarkErrGatewayBasic": {
-    "message": "Ein Proxy vor dem Server verlangt Benutzername und Passwort (Basic). Das lässt sich nicht mit dem Token des Lesezeichendienstes kombinieren, daher den API-Pfad im Proxy freigeben."
+    "message": "Ein Proxy vor dem Server verlangt Benutzername und Passwort, was mit einem Token nicht funktioniert. Gib den API-Pfad im Proxy frei."
   },
   "bookmarkErrGatewayDenied": {
     "message": "Ein Gateway vor dem Server hat die Anfrage abgelehnt. Die Zugangsdaten unter „Zugangs-Gateway“ prüfen und ob die Gateway-Richtlinie sie zulässt. Bei Cloudflare muss die Richtlinie die Aktion Service Auth haben."
@@ -5308,7 +5285,7 @@
     }
   },
   "bgTagTooLongSkip": {
-    "message": "linkding hat die Seite ohne Tags gespeichert: Das Tag „$TAG$“ ist länger als die erlaubten $MAX$ Zeichen. Beim Speichern per Tastenkürzel werden bereits gespeicherte Seiten übersprungen. Das Tag deshalb kürzen und im Popup ergänzen.",
+    "message": "linkding hat die Seite ohne Tags gespeichert: „$TAG$“ ist länger als die erlaubten $MAX$ Zeichen. Kürze das Tag und ergänze es im Popup.",
     "placeholders": {
       "tag": {
         "content": "$1"
@@ -5342,7 +5319,7 @@
     }
   },
   "bookmarkErrTooLarge": {
-    "message": "Die Anfrage war zu groß und wurde abgelehnt (HTTP 413). Ein Reverse Proxy vor dem Server begrenzt womöglich die Anfragegröße, etwa mit client_max_body_size in nginx. Notizen oder Beschreibung kürzen oder das Limit im Proxy erhöhen."
+    "message": "Das Lesezeichen ist zu groß für den Server (HTTP 413). Kürze Notizen oder Beschreibung oder erhöhe das Upload-Limit des Proxys, etwa client_max_body_size in nginx."
   },
   "bookmarkErrInvalidResponse": {
     "message": "Der Lesezeichenserver hat Daten geliefert, die die Erweiterung nicht lesen kann. Prüfen, ob die URL direkt auf Karakeep bzw. linkding zeigt und die Version unterstützt wird."
@@ -5368,6 +5345,6 @@
     "message": "Lesezeichendienst wählen"
   },
   "backupAdoptLibrary": {
-    "message": "Die persönliche Bibliothek ist leer. Beim Wiederherstellen von Vokabeln oder Markierungen wird die Bibliothek der Sicherung übernommen, damit ihre bisherigen Drive-Daten verfügbar bleiben."
+    "message": "Deine persönliche Bibliothek ist leer. Beim Wiederherstellen von Vokabeln oder Markierungen wechselst du deshalb zur Bibliothek der Sicherung. Deren Google-Drive-Daten bleiben verfügbar."
   }
 }

@@ -176,7 +176,7 @@
     "message": "Tags IA"
   },
   "urlWarning": {
-    "message": "Cette URL n’est pas prise en charge et ne peut pas être enregistrée comme signet."
+    "message": "Cette page ne peut pas être enregistrée comme signet."
   },
   "urlCannotSave": {
     "message": "Impossible d'enregistrer : URL non prise en charge"
@@ -195,7 +195,7 @@
   },
   "saveMergedExisting": {"message": "Cette URL était déjà enregistrée. Les modifications ont été fusionnées avec le signet existant."},
   "saveMergedKarakeepNote": {"message": "Karakeep l’a retiré des archives et a actualisé sa date d’enregistrement."},
-  "saveMergedLinkdingOverwrite": {"message": "Cette URL figurait déjà dans linkding. Le titre, la description, les notes, l’état « à lire » et le partage du signet existant ont été remplacés par ce que vous avez saisi ici, et ses tags par ceux-ci."},
+  "saveMergedLinkdingOverwrite": {"message": "Cette URL figurait déjà dans linkding. Ce signet contient maintenant tout ce que vous avez saisi ici, tags compris."},
   "bookmarkSaved": {
     "message": "Signet enregistré."
   },
@@ -232,7 +232,7 @@
   },
   "confirmLogoutDetail": {"message": "Votre jeton API sera supprimé. Les brouillons de signets non enregistrés seront abandonnés."},
   "confirmLogoutDetailKarakeep": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés. Les brouillons de signets non enregistrés seront abandonnés."},
-  "confirmLogoutDetailLinkding": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés. Les brouillons de signets non enregistrés seront abandonnés. Se reconnecter, même avec la même adresse et le même jeton, crée une nouvelle connexion : les enregistrements encore en attente de l’ancienne ne seront pas relancés automatiquement."},
+  "confirmLogoutDetailLinkding": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés. Les brouillons de signets non enregistrés seront abandonnés. Les enregistrements en attente ne seront pas relancés, même si vous vous reconnectez."},
   "hintCtrlEnter": {
     "message": "Ctrl+Entrée"
   },
@@ -604,7 +604,7 @@
     }
   },
   "batchTagTooLongSkip": {
-    "message": ". Signets enregistrés sans tags ($COUNT$) : le tag « $TAG$ » dépasse la limite de $MAX$ caractères de linkding. Raccourcissez-le, désactivez « Ignorer les URL déjà enregistrées » et relancez l’enregistrement groupé, ou ajoutez le tag page par page depuis le popup.",
+    "message": ". Signets enregistrés sans tags ($COUNT$) : « $TAG$ » dépasse la limite de $MAX$ caractères de linkding. Raccourcissez-le, désactivez « Ignorer les URL déjà enregistrées », puis relancez l’enregistrement groupé.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -940,7 +940,7 @@
     "message": "Impossible d'extraire cette page. Veuillez réessayer."
   },
   "mdSiteTargetMissing": {
-    "message": "La publication demandée n’est pas entièrement chargée ou n’a pas pu être identifiée. Ouvrez la page d’origine, attendez qu’elle s’affiche, puis réessayez."
+    "message": "La publication n’est pas encore chargée ou est introuvable. Ouvrez la page, attendez qu’elle s’affiche, puis réessayez."
   },
   "mdEngineTabGone": {
     "message": "L'onglet d'origine n'est plus disponible. Rouvrez la page pour utiliser Defuddle."
@@ -1071,7 +1071,7 @@
     "message": "Aucune note ne correspond à ce filtre."
   },
   "notesHiddenByOwner": {
-    "message": "Certains surlignages appartiennent à d’anciennes bibliothèques et n’ont pas été fusionnés avec cette bibliothèque personnelle."
+    "message": "Certains surlignages appartiennent à une ancienne bibliothèque et ne sont pas affichés ici."
   },
   "notesUnknownPage": {
     "message": "Page inconnue"
@@ -1194,7 +1194,10 @@
     "message": "Notes dans le popup"
   },
   "optAutoDescription": {
-    "message": "Ajouter automatiquement la description de la page : dans la description du signet sur linkding, sinon dans les notes si aucun texte n’est sélectionné"
+    "message": "Ajouter automatiquement la description de la page"
+  },
+  "optAutoDescriptionHint": {
+    "message": "linkding la place dans la description du signet. Les autres services la placent dans les notes, mais seulement si aucun texte n’est sélectionné."
   },
   "optBlockquote": {
     "message": "Mettre le texte sélectionné en citation"
@@ -1209,7 +1212,7 @@
     "message": "Reprendre l’écriture des tags existants"
   },
   "optRespectTagCaseHint": {
-    "message": "Si plusieurs formes d’un tag ne diffèrent que par la casse, les espaces, les traits d’union ou les tirets bas, la forme la plus utilisée est reprise. Les tags déjà présents sur un favori restent inchangés."
+    "message": "Si un tag s’écrit de plusieurs façons, comme JavaScript et javascript, la forme que vous utilisez le plus est retenue. Les tags déjà présents sur un favori ne changent pas."
   },
   "optShowSuggestTags": {
     "message": "Afficher les tags suggérés par Pinboard dans le popup"
@@ -1223,17 +1226,11 @@
   "optShowQuickLinks": {
     "message": "Afficher les liens rapides dans le popup"
   },
-  "optShowQuickLinksHint": {
-    "message": "Liens vers Ensembles, Réseau, Non lu, Notes et Populaire."
-  },
   "optShowQuickRow": {
     "message": "Afficher les boutons d'actions rapides"
   },
-  "optShowQuickRowHint": {
-    "message": "Les boutons Enregistrer l'ensemble d'onglets, Enregistrement groupé et Lecture."
-  },
   "tagSyncLabel": {
-    "message": "Stratégie de cache des tags"
+    "message": "Chargement des tags pour la saisie automatique"
   },
   "tagSyncCached": {
     "message": "En cache"
@@ -1245,16 +1242,13 @@
     "message": "En direct"
   },
   "tagSyncFreshDesc": {
-    "message": "Récupéré à chaque ouverture du popup ; plus lent."
+    "message": "Charge les tags à chaque ouverture du popup. Plus lent."
   },
   "tagSyncPrewarmed": {
-    "message": "Préchauffé"
+    "message": "En arrière-plan"
   },
   "tagSyncPrewarmedDesc": {
-    "message": "Récupéré en arrière-plan toutes les 15 minutes ; le popup s'ouvre instantanément."
-  },
-  "tagSyncHint": {
-    "message": "Choisissez quand charger vos étiquettes pour l’autocomplétion. Leur chargement ne les modifie pas sur le serveur."
+    "message": "Actualise les tags toutes les 15 minutes, pour que le popup s’ouvre aussitôt."
   },
   "labelTagPresets": {
     "message": "Préréglages de tags"
@@ -1292,14 +1286,11 @@
   "backupIncludeVocabularyLabel": {
     "message": "Inclure le vocabulaire dans les sauvegardes"
   },
-  "backupIncludeVocabularyHint": {
-    "message": "Inclut uniquement le vocabulaire du bibliothèque personnelle."
-  },
   "backupIncludeSecretsLabel": {
     "message": "Inclure les clés API et les jetons dans les sauvegardes"
   },
   "backupIncludeSecretsHint": {
-    "message": "Écrit tous les identifiants en clair dans le fichier : jetons API Pinboard, Karakeep et linkding, identifiants de la passerelle d'accès, clés de tous les fournisseurs d'IA, ainsi que les identifiants Jina, Wayback, Anki, Eudic, Notion, Gist et Webhook. Quiconque ouvre le fichier peut les utiliser. Conservez-le comme un mot de passe."
+    "message": "Vos jetons Pinboard, Karakeep et linkding, ainsi que toutes les autres clés et identifiants, sont enregistrés en clair. Toute personne qui a le fichier peut les utiliser."
   },
   "backupSecretsExportTitle": {"message": "Exporter une sauvegarde avec les identifiants ?"},
   "backupSecretsExportConfirm": {
@@ -1321,13 +1312,13 @@
     "message": "Cette sauvegarde contient des identifiants en clair. Ne les importez que si vous avez confiance dans la provenance du fichier."
   },
   "backupVocabOwnerMissing": {
-    "message": "Le vocabulaire n’a pas été inclus, car aucun bibliothèque personnelle n’est disponible. Les autres données sélectionnées ont été exportées."
+    "message": "Le vocabulaire n’a pas été inclus, car la bibliothèque personnelle n’est pas disponible. Tout le reste de votre sélection a été exporté."
   },
   "backupHighlightsOwnerMissing": {
-    "message": "Les surlignages et notes rattachés à un compte n’ont pas été inclus, car aucun bibliothèque personnelle n’est disponible. Les autres données sélectionnées ont été exportées."
+    "message": "Les surlignages et les notes de la bibliothèque personnelle n’ont pas été inclus, car elle n’est pas disponible. Tout le reste de votre sélection a été exporté."
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "Le vocabulaire ainsi que les surlignages et notes rattachés à un compte n’ont pas été inclus, car aucun bibliothèque personnelle n’est disponible. Les autres données sélectionnées ont été exportées."
+    "message": "Le vocabulaire, les surlignages et les notes de la bibliothèque personnelle n’ont pas été inclus, car elle n’est pas disponible. Tout le reste de votre sélection a été exporté."
   },
   "backupPreviewTitle": {
     "message": "Aperçu de l’importation"
@@ -1530,7 +1521,7 @@
     "message": "Non défini"
   },
   "qsAutoNotes": {
-    "message": "Ajouter la description de la page : dans la description du signet sur linkding, sinon dans les notes si aucun texte n’est sélectionné"
+    "message": "Ajouter la description de la page"
   },
   "qsBlockquote": {
     "message": "Mettre le texte sélectionné en citation"
@@ -1545,7 +1536,7 @@
     "message": "Générer automatiquement des tags IA"
   },
   "qsAiSummary": {
-    "message": "Générer automatiquement un résumé IA : dans la description du signet sur linkding, sinon dans les notes"
+    "message": "Générer automatiquement un résumé IA"
   },
   "secReadLater": {
     "message": "À lire"
@@ -1560,7 +1551,7 @@
     "message": "Tags (séparés par des virgules)"
   },
   "batchTagsHint": {
-    "message": "Séparez les tags par des virgules. Dans un nouveau tag, les espaces sont remplacés par le séparateur de tags multi-mots (réglage dans Comportement IA). Ex. : batch_saved, research"
+    "message": "Dans un nouveau tag, les espaces sont remplacés par le séparateur de tags multi-mots (réglage dans Comportement IA). Ex. : batch_saved, research"
   },
   "batchAiTags": {
     "message": "Générer automatiquement des tags IA pour chaque onglet"
@@ -1680,10 +1671,10 @@
     "message": "ID d’espace de travail (facultatif)"
   },
   "hintQwenRegion": {
-    "message": "Une clé n’est valable que dans sa région : une clé d’une autre région est refusée (401). Les modèles tiers comme DeepSeek et Kimi ne sont proposés qu’à Pékin."
+    "message": "Choisissez la région où votre clé a été créée. DeepSeek, Kimi et les autres modèles tiers ne sont proposés qu’à Pékin."
   },
   "hintQwenWorkspace": {
-    "message": "Avec un ID d’espace de travail, les requêtes passent par son adresse dédiée. Tokyo n’a pas d’adresse partagée et en exige un."
+    "message": "Obligatoire pour la région de Tokyo."
   },
   "hintOpenAIBaseUrl": {
     "message": "À modifier pour passer par un proxy ou un endpoint compatible"
@@ -1817,7 +1808,7 @@
     "message": "Les pages de l'extension suivent le thème Pinboard sélectionné"
   },
   "popupFollowHint": {
-    "message": "Lorsque l'option est activée, le popup, cette page de réglages et la bibliothèque utilisent la palette du préréglage Pinboard sélectionné ; lorsqu'elle est désactivée, ils utilisent la palette par défaut dans le mode clair/sombre ci-dessus. La page Lecture conserve toujours sa propre palette de lecture."
+    "message": "Le popup, les réglages et la bibliothèque reprennent les couleurs de votre préréglage Pinboard. La page Lecture garde ses propres couleurs."
   },
   "optFollowNeedsPreset": {
     "message": "Choisissez d’abord un préréglage Pinboard ci-dessous. Avec « Sans préréglage », il n’y a aucune palette à suivre."
@@ -1830,7 +1821,7 @@
       }
     }
   },
-  "optThemeHint": { "message": "Bascule le popup, cette page de réglages, la bibliothèque et la page Lecture entre clair et sombre. Les préréglages dotés de leur propre schéma (Dracula, par exemple) remplacent ce réglage sur les pages qui suivent le préréglage ; la page Lecture permet de le redéfinir sur chaque appareil depuis son panneau « Aa »." },
+  "optThemeHint": { "message": "S’applique au popup, aux réglages, à la bibliothèque et à la page Lecture. Les préréglages dotés de leur propre mode clair ou sombre, comme Dracula, ont la priorité. La page Lecture peut aussi le régler depuis son panneau « Aa »." },
   "secPopupElements": {
     "message": "Éléments du popup"
   },
@@ -2113,7 +2104,7 @@
     "message": "Nom"
   },
   "hintCustomBaseUrlAnthropic": {
-    "message": "/messages est ajouté à cette URL ; indiquez aussi le segment de version, par exemple …/v1"
+    "message": "Terminez par la version, par exemple …/v1. N’ajoutez pas /messages."
   },
   "aiCustomBaseUrlInvalid": {
     "message": "Utilisez une adresse https:// (http:// uniquement pour localhost). Cette adresse n'est pas enregistrée."
@@ -2563,14 +2554,8 @@
   "optUrlCleanOnOpen": {
     "message": "Nettoyer à l'ouverture du popup"
   },
-  "optUrlCleanOnOpenHint": {
-    "message": "Le nettoyage est silencieux ; un lien Annuler dans le popup rétablit l'URL d'origine."
-  },
   "optUrlCleanOnPaste": {
     "message": "Nettoyer au collage d'une URL"
-  },
-  "optUrlCleanOnPasteHint": {
-    "message": "Une notification avec Annuler s'affiche, au cas où vous voudriez garder l'URL d'origine."
   },
   "optUrlCleanAggressive": {
     "message": "Mode agressif : supprimer aussi ref, si, igshid et similaires (peut casser certains liens)"
@@ -2672,7 +2657,7 @@
     "message": "Ne jamais archiver sur archive.org les favoris enregistrés comme privés"
   },
   "waybackSelfHostedPrivateHint": {
-    "message": "Les favoris Karakeep et les favoris linkding non partagés sont considérés comme privés. Par défaut, ils ne sont donc pas archivés automatiquement. À l’enregistrement, vous pouvez cocher « archiver » ou désactiver « Ne jamais archiver sur archive.org les favoris enregistrés comme privés »."
+    "message": "Les favoris Karakeep et les favoris linkding non partagés sont considérés comme privés, donc ils ne sont pas archivés automatiquement. Cochez « archiver » à l’enregistrement, ou désactivez « Ne jamais archiver sur archive.org les favoris enregistrés comme privés »."
   },
   "waybackPermDenied": {
     "message": "L’archivage nécessite l’accès à web.archive.org, qui n’a pas été accordé. Réactivez l’archivage pour le demander."
@@ -2895,7 +2880,7 @@
     "message": "Codes d'entité résiduels dans les étiquettes"
   },
   "tagGovEntityHint": {
-    "message": "La réparation réenregistre chaque favori portant une étiquette sélectionnée et remplace celle-ci par son nom corrigé. C'est irréversible ; rien ne change avant votre confirmation."
+    "message": "La réparation renomme l’étiquette sur tous les favoris qui la portent. C'est irréversible."
   },
   "tagGovEntityScan": {
     "message": "Analyser les étiquettes"
@@ -2913,7 +2898,7 @@
     "message": "rejoint une étiquette existante"
   },
   "tagGovEntityConfirm": {
-    "message": "Réparer $N$ étiquettes ? Leurs favoris seront réenregistrés avec le nom corrigé. Décochez toute étiquette qui doit réellement contenir ce texte.",
+    "message": "Réparer $N$ étiquettes ? Décochez celles qui doivent garder ce texte.",
     "placeholders": {
       "N": {
         "content": "$1"
@@ -3055,7 +3040,7 @@
     "message": "Ignorer"
   },
   "optBgSaveModeSkipDesc": {
-    "message": "Ne fait rien : le favori enregistré reste tel quel."
+    "message": "Le favori reste tel quel."
   },
   "optBgSaveModeOverwrite": {
     "message": "Remplacer"
@@ -3785,11 +3770,11 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Une fois connecté, cet appareil synchronise le vocabulaire, les surlignages et notes, les entrées IA complètes et leurs compléments, ainsi que les conversations enregistrées avec leurs extraits sources pour le bibliothèque personnelle."
+      "message": "Synchronise votre vocabulaire, vos surlignages, vos notes, vos entrées IA du dictionnaire et vos conversations Ask enregistrées."
     },
     "vocabDriveConnectionHint": { "message": "Connectez chaque appareil séparément. Google Drive ne synchronise ni les réglages ni les identifiants." },
     "vocabDriveDisclosure": {
-      "message": "Les copies sont stockées en texte clair dans le dossier privé de l’extension sur Google Drive, sans chiffrement de bout en bout. Outre les contenus enregistrés, elles peuvent inclure les préférences d’apprentissage utilisées pour les compléments, les extraits cités, les URL sources, les titres et les dates."
+      "message": "Vos données sont stockées en texte clair, sans chiffrement de bout en bout, dans un dossier privé de votre Google Drive. Elles incluent les URL sources, les titres, les dates et les préférences d’apprentissage."
     },
     "vocabDriveLoading": {
       "message": "Chargement de l'état de la synchronisation Google Drive…"
@@ -4653,7 +4638,7 @@
   "diagnosticsCopied": { "message": "Diagnostic copié" },
   "diagnosticsCopyFailed": { "message": "Impossible de copier le diagnostic. Vérifiez l’accès au presse-papiers et réessayez." },
   "libraryVocabSignedOutTitle": { "message": "Connectez-vous pour utiliser le vocabulaire" },
-  "libraryVocabSignedOutHint": { "message": "Le vocabulaire, les surlignages, les notes et l’historique Ask restent dans la même bibliothèque, quel que soit le service de favoris." },
+  "libraryVocabSignedOutHint": { "message": "Votre vocabulaire, vos surlignages, vos notes et votre historique Ask restent les mêmes, quel que soit le service de favoris utilisé." },
   "libraryVocabOpenSettings": { "message": "Ouvrir les paramètres du compte" },
   "libraryLookupSignedOutHint": { "message": "Recherchez un mot dans la section « Dictionnaire ». Connectez-vous pour l’enregistrer dans votre vocabulaire." },
   "mdPreviewClose": { "message": "Fermer le lecteur" },
@@ -4831,7 +4816,7 @@
   "mdExportContextChanged": {"message": "Le compte, l’article ou la conversation a changé. Relancez l’export."},
   "themeGroupAdaptiveHint": {"message": "Les préréglages adaptatifs suivent le mode clair ou sombre choisi plus haut dans « Apparence de l’extension »."},
   "dictDefinitionLangLabel": { "message": "Langue des définitions des entrées IA" },
-  "dictDefinitionLangHint": {"message": "Les entrées IA et leurs compléments utilisent par défaut votre langue maternelle, ou celle de l’interface si aucune n’est renseignée. Une langue choisie ici est prioritaire. Les définitions des dictionnaires et les citations gardent leur langue d’origine."},
+  "dictDefinitionLangHint": {"message": "Par défaut, les entrées IA utilisent votre langue maternelle, ou celle de l’interface si aucune n’est renseignée. Les définitions des dictionnaires et les citations gardent leur langue d’origine."},
   "dictDefinitionLangUi": {"message": "Utiliser la langue maternelle"},
   "vocabLanguageFilterAria": { "message": "Filtrer par langue" },
   "vocabAllLanguages": { "message": "Toutes les langues" },
@@ -4848,13 +4833,13 @@
   "dictAnkiFormatLabel": { "message": "Format des notes Anki" },
   "dictAnkiFormatLegacy": { "message": "Original (six champs)" },
   "dictAnkiFormatMultilingual": { "message": "Multilingue (données complètes)" },
-  "dictAnkiFormatHint": { "message": "Le format multilingue utilise un type de note distinct et peut donc ajouter des cartes à côté des anciennes. Un nouvel envoi ignore les notes existantes sans les mettre à jour." },
+  "dictAnkiFormatHint": { "message": "Le format multilingue utilise son propre type de note, donc un mot déjà présent peut avoir une deuxième carte. Un nouvel envoi ignore les notes existantes sans les mettre à jour." },
   "dictExportCompleteTsv": { "message": "Exporter le TSV complet" },
   "dictExportLegacyTsv": { "message": "Exporter le TSV à six champs" },
   "vocabCompleteExportHint": { "message": "Le TSV complet contient la langue, la forme de base, les notes et chaque contexte avec sa source. Utilisez la sauvegarde JSON pour restaurer les données dans l’extension." },
   "dictAnkiModelMismatchNamed": {"message": "Le type de note « $MODEL$ » dans Anki comporte des champs différents. Rétablissez ses champs d’origine ou renommez-le pour permettre la création d’un nouveau type, puis réessayez.", "placeholders": {"model": {"content": "$1"}}},
   "multiPackSection": {"message": "Dictionnaires multilingues hors connexion"},
-  "multiPackHint": {"message": "Importez un dictionnaire ZIP au format Yomitan v3. Les définitions et les prononciations restent sur cet appareil. Les styles, les images et les fichiers audio ne sont pas importés."},
+  "multiPackHint": {"message": "Importez un dictionnaire Yomitan v3 (ZIP). Il reste sur cet appareil. Les styles, les images et l’audio ne sont pas importés."},
   "multiPackBrowse": {"message": "Trouver des fichiers de dictionnaire"},
   "multiPackChoose": {"message": "Choisir un fichier ZIP"},
   "multiPackEmpty": {"message": "Aucun dictionnaire multilingue installé."},
@@ -4864,7 +4849,7 @@
   "multiPackLanguageHint": {"message": "Utilisez des codes de langue, par exemple de, en ou zh-Hant. Vérifiez les deux langues avant l’importation."},
   "multiPackSourceUrl": {"message": "URL de la source (facultatif)"},
   "multiPackLicense": {"message": "Mention de licence (facultatif)"},
-  "multiPackLicenseHint": {"message": "Ces informations proviennent du fichier ou de vos modifications. Vérifiez les conditions de la source avant d’utiliser ou de partager son contenu."},
+  "multiPackLicenseHint": {"message": "Vérifiez les conditions du dictionnaire avant d’utiliser ou de partager son contenu."},
   "multiPackInspecting": {"message": "Lecture des informations du dictionnaire…"},
   "multiPackPreview": {"message": "Vérifier le dictionnaire"},
   "multiPackInstall": {"message": "Importer le dictionnaire"},
@@ -4874,8 +4859,6 @@
   "multiPackDisable": {"message": "Désactiver"},
   "multiPackAllowAi": {"message": "Autoriser l’utilisation par l’IA"},
   "multiPackBlockAi": {"message": "Arrêter l’utilisation par l’IA"},
-  "multiPackAiHint": {"message": "L’utilisation par l’IA est désactivée par défaut. Ne l’autorisez que si les conditions de la source permettent l’envoi des définitions à votre fournisseur d’IA configuré."},
-  "multiPackAiConfirm": {"message": "Autoriser l’envoi des définitions de ce dictionnaire à votre fournisseur d’IA configuré lorsque vous utilisez l’assistance IA ? Vérifiez que ses conditions le permettent."},
   "multiPackSummary": {"message": "$SOURCE$ / $TARGET$ · Entrées : $COUNT$ · $REVISION$", "placeholders": {"source": {"content": "$1"}, "target": {"content": "$2"}, "count": {"content": "$3"}, "revision": {"content": "$4"}}},
   "multiPackNotDeclared": {"message": "Non précisé"},
   "multiPackCancelled": {"message": "Importation annulée. Les dictionnaires installés restent inchangés."},
@@ -4890,7 +4873,6 @@
   "dictOnlineLanguageUnavailable": {"message": "La recherche en ligne n’est pas disponible pour cette langue."},
   "dictTagReading": {"message": "Prononciation"},
   "dictAssistRecommend": {"message": "Trouver le sens avec l’IA"},
-  "dictAssistExplain": {"message": "Expliquer le sens avec l’IA"},
   "dictAssistUseMeaning": {"message": "Sélectionner ce sens du dictionnaire"},
   "dictAssistNeedContext": {"message": "Pour trouver le sens qui convient, recherchez le mot dans une phrase ou ouvrez un mot enregistré avec une phrase source."},
   "dictAssistChooseMeaning": {"message": "Sélectionnez un sens du dictionnaire pour obtenir une explication."},
@@ -4907,7 +4889,6 @@
   "dictAssistFailed": {"message": "L’IA n’a pas pu traiter cette demande. Réessayez."},
   "dictAssistAllowedSources": {"message": "Seules les sources de dictionnaire autorisées pour l’IA sont prises en compte."},
   "dictAssistAnalyze": {"message": "Analyser avec l’IA"},
-  "dictAssistAnalysisHint": {"message": "Analysez l’expression sélectionnée à partir de sa phrase source."},
   "dictAssistAnalysisNeedsMatch": {"message": "L’expression sélectionnée est introuvable dans cette phrase. Recherchez la forme qui y apparaît."},
   "dictAssistAnalysisEmpty": {"message": "Aucune forme de base ni expression étayée par cette phrase n’a été trouvée."},
   "dictAssistLemmaSuggestion": {"message": "Forme de base possible"},
@@ -4934,15 +4915,14 @@
   "dictEntryShowAi": {"message": "Voir l’entrée IA"},
   "dictEntryNotCached": {"message": "Impossible d’enregistrer cette entrée. Gardez cette recherche ouverte et réessayez l’enregistrement."},
   "dictAiAutoGenerateLabel": {"message": "Générer automatiquement les entrées IA"},
-  "dictAiAutoGenerateHint": {"message": "Si aucune entrée IA n’est en cache, le modèle IA de la page Lecture en génère une lors de la recherche. Cela consomme des jetons. Désactivé par défaut ; la génération manuelle reste disponible."},
   "dictDefaultViewLabel": {"message": "Affichage initial du dictionnaire"},
-  "dictDefaultViewHint": {"message": "Les résultats du dictionnaire s’affichent toujours en premier. Ce réglage définit l’affichage initial de l’entrée IA qui les suit : repliée, une entrée enregistrée tient sur une ligne que vous pouvez déplier ; les deux autres options l’affichent directement. Seul le mode « générer si nécessaire » consomme automatiquement des jetons."},
+  "dictDefaultViewHint": {"message": "Les résultats du dictionnaire s’affichent toujours en premier. Seul « générer si nécessaire » consomme des jetons de lui-même."},
   "dictDefaultDictionary": {"message": "Replier les entrées IA enregistrées"},
   "dictDefaultAiSaved": {"message": "Afficher les entrées IA enregistrées"},
   "dictDefaultAiGenerate": {"message": "Afficher les entrées IA, générer si nécessaire"},
   "dictLearnerNativeLanguageLabel": {"message": "Langue maternelle (facultatif)"},
   "dictLearnerNativeLanguagePlaceholder": {"message": "Par exemple : espagnol"},
-  "dictLearnerProfileHint": {"message": "La langue maternelle détermine la langue par défaut des explications IA et aide à adapter les comparaisons. Le niveau règle la difficulté et les exemples. Ces préférences ne déclenchent aucune génération."},
+  "dictLearnerProfileHint": {"message": "Les entrées IA s’en servent pour choisir la langue et la difficulté des explications. Les modifier ne consomme pas de jetons."},
   "dictLearnerLevelLabel": {"message": "Niveau de langue (facultatif)"},
   "dictLearnerLevelUnspecified": {"message": "Non précisé"},
   "dictLearnerLevelBeginner": {"message": "Débutant"},
@@ -4954,7 +4934,7 @@
   "dictLearningUsagePoints": {"message": "Points d’emploi"},
   "dictLearningEtymology": {"message": "Étymologie"},
   "dictExamplesTitle": {"message": "Exemples tirés des textes"},
-  "dictExamplesHint": {"message": "Cherche sur Wikisource des phrases originales contenant ce mot, sans requête IA ni traduction."},
+  "dictExamplesHint": {"message": "Phrases tirées de Wikisource, sans traduction. N’utilise pas l’IA."},
   "dictExamplesFind": {"message": "Chercher des exemples dans les textes"},
   "dictExamplesNone": {"message": "Cette recherche n’a trouvé aucun texte source vérifiable."},
   "dictNegRetry": {"message": "Rien trouvé la dernière fois · Réessayer"},
@@ -4987,7 +4967,7 @@
   "dictEntryRetrySave": {"message": "Réessayer l’enregistrement"},
   "driveDictionaryStatus": {"message": "Entrées IA : $STATUS$", "placeholders": {"status": {"content": "$1"}}},
   "driveDictionaryErrorEntryTooLarge": {"message": "Une entrée IA est trop volumineuse pour être synchronisée. La copie locale est conservée. Cliquez sur « Synchroniser maintenant » pour réessayer."},
-  "dictSupplementUnsupported": {"message": "L’IA n’a pas pu fournir de complément étayé. Une requête IA a bien été effectuée."},
+  "dictSupplementUnsupported": {"message": "L’IA n’a pas pu s’appuyer sur des sources. La requête a tout de même consommé des jetons."},
   "askNewConversation": {"message": "Nouvelle conversation"},
   "askHistory": {"message": "Historique des conversations"},
   "askTemporary": {"message": "Ne pas enregistrer cette conversation temporaire"},
@@ -5019,37 +4999,37 @@
   "driveAskErrorEntryTooLarge": {"message": "Une réponse dépasse la taille maximale de synchronisation. Elle reste enregistrée sur cet appareil."},
   "askHistoryUnavailable": {"message": "Cette conversation a été supprimée ou n’est pas disponible sur cet appareil. Commencez une nouvelle conversation pour continuer."},
   "askHistoryKeysMove": {"message": "Conversation précédente ou suivante"},
-  "dictMeaningDefaultHelp": {"message": "Une définition est déjà sélectionnée et prête à être enregistrée. Si vous en choisissez une autre, votre choix est conservé pendant cette recherche."},
-  "dictMeaningManualHelp": {"message": "La définition sélectionnée sera enregistrée. Votre choix est conservé pendant cette recherche."},
-  "dictMeaningSavedHelp": {"message": "La définition enregistrée ne change pas automatiquement. Choisissez une définition pour mettre à jour ce mot enregistré."},
-  "dictMeaningChooseHelp": {"message": "Choisissez une définition à enregistrer. Votre choix est conservé pendant cette recherche."},
+  "dictMeaningDefaultHelp": {"message": "Cette définition sera enregistrée. Vous pouvez en choisir une autre."},
+  "dictMeaningManualHelp": {"message": "La définition choisie sera enregistrée."},
+  "dictMeaningSavedHelp": {"message": "Choisissez une définition pour remplacer celle qui est enregistrée."},
+  "dictMeaningChooseHelp": {"message": "Choisissez une définition à enregistrer."},
   "dictMeaningChange": {"message": "Changer"},
   "dictFullEntry": {"message": "Entrée complète"},
-  "dictFullEntryOnlyHint": {"message": "Cette entrée n’a pas encore été divisée en définitions distinctes. Vous pouvez la lire en entier ou choisir une définition d’un autre dictionnaire à enregistrer."},
-  "multiPackReimportHint": {"message": "Importez à nouveau le même dictionnaire pour réanalyser la structure de ses définitions. Le vocabulaire enregistré et l’état activé ou désactivé du dictionnaire restent inchangés."},
+  "dictFullEntryOnlyHint": {"message": "Cette entrée n’a pas de définitions distinctes. Pour en enregistrer une, choisissez un autre dictionnaire."},
+  "multiPackReimportHint": {"message": "Importez à nouveau ce dictionnaire pour actualiser ses définitions. Vos mots enregistrés et son état activé ou désactivé ne changent pas."},
   "dictEntryFormation": {"message": "Formation du mot"},
   "dictEntryHistory": {"message": "Origine historique"},
-  "dictEntryNoHistory": {"message": "Aucune source vérifiable sur l’origine du mot. Seules sa formation et ses relations lexicales sont présentées."},
+  "dictEntryNoHistory": {"message": "Aucune source fiable sur l’origine de ce mot. Seuls sa formation et les mots associés sont affichés."},
   "dictEntryRelationFamily": {"message": "Famille de mots"},
   "dictEntryRelationCognate": {"message": "Origine commune"},
   "dictEntryRelationSynonym": {"message": "Sens proche"},
   "dictEntryRelationTopic": {"message": "Même thème"},
   "dictSupplementLanguage": {"message": "Langue des explications : $LANGUAGE$", "placeholders": {"language": {"content": "$1"}}},
   "dictSupplementEtymology": {"message": "Étymologie et mots associés"},
-  "dictEtymologyHint": {"message": "Explique sur demande la formation, l’origine et les mots associés. Les explications historiques reposent uniquement sur les sources consultées."},
+  "dictEtymologyHint": {"message": "Formation, origine et mots associés. L’origine ne repose que sur les sources trouvées."},
   "dictEtymologyGenerating": {"message": "Génération de l’étymologie…"},
   "dictSupplementPartial": {"message": "Points conservés : $ACCEPTED$. Écartés après vérification : $OMITTED$.", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
   "dictSupplementOriginal": {"message": "Exemples rédigés par l’IA"},
   "dictSupplementMeaning": {"message": "Ici, le sens est : $MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "Actualiser ce complément"},
-  "dictSupplementUpdateHint": {"message": "Génère une nouvelle version et consomme des jetons. Les résultats précédents sont conservés et synchronisés lorsque Drive est connecté."},
+  "dictSupplementUpdateHint": {"message": "Consomme des jetons. L’ancien résultat est conservé."},
   "dictSupplementPrevious": {"message": "Résultats précédents"},
-  "dictSupplementLegacy": {"message": "Ancien résultat, non vérifié selon les nouveaux critères de contenu."},
+  "dictSupplementLegacy": {"message": "Ancien résultat, non vérifié comme les nouveaux."},
   "dictSupplementWrongLanguage": {"message": "L’explication n’est pas dans la langue demandée. Elle n’a pas été enregistrée ; vous pouvez la générer à nouveau."},
-  "dictSupplementInvalid": {"message": "Il manque des informations requises ou une citation n’a pas pu être vérifiée. Le résultat n’a pas été enregistré ; vous pouvez réessayer."},
+  "dictSupplementInvalid": {"message": "Le résultat était incomplet ou une citation n’a pas pu être vérifiée, il n’a donc pas été enregistré. Réessayez."},
   "dictSupplementSourceVerified": {"message": "Vérifié dans le texte source"},
   "dictEntryUpdate": {"message": "Actualiser cette entrée"},
-  "dictEntryUpdateHint": {"message": "Génère une nouvelle entrée et consomme des jetons. Les résultats précédents sont conservés."},
+  "dictEntryUpdateHint": {"message": "Consomme des jetons. L’ancienne entrée est conservée."},
   "dictPaidActionHint": {"message": "Appelle l’IA et consomme des jetons."},
   "dictResize": {"message": "Redimensionner la fenêtre du dictionnaire"},
   "dictResizeWidth": {"message": "Largeur"},
@@ -5068,11 +5048,11 @@
   "dictSupplementRetrieving": {"message": "Recherche de sources…"},
   "dictSupplementChecking": {"message": "Vérification du contenu généré…"},
   "dictSupplementSaving": {"message": "Enregistrement du complément…"},
-  "dictGenerationTruncated": {"message": "Le modèle n’a pas terminé sa réponse. Le résultat n’a pas été enregistré. Réessayez ou choisissez un autre modèle d’IA pour le lecteur dans les paramètres."},
+  "dictGenerationTruncated": {"message": "La réponse a été coupée et n’a pas été enregistrée. Réessayez ou choisissez un autre modèle IA pour le lecteur dans les paramètres."},
   "dictGenerationRefused": {"message": "Le modèle a refusé la demande ou bloqué la réponse. Le résultat n’a pas été enregistré."},
-  "dictGenerationEmpty": {"message": "Le modèle n’a renvoyé aucun texte de réponse. Ce résultat n’a pas été enregistré. Réessayez ou choisissez un autre modèle IA pour le lecteur dans les paramètres."},
-  "dictGenerationModelUnavailable": {"message": "Le fournisseur n’a pas pu trouver ou utiliser le modèle choisi. Vérifiez son nom et sa disponibilité, puis modifiez le modèle IA du lecteur dans les paramètres."},
-  "dictGenerationBilling": {"message": "Le fournisseur a refusé cette requête (HTTP 402). Vérifiez auprès de lui votre quota, la facturation et les droits d’accès de votre compte avant de réessayer."},
+  "dictGenerationEmpty": {"message": "Le modèle n’a rien renvoyé. Réessayez ou choisissez un autre modèle IA pour le lecteur dans les paramètres."},
+  "dictGenerationModelUnavailable": {"message": "Le fournisseur ne peut pas utiliser ce modèle. Vérifiez le nom du modèle IA du lecteur dans les paramètres."},
+  "dictGenerationBilling": {"message": "Le fournisseur a refusé la requête (HTTP 402). Vérifiez votre solde ou votre forfait auprès de lui."},
   "dictGenerationServiceUnavailable": {"message": "Le service du fournisseur est temporairement indisponible. Réessayez plus tard."},
   "dictProgressThinking": {"message": "Le modèle réfléchit…"},
   "dictProgressStreaming": {"message": "Réception de la réponse…"},
@@ -5083,14 +5063,11 @@
   "bookmarkServiceChoose": {
     "message": "Choisir où enregistrer les favoris"
   },
-  "bookmarkServiceHint": {
-    "message": "La fenêtre de l’extension, le lecteur, les raccourcis et l’enregistrement par lot utilisent ce service."
-  },
   "personalLibraryTitle": {
     "message": "Bibliothèque personnelle"
   },
   "personalLibraryHint": {
-    "message": "Le vocabulaire, les surlignages, les notes et l’historique Ask restent dans la même bibliothèque, quel que soit le service de favoris."
+    "message": "Votre vocabulaire, vos surlignages, vos notes et votre historique Ask restent les mêmes, quel que soit le service de favoris utilisé."
   },
   "bookmarkServerUrl": {
     "message": "URL du serveur"
@@ -5105,7 +5082,7 @@
     "message": "Indiquez l’URL du site, avec son sous-chemin éventuel. HTTPS est obligatoire, sauf sur localhost."
   },
   "bookmarkTokenLocalHint": {
-    "message": "Le jeton et les identifiants de passerelle restent dans ce navigateur et ne sont envoyés qu'à ce serveur. Ils ne rejoignent vos autres appareils que si vous synchronisez les clés API et les jetons."
+    "message": "Votre jeton et vos identifiants de passerelle restent dans ce navigateur et ne sont envoyés qu'à ce serveur. Vos autres appareils ne les reçoivent que si vous synchronisez les clés API et les jetons."
   },
   "bookmarkKarakeepTokenHelp": {
     "message": "Dans Karakeep, ouvrez Paramètres utilisateur → Clés API et créez une clé avec un accès complet. Elle ne s’affiche qu’une fois : copiez-la tout de suite ici."
@@ -5123,25 +5100,25 @@
     "message": "Charger les infos de la page pendant la navigation"
   },
   "optLinkdingPreloadHint": {
-    "message": "L’icône de la barre d’outils indique alors si chaque page ouverte se trouve déjà dans linkding, et le popup s’ouvre sans attente. En contrepartie, chaque adresse que vous visitez est envoyée à votre serveur linkding et inscrite dans son journal, et le serveur consulte lui-même la page. Option désactivée, linkding n’est interrogé qu’à l’ouverture du popup."
+    "message": "L’icône de la barre d’outils indique si chaque page est déjà enregistrée. Chaque adresse visitée est envoyée à votre serveur linkding, qui consulte ensuite lui-même la page."
   },
   "optLinkdingBrowserMetadata": {
     "message": "Utiliser le titre et la description de la page vus par le navigateur"
   },
   "optLinkdingBrowserMetadataHint": {
-    "message": "Un nouveau signet reprend le titre et la description de la page tels que votre navigateur les affiche. Option désactivée, il reprend ce que votre serveur linkding a lu sur la page, ce qui peut différer pour les pages qui changent après leur chargement ou qui demandent une connexion."
+    "message": "Option désactivée, linkding lit lui-même le titre et la description sur la page. Le résultat peut différer pour les pages qui demandent une connexion ou qui changent après leur chargement."
   },
   "optLinkdingSingleFile": {
     "message": "Lancer SingleFile après l’ajout d’un signet"
   },
   "optLinkdingSingleFileHint": {
-    "message": "Quand le popup ou un enregistrement rapide ajoute un signet, SingleFile enregistre une copie complète de la page, et linkding ne crée pas son propre instantané HTML pour ce signet. Il vous faut linkding 1.39 ou ultérieur et l’extension SingleFile. Dans ses options, choisissez comme destination l’envoi vers une API de formulaire REST, puis renseignez : l’URL, soit l’adresse de votre linkding suivie de /api/bookmarks/singlefile/ (avec la seule adresse de linkding, l’envoi échoue) ; le jeton d’autorisation (authorization token), soit le jeton d’API de la page des réglages de linkding, sans le préfixe « Token » ; le nom du champ de données (data field name), file, et le nom du champ d’URL (URL field name), url. SingleFile envoie lui-même la page à votre linkding ; cette extension ne manipule jamais le fichier."
+    "message": "Nécessite linkding 1.39 ou ultérieur et l’extension SingleFile. Dans les options de SingleFile, choisissez comme destination l’envoi vers une API de formulaire REST, puis renseignez : URL = adresse de votre linkding + /api/bookmarks/singlefile/ ; jeton d’autorisation (authorization token) = votre jeton d’API linkding, sans le préfixe « Token » ; nom du champ de données (data field name) = file ; nom du champ d’URL (URL field name) = url."
   },
   "optLinkdingSingleFileDocs": {
     "message": "Guide linkding sur l’archivage avec SingleFile"
   },
   "optCheckBookmarkStatusLinkding": {
-    "message": "Avec linkding, l’icône de la barre d’outils n’indique si une page figure dans vos signets que lorsque « Charger les infos de la page pendant la navigation » est activé. Cette option se trouve dans les réglages de connexion linkding, onglet Compte."
+    "message": "Avec linkding, activez aussi « Charger les infos de la page pendant la navigation » dans l’onglet Compte."
   },
   "bookmarkGatewayLabel": {
     "message": "Passerelle d’accès"
@@ -5184,7 +5161,7 @@
     "message": "Valeur"
   },
   "bookmarkGatewayNoneHint": {
-    "message": "Nécessaire seulement si une passerelle d’authentification, comme Cloudflare Access, précède le serveur. Si vous accédez directement au serveur, laissez Aucune."
+    "message": "Nécessaire seulement si une passerelle de connexion, comme Cloudflare Access, se trouve devant le serveur."
   },
   "bookmarkGatewayHeaderNameN": {
     "message": "Nom de l’en-tête $N$",
@@ -5210,7 +5187,7 @@
     "message": "Nom d’en-tête non valide. Utilisez au plus 64 lettres, chiffres et traits d’union, par exemple X-Auth-Token."
   },
   "bookmarkGatewayErrNameForbidden": {
-    "message": "Cet en-tête ne peut pas être défini ici : le navigateur le gère, ou l’extension l’envoie déjà (par exemple Authorization ou Cookie)."
+    "message": "Les en-têtes comme Authorization et Cookie ne sont pas autorisés ici."
   },
   "bookmarkGatewayErrDuplicate": {
     "message": "Chaque nom d’en-tête ne peut servir qu’une fois (sans tenir compte de la casse)."
@@ -5251,7 +5228,7 @@
     "message": "Autorisez l’accès à ce serveur dans les paramètres, puis reconnectez-vous."
   },
   "bookmarkKarakeepHint": {
-    "message": "« Lire plus tard » utilise une liste privée dédiée. Marquer un favori comme lu le retire de cette liste sans modifier son état d’archivage dans le service."
+    "message": "« Lire plus tard » est une liste privée dans Karakeep. Marquer un favori comme lu le retire de la liste sans toucher à son état d’archivage."
   },
   "bookmarkReadLaterListName": {
     "message": "Lire plus tard"
@@ -5264,13 +5241,13 @@
   "bookmarkPartialSavePopupReadLater": {"message": "Le signet a été enregistré, mais son état « à lire » n’a pas été modifié. Appuyez de nouveau sur « Mettre à jour » pour terminer."},
   "bookmarkPartialSavePopupBookmark": {"message": "Le titre et les notes n’ont pas été mis à jour : le signet est inchangé. Appuyez de nouveau sur « Mettre à jour » pour appliquer vos modifications."},
   "bookmarkErrGatewayRedirect": {
-    "message": "Le serveur a redirigé la requête. Vérifiez d’abord l’adresse et le port : ils doivent pointer vers Karakeep ou linkding lui-même. Si c’est le cas, une passerelle d’accès qui exige une connexion, comme Cloudflare Access, redirige peut-être la requête. Ajoutez un jeton de service dans « Passerelle d’accès » ou autorisez le chemin de l’API dans la passerelle."
+    "message": "Le serveur a redirigé la requête. Vérifiez que l’adresse et le port pointent vers Karakeep ou linkding lui-même. Si c’est le cas, une passerelle de connexion redirige peut-être la requête : ajoutez un jeton de service dans « Passerelle d’accès » ou autorisez le chemin de l’API dans la passerelle."
   },
   "bgTabSetPinboardOnly": {"message": "Les ensembles d’onglets ne fonctionnent qu’avec Pinboard. Pour les utiliser, choisissez Pinboard comme service de signets dans les réglages."},
   "bookmarkDisconnect": {"message": "Déconnecter"},
   "bookmarkDisconnectConfirm": {"message": "Se déconnecter de ce service ?"},
   "bookmarkDisconnectDetail": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés de ce navigateur. Cliquez sur Connecter pour vous reconnecter à tout moment."},
-  "bookmarkDisconnectDetailLinkding": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés de ce navigateur. Se reconnecter, même avec la même adresse et le même jeton, crée une nouvelle connexion : les enregistrements encore en attente de l’ancienne ne seront pas relancés automatiquement."},
+  "bookmarkDisconnectDetailLinkding": {"message": "Votre jeton API et les identifiants de la passerelle d’accès seront supprimés de ce navigateur. Les enregistrements en attente ne seront pas relancés, même si vous vous reconnectez."},
   "bookmarkDisconnected": {"message": "Déconnecté"},
   "bookmarkDisconnectFailed": {"message": "Déconnexion impossible : la modification n’a pas été enregistrée. Réessayez."},
   "bookmarkServicePending": {"message": "Les favoris continuent d’être enregistrés dans $ACTIVE$ tant que $SERVICE$ n’est pas connecté.", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
@@ -5282,10 +5259,10 @@
   "backupBookmarkServiceNotConnected": {"message": "La sauvegarde choisit $SERVICE$, qui n’est pas connecté sur cet appareil. Les favoris continuent d’être enregistrés dans $ACTIVE$ jusqu’à ce que vous connectiez $SERVICE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "La sauvegarde choisit $SERVICE$, qui n’est pas connecté sur cet appareil. Le changement n’a lieu que si les identifiants restaurés permettent de s’y connecter ; sinon, les favoris continuent d’être enregistrés dans $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
-    "message": "Une vérification de sécurité (test anti-robot) a bloqué la requête. Elle vient souvent des règles de sécurité de Cloudflare ; autorisez-y le chemin de l’API."
+    "message": "Une vérification anti-robot a bloqué la requête. Autorisez le chemin de l’API dans vos règles de sécurité Cloudflare ou autres."
   },
   "bookmarkErrGatewayBasic": {
-    "message": "Un proxy placé devant le serveur demande un nom d’utilisateur et un mot de passe (Basic). Ce mode ne peut pas être combiné avec le jeton du service de signets : autorisez le chemin de l’API dans le proxy."
+    "message": "Un proxy placé devant le serveur demande un nom d’utilisateur et un mot de passe, incompatibles avec un jeton. Autorisez le chemin de l’API dans le proxy."
   },
   "bookmarkErrGatewayDenied": {
     "message": "Une passerelle placée devant le serveur a refusé la requête. Vérifiez les identifiants dans « Passerelle d’accès » et que la stratégie de la passerelle les autorise. Avec Cloudflare, la stratégie doit avoir l’action Service Auth."
@@ -5308,7 +5285,7 @@
     }
   },
   "bgTagTooLongSkip": {
-    "message": "linkding a enregistré cette page sans tags : le tag « $TAG$ » dépasse la limite de $MAX$ caractères. L’enregistrement par raccourci ignore les pages déjà enregistrées : raccourcissez le tag, puis ajoutez-le depuis le popup.",
+    "message": "linkding a enregistré cette page sans tags : « $TAG$ » dépasse la limite de $MAX$ caractères. Raccourcissez le tag, puis ajoutez-le depuis le popup.",
     "placeholders": {
       "tag": {
         "content": "$1"
@@ -5342,7 +5319,7 @@
     }
   },
   "bookmarkErrTooLarge": {
-    "message": "La requête était trop volumineuse et a été refusée (HTTP 413). Un proxy inverse placé devant le serveur limite peut-être la taille des requêtes, par exemple client_max_body_size dans nginx. Raccourcissez les notes ou la description, ou relevez la limite du proxy."
+    "message": "Le signet est trop volumineux pour le serveur (HTTP 413). Raccourcissez les notes ou la description, ou relevez la limite d’envoi du proxy, par exemple client_max_body_size dans nginx."
   },
   "bookmarkErrInvalidResponse": {
     "message": "Le serveur de signets a renvoyé des données que l’extension ne sait pas lire. Vérifiez que l’URL pointe directement vers Karakeep ou linkding et que sa version est prise en charge."
@@ -5368,6 +5345,6 @@
     "message": "Choisir le service de favoris"
   },
   "backupAdoptLibrary": {
-    "message": "La bibliothèque personnelle est vide. Restaurer le vocabulaire ou les surlignages reprendra la bibliothèque de la sauvegarde pour conserver l’accès à ses données Drive."
+    "message": "Votre bibliothèque personnelle est vide. Restaurer le vocabulaire ou les surlignages fera donc passer à la bibliothèque de la sauvegarde. Ses données Google Drive restent accessibles."
   }
 }

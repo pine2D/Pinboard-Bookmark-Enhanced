@@ -1735,7 +1735,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   const contextualHelpKeys = [
     "optSyncHint", "syncApiKeysHint", "backupPlaintextDisclosure",
     "backupIncludeHighlightsHint",
-    "backupIncludeVocabularyHint", "optPopupWidthHelp", "tagSyncHint",
+    "optPopupWidthHelp",
     "tagPresetsHint", "batchTagsHint", "batchAiHint", "hintOpenAIBaseUrl",
     "hintOllamaModel", "hintCustomBaseUrl", "hintCustomKey",
     "freeTierTitle", "freeTierResourcesPrefix", "openrouterTagline", "jinaFreeTierHint",
@@ -1746,10 +1746,10 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     "optWaybackS3Hint", "archiveLogNote",
     "optThemeHint", "popupFollowHint", "customCSSOverlayHelp", "saveAsThemeHint",
     "storageIntro", "diagnosticsHint",
-    "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint",
+    "personalLibraryHint", "bookmarkKarakeepHint",
     "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint",
-    "optUrlCleanOnOpenHint", "optUrlCleanOnPasteHint", "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
-    "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "tagSeparatorHint", "mdExportExtendedMetaHelp",
+    "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
+    "optRespectTagCaseHint", "optAutoDescriptionHint", "tagSeparatorHint", "mdExportExtendedMetaHelp",
     "vocabCompleteExportHint", "ecdictHint", "dictPackHint",
   ];
   const isInsideContextHelp = (key) => {

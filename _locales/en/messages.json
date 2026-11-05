@@ -176,7 +176,7 @@
     "message": "AI Tags"
   },
   "urlWarning": {
-    "message": "This page has an unsupported URL and cannot be bookmarked."
+    "message": "This page can't be bookmarked."
   },
   "urlCannotSave": {
     "message": "Cannot save: unsupported URL"
@@ -195,7 +195,7 @@
   },
   "saveMergedExisting": {"message": "This URL already existed in the service. Changes were merged into the existing bookmark."},
   "saveMergedKarakeepNote": {"message": "Karakeep moved it out of the archive and updated its save time."},
-  "saveMergedLinkdingOverwrite": {"message": "This URL was already in linkding. The existing bookmark's title, description, notes, read later and sharing now match what you entered here, and its tags were replaced with these."},
+  "saveMergedLinkdingOverwrite": {"message": "This URL was already in linkding. That bookmark now has everything you entered here, tags included."},
   "bookmarkSaved": {
     "message": "Bookmark saved."
   },
@@ -232,7 +232,7 @@
   },
   "confirmLogoutDetail": {"message": "Your API token will be removed. Unsaved bookmark drafts will be discarded."},
   "confirmLogoutDetailKarakeep": {"message": "Your API token and any access gateway credential will be removed. Unsaved bookmark drafts will be discarded."},
-  "confirmLogoutDetailLinkding": {"message": "Your API token and any access gateway credential will be removed. Unsaved bookmark drafts will be discarded. Connecting again, even with the same address and token, counts as a new connection, so saves still waiting from this one are not retried automatically."},
+  "confirmLogoutDetailLinkding": {"message": "Your API token and any access gateway credential will be removed. Unsaved bookmark drafts will be discarded. Saves still waiting won't be retried, even if you reconnect."},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -610,7 +610,7 @@
     }
   },
   "batchTagTooLongSkip": {
-    "message": ". $COUNT$ saved without tags because the tag \"$TAG$\" is longer than linkding's $MAX$-character limit. Shorten it, turn off \"Skip already bookmarked URLs\" and run Batch Save again, or add it page by page from the popup.",
+    "message": ". $COUNT$ saved without tags: \"$TAG$\" is over linkding's $MAX$-character limit. Shorten it, turn off \"Skip already bookmarked URLs\", then run Batch Save again.",
     "description": "Replaces batchTagTooLong when Batch Save ran with \"Skip already bookmarked URLs\" on; it starts with its own separator. linkding on PostgreSQL created those $COUNT$ bookmarks without tags, so the sentence ends with the way to add them: turn the option off and rerun, or tag each page from the popup. $TAG$ is the first such tag, $MAX$ the limit.",
     "placeholders": {
       "count": {
@@ -948,7 +948,7 @@
     "message": "Couldn't extract this page. Please try again."
   },
   "mdSiteTargetMissing": {
-    "message": "The requested post is not fully loaded or could not be identified. Open the original page, wait for the post to appear, then retry."
+    "message": "The post hasn't loaded yet or can't be found. Open the page, wait for the post to appear, then try again."
   },
   "mdEngineTabGone": {
     "message": "The original tab is no longer available. Reopen the page to use Defuddle."
@@ -1079,7 +1079,7 @@
     "message": "No notes match this filter."
   },
   "notesHiddenByOwner": {
-    "message": "Some highlights belong to other historical libraries and have not been merged into this personal library."
+    "message": "Some highlights belong to an older library and aren't shown here."
   },
   "notesUnknownPage": {
     "message": "Unknown page"
@@ -1202,7 +1202,10 @@
     "message": "Notes in the Popup"
   },
   "optAutoDescription": {
-    "message": "Auto-fill page description: Description in linkding; Notes elsewhere when no text is selected"
+    "message": "Auto-fill page description"
+  },
+  "optAutoDescriptionHint": {
+    "message": "linkding puts it in Description. Other services put it in Notes, but only when no text is selected."
   },
   "optBlockquote": {
     "message": "Mark selected text as a quote"
@@ -1217,7 +1220,7 @@
     "message": "Reuse existing tag spelling"
   },
   "optRespectTagCaseHint": {
-    "message": "If a tag has variants that differ only in case, spaces, hyphens, or underscores, use the most common spelling. Tags already on a bookmark stay as they are."
+    "message": "Picks the spelling you use most when a tag has several, such as JavaScript and javascript. Tags already on a bookmark don't change."
   },
   "optShowSuggestTags": {
     "message": "Show Pinboard suggested tags in popup"
@@ -1231,17 +1234,11 @@
   "optShowQuickLinks": {
     "message": "Show the quick links row"
   },
-  "optShowQuickLinksHint": {
-    "message": "Links to your Sets, Network, Unread, Notes and Popular pages."
-  },
   "optShowQuickRow": {
     "message": "Show quick action buttons"
   },
-  "optShowQuickRowHint": {
-    "message": "The Save Tab Set, Batch Save and Reader buttons."
-  },
   "tagSyncLabel": {
-    "message": "Tag cache strategy"
+    "message": "Loading tags for autocomplete"
   },
   "tagSyncCached": {
     "message": "Cached"
@@ -1253,16 +1250,13 @@
     "message": "Live"
   },
   "tagSyncFreshDesc": {
-    "message": "Fetches each time the popup opens. Slower."
+    "message": "Loads every time you open the popup. Slower."
   },
   "tagSyncPrewarmed": {
-    "message": "Prewarmed"
+    "message": "In the background"
   },
   "tagSyncPrewarmedDesc": {
-    "message": "Fetches in the background every 15 minutes, so the popup opens instantly."
-  },
-  "tagSyncHint": {
-    "message": "Choose when to load your existing tags for autocomplete. Loading tags does not change them on the server."
+    "message": "Refreshes every 15 minutes, so the popup opens right away."
   },
   "labelTagPresets": {
     "message": "Tag presets"
@@ -1300,14 +1294,11 @@
   "backupIncludeVocabularyLabel": {
     "message": "Include vocabulary in backups"
   },
-  "backupIncludeVocabularyHint": {
-    "message": "Includes vocabulary only for the personal library."
-  },
   "backupIncludeSecretsLabel": {
     "message": "Include API keys and tokens in backups"
   },
   "backupIncludeSecretsHint": {
-    "message": "Writes every credential to the file in plain text: your Pinboard, Karakeep and linkding API tokens, your access gateway credentials, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Notion, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password."
+    "message": "Your Pinboard, Karakeep and linkding tokens and every other key and credential are saved in plain text. Anyone with the file can use them."
   },
   "backupSecretsExportTitle": {"message": "Export a backup with credentials?"},
   "backupSecretsExportConfirm": {
@@ -1329,13 +1320,13 @@
     "message": "This backup carries credentials in plain text. Import them only if you trust where the file has been."
   },
   "backupVocabOwnerMissing": {
-    "message": "Vocabulary was not included because no personal library is available. The other selected data was exported."
+    "message": "Vocabulary wasn't included because the personal library isn't available. Everything else you selected was exported."
   },
   "backupHighlightsOwnerMissing": {
-    "message": "Account-owned highlights and notes were not included because no personal library is available. The other selected data was exported."
+    "message": "Highlights and notes from the personal library weren't included because it isn't available. Everything else you selected was exported."
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "Vocabulary and account-owned highlights and notes were not included because no personal library is available. The other selected data was exported."
+    "message": "Vocabulary, highlights and notes from the personal library weren't included because it isn't available. Everything else you selected was exported."
   },
   "backupPreviewTitle": {
     "message": "Import preview"
@@ -1539,7 +1530,7 @@
     "message": "Not set"
   },
   "qsAutoNotes": {
-    "message": "Add page description: Description in linkding; Notes elsewhere when no text is selected"
+    "message": "Add page description"
   },
   "qsBlockquote": {
     "message": "Mark selected text as a quote"
@@ -1554,7 +1545,7 @@
     "message": "Auto-generate AI tags"
   },
   "qsAiSummary": {
-    "message": "Auto-generate AI summary: Description in linkding, Notes elsewhere"
+    "message": "Auto-generate AI summary"
   },
   "secReadLater": {
     "message": "Read Later"
@@ -1569,7 +1560,7 @@
     "message": "Tags (comma-separated)"
   },
   "batchTagsHint": {
-    "message": "Separate tags with commas. Spaces within a new tag become the multi-word tag separator (set under AI Behavior). E.g. batch_saved, research"
+    "message": "Spaces inside a new tag become the multi-word tag separator (set in AI Behavior). E.g. batch_saved, research"
   },
   "batchAiTags": {
     "message": "Auto-generate AI tags for each tab"
@@ -1689,10 +1680,10 @@
     "message": "Workspace ID (optional)"
   },
   "hintQwenRegion": {
-    "message": "Keys belong to one region: a key from another region is rejected (401). Third-party models such as DeepSeek and Kimi are available only in Beijing."
+    "message": "Use the region your key was created in. DeepSeek, Kimi and other third-party models are only in Beijing."
   },
   "hintQwenWorkspace": {
-    "message": "With a workspace ID, requests use its dedicated address. Tokyo has no shared address and needs one."
+    "message": "Required for the Tokyo region."
   },
   "hintOpenAIBaseUrl": {
     "message": "Change this to use a proxy or a compatible endpoint"
@@ -1826,7 +1817,7 @@
     "message": "Extension pages follow the Pinboard theme preset"
   },
   "popupFollowHint": {
-    "message": "When on, the popup, this settings page and the library use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette."
+    "message": "The popup, Settings and the library use your Pinboard preset's colors. The reader keeps its own colors."
   },
   "optFollowNeedsPreset": {
     "message": "Pick a Pinboard preset below first. With No preset there is no palette to follow."
@@ -1839,7 +1830,7 @@
       }
     }
   },
-  "optThemeHint": { "message": "Switches the popup, this settings page, the library and the reader between light and dark. Presets with a built-in scheme (Dracula, for example) override it on the pages that follow the preset; the reader can override it per device from its \"Aa\" panel." },
+  "optThemeHint": { "message": "Applies to the popup, Settings, the library and the reader. Presets with their own light or dark scheme, such as Dracula, override it. The reader can also set it from its \"Aa\" panel." },
   "secPopupElements": {
     "message": "Popup Elements"
   },
@@ -2123,7 +2114,7 @@
     "message": "Name"
   },
   "hintCustomBaseUrlAnthropic": {
-    "message": "/messages is appended to this URL. Include the version segment, such as …/v1"
+    "message": "End with the version, such as …/v1. Don't add /messages."
   },
   "aiCustomBaseUrlInvalid": {
     "message": "Use an https:// address (http:// only for localhost). This address isn't saved."
@@ -2545,14 +2536,8 @@
   "optUrlCleanOnOpen": {
     "message": "Clean when the popup opens"
   },
-  "optUrlCleanOnOpenHint": {
-    "message": "Happens silently; an Undo link in the popup restores the original URL."
-  },
   "optUrlCleanOnPaste": {
     "message": "Clean when a URL is pasted"
-  },
-  "optUrlCleanOnPasteHint": {
-    "message": "Shows a notice with Undo, in case you want to keep the original URL."
   },
   "optUrlCleanAggressive": {
     "message": "Aggressive mode: also remove ref, si, igshid and similar (may break some links)"
@@ -2684,7 +2669,7 @@
     "message": "Never archive bookmarks you save as private"
   },
   "waybackSelfHostedPrivateHint": {
-    "message": "Karakeep bookmarks and unshared linkding bookmarks are treated as private, so they are not archived automatically by default. When saving, you can select “archive” manually, or turn off “Never archive bookmarks you save as private”."
+    "message": "Karakeep bookmarks and unshared linkding bookmarks count as private, so they aren't archived automatically. Tick “archive” when saving, or turn off “Never archive bookmarks you save as private”."
   },
   "waybackPermDenied": {
     "message": "Archiving needs access to web.archive.org, which hasn't been granted. Re-enable archiving to request it."
@@ -2908,7 +2893,7 @@
     "message": "Leftover Entity Codes in Tags"
   },
   "tagGovEntityHint": {
-    "message": "Repairing re-saves every bookmark that carries a selected tag and puts the repaired name in its place. This cannot be undone; nothing changes until you confirm."
+    "message": "Repairing renames the tag on every bookmark that has it. This can't be undone."
   },
   "tagGovEntityScan": {
     "message": "Scan tags"
@@ -2926,7 +2911,7 @@
     "message": "joins an existing tag"
   },
   "tagGovEntityConfirm": {
-    "message": "Repair $N$ tags? Their bookmarks are re-saved with the repaired name. Untick any tag that really should contain such text.",
+    "message": "Repair $N$ tags? Untick any tag that should keep this text.",
     "placeholders": {
       "N": {
         "content": "$1"
@@ -3068,7 +3053,7 @@
     "message": "Skip"
   },
   "optBgSaveModeSkipDesc": {
-    "message": "Does nothing; the saved bookmark stays as it is."
+    "message": "Leaves the bookmark as it is."
   },
   "optBgSaveModeOverwrite": {
     "message": "Overwrite"
@@ -3799,11 +3784,11 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Once connected, this device syncs vocabulary, highlights and notes, complete AI dictionary entries and supplements, and saved conversations with their cited excerpts for the personal library."
+      "message": "Syncs your vocabulary, highlights, notes, AI dictionary entries and saved Ask conversations."
     },
     "vocabDriveConnectionHint": { "message": "Connect each device separately. Google Drive does not sync settings or credentials." },
     "vocabDriveDisclosure": {
-      "message": "Copies are stored as plaintext in the extension’s private Google Drive folder, without end-to-end encryption. Alongside saved content, they can include learning preferences used for supplements, cited excerpts, source URLs, titles and timestamps."
+      "message": "Your data is stored as plain text, without end-to-end encryption, in a private folder in your Google Drive. It includes source URLs, titles, times and learning preferences."
     },
     "vocabDriveLoading": {
       "message": "Loading Google Drive sync status…"
@@ -4663,7 +4648,7 @@
   "diagnosticsCopied": { "message": "Diagnostics copied" },
   "diagnosticsCopyFailed": { "message": "Could not copy diagnostics. Check clipboard access and try again." },
   "libraryVocabSignedOutTitle": { "message": "Sign in to use Vocabulary" },
-  "libraryVocabSignedOutHint": { "message": "Vocabulary, highlights, notes and Ask history share one personal library across all bookmark services." },
+  "libraryVocabSignedOutHint": { "message": "Your vocabulary, highlights, notes and Ask history stay the same whichever bookmark service you use." },
   "libraryVocabOpenSettings": { "message": "Open account settings" },
   "libraryLookupSignedOutHint": { "message": "Look up any word in the Dictionary section. Sign in to save words to your vocabulary." },
   "mdPreviewClose": { "message": "Close reader" },
@@ -4842,7 +4827,7 @@
   "mdExportContextChanged": {"message": "The account, article, or conversation changed. Start the export again."},
   "themeGroupAdaptiveHint": {"message": "Adaptive presets follow the light/dark setting under Extension Appearance above."},
   "dictDefinitionLangLabel": { "message": "AI entry definition language" },
-  "dictDefinitionLangHint": {"message": "AI entries and supplements use your native language by default, or the interface language if no native language is set. Choose another language here to override this. Original dictionary definitions and quotations keep their own language."},
+  "dictDefinitionLangHint": {"message": "By default, AI entries use your native language, or the interface language if none is set. Dictionary definitions and quotations keep their own language."},
   "dictDefinitionLangUi": {"message": "Follow native language"},
   "vocabLanguageFilterAria": { "message": "Filter by language" },
   "vocabAllLanguages": { "message": "All languages" },
@@ -4859,13 +4844,13 @@
   "dictAnkiFormatLabel": { "message": "Anki note format" },
   "dictAnkiFormatLegacy": { "message": "Original (six fields)" },
   "dictAnkiFormatMultilingual": { "message": "Multilingual (full details)" },
-  "dictAnkiFormatHint": { "message": "Multilingual uses a separate note type, so it can add cards alongside your original cards. Sending again skips existing notes; it does not update them." },
+  "dictAnkiFormatHint": { "message": "Multilingual uses its own note type, so words you already have may get a second card. Sending again skips existing notes; it doesn't update them." },
   "dictExportCompleteTsv": { "message": "Export complete TSV" },
   "dictExportLegacyTsv": { "message": "Export six-field TSV" },
   "vocabCompleteExportHint": { "message": "Complete TSV includes language, base form, notes and every context with its source. Use JSON backup to restore data in this extension." },
   "dictAnkiModelMismatchNamed": {"message": "The \"$MODEL$\" note type in Anki has different fields. Restore its original fields, or rename it so a new one can be created, then try again.", "placeholders": {"model": {"content": "$1"}}},
   "multiPackSection": {"message": "Multilingual Offline Dictionaries"},
-  "multiPackHint": {"message": "Import a Yomitan v3 ZIP dictionary. Definitions and readings stay on this device. Styles, images and audio are not imported."},
+  "multiPackHint": {"message": "Import a Yomitan v3 dictionary (ZIP). It stays on this device. Styles, images and audio aren't imported."},
   "multiPackBrowse": {"message": "Find dictionary files"},
   "multiPackChoose": {"message": "Choose a ZIP file"},
   "multiPackEmpty": {"message": "No multilingual dictionaries installed."},
@@ -4875,7 +4860,7 @@
   "multiPackLanguageHint": {"message": "Use language codes, such as de, en or zh-Hant. Check both languages before importing."},
   "multiPackSourceUrl": {"message": "Source URL (optional)"},
   "multiPackLicense": {"message": "License statement (optional)"},
-  "multiPackLicenseHint": {"message": "These details come from the file or your edits. Check the source's terms before using or sharing its contents."},
+  "multiPackLicenseHint": {"message": "Check the dictionary's terms before using or sharing its contents."},
   "multiPackInspecting": {"message": "Reading dictionary details…"},
   "multiPackPreview": {"message": "Review dictionary"},
   "multiPackInstall": {"message": "Import dictionary"},
@@ -4885,8 +4870,6 @@
   "multiPackDisable": {"message": "Disable"},
   "multiPackAllowAi": {"message": "Allow AI use"},
   "multiPackBlockAi": {"message": "Stop AI use"},
-  "multiPackAiHint": {"message": "AI use is off by default. Allow it only when the source's terms permit sending definitions to your configured AI provider."},
-  "multiPackAiConfirm": {"message": "Allow this dictionary's definitions to be sent to your configured AI provider when you use AI assistance? Check that its terms permit this."},
   "multiPackSummary": {"message": "$SOURCE$ / $TARGET$ · $COUNT$ entries · $REVISION$", "placeholders": {"source": {"content": "$1"}, "target": {"content": "$2"}, "count": {"content": "$3"}, "revision": {"content": "$4"}}},
   "multiPackNotDeclared": {"message": "Not declared"},
   "multiPackCancelled": {"message": "Import cancelled. Installed dictionaries are unchanged."},
@@ -4901,7 +4884,6 @@
   "dictOnlineLanguageUnavailable": {"message": "Online lookup is not available for this language."},
   "dictTagReading": {"message": "Reading"},
   "dictAssistRecommend": {"message": "Find meaning with AI"},
-  "dictAssistExplain": {"message": "Explain meaning with AI"},
   "dictAssistUseMeaning": {"message": "Select this dictionary meaning"},
   "dictAssistNeedContext": {"message": "To match a meaning, look up the word in a sentence or open a saved word with a source sentence."},
   "dictAssistChooseMeaning": {"message": "Select a dictionary meaning to explain it."},
@@ -4918,7 +4900,6 @@
   "dictAssistFailed": {"message": "AI could not complete this request. Try again."},
   "dictAssistAllowedSources": {"message": "Only dictionary sources allowed for AI are included."},
   "dictAssistAnalyze": {"message": "Analyze with AI"},
-  "dictAssistAnalysisHint": {"message": "Analyze the selected expression using its source sentence."},
   "dictAssistAnalysisNeedsMatch": {"message": "The selected expression could not be located in this sentence. Look up the form that appears there."},
   "dictAssistAnalysisEmpty": {"message": "No supported base form or phrase was found in this sentence."},
   "dictAssistLemmaSuggestion": {"message": "Possible base form"},
@@ -4945,15 +4926,14 @@
   "dictEntryShowAi": {"message": "View AI entry"},
   "dictEntryNotCached": {"message": "This entry could not be saved. Keep this lookup open and retry saving."},
   "dictAiAutoGenerateLabel": {"message": "Generate AI entries automatically"},
-  "dictAiAutoGenerateHint": {"message": "When no AI entry is cached, use the reader’s AI model to generate one during lookup. Uses tokens. Off by default; you can still generate entries manually."},
   "dictDefaultViewLabel": {"message": "Default lookup view"},
-  "dictDefaultViewHint": {"message": "Dictionary results always come first; this sets how the AI entry below them starts out. Folded, a saved entry is one line you can open; the other two options show it in full. Only “generate when missing” uses tokens automatically."},
+  "dictDefaultViewHint": {"message": "Dictionary results always come first. Only “generate when missing” uses tokens on its own."},
   "dictDefaultDictionary": {"message": "Fold saved AI entries into one line"},
   "dictDefaultAiSaved": {"message": "Show saved AI entries"},
   "dictDefaultAiGenerate": {"message": "Show AI entries, generate when missing"},
   "dictLearnerNativeLanguageLabel": {"message": "Native language (optional)"},
   "dictLearnerNativeLanguagePlaceholder": {"message": "For example, Spanish"},
-  "dictLearnerProfileHint": {"message": "Your native language sets the default AI explanation language and helps tailor comparisons. Learning level adjusts explanation difficulty and examples. These preferences do not trigger generation."},
+  "dictLearnerProfileHint": {"message": "AI entries use these to choose the explanation language and difficulty. Changing them doesn't use tokens."},
   "dictLearnerLevelLabel": {"message": "Learning level (optional)"},
   "dictLearnerLevelUnspecified": {"message": "Not specified"},
   "dictLearnerLevelBeginner": {"message": "Beginner"},
@@ -4965,7 +4945,7 @@
   "dictLearningUsagePoints": {"message": "Usage points"},
   "dictLearningEtymology": {"message": "Word origin"},
   "dictExamplesTitle": {"message": "Examples from texts"},
-  "dictExamplesHint": {"message": "Finds original sentences with this word on Wikisource. No AI request and no translation."},
+  "dictExamplesHint": {"message": "Sentences from Wikisource, not translated. Doesn't use AI."},
   "dictExamplesFind": {"message": "Find examples in texts"},
   "dictExamplesNone": {"message": "This search found no verifiable source text."},
   "dictNegRetry": {"message": "Not found last time · Try again"},
@@ -4998,7 +4978,7 @@
   "dictEntryRetrySave": {"message": "Retry saving"},
   "driveDictionaryStatus": {"message": "AI entries: $STATUS$", "placeholders": {"status": {"content": "$1"}}},
   "driveDictionaryErrorEntryTooLarge": {"message": "An AI entry is too large to sync. The local copy is kept. Click Sync now to retry."},
-  "dictSupplementUnsupported": {"message": "AI could not provide a grounded explanation. An AI request was made."},
+  "dictSupplementUnsupported": {"message": "AI couldn't back this up with sources. The request still used tokens."},
   "askNewConversation": {"message": "New conversation"},
   "askHistory": {"message": "Conversation history"},
   "askTemporary": {"message": "Do not save this temporary conversation"},
@@ -5030,37 +5010,37 @@
   "driveAskErrorEntryTooLarge": {"message": "An answer exceeds the sync size limit. It remains saved on this device."},
   "askHistoryUnavailable": {"message": "This conversation was deleted or is not available on this device. Start a new conversation to continue."},
   "askHistoryKeysMove": {"message": "Previous or next conversation"},
-  "dictMeaningDefaultHelp": {"message": "A definition is already selected and ready to save. If you choose another, your choice stays selected during this lookup."},
-  "dictMeaningManualHelp": {"message": "The definition you selected will be saved. Your choice stays selected during this lookup."},
-  "dictMeaningSavedHelp": {"message": "The saved definition will not change automatically. Choose a definition to update this saved word."},
-  "dictMeaningChooseHelp": {"message": "Choose a definition to save. Your choice stays selected during this lookup."},
+  "dictMeaningDefaultHelp": {"message": "This definition will be saved. You can pick another."},
+  "dictMeaningManualHelp": {"message": "Your chosen definition will be saved."},
+  "dictMeaningSavedHelp": {"message": "Pick a definition to replace the saved one."},
+  "dictMeaningChooseHelp": {"message": "Choose a definition to save."},
   "dictMeaningChange": {"message": "Change"},
   "dictFullEntry": {"message": "Full entry"},
-  "dictFullEntryOnlyHint": {"message": "This entry has not been split into individual definitions. You can read the full entry or choose a definition from another dictionary source to save."},
-  "multiPackReimportHint": {"message": "Reimport the same dictionary to reprocess its definition structure. Saved vocabulary and the dictionary’s enabled or disabled state stay unchanged."},
+  "dictFullEntryOnlyHint": {"message": "This entry has no separate definitions. To save one, pick another dictionary."},
+  "multiPackReimportHint": {"message": "Import this dictionary again to refresh its definitions. Your saved words and its on/off setting won't change."},
   "dictEntryFormation": {"message": "Word formation"},
   "dictEntryHistory": {"message": "Historical origin"},
-  "dictEntryNoHistory": {"message": "No verifiable word-origin source is available. Only word formation and vocabulary connections are shown."},
+  "dictEntryNoHistory": {"message": "No reliable source for this word's origin was found, so only its parts and related words are shown."},
   "dictEntryRelationFamily": {"message": "Word family"},
   "dictEntryRelationCognate": {"message": "Shared origin"},
   "dictEntryRelationSynonym": {"message": "Similar meaning"},
   "dictEntryRelationTopic": {"message": "Related topic"},
   "dictSupplementLanguage": {"message": "Explanation language: $LANGUAGE$", "placeholders": {"language": {"content": "$1"}}},
   "dictSupplementEtymology": {"message": "Word origin and related words"},
-  "dictEtymologyHint": {"message": "Explains word formation, origins and related words on request. Historical claims use retrieved sources only."},
+  "dictEtymologyHint": {"message": "Word parts, origin and related words. The origin comes only from sources it finds."},
   "dictEtymologyGenerating": {"message": "Generating word origins…"},
   "dictSupplementPartial": {"message": "Retained: $ACCEPTED$. Left out after failing checks: $OMITTED$.", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
   "dictSupplementOriginal": {"message": "AI-written examples"},
   "dictSupplementMeaning": {"message": "Here, it means: $MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "Update this supplement"},
-  "dictSupplementUpdateHint": {"message": "Generates a new version and uses tokens. Earlier results are kept and sync when Drive is connected."},
+  "dictSupplementUpdateHint": {"message": "Uses tokens. The old result is kept."},
   "dictSupplementPrevious": {"message": "Earlier results"},
-  "dictSupplementLegacy": {"message": "Earlier result, not checked against the new content requirements."},
+  "dictSupplementLegacy": {"message": "Older result. It wasn't checked the way new results are."},
   "dictSupplementWrongLanguage": {"message": "The explanation is not in the requested language. It was not saved; you can generate it again."},
-  "dictSupplementInvalid": {"message": "Required content is missing or a quotation could not be verified. The result was not saved; you can try again."},
+  "dictSupplementInvalid": {"message": "The result was incomplete or a quote couldn't be checked, so it wasn't saved. Try again."},
   "dictSupplementSourceVerified": {"message": "Checked against the source text"},
   "dictEntryUpdate": {"message": "Update this entry"},
-  "dictEntryUpdateHint": {"message": "Generates a new entry and uses tokens. Earlier results are kept."},
+  "dictEntryUpdateHint": {"message": "Uses tokens. The old entry is kept."},
   "dictPaidActionHint": {"message": "Calls AI and uses tokens."},
   "dictResize": {"message": "Resize dictionary window"},
   "dictResizeWidth": {"message": "Width"},
@@ -5079,11 +5059,11 @@
   "dictSupplementRetrieving": {"message": "Retrieving sources…"},
   "dictSupplementChecking": {"message": "Checking generated content…"},
   "dictSupplementSaving": {"message": "Saving supplement…"},
-  "dictGenerationTruncated": {"message": "The model stopped before completing the response. This result was not saved. Try again or choose another reader AI model in Settings."},
+  "dictGenerationTruncated": {"message": "The answer was cut off and wasn't saved. Try again or pick another reader AI model in Settings."},
   "dictGenerationRefused": {"message": "The model declined this request or blocked the output. This result was not saved."},
-  "dictGenerationEmpty": {"message": "The model returned no response text. This result was not saved. Try again or choose another reader AI model in Settings."},
-  "dictGenerationModelUnavailable": {"message": "The provider could not find or use the selected model. Check its name and availability, then update the reader AI model in Settings."},
-  "dictGenerationBilling": {"message": "The provider rejected this request (HTTP 402). Check your quota, billing status, and account access with the provider before trying again."},
+  "dictGenerationEmpty": {"message": "The model returned nothing. Try again or pick another reader AI model in Settings."},
+  "dictGenerationModelUnavailable": {"message": "The provider can't use this model. Check the reader AI model name in Settings."},
+  "dictGenerationBilling": {"message": "The provider refused the request (HTTP 402). Check your balance or plan with the provider."},
   "dictGenerationServiceUnavailable": {"message": "The provider's service is temporarily unavailable. Try again later."},
   "dictProgressThinking": {"message": "The model is thinking…"},
   "dictProgressStreaming": {"message": "Receiving the answer…"},
@@ -5094,14 +5074,11 @@
   "bookmarkServiceChoose": {
     "message": "Choose where to save bookmarks"
   },
-  "bookmarkServiceHint": {
-    "message": "Saving from the popup, reader, shortcuts and batch actions uses this service."
-  },
   "personalLibraryTitle": {
     "message": "Personal library"
   },
   "personalLibraryHint": {
-    "message": "Vocabulary, highlights, notes and Ask history share one personal library across all bookmark services."
+    "message": "Your vocabulary, highlights, notes and Ask history stay the same whichever bookmark service you use."
   },
   "bookmarkServerUrl": {
     "message": "Server URL"
@@ -5116,7 +5093,7 @@
     "message": "Use the site URL, including any subpath. HTTPS is required except on localhost."
   },
   "bookmarkTokenLocalHint": {
-    "message": "The token and any gateway credentials stay in this browser and are sent only to this server. They reach your other devices only if you sync API keys and tokens."
+    "message": "Your token and gateway credentials stay in this browser and go only to this server. Other devices get them only if you sync API keys and tokens."
   },
   "bookmarkKarakeepTokenHelp": {
     "message": "In Karakeep, open User Settings → API Keys and create a new API key with full access. Copy it right away: it is shown only once."
@@ -5134,25 +5111,25 @@
     "message": "Load page information while browsing"
   },
   "optLinkdingPreloadHint": {
-    "message": "The toolbar icon then shows whether each page you open is already in linkding, and the popup opens without waiting. The cost: every address you visit is sent to your linkding server and written to its log, and the server visits the page itself. When this is off, linkding is asked only when you open the popup."
+    "message": "The toolbar icon shows whether each page is already saved. Every address you visit is sent to your linkding server, which then visits the page itself."
   },
   "optLinkdingBrowserMetadata": {
     "message": "Use the browser's page title and description"
   },
   "optLinkdingBrowserMetadataHint": {
-    "message": "A new bookmark starts with the page's title and description as your browser shows them. When this is off, it starts with what your linkding server read from the page instead, which can differ on pages that change after loading or that need you to sign in."
+    "message": "When off, linkding reads the title and description from the page itself. They can differ on pages that need sign-in or change after loading."
   },
   "optLinkdingSingleFile": {
     "message": "Run SingleFile after adding a bookmark"
   },
   "optLinkdingSingleFileHint": {
-    "message": "When the popup or a quick save adds a new bookmark, SingleFile saves a full copy of the page, and linkding skips its own HTML snapshot for it. You need linkding 1.39 or later and the SingleFile extension. In SingleFile's options, set the destination to upload to a REST Form API, then fill in: the URL as your linkding address followed by /api/bookmarks/singlefile/ (the bare linkding address fails to upload); the authorization token as the API token from linkding's settings page, without a \"Token\" prefix; the data field name as file and the URL field name as url. SingleFile uploads the page to your linkding itself; this extension never handles the file."
+    "message": "Needs linkding 1.39 or later and the SingleFile extension. In SingleFile's options, set the destination to upload to a REST Form API, then fill in: URL = your linkding address + /api/bookmarks/singlefile/; authorization token = your linkding API token, without a \"Token\" prefix; data field name = file; URL field name = url."
   },
   "optLinkdingSingleFileDocs": {
     "message": "linkding guide to archiving with SingleFile"
   },
   "optCheckBookmarkStatusLinkding": {
-    "message": "With linkding, the toolbar icon shows whether a page is bookmarked only while \"Load page information while browsing\" is on. That switch is in the linkding connection settings on the Account tab."
+    "message": "For linkding, also turn on \"Load page information while browsing\" on the Account tab."
   },
   "bookmarkGatewayLabel": {
     "message": "Access gateway"
@@ -5195,7 +5172,7 @@
     "message": "Value"
   },
   "bookmarkGatewayNoneHint": {
-    "message": "Only needed when a login gateway, such as Cloudflare Access, sits in front of the server. Leave it on None if you reach the server directly."
+    "message": "Only needed if a sign-in gateway, such as Cloudflare Access, sits in front of the server."
   },
   "bookmarkGatewayHeaderNameN": {
     "message": "Header $N$ name",
@@ -5221,7 +5198,7 @@
     "message": "This header name isn't valid. Use up to 64 letters, digits and hyphens, such as X-Auth-Token."
   },
   "bookmarkGatewayErrNameForbidden": {
-    "message": "This header can't be set here. The browser controls it, or the extension already sends it (for example Authorization or Cookie)."
+    "message": "Headers such as Authorization and Cookie aren't allowed here."
   },
   "bookmarkGatewayErrDuplicate": {
     "message": "Each header name can be used only once (letter case is ignored)."
@@ -5262,7 +5239,7 @@
     "message": "Allow access to this server in Settings, then reconnect."
   },
   "bookmarkKarakeepHint": {
-    "message": "Read Later uses a dedicated private list. Marking a bookmark as read removes it from that list. Archiving in the service is unchanged."
+    "message": "Read Later is a private list in Karakeep. Marking a bookmark read removes it from the list and leaves its archive status alone."
   },
   "bookmarkReadLaterListName": {
     "message": "Read Later"
@@ -5275,13 +5252,13 @@
   "bookmarkPartialSavePopupReadLater": {"message": "The bookmark was saved, but its read later state was not changed. Press Update again to finish."},
   "bookmarkPartialSavePopupBookmark": {"message": "The title and notes were not updated, so the bookmark is unchanged. Press Update again to apply your changes."},
   "bookmarkErrGatewayRedirect": {
-    "message": "The server redirected the request. Check the address and port first: it must point to Karakeep or linkding itself. If it does, a sign-in gateway such as Cloudflare Access may be redirecting; add a service token under Access gateway, or allow the API path in the gateway."
+    "message": "The server redirected the request. Check that the address and port point to Karakeep or linkding itself. If they do, a sign-in gateway may be redirecting: add a service token under Access gateway, or allow the API path in the gateway."
   },
   "bgTabSetPinboardOnly": {"message": "Tab sets only work with Pinboard. Switch the bookmark service to Pinboard in Settings to use them."},
   "bookmarkDisconnect": {"message": "Disconnect"},
   "bookmarkDisconnectConfirm": {"message": "Disconnect from this service?"},
   "bookmarkDisconnectDetail": {"message": "Your API token and any access gateway credential will be removed from this browser. Click Connect to connect again."},
-  "bookmarkDisconnectDetailLinkding": {"message": "Your API token and any access gateway credential will be removed from this browser. Connecting again, even with the same address and token, counts as a new connection, so saves still waiting from this one are not retried automatically."},
+  "bookmarkDisconnectDetailLinkding": {"message": "Your API token and any access gateway credential will be removed from this browser. Saves still waiting won't be retried, even if you reconnect."},
   "bookmarkDisconnected": {"message": "Disconnected"},
   "bookmarkDisconnectFailed": {"message": "Couldn't disconnect: the change wasn't saved. Try again."},
   "bookmarkServicePending": {"message": "Bookmarks keep going to $ACTIVE$ until $SERVICE$ is connected.", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
@@ -5293,10 +5270,10 @@
   "backupBookmarkServiceNotConnected": {"message": "The backup chooses $SERVICE$, which isn't connected on this device. Bookmarks keep going to $ACTIVE$ until you connect $SERVICE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "The backup chooses $SERVICE$, which isn't connected on this device. Bookmarks switch to it only if the credentials you restore connect it; otherwise they keep going to $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
-    "message": "A security check (bot challenge) blocked the request. Cloudflare security rules are a common cause; allow the API path there."
+    "message": "A bot check blocked the request. Allow the API path in your Cloudflare or other security rules."
   },
   "bookmarkErrGatewayBasic": {
-    "message": "A proxy in front of the server asks for a username and password (Basic). That can't be combined with the bookmark token, so allow the API path in the proxy."
+    "message": "A proxy in front of the server asks for a username and password, which can't be used with a token. Allow the API path in the proxy."
   },
   "bookmarkErrGatewayDenied": {
     "message": "A gateway in front of the server refused the request. Check the credentials under Access gateway and that its policy allows them. With Cloudflare, the policy action must be Service Auth."
@@ -5320,7 +5297,7 @@
     }
   },
   "bgTagTooLongSkip": {
-    "message": "linkding saved this page without tags: the tag \"$TAG$\" is longer than its $MAX$-character limit. Shortcut saves skip pages that are already bookmarked, so shorten the tag and add it from the popup.",
+    "message": "linkding saved this page without tags: \"$TAG$\" is over its $MAX$-character limit. Shorten the tag and add it from the popup.",
     "description": "Replaces bookmarkErrTagTooLong for a shortcut save when \"When a shortcut save finds an existing bookmark\" is set to Skip. linkding on PostgreSQL created the bookmark without tags, and the next shortcut save would skip it, so the sentence points to the popup. $TAG$ is that tag (cut with an ellipsis when long), $MAX$ the limit.",
     "placeholders": {
       "tag": {
@@ -5360,7 +5337,7 @@
     }
   },
   "bookmarkErrTooLarge": {
-    "message": "The request was too large and was refused (HTTP 413). A reverse proxy in front of the server may cap the request size, such as nginx's client_max_body_size. Shorten the notes or description, or raise the proxy's limit.",
+    "message": "The bookmark is too large for the server (HTTP 413). Shorten the notes or description, or raise the proxy's upload limit, such as nginx's client_max_body_size.",
     "description": "A self-hosted bookmark server, or a reverse proxy in front of it, answered HTTP 413."
   },
   "bookmarkErrInvalidResponse": {
@@ -5390,6 +5367,6 @@
     "message": "Choose bookmark service"
   },
   "backupAdoptLibrary": {
-    "message": "This personal library is empty. Restoring vocabulary or highlights will adopt the backup’s library so its existing Drive data remains available."
+    "message": "Your personal library is empty, so restoring vocabulary or highlights will switch to the backup's library. Its Google Drive data stays available."
   }
 }

@@ -28,7 +28,7 @@
     ],
     "help": [
       "aiCacheHint", "aiContentSourceJinaHint", "aiContentSourceLocalHint", "archiveLogNote",
-      "backupIncludeHighlightsHint", "backupIncludeVocabularyHint", "backupPlaintextDisclosure", "batchAiHint",
+      "backupIncludeHighlightsHint", "backupPlaintextDisclosure", "batchAiHint",
       "batchTagsHint", "bookmarkGatewayCfHint", "bookmarkGatewayCustomHint", "bookmarkGatewayNoneHint",
       "customCSSOverlayHelp", "diagnosticsHint", "dictDefaultViewHint", "dictDefinitionLangHint", "dictEchoHint",
       "dictEudicSupportedHint", "dictLearnerProfileHint", "freeTierResourcesPrefix", "freeTierTitle",
@@ -36,12 +36,12 @@
       "mdExportImagePolicyHint", "openrouterTagline", "optAiUseTranscriptHint", "optPopupWidthHelp", "optSyncHint",
       "optThemeHint", "optVideoLangPrefHint", "optVideoUseLoginHint", "optWaybackBatchHint", "optWaybackHint",
       "optWaybackS3Hint", "popupFollowHint", "promptsHint", "saveAsThemeHint", "skimEnableHint", "storageIntro",
-      "summaryPromptHint", "syncApiKeysHint", "tagPresetsHint", "tagPromptHint", "tagSyncHint",
+      "summaryPromptHint", "syncApiKeysHint", "tagPresetsHint", "tagPromptHint",
       "translateGlossaryHint", "vocabDriveConnectionHint", "vocabDriveDisclosure",
-      "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint",
+      "personalLibraryHint", "bookmarkKarakeepHint",
       "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint",
-      "optUrlCleanOnOpenHint", "optUrlCleanOnPasteHint", "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
-      "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "tagSeparatorHint", "mdExportExtendedMetaHelp",
+      "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
+      "optRespectTagCaseHint", "optAutoDescriptionHint", "tagSeparatorHint", "mdExportExtendedMetaHelp",
       "vocabCompleteExportHint", "ecdictHint", "dictPackHint", "optLinkdingPreloadHint", "optLinkdingBrowserMetadataHint", "optLinkdingSingleFileHint"
     ],
     "pending": []

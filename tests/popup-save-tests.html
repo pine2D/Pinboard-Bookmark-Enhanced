@@ -6437,8 +6437,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(keyFor("") === "confirmLogoutDetail", "unknown service must keep the original wording");
       const karakeep = enMessages[keyFor("karakeep")].message, linkding = enMessages[keyFor("linkding")].message;
       assert(/gateway/i.test(karakeep) && /gateway/i.test(linkding), "self-hosted logout detail omits the gateway credential");
-      assert(/new connection/i.test(linkding) && /not retried/i.test(linkding), "linkding logout detail omits the reconnect consequence");
-      assert(!/new connection/i.test(karakeep), "Karakeep keeps its connection ID across reconnects (user ID based); the warning would be false");
+      assert(/reconnect/i.test(linkding) && /(not|won't) be retried/i.test(linkding), "linkding logout detail omits the reconnect consequence");
+      assert(!/reconnect/i.test(karakeep), "Karakeep keeps its connection ID across reconnects (user ID based); the warning would be false");
     });
     // The three cases above run the extracted helpers on stand-in elements, so they cannot see
     // whether the popup actually uses them. Pin the wiring: showMain applies the hints right

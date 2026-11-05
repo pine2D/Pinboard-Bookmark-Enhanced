@@ -176,7 +176,7 @@
     "message": "AI タグ"
   },
   "urlWarning": {
-    "message": "このページの URL は対応していないため、保存できません。"
+    "message": "このページは保存できません。"
   },
   "urlCannotSave": {
     "message": "保存できません：非対応の URL"
@@ -195,7 +195,7 @@
   },
   "saveMergedExisting": {"message": "このURLはすでに保存されていたため、既存のブックマークに変更を統合しました。"},
   "saveMergedKarakeepNote": {"message": "Karakeepでアーカイブが解除され、保存日時が更新されました。"},
-  "saveMergedLinkdingOverwrite": {"message": "このURLはlinkdingにすでに保存されていました。既存のブックマークのタイトル、説明、メモ、「あとで読む」、共有の状態をここで入力した内容に置き換え、タグもこのタグに置き換えました。"},
+  "saveMergedLinkdingOverwrite": {"message": "このURLはlinkdingにすでに保存されていました。そのブックマークを、タグも含めてここで入力した内容に置き換えました。"},
   "bookmarkSaved": {
     "message": "ブックマークを保存しました。"
   },
@@ -232,7 +232,7 @@
   },
   "confirmLogoutDetail": {"message": "API トークンが削除されます。未保存のブックマークの下書きは破棄されます。"},
   "confirmLogoutDetailKarakeep": {"message": "API トークンとアクセスゲートウェイの認証情報が削除されます。未保存のブックマークの下書きは破棄されます。"},
-  "confirmLogoutDetailLinkding": {"message": "API トークンとアクセスゲートウェイの認証情報が削除されます。未保存のブックマークの下書きは破棄されます。同じアドレスとトークンで再接続しても新しい接続として扱われ、以前の接続で待機中の保存は自動で再試行されません。"},
+  "confirmLogoutDetailLinkding": {"message": "API トークンとアクセスゲートウェイの認証情報が削除され、未保存のブックマークの下書きは破棄されます。待機中の保存は、再接続しても再試行されません。"},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -604,7 +604,7 @@
     }
   },
   "batchTagTooLongSkip": {
-    "message": "。ほかに $COUNT$ 件は、タグ「$TAG$」が linkding の上限（$MAX$ 文字）を超えたため、タグなしで保存されました。短くしてから「既にブックマーク済みの URL をスキップ」をオフにして一括保存し直すか、ポップアップで 1 件ずつタグを追加してください。",
+    "message": "。ほかに $COUNT$ 件はタグなしで保存されました。「$TAG$」が linkding の上限（$MAX$ 文字）を超えています。短くしてから「既にブックマーク済みの URL をスキップ」をオフにして、一括保存し直してください。",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -940,7 +940,7 @@
     "message": "このページを抽出できませんでした。もう一度お試しください。"
   },
   "mdSiteTargetMissing": {
-    "message": "対象の投稿が読み込まれていないか、特定できませんでした。元のページを開き、投稿が表示されてから再試行してください。"
+    "message": "投稿がまだ読み込まれていないか、見つかりません。元のページを開き、投稿が表示されてから再試行してください。"
   },
   "mdEngineTabGone": {
     "message": "元のタブはもう利用できません。Defuddle を使うには、ページを開き直してください。"
@@ -1071,7 +1071,7 @@
     "message": "この条件に一致するメモはありません。"
   },
   "notesHiddenByOwner": {
-    "message": "過去の別ライブラリのハイライトは、この個人ライブラリには統合されていません。"
+    "message": "一部のハイライトは以前のライブラリのもので、ここには表示されません。"
   },
   "notesUnknownPage": {
     "message": "不明なページ"
@@ -1194,7 +1194,10 @@
     "message": "ポップアップのメモ"
   },
   "optAutoDescription": {
-    "message": "ページの説明を自動入力：linkdingでは「説明」に、他のサービスではテキスト未選択時のみメモに入力"
+    "message": "ページの説明を自動入力"
+  },
+  "optAutoDescriptionHint": {
+    "message": "linkdingでは「説明」に入ります。ほかのサービスではメモに入りますが、テキストを選択していないときだけです。"
   },
   "optBlockquote": {
     "message": "選択したテキストを引用として表示"
@@ -1209,7 +1212,7 @@
     "message": "既存タグの表記を引き継ぐ"
   },
   "optRespectTagCaseHint": {
-    "message": "大文字・小文字、スペース、ハイフン、アンダースコアだけが異なるタグは、最もよく使われている表記に合わせます。ブックマークに既に付いているタグは変更しません。"
+    "message": "同じタグに複数の表記がある場合（JavaScript と javascript など）、いちばんよく使う表記にそろえます。ブックマークに付いているタグは変わりません。"
   },
   "optShowSuggestTags": {
     "message": "ポップアップに Pinboard のおすすめタグを表示"
@@ -1223,17 +1226,11 @@
   "optShowQuickLinks": {
     "message": "ポップアップにクイックリンクを表示"
   },
-  "optShowQuickLinksHint": {
-    "message": "セット、ネットワーク、未読、メモ、人気へのリンクです。"
-  },
   "optShowQuickRow": {
     "message": "ポップアップにクイック操作ボタンを表示"
   },
-  "optShowQuickRowHint": {
-    "message": "「タブセットを保存」「一括保存」「リーダー」のボタンです。"
-  },
   "tagSyncLabel": {
-    "message": "タグキャッシュ戦略"
+    "message": "タグ入力候補の読み込み方法"
   },
   "tagSyncCached": {
     "message": "キャッシュ"
@@ -1245,16 +1242,13 @@
     "message": "ライブ"
   },
   "tagSyncFreshDesc": {
-    "message": "ポップアップを開くたびに取得します。低速です。"
+    "message": "ポップアップを開くたびに読み込みます。時間がかかります。"
   },
   "tagSyncPrewarmed": {
-    "message": "プリウォーム"
+    "message": "バックグラウンド"
   },
   "tagSyncPrewarmedDesc": {
-    "message": "バックグラウンドで 15 分ごとに取得するので、ポップアップをすぐ使えます。"
-  },
-  "tagSyncHint": {
-    "message": "タグ補完用に既存のタグを読み込むタイミングを選びます。サーバー上のタグは変更しません。"
+    "message": "15 分ごとに更新するので、ポップアップをすぐ使えます。"
   },
   "labelTagPresets": {
     "message": "タグプリセット"
@@ -1292,14 +1286,11 @@
   "backupIncludeVocabularyLabel": {
     "message": "バックアップに単語を含める"
   },
-  "backupIncludeVocabularyHint": {
-    "message": "個人ライブラリの単語だけが含まれます。"
-  },
   "backupIncludeSecretsLabel": {
     "message": "バックアップに API キーとトークンを含める"
   },
   "backupIncludeSecretsHint": {
-    "message": "すべての認証情報が平文でファイルに書き込まれます。Pinboard、Karakeep、linkding の API トークン、アクセスゲートウェイの認証情報、各 AI プロバイダーの API キー、Jina、Wayback、Anki、Eudic、Notion、Gist、Webhook の認証情報が対象です。ファイルを開いた人は誰でもそのまま使用できます。パスワードと同じ扱いで保管してください。"
+    "message": "Pinboard、Karakeep、linkding の API トークンをはじめ、すべてのキーと認証情報が平文で保存されます。ファイルを手に入れた人は誰でも使えます。"
   },
   "backupSecretsExportTitle": {"message": "認証情報を含むバックアップをエクスポートしますか？"},
   "backupSecretsExportConfirm": {
@@ -1321,13 +1312,13 @@
     "message": "このバックアップには平文の認証情報が含まれています。ファイルの出所が信頼できる場合のみインポートしてください。"
   },
   "backupVocabOwnerMissing": {
-    "message": "利用できる 個人ライブラリがないため、単語は含まれませんでした。ほかに選択したデータはエクスポートされています。"
+    "message": "個人ライブラリを利用できないため、単語帳は含まれていません。ほかに選択したデータはエクスポートしました。"
   },
   "backupHighlightsOwnerMissing": {
-    "message": "利用できる 個人ライブラリがないため、アカウントに紐づくハイライトとメモは含まれませんでした。ほかに選択したデータはエクスポートされています。"
+    "message": "個人ライブラリを利用できないため、そのハイライトとメモは含まれていません。ほかに選択したデータはエクスポートしました。"
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "利用できる 個人ライブラリがないため、単語とアカウントに紐づくハイライトとメモは含まれませんでした。ほかに選択したデータはエクスポートされています。"
+    "message": "個人ライブラリを利用できないため、その単語帳、ハイライト、メモは含まれていません。ほかに選択したデータはエクスポートしました。"
   },
   "backupPreviewTitle": {
     "message": "インポートのプレビュー"
@@ -1530,7 +1521,7 @@
     "message": "未設定"
   },
   "qsAutoNotes": {
-    "message": "ページの説明を追加：linkdingでは「説明」に、他のサービスではテキスト未選択時のみメモに追加"
+    "message": "ページの説明を追加"
   },
   "qsBlockquote": {
     "message": "選択したテキストを引用として表示"
@@ -1545,7 +1536,7 @@
     "message": "AI タグを自動生成"
   },
   "qsAiSummary": {
-    "message": "AI 要約を自動生成：linkdingでは「説明」に、他のサービスではメモに入力"
+    "message": "AI 要約を自動生成"
   },
   "secReadLater": {
     "message": "あとで読む"
@@ -1560,7 +1551,7 @@
     "message": "タグ（カンマ区切り）"
   },
   "batchTagsHint": {
-    "message": "複数のタグはカンマで区切ります。新しいタグ内のスペースは「複数語タグの区切り文字」（「AI の動作」で設定）に置き換わります。例：batch_saved, research"
+    "message": "新しいタグ内のスペースは「複数語タグの区切り文字」（「AI の動作」で設定）に置き換わります。例：batch_saved, research"
   },
   "batchAiTags": {
     "message": "各タブに AI タグを自動生成"
@@ -1680,10 +1671,10 @@
     "message": "ワークスペース ID（任意）"
   },
   "hintQwenRegion": {
-    "message": "API キーは発行したリージョンでのみ有効です。別のリージョンのキーは拒否されます（401）。DeepSeek や Kimi などのサードパーティモデルは北京リージョンでのみ利用できます。"
+    "message": "API キーを作成したリージョンを選んでください。DeepSeek や Kimi などのサードパーティモデルは北京リージョンでのみ使えます。"
   },
   "hintQwenWorkspace": {
-    "message": "ワークスペース ID を入力すると、そのワークスペース専用のアドレスにリクエストを送ります。東京リージョンには共通アドレスがないため、入力が必要です。"
+    "message": "東京リージョンでは入力が必要です。"
   },
   "hintOpenAIBaseUrl": {
     "message": "プロキシや互換エンドポイントを使う場合に変更します"
@@ -1817,7 +1808,7 @@
     "message": "拡張機能のページを Pinboard テーマプリセットに合わせる"
   },
   "popupFollowHint": {
-    "message": "オンにすると、ポップアップ、この設定ページ、ライブラリページが選択した Pinboard プリセットの配色を使います。オフにすると上のライト／ダーク設定に従った既定の配色になります。リーダーは常に独自の読書配色を使います。"
+    "message": "ポップアップ、設定ページ、ライブラリで、選択した Pinboard プリセットの配色を使います。リーダーは独自の配色のままです。"
   },
   "optFollowNeedsPreset": {
     "message": "まず下で Pinboard プリセットを選んでください。「プリセットなし」では合わせる配色がありません。"
@@ -1830,7 +1821,7 @@
       }
     }
   },
-  "optThemeHint": { "message": "ポップアップ、この設定ページ、ライブラリページ、リーダーのライト／ダークを切り替えます。固有の配色を持つプリセット（Dracula など）は、プリセットに合わせるページでこの設定より優先されます。リーダーは「Aa」パネルからデバイスごとに上書きできます。" },
+  "optThemeHint": { "message": "ポップアップ、設定ページ、ライブラリ、リーダーに適用されます。Dracula など固有のライト／ダークを持つプリセットでは、そちらが優先されます。リーダーは「Aa」パネルでも設定できます。" },
   "secPopupElements": {
     "message": "ポップアップの要素"
   },
@@ -2113,7 +2104,7 @@
     "message": "名前"
   },
   "hintCustomBaseUrlAnthropic": {
-    "message": "この URL の末尾に /messages が付加されます。…/v1 のようにバージョン部分まで含めてください"
+    "message": "…/v1 のようにバージョンで終わる URL にしてください。/messages は付けません。"
   },
   "aiCustomBaseUrlInvalid": {
     "message": "https:// で始まるアドレスを入力してください（http:// は localhost のみ）。このアドレスは保存されていません。"
@@ -2563,14 +2554,8 @@
   "optUrlCleanOnOpen": {
     "message": "ポップアップを開いたときにクリーンアップ"
   },
-  "optUrlCleanOnOpenHint": {
-    "message": "通知なしで処理します。ポップアップの「元に戻す」リンクで元の URL に戻せます。"
-  },
   "optUrlCleanOnPaste": {
     "message": "URL を貼り付けたときにクリーンアップ"
-  },
-  "optUrlCleanOnPasteHint": {
-    "message": "処理後に通知が表示され、「元に戻す」で元の URL に戻せます。"
   },
   "optUrlCleanAggressive": {
     "message": "アグレッシブモード：ref、si、igshid なども削除（一部のリンクが機能しなくなる場合があります）"
@@ -2672,7 +2657,7 @@
     "message": "非公開で保存したブックマークは archive.org に送信しない"
   },
   "waybackSelfHostedPrivateHint": {
-    "message": "Karakeepのブックマークと共有していないlinkdingのブックマークは非公開として扱われるため、初期設定では自動アーカイブされません。保存時に「アーカイブ」を手動で選択するか、「非公開で保存したブックマークは archive.org に送信しない」をオフにするとアーカイブできます。"
+    "message": "Karakeepのブックマークと共有していないlinkdingのブックマークは非公開扱いのため、自動ではアーカイブされません。保存時に「アーカイブ」を選ぶか、「非公開で保存したブックマークは archive.org に送信しない」をオフにしてください。"
   },
   "waybackPermDenied": {
     "message": "アーカイブには web.archive.org へのアクセス権が必要ですが、許可されていません。アーカイブを有効にし直すと、もう一度リクエストできます。"
@@ -2895,7 +2880,7 @@
     "message": "タグに残ったエンティティコード"
   },
   "tagGovEntityHint": {
-    "message": "修復すると、選択したタグが付いたブックマークをすべて保存し直し、タグを修復後の名前に置き換えます。元に戻すことはできません。確認するまでは何も変更されません。"
+    "message": "修復すると、そのタグが付いたすべてのブックマークでタグを修復後の名前に変えます。元に戻せません。"
   },
   "tagGovEntityScan": {
     "message": "タグをスキャン"
@@ -2913,7 +2898,7 @@
     "message": "既存のタグに統合"
   },
   "tagGovEntityConfirm": {
-    "message": "$N$ 個のタグを修復しますか？該当するブックマークは修復後の名前で保存し直されます。こうした文字を本当に含めたいタグは、先にチェックを外してください。",
+    "message": "$N$ 個のタグを修復しますか？この文字を残したいタグは、チェックを外してください。",
     "placeholders": {
       "N": {
         "content": "$1"
@@ -3055,7 +3040,7 @@
     "message": "スキップ"
   },
   "optBgSaveModeSkipDesc": {
-    "message": "何もしません。保存済みのブックマークはそのままです。"
+    "message": "ブックマークはそのままです。"
   },
   "optBgSaveModeOverwrite": {
     "message": "上書き"
@@ -3785,11 +3770,11 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "接続すると、個人ライブラリの単語帳、ハイライトとノート、AI 辞書項目の全文と追加用法、保存済みの会話と引用を同期します。"
+      "message": "単語帳、ハイライト、ノート、AI 辞書項目、保存済みの Ask 会話を同期します。"
     },
     "vocabDriveConnectionHint": { "message": "端末ごとに接続が必要です。設定や認証情報は Google Drive で同期されません。" },
     "vocabDriveDisclosure": {
-      "message": "コピーは Google Drive の拡張機能専用の非公開フォルダーに平文で保存され、エンドツーエンド暗号化はされません。保存した内容のほか、追加用法に使用した学習設定、引用原文、出典 URL、タイトル、日時が含まれる場合があります。"
+      "message": "データは Google Drive の拡張機能専用フォルダーに平文で保存され、エンドツーエンド暗号化はされません。出典 URL、タイトル、日時、学習設定も含まれます。"
     },
     "vocabDriveLoading": {
       "message": "Google Drive の同期状態を読み込んでいます…"
@@ -4653,7 +4638,7 @@
   "diagnosticsCopied": { "message": "診断情報をコピーしました" },
   "diagnosticsCopyFailed": { "message": "診断情報をコピーできませんでした。クリップボードへのアクセスを確認して、もう一度お試しください。" },
   "libraryVocabSignedOutTitle": { "message": "単語帳を使うにはログインしてください" },
-  "libraryVocabSignedOutHint": { "message": "単語帳、ハイライト、メモ、Askの履歴は、どのブックマークサービスでも同じ個人ライブラリを使います。" },
+  "libraryVocabSignedOutHint": { "message": "どのブックマークサービスを使っても、単語帳、ハイライト、メモ、Askの履歴は同じライブラリに残ります。" },
   "libraryVocabOpenSettings": { "message": "アカウント設定を開く" },
   "libraryLookupSignedOutHint": { "message": "「辞書」欄で単語を調べられます。単語帳に保存するにはログインしてください。" },
   "mdPreviewClose": { "message": "リーダーを閉じる" },
@@ -4831,7 +4816,7 @@
   "mdExportContextChanged": {"message": "アカウント、記事、または会話履歴が変わりました。エクスポートをやり直してください。"},
   "themeGroupAdaptiveHint": {"message": "アダプティブプリセットは、上の「拡張機能の外観」で選んだライト／ダーク設定に従います。"},
   "dictDefinitionLangLabel": { "message": "AI辞書の説明言語" },
-  "dictDefinitionLangHint": {"message": "AI 辞書項目と補足は、既定では母語で解説します。母語が未設定なら画面の言語を使います。ここで別の言語を選ぶと優先されます。通常の辞書の定義や引用は元の言語を保ちます。"},
+  "dictDefinitionLangHint": {"message": "AI 辞書項目は既定で母語で解説します。母語が未設定なら画面の言語を使います。通常の辞書の定義や引用は元の言語のままです。"},
   "dictDefinitionLangUi": {"message": "母語に合わせる"},
   "vocabLanguageFilterAria": { "message": "言語で絞り込む" },
   "vocabAllLanguages": { "message": "すべての言語" },
@@ -4848,13 +4833,13 @@
   "dictAnkiFormatLabel": { "message": "Ankiのノート形式" },
   "dictAnkiFormatLegacy": { "message": "従来形式（6フィールド）" },
   "dictAnkiFormatMultilingual": { "message": "多言語形式（詳細情報付き）" },
-  "dictAnkiFormatHint": { "message": "多言語形式では別のノートタイプを使うため、従来のカードとは別にカードが追加されることがあります。再送信時は既存のノートをスキップし、内容を更新しません。" },
+  "dictAnkiFormatHint": { "message": "多言語形式は別のノートタイプを使うため、既存の単語にカードがもう 1 枚増えることがあります。再送信すると既存のノートはスキップされ、内容は更新されません。" },
   "dictExportCompleteTsv": { "message": "完全なTSVをエクスポート" },
   "dictExportLegacyTsv": { "message": "6フィールドのTSVをエクスポート" },
   "vocabCompleteExportHint": { "message": "完全なTSVには言語、基本形、メモ、各文脈とその出典が含まれます。この拡張機能にデータを復元するにはJSONバックアップを使ってください。" },
   "dictAnkiModelMismatchNamed": {"message": "Ankiのノートタイプ「$MODEL$」のフィールドが一致しません。元のフィールドに戻すか、名前を変更して新しいノートタイプを作成できるようにしてから、再試行してください。", "placeholders": {"model": {"content": "$1"}}},
   "multiPackSection": {"message": "多言語オフライン辞書"},
-  "multiPackHint": {"message": "Yomitan v3 の ZIP 辞書をインポートします。語義と読みはこのデバイスに保存されます。スタイル、画像、音声はインポートされません。"},
+  "multiPackHint": {"message": "Yomitan v3 の辞書（ZIP）をインポートします。このデバイスにだけ保存され、スタイル、画像、音声はインポートされません。"},
   "multiPackBrowse": {"message": "辞書ファイルを探す"},
   "multiPackChoose": {"message": "ZIP ファイルを選択"},
   "multiPackEmpty": {"message": "多言語辞書はまだインストールされていません。"},
@@ -4864,7 +4849,7 @@
   "multiPackLanguageHint": {"message": "de、en、zh-Hant などの言語コードを指定してください。インポート前に両方の言語を確認してください。"},
   "multiPackSourceUrl": {"message": "配布元 URL（任意）"},
   "multiPackLicense": {"message": "ライセンス情報（任意）"},
-  "multiPackLicenseHint": {"message": "この情報はファイルの内容または手動の編集に基づきます。内容を利用・共有する前に配布元の利用条件を確認してください。"},
+  "multiPackLicenseHint": {"message": "辞書の内容を利用・共有する前に、配布元の利用条件を確認してください。"},
   "multiPackInspecting": {"message": "辞書の情報を読み込んでいます…"},
   "multiPackPreview": {"message": "辞書を確認"},
   "multiPackInstall": {"message": "辞書をインポート"},
@@ -4874,8 +4859,6 @@
   "multiPackDisable": {"message": "無効にする"},
   "multiPackAllowAi": {"message": "AI での利用を許可"},
   "multiPackBlockAi": {"message": "AI での利用を停止"},
-  "multiPackAiHint": {"message": "AI での利用は既定で無効です。設定した AI プロバイダーへの語義の送信が配布元の利用条件で認められている場合にのみ有効にしてください。"},
-  "multiPackAiConfirm": {"message": "AI 補助機能を使う際、この辞書の語義を設定した AI プロバイダーに送信することを許可しますか？利用条件で認められていることを確認してください。"},
   "multiPackSummary": {"message": "$SOURCE$ / $TARGET$ · 項目数：$COUNT$ · $REVISION$", "placeholders": {"source": {"content": "$1"}, "target": {"content": "$2"}, "count": {"content": "$3"}, "revision": {"content": "$4"}}},
   "multiPackNotDeclared": {"message": "記載なし"},
   "multiPackCancelled": {"message": "インポートをキャンセルしました。インストール済みの辞書は変更されていません。"},
@@ -4890,7 +4873,6 @@
   "dictOnlineLanguageUnavailable": {"message": "この言語ではオンライン検索を利用できません。"},
   "dictTagReading": {"message": "読み"},
   "dictAssistRecommend": {"message": "AI で語義を探す"},
-  "dictAssistExplain": {"message": "AI で語義を解説"},
   "dictAssistUseMeaning": {"message": "この辞書の語義を選ぶ"},
   "dictAssistNeedContext": {"message": "文に合う語義を探すには、文中の単語を調べるか、出典の文を含む保存済みの単語を開いてください。"},
   "dictAssistChooseMeaning": {"message": "解説する辞書の語義を選んでください。"},
@@ -4907,7 +4889,6 @@
   "dictAssistFailed": {"message": "AIがこのリクエストを処理できませんでした。もう一度お試しください。"},
   "dictAssistAllowedSources": {"message": "AI 利用を許可した辞書の出典のみが対象です。"},
   "dictAssistAnalyze": {"message": "AI で分析"},
-  "dictAssistAnalysisHint": {"message": "元の文をもとに、選択した表現を分析します。"},
   "dictAssistAnalysisNeedsMatch": {"message": "選択した表現がこの文に見つかりません。文中にある語形を調べてください。"},
   "dictAssistAnalysisEmpty": {"message": "この文に基づく基本形やフレーズの候補は見つかりませんでした。"},
   "dictAssistLemmaSuggestion": {"message": "基本形の候補"},
@@ -4934,15 +4915,14 @@
   "dictEntryShowAi": {"message": "AI辞書を見る"},
   "dictEntryNotCached": {"message": "項目を保存できませんでした。この検索を開いたまま、保存を再試行してください。"},
   "dictAiAutoGenerateLabel": {"message": "AI辞書項目を自動生成"},
-  "dictAiAutoGenerateHint": {"message": "キャッシュにAI辞書項目がない場合、検索時にリーダーのAIモデルで生成します。トークンを消費します。初期設定ではオフですが、手動でも生成できます。"},
   "dictDefaultViewLabel": {"message": "辞書検索の初期表示"},
-  "dictDefaultViewHint": {"message": "辞書の結果は常に先頭に表示されます。ここでは、その下に続く AI辞書の最初の表示を選びます。折りたたむと 1 行になり、クリックで開けます。ほかの 2 つは最初から開いて表示します。「なければ生成」の場合のみ、自動でトークンを消費します。"},
+  "dictDefaultViewHint": {"message": "辞書の結果は常に先頭に表示されます。自動でトークンを消費するのは「なければ生成」だけです。"},
   "dictDefaultDictionary": {"message": "保存済みのAI辞書を1行に折りたたむ"},
   "dictDefaultAiSaved": {"message": "保存済みのAI辞書を開いて表示"},
   "dictDefaultAiGenerate": {"message": "AI辞書を開いて表示（なければ生成）"},
   "dictLearnerNativeLanguageLabel": {"message": "母語（任意）"},
   "dictLearnerNativeLanguagePlaceholder": {"message": "例：スペイン語"},
-  "dictLearnerProfileHint": {"message": "母語は AI 解説の既定の言語と語の比較に使います。学習レベルは解説の難しさや例文に反映されます。この設定だけで生成は始まりません。"},
+  "dictLearnerProfileHint": {"message": "AI 辞書項目は、これをもとに解説の言語と難しさを決めます。変更してもトークンは消費しません。"},
   "dictLearnerLevelLabel": {"message": "学習レベル（任意）"},
   "dictLearnerLevelUnspecified": {"message": "指定なし"},
   "dictLearnerLevelBeginner": {"message": "初級"},
@@ -4954,7 +4934,7 @@
   "dictLearningUsagePoints": {"message": "用法のポイント"},
   "dictLearningEtymology": {"message": "語源"},
   "dictExamplesTitle": {"message": "原文の用例"},
-  "dictExamplesHint": {"message": "この語を含む原文の一文を Wikisource で検索します。AI は使わず、翻訳もしません。"},
+  "dictExamplesHint": {"message": "Wikisource の原文です。翻訳せず、AI も使いません。"},
   "dictExamplesFind": {"message": "原文の用例を探す"},
   "dictExamplesNone": {"message": "今回の検索では、確認できる原文が見つかりませんでした。"},
   "dictNegRetry": {"message": "前回は見つからず · 再試行"},
@@ -4987,7 +4967,7 @@
   "dictEntryRetrySave": {"message": "保存を再試行"},
   "driveDictionaryStatus": {"message": "AI 項目：$STATUS$", "placeholders": {"status": {"content": "$1"}}},
   "driveDictionaryErrorEntryTooLarge": {"message": "AI 項目が大きすぎるため同期できません。端末のコピーは保持されています。「今すぐ同期」で再試行してください。"},
-  "dictSupplementUnsupported": {"message": "AI は根拠のある追加説明を生成できませんでした。AI へのリクエストは実行されています。"},
+  "dictSupplementUnsupported": {"message": "AI は根拠を示せず、内容を返しませんでした。このリクエストでもトークンは消費されています。"},
   "askNewConversation": {"message": "新しい会話"},
   "askHistory": {"message": "会話履歴"},
   "askTemporary": {"message": "この一時的な会話を保存しない"},
@@ -5019,37 +4999,37 @@
   "driveAskErrorEntryTooLarge": {"message": "同期できるサイズを超えた回答があります。このデバイスには保存されています。"},
   "askHistoryUnavailable": {"message": "この会話は削除されたか、このデバイスでは利用できません。新しい会話を開始して続けてください。"},
   "askHistoryKeysMove": {"message": "前または次の会話"},
-  "dictMeaningDefaultHelp": {"message": "保存する意味はすでに選択されており、そのまま保存できます。別の意味を選ぶと、今回の検索中はその選択が維持されます。"},
-  "dictMeaningManualHelp": {"message": "選択した意味を保存します。今回の検索中はこの選択が維持されます。"},
-  "dictMeaningSavedHelp": {"message": "保存済みの意味は自動では変わりません。意味を選ぶと、この単語を更新できます。"},
-  "dictMeaningChooseHelp": {"message": "保存する意味を選んでください。今回の検索中はその選択が維持されます。"},
+  "dictMeaningDefaultHelp": {"message": "この意味を保存します。別の意味を選ぶこともできます。"},
+  "dictMeaningManualHelp": {"message": "選択した意味を保存します。"},
+  "dictMeaningSavedHelp": {"message": "意味を選ぶと、保存済みの意味を置き換えます。"},
+  "dictMeaningChooseHelp": {"message": "保存する意味を選んでください。"},
   "dictMeaningChange": {"message": "変更"},
   "dictFullEntry": {"message": "項目の全文"},
-  "dictFullEntryOnlyHint": {"message": "この項目は個別の意味に分けられていません。全文を読むか、別の辞書の意味を選んで保存できます。"},
-  "multiPackReimportHint": {"message": "同じ辞書ファイルを再インポートすると、語義の構造を再解析します。保存済みの単語と辞書の有効・無効の設定は変わりません。"},
+  "dictFullEntryOnlyHint": {"message": "この項目には個別の意味がありません。意味を保存するには、別の辞書を選んでください。"},
+  "multiPackReimportHint": {"message": "この辞書をもう一度インポートすると語義を更新できます。保存済みの単語と有効・無効の設定は変わりません。"},
   "dictEntryFormation": {"message": "語の成り立ち"},
   "dictEntryHistory": {"message": "歴史的な由来"},
-  "dictEntryNoHistory": {"message": "確認できる語源資料がありません。語の構成と関連語のみ表示しています。"},
+  "dictEntryNoHistory": {"message": "信頼できる語源の資料が見つからないため、語の構成と関連語だけを表示しています。"},
   "dictEntryRelationFamily": {"message": "同じ語族"},
   "dictEntryRelationCognate": {"message": "同じ起源"},
   "dictEntryRelationSynonym": {"message": "類義語"},
   "dictEntryRelationTopic": {"message": "同じ分野の語"},
   "dictSupplementLanguage": {"message": "解説の言語：$LANGUAGE$", "placeholders": {"language": {"content": "$1"}}},
   "dictSupplementEtymology": {"message": "語源と関連語"},
-  "dictEtymologyHint": {"message": "必要に応じて語の構成、語源、関連語を生成します。歴史的な語源は取得した資料に基づいて説明します。"},
+  "dictEtymologyHint": {"message": "語の構成、語源、関連語。語源は見つかった資料だけに基づきます。"},
   "dictEtymologyGenerating": {"message": "語源と関連語を生成中…"},
   "dictSupplementPartial": {"message": "保持した項目：$ACCEPTED$ 件。検証に通らなかった $OMITTED$ 件は省きました。", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
   "dictSupplementOriginal": {"message": "AI 作成の例文"},
   "dictSupplementMeaning": {"message": "ここでの意味：$MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "この補足を更新"},
-  "dictSupplementUpdateHint": {"message": "新しい内容を生成し、トークンを消費します。以前の結果も保持され、Drive 接続後に同期されます。"},
+  "dictSupplementUpdateHint": {"message": "トークンを消費します。以前の結果は残ります。"},
   "dictSupplementPrevious": {"message": "以前の結果"},
-  "dictSupplementLegacy": {"message": "旧バージョンの結果です。新しい内容基準での確認は行われていません。"},
+  "dictSupplementLegacy": {"message": "以前の結果です。新しい方法では確認されていません。"},
   "dictSupplementWrongLanguage": {"message": "指定した言語で解説されていません。保存していないため、再生成できます。"},
-  "dictSupplementInvalid": {"message": "必要な内容が不足しているか、引用を確認できませんでした。保存していないため、再試行できます。"},
+  "dictSupplementInvalid": {"message": "結果が不完全か、引用を確認できなかったため、保存していません。もう一度お試しください。"},
   "dictSupplementSourceVerified": {"message": "原文と照合済み"},
   "dictEntryUpdate": {"message": "この辞書項目を更新"},
-  "dictEntryUpdateHint": {"message": "辞書項目を再生成し、トークンを消費します。以前の結果も保持されます。"},
+  "dictEntryUpdateHint": {"message": "トークンを消費します。以前の辞書項目は残ります。"},
   "dictPaidActionHint": {"message": "AI を呼び出し、トークンを消費します。"},
   "dictResize": {"message": "辞書ウィンドウのサイズを変更"},
   "dictResizeWidth": {"message": "幅"},
@@ -5068,11 +5048,11 @@
   "dictSupplementRetrieving": {"message": "資料を検索中…"},
   "dictSupplementChecking": {"message": "生成した内容を確認中…"},
   "dictSupplementSaving": {"message": "補足を保存中…"},
-  "dictGenerationTruncated": {"message": "モデルが回答を完了する前に停止しました。結果は保存されていません。再試行するか、設定でリーダーの AI モデルを変更してください。"},
+  "dictGenerationTruncated": {"message": "回答が途中で切れたため、保存していません。再試行するか、設定でリーダーの AI モデルを変更してください。"},
   "dictGenerationRefused": {"message": "モデルがリクエストを拒否したか、出力をブロックしました。結果は保存されていません。"},
-  "dictGenerationEmpty": {"message": "モデルから回答の本文が返されませんでした。今回の結果は保存されていません。再試行するか、設定でリーダーの AI モデルを変更してください。"},
-  "dictGenerationModelUnavailable": {"message": "プロバイダーは選択されたモデルを見つけられないか、利用できません。モデル名と提供状況を確認し、設定でリーダーの AI モデルを変更してください。"},
-  "dictGenerationBilling": {"message": "プロバイダーがリクエストを拒否しました（HTTP 402）。利用枠、請求状況、アカウントのアクセス権をプロバイダー側で確認してから再試行してください。"},
+  "dictGenerationEmpty": {"message": "モデルから何も返されませんでした。再試行するか、設定でリーダーの AI モデルを変更してください。"},
+  "dictGenerationModelUnavailable": {"message": "プロバイダーはこのモデルを使えません。設定でリーダーの AI モデル名を確認してください。"},
+  "dictGenerationBilling": {"message": "プロバイダーがリクエストを拒否しました（HTTP 402）。プロバイダーの残高やプランを確認してください。"},
   "dictGenerationServiceUnavailable": {"message": "プロバイダーのサービスが一時的に利用できません。しばらくしてからもう一度お試しください。"},
   "dictProgressThinking": {"message": "モデルが考えています…"},
   "dictProgressStreaming": {"message": "回答を受信中…"},
@@ -5083,14 +5063,11 @@
   "bookmarkServiceChoose": {
     "message": "ブックマークの保存先を選択"
   },
-  "bookmarkServiceHint": {
-    "message": "ポップアップ、リーダー、ショートカット、一括保存でこのサービスを使います。"
-  },
   "personalLibraryTitle": {
     "message": "個人ライブラリ"
   },
   "personalLibraryHint": {
-    "message": "単語帳、ハイライト、メモ、Askの履歴は、どのブックマークサービスでも同じ個人ライブラリを使います。"
+    "message": "どのブックマークサービスを使っても、単語帳、ハイライト、メモ、Askの履歴は同じライブラリに残ります。"
   },
   "bookmarkServerUrl": {
     "message": "サーバーURL"
@@ -5105,7 +5082,7 @@
     "message": "サブパスを含むサイトのURLを入力してください。ローカルホスト以外はHTTPSが必要です。"
   },
   "bookmarkTokenLocalHint": {
-    "message": "トークンとゲートウェイの認証情報はこのブラウザーに保存され、このサーバーにだけ送信されます。ほかのデバイスに届くのは、API キーとトークンの同期をオンにした場合だけです。"
+    "message": "トークンとゲートウェイの認証情報はこのブラウザーに保存され、このサーバーにだけ送られます。ほかのデバイスに同期されるのは、API キーとトークンの同期をオンにしたときだけです。"
   },
   "bookmarkKarakeepTokenHelp": {
     "message": "Karakeep の「ユーザ設定 → APIキー」で、フルアクセスの新しいキーを作成します。キーは一度しか表示されないので、作成したらすぐここにコピーしてください。"
@@ -5123,25 +5100,25 @@
     "message": "閲覧中にページ情報を先に読み込む"
   },
   "optLinkdingPreloadHint": {
-    "message": "オンにすると、開いた各ページがlinkdingに保存済みかどうかをツールバーのアイコンに表示し、ポップアップも待たずに開きます。その代わり、アクセスしたすべてのURLがlinkdingサーバーに送られてサーバーのログに残り、サーバー自身もそのページにアクセスします。オフのときは、ポップアップを開いたときだけlinkdingに問い合わせます。"
+    "message": "各ページが保存済みかどうかをツールバーのアイコンに表示します。アクセスしたすべてのURLがlinkdingサーバーに送られ、サーバーもそのページにアクセスします。"
   },
   "optLinkdingBrowserMetadata": {
     "message": "ブラウザーのページタイトルと説明を使う"
   },
   "optLinkdingBrowserMetadataHint": {
-    "message": "新しいブックマークには、ブラウザーに表示されているページのタイトルと説明が入ります。オフにすると、linkdingサーバーがページから読み取った内容が入ります。読み込み後に内容が変わるページや、ログインが必要なページでは、両者が異なることがあります。"
+    "message": "オフにすると、linkdingサーバーがページからタイトルと説明を読み取ります。ログインが必要なページや、読み込み後に内容が変わるページでは、結果が異なることがあります。"
   },
   "optLinkdingSingleFile": {
     "message": "ブックマークの追加後にSingleFileを実行"
   },
   "optLinkdingSingleFileHint": {
-    "message": "ポップアップまたはクイック保存で新しいブックマークを追加すると、SingleFileがページの完全なコピーを保存し、linkdingはそのブックマークのHTMLスナップショットを作りません。linkding 1.39以降とSingleFile拡張機能が必要です。SingleFileのオプションで保存先（destination）をREST形式APIへのアップロードにして、次のように入力します。URLはlinkdingのアドレスの後に /api/bookmarks/singlefile/ を付けたもの（linkdingのアドレスだけではアップロードに失敗します）、認証トークン（authorization token）はlinkdingの設定ページにあるAPIトークンを「Token」を付けずに、データのフィールド名（data field name）は file、URLのフィールド名（URL field name）は url です。ページはSingleFileが直接linkdingにアップロードし、この拡張機能はファイルを扱いません。"
+    "message": "linkding 1.39以降とSingleFile拡張機能が必要です。SingleFileのオプションで保存先（destination）をREST形式APIへのアップロードにして、次のように入力します。URL：linkdingのアドレスの後に /api/bookmarks/singlefile/ を付けたもの。認証トークン（authorization token）：linkdingのAPIトークン（「Token」は付けない）。データのフィールド名（data field name）：file。URLのフィールド名（URL field name）：url。"
   },
   "optLinkdingSingleFileDocs": {
     "message": "SingleFileによるアーカイブ（linkdingのガイド）"
   },
   "optCheckBookmarkStatusLinkding": {
-    "message": "linkdingでは、「閲覧中にページ情報を先に読み込む」がオンのときだけ、ページがブックマーク済みかどうかをツールバーのアイコンに表示します。この設定は「アカウント」タブのlinkding接続設定にあります。"
+    "message": "linkdingでは、「アカウント」タブの「閲覧中にページ情報を先に読み込む」もオンにしてください。"
   },
   "bookmarkGatewayLabel": {
     "message": "アクセスゲートウェイ"
@@ -5184,7 +5161,7 @@
     "message": "値"
   },
   "bookmarkGatewayNoneHint": {
-    "message": "サーバーの前にログインを求めるゲートウェイ（Cloudflare Access など）がある場合にだけ設定します。サーバーに直接アクセスできるなら「なし」のままにしてください。"
+    "message": "サーバーの前にログイン用のゲートウェイ（Cloudflare Access など）がある場合だけ設定します。"
   },
   "bookmarkGatewayHeaderNameN": {
     "message": "ヘッダー $N$ の名前",
@@ -5210,7 +5187,7 @@
     "message": "ヘッダー名が無効です。X-Auth-Tokenのように、64文字以内の英字、数字、ハイフンで入力してください。"
   },
   "bookmarkGatewayErrNameForbidden": {
-    "message": "このヘッダーはここでは指定できません。ブラウザーが管理するヘッダーか、拡張機能が自ら送信するヘッダー（AuthorizationやCookieなど）です。"
+    "message": "Authorization や Cookie などのヘッダーはここでは指定できません。"
   },
   "bookmarkGatewayErrDuplicate": {
     "message": "同じヘッダー名は一度しか使えません（大文字と小文字は区別しません）。"
@@ -5251,7 +5228,7 @@
     "message": "設定でこのサーバーへのアクセスを許可してから、再接続してください。"
   },
   "bookmarkKarakeepHint": {
-    "message": "「後で読む」には専用の非公開リストを使います。既読にするとリストから外れます。サービス内のアーカイブ状態は変わりません。"
+    "message": "「後で読む」は Karakeep の非公開リストです。既読にするとリストから外れますが、アーカイブ状態は変わりません。"
   },
   "bookmarkReadLaterListName": {
     "message": "後で読む"
@@ -5264,13 +5241,13 @@
   "bookmarkPartialSavePopupReadLater": {"message": "ブックマークは保存されましたが、「あとで読む」の状態は変更されていません。もう一度「更新」を押すと反映します。"},
   "bookmarkPartialSavePopupBookmark": {"message": "タイトルとメモは更新されず、ブックマークは変更されていません。もう一度「更新」を押すと、変更を反映します。"},
   "bookmarkErrGatewayRedirect": {
-    "message": "サーバーがリクエストをリダイレクトしました。まずアドレスとポートを確認してください。Karakeep または linkding 自体を指している必要があります。正しい場合は、Cloudflare Accessなど、ログインを求めるアクセスゲートウェイが原因かもしれません。「アクセスゲートウェイ」にサービストークンを入力するか、ゲートウェイでAPIのパスを許可してください。"
+    "message": "サーバーがリクエストをリダイレクトしました。アドレスとポートが Karakeep または linkding 自体を指しているか確認してください。正しい場合は、ログイン用のゲートウェイがリダイレクトしている可能性があります。「アクセスゲートウェイ」にサービストークンを入力するか、ゲートウェイでAPIのパスを許可してください。"
   },
   "bgTabSetPinboardOnly": {"message": "タブセットは Pinboard でのみ使えます。使うには、設定でブックマークサービスを Pinboard に切り替えてください。"},
   "bookmarkDisconnect": {"message": "接続を解除"},
   "bookmarkDisconnectConfirm": {"message": "このサービスとの接続を解除しますか？"},
   "bookmarkDisconnectDetail": {"message": "API トークンとアクセスゲートウェイの認証情報をこのブラウザーから削除します。「接続」を押すと、いつでも再接続できます。"},
-  "bookmarkDisconnectDetailLinkding": {"message": "API トークンとアクセスゲートウェイの認証情報をこのブラウザーから削除します。同じアドレスとトークンで再接続しても新しい接続として扱われ、以前の接続で待機中の保存は自動で再試行されません。"},
+  "bookmarkDisconnectDetailLinkding": {"message": "API トークンとアクセスゲートウェイの認証情報をこのブラウザーから削除します。待機中の保存は、再接続しても再試行されません。"},
   "bookmarkDisconnected": {"message": "接続を解除しました"},
   "bookmarkDisconnectFailed": {"message": "接続を解除できませんでした。変更が保存されませんでした。もう一度お試しください。"},
   "bookmarkServicePending": {"message": "$SERVICE$ に接続するまで、ブックマークは引き続き $ACTIVE$ に保存されます。", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
@@ -5282,10 +5259,10 @@
   "backupBookmarkServiceNotConnected": {"message": "バックアップでは $SERVICE$ が選ばれていますが、このデバイスでは接続していません。$SERVICE$ に接続するまで、ブックマークは引き続き $ACTIVE$ に保存されます。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "バックアップでは $SERVICE$ が選ばれていますが、このデバイスでは接続していません。復元した認証情報で接続できた場合にだけ切り替わり、それ以外はブックマークは引き続き $ACTIVE$ に保存されます。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
-    "message": "セキュリティチェック（ボット判定）でリクエストがブロックされました。よくある原因はCloudflareのセキュリティルールです。ルールでAPIのパスを許可してください。"
+    "message": "ボット判定でリクエストがブロックされました。Cloudflareなどのセキュリティルールで、APIのパスを許可してください。"
   },
   "bookmarkErrGatewayBasic": {
-    "message": "サーバーの手前にあるプロキシがユーザー名とパスワード（Basic認証）を求めています。ブックマークサービスのトークンとは併用できないため、プロキシでAPIのパスを許可してください。"
+    "message": "サーバーの手前にあるプロキシがユーザー名とパスワードを求めています。トークンとは併用できないため、プロキシでAPIのパスを許可してください。"
   },
   "bookmarkErrGatewayDenied": {
     "message": "サーバーの手前にあるゲートウェイがリクエストを拒否しました。「アクセスゲートウェイ」の認証情報が正しいか、ゲートウェイのポリシーで許可されているかを確認してください。Cloudflareでは、ポリシーのアクションをService Authにする必要があります。"
@@ -5308,7 +5285,7 @@
     }
   },
   "bgTagTooLongSkip": {
-    "message": "linkding はこのページをタグなしで保存しました。タグ「$TAG$」が上限（$MAX$ 文字）を超えています。ショートカットでの保存はブックマーク済みのページをスキップするため、タグを短くしてからポップアップで追加してください。",
+    "message": "linkding はこのページをタグなしで保存しました。「$TAG$」が上限（$MAX$ 文字）を超えています。タグを短くしてから、ポップアップで追加してください。",
     "placeholders": {
       "tag": {
         "content": "$1"
@@ -5342,7 +5319,7 @@
     }
   },
   "bookmarkErrTooLarge": {
-    "message": "リクエストが大きすぎるため拒否されました（HTTP 413）。サーバーの手前にあるリバースプロキシがリクエストサイズを制限している可能性があります（nginxのclient_max_body_sizeなど）。メモや説明を短くするか、プロキシの上限を引き上げてください。"
+    "message": "ブックマークが大きすぎるため、サーバーに拒否されました（HTTP 413）。メモや説明を短くするか、プロキシのアップロード上限（nginxのclient_max_body_sizeなど）を引き上げてください。"
   },
   "bookmarkErrInvalidResponse": {
     "message": "ブックマークサーバーから読み取れないデータが返されました。URLがKarakeepまたはlinkding本体を指しているか、サポート対象のバージョンかを確認してください。"
@@ -5368,6 +5345,6 @@
     "message": "ブックマークサービスを選択"
   },
   "backupAdoptLibrary": {
-    "message": "個人ライブラリは空です。単語帳またはハイライトを復元すると、バックアップのライブラリを引き継ぎ、既存の Drive データも引き続き利用できます。"
+    "message": "個人ライブラリが空なので、単語帳やハイライトを復元するとバックアップのライブラリに切り替わります。その Google Drive のデータも引き続き使えます。"
   }
 }

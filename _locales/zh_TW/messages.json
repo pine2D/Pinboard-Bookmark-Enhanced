@@ -176,7 +176,7 @@
     "message": "AI 標籤"
   },
   "urlWarning": {
-    "message": "此頁面的網址類型不受支援，無法儲存為書籤。"
+    "message": "此頁面無法儲存為書籤。"
   },
   "urlCannotSave": {
     "message": "無法儲存：不支援的網址類型"
@@ -195,7 +195,7 @@
   },
   "saveMergedExisting": {"message": "這個網址已存在於服務中，變更已合併至原有書籤。"},
   "saveMergedKarakeepNote": {"message": "Karakeep 已將書籤移出封存，並更新儲存時間。"},
-  "saveMergedLinkdingOverwrite": {"message": "這個網址在 linkding 中已有書籤。原書籤的標題、描述、備註、稍後閱讀和分享狀態已改為這次填寫的內容，標籤也已換成這次的標籤。"},
+  "saveMergedLinkdingOverwrite": {"message": "這個網址在 linkding 中已有書籤，已全部換成這次填寫的內容，包括標籤。"},
   "bookmarkSaved": {
     "message": "書籤已儲存"
   },
@@ -232,7 +232,7 @@
   },
   "confirmLogoutDetail": {"message": "API Token 將被移除，尚未儲存的書籤草稿將會捨棄。"},
   "confirmLogoutDetailKarakeep": {"message": "API Token 和存取閘道憑證將被移除，尚未儲存的書籤草稿將會捨棄。"},
-  "confirmLogoutDetailLinkding": {"message": "API Token 和存取閘道憑證將被移除，尚未儲存的書籤草稿將會捨棄。之後即使用同一位址和 Token 再次連線，也會視為新連線，原連線中尚未送出的儲存不再自動重試。"},
+  "confirmLogoutDetailLinkding": {"message": "API Token 和存取閘道憑證將被移除，尚未儲存的書籤草稿將會捨棄。尚未送出的儲存不會再重試，即使重新連線也一樣。"},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -604,7 +604,7 @@
     }
   },
   "batchTagTooLongSkip": {
-    "message": "。另有 $COUNT$ 個已存成沒有標籤的書籤：標籤「$TAG$」超過 linkding 的 $MAX$ 個字元上限。請縮短後關閉「跳過已收藏的網址」再批次儲存，或在彈窗中逐一補上標籤。",
+    "message": "。另有 $COUNT$ 個已存成沒有標籤的書籤：「$TAG$」超過 linkding 的 $MAX$ 個字元上限。請縮短後關閉「跳過已收藏的網址」，再重新批次儲存。",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -940,7 +940,7 @@
     "message": "無法擷取此頁面，請重試。"
   },
   "mdSiteTargetMissing": {
-    "message": "目標貼文尚未完整載入，或無法確認貼文身分。請開啟原頁面，待目標貼文出現後再試。"
+    "message": "貼文還沒載入完成或找不到。請開啟原頁面，等貼文出現後再試。"
   },
   "mdEngineTabGone": {
     "message": "原分頁已無法使用，請重新開啟該頁面才能使用 Defuddle。"
@@ -1071,7 +1071,7 @@
     "message": "沒有符合篩選條件的筆記。"
   },
   "notesHiddenByOwner": {
-    "message": "部分標記屬於其他歷史資料庫，尚未合併至目前的個人資料庫。"
+    "message": "部分標記屬於舊的資料庫，沒有顯示在這裡。"
   },
   "notesUnknownPage": {
     "message": "未知頁面"
@@ -1194,7 +1194,10 @@
     "message": "彈窗中的備註"
   },
   "optAutoDescription": {
-    "message": "自動填入網頁描述：linkding 寫入描述，其他服務僅在未選取文字時寫入備註"
+    "message": "自動填入網頁描述"
+  },
+  "optAutoDescriptionHint": {
+    "message": "linkding 寫入「描述」；其他服務寫入備註，但只在未選取文字時寫入。"
   },
   "optBlockquote": {
     "message": "將選取文字標為引用"
@@ -1209,7 +1212,7 @@
     "message": "沿用現有標籤的寫法"
   },
   "optRespectTagCaseHint": {
-    "message": "同一標籤若有不同寫法（只差大小寫，或只差空格、連字號、底線），會採用最常用的寫法；書籤上原有的標籤維持不變。"
+    "message": "同一個標籤有幾種寫法時（例如 JavaScript 和 javascript），採用你最常用的那種。書籤上已有的標籤不變。"
   },
   "optShowSuggestTags": {
     "message": "在彈出式視窗中顯示 Pinboard 推薦標籤"
@@ -1223,17 +1226,11 @@
   "optShowQuickLinks": {
     "message": "在彈出式視窗中顯示快捷連結"
   },
-  "optShowQuickLinksHint": {
-    "message": "包括分頁集、社交網路、待讀、筆記和熱門。"
-  },
   "optShowQuickRow": {
     "message": "在彈出式視窗中顯示快捷操作按鈕"
   },
-  "optShowQuickRowHint": {
-    "message": "包括儲存分頁集、批次儲存和閱讀器。"
-  },
   "tagSyncLabel": {
-    "message": "標籤快取策略"
+    "message": "標籤自動完成的載入方式"
   },
   "tagSyncCached": {
     "message": "快取"
@@ -1245,16 +1242,13 @@
     "message": "即時"
   },
   "tagSyncFreshDesc": {
-    "message": "每次開啟彈出式視窗都重新請求，較慢。"
+    "message": "每次開啟彈出式視窗都重新載入，較慢。"
   },
   "tagSyncPrewarmed": {
-    "message": "預熱"
+    "message": "背景更新"
   },
   "tagSyncPrewarmedDesc": {
-    "message": "背景每 15 分鐘更新一次，開啟彈出式視窗即可使用。"
-  },
-  "tagSyncHint": {
-    "message": "選擇何時載入既有標籤以供自動補全。載入不會修改伺服器上的標籤。"
+    "message": "每 15 分鐘更新一次，開啟彈出式視窗即可使用。"
   },
   "labelTagPresets": {
     "message": "標籤預設"
@@ -1292,14 +1286,11 @@
   "backupIncludeVocabularyLabel": {
     "message": "在備份中包含生詞"
   },
-  "backupIncludeVocabularyHint": {
-    "message": "只包含個人資料庫的生詞。"
-  },
   "backupIncludeSecretsLabel": {
     "message": "在備份中包含 API Key 和 Token"
   },
   "backupIncludeSecretsHint": {
-    "message": "會把全部憑證以明文寫進檔案：Pinboard/Karakeep/linkding API Token、存取閘道憑證、所有 AI 服務商的 API Key，以及 Jina、Wayback、Anki、歐路詞典、Notion、Gist 和 Webhook 的憑證。任何人開啟檔案都能直接使用。請按保管密碼的方式保管這個檔案。"
+    "message": "Pinboard、Karakeep、linkding 的 API Token 和其他所有 Key 與憑證都會以明文儲存，拿到檔案的人都能使用。"
   },
   "backupSecretsExportTitle": {"message": "要匯出包含憑證的備份嗎？"},
   "backupSecretsExportConfirm": {
@@ -1321,13 +1312,13 @@
     "message": "此備份含明文憑證。只在你確認檔案來源可靠時才匯入。"
   },
   "backupVocabOwnerMissing": {
-    "message": "目前沒有可用的 個人資料庫，因此未包含生詞。其他已選資料仍已匯出。"
+    "message": "個人資料庫暫時無法使用，未包含生詞。其他已選資料已匯出。"
   },
   "backupHighlightsOwnerMissing": {
-    "message": "目前沒有可用的 個人資料庫，因此未包含歸屬帳號的標記與筆記。其他已選資料仍已匯出。"
+    "message": "個人資料庫暫時無法使用，未包含其中的標記與筆記。其他已選資料已匯出。"
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "目前沒有可用的 個人資料庫，因此未包含生詞和歸屬帳號的標記與筆記。其他已選資料仍已匯出。"
+    "message": "個人資料庫暫時無法使用，未包含其中的生詞、標記與筆記。其他已選資料已匯出。"
   },
   "backupPreviewTitle": {
     "message": "匯入預覽"
@@ -1530,7 +1521,7 @@
     "message": "未設定"
   },
   "qsAutoNotes": {
-    "message": "填入網頁描述：linkding 寫入描述，其他服務僅在未選取文字時寫入備註"
+    "message": "填入網頁描述"
   },
   "qsBlockquote": {
     "message": "將選取文字標為引用"
@@ -1545,7 +1536,7 @@
     "message": "自動產生 AI 標籤"
   },
   "qsAiSummary": {
-    "message": "自動產生 AI 摘要：linkding 寫入描述，其他服務寫入備註"
+    "message": "自動產生 AI 摘要"
   },
   "secReadLater": {
     "message": "稍後閱讀"
@@ -1560,7 +1551,7 @@
     "message": "標籤（逗號分隔）"
   },
   "batchTagsHint": {
-    "message": "多個標籤請用逗號分隔。新標籤內的空格會換成「多詞標籤分隔符」（在「AI 行為」中設定）。例如 batch_saved, research"
+    "message": "新標籤內的空格會換成「多詞標籤分隔符」（在「AI 行為」中設定）。例如 batch_saved, research"
   },
   "batchAiTags": {
     "message": "為每個分頁自動產生 AI 標籤"
@@ -1680,10 +1671,10 @@
     "message": "業務空間 ID（選填）"
   },
   "hintQwenRegion": {
-    "message": "API Key 只在所屬地區有效，選錯地區會傳回 401。DeepSeek、Kimi 等第三方模型只在北京地區提供。"
+    "message": "請選擇 API Key 所屬的地區。DeepSeek、Kimi 等第三方模型只在北京地區提供。"
   },
   "hintQwenWorkspace": {
-    "message": "填寫後請求會改用該業務空間的專屬位址。東京地區沒有公用位址，必須填寫。"
+    "message": "東京地區必須填寫。"
   },
   "hintOpenAIBaseUrl": {
     "message": "可改為代理或相容端點的網址"
@@ -1817,7 +1808,7 @@
     "message": "擴充功能頁面跟隨 Pinboard 主題預設"
   },
   "popupFollowHint": {
-    "message": "啟用後，彈出視窗、此設定頁和資料庫頁會使用所選 Pinboard 預設的配色；關閉則依上方的明暗模式使用預設配色。閱讀器一律使用自己的閱讀配色。"
+    "message": "彈出式視窗、設定頁和資料庫使用所選 Pinboard 預設的配色，閱讀器保持自己的配色。"
   },
   "optFollowNeedsPreset": {
     "message": "先在下方選一個 Pinboard 預設。選「不使用預設」時沒有可跟隨的配色。"
@@ -1830,7 +1821,7 @@
       }
     }
   },
-  "optThemeHint": { "message": "切換彈出視窗、此設定頁、資料庫頁和閱讀器的明暗。自帶明暗的預設（例如 Dracula）會在跟隨預設的頁面上覆寫此項；閱讀器可在其「Aa」面板中依裝置單獨覆寫。" },
+  "optThemeHint": { "message": "套用於彈出式視窗、設定頁、資料庫和閱讀器。Dracula 等自帶明暗的預設會覆寫此項；閱讀器可在「Aa」面板單獨設定。" },
   "secPopupElements": {
     "message": "彈出式視窗元素"
   },
@@ -2113,7 +2104,7 @@
     "message": "名稱"
   },
   "hintCustomBaseUrlAnthropic": {
-    "message": "請求時會在此網址後加上 /messages，網址須包含版本段，例如 …/v1"
+    "message": "網址以版本結尾，例如 …/v1，不要加 /messages。"
   },
   "aiCustomBaseUrlInvalid": {
     "message": "網址須以 https:// 開頭（只有本機位址可用 http://），這個網址未儲存。"
@@ -2563,14 +2554,8 @@
   "optUrlCleanOnOpen": {
     "message": "開啟彈出式視窗時清理"
   },
-  "optUrlCleanOnOpenHint": {
-    "message": "靜默清理，彈出式視窗中有撤銷連結，可還原原本的網址。"
-  },
   "optUrlCleanOnPaste": {
     "message": "貼上 URL 時清理"
-  },
-  "optUrlCleanOnPasteHint": {
-    "message": "清理後會跳出提示，可撤銷並保留原本的網址。"
   },
   "optUrlCleanAggressive": {
     "message": "激進模式：額外清除 ref / si / igshid 等參數（可能導致部分連結失效）"
@@ -2672,7 +2657,7 @@
     "message": "儲存為私密的書籤一律不提交到 archive.org"
   },
   "waybackSelfHostedPrivateHint": {
-    "message": "Karakeep 書籤和未分享的 linkding 書籤都視為私密，預設不會自動封存。儲存時可手動勾選「封存」，或關閉「儲存為私密的書籤一律不提交到 archive.org」。"
+    "message": "Karakeep 書籤和未分享的 linkding 書籤都算私密，預設不會自動封存。可在儲存時勾選「封存」，或關閉「儲存為私密的書籤一律不提交到 archive.org」。"
   },
   "waybackPermDenied": {
     "message": "存檔需要 web.archive.org 的存取權限，目前尚未授予。重新開啟存檔即可再次申請。"
@@ -2895,7 +2880,7 @@
     "message": "標籤中殘留的實體編碼"
   },
   "tagGovEntityHint": {
-    "message": "修復會重新儲存帶有所選標籤的每筆書籤，將標籤換成修復後的名稱，無法復原。確認之前不會變更任何內容。"
+    "message": "修復會把所有相關書籤上的標籤改成修復後的名稱，無法復原。"
   },
   "tagGovEntityScan": {
     "message": "掃描標籤"
@@ -2913,7 +2898,7 @@
     "message": "併入既有標籤"
   },
   "tagGovEntityConfirm": {
-    "message": "修復 $N$ 個標籤？這些標籤下的書籤會以修復後的名稱重新儲存。確實應該包含此類文字的標籤，請先取消勾選。",
+    "message": "修復 $N$ 個標籤？要保留這類字元的標籤，請先取消勾選。",
     "placeholders": {
       "N": {
         "content": "$1"
@@ -3055,7 +3040,7 @@
     "message": "跳過"
   },
   "optBgSaveModeSkipDesc": {
-    "message": "不做任何變更，已儲存的書籤保持原樣。"
+    "message": "書籤保持原樣。"
   },
   "optBgSaveModeOverwrite": {
     "message": "覆蓋"
@@ -3785,11 +3770,11 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "連線後，同步個人資料庫的生詞、標記與筆記、完整 AI 詞條及補充，以及已儲存的問答和引用。"
+      "message": "同步生詞、標記、筆記、AI 詞條和已儲存的問答。"
     },
     "vocabDriveConnectionHint": { "message": "每部裝置需個別連線。Google Drive 不同步設定或憑證。" },
     "vocabDriveDisclosure": {
-      "message": "副本以明文儲存在 Google Drive 的擴充功能專用資料夾中，未經端對端加密。除了已儲存的內容，還可能包含產生補充時使用的學習偏好、引用原文、來源網址、標題與時間。"
+      "message": "資料以明文儲存在你 Google Drive 中的擴充功能專用資料夾，未經端對端加密，也包含來源網址、標題、時間和學習偏好。"
     },
     "vocabDriveLoading": {
       "message": "正在讀取 Google Drive 同步狀態…"
@@ -4653,7 +4638,7 @@
   "diagnosticsCopied": { "message": "已複製診斷資訊" },
   "diagnosticsCopyFailed": { "message": "無法複製診斷資訊，請檢查剪貼簿權限後再試一次。" },
   "libraryVocabSignedOutTitle": { "message": "登入後使用生詞本" },
-  "libraryVocabSignedOutHint": { "message": "所有書籤服務共用個人資料庫中的生詞、螢光標記、筆記與 Ask 歷史。" },
+  "libraryVocabSignedOutHint": { "message": "無論使用哪個書籤服務，生詞、螢光標記、筆記和 Ask 歷史都在同一個資料庫裡。" },
   "libraryVocabOpenSettings": { "message": "開啟帳號設定" },
   "libraryLookupSignedOutHint": { "message": "可在「詞典」欄查詢單字；登入後即可儲存到生詞本。" },
   "mdPreviewClose": { "message": "關閉閱讀器" },
@@ -4831,7 +4816,7 @@
   "mdExportContextChanged": {"message": "帳號、文章或問答紀錄已變更，請重新開始匯出。"},
   "themeGroupAdaptiveHint": {"message": "自適應預設會依照上方「擴充功能外觀」的明暗設定切換。"},
   "dictDefinitionLangLabel": { "message": "AI 詞條釋義語言" },
-  "dictDefinitionLangHint": {"message": "AI 詞條與補充用法預設以母語解釋；未填寫母語時使用介面語言。在此選擇其他語言可覆寫預設值。一般詞典釋義與引文保留原本語言。"},
+  "dictDefinitionLangHint": {"message": "AI 詞條預設以母語解釋，未填寫母語時使用介面語言。一般詞典釋義和引文保留原本語言。"},
   "dictDefinitionLangUi": {"message": "跟隨母語"},
   "vocabLanguageFilterAria": { "message": "依語言篩選" },
   "vocabAllLanguages": { "message": "所有語言" },
@@ -4848,13 +4833,13 @@
   "dictAnkiFormatLabel": { "message": "Anki 筆記格式" },
   "dictAnkiFormatLegacy": { "message": "原版（六欄位）" },
   "dictAnkiFormatMultilingual": { "message": "多語言（完整資訊）" },
-  "dictAnkiFormatHint": { "message": "多語言格式使用獨立的筆記類型，可能在原有卡片之外新增卡片。再次傳送時會略過已有筆記，不會更新內容。" },
+  "dictAnkiFormatHint": { "message": "多語言格式使用獨立的筆記類型，已有的詞可能多出一張卡片。再次傳送會略過已有筆記，不會更新內容。" },
   "dictExportCompleteTsv": { "message": "匯出完整 TSV" },
   "dictExportLegacyTsv": { "message": "匯出六欄位 TSV" },
   "vocabCompleteExportHint": { "message": "完整 TSV 包含語言、原形、筆記與各段語境對應的來源。還原本擴充功能的資料請使用 JSON 備份。" },
   "dictAnkiModelMismatchNamed": {"message": "Anki 中「$MODEL$」筆記類型的欄位不符。請還原原始欄位，或重新命名此類型以便建立新的筆記類型，再試一次。", "placeholders": {"model": {"content": "$1"}}},
   "multiPackSection": {"message": "多語言離線詞典"},
-  "multiPackHint": {"message": "匯入 Yomitan v3 ZIP 詞典。釋義與讀音儲存在本機，不匯入樣式、圖片和音訊。"},
+  "multiPackHint": {"message": "匯入 Yomitan v3 詞典（ZIP），只儲存在本機，不匯入樣式、圖片和音訊。"},
   "multiPackBrowse": {"message": "尋找詞典檔案"},
   "multiPackChoose": {"message": "選擇 ZIP 檔案"},
   "multiPackEmpty": {"message": "尚未安裝多語言詞典。"},
@@ -4864,7 +4849,7 @@
   "multiPackLanguageHint": {"message": "使用語言代碼，例如 de、en 或 zh-Hant。匯入前請確認兩種語言。"},
   "multiPackSourceUrl": {"message": "來源網址（選填）"},
   "multiPackLicense": {"message": "授權聲明（選填）"},
-  "multiPackLicenseHint": {"message": "這些資訊來自檔案或手動編輯。使用或分享內容前，請確認來源的授權條款。"},
+  "multiPackLicenseHint": {"message": "使用或分享詞典內容前，請先確認來源的授權條款。"},
   "multiPackInspecting": {"message": "正在讀取詞典資訊…"},
   "multiPackPreview": {"message": "確認詞典"},
   "multiPackInstall": {"message": "匯入詞典"},
@@ -4874,8 +4859,6 @@
   "multiPackDisable": {"message": "停用"},
   "multiPackAllowAi": {"message": "允許 AI 使用"},
   "multiPackBlockAi": {"message": "停止 AI 使用"},
-  "multiPackAiHint": {"message": "預設不允許 AI 使用。只有來源條款允許將釋義傳送給已設定的 AI 服務商時，才應開啟。"},
-  "multiPackAiConfirm": {"message": "要允許在使用 AI 輔助時，將此詞典的釋義傳送給已設定的 AI 服務商嗎？請先確認其條款允許此用途。"},
   "multiPackSummary": {"message": "$SOURCE$ / $TARGET$ · $COUNT$ 筆 · $REVISION$", "placeholders": {"source": {"content": "$1"}, "target": {"content": "$2"}, "count": {"content": "$3"}, "revision": {"content": "$4"}}},
   "multiPackNotDeclared": {"message": "未聲明"},
   "multiPackCancelled": {"message": "已取消匯入，已安裝詞典維持不變。"},
@@ -4890,7 +4873,6 @@
   "dictOnlineLanguageUnavailable": {"message": "此語言暫不支援線上查詞。"},
   "dictTagReading": {"message": "讀音"},
   "dictAssistRecommend": {"message": "用 AI 比對詞義"},
-  "dictAssistExplain": {"message": "用 AI 解釋詞義"},
   "dictAssistUseMeaning": {"message": "選取此詞典詞義"},
   "dictAssistNeedContext": {"message": "若要比對詞義，請在句子中查詞，或開啟附有來源句子的已存生詞。"},
   "dictAssistChooseMeaning": {"message": "請選取要解釋的詞典詞義。"},
@@ -4907,7 +4889,6 @@
   "dictAssistFailed": {"message": "AI 未能完成這次請求。請重試。"},
   "dictAssistAllowedSources": {"message": "僅使用已獲准供 AI 使用的詞典來源。"},
   "dictAssistAnalyze": {"message": "用 AI 分析"},
-  "dictAssistAnalysisHint": {"message": "依原句分析所選表達。"},
   "dictAssistAnalysisNeedsMatch": {"message": "無法在這句中找到所選表達。請查詢原句中的詞形。"},
   "dictAssistAnalysisEmpty": {"message": "未找到有原句依據的原形或片語建議。"},
   "dictAssistLemmaSuggestion": {"message": "可能的原形"},
@@ -4934,15 +4915,14 @@
   "dictEntryShowAi": {"message": "查看 AI 詞條"},
   "dictEntryNotCached": {"message": "無法儲存詞條。請保留查詞視窗，重試儲存。"},
   "dictAiAutoGenerateLabel": {"message": "自動產生 AI 詞條"},
-  "dictAiAutoGenerateHint": {"message": "查詞時若沒有已快取的 AI 詞條，使用閱讀器的 AI 模型產生，會消耗 tokens。預設關閉，仍可手動產生。"},
   "dictDefaultViewLabel": {"message": "查詞預設顯示"},
-  "dictDefaultViewHint": {"message": "詞典結果一律排在最前，這裡只決定其後 AI 詞條的初始顯示：收成一行時點開才展開，另外兩項直接展開。只有「缺少時自動產生」會自動消耗 token。"},
+  "dictDefaultViewHint": {"message": "詞典結果一律排在最前。只有「缺少時自動產生」會自動消耗 token。"},
   "dictDefaultDictionary": {"message": "已儲存的 AI 詞條收成一行"},
   "dictDefaultAiSaved": {"message": "展開已儲存的 AI 詞條"},
   "dictDefaultAiGenerate": {"message": "展開 AI 詞條，缺少時自動產生"},
   "dictLearnerNativeLanguageLabel": {"message": "母語（選填）"},
   "dictLearnerNativeLanguagePlaceholder": {"message": "例如：西班牙語"},
-  "dictLearnerProfileHint": {"message": "母語決定預設的 AI 解釋語言，也用於調整詞語比較；學習程度用於調整解釋難度與例句。這些設定不會觸發產生內容。"},
+  "dictLearnerProfileHint": {"message": "AI 詞條依此決定解釋語言和難度。修改這些設定不會消耗 token。"},
   "dictLearnerLevelLabel": {"message": "學習程度（選填）"},
   "dictLearnerLevelUnspecified": {"message": "未指定"},
   "dictLearnerLevelBeginner": {"message": "初級"},
@@ -4954,7 +4934,7 @@
   "dictLearningUsagePoints": {"message": "用法要點"},
   "dictLearningEtymology": {"message": "詞源"},
   "dictExamplesTitle": {"message": "原文用例"},
-  "dictExamplesHint": {"message": "在 Wikisource 檢索含這個詞的原句，不呼叫 AI，也不翻譯。"},
+  "dictExamplesHint": {"message": "來自 Wikisource 的原句，不翻譯，不呼叫 AI。"},
   "dictExamplesFind": {"message": "尋找原文用例"},
   "dictExamplesNone": {"message": "本次檢索未找到可核實的原文。"},
   "dictNegRetry": {"message": "上次未找到 · 再試"},
@@ -4987,7 +4967,7 @@
   "dictEntryRetrySave": {"message": "重試儲存"},
   "driveDictionaryStatus": {"message": "AI 詞條：$STATUS$", "placeholders": {"status": {"content": "$1"}}},
   "driveDictionaryErrorEntryTooLarge": {"message": "AI 詞條過大，無法同步。此裝置的內容已保留，請按「立即同步」重試。"},
-  "dictSupplementUnsupported": {"message": "AI 未能提供有依據的補充內容。本次已呼叫 AI。"},
+  "dictSupplementUnsupported": {"message": "AI 找不到依據，沒有提供內容。這次請求仍消耗了 token。"},
   "askNewConversation": {"message": "新對話"},
   "askHistory": {"message": "歷史對話"},
   "askTemporary": {"message": "不儲存此臨時對話"},
@@ -5019,37 +4999,37 @@
   "driveAskErrorEntryTooLarge": {"message": "有一則回答超出同步大小限制，仍儲存在此裝置。"},
   "askHistoryUnavailable": {"message": "此對話已刪除或在此裝置上無法使用。可以開始新對話繼續提問。"},
   "askHistoryKeysMove": {"message": "上一個或下一個對話"},
-  "dictMeaningDefaultHelp": {"message": "已預先選好一項解釋，可直接儲存。手動更換後，這次查詞會保留你的選擇。"},
-  "dictMeaningManualHelp": {"message": "將儲存你選取的解釋。這次查詞會保留這個選擇。"},
-  "dictMeaningSavedHelp": {"message": "已儲存的解釋不會自動變更。選取一項解釋後，即可更新這個生詞。"},
-  "dictMeaningChooseHelp": {"message": "請選取要儲存的解釋；這次查詞會保留你的選擇。"},
+  "dictMeaningDefaultHelp": {"message": "將儲存這項解釋，也可以改選其他。"},
+  "dictMeaningManualHelp": {"message": "將儲存你選取的解釋。"},
+  "dictMeaningSavedHelp": {"message": "選取一項解釋即可取代已儲存的解釋。"},
+  "dictMeaningChooseHelp": {"message": "請選取要儲存的解釋。"},
   "dictMeaningChange": {"message": "更換"},
   "dictFullEntry": {"message": "完整詞條"},
-  "dictFullEntryOnlyHint": {"message": "這個詞條尚未拆分出個別解釋。你可以閱讀全文，或選取其他詞典來源的解釋來儲存。"},
-  "multiPackReimportHint": {"message": "重新匯入同一個詞包，便可重新辨識釋義結構。既有生詞與詞包的啟用狀態維持不變。"},
+  "dictFullEntryOnlyHint": {"message": "這個詞條沒有分項解釋。要儲存解釋，請選取其他詞典。"},
+  "multiPackReimportHint": {"message": "重新匯入這個詞包可更新釋義，已存生詞和啟用狀態不變。"},
   "dictEntryFormation": {"message": "構詞"},
   "dictEntryHistory": {"message": "歷史來源"},
-  "dictEntryNoHistory": {"message": "尚無可核實的詞源資料；此處僅顯示構詞與詞彙關聯。"},
+  "dictEntryNoHistory": {"message": "找不到可靠的詞源資料，只顯示構詞和相關詞。"},
   "dictEntryRelationFamily": {"message": "同詞族"},
   "dictEntryRelationCognate": {"message": "同源詞"},
   "dictEntryRelationSynonym": {"message": "近義詞"},
   "dictEntryRelationTopic": {"message": "同主題詞"},
   "dictSupplementLanguage": {"message": "解釋語言：$LANGUAGE$", "placeholders": {"language": {"content": "$1"}}},
   "dictSupplementEtymology": {"message": "詞源與相關詞"},
-  "dictEtymologyHint": {"message": "按需產生構詞、詞源與相關詞。歷史詞源只依查得的資料說明。"},
+  "dictEtymologyHint": {"message": "構詞、詞源和相關詞。詞源只依據查得的資料。"},
   "dictEtymologyGenerating": {"message": "正在產生詞源與相關詞…"},
   "dictSupplementPartial": {"message": "已保留 $ACCEPTED$ 項，另有 $OMITTED$ 項未通過核對，已略去。", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
   "dictSupplementOriginal": {"message": "AI 編寫例句"},
   "dictSupplementMeaning": {"message": "這裡指：$MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "更新此補充"},
-  "dictSupplementUpdateHint": {"message": "會重新產生並消耗 token；舊結果仍會保留，連線 Drive 後一併同步。"},
+  "dictSupplementUpdateHint": {"message": "會消耗 token，舊結果會保留。"},
   "dictSupplementPrevious": {"message": "先前的結果"},
-  "dictSupplementLegacy": {"message": "舊版結果，尚未依新的內容標準核驗。"},
+  "dictSupplementLegacy": {"message": "舊結果，未經新版核對。"},
   "dictSupplementWrongLanguage": {"message": "回傳的解釋語言不符合設定。尚未儲存；可重新產生。"},
-  "dictSupplementInvalid": {"message": "結果缺少必要內容，或引文未通過核對。尚未儲存；可重試。"},
+  "dictSupplementInvalid": {"message": "結果不完整或引文無法核對，未儲存。請重試。"},
   "dictSupplementSourceVerified": {"message": "已核對原文"},
   "dictEntryUpdate": {"message": "更新此詞條"},
-  "dictEntryUpdateHint": {"message": "重新產生詞條會消耗 token；舊結果仍會保留。"},
+  "dictEntryUpdateHint": {"message": "會消耗 token，舊詞條會保留。"},
   "dictPaidActionHint": {"message": "會呼叫 AI 並消耗 token。"},
   "dictResize": {"message": "調整查詞視窗大小"},
   "dictResizeWidth": {"message": "寬度"},
@@ -5068,11 +5048,11 @@
   "dictSupplementRetrieving": {"message": "正在檢索資料…"},
   "dictSupplementChecking": {"message": "正在檢查產生的內容…"},
   "dictSupplementSaving": {"message": "正在儲存補充…"},
-  "dictGenerationTruncated": {"message": "模型尚未完成本次回答。這次結果未儲存；可重試，或在設定中更換閱讀器 AI 模型。"},
+  "dictGenerationTruncated": {"message": "回答沒有寫完，未儲存。請重試，或在設定中換一個閱讀器 AI 模型。"},
   "dictGenerationRefused": {"message": "模型拒絕了這次請求或封鎖了輸出。這次結果未儲存。"},
-  "dictGenerationEmpty": {"message": "模型未回傳正文。本次結果未儲存；請重試，或在設定中更換閱讀器 AI 模型。"},
-  "dictGenerationModelUnavailable": {"message": "供應商無法找到或使用所選模型。請檢查模型名稱及供應商支援情況，並在設定中更新閱讀器 AI 模型。"},
-  "dictGenerationBilling": {"message": "供應商拒絕了本次請求（HTTP 402）。請檢查該供應商的額度、帳務狀態和帳號存取權限後再試。"},
+  "dictGenerationEmpty": {"message": "模型沒有回傳內容。請重試，或在設定中換一個閱讀器 AI 模型。"},
+  "dictGenerationModelUnavailable": {"message": "供應商無法使用這個模型。請在設定中檢查閱讀器 AI 模型名稱。"},
+  "dictGenerationBilling": {"message": "供應商拒絕了請求（HTTP 402）。請檢查該供應商的餘額或方案。"},
   "dictGenerationServiceUnavailable": {"message": "供應商的服務暫時無法使用，請稍後再試。"},
   "dictProgressThinking": {"message": "模型正在思考…"},
   "dictProgressStreaming": {"message": "正在接收回答…"},
@@ -5083,14 +5063,11 @@
   "bookmarkServiceChoose": {
     "message": "選擇書籤儲存位置"
   },
-  "bookmarkServiceHint": {
-    "message": "彈出視窗、閱讀器、快捷鍵與批次儲存都使用此服務。"
-  },
   "personalLibraryTitle": {
     "message": "個人資料庫"
   },
   "personalLibraryHint": {
-    "message": "所有書籤服務共用個人資料庫中的生詞、螢光標記、筆記與 Ask 歷史。"
+    "message": "無論使用哪個書籤服務，生詞、螢光標記、筆記和 Ask 歷史都在同一個資料庫裡。"
   },
   "bookmarkServerUrl": {
     "message": "伺服器網址"
@@ -5105,7 +5082,7 @@
     "message": "填入網站網址，包含部署子路徑。除了本機位址，都必須使用 HTTPS。"
   },
   "bookmarkTokenLocalHint": {
-    "message": "Token 與閘道憑證儲存在這個瀏覽器，只會傳送給這台伺服器。開啟 API Key 和 Token 同步後，才會出現在你的其他裝置上。"
+    "message": "Token 和閘道憑證儲存在這個瀏覽器，只會傳給這台伺服器；開啟 API Key 和 Token 同步後，才會同步到其他裝置。"
   },
   "bookmarkKarakeepTokenHelp": {
     "message": "在 Karakeep 的「使用者設定 → API 金鑰」中新增一個金鑰，保留完整存取權限。金鑰只會顯示一次，建立後請立即複製到這裡。"
@@ -5123,25 +5100,25 @@
     "message": "瀏覽時預先讀取網頁資訊"
   },
   "optLinkdingPreloadHint": {
-    "message": "開啟後，工具列圖示會顯示你開啟的每個網頁是否已在 linkding 收藏，彈出式視窗開啟時也不必等待。代價是：你造訪的每個網址都會傳給你的 linkding 伺服器並寫入伺服器記錄，伺服器也會自行造訪該網頁。關閉時，只在你開啟彈出式視窗時查詢 linkding。"
+    "message": "工具列圖示會顯示每個網頁是否已收藏。你造訪的每個網址都會傳給 linkding 伺服器，伺服器也會自行造訪該網頁。"
   },
   "optLinkdingBrowserMetadata": {
     "message": "使用瀏覽器中的網頁標題和簡介"
   },
   "optLinkdingBrowserMetadataHint": {
-    "message": "新增書籤時，標題和簡介取自瀏覽器中顯示的網頁。關閉後改用你的 linkding 伺服器從網頁讀到的內容；載入後會變動或需要登入的網頁，兩者可能不同。"
+    "message": "關閉後由 linkding 伺服器自行讀取網頁的標題和簡介。需要登入或載入後會變動的網頁，結果可能不同。"
   },
   "optLinkdingSingleFile": {
     "message": "新增書籤後執行 SingleFile"
   },
   "optLinkdingSingleFileHint": {
-    "message": "用彈出式視窗或快速儲存新增書籤後，由 SingleFile 儲存網頁的完整副本，linkding 不再為它另做 HTML 快照。需要 linkding 1.39 以上版本，並安裝 SingleFile 擴充功能。在 SingleFile 的設定中將儲存目標（destination）選為上傳到 REST 表單 API，再填寫：網址（URL）為你的 linkding 網址加上 /api/bookmarks/singlefile/，只填 linkding 網址會上傳失敗；authorization token 填 linkding 設定頁中的 API Token，前面不加「Token」；資料欄位名稱（data field name）填 file，網址欄位名稱（URL field name）填 url。網頁由 SingleFile 直接上傳到你的 linkding，本擴充功能不經手檔案。"
+    "message": "需要 linkding 1.39 以上版本和 SingleFile 擴充功能。在 SingleFile 的設定中將儲存目標（destination）選為上傳到 REST 表單 API，再填寫：網址（URL）填 linkding 網址加上 /api/bookmarks/singlefile/；authorization token 填 linkding 的 API Token，前面不加「Token」；資料欄位名稱（data field name）填 file；網址欄位名稱（URL field name）填 url。"
   },
   "optLinkdingSingleFileDocs": {
     "message": "linkding 官方文件：用 SingleFile 封存"
   },
   "optCheckBookmarkStatusLinkding": {
-    "message": "使用 linkding 時，只有開啟「瀏覽時預先讀取網頁資訊」，工具列圖示才會顯示網頁是否已收藏。這個開關在「帳號」頁的 linkding 連線設定裡。"
+    "message": "使用 linkding 時，還需在「帳號」頁開啟「瀏覽時預先讀取網頁資訊」。"
   },
   "bookmarkGatewayLabel": {
     "message": "存取閘道"
@@ -5184,7 +5161,7 @@
     "message": "值"
   },
   "bookmarkGatewayNoneHint": {
-    "message": "只有伺服器前面還有一層要求先登入的閘道（例如 Cloudflare Access）時才需要設定。直接連線到伺服器就維持「無」。"
+    "message": "只有伺服器前面有登入閘道（例如 Cloudflare Access）時才需要設定。"
   },
   "bookmarkGatewayHeaderNameN": {
     "message": "標頭 $N$ 的名稱",
@@ -5210,7 +5187,7 @@
     "message": "標頭名稱無效。請使用不超過 64 個字元的英文字母、數字和連字號，例如 X-Auth-Token。"
   },
   "bookmarkGatewayErrNameForbidden": {
-    "message": "這個標頭無法在此設定：它由瀏覽器控制，或擴充功能已自行傳送（例如 Authorization、Cookie）。"
+    "message": "這裡不能設定 Authorization、Cookie 等標頭。"
   },
   "bookmarkGatewayErrDuplicate": {
     "message": "每個標頭名稱只能使用一次（不區分大小寫）。"
@@ -5251,7 +5228,7 @@
     "message": "請在設定中允許存取此伺服器，再重新連線。"
   },
   "bookmarkKarakeepHint": {
-    "message": "「稍後閱讀」使用專用私人清單。標記為已讀時只從清單移除，不變更服務中的封存狀態。"
+    "message": "「稍後閱讀」是 Karakeep 裡的一個私人清單。標記為已讀只會移出清單，不改變封存狀態。"
   },
   "bookmarkReadLaterListName": {
     "message": "稍後閱讀"
@@ -5264,13 +5241,13 @@
   "bookmarkPartialSavePopupReadLater": {"message": "書籤已儲存，但稍後閱讀狀態沒有改過來。再按一次「更新」，就會補上這一步。"},
   "bookmarkPartialSavePopupBookmark": {"message": "標題和備註沒有更新，書籤維持原樣。再按一次「更新」，就會寫入這些修改。"},
   "bookmarkErrGatewayRedirect": {
-    "message": "伺服器將請求重新導向。請先檢查位址和連接埠：必須指向 Karakeep 或 linkding 本身。位址無誤時，才可能是 Cloudflare Access 之類需要登入的存取閘道在重新導向，可在「存取閘道」中填入 Service Token，或在閘道中允許 API 路徑通過。"
+    "message": "伺服器將請求重新導向。請檢查位址和連接埠是否指向 Karakeep 或 linkding 本身；沒錯的話，可能是登入閘道在重新導向，請在「存取閘道」中填入 Service Token，或在閘道中允許 API 路徑通過。"
   },
   "bgTabSetPinboardOnly": {"message": "分頁集只能儲存到 Pinboard。要使用它，請先在設定中把書籤服務切換為 Pinboard。"},
   "bookmarkDisconnect": {"message": "中斷連線"},
   "bookmarkDisconnectConfirm": {"message": "中斷與此服務的連線？"},
   "bookmarkDisconnectDetail": {"message": "API Token 和存取閘道憑證將從此瀏覽器移除。需要時按一下「連線」即可重新連線。"},
-  "bookmarkDisconnectDetailLinkding": {"message": "API Token 和存取閘道憑證將從此瀏覽器移除。之後即使用同一位址和 Token 再次連線，也會視為新連線，原連線中尚未送出的儲存不再自動重試。"},
+  "bookmarkDisconnectDetailLinkding": {"message": "API Token 和存取閘道憑證將從此瀏覽器移除。尚未送出的儲存不會再重試，即使重新連線也一樣。"},
   "bookmarkDisconnected": {"message": "已中斷連線"},
   "bookmarkDisconnectFailed": {"message": "無法中斷連線：變更未能儲存，請再試一次。"},
   "bookmarkServicePending": {"message": "連線 $SERVICE$ 之前，書籤仍會儲存到 $ACTIVE$。", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
@@ -5282,10 +5259,10 @@
   "backupBookmarkServiceNotConnected": {"message": "備份選的是 $SERVICE$，本裝置沒有連線。連線 $SERVICE$ 之前，書籤仍會儲存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "備份選的是 $SERVICE$，本裝置沒有連線。只有還原的憑證能連線時才會切換，否則書籤仍會儲存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
-    "message": "請求遭安全性驗證（人機驗證）攔截。常見來源是 Cloudflare 的安全性規則，請在規則中允許 API 路徑通過。"
+    "message": "請求遭人機驗證攔截。請在 Cloudflare 等安全性規則中允許 API 路徑通過。"
   },
   "bookmarkErrGatewayBasic": {
-    "message": "伺服器前方的代理伺服器要求輸入使用者名稱與密碼（Basic 驗證），無法與書籤服務的 Token 同時使用。請在代理伺服器中允許 API 路徑通過。"
+    "message": "伺服器前方的代理伺服器要求輸入使用者名稱和密碼，無法與 Token 同時使用。請在代理伺服器中允許 API 路徑通過。"
   },
   "bookmarkErrGatewayDenied": {
     "message": "請求遭伺服器前方的閘道拒絕。請確認「存取閘道」中的憑證是否正確，以及閘道原則是否允許。使用 Cloudflare 時，原則動作必須為 Service Auth。"
@@ -5308,7 +5285,7 @@
     }
   },
   "bgTagTooLongSkip": {
-    "message": "linkding 已將這個頁面存成沒有標籤的書籤：標籤「$TAG$」超過 $MAX$ 個字元上限。快捷鍵儲存會跳過已收藏的頁面，請縮短標籤後在彈窗中補上。",
+    "message": "linkding 已儲存這個頁面，但沒有標籤：「$TAG$」超過 $MAX$ 個字元上限。請縮短後在彈窗中補上。",
     "placeholders": {
       "tag": {
         "content": "$1"
@@ -5342,7 +5319,7 @@
     }
   },
   "bookmarkErrTooLarge": {
-    "message": "請求內容過大而遭拒收（HTTP 413）。伺服器前方的反向代理伺服器可能限制了請求大小，例如 nginx 的 client_max_body_size。請縮短備註或描述，或調高代理伺服器的限制。"
+    "message": "書籤內容過大，遭伺服器拒收（HTTP 413）。請縮短備註或描述，或調高代理伺服器的上傳限制，例如 nginx 的 client_max_body_size。"
   },
   "bookmarkErrInvalidResponse": {
     "message": "書籤伺服器傳回了無法辨識的資料。請確認網址是否指向 Karakeep 或 linkding 本身，以及伺服器版本是否受支援。"
@@ -5368,6 +5345,6 @@
     "message": "選擇書籤服務"
   },
   "backupAdoptLibrary": {
-    "message": "個人資料庫是空的。還原生詞或標記時會採用備份所屬的資料庫，以便繼續讀取原有的 Drive 同步資料。"
+    "message": "個人資料庫是空的，還原生詞或標記時會改用備份所屬的資料庫，原有的 Drive 同步資料仍可使用。"
   }
 }

@@ -259,7 +259,7 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       ["This setting applies to this device only", "opt-sync-enabled"],
       ["This is one account-wide choice", "opt-sync-api-keys"],
       ["Includes page URLs, titles, selected text", "opt-backup-include-highlights"],
-      ["Includes vocabulary only for the personal library", "opt-backup-include-vocabulary"],
+      ["linkding puts it in Description", "opt-auto-description"],
       ["read the subtitles instead of the page text", "opt-ai-use-transcript"],
       ["Sends the saved URL to archive.org", "opt-wayback-enabled"],
     ];
@@ -283,10 +283,10 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       "the helper line indexed as " + JSON.stringify(desc));
     const name = index.find((e) => e.targetId === "opt-bgsave-overwrite" && !e.hint);
     assert(name && name.text === "Overwrite", "the option's name row reads " + JSON.stringify(name && name.text));
-    const sw = index.find((e) => e.targetId === "opt-show-quick-links" && !e.hint);
-    assert(sw && sw.text === "Show the quick links row", "a switch's name row carries its ? answer: " + JSON.stringify(sw && sw.text));
-    const swHelp = index.find((e) => e.text.startsWith("Links to your Sets"));
-    assert(swHelp && swHelp.owner === "Show the quick links row" && swHelp.targetId === "opt-show-quick-links",
+    const sw = index.find((e) => e.targetId === "opt-auto-description" && !e.hint);
+    assert(sw && sw.text === "Auto-fill page description", "a switch's name row carries its ? answer: " + JSON.stringify(sw && sw.text));
+    const swHelp = index.find((e) => e.text.startsWith("linkding puts it in Description"));
+    assert(swHelp && swHelp.owner === "Auto-fill page description" && swHelp.targetId === "opt-auto-description",
       "the switch's moved note is not found under its name: " + JSON.stringify(swHelp));
   });
 

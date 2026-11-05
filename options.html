@@ -85,9 +85,8 @@
           <div class="bl subhead" id="bookmark-service-label" data-i18n="bookmarkServiceChoose">Choose where to save bookmarks</div>
           <details class="context-help" id="bookmark-service-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="bookmarkServiceHint">Saving from the popup, reader, shortcuts and batch actions uses this service.</p>
-            <p class="hint context-help-body" data-i18n="personalLibraryHint">Vocabulary, highlights, notes and Ask history share one personal library across all bookmark services.</p>
-            <p class="hint context-help-body" id="bookmark-karakeep-help" data-i18n="bookmarkKarakeepHint" hidden>Read Later uses a dedicated private list. Marking a bookmark as read removes it from that list. Archiving in the service is unchanged.</p>
+            <p class="hint context-help-body" data-i18n="personalLibraryHint">Your vocabulary, highlights, notes and Ask history stay the same whichever bookmark service you use.</p>
+            <p class="hint context-help-body" id="bookmark-karakeep-help" data-i18n="bookmarkKarakeepHint" hidden>Read Later is a private list in Karakeep. Marking a bookmark read removes it from the list and leaves its archive status alone.</p>
           </details>
           <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="bookmark-service-label">
             <div class="pref-row"><label class="pick"><input type="radio" name="bookmark-service" value="pinboard" /> <span class="pick-text">Pinboard</span><span class="pick-mark" aria-hidden="true"></span></label></div>
@@ -126,13 +125,13 @@
             </details>
             <span class="key-wrap"><input type="password" id="opt-karakeep-token" autocomplete="off" spellcheck="false" />
             <button type="button" class="key-toggle" data-target="opt-karakeep-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
-            <p class="hint" data-i18n="bookmarkTokenLocalHint">The token and any gateway credentials stay in this browser and are sent only to this server. They reach your other devices only if you sync API keys and tokens.</p>
+            <p class="hint" data-i18n="bookmarkTokenLocalHint">Your token and gateway credentials stay in this browser and go only to this server. Other devices get them only if you sync API keys and tokens.</p>
           </div>
           <div class="fg entry-block context-help-host" data-help-role="field">
             <label class="bl" id="opt-karakeep-gateway-label" for="opt-karakeep-gateway" data-i18n="bookmarkGatewayLabel">Access gateway</label>
             <details class="context-help" id="karakeep-gateway-help">
               <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" id="karakeep-gateway-none-help" data-i18n="bookmarkGatewayNoneHint">Only needed when a login gateway, such as Cloudflare Access, sits in front of the server. Leave it on None if you reach the server directly.</p>
+              <p class="hint context-help-body" id="karakeep-gateway-none-help" data-i18n="bookmarkGatewayNoneHint">Only needed if a sign-in gateway, such as Cloudflare Access, sits in front of the server.</p>
               <p class="hint context-help-body" id="karakeep-gateway-cf-help" data-i18n="bookmarkGatewayCfHint" hidden>Create a service token under Service Tokens in Zero Trust. The Client Secret is shown only once, when the token is created. The Access application also needs a policy with the Service Auth action.</p>
               <p class="hint context-help-body" id="karakeep-gateway-custom-help" data-i18n="bookmarkGatewayCustomHint" hidden>These headers go to this server with every bookmark API request. Authorization, Cookie and similar headers aren't allowed. If the gateway uses Basic authentication, allow the API path in the gateway instead.</p>
             </details>
@@ -203,13 +202,13 @@
             </details>
             <span class="key-wrap"><input type="password" id="opt-linkding-token" autocomplete="off" spellcheck="false" />
             <button type="button" class="key-toggle" data-target="opt-linkding-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
-            <p class="hint" data-i18n="bookmarkTokenLocalHint">The token and any gateway credentials stay in this browser and are sent only to this server. They reach your other devices only if you sync API keys and tokens.</p>
+            <p class="hint" data-i18n="bookmarkTokenLocalHint">Your token and gateway credentials stay in this browser and go only to this server. Other devices get them only if you sync API keys and tokens.</p>
           </div>
           <div class="fg entry-block context-help-host" data-help-role="field">
             <label class="bl" id="opt-linkding-gateway-label" for="opt-linkding-gateway" data-i18n="bookmarkGatewayLabel">Access gateway</label>
             <details class="context-help" id="linkding-gateway-help">
               <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" id="linkding-gateway-none-help" data-i18n="bookmarkGatewayNoneHint">Only needed when a login gateway, such as Cloudflare Access, sits in front of the server. Leave it on None if you reach the server directly.</p>
+              <p class="hint context-help-body" id="linkding-gateway-none-help" data-i18n="bookmarkGatewayNoneHint">Only needed if a sign-in gateway, such as Cloudflare Access, sits in front of the server.</p>
               <p class="hint context-help-body" id="linkding-gateway-cf-help" data-i18n="bookmarkGatewayCfHint" hidden>Create a service token under Service Tokens in Zero Trust. The Client Secret is shown only once, when the token is created. The Access application also needs a policy with the Service Auth action.</p>
               <p class="hint context-help-body" id="linkding-gateway-custom-help" data-i18n="bookmarkGatewayCustomHint" hidden>These headers go to this server with every bookmark API request. Authorization, Cookie and similar headers aren't allowed. If the gateway uses Basic authentication, allow the API path in the gateway instead.</p>
             </details>
@@ -269,17 +268,17 @@
             <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" role="switch" id="opt-linkding-preload" aria-labelledby="opt-linkding-preload-label" /> <span class="switch-text" id="opt-linkding-preload-label" data-i18n="optLinkdingPreload">Load page information while browsing</span>
               <details class="context-help">
                 <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-                <p class="hint context-help-body" data-i18n="optLinkdingPreloadHint">The toolbar icon then shows whether each page you open is already in linkding, and the popup opens without waiting. The cost: every address you visit is sent to your linkding server and written to its log, and the server visits the page itself. When this is off, linkding is asked only when you open the popup.</p>
+                <p class="hint context-help-body" data-i18n="optLinkdingPreloadHint">The toolbar icon shows whether each page is already saved. Every address you visit is sent to your linkding server, which then visits the page itself.</p>
               </details><span class="switch-track" aria-hidden="true"></span></label></div>
             <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" role="switch" id="opt-linkding-browser-metadata" aria-labelledby="opt-linkding-browser-metadata-label" checked /> <span class="switch-text" id="opt-linkding-browser-metadata-label" data-i18n="optLinkdingBrowserMetadata">Use the browser's page title and description</span>
               <details class="context-help">
                 <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-                <p class="hint context-help-body" data-i18n="optLinkdingBrowserMetadataHint">A new bookmark starts with the page's title and description as your browser shows them. When this is off, it starts with what your linkding server read from the page instead, which can differ on pages that change after loading or that need you to sign in.</p>
+                <p class="hint context-help-body" data-i18n="optLinkdingBrowserMetadataHint">When off, linkding reads the title and description from the page itself. They can differ on pages that need sign-in or change after loading.</p>
               </details><span class="switch-track" aria-hidden="true"></span></label></div>
             <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" role="switch" id="opt-linkding-singlefile" aria-labelledby="opt-linkding-singlefile-label" /> <span class="switch-text" id="opt-linkding-singlefile-label" data-i18n="optLinkdingSingleFile">Run SingleFile after adding a bookmark</span>
               <details class="context-help">
                 <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-                <p class="hint context-help-body"><span data-i18n="optLinkdingSingleFileHint">When the popup or a quick save adds a new bookmark, SingleFile saves a full copy of the page, and linkding skips its own HTML snapshot for it. You need linkding 1.39 or later and the SingleFile extension. In SingleFile's options, set the destination to upload to a REST Form API, then fill in: the URL as your linkding address followed by /api/bookmarks/singlefile/ (the bare linkding address fails to upload); the authorization token as the API token from linkding's settings page, without a "Token" prefix; the data field name as file and the URL field name as url. SingleFile uploads the page to your linkding itself; this extension never handles the file.</span> <a href="https://linkding.link/archiving/" target="_blank" rel="noopener" data-i18n="optLinkdingSingleFileDocs">linkding guide to archiving with SingleFile</a></p>
+                <p class="hint context-help-body"><span data-i18n="optLinkdingSingleFileHint">Needs linkding 1.39 or later and the SingleFile extension. In SingleFile's options, set the destination to upload to a REST Form API, then fill in: URL = your linkding address + /api/bookmarks/singlefile/; authorization token = your linkding API token, without a "Token" prefix; data field name = file; URL field name = url.</span> <a href="https://linkding.link/archiving/" target="_blank" rel="noopener" data-i18n="optLinkdingSingleFileDocs">linkding guide to archiving with SingleFile</a></p>
               </details><span class="switch-track" aria-hidden="true"></span></label></div>
           </div>
         </div>
@@ -319,7 +318,7 @@
         <div class="pref-group" role="group" aria-labelledby="sec-popup-behavior">
           <div class="pref-row"><label class="switch" id="check-status-switch"><input type="checkbox" role="switch" id="opt-check-bookmark-status" checked /> <span class="switch-text" data-i18n="optCheckBookmarkStatus">Show on the toolbar icon whether this page is bookmarked</span><span class="switch-track" aria-hidden="true"></span></label>
             <!-- linkding: its browsing checks have their own switch; this note says where. -->
-            <p class="hint" id="check-status-linkding-note" hidden data-i18n="optCheckBookmarkStatusLinkding">With linkding, the toolbar icon shows whether a page is bookmarked only while "Load page information while browsing" is on. That switch is in the linkding connection settings on the Account tab.</p></div>
+            <p class="hint" id="check-status-linkding-note" hidden data-i18n="optCheckBookmarkStatusLinkding">For linkding, also turn on "Load page information while browsing" on the Account tab.</p></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-auto-close" checked /> <span class="switch-text" data-i18n="optAutoClose">Auto-close popup after save</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="offline-queue-enabled" checked /> <span class="switch-text" data-i18n="optOfflineQueue">Enable offline save queue</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
@@ -343,20 +342,8 @@
         <h2 class="section-title" data-i18n="optUrlCleanTitle">URL Tracking Parameter Cleanup</h2>
         <div class="pref-group">
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-enabled" checked /> <span class="switch-text" data-i18n="optUrlCleanEnabled">Auto-clean URL tracking parameters</span><span class="switch-track" aria-hidden="true"></span></label></div>
-          <div class="pref-row pref-row-sub context-help-host" data-parent="opt-urlclean-enabled" data-help-role="choice">
-            <label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-on-open" checked aria-labelledby="opt-urlclean-on-open-label" /> <span class="switch-text" id="opt-urlclean-on-open-label" data-i18n="optUrlCleanOnOpen">Clean when the popup opens</span>
-            <details class="context-help">
-              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" data-i18n="optUrlCleanOnOpenHint">Happens silently; an Undo link in the popup restores the original URL.</p>
-            </details><span class="switch-track" aria-hidden="true"></span></label>
-          </div>
-          <div class="pref-row pref-row-sub context-help-host" data-parent="opt-urlclean-enabled" data-help-role="choice">
-            <label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-on-paste" checked aria-labelledby="opt-urlclean-on-paste-label" /> <span class="switch-text" id="opt-urlclean-on-paste-label" data-i18n="optUrlCleanOnPaste">Clean when a URL is pasted</span>
-            <details class="context-help">
-              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" data-i18n="optUrlCleanOnPasteHint">Shows a notice with Undo, in case you want to keep the original URL.</p>
-            </details><span class="switch-track" aria-hidden="true"></span></label>
-          </div>
+          <div class="pref-row pref-row-sub" data-parent="opt-urlclean-enabled"><label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-on-open" checked /> <span class="switch-text" data-i18n="optUrlCleanOnOpen">Clean when the popup opens</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row pref-row-sub" data-parent="opt-urlclean-enabled"><label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-on-paste" checked /> <span class="switch-text" data-i18n="optUrlCleanOnPaste">Clean when a URL is pasted</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row pref-row-sub" data-parent="opt-urlclean-enabled"><label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-aggressive" /> <span class="switch-text" data-i18n="optUrlCleanAggressive">Aggressive mode: also remove ref, si, igshid and similar (may break some links)</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
         <div class="fg edit-area entry-block-sub context-help-host" data-parent="opt-urlclean-enabled" data-help-role="field">
@@ -385,20 +372,8 @@
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-show-suggest-tags" checked /> <span class="switch-text" data-i18n="optShowSuggestTags">Show Pinboard suggested tags in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-show-ai-summary" checked /> <span class="switch-text" data-i18n="optShowAiSummary">Show AI summary button in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-show-ai-tags" checked /> <span class="switch-text" data-i18n="optShowAiTags">Show AI tags row in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
-          <div class="pref-row context-help-host" data-help-role="choice">
-            <label class="switch"><input type="checkbox" role="switch" id="opt-show-quick-links" checked aria-labelledby="opt-show-quick-links-label" /> <span class="switch-text" id="opt-show-quick-links-label" data-i18n="optShowQuickLinks">Show the quick links row</span>
-            <details class="context-help">
-              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" data-i18n="optShowQuickLinksHint">Links to your Sets, Network, Unread, Notes and Popular pages.</p>
-            </details><span class="switch-track" aria-hidden="true"></span></label>
-          </div>
-          <div class="pref-row context-help-host" data-help-role="choice">
-            <label class="switch"><input type="checkbox" role="switch" id="opt-show-quick-row" checked aria-labelledby="opt-show-quick-row-label" /> <span class="switch-text" id="opt-show-quick-row-label" data-i18n="optShowQuickRow">Show quick action buttons</span>
-            <details class="context-help">
-              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" data-i18n="optShowQuickRowHint">The Save Tab Set, Batch Save and Reader buttons.</p>
-            </details><span class="switch-track" aria-hidden="true"></span></label>
-          </div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-show-quick-links" checked /> <span class="switch-text" data-i18n="optShowQuickLinks">Show the quick links row</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-show-quick-row" checked /> <span class="switch-text" data-i18n="optShowQuickRow">Show quick action buttons</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
       </section>
     </div>
@@ -416,7 +391,7 @@
           <label class="bl subhead" id="bgsave-mode-label" data-i18n="optBgSaveMode">When a shortcut save finds an existing bookmark</label>
           <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="bgsave-mode-label">
             <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-merge" value="merge" aria-labelledby="opt-bgsave-merge-name" aria-describedby="opt-bgsave-merge-desc" /> <span class="pick-text"><span id="opt-bgsave-merge-name" data-i18n="optBgSaveModeMerge">Merge</span><span class="pick-desc" id="opt-bgsave-merge-desc" data-i18n="optBgSaveModeMergeDesc">Default. Adds the new tags to the existing ones.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
-            <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-skip" value="skip" aria-labelledby="opt-bgsave-skip-name" aria-describedby="opt-bgsave-skip-desc" /> <span class="pick-text"><span id="opt-bgsave-skip-name" data-i18n="optBgSaveModeSkip">Skip</span><span class="pick-desc" id="opt-bgsave-skip-desc" data-i18n="optBgSaveModeSkipDesc">Does nothing; the saved bookmark stays as it is.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-skip" value="skip" aria-labelledby="opt-bgsave-skip-name" aria-describedby="opt-bgsave-skip-desc" /> <span class="pick-text"><span id="opt-bgsave-skip-name" data-i18n="optBgSaveModeSkip">Skip</span><span class="pick-desc" id="opt-bgsave-skip-desc" data-i18n="optBgSaveModeSkipDesc">Leaves the bookmark as it is.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
             <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-overwrite" value="overwrite" aria-labelledby="opt-bgsave-overwrite-name" aria-describedby="opt-bgsave-overwrite-desc" /> <span class="pick-text"><span id="opt-bgsave-overwrite-name" data-i18n="optBgSaveModeOverwrite">Overwrite</span><span class="pick-desc" id="opt-bgsave-overwrite-desc" data-i18n="optBgSaveModeOverwriteDesc">Replaces all existing tags with the new ones.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
           </div>
         </div>
@@ -424,7 +399,13 @@
       <section class="settings-section">
         <h2 class="section-title" id="sec-notes-behavior" data-i18n="secNotesBehavior">Notes in the Popup</h2>
         <div class="pref-group" role="group" aria-labelledby="sec-notes-behavior">
-          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-auto-description" checked /> <span class="switch-text" data-i18n="optAutoDescription">Auto-fill page description: Description in linkding; Notes elsewhere when no text is selected</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label class="switch"><input type="checkbox" role="switch" id="opt-auto-description" checked aria-labelledby="opt-auto-description-label" /> <span class="switch-text" id="opt-auto-description-label" data-i18n="optAutoDescription">Auto-fill page description</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="optAutoDescriptionHint">linkding puts it in Description. Other services put it in Notes, but only when no text is selected.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-blockquote" checked /> <span class="switch-text" data-i18n="optBlockquote">Mark selected text as a quote</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-include-referrer" /> <span class="switch-text" data-i18n="optIncludeReferrer">Add the referring page's URL to notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
@@ -436,7 +417,7 @@
             <label class="switch"><input type="checkbox" role="switch" id="opt-respect-tag-case" checked aria-labelledby="opt-respect-tag-case-label" /> <span class="switch-text" id="opt-respect-tag-case-label" data-i18n="optRespectTagCase">Reuse existing tag spelling</span>
             <details class="context-help">
               <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" data-i18n="optRespectTagCaseHint">If a tag has variants that differ only in case, spaces, hyphens, or underscores, use the most common spelling. Tags already on a bookmark stay as they are.</p>
+              <p class="hint context-help-body" data-i18n="optRespectTagCaseHint">Picks the spelling you use most when a tag has several, such as JavaScript and javascript. Tags already on a bookmark don't change.</p>
             </details><span class="switch-track" aria-hidden="true"></span></label>
           </div>
         </div>
@@ -448,16 +429,12 @@
           </details>
           <textarea id="opt-tag-presets" rows="4" placeholder="One preset per line:&#10;Work: project, review, report&#10;Dev: programming, tutorial, tool" data-i18n-placeholder="tagPresetsPlaceholder"></textarea>
         </div>
-        <div class="fg entry-block context-help-host" data-help-role="field">
-          <label class="bl subhead" id="tag-sync-label" data-i18n="tagSyncLabel">Tag cache strategy</label>
-          <details class="context-help">
-            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="tagSyncHint">Choose when to load your existing tags for autocomplete. Loading tags does not change them on the server.</p>
-          </details>
+        <div class="fg entry-block">
+          <label class="bl subhead" id="tag-sync-label" data-i18n="tagSyncLabel">Loading tags for autocomplete</label>
           <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="tag-sync-label">
             <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-cached" value="cached" checked aria-labelledby="opt-tag-sync-cached-name" aria-describedby="opt-tag-sync-cached-desc" /> <span class="pick-text"><span id="opt-tag-sync-cached-name" data-i18n="tagSyncCached">Cached</span><span class="pick-desc" id="opt-tag-sync-cached-desc" data-i18n="tagSyncCachedDesc">Default. Refreshes after 10 minutes.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
-            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" aria-labelledby="opt-tag-sync-fresh-name" aria-describedby="opt-tag-sync-fresh-desc" /> <span class="pick-text"><span id="opt-tag-sync-fresh-name" data-i18n="tagSyncFresh">Live</span><span class="pick-desc" id="opt-tag-sync-fresh-desc" data-i18n="tagSyncFreshDesc">Fetches each time the popup opens. Slower.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
-            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-prewarmed" value="prewarmed" aria-labelledby="opt-tag-sync-prewarmed-name" aria-describedby="opt-tag-sync-prewarmed-desc" /> <span class="pick-text"><span id="opt-tag-sync-prewarmed-name" data-i18n="tagSyncPrewarmed">Prewarmed</span><span class="pick-desc" id="opt-tag-sync-prewarmed-desc" data-i18n="tagSyncPrewarmedDesc">Fetches in the background every 15 minutes, so the popup opens instantly.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" aria-labelledby="opt-tag-sync-fresh-name" aria-describedby="opt-tag-sync-fresh-desc" /> <span class="pick-text"><span id="opt-tag-sync-fresh-name" data-i18n="tagSyncFresh">Live</span><span class="pick-desc" id="opt-tag-sync-fresh-desc" data-i18n="tagSyncFreshDesc">Loads every time you open the popup. Slower.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-prewarmed" value="prewarmed" aria-labelledby="opt-tag-sync-prewarmed-name" aria-describedby="opt-tag-sync-prewarmed-desc" /> <span class="pick-text"><span id="opt-tag-sync-prewarmed-name" data-i18n="tagSyncPrewarmed">In the background</span><span class="pick-desc" id="opt-tag-sync-prewarmed-desc" data-i18n="tagSyncPrewarmedDesc">Refreshes every 15 minutes, so the popup opens right away.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
           </div>
         </div>
       </section>
@@ -475,7 +452,7 @@
           </div>
         </div>
         <div class="pref-group">
-          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="qs-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Add page description: Description in linkding; Notes elsewhere when no text is selected</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="qs-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Add page description</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="qs-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Mark selected text as a quote</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
         <div class="fg entry-block">
@@ -484,7 +461,7 @@
         </div>
         <div class="pref-group">
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="qs-ai-tags" /> <span class="switch-text" data-i18n="qsAiTags">Auto-generate AI tags</span><span class="switch-track" aria-hidden="true"></span></label></div>
-          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="qs-ai-summary" /> <span class="switch-text" data-i18n="qsAiSummary">Auto-generate AI summary: Description in linkding, Notes elsewhere</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="qs-ai-summary" /> <span class="switch-text" data-i18n="qsAiSummary">Auto-generate AI summary</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
         <div class="fg entry-block" data-ai-unavailable="qs-ai-tags qs-ai-summary" hidden>
           <p class="hint hint-warn" role="status" aria-live="polite" data-i18n="aiUnavailableHint">The AI options above do nothing yet: the selected AI provider is missing an API key or access to it.</p>
@@ -501,7 +478,7 @@
           </div>
         </div>
         <div class="pref-group">
-          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="rl-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Add page description: Description in linkding; Notes elsewhere when no text is selected</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="rl-auto-notes" checked /> <span class="switch-text" data-i18n="qsAutoNotes">Add page description</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="rl-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Mark selected text as a quote</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
         <div class="fg entry-block">
@@ -510,7 +487,7 @@
         </div>
         <div class="pref-group">
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="rl-ai-tags" /> <span class="switch-text" data-i18n="qsAiTags">Auto-generate AI tags</span><span class="switch-track" aria-hidden="true"></span></label></div>
-          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="rl-ai-summary" /> <span class="switch-text" data-i18n="qsAiSummary">Auto-generate AI summary: Description in linkding, Notes elsewhere</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="rl-ai-summary" /> <span class="switch-text" data-i18n="qsAiSummary">Auto-generate AI summary</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
         <div class="fg entry-block" data-ai-unavailable="rl-ai-tags rl-ai-summary" hidden>
           <p class="hint hint-warn" role="status" aria-live="polite" data-i18n="aiUnavailableHint">The AI options above do nothing yet: the selected AI provider is missing an API key or access to it.</p>
@@ -526,7 +503,7 @@
           <label class="bl" for="opt-batch-tag" data-i18n="batchTagsLabel">Tags (comma-separated)</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="batchTagsHint">Separate tags with commas. Spaces within a new tag become the multi-word tag separator. E.g. <code>batch_saved, research</code></p>
+            <p class="hint context-help-body" data-i18n="batchTagsHint">Spaces inside a new tag become the multi-word tag separator (set in AI Behavior). E.g. <code>batch_saved, research</code></p>
           </details>
           <input type="text" id="opt-batch-tag" value="batch_saved" />
         </div>
@@ -677,12 +654,12 @@
               <option value="virginia" data-i18n="qwenRegionVirginia">US (Virginia)</option>
               <option value="tokyo" data-i18n="qwenRegionTokyo">Japan (Tokyo)</option>
             </select>
-            <p class="hint" id="hint-qwen-region" data-i18n="hintQwenRegion">Keys belong to one region: a key from another region is rejected (401). Third-party models such as DeepSeek and Kimi are available only in Beijing.</p>
+            <p class="hint" id="hint-qwen-region" data-i18n="hintQwenRegion">Use the region your key was created in. DeepSeek, Kimi and other third-party models are only in Beijing.</p>
           </div>
           <div class="fg entry-block">
             <label class="bl" for="opt-qwen-workspace" data-i18n="labelQwenWorkspace">Workspace ID (optional)</label>
             <input type="text" id="opt-qwen-workspace" maxlength="63" spellcheck="false" autocomplete="off" aria-describedby="hint-qwen-workspace qwen-workspace-warn" />
-            <p class="hint" id="hint-qwen-workspace" data-i18n="hintQwenWorkspace">With a workspace ID, requests use its dedicated address. Tokyo has no shared address and needs one.</p>
+            <p class="hint" id="hint-qwen-workspace" data-i18n="hintQwenWorkspace">Required for the Tokyo region.</p>
             <p class="hint hint-warn" id="qwen-workspace-warn" role="status" aria-live="polite" hidden></p>
           </div>
           <div class="fg entry-block"><label class="bl" for="opt-qwen-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-qwen-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-qwen-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://dashscope.console.aliyun.com/apiKey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
@@ -1162,7 +1139,7 @@
           <label class="bl" for="dict-default-view" data-i18n="dictDefaultViewLabel">Default lookup view</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="dictDefaultViewHint">Dictionary results always come first; this sets how the AI entry below them starts out. Folded, a saved entry is one line you can open; the other two options show it in full. Only “generate when missing” uses tokens automatically.</p>
+            <p class="hint context-help-body" data-i18n="dictDefaultViewHint">Dictionary results always come first. Only “generate when missing” uses tokens on its own.</p>
           </details>
           <select id="dict-default-view" data-listbox>
             <option value="dictionary" data-i18n="dictDefaultDictionary">Fold saved AI entries into one line</option>
@@ -1174,7 +1151,7 @@
           <label class="bl" id="dict-definition-lang-label" for="dict-definition-lang" data-i18n="dictDefinitionLangLabel">AI entry definition language</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="dictDefinitionLangHint">AI entries and supplements use your native language by default, or the interface language if no native language is set. Choose another language here to override this. Original dictionary definitions and quotations keep their own language.</p>
+            <p class="hint context-help-body" data-i18n="dictDefinitionLangHint">By default, AI entries use your native language, or the interface language if none is set. Dictionary definitions and quotations keep their own language.</p>
           </details>
           <select id="dict-definition-lang" data-listbox>
             <option value="" data-i18n="dictDefinitionLangUi">Follow native language</option>
@@ -1205,7 +1182,7 @@
           <label class="bl" for="dict-learner-native-language" data-i18n="dictLearnerNativeLanguageLabel">Native language (optional)</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="dictLearnerProfileHint">Your native language sets the default AI explanation language and helps tailor comparisons. Learning level adjusts explanation difficulty and examples. These preferences do not trigger generation.</p>
+            <p class="hint context-help-body" data-i18n="dictLearnerProfileHint">AI entries use these to choose the explanation language and difficulty. Changing them doesn't use tokens.</p>
           </details>
           <input type="text" id="dict-learner-native-language" maxlength="80" autocomplete="off" spellcheck="false" placeholder="For example, Spanish" data-i18n-placeholder="dictLearnerNativeLanguagePlaceholder" />
         </div>
@@ -1240,7 +1217,7 @@
                 <option value="legacy" data-i18n="dictAnkiFormatLegacy">Original (six fields)</option>
                 <option value="multilingual" data-i18n="dictAnkiFormatMultilingual">Multilingual (full details)</option>
               </select>
-              <p class="hint" id="dict-anki-format-hint" data-i18n="dictAnkiFormatHint">Multilingual uses a separate note type, so it can add cards alongside your original cards. Sending again skips existing notes; it does not update them.</p>
+              <p class="hint" id="dict-anki-format-hint" data-i18n="dictAnkiFormatHint">Multilingual uses its own note type, so words you already have may get a second card. Sending again skips existing notes; it doesn't update them.</p>
             </div>
             <div class="fg entry-block"><label class="bl" for="dict-anki-deck" data-i18n="dictAnkiDeckLabel">Anki deck</label>
               <input type="text" id="dict-anki-deck" placeholder="Pinboard Vocab" /></div>
@@ -1268,7 +1245,7 @@
         <details class="disclosure" id="multi-pack-section" data-acc-key="vocab-multilingual-packs">
           <summary><span data-i18n="multiPackSection">Multilingual Offline Dictionaries</span><span class="summary-state" id="multi-pack-summary"></span></summary>
           <div class="disclosure-body">
-            <p class="hint" data-i18n="multiPackHint">Import a Yomitan v3 ZIP dictionary. Definitions and readings stay on this device. Styles, images and audio are not imported.</p>
+            <p class="hint" data-i18n="multiPackHint">Import a Yomitan v3 dictionary (ZIP). It stays on this device. Styles, images and audio aren't imported.</p>
             <p class="hint"><a href="https://yomitan.wiki/dictionaries/" target="_blank" rel="noopener noreferrer" data-i18n="multiPackBrowse">Find dictionary files</a> · <a href="https://yomidevs.github.io/wiktionary-to-yomitan/download/" target="_blank" rel="noopener noreferrer">WTY</a> · <a href="https://jitendex.org/pages/downloads.html" target="_blank" rel="noopener noreferrer">Jitendex</a></p>
             <div class="fg"><div class="fg-actions"><button type="button" class="btn btn-sm" id="multi-pack-choose" data-i18n="multiPackChoose">Choose a ZIP file</button><span class="save-status" id="multi-pack-status" role="status" aria-live="polite"></span></div></div>
             <input type="file" id="multi-pack-file" accept=".zip" hidden />
@@ -1278,7 +1255,7 @@
               <div class="fg entry-block"><label class="bl" for="multi-pack-target-language" data-i18n="multiPackTargetLanguage">Definition language</label><input type="text" id="multi-pack-target-language" list="multi-pack-languages" spellcheck="false" autocomplete="off" maxlength="80" aria-describedby="multi-pack-language-hint" /><p class="hint" id="multi-pack-language-hint" data-i18n="multiPackLanguageHint">Use language codes, such as de, en or zh-Hant. Check both languages before importing.</p></div>
               <datalist id="multi-pack-languages"></datalist>
               <div class="fg entry-block"><label class="bl" for="multi-pack-source-url" data-i18n="multiPackSourceUrl">Source URL (optional)</label><input type="text" inputmode="url" id="multi-pack-source-url" spellcheck="false" autocomplete="off" maxlength="2048" /></div>
-              <div class="fg entry-block"><label class="bl" for="multi-pack-license" data-i18n="multiPackLicense">License statement (optional)</label><textarea id="multi-pack-license" rows="3" maxlength="8192" aria-describedby="multi-pack-license-hint"></textarea><p class="hint" id="multi-pack-license-hint" data-i18n="multiPackLicenseHint">These details come from the file or your edits. Check the source's terms before using or sharing its contents.</p>
+              <div class="fg entry-block"><label class="bl" for="multi-pack-license" data-i18n="multiPackLicense">License statement (optional)</label><textarea id="multi-pack-license" rows="3" maxlength="8192" aria-describedby="multi-pack-license-hint"></textarea><p class="hint" id="multi-pack-license-hint" data-i18n="multiPackLicenseHint">Check the dictionary's terms before using or sharing its contents.</p>
                 <div class="fg-actions"><button type="button" class="btn btn-sm" id="multi-pack-install" data-i18n="multiPackInstall">Import dictionary</button><button type="button" class="btn btn-sm ghost" id="multi-pack-cancel" data-i18n="cancel">Cancel</button></div>
               </div>
             </div>
@@ -1431,7 +1408,7 @@
         <details id="tag-gov-entities" class="disclosure">
           <summary><span id="tag-gov-entity-title" data-i18n="tagGovEntityTitle">Leftover Entity Codes in Tags</span> <span id="tag-gov-entity-count" class="summary-state tag-gov-count"></span></summary>
           <div class="disclosure-body">
-            <p class="hint" data-i18n="tagGovEntityHint">Repairing re-saves every bookmark that carries a selected tag and puts the repaired name in its place. This cannot be undone; nothing changes until you confirm.</p>
+            <p class="hint" data-i18n="tagGovEntityHint">Repairing renames the tag on every bookmark that has it. This can't be undone.</p>
             <div id="tag-gov-entity-list"></div>
             <div class="fg">
               <div class="fg-actions">
@@ -1491,7 +1468,7 @@
              it carries the same indent instead of sitting at the parent's own
              level. -->
         <div class="pref-row pref-row-sub" data-parent="opt-wayback-enabled"><label class="switch"><input type="checkbox" role="switch" id="opt-wayback-skip-private" checked /> <span class="switch-text" data-i18n="waybackSkipPrivate">Never archive bookmarks you save as private</span><span class="switch-track" aria-hidden="true"></span></label>
-          <p class="hint" id="wayback-selfhosted-private-hint" data-i18n="waybackSelfHostedPrivateHint" hidden>Karakeep bookmarks and unshared linkding bookmarks are treated as private, so they are not archived automatically by default. When saving, you can select “archive” manually, or turn off “Never archive bookmarks you save as private”.</p>
+          <p class="hint" id="wayback-selfhosted-private-hint" data-i18n="waybackSelfHostedPrivateHint" hidden>Karakeep bookmarks and unshared linkding bookmarks count as private, so they aren't archived automatically. Tick “archive” when saving, or turn off “Never archive bookmarks you save as private”.</p>
         </div>
         </div>
         <div class="fg entry-block entry-block-sub context-help-host" data-parent="opt-wayback-enabled" data-help-role="field">
@@ -1551,7 +1528,7 @@
           <label class="bl" id="opt-theme-label" for="opt-theme" data-i18n="secTheme">Theme</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" id="opt-theme-hint" data-i18n="optThemeHint">Switches the popup, this settings page, the notes &amp; vocabulary page and the reader between light and dark. Presets with a built-in scheme (Dracula, for example) override it on the pages that follow the preset; the reader can override it per device from its "Aa" panel.</p>
+            <p class="hint context-help-body" id="opt-theme-hint" data-i18n="optThemeHint">Applies to the popup, Settings, the library and the reader. Presets with their own light or dark scheme, such as Dracula, override it. The reader can also set it from its "Aa" panel.</p>
           </details>
           <select id="opt-theme" aria-labelledby="opt-theme-label" data-listbox>
             <option value="auto" data-i18n="themeAuto">Auto (follow system)</option>
@@ -1565,7 +1542,7 @@
             <label class="switch"><input type="checkbox" role="switch" id="opt-popup-follow-theme" aria-labelledby="opt-popup-follow-theme-label" aria-describedby="opt-popup-follow-theme-needs-preset" checked /> <span class="switch-text" id="opt-popup-follow-theme-label" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span>
             <details class="context-help">
               <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">When on, the popup, this settings page and the notes &amp; vocabulary page use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette.</p>
+              <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">The popup, Settings and the library use your Pinboard preset's colors. The reader keeps its own colors.</p>
             </details><span class="switch-track" aria-hidden="true"></span></label>
           </div>
           <p class="hint" id="opt-popup-follow-theme-needs-preset" data-i18n="optFollowNeedsPreset" hidden>Pick a Pinboard preset below first. With No preset there is no palette to follow.</p>
@@ -1681,9 +1658,9 @@
                 <details class="context-help">
                   <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
                   <p class="hint context-help-body" data-i18n="vocabDriveConnectionHint">Connect each device separately. Google Drive does not sync settings or credentials.</p>
-                  <p class="hint context-help-body" id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure">Copies in Google Drive are plaintext, without end-to-end encryption. They include the saved content above and associated learning preferences, cited excerpts, titles, URLs, and timestamps.</p>
+                  <p class="hint context-help-body" id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure">Your data is stored as plain text, without end-to-end encryption, in a private folder in your Google Drive. It includes source URLs, titles, times and learning preferences.</p>
                 </details>
-                <p class="hint" data-i18n="vocabDriveScope">Once connected, this device syncs vocabulary, highlights and notes, complete AI dictionary entries and supplements, and saved conversations with their cited excerpts for the personal library.</p>
+                <p class="hint" data-i18n="vocabDriveScope">Syncs your vocabulary, highlights, notes, AI dictionary entries and saved Ask conversations.</p>
               </div>
               <div id="vocab-drive-body">
                 <p id="vocab-drive-state" class="save-status vocab-drive-state" role="status" aria-live="polite" data-i18n="vocabDriveLoading">Loading Google Drive sync status…</p>
@@ -1721,15 +1698,10 @@
             <p class="hint context-help-body" data-i18n="backupIncludeHighlightsHint">Includes page URLs, titles, selected text, notes, colors, and timestamps.</p>
           </details><span class="switch-track" aria-hidden="true"></span></label>
         </div>
-        <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" role="switch" id="opt-backup-include-vocabulary" aria-labelledby="opt-backup-include-vocabulary-label" checked /> <span class="switch-text" id="opt-backup-include-vocabulary-label" data-i18n="backupIncludeVocabularyLabel">Include vocabulary in backups</span>
-          <details class="context-help">
-            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="backupIncludeVocabularyHint">Includes vocabulary only for the personal library.</p>
-          </details><span class="switch-track" aria-hidden="true"></span></label>
-        </div>
+        <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-backup-include-vocabulary" checked /> <span class="switch-text" data-i18n="backupIncludeVocabularyLabel">Include vocabulary in backups</span><span class="switch-track" aria-hidden="true"></span></label></div>
         <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-backup-include-secrets" aria-describedby="backup-secrets-warning" /> <span class="switch-text" data-i18n="backupIncludeSecretsLabel">Include API keys and tokens in backups</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
-        <p class="hint hint-warn" id="backup-secrets-warning" data-i18n="backupIncludeSecretsHint" hidden>Writes every credential to the file in plain text: your Pinboard, Karakeep and linkding API tokens, your access gateway credentials, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Notion, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password.</p>
+        <p class="hint hint-warn" id="backup-secrets-warning" data-i18n="backupIncludeSecretsHint" hidden>Your Pinboard, Karakeep and linkding tokens and every other key and credential are saved in plain text. Anyone with the file can use them.</p>
         <div class="backup-actions fg-actions">
           <button class="btn btn-sm" id="export-settings" data-i18n="exportSettings">Export backup</button>
           <button type="button" class="btn btn-sm" id="import-settings" title="Import from a JSON backup file" data-i18n="importSettings" data-i18n-title="importSettingsTitle">Import backup</button>

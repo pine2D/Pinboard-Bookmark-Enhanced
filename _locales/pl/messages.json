@@ -176,7 +176,7 @@
     "message": "Tagi AI"
   },
   "urlWarning": {
-    "message": "Ten adres URL nie jest obsługiwany i nie można go zapisać jako zakładki."
+    "message": "Tej strony nie można dodać do zakładek."
   },
   "urlCannotSave": {
     "message": "Nie można zapisać: nieobsługiwany URL"
@@ -195,7 +195,7 @@
   },
   "saveMergedExisting": {"message": "Ten adres URL był już zapisany. Zmiany zostały scalone z istniejącą zakładką."},
   "saveMergedKarakeepNote": {"message": "Karakeep usunął ją z archiwum i zaktualizował czas zapisu."},
-  "saveMergedLinkdingOverwrite": {"message": "Ten adres URL był już zapisany w linkding. Tytuł, opis, notki, stan „przeczytaj później” i udostępnianie istniejącej zakładki zastąpiono wpisanymi tutaj wartościami. Jej tagi również zastąpiono tymi tagami."},
+  "saveMergedLinkdingOverwrite": {"message": "Ten adres URL był już w linkding. Ta zakładka ma teraz wszystko, co tu wpisano, łącznie z tagami."},
   "bookmarkSaved": {
     "message": "Zakładka zapisana."
   },
@@ -232,7 +232,7 @@
   },
   "confirmLogoutDetail": {"message": "Twój token API zostanie usunięty. Niezapisane wersje robocze zakładek zostaną odrzucone."},
   "confirmLogoutDetailKarakeep": {"message": "Twój token API i dane uwierzytelniające bramki dostępu zostaną usunięte. Niezapisane wersje robocze zakładek zostaną odrzucone."},
-  "confirmLogoutDetailLinkding": {"message": "Twój token API i dane uwierzytelniające bramki dostępu zostaną usunięte. Niezapisane wersje robocze zakładek zostaną odrzucone. Ponowne połączenie, nawet z tym samym adresem i tokenem, jest traktowane jako nowe połączenie, więc zapisy czekające z poprzedniego nie będą ponawiane automatycznie."},
+  "confirmLogoutDetailLinkding": {"message": "Twój token API i dane uwierzytelniające bramki dostępu zostaną usunięte. Niezapisane wersje robocze zakładek zostaną odrzucone. Zapisy, które jeszcze czekają, nie zostaną ponowione, nawet jeśli połączysz się ponownie."},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -604,7 +604,7 @@
     }
   },
   "batchTagTooLongSkip": {
-    "message": ". Zapisano bez tagów: $COUNT$, bo tag „$TAG$” przekracza limit $MAX$ znaków w linkding. Skróć go, wyłącz „Pomiń już dodane URL-e” i uruchom zapis zbiorczy ponownie albo dodaj tag do każdej strony w popupie.",
+    "message": ". Zapisano bez tagów: $COUNT$, bo tag „$TAG$” przekracza limit $MAX$ znaków w linkding. Skróć go, wyłącz „Pomiń już dodane URL-e” i uruchom zapis zbiorczy ponownie.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -940,7 +940,7 @@
     "message": "Nie udało się wyodrębnić tej strony. Spróbuj ponownie."
   },
   "mdSiteTargetMissing": {
-    "message": "Żądany wpis nie został w pełni wczytany lub nie udało się go rozpoznać. Otwórz stronę źródłową, poczekaj na wyświetlenie wpisu i spróbuj ponownie."
+    "message": "Wpis jeszcze się nie wczytał albo nie można go znaleźć. Otwórz stronę, poczekaj, aż wpis się pojawi, i spróbuj ponownie."
   },
   "mdEngineTabGone": {
     "message": "Pierwotna karta nie jest już dostępna. Otwórz stronę ponownie, aby użyć Defuddle."
@@ -1071,7 +1071,7 @@
     "message": "Żadne notatki nie pasują do tego filtra."
   },
   "notesHiddenByOwner": {
-    "message": "Część wyróżnień należy do dawnych bibliotek i nie została połączona z tą biblioteką osobistą."
+    "message": "Część wyróżnień należy do starszej biblioteki i nie jest tu pokazywana."
   },
   "notesUnknownPage": {
     "message": "Nieznana strona"
@@ -1194,7 +1194,10 @@
     "message": "Notki w popupie"
   },
   "optAutoDescription": {
-    "message": "Automatycznie dodawaj opis strony: w linkding do pola Opis, w innych usługach do notki, jeśli nie zaznaczono tekstu"
+    "message": "Automatycznie dodawaj opis strony"
+  },
+  "optAutoDescriptionHint": {
+    "message": "W linkding trafia do pola Opis. W innych usługach trafia do notki, ale tylko wtedy, gdy nie zaznaczono tekstu."
   },
   "optBlockquote": {
     "message": "Oznaczaj zaznaczony tekst jako cytat"
@@ -1209,7 +1212,7 @@
     "message": "Zachowuj pisownię istniejących tagów"
   },
   "optRespectTagCaseHint": {
-    "message": "Jeśli warianty tagu różnią się tylko wielkością liter, spacjami, łącznikami lub podkreśleniami, używana jest najczęstsza pisownia. Tagi już przypisane do zakładki pozostają bez zmian."
+    "message": "Gdy tag ma kilka pisowni, np. JavaScript i javascript, używana jest ta, której używasz najczęściej. Tagi już przypisane do zakładki się nie zmieniają."
   },
   "optShowSuggestTags": {
     "message": "Pokaż sugerowane tagi Pinboard w okienku"
@@ -1223,17 +1226,11 @@
   "optShowQuickLinks": {
     "message": "Pokaż szybkie linki w okienku"
   },
-  "optShowQuickLinksHint": {
-    "message": "Linki: Zestawy, Sieć, Nieprzeczytane, Notki i Popularne."
-  },
   "optShowQuickRow": {
     "message": "Pokaż przyciski szybkich akcji"
   },
-  "optShowQuickRowHint": {
-    "message": "Przyciski: Zapisz zestaw kart, Zapis zbiorczy i Czytnik."
-  },
   "tagSyncLabel": {
-    "message": "Strategia pamięci podręcznej tagów"
+    "message": "Wczytywanie tagów do podpowiedzi"
   },
   "tagSyncCached": {
     "message": "Pamięć podręczna"
@@ -1245,16 +1242,13 @@
     "message": "Na żywo"
   },
   "tagSyncFreshDesc": {
-    "message": "Pobierane przy każdym otwarciu okienka; wolniej."
+    "message": "Wczytuje przy każdym otwarciu okienka. Wolniej."
   },
   "tagSyncPrewarmed": {
-    "message": "Wstępne ładowanie"
+    "message": "W tle"
   },
   "tagSyncPrewarmedDesc": {
-    "message": "Pobierane w tle co 15 minut, więc okienko otwiera się od razu."
-  },
-  "tagSyncHint": {
-    "message": "Wybierz, kiedy pobierać tagi do autouzupełniania. Pobranie nie zmienia tagów na serwerze."
+    "message": "Odświeża co 15 minut, więc okienko otwiera się od razu."
   },
   "labelTagPresets": {
     "message": "Predefiniowane tagi"
@@ -1292,14 +1286,11 @@
   "backupIncludeVocabularyLabel": {
     "message": "Uwzględniaj zapisane słówka w kopiach zapasowych"
   },
-  "backupIncludeVocabularyHint": {
-    "message": "Obejmuje tylko słówka z biblioteki osobistej."
-  },
   "backupIncludeSecretsLabel": {
     "message": "Uwzględniaj klucze API i tokeny w kopiach zapasowych"
   },
   "backupIncludeSecretsHint": {
-    "message": "Zapisuje wszystkie poświadczenia w pliku jawnym tekstem: tokeny API Pinboard, Karakeep i linkding, poświadczenia bramki dostępu, klucze API wszystkich dostawców AI oraz poświadczenia Jina, Wayback, Anki, Eudic, Notion, Gist i Webhook. Każdy, kto otworzy plik, może ich użyć. Przechowuj go tak jak hasło."
+    "message": "Tokeny Pinboard, Karakeep i linkding oraz wszystkie inne klucze i poświadczenia są zapisywane jawnym tekstem. Każdy, kto ma ten plik, może ich użyć."
   },
   "backupSecretsExportTitle": {"message": "Wyeksportować kopię zapasową z danymi logowania?"},
   "backupSecretsExportConfirm": {
@@ -1321,13 +1312,13 @@
     "message": "Ta kopia zapasowa zawiera poświadczenia jawnym tekstem. Importuj je tylko wtedy, gdy ufasz pochodzeniu pliku."
   },
   "backupVocabOwnerMissing": {
-    "message": "Zapisane słówka nie zostały uwzględnione, ponieważ biblioteka osobista jest niedostępna. Pozostałe wybrane dane zostały wyeksportowane."
+    "message": "Słówka nie zostały dołączone, bo biblioteka osobista jest niedostępna. Pozostałe wybrane dane wyeksportowano."
   },
   "backupHighlightsOwnerMissing": {
-    "message": "Zaznaczenia i notatki powiązane z kontem nie zostały uwzględnione, ponieważ biblioteka osobista jest niedostępna. Pozostałe wybrane dane zostały wyeksportowane."
+    "message": "Wyróżnienia i notatki z biblioteki osobistej nie zostały dołączone, bo jest ona niedostępna. Pozostałe wybrane dane wyeksportowano."
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "Zapisane słówka oraz zaznaczenia i notatki powiązane z kontem nie zostały uwzględnione, ponieważ biblioteka osobista jest niedostępna. Pozostałe wybrane dane zostały wyeksportowane."
+    "message": "Słówka, wyróżnienia i notatki z biblioteki osobistej nie zostały dołączone, bo jest ona niedostępna. Pozostałe wybrane dane wyeksportowano."
   },
   "backupPreviewTitle": {
     "message": "Podgląd importu"
@@ -1530,7 +1521,7 @@
     "message": "Nie ustawiono"
   },
   "qsAutoNotes": {
-    "message": "Dodawaj opis strony: w linkding do pola Opis, w innych usługach do notki, jeśli nie zaznaczono tekstu"
+    "message": "Dodawaj opis strony"
   },
   "qsBlockquote": {
     "message": "Oznaczaj zaznaczony tekst jako cytat"
@@ -1545,7 +1536,7 @@
     "message": "Automatycznie generuj tagi AI"
   },
   "qsAiSummary": {
-    "message": "Automatycznie generuj podsumowanie AI: w linkding w polu Opis, w innych usługach w notce"
+    "message": "Automatycznie generuj podsumowanie AI"
   },
   "secReadLater": {
     "message": "Przeczytaj później"
@@ -1560,7 +1551,7 @@
     "message": "Tagi (rozdzielone przecinkami)"
   },
   "batchTagsHint": {
-    "message": "Oddzielaj tagi przecinkami. Spacje wewnątrz nowego tagu są zastępowane separatorem tagów wielowyrazowych (ustawianym w sekcji Zachowanie AI). Przykład: batch_saved, research"
+    "message": "Spacje w nowym tagu zamieniają się na separator tagów wielowyrazowych (ustawiany w sekcji Zachowanie AI). Przykład: batch_saved, research"
   },
   "batchAiTags": {
     "message": "Automatycznie generuj tagi AI dla każdej karty"
@@ -1680,10 +1671,10 @@
     "message": "Identyfikator obszaru roboczego (opcjonalnie)"
   },
   "hintQwenRegion": {
-    "message": "Klucz działa tylko w swoim regionie: klucz z innego regionu zostanie odrzucony (401). Modele innych firm, takie jak DeepSeek i Kimi, są dostępne tylko w Pekinie."
+    "message": "Wybierz region, w którym utworzono klucz. DeepSeek, Kimi i inne modele innych firm są dostępne tylko w Pekinie."
   },
   "hintQwenWorkspace": {
-    "message": "Po podaniu identyfikatora obszaru roboczego żądania trafiają na jego dedykowany adres. Tokio nie ma wspólnego adresu i wymaga identyfikatora."
+    "message": "Wymagany dla regionu Tokio."
   },
   "hintOpenAIBaseUrl": {
     "message": "Zmień, aby użyć serwera proxy lub zgodnego endpointu"
@@ -1817,7 +1808,7 @@
     "message": "Strony rozszerzenia zgodne z motywem Pinboard"
   },
   "popupFollowHint": {
-    "message": "Po włączeniu okienko, ta strona ustawień i biblioteka używają palety wybranego motywu Pinboard; po wyłączeniu używają domyślnej palety w wybranym wyżej trybie jasnym/ciemnym. Czytnik zawsze zachowuje własną paletę czytania."
+    "message": "Okienko, ustawienia i biblioteka używają kolorów motywu Pinboard. Czytnik zachowuje własne kolory."
   },
   "optFollowNeedsPreset": {
     "message": "Najpierw wybierz poniżej motyw Pinboard. Przy „Bez motywu” nie ma palety do zastosowania."
@@ -1830,7 +1821,7 @@
       }
     }
   },
-  "optThemeHint": { "message": "Przełącza okienko, tę stronę ustawień, bibliotekę i czytnik między trybem jasnym a ciemnym. Motywy z własnym schematem (np. Dracula) mają pierwszeństwo na stronach, które podążają za motywem; czytnik może to zmienić osobno na każdym urządzeniu w panelu „Aa”." },
+  "optThemeHint": { "message": "Dotyczy okienka, ustawień, biblioteki i czytnika. Motywy z własnym schematem jasnym lub ciemnym, np. Dracula, mają pierwszeństwo. Czytnik może to też ustawić w panelu „Aa”." },
   "secPopupElements": {
     "message": "Elementy okienka"
   },
@@ -2113,7 +2104,7 @@
     "message": "Nazwa"
   },
   "hintCustomBaseUrlAnthropic": {
-    "message": "Do tego adresu dopisywane jest /messages; adres musi zawierać segment wersji, np. …/v1"
+    "message": "Adres musi kończyć się wersją, np. …/v1. Nie dopisuj /messages."
   },
   "aiCustomBaseUrlInvalid": {
     "message": "Użyj adresu https:// (http:// tylko dla localhost). Ten adres nie został zapisany."
@@ -2563,14 +2554,8 @@
   "optUrlCleanOnOpen": {
     "message": "Czyść przy otwarciu okienka"
   },
-  "optUrlCleanOnOpenHint": {
-    "message": "Dzieje się po cichu; link „Cofnij” w okienku przywraca pierwotny adres."
-  },
   "optUrlCleanOnPaste": {
     "message": "Czyść przy wklejaniu adresu URL"
-  },
-  "optUrlCleanOnPasteHint": {
-    "message": "Pojawia się powiadomienie z opcją „Cofnij”, na wypadek gdyby trzeba było zachować pierwotny adres."
   },
   "optUrlCleanAggressive": {
     "message": "Tryb agresywny: usuwa też ref, si, igshid i podobne (może zepsuć niektóre linki)"
@@ -2672,7 +2657,7 @@
     "message": "Nigdy nie archiwizuj w archive.org zakładek zapisanych jako prywatne"
   },
   "waybackSelfHostedPrivateHint": {
-    "message": "Zakładki Karakeep i nieudostępnione zakładki linkding są traktowane jako prywatne, więc domyślnie nie są automatycznie archiwizowane. Przy zapisywaniu możesz zaznaczyć „archiwizuj” lub wyłączyć opcję „Nigdy nie archiwizuj w archive.org zakładek zapisanych jako prywatne”."
+    "message": "Zakładki Karakeep i nieudostępnione zakładki linkding są traktowane jako prywatne, więc nie są archiwizowane automatycznie. Zaznacz „archiwizuj” przy zapisywaniu albo wyłącz opcję „Nigdy nie archiwizuj w archive.org zakładek zapisanych jako prywatne”."
   },
   "waybackPermDenied": {
     "message": "Archiwizacja wymaga dostępu do web.archive.org, którego nie przyznano. Włącz archiwizację ponownie, aby o niego poprosić."
@@ -2895,7 +2880,7 @@
     "message": "Pozostałe kody encji w tagach"
   },
   "tagGovEntityHint": {
-    "message": "Naprawa ponownie zapisuje każdą zakładkę z zaznaczonym tagiem i zastępuje tag poprawioną nazwą. Tej operacji nie można cofnąć; dopóki nie potwierdzisz, nic się nie zmieni."
+    "message": "Naprawa zmienia nazwę tagu we wszystkich zakładkach, które go mają. Tej operacji nie można cofnąć."
   },
   "tagGovEntityScan": {
     "message": "Skanuj tagi"
@@ -2913,7 +2898,7 @@
     "message": "łączy się z istniejącym tagiem"
   },
   "tagGovEntityConfirm": {
-    "message": "Naprawić tagi ($N$)? Ich zakładki zostaną zapisane ponownie z poprawioną nazwą. Odznacz tagi, które naprawdę mają zawierać taki tekst.",
+    "message": "Naprawić tagi ($N$)? Odznacz tagi, które mają zachować ten tekst.",
     "placeholders": {
       "N": {
         "content": "$1"
@@ -3055,7 +3040,7 @@
     "message": "Pomiń"
   },
   "optBgSaveModeSkipDesc": {
-    "message": "Nic nie robi; zapisana zakładka zostaje bez zmian."
+    "message": "Zakładka zostaje bez zmian."
   },
   "optBgSaveModeOverwrite": {
     "message": "Zastąp"
@@ -3785,11 +3770,11 @@
       "message": "Dysk Google"
     },
     "vocabDriveScope": {
-      "message": "Po połączeniu to urządzenie synchronizuje słownictwo, wyróżnienia i notatki, pełne hasła AI z uzupełnieniami oraz zapisane rozmowy z cytowanymi fragmentami dla biblioteki osobistej."
+      "message": "Synchronizuje słówka, wyróżnienia, notatki, hasła AI i zapisane rozmowy Ask."
     },
     "vocabDriveConnectionHint": { "message": "Połącz każde urządzenie osobno. Google Drive nie synchronizuje ustawień ani danych logowania." },
     "vocabDriveDisclosure": {
-      "message": "Kopie są zapisywane jawnym tekstem w prywatnym folderze rozszerzenia na Google Drive, bez szyfrowania end-to-end. Oprócz zapisanych treści mogą zawierać preferencje nauki użyte w uzupełnieniach, cytowane fragmenty, źródłowe adresy URL, tytuły i daty."
+      "message": "Dane są zapisywane jawnym tekstem, bez szyfrowania end-to-end, w prywatnym folderze na Twoim Dysku Google. Zawierają też źródłowe adresy URL, tytuły, daty i preferencje nauki."
     },
     "vocabDriveLoading": {
       "message": "Wczytywanie stanu synchronizacji z Dyskiem Google…"
@@ -4653,7 +4638,7 @@
   "diagnosticsCopied": { "message": "Skopiowano dane diagnostyczne" },
   "diagnosticsCopyFailed": { "message": "Nie udało się skopiować danych diagnostycznych. Sprawdź dostęp do schowka i spróbuj ponownie." },
   "libraryVocabSignedOutTitle": { "message": "Zaloguj się, aby korzystać ze słownictwa" },
-  "libraryVocabSignedOutHint": { "message": "Słówka, wyróżnienia, notatki i historia Ask pozostają w jednej bibliotece niezależnie od usługi zakładek." },
+  "libraryVocabSignedOutHint": { "message": "Słówka, wyróżnienia, notatki i historia Ask są te same bez względu na to, której usługi zakładek używasz." },
   "libraryVocabOpenSettings": { "message": "Otwórz ustawienia konta" },
   "libraryLookupSignedOutHint": { "message": "Wyszukaj słowo w sekcji „Słownik”. Zaloguj się, aby zapisać je w słówkach." },
   "mdPreviewClose": { "message": "Zamknij czytnik" },
@@ -4831,7 +4816,7 @@
   "mdExportContextChanged": {"message": "Konto, artykuł lub rozmowa uległy zmianie. Rozpocznij eksport ponownie."},
   "themeGroupAdaptiveHint": {"message": "Motywy adaptacyjne stosują tryb jasny lub ciemny wybrany powyżej w sekcji „Wygląd rozszerzenia”."},
   "dictDefinitionLangLabel": { "message": "Język definicji w hasłach AI" },
-  "dictDefinitionLangHint": {"message": "Hasła AI i uzupełnienia domyślnie używają języka ojczystego, a jeśli go nie podano — języka interfejsu. Język wybrany tutaj ma pierwszeństwo. Definicje ze słowników i cytaty pozostają w języku oryginału."},
+  "dictDefinitionLangHint": {"message": "Hasła AI domyślnie używają Twojego języka ojczystego, a jeśli go nie podano, języka interfejsu. Definicje ze słowników i cytaty zostają w swoim języku."},
   "dictDefinitionLangUi": {"message": "Użyj języka ojczystego"},
   "vocabLanguageFilterAria": { "message": "Filtruj według języka" },
   "vocabAllLanguages": { "message": "Wszystkie języki" },
@@ -4848,13 +4833,13 @@
   "dictAnkiFormatLabel": { "message": "Format notatek Anki" },
   "dictAnkiFormatLegacy": { "message": "Oryginalny (sześć pól)" },
   "dictAnkiFormatMultilingual": { "message": "Wielojęzyczny (pełne dane)" },
-  "dictAnkiFormatHint": { "message": "Format wielojęzyczny używa osobnego typu notatek, więc może dodać karty obok dotychczasowych. Ponowne wysłanie pomija istniejące notatki i nie aktualizuje ich treści." },
+  "dictAnkiFormatHint": { "message": "Format wielojęzyczny ma własny typ notatek, więc słowa, które już masz, mogą dostać drugą kartę. Ponowne wysłanie pomija istniejące notatki i ich nie aktualizuje." },
   "dictExportCompleteTsv": { "message": "Eksportuj pełny TSV" },
   "dictExportLegacyTsv": { "message": "Eksportuj TSV z sześcioma polami" },
   "vocabCompleteExportHint": { "message": "Pełny TSV zawiera język, formę podstawową, notatki i wszystkie konteksty wraz ze źródłami. Do przywracania danych w rozszerzeniu służy kopia JSON." },
   "dictAnkiModelMismatchNamed": {"message": "Typ notatki „$MODEL$” w Anki ma inne pola. Przywróć jego oryginalne pola albo zmień jego nazwę, aby można było utworzyć nowy typ, i spróbuj ponownie.", "placeholders": {"model": {"content": "$1"}}},
   "multiPackSection": {"message": "Wielojęzyczne słowniki offline"},
-  "multiPackHint": {"message": "Zaimportuj słownik ZIP w formacie Yomitan v3. Definicje i zapis wymowy pozostają na tym urządzeniu. Style, obrazy i nagrania nie są importowane."},
+  "multiPackHint": {"message": "Zaimportuj słownik Yomitan v3 (ZIP). Zostaje na tym urządzeniu. Style, obrazy i nagrania nie są importowane."},
   "multiPackBrowse": {"message": "Znajdź pliki słowników"},
   "multiPackChoose": {"message": "Wybierz plik ZIP"},
   "multiPackEmpty": {"message": "Nie zainstalowano słowników wielojęzycznych."},
@@ -4864,7 +4849,7 @@
   "multiPackLanguageHint": {"message": "Użyj kodów języków, np. de, en lub zh-Hant. Przed importem sprawdź oba języki."},
   "multiPackSourceUrl": {"message": "Adres źródła (opcjonalny)"},
   "multiPackLicense": {"message": "Informacja o licencji (opcjonalna)"},
-  "multiPackLicenseHint": {"message": "Te informacje pochodzą z pliku lub twoich zmian. Sprawdź warunki źródła przed użyciem lub udostępnieniem jego treści."},
+  "multiPackLicenseHint": {"message": "Sprawdź warunki słownika, zanim użyjesz jego treści lub je udostępnisz."},
   "multiPackInspecting": {"message": "Odczytywanie informacji o słowniku…"},
   "multiPackPreview": {"message": "Sprawdź słownik"},
   "multiPackInstall": {"message": "Importuj słownik"},
@@ -4874,8 +4859,6 @@
   "multiPackDisable": {"message": "Wyłącz"},
   "multiPackAllowAi": {"message": "Zezwól na użycie przez AI"},
   "multiPackBlockAi": {"message": "Zablokuj użycie przez AI"},
-  "multiPackAiHint": {"message": "Użycie przez AI jest domyślnie wyłączone. Włącz je tylko wtedy, gdy warunki źródła zezwalają na wysyłanie definicji do skonfigurowanego dostawcy AI."},
-  "multiPackAiConfirm": {"message": "Zezwolić na wysyłanie definicji z tego słownika do skonfigurowanego dostawcy AI podczas korzystania z pomocy AI? Sprawdź, czy pozwalają na to warunki słownika."},
   "multiPackSummary": {"message": "$SOURCE$ / $TARGET$ · Hasła: $COUNT$ · $REVISION$", "placeholders": {"source": {"content": "$1"}, "target": {"content": "$2"}, "count": {"content": "$3"}, "revision": {"content": "$4"}}},
   "multiPackNotDeclared": {"message": "Nie podano"},
   "multiPackCancelled": {"message": "Import anulowany. Zainstalowane słowniki pozostają bez zmian."},
@@ -4890,7 +4873,6 @@
   "dictOnlineLanguageUnavailable": {"message": "Wyszukiwanie online nie jest dostępne dla tego języka."},
   "dictTagReading": {"message": "Wymowa"},
   "dictAssistRecommend": {"message": "Znajdź znaczenie z AI"},
-  "dictAssistExplain": {"message": "Wyjaśnij znaczenie z AI"},
   "dictAssistUseMeaning": {"message": "Wybierz to znaczenie ze słownika"},
   "dictAssistNeedContext": {"message": "Aby dopasować znaczenie, sprawdź słowo w zdaniu lub otwórz zapisane słowo ze zdaniem źródłowym."},
   "dictAssistChooseMeaning": {"message": "Wybierz znaczenie ze słownika, aby uzyskać wyjaśnienie."},
@@ -4907,7 +4889,6 @@
   "dictAssistFailed": {"message": "AI nie udało się zrealizować tego żądania. Spróbuj ponownie."},
   "dictAssistAllowedSources": {"message": "Uwzględniane są tylko źródła słownikowe dopuszczone do użycia z AI."},
   "dictAssistAnalyze": {"message": "Analizuj z AI"},
-  "dictAssistAnalysisHint": {"message": "Przeanalizuj zaznaczone wyrażenie na podstawie zdania źródłowego."},
   "dictAssistAnalysisNeedsMatch": {"message": "Nie znaleziono zaznaczonego wyrażenia w tym zdaniu. Wyszukaj formę, która w nim występuje."},
   "dictAssistAnalysisEmpty": {"message": "Nie znaleziono formy podstawowej ani frazy, którą można potwierdzić na podstawie tego zdania."},
   "dictAssistLemmaSuggestion": {"message": "Możliwa forma podstawowa"},
@@ -4934,15 +4915,14 @@
   "dictEntryShowAi": {"message": "Pokaż hasło AI"},
   "dictEntryNotCached": {"message": "Nie udało się zapisać hasła. Pozostaw wyszukiwanie otwarte i ponów zapis."},
   "dictAiAutoGenerateLabel": {"message": "Automatycznie generuj hasła AI"},
-  "dictAiAutoGenerateHint": {"message": "Jeśli nie ma hasła AI w pamięci podręcznej, podczas wyszukiwania utworzy je model AI czytnika. Zużywa to tokeny. Domyślnie wyłączone; hasła można też generować ręcznie."},
   "dictDefaultViewLabel": {"message": "Domyślny widok wyszukiwania"},
-  "dictDefaultViewHint": {"message": "Wyniki słownika są zawsze na górze. To ustawienie określa, jak początkowo wygląda hasło AI pod nimi: zwinięte zapisane hasło zajmuje jeden wiersz, który możesz rozwinąć; dwie pozostałe opcje pokazują je od razu. Tylko opcja „generuj brakujące” automatycznie zużywa tokeny."},
+  "dictDefaultViewHint": {"message": "Wyniki słownika są zawsze na górze. Tylko opcja „generuj brakujące” sama zużywa tokeny."},
   "dictDefaultDictionary": {"message": "Zwijaj zapisane hasła AI"},
   "dictDefaultAiSaved": {"message": "Pokazuj zapisane hasła AI"},
   "dictDefaultAiGenerate": {"message": "Pokazuj hasła AI, generuj brakujące"},
   "dictLearnerNativeLanguageLabel": {"message": "Język ojczysty (opcjonalnie)"},
   "dictLearnerNativeLanguagePlaceholder": {"message": "Na przykład: hiszpański"},
-  "dictLearnerProfileHint": {"message": "Język ojczysty wyznacza domyślny język objaśnień AI i pomaga dobierać porównania. Poziom nauki wpływa na trudność i przykłady. Te ustawienia nie uruchamiają generowania."},
+  "dictLearnerProfileHint": {"message": "Na tej podstawie hasła AI dobierają język objaśnień i poziom trudności. Zmiana tych ustawień nie zużywa tokenów."},
   "dictLearnerLevelLabel": {"message": "Poziom językowy (opcjonalnie)"},
   "dictLearnerLevelUnspecified": {"message": "Nie określono"},
   "dictLearnerLevelBeginner": {"message": "Początkujący"},
@@ -4954,7 +4934,7 @@
   "dictLearningUsagePoints": {"message": "Wskazówki użycia"},
   "dictLearningEtymology": {"message": "Etymologia"},
   "dictExamplesTitle": {"message": "Przykłady z tekstów"},
-  "dictExamplesHint": {"message": "Wyszukuje w Wikisource oryginalne zdania z tym słowem – bez zapytania do AI i bez tłumaczenia."},
+  "dictExamplesHint": {"message": "Zdania z Wikisource, bez tłumaczenia. Nie korzysta z AI."},
   "dictExamplesFind": {"message": "Znajdź przykłady w tekstach"},
   "dictExamplesNone": {"message": "To wyszukiwanie nie znalazło weryfikowalnego tekstu źródłowego."},
   "dictNegRetry": {"message": "Ostatnio nic nie znaleziono · Spróbuj ponownie"},
@@ -4987,7 +4967,7 @@
   "dictEntryRetrySave": {"message": "Ponów zapis"},
   "driveDictionaryStatus": {"message": "Hasła AI: $STATUS$", "placeholders": {"status": {"content": "$1"}}},
   "driveDictionaryErrorEntryTooLarge": {"message": "Hasło AI jest za duże do synchronizacji. Lokalna kopia została zachowana. Kliknij „Synchronizuj teraz”, aby spróbować ponownie."},
-  "dictSupplementUnsupported": {"message": "AI nie zdołała przygotować wiarygodnego uzupełnienia. Zapytanie do AI zostało wysłane."},
+  "dictSupplementUnsupported": {"message": "AI nie znalazła źródeł, które by to potwierdzały. Zapytanie i tak zużyło tokeny."},
   "askNewConversation": {"message": "Nowa rozmowa"},
   "askHistory": {"message": "Historia rozmów"},
   "askTemporary": {"message": "Nie zapisuj tej rozmowy tymczasowej"},
@@ -5019,37 +4999,37 @@
   "driveAskErrorEntryTooLarge": {"message": "Jedna z odpowiedzi przekracza limit rozmiaru synchronizacji. Pozostaje zapisana na tym urządzeniu."},
   "askHistoryUnavailable": {"message": "Ta rozmowa została usunięta lub nie jest dostępna na tym urządzeniu. Rozpocznij nową rozmowę, aby kontynuować."},
   "askHistoryKeysMove": {"message": "Poprzednia lub następna rozmowa"},
-  "dictMeaningDefaultHelp": {"message": "Jedna z definicji jest już wybrana i gotowa do zapisania. Jeśli wybierzesz inną, wybór pozostanie zachowany podczas tego wyszukiwania."},
-  "dictMeaningManualHelp": {"message": "Zapisana zostanie wybrana definicja. Wybór pozostanie zachowany podczas tego wyszukiwania."},
-  "dictMeaningSavedHelp": {"message": "Zapisana definicja nie zmieni się automatycznie. Wybierz definicję, aby zaktualizować zapisane słowo."},
-  "dictMeaningChooseHelp": {"message": "Wybierz definicję do zapisania. Wybór pozostanie zachowany podczas tego wyszukiwania."},
+  "dictMeaningDefaultHelp": {"message": "Ta definicja zostanie zapisana. Możesz wybrać inną."},
+  "dictMeaningManualHelp": {"message": "Zostanie zapisana wybrana definicja."},
+  "dictMeaningSavedHelp": {"message": "Wybierz definicję, aby zastąpić zapisaną."},
+  "dictMeaningChooseHelp": {"message": "Wybierz definicję do zapisania."},
   "dictMeaningChange": {"message": "Zmień"},
   "dictFullEntry": {"message": "Pełne hasło"},
-  "dictFullEntryOnlyHint": {"message": "To hasło nie zostało jeszcze podzielone na osobne definicje. Możesz przeczytać je w całości lub wybrać do zapisania definicję z innego słownika."},
-  "multiPackReimportHint": {"message": "Zaimportuj ponownie ten sam słownik, aby ponownie rozpoznać strukturę definicji. Zapisane słownictwo i ustawienie włączenia lub wyłączenia słownika pozostaną bez zmian."},
+  "dictFullEntryOnlyHint": {"message": "To hasło nie ma osobnych definicji. Aby zapisać definicję, wybierz inny słownik."},
+  "multiPackReimportHint": {"message": "Zaimportuj ten słownik ponownie, aby odświeżyć definicje. Zapisane słówka i to, czy słownik jest włączony, się nie zmienią."},
   "dictEntryFormation": {"message": "Budowa słowa"},
   "dictEntryHistory": {"message": "Pochodzenie historyczne"},
-  "dictEntryNoHistory": {"message": "Brak weryfikowalnego źródła etymologii. Wyświetlana jest tylko budowa słowa i powiązania słownikowe."},
+  "dictEntryNoHistory": {"message": "Nie znaleziono wiarygodnego źródła pochodzenia tego słowa, więc pokazano tylko jego budowę i powiązane słowa."},
   "dictEntryRelationFamily": {"message": "Rodzina wyrazów"},
   "dictEntryRelationCognate": {"message": "Wspólne pochodzenie"},
   "dictEntryRelationSynonym": {"message": "Podobne znaczenie"},
   "dictEntryRelationTopic": {"message": "Wspólna tematyka"},
   "dictSupplementLanguage": {"message": "Język objaśnień: $LANGUAGE$", "placeholders": {"language": {"content": "$1"}}},
   "dictSupplementEtymology": {"message": "Pochodzenie i powiązane słowa"},
-  "dictEtymologyHint": {"message": "Na żądanie wyjaśnia budowę, pochodzenie i powiązane słowa. Informacje historyczne opierają się wyłącznie na pobranych źródłach."},
+  "dictEtymologyHint": {"message": "Budowa słowa, pochodzenie i powiązane słowa. Pochodzenie jest podawane tylko na podstawie znalezionych źródeł."},
   "dictEtymologyGenerating": {"message": "Generowanie pochodzenia słowa…"},
   "dictSupplementPartial": {"message": "Zachowane punkty: $ACCEPTED$. Pominięte po weryfikacji: $OMITTED$.", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
   "dictSupplementOriginal": {"message": "Przykłady napisane przez AI"},
   "dictSupplementMeaning": {"message": "W tym użyciu: $MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "Zaktualizuj uzupełnienie"},
-  "dictSupplementUpdateHint": {"message": "Generuje nową wersję i zużywa tokeny. Poprzednie wyniki zostają zachowane i są synchronizowane po połączeniu z Drive."},
+  "dictSupplementUpdateHint": {"message": "Zużywa tokeny. Poprzedni wynik zostaje zachowany."},
   "dictSupplementPrevious": {"message": "Poprzednie wyniki"},
-  "dictSupplementLegacy": {"message": "Wcześniejszy wynik, niesprawdzony według nowych kryteriów treści."},
+  "dictSupplementLegacy": {"message": "Starszy wynik. Nie był sprawdzany tak jak nowe wyniki."},
   "dictSupplementWrongLanguage": {"message": "Objaśnienie jest w innym języku niż wybrany. Nie zostało zapisane; można wygenerować je ponownie."},
-  "dictSupplementInvalid": {"message": "Brakuje wymaganych informacji lub nie udało się zweryfikować cytatu. Wynik nie został zapisany; można spróbować ponownie."},
+  "dictSupplementInvalid": {"message": "Wynik był niepełny albo nie udało się sprawdzić cytatu, więc go nie zapisano. Spróbuj ponownie."},
   "dictSupplementSourceVerified": {"message": "Sprawdzono w tekście źródłowym"},
   "dictEntryUpdate": {"message": "Zaktualizuj hasło"},
-  "dictEntryUpdateHint": {"message": "Generuje hasło ponownie i zużywa tokeny. Poprzednie wyniki zostają zachowane."},
+  "dictEntryUpdateHint": {"message": "Zużywa tokeny. Poprzednie hasło zostaje zachowane."},
   "dictPaidActionHint": {"message": "Wywołuje AI i zużywa tokeny."},
   "dictResize": {"message": "Zmień rozmiar okna słownika"},
   "dictResizeWidth": {"message": "Szerokość"},
@@ -5068,11 +5048,11 @@
   "dictSupplementRetrieving": {"message": "Wyszukiwanie źródeł…"},
   "dictSupplementChecking": {"message": "Sprawdzanie wygenerowanej treści…"},
   "dictSupplementSaving": {"message": "Zapisywanie uzupełnienia…"},
-  "dictGenerationTruncated": {"message": "Model nie ukończył odpowiedzi. Wynik nie został zapisany. Spróbuj ponownie lub wybierz inny model AI czytnika w ustawieniach."},
+  "dictGenerationTruncated": {"message": "Odpowiedź została ucięta i nie została zapisana. Spróbuj ponownie lub wybierz w ustawieniach inny model AI czytnika."},
   "dictGenerationRefused": {"message": "Model odrzucił żądanie lub zablokował odpowiedź. Wynik nie został zapisany."},
-  "dictGenerationEmpty": {"message": "Model nie zwrócił tekstu odpowiedzi. Ten wynik nie został zapisany. Spróbuj ponownie lub wybierz w ustawieniach inny model AI dla czytnika."},
-  "dictGenerationModelUnavailable": {"message": "Dostawca nie mógł znaleźć lub użyć wybranego modelu. Sprawdź jego nazwę i dostępność, a następnie zmień model AI czytnika w ustawieniach."},
-  "dictGenerationBilling": {"message": "Dostawca odrzucił to żądanie (HTTP 402). Przed kolejną próbą sprawdź u niego limit wykorzystania, stan rozliczeń i uprawnienia dostępu swojego konta."},
+  "dictGenerationEmpty": {"message": "Model nic nie zwrócił. Spróbuj ponownie lub wybierz w ustawieniach inny model AI czytnika."},
+  "dictGenerationModelUnavailable": {"message": "Dostawca nie może użyć tego modelu. Sprawdź w ustawieniach nazwę modelu AI czytnika."},
+  "dictGenerationBilling": {"message": "Dostawca odrzucił żądanie (HTTP 402). Sprawdź u dostawcy saldo lub plan."},
   "dictGenerationServiceUnavailable": {"message": "Usługa dostawcy jest chwilowo niedostępna. Spróbuj ponownie później."},
   "dictProgressThinking": {"message": "Model analizuje…"},
   "dictProgressStreaming": {"message": "Odbieranie odpowiedzi…"},
@@ -5083,14 +5063,11 @@
   "bookmarkServiceChoose": {
     "message": "Wybierz miejsce zapisu zakładek"
   },
-  "bookmarkServiceHint": {
-    "message": "Okno rozszerzenia, czytnik, skróty klawiszowe i zapis zbiorczy korzystają z tej usługi."
-  },
   "personalLibraryTitle": {
     "message": "Biblioteka osobista"
   },
   "personalLibraryHint": {
-    "message": "Słówka, wyróżnienia, notatki i historia Ask pozostają w jednej bibliotece niezależnie od usługi zakładek."
+    "message": "Słówka, wyróżnienia, notatki i historia Ask są te same bez względu na to, której usługi zakładek używasz."
   },
   "bookmarkServerUrl": {
     "message": "Adres serwera"
@@ -5105,7 +5082,7 @@
     "message": "Podaj adres witryny wraz z podścieżką, jeśli jest używana. Poza localhost wymagany jest HTTPS."
   },
   "bookmarkTokenLocalHint": {
-    "message": "Token i dane uwierzytelniające bramki zostają w tej przeglądarce i trafiają wyłącznie do tego serwera. Na inne urządzenia przejdą tylko wtedy, gdy włączysz synchronizację kluczy API i tokenów."
+    "message": "Token i dane uwierzytelniające bramki zostają w tej przeglądarce i trafiają tylko do tego serwera. Na inne urządzenia przejdą tylko wtedy, gdy synchronizujesz klucze API i tokeny."
   },
   "bookmarkKarakeepTokenHelp": {
     "message": "W Karakeep otwórz Ustawienia użytkownika → Klucze API i utwórz nowy klucz z pełnym dostępem. Klucz jest pokazywany tylko raz, więc od razu skopiuj go tutaj."
@@ -5123,25 +5100,25 @@
     "message": "Wczytuj informacje o stronie już podczas przeglądania"
   },
   "optLinkdingPreloadHint": {
-    "message": "Ikona na pasku narzędzi pokazuje wtedy przy każdej otwartej stronie, czy jest już w linkding, a okienko otwiera się bez czekania. Ceną jest to, że każdy odwiedzany adres trafia na Twój serwer linkding i do jego dziennika, a serwer sam odwiedza tę stronę. Gdy opcja jest wyłączona, linkding jest pytany tylko przy otwarciu okienka."
+    "message": "Ikona na pasku narzędzi pokazuje, czy strona jest już zapisana. Każdy odwiedzany adres trafia na Twój serwer linkding, który sam odwiedza tę stronę."
   },
   "optLinkdingBrowserMetadata": {
     "message": "Używaj tytułu i opisu strony z przeglądarki"
   },
   "optLinkdingBrowserMetadataHint": {
-    "message": "Nowa zakładka dostaje tytuł i opis strony w takiej postaci, w jakiej pokazuje je przeglądarka. Gdy opcja jest wyłączona, dostaje to, co z tej strony odczytał Twój serwer linkding. Może się to różnić na stronach, które zmieniają się po wczytaniu albo wymagają zalogowania."
+    "message": "Gdy opcja jest wyłączona, linkding sam odczytuje tytuł i opis ze strony. Mogą się różnić na stronach, które wymagają zalogowania albo zmieniają się po wczytaniu."
   },
   "optLinkdingSingleFile": {
     "message": "Uruchamiaj SingleFile po dodaniu zakładki"
   },
   "optLinkdingSingleFileHint": {
-    "message": "Gdy okienko albo szybki zapis doda nową zakładkę, SingleFile zapisze pełną kopię strony, a linkding nie utworzy dla niej własnej migawki HTML. Potrzebujesz linkding w wersji 1.39 lub nowszej oraz rozszerzenia SingleFile. W jego opcjach ustaw miejsce docelowe (destination) na przesyłanie do REST API formularza i wpisz: jako URL adres Twojego linkding, a po nim /api/bookmarks/singlefile/ (z samym adresem linkding przesyłanie się nie powiedzie); jako token autoryzacji (authorization token) token API ze strony ustawień linkding, bez przedrostka „Token”; jako nazwę pola danych (data field name) file, a jako nazwę pola URL (URL field name) url. SingleFile sam przesyła stronę do Twojego linkding; to rozszerzenie nie ma do czynienia z plikiem."
+    "message": "Wymaga linkding 1.39 lub nowszego i rozszerzenia SingleFile. W opcjach SingleFile ustaw miejsce docelowe (destination) na przesyłanie do REST API formularza i wpisz: URL = adres Twojego linkding + /api/bookmarks/singlefile/; token autoryzacji (authorization token) = token API linkding, bez przedrostka „Token”; nazwa pola danych (data field name) = file; nazwa pola URL (URL field name) = url."
   },
   "optLinkdingSingleFileDocs": {
     "message": "Przewodnik linkding o archiwizacji z SingleFile"
   },
   "optCheckBookmarkStatusLinkding": {
-    "message": "W linkding ikona na pasku narzędzi pokazuje, czy strona jest zapisana, tylko gdy włączona jest opcja „Wczytuj informacje o stronie już podczas przeglądania”. Znajdziesz ją w ustawieniach połączenia z linkding na karcie Konto."
+    "message": "W linkding włącz też opcję „Wczytuj informacje o stronie już podczas przeglądania” na karcie Konto."
   },
   "bookmarkGatewayLabel": {
     "message": "Bramka dostępu"
@@ -5184,7 +5161,7 @@
     "message": "Wartość"
   },
   "bookmarkGatewayNoneHint": {
-    "message": "Potrzebne tylko wtedy, gdy przed serwerem stoi bramka wymagająca logowania, np. Cloudflare Access. Jeśli łączysz się z serwerem bezpośrednio, zostaw „Brak”."
+    "message": "Potrzebne tylko wtedy, gdy przed serwerem stoi bramka logowania, np. Cloudflare Access."
   },
   "bookmarkGatewayHeaderNameN": {
     "message": "Nazwa nagłówka $N$",
@@ -5210,7 +5187,7 @@
     "message": "Nieprawidłowa nazwa nagłówka. Użyj najwyżej 64 liter, cyfr i łączników, np. X-Auth-Token."
   },
   "bookmarkGatewayErrNameForbidden": {
-    "message": "Tego nagłówka nie można tu ustawić: kontroluje go przeglądarka albo rozszerzenie wysyła go samo (np. Authorization lub Cookie)."
+    "message": "Nagłówków takich jak Authorization i Cookie nie można tu ustawić."
   },
   "bookmarkGatewayErrDuplicate": {
     "message": "Każdej nazwy nagłówka można użyć tylko raz (wielkość liter nie ma znaczenia)."
@@ -5251,7 +5228,7 @@
     "message": "Zezwól na dostęp do tego serwera w ustawieniach, a następnie połącz ponownie."
   },
   "bookmarkKarakeepHint": {
-    "message": "„Do przeczytania” korzysta z osobnej listy prywatnej. Oznaczenie zakładki jako przeczytanej usuwa ją z listy, bez zmiany stanu archiwizacji w usłudze."
+    "message": "„Do przeczytania” to prywatna lista w Karakeep. Oznaczenie zakładki jako przeczytanej usuwa ją z listy, a stan archiwizacji się nie zmienia."
   },
   "bookmarkReadLaterListName": {
     "message": "Do przeczytania"
@@ -5264,13 +5241,13 @@
   "bookmarkPartialSavePopupReadLater": {"message": "Zakładka została zapisana, ale nie zmieniono stanu „przeczytaj później”. Naciśnij ponownie „Aktualizuj”, aby to dokończyć."},
   "bookmarkPartialSavePopupBookmark": {"message": "Tytuł i notki nie zostały zaktualizowane, więc zakładka się nie zmieniła. Naciśnij ponownie „Aktualizuj”, aby zastosować zmiany."},
   "bookmarkErrGatewayRedirect": {
-    "message": "Serwer przekierował żądanie. Najpierw sprawdź adres i port: muszą wskazywać bezpośrednio na usługę Karakeep lub linkding. Jeśli są poprawne, przekierowanie może wynikać z bramki dostępu wymagającej logowania, np. Cloudflare Access. Dodaj token usługi w sekcji „Bramka dostępu” lub zezwól w bramce na ścieżkę API."
+    "message": "Serwer przekierował żądanie. Sprawdź, czy adres i port wskazują bezpośrednio na Karakeep lub linkding. Jeśli tak, przekierowywać może bramka logowania: dodaj token usługi w sekcji „Bramka dostępu” albo zezwól w bramce na ścieżkę API."
   },
   "bgTabSetPinboardOnly": {"message": "Zestawy kart działają tylko z Pinboardem. Aby ich używać, wybierz w ustawieniach Pinboard jako usługę zakładek."},
   "bookmarkDisconnect": {"message": "Rozłącz"},
   "bookmarkDisconnectConfirm": {"message": "Rozłączyć się z tą usługą?"},
   "bookmarkDisconnectDetail": {"message": "Token API i dane uwierzytelniające bramki dostępu zostaną usunięte z tej przeglądarki. Przyciskiem Połącz możesz połączyć się ponownie w dowolnej chwili."},
-  "bookmarkDisconnectDetailLinkding": {"message": "Token API i dane uwierzytelniające bramki dostępu zostaną usunięte z tej przeglądarki. Ponowne połączenie, nawet z tym samym adresem i tokenem, jest traktowane jako nowe połączenie, więc zapisy czekające z poprzedniego nie będą ponawiane automatycznie."},
+  "bookmarkDisconnectDetailLinkding": {"message": "Token API i dane uwierzytelniające bramki dostępu zostaną usunięte z tej przeglądarki. Zapisy, które jeszcze czekają, nie zostaną ponowione, nawet jeśli połączysz się ponownie."},
   "bookmarkDisconnected": {"message": "Rozłączono"},
   "bookmarkDisconnectFailed": {"message": "Nie udało się rozłączyć: zmiana nie została zapisana. Spróbuj ponownie."},
   "bookmarkServicePending": {"message": "Zakładki nadal trafiają do $ACTIVE$, dopóki nie połączysz $SERVICE$.", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
@@ -5282,10 +5259,10 @@
   "backupBookmarkServiceNotConnected": {"message": "Kopia zapasowa wybiera $SERVICE$, z którym to urządzenie nie jest połączone. Zakładki nadal trafiają do $ACTIVE$, dopóki nie połączysz $SERVICE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "Kopia zapasowa wybiera $SERVICE$, z którym to urządzenie nie jest połączone. Zmiana nastąpi tylko wtedy, gdy przywrócone poświadczenia pozwolą się połączyć; w przeciwnym razie zakładki nadal trafiają do $ACTIVE$.", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
-    "message": "Kontrola bezpieczeństwa (test antybotowy) zablokowała żądanie. Częstą przyczyną są reguły bezpieczeństwa Cloudflare; zezwól w nich na ścieżkę API."
+    "message": "Test antybotowy zablokował żądanie. Zezwól na ścieżkę API w regułach bezpieczeństwa Cloudflare lub innej usługi."
   },
   "bookmarkErrGatewayBasic": {
-    "message": "Proxy przed serwerem wymaga nazwy użytkownika i hasła (Basic). Nie da się tego połączyć z tokenem usługi zakładek, więc zezwól w proxy na ścieżkę API."
+    "message": "Proxy przed serwerem wymaga nazwy użytkownika i hasła, których nie można użyć razem z tokenem. Zezwól w proxy na ścieżkę API."
   },
   "bookmarkErrGatewayDenied": {
     "message": "Bramka przed serwerem odrzuciła żądanie. Sprawdź dane uwierzytelniające w sekcji „Bramka dostępu” i czy zasady bramki je dopuszczają. W Cloudflare potrzebna jest zasada z akcją Service Auth."
@@ -5308,7 +5285,7 @@
     }
   },
   "bgTagTooLongSkip": {
-    "message": "linkding zapisał tę stronę bez tagów, bo tag „$TAG$” przekracza limit $MAX$ znaków. Zapis skrótem pomija strony już dodane, więc skróć tag i dodaj go w popupie.",
+    "message": "linkding zapisał tę stronę bez tagów, bo tag „$TAG$” przekracza limit $MAX$ znaków. Skróć tag i dodaj go w popupie.",
     "placeholders": {
       "tag": {
         "content": "$1"
@@ -5342,7 +5319,7 @@
     }
   },
   "bookmarkErrTooLarge": {
-    "message": "Żądanie było za duże i zostało odrzucone (HTTP 413). Odwrotne proxy przed serwerem może ograniczać rozmiar żądań, np. client_max_body_size w nginx. Skróć notki lub opis albo zwiększ limit w proxy."
+    "message": "Zakładka jest za duża dla serwera (HTTP 413). Skróć notki lub opis albo zwiększ limit przesyłania w proxy, np. client_max_body_size w nginx."
   },
   "bookmarkErrInvalidResponse": {
     "message": "Serwer zakładek zwrócił dane, których rozszerzenie nie potrafi odczytać. Sprawdź, czy adres prowadzi bezpośrednio do Karakeep lub linkding i czy ta wersja jest obsługiwana."
@@ -5368,6 +5345,6 @@
     "message": "Wybierz usługę zakładek"
   },
   "backupAdoptLibrary": {
-    "message": "Biblioteka osobista jest pusta. Przywrócenie słownictwa lub wyróżnień przejmie bibliotekę z kopii zapasowej, zachowując dostęp do jej danych na Dysku."
+    "message": "Twoja biblioteka osobista jest pusta, więc przywrócenie słówek lub wyróżnień przełączy Cię na bibliotekę z kopii zapasowej. Jej dane na Dysku Google pozostaną dostępne."
   }
 }

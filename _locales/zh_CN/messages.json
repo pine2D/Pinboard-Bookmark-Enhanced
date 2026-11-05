@@ -176,7 +176,7 @@
     "message": "AI 标签"
   },
   "urlWarning": {
-    "message": "此页面的 URL 类型不受支持，无法保存为书签。"
+    "message": "此页面无法保存为书签。"
   },
   "urlCannotSave": {
     "message": "无法保存：不支持的网址类型"
@@ -195,7 +195,7 @@
   },
   "saveMergedExisting": {"message": "这个网址已在服务里存在，已合并到原书签。"},
   "saveMergedKarakeepNote": {"message": "Karakeep 已把它移出归档，并更新了保存时间。"},
-  "saveMergedLinkdingOverwrite": {"message": "这个网址在 linkding 里已有书签。原书签的标题、描述、备注、稍后阅读和共享状态已换成这次填写的内容，标签也换成了这次的标签。"},
+  "saveMergedLinkdingOverwrite": {"message": "这个网址在 linkding 里已有书签，已全部换成这次填写的内容，包括标签。"},
   "bookmarkSaved": {
     "message": "书签已保存"
   },
@@ -232,7 +232,7 @@
   },
   "confirmLogoutDetail": {"message": "API Token 将被移除，未保存的书签草稿将被丢弃。"},
   "confirmLogoutDetailKarakeep": {"message": "API Token 和访问网关凭据将被移除，未保存的书签草稿将被丢弃。"},
-  "confirmLogoutDetailLinkding": {"message": "API Token 和访问网关凭据将被移除，未保存的书签草稿将被丢弃。之后即使用同一地址和 Token 再次连接，也会视为新连接，原连接中尚未发出的保存不再自动重试。"},
+  "confirmLogoutDetailLinkding": {"message": "API Token 和访问网关凭据将被移除，未保存的书签草稿将被丢弃。待发送的保存不会再重试，重新连接也一样。"},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -604,7 +604,7 @@
     }
   },
   "batchTagTooLongSkip": {
-    "message": "。另有 $COUNT$ 个已存成无标签书签：标签「$TAG$」超过 linkding 的 $MAX$ 个字符上限。请缩短后关闭「跳过已收藏的网址」再批量保存，或在弹窗里逐个补上标签。",
+    "message": "。另有 $COUNT$ 个已存为无标签书签：「$TAG$」超过 linkding 的 $MAX$ 个字符上限。请缩短后关闭「跳过已收藏的网址」，再重新批量保存。",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -940,7 +940,7 @@
     "message": "无法抽取此页面，请重试。"
   },
   "mdSiteTargetMissing": {
-    "message": "尚未加载完整的目标帖子，或无法确认帖子身份。请打开原页面，等待目标帖子出现后重试。"
+    "message": "帖子还没加载完或找不到。请打开原页面，等帖子出现后重试。"
   },
   "mdEngineTabGone": {
     "message": "原标签页已不可用，重新打开该页面才能使用 Defuddle。"
@@ -1071,7 +1071,7 @@
     "message": "没有符合筛选条件的笔记。"
   },
   "notesHiddenByOwner": {
-    "message": "部分高亮属于其他历史资料库，尚未合并到当前个人资料库。"
+    "message": "部分高亮属于旧的资料库，没有显示在这里。"
   },
   "notesUnknownPage": {
     "message": "未知页面"
@@ -1194,7 +1194,10 @@
     "message": "弹窗中的备注"
   },
   "optAutoDescription": {
-    "message": "自动填入页面描述：linkding 写入描述，其他服务仅在未选中文字时写入备注"
+    "message": "自动填入页面描述"
+  },
+  "optAutoDescriptionHint": {
+    "message": "linkding 写入「描述」；其他服务写入备注，但只在未选中文字时写入。"
   },
   "optBlockquote": {
     "message": "把选中文字标为引用"
@@ -1209,7 +1212,7 @@
     "message": "沿用已有标签的写法"
   },
   "optRespectTagCaseHint": {
-    "message": "同一标签有几种写法（只差大小写，或只差空格、连字符、下划线）时，以使用最多的为准；书签上已有的标签保持原样。"
+    "message": "同一个标签有几种写法时（如 JavaScript 和 javascript），用你最常用的那种。书签上已有的标签不变。"
   },
   "optShowSuggestTags": {
     "message": "在弹窗中显示 Pinboard 推荐标签"
@@ -1223,17 +1226,11 @@
   "optShowQuickLinks": {
     "message": "在弹窗中显示快捷链接"
   },
-  "optShowQuickLinksHint": {
-    "message": "包括标签页集、关注、待读、笔记和热门。"
-  },
   "optShowQuickRow": {
     "message": "在弹窗中显示快捷操作按钮"
   },
-  "optShowQuickRowHint": {
-    "message": "包括保存标签页集、批量保存和阅读器。"
-  },
   "tagSyncLabel": {
-    "message": "标签缓存策略"
+    "message": "自动补全标签的加载方式"
   },
   "tagSyncCached": {
     "message": "缓存"
@@ -1245,16 +1242,13 @@
     "message": "实时"
   },
   "tagSyncFreshDesc": {
-    "message": "每次打开弹窗都重新请求，较慢。"
+    "message": "每次打开弹窗都重新加载，较慢。"
   },
   "tagSyncPrewarmed": {
-    "message": "预热"
+    "message": "后台刷新"
   },
   "tagSyncPrewarmedDesc": {
-    "message": "后台每 15 分钟刷新一次，打开弹窗即可使用。"
-  },
-  "tagSyncHint": {
-    "message": "选择何时加载已有标签用于自动补全。加载标签不会修改服务器上的数据。"
+    "message": "每 15 分钟刷新一次，打开弹窗即可使用。"
   },
   "labelTagPresets": {
     "message": "标签预设"
@@ -1292,14 +1286,11 @@
   "backupIncludeVocabularyLabel": {
     "message": "在备份中包含生词"
   },
-  "backupIncludeVocabularyHint": {
-    "message": "只包含个人资料库的生词。"
-  },
   "backupIncludeSecretsLabel": {
     "message": "在备份中包含 API Key 和 Token"
   },
   "backupIncludeSecretsHint": {
-    "message": "会把全部凭据以明文写进文件：Pinboard/Karakeep/linkding API Token、访问网关凭据、所有 AI 服务商的 API Key，以及 Jina、Wayback、Anki、欧路词典、Notion、Gist 和 Webhook 的凭据。任何人打开文件都能直接使用。请按保管密码的方式保管这个文件。"
+    "message": "Pinboard、Karakeep、linkding 的 Token 和其他所有 Key 与凭据都会以明文保存，拿到文件的人都能使用。"
   },
   "backupSecretsExportTitle": {"message": "导出含凭据的备份？"},
   "backupSecretsExportConfirm": {
@@ -1321,13 +1312,13 @@
     "message": "此备份含明文凭据。只在你确认文件来源可靠时才导入。"
   },
   "backupVocabOwnerMissing": {
-    "message": "当前没有可用的 个人资料库，因此未包含生词。其他已选数据仍已导出。"
+    "message": "个人资料库暂不可用，未包含生词。其他已选数据已导出。"
   },
   "backupHighlightsOwnerMissing": {
-    "message": "当前没有可用的 个人资料库，因此未包含归属账号的高亮和笔记。其他已选数据仍已导出。"
+    "message": "个人资料库暂不可用，未包含其中的高亮和笔记。其他已选数据已导出。"
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "当前没有可用的 个人资料库，因此未包含生词和归属账号的高亮和笔记。其他已选数据仍已导出。"
+    "message": "个人资料库暂不可用，未包含其中的生词、高亮和笔记。其他已选数据已导出。"
   },
   "backupPreviewTitle": {
     "message": "导入预览"
@@ -1530,7 +1521,7 @@
     "message": "未设置"
   },
   "qsAutoNotes": {
-    "message": "填入页面描述：linkding 写入描述，其他服务仅在未选中文字时写入备注"
+    "message": "填入页面描述"
   },
   "qsBlockquote": {
     "message": "把选中文字标为引用"
@@ -1545,7 +1536,7 @@
     "message": "自动生成 AI 标签"
   },
   "qsAiSummary": {
-    "message": "自动生成 AI 摘要：linkding 写入描述，其他服务写入备注"
+    "message": "自动生成 AI 摘要"
   },
   "secReadLater": {
     "message": "稍后阅读"
@@ -1560,7 +1551,7 @@
     "message": "标签（逗号分隔）"
   },
   "batchTagsHint": {
-    "message": "多个标签用逗号分隔，新标签内的空格会换成「多词标签分隔符」（在「AI 行为」中设置）。如 batch_saved, research"
+    "message": "新标签里的空格会换成「多词标签分隔符」（在「AI 行为」中设置）。如 batch_saved, research"
   },
   "batchAiTags": {
     "message": "为每个标签页自动生成 AI 标签"
@@ -1680,10 +1671,10 @@
     "message": "业务空间 ID（选填）"
   },
   "hintQwenRegion": {
-    "message": "API Key 只在所属地域有效，选错地域会返回 401。DeepSeek、Kimi 等第三方模型只在北京地域提供。"
+    "message": "选择 API Key 所属的地域。DeepSeek、Kimi 等第三方模型只在北京地域提供。"
   },
   "hintQwenWorkspace": {
-    "message": "填写后请求走该业务空间的专属地址。东京地域没有公共地址，必须填写。"
+    "message": "东京地域必须填写。"
   },
   "hintOpenAIBaseUrl": {
     "message": "可修改为代理或兼容接口地址"
@@ -1817,7 +1808,7 @@
     "message": "扩展页面跟随 Pinboard 主题预设"
   },
   "popupFollowHint": {
-    "message": "启用后，弹窗、本设置页和资料库页使用所选 Pinboard 预设的配色；关闭则按上方的明暗模式使用默认配色。阅读器始终使用自己的阅读配色。"
+    "message": "弹窗、设置页和资料库使用所选 Pinboard 预设的配色，阅读器保持自己的配色。"
   },
   "optFollowNeedsPreset": {
     "message": "先在下面选一个 Pinboard 预设。选「不使用预设」时没有可跟随的配色。"
@@ -1830,7 +1821,7 @@
       }
     }
   },
-  "optThemeHint": { "message": "切换弹窗、本设置页、资料库页和阅读器的明暗。自带明暗的预设（如 Dracula）会在跟随预设的页面上覆盖此项；阅读器可在其「Aa」面板中按设备单独覆盖。" },
+  "optThemeHint": { "message": "作用于弹窗、设置页、资料库和阅读器。Dracula 等自带明暗的预设会覆盖它；阅读器可在「Aa」面板单独设置。" },
   "secPopupElements": {
     "message": "弹窗元素"
   },
@@ -2113,7 +2104,7 @@
     "message": "名称"
   },
   "hintCustomBaseUrlAnthropic": {
-    "message": "请求时会在此地址后追加 /messages，地址需包含版本段，如 …/v1"
+    "message": "地址以版本结尾，如 …/v1，不要加 /messages。"
   },
   "aiCustomBaseUrlInvalid": {
     "message": "地址须以 https:// 开头（仅本机地址可用 http://），此地址未保存。"
@@ -2563,14 +2554,8 @@
   "optUrlCleanOnOpen": {
     "message": "打开弹窗时清理"
   },
-  "optUrlCleanOnOpenHint": {
-    "message": "静默清理，弹窗里有撤销链接，可恢复原网址。"
-  },
   "optUrlCleanOnPaste": {
     "message": "粘贴 URL 时清理"
-  },
-  "optUrlCleanOnPasteHint": {
-    "message": "清理后弹出提示，可撤销，保留原网址。"
   },
   "optUrlCleanAggressive": {
     "message": "激进模式：额外清除 ref / si / igshid 等可能影响功能的参数"
@@ -2672,7 +2657,7 @@
     "message": "保存为私密的书签一律不提交到 archive.org"
   },
   "waybackSelfHostedPrivateHint": {
-    "message": "Karakeep 书签和未共享的 linkding 书签都按私密处理，默认不会自动存档。保存时可以手动勾选「存档」，或关闭「保存为私密的书签一律不提交到 archive.org」。"
+    "message": "Karakeep 书签和未共享的 linkding 书签都算私密，默认不自动存档。可在保存时勾选「存档」，或关闭「保存为私密的书签一律不提交到 archive.org」。"
   },
   "waybackPermDenied": {
     "message": "存档需要 web.archive.org 的访问权限，目前尚未授予。重新开启存档即可再次申请。"
@@ -2895,7 +2880,7 @@
     "message": "标签中残留的实体编码"
   },
   "tagGovEntityHint": {
-    "message": "修复会重新保存带有所选标签的每条书签，把标签换成修复后的名称，不可撤销。确认之前不会改动任何内容。"
+    "message": "修复会把所有相关书签上的标签改成修复后的名称，无法撤销。"
   },
   "tagGovEntityScan": {
     "message": "扫描标签"
@@ -2913,7 +2898,7 @@
     "message": "并入已有标签"
   },
   "tagGovEntityConfirm": {
-    "message": "修复 $N$ 个标签？这些标签下的书签会用修复后的名称重新保存。确实应该含有此类文字的标签，请先取消勾选。",
+    "message": "修复 $N$ 个标签？要保留这类字符的标签请先取消勾选。",
     "placeholders": {
       "N": {
         "content": "$1"
@@ -3055,7 +3040,7 @@
     "message": "跳过"
   },
   "optBgSaveModeSkipDesc": {
-    "message": "不做任何改动，已保存的书签保持原样。"
+    "message": "书签保持原样。"
   },
   "optBgSaveModeOverwrite": {
     "message": "覆盖"
@@ -3785,11 +3770,11 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "连接后，同步个人资料库的生词、高亮与笔记、完整 AI 词条及补充，以及已保存的问答和引用。"
+      "message": "同步生词、高亮、笔记、AI 词条和已保存的问答。"
     },
     "vocabDriveConnectionHint": { "message": "每台设备需单独连接。Google Drive 不同步设置或凭据。" },
     "vocabDriveDisclosure": {
-      "message": "副本以明文保存在 Google Drive 的扩展专用文件夹中，未经端到端加密。除已保存的内容外，还可能包括生成补充时使用的学习偏好、引用原文、来源网址、标题和时间。"
+      "message": "数据以明文保存在你 Google Drive 中的扩展专用文件夹里，未经端到端加密，还包括来源网址、标题、时间和学习偏好。"
     },
     "vocabDriveLoading": {
       "message": "正在读取 Google Drive 同步状态…"
@@ -4647,7 +4632,7 @@
   "diagnosticsCopied": { "message": "诊断信息已复制" },
   "diagnosticsCopyFailed": { "message": "无法复制诊断信息，请检查剪贴板权限后重试。" },
   "libraryVocabSignedOutTitle": { "message": "登录后使用生词本" },
-  "libraryVocabSignedOutHint": { "message": "所有书签服务共用个人资料库中的生词、高亮、笔记和 Ask 历史。" },
+  "libraryVocabSignedOutHint": { "message": "无论使用哪个书签服务，生词、高亮、笔记和 Ask 历史都在同一个资料库里。" },
   "libraryVocabOpenSettings": { "message": "打开账号设置" },
   "libraryLookupSignedOutHint": { "message": "可在「词典」栏查询单词；登录后即可保存到生词本。" },
   "mdPreviewClose": { "message": "关闭阅读器" },
@@ -4825,7 +4810,7 @@
   "mdExportContextChanged": {"message": "账号、文章或问答记录已发生变化，请重新开始导出。"},
   "themeGroupAdaptiveHint": {"message": "自适应预设跟随上方「扩展外观」中的明暗设置。"},
   "dictDefinitionLangLabel": { "message": "AI 词条释义语言" },
-  "dictDefinitionLangHint": {"message": "AI 词条和补充用法默认用母语解释；未填写母语时使用界面语言。在这里选择其他语言可覆盖默认设置。普通词典释义和引文保留原语言。"},
+  "dictDefinitionLangHint": {"message": "默认用母语解释，未填写母语时使用界面语言。普通词典释义和引文保留原语言。"},
   "dictDefinitionLangUi": {"message": "跟随母语"},
   "vocabLanguageFilterAria": { "message": "按语言筛选" },
   "vocabAllLanguages": { "message": "全部语言" },
@@ -4842,13 +4827,13 @@
   "dictAnkiFormatLabel": { "message": "Anki 笔记格式" },
   "dictAnkiFormatLegacy": { "message": "原版（六字段）" },
   "dictAnkiFormatMultilingual": { "message": "多语言（完整信息）" },
-  "dictAnkiFormatHint": { "message": "多语言格式使用独立的笔记类型，可能在原有卡片之外新增卡片。重复发送会跳过已有笔记，不会更新内容。" },
+  "dictAnkiFormatHint": { "message": "多语言格式使用单独的笔记类型，已有的词可能多出一张卡片。重复发送会跳过已有笔记，不会更新内容。" },
   "dictExportCompleteTsv": { "message": "导出完整 TSV" },
   "dictExportLegacyTsv": { "message": "导出六字段 TSV" },
   "vocabCompleteExportHint": { "message": "完整 TSV 包含语言、原形、笔记和每段语境对应的来源。恢复本扩展数据请使用 JSON 备份。" },
   "dictAnkiModelMismatchNamed": {"message": "Anki 中的「$MODEL$」笔记类型字段不匹配。请恢复其原始字段，或将它重命名以便创建新的笔记类型，然后重试。", "placeholders": {"model": {"content": "$1"}}},
   "multiPackSection": {"message": "多语言离线词典"},
-  "multiPackHint": {"message": "导入 Yomitan v3 ZIP 词典。释义和读音保存在本机，不导入样式、图片和音频。"},
+  "multiPackHint": {"message": "导入 Yomitan v3 词典（ZIP），只保存在本机，不导入样式、图片和音频。"},
   "multiPackBrowse": {"message": "查找词典文件"},
   "multiPackChoose": {"message": "选择 ZIP 文件"},
   "multiPackEmpty": {"message": "尚未安装多语言词典。"},
@@ -4858,7 +4843,7 @@
   "multiPackLanguageHint": {"message": "使用语言代码，例如 de、en 或 zh-Hant。导入前请核对两种语言。"},
   "multiPackSourceUrl": {"message": "来源网址（可选）"},
   "multiPackLicense": {"message": "许可声明（可选）"},
-  "multiPackLicenseHint": {"message": "这些信息来自文件或手动编辑。使用或分享内容前，请核对来源的许可条款。"},
+  "multiPackLicenseHint": {"message": "使用或分享词典内容前，请先核对来源的许可条款。"},
   "multiPackInspecting": {"message": "正在读取词典信息…"},
   "multiPackPreview": {"message": "核对词典"},
   "multiPackInstall": {"message": "导入词典"},
@@ -4868,8 +4853,6 @@
   "multiPackDisable": {"message": "停用"},
   "multiPackAllowAi": {"message": "允许 AI 使用"},
   "multiPackBlockAi": {"message": "停止 AI 使用"},
-  "multiPackAiHint": {"message": "默认不允许 AI 使用。只有来源条款允许将释义发送给已配置的 AI 服务商时，才应开启。"},
-  "multiPackAiConfirm": {"message": "允许在使用 AI 辅助时，将此词典的释义发送给已配置的 AI 服务商？请先确认其条款允许此用途。"},
   "multiPackSummary": {"message": "$SOURCE$ / $TARGET$ · $COUNT$ 条 · $REVISION$", "placeholders": {"source": {"content": "$1"}, "target": {"content": "$2"}, "count": {"content": "$3"}, "revision": {"content": "$4"}}},
   "multiPackNotDeclared": {"message": "未声明"},
   "multiPackCancelled": {"message": "已取消导入，已安装词典保持不变。"},
@@ -4884,7 +4867,6 @@
   "dictOnlineLanguageUnavailable": {"message": "此语言暂不支持在线查词。"},
   "dictTagReading": {"message": "读音"},
   "dictAssistRecommend": {"message": "用 AI 匹配含义"},
-  "dictAssistExplain": {"message": "用 AI 解释含义"},
   "dictAssistUseMeaning": {"message": "选择此词典含义"},
   "dictAssistNeedContext": {"message": "要匹配含义，请在句子中查词，或打开带有来源句子的已存生词。"},
   "dictAssistChooseMeaning": {"message": "请选择要解释的词典含义。"},
@@ -4901,7 +4883,6 @@
   "dictAssistFailed": {"message": "AI 未能完成此次请求。请重试。"},
   "dictAssistAllowedSources": {"message": "仅使用已获准供 AI 使用的词典来源。"},
   "dictAssistAnalyze": {"message": "用 AI 分析"},
-  "dictAssistAnalysisHint": {"message": "根据原句分析所选表达。"},
   "dictAssistAnalysisNeedsMatch": {"message": "无法在这句中找到所选表达。请查询原句中的词形。"},
   "dictAssistAnalysisEmpty": {"message": "未找到有原句依据的原形或短语建议。"},
   "dictAssistLemmaSuggestion": {"message": "可能的原形"},
@@ -4928,15 +4909,14 @@
   "dictEntryShowAi": {"message": "查看 AI 词条"},
   "dictEntryNotCached": {"message": "词条未能保存。请保留此查词窗口，重试保存。"},
   "dictAiAutoGenerateLabel": {"message": "自动生成 AI 词条"},
-  "dictAiAutoGenerateHint": {"message": "查词时若没有已缓存的 AI 词条，使用阅读器 AI 模型生成，会消耗 tokens。默认关闭，仍可手动生成。"},
   "dictDefaultViewLabel": {"message": "查词默认显示"},
-  "dictDefaultViewHint": {"message": "词典结果始终排在最前，这里只决定其后 AI 词条的初始显示：收成一行时点开才展开，另外两项直接展开。只有“缺少时自动生成”会自动消耗 token。"},
+  "dictDefaultViewHint": {"message": "词典结果始终排在最前。只有“缺少时自动生成”会自动消耗 token。"},
   "dictDefaultDictionary": {"message": "已保存的 AI 词条收成一行"},
   "dictDefaultAiSaved": {"message": "展开已保存的 AI 词条"},
   "dictDefaultAiGenerate": {"message": "展开 AI 词条，缺少时自动生成"},
   "dictLearnerNativeLanguageLabel": {"message": "母语（可选）"},
   "dictLearnerNativeLanguagePlaceholder": {"message": "例如：西班牙语"},
-  "dictLearnerProfileHint": {"message": "母语决定默认的 AI 解释语言，也用于调整词语对比；学习水平用于调整解释难度和例句。这些设置不会触发生成。"},
+  "dictLearnerProfileHint": {"message": "AI 词条据此决定解释语言和难度。修改这些设置不会消耗 token。"},
   "dictLearnerLevelLabel": {"message": "学习水平（可选）"},
   "dictLearnerLevelUnspecified": {"message": "未指定"},
   "dictLearnerLevelBeginner": {"message": "初级"},
@@ -4948,7 +4928,7 @@
   "dictLearningUsagePoints": {"message": "用法要点"},
   "dictLearningEtymology": {"message": "词源"},
   "dictExamplesTitle": {"message": "原文用例"},
-  "dictExamplesHint": {"message": "在 Wikisource 检索含这个词的原句，不调用 AI，也不翻译。"},
+  "dictExamplesHint": {"message": "来自 Wikisource 的原句，不翻译，不调用 AI。"},
   "dictExamplesFind": {"message": "查找原文用例"},
   "dictExamplesNone": {"message": "本次检索未找到可核实原文。"},
   "dictNegRetry": {"message": "上次未找到 · 再试"},
@@ -4981,7 +4961,7 @@
   "dictEntryRetrySave": {"message": "重试保存"},
   "driveDictionaryStatus": {"message": "AI 词条：$STATUS$", "placeholders": {"status": {"content": "$1"}}},
   "driveDictionaryErrorEntryTooLarge": {"message": "AI 词条过大，无法同步。本机内容已保留，请点击“立即同步”重试。"},
-  "dictSupplementUnsupported": {"message": "AI 未能给出有依据的补充内容。本次已调用 AI。"},
+  "dictSupplementUnsupported": {"message": "AI 找不到依据，没有给出内容。这次请求仍消耗了 token。"},
   "askNewConversation": {"message": "新对话"},
   "askHistory": {"message": "历史对话"},
   "askTemporary": {"message": "不保存此临时对话"},
@@ -5013,37 +4993,37 @@
   "driveAskErrorEntryTooLarge": {"message": "有一条回答超出同步大小限制，仍保存在本机。"},
   "askHistoryUnavailable": {"message": "此对话已删除或在本机不可用。可以开始新对话继续提问。"},
   "askHistoryKeysMove": {"message": "上一个或下一个对话"},
-  "dictMeaningDefaultHelp": {"message": "已预先选好一条解释，可直接保存。手动更换后，本次查词会保留你的选择。"},
-  "dictMeaningManualHelp": {"message": "将保存你选中的解释。本次查词会保留这个选择。"},
-  "dictMeaningSavedHelp": {"message": "已保存的解释不会自动更改。选择一条解释后，可更新这个生词。"},
-  "dictMeaningChooseHelp": {"message": "请选择要保存的解释；本次查词会保留你的选择。"},
+  "dictMeaningDefaultHelp": {"message": "将保存这条解释，也可以改选其他。"},
+  "dictMeaningManualHelp": {"message": "将保存你选中的解释。"},
+  "dictMeaningSavedHelp": {"message": "选择一条解释可替换已保存的解释。"},
+  "dictMeaningChooseHelp": {"message": "选择要保存的解释。"},
   "dictMeaningChange": {"message": "更换"},
   "dictFullEntry": {"message": "完整词条"},
-  "dictFullEntryOnlyHint": {"message": "此词条尚未拆分出独立解释，可以阅读全文，或选择其他词典来源的解释保存。"},
-  "multiPackReimportHint": {"message": "重新导入同一词包以重新识别释义结构。已有生词和词包启用状态保持不变。"},
+  "dictFullEntryOnlyHint": {"message": "此词条没有分条释义。要保存释义，请选择其他词典。"},
+  "multiPackReimportHint": {"message": "重新导入这本词典可更新释义结构，已存生词和启用状态不变。"},
   "dictEntryFormation": {"message": "构词"},
   "dictEntryHistory": {"message": "历史来源"},
-  "dictEntryNoHistory": {"message": "尚无可核实的词源资料；这里仅展示构词和词汇联系。"},
+  "dictEntryNoHistory": {"message": "没找到可靠的词源资料，只显示构词和相关词。"},
   "dictEntryRelationFamily": {"message": "词族"},
   "dictEntryRelationCognate": {"message": "同源词"},
   "dictEntryRelationSynonym": {"message": "近义词"},
   "dictEntryRelationTopic": {"message": "同主题词"},
   "dictSupplementLanguage": {"message": "解释语言：$LANGUAGE$", "placeholders": {"language": {"content": "$1"}}},
   "dictSupplementEtymology": {"message": "词源与相关词"},
-  "dictEtymologyHint": {"message": "按需生成构词、词源与相关词。历史词源仅根据检索到的资料解释。"},
+  "dictEtymologyHint": {"message": "构词、词源和相关词。词源只依据检索到的资料。"},
   "dictEtymologyGenerating": {"message": "正在生成词源与相关词…"},
   "dictSupplementPartial": {"message": "已保留 $ACCEPTED$ 项，另有 $OMITTED$ 项未通过核验，已略去。", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
   "dictSupplementOriginal": {"message": "AI 编写例句"},
   "dictSupplementMeaning": {"message": "这里指：$MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "更新此补充"},
-  "dictSupplementUpdateHint": {"message": "会重新生成并消耗 token；旧结果仍会保留，连接 Drive 后一并同步。"},
+  "dictSupplementUpdateHint": {"message": "会消耗 token，旧结果会保留。"},
   "dictSupplementPrevious": {"message": "以前的结果"},
-  "dictSupplementLegacy": {"message": "旧版结果，未按新的内容标准核验。"},
+  "dictSupplementLegacy": {"message": "旧结果，没有经过新版核对。"},
   "dictSupplementWrongLanguage": {"message": "返回的解释语言不符合设置。尚未保存；可重试生成。"},
-  "dictSupplementInvalid": {"message": "结果缺少必要内容或引用未通过核对。尚未保存；可重试。"},
+  "dictSupplementInvalid": {"message": "结果不完整或引文无法核对，未保存。请重试。"},
   "dictSupplementSourceVerified": {"message": "原文已核对"},
   "dictEntryUpdate": {"message": "更新此词条"},
-  "dictEntryUpdateHint": {"message": "重新生成词条会消耗 token；旧结果仍会保留。"},
+  "dictEntryUpdateHint": {"message": "会消耗 token，旧词条会保留。"},
   "dictPaidActionHint": {"message": "会调用 AI，消耗 token。"},
   "dictResize": {"message": "调整查词窗口大小"},
   "dictResizeWidth": {"message": "宽度"},
@@ -5062,11 +5042,11 @@
   "dictSupplementRetrieving": {"message": "正在检索资料…"},
   "dictSupplementChecking": {"message": "正在检查生成内容…"},
   "dictSupplementSaving": {"message": "正在保存补充…"},
-  "dictGenerationTruncated": {"message": "模型未完成本次回答。本次结果未保存；可重试，或在设置中更换阅读器 AI 模型。"},
+  "dictGenerationTruncated": {"message": "回答没写完，未保存。请重试，或在设置中换一个阅读器 AI 模型。"},
   "dictGenerationRefused": {"message": "模型拒绝了本次请求或拦截了输出。本次结果未保存。"},
-  "dictGenerationEmpty": {"message": "模型未返回正文。本次结果未保存；请重试，或在设置中更换阅读器 AI 模型。"},
-  "dictGenerationModelUnavailable": {"message": "供应商无法找到或使用所选模型。请检查模型名称及供应商支持情况，并在设置中更新阅读器 AI 模型。"},
-  "dictGenerationBilling": {"message": "供应商拒绝了本次请求（HTTP 402）。请检查该供应商的额度、账单状态和账户访问权限后再试。"},
+  "dictGenerationEmpty": {"message": "模型没有返回内容。请重试，或在设置中换一个阅读器 AI 模型。"},
+  "dictGenerationModelUnavailable": {"message": "服务商无法使用这个模型。请在设置中检查阅读器 AI 模型名称。"},
+  "dictGenerationBilling": {"message": "服务商拒绝了请求（HTTP 402）。请检查该服务商的余额或套餐。"},
   "dictGenerationServiceUnavailable": {"message": "供应商的服务暂时不可用，请稍后再试。"},
   "dictProgressThinking": {"message": "模型正在思考…"},
   "dictProgressStreaming": {"message": "正在接收回答…"},
@@ -5077,14 +5057,11 @@
   "bookmarkServiceChoose": {
     "message": "选择书签保存位置"
   },
-  "bookmarkServiceHint": {
-    "message": "弹窗、阅读器、快捷键和批量保存均使用此服务。"
-  },
   "personalLibraryTitle": {
     "message": "个人资料库"
   },
   "personalLibraryHint": {
-    "message": "所有书签服务共用个人资料库中的生词、高亮、笔记和 Ask 历史。"
+    "message": "无论使用哪个书签服务，生词、高亮、笔记和 Ask 历史都在同一个资料库里。"
   },
   "bookmarkServerUrl": {
     "message": "服务器地址"
@@ -5099,7 +5076,7 @@
     "message": "填写站点地址，包含部署子路径。除本机地址外，必须使用 HTTPS。"
   },
   "bookmarkTokenLocalHint": {
-    "message": "Token 和网关凭据保存在本浏览器，只发送给这个服务器。开启 API Key 和 Token 同步后，才会出现在你的其他设备上。"
+    "message": "Token 和网关凭据保存在本浏览器，只发给这个服务器；开启 API Key 和 Token 同步后才会同步到其他设备。"
   },
   "bookmarkKarakeepTokenHelp": {
     "message": "在 Karakeep 的「用户设置 → API 密钥」中新建一个密钥，保留完全访问权限。密钥只显示一次，创建后立即复制到这里。"
@@ -5117,25 +5094,25 @@
     "message": "浏览时预先读取页面信息"
   },
   "optLinkdingPreloadHint": {
-    "message": "开启后，工具栏图标会显示你打开的每个页面是否已在 linkding 收藏，弹窗打开时也无需等待。代价是：你访问的每个网址都会发给你的 linkding 服务器并写入服务器日志，服务器还会自己去访问这个网页。关闭时，只在你打开弹窗时查询 linkding。"
+    "message": "工具栏图标会显示每个页面是否已收藏。你访问的每个网址都会发给 linkding 服务器，服务器也会自己访问这个网页。"
   },
   "optLinkdingBrowserMetadata": {
     "message": "使用浏览器里的网页标题和简介"
   },
   "optLinkdingBrowserMetadataHint": {
-    "message": "新建书签时，标题和简介取自浏览器里显示的网页。关闭后改用你的 linkding 服务器从网页读到的内容；加载后会变化或需要登录的网页，两者可能不同。"
+    "message": "关闭后由 linkding 服务器自己读取网页的标题和简介。需要登录或加载后会变化的网页，结果可能不同。"
   },
   "optLinkdingSingleFile": {
     "message": "新建书签后运行 SingleFile"
   },
   "optLinkdingSingleFileHint": {
-    "message": "用弹窗或快捷保存新建书签后，由 SingleFile 保存网页的完整副本，linkding 不再为它另做 HTML 快照。需要 linkding 1.39 及以上版本，并安装 SingleFile 扩展。在 SingleFile 的设置里把保存目标（destination）选为上传到 REST 表单 API，再填写：网址（URL）为你的 linkding 地址加上 /api/bookmarks/singlefile/，只填 linkding 地址会上传失败；authorization token 填 linkding 设置页里的 API Token，前面不加「Token」；数据字段名（data field name）填 file，网址字段名（URL field name）填 url。网页由 SingleFile 直接上传到你的 linkding，本扩展不经手文件。"
+    "message": "需要 linkding 1.39 及以上版本和 SingleFile 扩展。在 SingleFile 设置里把保存目标（destination）选为上传到 REST 表单 API，再填写：网址（URL）填 linkding 地址加 /api/bookmarks/singlefile/；authorization token 填 linkding 的 API Token，前面不加「Token」；数据字段名（data field name）填 file；网址字段名（URL field name）填 url。"
   },
   "optLinkdingSingleFileDocs": {
     "message": "linkding 官方文档：用 SingleFile 存档"
   },
   "optCheckBookmarkStatusLinkding": {
-    "message": "使用 linkding 时，只有开启「浏览时预先读取页面信息」，工具栏图标才会显示页面是否已收藏。这个开关在「账号」页的 linkding 连接设置里。"
+    "message": "使用 linkding 时，还需在「账号」页开启「浏览时预先读取页面信息」。"
   },
   "bookmarkGatewayLabel": {
     "message": "访问网关"
@@ -5178,7 +5155,7 @@
     "message": "值"
   },
   "bookmarkGatewayNoneHint": {
-    "message": "只有服务器前面还有一层要求先登录的网关（例如 Cloudflare Access）时才需要设置。直接访问服务器就保持「无」。"
+    "message": "只有服务器前面有登录网关（如 Cloudflare Access）时才需要设置。"
   },
   "bookmarkGatewayHeaderNameN": {
     "message": "请求头 $N$ 的名称",
@@ -5204,7 +5181,7 @@
     "message": "请求头名称无效。请使用不超过 64 个字符的英文字母、数字和连字符，例如 X-Auth-Token。"
   },
   "bookmarkGatewayErrNameForbidden": {
-    "message": "这个请求头不能在这里设置：它由浏览器控制，或扩展已经自行发送（如 Authorization、Cookie）。"
+    "message": "这里不能设置 Authorization、Cookie 等请求头。"
   },
   "bookmarkGatewayErrDuplicate": {
     "message": "每个请求头名称只能用一次（不区分大小写）。"
@@ -5245,7 +5222,7 @@
     "message": "请在设置中允许访问此服务器，然后重新连接。"
   },
   "bookmarkKarakeepHint": {
-    "message": "「稍后阅读」使用专用私有列表。标记为已读时只从列表移除，不更改服务中的归档状态。"
+    "message": "「稍后阅读」是 Karakeep 里的一个私有列表。标为已读只会移出列表，不改变归档状态。"
   },
   "bookmarkReadLaterListName": {
     "message": "稍后阅读"
@@ -5258,13 +5235,13 @@
   "bookmarkPartialSavePopupReadLater": {"message": "书签已保存，但稍后阅读状态没有改过来。再按一次「更新」，就会补上这一步。"},
   "bookmarkPartialSavePopupBookmark": {"message": "标题和备注没有更新，书签保持原样。再按一次「更新」，就会写入这些修改。"},
   "bookmarkErrGatewayRedirect": {
-    "message": "服务器把请求重定向到了别处。请先检查地址和端口：必须指向 Karakeep 或 linkding 本身。地址无误时，才可能是 Cloudflare Access 之类要求登录的访问网关在重定向，可在「访问网关」中填写 Service Token，或在网关里为接口路径放行。"
+    "message": "服务器把请求转到了别处。请检查地址和端口是否指向 Karakeep 或 linkding 本身；没错时，可能是登录网关在重定向，请在「访问网关」中填写 Service Token，或在网关里为接口路径放行。"
   },
   "bgTabSetPinboardOnly": {"message": "标签页集只能保存到 Pinboard。要使用它，请先在设置中把书签服务切换为 Pinboard。"},
   "bookmarkDisconnect": {"message": "断开连接"},
   "bookmarkDisconnectConfirm": {"message": "断开与此服务的连接？"},
   "bookmarkDisconnectDetail": {"message": "API Token 和访问网关凭据将从此浏览器移除。需要时点击「连接」即可重新连接。"},
-  "bookmarkDisconnectDetailLinkding": {"message": "API Token 和访问网关凭据将从此浏览器移除。之后即使用同一地址和 Token 再次连接，也会视为新连接，原连接中尚未发出的保存不再自动重试。"},
+  "bookmarkDisconnectDetailLinkding": {"message": "API Token 和访问网关凭据将从此浏览器移除。待发送的保存不会再重试，重新连接也一样。"},
   "bookmarkDisconnected": {"message": "已断开连接"},
   "bookmarkDisconnectFailed": {"message": "未能断开连接：更改没有保存下来，请重试。"},
   "bookmarkServicePending": {"message": "连接 $SERVICE$ 之前，书签仍保存到 $ACTIVE$。", "placeholders": {"active": {"content": "$1"}, "service": {"content": "$2"}}},
@@ -5276,10 +5253,10 @@
   "backupBookmarkServiceNotConnected": {"message": "备份选的是 $SERVICE$，本设备没有连接它。连接 $SERVICE$ 之前，书签仍保存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "backupBookmarkServiceNeedsCredentials": {"message": "备份选的是 $SERVICE$，本设备没有连接它。只有恢复的凭据能连上它时才会切换，否则书签仍保存到 $ACTIVE$。", "placeholders": {"service": {"content": "$1"}, "active": {"content": "$2"}}},
   "bookmarkErrGatewayChallenge": {
-    "message": "请求被安全验证（人机验证）拦下。常见来源是 Cloudflare 的安全规则，请在规则里为接口路径放行。"
+    "message": "请求被人机验证拦下。请在 Cloudflare 等安全规则里为接口路径放行。"
   },
   "bookmarkErrGatewayBasic": {
-    "message": "服务器前的代理要求输入用户名和密码（Basic 认证），无法与书签服务的 Token 同时使用。请在代理中为接口路径放行。"
+    "message": "服务器前的代理要求输入用户名和密码，无法与 Token 同时使用。请在代理中为接口路径放行。"
   },
   "bookmarkErrGatewayDenied": {
     "message": "请求被服务器前的网关拒绝。请检查「访问网关」中的凭据是否正确，以及网关策略是否允许它。使用 Cloudflare 时，策略动作须为 Service Auth。"
@@ -5302,7 +5279,7 @@
     }
   },
   "bgTagTooLongSkip": {
-    "message": "linkding 已把这个页面存成无标签书签：标签「$TAG$」超过 $MAX$ 个字符上限。快捷键保存会跳过已收藏的页面，请缩短标签后在弹窗里补上。",
+    "message": "linkding 已保存这个页面，但没有标签：「$TAG$」超过 $MAX$ 个字符上限。请缩短后在弹窗里补上。",
     "placeholders": {
       "tag": {
         "content": "$1"
@@ -5336,7 +5313,7 @@
     }
   },
   "bookmarkErrTooLarge": {
-    "message": "请求内容太大，被拒收（HTTP 413）。服务器前的反向代理可能限制了请求大小，例如 nginx 的 client_max_body_size。请缩短备注或描述，或调高代理的限制。"
+    "message": "书签内容太大，被服务器拒收（HTTP 413）。请缩短备注或描述，或调高代理的上传限制，例如 nginx 的 client_max_body_size。"
   },
   "bookmarkErrInvalidResponse": {
     "message": "书签服务器返回了无法识别的数据。请检查地址是否指向 Karakeep 或 linkding 本身，以及服务器版本是否受支持。"
@@ -5362,6 +5339,6 @@
     "message": "选择书签服务"
   },
   "backupAdoptLibrary": {
-    "message": "个人资料库为空。恢复生词或高亮时将采用备份所属资料库，以便继续读取原有 Drive 同步数据。"
+    "message": "个人资料库为空，恢复生词或高亮时会改用备份所属的资料库，原有 Drive 同步数据仍可使用。"
   }
 }
