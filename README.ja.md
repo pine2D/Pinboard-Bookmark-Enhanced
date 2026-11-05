@@ -12,7 +12,7 @@
 
 ![AI タグと要約を付けて保存（ダーク／ライトテーマ）](docs/screenshots/readme/hero.webp)
 
-[![30 秒の紹介動画：保存して、読んで、残す](docs/screenshots/readme/promo-video.webp)](https://youtu.be/DMQS8LC09kU)
+[![1 分の紹介動画：保存して、読んで、残す](docs/screenshots/readme/promo-video.webp)](https://youtu.be/f3F8Se2rnoc)
 
 ---
 

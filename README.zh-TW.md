@@ -12,7 +12,7 @@
 
 ![AI 產生標籤與摘要後儲存，深色與淺色主題](docs/screenshots/readme/hero.webp)
 
-[![30 秒影片介紹：儲存、閱讀、留存](docs/screenshots/readme/promo-video.webp)](https://youtu.be/DMQS8LC09kU)
+[![1 分鐘影片介紹：儲存、閱讀、留存](docs/screenshots/readme/promo-video.webp)](https://youtu.be/f3F8Se2rnoc)
 
 ---
 

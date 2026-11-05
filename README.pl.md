@@ -12,7 +12,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in), Karakeep i linkding: ta
 
 ![Zapis z tagami i streszczeniem od AI, w motywie ciemnym i jasnym](docs/screenshots/readme/hero.webp)
 
-[![30-sekundowy film: zapisz, przeczytaj, zachowaj](docs/screenshots/readme/promo-video.webp)](https://youtu.be/DMQS8LC09kU)
+[![Minutowy film: zapisz, przeczytaj, zachowaj](docs/screenshots/readme/promo-video.webp)](https://youtu.be/f3F8Se2rnoc)
 
 ---
 

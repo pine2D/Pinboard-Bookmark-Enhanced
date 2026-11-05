@@ -12,7 +12,7 @@ Une extension Chrome pour [Pinboard](https://pinboard.in), Karakeep et linkding 
 
 ![Enregistrement avec étiquettes et résumé par IA, en thème sombre et clair](docs/screenshots/readme/hero.webp)
 
-[![Vidéo de 30 secondes : enregistrer, lire, garder](docs/screenshots/readme/promo-video.webp)](https://youtu.be/DMQS8LC09kU)
+[![Vidéo d’une minute : enregistrer, lire, garder](docs/screenshots/readme/promo-video.webp)](https://youtu.be/f3F8Se2rnoc)
 
 ---
 
