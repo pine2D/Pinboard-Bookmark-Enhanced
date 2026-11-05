@@ -7,7 +7,10 @@
 html { scrollbar-gutter: stable both-edges; }
 :root {
   interpolate-size: allow-keywords;
+  /* Disclosure folds: expand at --motion-collapse, collapse at the shorter
+     --motion-collapse-out (exits are faster than entrances), both ease-out. */
   --motion-collapse: 200ms;
+  --motion-collapse-out: 160ms;
   --motion-pop: 140ms;
   --motion-pop-out: 100ms;
   /* Hover/focus/press feedback. Structural motion was tokenized above but state
@@ -815,6 +818,7 @@ label.switch > .context-help > .context-help-body {
   color: var(--opt-fg-hint);
   opacity: 0.72;
   list-style: none;
+  transition: color var(--motion-state) ease, opacity var(--motion-state) ease;
 }
 .context-help > summary.context-help-toggle::-webkit-details-marker { display: none; }
 .context-help > summary.context-help-toggle:hover,
@@ -2240,11 +2244,14 @@ html.motion-ready .pf:not([hidden]) {
 .disclosure-body > :nth-last-child(1 of :not([hidden], .hidden, :empty)),
 .disclosure-body > :nth-last-child(1 of :not([hidden], .hidden, :empty)) > :last-child { margin-bottom: 0; }
 
-/* Native details disclosure motion (height + content-visibility). Older
-   Chromium versions that lack ::details-content simply keep native instant
-   open/close behavior. */
+/* Native details disclosure motion (height + opacity + content-visibility).
+   Older Chromium versions that lack ::details-content simply keep native
+   instant open/close behavior. Only a pointer-clicked <details> carries
+   .motion-toggle (options.js pbpMotionMark); first paint, tab switches,
+   keyboard toggles, restores and a sibling help closing all flip instantly. */
 details::details-content {
   height: 0;
+  opacity: 0;
   /* Full-width fields paint their focus glow outside the disclosure. Only
      clip vertically for the height transition; clipping both axes cuts off
      the glow at the left/right edges, including nested export fields. */
@@ -2254,14 +2261,21 @@ details::details-content {
 }
 details[open]::details-content {
   height: auto;
+  opacity: 1;
   content-visibility: visible;
 }
+/* Base = collapse (the state being left is [open]); the [open] rule = expand.
+   Both ease-out: the old ease-in-out spent its first 60ms on 9% of the
+   height, so the answer sat still and then jumped. The text fades out ahead
+   of the clip edge and fades in behind it, so the edge never drags glyphs. */
 html.motion-ready details.motion-toggle::details-content {
-  transition: height var(--motion-collapse) var(--ease-in-out),
-              content-visibility var(--motion-collapse) allow-discrete;
+  transition: height var(--motion-collapse-out) var(--ease-out),
+              opacity var(--motion-pop-out) var(--ease-out),
+              content-visibility var(--motion-collapse-out) allow-discrete;
 }
 html.motion-ready details.motion-toggle[open]::details-content {
-  @starting-style { height: 0; }
+  transition-duration: var(--motion-collapse), var(--motion-pop), var(--motion-collapse);
+  @starting-style { height: 0; opacity: 0; }
 }
 
 /* ---- Details disclosures: one chevron family (2026-08 redesign) ----
@@ -3550,8 +3564,9 @@ html[data-theme] .confirm-popover .confirm-no { color: var(--opt-fg); background
 }
 /* Same enter/exit recipe as .confirm-popover (both are createElement-then-
    remove() popovers, so no display transition needed). The old entrance
-   referenced @keyframes confirmFadeIn, which lives only in popup.css and
-   never resolved here; exit needs options.js to add .is-closing and delay
+   referenced a popup-only @keyframes confirmFadeIn that never resolved here
+   (popup has since moved to this same recipe and dropped the keyframes);
+   exit needs options.js to add .is-closing and delay
    remove() -- see themeNamePopover's dismiss. */
 html.motion-ready .theme-name-popover {
   opacity: 1;
@@ -3696,6 +3711,9 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  /* `*` never matches ::details-content, and folding it into the list above
+     would void that whole rule on a Chromium without the pseudo-element. */
+  details::details-content { transition-duration: 0.01ms !important; }
   /* Keep the activity indicator visible without pulsing when motion is reduced. */
   .tab-btn.tab-busy::after {
     animation: none !important;

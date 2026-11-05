@@ -200,7 +200,7 @@ function _pbpLibInitialView() {
 // so this adds zero first-frame cost on the cold-start path.
 // Only on the library page itself: tests/library-*-tests.html and
 // tests/i18n-parity-tests.html load this file for its helpers, and a
-// motion-ready <html> there would arm the 220ms card-exit hold that their
+// motion-ready <html> there would arm the 180ms card-exit hold that their
 // task-count timing does not wait for.
 if (typeof requestAnimationFrame === "function" && document.getElementById("lib-tab-vocab")) {
   requestAnimationFrame(() => requestAnimationFrame(() => {

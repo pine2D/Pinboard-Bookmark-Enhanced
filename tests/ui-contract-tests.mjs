@@ -1776,9 +1776,35 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     return roles.length === 1 && contextHelpRoles.has(roles[0]);
   }) && [...contextHelpRoles].every((role) => contextHelpHosts.some((tag) => tag.includes(`data-help-role="${role}"`))),
   "options.html: contextual-help hosts no longer have one complete semantic-role registry");
-  check(/html\.motion-ready details\.motion-toggle::details-content[\s\S]{0,240}var\(--motion-collapse\) var\(--ease-in-out\)/.test(optionsCss) &&
-    !/\.context-help[^{]*\{[^}]*transition\s*:/.test(optionsCss),
-    "options.css: contextual help no longer reuses the native-details accordion motion");
+  // Fold language (COMPONENTS.md §3): collapse at --motion-collapse-out with a
+  // faster opacity fade, expand at --motion-collapse with the fade-in, both
+  // ease-out, and the entry grows from height 0 + opacity 0. Context help owns
+  // no fold transition of its own; its toggle only fades colour/opacity.
+  {
+    const ruleBody = (sel) => {
+      const at = optionsCss.indexOf(sel + " {");
+      return at < 0 ? "" : optionsCss.slice(at, optionsCss.indexOf("\n}", at));
+    };
+    const base = ruleBody("html.motion-ready details.motion-toggle::details-content");
+    const open = ruleBody("html.motion-ready details.motion-toggle[open]::details-content");
+    const rootBlock = optionsCss.slice(optionsCss.indexOf(":root {"), optionsCss.indexOf("\n}", optionsCss.indexOf(":root {")));
+    check(/--motion-collapse-out:\s*160ms/.test(rootBlock) && /--motion-collapse:\s*200ms/.test(rootBlock) &&
+      /height var\(--motion-collapse-out\) var\(--ease-out\)/.test(base) &&
+      /opacity var\(--motion-pop-out\) var\(--ease-out\)/.test(base) &&
+      /content-visibility var\(--motion-collapse-out\) allow-discrete/.test(base) &&
+      !/ease-in-out/.test(base + open) &&
+      /transition-duration:\s*var\(--motion-collapse\), var\(--motion-pop\), var\(--motion-collapse\)/.test(open) &&
+      /@starting-style\s*\{\s*height:\s*0;\s*opacity:\s*0;\s*\}/.test(open) &&
+      /(?:^|\n)details::details-content \{[^}]*opacity:\s*0;/.test(optionsCss) &&
+      /(?:^|\n)details\[open\]::details-content \{[^}]*opacity:\s*1;/.test(optionsCss) &&
+      ![...optionsCss.matchAll(/\.context-help[^{]*\{([^}]*)\}/g)].some((m) => /transition\s*:[^;]*\b(?:height|all|grid|margin|padding)\b/.test(m[1])) &&
+      /\.context-help > summary\.context-help-toggle \{[^}]*transition:\s*color var\(--motion-state\) ease, opacity var\(--motion-state\) ease;/.test(optionsCss),
+      "options.css: the native-details fold lost its recipe (collapse 160ms + faster fade-out / expand 200ms + fade-in, ease-out, entry from height 0 + opacity 0), contextual help grew its own fold transition, or the ? toggle lost its colour/opacity hover fade");
+    // `*` never matches ::details-content, so reduced motion must name it.
+    const reduced = optionsCss.slice(optionsCss.indexOf("@media (prefers-reduced-motion: reduce) {\n  *, *::before, *::after"));
+    check(/^[\s\S]{0,600}details::details-content \{ transition-duration: 0\.01ms !important; \}/.test(reduced),
+      "options.css: prefers-reduced-motion no longer stops the native-details fold (the universal selector does not reach ::details-content)");
+  }
   // Hosts with copy anchor the toggle to the copy baseline (font ascent/descent
   // splits differ between the Windows and CI font stacks; a centred constant fits
   // only one of them); the choice label exposes its text baseline through the
@@ -1794,8 +1820,21 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     // button may lead with an icon whose synthesized baseline is its bottom).
     /(?:^|\n)\.context-help-action-row\[data-help-role="action"\] > \.vocab-toolbar,\s*\.context-help-action-row\[data-help-role="action"\] > \.vocab-toolbar ~ \.context-help > summary\.context-help-toggle \{ align-self: last baseline; \}/.test(optionsCss),
     "options.css: contextual help lost its anchoring split (copy roles on the text baseline via the label span, the action row's wrapper and toggle on the button-text baseline, its container centred)");
-  check(/const det = summary && summary\.closest\("details"\);[\s\S]{0,500}details\.context-help\[open\]/.test(optionsJs),
+  check(/const det = summary && summary\.closest\("details"\);[\s\S]{0,800}details\.context-help\[open\]/.test(optionsJs),
     "options.js: contextual help lost the native-details motion gate or one-open-per-panel behavior");
+  // Motion is for the one element the user pointed at: the closing sibling is
+  // unmarked (instant) with the clicked summary held in place by an instant
+  // scroll, and keyboard activations (click detail 0) never get the marker.
+  {
+    const at = optionsJs.indexOf('const det = summary && summary.closest("details");');
+    const handler = at < 0 ? "" : optionsJs.slice(at, optionsJs.indexOf("}, true);", at));
+    check(/pbpMotionUnmark\(other\);\s*other\.open = false;/.test(handler) &&
+      !/pbpMotionMark\(other\)/.test(handler) &&
+      /summary\.getBoundingClientRect\(\)\.top[\s\S]{0,300}other\.open = false[\s\S]{0,200}summary\.getBoundingClientRect\(\)\.top[\s\S]{0,120}window\.scrollBy\(\{ top: shift, behavior: "instant" \}\)/.test(handler) &&
+      /if \(e\.detail > 0\) pbpMotionMark\(det\);/.test(handler) &&
+      /function pbpMotionUnmark\(el\) \{\s*clearTimeout\(el\._ppMotionT\);\s*el\.classList\.remove\("motion-toggle"\);/.test(optionsJs),
+      "options.js: the details click gate animates more than the clicked pointer toggle (sibling help must close instantly with scroll compensation; keyboard toggles must stay instant)");
+  }
   check(/const det = e\.target\.matches\?\.\("details\[data-acc-key\]"\) \? e\.target : null/.test(optionsJs) &&
     !/const det = e\.target\.closest\?\.\("details\[data-acc-key\]"\)/.test(optionsJs),
     "options.js: nested contextual help can overwrite its parent accordion persistence state");

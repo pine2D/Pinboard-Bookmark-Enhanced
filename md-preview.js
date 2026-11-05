@@ -645,12 +645,15 @@ function pbpFoldHeightAnimate(el, next, setFolded, prev, animate) {
   el.style.overflow = "clip";
 
   const cs = getComputedStyle(el);
-  const duration = parseFloat(cs.getPropertyValue("--motion-collapse")) || 200;
-  // The rail fold is an on-screen morph, so it takes the morph curve -- the same
-  // one the options accordion uses. The literal is a last-resort fallback only:
-  // if it is ever the value actually in use, --ease-in-out has gone missing from
-  // md-preview.css and the fold has silently dropped back to a weak curve.
-  const easing = cs.getPropertyValue("--ease-in-out").trim() || "cubic-bezier(0.77, 0, 0.175, 1)";
+  // Same fold language as the options/library disclosures: expand at
+  // --motion-collapse, collapse at the shorter --motion-collapse-out, both
+  // ease-out (the old ease-in-out sat still for its first ~60ms, then jumped).
+  // The literals are last-resort fallbacks only: if one is ever the value in
+  // use, the token has gone missing from md-preview.css's :root.
+  const duration = next
+    ? parseFloat(cs.getPropertyValue("--motion-collapse-out")) || 160
+    : parseFloat(cs.getPropertyValue("--motion-collapse")) || 200;
+  const easing = cs.getPropertyValue("--ease-out").trim() || "cubic-bezier(0.23, 1, 0.32, 1)";
   const animation = el.animate(
     [{ height: currentHeight + "px" }, { height: endHeight + "px" }],
     { duration, easing }

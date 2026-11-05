@@ -256,8 +256,10 @@ html[data-density="compact"] {
    signal) — ported here rather than inlined as per-use fallbacks since later
    tasks (accordion/disclosure UI) will add more consumers of this same scale.
    --motion-collapse/--ease-in-out added in Task 3 for the notes-card disclosure
-   and card-exit fold transitions, which reference them the same way. */
-:root { --motion-state: 150ms; --motion-collapse: 200ms; --motion-pop: 140ms; --motion-pop-out: 100ms; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); }
+   and card-exit fold transitions, which reference them the same way.
+   --motion-collapse-out: the collapse/exit half of a fold (exits are faster
+   than entrances; options.css carries the same pair). */
+:root { --motion-state: 150ms; --motion-collapse: 200ms; --motion-collapse-out: 160ms; --motion-pop: 140ms; --motion-pop-out: 100ms; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); }
 /* Lets height:0<->height:auto transitions on .notes-card.card-exit and
    .vocab-batch-bar actually interpolate instead of snapping; options.css
    sets this as the first line of its own :root. */
@@ -728,16 +730,18 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--lib-btn-
   border-radius: var(--lib-radius-sm, 3px);
   background: var(--lib-bg);
 }
-/* Deleted-card fold: library-notes.js's _pbpNotesDelete adds .card-exit only
-   after the store confirmed the delete, then waits out this transition. */
+/* Deleted-card fold: library-vocab.js's _pbpVocabMarkExit adds .card-exit only
+   after the store confirmed the delete, then holds the rebuild for 180ms
+   (_vocabExitHoldUntil) -- this 160ms exit plus a frame. Change both together.
+   An exit: ease-out, and the text fades out faster than the box closes. */
 html.motion-ready .notes-card.card-exit {
   overflow: clip;
   height: 0;
   margin-block: 0;
   opacity: 0;
-  transition: height var(--motion-collapse) var(--ease-in-out),
-              margin-block var(--motion-collapse) var(--ease-in-out),
-              opacity var(--motion-collapse) var(--ease-out);
+  transition: height var(--motion-collapse-out) var(--ease-out),
+              margin-block var(--motion-collapse-out) var(--ease-out),
+              opacity var(--motion-pop-out) var(--ease-out);
 }
 .notes-card-top {
   position: relative;
@@ -1960,7 +1964,7 @@ html.motion-ready .vocab-note-save {
   border-style: solid;
   border-radius: var(--lib-radius-md);
   /* Fill, frame, text, placeholder, hover and focus colours: FIELD_TARGETS.lib. */
-  transition: min-height 160ms ease-out, border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
+  transition: min-height var(--motion-collapse-out) var(--ease-out), border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
 }
 .vocab-note-input:placeholder-shown:not(:focus) {
   field-sizing: fixed;
@@ -2346,10 +2350,16 @@ html.motion-ready .vocab-note-save {
 @supports (interpolate-size: allow-keywords) and (interactivity: inert) and selector(::details-content) {
   #vocab-ref-result .xp-dict-ai-details:not([open]) > :not(summary) { interactivity: inert; }
   #vocab-ref-result .xp-dict-ai-details { interpolate-size: allow-keywords; }
-  #vocab-ref-result .xp-dict-ai-details::details-content { height: 0; overflow-y: clip; overflow-x: visible; content-visibility: hidden; }
-  #vocab-ref-result .xp-dict-ai-details[open]::details-content { height: auto; content-visibility: visible; }
+  #vocab-ref-result .xp-dict-ai-details::details-content { height: 0; opacity: 0; overflow-y: clip; overflow-x: visible; content-visibility: hidden; }
+  #vocab-ref-result .xp-dict-ai-details[open]::details-content { height: auto; opacity: 1; content-visibility: visible; }
+  /* Same fold recipe as options.css: collapse 160ms / expand 200ms, ease-out,
+     text fading ahead of the clip edge. Pointer clicks only (shared.js). */
   #vocab-ref-result .xp-dict-ai-details.dict-motion::details-content {
-    transition: height var(--motion-collapse) var(--ease-in-out), content-visibility var(--motion-collapse) allow-discrete;
+    transition: height var(--motion-collapse-out) var(--ease-out), opacity var(--motion-pop-out) var(--ease-out), content-visibility var(--motion-collapse-out) allow-discrete;
+  }
+  #vocab-ref-result .xp-dict-ai-details.dict-motion[open]::details-content {
+    transition-duration: var(--motion-collapse), var(--motion-pop), var(--motion-collapse);
+    @starting-style { height: 0; opacity: 0; }
   }
 }
 #vocab-ref-result .xp-dict-ai-details.dict-motion > summary::after { transition: transform 120ms var(--ease-in-out); }

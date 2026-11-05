@@ -2665,6 +2665,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     el.classList.add("motion-toggle");
     el._ppMotionT = setTimeout(() => el.classList.remove("motion-toggle"), 400);
   }
+  // A sibling closing as a side effect is not what the user clicked: drop any
+  // motion marker it still carries so the close lands in one frame.
+  function pbpMotionUnmark(el) {
+    clearTimeout(el._ppMotionT);
+    el.classList.remove("motion-toggle");
+  }
   // Capture phase runs before the default toggle action renders
   // ::details-content, so the marker is in place for the entry frame.
   // Delegated -> also covers the dynamically-created Send-to cards.
@@ -2673,17 +2679,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     const det = summary && summary.closest("details");
     if (!det) return;
     // Context help is deliberately transient: keep at most one explanation
-    // open in a panel, and close its sibling through the same native-details
-    // motion gate before the browser opens the newly clicked one.
+    // open in a panel. The sibling closes INSTANTLY -- animating it alongside
+    // the new answer moved the clicked "?" out from under the pointer whenever
+    // the old answer sat above it -- and the scroll is corrected in the same
+    // frame so the clicked summary keeps its on-screen position.
     if (det.matches("details.context-help") && !det.open) {
       const panel = det.closest(".panel");
-      panel?.querySelectorAll("details.context-help[open]").forEach((other) => {
-        if (other === det) return;
-        pbpMotionMark(other);
-        other.open = false;
-      });
+      const others = [...(panel?.querySelectorAll("details.context-help[open]") || [])]
+        .filter((other) => other !== det);
+      if (others.length) {
+        const before = summary.getBoundingClientRect().top;
+        for (const other of others) {
+          pbpMotionUnmark(other);
+          other.open = false;
+        }
+        const shift = summary.getBoundingClientRect().top - before;
+        if (shift) window.scrollBy({ top: shift, behavior: "instant" });
+      }
     }
-    pbpMotionMark(det);
+    // Only pointer clicks animate. Enter/Space on a summary dispatches a click
+    // with detail 0; a keyboard user gets the end state at once.
+    if (e.detail > 0) pbpMotionMark(det);
+    else pbpMotionUnmark(det);
   }, true);
   document.addEventListener("toggle", (e) => {
     const det = e.target.matches?.("details[data-acc-key]") ? e.target : null;

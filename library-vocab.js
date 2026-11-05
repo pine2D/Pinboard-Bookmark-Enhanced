@@ -37,7 +37,8 @@ function _pbpVocabMarkExit(cards) {
   for (const el of cards) {
     if (el && el.isConnected) { el.classList.add("card-exit"); marked = true; }
   }
-  if (marked) _vocabExitHoldUntil = performance.now() + 220;
+  // library.css .card-exit: --motion-collapse-out (160ms) plus a frame.
+  if (marked) _vocabExitHoldUntil = performance.now() + 180;
 }
 async function _pbpVocabExitSettle() {
   const wait = _vocabExitHoldUntil - performance.now();

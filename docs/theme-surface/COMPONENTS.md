@@ -381,8 +381,10 @@ inline 元素的默认基线对齐在「图标 + 文字」场景下几乎总是�
   summary 的 margin box 仍是零高，两种锚定都不参与行高。
   校准时用 `PBP_HELP_RASTER_RANGES=1` 让栅格门在通过时也打印各角色区间，本机与 `FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf"`
   各跑一次，取两者都落在容差内的值。
-- `<details>` 继续复用全局 disclosure 的 `::details-content` 动画与 one-open-per-panel 行为，组件层
-  不另写 transition。
+- `<details>` 继续复用全局 disclosure 的 `::details-content` 折叠配方（§3.5）与 one-open-per-panel 行为，
+  组件层不另写折叠 transition；`?` 本身只有 `color` / `opacity` 的 `--motion-state` 悬停过渡。
+  打开一个 `?` 时，同面板已开的那个**瞬时**关闭（不动画），并在同一帧按被点 summary 的位移量
+  `scrollBy({behavior:"instant"})` 补偿，被点的 `?` 始终留在光标下（2026-11-05 用户裁决）。
 - 门：`options-context-help-tests.html` 扫完整角色注册表、相邻锚点、24px 命中区、展开归属与间距；
   `options-help-render-audit.mjs` 用真实截图像素覆盖 zh-CN/en、DPR 1/1.25/1.5/2 和五种角色。
 
@@ -466,6 +468,56 @@ popup 原先「维持现状并记录在案」的那一条已于 2026-08-07 结�
 - 按压反馈禁止走 `transition`；hover 的**颜色**变化必须走 transition（否则颜色跳变读起来像故障）。
 - `prefers-reduced-motion` 下不需要为按压做特殊处理——它本来就没有动画。已有的全局 reduce 块
   （`animation-duration: 0.01ms !important` 等）不动。
+
+### 3.5 动效语言（折叠、弹层、状态；2026-11-05 收敛）
+
+token 定义在各表面手写 `:root`（popup / options / library / md-preview），不进 composer。
+
+| token | 值 | 用途 |
+|---|---|---|
+| `--motion-state` | 150ms，默认 `ease` | 颜色、透明度等状态反馈（hover / focus） |
+| `--motion-pop` / `--motion-pop-out` | 140ms / 100ms，`--ease-out` | 弹层进 / 出：opacity + 4px 位移；也是折叠里文字淡入 / 淡出的时长 |
+| `--motion-collapse` | 200ms，`--ease-out` | 折叠**展开** |
+| `--motion-collapse-out` | 160ms，`--ease-out` | 折叠**收起**、删除列表项的退出 |
+| `--ease-in-out` | — | 只用于屏上形变（chevron 旋转等），不用于进出 |
+| `--ease-drawer` | — | 抽屉 |
+| `linear` | — | 转圈、进度、倒计时 |
+
+折叠配方（options `details::details-content`、library 查词 AI 详情、阅读器 `pbpFoldHeightAnimate`）：
+
+```css
+details::details-content { height: 0; opacity: 0; overflow-y: clip; content-visibility: hidden; }
+details[open]::details-content { height: auto; opacity: 1; content-visibility: visible; }
+/* 基础规则 = 收起；[open] 规则 = 展开 */
+html.motion-ready details.motion-toggle::details-content {
+  transition: height var(--motion-collapse-out) var(--ease-out),
+              opacity var(--motion-pop-out) var(--ease-out),
+              content-visibility var(--motion-collapse-out) allow-discrete;
+}
+html.motion-ready details.motion-toggle[open]::details-content {
+  transition-duration: var(--motion-collapse), var(--motion-pop), var(--motion-collapse);
+  @starting-style { height: 0; opacity: 0; }
+}
+```
+
+守则：
+
+- 进出都用 ease-out，退出比进入快。旧的 ease-in-out 200ms 前 60ms 只走 9%，读起来是「先卡后跳」。
+- 只动 transform / opacity。折叠与删除列表项可以动 height，但必须同时带 opacity，文字先于裁切线淡出、
+  晚于裁切线淡入。会让正文重排的属性（margin、width、max-width 等）永不过渡。
+- 只动用户点的那一个；连带变化（同面板另一个 `?` 关闭等）瞬时完成，并在同一帧补偿滚动。
+- 永不动画：首屏、标签页切换、按压（§3.1）、键盘触发（`click.detail === 0`）、程序恢复（pp-acc 恢复、
+  搜索跳转展开祖先）、筛选与排序。options 的 `.motion-toggle` 与 library 的 `.dict-motion` 只在指针点击时加上，
+  400ms 后撤掉。
+- 可反复触发的 UI 用 transition / `@starting-style`；keyframes 只留给状态循环（转圈、忙碌脉冲）。
+  不能给 keyframes 后补 `motion-ready` 门控：类名落下时动画会重播。
+- 删除列表项：`library.css` `.notes-card.card-exit` 用 `--motion-collapse-out`，`library-vocab.js`
+  `_vocabExitHoldUntil` 等 180ms（退出时长加一帧），两处一起改。
+- `prefers-reduced-motion: reduce`：全局 reduce 块的 `*` 匹配不到 `::details-content`，options 单独写一条
+  `details::details-content { transition-duration: 0.01ms !important; }`，且不能并进 `*` 那条选择器列表
+  （不支持该伪元素的 Chromium 会让整条规则失效）；library 查词折叠与阅读器折叠在 JS / 选择器里自行门控。
+- 门：`tests/ui-contract-tests.mjs` 钉住 options 折叠配方、`?` 悬停过渡、reduce 规则，以及 options.js
+  点击门（兄弟瞬时关闭 + 滚动补偿、仅 `e.detail > 0` 才加标记）。
 
 ---
 
