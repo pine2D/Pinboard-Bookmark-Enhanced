@@ -162,10 +162,10 @@ function view({ file, x, y, w, h, ox = 0, oy = 0, s = 1, url = "", card = false,
 // ---------- 1280x800 screenshots: one idea each, headline left ----------
 const SHOT_CSS = `.s{position:absolute;inset:0;background:#eef1f6;overflow:hidden}
 .s::before{content:"";position:absolute;left:0;top:0;bottom:0;width:14px;background:#3b82f6;z-index:9}
-.copy{position:absolute;left:62px;top:0;bottom:0;width:452px;display:flex;flex-direction:column;justify-content:center;z-index:8}
-.brand{font:600 15px/1 ${SANS};letter-spacing:.2em;color:#2f6fde;margin-bottom:24px}
-.head{font-family:${DISPLAY};font-weight:700;font-stretch:75%;font-size:66px;line-height:1.02;color:#13213a;text-transform:uppercase}
-.sub{margin-top:26px;font:400 22px/1.45 ${SANS};color:#4a5568;max-width:410px;text-wrap:balance}`;
+.copy{position:absolute;left:62px;top:0;bottom:0;width:450px;display:flex;flex-direction:column;justify-content:center;z-index:8}
+.brand{font:600 18px/1 ${SANS};letter-spacing:.2em;color:#2f6fde;margin-bottom:26px}
+.head{font-family:${DISPLAY};font-weight:700;font-stretch:75%;font-size:76px;line-height:1.02;color:#13213a;text-transform:uppercase;white-space:nowrap}
+.sub{margin-top:30px;font:400 27px/1.42 ${SANS};color:#4a5568;max-width:440px;text-wrap:balance}`;
 const shot = ({ head, sub, art }) => `<div class="s"><div class="copy"><div class="brand">BOOKMARK ENHANCED</div>
 <div class="head">${head.join("<br>")}</div><div class="sub">${sub}</div></div>${art()}</div>`;
 
@@ -248,6 +248,11 @@ try {
       const page = await browser.newPage({ viewport: { width: p.w, height: p.h }, deviceScaleFactor: dsf });
       await page.setContent(doc, { waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready);
+      // A headline line never wraps: shrink that image's headline until its longest line fits the copy column.
+      await page.evaluate(() => { for (const h of document.querySelectorAll(".head")) {
+        let size = parseFloat(getComputedStyle(h).fontSize);
+        while (h.scrollWidth > h.clientWidth && size > 40) h.style.fontSize = `${--size}px`;
+      } });
       const png = pngWriteRGB(pngRead(await page.screenshot({ type: "png" })));
       await page.close();
       writeFileSync(file, png);
