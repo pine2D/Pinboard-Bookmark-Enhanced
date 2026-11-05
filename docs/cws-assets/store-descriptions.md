@@ -24,13 +24,13 @@
 # Save
 - Save to the service you choose: Pinboard, Karakeep or linkding, with the title, description and selected text filled in.
 - AI tags and summaries: suggested from the article itself, using your own API key.
-- Never lose a save: saves made offline wait in a queue and go through once you reconnect.
+- Save while offline: saves wait and go through once you are back online.
 
 # Read
-- A clean reader for any page: no ads or sidebars, with five-color highlights and notes.
+- A clean reader for any page: no ads or sidebars, with highlights and notes.
 - Read in two languages: translate the whole page and keep the original beside it.
-- Ask the page: answers cite the article and jump to the quoted sentence.
-- Look up words in place: definitions and pronunciation without leaving the page; send saved words to Anki.
+- Ask the page: answers cite the article, and one click takes you to the quoted sentence.
+- Look up words as you read: see definitions and pronunciation without leaving the page, and send saved words to Anki.
 - Watch while you read: YouTube and bilibili videos play beside a transcript that follows along.
 
 # Keep
@@ -50,22 +50,22 @@
 **Extension name:** 书签增强
 
 ```text
-⚠ 在设置中选择一种书签服务。使用 Karakeep 或 linkding 无需 Pinboard 账号。Pinboard 是独立的付费服务，使用时需自备账号和 API Token。本扩展是第三方客户端，与 Pinboard 官方无关，未获其赞助或认可。 AI 功能是可选的，需要你自备所选 LLM 服务商的 API Key。
+⚠ 在设置中选择一种书签服务。使用 Karakeep 或 linkding 无需 Pinboard 账号。Pinboard 是独立的付费服务，使用时需自备账号和 API Token。本扩展是第三方客户端，与 Pinboard 官方无关，未获其赞助或认可。AI 功能是可选的，需要你自备所选 LLM 服务商的 API Key。
 
 # 保存
 - 保存到你选的服务：Pinboard、Karakeep 或 linkding，标题、描述和选中文本自动填好。
-- AI 标签与摘要：根据文章正文给出建议，使用你自己的 API Key。
-- 断网也能保存：书签先进离线队列，恢复联网后自动提交。
+- AI 标签与摘要：根据文章内容自动生成，用的是你自己的 API Key。
+- 断网也能保存：书签先存在本机，恢复联网后自动提交。
 
 # 阅读
-- 任何网页都能变成清爽的阅读器：去掉广告和侧边栏，支持五色高亮与笔记。
+- 清爽阅读：任何网页都能去掉广告和侧边栏，还能高亮、记笔记。
 - 双语对照阅读：整页翻译，原文就在旁边。
-- 向文章提问：回答附带引用，点一下就跳到原句。
-- 就地查词：不离开页面就能看释义和发音，生词可发到 Anki。
+- 向文章提问：回答附带引用，点一下就能跳到原句。
+- 随手查词：不离开页面就能看释义和发音，生词还能发到 Anki。
 - 边读边看：YouTube 和 B 站视频旁边配上随播放滚动的字幕。
 
 # 留存
-- 留下的内容都在资料库：高亮、笔记、生词和以往的问答集中在一处，通过你自己的 Google Drive 同步。
+- 资料库：高亮、笔记、生词和以往的问答都在这里，可以通过你自己的 Google Drive 同步。
 - 发送或下载：把文章发到常用的笔记应用或你自己的 webhook，或者存成电子书放进阅读器。
 
 # 个性化 Pinboard
@@ -81,22 +81,22 @@
 **Extension name:** 書籤強化
 
 ```text
-⚠ 在設定中選擇一種書籤服務。使用 Karakeep 或 linkding 不需要 Pinboard 帳號。Pinboard 是獨立的付費服務，使用時需自備帳號與 API Token。本擴充功能是第三方用戶端，與 Pinboard 無隸屬、贊助或背書關係。 AI 功能為選用，並使用你自行提供、你所選 LLM 服務商的 API key。
+⚠ 在設定中選擇一種書籤服務。使用 Karakeep 或 linkding 不需要 Pinboard 帳號。Pinboard 是獨立的付費服務，使用時需自備帳號與 API Token。本擴充功能是第三方用戶端，與 Pinboard 無隸屬、贊助或背書關係。AI 功能為選用，需自備所選 LLM 服務商的 API Key。
 
 # 儲存
 - 儲存到你選的服務：Pinboard、Karakeep 或 linkding，標題、描述與選取文字自動填妥。
 - AI 標籤與摘要：根據文章正文提供建議，使用你自己的 API Key。
-- 離線也能儲存：書籤先進離線佇列，重新連線後自動送出。
+- 離線也能儲存：書籤先存在本機，重新連線後自動送出。
 
 # 閱讀
-- 任何網頁都能變成清爽的閱讀器：去除廣告與側欄，支援五色標記與筆記。
+- 清爽閱讀：任何網頁都能去除廣告與側欄，還能標記、做筆記。
 - 雙語對照閱讀：翻譯整頁，原文就在旁邊。
-- 向文章提問：回答附有引用，一按就跳到原句。
-- 就地查詞：不必離開頁面就能看釋義與發音，生詞可傳送到 Anki。
+- 向文章提問：回答附有引用，一按就能跳到原句。
+- 隨手查詞：不必離開頁面就能看釋義與發音，生詞還能傳送到 Anki。
 - 邊讀邊看：YouTube 與 B 站影片旁邊配上隨播放捲動的字幕。
 
 # 留存
-- 留下的內容都在資料庫：標記、筆記、生詞與過往的問答集中在一處，透過你自己的 Google Drive 同步。
+- 資料庫：標記、筆記、生詞與過往的問答都在這裡，可以透過你自己的 Google Drive 同步。
 - 傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器。
 
 # 個人化 Pinboard
@@ -112,22 +112,22 @@
 **Extension name:** 書籤增強
 
 ```text
-⚠ 在設定選擇一種書籤服務。使用 Karakeep 或 linkding 無需 Pinboard 帳號。Pinboard 是獨立的付費服務，使用時需自備帳號及 API Token。本擴充功能是第三方客戶端，與 Pinboard 沒有隸屬、贊助或認可關係。 AI 功能係可選嘅，會使用你為自選 LLM 服務商提供嘅 API key。
+⚠ 在設定選擇一種書籤服務。使用 Karakeep 或 linkding 無需 Pinboard 帳號。Pinboard 是獨立的付費服務，使用時需自備帳號及 API Token。本擴充功能是第三方客戶端，與 Pinboard 沒有隸屬、贊助或認可關係。AI 功能為可選，需自備所選 LLM 服務商的 API Key。
 
 # 儲存
 - 儲存到你選擇的服務：Pinboard、Karakeep 或 linkding 都可以，標題、描述與選取文字會自動填好。
 - AI 標籤與摘要：根據文章內容提出建議，使用你自己的 API Key。
-- 儲存不會遺失：離線時的儲存先排入佇列，重新連線後自動完成。
+- 離線也能儲存：書籤會先存在本機，重新連線後自動提交。
 
 # 閱讀
-- 任何網頁都能變成清爽的閱讀器：沒有廣告和側欄，還可加上五色高亮與筆記。
+- 清爽閱讀：任何網頁都可以去掉廣告和側欄，還可以高亮和做筆記。
 - 雙語閱讀：翻譯整頁，原文就在旁邊對照。
-- 向文章提問：答案附引註，一按即跳到引用的句子。
+- 向文章提問：答案附引註，按一下就能跳到引用的句子。
 - 邊讀邊查詞：不用離開頁面就能查看釋義與發音，生詞亦可傳送到 Anki。
 - 邊讀邊看：YouTube 與 B 站影片旁邊配上跟着播放捲動的字幕。
 
 # 留存
-- 一個資料庫收齊所有留存內容：標記、筆記、生詞與過往提問，都透過你自己的 Google Drive 同步。
+- 資料庫：標記、筆記、生詞與過往提問都在這裏，可以透過你自己的 Google Drive 同步。
 - 傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器。
 
 # 個人化
@@ -143,19 +143,19 @@
 **Extension name:** Bookmark Enhanced
 
 ```text
-⚠ Wähle deinen Lesezeichendienst in den Einstellungen. Karakeep und linkding funktionieren ohne Pinboard-Konto. Pinboard ist ein unabhängiger, kostenpflichtiger Dienst und erfordert ein eigenes Konto mit API-Token. Diese Erweiterung stammt von einem Drittanbieter und wird von Pinboard weder gesponsert noch unterstützt. KI-Funktionen sind optional und nutzen einen API-Key, den du für den LLM-Anbieter deiner Wahl bereitstellst.
+⚠ Wähle deinen Lesezeichendienst in den Einstellungen. Karakeep und linkding funktionieren ohne Pinboard-Konto. Pinboard ist ein unabhängiger, kostenpflichtiger Dienst und erfordert ein eigenes Konto mit API-Token. Diese Erweiterung stammt von einem Drittanbieter, steht in keiner Verbindung zu Pinboard und wird von Pinboard weder gesponsert noch befürwortet. KI-Funktionen sind optional und nutzen einen API-Key, den du für den LLM-Anbieter deiner Wahl bereitstellst.
 
 # Speichern
 - Beim Dienst deiner Wahl speichern: Pinboard, Karakeep oder linkding; Titel, Beschreibung und markierter Text werden automatisch übernommen.
 - KI-Tags und Zusammenfassungen: direkt aus dem Artikel vorgeschlagen, mit deinem eigenen API-Schlüssel.
-- Nichts geht verloren: Offline Gespeichertes wartet in einer Warteschlange und wird gesendet, sobald du wieder online bist.
+- Offline speichern: Was du offline speicherst, wartet und wird gesendet, sobald du wieder online bist.
 
 # Lesen
-- Eine saubere Leseansicht für jede Seite: ohne Werbung und Seitenleisten, mit Markierungen in fünf Farben und Notizen.
+- Eine saubere Leseansicht für jede Seite: ohne Werbung und Seitenleisten, mit Markierungen und Notizen.
 - Zweisprachig lesen: die ganze Seite übersetzen und das Original daneben behalten.
-- Seite befragen: Antworten zitieren den Artikel und führen direkt zum zitierten Satz.
-- Wörter direkt nachschlagen: Definitionen und Aussprache, ohne die Seite zu verlassen; gespeicherte Vokabeln gehen an Anki.
-- Sehen beim Lesen: YouTube- und Bilibili-Videos laufen neben einem Transkript, das der Wiedergabe folgt.
+- Seite befragen: Antworten zitieren den Artikel, und ein Klick bringt dich zum zitierten Satz.
+- Wörter beim Lesen nachschlagen: Definitionen und Aussprache sehen, ohne die Seite zu verlassen, und gespeicherte Wörter an Anki senden.
+- Lesen und zuschauen: YouTube- und bilibili-Videos laufen neben einem Transkript, das der Wiedergabe folgt.
 
 # Behalten
 - Eine Bibliothek für alles, was du behältst: Markierungen, Notizen, gespeicherte Wörter und frühere Fragen, synchronisiert über dein eigenes Google Drive.
@@ -179,14 +179,14 @@
 # Enregistrer
 - Enregistrez dans le service de votre choix : Pinboard, Karakeep ou linkding, avec le titre, la description et le texte sélectionné déjà remplis.
 - Étiquettes et résumés par IA : suggérés à partir de l’article lui-même, avec votre propre clé API.
-- Aucun enregistrement perdu : les enregistrements faits hors ligne patientent dans une file d’attente et partent dès que la connexion revient.
+- Enregistrez hors ligne : vos enregistrements patientent et partent dès que vous êtes de nouveau en ligne.
 
 # Lire
-- Un lecteur épuré pour chaque page : sans publicités ni barres latérales, avec surlignage en cinq couleurs et notes.
+- Un lecteur épuré pour chaque page : sans publicités ni barres latérales, avec surlignage et notes.
 - Lisez en deux langues : traduisez toute la page en gardant l’original à côté.
-- Interrogez la page : les réponses citent l’article et renvoient directement à la phrase citée.
-- Consultez le dictionnaire sur place : définitions et prononciation sans quitter la page ; envoyez les mots enregistrés vers Anki.
-- Regarder en lisant : les vidéos YouTube et Bilibili s’affichent à côté d’une transcription qui suit la lecture.
+- Interrogez la page : les réponses citent l’article, et un clic vous amène à la phrase citée.
+- Consultez le dictionnaire en lisant : affichez définitions et prononciation sans quitter la page, et envoyez les mots enregistrés vers Anki.
+- Regarder en lisant : les vidéos YouTube et bilibili s’affichent à côté d’une transcription qui suit la lecture.
 
 # Garder
 - Une bibliothèque pour tout ce que vous gardez : surlignages, notes, mots enregistrés et questions passées, synchronisés via votre propre Google Drive.
@@ -205,22 +205,22 @@
 **Extension name:** Bookmark Enhanced
 
 ```text
-⚠ 設定でブックマークサービスを選択します。Karakeep と linkding は Pinboard アカウントなしで使えます。Pinboard は独立した有料サービスで、自分のアカウントと API トークンが必要です。本拡張機能は第三者製で、Pinboard との提携・出資・公式の承認はありません。 AI 機能は任意で、ご自身が用意したお好みの LLM プロバイダーの API キーを使用します。
+⚠ 設定でブックマークサービスを選択します。Karakeep と linkding は Pinboard アカウントなしで使えます。Pinboard は独立した有料サービスで、自分のアカウントと API トークンが必要です。本拡張機能は第三者製で、Pinboard との提携・出資・公式の承認はありません。AI 機能は任意で、ご自身が用意したお好みの LLM プロバイダーの API キーを使用します。
 
 # 保存
 - 選んだサービスに保存：Pinboard、Karakeep、linkding のいずれかに、タイトル・説明・選択テキストを自動入力して保存します。
 - AI タグ・要約：自分の API キーを使い、記事の内容からタグと要約を提案します。
-- 保存を取りこぼさない：オフライン中の保存はキューで待機し、再接続すると送信されます。
+- オフラインでも保存：保存はいったん待機し、オンラインに戻ると送信されます。
 
-# リーダー
-- どんなページもすっきりしたリーダーに：広告やサイドバーを取り除き、5 色のハイライトとメモを付けられます。
+# 読む
+- どんなページもすっきりしたリーダーに：広告やサイドバーを取り除き、ハイライトとメモを付けられます。
 - 2 か国語で読む：ページ全体を翻訳し、原文と並べて表示します。
-- ページへの質問：回答には記事からの引用が付き、引用した文へジャンプできます。
-- その場で単語を調べる：ページを離れずに語義と発音を確認でき、保存した単語は Anki に送れます。
-- 読みながら観る：YouTube と Bilibili の動画を、再生に合わせて流れる字幕と並べて再生します。
+- ページへの質問：回答には記事からの引用が付き、クリックひとつで引用した文に移動できます。
+- 読みながら単語を調べる：ページを離れずに語義と発音を確認でき、保存した単語は Anki に送れます。
+- 読みながら観る：YouTube と bilibili の動画を、再生に合わせて流れる字幕と並べて再生します。
 
 # 残す
-- 残したものをひとつのライブラリに：ハイライト、メモ、保存した単語、過去の質問を、自分の Google ドライブで同期します。
+- 残したものをひとつのライブラリに：ハイライト、メモ、保存した単語、過去の質問がすべてここに集まり、自分の Google ドライブで同期できます。
 - 送信もダウンロードも：記事を普段使いのノートアプリや自分の webhook に送ったり、電子書籍として保存してリーダーで読んだりできます。
 
 # カスタマイズ
@@ -241,13 +241,13 @@
 # Zapisywanie
 - Zapis w wybranej usłudze — Pinboard, Karakeep lub linkding, z gotowym tytułem, opisem i zaznaczonym tekstem.
 - Tagi i streszczenia AI — propozycje na podstawie samego artykułu, z użyciem Twojego klucza API.
-- Żaden zapis nie przepada — zakładki zapisane offline czekają w kolejce i trafiają na miejsce po odzyskaniu połączenia.
+- Zapis offline — zapisane zakładki czekają i trafiają na miejsce, gdy znów będziesz online.
 
 # Czytanie
-- Czytelny widok każdej strony — bez reklam i pasków bocznych, z zaznaczeniami w pięciu kolorach i notatkami.
+- Czytelny widok każdej strony — bez reklam i pasków bocznych, z zaznaczeniami i notatkami.
 - Czytaj w dwóch językach — przetłumacz całą stronę i miej oryginał tuż obok.
-- Zapytaj stronę — odpowiedzi cytują artykuł i prowadzą prosto do przytoczonego zdania.
-- Sprawdzaj słowa na miejscu — definicje i wymowa bez opuszczania strony; zapisane słówka wyślesz do Anki.
+- Zapytaj stronę — odpowiedzi cytują artykuł, a jedno kliknięcie przenosi do przytoczonego zdania.
+- Sprawdzaj słowa podczas czytania — zobacz definicje i wymowę bez opuszczania strony i wysyłaj zapisane słówka do Anki.
 - Oglądaj podczas czytania — filmy z YouTube i bilibili odtwarzają się obok transkrypcji, która podąża za nagraniem.
 
 # Przechowywanie
@@ -272,13 +272,13 @@
 # Сохранение
 - Сохраняйте в выбранный сервис — Pinboard, Karakeep или linkding, с уже заполненными заголовком, описанием и выделенным текстом.
 - AI-теги и краткое содержание — подбираются по самой статье с вашим собственным API-ключом.
-- Ни одна закладка не потеряется — сохранённое без сети ждёт в очереди и отправляется, как только связь восстановится.
+- Сохраняйте без сети — закладки подождут и отправятся, когда вы снова будете в сети.
 
 # Чтение
-- Чистый режим чтения для любой страницы — без рекламы и боковых панелей, с выделениями пяти цветов и заметками.
+- Чистый режим чтения для любой страницы — без рекламы и боковых панелей, с выделениями и заметками.
 - Читайте на двух языках — переведите всю страницу, а оригинал останется рядом.
-- Спросите страницу — ответы ссылаются на статью и ведут прямо к процитированному предложению.
-- Ищите слова, не уходя со страницы — определения и произношение под рукой, а сохранённые слова можно отправить в Anki.
+- Спросите страницу — ответы ссылаются на статью, а один клик переносит к процитированному предложению.
+- Ищите слова по ходу чтения — смотрите определения и произношение, не уходя со страницы, и отправляйте сохранённые слова в Anki.
 - Смотрите, пока читаете — видео с YouTube и bilibili идут рядом с расшифровкой, которая следует за воспроизведением.
 
 # Хранение

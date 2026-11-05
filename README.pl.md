@@ -21,13 +21,13 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in), Karakeep i linkding: ta
 ### Zapisywanie
 - **Zapis w wybranej usłudze** — Pinboard, Karakeep lub linkding, z gotowym tytułem, opisem i zaznaczonym tekstem.
 - **Tagi i streszczenia AI** — propozycje na podstawie samego artykułu, z użyciem Twojego klucza API.
-- **Żaden zapis nie przepada** — zakładki zapisane offline czekają w kolejce i trafiają na miejsce po odzyskaniu połączenia.
+- **Zapis offline** — zapisane zakładki czekają i trafiają na miejsce, gdy znów będziesz online.
 
 ### Czytanie
-- **Czytelny widok każdej strony** — bez reklam i pasków bocznych, z zaznaczeniami w pięciu kolorach i notatkami.
+- **Czytelny widok każdej strony** — bez reklam i pasków bocznych, z zaznaczeniami i notatkami.
 - **Czytaj w dwóch językach** — przetłumacz całą stronę i miej oryginał tuż obok.
-- **Zapytaj stronę** — odpowiedzi cytują artykuł i prowadzą prosto do przytoczonego zdania.
-- **Sprawdzaj słowa na miejscu** — definicje i wymowa bez opuszczania strony; zapisane słówka wyślesz do Anki.
+- **Zapytaj stronę** — odpowiedzi cytują artykuł, a jedno kliknięcie przenosi do przytoczonego zdania.
+- **Sprawdzaj słowa podczas czytania** — zobacz definicje i wymowę bez opuszczania strony i wysyłaj zapisane słówka do Anki.
 - **Oglądaj podczas czytania** — filmy z YouTube i bilibili odtwarzają się obok transkrypcji, która podąża za nagraniem.
 
 ![Czytelny widok z tłumaczeniem dwujęzycznym i zaznaczeniami](docs/screenshots/readme/reader.webp)
@@ -38,14 +38,14 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in), Karakeep i linkding: ta
 
 ### Przechowywanie
 - **Jedna biblioteka na wszystko, co zachowasz** — zaznaczenia, notatki, zapisane słówka i wcześniejsze pytania, synchronizowane przez Twój własny Dysk Google.
-- **Wyślij albo pobierz** — do [Obsidiana](https://obsidian.md), Notion i innych usług albo jako plik `.md`, `.html` lub `.epub`.
+- **Wyślij albo pobierz** — wyślij do [Obsidiana](https://obsidian.md), Notion i innych usług albo pobierz jako plik `.md`, `.html` lub `.epub`.
 
 ![Strona notatek: zaznaczenia z jednego artykułu jako ciągły wypis](docs/screenshots/readme/notes.webp)
 
 ![Zapisane słówko z kontekstem i kolumną słownika](docs/screenshots/readme/vocab.webp)
 
 ### Pinboard po Twojemu
-- **13 motywów dla pinboard.in** — Dracula, Nord, Catppuccin i inne, a do tego własny CSS.
+- **13 motywów dla pinboard.in** — jasny i ciemny wygląd witryny, a do tego własny CSS.
 - **Porządki w tagach** — scalaj niemal identyczne tagi i usuwaj te, których rzadko używasz.
 - **Automatyczna archiwizacja w [Wayback Machine](https://web.archive.org)** — zapisane strony da się przeczytać nawet wtedy, gdy oryginalny link przestanie działać.
 
@@ -64,7 +64,7 @@ Następnie otwórz **Ustawienia → Konto** i połącz usługę zakładek: dla P
 
 ## Prywatność
 
-Bez śledzenia, bez analityki, bez telemetrii. Ustawienia i klucze pozostają na tym urządzeniu, dopóki nie włączysz synchronizacji; synchronizowane klucze są jedynie zaciemnione, a nie zaszyfrowane. Zapytania AI trafiają wyłącznie do skonfigurowanego przez Ciebie dostawcy i tylko wtedy, gdy korzystasz z funkcji AI. Poza Pinboard rozszerzenie prosi o dostęp do każdej potrzebnej witryny osobno, przy pierwszym użyciu danej funkcji. Kopie na Dysku Google są przechowywane w prywatnym folderze aplikacji rozszerzenia i nie są objęte szyfrowaniem end-to-end. Pełna polityka: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+Rozszerzenie nie śledzi Cię i nie zbiera danych o użytkowaniu. Ustawienia i klucze pozostają na tym urządzeniu, dopóki nie włączysz synchronizacji; synchronizowane klucze są jedynie zaciemnione, a nie zaszyfrowane. Zapytania AI trafiają wyłącznie do skonfigurowanego przez Ciebie dostawcy i tylko wtedy, gdy korzystasz z funkcji AI. W przypadku każdej witryny innej niż Pinboard rozszerzenie prosi o dostęp, gdy po raz pierwszy użyjesz funkcji, która go wymaga. Kopie na Dysku Google są przechowywane w prywatnym folderze aplikacji rozszerzenia i nie są objęte szyfrowaniem end-to-end. Pełna polityka: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## Licencja
 

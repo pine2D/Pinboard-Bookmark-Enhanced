@@ -21,14 +21,14 @@ Une extension Chrome pour [Pinboard](https://pinboard.in), Karakeep et linkding 
 ### Enregistrer
 - **Enregistrez dans le service de votre choix** : Pinboard, Karakeep ou linkding, avec le titre, la description et le texte sélectionné déjà remplis.
 - **Étiquettes et résumés par IA** : suggérés à partir de l’article lui-même, avec votre propre clé API.
-- **Aucun enregistrement perdu** : les enregistrements faits hors ligne patientent dans une file d’attente et partent dès que la connexion revient.
+- **Enregistrez hors ligne** : vos enregistrements patientent et partent dès que vous êtes de nouveau en ligne.
 
 ### Lire
-- **Un lecteur épuré pour chaque page** : sans publicités ni barres latérales, avec surlignage en cinq couleurs et notes.
+- **Un lecteur épuré pour chaque page** : sans publicités ni barres latérales, avec surlignage et notes.
 - **Lisez en deux langues** : traduisez toute la page en gardant l’original à côté.
-- **Interrogez la page** : les réponses citent l’article et renvoient directement à la phrase citée.
-- **Consultez le dictionnaire sur place** : définitions et prononciation sans quitter la page ; envoyez les mots enregistrés vers Anki.
-- **Regarder en lisant** : les vidéos YouTube et Bilibili s’affichent à côté d’une transcription qui suit la lecture.
+- **Interrogez la page** : les réponses citent l’article, et un clic vous amène à la phrase citée.
+- **Consultez le dictionnaire en lisant** : affichez définitions et prononciation sans quitter la page, et envoyez les mots enregistrés vers Anki.
+- **Regarder en lisant** : les vidéos YouTube et bilibili s’affichent à côté d’une transcription qui suit la lecture.
 
 ![Lecture claire avec traduction bilingue et surlignages](docs/screenshots/readme/reader.webp)
 
@@ -38,14 +38,14 @@ Une extension Chrome pour [Pinboard](https://pinboard.in), Karakeep et linkding 
 
 ### Garder
 - **Une bibliothèque pour tout ce que vous gardez** : surlignages, notes, mots enregistrés et questions passées, synchronisés via votre propre Google Drive.
-- **Envoyer ou télécharger** : vers [Obsidian](https://obsidian.md), Notion et d’autres services, ou en `.md`, `.html` ou `.epub`.
+- **Envoyer ou télécharger** : envoyez vers [Obsidian](https://obsidian.md), Notion et d’autres services, ou téléchargez au format `.md`, `.html` ou `.epub`.
 
 ![Page des notes : les surlignages d’un article réunis en un seul extrait](docs/screenshots/readme/notes.webp)
 
 ![Mot enregistré avec son contexte et une colonne de dictionnaire](docs/screenshots/readme/vocab.webp)
 
 ### Un Pinboard à votre image
-- **13 thèmes pour pinboard.in** : Dracula, Nord, Catppuccin et d’autres, plus votre propre CSS.
+- **13 thèmes pour pinboard.in** : des apparences claires et sombres pour le site, plus votre propre CSS.
 - **Nettoyage des étiquettes** : fusionnez les étiquettes quasi identiques et élaguez celles qui servent peu.
 - **Archivage automatique dans la [Wayback Machine](https://web.archive.org)** : les pages enregistrées restent lisibles même quand le lien d’origine disparaît.
 
@@ -64,7 +64,7 @@ Ouvrez ensuite **Paramètres → Compte** et connectez votre service de signets 
 
 ## Confidentialité
 
-Aucun pistage, aucune analytique, aucune télémétrie. Les paramètres et les clés restent sur cet appareil, sauf si vous activez la synchronisation ; les clés synchronisées sont obfusquées, pas chiffrées. Les requêtes IA ne partent que vers le fournisseur que vous avez configuré, et seulement lorsque vous utilisez une fonctionnalité IA. En dehors de Pinboard, l’extension demande l’accès à chaque site dont elle a besoin, un par un, la première fois que vous utilisez la fonctionnalité concernée. Les copies Google Drive sont stockées dans le dossier d’application privé de l’extension et ne sont pas chiffrées de bout en bout. Politique complète : <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+L’extension ne vous piste pas et ne collecte aucune donnée d’utilisation. Les paramètres et les clés restent sur cet appareil, sauf si vous activez la synchronisation ; les clés synchronisées sont obfusquées, pas chiffrées. Les requêtes IA ne partent que vers le fournisseur que vous avez configuré, et seulement lorsque vous utilisez une fonctionnalité IA. Pour tout site autre que Pinboard, l’extension demande l’accès la première fois que vous utilisez une fonctionnalité qui en a besoin. Les copies Google Drive sont stockées dans le dossier d’application privé de l’extension et ne sont pas chiffrées de bout en bout. Politique complète : <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## Licence
 

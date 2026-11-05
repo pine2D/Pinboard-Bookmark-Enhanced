@@ -20,14 +20,14 @@
 
 ### 保存
 - **保存到你选的服务**：Pinboard、Karakeep 或 linkding，标题、描述和选中文本自动填好。
-- **AI 标签与摘要**：根据文章正文给出建议，使用你自己的 API Key。
-- **断网也能保存**：书签先进离线队列，恢复联网后自动提交。
+- **AI 标签与摘要**：根据文章内容自动生成，用的是你自己的 API Key。
+- **断网也能保存**：书签先存在本机，恢复联网后自动提交。
 
 ### 阅读
-- **任何网页都能变成清爽的阅读器**：去掉广告和侧边栏，支持五色高亮与笔记。
+- **清爽阅读**：任何网页都能去掉广告和侧边栏，还能高亮、记笔记。
 - **双语对照阅读**：整页翻译，原文就在旁边。
-- **向文章提问**：回答附带引用，点一下就跳到原句。
-- **就地查词**：不离开页面就能看释义和发音，生词可发到 Anki。
+- **向文章提问**：回答附带引用，点一下就能跳到原句。
+- **随手查词**：不离开页面就能看释义和发音，生词还能发到 Anki。
 - **边读边看**：YouTube 和 B 站视频旁边配上随播放滚动的字幕。
 
 ![清爽阅读器：双语对照、五色高亮与笔记](docs/screenshots/readme/reader.webp)
@@ -37,15 +37,15 @@
 ![YouTube 预览：字幕随播放滚动](docs/screenshots/readme/video.webp)
 
 ### 留存
-- **留下的内容都在资料库**：高亮、笔记、生词和以往的问答集中在一处，通过你自己的 Google Drive 同步。
-- **发送或下载**：发到 [Obsidian](https://obsidian.md)、Notion 等，或下载为 `.md`、`.html`、`.epub`。
+- **资料库**：高亮、笔记、生词和以往的问答都在这里，可以通过你自己的 Google Drive 同步。
+- **发送或下载**：发送到 [Obsidian](https://obsidian.md)、Notion 等，或下载为 `.md`、`.html`、`.epub`。
 
 ![笔记页：同一篇文章的高亮连成摘录流](docs/screenshots/readme/notes.webp)
 
 ![生词详情：原文语境与词典参考栏](docs/screenshots/readme/vocab.webp)
 
 ### 个性化 Pinboard
-- **13 套 pinboard.in 主题**：Dracula、Nord、Catppuccin 等，还能叠加自定义 CSS。
+- **13 套 pinboard.in 主题**：给网站换上浅色或深色外观，还能叠加自定义 CSS。
 - **标签治理**：合并近似标签，清理不常用的标签。
 - **自动存档到 [Wayback Machine](https://web.archive.org)**：保存过的网页，原链接失效后仍能找回。
 
@@ -64,7 +64,7 @@
 
 ## 隐私
 
-零追踪、零分析、零遥测。设置和凭据默认只存在本机，开启同步后才会离开这台设备；同步的凭据只做混淆，没有加密。AI 请求只在你使用 AI 功能时发出，且只发往你配置的服务商。除 Pinboard 外，扩展需要访问的其他站点都在你首次使用相应功能时逐个申请。Google Drive 中的副本存放在扩展的私有应用文件夹里，未经端到端加密。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+扩展不追踪你，也不收集使用数据。设置和凭据默认只存在本机，开启同步后才会离开这台设备；同步的凭据只做混淆，没有加密。AI 请求只在你使用 AI 功能时发出，且只发往你配置的服务商。访问 Pinboard 以外的网站时，扩展会在你第一次用到相关功能时请求权限。Google Drive 中的副本存放在扩展的私有应用文件夹里，未经端到端加密。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## 许可证
 
