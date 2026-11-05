@@ -27,6 +27,28 @@ const EN_PROSE_DASH_BAN = ["README.md", "docs/privacy.md"];
 const errors = [];
 const blocks = {};
 
+// 5. Core features only (user rule, repeated five times by 2026-11-05; CLAUDE.md 发布流程): outward-facing
+//    feature lists name core features, one sentence each and two at most. The caps below hold today's copy
+//    with little room; a bullet over them gets cut, the caps do not get raised. Lengths are visible
+//    characters after stripping Markdown, by script: CJK runs about half the length of Latin.
+const CORE_MAX_BULLETS = 15;
+const CORE_MAX_CHARS = { "README.md": 140, "docs/index.md": 140, "README.zh-CN.md": 70, "README.zh-TW.md": 70,
+  "README.zh-HK.md": 70, "README.ja.md": 85, "README.de.md": 180, "README.fr.md": 180, "README.pl.md": 180, "README.ru.md": 180 };
+function checkCoreOnly(f, bullets) {
+  if (bullets.length > CORE_MAX_BULLETS) errors.push(`${f}: ${bullets.length} feature bullets; core features only, at most ${CORE_MAX_BULLETS}`);
+  for (const line of bullets) {
+    const text = line.slice(2).replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*`]/g, "").trim();
+    const chars = [...text].length, sentences = (text.match(/[.!?](?=\s|$)|[。！？]/g) || []).length;
+    if (chars > CORE_MAX_CHARS[f]) errors.push(`${f}: a feature bullet runs ${chars} characters (max ${CORE_MAX_CHARS[f]}); cut it to the core: ${text.slice(0, 60)}…`);
+    if (sentences > 2) errors.push(`${f}: a feature bullet has ${sentences} sentences (max 2): ${text.slice(0, 60)}…`);
+  }
+}
+{
+  const index = readFileSync("docs/index.md", "utf8").split("\n");
+  const firstH2 = index.findIndex(l => l.startsWith("## "));
+  checkCoreOnly("docs/index.md", index.slice(0, firstH2 < 0 ? index.length : firstH2).filter(l => l.startsWith("- ")).map(l => "- **" + l.slice(2)));
+}
+
 for (const f of READMES) {
   const text = readFileSync(f, "utf8");
   const lines = text.split("\n");
@@ -43,6 +65,7 @@ for (const f of READMES) {
     if ((block.split(span).length - 1) !== 1) errors.push(`${f}: expected exactly one ${span} span`);
   }
   if ((block.split("**").length - 1) % 2 !== 0) errors.push(`${f}: unbalanced ** in features block`);
+  checkCoreOnly(f, block.split("\n").filter(l => l.startsWith("- **")));
   if (!(lines[4] || "").includes("13")) errors.push(`${f}: tagline (line 5) lost the "13 themes" claim`);
   const dashDelims = (block.match(/\*\* [—–] /g) || []).length;
   if (DASH_DELIM_ALLOWED.has(f)) {
