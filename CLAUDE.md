@@ -172,6 +172,11 @@ bash scripts/release.sh         # 打 ZIP + GH release + changelog；--build-onl
 
 - **发版前文档核查（release.sh 硬门）**：自上个 tag 有 feat commit 而 README×9 / CLAUDE.md / docs/privacy.md / docs/index.md / theme-surface 文档全未改动时直接中止；确认无需更新用 `--docs-ok` 显式跳过。新增任何数据出口（新 API 调用、新导出目标、新 AI 触发面）必须同步 privacy.md 的 Network Requests / Permissions / Third-Party 三处。privacy.md 与 index.md 走 GitHub Pages，push 即生效，不依赖扩展发版。
 - **对外材料只讲核心（用户已反复强调，2026-11-05 第五次）**：README×9、`docs/index.md`、商店描述（`docs/cws-assets/store-descriptions.md`，由 README 生成）以及宣传图和视频，都写给潜在用户看。只写核心功能，每个功能一句话，最多两句。实现细节、选项名、数字规格、边界条件、试点功能和操作步骤都不写，这些放在设置页提示或 release notes 里。新功能默认不进 README：能并进已有条目就并，只有本身就是卖点时才单列一条。docs-lint 会检查条目数和每条长度；超限时删内容，不许调阈值。子代理写这些材料时，要把这一条原文写进它的提示词。
+- **用户看得到的文字都要说人话（2026-11-05 用户要求）**：适用于界面标签、设置提示、错误与状态信息、README、商店文案和宣传材料。
+  - **写法**：用短句和常用词，直接说用户能做什么、会发生什么。不解释实现原理。
+  - **不要 AI 腔**：不用破折号串句子，不用「无缝」「赋能」「不仅……还……」这类套话，不硬凑三连，不做宣传式拔高。
+  - **设置页不配大段说明**：每个开关、输入框默认不配说明，标签本身说清楚就够。只有用户不知道就会出错、丢数据或多花钱时，才加一行提示。更长的说明放进 ? 帮助，分类规则见 `tests/options-hint-policy.json`。
+  - **自查**：写完或改完，英文用 `humanizer` skill 检查，中文用 `humanizer-zh`，其他语种按 `content-l10n` 重写。子代理写这类文字时，要把这一条原文写进它的提示词。
 - **用户可见文案 / README 改动**：×9 locale 逐行镜像、同 commit 更新；按目标语言重写而非翻译——细则见 rules/l10n.md。
 - **打包规则**：root 的 `*.html` / `*.js` / `*.css` / `manifest.json` 自动进 ZIP，递归包含 `vendor/ icons/ _locales/`；`tests/ scripts/ docs/ release/ *.md` 与隐藏目录排除。新增非上述后缀/位置的运行时资源必须改 release.sh 的 INCLUDE_DIRS / TOP_LEVEL_PATTERNS；sanity check 断言 manifest 与所有 HTML 引用的文件都在 ZIP 内，少一个 exit 1。
 - **扩展 ID 分层**：源码 manifest 固定开发 ID `feoognahlmfmbllpmgailahcnjppiegb`（开发公钥 + 开发 OAuth client，可与 CWS 版并存）；release.sh 校验源码身份后只在 ZIP 内替换为 CWS 公钥与生产 OAuth client，正式版固定 CWS ID `pnjndmjhljjbdlbejeenkepdalokfooh`。严禁占位 client ID/secret。Drive 两个 OAuth client 对同一 Google 账号 appDataFolder 的互通性 smoke 测不到，发布前需人工实测（细则见 rules/vocab-sync.md）。
