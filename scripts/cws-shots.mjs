@@ -133,7 +133,10 @@ const SERIF = `"CWS Serif","Sitka Banner","Sitka Display","Georgia",serif`;
 const SANS = `"Segoe UI","Roboto","Helvetica Neue",Arial,sans-serif`;
 
 // ---------- shared pieces ----------
-const PIN = () => b64file(join(REPO, "icons/app-128.png"), "image/png");
+// PIN is the object that holds a card down; LOGO is the brand mark. app-128 has the
+// store's 16px transparent margin, so show it at 4/3 the visible size you want.
+const PIN = () => b64file(join(REPO, "icons/pin-saved-128.png"), "image/png");
+const LOGO = () => b64file(join(REPO, "icons/app-128.png"), "image/png");
 const BASE_CSS = `*{box-sizing:border-box;margin:0;padding:0}html,body{width:var(--w);height:var(--h);overflow:hidden}
 body{font-family:${SANS};-webkit-font-smoothing:antialiased}
 .win,.card{position:absolute;overflow:hidden;background:#fff}
@@ -203,7 +206,7 @@ const sayHtml = (size, x, y) => `<div class="say" style="position:absolute;left:
 <div><span class="hl y">Save</span> it.</div><div><span class="hl b">Read</span> it.</div><div><span class="hl g">Keep</span> it.</div></div>`;
 
 const MARQUEE_CSS = `.brandrow{position:absolute;left:612px;top:58px;display:flex;align-items:center;gap:14px;font:600 20px/1 ${SANS};letter-spacing:.24em;color:#1d1f24}
-.brandrow img{width:30px;height:30px}
+.brandrow img{width:40px;height:40px;margin:-5px}
 .mc{position:absolute;width:336px;height:190px;background:#fff;border-radius:10px;box-shadow:0 14px 30px -14px rgba(40,40,30,.35),0 0 0 1px rgba(40,40,30,.08);padding:10px 10px 0}
 .mc .shot{position:relative;height:132px;border-radius:6px;overflow:hidden;border:1px solid #e7e8ec;background:#fff}
 .mc .shot img{position:absolute;display:block;max-width:none}
@@ -219,13 +222,13 @@ function markCard({ x, y, file, ox, oy, s, n, label, cls }) {
 }
 const MARQUEE = { id: "marquee", w: 1400, h: 560, dsf: 3, out: "marquee-promo-tile-1400x560.png", orig: "marquee-promo-tile.png",
   html: () => `<div class="t">${sayHtml(128, 104, 64)}
-<div class="brandrow"><img src="${PIN()}">BOOKMARK ENHANCED</div>
+<div class="brandrow"><img src="${LOGO()}">BOOKMARK ENHANCED</div>
 ${markCard({ x: 612, y: 120, file: "popup-tags", ox: 84, oy: 245, s: 0.7, n: "01", label: "AI TAGS", cls: "y" })}
 ${markCard({ x: 972, y: 120, file: "reader-bilingual", ox: 398, oy: 476, s: 0.68, n: "02", label: "BILINGUAL READER", cls: "b" })}
 ${markCard({ x: 612, y: 340, file: "reader-lookup", ox: 962, oy: 494, s: 0.72, n: "03", label: "WORD LOOKUP", cls: "g" })}
 ${markCard({ x: 972, y: 340, file: "library-questions", ox: 30, oy: 120, s: 0.9, n: "04", label: "YOUR LIBRARY", cls: "p" })}</div>` };
 const SMALL = { id: "small", w: 440, h: 280, dsf: 3, out: "small-promo-tile-440x280.png", orig: "small-promo-tile.png",
-  html: () => `<div class="t">${sayHtml(52, 38, 30)}<img src="${PIN()}" style="position:absolute;left:342px;top:180px;width:66px;height:66px"></div>` };
+  html: () => `<div class="t">${sayHtml(52, 38, 30)}<img src="${LOGO()}" style="position:absolute;left:331px;top:169px;width:88px;height:88px"></div>` };
 
 // ---------- render ----------
 const PAGES = [
