@@ -988,6 +988,12 @@ async function driveJourney(context, worker, extId, rep) {
       return rows["pbp_hl_qa-drive-note-2"]?.items?.[0]?.owner;
     });
     requireState(legacyOwner === undefined, `legacy fixture was claimed before the tour: ${legacyOwner}`);
+    // The tour counts exactly its own two notes on this article, and earlier
+    // reader scenarios highlight the same article.
+    await worker.evaluate(async url => {
+      const rows = await chrome.storage.local.get(null);
+      await chrome.storage.local.remove(Object.keys(rows).filter(key => key.startsWith("pbp_hl_") && rows[key]?.url === url));
+    }, ARTICLE_URL);
     await seedPreviewData(worker);
     await reader.bringToFront();
     await reader.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`, { waitUntil: "load", timeout: TIMEOUT_MS });
@@ -1265,6 +1271,8 @@ async function driveJourney(context, worker, extId, rep) {
   } finally {
     // Keep subsequent surfaces independent even if a journey assertion fails.
     await worker.evaluate(async token => chrome.storage.local.set({ personalLibraryAccount: token.split(":")[0] }), FAKE_TOKEN);
+    // The tour ends on the reader's dark override, which outranks optTheme.
+    await reader.evaluate(() => pbpReaderSchemeSet("auto")).catch(() => {});
     detachReader(); detachLibrary();
     await reader.close().catch(() => {});
     await library.close().catch(() => {});
@@ -1786,6 +1794,10 @@ async function driveFaults(context, worker, extId, rep) {
       expected.add("Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING");
       expected.add(`requestfailed: http://127.0.0.1:${aiPort}/v1/chat/completions (net::ERR_INCOMPLETE_CHUNKED_ENCODING)`);
     }
+    // A rejected token reloads the popup, and clearing the token reloads it
+    // again through the storage listener, so one document load is cut off. The
+    // login error asserted above is the outcome that matters.
+    if (profile === "pb-401") expected.add(`requestfailed: chrome-extension://${extId}/popup.html (net::ERR_ABORTED)`);
     const count = s.consoleErrors.filter(message => expected.has(message)).length;
     s.consoleErrors = s.consoleErrors.filter(message => !expected.has(message));
     s.notes.push(`Verified ${profile}: ${requireHit()} matching response(s), ${count} expected transport error(s).`);
@@ -2151,8 +2163,12 @@ async function driveReaderExport(context, worker, extId, rep) {
       // before this seed). Write the rounds where the reader reads them, in
       // the shape that one-time import produces.
       if (typeof pbpAskArchiveAppend === "function") {
+        // The export takes the article's newest conversation, so one left by an
+        // earlier scenario would stand in for these rounds.
+        const owner = pbpDictOwnerScope("qa");
+        for (const session of await pbpAskArchiveRead({ owner, url })) await pbpAskArchiveDelete({ owner, sessionId: session.id });
         for (const round of rounds) {
-          await pbpAskArchiveAppend({ owner: pbpDictOwnerScope("qa"), url, title: document.title, sessionId: "qa_export_session",
+          await pbpAskArchiveAppend({ owner, url, title: document.title, sessionId: "qa_export_session",
             record: { ...round, blocksHash: "", cites: [], evidence: [] } });
         }
       } else await pbpAskHistSet(url, rounds, "qa");
@@ -2530,8 +2546,19 @@ async function driveReaderControls(context, worker, extId, rep) {
       // builder derive partial coverage from timed, already-indexed paragraphs.
       await page.evaluate(async () => {
         const st = _pbpAskState;
-        await pbpAskHistSet(st.url, Array.from({ length: 5 }, (_, i) => ({ q: "Fixture question " + i, a: "Fixture answer " + i, ts: 1700000000000 + i, model: "qa-mock" })), st.account);
-        _pbpAskHistRestored = false; await _pbpAskHistRestore();
+        // The reader restores from the Ask archive and imports the legacy cache
+        // once per article, so history goes to the archive. Exactly five rounds
+        // are asserted below: earlier scenarios' conversations have to go first,
+        // and a deleted session stays deleted, hence a new one for the seed.
+        const owner = _pbpAskArchiveOwnerOf(st.account);
+        await _pbpAskLoadArchive(st);
+        for (const session of await pbpAskArchiveRead({ owner, url: st.url })) await pbpAskArchiveDelete({ owner, sessionId: session.id });
+        _pbpAskNewConversation();
+        for (let i = 0; i < 5; i++) {
+          await pbpAskArchiveAppend({ owner, url: st.url, title: st.title, sessionId: st.sessionId,
+            record: { q: "Fixture question " + i, a: "Fixture answer " + i, ts: 1700000000000 + i, model: "qa-mock", blocksHash: "", cites: [], evidence: [] } });
+        }
+        await _pbpAskRefreshArchivedView(st);
         [...document.querySelectorAll("#rendered-view > p")].forEach((el, i) => { el.dataset.t = String(i * 30); });
         document.body.classList.add("video-mode");
         window.pbpVideoCurrentTime = () => 90;
@@ -2552,7 +2579,7 @@ async function driveReaderControls(context, worker, extId, rep) {
       if (locale === "de" || activeScenario) await rep.shot(page, s, activeScenario ? `ask-${locale}-partial-history` : "ask-de-partial-history-360");
       if (activeScenario) matrixCases++;
       recordCase({ locale, viewport: 360, scheme: "dark", density: "large" });
-      await page.evaluate(() => pbpAskHistSet(_pbpAskState.url, [], _pbpAskState.account));
+      await page.evaluate(() => pbpAskArchiveDelete({ owner: _pbpAskArchiveOwnerOf(_pbpAskState.account), sessionId: _pbpAskState.sessionId }));
       }
       console.log("[qa-drive]   reader-controls: " + locale + " (" + cases.length + " layout cases)");
     }
