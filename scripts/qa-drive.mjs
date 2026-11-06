@@ -1734,7 +1734,7 @@ async function driveThemes(context, worker, extId, rep) {
       for (const scheme of includesStep("popup-unset") ? axisValues("scheme", ["light", "dark"]) : []) {
         await clearTheme();
         await page.emulateMedia({ colorScheme: scheme });
-                await page.evaluate(async (m) => { await chrome.storage.local.set({ themePresetKey: m === "dark" ? "flexoki-dark" : "", optTheme: m }); }, scheme);
+        await worker.evaluate(async (m) => { await chrome.storage.local.set({ themePresetKey: m === "dark" ? "flexoki-dark" : "", optTheme: m }); }, scheme);
         await page.goto(`chrome-extension://${extId}/popup.html?_qa=unset-${scheme}`, { waitUntil: "load", timeout: TIMEOUT_MS });
         // Same reload the options/library unset loop above already does
         // (debt-sweep 2026-08-07, design-uplift Task 4 minor): without it
