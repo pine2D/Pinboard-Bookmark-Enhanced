@@ -522,7 +522,7 @@ async function showNotification(id, title, message, category, undoInfo) {
     // Storage failure: default to showing the notification (least surprising)
   }
   const notifId = id + "-" + Date.now();
-  const opts = { type: "basic", iconUrl: "icons/pin-default-48.png", title, message };
+  const opts = { type: "basic", iconUrl: "icons/app-48.png", title, message };
   if (undoInfo) {
     opts.buttons = [{ title: t("bgUndo") }];
     // Register before the toast exists, so the button can never be clicked ahead

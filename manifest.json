@@ -50,10 +50,10 @@
     }
   },
   "icons": {
-    "16": "icons/pin-default-16.png",
-    "32": "icons/pin-default-32.png",
-    "48": "icons/pin-default-48.png",
-    "128": "icons/pin-default-128.png"
+    "16": "icons/app-16.png",
+    "32": "icons/app-32.png",
+    "48": "icons/app-48.png",
+    "128": "icons/app-128.png"
   },
   "options_page": "options.html",
   "content_scripts": [

@@ -56,7 +56,7 @@ docs/superpowers/ DESIGN-IS-2026-07-22/ release/   # gitignored 本地产物（.
 | 提示词模板变量 | `{{title}}`、`{{url}}`、`{{content}}`、`{{lang_instruction}}` |
 | 书签缓存 | URL 书签状态 TTL 5 分钟 |
 | Storage prime | 冷启动慢，靠 chrome.alarms 周期性预热 SETTINGS_DEFAULTS |
-| 图标状态 | default（未收藏）/ saved（已收藏）两套 |
+| 图标 | 工具栏 `pin-*` 分 default（未收藏）/ saved（已收藏）/ toread（待读）三套，商店与通知用 `app-*`；全部由 `node scripts/gen-icons.mjs` 生成，勿手改 PNG |
 | Commit message | conventional commits（feat / fix / refactor / perf / docs / style / chore），英文 |
 
 ## 存储与同步边界（摘要）

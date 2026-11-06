@@ -133,7 +133,7 @@ const SERIF = `"CWS Serif","Sitka Banner","Sitka Display","Georgia",serif`;
 const SANS = `"Segoe UI","Roboto","Helvetica Neue",Arial,sans-serif`;
 
 // ---------- shared pieces ----------
-const PIN = () => b64file(join(REPO, "icons/pin-saved-128.png"), "image/png");
+const PIN = () => b64file(join(REPO, "icons/app-128.png"), "image/png");
 const BASE_CSS = `*{box-sizing:border-box;margin:0;padding:0}html,body{width:var(--w);height:var(--h);overflow:hidden}
 body{font-family:${SANS};-webkit-font-smoothing:antialiased}
 .win,.card{position:absolute;overflow:hidden;background:#fff}
