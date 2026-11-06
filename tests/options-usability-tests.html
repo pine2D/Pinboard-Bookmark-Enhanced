@@ -311,6 +311,36 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     });
   });
 
+  // A help line the page keeps [hidden] is not on screen, so a result built on
+  // it jumps to nothing the reader can find: the Wayback note for self-hosted
+  // services matched "linkding" on a Pinboard setup and the jump showed no such
+  // words. Help copy follows what is shown; a setting's NAME stays searchable
+  // (see "a setting only a hidden block names" above). Asked of the real page,
+  // and of every help row, so a new conditional hint is covered without being
+  // listed here.
+  await test("search lists only help copy the page is showing", async () => {
+    const html = await (await fetch("../options.html")).text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const norm = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const helpNodes = [...doc.querySelectorAll('.panel[id^="panel-"] .hint, .panel[id^="panel-"] .pick-desc')];
+    const shown = new Set(helpNodes.filter((n) => !n.closest("[hidden]")).map((n) => norm(n.textContent)));
+    const hidden = helpNodes.filter((n) => n.closest("[hidden]"));
+    assert(hidden.length > 0, "options.html no longer starts with any hidden help copy; this check proves nothing");
+    const index = pbpBuildSettingsSearchIndex(doc);
+    const dead = index.filter((e) => e.hint && !shown.has(e.text));
+    assert(dead.length === 0, "help rows with nothing on screen: " + JSON.stringify(dead.slice(0, 4).map((e) => e.text.slice(0, 50))));
+
+    // The rule reads the live state, not the file: the same note is found as
+    // soon as the page shows it, and the block's setting name never leaves.
+    const note = doc.getElementById("wayback-selfhosted-private-hint");
+    const words = norm(note.textContent);
+    note.hidden = false;
+    assert(pbpBuildSettingsSearchIndex(doc).some((e) => e.hint && e.text === words), "a shown note did not come back");
+    const blockName = doc.querySelector("#bookmark-linkding-fields label[for]");
+    assert(blockName && blockName.closest("[hidden]"), "the linkding block no longer starts hidden");
+    assert(index.some((e) => !e.hint && e.text === norm(blockName.textContent)), "a hidden block's setting name left the index");
+  });
+
   await test("a live readout (#tag-gov-overview) marked data-search-skip never becomes a dead search row", async () => {
     // Regression: it changed from <p class="fg"> to <p class="hint">, which
     // the .hint branch resolves a target from via .closest(".fg, .pref-row,

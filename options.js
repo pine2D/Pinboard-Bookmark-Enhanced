@@ -551,6 +551,12 @@ function pbpBuildSettingsSearchIndex(root = document) {
       // (#tag-gov-overview: "27 tags · 3,412 uses" -- resolves to no target
       // and would otherwise print as a dead row).
       if (node.closest("[data-search-skip]")) continue;
+      // Help copy the page keeps [hidden] is not on screen: a service-only
+      // note, a validation message, a line inside another provider's form.
+      // Listing it sends the reader to words they cannot find. render() rebuilds
+      // the index per search, so a line is found as soon as it shows. Only help
+      // copy leaves: a setting's name stays searchable (see the degrade below).
+      if (node.matches(".hint, .pick-desc") && node.closest("[hidden]")) continue;
       let target = "";
       let weak = false;
       const isSectionName = node.matches("summary");
