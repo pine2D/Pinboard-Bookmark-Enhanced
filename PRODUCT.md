@@ -56,7 +56,7 @@ A Chrome extension for Pinboard, Karakeep, and linkding that turns a bookmark in
 
 - README feature screenshots: `docs/screenshots/readme/` (hero, reader, ask, notes, vocab, video, themes).
 - Chrome Web Store promo images and screenshots: `docs/cws-assets/`.
-- 1-minute video tour: https://youtu.be/f3F8Se2rnoc
+- 1-minute video tour: https://youtu.be/YWvA_Vux0CI
 - Privacy policy: `docs/privacy.md` (published on GitHub Pages).
 - None of the following exists, so future work must not invent it: testimonials, user counts, ratings, reviews, press coverage, benchmarks.
 

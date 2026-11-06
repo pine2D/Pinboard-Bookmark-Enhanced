@@ -160,7 +160,7 @@ const parts = [
   "> untouched. Display names below match the localized extension name; the repository and listing URLs stay unchanged.",
   ">",
   "> **2026-11-06:** this folder holds the five store screenshots, in upload order, and the two promo tiles; the promo",
-  "> video is https://youtu.be/f3F8Se2rnoc. Keep `originals/` as the historical source archive.",
+  "> video is https://youtu.be/YWvA_Vux0CI. Keep `originals/` as the historical source archive.",
   "",
 ];
 let baseline = null;

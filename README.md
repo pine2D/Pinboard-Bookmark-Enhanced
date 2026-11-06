@@ -12,7 +12,7 @@ A Chrome extension for [Pinboard](https://pinboard.in), [Karakeep](https://karak
 
 ![Saving a page with AI tags and summary, in dark and light themes](docs/screenshots/readme/hero.webp)
 
-[![1-minute video tour: save it, read it, keep it](docs/screenshots/readme/promo-video.webp)](https://youtu.be/f3F8Se2rnoc)
+[![1-minute video tour: save it, read it, keep it](docs/screenshots/readme/promo-video.webp)](https://youtu.be/YWvA_Vux0CI)
 
 ---
 

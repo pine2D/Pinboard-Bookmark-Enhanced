@@ -12,7 +12,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in), [Karakeep](https:/
 
 ![Speichern mit KI-Tags und Zusammenfassung, in dunklem und hellem Theme](docs/screenshots/readme/hero.webp)
 
-[![1-Minuten-Video: speichern, lesen, behalten](docs/screenshots/readme/promo-video.webp)](https://youtu.be/f3F8Se2rnoc)
+[![1-Minuten-Video: speichern, lesen, behalten](docs/screenshots/readme/promo-video.webp)](https://youtu.be/YWvA_Vux0CI)
 
 ---
 

@@ -12,7 +12,7 @@
 
 ![Сохранение с AI-тегами и резюме, тёмная и светлая темы](docs/screenshots/readme/hero.webp)
 
-[![Минутное видео: сохранить, прочитать, оставить себе](docs/screenshots/readme/promo-video.webp)](https://youtu.be/f3F8Se2rnoc)
+[![Минутное видео: сохранить, прочитать, оставить себе](docs/screenshots/readme/promo-video.webp)](https://youtu.be/YWvA_Vux0CI)
 
 ---
 
