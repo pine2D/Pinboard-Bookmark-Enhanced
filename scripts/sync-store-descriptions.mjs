@@ -159,7 +159,7 @@ const parts = [
   "> disclosure states that Pinboard requires a paid account, while the other services do not; it is carried across regenerations",
   "> untouched. Display names below match the localized extension name; the repository and listing URLs stay unchanged.",
   ">",
-  "> **3.0 (2026-11-05):** the screenshots and promo tiles in this folder are the 3.0 set; the promo",
+  "> **2026-11-06:** this folder holds the five store screenshots, in upload order, and the two promo tiles; the promo",
   "> video is https://youtu.be/f3F8Se2rnoc. Keep `originals/` as the historical source archive.",
   "",
 ];
