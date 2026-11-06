@@ -1403,7 +1403,7 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
 .wayback-indicator { font-size: 11px; /* px, not 0.9em: appended to #status-msg (11px), i.e. 9.9px rendered -- under the textFloor */ opacity: 0.85; }
 
 /* Search Bar */
-.search-row { padding: 0 var(--pp-sp-4) var(--pp-sp-4); }
+.search-row { padding: 0 var(--pp-sp-5) var(--pp-sp-4); }
 .search-field {
   width: 100%; padding: var(--pp-sp-2) var(--pp-sp-4);
   border-width: 1px; border-style: solid; border-radius: var(--pp-radius-md);
@@ -1447,9 +1447,9 @@ input[type="text"].search-field:focus-visible:not(:disabled) { box-shadow: var(-
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* Same sp-4 inset as .search-row / .quick-links: the three buttons used to
-     run edge to edge (0..550px) beside a search field inset by 8px. */
-  padding: 0 var(--pp-sp-4) var(--pp-sp-4);
+  /* Same sp-5 surface inset as the form rows, .search-row and .quick-links:
+     every block in the popup shares the 12px left and right edges. */
+  padding: 0 var(--pp-sp-5) var(--pp-sp-4);
   /* wrap-not-truncate (project rule): de/fr labels fold to a 2+1 second row
      instead of squeezing three nowrap buttons into one. */
   flex-wrap: wrap;
@@ -1714,7 +1714,7 @@ html[data-theme] .batch-progress-text {
   align-items: center;
   justify-content: center;
   gap: var(--pp-sp-1);
-  padding: 0 var(--pp-sp-4) var(--pp-sp-2);
+  padding: 0 var(--pp-sp-5) var(--pp-sp-2);
   font-size: 11px;
 }
 /* 24px tall, 2px side pad: the hit area icon buttons get, for 11px text
@@ -1915,7 +1915,7 @@ button.offline-toggle { padding-block: var(--pp-sp-1); }
      with carry the break (user ruling 2026-09-18; the old border-top sat flush
      under the quick-row buttons and showed through their gaps as a stray 1px
      line). */
-  padding: 0 var(--pp-sp-4) var(--pp-sp-4);
+  padding: 0 var(--pp-sp-5) var(--pp-sp-4);
   font-size: 11px;
   line-height: 1.8;
 }
@@ -3377,15 +3377,15 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-btn-h
    no separation at all). Dropping the fill puts the buttons back on the
    surface their token was derived against, so no new derived token is needed.
    Padding, not margin, for the sp-4 the family contract asks each block to end
-   with: .search-row / .quick-links / .quick-row / .recent-bm-area all spell it
-   `padding: 0 sp-4 sp-4`, and this block is now the same shape. */
+   with: .search-row / .quick-row / .recent-bm-area all spell it
+   `padding: 0 sp-5 sp-4`, and this block is now the same shape. */
 .md-strip {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
   gap: var(--pp-sp-4);
   margin: 0;
-  padding: 0 var(--pp-sp-4) var(--pp-sp-4);
+  padding: 0 var(--pp-sp-5) var(--pp-sp-4);
   font-size: 11px;
   /* Entrance kept (the strip appears asynchronously, after a markdown copy);
      it is the arrival that is animated, not the card that no longer exists. */

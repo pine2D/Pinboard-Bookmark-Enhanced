@@ -277,14 +277,14 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
   position: sticky; top: 24px;
   z-index: var(--opt-z-sticky);
 }
-/* The sidebar is 679px tall (measured: search + 13 tabs + 5 group labels +
+/* The sidebar is 710px tall (measured: search + 13 tabs + 5 group labels +
    Reset This Tab) and it is the page, not the sidebar, that scrolls. A sticky
    box grows no inner scroller, so once the viewport is shorter than the sidebar
    its tail -- Appearance, Storage, Reset This Tab -- sits permanently below the
    fold and no amount of page scrolling brings it up. The width breakpoint below
    cannot help (1080p at 150% zoom is ~1280x633: short, but far wider than
    720px), so drop sticky on height instead and let the nav scroll with the
-   page, exactly as the mobile layout already does. 760px = the 679px column
+   page, exactly as the mobile layout already does. 760px = the 710px column
    plus its 24px offset, plus headroom for a longer locale. Deliberately not an
    overflow-y scroller on .options-nav: that computes overflow-x to auto too,
    and .options-search-results is an absolutely positioned 360px child of a
@@ -307,7 +307,9 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
    no hover rule paints it. */
 .options-search input[type="search"] {
   width: 100%; min-height: 32px; /* the sidebar column's one rung: the tab buttons below are 32px (was 34, two px off both that and the control rungs) */
-  padding: var(--opt-sp-3) var(--opt-sp-4);
+  /* Left inset + this 1px border = the tabs' sp-5 + 2px indicator, so the
+     sidebar has one text column. */
+  padding: var(--opt-sp-3) var(--opt-sp-4) var(--opt-sp-3) calc(var(--opt-sp-5) + 1px);
   border: 1px solid var(--opt-field-border);
   border-radius: var(--opt-radius-md);
   background: var(--opt-field-bg); color: var(--opt-field-fg);
@@ -415,7 +417,7 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
 }
 .tabs {
   display: flex; flex-direction: column; align-items: stretch;
-  gap: var(--opt-sp-1);
+  gap: var(--opt-sp-2);
 }
 /* Sidebar group labels (2026-07 IA round: 13 tabs -> 5 groups, ORIGINAL tab
    order preserved — real-device feedback: reordering costs muscle memory more
@@ -425,7 +427,7 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
    columns align. */
 .tab-group-label {
   padding: var(--opt-sp-1) var(--opt-sp-5) var(--opt-sp-1) calc(var(--opt-sp-5) + 2px);
-  margin: var(--opt-sp-5) 0 var(--opt-sp-1);
+  margin: var(--opt-sp-5) 0 0;
   font-size: 11px; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.5px;
   color: var(--opt-fg-hint, var(--opt-fg-muted));
@@ -437,7 +439,10 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
   border: none; border-left: 2px solid transparent;
   border-radius: 0 var(--opt-radius-sm) var(--opt-radius-sm) 0;
   background: none; cursor: pointer;
-  padding: var(--opt-sp-4) var(--opt-sp-5) var(--opt-sp-4) var(--opt-sp-5);
+  /* A fixed 32 + the list's 4px gap = a 36px step. Height from padding plus
+     line-height: normal followed the font (33.33 measured), so the steps
+     rounded unevenly to 36/35/35. */
+  min-height: 32px; padding: 0 var(--opt-sp-5);
   font-size: 13px; color: var(--opt-fg-muted);
   white-space: nowrap;
   transition: color var(--motion-state), border-color var(--motion-state), background-color var(--motion-state);
@@ -454,7 +459,9 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
   .tab-btn:not(.active):not(:hover) { border-left-color: Canvas; }
 }
 .reset-tab-btn {
-  margin: var(--opt-sp-6) 0 0 0; padding: var(--opt-sp-5) var(--opt-sp-5) 0;
+  /* Left inset = tab padding + the tabs' 2px border-left, like the group
+     labels: same text column. The block breakpoints restate their padding. */
+  margin: var(--opt-sp-6) 0 0 0; padding: var(--opt-sp-5) var(--opt-sp-5) 0 calc(var(--opt-sp-5) + 2px);
   border: none; border-top: 1px solid var(--opt-border-section);
   background: none; cursor: pointer;
   text-align: left; font-size: 11px; color: var(--opt-fg-hint);

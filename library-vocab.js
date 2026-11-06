@@ -1742,7 +1742,7 @@ function _pbpVocabRenderRefIdle(mode) {
   host.dataset.refState = "idle";
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "btn btn-sm ghost vocab-ref-idle";
+  btn.className = "btn btn-sm ghost lib-hang-start vocab-ref-idle";
   setBtnIcon(btn, "book", t("libraryDictIdle"));
   // A local busy flag, not `disabled`: disabling the focused button drops
   // focus to <body>, and a declined prompt would leave the keyboard user
