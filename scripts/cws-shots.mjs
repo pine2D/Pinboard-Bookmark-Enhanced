@@ -9,7 +9,8 @@
 //
 // USAGE
 //   node scripts/cws-shots.mjs               # all screenshots + both promo tiles
-//   node scripts/cws-shots.mjs --only 1-save,marquee
+//   node scripts/cws-shots.mjs --only 3-save,marquee
+//   node scripts/cws-shots.mjs --out <dir>   # try a set outside the repo
 //
 // OUTPUT  docs/cws-assets/
 //   screenshot-N-<name>-1280x800.png, marquee-promo-tile-1400x560.png,
@@ -38,7 +39,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "..");
 const { chromium } = createRequire(resolve(REPO, ".qa-scan/package.json"))("playwright");
 const RAW = join(process.env.PBP_QA_REPORT_DIR || join(homedir(), ".local/share/pbp-qa-report"), "readme-shots/raw/light");
-const OUT = join(REPO, "docs/cws-assets");
+const argOut = process.argv.includes("--out") ? process.argv[process.argv.indexOf("--out") + 1] : "";
+const OUT = argOut ? resolve(argOut) : join(REPO, "docs/cws-assets");
 const ORIG = join(OUT, "originals");
 const RAW_DSF = 2; // readme-shots captures at deviceScaleFactor 2
 const FONT_DIR = process.env.CWS_FONT_DIR || "/mnt/c/Windows/Fonts";
@@ -163,6 +165,18 @@ function view({ file, x, y, w, h, ox = 0, oy = 0, s = 1, url = "", card = false,
 }
 
 // ---------- 1280x800 screenshots: one idea each, headline left ----------
+// A line from the clicked citation down to the sentence it opened.
+const ASK_CHIP = { x: 740, y: 527 }, ASK_QUOTE = { x: 1150, y: 654 };
+const citeLink = (c) => `<svg style="position:absolute;inset:0;z-index:3" width="1280" height="800" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="${c.x}" cy="${c.y}" r="21"/><path d="M${c.x + 21} ${c.y + 4}C${c.x + 240} ${c.y + 36} ${ASK_QUOTE.x} ${ASK_QUOTE.y - 92} ${ASK_QUOTE.x} ${ASK_QUOTE.y}"/>
+<path d="M${ASK_QUOTE.x - 9} ${ASK_QUOTE.y - 11}L${ASK_QUOTE.x} ${ASK_QUOTE.y}L${ASK_QUOTE.x + 9} ${ASK_QUOTE.y - 11}"/></svg>`;
+// The library's saved answer: question, then answer. The date and model line
+// between them is cut; it says nothing to someone looking at the store.
+function answerCard({ x, y, w }) {
+  const r = raw("library-answer-sources"), s = 0.86, ox = 418;
+  const part = (oy, h) => `<div class="vp" style="width:${w}px;height:${h}px"><img src="${r.uri}" style="width:${r.w * s}px;height:${r.h * s}px;left:${-ox * s}px;top:${-oy * s}px"></div>`;
+  return `<div class="card" style="left:${x}px;top:${y}px;width:${w}px;z-index:2;background:#f7f7f7"><div style="height:10px"></div>${part(236, 30)}<div style="height:8px"></div>${part(300, 180)}</div>`;
+}
 const SHOT_CSS = `.s{position:absolute;inset:0;background:#eef1f6;overflow:hidden}
 .s::before{content:"";position:absolute;left:0;top:0;bottom:0;width:14px;background:#3b82f6;z-index:9}
 .copy{position:absolute;left:62px;top:0;bottom:0;width:450px;display:flex;flex-direction:column;justify-content:center;z-index:8}
@@ -172,72 +186,60 @@ const SHOT_CSS = `.s{position:absolute;inset:0;background:#eef1f6;overflow:hidde
 const shot = ({ head, sub, art }) => `<div class="s"><div class="copy"><div class="brand">BOOKMARK ENHANCED</div>
 <div class="head">${head.join("<br>")}</div><div class="sub">${sub}</div></div>${art()}</div>`;
 
+// The store shows five screenshots at most, so this set is five, reading first.
 const SHOTS = [
-  { id: "1-save", head: ["One click.", "AI does the tags."], sub: "Tags that fit the page, ready to save.",
-    art: () => view({ file: "article-page", x: 548, y: 40, w: 760, h: 702, url: "example.com/essays/the-case-for-slow-reading" })
-      + view({ file: "popup-tags", card: true, x: 612, y: 96, w: 640, h: Math.round(526 * 640 / 671), s: 640 / 671, z: 2 }) },
-  { id: "2-services", head: ["Your server.", "Your bookmarks."], sub: "Save to your own self-hosted server. No Pinboard account needed.",
-    art: () => view({ file: "options-account", x: 540, y: 52, w: 760, h: 540, ox: 304, oy: 84, s: 0.86, url: "Settings · Account" })
-      + view({ file: "popup-linkding", card: true, x: 742, y: 586, w: 512, h: 196, s: 0.75, z: 2 }) },
-  { id: "3-reader", head: ["Read it clean.", "In two languages."], sub: "Each paragraph with its translation right underneath.",
+  { id: "1-reader", head: ["Read it clean.", "In two languages."], sub: "Each paragraph with its translation right underneath.",
     art: () => view({ file: "reader-bilingual", x: 548, y: 40, w: 760, h: 690, ox: 386, oy: 0, s: 0.92, url: "Reader · The Case for Slow Reading" }) },
+  { id: "2-ask", head: ["Ask the page.", "Get cited answers."], sub: "Every answer points back to the paragraph it came from.",
+    art: () => view({ file: "ask-cited", card: true, x: 590, y: 30, w: 563, h: 514, ox: 953, oy: 54, s: 1.18, z: 1 })
+      + view({ file: "ask-cited", card: true, x: 540, y: 566, w: 708, h: 198, ox: 256, oy: 412, s: 1.02, z: 2 })
+      + citeLink(ASK_CHIP) },
+  { id: "3-save", head: ["Save to the service", "you choose."], sub: "Pinboard or your own server. AI tags use your own API key.",
+    art: () => view({ file: "options-services", card: true, x: 560, y: 30, w: 686, h: 212, z: 1 })
+      + view({ file: "popup-save", card: true, x: 590, y: 262, w: 640, h: Math.round(530 * 640 / 671), s: 640 / 671, z: 2 }) },
   { id: "4-dictionary", head: ["Any word,", "explained."], sub: "Dictionary and AI entry, right beside the text.",
     art: () => view({ file: "reader-lookup", x: 532, y: 48, w: 724, h: 480, ox: 262, oy: 0, s: 0.6, url: "Reader · The Case for Slow Reading" })
-      + view({ file: "reader-lookup", card: true, x: 846, y: 92, w: 408, h: 668, ox: 958, oy: 0, s: 0.86, z: 2 }) },
-  { id: "5-ask", head: ["Ask the page.", "Get cited answers."], sub: "Every answer points back to the paragraph it came from.",
-    art: () => view({ file: "ask-answer", x: 532, y: 48, w: 724, h: 468, ox: 262, oy: 0, s: 0.6, url: "Reader · Ask the page" })
-      + view({ file: "ask-answer", card: true, x: 852, y: 92, w: 400, h: 686, ox: 953, oy: 54, s: 0.82, z: 2 }) },
-  { id: "6-questions", head: ["Every answer,", "kept."], sub: "Your questions wait in your library, grouped by article.",
-    art: () => view({ file: "library-questions", x: 548, y: 40, w: 742, h: 464, s: 0.58, url: "Library · Questions" })
-      + view({ file: "library-questions", card: true, x: 588, y: 396, w: 382, h: 356, ox: 32, oy: 108, s: 1.0, z: 2 }) },
-  { id: "7-themes", head: ["A fresh look", "for Pinboard."], sub: "Restyle the site you already use.",
-    art: () => [["site-none-light", false], ["site-solarized-light", false], ["site-dracula-dark", true], ["site-terminal-dark", true]]
-      .map(([f, dark], i) => view({ file: f, x: 556 + i * 64, y: 40 + i * 118, w: 700, h: 438, s: 700 / 1280, url: "pinboard.in", dark, z: i + 1 })).join("") },
+      + view({ file: "reader-lookup", card: true, x: 846, y: 92, w: 408, h: 630, ox: 958, oy: 0, s: 0.86, z: 2 }) },
+  { id: "5-library", head: ["Words and answers,", "kept."], sub: "Find them again in your library.",
+    art: () => view({ file: "vocab-detail-crop", x: 548, y: 40, w: 720, h: 380, ox: 50, oy: 20, s: 0.86, url: "Library · Vocabulary" })
+      + answerCard({ x: 600, y: 446, w: 640 }) },
 ];
 
 // ---------- promo tiles ----------
-const TILE_CSS = `.t{position:absolute;inset:0;background:#f8f4ec;overflow:hidden}
-.say{font-family:${SERIF};font-weight:700;color:#1d1f24;letter-spacing:-.02em;font-variation-settings:"opsz" 72}
+// Chrome asks tiles to carry the brand: little text, strong colour, no plain
+// screenshot, and still clear at half size.
+const TILE = { bg: "#2563eb", ink: "#ffffff", hlInk: "#10203f", y: "#ffd84d", b: "#9bdcff", g: "#86eab0", top: ".04em", bottom: ".08em" };
+const TILE_CSS = (th) => `.t{position:absolute;inset:0;background:${th.bg};overflow:hidden}
+.say{font-family:${SERIF};font-weight:700;color:${th.ink};letter-spacing:-.02em;font-variation-settings:"opsz" 72}
 .say div{white-space:nowrap}
-.hl{position:relative;z-index:0}
-.hl::before{content:"";position:absolute;z-index:-1;left:-.07em;right:-.05em;top:.52em;bottom:.1em;border-radius:.14em;background:var(--c);transform:rotate(-1.6deg)}
-.y{--c:#f9e3a0}.b{--c:#d3e2fb}.g{--c:#cdeccd}.p{--c:#f6d3dc}`;
+.hl{position:relative;z-index:0;color:${th.hlInk}}
+.hl::before{content:"";position:absolute;z-index:-1;left:-.07em;right:-.05em;top:${th.top};bottom:${th.bottom};border-radius:.14em;background:var(--c);transform:rotate(-1.6deg)}
+.y{--c:${th.y}}.b{--c:${th.b}}.g{--c:${th.g}}`;
 const sayHtml = (size, x, y) => `<div class="say" style="position:absolute;left:${x}px;top:${y}px;font-size:${size}px;line-height:1.13">
 <div><span class="hl y">Save</span> it.</div><div><span class="hl b">Read</span> it.</div><div><span class="hl g">Keep</span> it.</div></div>`;
+const tileMark = (size, x, y) => `<div style="position:absolute;left:${x + size * 0.125}px;top:${y + size * 0.125}px;width:${size * 0.75}px;height:${size * 0.75}px;border-radius:22%;background:#fff;display:grid;place-items:center"><img src="${PIN()}" style="width:68%;height:68%"></div>`;
 
-const MARQUEE_CSS = `.brandrow{position:absolute;left:612px;top:58px;display:flex;align-items:center;gap:14px;font:600 20px/1 ${SANS};letter-spacing:.24em;color:#1d1f24}
-.brandrow img{width:40px;height:40px;margin:-5px}
-.mc{position:absolute;width:336px;height:190px;background:#fff;border-radius:10px;box-shadow:0 14px 30px -14px rgba(40,40,30,.35),0 0 0 1px rgba(40,40,30,.08);padding:10px 10px 0}
-.mc .shot{position:relative;height:132px;border-radius:6px;overflow:hidden;border:1px solid #e7e8ec;background:#fff}
-.mc .shot img{position:absolute;display:block;max-width:none}
-.mc .lab{display:flex;align-items:center;gap:12px;height:46px;font:600 13.5px/1 ${SANS};letter-spacing:.2em;color:#1d1f24}
-.mc .sw{width:24px;height:8px;border-radius:4px;background:var(--c)}
-.mc .no{font:italic 400 17px/1 "CWS Serif Italic",${SERIF};letter-spacing:0;color:#6b6f78}
-.mc .pin{position:absolute;left:150px;top:-26px;width:38px;height:38px}`;
-function markCard({ x, y, file, ox, oy, s, n, label, cls }) {
-  const r = raw(file);
-  return `<div class="mc ${cls}" style="left:${x}px;top:${y}px"><img class="pin" src="${PIN()}">
-<div class="shot"><img src="${r.uri}" style="width:${r.w * s}px;height:${r.h * s}px;left:${-ox * s}px;top:${-oy * s}px"></div>
-<div class="lab"><span class="sw"></span><span class="no">${n}</span><span>${label}</span></div></div>`;
-}
-const MARQUEE = { id: "marquee", w: 1400, h: 560, dsf: 3, out: "marquee-promo-tile-1400x560.png", orig: "marquee-promo-tile.png",
-  html: () => `<div class="t">${sayHtml(128, 104, 64)}
-<div class="brandrow"><img src="${LOGO()}">BOOKMARK ENHANCED</div>
-${markCard({ x: 612, y: 120, file: "popup-tags", ox: 84, oy: 245, s: 0.7, n: "01", label: "AI TAGS", cls: "y" })}
-${markCard({ x: 972, y: 120, file: "reader-bilingual", ox: 398, oy: 476, s: 0.68, n: "02", label: "BILINGUAL READER", cls: "b" })}
-${markCard({ x: 612, y: 340, file: "reader-lookup", ox: 962, oy: 494, s: 0.72, n: "03", label: "WORD LOOKUP", cls: "g" })}
-${markCard({ x: 972, y: 340, file: "library-questions", ox: 30, oy: 120, s: 0.9, n: "04", label: "YOUR LIBRARY", cls: "p" })}</div>` };
-const SMALL = { id: "small", w: 440, h: 280, dsf: 3, out: "small-promo-tile-440x280.png", orig: "small-promo-tile.png",
-  html: () => `<div class="t">${sayHtml(52, 38, 30)}<img src="${LOGO()}" style="position:absolute;left:331px;top:169px;width:88px;height:88px"></div>` };
+const MARQUEE_CSS = `.mk{position:absolute;left:560px;width:790px;height:152px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 14px 30px -14px rgba(10,20,50,.45)}
+.mk img{position:absolute;display:block;max-width:none}
+.lock{position:absolute;left:68px;top:476px;display:flex;align-items:center;gap:12px;font:600 19px/1 ${SANS};letter-spacing:.2em}`;
+const clip = ({ file, ox, oy, s, x, y, w, h }) => { const r = raw(file);
+  return `<div style="position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;overflow:hidden"><img src="${r.uri}" style="width:${r.w * s}px;height:${r.h * s}px;left:${-ox * s}px;top:${-oy * s}px"></div>`; };
+const markRow = (y, bg, ...parts) => `<div class="mk" style="top:${y}px;background:${bg}">${parts.map(clip).join("")}</div>`;
+const MARQUEE = { id: "marquee", w: 1400, h: 560, dsf: 3, out: "marquee-promo-tile-1400x560.png", orig: "marquee-promo-tile.png", css: TILE_CSS(TILE) + MARQUEE_CSS,
+  html: () => `<div class="t">${sayHtml(116, 68, 46)}
+<div class="lock" style="color:${TILE.ink}">BOOKMARK ENHANCED</div>
+${markRow(46, "#fff", { file: "popup-save", ox: 40, oy: 399, s: 1.25, x: 30, y: 24, w: 616, h: 44 }, { file: "popup-save", ox: 101, oy: 492, s: 1.25, x: 106, y: 84, w: 134, h: 46 })}
+${markRow(210, "#fffdf0", { file: "reader-bilingual", ox: 384, oy: 478, s: 1.3, x: 0, y: 0, w: 790, h: 152 })}
+${markRow(374, "#f7f7f7", { file: "vocab-detail-crop", ox: 136, oy: 66, s: 0.8, x: 0, y: 0, w: 660, h: 152 })}</div>` };
+const SMALL = { id: "small", w: 440, h: 280, dsf: 3, out: "small-promo-tile-440x280.png", orig: "small-promo-tile.png", css: TILE_CSS(TILE),
+  html: () => `<div class="t">${sayHtml(56, 34, 44)}${tileMark(124, 298, 78)}</div>` };
 
 // ---------- render ----------
 const PAGES = [
   ...SHOTS.map((d) => ({ id: d.id, w: 1280, h: 800, dsf: 2, out: `screenshot-${d.id}-1280x800.png`, orig: `screenshot-${d.id}.png`, css: SHOT_CSS, html: () => shot(d) })),
-  { ...MARQUEE, css: TILE_CSS + MARQUEE_CSS },
-  { ...SMALL, css: TILE_CSS },
+  MARQUEE, SMALL,
 ];
-const NEEDS = ["article-page", "popup-tags", "popup-linkding", "options-account", "reader-bilingual", "reader-lookup", "ask-answer", "library-questions",
-  "site-none-light", "site-solarized-light", "site-dracula-dark", "site-terminal-dark"];
+const NEEDS = ["popup-save", "options-services", "reader-bilingual", "reader-lookup", "ask-cited", "vocab-detail-crop", "library-answer-sources"];
 const missing = NEEDS.filter((n) => !existsSync(rawPath(n)));
 if (missing.length) { console.error(`missing raw captures (run node scripts/readme-shots.mjs first): ${missing.join(", ")}`); process.exit(1); }
 
@@ -259,13 +261,13 @@ try {
       const png = pngWriteRGB(pngRead(await page.screenshot({ type: "png" })));
       await page.close();
       writeFileSync(file, png);
-      console.log("wrote", file.slice(REPO.length + 1), `${p.w * dsf}x${p.h * dsf}`, `${Math.round(png.length / 1024)} KB`);
+      console.log("wrote", file.replace(REPO + "/", ""), `${p.w * dsf}x${p.h * dsf}`, `${Math.round(png.length / 1024)} KB`);
     }
   }
 } finally { await browser.close(); }
 
 // Drop screenshots from an earlier set (renamed or retired ideas).
-if (!ONLY) {
+if (!ONLY && !argOut) {
   const keep = new Set(SHOTS.flatMap((d) => [`screenshot-${d.id}-1280x800.png`, `screenshot-${d.id}.png`]));
   for (const dir of [OUT, ORIG]) for (const f of readdirSync(dir)) {
     if (/^screenshot-.*\.png$/.test(f) && !keep.has(f)) { rmSync(join(dir, f)); console.log("removed stale", join(dir, f).slice(REPO.length + 1)); }

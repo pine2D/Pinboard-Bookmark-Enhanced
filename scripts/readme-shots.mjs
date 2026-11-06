@@ -13,12 +13,12 @@
 //   node scripts/readme-shots.mjs --compose          # full rerun: shoot + compose + WebP
 //   node scripts/readme-shots.mjs --surfaces reader,ask   # light scheme, subset (no compose)
 //   node scripts/readme-shots.mjs --compose-only     # recompose from existing raw shots
-//   Options: --surfaces popup,popup-tags,popup-linkding,account,reader,ask,lookup,notes,
+//   Options: --surfaces popup,popup-tags,popup-linkding,popup-save,account,reader,ask,lookup,notes,
 //                       vocab,questions,themes,video
 //            --scheme light|dark   (with --surfaces; default light)
 //            --dsf 2   --video-t 95 (caption time shown in the video shot)
 //   Default (no --surfaces): light = popup..themes, dark = popup only (hero),
-//   (popup-tags, popup-linkding, account, lookup and questions feed
+//   (popup-tags, popup-linkding, popup-save, account, lookup and questions feed
 //   scripts/cws-shots.mjs),
 //   video = its own light context (YouTube origin grant + relay stub).
 //
@@ -43,8 +43,9 @@ const argv = process.argv.slice(2);
 const flag = (n, d) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : d; };
 const has = (n) => argv.includes(n);
 const DSF = Number(flag("--dsf", "2"));
+const ASK_FLASH_MS = 1000; // the flash lasts 1.6 s; this leaves time for the scroll
 const START_T = Number(flag("--video-t", "95"));
-const ALL = ["popup", "popup-tags", "popup-linkding", "account", "reader", "ask", "lookup", "notes", "vocab", "questions", "themes", "video"];
+const ALL = ["popup", "popup-tags", "popup-linkding", "popup-save", "account", "reader", "ask", "lookup", "notes", "vocab", "questions", "themes", "video"];
 const OUT_ROOT = join(process.env.PBP_QA_REPORT_DIR || join(homedir(), ".local/share/pbp-qa-report"), "readme-shots"); // outside the repo, see CLAUDE.md "测试与夹具"
 const RAW = (scheme) => join(OUT_ROOT, "raw", scheme);
 const COMPOSED = join(OUT_ROOT, "out");
@@ -66,7 +67,7 @@ const jobs = (() => {
     return [...(rest.length ? [{ scheme, surfaces: rest }] : []), ...(s.includes("video") ? [{ scheme, surfaces: ["video"] }] : [])];
   }
   return [
-    { scheme: "light", surfaces: ["popup", "popup-tags", "popup-linkding", "account", "reader", "ask", "lookup", "notes", "vocab", "questions", "themes"] },
+    { scheme: "light", surfaces: ["popup", "popup-tags", "popup-linkding", "popup-save", "account", "reader", "ask", "lookup", "notes", "vocab", "questions", "themes"] },
     { scheme: "dark", surfaces: ["popup"] },
     { scheme: "light", surfaces: ["video"] },
   ];
@@ -381,7 +382,9 @@ async function popupOnce(S, attempt, name, select = "", summary = true) {
     await sleep(1500);
     await evalP(`document.getElementById("ai-tags-btn")?.click(); ${summary ? `document.getElementById("ai-summary-btn")?.click();` : ""}`);
     await sleep(3500);
-    await evalP(`[...document.querySelectorAll(".add-all-link")].filter(a => a.id !== "add-all-suggest").pop()?.click(); document.activeElement?.blur();`);
+    // The store's save shot stops at the suggestions: added tags strike through,
+    // which reads as an error in a still image.
+    await evalP(`${name === "popup-save" ? `addTag("essays"); addTag("slow-web");` : `[...document.querySelectorAll(".add-all-link")].filter(a => a.id !== "add-all-suggest").pop()?.click();`} document.activeElement?.blur();`);
     await sleep(600);
     const img = await send("Page.captureScreenshot", { format: "png" });
     writeFileSync(join(S.out, name + ".png"), Buffer.from(img.data, "base64"));
@@ -409,7 +412,7 @@ async function withLinkding(S, fn) {
   try { return await fn(); } finally { await set("pinboard"); await sleep(400); }
 }
 // Pinboard keeps the AI summary as HTML in Notes; the store's save shot shows tags only.
-async function popupTags(S) {
+async function clearPopupState(S) {
   // A fresh popup: no draft and no cached summary left by the "popup" surface.
   await S.sw.evaluate(async () => {
     const rows = await chrome.storage.session.get(null);
@@ -428,9 +431,10 @@ async function popupTags(S) {
       };
     });
   });
-  await popup(S, "popup-tags", "", false);
 }
+async function popupTags(S) { await clearPopupState(S); await popup(S, "popup-tags", "", false); }
 async function popupLinkding(S) { await withLinkding(S, () => popup(S, "popup-linkding", F.POPUP_QUOTE)); }
+async function popupSave(S) { await withLinkding(S, async () => { await clearPopupState(S); await popup(S, "popup-save", "", false); }); }
 
 async function account(S) {
   await withLinkding(S, async () => {
@@ -441,6 +445,13 @@ async function account(S) {
     await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
     await page.mouse.move(1279, 799);
     await shot(S, page, "options-account");
+    // The store's save shot: the service choice alone, large enough to read.
+    await page.setViewportSize({ width: 980, height: 800 });
+    await sleep(400);
+    const box = await page.evaluate(() => { const r = [...document.querySelectorAll('input[name="bookmark-service"]')].map((i) => i.closest("label")?.getBoundingClientRect()).filter(Boolean), h = [...document.querySelectorAll("h2,h3")].find((e) => e.offsetParent && /Bookmark Service/.test(e.textContent))?.getBoundingClientRect();
+      const last = r[r.length - 1]; return { x: Math.floor(last.left) - 20, y: Math.floor((h || r[0]).top) - 16, width: Math.ceil(last.width) + 40, height: Math.ceil(last.bottom - (h || r[0]).top) + 28 }; });
+    await shot(S, page, "options-services", { clip: box });
+    console.log("services clip", JSON.stringify(box));
     await page.close();
   });
 }
@@ -475,6 +486,12 @@ async function ask(S) {
   await page.mouse.move(1439, 899);
   await sleep(300);
   await shot(S, page, "ask-answer");
+  // The store's Ask shot: a citation clicked, its quote flashing in the article.
+  // The last chip lands on a paragraph with no highlights of its own.
+  await page.locator(".ask-chip.verified").last().click();
+  await sleep(ASK_FLASH_MS);
+  await page.mouse.move(1439, 899);
+  await shot(S, page, "ask-cited");
   // A follow-up in the same conversation: the library's Questions view shows both.
   await page.locator("#ask-input").fill(F.ASK_QUESTIONS[1]);
   await page.locator("#ask-send").click();
@@ -542,6 +559,11 @@ async function questions(S) {
   await page.evaluate(() => document.activeElement?.blur());
   await page.mouse.move(1279, 799);
   await shot(S, page, "library-questions");
+  await page.locator("#ask-library-detail details.ask-library-evidence summary").first().click();
+  await sleep(300);
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.mouse.move(1279, 799);
+  await shot(S, page, "library-answer-sources");
   await page.close();
 }
 
@@ -631,7 +653,7 @@ async function video(S) {
   await page.close();
 }
 
-const SURF = { popup, "popup-tags": popupTags, "popup-linkding": popupLinkding, account, reader, ask, lookup, notes, vocab, questions, themes, video };
+const SURF = { popup, "popup-tags": popupTags, "popup-linkding": popupLinkding, "popup-save": popupSave, account, reader, ask, lookup, notes, vocab, questions, themes, video };
 
 // ---------- compose ----------
 const T_ = {
