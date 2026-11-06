@@ -168,6 +168,7 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 | ai.js、popup-ai.js、options-connectivity.js（关思考与参数方言、popup AI 代理） | `.claude/rules/ai-providers.md` |
 | ai.js、dict-entry.js（响应完整性、流式契约、任务输出要求、能力记录） | `.claude/rules/ai-response.md` |
 | README*.md、_locales/**、docs/privacy.md、docs/index.md | `.claude/rules/l10n.md` |
+| scripts/cws-shots.mjs、scripts/readme-shots*.mjs、docs/cws-assets/**、docs/screenshots/readme/**、.qa-scan/promo-video/**（商店图、README 图、宣传片） | `.claude/rules/promo-assets.md` |
 | 发版、bump 版本、打 tag、release.sh、ZIP / CWS、弄清 pre-commit 分路 | `.claude/skills/release/SKILL.md` |
 | 任何真实 AI API 调用或测试 | `.claude/skills/live-ai-test/SKILL.md` |
 | 新增、改期或退役一次性迁移 | `.claude/expiring-items.md` |
