@@ -2003,9 +2003,9 @@ try{
     await options.locator('#tab-general').click();
     assert.equal(await options.locator('#opt-linkding-browser-metadata').isChecked(),true,'the browser page information switch does not start on');
     const stored=()=>worker.evaluate(()=>chrome.storage.local.get('linkdingBrowserMetadata').then(row=>row.linkdingBrowserMetadata));
-    await options.locator('#opt-linkding-browser-metadata').uncheck();
+    await options.locator('.switch:has(#opt-linkding-browser-metadata) .switch-track').click();
     await until(async()=>await stored()===false,'switching off was stored');
-    await options.locator('#opt-linkding-browser-metadata').check();
+    await options.locator('.switch:has(#opt-linkding-browser-metadata) .switch-track').click();
     await until(async()=>await stored()===true,'switching on was stored');
     await options.close();
     // Forget earlier answers, in memory and in the storage.session copy.

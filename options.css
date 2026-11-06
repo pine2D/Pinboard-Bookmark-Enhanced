@@ -237,11 +237,11 @@ body { font-family: "Helvetica Neue", Verdana, "PingFang SC", "Hiragino Sans GB"
 button, input, select { font-family: inherit; }
 .container {
   visibility: hidden;
-  /* 900 -> 1040 (2026-08-01): the vocab tab's filter toolbar and batch bar
-     outgrew the ~660px content column once the status filter and status
-     batch buttons landed. Prose blocks keep their own ch-based caps, so
-     wider never means longer reading lines. */
-  max-width: 1040px; margin: 0 auto; padding: var(--opt-sp-7) var(--opt-sp-6);
+  /* 1040 -> 900 (2026-11-06): the extra width served the vocab list's
+     toolbars, and that list moved to the library page. At 900 a switch sits
+     140px closer to its label; all 13 panels were checked for overflow in
+     zh, en, de, fr and ru. */
+  max-width: 900px; margin: 0 auto; padding: var(--opt-sp-7) var(--opt-sp-6);
   display: grid;
   grid-template-columns: minmax(160px, max-content) minmax(0, 1fr);
   column-gap: var(--opt-sp-7);
