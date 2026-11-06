@@ -1205,9 +1205,13 @@ html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display:
    the row keeps its layout, so the measurement that set this stays true. */
 .kb-hint.kb-clipped, #bottom-kb-hint.kb-clipped + .submit-hint::before { visibility: hidden; }
 
+/* The line under the tag field holds Copy / Clear all or Last used, never both.
+   The relationship owns the 4px gap, and the fixed height keeps the popup still
+   when one replaces the other or a first tag brings Copy in. */
+.tags-input-wrap ~ .actions { margin-top: var(--pp-sp-2); min-height: 16px; line-height: 16px; }
 .clear-all-link {
   font-size: 11px; color: var(--pp-fg-hint); cursor: pointer;
-  margin-top: var(--pp-sp-1); display: inline-flex; align-items: center; gap: var(--pp-sp-1);
+  display: inline-flex; align-items: center; gap: var(--pp-sp-1);
 }
 .clear-all-link:hover { color: var(--pp-danger-quiet-fg); text-decoration: underline; }
 /* Icon anchors on the small link buttons: shrink the shared 13/14px icons to
@@ -1216,9 +1220,9 @@ html:not(.pp-kbd-learn):not(.pp-kbd-show) :is(.kb-hint, .submit-hint) { display:
 .clear-all-link .btn-ic svg, .offline-clear .btn-ic svg { width: 11px; height: 11px; }
 #tags-copy-all:hover { color: var(--pp-link); text-decoration: underline; }
 .last-used-hint {
-  display: block; width: 100%; border: 0; background: none; text-align: left; font-family: inherit;
-  font-size: 11px; color: var(--pp-fg-hint); cursor: pointer;
-  margin-top: var(--pp-sp-1); padding: var(--pp-sp-1) 0;
+  display: block; flex: 1 1 0; min-width: 0; border: 0; background: none; text-align: left; font-family: inherit;
+  font-size: 11px; line-height: inherit; color: var(--pp-fg-hint); cursor: pointer;
+  margin: 0; padding: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .last-used-hint:hover { color: var(--pp-link); }
