@@ -45,6 +45,7 @@ const BLOCKS=[
   'linkding changed elsewhere since loaded',
   'Karakeep changed elsewhere since loaded',
   'changed elsewhere: tag merges, both-sided edits, long tag lists',
+  'settings quick return to the previous service',
   'settings connection state and copy',
 ];
 // Self-check before any browser starts: the list above and the block() calls
@@ -2343,7 +2344,40 @@ try{
     await popup.close();
     console.log('changed elsewhere: restored tag drafts and reader tag lines are merged onto the newest tags, both-sided edits show the server value, a partial reader save is not taken for a change elsewhere, long tag lists still update');
   });
-  await block('settings connection state and copy',['linkding'],async()=>{
+  await block('settings quick return to the previous service',['karakeep','linkding'],async()=>{
+    // Two connected services: pick the other one and come straight back while
+    // the page still handles the first switch. The last pick wins, on the page
+    // and on this device, and the page does not take its own switch for a
+    // change made elsewhere.
+    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    await options.waitForFunction(()=>document.getElementById('opt-linkding-url').value!==''&&document.querySelector('#connection-health .connection-health-row'));
+    const pick=service=>options.evaluate(service=>{const radio=document.querySelector('input[name="bookmark-service"][value="'+service+'"]');radio.checked=true;radio.dispatchEvent(new Event('change',{bubbles:true}));},service);
+    const stored=()=>options.evaluate(()=>chrome.storage.local.get(['bookmarkService','bookmarkServiceActive']));
+    // Hold the service reads that start once the first switch begins, so they are still queued when the second pick arrives.
+    await options.evaluate(()=>{
+      const read=pbpReadBookmarkServiceState;
+      let release;const held=new Promise(resolve=>{release=resolve;});
+      window.pbpTestReleaseServiceReads=release;
+      pbpReadBookmarkServiceState=async()=>{
+        if((await chrome.storage.local.get('bookmarkService')).bookmarkService==='karakeep')await held;
+        return read();
+      };
+    });
+    await pick('karakeep');
+    await until(async()=>(await stored()).bookmarkServiceActive==='karakeep','the first pick did not switch');
+    await pick('linkding');
+    await options.evaluate(()=>window.pbpTestReleaseServiceReads());
+    await until(async()=>(await stored()).bookmarkServiceActive==='linkding','the last pick did not switch back');
+    // Give a queued note the time to move the radios, then read the settled page.
+    await options.waitForTimeout(300);
+    assert.deepEqual(await stored(),{bookmarkService:'linkding',bookmarkServiceActive:'linkding'},'the last pick did not stay on this device');
+    assert.equal(await options.evaluate(()=>document.querySelector('input[name="bookmark-service"]:checked')?.value),'linkding','the radios left the last pick');
+    assert(await options.locator('#connect-linkding').isVisible(),'the linkding form is hidden after picking it');
+    assert(await options.locator('#connect-karakeep').isHidden(),'the Karakeep form is still shown after leaving it');
+    await options.close();
+    console.log('settings: going to a connected service and straight back keeps the last pick');
+  });
+  await block('settings connection state and copy',['karakeep','linkding'],async()=>{
     // A reopened page shows the stored connection, a failed Connect does not
     // read as "no problems", the address field is marked for a web-page answer,
     // and the dynamic lines follow a language that arrives after first paint.

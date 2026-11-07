@@ -2900,6 +2900,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // outside (another tab, or following a synced choice) while its form was
   // the one in view, the radios follow it instead of describing a stale pick.
   let _bookmarkServiceShownActive = null;
+  // Picks whose switch has not finished. A service change seen meanwhile is this
+  // page's own, so the radios stay on what the user picked last.
+  let _bookmarkServicePicksOpen = 0;
   // Declared before the service radios and the note's listeners that call it:
   // a radio clicked while the rest of this init still awaits would otherwise
   // throw on the not-yet-initialised binding.
@@ -2910,61 +2913,70 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.warn("[connection-health] render failed:", e?.name, e?.message);
     }), 120);
   };
+  async function pbpOptRenderBookmarkServiceNote() {
+    const state = await pbpReadBookmarkServiceState();
+    let viewed = pbpOptViewedBookmarkService();
+    if (_bookmarkServiceShownActive !== null && state.active !== _bookmarkServiceShownActive
+        && viewed === _bookmarkServiceShownActive && !_bookmarkServicePicksOpen) {
+      const radio = document.querySelector(`input[name="bookmark-service"][value="${state.active}"]`);
+      if (radio) {
+        radio.checked = true;
+        viewed = state.active;
+        refreshBookmarkServiceFields();
+        pbpSyncTagGovServiceSelection();
+        scheduleConnectionOverview();
+      }
+    }
+    _bookmarkServiceShownActive = state.active;
+    const label = service => pbpBookmarkServiceLabel({bookmarkService:service});
+    const note = $id("bookmark-service-note");
+    const actions = $id("bookmark-service-chosen-actions");
+    const connectChosen = $id("bookmark-service-connect-chosen");
+    let text = "";
+    let action = "";
+    if (viewed !== state.active && state.ready[viewed]) {
+      // Connected here but not in use (its switch failed or came from elsewhere).
+      text = t("bookmarkServiceConnectedNotActive", label(viewed), label(state.active));
+      action = viewed;
+      connectChosen.textContent = t("bookmarkServiceUseViewed", label(viewed));
+    } else if (viewed !== state.active) {
+      text = viewed === "pinboard" ? t("bookmarkServicePendingPinboard", label(state.active))
+        : t("bookmarkServicePending", label(state.active), label(viewed));
+    } else if (state.chosen !== state.active && !state.ready[state.chosen]) {
+      text = t("bookmarkServiceChosenNotConnected", label(state.chosen), label(state.active));
+      action = state.chosen;
+      connectChosen.textContent = t("bookmarkServiceConnectChosen", label(state.chosen));
+    }
+    if (action) connectChosen.dataset.service = action;
+    note.textContent = text;
+    note.hidden = !text;
+    actions.hidden = !action;
+  }
   function pbpOptSyncBookmarkServiceNote() {
-    _bookmarkServiceNoteTail = _bookmarkServiceNoteTail.then(async () => {
-      const state = await pbpReadBookmarkServiceState();
-      let viewed = pbpOptViewedBookmarkService();
-      if (_bookmarkServiceShownActive !== null && state.active !== _bookmarkServiceShownActive
-          && viewed === _bookmarkServiceShownActive) {
-        const radio = document.querySelector(`input[name="bookmark-service"][value="${state.active}"]`);
-        if (radio) {
-          radio.checked = true;
-          viewed = state.active;
-          refreshBookmarkServiceFields();
-          pbpSyncTagGovServiceSelection();
-          scheduleConnectionOverview();
-        }
-      }
-      _bookmarkServiceShownActive = state.active;
-      const label = service => pbpBookmarkServiceLabel({bookmarkService:service});
-      const note = $id("bookmark-service-note");
-      const actions = $id("bookmark-service-chosen-actions");
-      const connectChosen = $id("bookmark-service-connect-chosen");
-      let text = "";
-      let action = "";
-      if (viewed !== state.active && state.ready[viewed]) {
-        // Connected here but not in use (its switch failed or came from elsewhere).
-        text = t("bookmarkServiceConnectedNotActive", label(viewed), label(state.active));
-        action = viewed;
-        connectChosen.textContent = t("bookmarkServiceUseViewed", label(viewed));
-      } else if (viewed !== state.active) {
-        text = viewed === "pinboard" ? t("bookmarkServicePendingPinboard", label(state.active))
-          : t("bookmarkServicePending", label(state.active), label(viewed));
-      } else if (state.chosen !== state.active && !state.ready[state.chosen]) {
-        text = t("bookmarkServiceChosenNotConnected", label(state.chosen), label(state.active));
-        action = state.chosen;
-        connectChosen.textContent = t("bookmarkServiceConnectChosen", label(state.chosen));
-      }
-      if (action) connectChosen.dataset.service = action;
-      note.textContent = text;
-      note.hidden = !text;
-      actions.hidden = !action;
-    }).catch(error => console.warn("[bookmark-service] note update failed:", error?.name, error?.message));
+    _bookmarkServiceNoteTail = _bookmarkServiceNoteTail.then(pbpOptRenderBookmarkServiceNote)
+      .catch(error => console.warn("[bookmark-service] note update failed:", error?.name, error?.message));
     return _bookmarkServiceNoteTail;
   }
-  async function pbpOptBookmarkServicePicked(event) {
+  function pbpOptBookmarkServicePicked(event) {
     const service = event.target.value;
-    try {
-      const state = await pbpReadBookmarkServiceState();
-      // Between services this device has connected, picking one is the switch.
-      if (pbpOptViewedBookmarkService() === service && service !== state.active && state.ready[service]) {
-        const saved = await pbpSwitchBookmarkService(service);
-        if (!saved.ok) console.warn("[bookmark-service] switch failed:", saved.error?.name, saved.error?.message);
+    _bookmarkServicePicksOpen++;
+    // Same queue as the note, so a note never reads between a pick and its switch.
+    _bookmarkServiceNoteTail = _bookmarkServiceNoteTail.then(async () => {
+      try {
+        const state = await pbpReadBookmarkServiceState();
+        // Between services this device has connected, picking one is the switch.
+        if (pbpOptViewedBookmarkService() === service && service !== state.active && state.ready[service]) {
+          const saved = await pbpSwitchBookmarkService(service);
+          if (!saved.ok) console.warn("[bookmark-service] switch failed:", saved.error?.name, saved.error?.message);
+        }
+      } catch (error) {
+        console.warn("[bookmark-service] switch failed:", error?.name, error?.message);
+      } finally {
+        _bookmarkServicePicksOpen--;
       }
-    } catch (error) {
-      console.warn("[bookmark-service] switch failed:", error?.name, error?.message);
-    }
-    await pbpOptSyncBookmarkServiceNote();
+      await pbpOptRenderBookmarkServiceNote();
+    }).catch(error => console.warn("[bookmark-service] note update failed:", error?.name, error?.message));
+    return _bookmarkServiceNoteTail;
   }
   // Pinboard has no Connect button: a token that passes Test connection while
   // its form shows is the login (options-connectivity.js fires the event).
