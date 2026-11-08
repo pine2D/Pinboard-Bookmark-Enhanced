@@ -38,7 +38,7 @@ let popupBatchSetupSource;
 // Run the shipped SW entry points. External work is bounded to local doubles:
 // the AI cache supplies names verbatim; Pinboard runs the shipped delivery and
 // URI builder against a hand-written success response, never the network.
-async function createSaveTagsHarness(service, names) {
+async function createSaveTagsHarness(service, names, opts = {}) {
   const source = await (await fetch("../background.js")).text();
   function block(startMarker, endMarker) {
     const start = source.indexOf(startMarker);
@@ -46,11 +46,20 @@ async function createSaveTagsHarness(service, names) {
     assert(start >= 0 && end > start, "SW source block not found: " + startMarker);
     return source.slice(start, end);
   }
-  const settings = {bookmarkService:service, pinboardToken:"fixture-token", _aiTags:true, batchAiTags:true};
-  const auth = {service, account:"test-owner", token:"fixture-token", baseUrl:"https://bookmarks.example/"};
-  const calls = {intents:[], uris:[], names:[], progress:[]};
+  const settings = {bookmarkService:service, pinboardToken:"fixture-token", _aiTags:true, batchAiTags:true, ...(opts.settings || {})};
+  const auth = {service, account:"test-owner", token:"fixture-token", baseUrl:"https://bookmarks.example/", epoch:0};
+  const calls = {intents:[], uris:[], names:[], progress:[], lookups:[]};
+  const state = {epoch:0, account:auth.account};
   const dependencies = {
-    getCurrentBookmarkAuth:async () => auth,
+    getCurrentBookmarkAuth:async () => ({...auth, account:state.account, epoch:state.epoch}),
+    // Shape copied from the real self-hosted catch branch of fetchExistingBookmark
+    // when the client's beforeRequest sees a stale epoch.
+    fetchExistingBookmark:async (url, token, lookupAuth) => {
+      calls.lookups.push({url, epoch:lookupAuth?.epoch, account:lookupAuth?.account});
+      if (lookupAuth?.epoch !== state.epoch || lookupAuth?.account !== state.account) return {exists:false, lookupFailed:true, reason:"account_changed", retryable:false};
+      return {exists:false};
+    },
+    pbpBookmarkHostGranted:async () => true,
     loadSettings:async () => settings,
     pbpLoadTagVocab:async account => ({account, timestamp:Date.now(), counts:null, index:pbpTagVocabIndex(Object.fromEntries(names.map(name => [name, 1])))}),
     pbpCanonicalTagName, pbpTagGroupKey,
@@ -69,15 +78,23 @@ async function createSaveTagsHarness(service, names) {
     _removeBatchRecordIfOwned:async () => {},
     _writeBatchProgress:async row => { calls.progress.push(row); return true; },
     t:key => key,
-    submitSaveIntent:async intent => {
+    submitSaveIntent:async (intent, context = {}) => {
       const invalid = delivery.validateSaveIntent(intent);
       if (invalid) return invalid;
       calls.intents.push(intent);
+      if (opts.lookupAware) {
+        const deliveryAuth = {...auth, account:state.account, epoch:state.epoch};
+        // Like the real path: a prefetched answer for this page and account is reused.
+        const prefetched = context.lookup?.url === intent.url && context.lookup.account === deliveryAuth.account ? context.lookup.found : undefined;
+        const found = prefetched || await dependencies.fetchExistingBookmark(intent.url, deliveryAuth.token, deliveryAuth);
+        if (found.lookupFailed) return {status:"failed", reason:found.reason, account:state.account};
+      }
       if (service === "pinboard") {
         return (await delivery.deliverSaveIntent(intent, settings, auth)).result;
       } else {
         calls.names.push(pbpBookmarkParseTags(intent.tags));
       }
+      if (opts.onSave) opts.onSave(state, calls.intents.length);
       return {status:"saved", mutation:"created", account:auth.account};
     },
   };
@@ -92,8 +109,9 @@ async function createSaveTagsHarness(service, names) {
     + block("async function _runBatchSave(", "// ===================== Tab Set");
   const keys = Object.keys(dependencies);
   const entry = new Function(...keys, "let _batchRunning = false;\n" + swSource + "\nreturn {saveFromBackground, _runBatchSave};")(...keys.map(key => dependencies[key]));
-  return {calls, quick:() => entry.saveFromBackground({url:"https://example.com/tags", title:"Tags", tab:{id:1}}),
-    batch:() => entry._runBatchSave([{id:1, url:"https://example.com/tags", title:"Tags"}], auth.account)};
+  const tabs = opts.tabs || [{id:1, url:"https://example.com/tags", title:"Tags"}];
+  return {calls, state, quick:() => entry.saveFromBackground({url:"https://example.com/tags", title:"Tags", tab:{id:1}}),
+    batch:() => entry._runBatchSave(tabs, auth.account)};
 }
 
 async function getPopupBatchSource() {
@@ -361,6 +379,28 @@ async function createUiHarness(storedProgress, now, opts = {}) {
       equal(h.calls.uris[0], "https://api.pinboard.in/v1/posts/add?auth_token=fixture-token&format=json&url=https%3A%2F%2Fexample.com%2Ftags&description=Tags&extended=&tags=say%22hello%20plain%20path%5Cname&shared=yes&toread=no&replace=no");
       if (path === "quick") equal(result.status, "saved");
       else equal(h.calls.progress.at(-1).saved, 1, "Pinboard batch did not save");
+    });
+  }
+  for (const service of ["karakeep", "linkding"]) {
+    const threeTabs = [1, 2, 3].map(n => ({id:n, url:"https://example.com/p" + n, title:"P" + n}));
+    await test(service + " batch skip mode keeps going when a same-account bookmark setting write bumps the epoch", async () => {
+      const h = await createSaveTagsHarness(service, ["a"], {tabs:threeTabs, settings:{batchSkipExisting:true}, lookupAware:true,
+        onSave:(state, n) => { if (n === 1) state.epoch++; }});
+      await h.batch();
+      const last = h.calls.progress.at(-1);
+      equal(last.error, null, "run was stopped");
+      equal(last.saved, 3, "not every tab saved");
+      equal(h.calls.intents.length, 3);
+    });
+    await test(service + " batch stops without lookup or save when the account really changes", async () => {
+      const h = await createSaveTagsHarness(service, ["a"], {tabs:threeTabs, settings:{batchSkipExisting:true}, lookupAware:true,
+        onSave:(state, n) => { if (n === 1) state.account = "someone-else"; }});
+      await h.batch();
+      const last = h.calls.progress.at(-1);
+      equal(last.error, "account_changed");
+      equal(last.saved, 1);
+      equal(h.calls.intents.length, 1, "saved after the account changed");
+      equal(h.calls.lookups.length, 1, "looked up after the account changed");
     });
   }
   await test("Batch AI origins are exact, deduplicated, ceiling-filtered, and include the provider", async () => {

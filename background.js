@@ -5675,7 +5675,9 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       }
 
       try {
-        await requireAccount();
+        // Re-read per item: the lookup client rejects an auth from before a
+        // same-account settings write (epoch bump), which is not an account change.
+        const itemAuth = await requireAccount();
         const mode = s.batchSkipExisting ? "skip" : "merge";
         // The bookmark's address is the cleaned page address, as the popup and
         // toolbar icon use; page reads keep the tab's own address.
@@ -5691,7 +5693,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         // too: only a new bookmark is sent that title (a merge keeps the
         // server's), so only a page not saved yet is counted too long.
         let lookup;
-        if (mode === "skip" || titleTooLong) lookup = { url: bookmarkUrl, account, found: await fetchExistingBookmark(bookmarkUrl, currentAuth.token, currentAuth) };
+        if (mode === "skip" || titleTooLong) lookup = { url: bookmarkUrl, account, found: await fetchExistingBookmark(bookmarkUrl, itemAuth.token, itemAuth) };
         const settled = !!lookup && ((mode === "skip" && lookup.found.exists) || (lookup.found.lookupFailed && !lookup.found.retryable));
         // Counted before any page read, AI request or write.
         if (titleTooLong && !lookup.found.exists && !lookup.found.lookupFailed) { tooLong++; continue; }
