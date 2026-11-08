@@ -842,7 +842,9 @@ delete document.documentElement.dataset.theme;
     }
 
     resetActions();
-    pbpReadSettingsWithSecrets = async () => { throw new Error("storage unavailable"); };
+    // The form port is read synchronously now, so an unexpected failure comes from the call itself.
+    window.chrome.permissions.request = async () => true;
+    pbpAnkiCall = async () => { throw new Error("storage unavailable"); };
     let ankiRejected = false;
     try { await _pbpVocabTestAnki(); } catch (_) { ankiRejected = true; }
     check("Anki connection test reports beside its button and leaves the toolbar status untouched",
@@ -912,7 +914,7 @@ delete document.documentElement.dataset.theme;
     healthCalls.length = 0;
     const testPortEvents = [];
     $id("dict-anki-port").value = "8766";
-    pbpReadSettingsWithSecrets = async () => ({ dictAnkiPort:"8765", dictAnkiKey:"" });
+    pbpReadSettingsWithSecrets = async () => { testPortEvents.push({ kind:"read" }); return { dictAnkiPort:"8765", dictAnkiKey:"" }; };
     window.chrome.permissions.request = async ({ origins }) => { testPortEvents.push({ kind:"permission", origins }); return true; };
     pbpAnkiCall = async (action, params, key, timeout, port) => {
       testPortEvents.push({ kind:"call", action, port: String(port) });
@@ -926,12 +928,13 @@ delete document.documentElement.dataset.theme;
       testPortEvents.some(e => e.kind === "call"), JSON.stringify(testPortEvents));
     $id("dict-anki-port").value = "";
     resetActions();
-    pbpReadSettingsWithSecrets = async () => ({ dictAnkiPort:"8777", dictAnkiKey:"" });
     const fallbackEvents = [];
+    pbpReadSettingsWithSecrets = async () => { fallbackEvents.push("read"); return { dictAnkiPort:"8777", dictAnkiKey:"" }; };
     window.chrome.permissions.request = async ({ origins }) => { fallbackEvents.push(origins.join()); return true; };
     await _pbpVocabTestAnki();
-    check("Anki connection test falls back to the saved port when the field is empty",
-      fallbackEvents[0] === "http://127.0.0.1:8777/*", JSON.stringify(fallbackEvents));
+    // Simplest miss: an empty field tests the saved port while the send path uses 8765.
+    check("Anki connection test uses the default port when the field is empty, without reading settings first",
+      fallbackEvents[0] === "http://127.0.0.1:8765/*", JSON.stringify(fallbackEvents));
     $id("dict-anki-port").value = "";
     resetActions();
 

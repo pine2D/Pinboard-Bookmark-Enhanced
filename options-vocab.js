@@ -817,7 +817,9 @@ async function _pbpVocabTestAnki() {
     // permission request must stay the first await after the click.
     const fieldPort = $id("dict-anki-port")?.value;
     let port = fieldPort;
-    if (fieldPort === undefined || fieldPort === null || String(fieldPort).trim() === "") {
+    // Only a missing field falls back to storage; an empty one means the
+    // default port, exactly as the send path resolves it.
+    if (fieldPort === undefined || fieldPort === null) {
       const preRead = await pbpReadSettingsWithSecrets({
         dictAnkiPort: SETTINGS_DEFAULTS.dictAnkiPort,
       });
@@ -944,6 +946,9 @@ if (_vocabDriveClearNotices) _vocabDriveClearNotices.addEventListener("click", a
       console.warn("[drive] notices dismissal failed:", error?.name, error?.message);
       response = { ok: false, error: "remote" };
     }
+    // An action started while this answer was in flight owns the panel and
+    // will repaint it with its own answer; settling here would clear its busy state.
+    if (_vocabDriveBusy) return;
     await _pbpVocabDriveSettle(response, gen, 0, await owner, "vocabDriveClearNotices");
   } catch (error) {
     console.warn("[drive] notices dismissal failed:", error?.name, error?.message);

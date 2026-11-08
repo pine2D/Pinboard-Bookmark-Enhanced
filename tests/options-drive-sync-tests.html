@@ -179,6 +179,20 @@ window.chrome = {
   send = async (message) => { messages.push(message); return response || {ok:true,status:fixture}; };
   check("the dismiss button is usable again once the run ends", !$id("vocab-drive-clear-notices").disabled);
 
+  // G4b-03: a dismissal answer that arrives after a sync started must not clear its busy state.
+  _pbpVocabDriveRender({...fixture, vocabulary:dataset({notices:2}), notes:dataset({notices:3})});
+  let resolveClear;
+  send = (message) => new Promise((resolve) => { if (message.type === "vocabDriveClearNotices") resolveClear = resolve; else resolveLateSync = resolve; });
+  var resolveLateSync;
+  $id("vocab-drive-clear-notices").click(); await task();
+  const lateSync = _pbpVocabDriveAction("vocabDriveSyncNow", true); await task();
+  resolveClear({ok:true, status:fixture}); await settle();
+  // Simplest miss: settle the late dismissal answer and repaint the idle panel.
+  check("a late dismissal answer keeps Sync now locked while the sync runs",
+    $id("vocab-drive-sync").getAttribute("aria-disabled") === "true", String($id("vocab-drive-sync").getAttribute("aria-disabled")));
+  resolveLateSync({ok:true, status:fixture}); await lateSync;
+  send = async (message) => { messages.push(message); return response || {ok:true,status:fixture}; };
+
   response = null; await renderDriveSyncPanel();
   let resolveAction;
   send = () => new Promise((resolve) => {resolveAction = resolve;});
