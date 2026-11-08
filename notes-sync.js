@@ -289,7 +289,15 @@ function pbpCreateNotesSyncStore({
   };
   async function listOutbox(owner) {
     const rows=[];
-    for (const key of await articleKeys()) rows.push(...pendingRows(await read(key),owner));
+    // Runs every sync round: read article records in chunks (one storage IPC
+    // per chunk, like seedLegacy) instead of one per article. Row content and
+    // order are unchanged.
+    const all=await articleKeys();
+    for (let start=0;start<all.length;start+=SEED_SCAN_CHUNK) {
+      const chunk=all.slice(start,start+SEED_SCAN_CHUNK);
+      const values=await storage.get(chunk);
+      for (const key of chunk) rows.push(...pendingRows(values[key],owner));
+    }
     return rows;
   }
   const seedCandidate = (key,rec,owner) => {

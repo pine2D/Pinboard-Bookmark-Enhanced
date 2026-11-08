@@ -220,6 +220,25 @@ test("legacy seed prefilters article records in one batched read outside the rec
  // 最简单漏判反例：批量读取之后锁内又对每个候选多读一遍（或每轮重复批量读多次），结果正确但读次数不降。
  assert(calls.length===9,"expected 9 storage reads, got "+calls.length+": "+JSON.stringify(calls));
 });
+test("listOutbox reads article records in chunks, not one storage.get per article",async()=>{
+ const N=450,f=fixture();
+ for (let i=0;i<N;i++) {
+  const url="https://example.com/outbox-"+i,key=pbpNotesArticleKey(url);
+  await pbpNotesWriteRecord(key,{v:1,url,title:"A"+i,items:[item("n"+i,"hl-"+i)]},OWNER,f.options);
+ }
+ // an article that only has another owner's items must contribute nothing
+ const foreignUrl="https://example.com/outbox-foreign",foreignKey=pbpNotesArticleKey(foreignUrl);
+ f.data[foreignKey]={v:1,url:foreignUrl,title:"F",items:[item("x","hl-f",OTHER)]};
+ const expected=Object.keys(f.data).filter(k=>/^pbp_hl_[0-9a-f]{8}$/.test(k)&&k!==foreignKey).map(k=>k+"|"+f.data[k].items[0].id);
+ let gets=0;const realGet=f.storage.get;
+ f.storage.get=async keys=>{gets++;return realGet(keys);};
+ const rows=await f.store().listOutbox(OWNER);
+ f.storage.get=realGet;
+ assert(rows.length===N,"expected "+N+" rows, got "+rows.length);
+ assert(JSON.stringify(rows.map(r=>r.event.recordKey))===JSON.stringify(expected),"rows or order changed");
+ assert(rows.every(r=>r.owner===OWNER),"owner missing on rows");
+ assert(gets<=Math.ceil((N+1)/200),"listOutbox issued "+gets+" storage.get calls");
+});
 test("status snapshot lists keys once and reads storage once",async()=>{
  const OTHER_HASH="b".repeat(64);
  const otherAccount="pbp_notes_sync_account_"+encodeURIComponent("google:"+OTHER_HASH);
