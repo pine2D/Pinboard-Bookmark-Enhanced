@@ -1251,6 +1251,17 @@ await test('Gemini budget refusals in every real wording heal once; unrelated 40
     assert(error?.status===400&&calls.length===1&&!stored.pbpThinkReject,'unrelated 400 retried: '+message);
   }
 });
+// Ollama's HTTP error body is {"error":"<string>"} (docs.ollama.com/api/errors).
+await test('Ollama string error bodies reach the message, code and status on both paths',async()=>{
+  const os=PROTOCOLS[3].settings;
+  for(const [status,error,code] of [[404,'model "x" not found, try pulling it first','model_not_found'],[500,'model requires more system memory (8.4 GiB) than is available (5.1 GiB)',undefined]]){
+    for(const mode of ['complete','stream']){
+      reset([reply({error},status)]);let caught;
+      try{await (mode==='complete'?run({},os):stream({},os));}catch(e){caught=e;}
+      assert(caught&&caught.status===status&&caught.message.includes(error)&&caught.code===code,mode+' '+status+': '+(caught&&caught.message)+'/'+(caught&&caught.code));
+    }
+  }
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script>

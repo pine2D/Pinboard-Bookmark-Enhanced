@@ -288,14 +288,16 @@ async function handleAIError(res, provider) {
   let paramHint = null;
   try {
     const body = await res.json();
-    if (body.error?.message) msg = `${provider}: ${body.error.message}`;
+    // Ollama answers {"error":"<string>"}; the others nest {error:{message}}.
+    const errText = typeof body.error === "string" ? body.error : body.error?.message;
+    if (errText) msg = `${provider}: ${errText}`;
     else if (body.error?.type) msg = `${provider}: ${body.error.type}`;
     // Detect model-not-found errors. Match ONLY explicit model-error phrasing, never a
     // bare "model" substring: provider auth errors often embed a help-link URL containing
     // the word "model" (e.g. DashScope's invalid-key message links to
     // ".../model-studio/error-code"), which previously flagged every bad-KEY error as
     // "model expired" and misdirected the user to change the model instead of the key.
-    const detail = String((body.error?.message || "") + " " + (body.error?.code || "") + " " + (body.error?.type || "")).toLowerCase();
+    const detail = String((errText || "") + " " + (body.error?.code || "") + " " + (body.error?.type || "")).toLowerCase();
     const modelErr =
       /model[_\s-]?not[_\s-]?(?:found|exist)/.test(detail) ||
       /\b(?:model|deployment)\b[^.]{0,40}\b(?:not\s+found|not\s+exist|does\s*not\s+exist|is\s+invalid|unavailable|unsupported|deprecated|decommissioned|no\s+longer\s+(?:available|supported))\b/.test(detail) ||
