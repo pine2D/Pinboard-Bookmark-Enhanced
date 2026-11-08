@@ -5671,6 +5671,9 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       try {
         await requireAccount();
         const mode = s.batchSkipExisting ? "skip" : "merge";
+        // The bookmark's address is the cleaned page address, as the popup and
+        // toolbar icon use; page reads keep the tab's own address.
+        const bookmarkUrl = pbpBookmarkLookupUrl(tab.url, s.urlClean);
         const title = tab.title || tab.url;
         const titleTooLong = !!pbpBookmarkTitleFailure(title, currentAuth.service);
         // Skip mode asks first (user decision 2026-11-02): a page already saved
@@ -5682,7 +5685,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         // too: only a new bookmark is sent that title (a merge keeps the
         // server's), so only a page not saved yet is counted too long.
         let lookup;
-        if (mode === "skip" || titleTooLong) lookup = { url: tab.url, account, found: await fetchExistingBookmark(tab.url, currentAuth.token, currentAuth) };
+        if (mode === "skip" || titleTooLong) lookup = { url: bookmarkUrl, account, found: await fetchExistingBookmark(bookmarkUrl, currentAuth.token, currentAuth) };
         const settled = !!lookup && ((mode === "skip" && lookup.found.exists) || (lookup.found.lookupFailed && !lookup.found.retryable));
         // Counted before any page read, AI request or write.
         if (titleTooLong && !lookup.found.exists && !lookup.found.lookupFailed) { tooLong++; continue; }
@@ -5709,47 +5712,47 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
             let summaryResolved = null;
             if (useAiTags && useAiSummary && !s.customTagPrompt?.trim() && !s.customSummaryPrompt?.trim()) {
               try {
-                const tCached = await getAICache(tab.url, "tags", s.aiCacheDuration, aiCacheSource, account, s);
-                const sCached = await getAICache(tab.url, "summary", s.aiCacheDuration, aiCacheSource, account, s);
+                const tCached = await getAICache(bookmarkUrl, "tags", s.aiCacheDuration, aiCacheSource, account, s);
+                const sCached = await getAICache(bookmarkUrl, "summary", s.aiCacheDuration, aiCacheSource, account, s);
                 // A16: reuse a cached half; combined call only when both missing.
                 if (tCached) aiTagsResolved = tCached;
                 if (sCached) summaryResolved = sCached;
                 if (aiTagsResolved === null && summaryResolved === null) {
-                  const resp = await callAI(s, buildCombinedPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", pbpRelevantTagsFirst(userTagsTop, tab.title || "", tab.url)));
+                  const resp = await callAI(s, buildCombinedPrompt(s, tab.title || tab.url, bookmarkUrl, pageInfo.pageText, "", pbpRelevantTagsFirst(userTagsTop, tab.title || "", bookmarkUrl)));
                   const parsed = parseAICombined(resp, s.aiTagSeparator);
                   if (parsed.tags.length) {
                     aiTagsResolved = parsed.tags;
-                    await setAICache(tab.url, "tags", aiTagsResolved, s.aiCacheDuration, aiCacheSource, account, s);
+                    await setAICache(bookmarkUrl, "tags", aiTagsResolved, s.aiCacheDuration, aiCacheSource, account, s);
                   }
                   if (parsed.summary) {
                     summaryResolved = parsed.summary;
-                    await setAICache(tab.url, "summary", parsed.summary, s.aiCacheDuration, aiCacheSource, account, s);
+                    await setAICache(bookmarkUrl, "summary", parsed.summary, s.aiCacheDuration, aiCacheSource, account, s);
                   }
                 }
-              } catch (e) { console.warn("batch AI combined failed, falling back:", tab.url, e.message); }
+              } catch (e) { console.warn("batch AI combined failed, falling back:", bookmarkUrl, e.message); }
             }
             {
               const aiJobs = [];
               if (useAiTags && aiTagsResolved === null) aiJobs.push((async () => {
                 try {
-                  const cached = await getAICache(tab.url, "tags", s.aiCacheDuration, aiCacheSource, account, s);
+                  const cached = await getAICache(bookmarkUrl, "tags", s.aiCacheDuration, aiCacheSource, account, s);
                   if (cached) return { type: "tags", result: cached };
-                  const prompt = buildTagPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", pbpRelevantTagsFirst(userTagsTop, tab.title || "", tab.url));
+                  const prompt = buildTagPrompt(s, tab.title || tab.url, bookmarkUrl, pageInfo.pageText, "", pbpRelevantTagsFirst(userTagsTop, tab.title || "", bookmarkUrl));
                   const resp = await callAI(s, prompt);
                   const rawTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
-                  await setAICache(tab.url, "tags", rawTags, s.aiCacheDuration, aiCacheSource, account, s);
+                  await setAICache(bookmarkUrl, "tags", rawTags, s.aiCacheDuration, aiCacheSource, account, s);
                   return { type: "tags", result: rawTags };
-                } catch (e) { console.warn("batch AI tags failed:", tab.url, e.message); aiFailed++; return null; }
+                } catch (e) { console.warn("batch AI tags failed:", bookmarkUrl, e.message); aiFailed++; return null; }
               })());
               if (useAiSummary && summaryResolved === null) aiJobs.push((async () => {
                 try {
-                  const cached = await getAICache(tab.url, "summary", s.aiCacheDuration, aiCacheSource, account, s);
+                  const cached = await getAICache(bookmarkUrl, "summary", s.aiCacheDuration, aiCacheSource, account, s);
                   if (cached) return { type: "summary", result: cached };
-                  const prompt = buildSummaryPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "");
+                  const prompt = buildSummaryPrompt(s, tab.title || tab.url, bookmarkUrl, pageInfo.pageText, "");
                   const summary = await callAI(s, prompt);
-                  await setAICache(tab.url, "summary", summary, s.aiCacheDuration, aiCacheSource, account, s);
+                  await setAICache(bookmarkUrl, "summary", summary, s.aiCacheDuration, aiCacheSource, account, s);
                   return { type: "summary", result: summary };
-                } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
+                } catch (e) { console.warn("batch AI summary failed:", bookmarkUrl, e.message); aiFailed++; return null; }
               })());
               if (aiTagsResolved) tags = [...tags, ...aiTagsResolved];
               if (summaryResolved) {
@@ -5790,7 +5793,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         const summaryRange = !linkding && notes ? { start: 0, end: notes.length } : null;
         const result = await submitSaveIntent({
           mode,
-          url: tab.url,
+          url: bookmarkUrl,
           title,
           notes,
           ...(description !== undefined ? { summary: description } : {}),

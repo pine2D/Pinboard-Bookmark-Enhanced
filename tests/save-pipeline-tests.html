@@ -2010,6 +2010,33 @@ await suite("unified save pipeline", async () => {
     }
   });
 
+  await test("Batch looks up, caches and saves under the cleaned address, reads pages by the tab's own", async () => {
+    for (const mode of [true, false]) {
+      for (const clean of [true, false]) {
+        const urlClean = clean ? SETTINGS_DEFAULTS.urlClean : { ...SETTINGS_DEFAULTS.urlClean, enabled: false };
+        const expected = clean ? CLEANED : TRACKED;
+        const h = await createBatchSaveHarness({
+          settings: { urlClean, batchSkipExisting: mode, batchAiTags: true },
+          hasAIKey: true, pageInfo: { pageText: "body" },
+          // The page is already saved under the cleaned address only.
+          lookup: url => url === CLEANED ? { exists: true, lookupFailed: false, post: { href: CLEANED } } : { exists: false, lookupFailed: false, post: null },
+        });
+        await h.handleBatchSave([{ id: 1, title: "Post", url: TRACKED }]);
+        if (mode) {
+          equal(h.lookups.every(row => row.url === expected), true, "skip lookup used another address");
+          equal(h.lookups.length, 1);
+          // Delivery decides skip from the lookup it is handed.
+          equal(h.intents[0].deliveryOptions.lookup.url, expected);
+          equal(h.intents[0].deliveryOptions.lookup.found.exists, clean, "the lookup did not find the page saved under the cleaned address");
+        }
+        equal(h.intents.length, 1);
+        for (const row of h.intents) equal(row.prepared.url, expected);
+        for (const call of h.cacheWrites) equal(call[0], expected, "AI cache keyed by another address");
+        for (const call of h.extractionCalls) equal(call[1].expectedUrl, TRACKED, "page read lost the tab's own address");
+      }
+    }
+  });
+
   // A tab Batch cannot read (no site access without AI) has no known
   // Description: the intent leaves it out and linkding fetches it itself.
   await test("linkding Batch uses the local meta fast path without AI, honors the description preference and leaves an unread tab to linkding", async () => {
