@@ -11854,6 +11854,63 @@ suiteIf("tr_ independent cache pool (ZH-6)", "_pbpAiTrRange", () => {
     }
   });
 
+  // Review round 2: every track on a video page shares one tr_ entry, so its
+  // generation record (gens/gfs) mixes tracks. Each track's user-glossary hit
+  // subset differs, and must not read as a "mixed" (or stale) translation.
+  await atest("video page: tracks with different glossary hits do not read as mixed", async () => {
+    const url = "https://pbp-test/video-gf-" + Date.now();
+    const key = _pbpTrCacheKey(url, "zh-Hans", "p:m", "acct");
+    document.body.classList.add("video-mode");
+    const realGf = window._pbpTrCurrentGf;
+    try {
+      // Track A (hits a glossary term) translated and cached on its own.
+      await pbpTrCacheSet(url, "zh-Hans", "p:m", { hTrackA1: "甲一" }, "acct",
+        { pg: PBP_TR_PROMPT_GEN, gf: "gfA", sm: 0 });
+      // Track B (no glossary hit) translated next: a full miss, so it merges.
+      const stB = retrFixtureSt(url);
+      stB.status = "idle"; stB.staleVerdict = null;
+      stB.work = [{ n: 1, md: "track b line", hash: "hTrackB1", shielded: { text: "track b line", slots: [] } }];
+      window._pbpTrCurrentGf = () => "";
+      await _pbpTrProbeCache(stB);
+      assert(!stB.replaceRun, "control: the track miss merges");
+      await pbpTrCacheSet(url, "zh-Hans", "p:m", { hTrackB1: "乙一" }, "acct",
+        { pg: PBP_TR_PROMPT_GEN, gf: "", sm: 0 }, stB.replaceRun);
+      const got = await pbpTrCacheGet(url, "zh-Hans", "p:m", "acct");
+      assertEq((got.meta.gfs || []).length, 2, "control: the shared record now holds both tracks' fingerprints");
+      // Reopen track B, then switch back to track A.
+      const stB2 = retrFixtureSt(url);
+      stB2.status = "idle"; stB2.staleVerdict = null;
+      stB2.work = [{ n: 1, md: "track b line", hash: "hTrackB1", shielded: { text: "track b line", slots: [] } }];
+      await _pbpTrProbeCache(stB2);
+      assertEq(stB2.staleVerdict, null, "track B is not flagged");
+      const stA = retrFixtureSt(url);
+      stA.status = "idle"; stA.staleVerdict = null;
+      stA.work = [{ n: 1, md: "track a line", hash: "hTrackA1", shielded: { text: "track a line", slots: [] } }];
+      window._pbpTrCurrentGf = () => "gfA";
+      await _pbpTrProbeCache(stA);
+      assertEq(stA.staleVerdict, null, "track A is not flagged");
+      assertEq(stA.trMd[1], "甲一", "control: track A is still a free hit");
+    } finally {
+      window._pbpTrCurrentGf = realGf;
+      document.body.classList.remove("video-mode");
+      await pbpAiCacheDelete(key);
+    }
+  });
+
+  await atest("article page: an entry holding blocks this article lacks still gets its verdict", async () => {
+    const url = "https://pbp-test/article-extra-" + Date.now();
+    const key = _pbpTrCacheKey(url, "zh-Hans", "p:m", "acct");
+    try {
+      await pbpTrCacheSet(url, "zh-Hans", "p:m", { hKEEP: "保留", hGONE: "已删段落" }, "acct",
+        { pg: PBP_TR_PROMPT_GEN - 1, gf: "", sm: 0 });
+      const st = retrFixtureSt(url);
+      st.status = "idle"; st.staleVerdict = null;
+      st.work = [{ n: 1, md: "kept para", hash: "hKEEP", shielded: { text: "kept para", slots: [] } }];
+      await _pbpTrProbeCache(st);
+      assertEq(st.staleVerdict, "prompt", "an old-prompt entry is still flagged off video pages");
+    } finally { await pbpAiCacheDelete(key); }
+  });
+
   // G8a-03: the production write path never rejects on its own -- ai-cache.js
   // swallows every IDB failure. Drive the REAL pbpTrCacheSet into a failing
   // database open (the shape a quota error takes) instead of a rejecting flushFn.

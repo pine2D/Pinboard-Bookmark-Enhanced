@@ -1330,6 +1330,8 @@ async function _pbpTrProbeCache(st) {
     if (cached) {
       st.cacheMeta = cached.meta;   // may be undefined (legacy entry); consumed by _pbpTrEnsureGlossary (ag)
       let hits = 0;
+      const videoPage = document.body.classList.contains("video-mode");
+      const workHashes = new Set(st.work.map((w) => w.hash));
       for (const w of st.work) {
         const ttext = cached.blocks[w.hash];
         if (typeof ttext === "string") { _pbpTrFill(st, w, ttext); hits++; }
@@ -1344,9 +1346,22 @@ async function _pbpTrProbeCache(st) {
         // Not on a video page: every subtitle track shares this one key
         // (st.url never moves on an in-place swap), so a miss there means
         // "another track", whose blocks the reader can switch back to. Those
-        // stay; blocks are keyed by content hash, so the merge is harmless.
+        // stay, and the run merges into the entry. Blocks are keyed by content
+        // hash, so they never collide; the shared generation record does mix
+        // tracks, which the verdict below accounts for.
         st.staleVerdict = null;
-        if (!document.body.classList.contains("video-mode")) st.replaceRun = true;
+        if (!videoPage) st.replaceRun = true;
+      } else if (videoPage && Object.keys(cached.blocks).some((h) => !workHashes.has(h))) {
+        // The entry also holds blocks this article does not have: on a video
+        // page that is another subtitle track (or an earlier version of this
+        // one). Its gens/gfs then pool every track's prompt generation and
+        // user-glossary hit subset, so it cannot say anything about THIS
+        // track: each track's own glossary hits would read as "mixed" or
+        // "glossary changed", and the retranslate offered there replaces the
+        // entry, dropping the other tracks' paid blocks. Treat it as
+        // generation unknown, like a legacy meta-less entry: no banner.
+        st.staleVerdict = null;
+        _pbpTrSyncStaleNote(st);
       } else {
         // ZH-1b D10: classify the entry's generation record against the
         // current world (prompt generation + THIS article's user-glossary hit

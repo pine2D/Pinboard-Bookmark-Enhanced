@@ -118,7 +118,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/library-listbox-tests.html": 92,
   "tests/library-notes-tests.html": 319,
   "tests/library-vocab-tests.html": 584,
-  "tests/md-ai-tests.html": 1162,
+  "tests/md-ai-tests.html": 1164,
   "tests/md-ask-export-tests.html": 42,
   "tests/reader-bookmark-tests.html": 112,
   "tests/reader-dict-panel-tests.html": 18,
