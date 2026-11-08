@@ -841,7 +841,7 @@ function buildUndoHarness(source, opts) {
     const r = await h.invoke({ type: "get_site_prefs" }, site);
     check("router: get_site_prefs answers null and warns once with only label, name, message when the settings read rejects",
       r.responses.length === 1 && r.responses[0] === null && warns.length === 1 &&
-      warns[0].length === 3 && warns[0][1] === "Error" && warns[0][2] === "sync read failed" &&
+      warns[0].length === 3 && warns[0][0] === "[site-prefs] read failed:" && warns[0][1] === "Error" && warns[0][2] === "sync read failed" &&
       !JSON.stringify(warns[0]).includes("/*ov*/"));
   }
 
