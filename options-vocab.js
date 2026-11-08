@@ -67,7 +67,10 @@ async function _pbpVocabRefreshEudicConfigured() {
   try {
     const s = await pbpReadSettingsWithSecrets({ dictEudicToken: SETTINGS_DEFAULTS.dictEudicToken });
     _vocabEudicConfigured = !!(s && s.dictEudicToken);
-  } catch (_) { _vocabEudicConfigured = false; }
+  } catch (e) {
+    console.warn("[vocab] Eudic token read failed:", e?.name, e?.message);
+    _vocabEudicConfigured = false;
+  }
 }
 
 // Reads the owner's rows itself now that the rendered list lives on another
@@ -79,7 +82,8 @@ async function _pbpVocabUpdateExternalActions() {
   let rows = [];
   try {
     rows = await pbpVocabAll(await pbpVocabCurrentOwner());
-  } catch (_) {
+  } catch (e) {
+    console.warn("[vocab] external actions read failed:", e?.name, e?.message);
     eudicBtn.hidden = true;
     return;
   }
@@ -1157,7 +1161,8 @@ function _pbpPackWire() {
         try {
           await pbpPackDelete();
           await _pbpPackRefreshStatus();
-        } catch (_) {
+        } catch (e) {
+          console.warn("[dict-pack] CC-CEDICT delete failed:", e?.name, e?.message);
           const status = $id("dict-pack-status");
           _pbpPackSetStatus(status, t("dictPackDeleteFailed"), "bad");
         }
@@ -1274,7 +1279,8 @@ function _pbpEcdictWire() {
         try {
           await pbpEcdictDelete();
           await _pbpEcdictRefreshStatus();
-        } catch (_) {
+        } catch (e) {
+          console.warn("[dict-pack] ECDICT delete failed:", e?.name, e?.message);
           const status = $id("ecdict-pack-status");
           _pbpPackSetStatus(status, t("dictPackDeleteFailed"), "bad");
         }
