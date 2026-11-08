@@ -270,11 +270,11 @@ function connectHarness(source, opts = {}) {
     pbpObserveDriveIdentity: (permissionId) => { order.push("observe:" + permissionId); },
     driveConnectClient: { async connect() {
       order.push("authorize");
-      return opts.authorization || { ok: true, permissionId: "google-a", emailAddress: "current@example.test", displayName: "Current" };
+      return opts.authorization === undefined ? { ok: true, permissionId: "google-a", emailAddress: "current@example.test", displayName: "Current" } : opts.authorization;
     } },
     pbpQueueDriveRound: async (options) => {
       order.push("round"); rounds.push(structuredClone(options));
-      return opts.round || { ok: true, results: { vocabulary: { ok: true }, notes: { ok: true } } };
+      return opts.round === undefined ? { ok: true, results: { vocabulary: { ok: true }, notes: { ok: true } } } : opts.round;
     },
     console: spyConsole(warnings)
   };
@@ -326,7 +326,7 @@ function refreshHarness(source, opts = {}) {
   let api = null;
   const about = (name) => async () => {
     aboutCalls.push(name); opts.duringAbout?.(api);
-    return opts.identity || { ok: true, permissionId: "google-new", emailAddress: "new@example.test", displayName: "New" };
+    return opts.identity === undefined ? { ok: true, permissionId: "google-new", emailAddress: "new@example.test", displayName: "New" } : opts.identity;
   };
   const deps = {
     chrome: { storage: { local: { async set(values) { Object.assign(local, structuredClone(values)); } } } },

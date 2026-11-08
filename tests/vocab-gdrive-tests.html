@@ -138,7 +138,7 @@ function syncHarness(options = {}) {
     changes: [], nextPageToken: null, newStartPageToken: "stable-new"
   }])];
   const aboutResults = [...(options.aboutResults || [])];
-  const seedResults = [...(options.seedResults || [0])];
+  const seedResults = [...(options.seedResults === undefined ? [0] : options.seedResults)];
   const pending = [...(options.pending || [])];
   const outbox = [...(options.outbox || [])];
   let accountState = options.accountState ? { protocolSchema: 2, ...options.accountState } : null;
@@ -167,7 +167,7 @@ function syncHarness(options = {}) {
   const store = {
     async getMeta() {
       if (options.afterGetMeta) options.afterGetMeta();
-      return options.meta || { deviceId: DEVICE_ID, counter: 1 };
+      return options.meta === undefined ? { deviceId: DEVICE_ID, counter: 1 } : options.meta;
     },
     async getPreflightState() {
       calls.push("get-preflight");
@@ -267,8 +267,10 @@ function syncHarness(options = {}) {
       if (options.afterAbout) options.afterAbout({
         setAccount(value) { authAccount = value; authEpoch++; }
       });
-      return aboutResults.shift() ||
-        { ok: true, permissionId: "perm-a", emailAddress: "a@example.test", displayName: "A" };
+      const about = aboutResults.shift();
+      return about === undefined
+        ? { ok: true, permissionId: "perm-a", emailAddress: "a@example.test", displayName: "A" }
+        : about;
     },
     async getStartPageToken() { calls.push("start"); return { ok: true, pageToken: "start-T" }; },
     async listFiles(_ownerHash, pageToken) {
@@ -294,13 +296,13 @@ function syncHarness(options = {}) {
       return file ? { ok: true, body: file.body } : { ok: false, error: "remote", retryable: false };
     },
     async generateId() {
-      const fileId = options.generatedId || "generated-batch";
+      const fileId = options.generatedId === undefined ? "generated-batch" : options.generatedId;
       calls.push(`generate:${fileId}`);
       return { ok: true, fileId };
     },
     async upload(meta, body) {
       calls.push(`upload:${meta.id}:${body}`);
-      return options.uploadResult || { ok: true, fileId: meta.id };
+      return options.uploadResult === undefined ? { ok: true, fileId: meta.id } : options.uploadResult;
     }
   };
   const runner = () => pbpCreateVocabDriveSyncRunner({
@@ -1383,7 +1385,20 @@ function syncHarness(options = {}) {
 
   await asyncCheck("409 exact metadata match is idempotent success", async () => {
     const meta = metadata();
-    const remoteMeta = { ...meta, parents: [APPDATA_PARENT_ID] };
+    // Hand-written files.get response in the Drive v3 File shape (resolved
+    // parent folder ID, string appProperties), not derived from metadata().
+    const remoteMeta = {
+      id: "file:opaque+id",
+      name: "pbp-vocab-file:opaque+id.json",
+      mimeType: "application/json",
+      parents: ["opaque-appdata-folder-id"],
+      appProperties: {
+        pbpKind: "vocab-batch",
+        schema: "1",
+        owner: "a".repeat(64),
+        device: "device-a"
+      }
+    };
     const calls = [];
     const client = pbpCreateVocabDriveClient({
       identity: identityFixture(["upload-token", "metadata-token"]),
@@ -1437,7 +1452,20 @@ function syncHarness(options = {}) {
 
   await asyncCheck("409 metadata mismatch is hard id_collision", async () => {
     const expected = metadata();
-    const mismatch = { ...expected, appProperties: { ...expected.appProperties, device: "device-b" } };
+    // Hand-written files.get response: same file, but written by another
+    // device. Compared field by field against the expected identity.
+    const mismatch = {
+      id: "file:opaque+id",
+      name: "pbp-vocab-file:opaque+id.json",
+      mimeType: "application/json",
+      parents: ["opaque-appdata-folder-id"],
+      appProperties: {
+        pbpKind: "vocab-batch",
+        schema: "1",
+        owner: "a".repeat(64),
+        device: "device-b"
+      }
+    };
     let fetches = 0;
     const client = pbpCreateVocabDriveClient({
       identity: identityFixture(["upload-token", "metadata-token"]),
@@ -1458,6 +1486,14 @@ function syncHarness(options = {}) {
       result.retryable === false && result.fileId === DRIVE_FILE_ID.slice(0, 8) &&
       !server.ok && server.error === "server" && server.status === 503 &&
       server.retryable === true;
+  });
+
+  await asyncCheck("a store with no sync meta (null) fails as corrupt without uploading or listing", async () => {
+    const harness = syncHarness({ meta: null });
+    const result = await harness.runner()();
+    // The runner files a missing deviceId under the public "corrupt" code.
+    return !result.ok && result.error === "corrupt" && result.retryable === false &&
+      !harness.calls.some((call) => call.startsWith("upload:") || call.startsWith("files:"));
   });
 
   await asyncCheck("files.list carries filters, minimal fields and page tokens", async () => {
