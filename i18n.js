@@ -29,13 +29,14 @@ let _i18nReadyPromise = null;
  * Always returns undefined — every call site (popup.js, options.js,
  * library.js, md-preview.js, background.js) calls this bare, with nothing
  * awaited. The refresh promise it kicks off is still tracked internally
- * (_i18nReadyPromise) so a caller that genuinely needs to wait for it — the
- * one example is background.js's saveFromBackground not-logged-in branch —
- * can do so via pbpI18nReady() without changing this function's signature.
+ * (_i18nReadyPromise) so a caller that needs the finished dictionary — the
+ * service worker, before it builds a notification — can wait for it via
+ * pbpI18nReady() without changing this function's signature. A failed
+ * refresh is logged by _refreshI18nAsync and never rejects that promise.
  */
 function initI18n() {
   if (_i18nReady) {
-    _i18nReadyPromise = _refreshI18nAsync().catch(() => {});
+    _i18nReadyPromise = _refreshI18nAsync().catch(e => console.warn("[i18n] refresh failed:", e?.name, e?.message));
     return;
   }
   // Sync mirror apply
@@ -53,8 +54,8 @@ function initI18n() {
   } catch (_) {}
   _i18nReady = true;
   // Async refresh (fire-and-forget); pbpI18nReady() below exposes this same
-  // promise for the one caller that needs to await ordering.
-  _i18nReadyPromise = _refreshI18nAsync().catch(() => {});
+  // promise for callers that need to await ordering.
+  _i18nReadyPromise = _refreshI18nAsync().catch(e => console.warn("[i18n] refresh failed:", e?.name, e?.message));
 }
 
 /**
@@ -112,7 +113,10 @@ async function _refreshI18nAsync() {
     // Manual language: fetch locale messages
     const url = chrome.runtime.getURL(`_locales/${optLang}/messages.json`);
     const resp = await fetch(url);
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      console.warn("[i18n] locale file not loaded:", optLang, resp.status);
+      return;
+    }
     const msgs = await resp.json();
     if (generation !== _i18nRefreshGeneration) return;
     const currentStorage = typeof getSettingsStorage === "function"
@@ -140,7 +144,7 @@ async function _refreshI18nAsync() {
     _i18nMessagesVerified = true;
     if (changed && typeof applyI18n === "function") applyI18n();
   } catch (e) {
-    console.warn("[i18n] async refresh failed:", e?.message || e);
+    console.warn("[i18n] async refresh failed:", e?.name, e?.message);
   }
 }
 

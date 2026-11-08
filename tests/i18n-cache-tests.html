@@ -51,6 +51,26 @@
   cold.language("zh_CN"); cold.api.initI18n(); await cold.api.pbpI18nReady();
   check("returning from automatic language loads the selected locale again",
     cold.api.t("vocabDriveDisconnect") === "断开此设备" && cold.reads() === 2);
+  // A failed refresh leaves a trace with the error's name and message, and
+  // pbpI18nReady() still resolves (callers await it before notifying).
+  async function failing(label, makeChrome, makeFetch) {
+    const warns = [];
+    const doc = document.implementation.createHTMLDocument();
+    const storage = { getItem: () => null, setItem() {}, removeItem() {} };
+    const api = new Function("chrome", "localStorage", "fetch", "document", "getSettingsStorage", "console",
+      source + "\nreturn {initI18n,pbpI18nReady};")(makeChrome(), storage, makeFetch, doc, undefined, { warn: (...a) => warns.push(a.join(" ")) });
+    api.initI18n();
+    let resolved = true;
+    try { await api.pbpI18nReady(); } catch (_) { resolved = false; }
+    check(label + ": pbpI18nReady still resolves", resolved);
+    check(label + ": the failure is logged with name and message (" + warns.join(" | ") + ")",
+      warns.some(w => w.includes("[i18n]") && w.includes("boom-" + label) && /Error/.test(w)));
+  }
+  const baseRuntime = { getURL: path => "../" + path, getManifest: () => ({version:"2.118"}) };
+  await failing("storage", () => ({ runtime: baseRuntime, i18n: { getMessage: () => "", getUILanguage: () => "en" },
+    storage: { local: { get: async () => { throw new RangeError("boom-storage"); } } } }), fetch);
+  await failing("fetch", () => ({ runtime: baseRuntime, i18n: { getMessage: () => "", getUILanguage: () => "en" },
+    storage: { local: { get: async () => ({ optLang: "zh_CN" }) } } }), async () => { throw new TypeError("boom-fetch"); });
   console.log(`pass=${pass} fail=${fail}`);
 })();
 </script></body></html>
