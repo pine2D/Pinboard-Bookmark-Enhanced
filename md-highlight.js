@@ -1259,6 +1259,11 @@ function pbpHlSyncMirror(n) {
 
 function pbpHlSyncMirrorAll() {
   if (!_pbpHlState) return;
+  // Items can vanish (account switch, delete in another tab) without their
+  // blocks ever being visited below, so drop every bar first, then recompute.
+  document.querySelectorAll("#rendered-view [data-pb-hl-mirror]").forEach((el) => {
+    delete el.dataset.pbHlMirror;
+  });
   const seen = new Set();
   for (const it of _pbpHlState.items) {
     const n = Number(it.n) || 0;
@@ -1501,6 +1506,7 @@ function _pbpHlSelectionSegments(range) {
   const segments = [];
   for (const b of pbpAiBlocks()) {
     if (!range.intersectsNode(b.el)) continue;
+    if (_pbpHlOrigHiddenInTrOnly(b.el)) continue; // invisible: let the .pb-tr fallback take it
     const seg = _pbpHlClipRangeToBlock(range, b.el);
     if (!seg || seg.collapsed) continue;
     segments.push({ n: b.n, el: b.el, range: seg });
@@ -1519,6 +1525,13 @@ function _pbpHlSelectionSegments(range) {
     });
   }
   return segments;
+}
+
+// True for an original block that tr-only mode hides behind its translation
+// (display:none via body.tr-only [data-pb-tr-done]:not(.pb-show-orig)).
+function _pbpHlOrigHiddenInTrOnly(el) {
+  return !!el && document.body.classList.contains("tr-only") &&
+    el.hasAttribute("data-pb-tr-done") && !el.classList.contains("pb-show-orig");
 }
 
 function _pbpHlNewId() {
@@ -2918,7 +2931,7 @@ function _pbpHlNotebookJump(item) {
   // critique). Open the original in place -- the same .pb-show-orig peek a
   // click on its translation toggles (md-translate.js _pbpTrPeekToggle) --
   // then jump to it as usual.
-  if (document.body.classList.contains("tr-only") && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig")) {
+  if (_pbpHlOrigHiddenInTrOnly(blockEl)) {
     blockEl.classList.add("pb-show-orig");
   }
   pbpFocusArticleTarget(blockEl);

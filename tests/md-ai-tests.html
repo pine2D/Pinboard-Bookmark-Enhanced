@@ -5888,6 +5888,111 @@ suiteIf("_pbpHlSelectionSegments tr-side", "_pbpHlSelectionSegments", () => {
   });
 });
 
+// ============ G8a-02: tr-only hides the originals; cross-paragraph selection of translations ============
+suiteIf("_pbpHlSelectionSegments tr-only", "_pbpHlSelectionSegments", () => {
+  function build(n, showOrigIdx) {
+    const d = document.createElement("div");
+    d.id = "rendered-view";
+    let h = "";
+    for (let i = 1; i <= n; i++) h += "<p data-pbtmp>orig " + i + "</p>";
+    d.innerHTML = h;
+    document.body.appendChild(d);
+    pbpAiIndexBlocks(d);
+    const trs = [];
+    d.querySelectorAll("p").forEach((p, i) => {
+      p.setAttribute("data-pb-tr-done", "1");
+      if (showOrigIdx === i) p.classList.add("pb-show-orig");
+      const tr = document.createElement("div");
+      tr.className = "pb-tr";
+      tr.dataset.pbTr = String(i + 1);
+      tr.dataset.pbTrLang = "zh-CN";
+      tr.innerHTML = "<p>tr " + (i + 1) + "</p>";
+      p.after(tr);
+      trs.push(tr);
+    });
+    return { d, trs };
+  }
+  test("tr-only: dragging across 3 translations yields tr segments n=1..3, never the hidden originals", () => {
+    const { d, trs } = build(3, -1);
+    document.body.classList.add("tr-only");
+    try {
+      const range = document.createRange();
+      range.setStart(trs[0].querySelector("p").firstChild, 1);
+      range.setEnd(trs[2].querySelector("p").firstChild, 2);
+      const segs = _pbpHlSelectionSegments(range);
+      assertEq(segs.map((s) => s.side).join(","), "tr,tr,tr", "all tr side");
+      assertEq(segs.map((s) => s.n).join(","), "1,2,3", "n in order");
+    } finally { document.body.classList.remove("tr-only"); d.remove(); }
+  });
+  test("tr-only: an original opened with pb-show-orig is still a visible original segment", () => {
+    const { d, trs } = build(3, 1);
+    document.body.classList.add("tr-only");
+    try {
+      const range = document.createRange();
+      range.setStart(trs[0].querySelector("p").firstChild, 1);
+      range.setEnd(trs[2].querySelector("p").firstChild, 2);
+      const segs = _pbpHlSelectionSegments(range);
+      assertEq(segs.length, 1, "only the visible original");
+      assertEq(segs[0].n, 2, "block 2");
+      assert(segs[0].side !== "tr", "original side");
+    } finally { document.body.classList.remove("tr-only"); d.remove(); }
+  });
+  test("bilingual (no tr-only): a cross-block mixed selection stays original-only", () => {
+    const { d, trs } = build(3, -1);
+    try {
+      const range = document.createRange();
+      range.setStart(trs[0].querySelector("p").firstChild, 1);
+      range.setEnd(trs[2].querySelector("p").firstChild, 2);
+      const segs = _pbpHlSelectionSegments(range);
+      assert(segs.length >= 1 && segs.every((s) => s.side !== "tr"), "original-only");
+    } finally { d.remove(); }
+  });
+});
+
+// ============ G8a-05: mirror bars follow the items (cleared when items vanish) ============
+suiteIf("pbpHlSyncMirrorAll stale mirrors", "pbpHlSyncMirrorAll", () => {
+  function build() {
+    const d = document.createElement("div");
+    d.id = "rendered-view";
+    d.innerHTML = "<p>one</p><p>two</p>";
+    document.body.appendChild(d);
+    pbpAiIndexBlocks(d);
+    d.querySelectorAll("p").forEach((p, i) => {
+      const tr = document.createElement("div");
+      tr.className = "pb-tr";
+      tr.dataset.pbTr = String(i + 1);
+      tr.dataset.pbTrLang = "zh-CN";
+      tr.innerHTML = "<p>t</p>";
+      p.after(tr);
+    });
+    return d;
+  }
+  test("items gone -> every mirror bar is removed", () => {
+    const d = build();
+    const prev = _pbpHlState;
+    try {
+      _pbpHlState = { items: [{ n: 1, color: 3, ts: 1 }] };
+      pbpHlSyncMirrorAll();
+      assertEq(d.querySelector('.pb-tr[data-pb-tr="1"]').dataset.pbHlMirror, "3", "set");
+      _pbpHlState = { items: [] };
+      pbpHlSyncMirrorAll();
+      assertEq(d.querySelectorAll("[data-pb-hl-mirror]").length, 0, "cleared");
+    } finally { _pbpHlState = prev; d.remove(); }
+  });
+  test("one of two blocks' items removed -> only the other mirror stays", () => {
+    const d = build();
+    const prev = _pbpHlState;
+    try {
+      _pbpHlState = { items: [{ n: 1, color: 3, ts: 1 }, { n: 2, color: 4, ts: 2 }] };
+      pbpHlSyncMirrorAll();
+      _pbpHlState = { items: [{ n: 2, color: 4, ts: 2 }] };
+      pbpHlSyncMirrorAll();
+      assertEq(d.querySelector('.pb-tr[data-pb-tr="1"]').dataset.pbHlMirror, undefined, "n=1 cleared");
+      assertEq(d.querySelector('.pb-tr[data-pb-tr="2"]').dataset.pbHlMirror, "4", "n=2 kept");
+    } finally { _pbpHlState = prev; d.remove(); }
+  });
+});
+
 // ============ H5: pbpHlLatestColorOnSide (mirror color, pure) ============
 suiteIf("pbpHlLatestColorOnSide", "pbpHlLatestColorOnSide", () => {
   test("returns the newest-by-ts original color in the block", () => {
