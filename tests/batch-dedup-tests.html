@@ -407,6 +407,12 @@ async function createUiHarness(storedProgress, now, opts = {}) {
       await h.resume(0);
       equal(h.calls.extracted.map(e => e.tabId).join(), "5,8,9");
     });
+    await test("a resumed batch does not reuse a same-address tab of the other window kind", async () => {
+      const h = await createSaveTagsHarness("pinboard", ["x"], {tabs:[{id:6, url:"https://example.com/a", title:"A", incognito:false}],
+        liveTabs:[{id:6, url:"https://example.com/a", incognito:true}, {id:7, url:"https://example.com/a", incognito:false}]});
+      await h.resume(0);
+      equal(h.calls.extracted.map(e => e.tabId).join(), "7", "extraction targets");
+    });
     await test("a resumed batch with no matching tab degrades per item as before", async () => {
       const h = await createSaveTagsHarness("pinboard", ["x"], {tabs:snap.slice(0, 1), liveTabs:[{id:6, url:"https://example.com/zzz"}]});
       await h.resume(0);

@@ -5643,7 +5643,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     if (!resumeState) return tab.id;
     try {
       const cur = await _cbTabsGet(tab.id);
-      if (cur && cur.url === tab.url && !takenTabIds.has(cur.id)) { takenTabIds.add(cur.id); return cur.id; }
+      if (cur && cur.url === tab.url && !!cur.incognito === !!tab.incognito && !takenTabIds.has(cur.id)) { takenTabIds.add(cur.id); return cur.id; }
       if (!liveTabs) liveTabs = await chrome.tabs.query({});
       const match = liveTabs.find((lt) => lt.url === tab.url && !!lt.incognito === !!tab.incognito && !takenTabIds.has(lt.id));
       if (match) { takenTabIds.add(match.id); return match.id; }
