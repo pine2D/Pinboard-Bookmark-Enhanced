@@ -602,6 +602,25 @@ async function _pbpVocabDriveSend(type, force, gen, actionSeq, sourceButton, foc
   }
 }
 
+// A refused permission prompt sends nothing, so nothing else would repaint
+// the panel. Connect took the action number, which drops any answer still in
+// flight (a notice dismissal clicked just before), and the panel would keep
+// showing what that answer had already changed. Re-read status under
+// Connect's own generation, action number and owner, and keep the refusal
+// first. A newer action, or a failed read, leaves the panel as it is.
+async function _pbpVocabDriveRepaintAfterDenial(gen, actionSeq, owner, denied) {
+  try {
+    owner = await owner;
+    if (!(await _pbpVocabDriveCurrent(gen, actionSeq, owner))) return;
+    const read = await chrome.runtime.sendMessage({ type: "vocabDriveStatus" });
+    if (!read?.ok || !read.status || !(await _pbpVocabDriveCurrent(gen, actionSeq, owner, read.status))) return;
+    _pbpVocabDriveRender(read.status);
+    _pbpVocabDrivePaintErrors([denied, ..._driveErrorLines], read.status);
+  } catch (error) {
+    console.warn("[drive] status re-read after a refused permission failed:", error?.name, error?.message);
+  }
+}
+
 async function _pbpVocabDriveConnect() {
   if (_vocabDriveBusy || !_pbpVocabDriveAvailable()) return;
   const gen = _driveRenderGen;
@@ -625,7 +644,9 @@ async function _pbpVocabDriveConnect() {
   }
   if (!granted) {
     _pbpVocabDriveSetBusy(false);
-    _pbpVocabDrivePaintErrors([t("vocabDrivePermissionDenied")], null);
+    const denied = t("vocabDrivePermissionDenied");
+    _pbpVocabDrivePaintErrors([denied], null);
+    await _pbpVocabDriveRepaintAfterDenial(gen, actionSeq, owner, denied);
     return;
   }
   // Spec §10.10: Chrome's permission prompt is a visible window and needs no

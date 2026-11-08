@@ -239,6 +239,68 @@ window.chrome = {
   resolveDismissSync({ok:true, status:fixture}); await dismissSync;
   send = async (message) => { messages.push(message); return response || {ok:true,status:fixture}; };
 
+  // U-03: a dismissal still in flight when Connect takes the action number is
+  // dropped, and a refused permission prompt repainted nothing, so the notice
+  // the worker had already cleared stayed on screen. Either order of the
+  // dismissal answer and the refusal must end on the worker's real status
+  // with the refusal still shown.
+  for (const order of ["answer before refusal", "answer after refusal"]) {
+    invalidateDriveSyncPanel();
+    const permissionLost = withConn({lastError:"permission"});
+    _pbpVocabDriveRender({...permissionLost, vocabulary:dataset({notices:2})});
+    _driveVisibleOwner = "acct_alice";
+    messages.length = 0;
+    let resolveClearAnswer, resolvePrompt;
+    send = (message) => {
+      messages.push(message);
+      if (message.type === "vocabDriveClearNotices") return new Promise((resolve) => {resolveClearAnswer = resolve;});
+      return Promise.resolve({ok:true, status:permissionLost});
+    };
+    const prevPrompt = chrome.permissions.request;
+    chrome.permissions.request = () => new Promise((resolve) => {resolvePrompt = resolve;});
+    try {
+      $id("vocab-drive-clear-notices").click(); await task();
+      const connecting = _pbpVocabDriveConnect(); await task();
+      if (order === "answer before refusal") { resolveClearAnswer({ok:true, status:permissionLost}); await settle(); }
+      resolvePrompt(false); await settle();
+      if (order === "answer after refusal") { resolveClearAnswer({ok:true, status:permissionLost}); await settle(); }
+      await connecting; await settle();
+    } finally { chrome.permissions.request = prevPrompt; }
+    // Simplest miss: settle the dismissal under any action number again, which
+    // repaints over the refusal (or over a running action's busy state).
+    check(`a dismissal superseded by a refused Connect still clears the notice (${order})`,
+      !$id("vocab-drive-notices").textContent && $id("vocab-drive-clear-notices").closest(".vocab-drive-notice-row").hidden &&
+      err().includes("vocabDrivePermissionDenied") && !$id("vocab-drive-connect").hidden &&
+      $id("vocab-drive-body").getAttribute("aria-busy") === "false",
+      `notices=${JSON.stringify($id("vocab-drive-notices").textContent)} err=${JSON.stringify(err())} busy=${$id("vocab-drive-body").getAttribute("aria-busy")}`);
+  }
+  // The re-read after a refusal answers to Connect's action number: a Sync now
+  // started while it is pending keeps the panel and its busy state.
+  {
+    invalidateDriveSyncPanel();
+    const permissionLost = withConn({lastError:"permission"});
+    _pbpVocabDriveRender(permissionLost);
+    _driveVisibleOwner = "acct_alice";
+    let resolveDenialRead, resolveRunningSync;
+    send = (message) => new Promise((resolve) => {
+      if (message.type === "vocabDriveStatus") resolveDenialRead = resolve; else resolveRunningSync = resolve;
+    });
+    const prevPrompt = chrome.permissions.request;
+    chrome.permissions.request = async () => false;
+    let connecting;
+    try { connecting = _pbpVocabDriveConnect(); await settle(); }
+    finally { chrome.permissions.request = prevPrompt; }
+    const running = _pbpVocabDriveAction("vocabDriveSyncNow", true); await task();
+    resolveDenialRead?.({ok:true, status:{...permissionLost, emailAddress:"stale@example.test"}}); await connecting; await settle();
+    // Simplest miss: re-read under the render generation alone.
+    check("a status re-read after a refused Connect does not repaint over a newer action",
+      !!resolveDenialRead && $id("vocab-drive-body").getAttribute("aria-busy") === "true" &&
+      !$id("vocab-drive-account").textContent.includes("stale@example.test"),
+      `read=${!!resolveDenialRead} busy=${$id("vocab-drive-body").getAttribute("aria-busy")} account=${$id("vocab-drive-account").textContent}`);
+    resolveRunningSync?.({ok:true, status:fixture}); await running;
+  }
+  send = async (message) => { messages.push(message); return response || {ok:true,status:fixture}; };
+
   // A thrown permission request still leaves a trace (MV3: name and message).
   const connectWarnings = [];
   const prevConnectWarn = console.warn, prevConnectRequest = chrome.permissions.request;
