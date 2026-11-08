@@ -145,6 +145,17 @@ function assertEq(actual, expected, label) {
   check("x == y is not a mark", !/<mark>/.test(r("if x == y then a == b")), r("if x == y then a == b"));
   check("a ==b (open before space) is not a mark", !/<mark>/.test(r("a == b== c")), r("a == b== c"));
   check("== inside inline code is untouched", !/<mark>/.test(r("use `==x==` here")), r("use `==x==` here"));
+  check("mark match does not run across a code span", !/<mark>/.test(r("==a `b== c` d")), r("==a `b== c` d"));
+  // Image alt with a tight ==x== must not break exports or leak <mark>.
+  const img = "![if a==b and c==d](https://x.test/code.png)";
+  check("img alt has no <mark>", /alt="if a==b and c==d"/.test(r(img)) && !/alt="[^"]*mark/.test(r(img)), r(img));
+  let thrown = "";
+  try {
+    for (const policy of ["keep", "alt"]) applyImagePolicy(img, { policy, baseUrl: "https://x.test/" });
+    composeExport(img, { title: "t", url: "https://x.test/" });
+    composeStyledHtml(img, { title: "t", url: "https://x.test/" });
+  } catch (e) { thrown = String(e && e.message || e); }
+  check("exports with ==x== in image alt do not throw", thrown === "", thrown);
 })();
 
 // ---- Dedup smoke: htmlToMarkdown exists once and both contexts use the SAME global ----

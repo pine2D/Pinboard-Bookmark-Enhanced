@@ -3875,7 +3875,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       note = emb.note;
       // Codex F5: EPUB gets its own composeExport call -- frontmatter/inline
       // ==marks== don't belong in content.xhtml (dc:* metadata covers title/
-      // author/date/etc, and marked doesn't parse "==...==" so an inline mark
+      // author/date/etc, and the HTML path skips the inline "==...==" mark on purpose so an inline mark
       // would leak as literal text, same reasoning as composeStyledHtml above).
       const md = composeExport(emb.md, meta, {
         ...opts, ask: null, frontmatter: false, highlightsInline: false,

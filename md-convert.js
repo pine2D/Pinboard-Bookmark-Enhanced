@@ -760,19 +760,38 @@ function _configureMarked() {
   // ==x== (what the turndown "highlight" rule writes for a source <mark>):
   // marked does not know it, so the reader showed literal equals signs. Opening
   // == must be followed by non-space and closing == preceded by non-space, so
-  // "a == b" stays text. Code spans are tokenized before inline extensions.
+  // "a == b" stays text. The body excludes backticks so a match never runs
+  // across a code span.
   const markExt = {
     name: "pbpMark",
     level: "inline",
     start(src) { const i = src.indexOf("=="); return i < 0 ? undefined : i; },
     tokenizer(src) {
-      const m = /^==(?=\S)((?:[^=\n]|=(?!=))*?\S)==(?!=)/.exec(src);
+      const m = /^==(?=\S)((?:[^=\n`]|=(?!=))*?[^\s`])==(?!=)/.exec(src);
       if (m) return { type: "pbpMark", raw: m[0], text: m[1], tokens: this.lexer.inlineTokens(m[1]) };
     },
     renderer(token) { return "<mark>" + this.parser.parseInline(token.tokens) + "</mark>"; }
   };
+  // Image alt is rendered in marked's plain-text context, where the mark
+  // extension's HTML renderer would leak "<mark>" into the attribute.
+  const protoImage = marked.Renderer.prototype.image;
+  renderer.image = function (token) {
+    return protoImage.call(this, token && token.tokens ? { ...token, tokens: _pbpFlattenMarks(token.tokens) } : token);
+  };
   marked.use({ gfm: true, breaks: false, renderer, extensions: [markExt] });
   _markedConfigured = true;
+}
+
+// Replace pbpMark tokens by their children wrapped in literal == (recursively) for plain-text
+// contexts such as image alt, which the inline extension cannot render.
+function _pbpFlattenMarks(tokens) {
+  const out = [];
+  for (const t of tokens || []) {
+    if (t && t.type === "pbpMark") out.push({ type: "text", raw: "==", text: "==" }, ..._pbpFlattenMarks(t.tokens), { type: "text", raw: "==", text: "==" });
+    else if (t && t.tokens && ["strong", "em", "del", "link"].includes(t.type)) out.push({ ...t, tokens: _pbpFlattenMarks(t.tokens) });
+    else out.push(t);
+  }
+  return out;
 }
 
 // Token allowlist for `class` on renderMarkdown's output (D1-3). Untrusted
@@ -1368,7 +1387,7 @@ function pbpMapExportImages(md, transform) {
       const own = map.slice(start, cursor);
       if (token.type === "html") rawHtml(token, own, inTable);
       else if (token.type === "image" && !htmlStack.length) {
-        const text = marked.Parser.parseInline(token.tokens || [], { renderer: new marked.TextRenderer() });
+        const text = marked.Parser.parseInline(_pbpFlattenMarks(token.tokens || []), { renderer: new marked.TextRenderer() });
         const src = _pbpImageDecode(token.href);
         patch(own, transform({
           raw: source.slice(own.at(0), own.at(own.length - 1) + 1), src,
@@ -1900,7 +1919,7 @@ function composeStyledHtml(canonicalMd, meta, opts) {
   meta = meta || {};
   opts = opts || {};
   // highlightsInline:false -- styled HTML gets ONLY the aggregation section (spec
-  // sec.5): marked doesn't parse "==...==", so an inline mark would render as literal
+  // sec.5): the HTML path skips the inline "==...==" mark on purpose, so an inline mark would render as literal
   // text in the exported doc.
   const bodyMd = composeExport(canonicalMd || "", meta, {
     frontmatter: false,

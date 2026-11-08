@@ -137,8 +137,8 @@ blockquote{border-left:3px solid #999;margin:1em 0;padding:0 1em}`;
 // pbpBuildEpub({ md, meta, images }) -> Blob. Caller contract (md-preview.js):
 // `md` is the FINAL canonical markdown -- frontmatter/highlightsInline already
 // forced off by the caller's own composeExport call (dc:* metadata covers title/
-// author/date/etc, and marked doesn't parse "==...==" so an inline mark would
-// leak as literal text into the XHTML body, same reasoning as composeStyledHtml).
+// author/date/etc, and the HTML path leaves the inline "==...==" mark off on purpose: highlights go in
+// the aggregation section there, same reasoning as composeStyledHtml).
 // `images`: the fetched Map from resolveEmbed(..., {keepUrls:true}) (absUrl ->
 // {mime, bytes}), or empty/undefined when the export image policy isn't "embed".
 function pbpBuildEpub({ md, meta, images, ask }) {
