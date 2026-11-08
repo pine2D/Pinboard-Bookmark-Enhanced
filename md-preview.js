@@ -162,14 +162,17 @@ function renderErrorState(message, retryFn, permissionRequired, alt, openUrl, pr
       btn.className = "action-btn";
       btn.textContent = t(permissionRequired ? "aiGrantRetry" : "askErrRetry");
       btn.addEventListener("click", async () => {
-        if (btn.disabled) return;
-        btn.disabled = true;
+        // aria-disabled, never the disabled property: disabling the button the
+        // user just activated drops focus to <body> (a cancelled permission
+        // prompt returns without re-rendering the shell).
+        if (btn.getAttribute("aria-disabled") === "true") return;
+        btn.setAttribute("aria-disabled", "true");
         // Leave a trace before degrading: retryFn is the whole re-extraction
         // flow, and a silent swallow left a re-enabled button as the only
         // symptom. Name/message only -- no payload, no URL.
         try { await retryFn(); }
         catch (e) { console.warn("[preview] retry failed", e && e.name, e && e.message); }
-        finally { btn.disabled = false; }
+        finally { btn.setAttribute("aria-disabled", "false"); }
       });
       retryBtn = btn;
     }
@@ -180,11 +183,11 @@ function renderErrorState(message, retryFn, permissionRequired, alt, openUrl, pr
       other.className = "action-btn";
       other.textContent = alt.label;
       other.addEventListener("click", async () => {
-        if (other.disabled) return;
-        other.disabled = true;
+        if (other.getAttribute("aria-disabled") === "true") return;
+        other.setAttribute("aria-disabled", "true");
         try { await alt.run(); }
         catch (e) { console.warn("[preview] engine switch failed", e && e.name, e && e.message); }
-        finally { other.disabled = false; }
+        finally { other.setAttribute("aria-disabled", "false"); }
       });
       altBtn = other;
     }
@@ -4323,9 +4326,19 @@ function setupDrawer() {
   const main = document.querySelector("main");
   if (!toggle || !scrim || !rail) return;
   let lastFocus = null;
-  const focusables = () => Array.from(
-    rail.querySelectorAll('button, a[href], input, select, [tabindex]:not([tabindex="-1"])')
-  ).filter((el) => el.offsetParent !== null);
+  // Popovers opened from the rail (the Aa typography panel) live on <body>,
+  // outside #rail: they join the cycle right after the rail, otherwise the
+  // wrap-around below keeps their controls unreachable by keyboard.
+  const FOCUSABLE_SEL = 'button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])';
+  const focusables = () => {
+    const out = Array.from(rail.querySelectorAll(FOCUSABLE_SEL));
+    for (const pop of document.querySelectorAll("[popover]")) {
+      let open = false;
+      try { open = pop.matches(":popover-open"); } catch (_) { /* no :popover-open */ }
+      if (open && !rail.contains(pop)) out.push(...pop.querySelectorAll(FOCUSABLE_SEL));
+    }
+    return out.filter((el) => el.offsetParent !== null && !el.disabled);
+  };
   const isOpen = () => document.body.classList.contains("rail-open");
   const setOpen = (open) => {
     document.body.classList.toggle("rail-open", open);
@@ -4368,9 +4381,13 @@ function setupDrawer() {
     if (e.key === "Tab") {
       const f = focusables();
       if (!f.length) return;
-      const first = f[0], last = f[f.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      const i = f.indexOf(document.activeElement);
+      if (i < 0) return;
+      const next = f[(i + (e.shiftKey ? f.length - 1 : 1)) % f.length];
+      // Native order inside one container; take over only at the list ends and
+      // where the cycle crosses between the rail and an open popover.
+      const wraps = e.shiftKey ? i === 0 : i === f.length - 1;
+      if (wraps || rail.contains(next) !== rail.contains(document.activeElement)) { e.preventDefault(); next.focus(); }
     }
   });
   window.matchMedia("(max-width: 1000px)").addEventListener("change", (e) => {

@@ -5394,8 +5394,9 @@ const renderErrorState = mdPreviewJs.slice(
   mdPreviewJs.indexOf("function pbpRequestJinaHostPermission")
 );
 check(renderErrorState.indexOf('btn.textContent = t(permissionRequired ? "aiGrantRetry" : "askErrRetry")') >= 0 &&
-  renderErrorState.indexOf("btn.disabled = true") < renderErrorState.indexOf("await retryFn()") &&
-  renderErrorState.indexOf("btn.disabled = false") > renderErrorState.indexOf("await retryFn()") &&
+  renderErrorState.indexOf('btn.setAttribute("aria-disabled", "true")') < renderErrorState.indexOf("await retryFn()") &&
+  renderErrorState.indexOf('btn.setAttribute("aria-disabled", "false")') > renderErrorState.indexOf("await retryFn()") &&
+  !/\.disabled\s*=/.test(renderErrorState) && // a real disabled drops focus to <body> (G6a-S01)
   mdPreviewJs.includes('pr && pr.error === "host_permission"'),
   "md-preview.js: Jina permission retry lacks grant copy or synchronous button guard");
 

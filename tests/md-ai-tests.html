@@ -7287,6 +7287,16 @@ suiteIf("_pbpSearchVisibleCandidates ([hidden] children)", "_pbpSearchVisibleCan
     const v = view('<p>one</p><p>two</p><blockquote>three</blockquote>');
     assertEq(_pbpSearchVisibleCandidates(v).length, 3, "visible blocks lost");
   });
+  // G6a-03: injected UI rows are siblings of the article blocks, not article text.
+  test("injected UI rows (.pbp-img-fix-ui incl. its hidden button, .pb-tr-err) are not search candidates", () => {
+    const v = view('<p>visible prose</p>'
+      + '<div class="pbp-img-fix-ui"><span>Try to fix this page images</span><button>fix</button><button hidden>Refresh the original page and reload</button></div>'
+      + '<div class="pb-tr-err"><span>Translation failed</span><button>Retry</button></div>'
+      + '<p>more prose</p>');
+    const out = _pbpSearchVisibleCandidates(v);
+    assertEq(out.map((e) => e.tagName).join(","), "P,P", "UI rows leaked into the candidates");
+    assert(out.every((e) => !/refresh|translation failed/i.test(e.textContent)), "UI label text is searchable");
+  });
 });
 
 // ============ R4: page-session query memory across close/reopen (md-reader.js) ============
@@ -10212,6 +10222,23 @@ suiteIf("extraction error shell: open original (item 6)", "renderErrorState", ()
       assertEq(shell(u), null, "no link for " + String(u));
     }
   });
+  // G6a-S01: disabling the button the user just activated drops focus to <body>.
+  test("retry and alt buttons guard re-entry with aria-disabled, never the disabled property", () => {
+    const host = document.createElement("div"); host.id = "rendered-view"; document.body.appendChild(host);
+    try {
+      let release; const gate = new Promise((r) => { release = r; });
+      renderErrorState("failed", () => gate, true, { label: "switch", run: () => gate }, "", "retry");
+      const [retry, alt] = host.querySelectorAll("button.action-btn");
+      for (const b of [retry, alt]) {
+        b.focus();
+        b.click();
+        assertEq(b.disabled, false, "disabled property set while running");
+        assertEq(b.getAttribute("aria-disabled"), "true", "re-entry guard missing");
+        assert(document.activeElement === b, "focus left the activated button");
+      }
+      release(); // let the pending runs settle after this test
+    } finally { host.remove(); document.body.classList.remove("md-empty"); }
+  });
   test("the retry button still comes first", () => {
     const host = document.createElement("div"); host.id = "rendered-view"; document.body.appendChild(host);
     renderErrorState("failed", () => {}, false, null, "https://example.com/");
@@ -10864,6 +10891,62 @@ suiteIf("tr stale retranslate (ZH-1b)", "_pbpTrRetranslate", () => {
   });
   // 2026-10-21 critique: the stepper had no way back to 100%. The readout
   // between - and + is the reset: inert at the default, a named button off it.
+  // G6a-05: the drawer's Tab trap must reach a popover opened from the rail.
+  test("setupDrawer: Tab from the last rail control moves into an open popover instead of wrapping", () => {
+    if (!HTMLElement.prototype.showPopover) return;
+    const ids = ["rail-toggle", "rail-scrim", "rail"].filter((i) => document.getElementById(i));
+    if (ids.length) return; // another fixture owns these ids
+    const fx = document.createElement("div");
+    fx.innerHTML = '<button id="rail-toggle">m</button><div id="rail-scrim" hidden></div>'
+      + '<aside id="rail"><button id="fx-a">a</button><button id="fx-b">b</button></aside><main>x</main>'
+      + '<div id="fx-pop" popover="manual"><button id="fx-p1">p1</button><button id="fx-p2">p2</button></div>';
+    document.body.appendChild(fx);
+    try {
+      setupDrawer();
+      document.getElementById("rail-toggle").click();
+      const b = document.getElementById("fx-b");
+      b.focus();
+      const pop = document.getElementById("fx-pop");
+      pop.showPopover();
+      const ev = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+      b.dispatchEvent(ev);
+      assertEq(ev.defaultPrevented ? document.activeElement.id : "native", "fx-p1", "Tab from the last rail control must enter the open popover");
+      const ev2 = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+      document.getElementById("fx-p2").focus();
+      document.getElementById("fx-p2").dispatchEvent(ev2);
+      assertEq(document.activeElement.id, "fx-a", "Tab past the popover's last control wraps to the rail start");
+      const ev3 = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, cancelable: true, bubbles: true });
+      document.getElementById("fx-a").focus();
+      document.getElementById("fx-a").dispatchEvent(ev3);
+      assertEq(document.activeElement.id, "fx-p2", "Shift+Tab from the rail start wraps to the popover end");
+    } finally {
+      try { document.getElementById("fx-pop").hidePopover(); } catch (_) {}
+      document.body.classList.remove("rail-open");
+      const m = fx.querySelector("main"); if (m) m.inert = false;
+      fx.remove();
+    }
+  });
+  // G6a-06: two reader tabs must not overwrite each other's untouched tier.
+  test("_pbpTypoSet persists only the tier that changed", () => {
+    const realStorage = window.chrome.storage;
+    const was = [_pbpTypoFont, _pbpTypoLeading, _pbpTypoTouched];
+    const writes = [];
+    window.chrome.storage = { local: { get: (d, cb) => cb && cb(d), set: (o) => { writes.push(Object.keys(o).sort().join(",")); return Promise.resolve(); } } };
+    try {
+      _pbpTypoSet(0, 0); writes.length = 0;
+      _pbpTypoSet(1, 0);
+      assertEq(writes.join("|"), "pbp_font_tier", "font change must write only the font key");
+      writes.length = 0;
+      _pbpTypoSet(1, 1);
+      assertEq(writes.join("|"), "pbp_leading_tier", "leading change must write only the leading key");
+      writes.length = 0;
+      _pbpTypoSet(1, 1);
+      assertEq(writes.length, 0, "no change, no write");
+    } finally {
+      window.chrome.storage = realStorage;
+      _pbpTypoSet(was[0], was[1]); _pbpTypoTouched = was[2];
+    }
+  });
   test("Aa font-size readout resets to 100% when off-default and is inert at the default", () => {
     const realT = window.t;
     window.t = (k) => k;

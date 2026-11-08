@@ -453,6 +453,10 @@ function _pbpSearchVisibleCandidates(view) {
     // changed. Attribute-driven, so any future hidden top-level child is
     // covered without a per-feature special case.
     if (el.hidden) continue;
+    // Injected UI rows (image-fix row with its hidden refresh button, the
+    // translation error card) are chrome, not article text. Same set
+    // md-dict.js's PBP_DICT_SAMPLE_EXCLUDE leaves out of sampling.
+    if (el.matches(".pbp-img-fix-ui, .pb-tr-err")) continue;
     if (el.classList.contains("pb-tr")) {
       if (!bilingual && !trOnly) continue;
     } else if (trOnly && el.hasAttribute("data-pb-tr-done") && !el.classList.contains("pb-show-orig")) {
@@ -1607,9 +1611,12 @@ let _pbpTypoTouched = false; // same stale-async-read guard as _pbpZenWidthTouch
 let _pbpTypoPopEl = null;
 let _pbpTypoInited = false;
 
-function _pbpTypoPersist() {
+// Writes only the key(s) in `patch`: a tab that changed one tier must not
+// overwrite the other tier another reader tab stored meanwhile.
+function _pbpTypoPersist(patch) {
   if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
-  try { chrome.storage.local.set({ pbp_font_tier: _pbpTypoFont, pbp_leading_tier: _pbpTypoLeading }).catch(() => {}); } catch (_) {}
+  if (!patch || !Object.keys(patch).length) return;
+  try { chrome.storage.local.set(patch).catch(() => {}); } catch (_) {}
 }
 
 // Runtime tier change: capture the reading anchor, swap the vars, re-settle --
@@ -1624,11 +1631,14 @@ function _pbpTypoSet(fontTier, leadingTier) {
   _pbpTypoTouched = true;
   const anchor = _pbpZenCaptureAnchor();
   const t2 = pbpTypoApplyVars(fontTier, leadingTier);
+  const patch = {};
+  if (t2.font !== _pbpTypoFont) patch.pbp_font_tier = t2.font;
+  if (t2.leading !== _pbpTypoLeading) patch.pbp_leading_tier = t2.leading;
   _pbpTypoFont = t2.font;
   _pbpTypoLeading = t2.leading;
   _pbpTypoSyncPop();
   _pbpZenSettleAnchor(anchor);
-  _pbpTypoPersist();
+  _pbpTypoPersist(patch);
 }
 
 // Panel state -> DOM sync: percentage readout, stepper end-stops, leading

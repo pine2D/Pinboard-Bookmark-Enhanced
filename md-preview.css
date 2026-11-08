@@ -2019,6 +2019,7 @@ html.motion-ready .msg-bar[data-state="busy"] { animation: msg-bar-busy-pulse 1.
 .pbp-img-fix-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 2px; }
 /* aria-disabled, not :disabled -- a disabled button cannot hold focus, and the
    user's focus would drop to <body> the moment their own click starts the run. */
+.empty-state .action-btn[aria-disabled="true"] { cursor: wait; } /* not :disabled, see renderErrorState */
 .pbp-img-fix-btn[aria-disabled="true"] { color: var(--fg-muted); text-decoration: none; cursor: wait; }
 .pbp-img-fix-btn[hidden] { display: none; }
 /* The broken image keeps a placeholder box so the gap reads as "an image
