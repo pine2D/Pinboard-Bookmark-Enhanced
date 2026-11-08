@@ -6649,9 +6649,18 @@ function _tagGovRestoreFocus(container, index) {
   const active = document.activeElement;
   if (active && active !== document.body && document.contains(active)) return;
   const rows = Array.from(container.children);
-  const row = rows[index] || rows[rows.length - 1];
-  const target = row && (row.querySelector('input[type="radio"]:checked')
-    || row.querySelector("button:not([disabled])"));
+  // Same position first, then the rows before it, then the ones after. Frozen
+  // (batch-queued) rows have every control disabled and cannot take focus.
+  const start = Math.min(index, rows.length - 1);
+  const order = [];
+  for (let i = start; i >= 0; i--) order.push(i);
+  for (let i = start + 1; i < rows.length; i++) order.push(i);
+  let target = null;
+  for (const i of order) {
+    target = rows[i].querySelector('input[type="radio"]:checked:not(:disabled)')
+      || rows[i].querySelector("button:not(:disabled)");
+    if (target) break;
+  }
   const fallback = $id("tag-gov-refresh");
   const el = target || (fallback && !fallback.disabled ? fallback : null);
   if (el) el.focus({ preventScroll: true });

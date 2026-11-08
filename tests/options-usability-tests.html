@@ -1144,7 +1144,7 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     const realAuth = getTagGovAuth;
     getTagGovAuth = async (expected = "") => (!expected || expected === "alice" ? { token: "alice:x", account: "alice" } : null);
     const host = document.createElement("div");
-    host.innerHTML = '<button id="tag-gov-refresh" type="button">Refresh</button><div id="tag-gov-groups"></div>';
+    host.innerHTML = '<div id="tag-gov-groups"></div>';
     document.body.appendChild(host);
     const outside = document.createElement("button");
     document.body.appendChild(outside);
@@ -1171,6 +1171,37 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     } finally {
       getTagGovAuth = realAuth;
       host.remove(); outside.remove();
+      await chrome.storage.local.remove(["cached_user_tags", pbpAccountStorageKey("_tagGovIgnored", "alice")]);
+    }
+  });
+
+  await test("tag-gov ignore: focus skips a batch-frozen neighbour row instead of falling to body", async () => {
+    const realAuth = getTagGovAuth;
+    getTagGovAuth = async (expected = "") => (!expected || expected === "alice" ? { token: "alice:x", account: "alice" } : null);
+    const host = document.createElement("div");
+    host.innerHTML = '<div id="tag-gov-groups"></div>';
+    document.body.appendChild(host);
+    await chrome.storage.local.set({ cached_user_tags: { account: "alice", counts: { webdev: 5, "web-dev": 9, tool: 3, tools: 4 } } });
+    try {
+      await renderTagGov();
+      const container = host.querySelector("#tag-gov-groups");
+      const rows = () => Array.from(container.querySelectorAll(".tag-gov-group-row"));
+      assert(rows().length === 2, "need two groups, got " + rows().length);
+      // Freeze the first row's group: it is the only row left after the second is ignored.
+      const frozenTags = Array.from(rows()[0].querySelectorAll("input[type=radio]")).map(r => r.value.toLowerCase());
+      frozenTags.forEach(x => _tagGovActiveTags.add(x));
+      _tagGovUnfinishedBatches++;
+      const ignore = rows()[1].querySelector(".btn.btn-sm.ghost");
+      ignore.focus();
+      ignore.click();
+      for (let i = 0; i < 50 && rows().length === 2; i++) await new Promise(r => setTimeout(r, 20));
+      assert(rows().length === 1 && rows()[0].classList.contains("tag-gov-row-queued"), "expected only the frozen row to remain");
+      assert(document.activeElement !== document.body, "focus fell to BODY with only a frozen row left");
+    } finally {
+      _tagGovUnfinishedBatches = Math.max(0, _tagGovUnfinishedBatches - 1);
+      _tagGovActiveTags.clear();
+      getTagGovAuth = realAuth;
+      host.remove();
       await chrome.storage.local.remove(["cached_user_tags", pbpAccountStorageKey("_tagGovIgnored", "alice")]);
     }
   });
