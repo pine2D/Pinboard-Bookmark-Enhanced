@@ -193,6 +193,40 @@ window.chrome = {
   resolveLateSync({ok:true, status:fixture}); await lateSync;
   send = async (message) => { messages.push(message); return response || {ok:true,status:fixture}; };
 
+  // G4b-03: the same when the dismissal answer has no status (worker restart)
+  // and Sync now starts while the panel is still re-reading the status.
+  _pbpVocabDriveRender({...fixture, vocabulary:dataset({notices:2}), notes:dataset({notices:3})});
+  messages.length = 0;
+  let resolveReread, resolveRereadSync;
+  send = (message) => {
+    messages.push(message);
+    if (message.type === "vocabDriveClearNotices") return Promise.resolve({ok:false, error:"remote"});
+    if (message.type === "vocabDriveStatus") return new Promise((resolve) => {resolveReread = resolve;});
+    return new Promise((resolve) => {resolveRereadSync = resolve;});
+  };
+  $id("vocab-drive-clear-notices").click(); await settle();
+  const rereadSent = messages.some((message) => message.type === "vocabDriveStatus");
+  const rereadSync = _pbpVocabDriveAction("vocabDriveSyncNow", true); await task();
+  resolveReread({ok:true, status:fixture}); await settle();
+  // Simplest miss: guard only the first answer and let the re-read repaint the idle panel.
+  check("a sync started during the dismissal's status re-read stays locked",
+    rereadSent && $id("vocab-drive-sync").getAttribute("aria-disabled") === "true" &&
+    $id("vocab-drive-body").getAttribute("aria-busy") === "true",
+    `reread=${rereadSent} aria=${$id("vocab-drive-sync").getAttribute("aria-disabled")} busy=${$id("vocab-drive-body").getAttribute("aria-busy")}`);
+  resolveRereadSync({ok:true, status:fixture}); await rereadSync;
+  send = async (message) => { messages.push(message); return response || {ok:true,status:fixture}; };
+
+  // A thrown permission request still leaves a trace (MV3: name and message).
+  const connectWarnings = [];
+  const prevConnectWarn = console.warn, prevConnectRequest = chrome.permissions.request;
+  console.warn = (...args) => { connectWarnings.push(args); };
+  chrome.permissions.request = async () => { throw new TypeError("Invalid url pattern"); };
+  try { await _pbpVocabDriveConnect(); }
+  finally { console.warn = prevConnectWarn; chrome.permissions.request = prevConnectRequest; }
+  check("a thrown Drive permission request is logged with its name and message",
+    connectWarnings.some((args) => args.includes("TypeError") && args.includes("Invalid url pattern")),
+    JSON.stringify(connectWarnings));
+
   response = null; await renderDriveSyncPanel();
   let resolveAction;
   send = () => new Promise((resolve) => {resolveAction = resolve;});

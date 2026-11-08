@@ -909,6 +909,18 @@ delete document.documentElement.dataset.theme;
       !$id("vocab-status").textContent && healthCalls.length === 0,
       `status=${$id("vocab-anki-test-status").textContent} toolbar=${$id("vocab-status").textContent}`);
 
+    // A thrown host-permission request in the connection test leaves a trace.
+    resetActions();
+    const testPermissionWarnings = [];
+    const prevTestPermissionWarn = console.warn;
+    console.warn = (...args) => { testPermissionWarnings.push(args); };
+    window.chrome.permissions.request = async () => { throw new TypeError("Invalid url pattern"); };
+    try { await _pbpVocabTestAnki(); } finally { console.warn = prevTestPermissionWarn; }
+    check("a thrown Anki host-permission request in the connection test is logged",
+      testPermissionWarnings.some((args) => args.includes("TypeError") && args.includes("Invalid url pattern")) &&
+      $id("vocab-anki-test-status").textContent.includes("dictAnkiHostPermissionDenied"),
+      `warnings=${JSON.stringify(testPermissionWarnings)} status=${$id("vocab-anki-test-status").textContent}`);
+
     // G4b-02: the test reads the form's port synchronously, before auto-save lands.
     resetActions();
     healthCalls.length = 0;

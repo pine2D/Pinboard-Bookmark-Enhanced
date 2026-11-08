@@ -616,7 +616,9 @@ async function _pbpVocabDriveConnect() {
     });
     _pbpVocabDriveSetBusy(true, sourceButton, "vocabDriveAuthorizing");
     granted = await permission;
-  } catch (_) {}
+  } catch (error) {
+    console.warn("[drive] permission request failed:", error?.name, error?.message);
+  }
   if (gen !== _driveRenderGen || actionSeq !== _vocabDriveActionSeq) {
     if (actionSeq === _vocabDriveActionSeq) _pbpVocabDriveSetBusy(false);
     return;
@@ -827,7 +829,8 @@ async function _pbpVocabTestAnki() {
     }
     const pattern = pbpEndpointOriginPattern(pbpAnkiEndpointFor(port));
     let granted = false;
-    try { granted = await chrome.permissions.request({ origins: [pattern] }); } catch (_) {}
+    try { granted = await chrome.permissions.request({ origins: [pattern] }); }
+    catch (e) { console.warn("[vocab] Anki host permission request failed:", e?.name, e?.message); }
     if (!granted) { _pbpVocabConnectionResult("anki", false, t("dictAnkiHostPermissionDenied"), "permission_denied"); return; }
     const perm = await pbpAnkiCall("requestPermission", {}, "", 120000, port);
     if (!perm.ok || !perm.result) { _pbpVocabConnectionResult("anki", false, t("dictAnkiConnectPermissionFailed"), "unreachable"); return; }
@@ -937,6 +940,11 @@ if (_vocabDriveClearNotices) _vocabDriveClearNotices.addEventListener("click", a
   // while a Connect or sync is still running.
   if (_vocabDriveBusy) return;
   const gen = _driveRenderGen;
+  // The dismissal takes its own action number. Connect, Sync now and
+  // Disconnect each take a new one, so an action started while this answer,
+  // the owner check or the status re-read is pending fails every check in
+  // _pbpVocabDriveSettle, and the running action keeps the panel.
+  const actionSeq = ++_vocabDriveActionSeq;
   const owner = _driveVisibleOwner === null ? pbpVocabCurrentOwner() : _driveVisibleOwner;
   try {
     let response;
@@ -946,13 +954,10 @@ if (_vocabDriveClearNotices) _vocabDriveClearNotices.addEventListener("click", a
       console.warn("[drive] notices dismissal failed:", error?.name, error?.message);
       response = { ok: false, error: "remote" };
     }
-    // An action started while this answer was in flight owns the panel and
-    // will repaint it with its own answer; settling here would clear its busy state.
-    if (_vocabDriveBusy) return;
-    await _pbpVocabDriveSettle(response, gen, 0, await owner, "vocabDriveClearNotices");
+    await _pbpVocabDriveSettle(response, gen, actionSeq, await owner, "vocabDriveClearNotices");
   } catch (error) {
     console.warn("[drive] notices dismissal failed:", error?.name, error?.message);
-    if (gen === _driveRenderGen) _pbpVocabDriveShowError("remote");
+    if (gen === _driveRenderGen && actionSeq === _vocabDriveActionSeq) _pbpVocabDriveShowError("remote");
   }
 });
 const _vocabDriveDisconnect = $id("vocab-drive-disconnect");
