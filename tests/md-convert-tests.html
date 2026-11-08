@@ -3506,9 +3506,12 @@ window._pbpEpubIntegrationDone = (async () => {
     img.addEventListener("error", res, { once: true });
   })));
   // A full resource-timing buffer (250 entries by default) drops new entries,
-  // which would hide a build-triggered load. Start empty; the fence below
-  // checks that its own entry was recorded.
-  performance.clearResourceTimings();
+  // which would hide a build-triggered load. Make room instead of clearing:
+  // the inert-document probes (_pbpInertDocDone) run concurrently and read
+  // their own entries until the page ends, so a clear here can erase their
+  // control entry or a regression's evidence (CI run 42488961579). The fence
+  // below checks that its own entry was recorded.
+  performance.setResourceTimingBufferSize(Math.max(1000, performance.getEntriesByType("resource").length + 100));
   // Positive control: the same markup parsed in a live (detached) div does load.
   const ctrlUrls = [1, 2].map(i => iconUrl(`g6b04ctrl${i}`));
   const ctrlHost = document.createElement("div");
