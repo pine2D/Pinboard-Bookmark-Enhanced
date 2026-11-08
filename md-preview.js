@@ -1630,6 +1630,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       const vDetectedErr = typeof pbpVideoDetect === "function" ? pbpVideoDetect(sourceTabUrl || url) : null;
       if (vDetectedErr) {
         document.body.classList.add("video-mode");
+        // The warm-up started at the top of this branch need not be done yet,
+        // and every probe below (the capture session, the transcript and
+        // state builders) is an md-video.js global: wait for it first, or a
+        // late module silently skips the caption attempt.
+        try { await ensureVideoModule(); }
+        catch (e) { console.warn("[pbp-video] module load failed on error shell:", (e && e.name) || "", (e && e.message) || e); }
         // inFlight is still held from the dispatch above (audit B4).
         let committed = false;
         let vSession = null;
@@ -1752,13 +1758,22 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // (ensureVideoModule); the chain waited for here is the rest of
     // md-preview.html's defer list, which continues past this file (md-ai-core
     // through md-skim). This async flow can resume ahead of it, so wait before
-    // probing. md-video.js's own globals ride the lazy load instead and stay
-    // typeof-guarded below -- hydration simply declines when they are late,
-    // which is the same fail-closed outcome a schema mismatch produces.
+    // probing.
     await pbpDeferredScriptsReady;
     const vDetected = typeof pbpVideoDetect === "function" ? pbpVideoDetect(sourceTabUrl || url) : null;
     if (vDetected) {
       document.body.classList.add("video-mode");
+      // md-video.js's own globals come from the lazy load, and nothing on
+      // this path has started it yet: the shell branch above is the only
+      // early warm-up. Wait for it HERE, before the hydration gate
+      // (pbpVideoStateValidate) and the placeholder title escaper below
+      // probe for them -- without this they were never loaded in time, so
+      // every F5 of a committed transcript declined hydration and refetched.
+      // It must also finish before window.pbpVideoSession is written: the
+      // module clears that global as it loads. A load failure keeps the
+      // typeof guards below as the fail-closed fallback.
+      try { await ensureVideoModule(); }
+      catch (e) { console.warn("[pbp-video] module load failed before hydration:", (e && e.name) || "", (e && e.message) || e); }
       if (info.videoTranscript === true) {
         // This payload was written by pbpVideoCommitTranscript: the markdown
         // already IS the transcript (possibly AI-punctuated). Re-deriving one

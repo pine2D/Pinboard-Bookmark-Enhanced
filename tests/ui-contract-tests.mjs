@@ -7259,6 +7259,55 @@ function stripJsComments(input) {
   const missingInPayload = restoreKeys.filter((key) => !payloadKeys.includes(key));
   check(missingInRestore.length === 0 && missingInPayload.length === 0,
     `md-preview.js: the commit payload and the committed-transcript restore record disagree -- only in the payload: [${missingInRestore.join(", ")}]; only in the restore record: [${missingInPayload.join(", ")}]. Both write the same MP_KEY slot, so whichever wrote last decides what an F5 gets, and a field missing from one is lost the moment that one wins`);
+
+  // ---- Lazy video module load order (bug sweep G8b-01 / G8b-04). md-video.js
+  // is loaded on demand by ensureVideoModule(), so a typeof probe of one of
+  // its globals in the boot flow is only meaningful once an AWAITED load has
+  // run on that same branch -- otherwise the probe always sees "undefined"
+  // and silently takes its fallback (every F5 of a committed transcript
+  // declined hydration this way). The names come from md-video.js itself,
+  // plus the md-preview.js top-level helpers that call them (the hydration
+  // gate), so a new probe of any of them is covered without listing it here.
+  // An un-awaited warm-up (`ensureVideoModule().catch(...)`) does not count.
+  {
+    const videoSrc = stripJsComments(read("md-video.js"));
+    const videoGlobals = new Set();
+    for (const m of videoSrc.matchAll(/^function (pbp[A-Za-z0-9_$]*)\s*\(/gm)) videoGlobals.add(m[1]);
+    for (const m of videoSrc.matchAll(/\bwindow\.(pbp[A-Za-z0-9_$]*)\s*=(?!=)/g)) videoGlobals.add(m[1]);
+    const ownFns = [...src.matchAll(/^function ([A-Za-z_$][\w$]*)\s*\(/gm)].map((m) => m[1]);
+    const ownBodies = new Map();
+    for (const name of ownFns) {
+      const at = src.search(new RegExp("^function " + name.replace(/\$/g, "\\$") + "\\s*\\(", "m"));
+      const end = src.indexOf("\n}", at);
+      ownBodies.set(name, src.slice(at, end));
+    }
+    const consumers = new Set(videoGlobals);
+    for (const [name, body] of ownBodies) {
+      if (name === "ensureVideoModule") continue;
+      if ([...videoGlobals].some((g) => new RegExp("\\b" + g + "\\b").test(body.slice(body.indexOf("{"))))) consumers.add(name);
+    }
+    check(videoGlobals.has("pbpVideoStateValidate") && videoGlobals.has("pbpVideoEscapeMdText") && videoGlobals.has("pbpVideoSession") && consumers.has("pbpVideoHydrationAccept"),
+      `ui-contract: could not read md-video.js's globals (${videoGlobals.size}) or their md-preview.js consumers -- the lazy-load order check below is UNVERIFIED`);
+    const bootFrom = src.indexOf("const data = await chrome.storage.local.get([MP_KEY");
+    const shellFrom = src.indexOf("if (info.pending || info.restore) {", bootFrom);
+    const shellBody = braceBody(src, shellFrom);
+    const shellTo = src.indexOf("{", shellFrom) + 1 + shellBody.length;
+    const bootTo = src.indexOf("const _restoreRecord", shellTo);
+    check(bootFrom > 0 && shellFrom > bootFrom && shellBody.includes("attemptExtract(info.engine)") && bootTo > shellTo,
+      "ui-contract: could not slice md-preview.js's boot flow into the shell branch and the article path -- the lazy-load order check below is UNVERIFIED");
+    const segments = [["the pending/restore shell branch", shellBody], ["the article path", src.slice(shellTo, bootTo)]];
+    const namePattern = new RegExp("\\b(" + [...consumers].map((n) => n.replace(/\$/g, "\\$")).join("|") + ")\\b", "g");
+    let probes = 0;
+    for (const [label, body] of segments) {
+      const firstAwait = body.indexOf("await ensureVideoModule()");
+      for (const m of body.matchAll(namePattern)) {
+        probes++;
+        check(firstAwait >= 0 && firstAwait < m.index,
+          `md-preview.js: ${label} uses md-video.js's ${m[1]} before any \`await ensureVideoModule()\` on that branch -- the module is lazy, so the probe sees nothing and silently takes its fallback`);
+      }
+    }
+    check(probes >= 8, `ui-contract: only ${probes} md-video.js probes found in md-preview.js's boot flow -- the lazy-load order check is not looking at the real code`);
+  }
 }
 
 // Rescue-tier traces are expected outcomes ("video has no caption tracks"),
