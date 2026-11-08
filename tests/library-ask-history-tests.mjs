@@ -110,16 +110,18 @@ try {
   });
   let handoff = await continueSlot();
   check('Continue under Pinboard hands over the bookmark connection account', handoff.slot && handoff.connection === 'ask-library-fixture' && handoff.slot.account === handoff.connection, handoff);
+  // The device's active service (bookmarkServiceActive, local only) decides
+  // the connection; the chosen bookmarkService alone does not switch it.
   for (const [service, userId] of [['karakeep', 'user-7'], ['linkding', 'conn-9']]) {
     await page.evaluate(async ({ service, userId }) => {
       const baseUrl = 'https://' + service + '.example/';
       const credential = { v: 1, baseUrl, token: 'fixture-token', connectionId: 'conn-9', ...(service === 'karakeep' ? { userId } : {}) };
-      await askStubs.set.call(chrome.storage.local, { bookmarkService: service, [service + 'Url']: baseUrl, [service + 'Token']: obfuscateKey(JSON.stringify(credential)) });
+      await askStubs.set.call(chrome.storage.local, { bookmarkService: service, [PBP_BOOKMARK_ACTIVE_KEY]: service, [service + 'Url']: baseUrl, [service + 'Token']: obfuscateKey(JSON.stringify(credential)) });
     }, { service, userId });
     handoff = await continueSlot();
     check('Continue under ' + service + ' hands over the current connection, matching what the reader compares', handoff.slot && handoff.connection === service + ':https://' + service + '.example/:' + userId && handoff.slot.account === handoff.connection && handoff.slot.account !== '', handoff);
   }
-  await page.evaluate(() => askStubs.set.call(chrome.storage.local, { bookmarkService: 'pinboard' }));
+  await page.evaluate(() => askStubs.set.call(chrome.storage.local, { bookmarkService: 'pinboard', [PBP_BOOKMARK_ACTIVE_KEY]: 'pinboard' }));
   // An unreadable urlClean setting is traced and the reader still opens, with the unchanged page address (tracking parameters included) as the bookmark address.
   await page.evaluate(() => {
     window.warnings = []; window.warnStub = console.warn; console.warn = (...args) => warnings.push(args.join(' '));
