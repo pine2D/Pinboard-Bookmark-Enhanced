@@ -1339,7 +1339,8 @@ async function doAISummary(forceRefresh, sOverride) {
     if (!_aiOpStillCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "calling", label: _aiPopupProviderLabel(s, s.aiProvider) });
-    const summary = await fetchAIArtifacts("summary", forceRefresh, account, s, contentSource);
+    const resultMeta = {};
+    const summary = await fetchAIArtifacts("summary", forceRefresh, account, s, contentSource, resultMeta);
     // account-only here: the result belongs to pageInfo.url and SHOULD be
     // cached even if the URL field drifted; the stillCurrent gate below
     // protects the form commit.
@@ -1353,13 +1354,20 @@ async function doAISummary(forceRefresh, sOverride) {
     // nothing. The error status is a UI write, so it waits for the same
     // stillCurrent gate as the form commit: a stale op (URL edited away
     // mid-flight) must not paint an error onto the page now on screen.
-    if (summary) await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s);
+    // Same rule as the tags half: the worker already filed what it generated,
+    // and rewriting a cache hit would restart its fixed TTL (ts = now).
+    if (summary && !PBP_AI_VIA_SW && !resultMeta.fromCache) await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s);
     if (!_aiOpStillCurrent(account)) return;
     // The page text was there (checked above); an empty reply is the model's.
     if (!summary) { showStatus("status-msg", t("aiEmptyResult"), "error", { remedy: true, key: "aiEmptyResult" }); return; }
     // Every summary paid for is written: a linkding Description the user
     // wrote is followed, not replaced (decision 2026-11-02 #4).
     if (upsertSummary(summary) === false) { showStatus("status-msg", t("aiEmptyResult"), "error", { remedy: true, key: "aiEmptyResult" }); return; }
+    if (resultMeta.fromCache) {
+      // Found under the extraction source's namespace: same display as the fast path.
+      showSummaryActions(true);
+      return true;
+    }
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");
     return true;

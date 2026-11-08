@@ -3048,7 +3048,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     })();
     function makePopupAi(opts) {
       const o = opts || {};
-      const calls = { sent: [], callAI: [], cache: [], rendered: [], summary: [], status: [], errors: [], order: [], progressCleared: [], dismissedRemedy: [] };
+      const calls = { sent: [], callAI: [], cache: [], rendered: [], summary: [], status: [], errors: [], order: [], progressCleared: [], dismissedRemedy: [], actions: [] };
       const inflight = new Map();
       // Fill EVERY whitelisted field, so "the snapshot's overrides travel" is a
       // rule about the shared list (which the worker suite pins to every
@@ -3169,7 +3169,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         clearAiProgress: (id) => calls.progressCleared.push(id),
         ensurePageText: async () => o.source || "local",
         upsertSummary: (text) => calls.summary.push(text),
-        showSummaryActions: () => {},
+        showSummaryActions: (fromCache) => calls.actions.push(fromCache),
         pbpPopupRenderDescriptionHint: () => {},
         renderAITags: (tags, cached) => { container.chips = tags.map(tag=>({dataset:{tag}})); calls.rendered.push({ tags, cached }); },
         _aiClearTagsOutput: () => {},
@@ -3644,6 +3644,19 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const wire = JSON.stringify(msg);
       assert(!wire.includes("sk-live-SECRET") && !wire.includes("SECRET-TOKEN"),
         "a secret value reached the message bus");
+    });
+
+    // The fast path missed (it probed another namespace), the second lookup under
+    // the real extraction source hit: nothing may be rewritten, or the entry's
+    // fixed TTL slides forward on every click.
+    await testAsync("a summary found by the secondary cache check is not rewritten and shows as cached", async () => {
+      for (const viaSW of [true, false]) {
+        const h = makePopupAi({ viaSW, cached: { summary: "an older summary" } });
+        await h.doAISummary(false);
+        assert(h.calls.cache.length === 0 && h.calls.sent.length === 0 && h.calls.callAI.length === 0, "viaSW=" + viaSW + ": cache hit rewrote or recalled");
+        assert(h.calls.summary[0] === "an older summary" && h.calls.actions.join() === "true", "viaSW=" + viaSW + ": not shown as cached: " + h.calls.actions);
+        assert(!h.calls.status.some((row) => row[2] === "success"), "viaSW=" + viaSW + ": a cache hit was reported as newly generated");
+      }
     });
 
     await testAsync("an empty summary half is a miss on the popup side too, never a cached fake success", async () => {
