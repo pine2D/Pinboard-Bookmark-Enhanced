@@ -216,6 +216,29 @@ window.chrome = {
   resolveRereadSync({ok:true, status:fixture}); await rereadSync;
   send = async (message) => { messages.push(message); return response || {ok:true,status:fixture}; };
 
+  // G4b-03: a dismissal that fails after Sync now started must not paint its
+  // error over the running sync (the owner lookup rejects here).
+  invalidateDriveSyncPanel();
+  _pbpVocabDriveRender({...fixture, vocabulary:dataset({notices:2})});
+  _driveVisibleOwner = null; // the dismissal looks the owner up itself
+  let rejectDismissOwner, resolveDismissAnswer, resolveDismissSync;
+  const prevOwnerLookup = pbpVocabCurrentOwner;
+  pbpVocabCurrentOwner = () => new Promise((_, reject) => {rejectDismissOwner = reject;});
+  send = (message) => new Promise((resolve) => {
+    if (message.type === "vocabDriveClearNotices") resolveDismissAnswer = resolve; else resolveDismissSync = resolve;
+  });
+  $id("vocab-drive-clear-notices").click(); await task();
+  pbpVocabCurrentOwner = prevOwnerLookup;
+  _driveVisibleOwner = "acct_alice";
+  const dismissSync = _pbpVocabDriveAction("vocabDriveSyncNow", true); await task();
+  rejectDismissOwner(new Error("owner lookup failed")); resolveDismissAnswer({ok:true, status:fixture}); await settle();
+  // Simplest miss: the error branch checks only the render generation.
+  check("a failed dismissal does not paint its error over a running sync",
+    !$id("vocab-drive-error").textContent.trim() && $id("vocab-drive-body").getAttribute("aria-busy") === "true",
+    `err=${JSON.stringify($id("vocab-drive-error").textContent)} busy=${$id("vocab-drive-body").getAttribute("aria-busy")}`);
+  resolveDismissSync({ok:true, status:fixture}); await dismissSync;
+  send = async (message) => { messages.push(message); return response || {ok:true,status:fixture}; };
+
   // A thrown permission request still leaves a trace (MV3: name and message).
   const connectWarnings = [];
   const prevConnectWarn = console.warn, prevConnectRequest = chrome.permissions.request;
