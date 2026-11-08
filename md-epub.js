@@ -194,7 +194,9 @@ function pbpBuildEpub({ md, meta, images, ask }) {
       bySrc.get(k).push(el);
     }
     for (const [absUrl, img] of images) {
-      const matches = bySrc.get(canon(absUrl)) || [];
+      const ck = canon(absUrl);
+      const matches = bySrc.get(ck) || [];
+      bySrc.delete(ck); // first of several equivalent keys wins; later ones skip (no orphan entry)
       if (!matches.length) continue; // no matching <img> left in the DOM -- skip, no orphan manifest/zip entry
       const name = `images/img-${n}.${PBP_EMBED_MIME_EXT[img.mime] || "bin"}`;
       matches.forEach(el => el.setAttribute("src", name));

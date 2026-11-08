@@ -3497,6 +3497,20 @@ window._pbpEpubIntegrationDone = (async () => {
   assert(!!entries10.find(e => e.name === "OEBPS/images/img-0.png"), "G6b-07 URL mixing %20 and | is embedded: " + entries10.map(e => e.name).join(", "));
   const content10 = new TextDecoder().decode(entries10.find(e => e.name === "OEBPS/content.xhtml").data);
   assert(content10.includes('src="images/img-0.png"'), "G6b-07 src rewritten to images/ path: " + content10);
+
+  // G6b-07 review: two Map keys that canonicalise equally yield one images/ entry, no orphan.
+  const imagesDup = new Map([
+    ["https://x.test/a b.png", { mime: "image/png", bytes: new Uint8Array([1]) }],
+    ["https://x.test/a%20b.png", { mime: "image/png", bytes: new Uint8Array([1]) }],
+  ]);
+  const entriesDup = _pbpZipEntries(new Uint8Array(await pbpBuildEpub({ md: "![a](<https://x.test/a b.png>)\n\n![b](https://x.test/a%20b.png)", meta, images: imagesDup }).arrayBuffer()));
+  const dupImgs = entriesDup.filter(e => e.name.startsWith("OEBPS/images/")).map(e => e.name);
+  assertEq(dupImgs.join(","), "OEBPS/images/img-0.png", "G6b-07 equivalent URL keys produce a single images/ entry");
+  const opfDup = new TextDecoder().decode(entriesDup.find(e => e.name === "OEBPS/content.opf").data);
+  assert(!/id="img1"/.test(opfDup), "G6b-07 no orphan manifest item for the second equivalent key: " + opfDup);
+
+  // G6b-05: lone surrogates are stripped by the pure function (TextEncoder would hide this).
+  assertEq(pbpEpubStripXmlInvalid("a\ud800b\udc00c"), "abc", "G6b-05 lone surrogates stripped");
 })();
 </script>
 
