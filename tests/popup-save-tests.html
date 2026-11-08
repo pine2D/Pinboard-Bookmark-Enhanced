@@ -6444,6 +6444,136 @@ test("posts/add default remains replace=yes for existing callers", () => {
       };
     }
 
+    // U-02: the whole delete chain, not just the last step. The row's button
+    // opens the real anchored confirm (shared.js), Confirm hands focus back to
+    // the opener, the worker answers in its real shape, and only then does the
+    // redraw decide where focus lands.
+    const pbpPopupBookmarkApiStart = source.indexOf("async function pbpPopupBookmarkApi(action, url) {");
+    const pbpPopupBookmarkApiSource = source.slice(pbpPopupBookmarkApiStart, source.indexOf("\n}\n", pbpPopupBookmarkApiStart) + 3);
+    const confirmThroughPopover = async (opener) => {
+      opener.focus();
+      opener.click();
+      const pop = [...document.querySelectorAll(".confirm-popover")].find((el) => !el.classList.contains("is-closing"));
+      assert(pop, "the delete button did not open the confirm popover");
+      assert(pop.contains(document.activeElement), "the confirm did not take focus");
+      const yes = pop.querySelector(".confirm-yes");
+      yes.focus();
+      yes.click();
+      assert(!pop.isConnected || pop.classList.contains("is-closing"), "Confirm did not close the popover");
+    };
+
+    await testAsync("a confirmed recent delete hands focus on after the worker answers", async () => {
+      assert(pbpPopupBookmarkApiStart >= 0, "pbpPopupBookmarkApi source not found");
+      const host = document.createElement("div");
+      host.innerHTML = '<input id="rc-url"><button id="rc-submit">Save</button><div id="rc-recent"></div>';
+      document.body.appendChild(host);
+      const ids = { "url-input": "rc-url", "submit-btn": "rc-submit", "recent-bookmarks": "rc-recent" };
+      const byId = (id) => host.querySelector("#" + (ids[id] || id));
+      const settingsStub = { bookmarkService: "pinboard", pinboardToken: obfuscateKey("alice:ABCDEF1234567890") };
+      const sent = [];
+      let answer = null;
+      const chromeStub = { runtime: { lastError: null, sendMessage: (message) => {
+        sent.push(message);
+        if (message.type !== "bookmark_api") return Promise.resolve(undefined);
+        // background.js pbpBookmarkApiRequest: a delete that went through.
+        return new Promise((resolve) => { answer = () => resolve({ ok: true, status: 200, data: { result_code: "done" }, account: "alice" }); });
+      } } };
+      const api = new Function("chrome", "settings", pbpPopupBookmarkApiSource + "\nreturn pbpPopupBookmarkApi;")(chromeStub, settingsStub);
+      // Pinboard posts/recent?format=json, as the API returns it.
+      const posts = ["a", "b", "c"].map((name, i) => ({ href: "https://" + name + ".example/", description: "Page " + name, extended: "",
+        meta: "m" + i, hash: "h" + i, time: "2026-11-0" + (i + 1) + "T08:00:00Z", shared: "yes", toread: "no", tags: "" }));
+      let current = posts;
+      const deps = {
+        $id: byId, t: (key) => key, chrome: chromeStub, settings: settingsStub, showStatus: () => {},
+        esc: (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])),
+        enc: (s) => encodeURIComponent(s),
+        pinboardFetch: async () => ({ status: 200, ok: true, json: async () => ({ date: "2026-11-03T08:00:00Z", user: "alice", posts: current }) }),
+        pbpPopupBookmarkApi: api, loadBookmarkForEdit: async () => {}, pbpPopupFormIsDirty: () => false,
+      };
+      const names = Object.keys(deps);
+      const fetchRecent = new Function(...names, recentBookmarksSource + "\nreturn fetchRecentBookmarks;")(...names.map((name) => deps[name]));
+      const settle = async (done) => { for (let i = 0; i < 40 && !done(); i++) await new Promise((r) => setTimeout(r, 0)); };
+      const rowOf = (href) => [...byId("recent-bookmarks").querySelectorAll(".recent-bm-row")].find((row) => row.querySelector(".recent-bm-item")?.getAttribute("href") === href);
+      const where = () => { const el = document.activeElement; const row = el.closest(".recent-bm-row"); return row ? row.querySelector(".recent-bm-item").getAttribute("href") + " " + el.className : (el === document.body ? "body" : el.id); };
+      try {
+        for (const [list, gone, expected] of [
+          [posts, "https://b.example/", "https://c.example/ recent-bm-del"],
+          [posts, "https://c.example/", "https://b.example/ recent-bm-del"],
+          [posts.slice(0, 1), "https://a.example/", "rc-url"],
+        ]) {
+          current = list;
+          byId("recent-bookmarks").textContent = "";
+          await fetchRecent("alice:ABCDEF1234567890");
+          assert(rowOf(gone), "setup: row not rendered for " + gone);
+          answer = null;
+          await confirmThroughPopover(rowOf(gone).querySelector(".recent-bm-del"));
+          assert(document.activeElement === rowOf(gone).querySelector(".recent-bm-del"), "Confirm did not hand focus back to the row's button: " + where());
+          await settle(() => !!answer);
+          const request = sent.filter((m) => m.type === "bookmark_api").at(-1);
+          assert(request && request.action === "delete" && request.url === gone && request.account === "alice", "delete request: " + JSON.stringify(request));
+          answer();
+          await settle(() => !rowOf(gone));
+          assert(!rowOf(gone), "the deleted row is still there");
+          assert(where() === expected, "deleting " + gone + ": focus went to " + where() + ", not " + expected);
+        }
+      } finally { host.remove(); }
+    });
+
+    await testAsync("a confirmed queue Remove hands focus on after the worker answers", async () => {
+      const host = document.createElement("div");
+      host.innerHTML = '<style>.hidden{display:none}</style><input id="oqr-url"><button id="oqr-submit">Save</button><div id="oqr-bar" class="hidden"><button id="oqr-toggle" aria-expanded="false"><span id="oqr-text"></span></button><button id="oqr-clear">Clear</button></div><div id="oqr-list" class="hidden"></div>';
+      document.body.appendChild(host);
+      const ids = { "offline-queue-bar": "oqr-bar", "offline-queue-text": "oqr-text", "offline-queue-toggle": "oqr-toggle", "offline-queue-list": "oqr-list", "offline-queue-clear": "oqr-clear", "url-input": "oqr-url", "submit-btn": "oqr-submit" };
+      const byId = (id) => host.querySelector("#" + (ids[id] || id));
+      const state = { queue: [], answer: null, removed: [] };
+      const chromeStub = {
+        runtime: {
+          lastError: null,
+          sendMessage: (message, callback) => {
+            if (message.type === "get_offline_queue") { callback({ ok: true, queue: state.queue, pause: null, account: "" }); return undefined; }
+            // background.js remove_offline_item: { ok: true } once the item is out of the queue.
+            if (message.type === "remove_offline_item") return new Promise((resolve) => { state.answer = () => {
+              state.removed.push(message.queueId);
+              state.queue = state.queue.filter((item) => item.queueId !== message.queueId);
+              resolve({ ok: true });
+            }; });
+            if (callback) callback(null);
+            return undefined;
+          },
+        },
+        storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } },
+      };
+      const win = {};
+      const settle = async (done) => { for (let i = 0; i < 40 && !done(); i++) await new Promise((r) => setTimeout(r, 0)); };
+      const rowIds = () => [...byId("offline-queue-list").querySelectorAll(".offline-queue-item")].map((row) => row.dataset.queueId).join();
+      const button = (queueId, cls) => [...byId("offline-queue-list").querySelectorAll(".offline-queue-item")].find((row) => row.dataset.queueId === queueId)?.querySelector("." + cls);
+      const where = () => { const el = document.activeElement; return el === document.body ? "body" : (el.closest(".offline-queue-item")?.dataset.queueId || "") + "/" + (el.className || el.id); };
+      try {
+        new Function("window", "chrome", "$id", "t", "pbpBookmarkFailureKey", "pbpBookmarkAccountService", popupOfflineSource)(
+          win, chromeStub, byId, (key, ...args) => args.length ? key + ":" + args.join(":") : key, pbpBookmarkFailureKey, pbpBookmarkAccountService);
+        win.PPOffline.init();
+        for (const [queued, gone, expected] of [
+          [["a", "b", "c"], "b", "c/offline-queue-remove"],
+          [["a", "b", "c"], "c", "b/offline-queue-remove"],
+          [["a"], "a", "/oqr-url"],
+        ]) {
+          state.queue = queued.map((queueId) => ({ queueId, url: "https://" + queueId + ".example/", account: "" }));
+          await win.PPOffline.refresh();
+          if (byId("offline-queue-toggle").getAttribute("aria-expanded") !== "true") byId("offline-queue-toggle").click();
+          await settle(() => rowIds() === queued.join());
+          state.answer = null;
+          await confirmThroughPopover(button(gone, "offline-queue-remove"));
+          assert(document.activeElement === button(gone, "offline-queue-remove"), "Confirm did not hand focus back to Remove: " + where());
+          await settle(() => !!state.answer);
+          assert(state.answer, "Confirm did not send remove_offline_item");
+          state.answer();
+          await settle(() => !rowIds().split(",").includes(gone));
+          assert(state.removed.at(-1) === gone, "removed " + state.removed.at(-1) + ", not " + gone);
+          assert(where() === expected, "removing " + gone + " from " + queued + ": focus went to " + where() + ", not " + expected);
+        }
+      } finally { host.remove(); }
+    });
+
     const K75_ONE_POST = [{ href: "https://example.com/a", description: "Example A" }];
 
     await testAsync("K75: a clean form skips the confirm and loads the recent bookmark immediately", async () => {
