@@ -616,13 +616,17 @@ async function _pbpVocabDriveRepaintAfterDenial(gen, actionSeq, owner, denied) {
     if (!read?.ok || !read.status || !(await _pbpVocabDriveCurrent(gen, actionSeq, owner, read.status))) return;
     // Render hides and reshows the buttons, which drops focus to <body>; put
     // it back on Connect only if it was there, as _pbpVocabDriveSend does.
+    // If the re-read shows this device connected meanwhile, Connect is gone
+    // and Sync now takes focus, the target the granted path moves to.
     const button = $id("vocab-drive-connect");
     const refocus = !!button && document.activeElement === button;
     _pbpVocabDriveRender(read.status);
     _pbpVocabDrivePaintErrors([denied, ..._driveErrorLines], read.status);
-    if (refocus && !button.hidden) {
-      try { button.focus({ preventScroll: true }); }
-      catch (_) { button.focus(); }
+    const sync = $id("vocab-drive-sync");
+    const target = !refocus ? null : !button.hidden ? button : (sync && !sync.hidden ? sync : null);
+    if (target) {
+      try { target.focus({ preventScroll: true }); }
+      catch (_) { target.focus(); }
     }
   } catch (error) {
     console.warn("[drive] status re-read after a refused permission failed:", error?.name, error?.message);

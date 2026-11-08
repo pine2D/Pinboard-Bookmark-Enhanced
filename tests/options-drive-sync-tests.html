@@ -283,7 +283,9 @@ window.chrome = {
       `active=${document.activeElement?.id || document.activeElement?.tagName}`);
   }
   // Focus that was not on Connect stays where it was: the repaint must not
-  // pull it onto the button.
+  // pull it onto the button. The prompt stays open while focus moves, as a
+  // real Chrome permission prompt does, so the refusal and the repaint run
+  // after the move. Simplest miss: refocus Connect unconditionally.
   {
     invalidateDriveSyncPanel();
     const permissionLost = withConn({lastError:"permission"});
@@ -291,18 +293,44 @@ window.chrome = {
     _driveVisibleOwner = "acct_alice";
     send = async (message) => { messages.push(message); return {ok:true, status:permissionLost}; };
     const prevPrompt = chrome.permissions.request;
-    chrome.permissions.request = async () => false;
+    let resolvePrompt;
+    chrome.permissions.request = () => new Promise((resolve) => {resolvePrompt = resolve;});
     const elsewhere = document.createElement("button");
     document.body.appendChild(elsewhere);
     try {
       $id("vocab-drive-connect").focus();
       const connecting = _pbpVocabDriveConnect(); await task();
+      const promptOpen = $id("vocab-drive-body").getAttribute("aria-busy") === "true";
       elsewhere.focus();
+      resolvePrompt(false);
       await connecting; await settle();
       check("a refused Connect does not pull focus back from another control",
-        document.activeElement === elsewhere,
-        `active=${document.activeElement?.id || document.activeElement?.tagName}`);
+        promptOpen && document.activeElement === elsewhere && err().includes("vocabDrivePermissionDenied"),
+        `promptOpen=${promptOpen} active=${document.activeElement?.id || document.activeElement?.tagName} err=${JSON.stringify(err())}`);
     } finally { chrome.permissions.request = prevPrompt; elsewhere.remove(); }
+  }
+  // The re-read may show this device connected meanwhile (another settings
+  // tab connected while the prompt was open): Connect is hidden, so focus
+  // that was on it goes to Sync now, the target the granted path uses.
+  // Simplest miss: refocus only a visible Connect, which leaves <body>.
+  {
+    invalidateDriveSyncPanel();
+    const permissionLost = withConn({lastError:"permission"});
+    _pbpVocabDriveRender(permissionLost);
+    _driveVisibleOwner = "acct_alice";
+    send = async (message) => { messages.push(message); return {ok:true, status:fixture}; };
+    const prevPrompt = chrome.permissions.request;
+    let resolvePrompt;
+    chrome.permissions.request = () => new Promise((resolve) => {resolvePrompt = resolve;});
+    try {
+      $id("vocab-drive-connect").focus();
+      const connecting = _pbpVocabDriveConnect(); await task();
+      resolvePrompt(false);
+      await connecting; await settle();
+      check("a refused Connect whose re-read hides Connect moves focus to Sync now",
+        $id("vocab-drive-connect").hidden && !$id("vocab-drive-sync").hidden && document.activeElement === $id("vocab-drive-sync"),
+        `connectHidden=${$id("vocab-drive-connect").hidden} syncHidden=${$id("vocab-drive-sync").hidden} active=${document.activeElement?.id || document.activeElement?.tagName}`);
+    } finally { chrome.permissions.request = prevPrompt; }
   }
   // The re-read after a refusal answers to Connect's action number: a Sync now
   // started while it is pending keeps the panel and its busy state.
