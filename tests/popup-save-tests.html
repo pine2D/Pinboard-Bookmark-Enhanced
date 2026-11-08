@@ -748,7 +748,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const results = { resets: [] };
       const t = (key, ...args) => key + (args.length ? "(" + args.join(",") + ")" : "");
       const settingsStub = { bookmarkService: service };
-      const api = async () => resp;
+      // pbpPopupBookmarkApi's shape: the worker answer plus json() over its data.
+      const api = async () => ({ ...resp, json: async () => resp.data || {} });
       const confirms = [];
       const showConfirmPopover = (anchor, opts) => confirms.push(opts);
       const failFrom = source.indexOf("function pbpDeleteFailureText(");

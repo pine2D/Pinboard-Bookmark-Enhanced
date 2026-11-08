@@ -1941,13 +1941,14 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
     await atest("offline: provider HTTP errors keep their message, status and code", async () => {
       Object.defineProperty(navigator, "onLine", { value: false, configurable: true });
       try {
-        for (const [status, body] of [[404, { error: { message: "model 'x' not found", code: "model_not_found" } }], [500, { error: { message: "boom" } }]]) {
+        // Ollama's real error body: {"error": "<string>"} (docs/api.md).
+        for (const [status, body] of [[404, { error: 'model "x" not found, try pulling it first' }], [500, { error: "model requires more system memory (8.0 GiB) than is available (4.0 GiB)" }]]) {
           window.fetch = async () => ({ ok: false, status, json: async () => body });
           let caught = null;
           try { await _pbpStreamRead("http://127.0.0.1:11434/api/chat", {}, {}, "Ollama", noopConsume); }
           catch (e) { caught = e; }
           ok(caught && caught.code !== "network" && caught.status === status, status + ": must not become the offline error, got " + (caught && caught.code) + "/" + (caught && caught.status));
-          ok(/boom|not found/.test(caught.message), status + ": original message must survive, got: " + caught.message);
+          ok(/system memory|not found/.test(caught.message), status + ": original message must survive, got: " + caught.message);
         }
       } finally {
         if (onlineDesc) Object.defineProperty(navigator, "onLine", onlineDesc); else delete navigator.onLine;
