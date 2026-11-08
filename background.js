@@ -2001,7 +2001,8 @@ async function pbpBookmarkApiRequest(message) {
   else if (message.action === "delete") {
     if (!pbpBookmarkWebUrl(message.url)) return {ok:false,status:0,error:"invalid_request"};
     const result = await pbpDeleteBookmarkInOrder(auth.account, message.url);
-    if (result.status !== "deleted") return {ok:false,status:result.httpStatus || 0,error:result.reason};
+    if (result.status !== "deleted") return {ok:false,status:result.httpStatus || 0,error:result.reason,
+      ...(typeof result.detail === "string" && result.detail ? {detail:result.detail} : {})};
     data = {result_code:"done"};
   } else return {ok:false,status:0,error:"invalid_request"};
   const fresh = await getCurrentBookmarkAuth();

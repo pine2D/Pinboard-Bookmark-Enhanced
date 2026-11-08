@@ -48,7 +48,7 @@ pinboardFetchImmediate = function(url) {
 async function pbpPopupBookmarkApi(action, url) {
   const account = pbpBookmarkConnection(settings).account;
   const result = await chrome.runtime.sendMessage({type:"bookmark_api",action,url,account});
-  return {ok:result?.ok === true, status:result?.status || 0, error:result?.error,
+  return {ok:result?.ok === true, status:result?.status || 0, error:result?.error, detail:result?.detail,
     json:async () => result?.data || {}};
 }
 
@@ -3007,16 +3007,15 @@ function setupSubmit(token) {
         delBtn.disabled = true; delBtn.classList.add("loading"); delBtn.textContent = t("deleting");
         try {
           const resp = await pbpPopupBookmarkApi("delete", deleteUrl);
-          // Same gate the recent-bookmark delete uses: _pbpProxyPinboardFetch
-          // resolves a stand-in whose json() is {} on 401, so without this the
-          // result_code is undefined and the user reads an API error ending in
-          // "undefined" instead of the login redirect already under way.
+          // bookmark_api failures carry status + error code and no data, so every
+          // failure is named from those, never from a result_code that is not there.
           const deleteService = pbpBookmarkServiceId(settings);
-          if (!resp.ok && deleteService !== "pinboard") {
-            if (ownsDeleteForm()) showStatus("status-msg", pbpDeleteFailureText(resp, deleteService), "error");
+          if (!resp.ok) {
+            // Pinboard: "" means the session was reset and the login screen is loading.
+            const failure = deleteService === "pinboard" ? await pbpPinboardDeleteFailureText(resp) : pbpDeleteFailureText(resp, deleteService);
+            if (failure && ownsDeleteForm()) showStatus("status-msg", failure, "error");
             return;
           }
-          if (resp.status === 401) return; // pinboardFetch already redirected to login
           const data = await resp.json();
           const deleted = data.result_code === "done" || data.result_code === "item not found";
           // Promise form: an unhandled rejection here (no receiver) would
@@ -3030,11 +3029,9 @@ function setupSubmit(token) {
         } catch (e) {
           if (ownsDeleteForm()) showStatus("status-msg", t("networkError"), "error");
         } finally {
-          // finally, not a trailing statement: the 401 gate above returns from
-          // inside the try, and on the one path where the redirect it trusts
-          // does not happen (persistSettings failing inside
-          // resetPinboardSession) a trailing restore would never run and leave
-          // a permanently disabled "Deleting..." button behind.
+          // finally, not a trailing statement: the failure branch above returns
+          // from inside the try, and a trailing restore would never run on it
+          // and leave a permanently disabled "Deleting..." button behind.
           if (ownsDeleteForm()) {
             delBtn.disabled = false; delBtn.classList.remove("loading"); delBtn.textContent = delOrig;
           }
@@ -3216,11 +3213,11 @@ async function fetchRecentBookmarks(token) {
             try {
               const resp = await pbpPopupBookmarkApi("delete", p.href);
               const deleteService = pbpBookmarkServiceId(settings);
-              if (!resp.ok && deleteService !== "pinboard") {
-                reportDeleteFailure(pbpDeleteFailureText(resp, deleteService));
+              if (!resp.ok) {
+                const failure = deleteService === "pinboard" ? await pbpPinboardDeleteFailureText(resp) : pbpDeleteFailureText(resp, deleteService);
+                if (failure) reportDeleteFailure(failure);
                 return;
               }
-              if (resp.status === 401) return; // pinboardFetch already redirected to login
               const data = await resp.json();
               if (data.result_code === "done" || data.result_code === "item not found") {
                 if (typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("recentDeleteFailed");
@@ -3455,6 +3452,16 @@ function pbpSaveErrorView(result) {
 function pbpDeleteFailureText(resp, service) {
   const reason = pbpBookmarkFailureText({ reason: resp?.error, httpStatus: resp?.status }, service, t);
   return reason ? t("bookmarkDeleteFailedReason", reason) : t("readerBookmarkDeleteFailed");
+}
+// A Pinboard delete that failed, from the worker's {status, error, detail}.
+// An expired token (401) resets the session like every other Pinboard request
+// and returns "" once the login screen is on its way; everything else gets the
+// same causes a failed save names, with a delete line when none fits.
+async function pbpPinboardDeleteFailureText(resp) {
+  if (resp?.status === 401 && await resetPinboardSession(settings.pinboardToken)) return "";
+  const reason = resp?.error === "timeout" ? "network" : resp?.error;
+  const view = pbpSaveErrorView({ reason, httpStatus: resp?.status, detail: resp?.detail });
+  return view.message === t("saveFailedGeneric") ? t("readerBookmarkDeleteFailed") : view.message;
 }
 // A caveat to a save that went through (SingleFile did not answer): its own
 // warning card under the Save button, so the green success line stays green.

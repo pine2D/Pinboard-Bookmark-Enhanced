@@ -1339,6 +1339,19 @@ await test("the popup's delete removes the bookmark it names and cancels that ad
   equal(h.env.post, null);
   equal(h.env.queue.map(item => item.queueId).join(), "other-url");
 });
+// A failed delete tells the popup why: Pinboard's own answer rides along as
+// detail, and an HTTP failure carries its status (the popup names both).
+await test("the popup's delete failure carries status, reason and Pinboard's detail", async () => {
+  for (const [env, want] of [
+    [{ deleteCode: "something went wrong" }, { ok: false, status: 0, error: "api", detail: "something went wrong" }],
+    [{ deleteHttp: 503 }, { ok: false, status: 503, error: "http" }],
+  ]) {
+    const h = await pipelineHarness({ post: { ...POST }, ...env });
+    const resp = await h.bookmarkApi({ type: "bookmark_api", action: "delete", url: URL_ARTICLE, account: "alice" });
+    for (const [key, value] of Object.entries(want)) equal(resp[key], value, JSON.stringify(env) + " " + key);
+    assert(!("data" in resp), "a failed delete carried data");
+  }
+});
 // The notification's Undo deletes as the reader does (user decision G17):
 // after a delivery in flight, with this owner's earlier queued saves of the
 // address cancelled first, and only for the connection that saved it.

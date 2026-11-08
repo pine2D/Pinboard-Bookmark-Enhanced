@@ -744,8 +744,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
     });
     // Behaviour, not shape: run the real delete handlers against the service
     // worker's self-hosted failure shape (status + error code, no data).
-    async function runDeleteHandlers(service, resp) {
-      const results = {};
+    async function runDeleteHandlers(service, resp, { resetOk = true } = {}) {
+      const results = { resets: [] };
       const t = (key, ...args) => key + (args.length ? "(" + args.join(",") + ")" : "");
       const settingsStub = { bookmarkService: service };
       const api = async () => resp;
@@ -754,6 +754,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const failFrom = source.indexOf("function pbpDeleteFailureText(");
       const pbpDeleteFailureText = new Function("pbpBookmarkFailureText", "t",
         source.slice(failFrom, source.indexOf("\n}\n", failFrom) + 3) + "\nreturn pbpDeleteFailureText;")(pbpBookmarkFailureText, t);
+      // The Pinboard failure text over the real pbpSaveErrorView; the session reset is recorded.
+      const pinboardView = bookmarkErrorView("pinboard");
+      const pbFrom = source.indexOf("async function pbpPinboardDeleteFailureText(");
+      const pbpPinboardDeleteFailureText = new Function("resetPinboardSession", "settings", "pbpSaveErrorView", "t",
+        source.slice(pbFrom, source.indexOf("\n}\n", pbFrom) + 3) + "\nreturn pbpPinboardDeleteFailureText;")(
+        async (token) => { results.resets.push(token); return resetOk; }, { pinboardToken: "tok:1" }, pinboardView, t);
       // Main Delete button.
       const mainStart = source.indexOf('$id("delete-btn").addEventListener("click", () => {');
       const mainEnd = source.lastIndexOf("\n  });\n", source.indexOf("// ===================== Edit From Recent"));
@@ -762,8 +768,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const statuses = [];
       const els = {};
       const el = (id) => els[id] ||= { value: id === "url-input" ? url : "", textContent: "Delete", disabled: false, classList: { add() {}, remove() {} }, addEventListener(type, fn) { if (type === "click") this.click = fn; } };
-      new Function("$id", "t", "bookmarkLookup", "showConfirmPopover", "pbpPopupBookmarkApi", "settings", "pbpBookmarkServiceId", "pbpBookmarkFailureKey", "pbpBookmarkFailureText", "pbpDeleteFailureText", "showStatus", "ownsGuard", "chrome", "setTimeout",
-        source.slice(mainStart, mainEnd + 6))(el, t, { status: "found", url, generation: 1, formLoaded: true }, showConfirmPopover, api, settingsStub, () => service, pbpBookmarkFailureKey, pbpBookmarkFailureText, pbpDeleteFailureText,
+      new Function("$id", "t", "bookmarkLookup", "showConfirmPopover", "pbpPopupBookmarkApi", "settings", "pbpBookmarkServiceId", "pbpBookmarkFailureKey", "pbpBookmarkFailureText", "pbpDeleteFailureText", "pbpPinboardDeleteFailureText", "showStatus", "ownsGuard", "chrome", "setTimeout",
+        source.slice(mainStart, mainEnd + 6))(el, t, { status: "found", url, generation: 1, formLoaded: true }, showConfirmPopover, api, settingsStub, () => service, pbpBookmarkFailureKey, pbpBookmarkFailureText, pbpDeleteFailureText, pbpPinboardDeleteFailureText,
         (id, msg, kind) => statuses.push([msg, kind]), null, { runtime: { sendMessage: async () => {} } }, () => {});
       els["delete-btn"].click();
       await confirms.pop().onConfirm();
@@ -774,8 +780,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(recStart >= 0 && recEnd > recStart, "recent delete handler source not found");
       const reports = [];
       const body = source.slice(recStart, recEnd).replace(/const reportDeleteFailure = [\s\S]*?\n      };\n/, "const reportDeleteFailure = (msg) => reports.push(msg);\n");
-      new Function("t", "p", "del", "row", "account", "container", "reports", "showConfirmPopover", "pbpPopupBookmarkApi", "settings", "pbpBookmarkServiceId", "pbpBookmarkFailureKey", "pbpBookmarkFailureText", "pbpDeleteFailureText", "chrome",
-        body + "\ndoDelete();")(t, { href: url }, {}, { remove() {} }, "acct", {}, reports, showConfirmPopover, api, settingsStub, () => service, pbpBookmarkFailureKey, pbpBookmarkFailureText, pbpDeleteFailureText, { runtime: { sendMessage: async () => {} } });
+      new Function("t", "p", "del", "row", "account", "container", "reports", "showConfirmPopover", "pbpPopupBookmarkApi", "settings", "pbpBookmarkServiceId", "pbpBookmarkFailureKey", "pbpBookmarkFailureText", "pbpDeleteFailureText", "pbpPinboardDeleteFailureText", "chrome",
+        body + "\ndoDelete();")(t, { href: url }, {}, { remove() {} }, "acct", {}, reports, showConfirmPopover, api, settingsStub, () => service, pbpBookmarkFailureKey, pbpBookmarkFailureText, pbpDeleteFailureText, pbpPinboardDeleteFailureText, { runtime: { sendMessage: async () => {} } });
       await confirms.pop().onConfirm();
       results.recent = reports;
       return results;
@@ -806,6 +812,34 @@ test("posts/add default remains replace=yes for existing callers", () => {
         const want = copy === "readerBookmarkDeleteFailed" ? copy : L(copy);
         assert(got.main.join() === want && got.recent.join() === want, service + " " + resp.error + ": " + JSON.stringify(got));
       }
+    });
+    await testAsync("Pinboard delete failures from the worker are named, never 'undefined', and an expired token resets the session", async () => {
+      // bookmark_api's delete failure shape: {ok:false, status, error[, detail]}, no data.
+      const named = [
+        [{ ok: false, status: 0, error: "network" }, "pinboardErrorOffline"],
+        [{ ok: false, status: 0, error: "timeout" }, "pinboardErrorOffline"],
+        [{ ok: false, status: 503, error: "http" }, "pinboardErrorServer"],
+        [{ ok: false, status: 429, error: "http" }, "pinboardErrorRateLimit"],
+        [{ ok: false, status: 404, error: "http" }, "pinboardApiError(HTTP 404)"],
+        [{ ok: false, status: 0, error: "account_changed" }, "pinboardErrorAuth"],
+        [{ ok: false, status: 403, error: "not_logged_in" }, "pinboardErrorAuth"],
+        [{ ok: false, status: 0, error: "api", detail: "something went wrong" }, "pinboardApiError(something went wrong)"],
+        [{ ok: false, status: 0, error: "invalid_request" }, "readerBookmarkDeleteFailed"],
+        [{ ok: false, status: 0 }, "readerBookmarkDeleteFailed"],
+      ];
+      for (const [resp, copy] of named) {
+        const got = await runDeleteHandlers("pinboard", resp);
+        assert(got.main.join() === copy && got.recent.join() === copy, JSON.stringify(resp) + " -> " + JSON.stringify(got));
+        assert(!/undefined/.test(got.main.join() + got.recent.join()), "a delete failure printed 'undefined'");
+        assert(got.resets.length === 0, "a non-401 failure reset the session: " + JSON.stringify(resp));
+      }
+      // 401: the session is reset with the token in use and the login screen takes over, so no card.
+      const expired = { ok: false, status: 401, error: "not_logged_in" };
+      const reset = await runDeleteHandlers("pinboard", expired);
+      assert(reset.resets.join() === "tok:1,tok:1" && reset.main.length === 0 && reset.recent.length === 0, JSON.stringify(reset));
+      // A reset that did not happen must still tell the user.
+      const stuck = await runDeleteHandlers("pinboard", expired, { resetOk: false });
+      assert(stuck.main.join() === "pinboardErrorAuth" && stuck.recent.join() === "pinboardErrorAuth", JSON.stringify(stuck));
     });
     test("Pinboard save errors are unchanged", () => {
       const view = bookmarkErrorView("pinboard");
