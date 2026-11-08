@@ -385,7 +385,8 @@ function pbpCreateBookmarkServiceClient(config) {
       return {status:"saved",bookmark,mutation};
     } catch (error) {
       if (["account_changed", "conflict"].includes(error.code) || !bookmark) throw error;
-      return {status:"partial",bookmark,mutation,failedStep:step,error:error.code || "remote",httpStatus:error.status};
+      return {status:"partial",bookmark,mutation,failedStep:step,error:error.code || "remote",httpStatus:error.status,
+        ...(error.retryAfter !== undefined ? {retryAfter:error.retryAfter} : {})};
     }
   };
   // linkding's DRF `next` is built from the request as the server saw it, so

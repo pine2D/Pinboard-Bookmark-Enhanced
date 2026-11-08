@@ -970,6 +970,24 @@ test("Karakeep existing bookmark: a first-step 400 stays a partial that is not q
   const result=await h.submitSaveIntent({...saveIntent,mode:"merge",tags:"extra"});
   equal([result.status,result.reason,result.failedStep,h.state.queue.length],["failed","partial","bookmark",0]);
 });
+// Karakeep answers a throttled PATCH with a plain 429 plus Retry-After in seconds or an HTTP date.
+const kkThrottled = retryAfter => new Response(JSON.stringify({code:"TOO_MANY_REQUESTS",message:"Too many requests"}),
+  {status:429, headers:{"Content-Type":"application/json", "Retry-After":retryAfter}});
+test("Karakeep existing bookmark: a first-step 429 keeps its Retry-After through the queue",async()=>{
+  const realNow=Date.now;
+  for(const [label,header,delay] of [["seconds","90",90000],["HTTP date",new Date(realNow()+600000).toUTCString(),600000],["HTTP date far ahead",new Date(realNow()+5*3600*1000).toUTCString(),3600000]]){
+    const replies=[[200,{bookmarkId:"bk1"}],[200,kk],kkThrottled(header)];
+    const h=await workerHarness("karakeep",replies);
+    const result=await h.submitSaveIntent({...saveIntent,mode:"merge",tags:"extra"});
+    equal([label,result.status,h.state.queue.length],[label,"queued",1]);
+    // The hold marker is written when the queued record is replayed and throttled again.
+    replies.push([200,{bookmarkId:"bk1"}],[200,kk],kkThrottled(header));
+    await h.processOfflineQueue();
+    const failure=h.state.queue[0].failure;
+    ok(failure&&failure.code==="rate_limited"&&Number.isFinite(failure.retryAfter),label+": no hold marker "+JSON.stringify(failure));
+    ok(Math.abs(failure.retryAfter-failure.at-delay)<=2000,label+": hold "+(failure.retryAfter-failure.at));
+  }
+});
 test("missing host permission prevents worker requests and queuing",async()=>{
   const h=await workerHarness("linkding",[],{permitted:false});equal((await h.submitSaveIntent(saveIntent)).reason,"permission");equal(h.state.calls,[]);equal(h.state.queue,[]);
 });
