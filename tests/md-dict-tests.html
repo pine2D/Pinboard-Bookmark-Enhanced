@@ -1440,6 +1440,51 @@ async function runDictNoAiAndSavedStateTests() {
           assert(ok === true && saveWrites === mid + 1, "control: the same unsaved lookup saves when nothing changes during the read " + JSON.stringify({ok, w: saveWrites - mid, k: _pbpDictCurrent.keptSaved, f: _pbpDictCurrent.fullEntryOnly, p: _pbpDictCurrent.packInvalidated, pc: !!_pbpDictCurrent.packChoice, o: _pbpDictCurrent.owner}));
         } finally { window.pbpVocabGet = realGet; Object.assign(_pbpDictCurrent, snap); saveWrites = 0; }
       }
+      // One gate per case (each check below is the only thing that can stop its write):
+      // the commit compares the head-word key and the gloss separately, and a late source can move either alone.
+      for (const [what, patch] of [
+        ["gloss", { gloss: "a different default definition" }],
+        ["head word", { term: "other-head" }],
+      ]) {
+        const realGet = window.pbpVocabGet, cur0 = _pbpDictCurrent;
+        const snap = { keptSaved: cur0.keptSaved, term: cur0.term, gloss: cur0.gloss, lemma: cur0.lemma, fullEntryOnly: cur0.fullEntryOnly, saved: cur0.saved, savedRecord: cur0.savedRecord };
+        const keyBefore = pbpDictVocabKey(cur0.owner, cur0.lang || "und", cur0.term);
+        window.pbpVocabGet = async () => { await new Promise((r) => setTimeout(r, 30)); return null; };
+        Object.assign(cur0, { keptSaved: false, fullEntryOnly: false, gloss: sameGloss });
+        try {
+          const before = saveWrites;
+          const pending = pbpDictSaveCurrent();
+          await new Promise((r) => setTimeout(r, 5));
+          Object.assign(cur0, patch);
+          const keyChanged = pbpDictVocabKey(cur0.owner, cur0.lang || "und", cur0.term) !== keyBefore;
+          assert(keyChanged === (what === "head word"), "fixture: only the " + what + " moved");
+          assert(await pending === false && saveWrites === before,
+            "a late source that changes only the " + what + " during the saved-state read refuses the save");
+        } finally { window.pbpVocabGet = realGet; Object.assign(cur0, snap); saveWrites = 0; }
+      }
+      // Same head word, two reads in flight: the superseded one (it saw a record that has since been
+      // deleted) must not paint, which only the read sequence number can tell (the key is identical).
+      {
+        const realGet = window.pbpVocabGet, cur0 = _pbpDictCurrent;
+        const snap = { term: cur0.term, gloss: cur0.gloss, saved: cur0.saved, savedRecord: cur0.savedRecord, keptSaved: cur0.keptSaved };
+        const statusEl = pop.querySelector(".xp-vocab-status");
+        let calls = 0;
+        window.pbpVocabGet = async (key) => {
+          calls++;
+          if (calls === 1) { await new Promise((r) => setTimeout(r, 30)); return { id: key, status: "new", gloss: "stale gloss", contexts: [] }; }
+          return null;
+        };
+        try {
+          const sig = new AbortController().signal;
+          cur0.term = "samehead"; cur0.gloss = "same gloss"; cur0.keptSaved = false; cur0.saved = false;
+          const first = _pbpDictRefreshSave(pop, cur0, sig);
+          await new Promise((r) => setTimeout(r, 5));
+          const second = _pbpDictRefreshSave(pop, cur0, sig);
+          await Promise.all([first, second]);
+          assert(calls === 2 && cur0.saved === false && statusEl.hidden === true,
+            "a superseded saved-state read for the same head word does not paint its stale record");
+        } finally { window.pbpVocabGet = realGet; Object.assign(cur0, snap); }
+      }
       // Display read: an older saved-state read for the previous head word
       // must not paint over the newer one when the default selection moves.
       {
