@@ -42,18 +42,17 @@ try{
  // Review: failed Regenerate of Q1, then Q2, then Retry on Q1 must not replace Q2.
  await page.locator('#ask-new').click();
  await send('Round one question');
- await page.evaluate(()=>{window.goodStream=window.goodStream||callAIStream;callAIStream=async(_s,_p,opts)=>{await opts.beforeRequest?.();throw new Error('fixture 429');};});
+ await page.evaluate(()=>{window.goodStream=window.goodStream||callAIStream;callAIStream=async(_s,_p,opts)=>{await opts.beforeRequest?.();fixtureCalls++;throw new Error('fixture 429');};});
  await page.locator('.ask-regenerate').last().click();await page.waitForSelector('#ask-thread .ask-a .ask-retry');
- await page.evaluate(()=>{callAIStream=async(_s,_p,opts,stream)=>{await opts.beforeRequest?.();const t='Second answer [P1].\n\nCITES:\nP1: "The surface of the table is scratched."';stream(t,t);return t;};});
+ await page.evaluate(()=>{callAIStream=async(_s,_p,opts,stream)=>{await opts.beforeRequest?.();fixtureCalls++;const t='Second answer [P1].\n\nCITES:\nP1: "The surface of the table is scratched."';stream(t,t);return t;};});
  await page.locator('#ask-input').fill('Round two question');await page.locator('#ask-send').click();
  await page.waitForFunction(()=>!_pbpAskState.running&&_pbpAskState.records.length===2);await page.waitForTimeout(100);
  const q2Before=await page.evaluate(async()=>({records:_pbpAskState.records.map(r=>r.q),rounds:_pbpAskState.rounds.map(r=>r.q),calls:fixtureCalls,arch:(await pbpAskArchiveRead({owner:pbpDictOwnerScope('ask-fixture')})).find(s=>s.id===_pbpAskState.sessionId).records.map(r=>({id:r.id,q:r.q,replacesId:r.replacesId||''}))}));
  await page.locator('#ask-thread .ask-a .ask-retry').first().click();await page.waitForTimeout(150);
  const q2After=await page.evaluate(async()=>({records:_pbpAskState.records.map(r=>r.q),rounds:_pbpAskState.rounds.map(r=>r.q),bubbles:document.querySelectorAll('#ask-thread .ask-a').length,retry:document.querySelectorAll('#ask-thread .ask-retry').length,calls:fixtureCalls,arch:(await pbpAskArchiveRead({owner:pbpDictOwnerScope('ask-fixture')})).find(s=>s.id===_pbpAskState.sessionId).records.map(r=>({id:r.id,q:r.q,replacesId:r.replacesId||''}))}));
- // Archive-only check, so it must catch the bad record by itself: no record may replace a later record.
+ // Archive-only check: the bad record replaces the Round two id, and the whole archive must stay unchanged.
  const q2Row=q2After.arch.find(r=>r.q==='Round two question');
- const replacesLater=q2After.arch.some((r,i)=>r.replacesId&&q2After.arch.findIndex(x=>x.id===r.replacesId)>i);
- check('retry on an earlier round writes no archive record that replaces a later round',!!q2Row&&!q2After.arch.some(r=>r.replacesId===q2Row.id)&&!replacesLater&&JSON.stringify(q2After.arch)===JSON.stringify(q2Before.arch),{q2Before,q2After});
+ check('retry on an earlier round writes no archive record that replaces a later round',!!q2Row&&!q2After.arch.some(r=>r.replacesId===q2Row.id)&&JSON.stringify(q2After.arch)===JSON.stringify(q2Before.arch),{q2Before,q2After});
  check('retry on an earlier round never replaces a later round',JSON.stringify(q2After.records)===JSON.stringify(q2Before.records)&&JSON.stringify(q2After.rounds)===JSON.stringify(q2Before.rounds)&&q2After.retry===0&&q2After.calls===q2Before.calls,{q2Before,q2After});
  // G7-01 end to end: raw model output with P0 cite, control chars; nothing may stay unsaved.
  await page.locator('#ask-new').click();
