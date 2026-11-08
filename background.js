@@ -1914,12 +1914,22 @@ function pbpDeleteBookmarkInOrder(account, url) {
       failure = "network";
       const resp = await pbpBookmarkDeleteResponse(auth, url);
       if (!resp.ok) return pbpSaveFailure(resp.status === 401 || resp.status === 403 ? "not_logged_in" : "http", { httpStatus: resp.status });
-      const data = await resp.json();
+      // The answer arrived, so an unreadable body is an API failure, not a
+      // network one (same reading as the save path).
+      let data = null;
+      try { data = await resp.json(); } catch (_) { /* classified below */ }
       auth = await pbpReadFreshBookmarkAuthForAccount(account);
       if (!auth) return pbpSaveFailure("account_changed");
       const code = typeof data?.result_code === "string" ? data.result_code : "";
       // "item not found": the bookmark is already gone, the state asked for.
-      if (code !== "done" && !/item\s+not\s+found/i.test(code)) return pbpSaveFailure("api", { detail: code });
+      if (code !== "done" && !/item\s+not\s+found/i.test(code)) {
+        if (!code) {
+          let contentType = "";
+          try { contentType = String(resp.headers?.get?.("content-type") || "").slice(0, 80); } catch (_) { /* header unreadable */ }
+          console.warn("[delete] Pinboard answered without a result_code:", resp.status, contentType);
+        }
+        return pbpSaveFailure("api", { detail: code || undefined });
+      }
       try {
         if (pbpStatusCacheSet(url, auth, { bookmarked: false, timestamp: Date.now(), posts: [] })) {
           const tabs = await chrome.tabs.query({});
@@ -1962,6 +1972,8 @@ function pbpNotifyUndoFailedResult(result, account) {
   const text = pbpBookmarkFailureText(result, pbpBookmarkAccountService(account), t);
   if (text) return pbpNotifyUndoFailed(text);
   if (result?.reason === "api" && result.detail) return pbpNotifyUndoFailed(result.detail);
+  // The server answered without a readable result_code: not a network cause.
+  if (result?.reason === "api") return pbpNotifyUndoFailed(t("readerBookmarkDeleteFailed"));
   if (Number.isInteger(result?.httpStatus)) return pbpNotifyUndoFailed({ status: result.httpStatus });
   if (result?.reason === "timeout") return pbpNotifyUndoFailed({ name: "TimeoutError" });
   return pbpNotifyUndoFailed(new TypeError("network"));

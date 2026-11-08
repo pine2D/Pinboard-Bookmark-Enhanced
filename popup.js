@@ -3030,7 +3030,7 @@ function setupSubmit(token) {
           if (deleted) {
             showStatus("status-msg", t("deleted"), "success");
             setTimeout(() => { if (ownsDeleteForm()) window.close(); }, 800);
-          } else showStatus("status-msg", t("pinboardApiError", String(data.result_code)), "error");
+          } else showStatus("status-msg", pbpDeleteCodeText(data), "error");
         } catch (e) {
           if (ownsDeleteForm()) showStatus("status-msg", t("networkError"), "error");
         } finally {
@@ -3249,7 +3249,7 @@ async function fetchRecentBookmarks(token) {
                 // Same feedback the main Delete button gives -- a failed delete
                 // that leaves the row in place is otherwise indistinguishable
                 // from a list that simply did not refresh.
-                reportDeleteFailure(t("pinboardApiError", String(data.result_code)));
+                reportDeleteFailure(pbpDeleteCodeText(data));
               }
             } catch (e) {
               console.warn("recent delete failed:", e && e.name, e && e.message);
@@ -3472,6 +3472,12 @@ function pbpSaveErrorView(result) {
 function pbpDeleteFailureText(resp, service) {
   const reason = pbpBookmarkFailureText({ reason: resp?.error, httpStatus: resp?.status }, service, t);
   return reason ? t("bookmarkDeleteFailedReason", reason) : t("readerBookmarkDeleteFailed");
+}
+// A 2xx delete answer that is not "done": the server's own code when it sent
+// one, else the plain delete failure line (never "...error: undefined").
+function pbpDeleteCodeText(data) {
+  const code = typeof data?.result_code === "string" ? data.result_code : "";
+  return code ? t("pinboardApiError", code) : t("readerBookmarkDeleteFailed");
 }
 // A Pinboard delete that failed, from the worker's {status, error, detail}.
 // An expired token (401) resets the session like every other Pinboard request

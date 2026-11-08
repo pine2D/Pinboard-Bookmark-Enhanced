@@ -1931,6 +1931,10 @@ await suite("unified save pipeline", async () => {
       ["rate-limited", () => ({ ok: false, status: 429, json: async () => { throw new Error("not json"); } }), "pinboardErrorRateLimit"],
       ["api-error", () => ({ ok: true, status: 200, json: async () => ({ result_code: "something went wrong" }) }), "something went wrong"],
       ["offline", () => new TypeError("Failed to fetch"), "pinboardErrorOffline"],
+      // 200 without a readable result_code: an API failure with no detail, never a network one.
+      ["html-200", () => ({ ok: true, status: 200, headers: { get: () => "text/html; charset=utf-8" }, json: async () => { throw new SyntaxError("Unexpected token '<'"); } }), "readerBookmarkDeleteFailed"],
+      ["empty-object-200", () => ({ ok: true, status: 200, json: async () => ({}) }), "readerBookmarkDeleteFailed"],
+      ["null-code-200", () => ({ ok: true, status: 200, json: async () => ({ result_code: null }) }), "readerBookmarkDeleteFailed"],
     ];
     for (const [id, answer, expectedMessage] of failures) {
       const before = toasts.length;
@@ -1942,6 +1946,7 @@ await suite("unified save pipeline", async () => {
       await settled();
       equal(toasts.length, before + 1, `${id} failed Undo left the user with no feedback`);
       equal(toasts[before].title, "bgUndoFailed", id);
+      assert(!/undefined/.test(String(toasts[before].message)), `${id} printed undefined`);
       equal(toasts[before].message, expectedMessage, id);
     }
 
