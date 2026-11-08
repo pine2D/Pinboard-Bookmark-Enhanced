@@ -5344,7 +5344,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (e) {
       // Commands API unavailable: leave the fields as they are.
       console.warn("[options] commands.getAll failed:", e?.name, e?.message);
-      }
+    }
   }
   await renderCommandShortcuts();
   // The shortcut page opens in another tab; show the new binding on return.

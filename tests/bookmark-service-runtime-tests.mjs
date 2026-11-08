@@ -302,6 +302,14 @@ try{
       await chrome.storage.local.set({offlineQueue:[],optCheckBookmarkStatus:false,linkdingPreload:false,linkdingBrowserMetadata:true,linkdingSingleFile:false});await chrome.storage.local.remove('urlClean');
     });
     for(const page of ctx.pages())if(page!==article)await page.close();
+    // The extension origin's localStorage mirror of optSyncEnabled is only kept
+    // current by open pages; bring it back in line with storage so a block that
+    // turned sync on cannot make the next page read settings from the wrong area.
+    const mirrorPage=await ctx.newPage();
+    try{
+      await mirrorPage.goto(pageUrl+'options.html');
+      await mirrorPage.evaluate(async()=>{const r=await chrome.storage.local.get('optSyncEnabled');localStorage.setItem('pp-sync-enabled',r.optSyncEnabled===true?'1':'0');});
+    }finally{await mirrorPage.close();}
     records.linkding.clear();records.karakeep.clear();membership.clear();raceCreates.clear();
     postgres.linkding=false;down.linkding=false;checkDown.linkding=false;tagsDown.karakeep=false;gate.linkding=false;holdLinkdingPatch=null;holdLinkdingCheck=null;holdLinkdingCreate=null;
     await article.goto(origin+'/article');
