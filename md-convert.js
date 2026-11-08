@@ -90,8 +90,10 @@ const PBP_GALLERY_ATTRS = new Set([
 // HTML. Two formulas that each carry "*" (A^{*}, f*g) got the prose between
 // them wrapped in <em>, splitting KaTeX's text node so one formula vanished.
 // Backslash-escape those characters too (G6b-02); CommonMark removes this
-// layer as well, so KaTeX still receives the source byte-for-byte. Markdown
-// exports keep the escaped form, same as they keep the doubled backslashes.
+// layer as well, so KaTeX still receives the source byte-for-byte. The stored
+// reader markdown, HTML and EPUB keep this escaped form (they re-parse with
+// marked); Markdown text exports strip it again with pbpMarkdownMathAsTex
+// (composeExport's rawMath option), since Obsidian/Pandoc read $..$ raw.
 // pbpLatexNormalize runs on this escaped text, so its env-name, \tag* and
 // \bbox[..] matchers accept an optional backslash before "*" and "[".
 function _pbpTexForMarkdown(tex) {
@@ -1553,6 +1555,10 @@ function composeExport(canonicalMd, meta, opts) {
     policy: opts.imagePolicy || "keep",
     baseUrl: meta.url || ""
   });
+  // rawMath: only Markdown TEXT exits pass it (copy/download .md, Send-to).
+  // HTML and EPUB re-parse this output with marked and need the escape layer.
+  // Only the article body: highlight notes and Ask answers are written as-is.
+  if (opts.rawMath && opts.math) body = pbpMarkdownMathAsTex(body);
   const hlItems = Array.isArray(opts.highlights) ? opts.highlights : null;
   if (hlItems && hlItems.length && opts.highlightsInline !== false && typeof pbpHlInlineMark === "function") {
     body = pbpHlInlineMark(body, hlItems, opts.hlView); // H5 (spec 1.6): filter marks by the exported view
@@ -1884,6 +1890,68 @@ function pbpLatexNormalize(md) {
   const wrapped = _pbpTexWrapBareEnvs(fixed.join("\n"));
   const transformed = _pbpTexTransformSegments(wrapped);
   return transformed.replace(/\x00T(\d+)\x00/g, (mm, k) => stash[+k] !== undefined ? stash[+k] : mm);
+}
+
+// pbpMarkdownMathAsTex: reader markdown -> Markdown for external renderers.
+// Inside $$..$$ and $..$ (the delimiters KaTeX uses in the reader) apply
+// CommonMark's backslash unescape, the same step marked performs before KaTeX
+// sees the text, so the export carries the TeX the reader renders: the mathml
+// rule's doubled backslashes and "\*" "\_" layer, and turndown's "\_" in
+// page-text $..$, both go. Fenced code, inline code spans and raw HTML blocks
+// (marked never unescapes inside them; table math there is already raw) keep
+// their bytes. The code-span scan honours "\`", as CommonMark does, because
+// the mathml rule escapes a backtick in TeX that way.
+function _pbpMathTextUnescapeChunk(chunk) {
+  const stash = [];
+  const parts = [];
+  const re = /\\[\s\S]|`+/g;
+  let last = 0, m;
+  while ((m = re.exec(chunk))) {
+    if (m[0][0] === "\\") continue;
+    const n = m[0].length;
+    const close = new RegExp("(?<!`)`{" + n + "}(?!`)", "g");
+    close.lastIndex = m.index + n;
+    const c = close.exec(chunk);
+    if (!c) continue;
+    parts.push(chunk.slice(last, m.index));
+    stash.push(chunk.slice(m.index, c.index + n));
+    parts.push("\x00C" + (stash.length - 1) + "\x00");
+    last = re.lastIndex = c.index + n;
+  }
+  parts.push(chunk.slice(last));
+  const unescape = (s) => s.replace(/\\([!-\/:-@\[-`{-~])/g, "$1");
+  return parts.join("")
+    .replace(/\$\$([\s\S]+?)\$\$|(?<![$\\])\$(?!\$)([^$\n]+)\$(?!\$)/g,
+      (all, block, inline) => block !== undefined ? "$$" + unescape(block) + "$$" : "$" + unescape(inline) + "$")
+    .replace(/\x00C(\d+)\x00/g, (all, k) => stash[+k] !== undefined ? stash[+k] : all);
+}
+
+function pbpMarkdownMathAsTex(md) {
+  if (md == null) return "";
+  md = String(md);
+  if (md.indexOf("\\") === -1 || md.indexOf("$") === -1) return md;
+  const out = [];
+  const inFence = _pbpFenceTracker();
+  let buf = [], inHtml = false, prevBlank = true;
+  const flush = () => {
+    if (buf.length) out.push(_pbpMathTextUnescapeChunk(buf.join("\n")));
+    buf = [];
+  };
+  for (const line of md.split("\n")) {
+    const blank = !line.trim();
+    if (inFence(line)) { flush(); out.push(line); prevBlank = false; continue; }
+    // An HTML block starts at a tag after a blank line and runs to the next
+    // blank line (CommonMark types 6/7, the shape _pbpRawBlockOneLine emits).
+    if (inHtml && !blank) { out.push(line); continue; }
+    inHtml = false;
+    if (prevBlank && /^\s*<\/?[A-Za-z][A-Za-z0-9-]*(?:[\s/>]|$)/.test(line)) {
+      flush(); out.push(line); inHtml = true; prevBlank = false; continue;
+    }
+    buf.push(line);
+    prevBlank = blank;
+  }
+  flush();
+  return out.join("\n");
 }
 
 // Scratch document for the "parse an HTML string, poke at it, read a string

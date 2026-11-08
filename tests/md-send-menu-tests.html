@@ -26,7 +26,7 @@ async function fixture({ realRuntime = false } = {}) {
     markdown: "Fixture body", includeAsk: false,
     askSnapshot: { url: "https://fixture.test/article", account: "qa", title: "Fixture", rounds: [{ q: "Question", a: "Answer" }], count: 1 },
     sendGuardWaits: [], ownerReads: [], askReads: [], requests: [], networkWaits: [], copied: [],
-    reads: [], lastReads: [], listeners: [], sends: [], sendWaits: [], permissionWaits: [], lastWrites: [], optionsTabs: []
+    composed: [], reads: [], lastReads: [], listeners: [], sends: [], sendWaits: [], permissionWaits: [], lastWrites: [], optionsTabs: []
   };
   const params = {
     exportSettings: {},
@@ -56,8 +56,8 @@ async function fixture({ realRuntime = false } = {}) {
       return state.sendWaits.length ? state.sendWaits.shift().promise : { ok: true, fellBack: false };
     },
     buildMeta: () => ({ title: "Fixture", url: "https://fixture.test/article" }),
-    buildExportOpts: () => ({ imagePolicy: "keep" }),
-    composeExport: body => body,
+    buildExportOpts: () => ({ imagePolicy: "embed", math: true }),
+    composeExport: (body, meta, opts) => { state.composed.push(opts); return body; },
     getViewMarkdown: () => state.markdown,
     imgFixExportNote: () => {},
     PBP_ICONS: { gear: "<svg data-ic=gear></svg>" },
@@ -144,6 +144,10 @@ async function test(name, fn, options) {
     f.click(); await settle();
     assert(f.state.sends.length === 1 && f.state.sends[0].id === "github"
       && f.state.sends[0].ctx.cfg.token === "first" && f.state.sends[0].ctx.rawBody === "Fixture body", "wrong outbound clip");
+    // Send-to is a Markdown text exit: formulas leave as plain TeX (rawMath).
+    const o = f.state.composed.at(-1);
+    assert(f.state.composed.length === 1 && o.rawMath === true && o.math === true && o.imagePolicy === "keep" && o.frontmatter === false,
+      "send body not composed as a Markdown text export: " + JSON.stringify(o));
   });
   await test("permission wait retains the captured article view", async f => {
     const wait = deferred(); f.state.permissionWaits.push(wait);

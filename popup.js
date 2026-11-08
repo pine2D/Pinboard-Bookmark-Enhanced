@@ -1648,7 +1648,8 @@ async function htmlToMarkdownAsync(html, opts) {
         const out = composeExport(markdown, meta, {
           frontmatter: settings.mdExportFrontmatter,
           imagePolicy: settings.mdExportImagePolicy,
-          includeToc: settings.mdExportIncludeToc
+          includeToc: settings.mdExportIncludeToc,
+          math: !!result.math, rawMath: true // formulas leave as plain TeX (md-convert.js)
         });
         try {
           await navigator.clipboard.writeText(out);
@@ -1767,7 +1768,8 @@ async function htmlToMarkdownAsync(html, opts) {
         const out = composeExport(markdown, meta, {
           frontmatter: settings.mdExportFrontmatter,
           imagePolicy: settings.mdExportImagePolicy,
-          includeToc: settings.mdExportIncludeToc
+          includeToc: settings.mdExportIncludeToc,
+          math: !!result.math, rawMath: true // formulas leave as plain TeX (md-convert.js)
         });
         downloadFile(safeFilename(meta.title) + ".md", out, "text/markdown;charset=utf-8");
       };
@@ -1794,7 +1796,8 @@ async function htmlToMarkdownAsync(html, opts) {
           composeExport(markdown, meta, {
             frontmatter: false,
             imagePolicy: settings.mdExportImagePolicy,
-            includeToc: settings.mdExportIncludeToc
+            includeToc: settings.mdExportIncludeToc,
+            math: !!result.math, rawMath: true
           }),
           meta,
           {}

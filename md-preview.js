@@ -2209,9 +2209,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     return t(error?.message === "export-ask-empty" ? "mdExportAskEmpty"
       : /(?:context|history)-changed/.test(error?.message || "") ? "mdExportContextChanged" : "mdPreviewFailed");
   }
-  function buildExportMarkdown(job) {
-    return composeExport(job.md, job.meta, { ...job.opts,
-      imagePolicy: job.opts.imagePolicy === "embed" ? "keep" : job.opts.imagePolicy });
+  // Every Markdown TEXT exit (Copy, Download .md, Send-to) goes through here.
+  // rawMath hands formulas out as plain TeX for Obsidian/Pandoc; the HTML and
+  // EPUB paths call composeExport/composeStyledHtml without it (see md-convert.js).
+  function buildExportMarkdown(job, md = job.md, extra) {
+    return composeExport(md, job.meta, { ...job.opts,
+      imagePolicy: job.opts.imagePolicy === "embed" ? "keep" : job.opts.imagePolicy, ...extra, rawMath: true });
   }
   function updateExportSummary() {
     const askOnly = exportScope === "ask";
@@ -3783,7 +3786,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // substituted have a scheme, so applyImagePolicy's "keep" pass absolutizes
       // any remaining plain src and leaves data: URIs untouched (Codex-P1: one
       // composeExport pass, no double transform of the export markdown).
-      const body = composeExport(emb.md, meta, { ...opts, imagePolicy: opts.imagePolicy === "embed" ? "keep" : opts.imagePolicy });
+      const body = buildExportMarkdown(job, emb.md);
       await requireExportOwner(job);
       downloadFile(safeTitle + (job.askOnly ? "-qa" : "") + ".md", body, "text/markdown;charset=utf-8");
     } catch (e) {
@@ -4056,14 +4059,13 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         await prepareExportAsk(job);
         if (_sig.aborted) return;
         const meta = job.meta;
-        const _exp = job.opts;
         imgFixExportNote(false);
         clearTimeout(sendStatusTimer);
         if (sendStatus) { sendStatus.hidden = true; sendStatus.textContent = ""; }
         // Send-to never runs resolveEmbed (no permission-gesture flow here) --
         // "embed" clamps to "keep" so a plain absolute link is sent instead of
         // a dangling literal "embed" policy string reaching applyImagePolicy.
-        const _sendBody = composeExport(job.md, meta, { ..._exp, askCitationStyle: row.citationStyle || "sources", frontmatter: false, imagePolicy: _exp.imagePolicy === "embed" ? "keep" : _exp.imagePolicy, includeToc: _exp.includeToc, highlights: _exp.highlights, hlView: _exp.hlView }); // H5 (spec 1.6): send-to honors the exported view's tri-state too
+        const _sendBody = buildExportMarkdown(job, job.md, { askCitationStyle: row.citationStyle || "sources", frontmatter: false }); // H5 (spec 1.6): send-to honors the exported view's tri-state too (job.opts carries hlView)
         primary.classList.add("sending");
         primaryLabel.textContent = t("mdSending");
         let res;

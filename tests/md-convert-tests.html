@@ -4080,6 +4080,100 @@ section("mathml TeX survives marked's inline parsing (emphasis, strike, links, c
   check("raw-HTML table math keeps the TeX unescaped (no added \\* or \\_)",
     raw.includes("$A^{*}_1$"), raw);
 })();
+
+// R-01: the reader's markdown carries an escape layer inside formulas
+// (doubled backslashes plus "\*", "\_" ... from _pbpTexForMarkdown, and
+// turndown's "\_" in page-text $..$) that only marked removes. Markdown TEXT
+// exports go to Obsidian, Pandoc, Typora, Notion and Gist, which read $..$
+// raw, so composeExport's rawMath option hands out the TeX KaTeX receives in
+// the reader. Every case compares the exported TeX with the source AND with
+// what real marked + KaTeX render from the reader markdown, byte for byte
+// (a substring check cannot tell "\," from a doubled "\\,").
+section("Markdown text export hands out the formula source TeX (rawMath)");
+(function () {
+  const mml = (tex, block) =>
+    '<math xmlns="http://www.w3.org/1998/Math/MathML" alttext="' + tex.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;") + '"'
+    + (block ? ' display="block"' : '') + '><semantics><mrow><mi>x</mi></mrow>'
+    + '<annotation encoding="application/x-tex">' + tex.replace(/&/g, "&amp;").replace(/</g, "&lt;") + '</annotation></semantics></math>';
+  const filler = "<p>" + "This paragraph exists so the extractor keeps the article body intact. ".repeat(6) + "</p>";
+  const viaDefuddle = (bodyHtml) => {
+    const doc = new DOMParser().parseFromString('<!doctype html><html><head><title>Math</title></head><body><article><h1>Math</h1>' + filler + bodyHtml + filler + '</article></body></html>', "text/html");
+    return new Defuddle(doc, { url: "https://arxiv.example/html/1234" }).parse().content || "";
+  };
+  const katexOpts = { delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }], throwOnError: false };
+  const readerTex = (md) => {
+    const host = document.createElement("div");
+    host.innerHTML = renderMarkdown(md);
+    renderMathInElement(host, katexOpts);
+    return [...host.querySelectorAll(".katex annotation")].map(a => a.textContent);
+  };
+  const exportedTex = (text) => {
+    const out = [];
+    text.replace(/\$\$([\s\S]+?)\$\$|(?<![$\\])\$(?!\$)([^$\n]+)\$(?!\$)/g, (m, b, i) => { out.push(b !== undefined ? b : i); return m; });
+    return out;
+  };
+  const textExport = (md, extra) => composeExport(md, {}, { math: true, rawMath: true, ...extra });
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const cases = [
+    ["starred superscripts", ["A^{*}", "B^{*}"]],
+    ["bare * convolutions", ["f*g", "g*h"]],
+    ["tildes", ["a\\sim b~c", "d~e"]],
+    ["subscripts", ["x_{i}", "\\mathbf{y}_{j}"]],
+    ["link-shaped brackets", ["[0,1](t)", "x"]],
+    ["backticks", ["f`(x)", "g`(y)"]],
+    ["angle brackets", ["a<b c>d", "e"]],
+    ["already-escaped TeX punctuation", ["\\{x\\}\\_1\\*\\#", "\\\\ y"]],
+    ["thin space and bang", ["1,2\\,\\!", "\\{x\\}"]],
+    ["matrix row breaks", ["\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}", "\\left\\{ z \\right\\}"]]
+  ];
+  cases.forEach(([label, texs]) => {
+    const md = pbpLatexNormalize(htmlToMarkdown(viaDefuddle("<p>Let " + mml(texs[0]) + " and " + mml(texs[1]) + " be given.</p>"), {}));
+    const got = exportedTex(textExport(md));
+    const reader = readerTex(md);
+    check("text export: " + label + " equals the source TeX and the reader's KaTeX input",
+      same(got, texs) && same(reader, texs), JSON.stringify({ md, got, reader }));
+  });
+  const blockMd = pbpLatexNormalize(htmlToMarkdown(viaDefuddle("<p>Then</p>" + mml("\\begin{align*}p&=q^{*}\\\\r&=s\\end{align*}", true) + "<p>holds.</p>"), {}));
+  const blockGot = exportedTex(textExport(blockMd));
+  check("text export: align* block leaves as the reader's aligned source",
+    same(blockGot, ["\\begin{aligned}p&=q^{*}\\\\r&=s\\end{aligned}"]) && same(readerTex(blockMd), blockGot), JSON.stringify({ blockMd, blockGot }));
+  const tagMd = pbpLatexNormalize(htmlToMarkdown('<math display="block" data-latex="y=1\\tag*{1}">ignored</math>', {}));
+  check("text export: \\tag* block leaves with no orphan backslash or star",
+    same(exportedTex(textExport(tagMd)), ["y=1"]), textExport(tagMd));
+  // alttext without Defuddle (the reader's site-rule path keeps alttext).
+  const altMd = pbpLatexNormalize(htmlToMarkdown("<p>so " + mml("x_{i}^{*} \\le \\{1\\}") + " here</p>", {}));
+  check("text export: alttext MathML leaves as its exact source",
+    same(exportedTex(textExport(altMd)), ["x_{i}^{*} \\le \\{1\\}"]) && same(readerTex(altMd), ["x_{i}^{*} \\le \\{1\\}"]), textExport(altMd));
+  // Page text that already wrote $..$: turndown escaped "_" to "\_".
+  const pageMd = htmlToMarkdown("<p>where $x_i$ and $y_j^*$ hold</p>", {});
+  check("text export: page-text $..$ leaves unescaped, the same TeX the reader renders",
+    pageMd.includes("\\_") && same(exportedTex(textExport(pageMd)), ["x_i", "y_j^*"]) && same(readerTex(pageMd), ["x_i", "y_j^*"]), JSON.stringify({ pageMd, out: textExport(pageMd) }));
+  // Other outputs keep the reader markdown: composeExport's default (HTML and
+  // EPUB build from it and re-parse with marked), and a non-math article.
+  const escapedMd = cases.map(([, texs]) => pbpLatexNormalize(htmlToMarkdown("<p>" + mml(texs[0]) + " , " + mml(texs[1]) + "</p>", {}))).join("\n\n");
+  check("composeExport without rawMath keeps the reader markdown byte for byte",
+    composeExport(escapedMd, {}, { math: true }) === escapedMd && /\\\\/.test(escapedMd), escapedMd);
+  const currency = "Costs $5 and foo\\_bar or \\*x\\* $6.";
+  check("rawMath on a non-math article leaves $ text and escapes alone",
+    composeExport(currency, {}, { rawMath: true }) === currency && composeExport(escapedMd, {}, { rawMath: true }) === escapedMd);
+  const styled = composeStyledHtml(escapedMd, {}, { math: true });
+  const styledHost = document.createElement("div");
+  styledHost.innerHTML = new DOMParser().parseFromString(styled, "text/html").body.innerHTML;
+  check("HTML export still renders every formula from its exact source",
+    same([...styledHost.querySelectorAll(".katex annotation")].map(a => a.textContent), cases.flatMap(([, texs]) => texs)), styled.slice(0, 400));
+  // Code keeps its bytes; only formulas outside code lose the escape layer.
+  const codeMd = "Inline `$a\\_b$` and ``x ` $c\\_d$`` here.\n\n```\n$e\\_f$\n```\n\nreal $x\\_i$ and \\`$y\\_j$";
+  check("text export leaves inline code and fenced code byte for byte",
+    textExport(codeMd) === "Inline `$a\\_b$` and ``x ` $c\\_d$`` here.\n\n```\n$e\\_f$\n```\n\nreal $x_i$ and \\`$y_j$", textExport(codeMd));
+  // Raw HTML blocks (complex/headerless tables) never had the layer.
+  const rawMd = htmlToMarkdown('<table><tr><td><math data-latex="\\{x\\}_1">t</math></td><td>b</td></tr></table>', {}) + "\n\nthen $z\\_1$";
+  check("text export leaves raw-HTML table math untouched",
+    textExport(rawMd) === rawMd.replace("$z\\_1$", "$z_1$") && rawMd.includes("$\\{x\\}_1$"), textExport(rawMd));
+  // Highlights the reader wrote are user text, not reader markdown.
+  const hlOut = textExport("body $x\\_i$", { highlights: [{ quote: "nothing matches", note: "note $a\\_b$" }] });
+  check("text export leaves the highlights section as written",
+    hlOut.startsWith("body $x_i$") && hlOut.includes("> note $a\\_b$"), hlOut);
+})();
 </script>
 
 <script>
