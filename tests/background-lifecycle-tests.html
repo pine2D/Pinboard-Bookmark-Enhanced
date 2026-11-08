@@ -626,7 +626,7 @@ function buildUndoHarness(source, opts) {
       pbpWithLargeStorageLock: o.pbpWithLargeStorageLock || ((key, fn) => fn()),
       pbpReadLargeWithFallbackUnlocked: async (key, read, dflt) => (await read()) ?? dflt,
       getSettingsStorage: async () => ({ get: async () => ({ customOverlayCSS: "/*ov*/" }) }),
-      console,
+      console: o.console || console,
     };
     const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
       return handleRuntimeMessage;`);
@@ -827,6 +827,22 @@ function buildUndoHarness(source, opts) {
     const r = await pending;
     check("router: get_site_prefs still resolves the full response once the deferred loadSettings settles",
       r.responses[0]?.optTheme === "auto" && r.responses[0]?.overlayCss === "/*ov*/");
+  }
+
+  {
+    // G5-02: a failed settings read must answer null and leave a trace with
+    // only the error name and message (no settings values, no overlay CSS).
+    const warns = [];
+    const h = buildRouterHarness({
+      loadSettings: () => Promise.reject(Object.assign(new Error("sync read failed"), { name: "Error" })),
+      console: { warn: (...a) => warns.push(a), log() {}, error() {} },
+    });
+    const site = { id: EXT_ID, url: "https://pinboard.in/u:alice/t:tag" };
+    const r = await h.invoke({ type: "get_site_prefs" }, site);
+    check("router: get_site_prefs answers null and warns once with only label, name, message when the settings read rejects",
+      r.responses.length === 1 && r.responses[0] === null && warns.length === 1 &&
+      warns[0].length === 3 && warns[0][1] === "Error" && warns[0][2] === "sync read failed" &&
+      !JSON.stringify(warns[0]).includes("/*ov*/"));
   }
 
   // ---- K12: pbpImgFixSweepRules startup scan scopes its tabs.query() to a
