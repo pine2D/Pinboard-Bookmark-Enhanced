@@ -393,7 +393,10 @@ function _pbpGetTurndown() {
         out.push("| " + cells.join(" | ") + " |");
         if (i === 0 && hasHeader) out.push("| " + cells.map(() => "---").join(" | ") + " |");
       });
-      return "\n\n" + out.join("\n") + "\n\n";
+      const capEl = node.querySelector(":scope > caption");
+      let capMd = "";
+      if (capEl) { try { capMd = td.turndown(capEl.innerHTML); } catch (_) { capMd = capEl.textContent || ""; } capMd = capMd.replace(/\s+/g, " ").trim(); }
+      return "\n\n" + (capMd ? capMd + "\n\n" : "") + out.join("\n") + "\n\n";
     }
   });
   // Image galleries (see _pbpIsGalleryList / _pbpGalleryGridHtml above): a
@@ -434,9 +437,24 @@ function _pbpGetTurndown() {
       const img = node.querySelector("img");
       const caption = node.querySelector("figcaption");
       if (!img) return content;
-      const alt = caption ? caption.textContent.trim() : (img.getAttribute("alt") || "");
+      // Image form only when the figure is really "one picture (maybe inside a
+      // link/picture) + optional caption". Anything else (a table with an icon
+      // in a cell, paragraphs around an image, several images) keeps its whole
+      // content; figcaption has no rule of its own, so its text is already in it.
+      const probe = node.cloneNode(true);
+      probe.querySelectorAll("figcaption").forEach((c) => c.remove());
+      const onlyPicture = probe.querySelectorAll("img").length === 1 &&
+        !Array.from(probe.querySelectorAll("*")).some((e) => !/^(IMG|PICTURE|SOURCE|A)$/.test(e.nodeName)) &&
+        !(probe.textContent || "").trim();
+      if (!onlyPicture) return "\n\n" + content.trim() + "\n\n";
+      const captionText = caption ? caption.textContent.replace(/\s+/g, " ").trim() : "";
+      const altText = captionText || (img.getAttribute("alt") || "").replace(/\s+/g, " ").trim();
       const src = img.getAttribute("src") || "";
-      return "\n\n![" + alt + "](" + src + ")" + (caption ? "\n*" + caption.textContent.trim() + "*" : "") + "\n\n";
+      // Same escaping the default turndown image rule applies; unescaped
+      // brackets/parens/emphasis marks turned the output into plain text.
+      let dest = src.replace(/[<>\r\n]/g, (c) => encodeURIComponent(c));
+      if (/[\s()\\]/.test(dest)) dest = "<" + dest.replace(/\\/g, "%5C") + ">";
+      return "\n\n![" + td.escape(altText) + "](" + dest + ")" + (captionText ? "\n*" + td.escape(captionText) + "*" : "") + "\n\n";
     }
   });
   td.addRule("listItem", {
@@ -689,8 +707,9 @@ function slugify(text) {
   return (text || "")
     .trim()
     .toLowerCase()
-    // strip punctuation but keep latin word chars, digits, CJK, whitespace, hyphen
-    .replace(/[^\w一-鿿぀-ヿ가-힯\s-]/g, "")
+    // strip punctuation but keep Unicode letters/marks/digits (Latin, Cyrillic, Greek,
+    // Arabic, Hebrew, CJK, kana, hangul...), underscore, whitespace, hyphen
+    .replace(/[^\p{L}\p{N}\p{M}_\s-]/gu, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "");
@@ -738,7 +757,21 @@ function _configureMarked() {
   renderer.table = function (token) {
     return '<div class="pb-table-wrap">' + protoTable.call(this, token) + "</div>";
   };
-  marked.use({ gfm: true, breaks: false, renderer });
+  // ==x== (what the turndown "highlight" rule writes for a source <mark>):
+  // marked does not know it, so the reader showed literal equals signs. Opening
+  // == must be followed by non-space and closing == preceded by non-space, so
+  // "a == b" stays text. Code spans are tokenized before inline extensions.
+  const markExt = {
+    name: "pbpMark",
+    level: "inline",
+    start(src) { const i = src.indexOf("=="); return i < 0 ? undefined : i; },
+    tokenizer(src) {
+      const m = /^==(?=\S)((?:[^=\n]|=(?!=))*?\S)==(?!=)/.exec(src);
+      if (m) return { type: "pbpMark", raw: m[0], text: m[1], tokens: this.lexer.inlineTokens(m[1]) };
+    },
+    renderer(token) { return "<mark>" + this.parser.parseInline(token.tokens) + "</mark>"; }
+  };
+  marked.use({ gfm: true, breaks: false, renderer, extensions: [markExt] });
   _markedConfigured = true;
 }
 

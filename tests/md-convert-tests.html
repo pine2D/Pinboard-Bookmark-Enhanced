@@ -90,6 +90,63 @@ function assertEq(actual, expected, label) {
   check("heading slug keeps CJK", /<h2 id="中文-标题">/.test(h), h);
 })();
 
+// ---- G6b-01: non-Latin / accented heading slugs ----
+(() => {
+  const md = "## Привет мир\n\n## Ελληνικά\n\n## مرحبا\n\n## שלום עולם\n\n## Résumé café";
+  const h = norm(renderMarkdown(md));
+  const ids = Array.from(h.matchAll(/<h2 id="([^"]*)"/g)).map((m) => m[1]);
+  check("non-Latin headings all get a non-empty distinct id", ids.length === 5 && ids.every(Boolean) && new Set(ids).size === 5, JSON.stringify(ids));
+  check("Cyrillic/Greek slug keeps the letters", ids[0] === "привет-мир" && ids[1] === "ελληνικά", JSON.stringify(ids));
+  check("accented Latin keeps its accents", ids[4] === "résumé-café", JSON.stringify(ids));
+  const t = buildToc(md, { minLevel: 2, maxLevel: 4 });
+  check("buildToc gives no empty anchor for non-Latin headings", !/\(#\)/.test(t.tocMarkdown) && t.headings.every((x) => x.slug), t.tocMarkdown);
+  check("buildToc slugs equal rendered ids", JSON.stringify(t.headings.map((x) => x.slug)) === JSON.stringify(ids), JSON.stringify(t.headings.map((x) => x.slug)));
+})();
+
+// ---- G6b-03 / G6b-08: figure rule ----
+(() => {
+  const fig = (html) => htmlToMarkdown(html, { baseUrl: "https://e.com" });
+  const t = fig('<figure class="table"><table><thead><tr><th>Name</th><th>Icon</th></tr></thead><tbody><tr><td>Foo</td><td><img src="https://x.test/i.png"></td></tr></tbody></table></figure>');
+  check("figure wrapping a table keeps header and cell text", /Name/.test(t) && /Foo/.test(t), t);
+  const p = fig('<figure><p>Intro paragraph</p><img src="https://x.test/a.png"><p>Outro paragraph</p></figure>');
+  check("figure with paragraphs and an image keeps the paragraphs", /Intro paragraph/.test(p) && /Outro paragraph/.test(p), p);
+  const one = fig('<figure><img src="https://x.test/a.png" alt="ignored"><figcaption>Cap</figcaption></figure>');
+  check("single image + caption keeps image form", /!\[Cap\]\(https:\/\/x\.test\/a\.png\)/.test(one) && /\*Cap\*/.test(one), one);
+  const linked = fig('<figure><a href="https://x.test/big"><img src="https://x.test/a.png"></a><figcaption>Cap</figcaption></figure>');
+  check("linked single image + caption keeps image form", /!\[Cap\]\(https:\/\/x\.test\/a\.png\)/.test(linked), linked);
+  const cases = [
+    ['<figure><img src="https://x.test/a%20b(1).png"><figcaption>Fig [a</figcaption></figure>', "https://x.test/a%20b(1).png", "Fig [a"],
+    ['<figure><img src="https://x.test/p(1.png"><figcaption>Plain</figcaption></figure>', "https://x.test/p(1.png", "Plain"],
+    ['<figure><img src="https://x.test/a.png"><figcaption>line *two* and _x_</figcaption></figure>', "https://x.test/a.png", "line *two* and _x_"]
+  ];
+  for (const [html, src, cap] of cases) {
+    const out = norm(renderMarkdown(fig(html)));
+    const m = out.match(/<img[^>]*>/);
+    const srcOk = m && new RegExp('src="' + src.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + '"').test(m[0]);
+    check("figure image survives rendering: " + cap, !!m && srcOk && out.includes(cap), out);
+    check("figure caption is not parsed as emphasis markup: " + cap, (out.match(/<em>/g) || []).length === 1 && !/<em>two<\/em>/.test(out), out);
+  }
+})();
+
+// ---- G6b-09: table caption ----
+(() => {
+  const md = htmlToMarkdown("<table><caption>Table 1: Population by year</caption><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>", { baseUrl: "https://e.com" });
+  check("pipe table keeps its caption text", /Table 1: Population by year/.test(md), md);
+  check("pipe table structure unchanged", /\| A \| B \|\n\| --- \| --- \|\n\| 1 \| 2 \|/.test(md), md);
+  const cx = htmlToMarkdown("<table><caption>Complex cap</caption><tr><th colspan=\"2\">H</th></tr><tr><td>1</td><td>2</td></tr></table>", { baseUrl: "https://e.com" });
+  check("complex table passthrough still keeps caption", /Complex cap/.test(cx), cx);
+})();
+
+// ---- G6b-10: ==x== renders as <mark> ----
+(() => {
+  const r = (s) => norm(renderMarkdown(s));
+  check("==important== renders as <mark>", /<mark>important<\/mark>/.test(r("This is ==important== text")), r("This is ==important== text"));
+  check("source <mark> round-trips to <mark>", /<mark>important<\/mark>/.test(r(htmlToMarkdown("<p>This is <mark>important</mark> text</p>", { baseUrl: "https://e.com" }))));
+  check("x == y is not a mark", !/<mark>/.test(r("if x == y then a == b")), r("if x == y then a == b"));
+  check("a ==b (open before space) is not a mark", !/<mark>/.test(r("a == b== c")), r("a == b== c"));
+  check("== inside inline code is untouched", !/<mark>/.test(r("use `==x==` here")), r("use `==x==` here"));
+})();
+
 // ---- Dedup smoke: htmlToMarkdown exists once and both contexts use the SAME global ----
 (() => {
   check("htmlToMarkdown is a single global function",
@@ -4175,7 +4232,9 @@ section("source fragments follow surviving Markdown headings only");
   check("raw-table heading without a rendered ID links back to the source", table.querySelector('a').getAttribute('href') === baseUrl + '#src', table.body.innerHTML);
   const gone = converted('<figure><h2 id="gone">Same</h2><img src="https://example.com/pic.png"></figure><h2 id="kept">Same</h2><a href="#kept">Jump</a>');
   const jump = gone.querySelector('a');
-  check("discarded figure headings do not shift real heading IDs", jump && gone.getElementById(jump.getAttribute('href').slice(1)) === gone.querySelector('h2'), gone.body.innerHTML);
+  // A figure holding more than one picture-and-caption keeps its content (G6b-03), so its heading is now a real
+  // heading too; the link must still land on the heading it pointed at (the second one).
+  check("figure-contained headings do not misdirect a later heading link", jump && gone.getElementById(jump.getAttribute('href').slice(1)) === gone.querySelectorAll('h2')[1], gone.body.innerHTML);
   const collision = converted('<p id="results">Original target</p><h2>Results</h2><a href="#results">Jump</a>');
   check("a source paragraph ID is never reassigned to a same-name heading", collision.querySelector('a').getAttribute('href') === baseUrl + '#results', collision.body.innerHTML);
 }
