@@ -1488,6 +1488,54 @@ function syncHarness(options = {}) {
       server.retryable === true;
   });
 
+  await asyncCheck("409 compares every identity field: each single-field mismatch is id_collision, exact match is idempotent", async () => {
+    const expected = metadata();
+    // Hand-written files.get response in Drive's real shape: parents holds an
+    // opaque folder ID (not the "appDataFolder" alias the request used).
+    const remote = () => ({
+      id: expected.id,
+      name: expected.name,
+      mimeType: "application/json",
+      parents: ["1opaque-real-appdata-folder"],
+      appProperties: { ...expected.appProperties }
+    });
+    const upload409 = async (response) => {
+      let fetches = 0;
+      const client = pbpCreateVocabDriveClient({
+        identity: identityFixture(["upload-token", "metadata-token"]),
+        fetchImpl: async () => ++fetches === 1 ? new Response(null, { status: 409 }) : jsonResponse(response)
+      });
+      return client.upload(expected, bodyString([live("Matrix")]));
+    };
+    const exact = await upload409(remote());
+    // The field set comes from the identity the comparison is given, not a hand-copied list.
+    const mutations = [];
+    for (const key of Object.keys(expected)) {
+      if (key === "parents" || key === "appProperties") continue; // parent is an opaque ID, only its shape is checked
+      const r = remote();
+      if (key === "id") { r.id = "other:file+id"; r.name = `pbp-vocab-${r.id}.json`; }
+      else r[key] = `${expected[key]}-x`;
+      mutations.push([key, r]);
+    }
+    for (const key of Object.keys(expected.appProperties)) {
+      const r = remote();
+      r.appProperties[key] = key === "owner" ? OTHER_OWNER_HASH
+        : key === "schema" ? (expected.appProperties.schema === "1" ? "2" : "1")
+        : `${expected.appProperties[key]}-x`;
+      mutations.push([`appProperties.${key}`, r]);
+    }
+    const extraKey = remote(); extraKey.appProperties.extra = "1"; mutations.push(["appProperties extra key", extraKey]);
+    const twoParents = remote(); twoParents.parents = ["p1", "p2"]; mutations.push(["two parents", twoParents]);
+    const noParents = remote(); delete noParents.parents; mutations.push(["missing parents", noParents]);
+    const bad = [];
+    for (const [name, r] of mutations) {
+      const result = await upload409(r);
+      if (result.ok || result.error !== "id_collision" || result.retryable !== false) bad.push(name);
+    }
+    if (bad.length) console.warn("collision matrix not rejected:", bad.join(", "));
+    return exact.ok && exact.idempotent === true && mutations.length >= 7 && bad.length === 0;
+  });
+
   await asyncCheck("a store with no sync meta (null) fails as corrupt without uploading or listing", async () => {
     const harness = syncHarness({ meta: null });
     const result = await harness.runner()();

@@ -279,6 +279,33 @@ function fixture(ownerHash, options = {}) {
       sameRow?.needsCheckpoint !== true && otherNoRow && flagged?.needsCheckpoint === true &&
       flagged.pageToken === "notes-end" && flagged.bootstrapComplete === true;
   });
+  await test("a 409 over a same-id file of another dataset or owner is id_collision (notes comparison shares the vocab client)", async () => {
+    pbpVocabDriveForgetIdentity();
+    const protocol = PBP_NOTES_DRIVE_PROTOCOL;
+    const expected = pbpVocabDriveMetadata("notes-file+id", hash, "local-a", protocol);
+    const remote = () => ({ id: expected.id, name: expected.name, mimeType: "application/json",
+      parents: ["1opaque-real-appdata-folder"], appProperties: { ...expected.appProperties } });
+    const body = JSON.stringify({ schema: 1, ownerHash: hash, deviceId: "local-a", createdAt: 1, entries: [] });
+    const run = async (response) => {
+      let n = 0;
+      const identity = { async getAuthToken() { return { token: "t" }; }, async removeCachedAuthToken() {} };
+      const client = pbpCreateVocabDriveClient({ identity, protocol,
+        fetchImpl: async () => ++n === 1 ? new Response(null, { status: 409 })
+          : new Response(JSON.stringify(response), { status: 200, headers: { "Content-Type": "application/json" } }) });
+      return client.upload(expected, body);
+    };
+    const exact = await run(remote());
+    const mutations = [];
+    for (const key of Object.keys(expected.appProperties)) {
+      const r = remote();
+      r.appProperties[key] = key === "owner" ? "b".repeat(64) : key === "schema" ? "2" : r.appProperties[key] + "-x";
+      mutations.push(r);
+    }
+    const otherId = remote(); otherId.id = "other"; otherId.name = "pbp-notes-other.json"; mutations.push(otherId);
+    const results = await Promise.all(mutations.map(run));
+    return exact.ok && exact.idempotent === true && mutations.length === 5 &&
+      results.every((r) => !r.ok && r.error === "id_collision" && r.retryable === false);
+  });
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>
