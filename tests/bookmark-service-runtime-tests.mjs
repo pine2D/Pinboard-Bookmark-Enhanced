@@ -37,6 +37,7 @@ const BLOCKS=[
   'settings Disconnect',
   'settings switch only after connecting',
   'settings tag panel follows the service',
+  'settings appearance, shortcuts and reader reset',
   'archive log follows the bookmark connection',
   'linkding #fragment address saved without it',
   'linkding browsing checks',
@@ -1742,6 +1743,43 @@ try{
     },beforeSync);
   }
   console.log('settings Tags panel reloads on a bookmark service change: Pinboard tags in, linkding explanation back, in local and in sync');
+  });
+  await block('settings appearance, shortcuts and reader reset',[],async()=>{
+  // Three states the options page keeps in closures: the preset buttons after
+  // a saved theme is picked, the shown shortcuts after the shortcut page is
+  // visited, and the per-provider reader model overrides after a tab reset.
+  const stored=keys=>worker.evaluate(async keys=>({...await chrome.storage.sync.get(keys),...await chrome.storage.local.get(keys)}),keys);
+  await worker.evaluate(async()=>{
+    await chrome.storage.local.set({aiProvider:'gemini',previewAiModelByProvider:{gemini:'g-x',openai:'o-y'}});
+  });
+  const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+  await options.evaluate(()=>syncSetLarge('savedThemes',[{name:'Mine',css:'a{color:red}'}]));
+  await options.goto(pageUrl+'options.html#appearance');
+  try{
+    await options.locator('.theme-preset-btn[data-theme="nord-night"]').click();
+    await until(async()=>(await stored(['themePresetKey'])).themePresetKey==='nord-night','preset stored');
+    await options.locator('.saved-theme-btn').first().click();
+    await until(async()=>(await stored(['themePresetKey'])).themePresetKey==='','saved theme cleared the preset key');
+    const pressed=await options.evaluate(()=>[...document.querySelectorAll('.theme-preset-btn')].filter(b=>b.getAttribute('aria-pressed')==='true'||b.classList.contains('active')).map(b=>b.dataset.theme));
+    assert.deepEqual(pressed,[''],'only "No preset" is pressed after a saved theme was chosen');
+    assert(await options.locator('#preset-preview-section').evaluate(el=>el.hidden),'the preset CSS preview is hidden with no preset');
+    // Shortcuts: a binding made on chrome://extensions/shortcuts shows on return.
+    await options.evaluate(()=>{chrome.commands.getAll=async()=>[{name:'_execute_action',shortcut:''}];});
+    await options.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+    const slot=options.locator('[data-command]').first();
+    const cmd=await slot.getAttribute('data-command');
+    await options.evaluate(c=>{chrome.commands.getAll=async()=>[{name:c,shortcut:'Alt+Shift+Q'}];},cmd);
+    await options.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+    await until(async()=>(await slot.textContent()).includes('Alt+Shift+Q'),'shortcut slot refreshed when the page became visible again');
+    // Reader tab reset clears the overrides of every provider, not the shown one only.
+    await options.locator('#tab-reader').click();
+    await options.locator('#reset-panel-btn').click();
+    await options.locator('.confirm-yes').click();
+    await until(async()=>{const m=(await stored(['previewAiModelByProvider'])).previewAiModelByProvider;return m&&m.gemini==='';},'reader reset saved');
+    const map=(await stored(['previewAiModelByProvider'])).previewAiModelByProvider;
+    assert(Object.values(map).every(v=>v===''),'every provider override is cleared: '+JSON.stringify(map));
+  }finally{await options.close();}
+  console.log('settings: saved theme releases the preset, shortcuts refresh on return, reader reset clears every provider override');
   });
   await block('archive log follows the bookmark connection',['linkding'],async()=>{
   // The archive log lists page URLs (private bookmarks included) for the

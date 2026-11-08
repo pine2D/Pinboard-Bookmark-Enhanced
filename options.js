@@ -2020,6 +2020,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         // mdVideoPauseOnLookup / mdVideoUseLogin.
         "opt-md-video-lang": "", "opt-md-video-dark": false,
         "opt-md-video-pause-lookup": true, "opt-md-video-use-login": true
+      },
+      // The model override is kept per provider; the field above shows only the
+      // current provider's. Clear the rest too, so a reset leaves no override
+      // behind (explicit "" means no override, unlike a missing key).
+      after: () => {
+        for (const k of Object.keys(_previewModelMap)) _previewModelMap[k] = "";
+        scheduleAutoSave();
       }
     },
     quick: {
@@ -5141,12 +5148,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       btn.setAttribute("aria-pressed", isActive ? "true" : "false");
       btn.addEventListener("click", () => {
         $id("opt-custom-css").value = theme.css;
+        // Custom saved themes do NOT affect options page styling — clear the
+        // preset key first so the buttons and the preview read the new value.
+        currentPresetKey = "";
         updateThemePresetButtons();
         updateSavedThemeButtons();
         updateSaveThemeBtnState();
-        // Custom saved themes do NOT affect options page styling — clear preset key
-        currentPresetKey = "";
         applyOptionsPageTheme("", $id("opt-theme").value);
+        renderPresetPreview();
         scheduleAutoSave();
       });
       const del = document.createElement("button");
@@ -5312,26 +5321,36 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Show the ACTUAL bound key for every command that has a display slot in the
   // page ([data-command="<command name>"]) — not a hardcoded guess. Unbound
   // commands show the "unset" hint. One loop covers all current + future slots.
-  try {
-    const cmds = await chrome.commands.getAll();
-    const byName = new Map(cmds.map((c) => [c.name, c.shortcut]));
-    document.querySelectorAll("[data-command]").forEach((slot) => {
-      const sc = byName.get(slot.dataset.command);
-      slot.textContent = "";
-      if (sc) {
-        const kbd = document.createElement("kbd");
-        kbd.textContent = sc;
-        slot.appendChild(kbd);
-      } else {
-        // Keep a missing binding as neutral status text. Only actual keyboard
-        // input belongs in <kbd>; configuring it remains the adjacent action.
-        const unset = document.createElement("span");
-        unset.className = "shortcut-unset";
-        unset.textContent = t("mdShortcutUnset");
-        slot.appendChild(unset);
+  async function renderCommandShortcuts() {
+    try {
+      const cmds = await chrome.commands.getAll();
+      const byName = new Map(cmds.map((c) => [c.name, c.shortcut]));
+      document.querySelectorAll("[data-command]").forEach((slot) => {
+        const sc = byName.get(slot.dataset.command);
+        slot.textContent = "";
+        if (sc) {
+          const kbd = document.createElement("kbd");
+          kbd.textContent = sc;
+          slot.appendChild(kbd);
+        } else {
+          // Keep a missing binding as neutral status text. Only actual keyboard
+          // input belongs in <kbd>; configuring it remains the adjacent action.
+          const unset = document.createElement("span");
+          unset.className = "shortcut-unset";
+          unset.textContent = t("mdShortcutUnset");
+          slot.appendChild(unset);
+        }
+      });
+    } catch (e) {
+      // Commands API unavailable: leave the fields as they are.
+      console.warn("[options] commands.getAll failed:", e?.name, e?.message);
       }
-    });
-  } catch (_) { /* commands API unavailable — leave fields blank */ }
+  }
+  await renderCommandShortcuts();
+  // The shortcut page opens in another tab; show the new binding on return.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void renderCommandShortcuts();
+  });
 
 
   // B5: Write high-frequency UI fields mirror for next options open.
