@@ -90,6 +90,7 @@ function _pbpLibAskAnswer(record) {
   // remote images inert while replacing them with their alternative text.
   const template = document.createElement("template");
   template.innerHTML = renderMarkdown(pbpAiParseCites(record.a).body);
+  template.content.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
   for (const image of template.content.querySelectorAll("img")) image.replaceWith(document.createTextNode(image.alt || ""));
   for (const link of template.content.querySelectorAll("a")) {
     const safe = pbpLibAskSafeUrl(link.getAttribute("href"));

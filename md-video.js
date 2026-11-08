@@ -5435,7 +5435,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     summary.textContent = t("mdVideoDescription");
     details.appendChild(summary);
     const body = el("div", "desc-body");
-    if (typeof renderMarkdown === "function") body.innerHTML = renderMarkdown(md);
+    if (typeof renderMarkdown === "function") { body.innerHTML = renderMarkdown(md); body.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id")); }
     details.appendChild(body);
     return details;
   }

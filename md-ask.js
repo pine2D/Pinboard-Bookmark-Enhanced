@@ -1456,7 +1456,7 @@ function _pbpAskAppendRound(question) {
 
 // Error UI: human message (callAIStream rejects with handleAIError text)
 // plus a retry button that re-runs the SAME question into the same .ask-a.
-function _pbpAskErrorUi(aEl, error, question) {
+function _pbpAskErrorUi(aEl, error, question, runOpts) {
   const err = document.createElement("p");
   err.className = "ask-err";
   // The reason is UI-language text (or the provider's own); the bubble above
@@ -1481,9 +1481,13 @@ function _pbpAskErrorUi(aEl, error, question) {
     // this check, clicking Retry on Q1's failed answer while Q2 streams wipes
     // Q1's error UI + adds .streaming shimmer, but the request never fires --
     // a permanent empty "streaming" bubble (audit md-ask.js:423).
-    if (_pbpAskState && _pbpAskState.running) return;
+    // Same gate as _pbpAskRun's first line: any other early return there would
+    // leave the bubble wiped and shimmering forever.
+    const runnable = () => { const st = _pbpAskState;
+      return !!st && !st.running && pbpAiAvailable(st.s) && !st.archiveMissing && !st.archiveError; };
+    if (!runnable()) return;
     pbpAiRetryWithPermission(error, _pbpAskState && _pbpAskState.s, () => {
-      if (_pbpAskState && _pbpAskState.running) return;
+      if (!runnable()) return;
       if (aEl.contains(document.activeElement)) {
         aEl.tabIndex = -1;
         aEl.focus();
@@ -1491,7 +1495,10 @@ function _pbpAskErrorUi(aEl, error, question) {
       aEl.replaceChildren();
       aEl.classList.add("streaming");
       aEl.setAttribute("aria-busy", "true");
-      return _pbpAskRun(question, aEl);
+      // A failed Regenerate retries as a replacement of the same round, with the
+      // same old nodes to put back; a plain failed question has neither.
+      return _pbpAskRun(question, aEl, runOpts && runOpts.restoreNodes
+        ? { replaceLast: !!runOpts.replaceLast, restoreNodes: runOpts.restoreNodes } : undefined);
     }).catch(() => {});
   });
   aEl.appendChild(err);
@@ -1615,7 +1622,7 @@ async function _pbpAskRun(question, aEl, opts) {
     // markdown and appends the cite chips plus the copy/regenerate row, so the
     // bubble grows again after the last streamed frame.
     const parsed = _pbpAskKeepPinned(() => _pbpAskFinalize(aEl, full, runCtx.sent, runCtx.sources));
-    const record = {
+    const rawRecord = {
       q: question,
       a: full,
       cites: parsed.cites,
@@ -1626,6 +1633,10 @@ async function _pbpAskRun(question, aEl, opts) {
       blocksHash: runCtx.blocksHash,
       evidence: pbpAskFreezeEvidence(parsed.cites, runCtx.sent, st.url, runCtx.sources)
     };
+    // Memory and archive hold the same cleaned record (a P0 cite or a control
+    // character would otherwise make every storage retry fail). The chips in
+    // the bubble keep using `parsed`.
+    const record = typeof pbpAskArchiveSafeRecord === "function" ? pbpAskArchiveSafeRecord(rawRecord) : rawRecord;
     if (opts.replaceLast && st.rounds.length) {
       st.rounds[st.rounds.length - 1] = { q: question, a: parsed.body };
     } else {
@@ -1642,7 +1653,7 @@ async function _pbpAskRun(question, aEl, opts) {
       if (!_pbpAskArchiveEnabled()) st.records = _pbpAskHistTrim(st.records);
     }
     aEl._askExportRecord = record;
-    const pending = { url: st.url, title: st.title, account: runAccount, sessionId: runSession, record, replaceLast: !!opts.replaceLast, replacesId: replacedRecord?.id || "" };
+    const pending = { url: st.url, title: typeof pbpAskArchiveSafeTitle === "function" ? pbpAskArchiveSafeTitle(st.title) : st.title, account: runAccount, sessionId: runSession, record, replaceLast: !!opts.replaceLast, replacesId: replacedRecord?.id || "" };
     if (!st.temporary) _pbpAskUnpersisted.push(pending);
     if (!_pbpAskArchiveEnabled()) _pbpAskUnpersisted = _pbpAskHistTrim(_pbpAskUnpersisted);
     _pbpAskHistoryChanged();
@@ -1720,7 +1731,7 @@ async function _pbpAskRun(question, aEl, opts) {
       note.textContent = t("askStopped");
       aEl.appendChild(note);
     } else {
-      _pbpAskErrorUi(aEl, e || new Error(t("aiErrRequestFailed")), question);
+      _pbpAskErrorUi(aEl, e || new Error(t("aiErrRequestFailed")), question, opts);
     }
   } finally {
     if (st.ctrl !== runCtrl) return;
@@ -2192,6 +2203,9 @@ function _pbpAskFinalize(el, fullText, sent, sourceSnapshot) {
   const qText = el.dataset ? el.dataset.askQuestion : "";
   pbpAiSetLang(el, _pbpAskAnswerLang(parsed.body, pbpAiContentLang(qText, [_pbpAskViewLang()])));
   el.innerHTML = renderMarkdown(parsed.body);
+  // Model headings keep a slug id for the article TOC, but here an id such as
+  // "ask-input" would shadow the real control. Answers need no anchors.
+  el.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
   _pbpAskChipPass(el, parsed.cites, sent, sourceSnapshot);
   // Task 15 hook (copy button + history chrome). typeof-guarded so this
   // Task 14 commit stands alone before Task 15 lands.
@@ -4496,6 +4510,7 @@ async function _pbpExplainRun(cap, ctx, pop) {
     md.className = "xp-md";
     if (resultLang) md.lang = resultLang;
     md.innerHTML = renderMarkdown(full);
+    md.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id")); // heading slugs must not shadow panel controls
     body.replaceChildren(md);
     // H4 2.2: the answer is now final -- stash the raw markdown text (never
     // the rendered HTML) for "Save as note", and reveal the button only if

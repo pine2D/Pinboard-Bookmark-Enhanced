@@ -12181,6 +12181,21 @@ suiteIf("T4 ask: citations after a replacement", "_pbpAskOnArticleReplaced", () 
     }
   });
 });
+suiteIf("G7-04 ask: model headings cannot shadow panel controls", "_pbpAskFinalize", () => {
+  test("rendered answers carry no id at all", () => {
+    const host = document.createElement("div");
+    const thread = document.createElement("div"); thread.id = "ask-thread";
+    const ta = document.createElement("textarea"); ta.id = "ask-input";
+    host.append(thread, ta); document.body.appendChild(host);
+    try {
+      const aEl = document.createElement("div"); aEl.className = "ask-a";
+      thread.appendChild(aEl);
+      _pbpAskFinalize(aEl, "## Ask input\n\nbody\n\n<h3 id=\"ask-send\">x</h3>");
+      assertEq(aEl.querySelectorAll("[id]").length, 0, "an id survived in the answer");
+      assertEq(document.getElementById("ask-input"), ta, "the answer heading shadowed the textarea");
+    } finally { host.remove(); }
+  });
+});
 </script>
 
 <script>
@@ -15293,6 +15308,7 @@ suite("t key confirms before spending tokens the reader cannot see", () => {
     } finally { await f.done(); }
   });
 })();
+
 </script>
 
 </body></html>

@@ -37,6 +37,32 @@ test("client reads frozen pending uploads using the raw UTF-8 owner hash", async
   await store.deletePendingBatch("google-a", HASH, "file-a");
   assert(!(await store.read({ owner: OWNER, sessionId: SESSION }))[0].hasPending);
 });
+// G7-01: the reader cleans a finished answer into the shape the REAL validator accepts.
+const okRec = (rec, title) => pbpAskArchiveValidateEvent({ recordKey: "0".repeat(64), value: {
+  kind: "round", sessionId: SESSION, url: URL_VALUE, title: title || "T", replacesId: "", record: rec } });
+const baseRec = () => ({ ...record(), cites: [{ p: 1, quote: "x" }],
+  evidence: [{ p: 1, quote: "x", state: "matched", sourceUrl: URL_VALUE }] });
+test("G7-01 control: the clean record passes the real validator", () => assert(okRec(baseRec())));
+const dirty = {
+  "P0 cite and evidence": (r) => { r.cites.push({ p: 0, quote: "t" }); r.evidence.push({ p: 0, quote: "t", state: "unverified", sourceUrl: "" }); },
+  "unsafe-integer P": (r) => { r.cites.push({ p: 1e30, quote: "t" }); r.evidence.push({ p: 1e30, quote: "t", state: "unverified", sourceUrl: "" }); },
+  "form feed in question": (r) => { r.q = "page one\fpage two"; },
+  "vertical tab and ESC in answer": (r) => { r.a = "a\u000bb\u001bc"; },
+  "control char in quote": (r) => { r.cites[0].quote = "q\u0000"; r.evidence[0].quote = "q\u007f"; },
+  "oversized fields": (r) => { r.q = "q".repeat(40000); r.a = "a".repeat(600000); r.cites[0].quote = "x".repeat(9000); r.evidence[0].quote = "x".repeat(9000); r.model = "m".repeat(600); }
+};
+for (const name of Object.keys(dirty)) test("G7-01 " + name + " is cleaned into a valid record", () => {
+  const r = baseRec(); dirty[name](r);
+  assert(!okRec(r), "control: the raw record must be rejected");
+  const safe = pbpAskArchiveSafeRecord(r);
+  assert(okRec(safe), "cleaned record still rejected");
+  assert(safe.cites.every(c => c.p > 0) && safe.evidence.every(e => e.p > 0), "invalid P kept");
+  assert(safe.cites.some(c => c.p === 1) && safe.evidence.some(e => e.p === 1), "valid P dropped");
+});
+test("G7-01 an over-long page title is cleaned too", () => {
+  assert(!okRec(baseRec(), "t".repeat(3000)), "control");
+  assert(okRec(baseRec(), pbpAskArchiveSafeTitle("t".repeat(3000) + "\f")), "title still rejected");
+});
 test("client migrates old completed answers without loading transport", async () => {
   const store = fixture(); await store.migrate({ owner: OWNER, url: URL_VALUE, records: [record()] });
   assert((await store.read({ owner: OWNER, url: URL_VALUE }))[0].records[0].ts === 100);

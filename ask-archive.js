@@ -44,6 +44,27 @@ function _pbpAskArchiveRecord(record) {
       ["matched", "unverified", "source-changed"].includes(evidence.state) && _pbpAskArchiveUrl(evidence.sourceUrl, true) &&
       (evidence.time === undefined || (Number.isFinite(evidence.time) && evidence.time >= 0 && _pbpAskArchiveUrl(evidence.deepUrl))));
 }
+// Reader-side cleaning to the exact shape the validator above accepts. A model
+// answer can carry a P0 cite, a huge P number or a stray control character;
+// without this the completed answer could never be written and Retry would
+// fail forever. The reader keeps this cleaned copy in memory too, so what the
+// session shows is what the archive stores.
+function _pbpAskArchiveClean(value, max) {
+  return String(value == null ? "" : value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, " ").slice(0, max);
+}
+function pbpAskArchiveSafeTitle(title) { return _pbpAskArchiveClean(title, 2048); }
+function pbpAskArchiveSafeRecord(record) {
+  const keep = (p) => Number.isSafeInteger(p) && p > 0;
+  const out = { ...record };
+  out.q = _pbpAskArchiveClean(record.q, 32000);
+  out.a = _pbpAskArchiveClean(record.a, 512000);
+  out.model = _pbpAskArchiveClean(record.model, 512);
+  out.cites = (Array.isArray(record.cites) ? record.cites : []).filter((c) => c && keep(c.p)).slice(0, 512)
+    .map((c) => ({ p: c.p, quote: _pbpAskArchiveClean(c.quote, 8000) }));
+  out.evidence = (Array.isArray(record.evidence) ? record.evidence : []).filter((e) => e && keep(e.p)).slice(0, 512)
+    .map((e) => ({ ...e, quote: _pbpAskArchiveClean(e.quote, 8000) }));
+  return out;
+}
 function _pbpAskArchiveValue(value) {
   if (value?.kind === "delete") return _pbpAskArchiveObject(value, ["kind", "sessionId", "deletedAt"]) &&
     _pbpAskArchiveId(value.sessionId) && Number.isSafeInteger(value.deletedAt) && value.deletedAt > 0;

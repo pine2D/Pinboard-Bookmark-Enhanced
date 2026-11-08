@@ -379,6 +379,7 @@ function _pbpSkimRenderCached(r) {
   _pbpSkimSetStatus("");
   _pbpSkimStampLang(body, r.md);
   body.innerHTML = renderMarkdown(r.md);
+  body.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id")); // heading slugs must not shadow panel controls
   // Rebuild the sampled-paragraph set persisted at generation time so a
   // cache hit applies the same sent-gate as the live pass; legacy entries
   // without the field degrade to null = unknown (old behavior).
@@ -512,6 +513,7 @@ function _pbpSkimFinalize(fullText, usage, sent) {
   const parsed = pbpAiParseCites(fullText);
   _pbpSkimStampLang(body, parsed.body);
   body.innerHTML = renderMarkdown(parsed.body);
+  body.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id")); // heading slugs must not shadow panel controls
   // Same sent-gate as ask (A7): a cite of a paragraph the sampler never
   // sent must not earn the solid verified state even when its guessed
   // quote fuzzy-matches.
