@@ -52,6 +52,9 @@ fi
 echo "[bookmark-services] isolated primary-service UI and personal-library restore"
 node tests/bookmark-service-runtime-tests.mjs
 node tests/bookmark-live-preflight-tests.mjs
+echo "[ask-history] reader and library Ask history against an isolated archive"
+node tests/ask-history-tests.mjs
+node tests/library-ask-history-tests.mjs
 echo "[mutate-check] self-test: restore, exactly-once, crash backup"
 node tests/mutate-check-tests.mjs
 echo "[run-test] self-test: --print-counts waits for the registered count"
