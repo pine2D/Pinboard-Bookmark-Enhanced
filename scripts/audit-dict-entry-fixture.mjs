@@ -465,6 +465,12 @@ export async function openDictEntryState(page, state) {
     }
     const remembered = page.locator('.xp-dict-examples .xp-dict-examples-find[data-remembered="true"]');
     await remembered.waitFor();
+    // The note is written while its row is hidden, so _pbpDictLiveSay paints it
+    // two frames after the row appears: the action can be visible first, and
+    // dictActionNoteBelow measures the note.
+    await page.locator('.xp-dict-examples .xp-dict-usage-feedback[data-state="neutral"]').filter({ hasText: /\S/ })
+      .waitFor({ timeout: 10000 })
+      .catch(() => { throw new Error('SETUP: the remembered action opened without its note'); });
     await page.evaluate(() => { window._auditDictEntry.examplesMiss = false; });
     if (await page.evaluate(() => window._auditDictEntry.calls) !== before) throw new Error('SETUP: free examples issued an AI request');
     return remembered.isVisible();
