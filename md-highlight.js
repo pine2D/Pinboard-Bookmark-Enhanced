@@ -2695,22 +2695,7 @@ function _pbpHlNotebookRender() {
     index: Array.prototype.indexOf.call(nbList.children, focusedLi),
   } : null;
   nbList.replaceChildren(...model.map(_pbpHlBuildItemEl));
-  if (focusSpec) {
-    const rows = Array.from(nbList.children);
-    let target = null;
-    const same = rows.find((r) => r.dataset.hlId === focusSpec.id);
-    if (same) {
-      target = same.querySelector("." + focusSpec.cls);
-      if (!target || target.disabled) target = same.querySelector(".hl-item-del");
-    } else if (rows.length) {
-      // Row is gone: the one that took its place, else the one above.
-      const near = rows[Math.min(focusSpec.index, rows.length - 1)];
-      target = near.querySelector(".hl-item-del");
-    } else {
-      target = _pbpHlNbEls.sec.querySelector(".rail-sec-head");
-    }
-    if (target) { try { target.focus({ preventScroll: true }); } catch (_) {} }
-  }
+  if (focusSpec) _pbpHlNbFocusRow(focusSpec);
   _pbpHlNbEls.emptyHint.hidden = !(items.length > 0 && model.length === 0);
   // Orphan note (anchoring round): count-gated like Hypothesis's Orphans
   // tab -- present exactly while orphans exist, gone when healthy, never a
@@ -2720,6 +2705,63 @@ function _pbpHlNotebookRender() {
   const orphanCount = _pbpHlState ? Object.keys(_pbpHlState.orphans || {}).length : 0;
   _pbpHlNbEls.orphanNote.hidden = orphanCount === 0;
   _pbpHlNbEls.orphanNote.textContent = orphanCount ? t("hlOrphanNote", String(orphanCount)) : "";
+}
+
+// Put focus back on a notebook row after the list was rebuilt: the same row
+// (by data-hl-id) and button class, else the row that took its place, else
+// the one above, else the section header. spec = {id, cls, index}.
+function _pbpHlNbFocusRow(spec) {
+  if (!_pbpHlNbEls) return;
+  const rows = Array.from(_pbpHlNbEls.list.children);
+  let target = null;
+  const same = rows.find((r) => r.dataset.hlId === spec.id);
+  if (same) {
+    target = same.querySelector("." + spec.cls);
+    if (!target || target.disabled) target = same.querySelector(".hl-item-del");
+  } else if (rows.length) {
+    // Row is gone: the one that took its place, else the one above.
+    const near = rows[Math.min(Math.max(0, spec.index), rows.length - 1)];
+    target = near.querySelector(".hl-item-del");
+  } else {
+    target = _pbpHlNbEls.sec.querySelector(".rail-sec-head");
+  }
+  if (target) { try { target.focus({ preventScroll: true }); } catch (_) {} }
+}
+
+// Row x -> delete confirm. While the confirm is open another tab can rewrite
+// the key and the list rebuilds, replacing the x the confirm would hand focus
+// back to (shared dismiss then leaves focus on body). On close, if that x is
+// gone and focus landed nowhere, find the row again by its id. A pointer
+// press outside the confirm, or focus that already moved somewhere real
+// (Tab out), is left alone.
+function _pbpHlNbConfirmDelete(del, id) {
+  const li = del.closest("li");
+  const index = li && li.parentNode ? Array.prototype.indexOf.call(li.parentNode.children, li) : 0;
+  let pointerOutside = false;
+  const onDown = (ev) => {
+    if (!(ev.target instanceof Element && ev.target.closest(".confirm-popover"))) pointerOutside = true;
+  };
+  const refocus = () => {
+    if (del.isConnected || pointerOutside) return;
+    const a = document.activeElement;
+    if (a && a !== document.body) return;
+    _pbpHlNbFocusRow({ id, cls: "hl-item-del", index });
+  };
+  // Registered before the confirm's own capture listener so it still sees the
+  // press that makes the confirm dismiss itself (and run onDismiss below).
+  document.addEventListener("pointerdown", onDown, true);
+  const opened = showConfirmPopover(del, {
+    msg: t("hlDeleteConfirm"),
+    yesText: t("hlDelete"),
+    noText: t("cancel"),
+    onDismiss: () => document.removeEventListener("pointerdown", onDown, true),
+    // Deferred one task: a Tab-out has landed on its target by then.
+    onCancel: () => { setTimeout(refocus, 0); },
+    onConfirm: async () => {
+      try { return await _pbpHlDeleteItem(id, del); } finally { refocus(); }
+    },
+  });
+  if (!opened) document.removeEventListener("pointerdown", onDown, true);
 }
 
 // One-time DOM build: filter row + list + zero-items hint + empty-filter hint
@@ -2920,12 +2962,7 @@ function _pbpHlBuildItemEl(m) {
   del.title = delLabel;
   del.setAttribute("aria-label", delLabel);
   del.innerHTML = (typeof PBP_ICONS === "object" && PBP_ICONS && PBP_ICONS.cross) || "";
-  del.addEventListener("click", () => showConfirmPopover(del, {
-    msg: t("hlDeleteConfirm"),
-    yesText: t("hlDelete"),
-    noText: t("cancel"),
-    onConfirm: () => _pbpHlDeleteItem(m.id, del),
-  }));
+  del.addEventListener("click", () => _pbpHlNbConfirmDelete(del, m.id));
   li.appendChild(del);
 
   if (m.noteExcerpt) {

@@ -1654,6 +1654,80 @@ function selectionRange(n, start, end) {
     outside.remove();
   }
 
+  section("(13) delete confirm hands focus back to the same row after a cross-tab rebuild");
+  {
+    const threeItems = () => {
+      const rec = baseRecord();
+      rec.items.push({ id: "h-gamma", n: 3, quote: "Gamma", prefix: "", suffix: " paragraph", color: 2, note: "", ts: 3000 });
+      return rec;
+    };
+    const rowBtn = (id, cls) => document.querySelector('#hl-list li[data-hl-id="' + id + '"] .' + cls);
+    const tick = () => new Promise((r) => setTimeout(r, 0));
+    const fresh = async () => { await boot(threeItems()); pbpHlRestore(); _pbpHlNotebookRender(); };
+    // Open the real confirm on a row's x, then let "another tab" rebuild the list.
+    const openThenRebuild = async (id, mutate) => {
+      const del = rowBtn(id, "hl-item-del");
+      del.focus(); del.click(); await tick();
+      if (mutate) mutate();
+      _pbpHlNotebookRender(); // what the storage.onChanged path runs
+      return del;
+    };
+    const desc = (el) => el ? ((el.closest && el.closest("li") ? el.closest("li").dataset.hlId + " " : "") + (el.className || el.tagName)) : "null";
+
+    await fresh();
+    const old1 = await openThenRebuild("h-beta");
+    check("fixture: the rebuild replaced the confirm's opener", !old1.isConnected && !!document.querySelector(".confirm-popover"));
+    document.querySelector(".confirm-popover .confirm-no").click(); await tick();
+    check("Cancel after a rebuild returns focus to the same row's x, not body",
+      document.activeElement === rowBtn("h-beta", "hl-item-del"), desc(document.activeElement));
+
+    await fresh();
+    await openThenRebuild("h-beta");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await tick();
+    check("Escape after a rebuild returns focus to the same row's x, not body",
+      document.activeElement === rowBtn("h-beta", "hl-item-del"), desc(document.activeElement));
+
+    await fresh();
+    await openThenRebuild("h-beta");
+    document.querySelector(".confirm-popover .confirm-yes").click(); await settle();
+    check("confirming after a rebuild deletes the row and focuses the row that took its place",
+      !rowBtn("h-beta", "hl-item-del") && document.activeElement === rowBtn("h-gamma", "hl-item-del"), desc(document.activeElement));
+
+    await fresh();
+    await openThenRebuild("h-beta", () => { _pbpHlState.items = _pbpHlState.items.filter((it) => it.id !== "h-beta"); });
+    document.querySelector(".confirm-popover .confirm-no").click(); await tick();
+    check("Cancel after another tab removed the row focuses the row that took its place",
+      document.activeElement === rowBtn("h-gamma", "hl-item-del"), desc(document.activeElement));
+
+    await fresh();
+    await openThenRebuild("h-gamma", () => { _pbpHlState.items = _pbpHlState.items.filter((it) => it.id !== "h-gamma"); });
+    document.querySelector(".confirm-popover .confirm-no").click(); await tick();
+    check("Cancel after the last row vanished focuses the row above it",
+      document.activeElement === rowBtn("h-beta", "hl-item-del"), desc(document.activeElement));
+
+    await fresh();
+    await openThenRebuild("h-beta");
+    const away = document.createElement("button");
+    away.id = "focus-away"; document.getElementById("fixture").appendChild(away);
+    away.focus(); await tick(); await tick();
+    check("moving focus out of the confirm is not pulled back to the list",
+      document.activeElement === away && !document.querySelector(".confirm-popover:not(.is-closing)"), desc(document.activeElement));
+    away.remove();
+
+    await fresh();
+    await openThenRebuild("h-beta");
+    document.getElementById("fixture").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
+    await tick(); await tick();
+    check("a pointer press outside the confirm does not pull focus into the list",
+      !document.querySelector(".confirm-popover:not(.is-closing)") && !document.getElementById("hl-list").contains(document.activeElement), desc(document.activeElement));
+
+    await fresh();
+    const kept = rowBtn("h-alpha", "hl-item-del");
+    kept.focus(); kept.click(); await tick();
+    document.querySelector(".confirm-popover .confirm-no").click(); await tick();
+    check("Cancel without a rebuild still returns focus to the original x", document.activeElement === kept, desc(document.activeElement));
+  }
+
   document.getElementById("summary").textContent =
     "PASS " + PASS + " / FAIL " + FAIL + " (total " + (PASS + FAIL) + ")";
   document.getElementById("summary").style.color = FAIL ? "#c00" : "#0a0";
