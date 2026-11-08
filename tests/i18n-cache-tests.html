@@ -71,6 +71,32 @@
     storage: { local: { get: async () => { throw new RangeError("boom-storage"); } } } }), fetch);
   await failing("fetch", () => ({ runtime: baseRuntime, i18n: { getMessage: () => "", getUILanguage: () => "en" },
     storage: { local: { get: async () => ({ optLang: "zh_CN" }) } } }), async () => { throw new TypeError("boom-fetch"); });
+  // A non-2xx locale response is logged with the language and status only (never
+  // the body), and the cached dictionary and stamp it would have replaced stay.
+  {
+    const warns = [];
+    const mirror = new Map([["pp-i18n-lang", "zh_CN"], ["pp-i18n-stamp", "zh_CN@2.100"],
+      ["pp-i18n-msgs", JSON.stringify({ vocabDriveSyncNow: { message: "旧同步按钮" } })]]);
+    const before = JSON.stringify([...mirror]);
+    const storage = { getItem: key => mirror.get(key) ?? null,
+      setItem: (key, value) => mirror.set(key, String(value)), removeItem: key => mirror.delete(key) };
+    const chrome = { runtime: { getURL: path => "../" + path, getManifest: () => ({version:"2.118"}) },
+      storage: { local: { get: async () => ({ optLang: "zh_CN" }) } },
+      i18n: { getMessage: () => "", getUILanguage: () => "en" } };
+    const api = new Function("chrome", "localStorage", "fetch", "document", "getSettingsStorage", "console",
+      source + "\nreturn {initI18n,pbpI18nReady,t};")(chrome, storage,
+      async () => new Response("private-body-secret", { status: 503 }),
+      document.implementation.createHTMLDocument(), undefined, { warn: (...a) => warns.push(a.join(" ")) });
+    api.initI18n();
+    let resolved = true;
+    try { await api.pbpI18nReady(); } catch (_) { resolved = false; }
+    check("non-2xx locale: pbpI18nReady still resolves", resolved);
+    check("non-2xx locale: the trace names the language and the status (" + warns.join(" | ") + ")",
+      warns.some(w => w.includes("[i18n]") && w.includes("zh_CN") && w.includes("503")));
+    check("non-2xx locale: the response body is not logged", !warns.some(w => w.includes("private-body-secret")));
+    check("non-2xx locale: the cached dictionary and stamp are not overwritten",
+      JSON.stringify([...mirror]) === before && api.t("vocabDriveSyncNow") === "旧同步按钮");
+  }
   console.log(`pass=${pass} fail=${fail}`);
 })();
 </script></body></html>
