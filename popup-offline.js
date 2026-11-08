@@ -5,6 +5,9 @@
 
 (function () {
   let expanded = false;
+  // Focus noted before a control disables itself (a disabled button gives up
+  // focus on its own), for the redraw that follows to hand back.
+  let heldFocus = null;
 
   function relTime(ts) {
     if (!ts) return "";
@@ -62,14 +65,56 @@
   // (background.js mutateOfflineQueue, single-writer mutex, D1). The popup reads
   // via getQueue() and sends messages for retry/remove; it never writes directly.
 
+  // Focus that sat inside the bar or its list before a redraw, as something a
+  // redraw can find again: the control kind, its row id and its row position.
+  function captureFocus(bar) {
+    const list = $id("offline-queue-list");
+    const el = document.activeElement;
+    if (!el || el === document.body || typeof el.closest !== "function") return null;
+    if (!bar.contains(el) && !(list && list.contains(el))) return null;
+    const row = el.closest(".offline-queue-item");
+    const kind = ["offline-queue-retry", "offline-queue-remove"].find((name) => el.classList.contains(name)) || el.id || "";
+    const rows = list ? [...list.querySelectorAll(".offline-queue-item")] : [];
+    return { el, kind, queueId: row ? row.dataset.queueId : "", index: row ? rows.indexOf(row) : -1 };
+  }
+
+  function canFocus(el) {
+    return !!el && !el.disabled && el.isConnected && el.getClientRects().length > 0;
+  }
+
+  // The redraw removed or hid the focused control: hand focus to the nearest
+  // control that is still there. A control that survived keeps its focus.
+  function restoreFocus(saved) {
+    if (!saved || canFocus(saved.el)) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && active !== saved.el && canFocus(active)) return;
+    const list = $id("offline-queue-list");
+    const rows = list ? [...list.querySelectorAll(".offline-queue-item")] : [];
+    const inRow = (row) => row && saved.kind ? row.querySelector("." + saved.kind) : null;
+    const sameRow = rows.find((row) => row.dataset.queueId === saved.queueId);
+    const nearby = rows.length && saved.index >= 0 ? rows[Math.min(saved.index, rows.length - 1)] : null;
+    const candidates = [
+      saved.queueId && inRow(sameRow),
+      inRow(nearby),
+      $id("offline-queue-toggle"),
+      $id("url-input"),
+      $id("submit-btn"),
+    ];
+    const target = candidates.find((el) => el && canFocus(el));
+    if (target) target.focus({ preventScroll: true });
+  }
+
   async function refreshBar() {
     const { queue: q, pause, account: current } = await getQueueState();
     const bar = $id("offline-queue-bar");
     const text = $id("offline-queue-text");
     if (!bar || !text) return;
+    const savedFocus = captureFocus(bar) || heldFocus;
+    heldFocus = null;
     if (!q.length) {
       bar.classList.add("hidden");
       hideList();
+      restoreFocus(savedFocus);
       return;
     }
     bar.classList.remove("hidden");
@@ -83,6 +128,7 @@
     if (paused) parts.push(paused);
     text.textContent = parts.join(" · ");
     if (expanded) renderList(q, current);
+    restoreFocus(savedFocus);
   }
 
   function hideList() {
@@ -253,6 +299,8 @@
   }
 
   async function onRetry(queueId, btn, service) {
+    const hadFocus = document.activeElement === btn;
+    if (hadFocus) heldFocus = captureFocus($id("offline-queue-bar") || btn);
     btn.disabled = true;
     btn.classList.add("loading");
     try {
@@ -263,7 +311,9 @@
         return;
       }
       if (!resp || !resp.ok) {
+        heldFocus = null;
         btn.disabled = false;
+        if (hadFocus) btn.focus({ preventScroll: true });
         btn.classList.remove("loading");
         btn.innerHTML = PBP_ICONS.refresh;
         btn.classList.add("offline-queue-failed");
@@ -276,7 +326,9 @@
       // Success — background has removed this item; refresh list
       await refreshBar();
     } catch (_) {
+      heldFocus = null;
       btn.disabled = false;
+      if (hadFocus) btn.focus({ preventScroll: true });
       btn.classList.remove("loading");
       btn.innerHTML = PBP_ICONS.refresh;
     }

@@ -3123,6 +3123,21 @@ async function exitEditMode() {
 }
 
 // ===================== Recent Bookmarks =====================
+// Takes a recent row out of the list. The row's own button holds the focus
+// after a confirmed delete; removing it would drop focus to <body>, so hand it
+// to the next row (or the previous one), then to the form when none is left.
+// Focus that was never in the row stays where it is.
+function pbpRemoveRecentRow(row) {
+  const active = document.activeElement;
+  const held = !!active && active !== document.body && row.contains(active);
+  const sibling = [row.nextElementSibling, row.previousElementSibling].find((el) => el && el.classList.contains("recent-bm-row"));
+  const neighbour = sibling && (sibling.querySelector(".recent-bm-del") || sibling.querySelector(".recent-bm-item"));
+  row.remove();
+  if (!held) return;
+  const target = [neighbour, $id("url-input"), $id("submit-btn")].find((el) => el && !el.disabled && el.isConnected);
+  if (target) target.focus({ preventScroll: true });
+}
+
 async function fetchRecentBookmarks(token) {
   const container = $id("recent-bookmarks");
   const account = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
@@ -3226,7 +3241,7 @@ async function fetchRecentBookmarks(token) {
               const data = await resp.json();
               if (data.result_code === "done" || data.result_code === "item not found") {
                 if (typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("recentDeleteFailed");
-                row.remove();
+                pbpRemoveRecentRow(row);
                 // Promise form: an unhandled rejection here (no receiver) would
                 // escape this handler entirely.
                 chrome.runtime.sendMessage({ type: "bookmark_deleted", url: p.href, account })?.catch?.(() => {});

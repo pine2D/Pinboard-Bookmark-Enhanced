@@ -892,6 +892,110 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(message({ reason: "http", httpStatus: 400 }, "pinboard") === "pinboardErrRejected:400", "400 -> " + message({ reason: "http", httpStatus: 400 }, "pinboard"));
     });
 
+    // X5-03 / X5-04: a redraw that removes or hides the focused control hands focus to a
+    // neighbour; focus that was never in the bar is left alone.
+    // X5-02: deleting a recent bookmark takes the focused button with the row.
+    test("deleting a recent bookmark row hands focus to a neighbour", () => {
+      const start = source.indexOf("function pbpRemoveRecentRow(row) {");
+      assert(start >= 0, "pbpRemoveRecentRow is missing");
+      const body = source.slice(start, source.indexOf("\n}\n", start) + 3);
+      assert(source.includes("pbpRemoveRecentRow(row);"), "the delete handler does not use pbpRemoveRecentRow");
+      const host = document.createElement("div");
+      host.innerHTML = '<input id="rb-url"><button id="rb-submit">Save</button><div id="rb-list"></div>';
+      document.body.appendChild(host);
+      try {
+        const byId = (id) => host.querySelector("#" + ({ "url-input": "rb-url", "submit-btn": "rb-submit" }[id] || id));
+        const remove = new Function("$id", "document", body + "\nreturn pbpRemoveRecentRow;")(byId, document);
+        const list = host.querySelector("#rb-list");
+        const build = (names) => {
+          list.textContent = "";
+          return names.map((name) => {
+            const row = document.createElement("div");
+            row.className = "recent-bm-row";
+            row.dataset.name = name;
+            row.innerHTML = '<a class="recent-bm-item" href="https://x.example/' + name + '">x</a><button class="recent-bm-edit"></button><button class="recent-bm-del"></button>';
+            list.appendChild(row);
+            return row;
+          });
+        };
+        const owner = () => document.activeElement.closest(".recent-bm-row")?.dataset.name || (document.activeElement === document.body ? "body" : document.activeElement.id);
+        let rows = build(["a", "b", "c"]);
+        rows[0].querySelector(".recent-bm-del").focus();
+        remove(rows[0]);
+        assert(owner() === "b" && document.activeElement.className === "recent-bm-del", "first row: focus went to " + owner());
+        rows = build(["a", "b", "c"]);
+        rows[2].querySelector(".recent-bm-del").focus();
+        remove(rows[2]);
+        assert(owner() === "b", "last row: focus went to " + owner());
+        rows = build(["a"]);
+        rows[0].querySelector(".recent-bm-del").focus();
+        remove(rows[0]);
+        assert(document.activeElement === byId("url-input"), "only row: focus went to " + owner());
+        // Focus held elsewhere is not taken.
+        rows = build(["a", "b"]);
+        byId("submit-btn").focus();
+        remove(rows[0]);
+        assert(document.activeElement === byId("submit-btn"), "focus outside the row was moved to " + owner());
+      } finally { host.remove(); }
+    });
+
+    await testAsync("the queue bar keeps keyboard focus across redraws", async () => {
+      const host = document.createElement("div");
+      host.innerHTML = '<style>.hidden{display:none}</style><input id="oq-url"><button id="oq-submit">Save</button><div id="oq-bar" class="hidden"><button id="oq-toggle" aria-expanded="false"><span id="oq-text"></span></button><button id="oq-clear">Clear</button></div><div id="oq-list" class="hidden"></div>';
+      document.body.appendChild(host);
+      const ids = { "offline-queue-bar": "oq-bar", "offline-queue-text": "oq-text", "offline-queue-toggle": "oq-toggle", "offline-queue-list": "oq-list", "offline-queue-clear": "oq-clear", "url-input": "oq-url", "submit-btn": "oq-submit" };
+      const byId = (id) => host.querySelector("#" + (ids[id] || id));
+      const state = { queue: ["a", "b", "c"].map((queueId) => ({ queueId, url: "https://" + queueId + ".example/", account: "" })) };
+      const chromeStub = {
+        runtime: {
+          lastError: null,
+          sendMessage: (message, callback) => {
+            if (message.type === "get_offline_queue") callback({ ok: true, queue: state.queue, pause: null, account: "" });
+            else if (message.type === "retry_offline_item") { state.queue = state.queue.filter((item) => item.queueId !== message.queueId); callback({ ok: true, result: { status: "sent" } }); }
+            else callback(null);
+          },
+        },
+        storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } },
+      };
+      const win = {};
+      try {
+        new Function("window", "chrome", "$id", "t", "pbpBookmarkFailureKey", "pbpBookmarkAccountService", popupOfflineSource)(
+          win, chromeStub, byId, (key, ...args) => args.length ? key + ":" + args.join(":") : key, pbpBookmarkFailureKey, pbpBookmarkAccountService);
+        win.PPOffline.init();
+        await win.PPOffline.refresh();
+        byId("offline-queue-toggle").click();
+        const settle = async (done) => { for (let i = 0; i < 40 && !done(); i++) await new Promise((r) => setTimeout(r, 0)); };
+        const rowIds = () => [...byId("offline-queue-list").querySelectorAll(".offline-queue-item")].map((row) => row.dataset.queueId).join();
+        await settle(() => rowIds() === "a,b,c");
+        const button = (queueId, cls) => [...byId("offline-queue-list").querySelectorAll(".offline-queue-item")].find((row) => row.dataset.queueId === queueId).querySelector("." + cls);
+        const where = () => { const el = document.activeElement; return el === document.body ? "body" : (el.closest(".offline-queue-item")?.dataset.queueId || "") + "/" + (el.className || el.id); };
+
+        // Retry in the middle row: the row leaves, focus lands on the next row's retry button.
+        button("b", "offline-queue-retry").focus();
+        button("b", "offline-queue-retry").click();
+        await settle(() => rowIds() === "a,c");
+        assert(rowIds() === "a,c" && where() === "c/offline-queue-retry", "after retry: " + where());
+
+        // Remove on the last row (the confirm has already returned focus to the button).
+        button("c", "offline-queue-remove").focus();
+        state.queue = state.queue.filter((item) => item.queueId !== "c");
+        await win.PPOffline.refresh();
+        assert(rowIds() === "a" && where() === "a/offline-queue-remove", "after remove of the last row: " + where());
+
+        // Focus that is not in the bar stays where it is, whatever the redraw does.
+        byId("url-input").focus();
+        state.queue = state.queue.concat([{ queueId: "d", url: "https://d.example/", account: "" }]);
+        await win.PPOffline.refresh();
+        assert(document.activeElement === byId("url-input"), "a redraw moved focus that was outside the bar: " + where());
+
+        // Clear hides the whole bar: focus moves out to the form.
+        byId("offline-queue-clear").focus();
+        state.queue = [];
+        await win.PPOffline.refresh();
+        assert(byId("offline-queue-bar").classList.contains("hidden") && document.activeElement === byId("url-input"), "after clear: " + where());
+      } finally { host.remove(); }
+    });
+
     await testAsync("the queue bar shows the pause cause", async () => {
       const tr = (key, ...args) => args.length ? `${key}:${args.join(":")}` : key;
       const render = async (queue, pause) => {
@@ -6499,7 +6603,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       // User decision 2026-11-05: the row is still there and the user has to
       // try again, so the card stays until the next delete goes through.
       assert(/showFeedback\(\{[^}]*autoHide: 0[^}]*target: container/.test(block), "the delete failure card hides on a timer");
-      assert(/remedyKey = "recentDeleteFailed"/.test(block) && /pbpDismissRemedyStatus\("recentDeleteFailed"\);\s*row\.remove\(\)/.test(block),
+      assert(/remedyKey = "recentDeleteFailed"/.test(block) && /pbpDismissRemedyStatus\("recentDeleteFailed"\);\s*pbpRemoveRecentRow\(row\)/.test(block),
         "the delete failure card is not retired by the next delete that goes through");
       assert(!/showStatus\(/.test(block), "no failure path may fall back to the form's status card");
       assert((block.match(/reportDeleteFailure\(/g) || []).length === 3, "all failure paths (self-hosted result, API result, network) must use the in-list report");
