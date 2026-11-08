@@ -10519,8 +10519,19 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
 // being listed here. The mark must come from pbpVideoDetect on the page URL.
 {
   const openers = [];
+  const indirect = [];
+  // Literals that name the reader page but are NOT the direct argument of an open call. A URL kept in a
+  // variable and handed to tabs.create later would slip past the direct scan, so every such literal must
+  // be a known non-opener below (file + the code line it sits on + why it cannot open a tab).
+  const nonOpeners = [
+    ["background.js", /u\.pathname === "\/md-preview\.html"/, "pathname comparison in pbpReaderDocumentUrl"],
+    ["background.js", /startsWith\(chrome\.runtime\.getURL\("md-preview\.html"\)\)/, "URL prefix test in _imgFixIsPreviewUrl"],
+    ["background.js", /chrome\.tabs\.query\(\{ url: chrome\.runtime\.getURL\("md-preview\.html"\) \+ "\*" \}\)/, "tabs.query match pattern (lookup only)"],
+    ["background.js", /const base = chrome\.runtime\.getURL\("md-preview\.html"\);/, "orphan sweep prefix, only startsWith-tested against tab urls"],
+  ];
   for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
     const code = stripJsComments(read(f));
+    const covered = [];
     for (const m of code.matchAll(/\bchrome\.(?:tabs|windows)\.(?:create|update)\(/g)) {
       const open = m.index + m[0].length - 1;
       let depth = 0, end = open;
@@ -10530,14 +10541,27 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
       }
       const args = code.slice(open, end + 1);
       if (!args.includes("md-preview.html")) continue;
+      covered.push([open, end]);
       const before = code.slice(Math.max(0, m.index - 2000), m.index);
       const ids = [...new Set(args.match(/[A-Za-z_$][\w$]*/g) || [])];
       const marked = ids.some((id) => new RegExp("const " + id.replace(/\$/g, "\\$") + " = [^;]*\\bpbpVideoDetect\\([^;]*\"&video=1\"").test(before));
       openers.push({ where: f + ":" + code.slice(0, m.index).split("\n").length, marked });
     }
+    for (const m of code.matchAll(/md-preview\.html/g)) {
+      if (covered.some(([lo, hi]) => m.index >= lo && m.index <= hi)) continue;
+      const ls = code.lastIndexOf("\n", m.index) + 1;
+      const le = code.indexOf("\n", m.index);
+      const lineText = code.slice(ls, le < 0 ? code.length : le).trim();
+      // Prose mentions ("Loaded ONLY by md-preview.html") survive only inside block comments that
+      // stripJsComments already removed; anything left is code.
+      if (nonOpeners.some(([nf, re]) => nf === f && re.test(lineText))) continue;
+      indirect.push(f + ":" + code.slice(0, m.index).split("\n").length + " `" + lineText.slice(0, 80) + "`");
+    }
   }
   check(openers.length >= 4,
     `ui-contract: found only ${openers.length} reader openers (${openers.map((o) => o.where).join(", ")}) -- the video=1 opener check is not looking at the real code`);
+  check(indirect.length === 0,
+    `md-preview.html literals outside a direct open call: [${indirect.join("; ")}] -- if one is an opener (URL kept in a variable), compute video=1 with pbpVideoDetect next to the open and extend this scan; if it only compares or queries, add it to nonOpeners with the reason`);
   const unmarked = openers.filter((o) => !o.marked).map((o) => o.where);
   check(unmarked.length === 0,
     `reader openers without the video=1 mark: [${unmarked.join(", ")}] -- compute it with pbpVideoDetect(<page url>) ? "&video=1" : "" next to the open, or a video page paints in the global theme before flipping to the video default`);
