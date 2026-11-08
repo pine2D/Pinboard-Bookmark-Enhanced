@@ -441,7 +441,7 @@ function buildUndoHarness(source, opts) {
       window >= 15 * 60 * 1000 && first.syncs.length === 1 &&
       second.syncs.length === 0 && third.syncs.length === 0 && stamped > 0);
 
-    local[first.PBP_VOCAB_BOOT_SYNC_KEY] = stamped - window - 1;
+    local[first.PBP_VOCAB_BOOT_SYNC_KEY] = stamped - window - 5 * 60 * 1000;
     const later = buildBootDriveSyncHarness(source, { local });
     await later.pbpBootDriveSync({ throttleMs: window });
     check("a wake past the throttle window syncs again",
@@ -474,6 +474,27 @@ function buildUndoHarness(source, opts) {
       alarmRound.syncs.length === 1 && Number(local[alarmRound.PBP_VOCAB_BOOT_SYNC_KEY]) > 0 && wake.syncs.length === 0);
     await alarmRound.pbpBootDriveSync();
     check("alarm-driven syncs still run back to back while stamping", alarmRound.syncs.length === 2);
+  }
+  {
+    // Y3-02 review: a periodic alarm wakes a cold worker. The top-level boot
+    // reads the stamp before the alarm handler writes one, and the stamp is
+    // already a hair older than the window. Only one round may run.
+    const local = {};
+    const probe = buildBootDriveSyncHarness(source, { local });
+    local[probe.PBP_VOCAB_BOOT_SYNC_KEY] = Date.now() - probe.PBP_VOCAB_BOOT_SYNC_MIN_MS - 300;
+    const topLevel = buildBootDriveSyncHarness(source, { local });
+    const alarm = buildBootDriveSyncHarness(source, { local });
+    await Promise.all([
+      topLevel.pbpBootDriveSync({ throttleMs: topLevel.PBP_VOCAB_BOOT_SYNC_MIN_MS }),
+      alarm.pbpBootDriveSync()
+    ]);
+    check("a periodic-alarm wake runs one round, not the boot plus the alarm",
+      topLevel.syncs.length + alarm.syncs.length === 1 && alarm.syncs.length === 1);
+    const lost = {};
+    const stale = buildBootDriveSyncHarness(source, { local: lost });
+    lost[stale.PBP_VOCAB_BOOT_SYNC_KEY] = Date.now() - stale.PBP_VOCAB_BOOT_SYNC_MIN_MS - 10 * 60 * 1000;
+    await stale.pbpBootDriveSync({ throttleMs: stale.PBP_VOCAB_BOOT_SYNC_MIN_MS });
+    check("a stamp well past the window (alarm lost) still lets the wake boot run", stale.syncs.length === 1);
   }
   {
     const router = buildDriveAlarmRouterHarness(source);

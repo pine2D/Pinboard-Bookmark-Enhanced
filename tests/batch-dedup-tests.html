@@ -403,7 +403,7 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     });
     await test("a resumed batch matches window kind and gives each live tab to one entry", async () => {
       const twins = [{id:100, url:"https://example.com/a", title:"A1"}, {id:101, url:"https://example.com/a", title:"A2"}, {id:102, url:"https://example.com/c", title:"C", incognito:true}];
-      const h = await createSaveTagsHarness("pinboard", ["x"], {tabs:twins, liveTabs:[{id:5, url:"https://example.com/a"}, {id:8, url:"https://example.com/a"}, {id:9, url:"https://example.com/c", incognito:true}]});
+      const h = await createSaveTagsHarness("pinboard", ["x"], {tabs:twins, liveTabs:[{id:5, url:"https://example.com/a"}, {id:8, url:"https://example.com/a"}, {id:4, url:"https://example.com/c"}, {id:9, url:"https://example.com/c", incognito:true}]});
       await h.resume(0);
       equal(h.calls.extracted.map(e => e.tabId).join(), "5,8,9");
     });

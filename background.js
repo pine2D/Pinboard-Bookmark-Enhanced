@@ -4038,6 +4038,11 @@ async function pbpVocabDriveResponse(result) {
 // stamp covers the whole round: both datasets run in it.
 const PBP_VOCAB_BOOT_SYNC_KEY = "_vocabBootSyncTs";
 const PBP_VOCAB_BOOT_SYNC_MIN_MS = 15 * 60 * 1000;
+// A periodic-alarm wake runs this top-level path BEFORE the alarm handler
+// stamps, and the alarm arrives a little after its nominal 15 minutes, so the
+// stamp it reads is already just past the window. The slack lets the alarm own
+// that round; a lost alarm is still covered by a later storage-warm wake.
+const PBP_VOCAB_BOOT_SYNC_SLACK_MS = 2 * 60 * 1000;
 
 async function pbpBootDriveSync({ throttleMs = 0 } = {}) {
   if (!PBP_VOCAB_DRIVE_CAPABLE) return { ok: true };
@@ -4060,10 +4065,10 @@ async function pbpBootDriveSync({ throttleMs = 0 } = {}) {
     } catch (e) {
       console.warn("[drive-sync] boot throttle read failed:", e?.name, e?.message);
     }
-    // Stamp BEFORE the run: a failed sync sets its own retryAt/backoff and the
-    // round reconciles drive-sync-retry, so the wake path must not hammer it.
-    if (now - last < throttleMs) return { ok: true, throttled: true };
+    if (now - last < throttleMs + PBP_VOCAB_BOOT_SYNC_SLACK_MS) return { ok: true, throttled: true };
   }
+  // Stamp BEFORE the run: a failed sync sets its own retryAt/backoff and the
+  // round reconciles drive-sync-retry, so the wake path must not hammer it.
   // Both paths stamp: a round an alarm ran also counts toward the cold-start
   // window. Only the throttled path reads it, so alarms stay unthrottled.
   try { await chrome.storage.local.set({ [PBP_VOCAB_BOOT_SYNC_KEY]: now }); }
@@ -4404,7 +4409,7 @@ async function sweepSuggestCache() {
     // Chrome >=130 getKeys() lists keys without deserializing values, so the
     // sweep reads only the two cache families instead of the whole local area
     // (highlights, vocab, previews) while a popup cold-open may share the
-    // backend. Below min-chrome 130 fall back to get(null).
+    // backend. Chrome 123-129 (no getKeys) fall back to get(null).
     let all;
     if (typeof chrome.storage.local.getKeys === "function") {
       const keys = (await chrome.storage.local.getKeys())
