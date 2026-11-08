@@ -317,8 +317,8 @@ function syncHarness(options = {}) {
     libraryAuthIsCurrent: (captured) =>
       captured.account === authAccount && captured.epoch === authEpoch,
     hashOwner: async (value) => { hashInputs.push(value); return OWNER_HASH; },
-    now: options.now || (() => 1_000_000),
-    random: options.random || (() => 0.5)
+    now: options.now === undefined ? (() => 1_000_000) : options.now,
+    random: options.random === undefined ? (() => 0.5) : options.random
   });
   return {
     calls, client, store, outbox, pending, ownerArgs, hashInputs, connectionReads, runner,

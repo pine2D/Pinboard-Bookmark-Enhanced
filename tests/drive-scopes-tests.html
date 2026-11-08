@@ -224,21 +224,21 @@ function statusHarness(source, opts = {}) {
     getCurrentLibraryAuth: async () => ({ account: "alice", epoch: 1 }),
     pbpLibraryAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
     pbpVocabOwnerHash: async () => OWNER_HASH,
-    pbpVocabSyncSnapshot: async () => { if (opts.vocabSnapshotError) throw new Error("vocabulary storage unavailable"); return opts.vocabSnapshot || snapshotOf(); },
+    pbpVocabSyncSnapshot: async () => { if (opts.vocabSnapshotError) throw new Error("vocabulary storage unavailable"); return opts.vocabSnapshot === undefined ? snapshotOf() : opts.vocabSnapshot; },
     pbpVocabGetPreflightState: async () => { if (opts.vocabPreflightError) throw new Error("vocabulary preflight unavailable"); return opts.vocabPreflight === undefined ? null : opts.vocabPreflight; }, // vocab-store returns null when absent
-    pbpNotesSyncSnapshot: async () => { if (opts.notesSnapshotError) throw new Error("notes storage unavailable"); return opts.notesSnapshot || snapshotOf(); },
+    pbpNotesSyncSnapshot: async () => { if (opts.notesSnapshotError) throw new Error("notes storage unavailable"); return opts.notesSnapshot === undefined ? snapshotOf() : opts.notesSnapshot; },
     // notes-sync.js reads storage[key], so an absent record is undefined, not null.
     notesDriveStore: { getPreflightState: async () => opts.notesPreflight },
     dictArchiveDriveStore: {
       getPreflightState: async () => opts.dictionaryPreflight,
-      snapshot: async () => { if (opts.dictionarySnapshotError) throw new Error("dictionary storage unavailable"); return opts.dictionarySnapshot || snapshotOf(); }
+      snapshot: async () => { if (opts.dictionarySnapshotError) throw new Error("dictionary storage unavailable"); return opts.dictionarySnapshot === undefined ? snapshotOf() : opts.dictionarySnapshot; }
     },
     askArchiveDriveStore: {
       getPreflightState: async () => opts.askPreflight,
-      snapshot: async () => { if (opts.askSnapshotError) throw new Error("ask storage unavailable"); return opts.askSnapshot || snapshotOf(); }
+      snapshot: async () => { if (opts.askSnapshotError) throw new Error("ask storage unavailable"); return opts.askSnapshot === undefined ? snapshotOf() : opts.askSnapshot; }
     },
     // The throwing read (Task 3): status must tell "no record" from "unreadable".
-    pbpDriveReadConnState: async (hash) => { if (opts.connectionError) throw new Error("connection state unavailable"); return hash === OWNER_HASH ? (opts.connectionState || null) : null; },
+    pbpDriveReadConnState: async (hash) => { if (opts.connectionError) throw new Error("connection state unavailable"); return hash === OWNER_HASH ? (opts.connectionState === undefined ? null : opts.connectionState) : null; },
     console: spyConsole(warnings)
   };
   const body = [fnSource(source, "function pbpDriveSnapshotStatus"), fnSource(source, "async function pbpGetVocabDriveStatus"),
@@ -265,7 +265,7 @@ function connectHarness(source, opts = {}) {
     pbpVocabDriveIsConnected: async () => local.vocabDriveConnected === true,
     pbpVocabOwnerHash: async () => OWNER_HASH,
     // Task 3's forgiving read: never rejects. connectionState is the shared record as Task 2 writes it.
-    driveConnectionStore: { get: async (hash) => (hash === OWNER_HASH ? structuredClone(opts.connectionState || null) : null) },
+    driveConnectionStore: { get: async (hash) => (hash === OWNER_HASH ? structuredClone(opts.connectionState === undefined ? null : opts.connectionState) : null) },
     pbpVocabDriveForgetIdentity: (...args) => { order.push("forget:" + args.length); },
     pbpObserveDriveIdentity: (permissionId) => { order.push("observe:" + permissionId); },
     driveConnectClient: { async connect() {
