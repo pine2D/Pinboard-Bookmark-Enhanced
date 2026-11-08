@@ -2682,7 +2682,35 @@ function _pbpHlNotebookRender() {
     b.classList.toggle("off", !on);
   });
   const model = pbpHlNotebookModel(items, _pbpHlColorFilter);
-  _pbpHlNbEls.list.replaceChildren(...model.map(_pbpHlBuildItemEl));
+  // The rebuild drops whichever row button holds focus (a confirmed delete
+  // hands focus back to the x, then the whole row is replaced). Note where it
+  // was, and only if it was inside the list: a passive re-render must not
+  // take focus from anywhere else.
+  const nbList = _pbpHlNbEls.list;
+  const focused = document.activeElement;
+  const focusedLi = (focused && nbList.contains(focused)) ? focused.closest("li") : null;
+  const focusSpec = focusedLi ? {
+    id: focusedLi.dataset.hlId,
+    cls: focused.classList.contains("hl-item-del") ? "hl-item-del" : "hl-item-main",
+    index: Array.prototype.indexOf.call(nbList.children, focusedLi),
+  } : null;
+  nbList.replaceChildren(...model.map(_pbpHlBuildItemEl));
+  if (focusSpec) {
+    const rows = Array.from(nbList.children);
+    let target = null;
+    const same = rows.find((r) => r.dataset.hlId === focusSpec.id);
+    if (same) {
+      target = same.querySelector("." + focusSpec.cls);
+      if (!target || target.disabled) target = same.querySelector(".hl-item-del");
+    } else if (rows.length) {
+      // Row is gone: the one that took its place, else the one above.
+      const near = rows[Math.min(focusSpec.index, rows.length - 1)];
+      target = near.querySelector(".hl-item-del");
+    } else {
+      target = _pbpHlNbEls.sec.querySelector(".rail-sec-head");
+    }
+    if (target) { try { target.focus({ preventScroll: true }); } catch (_) {} }
+  }
   _pbpHlNbEls.emptyHint.hidden = !(items.length > 0 && model.length === 0);
   // Orphan note (anchoring round): count-gated like Hypothesis's Orphans
   // tab -- present exactly while orphans exist, gone when healthy, never a
@@ -2834,6 +2862,7 @@ function _pbpHlBuildItemEl(m) {
         && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig"));
 
   const li = document.createElement("li");
+  li.dataset.hlId = m.id; // _pbpHlNotebookRender finds the focused row again after a rebuild
   // Orphan (quote unlocatable in the current content) is visually distinct
   // from dim (temporarily hidden by the translation view): dashed edge +
   // muted, note text still fully readable -- the data outlives the anchor.

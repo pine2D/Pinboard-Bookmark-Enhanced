@@ -1596,6 +1596,64 @@ function selectionRange(n, start, end) {
   await flush();
   check("reader exports reject a failed pending note save", readerRejected);
 
+  section("(12) notebook focus survives a rebuild of the list");
+  {
+    const threeItems = () => {
+      const rec = baseRecord();
+      rec.items.push({ id: "h-gamma", n: 3, quote: "Gamma", prefix: "", suffix: " paragraph", color: 2, note: "", ts: 3000 });
+      return rec;
+    };
+    const rowBtn = (id, cls) => document.querySelector('#hl-list li[data-hl-id="' + id + '"] .' + cls);
+    const aliveItems = (ids) => ids.every((id) => !!rowBtn(id, "hl-item-del"));
+    await boot(threeItems()); pbpHlRestore(); _pbpHlNotebookRender();
+    // This page has no pbpRailCollapsible; stand in for the header it installs.
+    const secEl = document.getElementById("hl-rail-section");
+    if (!secEl.querySelector(".rail-sec-head")) {
+      const head = document.createElement("button"); head.type = "button"; head.className = "rail-sec-head";
+      secEl.prepend(head);
+    }
+    check("fixture: three rows with their ids on the li", aliveItems(["h-alpha", "h-beta", "h-gamma"]));
+
+    // The real path: click x, confirm in the real popover, wait for the commit.
+    const confirmDelete = async (id) => {
+      rowBtn(id, "hl-item-del").focus();
+      rowBtn(id, "hl-item-del").click();
+      await new Promise((r) => setTimeout(r, 0));
+      const yes = document.querySelector(".confirm-popover .confirm-yes");
+      yes.click();
+      await settle();
+    };
+    await confirmDelete("h-beta");
+    const a1 = document.activeElement;
+    check("deleting a middle row leaves focus on a remaining row's delete button, not body",
+      a1 && a1.classList.contains("hl-item-del") && document.getElementById("hl-list").contains(a1) && a1.closest("li").dataset.hlId === "h-gamma",
+      a1 && (a1.className || a1.tagName));
+    await confirmDelete("h-gamma");
+    const a2 = document.activeElement;
+    check("deleting the last row moves focus to the previous row",
+      a2 && a2.classList.contains("hl-item-del") && a2.closest("li").dataset.hlId === "h-alpha", a2 && (a2.className || a2.tagName));
+    await confirmDelete("h-alpha");
+    const a3 = document.activeElement;
+    check("deleting every row leaves focus somewhere in the notebook section, not body",
+      a3 && a3 !== document.body && document.getElementById("hl-rail-section").contains(a3), a3 && (a3.className || a3.tagName));
+
+    // Passive re-render (another tab wrote the key) keeps a key position and never steals focus.
+    await boot(threeItems()); pbpHlRestore(); _pbpHlNotebookRender();
+    rowBtn("h-beta", "hl-item-main").focus();
+    _pbpHlNotebookRender();
+    check("a re-render keeps focus on the same row's main button",
+      document.activeElement === rowBtn("h-beta", "hl-item-main"), document.activeElement && document.activeElement.className);
+    const outside = document.createElement("button");
+    outside.id = "focus-outside"; document.getElementById("fixture").appendChild(outside);
+    outside.focus();
+    _pbpHlNotebookRender();
+    check("a re-render does not pull focus from outside the list", document.activeElement === outside);
+    outside.blur();
+    _pbpHlNotebookRender();
+    check("a re-render with nothing focused focuses nothing", document.activeElement === document.body);
+    outside.remove();
+  }
+
   document.getElementById("summary").textContent =
     "PASS " + PASS + " / FAIL " + FAIL + " (total " + (PASS + FAIL) + ")";
   document.getElementById("summary").style.color = FAIL ? "#c00" : "#0a0";
