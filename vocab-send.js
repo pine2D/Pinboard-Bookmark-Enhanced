@@ -184,7 +184,7 @@ async function pbpVocabSendEcdictTag() {
 async function _pbpVocabSendFlushed(flush, flash) {
   if (typeof flush !== "function") return true;
   let flushed = null;
-  try { flushed = await flush(); } catch (_) {}
+  try { flushed = await flush(); } catch (e) { console.warn("[vocab] settings flush failed:", e?.name, e?.message); }
   if (flushed && flushed.ok) return true;
   flash(false, t("vocabSettingsSaveFailed"));
   return false;
@@ -242,7 +242,8 @@ async function pbpVocabExportTsv({ flash, flush, format = "legacy" } = {}) {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  } catch (_) {
+  } catch (e) {
+    console.warn("[vocab] TSV export failed:", e?.name, e?.message);
     flash(false, t("vocabExportFailed"));
   }
 }
@@ -335,7 +336,8 @@ async function pbpVocabSendToAnki({ flash, flush, port: clickedPort } = {}) {
       // error text; use the generic send failure only when no detail exists.
       flash(false, res.error || t("dictAnkiFailed"));
     }
-  } catch (_) {
+  } catch (e) {
+    console.warn("[vocab] Anki send failed:", e?.name, e?.message);
     flash(false, t("dictAnkiFailed"));
   }
 }
@@ -347,7 +349,7 @@ async function pbpVocabSendToEudic({ flash, flush } = {}) {
   try {
     const pattern = pbpEndpointOriginPattern(PBP_EUDIC_ENDPOINT);
     let granted = false;
-    try { granted = await chrome.permissions.request({ origins: [pattern] }); } catch (_) {}
+    try { granted = await chrome.permissions.request({ origins: [pattern] }); } catch (e) { console.warn("[vocab] Eudic host permission request failed:", e?.name, e?.message); }
     if (!granted) { flash(false, t("dictEudicHostPermissionDenied")); return; }
     if (!(await _pbpVocabSendFlushed(flush, flash))) return;
     const raw = await pbpReadSettingsWithSecrets({ dictEudicToken: SETTINGS_DEFAULTS.dictEudicToken });
@@ -393,7 +395,8 @@ async function pbpVocabSendToEudic({ flash, flush } = {}) {
       // successful send just because no request failed.
       flash(res.added > 0 || res.skipped > 0, msg);
     }
-  } catch (_) {
+  } catch (e) {
+    console.warn("[vocab] Eudic send failed:", e?.name, e?.message);
     flash(false, t("dictEudicFailed"));
   }
 }
