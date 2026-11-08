@@ -411,6 +411,25 @@ let _pbpSearchRegexOn = false;
 let _pbpSearchLastQuery = "";
 let _pbpSearchLastIdx = 0;
 
+// Searchable text of a candidate: textContent, except that text inside an
+// injected UI row (.pbp-img-fix-ui / .pb-tr-err) nested anywhere under the
+// candidate (an image-fix row lands inside .pb-table-wrap, a wrapper div, a
+// forum comment body) is replaced by NUL of equal length, so offsets still
+// line up with _pbpAskRangeFromOffsets and no hit can land in the chrome.
+const _PBP_SEARCH_UI_SEL = ".pbp-img-fix-ui, .pb-tr-err";
+function _pbpSearchTextOf(el) {
+  if (!el.querySelector(_PBP_SEARCH_UI_SEL)) return el.textContent;
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let out = "";
+  let node;
+  while ((node = walker.nextNode())) {
+    const t = node.nodeValue;
+    const p = node.parentElement;
+    out += p && p.closest(_PBP_SEARCH_UI_SEL) ? "\0".repeat(t.length) : t;
+  }
+  return out;
+}
+
 // Candidate containers: #rendered-view's DIRECT children only (matches
 // spec sec.4 -- cross-top-level-block matches are out of scope), filtered
 // by the [hidden] attribute plus the two known view-mode hidden-selectors
@@ -669,10 +688,12 @@ function _pbpSearchRun(query, opts) {
     const cands = _pbpSearchVisibleCandidates(view);
     scan:
     for (const el of cands) {
+      const text = _pbpSearchTextOf(el);
       const hits = _pbpSearchRegexOn
-        ? pbpSearchEnumerateRegex(el.textContent, query, CAP - st.matches.length)
-        : pbpSearchEnumerate(el.textContent, query, CAP - st.matches.length);
+        ? pbpSearchEnumerateRegex(text, query, CAP - st.matches.length)
+        : pbpSearchEnumerate(text, query, CAP - st.matches.length);
       for (const h of hits) {
+        if (text.slice(h.start, h.end).includes("\0")) continue; // regex hit spilling into masked UI text
         st.matches.push({ el: el, start: h.start, end: h.end });
         if (st.matches.length >= CAP) break scan;
       }

@@ -7297,6 +7297,19 @@ suiteIf("_pbpSearchVisibleCandidates ([hidden] children)", "_pbpSearchVisibleCan
     assertEq(out.map((e) => e.tagName).join(","), "P,P", "UI rows leaked into the candidates");
     assert(out.every((e) => !/refresh|translation failed/i.test(e.textContent)), "UI label text is searchable");
   });
+  test("UI rows nested inside a candidate (table wrap, wrapper div) are masked out of the searchable text", () => {
+    const ui = '<div class="pbp-img-fix-ui"><span>Try to fix</span><button hidden>Refresh the original page</button></div>';
+    const v = view('<div class="pb-table-wrap"><table data-pb="1"><tr><td>cell prose</td></tr></table>' + ui + '</div>'
+      + '<div><p>wrapped prose</p>' + ui + '<div class="pb-tr-err">Translation failed</div></div>');
+    const out = _pbpSearchVisibleCandidates(v);
+    assertEq(out.length, 2, "candidates changed");
+    for (const el of out) {
+      const txt = _pbpSearchTextOf(el);
+      assertEq(txt.length, el.textContent.length, "mask must keep offsets aligned");
+      assert(!/refresh|try to fix|translation failed/i.test(txt), "nested UI text is searchable: " + el.className);
+      assert(/prose/.test(txt), "article text lost");
+    }
+  });
 });
 
 // ============ R4: page-session query memory across close/reopen (md-reader.js) ============
