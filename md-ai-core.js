@@ -923,8 +923,12 @@ async function pbpTrCacheSet(url, lang, model, blocksMap, account, meta, replace
   // carries NO time or document semantics -- viewport-priority claiming means
   // writes arrive in whatever order batches finish; consumers must key by
   // blockHash only, never by insertion order.
+  // pbpAiCacheAppend swallows IDB failures and reports false; turn that into
+  // a rejection, because every caller decides "did this land?" (consume
+  // replaceRun, set wroteOk) by whether this promise rejects.
   const key = _pbpTrCacheKey(url, lang, model, account);
-  await pbpAiCacheAppend(key, (prev) => pbpTrCacheApplyWrite(replace ? undefined : prev, blocksMap, meta), Date.now());
+  const ok = await pbpAiCacheAppend(key, (prev) => pbpTrCacheApplyWrite(replace ? undefined : prev, blocksMap, meta), Date.now());
+  if (ok === false) throw new Error("tr cache write failed");
 }
 
 // Auto-extracted terminology cache (spec T1): one entry per account/article/(lang, model),

@@ -387,9 +387,11 @@ async function pbpAiCacheSet(key, result, ts) {
 // inside the transaction and returns the new `result` to store - it must
 // not await or touch other stores. Used by md-ai-core.js's
 // pbpAskHistAppend for ask history; degrades to a no-op on any failure
-// (same swallow-all-errors contract as the rest of this file).
+// (same swallow-all-errors contract as the rest of this file), but reports
+// whether the write landed: true on commit, false on any failure. Callers
+// that gate state on a durable write (pbpTrCacheSet) must read it.
 async function pbpAiCacheAppend(key, transform, ts) {
-  await _pbpAiWriteAndPrune(key, transform, ts == null ? Date.now() : ts, true);
+  return await _pbpAiWriteAndPrune(key, transform, ts == null ? Date.now() : ts, true);
 }
 
 async function pbpAiCacheDelete(key) {

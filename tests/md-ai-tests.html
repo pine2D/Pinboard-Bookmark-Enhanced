@@ -11854,6 +11854,45 @@ suiteIf("tr_ independent cache pool (ZH-6)", "_pbpAiTrRange", () => {
     }
   });
 
+  // G8a-03: the production write path never rejects on its own -- ai-cache.js
+  // swallows every IDB failure. Drive the REAL pbpTrCacheSet into a failing
+  // database open (the shape a quota error takes) instead of a rejecting flushFn.
+  async function withFailingAiDb(fn) {
+    const realOpen = window._pbpAiOpenDB;
+    const realWarn = console.warn;
+    window._pbpAiOpenDB = async () => { throw new DOMException("disk full", "QuotaExceededError"); };
+    console.warn = () => {};
+    try { return await fn(); }
+    finally { window._pbpAiOpenDB = realOpen; console.warn = realWarn; }
+  }
+
+  await atest("a failed IDB write makes pbpAiCacheAppend report false and pbpTrCacheSet reject", async () => {
+    await withFailingAiDb(async () => {
+      assertEq(await pbpAiCacheAppend("tr_fail_probe", () => ({ blocks: {} }), 1), false, "append reports the failed write");
+      let rejected = false;
+      try { await pbpTrCacheSet("https://pbp-test/tr-fail", "zh-Hans", "m", { h1: "x" }, "acct"); }
+      catch (_) { rejected = true; }
+      assert(rejected, "pbpTrCacheSet must reject when nothing reached disk");
+    });
+    assertEq(await pbpAiCacheAppend("tr_ok_probe", () => ({ blocks: {} }), 1), true, "a landed write reports true");
+    await pbpAiCacheDelete("tr_ok_probe");
+  });
+
+  await atest("a replace flush that fails in IndexedDB keeps the flag and records no landed write", async () => {
+    const st = {
+      newly: { h1: "x" }, flushBuf: { h1: "x" }, flushInflight: false, lastFlushTs: 0,
+      url: "https://pbp-test/tr-flush-fail", target: { code: "zh-Hans" }, modelKey: "m", account: "a",
+      runMeta: undefined, replaceRun: true, wroteOk: false
+    };
+    await withFailingAiDb(async () => {
+      _pbpTrFlushCache(st);
+      for (let i = 0; i < 50 && st.flushInflight; i++) await new Promise((r) => setTimeout(r, 10));
+    });
+    assertEq(st.flushInflight, false, "the flush settled");
+    assertEq(st.replaceRun, true, "failed replace keeps the flag so the next write retries it");
+    assertEq(st.wroteOk, false, "nothing landed, so the mixed escalation must not fire");
+  });
+
   // #40: skipped blocks (already written in the target language) are
   // deliberately never cached, so a completeness verdict counting cache hits
   // alone reopened every article carrying one as "partial" -- forever, since
@@ -13268,6 +13307,39 @@ window._t4AsyncDone = (async function () {
       if (st.ctrl) st.ctrl.abort();
       window.callAIStream = savedStream; window.getAICache = savedSummary; window.pbpReadBookmarkConnection = savedConn;
       window.pbpTrCacheSet = savedSet; window.pbpTrCacheGet = savedGet; _pbpTrState = saved;
+      sec.remove(); view.remove(); document.body.classList.remove("tr-bilingual", "tr-only"); window.pbpViewMarkdown = null;
+    }
+  });
+
+  // G8a-03: the end-of-run write through the REAL pbpTrCacheSet, with
+  // IndexedDB failing underneath, must not claim a landed write.
+  await atest("an end-of-run cache write that fails in IndexedDB keeps replaceRun and never escalates to mixed", async () => {
+    const saved = _pbpTrState, savedStream = window.callAIStream, savedSummary = window.getAICache;
+    const savedGet = window.pbpTrCacheGet, savedOpen = window._pbpAiOpenDB, savedWarn = console.warn;
+    const sec = document.createElement("div"); sec.id = "tr-section"; document.body.appendChild(sec);
+    const view = _t4View("<p>article text for the failing write</p>");
+    const st = _t4TrState("https://example.test/t4-write-fail-" + Date.now());
+    st.work = [_t4Work(1, "article text for the failing write", 0)]; _pbpTrState = st;
+    st.replaceRun = true;
+    st.staleVerdict = "prompt";
+    window.pbpTrCacheGet = async () => null;
+    window.getAICache = async () => "";
+    const answer = '{"translations":[{"id":1,"text":"translated failing write"}]}';
+    window.callAIStream = async (settings, prompt, opts, onDelta) => { onDelta(answer, answer); return answer; };
+    window._pbpAiOpenDB = async () => { throw new DOMException("disk full", "QuotaExceededError"); };
+    console.warn = () => {};
+    try {
+      await _pbpTrStart(st);
+      for (let i = 0; i < 50 && st.flushInflight; i++) await new Promise((r) => setTimeout(r, 10));
+      assert(1 in st.trMd, "control: the block was translated and shown");
+      assertEq(st.wroteOk, false, "no write landed");
+      assertEq(st.replaceRun, true, "the replace is still armed for the next write");
+      assertEq(st.staleVerdict, "prompt", "a run that wrote nothing must not turn the entry mixed");
+    } finally {
+      if (st.ctrl) st.ctrl.abort();
+      window._pbpAiOpenDB = savedOpen; console.warn = savedWarn;
+      window.callAIStream = savedStream; window.getAICache = savedSummary;
+      window.pbpTrCacheGet = savedGet; _pbpTrState = saved;
       sec.remove(); view.remove(); document.body.classList.remove("tr-bilingual", "tr-only"); window.pbpViewMarkdown = null;
     }
   });
