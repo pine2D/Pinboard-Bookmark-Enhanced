@@ -65,7 +65,8 @@ try {
     chrome.permissions.contains = async () => true;
     chrome.tabs.query = async () => [{ id: 4242, url: window.continueUrl, status: 'complete', incognito: false }];
     chrome.tabs.get = async () => ({ id: 4242, url: window.continueUrl, status: 'complete', incognito: false });
-    chrome.tabs.create = async () => ({ id: 4243 });
+    window.createdUrls = [];
+    chrome.tabs.create = async (props) => { createdUrls.push(props && props.url); return { id: 4243 }; };
     chrome.storage.local.set = function (items, ...rest) {
       const slots = Object.entries(items || {}).filter(([key]) => key.startsWith('md_preview_data_'));
       if (slots.length) { for (const [, slot] of slots) readerSlots.push(slot); return Promise.resolve(); }
@@ -84,6 +85,20 @@ try {
       return readerSlots[0] || null;
     }, { tracked, urlClean });
     check('Continue hands the reader the bookmark address under ' + JSON.stringify(urlClean ?? 'default'), slot && slot.url === tracked && slot.baseUrl === tracked && slot.sourceTabUrl === tracked && slot.bookmarkUrl === expected, slot);
+  }
+  // A video page opens with the same video=1 first-paint mark the popup and
+  // the shortcut add, so the dark video default applies before first paint;
+  // an ordinary page does not get it.
+  for (const [pageUrl, wantMark] of [['https://www.youtube.com/watch?v=dQw4w9WgXcQ', true], ['https://www.bilibili.com/video/BV1xx411c7mD', true], ['https://example.test/reading', false]]) {
+    const created = await page.evaluate(async (pageUrl) => {
+      window.continueUrl = pageUrl; readerSlots.length = 0; createdUrls.length = 0;
+      const session = _libAskSessions.find(row => row.id === 'render-session-main');
+      const saved = session.url; session.url = pageUrl;
+      try { await _pbpLibAskContinue(session, document.querySelector('.ask-library-actions button')); }
+      finally { session.url = saved; }
+      return createdUrls.slice();
+    }, pageUrl);
+    check('Continue on ' + pageUrl + (wantMark ? ' carries' : ' omits') + ' the video=1 mark', created.length === 1 && /[?&]video=1(&|$)/.test(created[0]) === wantMark && created[0].includes('askSession='), created);
   }
   // The slot's account is the bookmark connection, not the library owner: the
   // reader keeps the slot when it equals the current connection and retires

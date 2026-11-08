@@ -302,7 +302,10 @@ async function _pbpLibAskContinue(session, button) {
     await chrome.storage.local.set({ ["md_preview_data_" + key]: { pending: true, engine: "local", source: "local", tabId: tab.id,
       url, baseUrl: url, sourceTabUrl: url, bookmarkUrl: cleanFailed ? url : pbpBookmarkLookupUrl(url, urlClean), title: session.title, sourceIncognito: false, account, tags: [], description: "", ts: Date.now() } });
     if (!await _pbpLibAskCurrent(owner, revision)) return;
-    await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html") + "?k=" + key + "&askSession=" + encodeURIComponent(session.id) });
+    // video=1 lets md-preview-theme-early.js apply the video dark default
+    // before first paint, as the popup and the shortcut do.
+    const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect(url)) ? "&video=1" : "";
+    await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html") + "?k=" + key + "&askSession=" + encodeURIComponent(session.id) + videoQ });
     key = "";
   } catch (error) { console.warn("[library] Ask reader open failed:", error?.name); if (revision === _libAskRevision) _pbpLibAskStatus(t("askHistoryOpenFailed"), true); }
   finally {

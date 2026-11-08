@@ -1566,7 +1566,9 @@ async function htmlToMarkdownAsync(html, opts) {
                 ts: Date.now()
               }
             });
-            await chrome.tabs.create({ url: "md-preview.html?k=" + k });
+            // video=1: same first-paint mark as the ordinary open below.
+            const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect(tab.url || url)) ? "&video=1" : "";
+            await chrome.tabs.create({ url: "md-preview.html?k=" + k + videoQ });
             opened = true;
           } catch (_) { /* storage quota / tab failure: fall through to the ordinary failure feedback below */ }
           if (opened) {

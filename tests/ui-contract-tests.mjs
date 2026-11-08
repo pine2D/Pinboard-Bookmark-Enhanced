@@ -10509,6 +10509,39 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
     "options.html: each of the eight custom header rows needs a numbered name label and a value box named by its row");
 }
 
+// Every place that opens the reader marks a video page with video=1 (bug
+// sweep G6a-02): md-preview-theme-early.js resolves the "open video pages in
+// dark" default before first paint from that mark alone, so an opener that
+// leaves it off paints a video page in the global theme and flips it once the
+// payload is read. Found by scanning every root script for a tab/window
+// open whose URL names md-preview.html -- a new opener is covered without
+// being listed here. The mark must come from pbpVideoDetect on the page URL.
+{
+  const openers = [];
+  for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
+    const code = stripJsComments(read(f));
+    for (const m of code.matchAll(/\bchrome\.(?:tabs|windows)\.(?:create|update)\(/g)) {
+      const open = m.index + m[0].length - 1;
+      let depth = 0, end = open;
+      for (; end < code.length; end++) {
+        if (code[end] === "(") depth++;
+        else if (code[end] === ")") { depth--; if (depth === 0) break; }
+      }
+      const args = code.slice(open, end + 1);
+      if (!args.includes("md-preview.html")) continue;
+      const before = code.slice(Math.max(0, m.index - 2000), m.index);
+      const ids = [...new Set(args.match(/[A-Za-z_$][\w$]*/g) || [])];
+      const marked = ids.some((id) => new RegExp("const " + id.replace(/\$/g, "\\$") + " = [^;]*\\bpbpVideoDetect\\([^;]*\"&video=1\"").test(before));
+      openers.push({ where: f + ":" + code.slice(0, m.index).split("\n").length, marked });
+    }
+  }
+  check(openers.length >= 4,
+    `ui-contract: found only ${openers.length} reader openers (${openers.map((o) => o.where).join(", ")}) -- the video=1 opener check is not looking at the real code`);
+  const unmarked = openers.filter((o) => !o.marked).map((o) => o.where);
+  check(unmarked.length === 0,
+    `reader openers without the video=1 mark: [${unmarked.join(", ")}] -- compute it with pbpVideoDetect(<page url>) ? "&video=1" : "" next to the open, or a video page paints in the global theme before flipping to the video default`);
+}
+
 if (timingEnabled) {
   console.error(`[ui-contract timing] ${JSON.stringify({
     totalMilliseconds: Math.round(performance.now() - auditStarted),
