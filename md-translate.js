@@ -1195,11 +1195,7 @@ async function pbpTrInit(detail) {
       } else {
         value = changes.translateTargetLang.newValue;
       }
-      const next = { translateTargetLang: value };
-      // Don't swap target mid-run (mixes languages + mis-keys the end-of-run cache);
-      // stash it and apply once the run settles (see _pbpTrStart tail).
-      if (st.running) { st.pendingLangChange = next; return; }
-      _pbpTrApplyTargetLang(st, next).catch(() => {});
+      _pbpTrOnTargetLangSetting(st, { translateTargetLang: value });
     });
   }
 
@@ -1759,6 +1755,7 @@ function _pbpTrTrigger(st) {
     if (!st.staleVerdict) return;
     _pbpTrRetranslate(st).catch(() => {
       st.running = false;
+      if (_pbpTrSettlePendingLang(st)) return;
       const doneAll = st.work.every((w) => (w.n in st.trMd));
       _pbpTrSetStatus(st, doneAll ? "done" : "partial");
     });
@@ -1768,6 +1765,7 @@ function _pbpTrTrigger(st) {
     // Unexpected rejection (setup error etc.): never leave the UI stuck on
     // "翻译中". Reset run flag and settle to a terminal status the user can act on.
     st.running = false;
+    if (_pbpTrSettlePendingLang(st)) return;
     const doneAll = st.work.every((w) => (w.n in st.trMd));
     _pbpTrSetStatus(st, doneAll ? "done" : "partial");
   });
@@ -1984,6 +1982,7 @@ function _pbpTrStaleRetranslateClick(st) {
   if (st.running) return;
   _pbpTrRetranslate(st).catch(() => {
     st.running = false;
+    if (_pbpTrSettlePendingLang(st)) return;
     const doneAll = st.work.every((w) => (w.n in st.trMd));
     _pbpTrSetStatus(st, doneAll ? "done" : "partial");
   });
@@ -2032,6 +2031,27 @@ function _pbpTrResetTranslations(st, opts) {
 // `s` may be passed (test / storage-change fast path) or fetched.
 // No-op-safe if the label element isn't mounted yet.
 // ponytail: passes s from the onChanged event to bypass the memoized stale promise.
+// A target-language setting change. Don't swap target mid-run (mixes
+// languages + mis-keys the end-of-run cache): stash it, and every exit that
+// releases st.running applies it (_pbpTrSettlePendingLang). Applied directly,
+// it also drops any older stash, so a stale choice can never come back later.
+function _pbpTrOnTargetLangSetting(st, next) {
+  if (st.running) { st.pendingLangChange = next; return; }
+  st.pendingLangChange = null;
+  _pbpTrApplyTargetLang(st, next).catch(() => {});
+}
+
+// Apply a language switch stashed while a run was live. Call it right after
+// any `st.running = false`. Returns null when nothing was stashed, otherwise
+// the apply promise (never rejects): the caller then skips painting the old
+// language's status, since the apply already reset the section to idle.
+function _pbpTrSettlePendingLang(st) {
+  const pending = st && st.pendingLangChange;
+  if (!pending) return null;
+  st.pendingLangChange = null;
+  return _pbpTrApplyTargetLang(st, pending).catch(() => {});
+}
+
 async function _pbpTrApplyTargetLang(st, s) {
   s = s || await pbpAiGetSettings();
   // ponytail: uiLangToBCP47 lives in i18n.js; isolated test harnesses may omit it, so ""
@@ -2215,7 +2235,7 @@ async function _pbpTrStart(st) {
   if (st.permissionError) {
     const recovered = await pbpAiRetryWithPermission(st.permissionError, st.s, () => {});
     if (st.rev !== runRev) return;
-    if (!recovered) { st.running = false; return; }
+    if (!recovered) { st.running = false; await _pbpTrSettlePendingLang(st); return; }
     st.permissionError = null;
   }
   if (st.workReady) await st.workReady;    // ensure the deferred st.work build finished
@@ -2228,7 +2248,12 @@ async function _pbpTrStart(st) {
   if (st.rev !== runRev) return;
   _pbpTrApplySkips(st);                    // T3: re-detect every run -- target may have changed since init/last run
   const pending = st.work.filter((w) => !(w.n in st.trMd));
-  if (!pending.length) { st.running = false; _pbpTrSetStatus(st, "done"); _pbpTrShowViewToggle(st); return; }
+  if (!pending.length) {
+    st.running = false;
+    const applied = _pbpTrSettlePendingLang(st);
+    if (applied) { await applied; return; }
+    _pbpTrSetStatus(st, "done"); _pbpTrShowViewToggle(st); return;
+  }
   _pbpTrClearPendingFailures(new Set(pending.map((w) => w.n)));
   st.ctrl = new AbortController();
   // The lifecycle teardown clears st.ctrl. All work in this run must retain
@@ -2451,6 +2476,10 @@ async function _pbpTrStart(st) {
     st.permissionError = queueResult.permissionError;
     const headProg = document.querySelector("#tr-section .rail-sec-progress");
     if (headProg) headProg.textContent = "";
+    // A stashed language switch wins over the old language's partial state;
+    // st.permissionError stays, so the next click still asks for the grant.
+    const applied = _pbpTrSettlePendingLang(st);
+    if (applied) { await applied; return; }
     _pbpTrSetStatus(st, "partial");
     const prog = document.getElementById("tr-progress");
     // Fallback names the problem, not the "Retry" button label (this line is
@@ -2469,12 +2498,8 @@ async function _pbpTrStart(st) {
   // old-language results are now cached under the OLD st.target.code above; apply the
   // change (Task 7: resets filled state + re-arms the button for the new language) and
   // stop — don't persist the old-language status/view.
-  if (st.pendingLangChange) {
-    const pending = st.pendingLangChange;
-    st.pendingLangChange = null;
-    await _pbpTrApplyTargetLang(st, pending).catch(() => {});
-    return;
-  }
+  const appliedLang = _pbpTrSettlePendingLang(st);
+  if (appliedLang) { await appliedLang; return; }
   const doneAll = st.work.every((w) => (w.n in st.trMd));
   _pbpTrSetStatus(st, doneAll ? "done" : "partial"); // partial = Stop / failures: Continue
   // A run where every block fails (offline, dead key) used to leave
@@ -3504,6 +3529,10 @@ function _pbpTrOnArticleWillReplace(detail) {
   // table, "导出" row).
   window.pbpViewMarkdown = null;
   _pbpTrSetStatus(st, "idle");
+  // The run released above may have stashed a language switch. Apply it now
+  // (synchronous when the stash carries the setting), so the replaced handler
+  // probes the new article's cache in the language the reader picked.
+  _pbpTrSettlePendingLang(st);
 }
 
 function _pbpTrOnArticleReplaced(detail) {

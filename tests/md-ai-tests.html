@@ -13344,6 +13344,99 @@ window._t4AsyncDone = (async function () {
     }
   });
 
+  // G8a-04: a target-language change made while a run is live is stashed;
+  // every way the run can end must apply it, not only the normal tail.
+  const frCode = pbpTrResolveTargetLang({ translateTargetLang: "fr" }, "").code;
+  async function withTrRun(url, html, fn) {
+    const saved = _pbpTrState, savedStream = window.callAIStream, savedSummary = window.getAICache;
+    const savedSet = window.pbpTrCacheSet, savedGet = window.pbpTrCacheGet;
+    const sec = document.createElement("div"); sec.id = "tr-section"; document.body.appendChild(sec);
+    const view = _t4View(html);
+    const st = _t4TrState(url + Date.now());
+    _pbpTrState = st;
+    window.pbpTrCacheGet = async () => null;
+    window.pbpTrCacheSet = async () => {};
+    window.getAICache = async () => "";
+    try { await fn(st); }
+    finally {
+      if (st.ctrl) st.ctrl.abort();
+      window.callAIStream = savedStream; window.getAICache = savedSummary;
+      window.pbpTrCacheSet = savedSet; window.pbpTrCacheGet = savedGet; _pbpTrState = saved;
+      sec.remove(); view.remove(); document.body.classList.remove("tr-bilingual", "tr-only"); window.pbpViewMarkdown = null;
+    }
+  }
+
+  await atest("a stashed language switch is applied when the run ends on a host-permission error", async () => {
+    await withTrRun("https://example.test/t4-lang-perm-", "<p>permission article text</p>", async (st) => {
+      st.work = [_t4Work(1, "permission article text", 0)];
+      const permErr = Object.assign(new Error("grant needed"), { code: "host_permission" });
+      window.callAIStream = async () => { st.pendingLangChange = { translateTargetLang: "fr" }; throw permErr; };
+      await _pbpTrStart(st);
+      assertEq(st.running, false, "control: the run ended");
+      assertEq(st.pendingLangChange, null, "the stash is consumed");
+      assertEq(st.target.code, frCode, "the page now targets the language the reader picked");
+      assert(st.permissionError === permErr, "the grant is still owed, so the next click asks for it");
+    });
+  });
+
+  await atest("a stashed language switch is applied when nothing was left to translate", async () => {
+    await withTrRun("https://example.test/t4-lang-empty-", "<p>already done text</p>", async (st) => {
+      st.work = [_t4Work(1, "already done text", 0)];
+      st.trMd[1] = "已完成";
+      let release;
+      st.workReady = new Promise((r) => { release = r; });
+      const runP = _pbpTrStart(st);
+      st.pendingLangChange = { translateTargetLang: "fr" };   // arrives while the run is live
+      release();
+      await runP;
+      assertEq(st.pendingLangChange, null, "the stash is consumed");
+      assertEq(st.target.code, frCode, "the new target took effect");
+      assert(st.status !== "done", "the old language's done state is not painted, got " + st.status);
+    });
+  });
+
+  await atest("a stashed language switch is applied when the article is replaced mid-run", async () => {
+    await withTrRun("https://example.test/t4-lang-swap-", "<p>swap article text</p>", async (st) => {
+      st.work = [_t4Work(1, "swap article text", 0)];
+      st.running = true;
+      st.pendingLangChange = { translateTargetLang: "fr" };
+      _t4FireQuiet("pbp:article-will-replace", 1);
+      assertEq(st.running, false, "control: the replacement released the run");
+      assertEq(st.pendingLangChange, null, "the stash does not outlive the run");
+      assertEq(st.target.code, frCode, "the new article is probed in the new language");
+    });
+  });
+
+  await atest("a stashed language switch is applied when the run throws", async () => {
+    await withTrRun("https://example.test/t4-lang-throw-", "<p>throwing article text</p>", async (st) => {
+      st.work = [_t4Work(1, "throwing article text", 0)];
+      const realSkips = window._pbpTrApplySkips;
+      window._pbpTrApplySkips = () => { st.pendingLangChange = { translateTargetLang: "fr" }; throw new Error("setup bug"); };
+      try {
+        _pbpTrTrigger(st);
+        for (let i = 0; i < 50 && st.running; i++) await new Promise((r) => setTimeout(r, 10));
+        await new Promise((r) => setTimeout(r, 10));
+      } finally { window._pbpTrApplySkips = realSkips; }
+      assertEq(st.running, false, "control: the catch released the run");
+      assertEq(st.pendingLangChange, null, "the stash is consumed");
+      assertEq(st.target.code, frCode, "the new target took effect");
+    });
+  });
+
+  await atest("a direct language switch drops any older stash so it can never come back", async () => {
+    await withTrRun("https://example.test/t4-lang-direct-", "<p>direct article text</p>", async (st) => {
+      st.work = [_t4Work(1, "direct article text", 0)];
+      st.running = true;
+      _pbpTrOnTargetLangSetting(st, { translateTargetLang: "de" });
+      assertEq(st.pendingLangChange && st.pendingLangChange.translateTargetLang, "de", "control: a live run stashes the switch");
+      st.running = false;
+      _pbpTrOnTargetLangSetting(st, { translateTargetLang: "fr" });
+      await new Promise((r) => setTimeout(r, 0));
+      assertEq(st.pendingLangChange, null, "the older stash is dropped");
+      assertEq(st.target.code, frCode, "the latest choice is in effect");
+    });
+  });
+
   await atest("a new article never shares the previous article's in-flight translation", async () => {
     const saved = _pbpTrState, savedStream = window.callAIStream, savedSummary = window.getAICache;
     const savedSet = window.pbpTrCacheSet, savedGet = window.pbpTrCacheGet;
