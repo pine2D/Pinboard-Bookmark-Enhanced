@@ -1486,8 +1486,21 @@ function _pbpAskErrorUi(aEl, error, question, runOpts) {
     const runnable = () => { const st = _pbpAskState;
       return !!st && !st.running && pbpAiAvailable(st.s) && !st.archiveMissing && !st.archiveError; };
     if (!runnable()) return;
+    // A replacement retry may only replace the LAST round. If the user asked
+    // something else after the failed Regenerate, replaceLast would swap that
+    // newer round out; put the old answer back and drop the error bar instead.
+    const isLastRound = () => {
+      const st = _pbpAskState;
+      const bubbles = document.querySelectorAll("#ask-thread .ask-a");
+      return !!st && bubbles[bubbles.length - 1] === aEl && !!st.records
+        && st.records[st.records.length - 1] === aEl._askExportRecord;
+    };
+    const replacing = !!(runOpts && runOpts.restoreNodes && runOpts.replaceLast);
+    const giveUp = () => { aEl.replaceChildren(...runOpts.restoreNodes); };
+    if (replacing && !isLastRound()) { giveUp(); return; }
     pbpAiRetryWithPermission(error, _pbpAskState && _pbpAskState.s, () => {
       if (!runnable()) return;
+      if (replacing && !isLastRound()) { giveUp(); return; }
       if (aEl.contains(document.activeElement)) {
         aEl.tabIndex = -1;
         aEl.focus();
