@@ -4498,6 +4498,8 @@ function pbpAiErrorEnvelope(err) {
   if (err && typeof err.code === "string" && err.code) envelope.code = err.code;
   if (err && typeof err.status === "number") envelope.status = err.status;
   if (err && typeof err.paramHint === "string" && err.paramHint) envelope.paramHint = err.paramHint;
+  // Only the two names the popup acts on (a timeout reads "signal timed out").
+  if (err && (err.name === "TimeoutError" || err.name === "AbortError")) envelope.name = err.name;
   return envelope;
 }
 

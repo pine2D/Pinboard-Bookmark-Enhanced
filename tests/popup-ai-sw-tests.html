@@ -661,6 +661,15 @@ function buildRouterHarness(source, opts) {
       keys.every((k) => r.error[k] !== undefined);
   });
 
+  await testCase("a timeout keeps its name on the wire; other error names do not ride along", async () => {
+    const run = async (name) => {
+      const h = buildAiHarness(source, { settings: {}, callAI: async () => { const e = new Error("signal timed out"); e.name = name; throw e; } });
+      return (await h.pbpRunPopupAiCall(baseMessage())).error;
+    };
+    const t = await run("TimeoutError"), a = await run("AbortError"), o = await run("TypeError");
+    return t.name === "TimeoutError" && a.name === "AbortError" && !("name" in o) && t.message === "signal timed out";
+  });
+
   await testCase("the envelope never carries the stack, the prompt or the settings", async () => {
     const h = buildAiHarness(source, {
       settings: { openaiApiKey: "sk-live-REAL" },
@@ -669,7 +678,7 @@ function buildRouterHarness(source, opts) {
     const r = await h.pbpRunPopupAiCall(baseMessage({ prompt: "SECRET PROMPT BODY" }));
     const wire = JSON.stringify(r);
     return !("stack" in r.error) && !wire.includes("SECRET PROMPT BODY") && !wire.includes("sk-live-REAL") &&
-      Object.keys(r.error).every((k) => ["message", "code", "status", "paramHint"].includes(k));
+      Object.keys(r.error).every((k) => ["message", "code", "status", "paramHint", "name"].includes(k));
   });
 
   await testCase("a failure leaves a trace before it is folded into a product code", async () => {

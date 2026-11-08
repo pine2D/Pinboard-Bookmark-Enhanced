@@ -4247,6 +4247,17 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "a provider reply with a status was flattened into the unreachable text");
     });
 
+    await testAsync("a worker timeout renders the localized timeout text, not Chromium's English", async () => {
+      const h = makePopupAi({
+        realErrorCard: true,
+        respond: async () => ({ ok: false, error: { message: "signal timed out", name: "TimeoutError" } }),
+      });
+      await h.doAISummary(false);
+      const shown = h.el["ai-error-message"].textContent;
+      assert(enMessages.trErrTimeout && shown === `[OpenAI] ${enMessages.trErrTimeout.message}`, "timeout not localized, got: " + shown);
+      assert(!/signal timed out/i.test(shown), "the raw timeout text reached the card: " + shown);
+    });
+
     await testAsync("a worker diagnostic code renders as the generic failure, not its log string", async () => {
       const h = makePopupAi({
         realErrorCard: true,

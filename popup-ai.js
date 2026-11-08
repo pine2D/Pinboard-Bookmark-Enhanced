@@ -517,7 +517,8 @@ function showAIError(op, err, opSettings) {
     // the raw text stays under Details (critique 2026-10-21).
     msgEl.textContent = t("aiErrorUnreachable", provLabel, _aiEndpointHost(s) || provLabel);
   } else {
-    msgEl.textContent = `[${provLabel}] ${short}`;
+    // Chromium's "signal timed out" is English in every UI language.
+    msgEl.textContent = `[${provLabel}] ${err?.name === "TimeoutError" ? t("trErrTimeout") : short}`;
     // The service itself may be down: point at its status page, inline after
     // the reason (a fourth button would wrap the action row at popup width).
     const statusUrl = pbpAiStatusPageUrl(s, err);
@@ -1092,6 +1093,7 @@ function pbpAiErrorFromEnvelope(envelope) {
   if (code) err.code = code;
   if (envelope && typeof envelope.status === "number") err.status = envelope.status;
   if (envelope && typeof envelope.paramHint === "string" && envelope.paramHint) err.paramHint = envelope.paramHint;
+  if (envelope && (envelope.name === "TimeoutError" || envelope.name === "AbortError")) err.name = envelope.name;
   return err;
 }
 
