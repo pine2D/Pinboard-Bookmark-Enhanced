@@ -13423,6 +13423,43 @@ window._t4AsyncDone = (async function () {
     });
   });
 
+  // Review round 2: a stash that names the language already in effect (an
+  // optSyncEnabled reroute re-reads the same value; X then back again) is not
+  // a switch. The exits must still paint their own status, not stay on
+  // "translating" with running already false.
+  await atest("a same-language stash does not leave the host-permission exit on translating", async () => {
+    await withTrRun("https://example.test/t4-lang-same-perm-", "<p>same perm article text</p>", async (st) => {
+      st.work = [_t4Work(1, "same perm article text", 0)];
+      const permErr = Object.assign(new Error("grant needed"), { code: "host_permission" });
+      window.callAIStream = async () => { st.pendingLangChange = { translateTargetLang: "zh-Hans" }; throw permErr; };
+      await _pbpTrStart(st);
+      assertEq(st.running, false, "control: the run ended");
+      assertEq(st.pendingLangChange, null, "the stash is consumed");
+      assertEq(st.target.code, "zh-Hans", "control: the language did not move");
+      assertEq(st.status, "partial", "the permission exit paints partial");
+    });
+  });
+
+  await atest("a same-language stash does not leave the run-throws catch on translating", async () => {
+    await withTrRun("https://example.test/t4-lang-same-throw-", "<p>same throw article text</p>", async (st) => {
+      st.work = [_t4Work(1, "same throw article text", 0)];
+      const realSkips = window._pbpTrApplySkips;
+      window._pbpTrApplySkips = () => {
+        st.pendingLangChange = { translateTargetLang: "zh-Hans" };
+        _pbpTrSetStatus(st, "translating");   // the run already painted its busy state
+        throw new Error("setup bug");
+      };
+      try {
+        _pbpTrTrigger(st);
+        for (let i = 0; i < 50 && st.running; i++) await new Promise((r) => setTimeout(r, 10));
+        await new Promise((r) => setTimeout(r, 10));
+      } finally { window._pbpTrApplySkips = realSkips; }
+      assertEq(st.running, false, "control: the catch released the run");
+      assertEq(st.pendingLangChange, null, "the stash is consumed");
+      assert(st.status !== "translating", "the catch paints a terminal status, got " + st.status);
+    });
+  });
+
   await atest("a direct language switch drops any older stash so it can never come back", async () => {
     await withTrRun("https://example.test/t4-lang-direct-", "<p>direct article text</p>", async (st) => {
       st.work = [_t4Work(1, "direct article text", 0)];

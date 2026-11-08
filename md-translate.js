@@ -2027,10 +2027,6 @@ function _pbpTrResetTranslations(st, opts) {
   if (!(opts && opts.keepMode) && st.mode !== "original") _pbpTrSetMode(st, "original", false);
 }
 
-// Re-resolve target language from settings and update the rail label.
-// `s` may be passed (test / storage-change fast path) or fetched.
-// No-op-safe if the label element isn't mounted yet.
-// ponytail: passes s from the onChanged event to bypass the memoized stale promise.
 // A target-language setting change. Don't swap target mid-run (mixes
 // languages + mis-keys the end-of-run cache): stash it, and every exit that
 // releases st.running applies it (_pbpTrSettlePendingLang). Applied directly,
@@ -2042,16 +2038,30 @@ function _pbpTrOnTargetLangSetting(st, next) {
 }
 
 // Apply a language switch stashed while a run was live. Call it right after
-// any `st.running = false`. Returns null when nothing was stashed, otherwise
-// the apply promise (never rejects): the caller then skips painting the old
-// language's status, since the apply already reset the section to idle.
+// any `st.running = false`. Returns the apply promise (never rejects) only
+// when the target language actually moved: the caller then skips painting
+// the old language's status, since the apply already reset the section to
+// idle. Returns null otherwise -- nothing stashed, or a stash naming the
+// language already in effect (an optSyncEnabled reroute re-reads the same
+// value; X then back again). That apply only refreshes the label and resets
+// nothing, so the caller must still paint its own status, or the section
+// stays on "translating" with running already false.
+// The stash is always a settings object, so the apply runs synchronously up
+// to its same-code return, and st.target is already settled when read here.
 function _pbpTrSettlePendingLang(st) {
   const pending = st && st.pendingLangChange;
   if (!pending) return null;
   st.pendingLangChange = null;
-  return _pbpTrApplyTargetLang(st, pending).catch(() => {});
+  const prevCode = st.target && st.target.code;
+  const applied = _pbpTrApplyTargetLang(st, pending).catch(() => {});
+  if ((st.target && st.target.code) === prevCode) return null;
+  return applied;
 }
 
+// Re-resolve target language from settings and update the rail label.
+// `s` may be passed (test / storage-change fast path) or fetched.
+// No-op-safe if the label element isn't mounted yet.
+// ponytail: passes s from the onChanged event to bypass the memoized stale promise.
 async function _pbpTrApplyTargetLang(st, s) {
   s = s || await pbpAiGetSettings();
   // ponytail: uiLangToBCP47 lives in i18n.js; isolated test harnesses may omit it, so ""
