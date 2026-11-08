@@ -250,6 +250,11 @@
     btn.classList.add("loading");
     try {
       const resp = await retryItem(queueId);
+      if (resp && resp.result && resp.result.reason === "gone") {
+        // Delivered by the automatic replay (or removed) since the list was drawn.
+        await refreshBar();
+        return;
+      }
       if (!resp || !resp.ok) {
         btn.disabled = false;
         btn.classList.remove("loading");

@@ -1705,9 +1705,11 @@ function retryOfflineItem(queueId) {
       // it (onFailure above): a retry that sends nothing keeps the cause.
       const outcomes = await drainOfflineQueueIds([queueId], { manual: true });
       const outcome = outcomes[0];
-      return outcome
-        ? { ok: outcome.acknowledged, result: outcome.result }
-        : { ok: false, result: pbpSaveFailure("invalid") };
+      if (outcome) return { ok: outcome.acknowledged, result: outcome.result };
+      // A manual drain has no skip rule, so no outcome means the record is no
+      // longer queued: the automatic replay delivered it, or it was removed.
+      // Not an error, and not proof of a save either; the popup refreshes.
+      return { ok: false, result: { status: "gone", reason: "gone" } };
     } catch (_) {
       return { ok: false, result: pbpSaveFailure("storage") };
     }

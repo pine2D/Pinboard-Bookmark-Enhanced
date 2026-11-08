@@ -1733,6 +1733,17 @@ test("an over-long tag already in the offline queue stays queued on replay and i
   equal([retried.ok,retried.result.reason,retried.result.tag],[false,"tag_too_long",tag]);
   equal([h.state.calls.length,h.state.queue.map(item=>item.queueId)],[5,[queueId]]);
 });
+test("a manual retry of a record the automatic replay already delivered answers gone, not invalid",async()=>{
+  const h=await workerHarness("linkding",[new TypeError("offline"),[200,{bookmark:null}],[201,ld]]);
+  const queued=await h.submitSaveIntent(saveIntent); equal(queued.status,"queued");
+  await h.processOfflineQueue(); equal(h.state.queue,[]);
+  const calls=h.state.calls.length;
+  const late=await h.retryOfflineItem(queued.queueId);
+  equal([late.ok,late.result.reason],[false,"gone"]);
+  equal(h.state.calls.length,calls,"a gone record was sent again");
+  // A malformed id is still invalid.
+  for(const bad of ["",null,undefined,7]) equal((await h.retryOfflineItem(bad)).result.reason,"invalid");
+});
 // linkding on PostgreSQL inserts the bookmark before its tags (G3), so the
 // failed create leaves this untagged record behind; /check/ finds it next time.
 const ldUntaggedLeftover = {...ldUnscraped,id:23,title:"Title",notes:"Note",tag_names:[],date_added:"2026-11-02T08:00:00.000000Z",date_modified:"2026-11-02T08:00:00.000000Z"};

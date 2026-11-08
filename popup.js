@@ -3508,6 +3508,9 @@ function showSaveQueued(result) {
           showStatus("status-msg", t("bookmarkSaved"), "success");
           return;
         }
+        // Already gone from the queue (replayed meanwhile, or removed): the
+        // refresh above updated the bar; there is nothing left to retry.
+        if (resp && resp.result && resp.result.reason === "gone") { clearSaveError(); return; }
         if (btn) btn.disabled = false;
         showStatus("status-msg", window.PPOffline.retryFailureMessage(resp && resp.result, pbpBookmarkServiceId(settings)), "error", { remedy: true });
       },

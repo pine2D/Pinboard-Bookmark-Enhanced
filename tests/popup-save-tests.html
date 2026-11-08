@@ -948,10 +948,32 @@ test("posts/add default remains replace=yes for existing callers", () => {
       await net.log.cards[0].actions[0].onClick(net.element);
       assert(net.btn.disabled === false, "a failed retry left the button disabled");
       assert(JSON.stringify(net.log.status.at(-1)) === JSON.stringify(["status-msg", "fail:network", "error", { remedy: true }]), "a failed retry gave no reason, or its remedy hid on a timer");
+      // Delivered by the automatic replay before the click: no error and no
+      // "saved" claim (the record may have been removed); the card goes.
+      const gone = run({ status: "queued", queueId: "q3", cause: "network" }, { ok: false, result: { status: "gone", reason: "gone" } });
+      await gone.log.cards[0].actions[0].onClick(gone.element);
+      assert(gone.log.status.length === 0, "a gone record showed a message: " + JSON.stringify(gone.log.status));
+      assert(gone.log.cleared === 2, "the queued card was not cleared (clears: " + gone.log.cleared + ")");
       for (const key of ["saveQueuedServer", "saveQueuedNetwork", "offlineRetry", "bookmarkSaved"]) {
         assert(enMessages[key]?.message, "en catalogue lacks " + key);
       }
       assert(!/offline\)/i.test(enMessages.offlineQueued.message), "the queue bar still blames the network");
+    });
+
+    await testAsync("the offline row's Retry on a record that is already gone refreshes and shows no error", async () => {
+      const start = popupOfflineSource.indexOf("async function onRetry(");
+      const end = popupOfflineSource.indexOf("async function onRemove(", start);
+      assert(start >= 0 && end > start, "onRetry source not found");
+      for (const [resp, wantError] of [[{ ok: false, result: { status: "gone", reason: "gone" } }, false], [{ ok: false, result: { reason: "network" } }, true], [null, true]]) {
+        const log = { refreshed: 0, shown: [] };
+        const btn = { disabled: false, classList: { add() {}, remove() {} }, innerHTML: "" };
+        const onRetry = new Function("retryItem", "refreshBar", "showStatus", "retryFailureMessage", "PBP_ICONS", "setTimeout",
+          popupOfflineSource.slice(start, end) + "\nreturn onRetry;")(
+          async () => resp, async () => { log.refreshed++; }, (...a) => log.shown.push(a), (r) => "fail:" + (r?.reason || ""), { refresh: "" }, () => {});
+        await onRetry("q1", btn, "pinboard");
+        assert((log.shown.length > 0) === wantError, JSON.stringify(resp) + " shown=" + JSON.stringify(log.shown));
+        if (!wantError) assert(log.refreshed === 1 && btn.disabled === true, "gone did not refresh the bar");
+      }
     });
 
     test("unchanged submitted tags retain the existing union behavior", () => {
