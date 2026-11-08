@@ -162,6 +162,23 @@ window.chrome = {
     !$id("vocab-drive-notices").textContent &&
     $id("vocab-drive-clear-notices").closest(".vocab-drive-notice-row").hidden);
 
+  // G4b-03: dismissing notices mid-run must not clear the panel's busy state.
+  _pbpVocabDriveRender({...fixture, vocabulary:dataset({notices:2}), notes:dataset({notices:3})});
+  messages.length = 0;
+  let resolveBusySync;
+  send = (message) => { messages.push(message); return new Promise((resolve) => {resolveBusySync = resolve;}); };
+  const busySync = _pbpVocabDriveAction("vocabDriveSyncNow", true); await task();
+  const clearBtn = $id("vocab-drive-clear-notices");
+  // Simplest miss: leave the dismiss button enabled while busy.
+  check("the dismiss button is disabled while a Drive action runs", clearBtn.disabled, String(clearBtn.disabled));
+  clearBtn.click(); await settle();
+  check("a dismissal click during a run sends nothing and keeps Sync now locked",
+    !messages.some((message) => message.type === "vocabDriveClearNotices") &&
+    $id("vocab-drive-sync").getAttribute("aria-disabled") === "true", JSON.stringify(messages.map((m) => m.type)));
+  resolveBusySync({ok:true, status:fixture}); await busySync;
+  send = async (message) => { messages.push(message); return response || {ok:true,status:fixture}; };
+  check("the dismiss button is usable again once the run ends", !$id("vocab-drive-clear-notices").disabled);
+
   response = null; await renderDriveSyncPanel();
   let resolveAction;
   send = () => new Promise((resolve) => {resolveAction = resolve;});

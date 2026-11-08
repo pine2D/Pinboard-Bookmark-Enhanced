@@ -293,7 +293,7 @@ function _pbpVocabDriveSetBusy(busy, focusOwner, phaseKey) {
     state.classList.remove("ok", "bad");
     state.textContent = t(phaseKey || "vocabDriveWorking");
   }
-  for (const id of ["vocab-drive-connect", "vocab-drive-sync", "vocab-drive-disconnect"]) {
+  for (const id of ["vocab-drive-connect", "vocab-drive-sync", "vocab-drive-disconnect", "vocab-drive-clear-notices"]) {
     const button = $id(id);
     if (!button) continue;
     const keepFocused = _vocabDriveBusy && button === focusOwner;
@@ -927,6 +927,9 @@ if (_vocabDriveSync) _vocabDriveSync.addEventListener("click", () =>
   _pbpVocabDriveAction("vocabDriveSyncNow", true));
 const _vocabDriveClearNotices = $id("vocab-drive-clear-notices");
 if (_vocabDriveClearNotices) _vocabDriveClearNotices.addEventListener("click", async () => {
+  // Settling this answer would repaint the panel and drop the busy state
+  // while a Connect or sync is still running.
+  if (_vocabDriveBusy) return;
   const gen = _driveRenderGen;
   const owner = _driveVisibleOwner === null ? pbpVocabCurrentOwner() : _driveVisibleOwner;
   try {
