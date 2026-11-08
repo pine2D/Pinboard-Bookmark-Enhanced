@@ -272,6 +272,54 @@ async function runMultilingualChecks() {
   });
 }
 
+
+// Transport failures must not leak pbpAnkiCall's own English codes; only text
+// AnkiConnect answered with is passed through. Replies below are the real
+// AnkiConnect envelope shape.
+async function runTransportErrorChecks() {
+  section("pbpAnkiSendRows transport failures");
+  const realFetch = window.fetch;
+  const send = () => pbpAnkiSendRows([{ term:"word" }], { deck:"D", key:"k", port:"9999", ownerCheck:async () => true });
+  const cases = [
+    ["fetch rejects with TypeError (Anki closed)", async () => { throw new TypeError("Failed to fetch"); }],
+    ["fetch aborted (timeout)", async () => { const e = new Error("aborted"); e.name = "AbortError"; throw e; }],
+    ["reply is not JSON", async () => ({ ok:true, text:async () => "<html>Bad gateway</html>" })],
+    ["reply is JSON but not an object", async () => ({ ok:true, text:async () => "null" })]
+  ];
+  try {
+    for (const [label, impl] of cases) {
+      window.fetch = impl;
+      const out = await send();
+      check(label + ": no internal code reaches the UI", out.stage === "deck" && out.error === null, JSON.stringify(out));
+    }
+    window.fetch = async () => ({ ok:true, text:async () => '{"result":null,"error":"collection is not available"}' });
+    const answered = await send();
+    check("AnkiConnect's own error text is passed through", answered.stage === "deck" && answered.error === "collection is not available", JSON.stringify(answered));
+
+    // Later stages: createDeck answers fine, the failing call is a transport error.
+    for (const stage of ["modelNames", "canAddNotesWithErrorDetail", "addNotes"]) {
+      window.fetch = async (_u, init) => {
+        const act = JSON.parse(init.body).action;
+        if (act === "createDeck") return { ok:true, text:async () => '{"result":1700000000001,"error":null}' };
+        if (act === "modelNames") {
+          if (stage === "modelNames") throw new TypeError("Failed to fetch");
+          return { ok:true, text:async () => '{"result":["Pinboard Vocab"],"error":null}' };
+        }
+        if (act === "modelFieldNames") return { ok:true, text:async () => JSON.stringify({ result: PBP_ANKI_FIELDS, error:null }) };
+        if (act === "canAddNotesWithErrorDetail") {
+          if (stage === "canAddNotesWithErrorDetail") throw new TypeError("Failed to fetch");
+          return { ok:true, text:async () => '{"result":[{"canAdd":true}],"error":null}' };
+        }
+        throw new TypeError("Failed to fetch");
+      };
+      const out = await send();
+      check(stage + " transport failure carries no internal code", out.stage !== "done" && out.error === null && out.stage !== "deck", JSON.stringify(out));
+    }
+  } finally {
+    window.fetch = realFetch;
+  }
+}
+
 (async () => {
   section("pbpAnkiSendRows model-field diagnosis");
   const realCall = pbpAnkiCall;
@@ -296,6 +344,7 @@ async function runMultilingualChecks() {
   } finally {
     pbpAnkiCall = realCall;
   }
+  await runTransportErrorChecks();
   await runMultilingualChecks();
   document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
 })();

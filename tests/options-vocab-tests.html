@@ -1748,6 +1748,15 @@ delete document.documentElement.dataset.theme;
       check("C absent/invalid Anki preference keeps legacy payloads and skips hashing",payloads.length===2&&payloads.every(p=>p.format==="legacy"&&!Object.hasOwn(p.rows[0],"wordId")&&typeof p.rows[0].contexts[0]==="string")&&digestCalls===0);
       reset();await pbpVocabSendToAnki({flash,port:"8765",flush:async()=>{format="multilingual";return {ok:true};}});
       check("C format is read after the settings flush",payloads[0]?.format==="multilingual");
+      {
+        const realSend=pbpAnkiSendRows;
+        for(const [label,res,expectLocal] of [["deck transport failure",{stage:"deck",error:null},true],["precheck transport failure",{stage:"precheck",error:null},true],["add transport failure",{stage:"add",error:null,failed:1},true],["AnkiConnect's own answer",{stage:"deck",error:"collection is not available"},false]]){
+          reset();pbpAnkiSendRows=async()=>res;await pbpVocabSendToAnki({flash,port:"8765"});
+          const text=flashes.at(-1)?.text||"";
+          check("C Anki "+label+" shows "+(expectLocal?"the localized failure":"the answered text"),flashes.at(-1)?.ok===false&&(expectLocal?(text.includes("dictAnkiFailed")&&!/timeout|unreachable|failed$/.test(text.replace("dictAnkiFailed",""))):text==="collection is not available"));
+        }
+        pbpAnkiSendRows=realSend;
+      }
       for(const target of ["tsv","anki"]){
         reset();format="multilingual";
         crypto.subtle.digest=async(...args)=>{const out=await digest(...args);owner="acct_bob";return out;};

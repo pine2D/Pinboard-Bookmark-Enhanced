@@ -333,7 +333,8 @@ async function pbpVocabSendToAnki({ flash, flush, port: clickedPort } = {}) {
       flash(false, t("vocabAccountChanged"));
     } else {
       // Pipeline stages (deck/model/precheck/add) carry AnkiConnect's own
-      // error text; use the generic send failure only when no detail exists.
+      // answer; transport failures (Anki closed, timeout, unreadable reply)
+      // arrive as null, so they get the localized send failure.
       flash(false, res.error || t("dictAnkiFailed"));
     }
   } catch (e) {

@@ -170,9 +170,9 @@ function pbpAnkiBuildRequest(action, params, key) {
 function pbpAnkiParseResult(text) {
   let data;
   try { data = JSON.parse(String(text == null ? "" : text)); } catch (_) {
-    return { ok: false, result: null, error: "malformed response" };
+    return { ok: false, result: null, error: "malformed response", transport: true };
   }
-  if (!data || typeof data !== "object") return { ok: false, result: null, error: "malformed response" };
+  if (!data || typeof data !== "object") return { ok: false, result: null, error: "malformed response", transport: true };
   if (data.error != null) return { ok: false, result: data.result == null ? null : data.result, error: String(data.error) };
   return { ok: true, result: "result" in data ? data.result : null, error: null };
 }
@@ -209,10 +209,18 @@ async function pbpAnkiCall(action, params, key, timeoutMs, port) {
     });
     return pbpAnkiParseResult(await resp.text());
   } catch (e) {
-    return { ok: false, result: null, error: (e && e.name === "AbortError") ? "timeout" : "unreachable" };
+    return { ok: false, result: null, error: (e && e.name === "AbortError") ? "timeout" : "unreachable", transport: true };
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Only text AnkiConnect itself answered with may reach the user. The codes
+// pbpAnkiCall makes up (unreachable / timeout / malformed response) are
+// flagged transport and become null, so the UI falls back to its localized
+// send-failure message instead of printing an English code.
+function pbpAnkiAnsweredError(res) {
+  return (res && !res.transport && res.error) ? String(res.error) : null;
 }
 
 // Full send pipeline. opts: {deck, key, port, format, ownerCheck: async () => bool}.
@@ -234,7 +242,7 @@ async function pbpAnkiSendRows(rows, opts) {
   try { notes = rows.map((r) => pbpAnkiNoteFromRow(r, deck, format)); }
   catch (_) {
     out.stage = "input";
-    out.error = "invalid vocabulary identity";
+    out.error = null;
     return out;
   }
 
@@ -242,20 +250,20 @@ async function pbpAnkiSendRows(rows, opts) {
   // settings/owner (spec §3 ordering) -- this pipeline starts at createDeck.
   if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
   const deckRes = await pbpAnkiCall("createDeck", { deck }, key, 10000, port); // idempotent
-  if (!deckRes.ok) { out.stage = "deck"; out.error = deckRes.error; return out; }
+  if (!deckRes.ok) { out.stage = "deck"; out.error = pbpAnkiAnsweredError(deckRes); return out; }
 
   if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
   const models = await pbpAnkiCall("modelNames", {}, key, 10000, port);
-  if (!models.ok || !Array.isArray(models.result)) { out.stage = "model"; out.error = models.error || "modelNames failed"; return out; }
+  if (!models.ok || !Array.isArray(models.result)) { out.stage = "model"; out.error = pbpAnkiAnsweredError(models); return out; }
   if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
   if (!models.result.includes(modelName)) {
     const created = await pbpAnkiCall("createModel", pbpAnkiModelDef(format), key, 10000, port);
-    if (!created.ok) { out.stage = "model"; out.error = created.error; return out; }
+    if (!created.ok) { out.stage = "model"; out.error = pbpAnkiAnsweredError(created); return out; }
   } else {
     const fields = await pbpAnkiCall("modelFieldNames", { modelName }, key, 10000, port);
     if (!fields.ok || !Array.isArray(fields.result)) {
       out.stage = "modelFields";
-      out.error = fields.error || "modelFieldNames failed";
+      out.error = pbpAnkiAnsweredError(fields);
       return out;
     }
     if (!pbpAnkiFieldsMatch(fields.result, format)) {
@@ -271,7 +279,7 @@ async function pbpAnkiSendRows(rows, opts) {
   const can = await pbpAnkiCall("canAddNotesWithErrorDetail", { notes }, key, 30000, port);
   if (!can.ok || !Array.isArray(can.result) || can.result.length !== notes.length) {
     out.stage = "precheck";
-    out.error = can.error || "precheck failed";
+    out.error = pbpAnkiAnsweredError(can);
     return out;
   }
   const addable = [];
@@ -307,7 +315,7 @@ async function pbpAnkiSendRows(rows, opts) {
     out.stage = "add";
     out.failed += addable.length;
     out.failedTerms.push(...addableTerms);
-    out.error = added.error || "addNotes failed";
+    out.error = pbpAnkiAnsweredError(added);
     return out;
   }
   for (let i = 0; i < added.result.length; i++) {
