@@ -5991,6 +5991,32 @@ suiteIf("pbpHlSyncMirrorAll stale mirrors", "pbpHlSyncMirrorAll", () => {
       assertEq(d.querySelector('.pb-tr[data-pb-tr="2"]').dataset.pbHlMirror, "4", "n=2 kept");
     } finally { _pbpHlState = prev; d.remove(); }
   });
+  // The real entry: pbpHlRestore (also what the storage.onChanged absorb calls
+  // after it swaps _pbpHlState.items) must clear mirror bars whose items vanished.
+  test("pbpHlRestore with the items gone clears the mirror bars it left behind", () => {
+    const d = build();
+    const prev = _pbpHlState;
+    try {
+      _pbpHlState = { items: [{ n: 1, color: 3, ts: 1 }, { n: 2, color: 4, ts: 2 }] };
+      pbpHlSyncMirrorAll();
+      assertEq(d.querySelectorAll("[data-pb-hl-mirror]").length > 0, true, "fixture painted no mirror bars");
+      _pbpHlState.items = [];
+      pbpHlRestore();
+      assertEq(d.querySelectorAll("[data-pb-hl-mirror]").length, 0, "restore left stale mirror bars");
+    } finally { _pbpHlState = prev; d.remove(); }
+  });
+  test("pbpHlRestore keeps the mirror bar of an item that stays visible (n=2) and drops n=1", () => {
+    const d = build();
+    const prev = _pbpHlState;
+    try {
+      _pbpHlState = { items: [{ n: 1, color: 3, ts: 1 }, { n: 2, color: 4, ts: 2 }] };
+      pbpHlSyncMirrorAll();
+      _pbpHlState.items = [{ n: 2, color: 4, ts: 2 }];
+      pbpHlRestore();
+      assertEq(d.querySelector('.pb-tr[data-pb-tr="1"]').dataset.pbHlMirror, undefined, "n=1 cleared");
+      assertEq(d.querySelector('.pb-tr[data-pb-tr="2"]').dataset.pbHlMirror, "4", "n=2 kept");
+    } finally { _pbpHlState = prev; d.remove(); }
+  });
 });
 
 // ============ H5: pbpHlLatestColorOnSide (mirror color, pure) ============
