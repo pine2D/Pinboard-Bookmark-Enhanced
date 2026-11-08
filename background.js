@@ -2089,7 +2089,7 @@ async function pbpRouteReaderSaveCommand(command, tab) {
 // ---- End reader bookmark workflow ----
 
 // ---- P1: Shared save function ----
-async function saveFromBackground({ url, title, tab, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
+async function saveFromBackground({ url, pageUrl, title, tab, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
   const startAuth = await getCurrentBookmarkAuth();
   if (!startAuth.token) {
     // This is the earliest possible notification in the SW's lifecycle — it
@@ -2138,8 +2138,8 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   if (tab?.id) {
     try {
       pageInfo = (s._aiTags || s._aiSummary) && hasAIKey(s)
-        ? await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: url })
-        : await getPageInfoFromTab(tab.id, { expectedUrl: url });
+        ? await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: pageUrl || url })
+        : await getPageInfoFromTab(tab.id, { expectedUrl: pageUrl || url });
     } catch (_) { /* content script may not be injected yet — proceed with empty pageInfo */ }
   }
 
@@ -6294,7 +6294,10 @@ chrome.commands.onCommand.addListener(async (command) => {
     const s = await loadSettings();
     const overrides = resolvePrefixSettings(s, cfg.prefix);
     await saveFromBackground({
-      url: tab.url, title: tab.title || tab.url, tab,
+      // url is the bookmark's address (cleaned like the popup does); pageUrl
+      // stays the tab's own address for page reads.
+      url: pbpBookmarkLookupUrl(tab.url, s.urlClean), pageUrl: tab.url,
+      title: tab.title || tab.url, tab,
       settingsOverrides: overrides,
       toread: cfg.toread,
       notifyId: cfg.notifyId,

@@ -1967,6 +1967,49 @@ await suite("unified save pipeline", async () => {
     await batch.handleBatchSave(batchTabs(2));equal(batch.intents.length,2);assert(batch.intents.every(row=>row.prepared.private===true));
   });
 
+  // K0: a bookmark is looked up and saved under the cleaned page address
+  // (pbpBookmarkLookupUrl); page reads stay bound to the tab's own address.
+  const TRACKED = "https://example.com/post?utm_source=newsletter&fbclid=abc&id=7";
+  const CLEANED = pbpBookmarkLookupUrl(TRACKED, SETTINGS_DEFAULTS.urlClean);
+  await test("fixture: the default URL cleaning changes the tracked address", () => {
+    assert(CLEANED !== TRACKED && !/utm_|fbclid/.test(CLEANED), "cleaner left tracking parameters: " + CLEANED);
+  });
+
+  await test("Quick Save and Read Later shortcuts save under the cleaned address and read the page by the tab's own", async () => {
+    const background = await getBackgroundSource();
+    const start = background.indexOf("chrome.commands.onCommand.addListener(");
+    const end = background.indexOf("\n});\n", start);
+    assert(start >= 0 && end > start, "onCommand listener source not found");
+    for (const [command, toread] of [["quick_save", false], ["read_later", true]]) {
+      for (const urlClean of [SETTINGS_DEFAULTS.urlClean, { ...SETTINGS_DEFAULTS.urlClean, enabled: false }, { ...SETTINGS_DEFAULTS.urlClean, onPopupOpen: false }]) {
+        let listener;
+        const saves = [];
+        const chromeStub = { commands: { onCommand: { addListener: fn => { listener = fn; } } },
+          tabs: { query: async () => [{ id: 4, url: TRACKED, title: "Post" }] } };
+        new Function("chrome", "openMarkdownPreviewFromShortcut", "handleSaveTabSet", "showNotification", "t",
+          "pbpRouteReaderSaveCommand", "loadSettings", "resolvePrefixSettings", "saveFromBackground", "pbpBookmarkLookupUrl",
+          background.slice(start, end + 4))(chromeStub, async () => {}, async () => {}, () => {}, k => k,
+          async () => false, async () => ({ urlClean }), () => ({}), async args => { saves.push(args); }, pbpBookmarkLookupUrl);
+        await listener(command);
+        equal(saves.length, 1);
+        const cleaning = urlClean.enabled && urlClean.onPopupOpen;
+        equal(saves[0].url, cleaning ? CLEANED : TRACKED, command + " saved under the wrong address");
+        equal(saves[0].pageUrl, TRACKED, "page reads lost the tab's own address");
+        equal(saves[0].toread, toread);
+      }
+    }
+  });
+
+  await test("saveFromBackground saves under url and reads the page by pageUrl", async () => {
+    for (const withPageUrl of [true, false]) {
+      const reads = [];
+      const h = await createBackgroundSaveHarness({ getPageInfoFromTab: async (id, o) => { reads.push(o.expectedUrl); return null; } });
+      await runBackgroundSave(h, { url: CLEANED, ...(withPageUrl ? { pageUrl: TRACKED } : {}), tab: { id: 9, url: TRACKED, incognito: false } });
+      equal(h.intents[0].url, CLEANED);
+      equal(reads[0], withPageUrl ? TRACKED : CLEANED);
+    }
+  });
+
   // A tab Batch cannot read (no site access without AI) has no known
   // Description: the intent leaves it out and linkding fetches it itself.
   await test("linkding Batch uses the local meta fast path without AI, honors the description preference and leaves an unread tab to linkding", async () => {
