@@ -2,8 +2,8 @@
 // API fixture. No credentials, profiles or remote services from the user.
 import {createRequire} from 'node:module';
 import {createServer} from 'node:http';
-import {mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
+import {tmpdir,homedir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
@@ -68,6 +68,10 @@ const filterNote=only.length?'Only ran '+BLOCKS.filter(selected).length+'/'+BLOC
 if(filterNote)console.log(filterNote.replace('Only ran','Running only'));
 const {chromium}=createRequire(resolve(root,'.qa-scan/package.json'))('playwright');
 const profile=mkdtempSync(join(tmpdir(),'pbp-bookmark-runtime-'));
+// Screenshots are evidence: keep them under $PBP_QA_REPORT_DIR, not the system temp dir.
+const reportBase=process.env.PBP_QA_REPORT_DIR||join(homedir(),'.local/share/pbp-qa-report');
+mkdirSync(reportBase,{recursive:true});
+const evidenceDir=mkdtempSync(join(reportBase,'bookmark-service-runtime-evidence-'));
 const records={linkding:new Map(),karakeep:new Map()}, requests=[], membership=new Set(), wire=[];
 const raceCreates=new Map();
 // The synthetic pages this server publishes. linkding's own scraper reads the
@@ -413,7 +417,7 @@ try{
     await until(()=>options.evaluate(async service=>{const c=await pbpReadBookmarkConnection();return c.service===service&&!!c.account;},service),'selected service persisted');
     await options.setViewportSize({width:400,height:900});
     assert(await options.evaluate(service=>document.getElementById('opt-'+service+'-url').getBoundingClientRect().width>=document.getElementById('opt-'+service+'-token').parentElement.getBoundingClientRect().width-1,service),'server URL field does not fill its form column');
-    await options.locator('#panel-general .settings-section').first().screenshot({path:join(tmpdir(),'pbp-'+service+'-settings.png')});
+    await options.locator('#panel-general .settings-section').first().screenshot({path:join(evidenceDir,'pbp-'+service+'-settings.png')});
     assert(await options.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'settings horizontal overflow');
     const owner=await worker.evaluate(()=>pbpVocabCurrentOwner());
     if(!personalOwner){personalOwner=owner;assert(await worker.evaluate(owner=>pbpVocabSaveWord(owner,{term:'shared',language:'en',gloss:'fixture',contexts:[]}),owner));}
