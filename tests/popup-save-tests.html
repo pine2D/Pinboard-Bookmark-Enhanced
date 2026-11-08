@@ -1016,6 +1016,84 @@ test("posts/add default remains replace=yes for existing callers", () => {
       } finally { host.remove(); }
     });
 
+    // U-01: a Retry held its focus for the redraw even after the user moved on.
+    // Clicking a blank spot (focus drops to <body>) or another control while
+    // the retry is in flight is the user's choice, and neither the success
+    // redraw nor the failure path may pull focus back into the queue.
+    await testAsync("a retry in flight lets go of focus the user moved elsewhere", async () => {
+      const host = document.createElement("div");
+      host.innerHTML = '<style>.hidden{display:none}</style><input id="oqm-url"><button id="oqm-submit">Save</button><button id="oqm-other">Other</button><p id="oqm-blank">blank</p><div id="oqm-bar" class="hidden"><button id="oqm-toggle" aria-expanded="false"><span id="oqm-text"></span></button><button id="oqm-clear">Clear</button></div><div id="oqm-list" class="hidden"></div><div id="status-msg"></div>';
+      document.body.appendChild(host);
+      const ids = { "offline-queue-bar": "oqm-bar", "offline-queue-text": "oqm-text", "offline-queue-toggle": "oqm-toggle", "offline-queue-list": "oqm-list", "offline-queue-clear": "oqm-clear", "url-input": "oqm-url", "submit-btn": "oqm-submit" };
+      const byId = (id) => host.querySelector("#" + (ids[id] || id));
+      const state = { queue: [], pending: null };
+      const chromeStub = {
+        runtime: {
+          lastError: null,
+          sendMessage: (message, callback) => {
+            if (message.type === "get_offline_queue") callback({ ok: true, queue: state.queue, pause: null, account: "" });
+            // Held open until the case answers it, in the worker's { ok, result } shape.
+            else if (message.type === "retry_offline_item") state.pending = (ok) => {
+              if (ok) state.queue = state.queue.filter((item) => item.queueId !== message.queueId);
+              callback(ok ? { ok: true, result: { status: "sent" } } : { ok: false, result: { reason: "network" } });
+            };
+            else callback(null);
+          },
+        },
+        storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } },
+      };
+      const win = {};
+      const settle = async (done) => { for (let i = 0; i < 40 && !done(); i++) await new Promise((r) => setTimeout(r, 0)); };
+      const rowIds = () => [...byId("offline-queue-list").querySelectorAll(".offline-queue-item")].map((row) => row.dataset.queueId).join();
+      const button = (queueId, cls) => [...byId("offline-queue-list").querySelectorAll(".offline-queue-item")].find((row) => row.dataset.queueId === queueId)?.querySelector("." + cls);
+      const where = () => { const el = document.activeElement; return el === document.body ? "body" : (el.closest(".offline-queue-item")?.dataset.queueId || "") + "/" + (el.className || el.id); };
+      const realShowStatus = window.showStatus;
+      window.showStatus = () => {};
+      try {
+        new Function("window", "chrome", "$id", "t", "pbpBookmarkFailureKey", "pbpBookmarkAccountService", popupOfflineSource)(
+          win, chromeStub, byId, (key, ...args) => args.length ? key + ":" + args.join(":") : key, pbpBookmarkFailureKey, pbpBookmarkAccountService);
+        win.PPOffline.init();
+        const reset = async () => {
+          state.queue = ["a", "b", "c"].map((queueId) => ({ queueId, url: "https://" + queueId + ".example/", account: "" }));
+          await win.PPOffline.refresh();
+          if (byId("offline-queue-toggle").getAttribute("aria-expanded") !== "true") byId("offline-queue-toggle").click();
+          await settle(() => rowIds() === "a,b,c");
+        };
+        // Each way of moving on, against each way the retry can end.
+        const moves = {
+          "blank click": () => {
+            byId("oqm-blank").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
+            document.activeElement.blur();
+          },
+          "another control": () => byId("oqm-other").focus(),
+        };
+        for (const [move, act] of Object.entries(moves)) {
+          for (const ok of [true, false]) {
+            await reset();
+            button("b", "offline-queue-retry").focus();
+            button("b", "offline-queue-retry").click();
+            await settle(() => !!state.pending);
+            assert(state.pending, "the retry was not sent");
+            act();
+            const expected = where();
+            state.pending(ok);
+            state.pending = null;
+            await settle(() => ok ? rowIds() === "a,c" : !button("b", "offline-queue-retry").disabled);
+            assert(where() === expected, move + " then " + (ok ? "success" : "failure") + ": focus went to " + where() + ", not " + expected);
+          }
+        }
+        // Control: focus still in the queue keeps its hand-off.
+        await reset();
+        button("b", "offline-queue-retry").focus();
+        button("b", "offline-queue-retry").click();
+        await settle(() => !!state.pending);
+        state.pending(true);
+        state.pending = null;
+        await settle(() => rowIds() === "a,c");
+        assert(where() === "c/offline-queue-retry", "focus left in the queue was not handed to the next row: " + where());
+      } finally { window.showStatus = realShowStatus; host.remove(); }
+    });
+
     await testAsync("the queue bar shows the pause cause", async () => {
       const tr = (key, ...args) => args.length ? `${key}:${args.join(":")}` : key;
       const render = async (queue, pause) => {

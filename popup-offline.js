@@ -298,9 +298,40 @@
     });
   }
 
+  // While a retry is in flight, a click or focus outside the bar and its list
+  // is the user moving on: the held focus must not be pulled back afterwards.
+  // Calls onLeave once and returns the function that stops listening.
+  function watchFocusLeave(onLeave) {
+    const inQueue = (node) => {
+      const bar = $id("offline-queue-bar");
+      const list = $id("offline-queue-list");
+      return !!node && ((bar && bar.contains(node)) || (list && list.contains(node)));
+    };
+    const handler = (ev) => { if (!inQueue(ev.target)) { stop(); onLeave(); } };
+    const stop = () => {
+      document.removeEventListener("pointerdown", handler, true);
+      document.removeEventListener("focusin", handler, true);
+    };
+    document.addEventListener("pointerdown", handler, true);
+    document.addEventListener("focusin", handler, true);
+    return stop;
+  }
+
   async function onRetry(queueId, btn, service) {
-    const hadFocus = document.activeElement === btn;
-    if (hadFocus) heldFocus = captureFocus($id("offline-queue-bar") || btn);
+    let hadFocus = document.activeElement === btn;
+    let stopWatch = null;
+    if (hadFocus) {
+      const held = captureFocus($id("offline-queue-bar") || btn);
+      heldFocus = held;
+      stopWatch = watchFocusLeave(() => {
+        hadFocus = false;
+        if (heldFocus === held) heldFocus = null;
+      });
+    }
+    try { await sendRetry(queueId, btn, service, () => hadFocus); } finally { if (stopWatch) stopWatch(); }
+  }
+
+  async function sendRetry(queueId, btn, service, focusHeld) {
     btn.disabled = true;
     btn.classList.add("loading");
     try {
@@ -313,7 +344,7 @@
       if (!resp || !resp.ok) {
         heldFocus = null;
         btn.disabled = false;
-        if (hadFocus) btn.focus({ preventScroll: true });
+        if (focusHeld()) btn.focus({ preventScroll: true });
         btn.classList.remove("loading");
         btn.innerHTML = PBP_ICONS.refresh;
         btn.classList.add("offline-queue-failed");
@@ -328,7 +359,7 @@
     } catch (_) {
       heldFocus = null;
       btn.disabled = false;
-      if (hadFocus) btn.focus({ preventScroll: true });
+      if (focusHeld()) btn.focus({ preventScroll: true });
       btn.classList.remove("loading");
       btn.innerHTML = PBP_ICONS.refresh;
     }
