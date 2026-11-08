@@ -113,6 +113,29 @@ m.addEventListener("input", () => {
 }
 </script>
 <script>
+// ============ Group R-04/R-05: emptied query leaves no "?" and never touches the hash ============
+{
+  const hashes = ["", "#h", "#h?", "#?", "#a?b=1&c", "#x&y=utm_source=1", "#utm_source=x", "#:~:text=hi?", "#a?utm_source=x&b"];
+  const queries = ["utm_source=x", "utm_source=x&fbclid=1", "&utm_source=x", "utm_source=x&&", "&&&utm_source=x", "&&utm_source=x&", "utm_source=x&&&fbclid=1&&"];
+  let bad = [];
+  for (const h of hashes) for (const q of queries) {
+    const raw = "https://example.com/p?" + q + h;
+    const r = stripTrackingParams(raw, {});
+    if (r.cleaned !== "https://example.com/p" + h) bad.push(raw + " => " + r.cleaned);
+  }
+  b2case("R-04/R-05: tracking-only (or empty) query vanishes, hash byte for byte (" + (bad.length ? bad[0] : "all combos") + ")", bad.length === 0);
+  let bad2 = [];
+  for (const h of hashes) for (const q of ["a=1&&utm_source=x", "&a=1&utm_source=x&", "utm_source=x&&a&&"]) {
+    const r = stripTrackingParams("https://example.com/p?" + q + h, {});
+    const qpart = r.cleaned.slice(0, r.cleaned.length - h.length);
+    if (!r.cleaned.endsWith(h) || !/\?.*a/.test(qpart) || qpart.includes("utm_")) bad2.push(q + h + " => " + r.cleaned);
+  }
+  b2case("R-05: a non-empty segment keeps empty segments as written (" + (bad2.length ? bad2[0] : "ok") + ")", bad2.length === 0);
+  b2case("R-05: exact bytes with a kept segment",
+    stripTrackingParams("https://example.com/p?a=1&&utm_source=x", {}).cleaned === "https://example.com/p?a=1&");
+}
+</script>
+<script>
 // ============ Group B3: setIcon only when URL matches active tab ============
 // Uses the SHIPPED pbpSameBookmark from shared.js (no inline copy).
 {

@@ -5018,12 +5018,11 @@ function stripTrackingParams(urlStr, settings = {}) {
     else kept.push(seg);
   }
   if (removed === 0) return { cleaned: urlStr, removedCount: 0, original };
-  u.search = kept.length ? "?" + kept.join("&") : "";
+  // Only empty segments left ("?&&") counts as an emptied query. Assigning ""
+  // drops the "?" itself, so the hash is never touched.
+  u.search = kept.some(seg => seg !== "") ? "?" + kept.join("&") : "";
 
-  let result = u.toString();
-  if (u.search === "" && result.includes("?")) {
-    result = result.replace(/\?(?=#|$)/, "");
-  }
+  const result = u.toString();
 
   return { cleaned: result, removedCount: removed, original };
 }
