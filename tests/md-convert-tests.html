@@ -3493,11 +3493,33 @@ window._pbpEpubIntegrationDone = (async () => {
   assert(!/id="img0"/.test(opf8), "unmatched images Map entry gets no manifest item either: " + opf8);
 
   // G6b-04: building must not make the live document fetch the article's remote
-  // images (inert host document). Unique URLs, resource-timing entries.
-  const lazyUrls = [1, 2].map(i => `https://img.example.test/g6b04-${Date.now()}-${i}.png`);
+  // images (inert host document). The URLs are same-origin icon files so a live
+  // load really succeeds and leaves a resource-timing entry; unresolvable hosts
+  // may leave no entry at all, which would make the assertion pass for any
+  // implementation. A positive control proves the observation works, and the
+  // wait is bound to load events instead of a fixed delay.
+  const iconUrl = (tag) => new URL(`../icons/app-16.png?${tag}-${Date.now()}`, location.href).href;
+  const timingFor = (urls) => performance.getEntriesByType("resource").filter(e => urls.includes(e.name));
+  const awaitLoads = (imgs) => Promise.all(imgs.map(img => new Promise(res => {
+    if (img.complete) return res();
+    img.addEventListener("load", res, { once: true });
+    img.addEventListener("error", res, { once: true });
+  })));
+  // Positive control: the same markup parsed in a live (detached) div does load.
+  const ctrlUrls = [1, 2].map(i => iconUrl(`g6b04ctrl${i}`));
+  const ctrlHost = document.createElement("div");
+  ctrlHost.innerHTML = ctrlUrls.map(u => `<img src="${u}">`).join("");
+  await awaitLoads([...ctrlHost.querySelectorAll("img")]);
+  await new Promise(r => setTimeout(r, 50));
+  assertEq(timingFor(ctrlUrls).length, 2, "G6b-04 control: images parsed in a live document are observable via resource timing");
+  const lazyUrls = [1, 2].map(i => iconUrl(`g6b04-${i}`));
   pbpBuildEpub({ md: lazyUrls.map(u => `![x](${u})`).join("\n\n"), meta, images: new Map() });
-  await new Promise(r => setTimeout(r, 300));
-  const fetched = performance.getEntriesByType("resource").filter(e => lazyUrls.includes(e.name));
+  // Fence: a later live image finishing means any earlier build-triggered load had its chance.
+  const fenceHost = document.createElement("div");
+  fenceHost.innerHTML = `<img src="${iconUrl("g6b04fence")}">`;
+  await awaitLoads([...fenceHost.querySelectorAll("img")]);
+  await new Promise(r => setTimeout(r, 100));
+  const fetched = timingFor(lazyUrls);
   assertEq(fetched.length, 0, "G6b-04 pbpBuildEpub does not trigger remote image requests in the live document: " + fetched.map(e => e.name).join(", "));
 
   // G6b-05: XML 1.0 illegal characters must not reach content.xhtml / nav / opf.
