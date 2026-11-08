@@ -2105,8 +2105,9 @@ async function saveFromBackground({ url, pageUrl, title, tab, settingsOverrides,
   if (!startAuth.token) {
     // This notification fires before any network round-trip, so on a cold SW
     // the manual-language refresh kicked off by initI18n() at module top may
-    // not have landed yet. The shortcut handler waits for it up front; this
-    // branch also serves the other callers (popup, context menu) that do not.
+    // not have landed yet. The shortcut handler, its only caller today,
+    // already waits for it up front; the await stays so this branch is safe
+    // for any future caller.
     await pbpI18nReady();
     showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("bgSetToken"), "error");
     return pbpSaveFailure("not_logged_in");
