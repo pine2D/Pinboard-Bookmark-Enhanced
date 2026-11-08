@@ -614,8 +614,16 @@ async function _pbpVocabDriveRepaintAfterDenial(gen, actionSeq, owner, denied) {
     if (!(await _pbpVocabDriveCurrent(gen, actionSeq, owner))) return;
     const read = await chrome.runtime.sendMessage({ type: "vocabDriveStatus" });
     if (!read?.ok || !read.status || !(await _pbpVocabDriveCurrent(gen, actionSeq, owner, read.status))) return;
+    // Render hides and reshows the buttons, which drops focus to <body>; put
+    // it back on Connect only if it was there, as _pbpVocabDriveSend does.
+    const button = $id("vocab-drive-connect");
+    const refocus = !!button && document.activeElement === button;
     _pbpVocabDriveRender(read.status);
     _pbpVocabDrivePaintErrors([denied, ..._driveErrorLines], read.status);
+    if (refocus && !button.hidden) {
+      try { button.focus({ preventScroll: true }); }
+      catch (_) { button.focus(); }
+    }
   } catch (error) {
     console.warn("[drive] status re-read after a refused permission failed:", error?.name, error?.message);
   }

@@ -243,7 +243,9 @@ window.chrome = {
   // dropped, and a refused permission prompt repainted nothing, so the notice
   // the worker had already cleared stayed on screen. Either order of the
   // dismissal answer and the refusal must end on the worker's real status
-  // with the refusal still shown.
+  // with the refusal still shown. The mock answers the re-read with the
+  // cleared status even before the dismissal answer arrives: it assumes the
+  // worker's IndexedDB delete finishes before a user refuses the prompt.
   for (const order of ["answer before refusal", "answer after refusal"]) {
     invalidateDriveSyncPanel();
     const permissionLost = withConn({lastError:"permission"});
@@ -260,6 +262,7 @@ window.chrome = {
     chrome.permissions.request = () => new Promise((resolve) => {resolvePrompt = resolve;});
     try {
       $id("vocab-drive-clear-notices").click(); await task();
+      $id("vocab-drive-connect").focus();
       const connecting = _pbpVocabDriveConnect(); await task();
       if (order === "answer before refusal") { resolveClearAnswer({ok:true, status:permissionLost}); await settle(); }
       resolvePrompt(false); await settle();
@@ -273,6 +276,33 @@ window.chrome = {
       err().includes("vocabDrivePermissionDenied") && !$id("vocab-drive-connect").hidden &&
       $id("vocab-drive-body").getAttribute("aria-busy") === "false",
       `notices=${JSON.stringify($id("vocab-drive-notices").textContent)} err=${JSON.stringify(err())} busy=${$id("vocab-drive-body").getAttribute("aria-busy")}`);
+    // The repaint hides and reshows the buttons. Simplest miss: render without
+    // putting focus back, which drops a keyboard user to <body>.
+    check(`a refused Connect keeps focus on the Connect button (${order})`,
+      document.activeElement === $id("vocab-drive-connect"),
+      `active=${document.activeElement?.id || document.activeElement?.tagName}`);
+  }
+  // Focus that was not on Connect stays where it was: the repaint must not
+  // pull it onto the button.
+  {
+    invalidateDriveSyncPanel();
+    const permissionLost = withConn({lastError:"permission"});
+    _pbpVocabDriveRender(permissionLost);
+    _driveVisibleOwner = "acct_alice";
+    send = async (message) => { messages.push(message); return {ok:true, status:permissionLost}; };
+    const prevPrompt = chrome.permissions.request;
+    chrome.permissions.request = async () => false;
+    const elsewhere = document.createElement("button");
+    document.body.appendChild(elsewhere);
+    try {
+      $id("vocab-drive-connect").focus();
+      const connecting = _pbpVocabDriveConnect(); await task();
+      elsewhere.focus();
+      await connecting; await settle();
+      check("a refused Connect does not pull focus back from another control",
+        document.activeElement === elsewhere,
+        `active=${document.activeElement?.id || document.activeElement?.tagName}`);
+    } finally { chrome.permissions.request = prevPrompt; elsewhere.remove(); }
   }
   // The re-read after a refusal answers to Connect's action number: a Sync now
   // started while it is pending keeps the panel and its busy state.
