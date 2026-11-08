@@ -69,6 +69,34 @@ try{
  await page.locator('#ask-thread .ask-retry').click();await page.waitForFunction(()=>!_pbpAskState.running&&!document.querySelector('#ask-thread .ask-retry'));await page.waitForTimeout(100);
  const lone=await page.evaluate(async()=>({records:_pbpAskState.records.map(r=>r.q),bubbles:document.querySelectorAll('#ask-thread .ask-a').length,calls:fixtureCalls,arch:(await pbpAskArchiveRead({owner:pbpDictOwnerScope('ask-fixture')})).find(s=>s.id===_pbpAskState.sessionId).records.map(r=>({q:r.q,replacesId:r.replacesId||''}))}));
  check('retry after a blocked new question still replaces the last round',lone.calls===loneBefore+1&&JSON.stringify(lone.records)===JSON.stringify(['Lone question'])&&lone.bubbles===1&&lone.arch.length===2&&!!lone.arch[1].replacesId,{loneBefore,lone});
+ // Review must-fix: Regenerate (not Retry) on a failed Regenerate must drop the restore mark.
+ await page.locator('#ask-new').click();
+ await page.evaluate(()=>{window.answerStream=label=>async(_s,_p,opts,stream)=>{await opts.beforeRequest?.();fixtureCalls++;const t=label+' answer [P1].\n\nCITES:\nP1: "The surface of the table is scratched."';stream(t,t);return t;};window.failStream=async(_s,_p,opts)=>{await opts.beforeRequest?.();fixtureCalls++;throw new Error('fixture 429');};});
+ await page.evaluate(()=>{callAIStream=answerStream('ORIGINAL');});await send('Mark one question');
+ await page.evaluate(()=>{callAIStream=failStream;});
+ await page.locator('.ask-regenerate').last().click();await page.waitForSelector('#ask-thread .ask-a .ask-retry');
+ await page.evaluate(()=>{callAIStream=answerStream('REGENERATED');});
+ await page.locator('#ask-thread .ask-a .ask-regenerate').last().click();await page.waitForFunction(()=>!_pbpAskState.running&&!document.querySelector('#ask-thread .ask-retry'));await page.waitForTimeout(100);
+ const regenOk=await page.evaluate(()=>({mark:!!document.querySelector('#ask-thread .ask-a')._askPendingRestore,text:document.querySelector('#ask-thread .ask-a').textContent}));
+ check('regenerate after a failed regenerate clears the restore mark',!regenOk.mark&&regenOk.text.includes('REGENERATED')&&!regenOk.text.includes('ORIGINAL'),regenOk);
+ await page.locator('#ask-input').fill('Mark two question');await page.locator('#ask-send').click();
+ await page.waitForFunction(()=>!_pbpAskState.running&&_pbpAskState.records.length===2);await page.waitForTimeout(100);
+ const afterMark=await page.evaluate(()=>{const q1=document.querySelector('#ask-thread .ask-a');return {text:q1.textContent,rec:String(_pbpAskState.records[0].a||_pbpAskState.records[0].answer||'')};});
+ check('a new question keeps the successful regenerate on screen',afterMark.text.includes('REGENERATED')&&!afterMark.text.includes('ORIGINAL')&&afterMark.rec.includes('REGENERATED'),afterMark);
+ // Two failed Regenerates in a row, then a new question: no error bar or Retry may come back.
+ await page.locator('#ask-new').click();
+ await page.evaluate(()=>{callAIStream=answerStream('FIRST');});await send('Twice one question');
+ await page.evaluate(()=>{callAIStream=failStream;});
+ await page.locator('.ask-regenerate').last().click();await page.waitForSelector('#ask-thread .ask-a .ask-retry');
+ await page.locator('#ask-thread .ask-a .ask-regenerate').last().click();await page.waitForFunction(()=>!_pbpAskState.running&&!!document.querySelector('#ask-thread .ask-retry'));await page.waitForTimeout(50);
+ const twice=await page.evaluate(()=>({err:document.querySelectorAll('#ask-thread .ask-err').length,retry:document.querySelectorAll('#ask-thread .ask-retry').length}));
+ check('a second failed regenerate shows a single error bar',twice.err===1&&twice.retry===1,twice);
+ await page.evaluate(()=>{callAIStream=answerStream('LATER');});
+ await page.locator('#ask-input').fill('Twice two question');await page.locator('#ask-send').click();
+ await page.waitForFunction(()=>!_pbpAskState.running&&_pbpAskState.records.length===2);await page.waitForTimeout(100);
+ const twiceAfter=await page.evaluate(()=>{const q1=document.querySelector('#ask-thread .ask-a');return {err:document.querySelectorAll('#ask-thread .ask-err').length,retry:document.querySelectorAll('#ask-thread .ask-retry').length,q1First:q1.textContent.includes('FIRST'),regen:q1.querySelectorAll('.ask-regenerate').length};});
+ check('two failed regenerates then a new question leave no error bar or Retry',twice.err===1&&twiceAfter.err===0&&twiceAfter.retry===0&&twiceAfter.q1First&&twiceAfter.regen===1,twiceAfter);
+ await page.evaluate(()=>{callAIStream=window.goodStream;});
  // G7-01 end to end: raw model output with P0 cite, control chars; nothing may stay unsaved.
  await page.locator('#ask-new').click();
  await page.evaluate(()=>{callAIStream=async(_s,_p,opts,stream)=>{await opts.beforeRequest?.();const t='Body with\u000b control [P0] and [P1].\n\nCITES:\nP0: "The surface of the table is scratched."\nP1: "The surface of the table is scratched."';stream(t,t);return t;};});

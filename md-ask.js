@@ -2765,7 +2765,11 @@ function _pbpAskRegenerate(el) {
   const st = _pbpAskState;
   if (!st || st.running || !pbpAiAvailable(st.s) || st.archiveMissing || st.archiveError || !el || !el.dataset.askQuestion) return;
   if (_pbpAskArchiveEnabled() && _pbpAskUnpersisted.some(item => item.record === el._askExportRecord)) return;
-  const oldNodes = Array.from(el.childNodes);
+  // On a bubble whose last Regenerate failed, the real old answer is the
+  // marked one: the current children also hold that failure's error bar and
+  // Retry. This run supersedes the mark, so drop it; a new failure re-marks.
+  const oldNodes = el._askPendingRestore || Array.from(el.childNodes);
+  delete el._askPendingRestore;
   if (el.contains(document.activeElement)) {
     el.tabIndex = -1;
     el.focus();
