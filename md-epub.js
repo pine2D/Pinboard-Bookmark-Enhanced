@@ -56,8 +56,16 @@ function pbpZipStore(entries) {
   return out;
 }
 
-function pbpEpubXmlEscape(s) {
+// XML 1.0 forbids most C0 controls, U+FFFE/U+FFFF and unpaired surrogates; an
+// XML parser rejects the whole document on one of them (ANSI colour codes in a
+// code block, a stray form feed). Drop them from every text that enters XML.
+function pbpEpubStripXmlInvalid(s) {
   return String(s == null ? "" : s)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+}
+
+function pbpEpubXmlEscape(s) {
+  return pbpEpubStripXmlInvalid(s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
@@ -142,7 +150,11 @@ blockquote{border-left:3px solid #999;margin:1em 0;padding:0 1em}`;
 // `images`: the fetched Map from resolveEmbed(..., {keepUrls:true}) (absUrl ->
 // {mime, bytes}), or empty/undefined when the export image policy isn't "embed".
 function pbpBuildEpub({ md, meta, images, ask }) {
-  const host = document.createElement("div");
+  // Inert document: a div in the live document would fetch every remote <img>
+  // the moment innerHTML is set (same reason as composeStyledHtml).
+  const host = typeof _pbpConvertScratchDiv === "function"
+    ? _pbpConvertScratchDiv()
+    : document.implementation.createHTMLDocument("").createElement("div");
   host.innerHTML = renderMarkdown(md);            // 单点 sanitize：唯一入口
   if (ask && typeof pbpAskExportHtml === "function") host.insertAdjacentHTML("beforeend", pbpAskExportHtml(ask, { occupied: host.innerHTML }));
   // B1: mermaid fences already rendered on the page swap to their cached
@@ -172,12 +184,17 @@ function pbpBuildEpub({ md, meta, images, ask }) {
   const imgEntries = [];
   if (images && images.size) {
     let n = 0;
+    // Match by canonical URL (marked encodeURI()s hrefs then restores %25 -> %),
+    // the same normalisation md-embed.js uses; fall back to raw + encodeURI.
+    const canon = typeof pbpEmbedCanonicalUrl === "function" ? pbpEmbedCanonicalUrl : (u => encodeURI(u).replace(/%25/g, "%"));
+    const bySrc = new Map();
+    for (const el of host.querySelectorAll("img[src]")) {
+      const k = canon(el.getAttribute("src"));
+      if (!bySrc.has(k)) bySrc.set(k, []);
+      bySrc.get(k).push(el);
+    }
     for (const [absUrl, img] of images) {
-      let matches = host.querySelectorAll(`img[src="${CSS.escape(absUrl)}"]`);
-      // Fable-A: marked encodeURI()s the href it emits, so a source URL with
-      // spaces/CJK characters lands percent-encoded in the DOM's src attribute
-      // even though `images` is keyed by the raw absolute URL -- retry encoded.
-      if (!matches.length) matches = host.querySelectorAll(`img[src="${CSS.escape(encodeURI(absUrl))}"]`);
+      const matches = bySrc.get(canon(absUrl)) || [];
       if (!matches.length) continue; // no matching <img> left in the DOM -- skip, no orphan manifest/zip entry
       const name = `images/img-${n}.${PBP_EMBED_MIME_EXT[img.mime] || "bin"}`;
       matches.forEach(el => el.setAttribute("src", name));
@@ -195,7 +212,7 @@ function pbpBuildEpub({ md, meta, images, ask }) {
   }
   // host is an HTML-namespace <div> -- XMLSerializer stamps xmlns="…xhtml" on the
   // root element; the strip regex tolerates that (and any other) attribute text.
-  const bodyXhtml = new XMLSerializer().serializeToString(host)
+  const bodyXhtml = pbpEpubStripXmlInvalid(new XMLSerializer().serializeToString(host))
     .replace(/^<div[^>]*>/, "").replace(/<\/div>$/, "");
   const esc = pbpEpubXmlEscape;
   const contentXhtml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml"><head><title>${esc(meta.title || "Untitled")}</title><link rel="stylesheet" type="text/css" href="styles.css"/></head><body>\n<h1>${esc(meta.title || "Untitled")}</h1>\n${bodyXhtml}\n</body></html>\n`;

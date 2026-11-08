@@ -3467,6 +3467,36 @@ window._pbpEpubIntegrationDone = (async () => {
     "unmatched images Map entry produces no images/ zip entry: " + entries8.map(e => e.name).join(", "));
   const opf8 = new TextDecoder().decode(entries8.find(e => e.name === "OEBPS/content.opf").data);
   assert(!/id="img0"/.test(opf8), "unmatched images Map entry gets no manifest item either: " + opf8);
+
+  // G6b-04: building must not make the live document fetch the article's remote
+  // images (inert host document). Unique URLs, resource-timing entries.
+  const lazyUrls = [1, 2].map(i => `https://img.example.test/g6b04-${Date.now()}-${i}.png`);
+  pbpBuildEpub({ md: lazyUrls.map(u => `![x](${u})`).join("\n\n"), meta, images: new Map() });
+  await new Promise(r => setTimeout(r, 300));
+  const fetched = performance.getEntriesByType("resource").filter(e => lazyUrls.includes(e.name));
+  assertEq(fetched.length, 0, "G6b-04 pbpBuildEpub does not trigger remote image requests in the live document: " + fetched.map(e => e.name).join(", "));
+
+  // G6b-05: XML 1.0 illegal characters must not reach content.xhtml / nav / opf.
+  const badMeta = { title: "T\x0Bitle\x1B", url: "https://example.com/b", clipped: "2026-07-12", lang: "en", author: "A\x0Cuthor" };
+  const zip9 = new Uint8Array(await pbpBuildEpub({ md: "## Head\x0Bing\n\n```\n\x1b[31mred\x1b[0m and \x0c formfeed \x08 ￾ \ud800\n```\n\npara\x01graph", meta: badMeta, images: new Map() }).arrayBuffer());
+  const entries9 = _pbpZipEntries(zip9);
+  for (const nm of ["OEBPS/content.xhtml", "OEBPS/nav.xhtml", "OEBPS/content.opf"]) {
+    const txt = new TextDecoder().decode(entries9.find(e => e.name === nm).data);
+    const doc9 = new DOMParser().parseFromString(txt, "application/xhtml+xml");
+    assert(!doc9.querySelector("parsererror"), `G6b-05 ${nm} parses as XML: ` + (doc9.querySelector("parsererror") || {}).textContent);
+    assert(!/[\x00-\x08\x0B\x0C\x0E-\x1F￾￿]/.test(txt), `G6b-05 ${nm} has no XML-illegal characters`);
+  }
+  const content9 = new TextDecoder().decode(entries9.find(e => e.name === "OEBPS/content.xhtml").data);
+  assert(content9.includes("[31mred") && content9.includes("formfeed") && content9.includes("Heading") && content9.includes("paragraph"),
+    "G6b-05 legal text around the stripped characters is kept");
+
+  // G6b-07: URL with both %xx escapes and a character marked encodes (|).
+  const pipeUrl = "https://x.test/a%20b.png?w=1|2";
+  const images10 = new Map([[pipeUrl, { mime: "image/png", bytes: new Uint8Array([7]) }]]);
+  const entries10 = _pbpZipEntries(new Uint8Array(await pbpBuildEpub({ md: `![alt](${pipeUrl})`, meta, images: images10 }).arrayBuffer()));
+  assert(!!entries10.find(e => e.name === "OEBPS/images/img-0.png"), "G6b-07 URL mixing %20 and | is embedded: " + entries10.map(e => e.name).join(", "));
+  const content10 = new TextDecoder().decode(entries10.find(e => e.name === "OEBPS/content.xhtml").data);
+  assert(content10.includes('src="images/img-0.png"'), "G6b-07 src rewritten to images/ path: " + content10);
 })();
 </script>
 
