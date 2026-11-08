@@ -2796,6 +2796,23 @@ function syncHarness(options = {}) {
     return first.ok && second.ok && !preflight && words[0]?.note==="new" && words[0].groups.length===0 &&
       uploads[0]?.schema===2 && uploads[0].entries[0].versions.length===2 && uploads.length===1;
   });
+  // finishFailure awaits store.putPreflightState; a rejection there must be
+  // classified by the runner's own catch, never escape run().
+  for (const [label, makeError, expectCode] of [
+    ["coded account_changed", () => Object.assign(new Error("owner moved"), { code: "account_changed" }), "account_changed"],
+    ["coded local_store", () => Object.assign(new Error("idb"), { code: "local_store" }), "local_store"],
+    ["uncoded", () => new Error("boom"), null]
+  ]) {
+    await asyncCheck(`finishFailure putPreflightState rejection (${label}) resolves instead of escaping run()`, async () => {
+      const h = syncHarness({ aboutResults: [{ ok: false, error: "id_collision", retryable: false }] });
+      h.store.putPreflightState = async () => { throw makeError(); };
+      let result, rejected = false;
+      try { result = await h.runner()(); } catch (_) { rejected = true; }
+      return !rejected && result && result.ok === false &&
+        (expectCode ? result.error === expectCode : result.error !== "unexpected" || result.retryable === true) &&
+        (expectCode !== "account_changed" || result.retryable === false);
+    });
+  }
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>

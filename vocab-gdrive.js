@@ -1097,7 +1097,7 @@ function pbpCreateVocabDriveSyncRunner({
       if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
       if (force) {
         if (!await store.deletePreflightState(ownerHash)) {
-          return finishFailure({ error: "local_store" });
+          return await finishFailure({ error: "local_store" });
         }
         preflight = null;
         // A forced run is the user's way out of a block, so the shared
@@ -1126,7 +1126,7 @@ function pbpCreateVocabDriveSyncRunner({
         return current?.account === startAuth.account && libraryAuthIsCurrent(startAuth) &&
           libraryAuthIsCurrent(current) && scopeIsCurrent();
       }, isCurrent: () => libraryAuthIsCurrent(startAuth) && scopeIsCurrent() });
-      if (!session.ok) return finishFailure(session);
+      if (!session.ok) return await finishFailure(session);
       if (onSession) onSession(session.permissionId);
       if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
       // Google answered (spec §10.2): the connection error and its wait are
@@ -1141,7 +1141,7 @@ function pbpCreateVocabDriveSyncRunner({
       // atomically, before any cursor or upload can advance.
       if (store.activateAccount) {
         if (!await readStore(() => store.activateAccount(session.permissionId, ownerHash))) {
-          return finishFailure({ error: "local_store" });
+          return await finishFailure({ error: "local_store" });
         }
         if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
       }
@@ -1205,7 +1205,7 @@ function pbpCreateVocabDriveSyncRunner({
             "bootstrapFilePageToken", "bootstrapChangePageToken"])
           : stateWith({ retryAttempt: 0, retryAt: null, lastError: null });
         if (!await store.putAccountState(reset)) {
-          return finishFailure({ error: "local_store" });
+          return await finishFailure({ error: "local_store" });
         }
         state = reset;
       }
@@ -1215,7 +1215,7 @@ function pbpCreateVocabDriveSyncRunner({
 
       const meta = await readStore(() => store.getMeta());
       if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
-      if (!meta?.deviceId) return finishFailure({ error: "invalid_response" });
+      if (!meta?.deviceId) return await finishFailure({ error: "invalid_response" });
       const deviceId = meta.deviceId;
       let needsCheckpoint = state.needsCheckpoint === true;
 
@@ -1224,17 +1224,17 @@ function pbpCreateVocabDriveSyncRunner({
           if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
           const seeded = await store.seedLegacy(owner, 100);
           if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
-          if (!seeded?.ok) return finishFailure(seeded?.error ? seeded : { error: "local_store" });
+          if (!seeded?.ok) return await finishFailure(seeded?.error ? seeded : { error: "local_store" });
           if (!seeded.processed) break;
         }
 
         if (!state.bootstrapStartToken) {
           const token = await session.getStartPageToken();
-          if (!token.ok) return finishFailure(token);
+          if (!token.ok) return await finishFailure(token);
           if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
           const next = stateWith({ bootstrapStartToken: token.pageToken });
           if (!await store.putAccountState(next)) {
-            return finishFailure({ error: "local_store" });
+            return await finishFailure({ error: "local_store" });
           }
           state = next;
         }
@@ -1245,14 +1245,14 @@ function pbpCreateVocabDriveSyncRunner({
             const page = await session.listFiles(ownerHash, pageToken);
             if (!page.ok) {
               if (pageToken) noteCursorRejected(page);
-              return finishFailure(page);
+              return await finishFailure(page);
             }
             if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
             const next = page.nextPageToken
               ? stateWith({ bootstrapFilePageToken: page.nextPageToken })
               : stateWith({ bootstrapListComplete: true }, ["bootstrapFilePageToken"]);
             const applied = await applyPage(page.files, next);
-            if (!applied.ok) return finishFailure(applied);
+            if (!applied.ok) return await finishFailure(applied);
             state = next;
             if (!page.nextPageToken) break;
             pageToken = page.nextPageToken;
@@ -1264,11 +1264,11 @@ function pbpCreateVocabDriveSyncRunner({
           const page = await session.listChanges(changeToken);
           if (!page.ok) {
             noteCursorRejected(page);
-            return finishFailure(page);
+            return await finishFailure(page);
           }
           if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
           const selected = changesMetadata(page.changes, false, deviceId);
-          if (!selected.ok) return finishFailure({ error: "invalid_response" });
+          if (!selected.ok) return await finishFailure({ error: "invalid_response" });
           needsCheckpoint ||= selected.removed;
           const terminal = !page.nextPageToken;
           const next = terminal
@@ -1279,23 +1279,23 @@ function pbpCreateVocabDriveSyncRunner({
             : stateWith({ bootstrapChangePageToken: page.nextPageToken });
           if (needsCheckpoint) next.needsCheckpoint = true;
           const applied = await applyPage(selected.metadata, next);
-          if (!applied.ok) return finishFailure(applied);
+          if (!applied.ok) return await finishFailure(applied);
           state = next;
           if (terminal) break;
           changeToken = page.nextPageToken;
         }
       } else {
         let changeToken = state.pageToken;
-        if (!changeToken) return finishFailure({ error: "invalid_response" });
+        if (!changeToken) return await finishFailure({ error: "invalid_response" });
         while (true) {
           const page = await session.listChanges(changeToken);
           if (!page.ok) {
             noteCursorRejected(page);
-            return finishFailure(page);
+            return await finishFailure(page);
           }
           if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
           const selected = changesMetadata(page.changes, true, deviceId);
-          if (!selected.ok) return finishFailure({ error: "invalid_response" });
+          if (!selected.ok) return await finishFailure({ error: "invalid_response" });
           needsCheckpoint ||= selected.removed;
           const terminal = !page.nextPageToken;
           const next = stateWith({
@@ -1303,7 +1303,7 @@ function pbpCreateVocabDriveSyncRunner({
           });
           if (needsCheckpoint) next.needsCheckpoint = true;
           const applied = await applyPage(selected.metadata, next);
-          if (!applied.ok) return finishFailure(applied);
+          if (!applied.ok) return await finishFailure(applied);
           state = next;
           if (terminal) break;
           changeToken = page.nextPageToken;
@@ -1321,7 +1321,7 @@ function pbpCreateVocabDriveSyncRunner({
           await store.checkpointOwner(owner);
         } catch (error) {
           console.warn("[vocab-drive] checkpoint failed:", error?.name, error?.message);
-          return finishFailure({
+          return await finishFailure({
             error: typeof error?.code === "string" ? error.code : "local_store",
             retryable: error?.retryable === true
           });
@@ -1329,7 +1329,7 @@ function pbpCreateVocabDriveSyncRunner({
         if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
         const cleared = stateWith({}, ["needsCheckpoint"]);
         if (!await store.putAccountState(cleared)) {
-          return finishFailure({ error: "local_store" });
+          return await finishFailure({ error: "local_store" });
         }
         state = cleared;
       }
@@ -1364,7 +1364,7 @@ function pbpCreateVocabDriveSyncRunner({
         state.drivePermissionId, ownerHash
       ))) {
         const uploaded = await uploadPending(pending);
-        if (!uploaded.ok) return finishFailure(uploaded);
+        if (!uploaded.ok) return await finishFailure(uploaded);
       }
 
       const outbox = await readStore(() => store.listOutbox(owner));
@@ -1372,10 +1372,10 @@ function pbpCreateVocabDriveSyncRunner({
         outbox.map((row) => row.event),
         { ownerHash, deviceId, createdAt: now() }, protocol
       );
-      if (!split.ok) return finishFailure(split);
+      if (!split.ok) return await finishFailure(split);
       for (const batch of split.batches) {
         const generated = await session.generateId();
-        if (!generated.ok) return finishFailure(generated);
+        if (!generated.ok) return await finishFailure(generated);
         if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
         let frozen;
         try {
@@ -1384,18 +1384,18 @@ function pbpCreateVocabDriveSyncRunner({
           );
         } catch (error) {
           console.warn("[vocab-drive] freeze failed:", error?.name, error?.message);
-          return finishFailure({
+          return await finishFailure({
             error: typeof error?.code === "string" ? error.code : "local_store",
             retryable: error?.retryable === true
           });
         }
-        if (!frozen) return finishFailure({ error: "local_store" });
+        if (!frozen) return await finishFailure({ error: "local_store" });
         const uploaded = await uploadPending(frozen);
-        if (!uploaded.ok) return finishFailure(uploaded);
+        if (!uploaded.ok) return await finishFailure(uploaded);
       }
 
       const confirmed = await session.about();
-      if (!confirmed.ok) return finishFailure(confirmed);
+      if (!confirmed.ok) return await finishFailure(confirmed);
       if (!await stillCurrent() || confirmed.permissionId !== state.drivePermissionId) {
         return normalizedFailure({ error: "account_changed" });
       }
@@ -1406,12 +1406,12 @@ function pbpCreateVocabDriveSyncRunner({
         retryAt: null
       }, ["cursorRejected"]);
       if (!await store.putAccountState(success)) {
-        return finishFailure({ error: "local_store" });
+        return await finishFailure({ error: "local_store" });
       }
       state = success;
       if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
       if (!await store.deletePreflightState(ownerHash)) {
-        return finishFailure({ error: "local_store" });
+        return await finishFailure({ error: "local_store" });
       }
       preflight = null;
       // Every request of the run went through: the shared connection has no
