@@ -5620,6 +5620,25 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
   let longTagSkip = rc.longTagSkip === true;
   const startIndex = resumeState ? Math.max(0, Number(resumeState.startIndex) || 0) : 0;
   const resumeCount = Number(resumeState?.resumeCount) || 0;
+  // Tab ids only live for one browser session, so a run resumed after a browser
+  // restart finds its snapshot ids dead or reassigned. Resume only: look the
+  // page up again by its exact address (and window kind). A fresh run holds live
+  // ids and pays no tabs.query. Each live tab serves one entry.
+  let liveTabs = null;
+  const takenTabIds = new Set();
+  const resolveLiveTabId = async (tab) => {
+    if (!resumeState) return tab.id;
+    try {
+      const cur = await _cbTabsGet(tab.id);
+      if (cur && cur.url === tab.url && !takenTabIds.has(cur.id)) { takenTabIds.add(cur.id); return cur.id; }
+      if (!liveTabs) liveTabs = await chrome.tabs.query({});
+      const match = liveTabs.find((lt) => lt.url === tab.url && !!lt.incognito === !!tab.incognito && !takenTabIds.has(lt.id));
+      if (match) { takenTabIds.add(match.id); return match.id; }
+    } catch (e) {
+      console.warn("[batch] resume tab lookup failed:", e?.name, e?.message);
+    }
+    return tab.id;
+  };
   const base = () => ({ runId, resumeCount, account, total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, partial, partialList, longTag, longTagSkip });
   // Persist the job snapshot BEFORE the first item: everything a resume needs
   // (public tab identity + cursor + counts), never a token. The per-item
@@ -5741,7 +5760,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         let pageInfo = null;
 
         if (!settled && (useAiTags || useAiSummary || (linkding && s.optAutoDescription !== false))) {
-          try { pageInfo = await getPageInfoFromTab(tab.id, {
+          try { pageInfo = await getPageInfoFromTab(await resolveLiveTabId(tab), {
             withDefuddle: !!(useAiTags || useAiSummary), expectedUrl: tab.url
           }); }
           catch (e) { console.warn("batch: cannot extract page content for", tab.url, e.message); }

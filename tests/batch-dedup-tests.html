@@ -48,7 +48,7 @@ async function createSaveTagsHarness(service, names, opts = {}) {
   }
   const settings = {bookmarkService:service, pinboardToken:"fixture-token", _aiTags:true, batchAiTags:true, ...(opts.settings || {})};
   const auth = {service, account:"test-owner", token:"fixture-token", baseUrl:"https://bookmarks.example/", epoch:0};
-  const calls = {intents:[], uris:[], names:[], progress:[], lookups:[]};
+  const calls = {intents:[], uris:[], names:[], progress:[], lookups:[], extracted:[], queries:0};
   const state = {epoch:0, account:auth.account};
   const dependencies = {
     getCurrentBookmarkAuth:async () => ({...auth, account:state.account, epoch:state.epoch}),
@@ -63,8 +63,14 @@ async function createSaveTagsHarness(service, names, opts = {}) {
     loadSettings:async () => settings,
     pbpLoadTagVocab:async account => ({account, timestamp:Date.now(), counts:null, index:pbpTagVocabIndex(Object.fromEntries(names.map(name => [name, 1])))}),
     pbpCanonicalTagName, pbpTagGroupKey,
-    chrome:{permissions:{contains:async () => true}, storage:{local:{get:async () => ({}), set:async () => {}}}},
-    getPageInfoFromTab:async () => ({pageText:"Synthetic public text"}),
+    chrome:{permissions:{contains:async () => true}, storage:{local:{get:async () => ({}), set:async () => {}}},
+      tabs:{query:async () => { calls.queries++; return (opts.liveTabs || []).map(lt => ({...lt})); }}},
+    getPageInfoFromTab:async (tabId, o) => {
+      calls.extracted.push({tabId, expectedUrl:o?.expectedUrl});
+      if (opts.liveTabs && !opts.liveTabs.some(lt => lt.id === tabId && lt.url === o?.expectedUrl)) return null;
+      return {pageText:"Synthetic public text"};
+    },
+    _cbTabsGet:async id => (opts.liveTabs || []).find(lt => lt.id === id) || null,
     buildAutoNotes:() => "",
     pbpNotesDescription:() => "", pbpPageInfoReadable:info=>!!info&&info._pbpUnavailable!==true&&["","text/html","application/xhtml+xml"].includes(String(info.contentType||"").split(";")[0].trim()),
     hasAIKey:() => true,
@@ -111,7 +117,8 @@ async function createSaveTagsHarness(service, names, opts = {}) {
   const entry = new Function(...keys, "let _batchRunning = false;\n" + swSource + "\nreturn {saveFromBackground, _runBatchSave};")(...keys.map(key => dependencies[key]));
   const tabs = opts.tabs || [{id:1, url:"https://example.com/tags", title:"Tags"}];
   return {calls, state, quick:() => entry.saveFromBackground({url:"https://example.com/tags", title:"Tags", tab:{id:1}}),
-    batch:() => entry._runBatchSave(tabs, auth.account)};
+    batch:() => entry._runBatchSave(tabs, auth.account),
+    resume:(startIndex = 0) => entry._runBatchSave(tabs, auth.account, {runId:"test-run", startIndex, resumeCount:1, counts:{}})};
 }
 
 async function getPopupBatchSource() {
@@ -379,6 +386,39 @@ async function createUiHarness(storedProgress, now, opts = {}) {
       equal(h.calls.uris[0], "https://api.pinboard.in/v1/posts/add?auth_token=fixture-token&format=json&url=https%3A%2F%2Fexample.com%2Ftags&description=Tags&extended=&tags=say%22hello%20plain%20path%5Cname&shared=yes&toread=no&replace=no");
       if (path === "quick") equal(result.status, "saved");
       else equal(h.calls.progress.at(-1).saved, 1, "Pinboard batch did not save");
+    });
+  }
+  // Y3-01: tab ids do not survive a browser restart. A resumed run must find
+  // each page again by its address; a fresh run must not pay for tabs.query.
+  {
+    const snap = [{id:812, url:"https://example.com/a", title:"A"}, {id:6, url:"https://example.com/b", title:"B"}, {id:813, url:"https://example.com/c", title:"C"}];
+    const live = [{id:5, url:"https://example.com/a"}, {id:6, url:"https://example.com/other"}, {id:7, url:"https://example.com/b"}, {id:9, url:"https://example.com/c", incognito:true}];
+    await test("a resumed batch extracts from the restored tab, not the dead or reassigned snapshot id", async () => {
+      const h = await createSaveTagsHarness("pinboard", ["x"], {tabs:snap, liveTabs:live.slice(0, 3)});
+      await h.resume(0);
+      equal(h.calls.extracted.map(e => e.tabId).join(), "5,7,813", "extraction targets");
+      const last = h.calls.progress.at(-1);
+      equal(last.aiFailed, 1, "only the tab with no live twin should degrade");
+      equal(h.calls.queries, 1, "tabs.query is read once per resume");
+    });
+    await test("a resumed batch matches window kind and gives each live tab to one entry", async () => {
+      const twins = [{id:100, url:"https://example.com/a", title:"A1"}, {id:101, url:"https://example.com/a", title:"A2"}, {id:102, url:"https://example.com/c", title:"C", incognito:true}];
+      const h = await createSaveTagsHarness("pinboard", ["x"], {tabs:twins, liveTabs:[{id:5, url:"https://example.com/a"}, {id:8, url:"https://example.com/a"}, {id:9, url:"https://example.com/c", incognito:true}]});
+      await h.resume(0);
+      equal(h.calls.extracted.map(e => e.tabId).join(), "5,8,9");
+    });
+    await test("a resumed batch with no matching tab degrades per item as before", async () => {
+      const h = await createSaveTagsHarness("pinboard", ["x"], {tabs:snap.slice(0, 1), liveTabs:[{id:6, url:"https://example.com/zzz"}]});
+      await h.resume(0);
+      equal(h.calls.extracted[0].tabId, 812);
+      equal(h.calls.progress.at(-1).aiFailed, 1);
+      equal(h.calls.progress.at(-1).saved, 1, "the bare bookmark is still saved");
+    });
+    await test("a fresh batch never calls tabs.query and keeps the snapshot ids", async () => {
+      const h = await createSaveTagsHarness("pinboard", ["x"], {tabs:snap.slice(0, 1), liveTabs:[{id:812, url:"https://example.com/a"}]});
+      await h.batch();
+      equal(h.calls.queries, 0);
+      equal(h.calls.extracted[0].tabId, 812);
     });
   }
   for (const service of ["karakeep", "linkding"]) {
