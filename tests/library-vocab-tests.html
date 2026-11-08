@@ -4719,6 +4719,30 @@ await (async () => {
       const before = onlineCalls, els = _pbpVocabRefSlot();
       _pbpVocabDictRun("学习", "zh", els, "", () => {}, { online: false }); await settle();
       check("legacy sources: local-only open renders Chinese without starting online", onlineCalls === before && host.querySelector(".xp-dict-legacy")?.textContent.includes("to study"));
+      // A lookup that has left the screen must not rerun when a dictionary
+      // pack changes: not with no session controller (cover, closed detail,
+      // account switch), and not while a newer idle lookup owns the controller.
+      {
+        const errors = [];
+        const onError = (event) => { errors.push(String(event.message || event.error)); event.preventDefault(); };
+        window.addEventListener("error", onError);
+        try {
+          for (const [label, start] of [["relookup", () => _pbpVocabRelookup({ id: "w-gone", term: "学习", language: "zh", contexts: [] })],
+                                        ["other-word", () => _pbpVocabLookupOther("学习", "zh")]]) {
+            for (const successor of ["no controller", "a newer idle controller"]) {
+              start(); await settle();
+              _pbpVocabResetRef(null);
+              if (successor === "a newer idle controller") _pbpVocabDictCtrl = new AbortController();
+              const intentBefore = _vocabLookupIntent, callsBefore = onlineCalls;
+              window.dispatchEvent(new CustomEvent("pbp-dict-packs-changed", { detail: { type: "changed", id: "cedict", action: "disable", kind: "legacy" } }));
+              await settle(); await settle();
+              check("left-screen lookup (" + label + ", " + successor + "): a pack change reruns nothing and throws nothing",
+                errors.length === 0 && _vocabLookupIntent === intentBefore && onlineCalls === callsBefore);
+              _pbpVocabDictCtrl?.abort(); _pbpVocabDictCtrl = null;
+            }
+          }
+        } finally { window.removeEventListener("error", onError); }
+      }
     } finally {
       _pbpVocabDictCtrl?.abort(); _pbpVocabDictChildCtrl?.abort(); _pbpVocabRenderDetail(null);
       _pbpDictLoadPack = old.load; pbpPackLookup = old.cedict; window.pbpDictPackLookup = old.lookup;

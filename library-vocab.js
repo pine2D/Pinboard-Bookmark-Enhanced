@@ -1335,6 +1335,7 @@ async function _pbpVocabSaveLookup(state) {
 // still live when its legs settle takes the flag down.
 function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, packResult, derived = false } = {}) {
   const { localEl, onlineEl } = els;
+  if (!_pbpVocabDictCtrl) return; // no live lookup session (cover, closed detail)
   if (_pbpVocabDictChildCtrl) _pbpVocabDictChildCtrl.abort();
   if (_pbpVocabDictChildCleanup) { _pbpVocabDictChildCleanup(); _pbpVocabDictChildCleanup = null; }
   const child = new AbortController();
@@ -1805,7 +1806,7 @@ function _pbpVocabRelookup(w) {
   _pbpVocabRelookedWordId = w.id;
   if (_pbpVocabDictCtrl) _pbpVocabDictCtrl.abort();
   clearTimeout(_pbpVocabAutoTimer);
-  _pbpVocabDictCtrl = new AbortController();
+  const ctrl = _pbpVocabDictCtrl = new AbortController();
   const els = _pbpVocabRefSlot();
   host.dataset.refState = "word";
   host.dataset.sameWord = "";
@@ -1813,7 +1814,9 @@ function _pbpVocabRelookup(w) {
   delete host.dataset.refLang;
   const lang = sel.value || (w.language && w.language !== "und" ? w.language : "") || _vocabLookupLang;
   const sentence = w.contexts?.find(context => typeof context?.quote === "string" && context.quote.trim())?.quote || "";
-  const run = () => _pbpVocabDictRun(w.term, lang, els, sentence, run);
+  // A pack change reruns this lookup long after submit; once the session
+  // controller is gone or replaced the lookup has left the screen.
+  const run = () => { if (_pbpVocabDictCtrl === ctrl && !ctrl.signal.aborted) _pbpVocabDictRun(w.term, lang, els, sentence, run); };
   run();
 }
 
@@ -1853,7 +1856,7 @@ function _pbpVocabLookupOther(term, lang, sentence = "", { derived = false } = {
   _pbpVocabRelookedWordId = null;
   if (_pbpVocabDictCtrl) _pbpVocabDictCtrl.abort();
   clearTimeout(_pbpVocabAutoTimer);
-  _pbpVocabDictCtrl = new AbortController();
+  const ctrl = _pbpVocabDictCtrl = new AbortController();
   const els = _pbpVocabRefSlot();
   host.dataset.refState = "other";
   host.dataset.refTerm = term;
@@ -1889,7 +1892,7 @@ function _pbpVocabLookupOther(term, lang, sentence = "", { derived = false } = {
   host.prepend(head);
   // `lang`, not the list box: md-dict's rerun fires long after submit, and by
   // then the list box may name the language picked for the NEXT lookup.
-  const run = () => _pbpVocabDictRun(term, lang, els, sentence, run, { derived });
+  const run = () => { if (_pbpVocabDictCtrl === ctrl && !ctrl.signal.aborted) _pbpVocabDictRun(term, lang, els, sentence, run, { derived }); };
   run();
 }
 
