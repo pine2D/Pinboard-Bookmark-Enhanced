@@ -689,13 +689,25 @@ function _pbpSearchRun(query, opts) {
     scan:
     for (const el of cands) {
       const text = _pbpSearchTextOf(el);
-      const hits = _pbpSearchRegexOn
-        ? pbpSearchEnumerateRegex(text, query, CAP - st.matches.length)
-        : pbpSearchEnumerate(text, query, CAP - st.matches.length);
-      for (const h of hits) {
-        if (text.slice(h.start, h.end).includes("\0")) continue; // regex hit spilling into masked UI text
-        st.matches.push({ el: el, start: h.start, end: h.end });
-        if (st.matches.length >= CAP) break scan;
+      // Masked UI text (NUL, see _pbpSearchTextOf) splits the text into
+      // visible segments searched one by one, so a greedy regex hit can never
+      // swallow the UI row and the visible text on both sides stays findable.
+      // No NUL: one segment, identical to searching the whole text.
+      let from = 0;
+      while (from <= text.length) {
+        let to = text.indexOf("\0", from);
+        if (to === -1) to = text.length;
+        if (to > from) {
+          const seg = from === 0 && to === text.length ? text : text.slice(from, to);
+          const hits = _pbpSearchRegexOn
+            ? pbpSearchEnumerateRegex(seg, query, CAP - st.matches.length)
+            : pbpSearchEnumerate(seg, query, CAP - st.matches.length);
+          for (const h of hits) {
+            st.matches.push({ el: el, start: from + h.start, end: from + h.end });
+            if (st.matches.length >= CAP) break scan;
+          }
+        }
+        from = to + 1;
       }
     }
     for (const m of st.matches) {

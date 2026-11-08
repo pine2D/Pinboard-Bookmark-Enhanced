@@ -7388,6 +7388,36 @@ suiteIf("_pbpSearchOpen (query memory)", "_pbpSearchOpen", () => {
       assertEq(scrolls, 2, "restoring the query yanked the viewport back to a hit");
     } finally { cleanup(v, realScroll); }
   });
+  // R-02: the real consumer. Masked UI text (NUL) splits a candidate into visible
+  // segments; a regex hit may not cross or swallow the UI row, and the visible
+  // text on both sides stays searchable.
+  test("regex search across a masked UI row still finds the visible text on both sides", () => {
+    const ui = '<div class="pbp-img-fix-ui"><span>Try to fix</span><button>Refresh page</button></div>';
+    const v = prependView('<div><p>foo before</p>' + ui + '<p>after bar</p></div><p>plain foo tail</p>');
+    const regexBtn = typeof _pbpSearchRegexOn !== "undefined" ? _pbpSearchRegexOn : false;
+    try {
+      _pbpSearchRegexOn = true;
+      _pbpSearchRun("foo.*");
+      const m = _pbpSearchState.matches;
+      assertEq(m.length, 2, "hit before the UI row was dropped (or extra hits)");
+      for (const h of m) {
+        const txt = _pbpSearchTextOf(h.el).slice(h.start, h.end);
+        assert(!txt.includes("\0") && !/try to fix|refresh/i.test(txt), "hit swallowed UI text: " + txt);
+      }
+      assertEq(_pbpSearchTextOf(m[0].el).slice(m[0].start, m[0].end), "foo before", "first hit range");
+      _pbpSearchRun("after.*");
+      assertEq(_pbpSearchState.matches.length, 1, "visible text after the UI row not searchable");
+      assertEq(_pbpSearchTextOf(_pbpSearchState.matches[0].el).slice(_pbpSearchState.matches[0].start, _pbpSearchState.matches[0].end), "after bar", "second-segment range offset");
+      assert(_pbpSearchState.ranges[0] && _pbpSearchState.ranges[0].toString() === "after bar", "range does not cover the visible hit");
+      _pbpSearchRun("[^x]*fix");
+      assertEq(_pbpSearchState.matches.length, 0, "UI row text matched");
+      _pbpSearchRegexOn = false;
+      _pbpSearchRun("Try to fix");
+      assertEq(_pbpSearchState.matches.length, 0, "literal search hit the UI row");
+      _pbpSearchRun("after bar");
+      assertEq(_pbpSearchState.matches.length, 1, "literal search lost the visible text");
+    } finally { _pbpSearchRegexOn = regexBtn; cleanup(v); }
+  });
   test("clearing the box is itself remembered: the next open is empty", () => {
     const v = prependView("<p>epsilon zeta</p>");
     try {
