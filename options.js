@@ -5387,11 +5387,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       yesText: t("reset"),
       noText: t("cancel"),
       onConfirm: async () => {
-        const auth = await getTagGovAuth(startAuth.account);
-        if (!auth) return;
-        const ignoredKey = pbpAccountStorageKey("_tagGovIgnored", auth.account);
-        await chrome.storage.local.set({ [ignoredKey]: { account: auth.account, ids: [] } });
-        await renderTagGov();
+        try {
+          await _tagGovResetIgnored(startAuth.account);
+        } catch (e) {
+          console.warn("[tag-gov] reset ignored list failed:", e?.name, e?.message);
+          return;
+        }
+        if (await getTagGovAuth(startAuth.account)) await renderTagGov();
       }
     });
   });
@@ -5758,7 +5760,7 @@ function formatTagGovEst(seconds) {
 // another account's list.
 async function _tagGovIgnoreGroup(account, groupId) {
   const ignoredKey = pbpAccountStorageKey("_tagGovIgnored", account);
-  await _tagGovWithAccountLock(account, async () => {
+  await _tagGovWithIgnoredLock(account, async () => {
     if (!(await getTagGovAuth(account))) return;
     const stored = await chrome.storage.local.get(ignoredKey);
     const list = (_tagGovOwned(stored[ignoredKey], account)?.ids || []).slice();
@@ -5766,6 +5768,16 @@ async function _tagGovIgnoreGroup(account, groupId) {
     list.push(groupId);
     if (!(await getTagGovAuth(account))) return;
     await chrome.storage.local.set({ [ignoredKey]: { account, ids: list } });
+  });
+}
+
+// Clear this account's ignore list under the same lock as the Ignore button,
+// re-checking the account right before the write.
+async function _tagGovResetIgnored(account) {
+  const ignoredKey = pbpAccountStorageKey("_tagGovIgnored", account);
+  await _tagGovWithIgnoredLock(account, async () => {
+    if (!(await getTagGovAuth(account))) return;
+    await chrome.storage.local.set({ [ignoredKey]: { account, ids: [] } });
   });
 }
 
@@ -6193,6 +6205,16 @@ function _tagGovWithAccountLock(account, work) {
     : Promise.resolve().then(work);
 }
 
+// The ignore list has its own lock: it shares no data with the merge batch, and
+// the batch holds the account lock for minutes of throttled Pinboard resaves.
+// "|" cannot appear in the batch lock's name prefix, so the two never collide.
+function _tagGovWithIgnoredLock(account, work) {
+  const locks = typeof navigator !== "undefined" && navigator.locks;
+  return locks && typeof locks.request === "function"
+    ? locks.request("pbp-tag-gov-ignored|" + account, work)
+    : Promise.resolve().then(work);
+}
+
 async function runTagGovOps(ops, expectedAccount = "") {
   const auth = await getTagGovAuth(expectedAccount);
   if (!auth) return { ok: 0, fail: 0, aborted: true, reason: "account_changed" };
@@ -6524,6 +6546,9 @@ async function renderTagGov() {
   if (!container) return;
   const auth = await getTagGovAuth();
   if (!auth) { pbpSetTagGovIgnoredCount(0); pbpSetTagGovHasData(false); container.replaceChildren(); return; }
+  // Focus inside the list when the render starts (a keyboard Ignore click): the
+  // swap below removes that button, so remember which row it was in.
+  const focusRowIndex = _tagGovFocusRowIndex(container);
 
   // Do NOT empty the container before the awaits below: a paint during the async gap
   // collapses the panel height, Chrome clamps the scroll offset, and the page visibly
@@ -6576,6 +6601,7 @@ async function renderTagGov() {
     empty.className = "fg";
     empty.textContent = t("tagGovNoGroups");
     container.replaceChildren(empty);
+    _tagGovRestoreFocus(container, focusRowIndex);
     return;
   }
 
@@ -6605,6 +6631,30 @@ async function renderTagGov() {
     }
   }
   container.replaceChildren(frag);
+  _tagGovRestoreFocus(container, focusRowIndex);
+}
+
+function _tagGovFocusRowIndex(container) {
+  const active = document.activeElement;
+  if (!active || !container.contains(active)) return -1;
+  const row = Array.from(container.children).find(el => el.contains(active));
+  return row ? Array.from(container.children).indexOf(row) : -1;
+}
+
+// Put focus back in the list after a rebuild that removed the focused control.
+// Only when focus fell out to <body>, so the tail render after a merge never
+// steals it from wherever the user has moved on to.
+function _tagGovRestoreFocus(container, index) {
+  if (index < 0) return;
+  const active = document.activeElement;
+  if (active && active !== document.body && document.contains(active)) return;
+  const rows = Array.from(container.children);
+  const row = rows[index] || rows[rows.length - 1];
+  const target = row && (row.querySelector('input[type="radio"]:checked')
+    || row.querySelector("button:not([disabled])"));
+  const fallback = $id("tag-gov-refresh");
+  const el = target || (fallback && !fallback.disabled ? fallback : null);
+  if (el) el.focus({ preventScroll: true });
 }
 
 async function renderLowCountTags() {

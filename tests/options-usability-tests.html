@@ -194,6 +194,7 @@ async function pbpAiCacheStats() {
 <script src="../vocab-store.js"></script>
 <script src="../options-backup.js"></script>
 <script src="../export-targets.js"></script>
+<script src="../tag-gov.js"></script>
 <script src="../options.js"></script>
 <script>
 const root = document.getElementById("results");
@@ -1093,6 +1094,85 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     merge.click();
     row.querySelector(".btn.btn-sm.ghost").click();
     assert(JSON.stringify(calls) === JSON.stringify([["merge", "webdev", "BUTTON"], ["ignore"]]), "callbacks: " + JSON.stringify(calls));
+  });
+
+  await test("tag-gov ignore: a running merge batch (account lock held) does not delay Ignore", async () => {
+    assert(navigator.locks?.request, "navigator.locks unavailable in this runner");
+    const realAuth = getTagGovAuth;
+    getTagGovAuth = async (expected = "") => (!expected || expected === "alice" ? { token: "alice:x", account: "alice" } : null);
+    let release;
+    const held = new Promise(res => navigator.locks.request("pbp-tag-gov-alice", () => new Promise(r => { release = r; res(); })));
+    await held;
+    try {
+      const done = _tagGovIgnoreGroup("alice", "a|b");
+      const winner = await Promise.race([done.then(() => "done"), new Promise(r => setTimeout(() => r("blocked"), 300))]);
+      assert(winner === "done", "Ignore waited behind the batch lock");
+      const key = pbpAccountStorageKey("_tagGovIgnored", "alice");
+      const stored = (await chrome.storage.local.get(key))[key];
+      assert(stored && stored.account === "alice" && stored.ids.includes("a|b"), "ignore not written: " + JSON.stringify(stored));
+    } finally {
+      release();
+      getTagGovAuth = realAuth;
+      await chrome.storage.local.remove(pbpAccountStorageKey("_tagGovIgnored", "alice"));
+    }
+  });
+
+  await test("tag-gov ignore: concurrent ignores and a reset serialize without losing ids, and a swapped account writes nothing", async () => {
+    const realAuth = getTagGovAuth;
+    let current = "alice";
+    getTagGovAuth = async (expected = "") => (!expected || expected === current ? { token: current + ":x", account: current } : null);
+    const key = pbpAccountStorageKey("_tagGovIgnored", "alice");
+    try {
+      await Promise.all([_tagGovIgnoreGroup("alice", "g1"), _tagGovIgnoreGroup("alice", "g2"), _tagGovIgnoreGroup("alice", "g3")]);
+      const ids = (await chrome.storage.local.get(key))[key].ids.slice().sort().join(",");
+      assert(ids === "g1,g2,g3", "lost an id: " + ids);
+      await Promise.all([_tagGovResetIgnored("alice"), _tagGovIgnoreGroup("alice", "g4")]);
+      const after = (await chrome.storage.local.get(key))[key];
+      assert(after.account === "alice" && JSON.stringify(after.ids) === '["g4"]', "reset then ignore must run in order: " + JSON.stringify(after));
+      current = "bob";
+      await _tagGovIgnoreGroup("alice", "g5");
+      await _tagGovResetIgnored("alice");
+      const final = (await chrome.storage.local.get(key))[key];
+      assert(JSON.stringify(final.ids) === '["g4"]', "wrote after the account changed: " + JSON.stringify(final));
+    } finally {
+      getTagGovAuth = realAuth;
+      await chrome.storage.local.remove(key);
+    }
+  });
+
+  await test("tag-gov ignore: focus stays inside the list after the rebuild, and a render that starts elsewhere does not take it", async () => {
+    const realAuth = getTagGovAuth;
+    getTagGovAuth = async (expected = "") => (!expected || expected === "alice" ? { token: "alice:x", account: "alice" } : null);
+    const host = document.createElement("div");
+    host.innerHTML = '<button id="tag-gov-refresh" type="button">Refresh</button><div id="tag-gov-groups"></div>';
+    document.body.appendChild(host);
+    const outside = document.createElement("button");
+    document.body.appendChild(outside);
+    await chrome.storage.local.set({ cached_user_tags: { account: "alice", counts: { webdev: 5, "web-dev": 9, tool: 3, tools: 4 } } });
+    try {
+      await renderTagGov();
+      const container = document.getElementById("tag-gov-groups");
+      const rows = () => Array.from(container.querySelectorAll(".tag-gov-group-row"));
+      assert(rows().length === 2, "need two groups, got " + rows().length);
+      const ignore = rows()[0].querySelector(".btn.btn-sm.ghost");
+      ignore.focus();
+      ignore.click();
+      for (let i = 0; i < 50 && rows().length === 2; i++) await new Promise(r => setTimeout(r, 20));
+      assert(rows().length === 1, "ignored group should disappear");
+      assert(container.contains(document.activeElement), "focus fell out to " + document.activeElement?.tagName);
+      const last = container.querySelector(".btn.btn-sm.ghost");
+      last.focus();
+      last.click();
+      for (let i = 0; i < 50 && rows().length === 1; i++) await new Promise(r => setTimeout(r, 20));
+      assert(document.activeElement === document.getElementById("tag-gov-refresh"), "empty list: focus should land on Refresh, got " + document.activeElement?.tagName);
+      outside.focus();
+      await renderTagGov();
+      assert(document.activeElement === outside, "a render started elsewhere stole focus");
+    } finally {
+      getTagGovAuth = realAuth;
+      host.remove(); outside.remove();
+      await chrome.storage.local.remove(["cached_user_tags", pbpAccountStorageKey("_tagGovIgnored", "alice")]);
+    }
   });
 
   await test("tag-gov group row: an AI group shows its reason upright, never italic", async () => {
