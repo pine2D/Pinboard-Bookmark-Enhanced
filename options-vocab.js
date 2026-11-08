@@ -808,10 +808,17 @@ async function _pbpVocabTestAnki() {
   const orig = btn.textContent;
   try {
     btn.textContent = t("testTesting");
-    const preRead = await pbpReadSettingsWithSecrets({
-      dictAnkiPort: SETTINGS_DEFAULTS.dictAnkiPort,
-    });
-    const port = preRead.dictAnkiPort;
+    // Read the live form value before any await, like the send path: the
+    // 500ms auto-save may not have stored a just-typed port yet, and the
+    // permission request must stay the first await after the click.
+    const fieldPort = $id("dict-anki-port")?.value;
+    let port = fieldPort;
+    if (fieldPort === undefined || fieldPort === null || String(fieldPort).trim() === "") {
+      const preRead = await pbpReadSettingsWithSecrets({
+        dictAnkiPort: SETTINGS_DEFAULTS.dictAnkiPort,
+      });
+      port = preRead.dictAnkiPort;
+    }
     const pattern = pbpEndpointOriginPattern(pbpAnkiEndpointFor(port));
     let granted = false;
     try { granted = await chrome.permissions.request({ origins: [pattern] }); } catch (_) {}

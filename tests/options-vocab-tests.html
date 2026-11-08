@@ -907,6 +907,34 @@ delete document.documentElement.dataset.theme;
       !$id("vocab-status").textContent && healthCalls.length === 0,
       `status=${$id("vocab-anki-test-status").textContent} toolbar=${$id("vocab-status").textContent}`);
 
+    // G4b-02: the test reads the form's port synchronously, before auto-save lands.
+    resetActions();
+    healthCalls.length = 0;
+    const testPortEvents = [];
+    $id("dict-anki-port").value = "8766";
+    pbpReadSettingsWithSecrets = async () => ({ dictAnkiPort:"8765", dictAnkiKey:"" });
+    window.chrome.permissions.request = async ({ origins }) => { testPortEvents.push({ kind:"permission", origins }); return true; };
+    pbpAnkiCall = async (action, params, key, timeout, port) => {
+      testPortEvents.push({ kind:"call", action, port: String(port) });
+      return { ok:true, result:{ permission:"granted", version:6 } };
+    };
+    await _pbpVocabTestAnki();
+    // Simplest miss: test the saved port, or read it after an await.
+    check("Anki connection test uses the port typed in the form, not the saved one",
+      testPortEvents[0]?.kind === "permission" && testPortEvents[0].origins.join() === "http://127.0.0.1:8766/*" &&
+      testPortEvents.filter(e => e.kind === "call").every(e => e.port === "8766") &&
+      testPortEvents.some(e => e.kind === "call"), JSON.stringify(testPortEvents));
+    $id("dict-anki-port").value = "";
+    resetActions();
+    pbpReadSettingsWithSecrets = async () => ({ dictAnkiPort:"8777", dictAnkiKey:"" });
+    const fallbackEvents = [];
+    window.chrome.permissions.request = async ({ origins }) => { fallbackEvents.push(origins.join()); return true; };
+    await _pbpVocabTestAnki();
+    check("Anki connection test falls back to the saved port when the field is empty",
+      fallbackEvents[0] === "http://127.0.0.1:8777/*", JSON.stringify(fallbackEvents));
+    $id("dict-anki-port").value = "";
+    resetActions();
+
     // B22: the tester maps 401/403 exactly as pbpEudicSendRows does.
     const realFetch = window.fetch;
     try {
