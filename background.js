@@ -1016,8 +1016,16 @@ async function pbpSendResolvedPlan(plan, settings) {
   if (/already\s+exists/i.test(code)) {
     return { result: pbpSaveFailure("conflict", { httpStatus }), persisted: null, retryable: false };
   }
+  // No result_code at all (a portal or maintenance page answering 200, an
+  // empty body): there is no Pinboard message to show, so leave detail out and
+  // let every outlet use its generic copy. Log only the status and type.
+  if (!code) {
+    let contentType = "";
+    try { contentType = String(resp.headers?.get?.("content-type") || "").slice(0, 80); } catch (_) { /* header unreadable */ }
+    console.warn("[save] Pinboard answered without a result_code:", httpStatus, contentType);
+  }
   return {
-    result: pbpSaveFailure("api", { detail: code || "invalid_response", httpStatus }),
+    result: pbpSaveFailure("api", { detail: code || undefined, httpStatus }),
     persisted: null,
     retryable: false,
   };
@@ -2095,12 +2103,10 @@ async function pbpRouteReaderSaveCommand(command, tab) {
 async function saveFromBackground({ url, pageUrl, title, tab, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
   const startAuth = await getCurrentBookmarkAuth();
   if (!startAuth.token) {
-    // This is the earliest possible notification in the SW's lifecycle — it
-    // fires before any network round-trip, so on a cold SW the manual-language
-    // refresh kicked off by initI18n() at module top may not have landed yet.
-    // Every other showNotification()/t() call in this file runs after at
-    // least one await on Pinboard's API, by which point the refresh has long
-    // since finished, so only this branch needs to wait for it.
+    // This notification fires before any network round-trip, so on a cold SW
+    // the manual-language refresh kicked off by initI18n() at module top may
+    // not have landed yet. The shortcut handler waits for it up front; this
+    // branch also serves the other callers (popup, context menu) that do not.
     await pbpI18nReady();
     showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("bgSetToken"), "error");
     return pbpSaveFailure("not_logged_in");
@@ -6267,8 +6273,27 @@ async function openMarkdownPreviewFromShortcut() {
   }
 }
 
+// Follow a language change: a running worker keeps the strings it loaded at
+// start, so the settings page's language switch (optLang, or optSyncEnabled,
+// which moves optLang between storage areas) has to reload them. i18n.js
+// re-fetches on a repeat call; pbpI18nReady() follows the latest refresh.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if ((area === "sync" || area === "local") && (changes.optLang || changes.optSyncEnabled)) {
+    try {
+      Promise.resolve(initI18n()).catch((e) => console.warn("[i18n] refresh failed:", e?.name, e?.message));
+    } catch (e) { console.warn("[i18n] refresh failed:", e?.name, e?.message); }
+  }
+});
+
 // ===================== Keyboard Shortcuts =====================
 chrome.commands.onCommand.addListener(async (command) => {
+  // Every branch below builds notification copy with t() after at most a
+  // tabs.query, which on a cold worker can beat the manual-language refresh
+  // started at module top. Wait for it once here. No branch needs the shortcut's
+  // user gesture afterwards: none calls sidePanel.open, action.openPopup or
+  // permissions.request (the reader route only answers; the grant button is
+  // the reader's own).
+  await pbpI18nReady();
   if (command === "markdown_preview") {
     await openMarkdownPreviewFromShortcut();
     return;

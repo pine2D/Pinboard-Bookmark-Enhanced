@@ -1987,9 +1987,9 @@ await suite("unified save pipeline", async () => {
         const chromeStub = { commands: { onCommand: { addListener: fn => { listener = fn; } } },
           tabs: { query: async () => [{ id: 4, url: TRACKED, title: "Post" }] } };
         new Function("chrome", "openMarkdownPreviewFromShortcut", "handleSaveTabSet", "showNotification", "t",
-          "pbpRouteReaderSaveCommand", "loadSettings", "resolvePrefixSettings", "saveFromBackground", "pbpBookmarkLookupUrl",
+          "pbpRouteReaderSaveCommand", "loadSettings", "resolvePrefixSettings", "saveFromBackground", "pbpBookmarkLookupUrl", "pbpI18nReady",
           background.slice(start, end + 4))(chromeStub, async () => {}, async () => {}, () => {}, k => k,
-          async () => false, async () => ({ urlClean }), () => ({}), async args => { saves.push(args); }, pbpBookmarkLookupUrl);
+          async () => false, async () => ({ urlClean }), () => ({}), async args => { saves.push(args); }, pbpBookmarkLookupUrl, async () => {});
         await listener(command);
         equal(saves.length, 1);
         const cleaning = urlClean.enabled && urlClean.onPopupOpen;
@@ -1998,6 +1998,77 @@ await suite("unified save pipeline", async () => {
         equal(saves[0].toread, toread);
       }
     }
+  });
+
+  // X4-02/03: the shortcut handler computes titles and failure copy before any
+  // network round-trip, so on a cold worker it must wait for the manual-language
+  // refresh first.
+  await test("shortcut notifications wait for the language refresh before any copy is built", async () => {
+    const background = await getBackgroundSource();
+    const start = background.indexOf("chrome.commands.onCommand.addListener(");
+    const end = background.indexOf("\n});\n", start);
+    for (const scenario of ["quick_save", "read_later", "bad_page", "tabset_empty", "md_bad_page"]) {
+      let listener, ready = false, release;
+      const gate = new Promise(r => { release = () => { ready = true; r(); }; });
+      const notes = [], saves = [];
+      const tabUrl = scenario === "bad_page" || scenario === "md_bad_page" ? "chrome://extensions" : "https://example.com/a";
+      const chromeStub = { commands: { onCommand: { addListener: fn => { listener = fn; } } },
+        tabs: { query: async () => scenario === "tabset_empty" ? [{ id: 1, url: "chrome://x", title: "x" }] : [{ id: 4, url: tabUrl, title: "Post" }] } };
+      const t = k => (ready ? "MANUAL:" : "BROWSER:") + k;
+      new Function("chrome", "openMarkdownPreviewFromShortcut", "handleSaveTabSet", "showNotification", "t",
+        "pbpRouteReaderSaveCommand", "loadSettings", "resolvePrefixSettings", "saveFromBackground", "pbpBookmarkLookupUrl", "pbpI18nReady",
+        background.slice(start, end + 4))(chromeStub,
+        async () => { notes.push(["mdpv", t("bgMdPreviewFailed")]); }, async () => {},
+        (...a) => notes.push(a), t, async () => false, async () => ({ urlClean: SETTINGS_DEFAULTS.urlClean }), () => ({}),
+        async args => { saves.push(args); }, pbpBookmarkLookupUrl, () => gate);
+      const command = { quick_save: "quick_save", read_later: "read_later", bad_page: "quick_save", tabset_empty: "save_tabset", md_bad_page: "markdown_preview" }[scenario];
+      const running = listener(command);
+      await new Promise(r => setTimeout(r, 20));
+      equal(notes.length + saves.length, 0, scenario + " acted before the language refresh finished");
+      release();
+      await running;
+      if (saves.length) equal(saves[0].notifyTitle.startsWith("MANUAL:"), true, scenario + " title " + saves[0].notifyTitle);
+      else { equal(notes.length, 1, scenario + " notification count"); equal(String(notes[0][1]).startsWith("MANUAL:"), true, scenario + " title " + notes[0][1]); }
+    }
+  });
+
+  // X4-01: a language change reaches a running worker through storage.onChanged.
+  await test("a language change re-initializes the worker's strings, other changes do not", async () => {
+    const background = await getBackgroundSource();
+    const start = background.indexOf("// Follow a language change");
+    const end = background.indexOf("\n});\n", start);
+    assert(start >= 0 && end > start, "language listener source not found");
+    let listener, calls = 0;
+    new Function("chrome", "initI18n", background.slice(start, end + 4))(
+      { storage: { onChanged: { addListener: fn => { listener = fn; } } } }, () => { calls++; });
+    listener({ optLang: { oldValue: "zh_CN", newValue: "en" } }, "sync"); equal(calls, 1, "sync optLang");
+    listener({ optLang: { oldValue: "en", newValue: "auto" } }, "local"); equal(calls, 2, "local optLang");
+    listener({ optSyncEnabled: { oldValue: false, newValue: true } }, "local"); equal(calls, 3, "optSyncEnabled moves optLang's storage area");
+    listener({ optLang: { newValue: "en" } }, "managed"); equal(calls, 3, "other areas are ignored");
+    listener({ optTheme: { newValue: "dark" } }, "sync"); equal(calls, 3, "unrelated keys are ignored");
+  });
+
+  await test("a 2xx Pinboard answer without a result code is not shown as Pinboard's own error", async () => {
+    const warns = [];
+    const realWarn = console.warn;
+    console.warn = (...a) => { warns.push(a.map(String).join(" ")); };
+    try {
+      for (const [label, resp] of [
+        ["html", { ok: true, status: 200, headers: { get: n => /content-type/i.test(n) ? "text/html; charset=utf-8" : null }, json: async () => { throw new SyntaxError("Unexpected token <"); } }],
+        ["empty object", { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({}) }],
+        ["null code", { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ result_code: null }) }],
+      ]) {
+        warns.length = 0;
+        const h = await createHarness({ pinboardFetch: async () => resp });
+        const delivered = await h.deliverSaveIntent(intent(), h.settings);
+        equal(delivered.result.status, "failed", label);
+        equal(delivered.result.reason, "api", label);
+        equal(Object.hasOwn(delivered.result, "detail"), false, label + " leaked an internal code as Pinboard's message");
+        equal(delivered.result.httpStatus, 200, label);
+        assert(warns.some(w => w.includes("200")), label + " left no trace of the status");
+        assert(!warns.some(w => w.includes("auth_token")), label + " logged a credential");
+      }
+    } finally { console.warn = realWarn; }
   });
 
   await test("saveFromBackground saves under url and reads the page by pageUrl", async () => {
