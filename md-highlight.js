@@ -2733,11 +2733,14 @@ function _pbpHlNbFocusRow(spec) {
 // back to (shared dismiss then leaves focus on body). On close, if that x is
 // gone and focus landed nowhere, find the row again by its id. A pointer
 // press outside the confirm, or focus that already moved somewhere real
-// (Tab out), is left alone.
+// (Tab out, a newer confirm that replaced this one), is left alone. Every
+// close runs onDismiss, including the silent ones that skip onCancel (page
+// scroll, pbpDismissActiveConfirm, a newer confirm), so the check lives there.
 function _pbpHlNbConfirmDelete(del, id) {
   const li = del.closest("li");
   const index = li && li.parentNode ? Array.prototype.indexOf.call(li.parentNode.children, li) : 0;
   let pointerOutside = false;
+  let confirmed = false;
   const onDown = (ev) => {
     if (!(ev.target instanceof Element && ev.target.closest(".confirm-popover"))) pointerOutside = true;
   };
@@ -2754,10 +2757,15 @@ function _pbpHlNbConfirmDelete(del, id) {
     msg: t("hlDeleteConfirm"),
     yesText: t("hlDelete"),
     noText: t("cancel"),
-    onDismiss: () => document.removeEventListener("pointerdown", onDown, true),
-    // Deferred one task: a Tab-out has landed on its target by then.
-    onCancel: () => { setTimeout(refocus, 0); },
+    onDismiss: () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      // Deferred one task: a Tab-out or a newer confirm has taken focus by
+      // then. Delete refocuses after its own write instead (onConfirm runs
+      // synchronously right after this, before the task fires).
+      setTimeout(() => { if (!confirmed) refocus(); }, 0);
+    },
     onConfirm: async () => {
+      confirmed = true;
       try { return await _pbpHlDeleteItem(id, del); } finally { refocus(); }
     },
   });

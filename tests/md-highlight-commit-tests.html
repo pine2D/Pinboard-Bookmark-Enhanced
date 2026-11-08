@@ -1726,6 +1726,38 @@ function selectionRange(n, start, end) {
     kept.focus(); kept.click(); await tick();
     document.querySelector(".confirm-popover .confirm-no").click(); await tick();
     check("Cancel without a rebuild still returns focus to the original x", document.activeElement === kept, desc(document.activeElement));
+
+    // N-02: the silent closes (scroll, pbpDismissActiveConfirm, a newer confirm) skip onCancel.
+    await fresh();
+    await openThenRebuild("h-beta");
+    document.getElementById("fixture").dispatchEvent(new Event("scroll")); await tick(); await tick();
+    check("scrolling the page closes the confirm and returns focus to the same row's x",
+      !document.querySelector(".confirm-popover:not(.is-closing)") && document.activeElement === rowBtn("h-beta", "hl-item-del"), desc(document.activeElement));
+
+    await fresh();
+    await openThenRebuild("h-beta");
+    pbpDismissActiveConfirm(); await tick(); await tick();
+    check("pbpDismissActiveConfirm with focus left nowhere returns it to the same row's x",
+      document.activeElement === rowBtn("h-beta", "hl-item-del"), desc(document.activeElement));
+
+    await fresh();
+    await openThenRebuild("h-beta");
+    const away2 = document.createElement("button");
+    away2.id = "focus-away-2"; document.getElementById("fixture").appendChild(away2);
+    pbpDismissActiveConfirm(); away2.focus(); await tick(); await tick();
+    check("pbpDismissActiveConfirm after focus moved elsewhere does not pull it back",
+      document.activeElement === away2, desc(document.activeElement));
+    away2.remove();
+
+    await fresh();
+    await openThenRebuild("h-beta");
+    const other = document.createElement("button");
+    other.id = "other-confirm-anchor"; document.getElementById("fixture").appendChild(other);
+    showConfirmPopover(other, { msg: "Other", yesText: "OK", noText: "No" }); await tick(); await tick();
+    const newer = document.querySelector(".confirm-popover:not(.is-closing)");
+    check("a newer confirm replacing this one keeps focus in the newer confirm",
+      !!newer && newer.contains(document.activeElement), desc(document.activeElement));
+    pbpDismissActiveConfirm(); other.remove(); await tick();
   }
 
   document.getElementById("summary").textContent =
