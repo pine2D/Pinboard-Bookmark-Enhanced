@@ -85,7 +85,18 @@ const PBP_GALLERY_ATTRS = new Set([
 // CommonMark inline escaping eats a backslash before ASCII punctuation
 // ("\," -> ",", "\\" -> "\"). Double the backslashes so the escape pass
 // consumes the added layer and KaTeX still receives the original source.
-function _pbpTexForMarkdown(tex) { return String(tex).replace(/\\/g, "\\\\"); }
+// The same parse also reads inline syntax inside the formula: "*" / "_" open
+// emphasis, "~" strikethrough, "`" code spans, "[..](..)" links, "<..>" raw
+// HTML. Two formulas that each carry "*" (A^{*}, f*g) got the prose between
+// them wrapped in <em>, splitting KaTeX's text node so one formula vanished.
+// Backslash-escape those characters too (G6b-02); CommonMark removes this
+// layer as well, so KaTeX still receives the source byte-for-byte. Markdown
+// exports keep the escaped form, same as they keep the doubled backslashes.
+// pbpLatexNormalize runs on this escaped text, so its env-name, \tag* and
+// \bbox[..] matchers accept an optional backslash before "*" and "[".
+function _pbpTexForMarkdown(tex) {
+  return String(tex).replace(/\\/g, "\\\\").replace(/[*_~`[\]<>]/g, "\\$&");
+}
 
 // Shared by the turndown "mathml" rule (below) AND _pbpSanitizeComplexTableHtml
 // (the complex-table AND, since fix round 1, headerless-table raw-HTML
@@ -1619,7 +1630,8 @@ function _pbpTexStripBraceCmd(s, cmd) {
     let start = idx;
     if (start > 0 && s[start - 1] === "\\") start--;
     let i = idx + marker.length;
-    if (s[i] === "[") {                      // optional [..] argument
+    // optional [..] argument; "\[" is the mathml rule's markdown-escaped form
+    if (s[i] === "[" || (s[i] === "\\" && s[i + 1] === "[")) {
       const close = s.indexOf("]", i);
       if (close === -1) break;
       i = close + 1;
@@ -1641,12 +1653,16 @@ function _pbpTexStripBraceCmd(s, cmd) {
 // env names to the aliases KaTeX ships (\aligned etc.), drop \bbox (MathJax-only,
 // keep its nested-brace content), drop \tag{...}, drop font-size commands.
 function _pbpTexFixMathContent(content) {
-  let out = content.replace(/\\(begin|end)\{([a-zA-Z*]+)\}/g, (m, be, env) =>
-    _PBP_TEX_ENV_MAP[env] ? "\\" + be + "{" + _PBP_TEX_ENV_MAP[env] + "}" : m);
+  // (\\?\*): the mathml rule escapes "*" for markdown ("align\*"), see
+  // _pbpTexForMarkdown; the mapped names carry no star, so no escape is lost.
+  let out = content.replace(/\\(begin|end)\{([a-zA-Z]+)(\\?\*)?\}/g, (m, be, name, star) => {
+    const env = name + (star ? "*" : "");
+    return _PBP_TEX_ENV_MAP[env] ? "\\" + be + "{" + _PBP_TEX_ENV_MAP[env] + "}" : m;
+  });
   out = _pbpTexStripBraceCmd(out, "bbox");
   // \\{1,2}: see _PBP_TEX_SIZE_CMDS comment -- doubled input must have the
   // WHOLE backslash run consumed, or a sibling backslash is left orphaned.
-  out = out.replace(/\\{1,2}tag\*?\{[^{}]*\}\s*/g, "");
+  out = out.replace(/\\{1,2}tag(?:\\?\*)?\{[^{}]*\}\s*/g, "");
   out = out.replace(_PBP_TEX_SIZE_CMDS, "");
   return out;
 }

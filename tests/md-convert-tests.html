@@ -3852,6 +3852,76 @@ section("mathml + pbpLatexNormalize: doubled backslashes survive normalization")
   check("align* still maps to \\begin{aligned} (single backslash) after doubled-backslash normalization",
     env.includes("$$\\begin{aligned}p=q\\end{aligned}$$"), env);
 })();
+
+// G6b-02: the mathml rule's $TeX$ output is markdown TEXT, so marked parses
+// CommonMark inline syntax inside it. Doubling backslashes alone left "*",
+// "_", "~", "`", "[", "]", "<" live: two formulas in one paragraph that each
+// carry "*" (A^{*}, f*g) got "$ and $" wrapped in <em>, KaTeX received split
+// text nodes, and one formula vanished. Real shape end to end: LaTeXML-style
+// MathML through Defuddle (which rewrites it to data-latex), then the
+// production order htmlToMarkdown -> pbpLatexNormalize -> renderMarkdown ->
+// renderMathInElement. Each case asserts the class property, not one string:
+// every formula renders exactly once and KaTeX's own annotation equals the
+// source TeX byte-for-byte.
+section("mathml TeX survives marked's inline parsing (emphasis, strike, links, code)");
+(function () {
+  const mml = (tex, block) =>
+    '<math xmlns="http://www.w3.org/1998/Math/MathML" alttext="' + tex.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;") + '"'
+    + (block ? ' display="block"' : '') + '><semantics><mrow><mi>x</mi></mrow>'
+    + '<annotation encoding="application/x-tex">' + tex.replace(/&/g, "&amp;").replace(/</g, "&lt;") + '</annotation></semantics></math>';
+  const filler = "<p>" + "This paragraph exists so the extractor keeps the article body intact. ".repeat(6) + "</p>";
+  const viaDefuddle = (bodyHtml) => {
+    const doc = new DOMParser().parseFromString('<!doctype html><html><head><title>Math</title></head><body><article><h1>Math</h1>' + filler + bodyHtml + filler + '</article></body></html>', "text/html");
+    const res = new Defuddle(doc, { url: "https://arxiv.example/html/1234" }).parse();
+    return res.content || "";
+  };
+  const renderAll = (md) => {
+    const host = document.createElement("div");
+    host.innerHTML = renderMarkdown(md);
+    renderMathInElement(host, {
+      delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }],
+      throwOnError: false
+    });
+    return host;
+  };
+  const annotations = (host) => [...host.querySelectorAll(".katex annotation")].map(a => a.textContent);
+  const cases = [
+    ["two adjoints with a starred superscript", ["A^{*}", "B^{*}"]],
+    ["two convolutions with a bare *", ["f*g", "g*h"]],
+    ["tilde in both formulas", ["a\\sim b~c", "d~e"]],
+    ["underscore after punctuation in both formulas", ["{}_2F_1", "{}_1F_0"]],
+    ["bracket pair followed by parens (link shape)", ["[0,1](t)", "x"]],
+    ["backticks in both formulas", ["f`(x)", "g`(y)"]],
+    ["angle brackets that read as an HTML tag", ["a<b c>d", "e"]],
+    ["already-escaped TeX punctuation", ["\\{x\\}\\_1\\*\\#", "\\\\ y"]]
+  ];
+  cases.forEach(([label, texs]) => {
+    const html = viaDefuddle("<p>Let " + mml(texs[0]) + " and " + mml(texs[1]) + " be given.</p>");
+    const md = pbpLatexNormalize(htmlToMarkdown(html, {}));
+    const host = renderAll(md);
+    const got = annotations(host);
+    check("Defuddle -> markdown -> KaTeX: " + label + " renders every formula with its exact source",
+      got.length === texs.length && got.every((t, i) => t === texs[i]) && !host.querySelector("p em, p del, p a, p code, p strong"),
+      JSON.stringify({ md, got, html: host.innerHTML.slice(0, 400) }));
+  });
+  // Block formula with a starred environment: the normalizer must still see
+  // align* through the added escape layer and map it to KaTeX's aligned.
+  const blockHtml = viaDefuddle("<p>Then</p>" + mml("\\begin{align*}p&=q^{*}\\\\r&=s\\end{align*}", true) + "<p>holds.</p>");
+  const blockMd = pbpLatexNormalize(htmlToMarkdown(blockHtml, {}));
+  const blockHost = renderAll(blockMd);
+  const blockAnn = annotations(blockHost);
+  check("Defuddle -> markdown -> KaTeX: align* block maps to aligned and renders once",
+    blockAnn.length === 1 && blockAnn[0] === "\\begin{aligned}p&=q^{*}\\\\r&=s\\end{aligned}" && !blockHost.querySelector(".katex-error"),
+    JSON.stringify({ blockMd, blockAnn }));
+  const tagMd = pbpLatexNormalize(htmlToMarkdown('<math display="block" data-latex="y=1\\tag*{1}">ignored</math>', {}));
+  const tagAnn = annotations(renderAll(tagMd));
+  check("\\tag* strips through the escape layer with no orphan backslash or star",
+    tagAnn.length === 1 && tagAnn[0] === "y=1", JSON.stringify({ tagMd, tagAnn }));
+  // Raw-HTML passthrough (doubleEscape:false) must not gain the escape layer.
+  const raw = htmlToMarkdown('<table><tr><td><math data-latex="A^{*}_1">t</math></td><td>b</td></tr></table>', {});
+  check("raw-HTML table math keeps the TeX unescaped (no added \\* or \\_)",
+    raw.includes("$A^{*}_1$"), raw);
+})();
 </script>
 
 <script>
