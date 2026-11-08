@@ -1466,6 +1466,11 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
             videoDescriptionMd: descMd,
             url, baseUrl, sourceTabUrl, tabId: srcTabId,
             source: source === "jina" ? "jina" : "local",
+            // The article's own metadata from the handoff (byline, date, hero
+            // image, page language): exports and the reading language read it
+            // from the payload, so a transcript that dropped it lost all four
+            // export fields and its lang on the next F5.
+            author, published, site, image, lang: info.lang || "",
             sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
             nonce: _pageNonce
           }
@@ -1946,6 +1951,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         videoDescriptionMd: (window.pbpVideoDoc && window.pbpVideoDoc.descriptionMarkdown) || "",
         title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
         source: source === "jina" ? "jina" : "local",
+        author, published, site, image, lang: info.lang || "",
         sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
       }

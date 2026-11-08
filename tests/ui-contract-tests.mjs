@@ -7259,6 +7259,18 @@ function stripJsComments(input) {
   const missingInPayload = restoreKeys.filter((key) => !payloadKeys.includes(key));
   check(missingInRestore.length === 0 && missingInPayload.length === 0,
     `md-preview.js: the commit payload and the committed-transcript restore record disagree -- only in the payload: [${missingInRestore.join(", ")}]; only in the restore record: [${missingInPayload.join(", ")}]. Both write the same MP_KEY slot, so whichever wrote last decides what an F5 gets, and a field missing from one is lost the moment that one wins`);
+  // Parity alone cannot see a field BOTH records drop (bug sweep G6a-04):
+  // the committed transcript must also forward the article metadata the
+  // handoff carried. The set is read from the code: every article const
+  // taken off the payload as `const x = info.x || ""`, plus the page
+  // language the render reads off info.
+  const articleMetaKeys = [...src.matchAll(/^  const ([A-Za-z_$][\w$]*) = info\.\1 \|\| "";$/gm)].map((m) => m[1]);
+  if (/\binfo && info\.lang\b/.test(src)) articleMetaKeys.push("lang");
+  check(articleMetaKeys.length >= 5,
+    `ui-contract: could not read the article metadata the reader takes off its payload (${articleMetaKeys.join(", ")}) -- the forward check below is UNVERIFIED`);
+  const metaMissing = articleMetaKeys.filter((key) => !payloadKeys.includes(key) || !restoreKeys.includes(key));
+  check(metaMissing.length === 0,
+    `md-preview.js: the committed-transcript records drop article metadata the handoff carried: [${metaMissing.join(", ")}] -- the reload after a commit exports without it`);
 
   // ---- Lazy video module load order (bug sweep G8b-01 / G8b-04). md-video.js
   // is loaded on demand by ensureVideoModule(), so a typeof probe of one of
