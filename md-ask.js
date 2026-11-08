@@ -1496,11 +1496,14 @@ function _pbpAskErrorUi(aEl, error, question, runOpts) {
         && st.records[st.records.length - 1] === aEl._askExportRecord;
     };
     const replacing = !!(runOpts && runOpts.restoreNodes && runOpts.replaceLast);
-    const giveUp = () => { aEl.replaceChildren(...runOpts.restoreNodes); };
+    // Fallback only: starting a new question already put this bubble back
+    // (_pbpAskRestoreFailedRegens), so an earlier-round Retry should not exist.
+    const giveUp = () => { delete aEl._askPendingRestore; aEl.replaceChildren(...runOpts.restoreNodes); };
     if (replacing && !isLastRound()) { giveUp(); return; }
     pbpAiRetryWithPermission(error, _pbpAskState && _pbpAskState.s, () => {
       if (!runnable()) return;
       if (replacing && !isLastRound()) { giveUp(); return; }
+      delete aEl._askPendingRestore;
       if (aEl.contains(document.activeElement)) {
         aEl.tabIndex = -1;
         aEl.focus();
@@ -1516,6 +1519,29 @@ function _pbpAskErrorUi(aEl, error, question, runOpts) {
   });
   aEl.appendChild(err);
   aEl.appendChild(retry);
+  // A failed Regenerate keeps its old answer above the error bar. Mark it so
+  // the next question can put that answer back (user ruling 2026-11-08): once
+  // a later round exists, this Retry could no longer replace anything.
+  if (runOpts && runOpts.restoreNodes && runOpts.replaceLast) aEl._askPendingRestore = runOpts.restoreNodes;
+}
+
+// A new round is about to be requested: every failed Regenerate still in the
+// thread goes back to its old answer, dropping its error bar and Retry. Only
+// the DOM changes -- a failed Regenerate never wrote st.records, st.rounds or
+// the archive. The mark lives on the bubble itself, so Clear, a new session,
+// an account switch or a history re-render (which all replace the thread's
+// bubbles) leave nothing behind to restore.
+function _pbpAskRestoreFailedRegens(except) {
+  for (const el of document.querySelectorAll("#ask-thread .ask-a")) {
+    const nodes = el._askPendingRestore;
+    if (!nodes || el === except) continue;
+    delete el._askPendingRestore;
+    const hadFocus = el.contains(document.activeElement);
+    el.replaceChildren(...nodes);
+    el.classList.remove("streaming");
+    el.removeAttribute("aria-busy");
+    if (hadFocus) { el.tabIndex = -1; el.focus({ preventScroll: true }); }
+  }
 }
 
 // Core runner: stream into aEl, finalize, persist, count.
@@ -1539,6 +1565,7 @@ async function _pbpAskRun(question, aEl, opts) {
   const runSettings = st.s;
   const runSession = st.sessionId;
   const runArchiveRev = st.archiveRev || 0;
+  if (opts.newRound) _pbpAskRestoreFailedRegens(aEl);
   const replacedRecord = opts.replaceLast ? st.records?.[st.records.length - 1] : null;
   st.ctrl = new AbortController();
   const runCtrl = st.ctrl;
@@ -1781,7 +1808,7 @@ async function _pbpAskSend() {
   const aEl = _pbpAskAppendRound(question);
   if (!aEl) return;
   ta.value = "";
-  await _pbpAskRun(question, aEl);
+  await _pbpAskRun(question, aEl, { newRound: true });
 }
 
 // ============================================================
