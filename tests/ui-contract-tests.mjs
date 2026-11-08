@@ -4302,11 +4302,11 @@ check(/<div class="tabs" role="tablist" aria-orientation="vertical">/.test(optio
 check(/btn\.tabIndex = btn\.classList\.contains\("active"\) \? 0 : -1;/.test(optionsJs),
   "options.js: tab button roving-tabindex init is missing (btn.tabIndex = ...active ? 0 : -1)");
 {
-  const kdStart = optionsJs.indexOf('_tabBtns.forEach((btn, i) => {');
+  const kdStart = optionsJs.indexOf('_tabBtns.forEach((btn) => {');
   const kdEnd = kdStart < 0 ? -1 : optionsJs.indexOf("mobileTabSelect?.addEventListener", kdStart);
   const kdBody = kdStart < 0 || kdEnd < 0 ? "" : optionsJs.slice(kdStart, kdEnd);
-  check(/e\.key === "ArrowDown"/.test(kdBody) && /e\.key === "ArrowUp"/.test(kdBody) &&
-    /activateTab\(_tabBtns\[n\]\)/.test(kdBody) && /_tabBtns\[n\]\.focus\(\)/.test(kdBody),
+  check(/"ArrowDown"/.test(kdBody) && /"ArrowUp"/.test(kdBody) &&
+    /activateTab\(target\)/.test(kdBody) && /target\.focus\(\)/.test(kdBody) && /!b\.hidden/.test(kdBody),
     "options.js: tab keydown handler lost the ArrowDown/ArrowUp roving-focus branches");
 }
 {

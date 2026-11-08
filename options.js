@@ -1733,6 +1733,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     btn.classList.add("active");
     btn.setAttribute("aria-selected", "true");
     btn.tabIndex = 0;
+    // A hidden tab (Tags under Karakeep/linkding) can be activated by a deep
+    // link or a settings search hit; hand the Tab stop to a visible one.
+    if (btn.hidden) { const first = _tabBtns.find((b) => !b.hidden); if (first) first.tabIndex = 0; }
     if (mobileTabSelect) mobileTabSelect.value = btn.dataset.panel;
     $id(`panel-${btn.dataset.panel}`).classList.add("active");
     _syncResetBtnVisibility(btn.dataset.panel);
@@ -1744,17 +1747,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (btn.dataset.panel === "vocab") renderVocabPanel();
     history.replaceState(null, "", "#" + btn.dataset.panel);
   }
-  _tabBtns.forEach((btn, i) => {
+  _tabBtns.forEach((btn) => {
     btn.tabIndex = btn.classList.contains("active") ? 0 : -1;
     btn.addEventListener("click", () => activateTab(btn));
     btn.addEventListener("keydown", (e) => {
-      let n = -1;
-      if (e.key === "ArrowDown") n = (i + 1) % _tabBtns.length;
-      else if (e.key === "ArrowUp") n = (i - 1 + _tabBtns.length) % _tabBtns.length;
-      else return;
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      // Step through the visible tabs only: a hidden one cannot take focus.
+      const vis = _tabBtns.filter((b) => !b.hidden);
+      const at = vis.indexOf(btn);
+      if (at < 0 || !vis.length) return;
+      const target = vis[(at + (e.key === "ArrowDown" ? 1 : vis.length - 1)) % vis.length];
       e.preventDefault();
-      activateTab(_tabBtns[n]);
-      _tabBtns[n].focus();
+      activateTab(target);
+      target.focus();
     });
   });
   mobileTabSelect?.addEventListener("change", () => {
@@ -2873,7 +2878,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     $id("bookmark-karakeep-help").hidden = service !== "karakeep";
     $id("wayback-selfhosted-private-hint").hidden = service === "pinboard";
     const tab = $id("tab-tags");
-    if (tab) tab.hidden = service !== "pinboard";
+    if (tab) {
+      tab.hidden = service !== "pinboard";
+      // Keep one visible tab reachable by Tab when the hidden one held the stop.
+      if (tab.hidden && tab.tabIndex === 0) {
+        const first = document.querySelector(".tab-btn:not([hidden])");
+        if (first) first.tabIndex = 0;
+      }
+    }
     for (const id of ["opt-show-search", "opt-show-badge", "opt-show-suggest-tags"]) {
       const row = $id(id)?.closest(".pref-row");
       if (row) row.hidden = service !== "pinboard";

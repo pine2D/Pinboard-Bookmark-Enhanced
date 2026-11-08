@@ -1641,6 +1641,24 @@ try{
   try{
     const panelNow=async()=>JSON.stringify({state:await state(),stats:(await stats.textContent()).trim(),service:await options.evaluate(()=>document.querySelector('input[name="bookmark-service"]:checked')?.value||'')});
     await until(async()=>(await state())==='pinboard-only'&&(await stats.textContent()).trim()===en.tagGovPinboardOnly.message,'deep-linked Tags panel explains linkding is not supported').catch(async e=>{throw new Error(e.message+' '+await panelNow());});
+    // Keyboard on the tab strip while the Tags tab is hidden (linkding): the
+    // deep link activated the hidden tab, yet one visible tab must stay
+    // reachable by Tab, and the arrow keys must step over the hidden one.
+    {
+      const tabState=()=>options.evaluate(()=>({tabbable:[...document.querySelectorAll('.tab-btn')].filter(b=>!b.hidden&&b.tabIndex===0).map(b=>b.id),tagsHidden:document.getElementById('tab-tags').hidden}));
+      const st=await tabState();
+      assert.equal(st.tagsHidden,true,'Tags tab is hidden while linkding is chosen');
+      assert.equal(st.tabbable.length,1,'exactly one visible tab is reachable by Tab after the hidden Tags tab was activated: '+JSON.stringify(st));
+      await options.locator('#tab-markdown').click();
+      await options.locator('#tab-markdown').focus();
+      await options.keyboard.press('ArrowDown');
+      assert.equal(await options.evaluate(()=>document.activeElement?.id),'tab-archive','ArrowDown steps over the hidden Tags tab');
+      assert(await options.locator('#panel-archive').evaluate(el=>el.classList.contains('active')),'the Archive panel is active');
+      await options.keyboard.press('ArrowUp');
+      assert.equal(await options.evaluate(()=>document.activeElement?.id),'tab-markdown','ArrowUp steps back over the hidden Tags tab');
+      await options.goto(pageUrl+'options.html#tags');
+      await until(async()=>(await state())==='pinboard-only','deep link reopened');
+    }
     await options.locator('#tab-general').click();
     await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
     await until(()=>worker.evaluate(async()=>(await chrome.storage.local.get('bookmarkServiceActive')).bookmarkServiceActive==='pinboard'),'Pinboard (connected) switched to');
