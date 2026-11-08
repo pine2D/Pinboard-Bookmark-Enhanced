@@ -1345,8 +1345,12 @@ async function _pbpTrProbeCache(st) {
         // (review #10); and merging a fresh run into it would fossilize the
         // orphan blocks plus old-generation meta into a forever-"mixed"
         // record (review #4). Arm the next run as a full replace instead.
+        // Not on a video page: every subtitle track shares this one key
+        // (st.url never moves on an in-place swap), so a miss there means
+        // "another track", whose blocks the reader can switch back to. Those
+        // stay; blocks are keyed by content hash, so the merge is harmless.
         st.staleVerdict = null;
-        st.replaceRun = true;
+        if (!document.body.classList.contains("video-mode")) st.replaceRun = true;
       } else {
         // ZH-1b D10: classify the entry's generation record against the
         // current world (prompt generation + THIS article's user-glossary hit

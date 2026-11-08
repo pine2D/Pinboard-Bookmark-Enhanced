@@ -11823,6 +11823,37 @@ suiteIf("tr_ independent cache pool (ZH-6)", "_pbpAiTrRange", () => {
     }
   });
 
+  // G8a-01: a video page keeps ONE tr_ key across subtitle tracks (st.url
+  // never moves on an in-place swap), so track B misses every block of track
+  // A's paid entry. Those blocks are not orphans -- the reader can switch back.
+  await atest("video page: a full miss merges instead of replacing another track's paid blocks", async () => {
+    const url = "https://pbp-test/video-tracks-" + Date.now();
+    const key = _pbpTrCacheKey(url, "zh-Hans", "p:m", "acct");
+    await pbpTrCacheSet(url, "zh-Hans", "p:m", { hTrackA1: "甲一", hTrackA2: "甲二" }, "acct",
+      { pg: PBP_TR_PROMPT_GEN, gf: "", sm: 0 });
+    const st = retrFixtureSt(url);
+    st.status = "idle";
+    st.staleVerdict = null;
+    st.work = [{ n: 1, md: "track b line", hash: "hTrackB1", shielded: { text: "track b line", slots: [] } }];
+    document.body.classList.add("video-mode");
+    try {
+      await _pbpTrProbeCache(st);
+      assert(!st.replaceRun, "a subtitle-track miss must not arm a replace run");
+      assertEq(st.staleVerdict, null, "no banner pointing at nothing");
+      st.newly = { hTrackB1: "乙一" };
+      st.flushBuf = { hTrackB1: "乙一" };
+      st.flushInflight = false;
+      _pbpTrFlushCache(st);
+      for (let i = 0; i < 50 && st.flushInflight; i++) await new Promise((r) => setTimeout(r, 10));
+      const got = await pbpTrCacheGet(url, "zh-Hans", "p:m", "acct");
+      assertEq(Object.keys(got.blocks).sort().join(","), "hTrackA1,hTrackA2,hTrackB1",
+        "both tracks stay cached, so switching back is a free hit");
+    } finally {
+      document.body.classList.remove("video-mode");
+      await pbpAiCacheDelete(key);
+    }
+  });
+
   // #40: skipped blocks (already written in the target language) are
   // deliberately never cached, so a completeness verdict counting cache hits
   // alone reopened every article carrying one as "partial" -- forever, since
