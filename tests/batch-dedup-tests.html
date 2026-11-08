@@ -438,6 +438,17 @@ async function createUiHarness(storedProgress, now, opts = {}) {
       equal(last.saved, 3, "not every tab saved");
       equal(h.calls.intents.length, 3);
     });
+    await test(service + " batch over-long title check uses the current auth after a same-account setting write", async () => {
+      const long = "T".repeat(5000);
+      const tabs = [{id:1, url:"https://example.com/p1", title:"P1"}, {id:2, url:"https://example.com/p2", title:long}, {id:3, url:"https://example.com/p3", title:long}];
+      // Merge mode: only the over-long title triggers a lookup.
+      const h = await createSaveTagsHarness(service, ["a"], {tabs, lookupAware:true, onSave:(state, n) => { if (n === 1) state.epoch++; }});
+      await h.batch();
+      const last = h.calls.progress.at(-1);
+      equal(last.error, null, "run was stopped by a stale-epoch lookup");
+      equal(last.saved + "/" + last.tooLong, "1/2");
+      assert(h.calls.lookups.length >= 2 && h.calls.lookups.slice(-2).every(l => l.epoch === 1), "lookups did not carry the current epoch");
+    });
     await test(service + " batch stops without lookup or save when the account really changes", async () => {
       const h = await createSaveTagsHarness(service, ["a"], {tabs:threeTabs, settings:{batchSkipExisting:true}, lookupAware:true,
         onSave:(state, n) => { if (n === 1) state.account = "someone-else"; }});
