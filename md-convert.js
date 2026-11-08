@@ -1543,9 +1543,9 @@ function readingProgressPercent(scrollY, viewportHeight, scrollHeight) {
 // append) → (frontmatter prepend). baseUrl = meta.url.
 // highlights (H2, md-highlight.js): absent/empty -> byte-identical to the pre-H2 output
 // (regression guard, spec sec.5/9). highlightsInline:false lets composeStyledHtml's own
-// internal call opt OUT of the "==...==" inline mark (marked doesn't parse ==, so styled
-// HTML only ever gets the aggregation section) while the plain .md export path (default
-// true) gets both. Both pbpHlInlineMark/pbpHlComposeSection calls are typeof-guarded:
+// internal call opt OUT of the "==...==" inline mark (marked does render ==x== as
+// <mark>, but styled HTML keeps user highlights in the aggregation section only, on
+// purpose) while the plain .md export path (default true) gets both. Both pbpHlInlineMark/pbpHlComposeSection calls are typeof-guarded:
 // popup.html loads this file WITHOUT md-highlight.js and never passes opts.highlights,
 // but a guard costs nothing and removes a latent ReferenceError for any future caller.
 function composeExport(canonicalMd, meta, opts) {
@@ -1987,8 +1987,8 @@ function composeStyledHtml(canonicalMd, meta, opts) {
   meta = meta || {};
   opts = opts || {};
   // highlightsInline:false -- styled HTML gets ONLY the aggregation section (spec
-  // sec.5): the HTML path skips the inline "==...==" mark on purpose, so an inline mark would render as literal
-  // text in the exported doc.
+  // sec.5): marked renders ==x== as <mark>, but the HTML path leaves the reader's
+  // inline "==...==" highlights out of the body on purpose.
   const bodyMd = composeExport(canonicalMd || "", meta, {
     frontmatter: false,
     imagePolicy: opts.imagePolicy || "keep",
