@@ -1782,8 +1782,12 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     // downstream), so bake the localized text into the message here (D4-2).
     // Best-effort: if t() is unavailable for any reason, degrade to the
     // original error untouched rather than let classification itself fail.
-    const offline = (e instanceof TypeError && /failed to fetch/i.test(e.message || "")) ||
-      (typeof navigator !== "undefined" && navigator.onLine === false);
+    // Stop wins over any offline guess, and a provider answer (a status, or the
+    // caller's AbortError) proves the host was reachable (local Ollama works offline).
+    if (callerAborted) throw _pbpAbortError();
+    const offline = !(e && (typeof e.status === "number" || e.name === "AbortError")) &&
+      ((e instanceof TypeError && /failed to fetch/i.test(e.message || "")) ||
+      (typeof navigator !== "undefined" && navigator.onLine === false));
     if (offline) {
       let offlineMsg = "";
       try { offlineMsg = t("pinboardErrorOffline"); } catch (_) { offlineMsg = ""; }

@@ -1938,6 +1938,36 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
       ok(caught && caught.code !== "network", "AbortError must not be reclassified as network");
     });
 
+    await atest("offline: provider HTTP errors keep their message, status and code", async () => {
+      Object.defineProperty(navigator, "onLine", { value: false, configurable: true });
+      try {
+        for (const [status, body] of [[404, { error: { message: "model 'x' not found", code: "model_not_found" } }], [500, { error: { message: "boom" } }]]) {
+          window.fetch = async () => ({ ok: false, status, json: async () => body });
+          let caught = null;
+          try { await _pbpStreamRead("http://127.0.0.1:11434/api/chat", {}, {}, "Ollama", noopConsume); }
+          catch (e) { caught = e; }
+          ok(caught && caught.code !== "network" && caught.status === status, status + ": must not become the offline error, got " + (caught && caught.code) + "/" + (caught && caught.status));
+          ok(/boom|not found/.test(caught.message), status + ": original message must survive, got: " + caught.message);
+        }
+      } finally {
+        if (onlineDesc) Object.defineProperty(navigator, "onLine", onlineDesc); else delete navigator.onLine;
+      }
+    });
+
+    await atest("offline: the caller's Stop surfaces as AbortError, not the offline error", async () => {
+      Object.defineProperty(navigator, "onLine", { value: false, configurable: true });
+      try {
+        const ctrl = new AbortController();
+        window.fetch = async () => { ctrl.abort(); throw new TypeError("Failed to fetch"); };
+        let caught = null;
+        try { await _pbpStreamRead("https://example.test/x", {}, { signal: ctrl.signal }, "API", noopConsume); }
+        catch (e) { caught = e; }
+        ok(caught && caught.name === "AbortError" && caught.code !== "network", "expected AbortError, got " + (caught && caught.name) + "/" + (caught && caught.code));
+      } finally {
+        if (onlineDesc) Object.defineProperty(navigator, "onLine", onlineDesc); else delete navigator.onLine;
+      }
+    });
+
     await atest("degrade path: if t()/chrome.i18n is unavailable, the original error is rethrown untouched", async () => {
       window.chrome = undefined; // simulate t() throwing (no extension context)
       window.fetch = async () => { throw new TypeError("Failed to fetch"); };
