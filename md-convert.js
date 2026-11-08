@@ -932,8 +932,13 @@ function renderMarkdown(md) {
     // and untrusted CSS would restyle the whole page; drop it too.
     FORBID_TAGS: ["svg", "image", "video", "audio", "source", "track",
       "form", "select", "option", "optgroup", "textarea", "button", "label",
-      "fieldset", "legend", "datalist", "output", "dialog", "style"],
-    FORBID_ATTR: ["style", "background", "poster"]
+      "fieldset", "legend", "datalist", "output", "dialog", "style",
+      // Image maps: <area href> is a second navigable element the <a>-only
+      // link hook above never normalises (no rel, caller-chosen target), so
+      // one oversized usemap image could navigate the reader tab or leave a
+      // window.opener. The preview renders documents, not hot-spot images.
+      "map", "area"],
+    FORBID_ATTR: ["style", "background", "poster", "usemap"]
   });
 }
 

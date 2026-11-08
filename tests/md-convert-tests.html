@@ -209,6 +209,30 @@ function assertEq(actual, expected, label) {
   check("renderMarkdown safe link gets target+rel", /rel="noopener noreferrer"/.test(s) && /target="_blank"/.test(s), s);
 })();
 
+// ---- Y1-01: image maps (<map><area href>) are a second navigable element ----
+(() => {
+  const gif = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  const variants = {
+    "no target": '<area shape="default" href="https://evil.example/a" alt="go">',
+    "named target": '<area shape="default" href="https://evil.example/b" target="pbpwin" alt="go">',
+    "_self target": '<area shape="default" href="https://evil.example/c" target="_self" alt="go">'
+  };
+  for (const [label, area] of Object.entries(variants)) {
+    const html = renderMarkdown('<img src="' + gif + '" width="2000" height="2000" usemap="#m" alt="x"><map name="m">' + area + '</map>');
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const bad = [...doc.querySelectorAll("[href]")].filter((el) => {
+      const href = el.getAttribute("href") || "";
+      if (href.startsWith("#")) return false;
+      const rel = (el.getAttribute("rel") || "").toLowerCase().split(/\s+/);
+      return !(el.getAttribute("target") === "_blank" && rel.includes("noopener") && rel.includes("noreferrer"));
+    });
+    check("Y1-01 (" + label + "): every external href element is _blank + noopener + noreferrer",
+      bad.length === 0, bad.map((e) => e.outerHTML).join(" | "));
+    check("Y1-01 (" + label + "): no image-map hot areas survive (map/area/usemap)",
+      !doc.querySelector("map, area, [usemap]"), html);
+  }
+})();
+
 // ---- Form controls / style element are dropped from the reading surface ----
 (() => {
   const s = norm(renderMarkdown("窄屏时侧栏变 <select>,分组如何映射(optgroup?)"));
