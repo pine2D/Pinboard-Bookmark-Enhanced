@@ -2,11 +2,14 @@
 import { createRequire } from 'node:module';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 import { installAskHistoryFixture } from '../scripts/audit-ask-history-fixture.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url)).replace(/\/$/, '');
-const out = process.env.PBP_ASK_LIBRARY_QA_OUT || mkdtempSync(join(tmpdir(), 'pbp-ask-library-evidence-'));
+// Evidence (screenshots, results.json) goes under $PBP_QA_REPORT_DIR, outside the repo and the system temp dir.
+const reportBase = process.env.PBP_QA_REPORT_DIR || join(homedir(), '.local/share/pbp-qa-report');
+mkdirSync(reportBase, { recursive: true });
+const out = process.env.PBP_ASK_LIBRARY_QA_OUT || mkdtempSync(join(reportBase, 'ask-library-evidence-'));
 mkdirSync(out, { recursive: true });
 const { chromium } = createRequire(root + '/.qa-scan/package.json')('playwright');
 const profile = mkdtempSync(join(tmpdir(), 'pbp-ask-library-'));
