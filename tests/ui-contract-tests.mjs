@@ -10518,49 +10518,74 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
 // open whose URL names md-preview.html -- a new opener is covered without
 // being listed here. The mark must come from pbpVideoDetect on the page URL.
 {
-  const openers = [];
-  const indirect = [];
   // Literals that name the reader page but are NOT the direct argument of an open call. A URL kept in a
   // variable and handed to tabs.create later would slip past the direct scan, so every such literal must
   // be a known non-opener below (file + the code line it sits on + why it cannot open a tab). Each entry
   // must match exactly one literal in its file: a second copy of an exempted line is new code, and an
-  // entry that matches nothing is stale.
+  // entry that matches nothing is stale. An exemption pins the whole line: once the exempted expression is
+  // removed, nothing that can open a tab or window may be left on that line.
   const nonOpeners = [
     ["background.js", /u\.pathname === "\/md-preview\.html"/, "pathname comparison in pbpReaderDocumentUrl"],
     ["background.js", /startsWith\(chrome\.runtime\.getURL\("md-preview\.html"\)\)/, "URL prefix test in _imgFixIsPreviewUrl"],
     ["background.js", /chrome\.tabs\.query\(\{ url: chrome\.runtime\.getURL\("md-preview\.html"\) \+ "\*" \}\)/, "tabs.query match pattern (lookup only)"],
     ["background.js", /const base = chrome\.runtime\.getURL\("md-preview\.html"\);/, "orphan sweep prefix, only startsWith-tested against tab urls"],
   ];
-  const nonOpenerHits = nonOpeners.map(() => 0);
-  for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
-    const code = stripJsComments(read(f));
-    const covered = [];
-    for (const m of code.matchAll(/\bchrome\.(?:tabs|windows)\.(?:create|update)\(/g)) {
-      const open = m.index + m[0].length - 1;
-      let depth = 0, end = open;
-      for (; end < code.length; end++) {
-        if (code[end] === "(") depth++;
-        else if (code[end] === ")") { depth--; if (depth === 0) break; }
+  const openCall = /\b(?:tabs|windows)\s*\.\s*(?:create|update)\b|\bwindow\s*\.\s*open\b|\bopen\s*\(|\blocation\s*(?:\.\s*(?:assign|replace|href)\b|\s*=)/;
+  const exemptionHolds = (re, lineText) => re.test(lineText) && !openCall.test(lineText.replace(re, ""));
+  // files: [[name, strippedCode]]. Pure, so the synthetic cases below can feed it.
+  const scanReaderOpeners = (files) => {
+    const openers = [];
+    const indirect = [];
+    const nonOpenerHits = nonOpeners.map(() => 0);
+    for (const [f, code] of files) {
+      const covered = [];
+      for (const m of code.matchAll(/\bchrome\.(?:tabs|windows)\.(?:create|update)\(/g)) {
+        const open = m.index + m[0].length - 1;
+        let depth = 0, end = open;
+        for (; end < code.length; end++) {
+          if (code[end] === "(") depth++;
+          else if (code[end] === ")") { depth--; if (depth === 0) break; }
+        }
+        const args = code.slice(open, end + 1);
+        if (!args.includes("md-preview.html")) continue;
+        covered.push([open, end]);
+        const before = code.slice(Math.max(0, m.index - 2000), m.index);
+        const ids = [...new Set(args.match(/[A-Za-z_$][\w$]*/g) || [])];
+        const marked = ids.some((id) => new RegExp("const " + id.replace(/\$/g, "\\$") + " = [^;]*\\bpbpVideoDetect\\([^;]*\"&video=1\"").test(before));
+        openers.push({ where: f + ":" + code.slice(0, m.index).split("\n").length, marked });
       }
-      const args = code.slice(open, end + 1);
-      if (!args.includes("md-preview.html")) continue;
-      covered.push([open, end]);
-      const before = code.slice(Math.max(0, m.index - 2000), m.index);
-      const ids = [...new Set(args.match(/[A-Za-z_$][\w$]*/g) || [])];
-      const marked = ids.some((id) => new RegExp("const " + id.replace(/\$/g, "\\$") + " = [^;]*\\bpbpVideoDetect\\([^;]*\"&video=1\"").test(before));
-      openers.push({ where: f + ":" + code.slice(0, m.index).split("\n").length, marked });
+      for (const m of code.matchAll(/md-preview\.html/g)) {
+        if (covered.some(([lo, hi]) => m.index >= lo && m.index <= hi)) continue;
+        const ls = code.lastIndexOf("\n", m.index) + 1;
+        const le = code.indexOf("\n", m.index);
+        const lineText = code.slice(ls, le < 0 ? code.length : le).trim();
+        // Comments (block and line) were already removed by stripJsComments; anything left is code.
+        const known = nonOpeners.findIndex(([nf, re]) => nf === f && exemptionHolds(re, lineText));
+        if (known >= 0 && nonOpenerHits[known] === 0) { nonOpenerHits[known]++; continue; }
+        if (known >= 0) nonOpenerHits[known]++;
+        indirect.push(f + ":" + code.slice(0, m.index).split("\n").length + " `" + lineText.slice(0, 80) + "`");
+      }
     }
-    for (const m of code.matchAll(/md-preview\.html/g)) {
-      if (covered.some(([lo, hi]) => m.index >= lo && m.index <= hi)) continue;
-      const ls = code.lastIndexOf("\n", m.index) + 1;
-      const le = code.indexOf("\n", m.index);
-      const lineText = code.slice(ls, le < 0 ? code.length : le).trim();
-      // Comments (block and line) were already removed by stripJsComments; anything left is code.
-      const known = nonOpeners.findIndex(([nf, re]) => nf === f && re.test(lineText));
-      if (known >= 0 && nonOpenerHits[known] === 0) { nonOpenerHits[known]++; continue; }
-      if (known >= 0) nonOpenerHits[known]++;
-      indirect.push(f + ":" + code.slice(0, m.index).split("\n").length + " `" + lineText.slice(0, 80) + "`");
+    return { openers, indirect, nonOpenerHits };
+  };
+  const { openers, indirect, nonOpenerHits } = scanReaderOpeners(
+    readdirSync(root).filter((n) => n.endsWith(".js")).map((f) => [f, stripJsComments(read(f))]));
+  // The exemption must not hide an opener appended to the same line (synthetic code, background.js).
+  {
+    const exempt = 'const base = chrome.runtime.getURL("md-preview.html");';
+    const plain = scanReaderOpeners([["background.js", exempt]]);
+    check(plain.indirect.length === 0 && plain.nonOpenerHits[3] === 1,
+      "ui-contract: the exempted `const base = ...` line alone must still pass the reader-opener scan");
+    for (const tail of [" chrome.tabs.create({ url: base });", " window.open(base);", " chrome.windows.create({ url: base });", " chrome.tabs.update(1, { url: base });"]) {
+      const bad = scanReaderOpeners([["background.js", exempt + tail]]);
+      check(bad.indirect.length === 1,
+        `ui-contract: an opener appended on the exempted line (${tail.trim()}) must be reported, not exempted`);
     }
+    const q = 'const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL("md-preview.html") + "*" });';
+    check(scanReaderOpeners([["background.js", q]]).indirect.length === 0,
+      "ui-contract: the exempted tabs.query line alone must still pass the reader-opener scan");
+    check(scanReaderOpeners([["background.js", q + " chrome.tabs.create({ url: base });"]]).indirect.length === 1,
+      "ui-contract: an opener appended after the tabs.query exemption must be reported");
   }
   check(openers.length >= 4,
     `ui-contract: found only ${openers.length} reader openers (${openers.map((o) => o.where).join(", ")}) -- the video=1 opener check is not looking at the real code`);
