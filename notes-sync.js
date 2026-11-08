@@ -432,6 +432,24 @@ function pbpCreateNotesSyncStore({
       await storage.remove(stateKey("preflight",ownerHash));return true;
     } catch (error) { return stateFailure(error); }
   }
+  // Pending IDs live in the owner's article records and are shared by every
+  // Google account. Returning to an account that already has a row must
+  // republish edits another account consumed meanwhile (the runner then
+  // checkpoints); a new account gets its checkpoint from the runner instead.
+  async function activateAccount(permissionId,ownerHash) {
+    if (typeof permissionId!=="string" || !permissionId || !/^[0-9a-f]{64}$/.test(ownerHash)) return false;
+    try {
+      const owner=await getCurrentOwner(); await checkHash(owner,ownerHash);
+      return await withLock("pbp-notes-batches",async()=>{
+        const activeKey=stateKey("active",ownerHash),rowKey=stateKey("account",accountId(permissionId,ownerHash));
+        const values=await storage.get([activeKey,rowKey]);
+        if (values[activeKey]?.permissionId===permissionId) return true;
+        const writes={[activeKey]:{ownerHash,permissionId}};
+        if (values[rowKey]) writes[rowKey]={...values[rowKey],needsCheckpoint:true};
+        await checkOwner(owner); await storage.set(writes); return true;
+      });
+    } catch (error) { return stateFailure(error); }
+  }
   async function listPendingBatches(permissionId,ownerHash) {
     const prefix=stateKey("batch",accountId(permissionId,ownerHash)+":");
     const selected=(await keys()).filter(key=>key.startsWith(prefix));
@@ -511,7 +529,7 @@ function pbpCreateNotesSyncStore({
     }
   }
   return {getMeta,getPreflightState,putPreflightState,deletePreflightState,getAccountState,putAccountState,
-    seedLegacy,applyRemotePage,checkpointOwner,listPendingBatches,deletePendingBatch,listOutbox,freezeOutbox,
+    seedLegacy,applyRemotePage,checkpointOwner,activateAccount,listPendingBatches,deletePendingBatch,listOutbox,freezeOutbox,
     writeRecord,snapshot,clearNotices};
 }
 

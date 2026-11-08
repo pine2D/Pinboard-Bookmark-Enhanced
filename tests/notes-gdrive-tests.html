@@ -91,7 +91,7 @@ function fixture(ownerHash, options = {}) {
         const parts = init.body.split("\r\n\r\n");
         const metadata = JSON.parse(parts[1].split("\r\n--")[0]);
         const body = JSON.parse(parts[2].slice(0, parts[2].lastIndexOf("\r\n--")));
-        uploads.push({ metadata, body });
+        uploads.push({ metadata, body, account: drivePermissionId });
         return json({}, failUpload ? 503 : 201);
       }
       throw new Error("unexpected fixture request: " + url.pathname);
@@ -117,7 +117,7 @@ function fixture(ownerHash, options = {}) {
   })(runOptions);
   return { data, calls, uploads, connectionPuts, connection: () => connectionState, client, store, run, remoteMetadata, remoteBody,
     async addLocal() { await store.writeRecord(ARTICLE, { v: 1, url: ARTICLE_URL, title: "Article", items: [{ ...item(), owner: OWNER }] }, OWNER); },
-    failUpload(value) { failUpload = value; }, quota(value) { rejectArticles = value; }, frozenQuota(value) { rejectFrozen = value; }, goOffline() { offline = true; } };
+    failUpload(value) { failUpload = value; }, setGoogle(id) { drivePermissionId = id; }, quota(value) { rejectArticles = value; }, frozenQuota(value) { rejectFrozen = value; }, goOffline() { offline = true; } };
 }
 (async () => {
   const hash = await pbpVocabOwnerHash(OWNER);
@@ -237,6 +237,47 @@ function fixture(ownerHash, options = {}) {
     }
     // Simplest miss: "server" swallowed into `false`, which the runner reads as local_store.
     return outcomes.length === 4 && outcomes.every(Boolean);
+  });
+  await test("returning to an existing Google account republishes notes edits the other account consumed", async () => {
+    const f = fixture(hash); await f.addLocal();
+    if (!(await f.run()).ok) return false;
+    f.setGoogle("google-b");
+    if (!(await f.run({ force: true })).ok) return false;
+    // While on B: add a second highlight and delete the first one.
+    const second = { ...item("Second note"), id: "highlight-b", quote: "Another passage", ts: 200, owner: OWNER };
+    await f.store.writeRecord(ARTICLE, { v: 1, url: ARTICLE_URL, title: "Article", items: [second] }, OWNER);
+    if (!(await f.run()).ok) return false;
+    const onB = f.uploads.filter((u) => u.account === "google-b").flatMap((u) => u.body.entries);
+    f.setGoogle("google-a");
+    const returned = await f.run({ force: true });
+    const onA = () => f.uploads.filter((u) => u.account === "google-a").flatMap((u) => u.body.entries);
+    const reached = onA(), before = reached.length;
+    const repeated = await f.run({ force: true });
+    const live = (id) => (entries) => entries.some((e) => e.recordKey === ARTICLE + "|" + id && e.deleted === false);
+    const gone = (id) => (entries) => entries.some((e) => e.recordKey === ARTICLE + "|" + id && e.deleted === true);
+    // B consumed both edits; A must still receive both, and only once.
+    return live("highlight-b")(onB) && gone("highlight-a")(onB) && returned.ok && repeated.ok &&
+      live("highlight-b")(reached) && gone("highlight-a")(reached) && onA().length === before &&
+      (await f.store.listOutbox(OWNER)).length === 0 && !(await f.store.getAccountState("google-a", hash)).needsCheckpoint;
+  });
+  await test("activating a Google account flags only an existing row, once per switch", async () => {
+    const f = fixture(hash);
+    const row = (id) => f.store.getAccountState(id, hash);
+    const invalid = [await f.store.activateAccount("", hash), await f.store.activateAccount("google-a", "short")];
+    const fresh = await f.store.activateAccount("google-a", hash);
+    const noRow = await row("google-a") === undefined;
+    await f.store.putAccountState({ key: "account:google-a:" + hash, drivePermissionId: "google-a", ownerHash: hash,
+      bootstrapComplete: true, pageToken: "notes-end" });
+    const same = await f.store.activateAccount("google-a", hash), sameRow = await row("google-a");
+    f.setGoogle("google-b");
+    await f.store.activateAccount("google-b", hash);
+    const otherNoRow = await row("google-b") === undefined;
+    f.setGoogle("google-a");
+    await f.store.activateAccount("google-a", hash);
+    const flagged = await row("google-a");
+    return invalid.every((value) => value === false) && fresh === true && noRow && same === true &&
+      sameRow?.needsCheckpoint !== true && otherNoRow && flagged?.needsCheckpoint === true &&
+      flagged.pageToken === "notes-end" && flagged.bootstrapComplete === true;
   });
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
