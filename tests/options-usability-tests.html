@@ -1206,6 +1206,80 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     }
   });
 
+  // U-04: each branch of _tagGovRestoreFocus on its own: a rebuild that keeps
+  // the focused row, a removed row (the one below takes its place), the last
+  // row removed (the one above), and frozen rows skipped in both directions.
+  await test("tag-gov rebuild: focus returns to the same row, the row that took its place, or the row above, never a frozen one", async () => {
+    const realAuth = getTagGovAuth;
+    getTagGovAuth = async (expected = "") => (!expected || expected === "alice" ? { token: "alice:x", account: "alice" } : null);
+    const host = document.createElement("div");
+    host.innerHTML = '<div id="tag-gov-groups"></div>';
+    document.body.appendChild(host);
+    const counts = { webdev: 5, "web-dev": 9, datasci: 3, "data-sci": 4, mlops: 2, "ml-ops": 6, devops: 7, "dev-ops": 8 };
+    const container = () => host.querySelector("#tag-gov-groups");
+    const rows = () => Array.from(container().querySelectorAll(".tag-gov-group-row"));
+    const keyOf = (row) => row ? Array.from(row.querySelectorAll("input[type=radio]")).map(r => r.value.toLowerCase()).sort().join("|") : "";
+    const focusedRow = () => keyOf(rows().find(row => row.contains(document.activeElement)));
+    const wait = async (done) => { for (let i = 0; i < 50 && !done(); i++) await new Promise(r => setTimeout(r, 20)); };
+    const freeze = (key) => { key.split("|").forEach(x => _tagGovActiveTags.add(x)); };
+    const reset = async () => {
+      _tagGovActiveTags.clear();
+      _tagGovUnfinishedBatches = 0;
+      await chrome.storage.local.remove(pbpAccountStorageKey("_tagGovIgnored", "alice"));
+      await renderTagGov();
+      assert(rows().length === 4, "need four groups, got " + rows().length);
+      return rows().map(keyOf);
+    };
+    const ignoreAt = async (index) => {
+      const before = rows().length;
+      const ignore = rows()[index].querySelector(".btn.btn-sm.ghost");
+      ignore.focus();
+      ignore.click();
+      await wait(() => rows().length < before);
+      assert(rows().length === before - 1, "the ignored group did not leave");
+    };
+    const savedBatches = _tagGovUnfinishedBatches;
+    await chrome.storage.local.set({ cached_user_tags: { account: "alice", counts } });
+    try {
+      // A rebuild that keeps every row: focus comes back to the row it was in.
+      let keys = await reset();
+      rows()[2].querySelector(".btn.btn-sm.ghost").focus();
+      await renderTagGov();
+      assert(focusedRow() === keys[2], "kept row: focus went to " + (focusedRow() || document.activeElement?.tagName) + ", not " + keys[2]);
+
+      // A middle row removed: the row below moves up and takes the focus.
+      keys = await reset();
+      await ignoreAt(1);
+      assert(focusedRow() === keys[2], "removed row: focus went to " + (focusedRow() || document.activeElement?.tagName) + ", not " + keys[2]);
+
+      // The last row removed: focus goes to the row above.
+      keys = await reset();
+      await ignoreAt(3);
+      assert(focusedRow() === keys[2], "last row: focus went to " + (focusedRow() || document.activeElement?.tagName) + ", not " + keys[2]);
+
+      // The row that would take the focus is frozen: the row above is next.
+      keys = await reset();
+      freeze(keys[2]); _tagGovUnfinishedBatches = 1;
+      await renderTagGov();
+      assert(rows()[2].classList.contains("tag-gov-row-queued"), "setup: row did not freeze");
+      await ignoreAt(1);
+      assert(focusedRow() === keys[0], "frozen replacement: focus went to " + (focusedRow() || document.activeElement?.tagName) + ", not " + keys[0]);
+
+      // Every row from that position up is frozen: the first free row below.
+      keys = await reset();
+      freeze(keys[0]); freeze(keys[2]); _tagGovUnfinishedBatches = 1;
+      await renderTagGov();
+      await ignoreAt(1);
+      assert(focusedRow() === keys[3], "frozen above and at: focus went to " + (focusedRow() || document.activeElement?.tagName) + ", not " + keys[3]);
+    } finally {
+      _tagGovUnfinishedBatches = savedBatches;
+      _tagGovActiveTags.clear();
+      getTagGovAuth = realAuth;
+      host.remove();
+      await chrome.storage.local.remove(["cached_user_tags", pbpAccountStorageKey("_tagGovIgnored", "alice")]);
+    }
+  });
+
   await test("tag-gov group row: an AI group shows its reason upright, never italic", async () => {
     const row = pbpBuildTagGovGroupRow({ id: "ml|machine-learning", kind: "ai", suggestedCanonical: "machine-learning",
       reason: "缩写与全称同义", members: [{ tag: "ml", count: 5 }, { tag: "machine-learning", count: 33 }] },
