@@ -791,7 +791,7 @@ test("saves without a loaded form keep their rules when the bookmark changed els
 test("a Karakeep update whose note PATCH fails owns nothing", async()=>{
   const notes="Auto notes\n\n" + KK_SUMMARY, range={start:"Auto notes\n\n".length, end:notes.length};
   await pbpFixtureClearSummaryOwnership();
-  const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[500,{}]]);
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[400,{}]]);
   const result=await h.submitPopupSaveIntent({...saveIntent,mode:"update",time:kk.createdAt,tags:"work",notes},(await h.auth()).account,range,undefined,KK_LOADED);
   equal([result.status, result.reason, result.failedStep, h.state.calls.at(-1).method],["failed","partial","bookmark","PATCH"]);
   equal((await pbpFixtureSummaryOwnershipEntries()).length,0);
@@ -953,6 +953,22 @@ test("worker preserves merge semantics through Karakeep and does not archive", a
 test("worker never queues a partial Karakeep write as a fresh create", async()=>{
   const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[201,{...kk,tags:[]}],[500,{}]]);
   const result=await h.submitSaveIntent(saveIntent);equal(result.reason,"partial");equal(result.failedStep,"tags");equal(h.state.queue,[]);equal(h.state.sideEffects,[]);
+});
+// Y2-02: an existing bookmark whose first request failed wrote nothing, so a
+// cause a retry can get past is queued, as linkding's identical failure is.
+for(const [label,reply] of [["503",[503,{}]],["429",[429,{}]],["offline",new TypeError("offline")],["timeout",new DOMException("t","TimeoutError")]]){
+  for(const mode of ["merge","overwrite"]){
+    test("Karakeep "+mode+" onto an existing bookmark queues a first-step "+label+" failure",async()=>{
+      const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],reply]);
+      const result=await h.submitSaveIntent({...saveIntent,mode,tags:"extra"},{expectedAccount:(await h.auth()).account});
+      equal([result.status,h.state.queue.length],["queued",1],"not queued: "+JSON.stringify(result));
+    });
+  }
+}
+test("Karakeep existing bookmark: a first-step 400 stays a partial that is not queued",async()=>{
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[400,{}]]);
+  const result=await h.submitSaveIntent({...saveIntent,mode:"merge",tags:"extra"});
+  equal([result.status,result.reason,result.failedStep,h.state.queue.length],["failed","partial","bookmark",0]);
 });
 test("missing host permission prevents worker requests and queuing",async()=>{
   const h=await workerHarness("linkding",[],{permitted:false});equal((await h.submitSaveIntent(saveIntent)).reason,"permission");equal(h.state.calls,[]);equal(h.state.queue,[]);

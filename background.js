@@ -821,6 +821,14 @@ async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab, prefetched
     if (!pbpBookmarkAuthIsCurrent(auth)) return {result:pbpSaveFailure("account_changed"), persisted:null, retryable:false};
     if (result.status === "partial") {
       pbpStatusCacheDelete(intent.url, auth);
+      // An existing bookmark whose very first request (the PATCH) failed wrote
+      // nothing, and the PATCH is idempotent. A cause a second attempt can get
+      // past is then the same plain, retryable failure linkding reports for the
+      // same request, so the offline queue takes it. A failure after the
+      // create, or past the first step, stays partial and is never queued.
+      if (lookup.exists && result.failedStep === "bookmark" && pbpBookmarkFailureRetryable(result.error)) {
+        return {result:pbpSaveFailure(result.error, {httpStatus:result.httpStatus, retryAfter:result.retryAfter}), persisted:null, retryable:true};
+      }
       // Past the bookmark step the note is on the server (a create posts it,
       // an update patches it before tags and Read Later), so summary
       // ownership treats it as written while the save still reports failure.
