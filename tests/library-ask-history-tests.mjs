@@ -206,12 +206,16 @@ try {
   await page.evaluate(() => { window.askHitRef = document.querySelector('#ask-library-list .ask-library-hit'); });
   await page.locator('#ask-library-list .ask-library-hit').nth(4).click();
   check('second pick reuses the same button elements', await page.evaluate(() => askHitRef === document.querySelector('#ask-library-list .ask-library-hit') && document.activeElement === document.querySelectorAll('#ask-library-list .ask-library-hit')[4]));
+  const idsBefore = await page.evaluate(() => [...document.querySelectorAll('#ask-library-list .ask-library-hit')].map(b => b.dataset.session));
   await page.locator('#ask-load-more').click();
+  check('load more keeps the earlier rows in place and only appends', await page.evaluate(before => { const ids = [...document.querySelectorAll('#ask-library-list .ask-library-hit')].map(b => b.dataset.session); return ids.length > before.length && before.every((id, i) => ids[i] === id); }, idsBefore));
   askC = await askCounts();
   check('load more appends the next batch', askC.hits === 200 && askC.stops === 1 && askC.more, askC);
   await page.evaluate(() => _pbpLibAskRenderList());
   check('a background refresh keeps the expanded batch', (await askCounts()).hits === 200);
+  const idsLast = await page.evaluate(() => [...document.querySelectorAll('#ask-library-list .ask-library-hit')].map(b => b.dataset.session));
   await page.locator('#ask-load-more').click();
+  check('last batch hands focus to the first newly loaded row', await page.evaluate(before => { const ids = [...document.querySelectorAll('#ask-library-list .ask-library-hit')].map(b => b.dataset.session); return before.every((id, i) => ids[i] === id) && document.activeElement?.dataset.session === ids[before.length] && document.activeElement.tabIndex === 0; }, idsLast));
   askC = await askCounts();
   check('last batch removes the control', askC.hits === 250 && !askC.more, askC);
   await page.locator('#ask-library-search').fill('Question 1');

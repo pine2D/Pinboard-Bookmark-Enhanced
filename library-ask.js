@@ -212,7 +212,13 @@ function _pbpLibAskLoadMore() {
 function _pbpLibAskRenderList(resetLimit) {
   const list = $id("ask-library-list"); if (!list) return;
   if (resetLimit === true) _libAskRenderLimit = PBP_ASK_RENDER_BATCH;
-  const rows = pbpLibAskFilter(_libAskSessions, $id("ask-library-search")?.value);
+  const matched = pbpLibAskFilter(_libAskSessions, $id("ask-library-search")?.value);
+  // Group by article BEFORE capping: sessions of one article are not adjacent in time
+  // order, so capping first would slot a later batch into an earlier article's group
+  // (mid-list) instead of appending it.
+  const byArticle = new Map();
+  for (const session of matched) { if (!byArticle.has(session.url)) byArticle.set(session.url, []); byArticle.get(session.url).push(session); }
+  const rows = [].concat(...byArticle.values());
   const selectedAt = rows.findIndex(row => row.id === _libAskSelected);
   const hasSelected = selectedAt >= 0;
   // A selection beyond the cap pulls the cap out to it, or the list would show nothing current.
