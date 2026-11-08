@@ -247,6 +247,11 @@ function _aiRejectedParam(body, detail) {
   if (!param && /\bstructured[\s_-]?outputs?\b|\bjson[\s_-]?mode\b/.test(detail) &&
       /does\s+not\s+support|not\s+supported|unsupported/.test(detail)) return "response_format";
   if (_AI_PARAM_REFUSED_RE.test(detail) && _AI_HEALABLE_PARAMS.includes(param)) return param;
+  // Gemini's own wording for a thinking-only model refusing thinkingBudget:0
+  // never says "unsupported": "Budget 0 is invalid. This model only works in
+  // thinking mode." The anchors keep this to the budget; a bare 400 is not it.
+  if ((!param || param.startsWith("thinkingConfig")) &&
+      /\bbudget\s+0\s+is\s+invalid\b|\bonly\s+works\s+in\s+thinking\s+mode\b|\bthinking\s*budget\b[^.]{0,60}\b(?:not\s+supported|unsupported)\b/.test(detail)) return "thinkingBudget";
   // Value refusals can identify a mandatory-thinking endpoint without guessing
   // from every 400. Never interpret an unrelated schema/context error this way.
   // An enumeration of the accepted values ("Invalid option: expected one of

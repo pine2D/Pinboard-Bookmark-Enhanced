@@ -545,8 +545,10 @@ await test('unsupported schema negotiates JSON object before plain text within t
 const DICT_SCHEMA={type:'object',properties:{text:{type:'string'}},required:['text'],additionalProperties:false};
 const DICT_OPTS={maxTokens:8192,totalOutputBudget:true,reasoningEffort:'minimum',timeoutMs:180000,jsonMode:true,requireComplete:true,responseSchema:DICT_SCHEMA};
 const GEMINI_BASE='https://generativelanguage.googleapis.com/v1beta';
-// Gemini's documented error envelope; the message names the refused field.
-const GEMINI_BUDGET_REFUSED={error:{code:400,message:'thinkingBudget is not supported for this model.',status:'INVALID_ARGUMENT'}};
+// Gemini's error envelope with the text a thinking-only model really returns
+// for thinkingBudget:0 (the field is not named as "unsupported").
+const GEMINI_BUDGET_REFUSED={error:{code:400,message:'Budget 0 is invalid. This model only works in thinking mode.',status:'INVALID_ARGUMENT'}};
+const geminiRefusal=message=>({error:{code:400,message,status:'INVALID_ARGUMENT'}});
 const FORMAT_DENIED=reply({error:{message:'Unsupported response_format type',param:'response_format'}},400);
 function bodyWithout(body,paths){const copy=structuredClone(body);
   for(const path of paths){const keys=path.split('.'),last=keys.pop();let at=copy;for(const k of keys)at=at?.[k];if(at&&typeof at==='object')delete at[last];}
@@ -1232,6 +1234,22 @@ await test('OpenCode Zen in the Anthropic format streams through callAIStream',a
   assert(seen.length===1,'Requests: '+seen.length);
   assertAnthropicRequest(seen[0],calls[0],'https://opencode.ai/inference/anthropic/v1/messages');
   assert(calls[0].stream===true,'Not a stream request');
+});
+await test('Gemini budget refusals in every real wording heal once; unrelated 400s do not',async()=>{
+  const wordings=['Budget 0 is invalid. This model only works in thinking mode.','Thinking budget is not supported for this model.','thinkingBudget is not supported for this model.'];
+  for(const [i,message] of wordings.entries()){
+    const model='budget-wording-'+i,s={aiProvider:'gemini',geminiApiKey:'fixture',geminiModel:model};
+    const gKey=JSON.stringify([2,'gemini',GEMINI_BASE,model]);
+    reset([reply(geminiRefusal(message),400),reply(PROTOCOLS[1].complete)]);await run({},s);
+    assert(calls.length===2&&calls[0].generationConfig.thinkingConfig?.thinkingBudget===0&&!('thinkingConfig'in calls[1].generationConfig)&&stored.pbpThinkReject?.[gKey]?.rejected===true,'complete: '+message);
+    reset([reply(geminiRefusal(message),400),STREAM_DONE.gemini]);
+    assert(await stream({noThinking:true},{...s,geminiModel:model+'-s'})==='ready'&&calls.length===2&&!('thinkingConfig'in calls[1].generationConfig),'stream: '+message);
+  }
+  for(const message of ['Invalid JSON payload received. Unknown name "foo": Cannot find field.','Request contains an invalid argument.','The input token count exceeds the maximum number of tokens allowed.']){
+    reset([reply(geminiRefusal(message),400),reply(PROTOCOLS[1].complete)],{});let error;
+    try{await run({},{aiProvider:'gemini',geminiApiKey:'fixture',geminiModel:'budget-negative'});}catch(e){error=e;}
+    assert(error?.status===400&&calls.length===1&&!stored.pbpThinkReject,'unrelated 400 retried: '+message);
+  }
 });
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();

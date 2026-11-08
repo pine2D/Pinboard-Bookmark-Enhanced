@@ -1537,7 +1537,7 @@ suite("custom provider entries", () => {
       window.fetch = async (_url, init) => {
         bodies.push(JSON.parse(init.body));
         return bodies.length === 1
-          ? new Response(JSON.stringify({ error: { message: "thinkingBudget is not supported" } }), { status: 400 })
+          ? new Response(JSON.stringify({ error: { message: "Budget 0 is invalid. This model only works in thinking mode." } }), { status: 400 })
           : new Response('data: {"candidates":[{"content":{"parts":[{"text":"bonjour"}]}}]}\n\n', { status: 200 });
       };
       const stored = {};
@@ -1655,7 +1655,7 @@ suite("custom provider entries", () => {
         let current = true, fetches = 0, calls = 0, caught;
         guardedChrome(); window.fetch = async () => {
           fetches++;
-          if (fetches === 1) { current = false; return new Response(JSON.stringify({error:{message:provider==='gemini'?'thinkingBudget is not supported':'Unsupported parameter: reasoning_effort'}}), { status: 400 }); }
+          if (fetches === 1) { current = false; return new Response(JSON.stringify({error:{message:provider==='gemini'?'Budget 0 is invalid. This model only works in thinking mode.':'Unsupported parameter: reasoning_effort'}}), { status: 400 }); }
           return guardedReply(provider);
         };
         try { await callAI(settings, "fixture", { beforeRequest: async () => {
@@ -1668,7 +1668,7 @@ suite("custom provider entries", () => {
       await atest(provider + " revalidates and preserves an allowed dialect retry", async () => {
         let fetches = 0, calls = 0;
         guardedChrome(); window.fetch = async () => ++fetches === 1
-          ? new Response(JSON.stringify({error:{message:provider==='gemini'?'thinkingBudget is not supported':'Unsupported parameter: reasoning_effort'}}), { status: 422 }) : guardedReply(provider);
+          ? new Response(JSON.stringify({error:{message:provider==='gemini'?'Budget 0 is invalid. This model only works in thinking mode.':'Unsupported parameter: reasoning_effort'}}), { status: 422 }) : guardedReply(provider);
         const result = await callAI(settings, "fixture", { beforeRequest: async () => { calls++; } });
         assertEq(calls, 2, "both dispatches require validation");
         assertEq(fetches, 2, "allowed retry count");
