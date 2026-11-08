@@ -276,10 +276,21 @@ async function pbpAnkiSendRows(rows, opts) {
   }
   const addable = [];
   const addableTerms = [];
+  const seenFirst = new Set();
   for (let i = 0; i < can.result.length; i++) {
     const d = can.result[i];
     const term = (rows[i] && rows[i].term) || "";
-    if (d && d.canAdd) { addable.push(notes[i]); addableTerms.push(term); }
+    if (d && d.canAdd) {
+      // The precheck compares against the collection only. Two notes in this
+      // batch sharing a first field (same word spelled in two languages under
+      // the legacy model) pass it, then addNotes rolls the WHOLE batch back on
+      // the second one. Keep the first and skip the rest, like a duplicate.
+      const first = notes[i].fields && Object.values(notes[i].fields)[0];
+      const dupKey = notes[i].deckName + "\u0000" + notes[i].modelName + "\u0000" + String(first == null ? "" : first);
+      if (seenFirst.has(dupKey)) { out.skipped++; continue; }
+      seenFirst.add(dupKey);
+      addable.push(notes[i]); addableTerms.push(term);
+    }
     else if (d && /duplicate/i.test(String(d.error || ""))) out.skipped++;
     else { out.failed++; out.failedTerms.push(term); }
   }

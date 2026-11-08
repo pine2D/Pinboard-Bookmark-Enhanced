@@ -117,8 +117,8 @@ async function runMultilingualChecks() {
         case 'modelNames':result=options.models ?? ['Pinboard Vocab','Pinboard Vocab Multilingual'];if(options.afterModels)options.afterModels();break;
         case 'modelFieldNames':result=options.fields ?? (request.params.modelName===modelName ? completeFields : legacyFields);break;
         case 'createModel':result={id:1700000000002,name:modelName,type:0,flds:[],tmpls:[],css:''};break;
-        case 'canAddNotesWithErrorDetail':result=options.precheck ?? [{canAdd:true}];if(options.afterPrecheck)options.afterPrecheck();break;
-        case 'addNotes':result=options.addError ? null : (options.added ?? [1700000000003]);error=options.addError ?? null;break;
+        case 'canAddNotesWithErrorDetail':result=options.precheck ?? (options.precheckAll ? request.params.notes.map(()=>({canAdd:true})) : [{canAdd:true}]);if(options.afterPrecheck)options.afterPrecheck();break;
+        case 'addNotes':if(options.addHandler){const r=options.addHandler(request.params.notes);result=r.result;error=r.error;break;}result=options.addError ? null : (options.added ?? [1700000000003]);error=options.addError ?? null;break;
         default:throw new Error('unexpected mutating or unsupported action '+request.action);
       }
       return {ok:true,text:async()=>JSON.stringify({result,error})};
@@ -194,6 +194,22 @@ async function runMultilingualChecks() {
   await test('official atomic addNotes error reports the entire addable batch as failed',()=>withService({precheck:[{canAdd:true},{canAdd:true}],addError:"['cannot create note because it is a duplicate']"},async()=>{
     const result=await call('pbpAnkiSendRows',[row,{...row,wordId:'pbp-v1-'+'b'.repeat(64)}],sendOptions());
     assert(result.stage==='add'&&result.added===0&&result.failed===2,'atomic failure misreported');
+  }));
+  // AnkiConnect real shape: top-level {result,error}; addNotes rolls the whole batch back when
+  // any note duplicates one added earlier in the SAME request (first field, same deck/model).
+  const batchDupHandler=(field)=>(notes)=>{const seen=new Set();for(const n of notes){const k=n.deckName+'\u0000'+n.modelName+'\u0000'+n.fields[field];if(seen.has(k))return {result:null,error:"['cannot create note because it is a duplicate']"};seen.add(k);}return {result:notes.map((_,i)=>1700000001000+i),error:null};};
+  await test('legacy: same Term in different languages in one batch is sent once, not failing the whole batch',()=>withService({precheckAll:true,addHandler:batchDupHandler('Term')},async requests=>{
+    const rows=[{...legacyRow,term:'chat',language:'en'},{...legacyRow,term:'chat',language:'fr'},{...legacyRow,term:'apple',language:'en'}];
+    const result=await call('pbpAnkiSendRows',rows,sendOptions({format:'legacy'}));
+    const add=requests.find(x=>x.request.action==='addNotes');
+    assert(result.stage==='done'&&result.added===2&&result.skipped===1&&result.failed===0,'homograph batch failed: '+JSON.stringify(result));
+    assert(add.request.params.notes.length===2&&new Set(add.request.params.notes.map(n=>n.fields.Term)).size===2,'duplicate first field was dispatched');
+  }));
+  await test('multilingual: same Term with different WordID are both sent (not deduped)',()=>withService({precheckAll:true,addHandler:batchDupHandler('WordID')},async requests=>{
+    const rows=[{...row,term:'chat',language:'en'},{...row,wordId:'pbp-v1-'+'b'.repeat(64),term:'chat',language:'fr'}];
+    const result=await call('pbpAnkiSendRows',rows,sendOptions());
+    const add=requests.find(x=>x.request.action==='addNotes');
+    assert(result.stage==='done'&&result.added===2&&result.skipped===0&&add.request.params.notes.length===2,'distinct WordIDs were collapsed: '+JSON.stringify(result));
   }));
   await test('owner change during precheck prevents addNotes',async()=>{
     let current=true;
