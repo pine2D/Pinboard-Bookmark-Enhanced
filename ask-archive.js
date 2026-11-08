@@ -253,9 +253,20 @@ function pbpCreateAskArchiveStore({
   async function read(input) {
     const owner = _pbpAskArchiveOwner(input.owner), url = input.url ? _pbpAskArchiveUrlNorm(input.url) : "";
     const db = await open(); await checkOwner(owner);
-    const rows = await _pbpAskArchiveRequest(db.transaction("records", "readonly").objectStore("records")
-      .index(input.sessionId ? "session" : "owner").getAll(input.sessionId ? [owner, input.sessionId] : owner));
-    const deleted = new Set(rows.filter(row => row.owner === owner && row.event.value.kind === "delete").map(row => row.sessionId));
+    const records = db.transaction("records", "readonly").objectStore("records");
+    let rows, deleted;
+    if (url && !input.sessionId) {
+      // The reader asks for one article on every focus; read only its rounds.
+      // Delete tombstones carry no URL, so check each session found here.
+      rows = await _pbpAskArchiveRequest(records.index("url").getAll([owner, url]));
+      const ids = [...new Set(rows.map(row => row.sessionId))];
+      const siblings = await Promise.all(ids.map(id => _pbpAskArchiveRequest(records.index("session").getAll([owner, id]))));
+      deleted = new Set(siblings.flat().filter(row => row.owner === owner && row.event.value.kind === "delete").map(row => row.sessionId));
+    } else {
+      rows = await _pbpAskArchiveRequest(records.index(input.sessionId ? "session" : "owner")
+        .getAll(input.sessionId ? [owner, input.sessionId] : owner));
+      deleted = new Set(rows.filter(row => row.owner === owner && row.event.value.kind === "delete").map(row => row.sessionId));
+    }
     const sessions = new Map();
     for (const row of rows) {
       if (row.owner !== owner || row.event.value.kind !== "round" || deleted.has(row.sessionId) ||

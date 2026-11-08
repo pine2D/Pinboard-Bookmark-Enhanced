@@ -169,6 +169,44 @@ test("a second Google account and returning account get a full checkpoint", asyn
   await f.store.activateAccount("google-b", HASH); await f.store.activateAccount("google-a", HASH);
   assert((await f.store.getAccountState("google-a", HASH)).needsCheckpoint === true);
 });
+// Article reads run on every reader focus; they must stay scoped to the article.
+async function readIndexes(run) {
+  const names = [], original = IDBIndex.prototype.getAll;
+  IDBIndex.prototype.getAll = function (...args) { names.push(this.name); return original.apply(this, args); };
+  try { return { result: await run(), names }; } finally { IDBIndex.prototype.getAll = original; }
+}
+const shape = sessions => JSON.stringify(sessions.map(s => [s.id, s.url, s.title, s.createdAt, s.updatedAt, s.hasPending,
+  s.records.map(r => [r.id, r.ts, r.q, r.a, r.replacesId])]));
+test("article reads return only that article without scanning the owner's whole archive", async () => {
+  const f = fixture(), other = "https://example.test/other-article";
+  for (let i = 0; i < 12; i++) await f.store.append(input({ url: other + "/" + i, sessionId: "other-session-" + i }));
+  await f.store.append(input()); await f.store.append(input({ record: { ...input().record, ts: 210 } }));
+  await f.store.append(input({ sessionId: "local-session-b", record: { ...input().record, ts: 220 } }));
+  const all = await f.store.read({ owner: OWNER });
+  const { result, names } = await readIndexes(() => f.store.read(request()));
+  // Same sessions, records, order and pending flags as the full read narrowed to this article.
+  assert(shape(result) === shape(all.filter(s => s.url === REMOTE.value.url)) && result.length === 2, "article sessions differ");
+  assert(!names.includes("owner") && names.includes("url"), "article read used " + names.join(","));
+});
+test("article reads still hide deleted sessions whose tombstone has no URL", async () => {
+  const f = fixture(); await f.store.append(input()); await f.store.append(input({ sessionId: "local-session-b" }));
+  await f.store.append(input({ url: "https://example.test/other", sessionId: "other-session-a" }));
+  await f.store.remove({ owner: OWNER, sessionId: "local-session-a" });
+  const ids = (await f.store.read(request())).map(s => s.id);
+  assert(ids.length === 1 && ids[0] === "local-session-b", "got " + ids.join(","));
+  assert((await f.store.read({ owner: OWNER })).map(s => s.id).sort().join() === "local-session-b,other-session-a");
+});
+test("a session ID reused by a peer for another article stays split by article", async () => {
+  const f = fixture(), elsewhere = "https://example.test/elsewhere";
+  await f.store.append(input({ url: elsewhere, sessionId: REMOTE.value.sessionId }));
+  await f.store.applyRemotePage(OWNER, HASH, [batch()], state());
+  const here = await f.store.read(request()), there = await f.store.read(request({ url: elsewhere }));
+  assert(here.length === 1 && here[0].url === REMOTE.value.url && here[0].records.length === 1 &&
+    here[0].records[0].id === REMOTE.recordKey, "article copy");
+  assert(there.length === 1 && there[0].url === elsewhere && there[0].records.every(r => r.id !== REMOTE.recordKey), "other copy");
+  await f.store.remove({ owner: OWNER, sessionId: REMOTE.value.sessionId });
+  assert(!(await f.store.read(request())).length && !(await f.store.read(request({ url: elsewhere }))).length, "tombstone");
+});
 test("snapshot counts pending bodies without exposing their content", async () => {
   const f = fixture(); await f.store.append(input());
   const split = pbpVocabSplitDriveEntries((await f.store.listOutbox(OWNER)).map(row => row.event), { ownerHash: HASH, deviceId: "local-a", createdAt: 100 }, PBP_ASK_ARCHIVE_DRIVE_PROTOCOL);
