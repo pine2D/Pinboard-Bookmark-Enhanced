@@ -4771,7 +4771,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
           overlayCss: typeof overlay === "string" ? overlay : "",
           tagSortByPopEnabled: s.tagSortByPopEnabled !== false,
         });
-      })().catch(() => sendResponse(null));
+      })().catch((e) => {
+        console.warn("[site-prefs] read failed:", e?.name, e?.message);
+        sendResponse(null);
+      });
       return true;
     }
     sendResponse({ error: "forbidden" });
