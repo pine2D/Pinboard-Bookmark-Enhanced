@@ -878,6 +878,20 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(message({ reason: "remote", httpStatus: 400 }, "pinboard") === "offlineRetryFailed", "pinboard remote copy changed");
     });
 
+    // X4-S01: a manual retry that meets a Pinboard server fault or rate limit gets the
+    // same localized copy as the save path, never a bare status code.
+    test("offline retry names Pinboard server faults and rate limits", () => {
+      const fnStart = popupOfflineSource.indexOf("function retryFailureMessage(result, service) {");
+      const fnEnd = popupOfflineSource.indexOf("\n  }\n", fnStart);
+      const message = new Function("t", "POSTS_ADD_URI_BUDGET", "pbpBookmarkFailureKey",
+        popupOfflineSource.slice(fnStart, fnEnd + 4) + "\nreturn retryFailureMessage;"
+      )((key, ...args) => args.length ? `${key}:${args.join(":")}` : key, 4000, pbpBookmarkFailureKey);
+      for (const status of [500, 502, 503, 504, 599]) assert(message({ reason: "http", httpStatus: status }, "pinboard") === "pinboardErrorServer", status + " -> " + message({ reason: "http", httpStatus: status }, "pinboard"));
+      assert(message({ reason: "http", httpStatus: 429 }, "pinboard") === "pinboardErrorRateLimit", "429 -> " + message({ reason: "http", httpStatus: 429 }, "pinboard"));
+      assert(message({ reason: "http", httpStatus: 408 }, "pinboard") === "pinboardApiError:HTTP 408", "408 -> " + message({ reason: "http", httpStatus: 408 }, "pinboard"));
+      assert(message({ reason: "http", httpStatus: 400 }, "pinboard") === "pinboardErrRejected:400", "400 -> " + message({ reason: "http", httpStatus: 400 }, "pinboard"));
+    });
+
     await testAsync("the queue bar shows the pause cause", async () => {
       const tr = (key, ...args) => args.length ? `${key}:${args.join(":")}` : key;
       const render = async (queue, pause) => {

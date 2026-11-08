@@ -203,7 +203,14 @@
       return result.detail ? t("uriTooLong", String(result.detail), String(POSTS_ADD_URI_BUDGET)) : t("submitUriTooLong");
     }
     if (reason === "http" && pbpOfflineQueueAttentionFailure(result)) return t("pinboardErrRejected", String(result.httpStatus));
-    if (reason === "http" && result.httpStatus) return `HTTP ${result.httpStatus}`;
+    if (reason === "http" && result.httpStatus) {
+      // Same split as the save path in popup.js: a server fault or rate limit
+      // gets its own copy, any other status is named inside the API error.
+      const status = result.httpStatus;
+      return status === 429 || status >= 500
+        ? t(classifyPinboardError(status))
+        : t("pinboardApiError", `HTTP ${status}`);
+    }
     if (reason === "api" && result.detail) return t("pinboardApiError", String(result.detail));
     // Only reason "network" (and an answerless send -- a service worker that
     // never replied) may claim the network. The pipeline also produces invalid,
