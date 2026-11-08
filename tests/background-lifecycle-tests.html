@@ -463,6 +463,19 @@ function buildUndoHarness(source, opts) {
       router.boots.length === 3 && router.boots.every((args) => args.length === 0));
   }
   {
+    // Y3-02: a round an alarm already ran counts toward the cold-start window,
+    // otherwise an idle browser syncs twice per period (wake boot + periodic).
+    const local = {};
+    const alarmRound = buildBootDriveSyncHarness(source, { local });
+    await alarmRound.pbpBootDriveSync();
+    const wake = buildBootDriveSyncHarness(source, { local });
+    await wake.pbpBootDriveSync({ throttleMs: wake.PBP_VOCAB_BOOT_SYNC_MIN_MS });
+    check("a round run by an alarm stamps the cold-start window, so the next wake boot skips",
+      alarmRound.syncs.length === 1 && Number(local[alarmRound.PBP_VOCAB_BOOT_SYNC_KEY]) > 0 && wake.syncs.length === 0);
+    await alarmRound.pbpBootDriveSync();
+    check("alarm-driven syncs still run back to back while stamping", alarmRound.syncs.length === 2);
+  }
+  {
     const router = buildDriveAlarmRouterHarness(source);
     ["vocab-sync-dirty", "vocab-sync-periodic", "vocab-sync-retry",
       "notes-sync-dirty", "notes-sync-periodic", "notes-sync-retry"].forEach((name) => router?.fire(name));

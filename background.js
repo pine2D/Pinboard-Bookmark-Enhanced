@@ -4043,8 +4043,8 @@ async function pbpBootDriveSync({ throttleMs = 0 } = {}) {
     await pbpClearDriveAlarms();
     return { ok: false, error: "permission" };
   }
+  const now = Date.now();
   if (throttleMs > 0) {
-    const now = Date.now();
     let last = 0;
     try {
       const stored = await chrome.storage.local.get({ [PBP_VOCAB_BOOT_SYNC_KEY]: 0 });
@@ -4055,9 +4055,11 @@ async function pbpBootDriveSync({ throttleMs = 0 } = {}) {
     // Stamp BEFORE the run: a failed sync sets its own retryAt/backoff and the
     // round reconciles drive-sync-retry, so the wake path must not hammer it.
     if (now - last < throttleMs) return { ok: true, throttled: true };
-    try { await chrome.storage.local.set({ [PBP_VOCAB_BOOT_SYNC_KEY]: now }); }
-    catch (e) { console.warn("[drive-sync] boot throttle write failed:", e?.name, e?.message); }
   }
+  // Both paths stamp: a round an alarm ran also counts toward the cold-start
+  // window. Only the throttled path reads it, so alarms stay unthrottled.
+  try { await chrome.storage.local.set({ [PBP_VOCAB_BOOT_SYNC_KEY]: now }); }
+  catch (e) { console.warn("[drive-sync] boot throttle write failed:", e?.name, e?.message); }
   return pbpQueueDriveRound({ interactive: false });
 }
 
