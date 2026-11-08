@@ -7308,6 +7308,34 @@ function stripJsComments(input) {
     }
     check(probes >= 8, `ui-contract: only ${probes} md-video.js probes found in md-preview.js's boot flow -- the lazy-load order check is not looking at the real code`);
   }
+
+  // ---- Video-mode hand-over between the twin scheme resolvers (bug sweep
+  // G6a-01). md-preview-theme-early.js decides "video page" from the URL
+  // mark; pbpReaderSchemeApply must read that SAME mark until the payload
+  // decides body.video-mode, or its first authoritative apply undoes the
+  // dark first frame. Each boot branch must then settle it once judged.
+  {
+    const earlyJs = stripJsComments(read("md-preview-theme-early.js"));
+    const earlyMark = (earlyJs.match(/var videoMode = (\/[^\n]*?\/)\.test\(location\.search\)/) || [])[1];
+    const hintMark = (src.match(/videoHint: (\/[^\n]*?\/)\.test\(location\.search\)/) || [])[1];
+    check(!!earlyMark && earlyMark === hintMark,
+      `md-preview.js: _pbpScheme.videoHint must test location.search with the exact video=1 pattern md-preview-theme-early.js uses (early ${earlyMark}, reader ${hintMark}) -- the two resolvers are twins and must agree on "video page" before the payload is read`);
+    const applyBody = (src.match(/function pbpReaderSchemeApply\(\) \{[\s\S]*?\n\}/) || [""])[0];
+    check(/videoMode: document\.body\.classList\.contains\("video-mode"\) \|\| _pbpScheme\.videoHint\b/.test(applyBody),
+      "md-preview.js: pbpReaderSchemeApply must treat the URL video hint as video-mode until the payload is judged");
+    const bootFrom = src.indexOf("const data = await chrome.storage.local.get([MP_KEY");
+    const shellFrom = src.indexOf("if (info.pending || info.restore) {", bootFrom);
+    const shellBody = braceBody(src, shellFrom);
+    const shellTo = src.indexOf("{", shellFrom) + 1 + shellBody.length;
+    const articleBody = src.slice(shellTo, src.indexOf("const _restoreRecord", shellTo));
+    const noInfo = src.slice(bootFrom, shellFrom);
+    for (const [label, body] of [["the missing-payload exit", noInfo], ["the pending/restore shell branch", shellBody], ["the article path", articleBody]]) {
+      const settleAt = body.indexOf("pbpReaderSchemeVideoSettled()");
+      const firstVideoMode = body.indexOf('classList.add("video-mode")');
+      check(settleAt >= 0 && (firstVideoMode < 0 || firstVideoMode < settleAt),
+        `md-preview.js: ${label} must call pbpReaderSchemeVideoSettled() once it has judged the payload, after its first video-mode add -- otherwise the URL hint keeps a non-video page on the video default, or drops a video page's dark before the class lands`);
+    }
+  }
 }
 
 // Rescue-tier traces are expected outcomes ("video has no caption tracks"),

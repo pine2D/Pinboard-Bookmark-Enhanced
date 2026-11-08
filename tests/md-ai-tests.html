@@ -6078,6 +6078,48 @@ suiteIf("pbpResolveReaderScheme", "pbpResolveReaderScheme", () => {
   });
 });
 
+// The authoritative read runs before the payload decides body.video-mode; the
+// opener's video=1 mark has to stand in for the class until then, or the
+// first authoritative apply undoes md-preview-theme-early.js's dark first
+// frame and the class flips it back (bug sweep G6a-01).
+suiteIf("pbpReaderSchemeApply video hint", "pbpReaderSchemeVideoSettled", () => {
+  const run = (setup, body) => {
+    const saved = Object.assign({}, _pbpScheme);
+    const hadClass = document.body.classList.contains("video-mode");
+    const savedScheme = document.documentElement.style.colorScheme;
+    try {
+      document.body.classList.remove("video-mode");
+      Object.assign(_pbpScheme, { optTheme: "light", override: "auto", videoDark: true, applied: null }, setup);
+      body();
+    } finally {
+      Object.assign(_pbpScheme, saved);
+      document.body.classList.toggle("video-mode", hadClass);
+      document.documentElement.style.colorScheme = savedScheme;
+    }
+  };
+  test("before the payload is judged, the video=1 mark keeps a video page dark", () => {
+    run({ videoHint: true }, () => {
+      pbpReaderSchemeApply();
+      assertEq(document.documentElement.style.colorScheme, "dark", "hinted video page, light theme, video-dark on");
+      document.body.classList.add("video-mode");
+      pbpReaderSchemeVideoSettled();
+      assertEq(document.documentElement.style.colorScheme, "dark", "payload confirms video-mode: still dark, no flip");
+      assertEq(_pbpScheme.videoHint, false, "settling drops the hint");
+    });
+  });
+  test("a payload that is not a video page settles back to the global theme", () => {
+    run({ videoHint: true }, () => {
+      pbpReaderSchemeApply();
+      pbpReaderSchemeVideoSettled();
+      assertEq(document.documentElement.style.colorScheme, "light", "hint cleared without video-mode -> optTheme");
+    });
+    run({ videoHint: false }, () => {
+      pbpReaderSchemeApply();
+      assertEq(document.documentElement.style.colorScheme, "light", "no mark, no class -> optTheme");
+    });
+  });
+});
+
 // ============ md-preview.js: pbpRailCollapseState (rail accordion) ============
 suiteIf("pbpRailCollapseState", "pbpRailCollapseState", () => {
   const DEFAULTS = { tr: true, ask: true, export: true, toc: false, hl: false };

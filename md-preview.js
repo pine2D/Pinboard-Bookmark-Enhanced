@@ -895,7 +895,10 @@ function pbpApplyColorScheme(mode) {
 // md-preview-theme-early.js carries a verbatim twin (its video term comes
 // from the opener's video=1 URL mark and the md-preview-video-dark mirror,
 // this one from the body class and the authoritative read), same contract
-// as pbpResolveColorScheme. Change one side, change the other.
+// as pbpResolveColorScheme. Change one side, change the other. Until the
+// payload decides video-mode, this side reads the same video=1 mark
+// (_pbpScheme.videoHint), so the authoritative read cannot undo the early
+// script's dark first frame and flip back once the body class lands.
 function pbpResolveReaderScheme(input) {
   const s = input || {};
   const override = s.override === "light" || s.override === "dark" ? s.override : "auto";
@@ -904,14 +907,19 @@ function pbpResolveReaderScheme(input) {
   return s.optTheme === "light" || s.optTheme === "dark" ? s.optTheme : "auto";
 }
 
-const _pbpScheme = { optTheme: "auto", override: "auto", videoDark: false, applied: null };
+const _pbpScheme = {
+  optTheme: "auto", override: "auto", videoDark: false, applied: null,
+  // The opener's video=1 mark, standing in for body.video-mode until the
+  // payload has been judged (pbpReaderSchemeVideoSettled clears it).
+  videoHint: /(?:^|[?&])video=1(?:&|$)/.test(location.search)
+};
 // Stored override values are normalised on the way in (a stale or foreign
 // value must never leave the "Aa" segment with no pressed button).
 function pbpReaderSchemeNorm(v) { return v === "light" || v === "dark" ? v : "auto"; }
 function pbpReaderSchemeApply() {
   const mode = pbpResolveReaderScheme({
     optTheme: _pbpScheme.optTheme, override: _pbpScheme.override,
-    videoMode: document.body.classList.contains("video-mode"), videoDark: _pbpScheme.videoDark
+    videoMode: document.body.classList.contains("video-mode") || _pbpScheme.videoHint, videoDark: _pbpScheme.videoDark
   });
   if (mode === _pbpScheme.applied) return; // body-class observer fires on every class flip
   _pbpScheme.applied = mode;
@@ -924,6 +932,15 @@ function pbpReaderSchemeApply() {
   // colorScheme this line just wrote. typeof guard: the file:// test page
   // loads md-preview.js without md-mermaid.js.
   if (typeof pbpMermaidRetheme === "function") pbpMermaidRetheme(document).catch(() => {});
+}
+// The payload has been judged: from here on body.video-mode alone says
+// whether this is a video page. Called at every point that decides it, after
+// the class (if any) is added, so a page the URL marked but the payload did
+// not confirm falls back to the global theme.
+function pbpReaderSchemeVideoSettled() {
+  if (!_pbpScheme.videoHint) return;
+  _pbpScheme.videoHint = false;
+  pbpReaderSchemeApply();
 }
 // md-reader.js's "Aa" panel edits the override through these two hooks
 // (exposed on window: that script loads later and must not depend on load
@@ -1141,6 +1158,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   }
   const info = data[MP_KEY];
   if (!info) {
+    pbpReaderSchemeVideoSettled();
     renderEmptyState(t("mdPreviewEmpty"), "mdPreviewClose");
     return;
   }
@@ -1506,6 +1524,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // the mount points below await it, the fetch is usually done.
       ensureVideoModule().catch(() => {});
     }
+    pbpReaderSchemeVideoSettled();
 
     // One function drives the initial attempt, the error state's retry button, and the
     // rail's engine-switch badge clicks — all funnel back through the same
@@ -1844,6 +1863,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         window.pbpVideoDoc = { kind: "video-fallback", descriptionMarkdown: _extractedMarkdown };
       }
     }
+    pbpReaderSchemeVideoSettled();
   }
   // `let`, not const: an in-place article replacement reassigns this after its
   // payload is persisted, so getMarkdown() (and everything downstream of it —
