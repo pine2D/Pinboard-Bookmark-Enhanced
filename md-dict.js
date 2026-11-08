@@ -3615,7 +3615,12 @@ async function _pbpDictRefreshSave(pop, cur, signal) {
     // page has not seen yet.
     if (cur.owner !== _pbpDictOwner) { vocabBtn.disabled = false; return; }
     const key = pbpDictVocabKey(cur.owner, cur.lang || "und", cur.term);
+    // runId is shared by the whole lookup, so reads started for different
+    // head words in one run cannot cancel each other that way: number them,
+    // and let only the newest read (for the current key) paint.
+    const readSeq = cur.saveReadSeq = (cur.saveReadSeq || 0) + 1;
     const hit = await pbpVocabGet(key);
+    if (cur.saveReadSeq !== readSeq || pbpDictVocabKey(cur.owner, cur.lang || "und", cur.term) !== key) return;
     if (signal.aborted || _pbpDictCurrent !== cur || cur.packChoice !== choice ||
         (cur.contextRevision || 0) !== contextRevision || vocabBtn.dataset.runId !== String(runId)) return;
     if (cur.owner !== _pbpDictOwner) { vocabBtn.disabled = false; return; } // switch landed during the read

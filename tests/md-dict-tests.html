@@ -1440,6 +1440,28 @@ async function runDictNoAiAndSavedStateTests() {
           assert(ok === true && saveWrites === mid + 1, "control: the same unsaved lookup saves when nothing changes during the read " + JSON.stringify({ok, w: saveWrites - mid, k: _pbpDictCurrent.keptSaved, f: _pbpDictCurrent.fullEntryOnly, p: _pbpDictCurrent.packInvalidated, pc: !!_pbpDictCurrent.packChoice, o: _pbpDictCurrent.owner}));
         } finally { window.pbpVocabGet = realGet; Object.assign(_pbpDictCurrent, snap); saveWrites = 0; }
       }
+      // Display read: an older saved-state read for the previous head word
+      // must not paint over the newer one when the default selection moves.
+      {
+        const realGet = window.pbpVocabGet, cur0 = _pbpDictCurrent;
+        const snap = { term: cur0.term, gloss: cur0.gloss, saved: cur0.saved, savedRecord: cur0.savedRecord, keptSaved: cur0.keptSaved };
+        const statusEl = pop.querySelector(".xp-vocab-status");
+        window.pbpVocabGet = async (key) => {
+          if (key === "acct_a|en|oldhead") { await new Promise((r) => setTimeout(r, 30)); return { id: key, status: "new", gloss: "old gloss", contexts: [] }; }
+          return null;
+        };
+        try {
+          const sig = new AbortController().signal;
+          cur0.term = "oldhead"; cur0.gloss = "old gloss"; cur0.keptSaved = false;
+          const first = _pbpDictRefreshSave(pop, cur0, sig);
+          await new Promise((r) => setTimeout(r, 5));
+          cur0.term = "newhead"; cur0.gloss = "new gloss";
+          const second = _pbpDictRefreshSave(pop, cur0, sig);
+          await Promise.all([first, second]);
+          assert(cur0.saved === false && statusEl.hidden === true,
+            "a slower saved-state read for a previous head word does not paint its record on the current one");
+        } finally { window.pbpVocabGet = realGet; Object.assign(cur0, snap); }
+      }
       const other = _pbpDictCurrent.meaningChoices.findIndex(c => c.gloss !== sameGloss && c.term === "hello");
       assert(pickMeaning(pop, other), "the saved word's lookup still offers its other definitions");
       await new Promise((r) => setTimeout(r, 0));
