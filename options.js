@@ -2887,11 +2887,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const tab = $id("tab-tags");
     if (tab) {
       tab.hidden = service !== "pinboard";
-      // Keep one visible tab reachable by Tab when the hidden one held the stop.
-      if (tab.hidden && tab.tabIndex === 0) {
-        const first = document.querySelector(".tab-btn:not([hidden])");
-        if (first) first.tabIndex = 0;
-      }
+      // Recompute the strip's one Tab stop whenever Tags shows or hides: the
+      // active visible tab, else the first visible one; every other is -1.
+      const visible = [...document.querySelectorAll(".tab-btn")].filter((b) => !b.hidden);
+      const stop = visible.find((b) => b.classList.contains("active")) || visible[0];
+      document.querySelectorAll(".tab-btn").forEach((b) => { b.tabIndex = b === stop ? 0 : -1; });
     }
     for (const id of ["opt-show-search", "opt-show-badge", "opt-show-suggest-tags"]) {
       const row = $id(id)?.closest(".pref-row");

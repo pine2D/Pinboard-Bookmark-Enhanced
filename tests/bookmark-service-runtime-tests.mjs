@@ -1700,6 +1700,12 @@ try{
     await until(async()=>await options.evaluate(()=>document.querySelector('input[name="bookmark-service"]:checked')?.value)==='linkding','the page radios did not follow the service switched elsewhere');
     await elsewhere({removeToken:true},'pinboard-only','Pinboard token removed elsewhere under linkding');
     await elsewhere({service:'pinboard'},'no-token','Pinboard chosen elsewhere without a token');
+    // Tags was active while hidden, so General took the Tab stop; with Tags back the strip needs exactly one stop again.
+    {
+      const stops=await options.evaluate(()=>[...document.querySelectorAll('.tab-btn')].filter(b=>b.tabIndex===0).map(b=>b.id));
+      assert.equal(stops.length,1,'exactly one tab button is a Tab stop after the active Tags tab came back: '+JSON.stringify(stops));
+      assert.equal(stops[0],'tab-tags','the active, visible Tags tab holds the Tab stop');
+    }
     await options.locator('#tab-general').click();
     await options.locator('input[name="bookmark-service"][value="karakeep"]').check();
     await until(()=>worker.evaluate(async()=>(await chrome.storage.local.get('bookmarkServiceActive')).bookmarkServiceActive==='karakeep'),'Karakeep (connected) switched to');
