@@ -1365,6 +1365,8 @@ async function doAISummary(forceRefresh, sOverride) {
     if (upsertSummary(summary) === false) { showStatus("status-msg", t("aiEmptyResult"), "error", { remedy: true, key: "aiEmptyResult" }); return; }
     if (resultMeta.fromCache) {
       // Found under the extraction source's namespace: same display as the fast path.
+      // A summary is in place now, so an earlier empty-result card is over.
+      if (typeof pbpDismissRemedyStatus === "function") pbpDismissRemedyStatus("aiEmptyResult");
       showSummaryActions(true);
       return true;
     }

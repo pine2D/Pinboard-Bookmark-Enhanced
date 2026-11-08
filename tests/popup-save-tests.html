@@ -3656,6 +3656,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(h.calls.cache.length === 0 && h.calls.sent.length === 0 && h.calls.callAI.length === 0, "viaSW=" + viaSW + ": cache hit rewrote or recalled");
         assert(h.calls.summary[0] === "an older summary" && h.calls.actions.join() === "true", "viaSW=" + viaSW + ": not shown as cached: " + h.calls.actions);
         assert(!h.calls.status.some((row) => row[2] === "success"), "viaSW=" + viaSW + ": a cache hit was reported as newly generated");
+        assert(h.calls.dismissedRemedy.includes("aiEmptyResult"), "viaSW=" + viaSW + ": the empty-result card stayed after a cached summary was shown");
       }
     });
 

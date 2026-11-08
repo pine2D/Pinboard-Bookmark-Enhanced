@@ -247,11 +247,6 @@ function _aiRejectedParam(body, detail) {
   if (!param && /\bstructured[\s_-]?outputs?\b|\bjson[\s_-]?mode\b/.test(detail) &&
       /does\s+not\s+support|not\s+supported|unsupported/.test(detail)) return "response_format";
   if (_AI_PARAM_REFUSED_RE.test(detail) && _AI_HEALABLE_PARAMS.includes(param)) return param;
-  // Gemini's own wording for a thinking-only model refusing thinkingBudget:0
-  // never says "unsupported": "Budget 0 is invalid. This model only works in
-  // thinking mode." The anchors keep this to the budget; a bare 400 is not it.
-  if ((!param || param.startsWith("thinkingConfig")) &&
-      /\bbudget\s+0\s+is\s+invalid\b|\bonly\s+works\s+in\s+thinking\s+mode\b|\bthinking\s*budget\b[^.]{0,60}\b(?:not\s+supported|unsupported)\b/.test(detail)) return "thinkingBudget";
   // Value refusals can identify a mandatory-thinking endpoint without guessing
   // from every 400. Never interpret an unrelated schema/context error this way.
   // An enumeration of the accepted values ("Invalid option: expected one of
@@ -260,6 +255,11 @@ function _aiRejectedParam(body, detail) {
     .find(p => param === p || param.startsWith(p + ".") || new RegExp("\\b" + p + "\\b", "i").test(detail));
   if (thinkingParam && (!param || param === thinkingParam || param.startsWith(thinkingParam + ".")) &&
       /not\s+(?:supported|allowed)|unsupported|cannot\s+(?:be\s+)?(?:disabled|zero)|must\s+be\s+(?:true|enabled)|only\s+(?:supports?|allows?)|restricted\s+to\s+true|(?:expected|must\s+be|should\s+be)\s+one\s+of/.test(detail)) return thinkingParam;
+  // Gemini's own wording for a thinking-only model refusing thinkingBudget:0
+  // never says "unsupported": "Budget 0 is invalid. This model only works in
+  // thinking mode." The anchors keep this to the budget; a bare 400 is not it.
+  if ((!param || param.startsWith("thinkingConfig")) &&
+      /\bbudget\s+0\s+is\s+invalid\b|\bonly\s+works\s+in\s+thinking\s+mode\b|\bthinking\s*budget\b[^.]{0,60}\b(?:not\s+supported|unsupported)\b/.test(detail)) return "thinkingBudget";
   // The wording gate guards BOTH routes below, error.param included. That field
   // is filled for ANY parameter-level validation error, range errors among them
   // ("max_tokens is too large: this model supports at most 4096 completion
@@ -603,7 +603,7 @@ function _aiEffectiveExtraBody(cfg, thinkRejected, omitThinkingFallback = false)
 }
 function _aiThinkingParamMatches(body, hint) {
   return !!hint && !!body && (Object.hasOwn(body, hint) ||
-    (hint === "thinkingBudget" && Object.hasOwn(body, "thinkingConfig")));
+    ((hint === "thinkingBudget" || hint === "thinking") && Object.hasOwn(body, "thinkingConfig")));
 }
 function _aiShouldRetryNoThink(cfg, thinkRejected, error) {
   return !thinkRejected && [400, 422].includes(error?.status) && _aiThinkingParamMatches(cfg?.thinkingOff, error?.paramHint);

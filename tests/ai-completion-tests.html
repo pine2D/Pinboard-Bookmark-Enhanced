@@ -1251,6 +1251,13 @@ await test('Gemini budget refusals in every real wording heal once; unrelated 40
     assert(error?.status===400&&calls.length===1&&!stored.pbpThinkReject,'unrelated 400 retried: '+message);
   }
 });
+await test('thinking-field providers still heal on Gemini-like budget wordings (not hijacked by the Gemini rule)',async()=>{
+  for(const [i,message] of ['thinking cannot be disabled; this model only works in thinking mode.','Thinking budget is not supported for this model.'].entries()){
+    const s={aiProvider:'deepseek',deepseekApiKey:'fixture',deepseekModel:'think-wording-'+i};
+    reset([reply({error:{message}},400),reply(OK)]);await run({},s);
+    assert(calls.length===2&&'thinking'in calls[0]&&!('thinking'in calls[1]),'no heal: '+message);
+  }
+});
 // Ollama's HTTP error body is {"error":"<string>"} (docs.ollama.com/api/errors).
 await test('Ollama string error bodies reach the message, code and status on both paths',async()=>{
   const os=PROTOCOLS[3].settings;
