@@ -97,6 +97,53 @@ try{
  const twiceAfter=await page.evaluate(()=>{const q1=document.querySelector('#ask-thread .ask-a');return {err:document.querySelectorAll('#ask-thread .ask-err').length,retry:document.querySelectorAll('#ask-thread .ask-retry').length,q1First:q1.textContent.includes('FIRST'),regen:q1.querySelectorAll('.ask-regenerate').length};});
  check('two failed regenerates then a new question leave no error bar or Retry',twice.err===1&&twiceAfter.err===0&&twiceAfter.retry===0&&twiceAfter.q1First&&twiceAfter.regen===1,twiceAfter);
  await page.evaluate(()=>{callAIStream=window.goodStream;});
+ // A-02 (user ruling): Retry on a plain failed question that is no longer the last round moves the round to the end first.
+ const askScreen=()=>page.evaluate(()=>[...document.querySelectorAll('#ask-thread .ask-q')].map(q=>q.textContent));
+ const askOrder=()=>page.evaluate(async()=>{const s=(await pbpAskArchiveRead({owner:pbpDictOwnerScope('ask-fixture')})).find(x=>x.id===_pbpAskState.sessionId);const ex=await pbpAskExportSnapshot({url:_pbpAskState.url,account:_pbpAskState.account});const kids=[...document.getElementById('ask-thread').children].filter(el=>el.matches('.ask-q,.ask-a'));return {screen:[...document.querySelectorAll('#ask-thread .ask-q')].map(q=>q.textContent),pairs:kids.every((el,i)=>i%2?el.matches('.ask-a')&&el.dataset.askQuestion===kids[i-1].textContent:el.matches('.ask-q')),records:_pbpAskState.records.map(r=>r.q),rounds:_pbpAskState.rounds.map(r=>r.q),archive:s?s.records.map(r=>r.q):[],exported:(ex.rounds||[]).map(r=>r.q),err:document.querySelectorAll('#ask-thread .ask-err').length,retry:document.querySelectorAll('#ask-thread .ask-retry').length};});
+ await page.locator('#ask-new').click();
+ await page.evaluate(()=>{callAIStream=failStream;});
+ await page.locator('#ask-input').fill('Order one question');await page.locator('#ask-send').click();await page.waitForSelector('#ask-thread .ask-retry');await page.waitForFunction(()=>!_pbpAskState.running);
+ await page.evaluate(()=>{callAIStream=answerStream('SECOND');});await send('Order two question');
+ await sw.evaluate(()=>chrome.storage.local.set({previewAiEnabled:false}));await page.waitForFunction(()=>!pbpAiAvailable(_pbpAskState.s));
+ await page.locator('#ask-thread .ask-retry').click();await page.waitForTimeout(50);
+ const gated=await askOrder();
+ check('retry with AI off moves no round',JSON.stringify(gated.screen)===JSON.stringify(['Order one question','Order two question'])&&gated.retry===1&&gated.err===1,gated);
+ await sw.evaluate(()=>chrome.storage.local.set({previewAiEnabled:true}));await page.waitForFunction(()=>pbpAiAvailable(_pbpAskState.s));
+ await page.evaluate(()=>{window.orderPrompts=[];const s=answerStream('FIRST');callAIStream=(a,p,o,st)=>{window.orderPrompts.push(String(p));return s(a,p,o,st);};});
+ await page.locator('#ask-thread .ask-retry').focus();await page.keyboard.press('Enter');
+ await page.waitForFunction(()=>!_pbpAskState.running&&!document.querySelector('#ask-thread .ask-retry'));await page.waitForTimeout(150);
+ const moved=await askOrder();
+ const movedFocus=await page.evaluate(()=>{const bubbles=document.querySelectorAll('#ask-thread .ask-a');const t=document.getElementById('ask-thread');return {inLast:bubbles[bubbles.length-1].contains(document.activeElement),pinned:t.scrollHeight-t.scrollTop-t.clientHeight<=2,promptHasSecond:window.orderPrompts.slice(-1)[0].includes('Order two question')};});
+ const want=JSON.stringify(['Order two question','Order one question']);
+ check('retry of an earlier failed question moves it to the end everywhere',JSON.stringify(moved.screen)===want&&moved.pairs&&JSON.stringify(moved.records)===want&&JSON.stringify(moved.rounds)===want&&JSON.stringify(moved.archive)===want&&JSON.stringify(moved.exported)===want&&moved.err===0&&moved.retry===0,moved);
+ check('the moved round keeps focus and is scrolled into view',movedFocus.inLast&&movedFocus.pinned&&movedFocus.promptHasSecond,movedFocus);
+ // Last round failing: Retry stays in place.
+ await page.locator('#ask-new').click();
+ await page.evaluate(()=>{callAIStream=answerStream('ONE');});await send('Tail one question');
+ await page.evaluate(()=>{callAIStream=failStream;});
+ await page.locator('#ask-input').fill('Tail two question');await page.locator('#ask-send').click();await page.waitForSelector('#ask-thread .ask-retry');await page.waitForFunction(()=>!_pbpAskState.running);
+ await page.evaluate(()=>{callAIStream=answerStream('TWO');});
+ await page.locator('#ask-thread .ask-retry').click();await page.waitForFunction(()=>!_pbpAskState.running&&!document.querySelector('#ask-thread .ask-retry'));await page.waitForTimeout(100);
+ const tail=await askOrder();const tailWant=JSON.stringify(['Tail one question','Tail two question']);
+ check('retry of the last failed question stays in place',JSON.stringify(tail.screen)===tailWant&&tail.pairs&&JSON.stringify(tail.records)===tailWant&&JSON.stringify(tail.archive)===tailWant,tail);
+ // Q1 plain failure, Q2 ok, Q2 regenerate fails, Retry Q1: Q2 goes back to its old answer.
+ await page.locator('#ask-new').click();
+ await page.evaluate(()=>{callAIStream=failStream;});
+ await page.locator('#ask-input').fill('Mix one question');await page.locator('#ask-send').click();await page.waitForSelector('#ask-thread .ask-retry');await page.waitForFunction(()=>!_pbpAskState.running);
+ await page.evaluate(()=>{callAIStream=answerStream('MIXOLD');});await send('Mix two question');
+ await page.evaluate(()=>{callAIStream=failStream;});
+ await page.locator('#ask-thread .ask-a .ask-regenerate').last().click();await page.waitForFunction(()=>!_pbpAskState.running&&document.querySelectorAll('#ask-thread .ask-retry').length===2);
+ await page.evaluate(()=>{callAIStream=answerStream('MIXONE');});
+ await page.locator('#ask-thread .ask-a').first().locator('.ask-retry').click();
+ await page.waitForFunction(()=>!_pbpAskState.running&&!document.querySelector('#ask-thread .ask-retry'));await page.waitForTimeout(100);
+ const mix=await askOrder();
+ const mixQ2=await page.evaluate(()=>{const a=document.querySelector('#ask-thread .ask-a');return {text:a.textContent,mark:!!a._askPendingRestore,busy:a.classList.contains('streaming')||a.hasAttribute('aria-busy')};});
+ const mixWant=JSON.stringify(['Mix two question','Mix one question']);
+ check('retrying an earlier question restores a failed regenerate on the round it passes',JSON.stringify(mix.screen)===mixWant&&mix.pairs&&JSON.stringify(mix.records)===mixWant&&JSON.stringify(mix.archive)===mixWant&&mix.err===0&&mix.retry===0&&mixQ2.text.includes('MIXOLD')&&!mixQ2.mark&&!mixQ2.busy,{mix,mixQ2});
+ // Reopening the moved conversation keeps the same order.
+ const orderSid=await page.evaluate(()=>_pbpAskState.sessionId);
+ await open('&askSession='+orderSid);await page.waitForFunction(()=>document.querySelectorAll('#ask-thread .ask-q').length===2);
+ check('reopened conversation keeps the moved order',JSON.stringify(await askScreen())===mixWant,await askScreen());
  // G7-01 end to end: raw model output with P0 cite, control chars; nothing may stay unsaved.
  await page.locator('#ask-new').click();
  await page.evaluate(()=>{callAIStream=async(_s,_p,opts,stream)=>{await opts.beforeRequest?.();const t='Body with\u000b control [P0] and [P1].\n\nCITES:\nP0: "The surface of the table is scratched."\nP1: "The surface of the table is scratched."';stream(t,t);return t;};});

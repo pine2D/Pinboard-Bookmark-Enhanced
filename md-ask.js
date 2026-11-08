@@ -1504,17 +1504,36 @@ function _pbpAskErrorUi(aEl, error, question, runOpts) {
       if (!runnable()) return;
       if (replacing && !isLastRound()) { giveUp(); return; }
       delete aEl._askPendingRestore;
-      if (aEl.contains(document.activeElement)) {
+      const hadFocus = aEl.contains(document.activeElement);
+      // A plain failed question is appended to st.records/rounds and the
+      // archive when it succeeds, so a round that is no longer last moves to
+      // the end of the thread first (user ruling 2026-11-08): screen, saved
+      // order, export and a reopened session then all agree. Its .ask-q is the
+      // sibling right before it (_pbpAskAppendRound / history restore pair).
+      const thread = document.getElementById("ask-thread");
+      const moving = !replacing && !!thread && aEl.parentNode === thread
+        && thread.lastElementChild !== aEl;
+      if (moving) {
+        const qEl = aEl.previousElementSibling;
+        if (qEl && qEl.classList.contains("ask-q")) thread.appendChild(qEl);
+        thread.appendChild(aEl);
+      }
+      if (hadFocus) {
         aEl.tabIndex = -1;
-        aEl.focus();
+        // Moving a node blurs it, so focus lands after the move.
+        if (moving) aEl.focus({ preventScroll: true });
+        else aEl.focus();
       }
       aEl.replaceChildren();
       aEl.classList.add("streaming");
       aEl.setAttribute("aria-busy", "true");
+      if (moving) thread.scrollTop = thread.scrollHeight; // same as a new question
       // A failed Regenerate retries as a replacement of the same round, with the
-      // same old nodes to put back; a plain failed question has neither.
+      // same old nodes to put back. Anything else appends a round at the end, so
+      // other failed Regenerates go back to their old answers first (A-01).
       return _pbpAskRun(question, aEl, runOpts && runOpts.restoreNodes
-        ? { replaceLast: !!runOpts.replaceLast, restoreNodes: runOpts.restoreNodes } : undefined);
+        ? { replaceLast: !!runOpts.replaceLast, restoreNodes: runOpts.restoreNodes, newRound: !replacing }
+        : { newRound: true });
     }).catch(() => {});
   });
   aEl.appendChild(err);
