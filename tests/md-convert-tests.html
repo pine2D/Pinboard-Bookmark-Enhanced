@@ -3643,6 +3643,52 @@ section("pbpLatexNormalize: pre-KaTeX repair");
   check("no control bytes ever leak", !/\x00/.test(N("one `a\nb` two `c\nd` three")));
   check("connecting-line shape is idempotent", N(N(twospans)) === N(twospans));
 })();
+
+// G6b-06: the preformattedCode rule lengthens its fence (````) when the code
+// holds a ``` line, and a ``` block can hold ~~~ lines. Fence tracking that
+// toggled on ANY ```/~~~ line flipped state inside such blocks: buildToc
+// dropped every later heading, and pbpLatexNormalize rewrote code while
+// skipping the real TeX after it. CommonMark: only a same-character fence at
+// least as long as the opener, with nothing but spaces after it, closes.
+section("fence tracking follows CommonMark fence character and length");
+(function () {
+  const blocks = [
+    ["```` fence holding one ``` line", "Wrap code like this:\n```\nprint(1)"],
+    ["``` fence holding a ~~~ line", "Tilde fences look like:\n~~~\nprint(2)"],
+    ["~~~ fence holding a ``` line", null]
+  ];
+  blocks.forEach(([label, code]) => {
+    let md;
+    if (code != null) {
+      md = htmlToMarkdown("<h2>Intro</h2><pre><code>" + code.replace(/</g, "&lt;") + "</code></pre><h2>Install</h2><p>a</p><h3>Usage</h3><p>b</p>", {});
+    } else {
+      md = "## Intro\n\n~~~\n```\n## Not a heading\n~~~\n\n## Install\n\na\n\n### Usage\n\nb";
+    }
+    const slugs = buildToc(md, { minLevel: 2, maxLevel: 4 }).headings.map(h => h.slug);
+    const host = document.createElement("div");
+    host.innerHTML = renderMarkdown(md);
+    const ids = [...host.querySelectorAll("h2,h3,h4")].map(h => h.id);
+    check("buildToc slugs equal rendered heading ids: " + label,
+      JSON.stringify(slugs) === JSON.stringify(ids) && ids.length === 3, JSON.stringify({ md, slugs, ids }));
+  });
+  const N = pbpLatexNormalize;
+  const fences = [
+    ["````", "```", "````"],
+    ["```", "~~~", "```"],
+    ["~~~~", "~~~", "~~~~"],
+    ["```js", "```js", "```"]   // an inner line with an info string never closes
+  ];
+  fences.forEach(([open, inner, close]) => {
+    const block = open + "\n" + inner + "\n\\begin{align}a\\end{align}\n$$$y$$$\n$$\\begin{align*}b\\end{align*}$$\n" + close;
+    const md = block + "\n\nSee $$$x$$$ and `$$\\Huge q$$` then\n\\begin{aligned}\nc\n\\end{aligned}";
+    const out = N(md);
+    const want = block + "\n\nSee $$x$$ and `$$\\Huge q$$` then\n$$\n\\begin{aligned}\nc\n\\end{aligned}\n$$";
+    check("pbpLatexNormalize leaves a " + open + " block holding " + inner + " byte-identical and fixes the TeX after it",
+      out === want, JSON.stringify(out));
+  });
+  check("a ``` line with backticks in its info string is not a fence (CommonMark)",
+    N("```a`b\n$$$z$$$") === "```a`b\n$$z$$", N("```a`b\n$$$z$$$"));
+})();
 </script>
 
 <script>

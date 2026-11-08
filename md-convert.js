@@ -1398,6 +1398,31 @@ function applyImagePolicy(md, opts) {
   });
 }
 
+// Fenced-code line tracker shared by buildToc and the LaTeX normalizer's
+// passes (G6b-06). CommonMark: an opener is 3+ backticks or 3+ tildes (a
+// backtick opener's info string may not contain a backtick); only a line of
+// the SAME character, at least as long as the opener, followed by nothing
+// but spaces, closes it. The preformattedCode rule lengthens its fence to
+// ```` when the code holds a ``` line, and a ``` block may hold ~~~ lines,
+// so toggling on any ```/~~~ line flipped state inside such blocks.
+// Indentation stays lenient (any leading whitespace), as before, so fences
+// nested in list items still count. Returns a function: call it on each line
+// in order; true means the line is an opener, a closer or fenced content.
+function _pbpFenceTracker() {
+  let open = null;
+  return (line) => {
+    if (open) {
+      const close = line.match(/^\s*(`{3,}|~{3,})[ \t]*$/);
+      if (close && close[1][0] === open.ch && close[1].length >= open.len) open = null;
+      return true;
+    }
+    const m = line.match(/^\s*(`{3,}|~{3,})(.*)$/);
+    if (!m || (m[1][0] === "`" && m[2].indexOf("`") !== -1)) return false;
+    open = { ch: m[1][0], len: m[1].length };
+    return true;
+  };
+}
+
 // ── Export transform ③: table of contents ──
 // Scans ATX headings in [minLevel,maxLevel], skipping fenced code blocks.
 // Slugs reuse P1 slugify() (GitHub-style, CJK preserved). De-dupes slugs with -1, -2…
@@ -1410,11 +1435,9 @@ function buildToc(md, opts) {
   const headings = [];
   const seen = Object.create(null);
   if (opts.reserveTocHeading) seen.contents = 0;
-  let inFence = false;
+  const inFence = _pbpFenceTracker();
   for (const line of lines) {
-    const fence = line.match(/^\s*(```|~~~)/);
-    if (fence) { inFence = !inFence; continue; }
-    if (inFence) continue;
+    if (inFence(line)) continue;
     const m = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
     if (!m) continue;
     const level = m[1].length;
@@ -1678,11 +1701,11 @@ function _pbpTexFixDollarRuns(line) {
 function _pbpTexWrapBareEnvs(md) {
   const lines = md.split("\n");
   const out = [];
-  let inFence = false, inDollars = false;
+  const inFence = _pbpFenceTracker();
+  let inDollars = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; out.push(line); continue; }
-    if (inFence) { out.push(line); continue; }
+    if (inFence(line)) { out.push(line); continue; }
     const dd = (line.match(/\$\$/g) || []).length;
     if (inDollars) { if (dd % 2 === 1) inDollars = false; out.push(line); continue; }
     const m = line.match(/^\s*\\begin\{([a-zA-Z*]+)\}/);
@@ -1719,7 +1742,8 @@ function _pbpTexWrapBareEnvs(md) {
 function _pbpTexTransformSegments(md) {
   const lines = md.split("\n");
   const out = [];
-  let inFence = false, buf = [];
+  const inFence = _pbpFenceTracker();
+  let buf = [];
   const flush = () => {
     if (!buf.length) return;
     let chunk = buf.join("\n");
@@ -1729,8 +1753,7 @@ function _pbpTexTransformSegments(md) {
     buf = [];
   };
   for (const line of lines) {
-    if (/^\s*(```|~~~)/.test(line)) { flush(); inFence = !inFence; out.push(line); continue; }
-    if (inFence) { out.push(line); continue; }
+    if (inFence(line)) { flush(); out.push(line); continue; }
     buf.push(line);
   }
   flush();
@@ -1763,7 +1786,8 @@ function _pbpTexTransformSegments(md) {
 function _pbpTexMaskMultilineSpans(md, stash) {
   const lines = md.split("\n");
   const out = [];
-  let inFence = false, buf = [];
+  const inFence = _pbpFenceTracker();
+  let buf = [];
   const flush = () => {
     if (!buf.length) return;
     const chunk = buf.join("\n").replace(/(`+)[\s\S]*?\1/g, (m) => {
@@ -1774,8 +1798,7 @@ function _pbpTexMaskMultilineSpans(md, stash) {
     buf = [];
   };
   for (const line of lines) {
-    if (/^\s*(```|~~~)/.test(line)) { flush(); inFence = !inFence; out.push(line); continue; }
-    if (inFence) { out.push(line); continue; }
+    if (inFence(line)) { flush(); out.push(line); continue; }
     buf.push(line);
   }
   flush();
@@ -1801,10 +1824,9 @@ function pbpLatexNormalize(md) {
   const stash = [];
   const masked = _pbpTexMaskMultilineSpans(md, stash);
   const fixed = [];
-  let inFence = false;
+  const inFence = _pbpFenceTracker();
   for (const line of masked.split("\n")) {
-    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; fixed.push(line); continue; }
-    if (inFence) { fixed.push(line); continue; }
+    if (inFence(line)) { fixed.push(line); continue; }
     fixed.push(_pbpTexFixDollarRuns(line));
   }
   const wrapped = _pbpTexWrapBareEnvs(fixed.join("\n"));
