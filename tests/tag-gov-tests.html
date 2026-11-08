@@ -690,6 +690,89 @@ suite("_findTypoGroups: bucketing", () => {
   });
 });
 
+// ============ pbpTagGovFindGroups: content-keyed memo + lowercase-once scan ============
+suite("pbpTagGovFindGroups: memo", () => {
+  // Frozen copy of the scan as it was before the lowercase Map: the grouping
+  // (ids, members, order) must not move.
+  function refTypoGroups(counts, used) {
+    const groups = [], lcSeen = new Set(), lcDupes = new Set();
+    for (const t of Object.keys(counts)) {
+      if (t.startsWith(".")) continue;
+      const lc = t.toLowerCase();
+      if (lcSeen.has(lc)) lcDupes.add(lc); else lcSeen.add(lc);
+    }
+    const tags = Object.keys(counts).filter(t => !t.startsWith(".") && !used.has(t) && t.length >= 5 && !lcDupes.has(t.toLowerCase()));
+    const byLen = new Map();
+    for (const tag of tags) { if (!byLen.has(tag.length)) byLen.set(tag.length, []); byLen.get(tag.length).push(tag); }
+    const tryPair = (tag1, tag2) => {
+      if (used.has(tag1) || used.has(tag2)) return;
+      const lc1 = tag1.toLowerCase(), lc2 = tag2.toLowerCase();
+      if (pbpTagGovLevenshtein(lc1, lc2) === 1 && lc1.length >= 5 && lc2.length >= 5) {
+        const c1 = counts[tag1], c2 = counts[tag2], minC = Math.min(c1, c2), maxC = Math.max(c1, c2);
+        if (minC <= 2 && maxC >= 5 * minC) {
+          const members = [{ tag: tag1, count: c1 }, { tag: tag2, count: c2 }];
+          members.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+          groups.push({ id: [tag1, tag2].sort().join("|"), kind: "typo", members, suggestedCanonical: members[0].tag });
+          used.add(tag1); used.add(tag2);
+        }
+      }
+    };
+    for (const L of [...byLen.keys()].sort((a, b) => a - b)) {
+      const same = byLen.get(L);
+      for (let i = 0; i < same.length; i++) for (let j = i + 1; j < same.length; j++) tryPair(same[i], same[j]);
+      const next = byLen.get(L + 1);
+      if (next) for (const a of same) for (const b of next) tryPair(a, b);
+    }
+    return groups;
+  }
+  function seeded(n) {
+    let x = 12345; const rnd = () => (x = (x * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const syll = ["ba", "ko", "ri", "tu", "se", "mo", "la", "pen"], counts = {};
+    while (Object.keys(counts).length < n) {
+      let w = ""; const k = 2 + Math.floor(rnd() * 2);
+      for (let i = 0; i < k; i++) w += syll[Math.floor(rnd() * syll.length)];
+      if (rnd() < 0.3) w = w[0].toUpperCase() + w.slice(1);
+      if (rnd() < 0.2) w += "-x";
+      counts[w] = rnd() < 0.3 ? 1 + Math.floor(rnd() * 2) : 3 + Math.floor(rnd() * 60);
+      if (rnd() < 0.5) counts[w.slice(0, -1)] = 1 + Math.floor(rnd() * 2);
+    }
+    return counts;
+  }
+  test("lowercase-once scan returns the same groups, in the same order, as before", () => {
+    const counts = seeded(500);
+    const want = refTypoGroups(counts, new Set());
+    const got = _findTypoGroups(counts, new Set());
+    assert(want.length > 5, "fixture must exercise typo groups, got " + want.length);
+    assert(JSON.stringify(got) === JSON.stringify(want), "groups differ");
+  });
+  test("same content in a fresh object skips the typo scan; any change recomputes", () => {
+    let n = 0; window.__PBP_TYPO_CMP_INC = () => { n++; };
+    try {
+      const a = seeded(300);
+      const first = pbpTagGovFindGroups(a);
+      const scanned = n;
+      assert(scanned > 0, "first call scans");
+      const second = pbpTagGovFindGroups(JSON.parse(JSON.stringify(a)));
+      assert(n === scanned, "second call with equal content must not scan, scanned " + (n - scanned) + " more");
+      assert(JSON.stringify(first) === JSON.stringify(second), "memo changed the answer");
+      const bumped = { ...a }; const k = Object.keys(bumped)[0]; bumped[k] += 1;
+      pbpTagGovFindGroups(bumped);
+      assert(n > scanned, "a changed count recomputes");
+      const before = n;
+      pbpTagGovFindGroups({ ...bumped, "brand-new-tag": 4 });
+      assert(n > before, "a new tag recomputes");
+    } finally { delete window.__PBP_TYPO_CMP_INC; }
+  });
+  test("callers mutating a returned group cannot poison the memo", () => {
+    const a = seeded(300);
+    const first = pbpTagGovFindGroups(a);
+    const snapshot = JSON.stringify(first);
+    for (const g of first) { g.members.forEach(m => { m.count = -1; }); g.members.reverse(); g.suggestedCanonical = "x"; }
+    first.length = 0;
+    assert(JSON.stringify(pbpTagGovFindGroups(JSON.parse(JSON.stringify(a)))) === snapshot, "memo was mutated through a returned group");
+  });
+});
+
 // ============ leftover entity-code tags ============
 // Fixture names are the stored values the 2026-11-04 live probe produced
 // (`q"uote` written back from its escaped read-back became `q&quot;uote`; one

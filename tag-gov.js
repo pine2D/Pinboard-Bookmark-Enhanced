@@ -70,7 +70,24 @@ function pbpTagGovLevenshtein(a, b) {
 // Dot-tags ("."-prefixed) excluded from EVERYTHING.
 // Kind priority: plural > separator > typo. Tags consumed by higher-priority groups
 // are excluded from lower-priority groups.
+// renderTagGov re-reads the tag counts from storage on every repaint, so the
+// object is always new even when nothing changed (clicking "Ignore" repaints
+// with the very same counts). The memo is therefore keyed on the CONTENT: every
+// tag name and count in insertion order (the scan's pairing is order-dependent).
+// One entry is enough; callers get copies because rows and merge flows own
+// the group objects they are handed.
+let _tagGovGroupsMemo = null;
+function _tagGovCountsSignature(counts) {
+  let sig = "";
+  for (const tag of Object.keys(counts)) sig += tag + "\u0000" + counts[tag] + "\u0001";
+  return sig;
+}
+function _tagGovCloneGroups(groups) {
+  return groups.map(g => ({ ...g, members: g.members.map(m => ({ ...m })) }));
+}
 function pbpTagGovFindGroups(counts) {
+  const sig = _tagGovCountsSignature(counts);
+  if (_tagGovGroupsMemo && _tagGovGroupsMemo.sig === sig) return _tagGovCloneGroups(_tagGovGroupsMemo.groups);
   const groups = [];
   const used = new Set();
 
@@ -86,6 +103,7 @@ function pbpTagGovFindGroups(counts) {
   const typoGroups = _findTypoGroups(counts, used);
   groups.push(...typoGroups);
 
+  _tagGovGroupsMemo = { sig, groups: _tagGovCloneGroups(groups) };
   return groups;
 }
 
@@ -231,18 +249,20 @@ function _findTypoGroups(counts, used) {
   // pass eats part of the family ({Design:40, design:2, designs:1} — plural takes
   // Design+designs), the leftover fragment lands in a size-1 separator bucket with
   // no sibling left to recognise it by, and leaks to "design -> resign".
+  const lcOf = new Map();
   const lcSeen = new Set();
   const lcDupes = new Set();
   for (const t of Object.keys(counts)) {
     if (t.startsWith(".")) continue;
     const lc = t.toLowerCase();
+    lcOf.set(t, lc);
     if (lcSeen.has(lc)) lcDupes.add(lc);
     else lcSeen.add(lc);
   }
 
   const tags = Object.keys(counts)
     .filter(t => !t.startsWith(".") && !used.has(t) && t.length >= 5
-      && !lcDupes.has(t.toLowerCase()));
+      && !lcDupes.has(lcOf.get(t)));
 
   const byLen = new Map();
   for (const tag of tags) {
@@ -254,7 +274,7 @@ function _findTypoGroups(counts, used) {
 
   const tryPair = (tag1, tag2) => {
     if (used.has(tag1) || used.has(tag2)) return;
-    const lc1 = tag1.toLowerCase(), lc2 = tag2.toLowerCase();
+    const lc1 = lcOf.get(tag1), lc2 = lcOf.get(tag2);
     if (typeof window !== "undefined" && window.__PBP_TYPO_CMP_INC) window.__PBP_TYPO_CMP_INC();
     const dist = pbpTagGovLevenshtein(lc1, lc2);
     if (dist === 1 && lc1.length >= 5 && lc2.length >= 5) {
