@@ -164,14 +164,64 @@ function _pbpLibAskRenderDetail() {
   pane.scrollTop = top;
   if (focused >= 0) host.querySelectorAll("button, summary")[focused]?.focus({ preventScroll: true });
 }
-function _pbpLibAskRenderList() {
+// Render cap, the notes and vocabulary lists' contract (library-notes.js's
+// PBP_NOTES_RENDER_BATCH): a heavy Ask user has hundreds of sessions and every
+// one is a button plus a listener, rebuilt on each keystroke in the search box.
+// Reset by whatever changes WHICH sessions exist (search, owner), kept across a
+// background refresh so it never collapses what was expanded.
+const PBP_ASK_RENDER_BATCH = 100;
+let _libAskRenderLimit = PBP_ASK_RENDER_BATCH;
+function _pbpLibAskSelect(button, session) {
+  _libAskSelected = session.id;
+  for (const row of $id("ask-library-list").querySelectorAll(".ask-library-hit")) {
+    const on = row === button;
+    row.tabIndex = on ? 0 : -1;
+    if (on) row.setAttribute("aria-current", "true"); else row.removeAttribute("aria-current");
+  }
+  _pbpLibAskRenderDetail();
+  document.body.classList.add("lib-narrow-ask"); $id("ask-library-detail-pane").scrollTop = 0;
+  if (matchMedia("(max-width: 860px)").matches) $id("ask-library-detail").querySelector("button")?.focus({ preventScroll: true });
+  else button.focus({ preventScroll: true });
+}
+// Same control as the notes list's: .btn.btn-sm.ghost.vocab-load-more, the same
+// locale keys, a sibling of the list that leaves the DOM when nothing is left.
+function _pbpLibAskSyncLoadMore(remaining) {
+  const list = $id("ask-library-list"), existing = $id("ask-load-more");
+  if (!list || remaining <= 0) { existing?.remove(); return; }
+  const more = existing || document.createElement("button");
+  if (!existing) {
+    more.type = "button"; more.id = "ask-load-more"; more.className = "btn btn-sm ghost vocab-load-more";
+    more.addEventListener("click", _pbpLibAskLoadMore);
+  }
+  const next = Math.min(PBP_ASK_RENDER_BATCH, remaining);
+  more.textContent = t(pbpLibCountKey(next, "vocabLoadMoreOne", "vocabLoadMore"), String(next));
+  if (more.previousElementSibling !== list) list.after(more);
+}
+function _pbpLibAskLoadMore() {
+  const appendedAt = $id("ask-library-list").querySelectorAll(".ask-library-hit").length;
+  _libAskRenderLimit += PBP_ASK_RENDER_BATCH;
+  _pbpLibAskRenderList();
+  // The last click removes the button it came from and focus would fall to <body>:
+  // hand it to the first row this click appended, with the tab stop.
+  if ($id("ask-load-more")) return;
+  const rows = [...$id("ask-library-list").querySelectorAll(".ask-library-hit")];
+  const target = rows[appendedAt]; if (!target) { $id("ask-library-search")?.focus({ preventScroll: true }); return; }
+  for (const row of rows) row.tabIndex = row === target ? 0 : -1;
+  target.focus({ preventScroll: true });
+}
+function _pbpLibAskRenderList(resetLimit) {
   const list = $id("ask-library-list"); if (!list) return;
+  if (resetLimit === true) _libAskRenderLimit = PBP_ASK_RENDER_BATCH;
   const rows = pbpLibAskFilter(_libAskSessions, $id("ask-library-search")?.value);
-  const hasSelected = rows.some(row => row.id === _libAskSelected);
+  const selectedAt = rows.findIndex(row => row.id === _libAskSelected);
+  const hasSelected = selectedAt >= 0;
+  // A selection beyond the cap pulls the cap out to it, or the list would show nothing current.
+  if (selectedAt >= _libAskRenderLimit) _libAskRenderLimit = selectedAt + 1;
+  const shown = rows.slice(0, _libAskRenderLimit);
   const focusedId = list.contains(document.activeElement) ? document.activeElement.dataset.session : "";
   list.replaceChildren();
   const articles = new Map();
-  for (const session of rows) { if (!articles.has(session.url)) articles.set(session.url, []); articles.get(session.url).push(session); }
+  for (const session of shown) { if (!articles.has(session.url)) articles.set(session.url, []); articles.get(session.url).push(session); }
   for (const sessions of articles.values()) {
     const heading = _pbpLibAskElement("h3", "ask-library-page", sessions[0].title || sessions[0].url); heading.dir = "auto"; list.append(heading);
     for (const session of sessions) {
@@ -180,14 +230,10 @@ function _pbpLibAskRenderList() {
       if (session.id === _libAskSelected) button.setAttribute("aria-current", "true");
       const question = _pbpLibAskElement("span", "ask-library-question", session.records[0]?.q || session.title); question.dir = "auto";
       button.append(question, _pbpLibAskElement("span", "ask-library-stamp", pbpLibFormatDay(session.updatedAt) + " · " + pbpLibFormatTime(session.updatedAt)));
-      button.addEventListener("click", () => {
-        _libAskSelected = session.id; _pbpLibAskRenderList(); _pbpLibAskRenderDetail();
-        document.body.classList.add("lib-narrow-ask"); $id("ask-library-detail-pane").scrollTop = 0;
-        if (matchMedia("(max-width: 860px)").matches) $id("ask-library-detail").querySelector("button")?.focus({ preventScroll: true });
-        else $id("ask-library-list").querySelector('[aria-current="true"]')?.focus({ preventScroll: true });
-      }); list.append(button);
+      button.addEventListener("click", () => _pbpLibAskSelect(button, session)); list.append(button);
     }
   }
+  _pbpLibAskSyncLoadMore(rows.length - shown.length);
   if (focusedId) [...list.querySelectorAll("button")].find(row => row.dataset.session === focusedId)?.focus({ preventScroll: true });
   const empty = $id("ask-library-empty"); empty.hidden = !!rows.length;
   empty.textContent = t(_libAskSessions.length ? "askHistoryNoResults" : "askHistoryEmpty");
@@ -198,7 +244,7 @@ async function pbpLibAskRefresh() {
   try {
     const owner = await _pbpLibAskCurrentOwner();
     if (revision !== _libAskRevision || run !== _libAskLoad) return;
-    if (_libAskOwner !== owner) { _libAskOwner = owner; _libAskSessions = []; _libAskSelected = ""; _pbpLibAskRenderList(); _pbpLibAskRenderDetail(); }
+    if (_libAskOwner !== owner) { _libAskOwner = owner; _libAskSessions = []; _libAskSelected = ""; _pbpLibAskRenderList(true); _pbpLibAskRenderDetail(); }
     _pbpLibAskStatus(t("askHistoryLoading"));
     const [sessions] = await Promise.all([pbpAskArchiveRead({ owner }), _pbpLibAskEnsureMarkdown()]);
     if (run !== _libAskLoad || !await _pbpLibAskCurrent(owner, revision)) return;
@@ -334,7 +380,7 @@ document.addEventListener("pbp-lib-view", event => {
   if (event.detail?.view === "ask") { pbpLibAskRefresh(); _pbpLibAskRestore(); }
 });
 document.addEventListener("DOMContentLoaded", () => {
-  $id("ask-library-search")?.addEventListener("input", _pbpLibAskRenderList);
+  $id("ask-library-search")?.addEventListener("input", () => _pbpLibAskRenderList(true));
   $id("ask-library-retry")?.addEventListener("click", () => { pbpLibAskRefresh(); _pbpLibAskRestore(true); });
   $id("ask-library-list")?.addEventListener("keydown", event => {
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.defaultPrevented || event.isComposing) return;
@@ -353,7 +399,7 @@ if (typeof chrome !== "undefined") {
     if (!changes.personalLibraryAccount && !changes.optSyncEnabled && !changes.syncApiKeys) return;
     _libAskRevision++; _libAskLoad++; _libAskOwner = null; _libAskRestoreOwner = null; _libAskSessions = []; _libAskSelected = "";
     document.body.classList.remove("lib-narrow-ask");
-    _pbpLibAskRenderList(); _pbpLibAskRenderDetail(); pbpLibAskRefresh();
+    _pbpLibAskRenderList(true); _pbpLibAskRenderDetail(); pbpLibAskRefresh();
     if (!$id("view-ask")?.hidden) _pbpLibAskRestore();
   });
   chrome.runtime?.onMessage?.addListener(message => {

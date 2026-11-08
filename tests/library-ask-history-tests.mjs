@@ -192,6 +192,37 @@ try {
   await page.evaluate(async () => { pendingReads.old(oldRows); await oldRefresh; });
   check('late previous-account read cannot repopulate history', await page.locator('.ask-library-hit').count() === 0 && await page.evaluate(() => _libAskSessions.length === 0));
   await page.evaluate(() => pendingReads.new([]));
+  await page.waitForFunction(() => !document.getElementById('ask-library-status').textContent);
+  // Render cap: the list grows 100 sessions at a time like the notes and vocabulary lists, and picking a session never rebuilds it.
+  await page.evaluate(() => {
+    _libAskSessions = Array.from({ length: 250 }, (_, i) => ({ id: 's' + i, url: 'https://example.test/p' + (i % 40), title: 'Page ' + (i % 40), updatedAt: 1792800000000 - i, records: [{ id: 'r' + i, q: 'Question ' + i, a: 'Answer ' + i, ts: 1792800000000 - i }] }));
+    _libAskSelected = ''; document.getElementById('ask-library-search').value = ''; _pbpLibAskRenderList(true);
+  });
+  const askCounts = () => page.evaluate(() => ({ hits: document.querySelectorAll('#ask-library-list .ask-library-hit').length, stops: document.querySelectorAll('#ask-library-list .ask-library-hit[tabindex="0"]').length, more: !!document.getElementById('ask-load-more') }));
+  let askC = await askCounts();
+  check('long Ask history renders one batch with a load-more control', askC.hits === 100 && askC.stops === 1 && askC.more, askC);
+  await page.locator('#ask-library-list .ask-library-hit').nth(3).click();
+  check('picking a session keeps the list nodes and moves the single tab stop', await page.evaluate(() => { const hits = [...document.querySelectorAll('#ask-library-list .ask-library-hit')]; return hits.length === 100 && hits[3].getAttribute('aria-current') === 'true' && hits.filter(b => b.getAttribute('aria-current') === 'true').length === 1 && hits.filter(b => b.tabIndex === 0).length === 1 && hits[3].tabIndex === 0 && _libAskSelected === hits[3].dataset.session; }));
+  await page.evaluate(() => { window.askHitRef = document.querySelector('#ask-library-list .ask-library-hit'); });
+  await page.locator('#ask-library-list .ask-library-hit').nth(4).click();
+  check('second pick reuses the same button elements', await page.evaluate(() => askHitRef === document.querySelector('#ask-library-list .ask-library-hit') && document.activeElement === document.querySelectorAll('#ask-library-list .ask-library-hit')[4]));
+  await page.locator('#ask-load-more').click();
+  askC = await askCounts();
+  check('load more appends the next batch', askC.hits === 200 && askC.stops === 1 && askC.more, askC);
+  await page.evaluate(() => _pbpLibAskRenderList());
+  check('a background refresh keeps the expanded batch', (await askCounts()).hits === 200);
+  await page.locator('#ask-load-more').click();
+  askC = await askCounts();
+  check('last batch removes the control', askC.hits === 250 && !askC.more, askC);
+  await page.locator('#ask-library-search').fill('Question 1');
+  askC = await askCounts();
+  check('a new search starts again from one batch', askC.hits === 100 && askC.more, askC);
+  await page.locator('#ask-library-search').fill('');
+  askC = await askCounts();
+  check('clearing the search resets the cap', askC.hits === 100 && askC.more, askC);
+  await page.evaluate(() => { _libAskSelected = 's240'; _pbpLibAskRenderList(); });
+  check('a selected session beyond the cap is rendered', await page.evaluate(() => !!document.querySelector('#ask-library-list [data-session="s240"][aria-current="true"]')));
+  await page.evaluate(() => { _libAskSessions = []; _libAskSelected = ''; _pbpLibAskRenderList(true); });
   check('no browser exceptions', errors.length === 0, errors);
   console.log(JSON.stringify({ checks: checks.length, ok: true, out }));
 } catch (error) {
