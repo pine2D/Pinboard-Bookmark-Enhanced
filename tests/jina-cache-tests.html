@@ -71,26 +71,29 @@ function buildSuggestSweepHarness(source, options) {
   if (start < 0 || end <= start) throw new Error("suggest sweep source not found");
   const data = structuredClone(o.entries || {});
   const removed = [];
+  const calls = { getNull: 0, getKeys: 0, failSet: !!o.failSet };
   const deps = {
     chrome: { storage: { local: {
       async get(query) {
-        if (query === null || query === undefined) return structuredClone(data);
+        if (query === null || query === undefined) { calls.getNull++; return structuredClone(data); }
         const out = {};
+        if (Array.isArray(query)) { for (const key of query) if (key in data) out[key] = structuredClone(data[key]); return out; }
         for (const [key, fallback] of Object.entries(query)) {
           out[key] = key in data ? structuredClone(data[key]) : fallback;
         }
         return out;
       },
-      async set(obj) { for (const [key, value] of Object.entries(obj)) data[key] = structuredClone(value); },
+      ...(o.noGetKeys ? {} : { async getKeys() { calls.getKeys++; return Object.keys(data); } }),
+      async set(obj) { if (calls.failSet) { const e = new Error("quota"); e.name = "QuotaError"; throw e; } for (const [key, value] of Object.entries(obj)) data[key] = structuredClone(value); },
       async remove(keys) {
         for (const key of [].concat(keys)) { removed.push(key); delete data[key]; }
       },
     } } },
     pbpReadSettingsWithSecrets: async (defaults) => ({ ...defaults, ...(o.settings || {}) }),
-    console,
+    console: o.console || console,
   };
   const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}\nreturn sweepSuggestCache;`);
-  return { run: factory(...Object.values(deps)), data, removed };
+  return { run: factory(...Object.values(deps)), data, removed, calls };
 }
 
 (async function () {
@@ -182,6 +185,45 @@ function buildSuggestSweepHarness(source, options) {
       const h = buildSuggestSweepHarness(backgroundSource, { settings: { aiCacheDuration: 0 }, entries: fresh });
       await h.run();
       if (!h.removed.includes("jina_md_https://example.com/a")) throw new Error("disabled cache kept an unreachable entry forever");
+    });
+
+    // ---- Y4-05: read only the cache families, never the whole local area ----
+    const mixed = () => ({
+      ...entries(),
+      "jina_md_https://example.com/fresh": { result: { markdown: "# F" }, timestamp: Date.now() },
+      "highlights_https://example.com/a": [{ text: "keep me" }],
+    });
+    for (const noGetKeys of [false, true]) {
+      await acheck("sweep " + (noGetKeys ? "without getKeys falls back to get(null)" : "with getKeys never calls get(null)") + " and evicts only stale cache entries", async () => {
+        const h = buildSuggestSweepHarness(backgroundSource, { settings: { aiCacheDuration: 60 }, entries: mixed(), noGetKeys });
+        await h.run();
+        if (noGetKeys ? h.calls.getNull !== 1 : (h.calls.getNull !== 0 || h.calls.getKeys !== 1)) throw new Error("wrong read path: " + JSON.stringify(h.calls));
+        if (h.removed.length !== 2 || !h.removed.includes("jina_md_https://example.com/a") || !h.removed.includes("cached_suggest_https://example.com/a")) throw new Error("removed " + JSON.stringify(h.removed));
+        if (!("jina_md_https://example.com/fresh" in h.data) || !("highlights_https://example.com/a" in h.data)) throw new Error("swept a live entry");
+      });
+    }
+
+    // ---- Y4-04: a failed sweep leaves a trace (label and error name only) ----
+    await acheck("a failing cache sweep warns once under [cache-sweep] without keys or URLs", async () => {
+      const warns = [];
+      const h = buildSuggestSweepHarness(backgroundSource, { settings: { aiCacheDuration: 60 }, entries: entries(), failSet: true,
+        console: { log() {}, warn: (...a) => warns.push(a) } });
+      await h.run();
+      if (warns.length !== 1 || !String(warns[0][0]).startsWith("[cache-sweep]")) throw new Error("warns " + JSON.stringify(warns));
+      if (JSON.stringify(warns).includes("example.com") || warns[0][1] !== "QuotaError") throw new Error("log leaks or lacks error name");
+    });
+
+    await acheck("a failing preview-orphan sweep warns once under [preview-sweep] without keys", async () => {
+      const start = backgroundSource.indexOf("const PREVIEW_SWEEP_INTERVAL_MS");
+      const end = backgroundSource.indexOf("\n// Cold-start residue clean", start);
+      if (start < 0 || end <= start) throw new Error("preview sweep source not found");
+      const warns = [];
+      const chromeStub = { runtime: { getURL: (p) => "chrome-extension://x/" + p },
+        tabs: { query: async () => { const e = new Error("tabs gone"); e.name = "TabsError"; throw e; } },
+        storage: { local: { get: async () => ({ _previewSweepTs: 0 }) } } };
+      const run = new Function("chrome", "console", backgroundSource.slice(start, end) + "\nreturn pbpSweepPreviewOrphans;")(chromeStub, { warn: (...a) => warns.push(a) });
+      await run();
+      if (warns.length !== 1 || !String(warns[0][0]).startsWith("[preview-sweep]") || warns[0][1] !== "TabsError") throw new Error("warns " + JSON.stringify(warns));
     });
   } finally {
     window.chrome = realChrome;

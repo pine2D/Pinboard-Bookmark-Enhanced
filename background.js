@@ -4391,7 +4391,18 @@ async function sweepSuggestCache() {
       // here — the read asks for one duration key.
       console.warn("[cache-sweep] cache duration read failed:", e?.name, e?.message);
     }
-    const all = await chrome.storage.local.get(null);
+    // Chrome >=130 getKeys() lists keys without deserializing values, so the
+    // sweep reads only the two cache families instead of the whole local area
+    // (highlights, vocab, previews) while a popup cold-open may share the
+    // backend. Below min-chrome 130 fall back to get(null).
+    let all;
+    if (typeof chrome.storage.local.getKeys === "function") {
+      const keys = (await chrome.storage.local.getKeys())
+        .filter((k) => k.startsWith("cached_suggest_") || k.startsWith("jina_md_"));
+      all = keys.length ? await chrome.storage.local.get(keys) : {};
+    } else {
+      all = await chrome.storage.local.get(null);
+    }
     const stale = Object.keys(all).filter((k) => {
       if (k.startsWith("cached_suggest_")) return isStaleCacheEntry(all[k], now, SUGGEST_STALE_MS);
       if (k.startsWith("jina_md_")) return jinaStaleMs === 0 || isStaleCacheEntry(all[k], now, jinaStaleMs);
@@ -4400,7 +4411,10 @@ async function sweepSuggestCache() {
     if (stale.length) await chrome.storage.local.remove(stale);
     await chrome.storage.local.set({ _suggestSweepTs: now });
     if (stale.length) console.log(`[cache-sweep] evicted ${stale.length} stale entries (suggest + jina_md)`);
-  } catch (_) {}
+  } catch (e) {
+    // MV3 rule: leave a trace. Name and message only, never keys or URLs.
+    console.warn("[cache-sweep] suggest/jina sweep failed:", e?.name, e?.message);
+  }
 }
 
 // Best-effort sweep of orphaned per-tab preview payloads (md_preview_data_<uuid>).
@@ -4452,7 +4466,10 @@ async function pbpSweepPreviewOrphans() {
       if (stale.length) await chrome.storage.local.remove(stale);
     }
     await chrome.storage.local.set({ _previewSweepTs: now });
-  } catch (_) { /* best-effort: leaked keys just linger to the next sweep */ }
+  } catch (e) {
+    // Best-effort: leaked keys just linger to the next sweep, but leave a trace.
+    console.warn("[preview-sweep] orphan sweep failed:", e?.name, e?.message);
+  }
 }
 // Cold-start residue clean (fire-and-forget; internally throttled).
 pbpSweepPreviewOrphans();
