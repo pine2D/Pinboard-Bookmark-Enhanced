@@ -84,6 +84,35 @@ m.addEventListener("input", () => {
 });
 </script>
 <script>
+// ============ Group G5-01: the rest of the query is left byte for byte ============
+// Class check: for any kept query, inserting tracking segments anywhere and
+// cleaning gives back exactly the kept segments, in the original spelling
+// (%20, +, bare keys, ";" separators, "/" and ":", UTF-8 escapes, empty segments).
+{
+  const kept = ["q=a%20b", "flag", "x=1;y=2", "redirect=/a/b:c", "n=%E4%B8%AD", "e=a+b", "", "k=v"];
+  const tracks = [["utm_source=x"], ["utm_source=x", "fbclid=abc"], ["utm_medium=y", "utm_medium=z"]];
+  let bad = [];
+  for (const hash of ["", "#frag", "#:~:text=hi"]) {
+    for (const tr of tracks) {
+      for (let p = 0; p <= kept.length; p++) {
+        const segs = kept.slice(0, p).concat(tr, kept.slice(p));
+        const raw = "https://example.com/path?" + segs.join("&") + hash;
+        const want = "https://example.com/path?" + kept.join("&") + hash;
+        const r = stripTrackingParams(raw, {});
+        if (r.cleaned !== want || r.removedCount !== tr.length) bad.push(raw + " => " + r.cleaned);
+      }
+    }
+  }
+  b2case("G5-01: cleaning leaves non-tracking query bytes untouched (" + (bad.length ? bad[0] : "all positions") + ")", bad.length === 0);
+  const only = stripTrackingParams("https://example.com/p?x=1;y=2&utm_source=x", {});
+  b2case("G5-01: ';' separated value survives", only.cleaned === "https://example.com/p?x=1;y=2");
+  const none = "https://example.com/p?q=a%20b;c&flag";
+  b2case("G5-01: nothing to strip returns the original string", stripTrackingParams(none, {}).cleaned === none);
+  b2case("G5-01: only tracking params -> bare path, hash kept",
+    stripTrackingParams("https://example.com/p?utm_source=x&fbclid=1#top", {}).cleaned === "https://example.com/p#top");
+}
+</script>
+<script>
 // ============ Group B3: setIcon only when URL matches active tab ============
 // Uses the SHIPPED pbpSameBookmark from shared.js (no inline copy).
 {

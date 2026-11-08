@@ -540,13 +540,13 @@ async function pbpOpenExtensionTab(page, hash) {
         return true;
       }
     }
-  } catch (_) {}
+  } catch (e) { console.warn("[open-tab] reuse failed:", e?.name, e?.message); }
   try {
     if (chrome && chrome.tabs && chrome.tabs.create) {
       await chrome.tabs.create({ url });
       return true;
     }
-  } catch (_) {}
+  } catch (e) { console.warn("[open-tab] create failed:", e?.name, e?.message); }
   return false;
 }
 
@@ -4994,20 +4994,31 @@ function stripTrackingParams(urlStr, settings = {}) {
   const isAmazon = /(^|\.)amazon\./.test(hostLower);
   if (isAmazon && !aggressiveMode) exclude.add("tag");
 
+  // Work on the raw query segments, not on searchParams: delete() + toString()
+  // re-serializes every parameter as form data (%20 -> +, "/" -> %2F, a bare
+  // "flag" -> "flag=", "x=1;y=2" -> "x=1%3By%3D2"), which would rewrite the
+  // address the user is about to save. Kept segments stay byte for byte.
+  const formKey = (seg) => {
+    const eq = seg.indexOf("=");
+    const raw = (eq < 0 ? seg : seg.slice(0, eq)).replace(/\+/g, " ");
+    try { return decodeURIComponent(raw); } catch { return raw; }
+  };
   let removed = 0;
-  for (const k of [...u.searchParams.keys()]) {
-    if (exclude.has(k)) continue;
-    let shouldStrip = toStrip.has(k);
-    if (!shouldStrip && hostRule) {
+  const kept = [];
+  const rawQuery = u.search.slice(1);
+  for (const seg of rawQuery === "" ? [] : rawQuery.split("&")) {
+    const k = formKey(seg);
+    let shouldStrip = seg !== "" && !exclude.has(k) && toStrip.has(k);
+    if (!shouldStrip && seg !== "" && !exclude.has(k) && hostRule) {
       for (const rule of hostRule) {
         if (rule.endsWith("_") && k.startsWith(rule)) { shouldStrip = true; break; }
       }
     }
-    if (shouldStrip) {
-      u.searchParams.delete(k);
-      removed++;
-    }
+    if (shouldStrip) removed++;
+    else kept.push(seg);
   }
+  if (removed === 0) return { cleaned: urlStr, removedCount: 0, original };
+  u.search = kept.length ? "?" + kept.join("&") : "";
 
   let result = u.toString();
   if (u.search === "" && result.includes("?")) {
