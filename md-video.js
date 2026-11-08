@@ -1370,6 +1370,23 @@ function pbpVideoStateValidate(state, detected, canonicalMarkdown) {
   for (const [h, raw] of accepts) {
     if (pbpVideoTranscriptMarkdown(segs, state.meta, state.paragraphs, h, raw) === canonicalMarkdown) return true;
   }
+  // The heading is the UI locale active at commit time (G8b-05). Read the one
+  // actually present and rebuild with it; ONLY this axis is relaxed, the body
+  // must still match byte for byte.
+  const hm = /^## ([^\n]*)\n/.exec(canonicalMarkdown);
+  if (hm) {
+    let heading = hm[1];
+    const tl = state.meta && state.meta.trackLabel ? " (" + state.meta.trackLabel + ")" : "";
+    if (tl) {
+      if (!heading.endsWith(tl)) return false;
+      heading = heading.slice(0, heading.length - tl.length);
+    }
+    if (heading) {
+      for (const raw of [false, true]) {
+        if (pbpVideoTranscriptMarkdown(segs, state.meta, state.paragraphs, heading, raw) === canonicalMarkdown) return true;
+      }
+    }
+  }
   return false;
 }
 
@@ -1766,7 +1783,12 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // transcript panel that page happens to show. Without this, video
   // B's captions get returned as A's "success" and even poison the
   // tier cache (audit round 5, A1).
-  if (vid && !String(location.href).includes(vid)) {
+  // Exact identity (G8b-02): a Mix URL v=B&list=RD<A> CONTAINS A's id. Defined
+  // inside because the injected page function must have zero closure refs.
+  const onVid = () => {
+    try { const u = new URL(location.href); return u.searchParams.get("v") === vid || u.pathname === "/shorts/" + vid; } catch (_) { return false; }
+  };
+  if (vid && !onVid()) {
     out.trace = "tab no longer on target video";
     return out;
   }
@@ -1931,7 +1953,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       }
     }
     if (captured) {
-      if (vid && !String(location.href).includes(vid)) {
+      if (vid && !onVid()) {
         out.trace = "tab navigated away mid-scrape";
         return out;
       }
@@ -1997,7 +2019,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       // Return-time identity recheck (closing review H2): the tab can
       // SPA-navigate mid-scrape; rows read after that may be another
       // video's panel.
-      if (vid && !String(location.href).includes(vid)) {
+      if (vid && !onVid()) {
         out.kind = ""; out.segs = [];
         out.trace = "tab navigated away mid-scrape";
         return out;
@@ -2994,7 +3016,9 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             // Return-time identity recheck (closing review H2): the tab can
             // SPA-navigate to another video DURING the capture window; a body
             // captured after that may belong to the new video.
-            if (vid && !String(location.href).includes(vid)) {
+            let stillOnVideo = false;
+            try { const u2 = new URL(location.href); stillOnVideo = u2.searchParams.get("v") === vid || u2.pathname === "/shorts/" + vid; } catch (_) {}
+            if (vid && !stillOnVideo) {
               return { body: "", trace: "tab navigated away mid-capture" };
             }
             return { body: captured, trace: captured ? "" : "no timedtext round-trip" };
