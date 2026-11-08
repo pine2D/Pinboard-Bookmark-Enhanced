@@ -3935,7 +3935,7 @@ section("mathml TeX survives marked's inline parsing (emphasis, strike, links, c
     ["two adjoints with a starred superscript", ["A^{*}", "B^{*}"]],
     ["two convolutions with a bare *", ["f*g", "g*h"]],
     ["tilde in both formulas", ["a\\sim b~c", "d~e"]],
-    ["underscore after punctuation in both formulas", ["{}_2F_1", "{}_1F_0"]],
+    ["underscore between closing and opening braces in both formulas", ["\\mathbf{x}_{i}", "\\mathbf{y}_{j}"]],
     ["bracket pair followed by parens (link shape)", ["[0,1](t)", "x"]],
     ["backticks in both formulas", ["f`(x)", "g`(y)"]],
     ["angle brackets that read as an HTML tag", ["a<b c>d", "e"]],
