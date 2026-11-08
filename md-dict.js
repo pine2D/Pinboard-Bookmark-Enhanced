@@ -3765,6 +3765,10 @@ async function pbpDictSaveCurrent() {
   if (!cur || !cur.term || cur.fullEntryOnly) return false;
   if (cur.keptSaved) return false; // a saved word is updated only with an explicit choice
   if (cur.owner !== _pbpDictOwner) return false; // owner re-check at commit time (invariant)
+  // What the saved-state read below is about to check. A late source can swap
+  // the default selection (term/gloss) during any await; the write must go
+  // out under the identity that was actually checked.
+  const checkedKey = pbpDictVocabKey(cur.owner, cur.lang || "und", cur.term), checkedGloss = cur.gloss;
   const urlEl = document.getElementById("preview-url");
   const titleEl = document.getElementById("preview-title");
   let highlightId = null;
@@ -3816,14 +3820,15 @@ async function pbpDictSaveCurrent() {
   // itself. A failed read refuses (fail-closed).
   if (!cur.packChoice && typeof pbpVocabGet === "function") {
     let saved;
-    try { saved = await pbpVocabGet(pbpDictVocabKey(cur.owner, cur.lang || "und", cur.term)); }
+    try { saved = await pbpVocabGet(checkedKey); }
     catch (error) { console.warn("[dict] saved state read failed:", error?.name); return false; }
     if (saved) return false;
   }
   // A reused lookup can acquire another selection during the owner read.
   // Never pair the earlier highlight target with the later sentence.
   if (cur.fullEntryOnly || cur.packInvalidated || cur.keptSaved || (cur.packRevision || 0) !== packRevision ||
-      (cur.contextRevision || 0) !== contextRevision) return false;
+      (cur.contextRevision || 0) !== contextRevision ||
+      pbpDictVocabKey(cur.owner, cur.lang || "und", cur.term) !== checkedKey || cur.gloss !== checkedGloss) return false;
   const entry = await pbpVocabSaveWord(cur.owner, {
     term: cur.term, lemma: cur.lemma, language: cur.lang || "und",
     gloss: cur.gloss, ipa: cur.ipa, sourceUrl: cur.sourceUrl, license: cur.license,

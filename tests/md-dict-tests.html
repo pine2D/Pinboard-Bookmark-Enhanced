@@ -1421,6 +1421,25 @@ async function runDictNoAiAndSavedStateTests() {
       assert(await pbpDictSaveCurrent() === false && saveWrites === 0,
         "a save clicked before the saved-state read lands still refuses to overwrite the saved definition");
       Object.assign(_pbpDictCurrent, settled);
+      // A default choice that swaps the head word while the saved-state read
+      // is in flight must not be written under a word nobody checked.
+      {
+        const realGet = window.pbpVocabGet, snap = { keptSaved: _pbpDictCurrent.keptSaved, term: _pbpDictCurrent.term, gloss: _pbpDictCurrent.gloss, lemma: _pbpDictCurrent.lemma, fullEntryOnly: _pbpDictCurrent.fullEntryOnly, saved: _pbpDictCurrent.saved, savedRecord: _pbpDictCurrent.savedRecord };
+        window.pbpVocabGet = async () => { await new Promise((r) => setTimeout(r, 30)); return null; };
+        Object.assign(_pbpDictCurrent, { keptSaved: false, fullEntryOnly: false, gloss: sameGloss });
+        try {
+          const before = saveWrites;
+          const pending = pbpDictSaveCurrent();
+          await new Promise((r) => setTimeout(r, 5));
+          Object.assign(_pbpDictCurrent, { term: "other-head", gloss: "swapped by a late source" });
+          assert(await pending === false && saveWrites === before,
+            "a default selection that changes the head word during the saved-state read refuses the save");
+          Object.assign(_pbpDictCurrent, { keptSaved: false, fullEntryOnly: false, term: snap.term, gloss: sameGloss });
+          const mid = saveWrites;
+          const ok = await pbpDictSaveCurrent();
+          assert(ok === true && saveWrites === mid + 1, "control: the same unsaved lookup saves when nothing changes during the read " + JSON.stringify({ok, w: saveWrites - mid, k: _pbpDictCurrent.keptSaved, f: _pbpDictCurrent.fullEntryOnly, p: _pbpDictCurrent.packInvalidated, pc: !!_pbpDictCurrent.packChoice, o: _pbpDictCurrent.owner}));
+        } finally { window.pbpVocabGet = realGet; Object.assign(_pbpDictCurrent, snap); saveWrites = 0; }
+      }
       const other = _pbpDictCurrent.meaningChoices.findIndex(c => c.gloss !== sameGloss && c.term === "hello");
       assert(pickMeaning(pop, other), "the saved word's lookup still offers its other definitions");
       await new Promise((r) => setTimeout(r, 0));
