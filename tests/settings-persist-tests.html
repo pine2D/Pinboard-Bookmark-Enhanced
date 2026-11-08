@@ -5404,6 +5404,9 @@ async function run() {
       pbpImportNeedsPageReload({ settings: "skipped", themes: "local-only" }) &&
       !pbpImportNeedsPageReload({ settings: "skipped", themes: "failed", highlights: "applied", vocabulary: "applied" }) &&
       !pbpImportNeedsPageReload(null));
+    check("E11b restoring only credentials reloads; kept, failed and skipped credentials do not",
+      pbpImportNeedsPageReload({ settings: "skipped", themes: "skipped", secrets: "applied" }) &&
+      ["kept", "failed", "skipped"].every((v) => !pbpImportNeedsPageReload({ settings: "skipped", themes: "skipped", highlights: "skipped", vocabulary: "skipped", secrets: v })));
     {
       const stashed = { settings: "applied", themes: "skipped", highlights: "applied", vocabulary: "skipped", secrets: "skipped", vocabularyApplied: 0 };
       pbpStashImportResult(stashed);

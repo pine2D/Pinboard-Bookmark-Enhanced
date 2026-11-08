@@ -802,11 +802,13 @@ function pbpTakeImportResult() {
   }
 }
 
-// True when the import changed something the form or the theme controls
-// display: highlights and vocabulary live outside this page's form.
+// True when the import changed something the form, the credential fields or
+// the theme controls display: highlights and vocabulary live outside this page's form.
 function pbpImportNeedsPageReload(result) {
   const landed = (v) => v === "applied" || v === "local-only";
-  return !!result && (result.libraryAdopted === true || landed(result.settings) || landed(result.themes));
+  // Restored credentials are shown in the form too (API keys, Send-to tokens),
+  // and the next auto-save would write the stale form values back over them.
+  return !!result && (result.libraryAdopted === true || landed(result.settings) || landed(result.themes) || result.secrets === "applied");
 }
 
 // The preview's "created" value: _backup.createdAt is an ISO string (export
