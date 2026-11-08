@@ -6300,6 +6300,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // ===================== Keyboard Shortcuts =====================
 chrome.commands.onCommand.addListener(async (command) => {
+  // A shortcut is user activity: reopen the keepalive window first, so the AI
+  // round trip behind a save cannot outlast the worker's idle timer.
+  if (typeof noteActivity === "function") noteActivity();
   // Every branch below builds notification copy with t() after at most a
   // tabs.query, which on a cold worker can beat the manual-language refresh
   // started at module top. Wait for it once here. No branch needs the shortcut's

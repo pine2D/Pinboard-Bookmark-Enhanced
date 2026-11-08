@@ -2005,6 +2005,27 @@ await suite("unified save pipeline", async () => {
     }
   });
 
+  // Y3-03: a shortcut is user activity. The AI round trip behind it can outlast
+  // the worker's idle timer once the keepalive window has lapsed, so the handler
+  // must reopen the window before its first await.
+  await test("every shortcut reopens the keepalive window before its first await", async () => {
+    const background = await getBackgroundSource();
+    const start = background.indexOf("chrome.commands.onCommand.addListener(");
+    const end = background.indexOf("\n});\n", start);
+    for (const command of ["quick_save", "read_later", "save_tabset", "markdown_preview"]) {
+      let listener, noted = 0;
+      const chromeStub = { commands: { onCommand: { addListener: fn => { listener = fn; } } },
+        tabs: { query: async () => [{ id: 4, url: "https://example.com/a", title: "Post" }] } };
+      new Function("chrome", "openMarkdownPreviewFromShortcut", "handleSaveTabSet", "showNotification", "t",
+        "pbpRouteReaderSaveCommand", "loadSettings", "resolvePrefixSettings", "saveFromBackground", "pbpBookmarkLookupUrl", "pbpI18nReady", "noteActivity",
+        background.slice(start, end + 4))(chromeStub, async () => {}, async () => {}, () => {}, k => k,
+        async () => false, async () => ({ urlClean: SETTINGS_DEFAULTS.urlClean }), () => ({}), async () => {}, pbpBookmarkLookupUrl,
+        () => new Promise(() => {}), () => { noted++; });
+      listener(command); // pbpI18nReady never settles: only the synchronous prefix runs
+      equal(noted, 1, command + " did not note activity before its first await");
+    }
+  });
+
   // X4-02/03: the shortcut handler computes titles and failure copy before any
   // network round-trip, so on a cold worker it must wait for the manual-language
   // refresh first.
