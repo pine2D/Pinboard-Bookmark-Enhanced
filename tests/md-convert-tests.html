@@ -3505,6 +3505,10 @@ window._pbpEpubIntegrationDone = (async () => {
     img.addEventListener("load", res, { once: true });
     img.addEventListener("error", res, { once: true });
   })));
+  // A full resource-timing buffer (250 entries by default) drops new entries,
+  // which would hide a build-triggered load. Start empty; the fence below
+  // checks that its own entry was recorded.
+  performance.clearResourceTimings();
   // Positive control: the same markup parsed in a live (detached) div does load.
   const ctrlUrls = [1, 2].map(i => iconUrl(`g6b04ctrl${i}`));
   const ctrlHost = document.createElement("div");
@@ -3515,10 +3519,12 @@ window._pbpEpubIntegrationDone = (async () => {
   const lazyUrls = [1, 2].map(i => iconUrl(`g6b04-${i}`));
   pbpBuildEpub({ md: lazyUrls.map(u => `![x](${u})`).join("\n\n"), meta, images: new Map() });
   // Fence: a later live image finishing means any earlier build-triggered load had its chance.
+  const fenceUrl = iconUrl("g6b04fence");
   const fenceHost = document.createElement("div");
-  fenceHost.innerHTML = `<img src="${iconUrl("g6b04fence")}">`;
+  fenceHost.innerHTML = `<img src="${fenceUrl}">`;
   await awaitLoads([...fenceHost.querySelectorAll("img")]);
   await new Promise(r => setTimeout(r, 100));
+  assertEq(timingFor([fenceUrl]).length, 1, "G6b-04 fence: the fence image was recorded, so entries were not being dropped");
   const fetched = timingFor(lazyUrls);
   assertEq(fetched.length, 0, "G6b-04 pbpBuildEpub does not trigger remote image requests in the live document: " + fetched.map(e => e.name).join(", "));
 
