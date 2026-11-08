@@ -820,6 +820,17 @@ section("pbpVideoStateValidate");
   const zhCanon = pbpVideoTranscriptMarkdown(segments, meta, null, "字幕稿");
   assertEq(pbpVideoStateValidate(state, detected, zhCanon), true, "canonical committed under another locale heading -> still valid");
   assertEq(pbpVideoStateValidate(state, detected, pbpVideoTranscriptMarkdown(segments, meta, null, "文字起こし", true)), true, "other-locale heading with raw title escaping -> valid");
+  // A title with markdown-special characters makes the raw and escaped rebuilds differ, so the raw=true
+  // round of the other-locale loop is the only thing that can accept an unescaped legacy title.
+  const escTitle = 'A <b> & "q" [x] _y_';
+  const metaEsc = { title: escTitle, url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", trackLabel: "English" };
+  const stateEsc = pbpVideoStateBuild({ detected, track, tracks: [track], segments, aiParas: null, wasUnpunct: true, aiPunct: false, meta: metaEsc });
+  const rawEsc = pbpVideoTranscriptMarkdown(segments, metaEsc, null, "文字起こし", true);
+  const escEsc = pbpVideoTranscriptMarkdown(segments, metaEsc, null, "文字起こし", false);
+  assertEq(rawEsc !== escEsc, true, "fixture precondition: raw and escaped rebuilds differ for this title");
+  assertEq(pbpVideoStateValidate(stateEsc, detected, rawEsc), true, "other-locale heading + unescaped legacy title -> valid (raw=true round)");
+  assertEq(pbpVideoStateValidate(stateEsc, detected, escEsc), true, "other-locale heading + escaped title -> valid (raw=false round)");
+  assertEq(pbpVideoStateValidate(stateEsc, detected, rawEsc.replace("world.", "worle.")), false, "other-locale raw-title canonical with one body char changed -> false");
   assertEq(pbpVideoStateValidate(state, detected, zhCanon.replace("world.", "worle.")), false, "same other-locale heading but one body char changed -> false");
   assertEq(pbpVideoStateValidate(state, detected, zhCanon.replace("hello", "hullo")), false, "same other-locale heading but one body char changed (2) -> false");
 
