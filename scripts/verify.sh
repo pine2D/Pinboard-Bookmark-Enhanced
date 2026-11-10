@@ -14,9 +14,11 @@ cd "$ROOT"
 # in this order; it cannot be mixed with other arguments. Any other arguments
 # go to scripts/audit.mjs unchanged, as before groups existed.
 # PBP_VERIFY_DRY=1 prints each command as "[dry][<group>] <command>" and runs
-# nothing (tests/verify-groups-tests.mjs checks the groups with it).
-# PBP_RETRY_FLAKY=1 runs a failed render or journeys command once more, and
-# makes scripts/run-html-suites.mjs do the same per page. A pass on the second
+# nothing (tests/verify-groups-tests.mjs checks the groups with it). Dry only
+# applies to the group path: --changed and the other audit.mjs arguments still
+# run scripts/audit.mjs for real.
+# PBP_RETRY_FLAKY=1 runs a failed pages, render or journeys command once more,
+# and makes scripts/run-html-suites.mjs do the same per page. A pass on the second
 # try is recorded in $PBP_QA_REPORT_DIR/flakes.jsonl (scripts/flake-record.mjs);
 # a second failure fails. static never retries. Unset, nothing is retried.
 ALL_GROUPS="static pages render journeys"
@@ -125,7 +127,7 @@ gate() {
     return 0
   fi
   case "$gate_group" in
-    render|journeys)
+    pages|render|journeys)
       if [ "$RETRY" = 1 ]; then
         retry_once "$@"
         return 0

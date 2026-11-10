@@ -15,31 +15,125 @@ import { recordFlake, tailLines } from '../scripts/flake-record.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const GROUPS = ['static', 'pages', 'render', 'journeys'];
-// Gate commands in `sh scripts/verify.sh` at 34a8a91c, the commit before the
-// groups existed, counted with PBP_RENDER_SHARDS=4 the way the dry list counts
-// them: one per tests/audit*-tests.mjs file, one per HTML page, one per
-// render shard, the syntax loop as one, every other command line as one.
-// Measured by running that verify.sh with logging stubs for node/npx/sh on
-// PATH. The list may grow; it may only shrink by lowering this on purpose.
-const PRE_CHANGE_COMMANDS = 148;
-// The [verify-groups] stage added one command (this test), so dropping any
-// older gate must still show up.
-const ADDED_WITH_GROUPS = 1;
-// Stage labels in run order. The first and second lines of every stage stay
-// as they were; [verify-groups] is the one stage this change added.
-const STAGES = ['audit-scope', 'verify-groups', 'bookmark-services', 'ask-history', 'mutate-check', 'run-test',
-  'selection', 'draft', 'options-save', 'translate-stop', 'layouts', 'journey', 'discovery', 'reader-save-export',
-  'syntax', 'eslint', 'eslint-silent-catch', 'eslint-baseline', 'script-graph', 'vendor-lock', 'network-exits',
-  'ui-contract', 'popup-label-fit', 'md-preview-contrast', 'ui-vocabulary', 'render-audit', 'options-help-render',
-  'docs-lint', 'registers', 'rules-lint', 'store-descriptions', 'hooks', 'theme'];
+// The gates of `sh scripts/verify.sh` at 34a8a91c, the commit before the
+// groups existed, written out by reading that script. Every one must still be
+// in the no-argument dry list, so dropping a fixed gate fails here whatever
+// else is added. Nothing here is generated from the current script.
+// The glob parts are not frozen: tests/*-tests.html and tests/audit*-tests.mjs
+// are compared with the directory live in the tests below.
+// Two spellings changed with the groups, nothing else: the eslint line is now
+// printed with `env` in front (a gate command cannot start with a variable
+// assignment), and the syntax pipeline became the function check_js_syntax.
+// The render audit ran as shards; with PBP_RENDER_SHARDS=4 that is four commands.
+const OLD_FIXED_COMMANDS = [
+  'node tests/bookmark-service-runtime-tests.mjs',
+  'node tests/bookmark-live-preflight-tests.mjs',
+  'node tests/ask-history-tests.mjs',
+  'node tests/library-ask-history-tests.mjs',
+  'node tests/mutate-check-tests.mjs',
+  'node tests/run-test-print-counts-tests.mjs',
+  'node scripts/qa-drive.mjs --headless --surfaces selection --check --label selection-default-contract',
+  'node scripts/qa-drive.mjs --headless --surfaces selection --click-dismiss --check --label selection-click-contract',
+  'node scripts/qa-drive.mjs --surfaces drafts --check --label popup-draft-contract',
+  'node scripts/qa-drive.mjs --headless --surfaces options-save --check --label options-save-contract',
+  'node scripts/qa-drive.mjs --headless --surfaces translate-stop --fault ai-429 --check --label translate-stop-contract',
+  'node scripts/qa-drive.mjs --headless --surfaces layouts --check --label layouts-contract',
+  'node scripts/qa-drive.mjs --headless --surfaces journey --check --label notes-edit-clear-contract',
+  'node scripts/qa-drive.mjs --headless --surfaces discovery --check --label discovery-contract',
+  'node scripts/qa-drive.mjs --headless --surfaces reader-bookmark,reader-export --check --label reader-save-export-contract',
+  'env ESLINT_USE_FLAT_CONFIG=true npx --prefix .qa-scan eslint . --suppressions-location scripts/eslint-suppressions.json',
+  'node tests/eslint-silent-catch-tests.mjs',
+  'node tests/eslint-baseline-tests.mjs',
+  'node scripts/script-graph-lint.mjs',
+  'node scripts/vendor-lock-check.mjs',
+  'node scripts/network-exits-check.mjs',
+  'node tests/ui-contract-tests.mjs',
+  'node tests/popup-label-fit-tests.mjs',
+  'node tests/md-preview-contrast-tests.mjs',
+  'node scripts/ui-vocabulary-lint.mjs',
+  'node tests/ui-vocabulary-tests.mjs',
+  'node scripts/options-help-render-audit.mjs',
+  'node scripts/docs-lint.mjs',
+  'node scripts/registers-lint.mjs',
+  'node tests/registers-lint-tests.mjs',
+  'node scripts/rules-lint.mjs',
+  'node tests/rules-lint-tests.mjs',
+  'node scripts/sync-store-descriptions.mjs --check',
+  'sh scripts/setup-hooks.sh --check',
+  'node docs/theme-surface/tools/validate-contracts.mjs',
+  'node tests/theme-contract-tests.mjs',
+  'node tests/theme-css-syntax-tests.mjs',
+  'node tests/theme-tooling-tests.mjs',
+  'node tests/theme-ui-derive-tests.mjs',
+  'node tests/theme-media-audit-tests.mjs',
+  'node tests/pinboard-theme-render-tests.mjs',
+  'node tests/theme-override-debt-tests.mjs',
+  'node tests/theme-sync-check-tests.mjs',
+  'node docs/theme-surface/tools/diff-all.mjs --strict',
+  'node docs/theme-surface/tools/token-coverage.mjs',
+  'node docs/theme-surface/tools/cascade-lint.mjs',
+  'node docs/theme-surface/tools/override-drift.mjs',
+  'node docs/theme-surface/tools/override-debt.mjs',
+  'node docs/theme-surface/tools/handedit-audit.mjs',
+  'node docs/theme-surface/tools/css-region-audit.mjs',
+  'node docs/theme-surface/tools/ui-token-coverage.mjs',
+  'node docs/theme-surface/tools/contrast-audit.mjs',
+  'node docs/theme-surface/tools/recipe-lint.mjs',
+  'check_js_syntax',
+  'node scripts/ui-render-audit.mjs --shard=0/4',
+  'node scripts/ui-render-audit.mjs --shard=1/4',
+  'node scripts/ui-render-audit.mjs --shard=2/4',
+  'node scripts/ui-render-audit.mjs --shard=3/4',
+];
+// The stage label lines of 34a8a91c, verbatim and in order. Left out: the
+// [browser] lines (their text holds a count) and the render-audit progress line.
+// [verify-groups] is the one label this change added; it sits second.
+const OLD_LABELS = [
+  "[audit-scope] checking selection, dependencies, matrices and runner plans",
+  "[bookmark-services] isolated primary-service UI and personal-library restore",
+  "[ask-history] reader and library Ask history against an isolated archive",
+  "[mutate-check] self-test: restore, exactly-once, crash backup",
+  "[run-test] self-test: --print-counts waits for the registered count",
+  "[selection] real pointer selection with native popover light-dismiss",
+  "[draft] native popup close/reopen preserves unsaved edits",
+  "[options-save] persistent feedback, retry and translated narrow layouts",
+  "[translate-stop] HTTP 429 wait responds to Stop",
+  "[layouts] nine locales, narrow settings, Ask width and popup semantics",
+  "[journey] note editing, failure retry and clearing combined filters",
+  "[discovery] source controls, AI setup and preset CSS",
+  "[reader-save-export] bookmark completion and portable Q&A exports",
+  "[syntax] checking JavaScript",
+  "[eslint] correctness lint over runtime scripts (config: eslint.config.mjs)",
+  "[eslint-silent-catch] checking the no-silent-catch rule against valid and invalid samples",
+  "[eslint-baseline] checking the silent-catch baseline check against growing and shrinking samples",
+  "[script-graph] checking executeScript page functions are closure-free",
+  "[vendor-lock] verifying vendored artifacts against vendor/vendor-lock.json",
+  "[network-exits] cross-checking runtime hosts vs docs/network-exits.json vs privacy.md",
+  "[ui-contract] checking static UI contracts",
+  "[popup-label-fit] checking every popup form label fits its column in every UI locale",
+  "[md-preview-contrast] checking md-preview.css's light-dark token contrast pairs",
+  "[ui-vocabulary] checking structural class tokens against the registry and the legacy baseline",
+  "[render-audit] checking hand-written render oracle (contrast + geometry + media preferences)",
+  "[options-help-render] checking semantic roles and raster alignment",
+  "[docs-lint] checking README x9 mirror + prose contracts + .claude/expiring-items.md 临时事项 expiry dates",
+  "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger) + lint self-tests",
+  "[rules-lint] checking CLAUDE.md index, rule files, skills, backticked references and number claims + lint self-tests",
+  "[store-descriptions] checking CWS store copy is regenerated from the READMEs",
+  "[hooks] checking installed git hooks still delegate to the tracked scripts",
+  "[theme] checking generated theme integrity",
+];
+const NEW_LABEL = '[verify-groups] checking that the verify groups cover every gate exactly once';
+const EXPECTED_LABELS = [OLD_LABELS[0], NEW_LABEL, ...OLD_LABELS.slice(1)];
 const JOURNEY_STAGES = ['bookmark-services', 'ask-history', 'selection', 'draft', 'options-save', 'translate-stop',
   'layouts', 'journey', 'discovery', 'reader-save-export'];
 
-// Environment without anything from the caller's CI or retry settings.
+// Environment without anything from the caller's CI or retry settings. GIT_*
+// goes too: the pre-commit hook runs this file with GIT_INDEX_FILE and GIT_DIR
+// set, and the stub repo's `git init` / `git add -A` would then hit the real repo.
 function cleanEnv(extra = {}) {
   const env = {};
   for (const [k, v] of Object.entries(process.env)) {
-    if (/^(PBP_|GITHUB_|STUB_)/.test(k)) continue;
+    if (/^(PBP_|GITHUB_|STUB_|GIT_)/.test(k)) continue;
     env[k] = v;
   }
   return { ...env, ...extra };
@@ -54,16 +148,28 @@ function dry(args) {
   const r = verify(ROOT, args, cleanEnv({ PBP_VERIFY_DRY: '1', PBP_RENDER_SHARDS: '4' }));
   const commands = [];
   const stages = [];
+  const labels = [];
   for (const line of r.stdout.split('\n')) {
     const m = /^\[dry\]\[([^\]]+)\] (.+)$/.exec(line);
     if (m) commands.push({ group: m[1], command: m[2] });
     else {
       const s = /^\[([a-z-]+)\] /.exec(line);
-      if (s && s[1] !== 'verify') stages.push(s[1]);
+      if (s && s[1] !== 'verify') { stages.push(s[1]); labels.push(line); }
     }
   }
-  return { ...r, commands, stages };
+  return { ...r, commands, stages, labels };
 }
+
+test('the test environment drops git variables a hook would hand down', () => {
+  const saved = { GIT_DIR: process.env.GIT_DIR, GIT_INDEX_FILE: process.env.GIT_INDEX_FILE };
+  process.env.GIT_DIR = '/nonexistent/.git';
+  process.env.GIT_INDEX_FILE = '/nonexistent/index';
+  try {
+    assert.deepEqual(Object.keys(cleanEnv()).filter((k) => k.startsWith('GIT_')), []);
+  } finally {
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+});
 
 const key = (c) => `${c.group}\t${c.command}`;
 
@@ -73,13 +179,28 @@ const full = dry([]);
 
 test('no-argument dry run lists every gate command', () => {
   assert.equal(full.status, 0, full.stderr);
-  assert.ok(full.commands.length >= PRE_CHANGE_COMMANDS + ADDED_WITH_GROUPS,
-    `dry run lists ${full.commands.length} commands, fewer than the ${PRE_CHANGE_COMMANDS} before the groups existed plus ${ADDED_WITH_GROUPS} added with them`);
   for (const c of full.commands) assert.ok(GROUPS.includes(c.group), `unknown group tag ${c.group}`);
 });
 
-test('stage labels keep their order', () => {
-  assert.deepEqual(full.stages, STAGES);
+test('every gate of the pre-split script is still listed', () => {
+  const listed = new Set(full.commands.map((c) => c.command));
+  const missing = OLD_FIXED_COMMANDS.filter((c) => !listed.has(c));
+  assert.deepEqual(missing, []);
+  assert.equal(new Set(OLD_FIXED_COMMANDS).size, OLD_FIXED_COMMANDS.length, 'the frozen list has no repeats');
+});
+
+test('the glob gates follow the directory', () => {
+  const tests = readdirSync(join(ROOT, 'tests'));
+  const scopes = tests.filter((n) => /^audit.*-tests\.mjs$/.test(n)).map((n) => `node tests/${n}`);
+  assert.ok(scopes.length > 0);
+  assert.deepEqual(full.commands.filter((c) => /^node tests\/audit[^/ ]*-tests\.mjs$/.test(c.command)).map((c) => c.command).sort(), scopes.sort(), 'every audit scope test is listed once');
+  const pages = tests.filter((n) => n.endsWith('-tests.html')).map((n) => `node .qa-scan/run-test.mjs tests/${n}`);
+  assert.ok(pages.length > 0);
+  assert.deepEqual(full.commands.filter((c) => c.command.includes('run-test.mjs tests/')).map((c) => c.command).sort(), pages.sort(), 'every HTML page is listed once');
+});
+
+test('stage label lines are the old ones, word for word, in order', () => {
+  assert.deepEqual(full.labels, EXPECTED_LABELS);
 });
 
 test('--all lists exactly what no argument lists', () => {
@@ -197,9 +318,9 @@ function makeSandbox() {
   mkdirSync(join(dir, '.qa-scan/node_modules/playwright'), { recursive: true });
   // npx would reach for the network; the eslint gate gets a stub on PATH.
   put('.bin/npx', '#!/bin/sh\necho "stub npx $*"\n', 0o755);
-  const git = spawnSync('git', ['init', '-q'], { cwd: dir });
+  const git = spawnSync('git', ['init', '-q'], { cwd: dir, env: cleanEnv() });
   assert.equal(git.status, 0, 'git init');
-  assert.equal(spawnSync('git', ['add', '-A'], { cwd: dir }).status, 0, 'git add');
+  assert.equal(spawnSync('git', ['add', '-A'], { cwd: dir, env: cleanEnv() }).status, 0, 'git add');
   return dir;
 }
 
@@ -390,4 +511,42 @@ test('recordFlake keeps the last lines of the first failure and escapes workflow
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('pages: the group own gate command is retried like the other browser groups', () => {
+  const gate = 'tests/run-test-print-counts-tests.mjs';
+  const once = run(['--group=pages'], { env: { ...retry, STUB_FAIL_ONCE: gate } });
+  assert.equal(once.status, 0, once.out);
+  assert.equal(times(once.calls, gate), 2);
+  assert.equal(once.flakes.length, 1);
+  assert.equal(once.flakes[0].stage, 'run-test');
+  assert.equal(once.flakes[0].target, 'node ' + gate);
+  assert.match(once.flakes[0].firstFailure, /failing once/);
+  const off = run(['--group=pages'], { env: { STUB_FAIL_ONCE: gate } });
+  assert.notEqual(off.status, 0);
+  assert.equal(times(off.calls, gate), 1);
+  assert.deepEqual(off.flakes, []);
+  const twice = run(['--group=pages'], { env: { ...retry, STUB_FAIL_ALWAYS: gate } });
+  assert.equal(twice.status, 3, twice.out);
+  assert.equal(times(twice.calls, gate), 2);
+  assert.deepEqual(twice.flakes, []);
+});
+
+test('a real no-argument run calls exactly what the dry run lists', () => {
+  const dryList = run([], { env: { PBP_VERIFY_DRY: '1' } });
+  assert.equal(dryList.status, 0, dryList.out);
+  assert.deepEqual(dryList.calls, [], 'a dry run calls nothing');
+  // Only commands that start a stub script leave a call-log line. The eslint
+  // line (env ... npx), the syntax loop and setup-hooks.sh are stubbed or
+  // run without logging, so they are not part of the comparison.
+  const expected = dryList.stdout.split('\n')
+    .map((l) => /^\[dry\]\[[a-z]+\] node (.+)$/.exec(l))
+    .filter(Boolean)
+    .map((m) => m[1])
+    .sort();
+  assert.ok(expected.length > 40, 'the dry list has the expected size');
+  assert.ok(expected.some((c) => c.startsWith('scripts/ui-render-audit.mjs --shard=')), 'the render shards are in the dry list');
+  const real = run([]);
+  assert.equal(real.status, 0, real.out);
+  assert.deepEqual([...real.calls].sort(), expected);
 });
