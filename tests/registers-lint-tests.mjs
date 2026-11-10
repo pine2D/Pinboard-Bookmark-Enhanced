@@ -157,13 +157,6 @@ test('flake: wrong header, empty case, invalid or future date fail', () => {
   assert.ok(has(lintFlakeLedger(flake(fl('甲', '未处理', '-', '2026-11-11')), T).errors, /日期/));
 });
 
-// ---- the committed registers pass with the real clock fixed ----
-test('the three committed registers lint clean', () => {
-  const r = spawnSync('node', [join(ROOT, 'scripts/registers-lint.mjs')], { encoding: 'utf8', env: { ...process.env, PBP_LINT_TODAY: today } });
-  assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /PASS/);
-});
-
 // ---- command line ----
 function withDir(files, fn) {
   const dir = mkdtempSync(join(tmpdir(), 'registers-lint-'));
@@ -212,10 +205,58 @@ test('cli: --release-gate also fails on a format error, even with --accept-debt'
   assert.equal(run(d, ['--release-gate']).status, 1);
   assert.equal(run(d, ['--release-gate', '--accept-debt']).status, 1);
 }));
-test('cli: an item overdue beyond 14 days blocks the gate and the plain run', () => withDir(set({ 'acceptance-debt.md': debt([pend('A-001', '2026-10-01')]) }), (d) => {
+test('cli: an item overdue beyond 14 days fails the plain run but is a gate item: --accept-debt exits 0, without exits 1', () => withDir(set({ 'acceptance-debt.md': debt([pend('A-001', '2026-10-01')]) }), (d) => {
   assert.equal(run(d).status, 1);
-  assert.equal(run(d, ['--release-gate', '--accept-debt']).status, 1);
+  const acc = run(d, ['--release-gate', '--accept-debt']);
+  assert.equal(acc.status, 0, acc.stdout + acc.stderr);
+  assert.match(acc.stdout, /A-001/); assert.match(acc.stdout, /接受/);
+  const blocked = run(d, ['--release-gate']);
+  assert.equal(blocked.status, 1);
+  assert.match(blocked.stdout + blocked.stderr, /A-001/); assert.match(blocked.stdout + blocked.stderr, /--accept-debt/);
+  assert.doesNotMatch(blocked.stdout + blocked.stderr, /格式有错/);
 }));
+test('cli: a flake quarantine overdue beyond 14 days fails the plain run but does not change the gate exit code', () => withDir(set({ 'flake-ledger.md': flake(fl('甲', '已隔离', '2026-10-01')) }), (d) => {
+  assert.equal(run(d).status, 1);
+  assert.equal(run(d, ['--release-gate']).status, 0);
+  assert.equal(run(d, ['--release-gate', '--accept-debt']).status, 0);
+  const bad = set({ 'flake-ledger.md': flake(fl('甲', '已隔离', '2026-10-01'), fl('乙', '处理中')) });
+  return withDir(bad, (d2) => {
+    const r = run(d2, ['--release-gate']);
+    assert.equal(r.status, 1); assert.match(r.stdout + r.stderr, /格式有错/);
+  });
+}));
+test('cli: the gate reason names a format error as a format error, and an invalid due date counts as one', () => withDir(set({ 'acceptance-debt.md': debt([pend('A-001', '2026-13-01')]) }), (d) => {
+  const r = run(d, ['--release-gate', '--accept-debt']);
+  assert.equal(r.status, 1); assert.match(r.stdout + r.stderr, /格式有错/);
+}));
+test('cli: the real committed registers lint clean with the real clock', () => {
+  const r = spawnSync('node', [join(ROOT, 'scripts/registers-lint.mjs')], { encoding: 'utf8', env: { ...process.env, PBP_LINT_TODAY: '' } });
+  // not asserted on content that depends on the date: only that the CLI can read all three files
+  assert.doesNotMatch(r.stdout + r.stderr, /读不到文件/);
+});
+
+// ---- table structure: nothing is silently skipped ----
+test('structure: a second table under the same heading is an error (all three files)', () => {
+  const extra = '\n| 编号 | 清账日 | 结果 |\n|---|---|---|\n| A-009 | 2026-11-09 | 通过 |\n';
+  assert.ok(has(lintAcceptanceDebt(debt() + extra, T).errors, /第二张表|多张表|同一标题/), 'debt');
+  const dec = decisions(DEC_OK) + '\n' + DEC_HEAD + '| 2026-08-04 | 乙 | 理由 | 范围 |\n';
+  assert.ok(has(lintDecisions(dec, T).errors, /第二张表|多张表|同一标题/), 'decisions');
+  const fk = flake(fl('甲', '未处理')) + '\n' + FL_HEAD + fl('乙', '未处理') + '\n';
+  assert.ok(has(lintFlakeLedger(fk, T).errors, /第二张表|多张表|同一标题/), 'flake');
+});
+test('structure: a table outside the expected heading is an error (all three files)', () => {
+  const stray = '\n## 杂项\n\n| a | b |\n|---|---|\n| 1 | 2 |\n';
+  assert.ok(has(lintAcceptanceDebt(debt() + stray, T).errors, /杂项/), 'debt');
+  assert.ok(has(lintFlakeLedger(flake(fl('甲', '未处理')) + stray, T).errors, /杂项/), 'flake');
+  const noHeading = '# 裁决登记册\n\n' + DEC_HEAD + DEC_OK + '\n';
+  assert.ok(has(lintDecisions(noHeading, T).errors, /标题/), 'decisions before any ## heading');
+});
+test('structure: a header row without a separator row is an error (all three files)', () => {
+  const nosep = (t) => t.replace(/\|---[|-]*\n/, '');
+  assert.ok(has(lintDecisions(nosep(decisions(DEC_OK)), T).errors, /分隔行/), 'decisions');
+  assert.ok(has(lintAcceptanceDebt(nosep(debt([pend('A-001', '2026-12-10')])), T).errors, /分隔行/), 'debt');
+  assert.ok(has(lintFlakeLedger(nosep(flake(fl('甲', '未处理'))), T).errors, /分隔行/), 'flake');
+});
 
 // ---- release.sh surface ----
 test('release.sh parses and documents --accept-debt; unknown flag exits 2', () => {

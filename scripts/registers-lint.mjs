@@ -42,14 +42,18 @@ function splitCells(line) {
 const isSeparator = (line) => /^\s*\|[\s:|-]+\|\s*$/.test(line) && line.includes("-");
 
 // Every Markdown table: { heading (nearest "## ..." above), headerLine, header, rows: [{ line, cells }] }.
+// `tables.orphans` lists table-looking lines ("|...") that are not part of any
+// parsed table, e.g. a header row whose separator row is missing.
 function parseTables(text) {
   const lines = text.split("\n");
   const tables = [];
+  tables.orphans = [];
   let heading = "";
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
     if (/^##\s/.test(l)) { heading = l.replace(/^##\s+/, "").trim(); continue; }
-    if (!l.trim().startsWith("|") || !lines[i + 1] || !isSeparator(lines[i + 1])) continue;
+    if (!l.trim().startsWith("|")) continue;
+    if (!lines[i + 1] || !isSeparator(lines[i + 1])) { tables.orphans.push({ line: i + 1, text: l.trim() }); continue; }
     const t = { heading, headerLine: i + 1, header: splitCells(l), rows: [] };
     i += 2;
     for (; i < lines.length && lines[i].trim().startsWith("|"); i++) t.rows.push({ line: i + 1, cells: splitCells(lines[i]) });
@@ -73,6 +77,25 @@ const daysBetween = (todayStr, dateStr) => Math.round((parseDate(todayStr) - par
 
 function sameHeader(a, b) {
   return a.length === b.length && a.every((c, i) => c === b[i]);
+}
+
+// Structure checks so nothing is silently skipped: table-like lines without a
+// separator row, a table under a heading the file does not allow, and a second
+// table under one heading. `allowed(heading)` says which headings may hold a table.
+function checkStructure(tables, allowed, allowedText, at, errors) {
+  for (const o of tables.orphans) {
+    errors.push(`${at(o.line)} 这一行像表格，但表头行后面没有分隔行 |---|---|，整张表会被跳过`);
+  }
+  const perHeading = new Map();
+  for (const t of tables) {
+    if (!allowed(t.heading)) {
+      errors.push(`${at(t.headerLine)} 表格在「## ${t.heading || "（没有二级标题）"}」下，只允许在${allowedText}下放表`);
+      continue;
+    }
+    if (perHeading.has(t.heading)) {
+      errors.push(`${at(t.headerLine)} 「## ${t.heading}」下有第二张表，同一标题下只能有一张表（第 ${perHeading.get(t.heading)} 行已有）`);
+    } else perHeading.set(t.heading, t.headerLine);
+  }
 }
 
 // Shared per-row checks. `at(line)` builds the "file:line" prefix.
@@ -102,12 +125,14 @@ function checkPastDate(value, label, row, today, at, errors) {
   return true;
 }
 // Expiry with the grace window. Pushes a warning (1-14 days) or an error (>14).
-function checkDue(value, who, row, today, at, errors, warnings) {
+// Format problems go to `errors`; expiry past the grace window goes to `dueErrors`
+// so the release gate can treat the two differently.
+function checkDue(value, who, row, today, at, errors, warnings, dueErrors) {
   if (parseDate(value) === null) { errors.push(`${at(row.line)} ${who} 到期日 "${value}" 不是合法的 YYYY-MM-DD 日期`); return; }
   const over = daysBetween(today, value);
   if (over <= 0) return;
   if (over <= GRACE_DAYS) warnings.push(`${at(row.line)} ${who} 到期日 ${value} 已过期 ${over} 天，超过 ${GRACE_DAYS} 天会报错`);
-  else errors.push(`${at(row.line)} ${who} 到期日 ${value} 已过期 ${over} 天，超过 ${GRACE_DAYS} 天宽限期，做完它或改期`);
+  else dueErrors.push(`${at(row.line)} ${who} 到期日 ${value} 已过期 ${over} 天，超过 ${GRACE_DAYS} 天宽限期，做完它或改期`);
 }
 
 // ---- decisions.md ----
@@ -116,7 +141,10 @@ export function lintDecisions(text, { today }) {
   const at = (n) => `decisions.md:${n}:`;
   const seen = new Map();
   let dataRows = 0;
-  for (const t of parseTables(text)) {
+  const tables = parseTables(text);
+  checkStructure(tables, (h) => h !== "", "任一「## 标题」", at, errors);
+  for (const t of tables) {
+    if (t.heading === "") continue;
     if (!checkShape(t, DECISIONS_HEADER, at, errors)) continue;
     for (const row of t.rows) {
       dataRows++;
@@ -141,9 +169,16 @@ function debtTables(text) {
   };
 }
 
-export function lintAcceptanceDebt(text, { today }) {
-  const errors = [], warnings = [];
+export function lintAcceptanceDebt(text, opts) {
+  const r = lintAcceptanceDebtDetailed(text, opts);
+  return { errors: [...r.errors, ...r.dueErrors], warnings: r.warnings };
+}
+// Same check, with expiry errors kept apart from format errors (release gate).
+export function lintAcceptanceDebtDetailed(text, { today }) {
+  const errors = [], warnings = [], dueErrors = [];
   const at = (n) => `acceptance-debt.md:${n}:`;
+  const all = parseTables(text);
+  checkStructure(all, (h) => h === "待验" || h === "已清", "「## 待验」和「## 已清」", at, errors);
   const { pending, done } = debtTables(text);
   const ids = new Map();
   const claimId = (id, row) => {
@@ -158,7 +193,7 @@ export function lintAcceptanceDebt(text, { today }) {
       const [id, reg, , , , due] = row.cells;
       claimId(id, row);
       checkPastDate(reg, "登记日", row, today, at, errors);
-      checkDue(due, id, row, today, at, errors, warnings);
+      checkDue(due, id, row, today, at, errors, warnings, dueErrors);
     }
   }
   if (!done) errors.push('acceptance-debt.md: 缺少「## 已清」下的表');
@@ -169,7 +204,7 @@ export function lintAcceptanceDebt(text, { today }) {
       checkPastDate(row.cells[1], "清账日", row, today, at, errors);
     }
   }
-  return { errors, warnings };
+  return { errors, warnings, dueErrors };
 }
 
 // Pending rows for the release gate. overdueDays <= 0 means not yet due.
@@ -183,17 +218,24 @@ export function openAcceptanceItems(text, { today }) {
 }
 
 // ---- flake-ledger.md ----
-export function lintFlakeLedger(text, { today }) {
-  const errors = [], warnings = [];
+export function lintFlakeLedger(text, opts) {
+  const r = lintFlakeLedgerDetailed(text, opts);
+  return { errors: [...r.errors, ...r.dueErrors], warnings: r.warnings };
+}
+// Same check, with quarantine-expiry errors kept apart from format errors.
+export function lintFlakeLedgerDetailed(text, { today }) {
+  const errors = [], warnings = [], dueErrors = [];
   const at = (n) => `flake-ledger.md:${n}:`;
   const byCase = new Map();
-  for (const t of parseTables(text).filter((x) => x.heading === "记录")) {
+  const all = parseTables(text);
+  checkStructure(all, (h) => h === "记录", "「## 记录」", at, errors);
+  for (const t of all.filter((x) => x.heading === "记录").slice(0, 1)) {
     if (!checkShape(t, FLAKE_HEADER, at, errors)) continue;
     for (const row of t.rows) {
       if (!checkRow(row, FLAKE_HEADER, at, errors)) continue;
       const [date, name, , status, due] = row.cells;
       checkPastDate(date, "日期", row, today, at, errors);
-      if (status === "已隔离") checkDue(due, `「${name}」`, row, today, at, errors, warnings);
+      if (status === "已隔离") checkDue(due, `「${name}」`, row, today, at, errors, warnings, dueErrors);
       else if (status === "未处理" || /^已根治\s+\S+/.test(status)) {
         if (due !== "-") errors.push(`${at(row.line)} 状态「${status}」的到期日要写 -`);
       } else if (status.startsWith("已根治")) errors.push(`${at(row.line)} 「已根治」后面要跟提交号`);
@@ -202,14 +244,14 @@ export function lintFlakeLedger(text, { today }) {
       byCase.get(name).push({ line: row.line, status });
     }
   }
-  if (!parseTables(text).some((x) => x.heading === "记录")) errors.push('flake-ledger.md: 缺少「## 记录」下的表');
+  if (!all.some((x) => x.heading === "记录")) errors.push('flake-ledger.md: 缺少「## 记录」下的表');
   for (const [name, rows] of byCase) {
     const open = rows.find((r) => r.status === "未处理");
     if (rows.length >= 2 && open) {
       errors.push(`flake-ledger.md:${open.line}: 用例「${name}」已上榜 ${rows.length} 次，第二次上榜必须根治或隔离，不能留「未处理」`);
     }
   }
-  return { errors, warnings };
+  return { errors, warnings, dueErrors };
 }
 
 // ---- command line ----
@@ -226,26 +268,31 @@ function main(argv) {
   const dir = process.env.PBP_REGISTERS_DIR ||
     join(dirname(fileURLToPath(import.meta.url)), "..", ".claude");
   const files = [
-    ["decisions.md", lintDecisions],
-    ["acceptance-debt.md", lintAcceptanceDebt],
-    ["flake-ledger.md", lintFlakeLedger],
+    ["decisions.md", (t, o) => ({ ...lintDecisions(t, o), dueErrors: [] })],
+    ["acceptance-debt.md", lintAcceptanceDebtDetailed],
+    ["flake-ledger.md", lintFlakeLedgerDetailed],
   ];
-  const errors = [], warnings = [];
+  const errors = [], warnings = [], dueErrors = [];
   const texts = {};
   for (const [name, lint] of files) {
     try { texts[name] = readFileSync(join(dir, name), "utf8"); }
     catch (e) { errors.push(`${name}: 读不到文件（${e.code || e.message}）`); continue; }
     const r = lint(texts[name], { today });
     errors.push(...r.errors); warnings.push(...r.warnings);
+    dueErrors.push(...r.dueErrors.map((m) => ({ file: name, m })));
   }
   for (const w of warnings) console.log(`[registers] WARN ${w}`);
   for (const e of errors) console.error(`[registers] FAIL ${e}`);
 
   if (!releaseGate) {
-    if (errors.length) return 1;
+    for (const d of dueErrors) console.error(`[registers] FAIL ${d.m}`);
+    if (errors.length || dueErrors.length) return 1;
     console.log(warnings.length ? `[registers] WARN ${warnings.length} 条警告，无错误` : "[registers] PASS");
     return 0;
   }
+  // Gate mode: expiry is judged below (acceptance items) or does not concern the
+  // release (flake quarantines); only format errors stop here.
+  for (const d of dueErrors.filter((x) => x.file !== "acceptance-debt.md")) console.log(`[registers] WARN ${d.m}（不影响发版门）`);
   if (errors.length) { console.error("[registers] 登记册格式有错，先修好再发版"); return 1; }
   const items = openAcceptanceItems(texts["acceptance-debt.md"], { today });
   console.log(`[registers] 待验欠账 ${items.length} 条`);
