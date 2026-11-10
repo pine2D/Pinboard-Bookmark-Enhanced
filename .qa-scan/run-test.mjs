@@ -27,15 +27,20 @@
 // registered page that never reaches its count is UNCONFIRMED, exit 1, even if it
 // announced its end below that count (the message says so). It edits nothing and
 // leaves the normal mode untouched; exit 0 unless the page could not be measured.
+//        PBP_COVERAGE_DIR=<dir> node .qa-scan/run-test.mjs tests/<file>.html
+// PBP_COVERAGE_DIR (dev tool, scripts/coverage-report.mjs) also records V8 JS
+// coverage for the page and writes <dir>/<page>.json: url + per-function
+// ranges, no source text. The verdict and exit code are unchanged.
 import { chromium } from "playwright";
 import { createServer } from "http";
-import { readFile } from "fs/promises";
+import { readFile, writeFile, mkdir } from "fs/promises";
 import { resolve, dirname, extname, relative } from "path";
 import { fileURLToPath } from "url";
 
 const argv = process.argv.slice(2);
 const printCounts = argv.includes("--print-counts");
 const onlyFilter = (process.env.PBP_ONLY || "").trim();
+const coverageDir = (process.env.PBP_COVERAGE_DIR || "").trim();
 if (onlyFilter && printCounts) {
   console.error("ERROR: PBP_ONLY cannot be combined with --print-counts (a filtered page has no row count to print)");
   process.exit(2);
@@ -164,6 +169,8 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/drive-scopes-tests.html": 105,
   "tests/drive-migration-tests.html": 20,
   "tests/wayback-tests.html": 45,
+  // Not a suite: the fixture page of tests/coverage-report-tests.mjs.
+  "tests/fixtures/coverage-fixture.html": 2,
 });
 const expected = EXPECTED_RESULTS[rel];
 if (expected === undefined && !printCounts && !onlyFilter) {
@@ -256,6 +263,7 @@ try {
       return route.continue();
     });
 
+    if (coverageDir) await page.coverage.startJSCoverage({ resetOnNavigation: false, reportAnonymousScripts: true });
     const response = await page.goto(url, { waitUntil: "load", timeout: 0 });
     if (!response || !response.ok()) throw new Error(`test page failed to load: HTTP ${response && response.status()}`);
 
@@ -394,6 +402,16 @@ try {
         pass: 0, fail: 0, skip: 0, failures: [], title: "", lastRows: [],
         sampleError: sampleError && sampleError.message ? sampleError.message : String(sampleError),
       };
+    }
+    if (coverageDir) {
+      try {
+        const entries = await bounded("coverage", CLEANUP_TIMEOUT_MS, () => page.coverage.stopJSCoverage());
+        const slim = entries.map((e) => ({ url: e.url, functions: e.functions }));
+        await mkdir(coverageDir, { recursive: true });
+        await writeFile(resolve(coverageDir, rel.split("/").pop().replace(/\.html$/, ".json")), JSON.stringify({ page: rel, entries: slim }));
+      } catch (coverageError) {
+        console.error(`ERROR: coverage could not be recorded: ${coverageError && coverageError.message ? coverageError.message : coverageError}`);
+      }
     }
     return { ...dom, stalled };
   });

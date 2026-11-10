@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Coverage fixture</title>
+<!-- Fixture for tests/coverage-report-tests.mjs: calls some functions of
+     coverage-fixture.js for real, and runs one only through a sliced copy. -->
+<div id="results"></div>
+<script src="coverage-fixture.js"></script>
+<script>
+(async () => {
+  const row = (ok, name) => { const d = document.createElement("div"); d.className = ok ? "pass" : "fail"; d.textContent = name; document.getElementById("results").append(d); };
+  row(calledFn() === 1 && arrowCalled(1) === 2 && holder.method() === 4, "called for real");
+  const text = await (await fetch("coverage-fixture.js")).text();
+  const start = text.indexOf("function slicedOnlyFn(");
+  const end = text.indexOf("\n", start);
+  row(start >= 0 && new Function(text.slice(start, end) + "\nreturn slicedOnlyFn();")() === 3, "run through a sliced copy");
+})();
+</script>
