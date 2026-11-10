@@ -34,11 +34,11 @@ jobs:
     defaults:
       run:
         shell: bash
-    env:
-      PBP_QA_REPORT_DIR: ${{ runner.temp }}/pbp-qa-report
     steps:
-      - name: Keep LF line endings
-        run: git config --global core.autocrlf false
+      - name: Keep LF line endings and set the report folder
+        run: |
+          git config --global core.autocrlf false
+          echo "PBP_QA_REPORT_DIR=$RUNNER_TEMP/pbp-qa-report" >> "$GITHUB_ENV"
 
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
