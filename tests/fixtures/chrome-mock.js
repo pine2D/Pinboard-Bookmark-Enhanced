@@ -17,11 +17,32 @@
 //
 // permissions.request rejects unless the test says a click happened:
 //   mock.userGesture();  // the next 5 s count as inside a user gesture
-// (or install({ userGesture: true }) for the whole page).
+// (or install({ userGesture: true }) for the whole page). The window is
+// timed with Date.now(), read when request is called: a test that installs a
+// fake clock must call userGesture() after installing it, or the window is
+// measured against the other clock.
 //
 // Known differences that are NOT modelled; a test that depends on one of
-// these needs a real browser. Behaviour marked "measured" was checked in a
-// real Chromium 147 extension on 2026-11-11.
+// these needs a real browser.
+//
+// Behaviour marked "measured" comes from scripts/chrome-mock-probe.mjs, which
+// loads a throwaway extension in the bundled Chromium and prints what it saw
+// as JSON. Run it again after a Chromium update. Its output on 2026-11-11
+// (Chromium 147.0.7727.15), shortened:
+//   storageSetThenGetAll: date / regexp / map / set -> {}, instance -> { x: 1 },
+//     error -> { code: 7 }, infinity / fn / undef dropped,
+//     array [1, undefined, NaN, fn, Date, null] -> [1, null, null, null, {}, null],
+//     nested { a: undefined, b: NaN, c: "ok", d: Date } -> { c: "ok", d: {} }
+//   permissionsRequestWithoutGesture: "rejected: This function must be called
+//     during a user gesture"
+//   getMessageExactName / getMessageLowerCaseName ("Hi $1 and $NAME$"):
+//     both "Hi A and B"
+//   sendMessageListenerNeverAnswers: "resolved: undefined"
+//   storageGetWithNumber: "synchronous TypeError: Error in invocation of
+//     storage.get(...): No matching signature."
+// Not measured by the script: the length of the gesture window (about 5 s,
+// from a manual check in a real extension on 2026-11-08) and anything below
+// that is not marked "measured".
 //   - storage.onChanged timing: here listeners run before the set() callback
 //     or promise settles; Chrome promises no order between the two.
 //   - Argument checking: Chrome throws a TypeError synchronously for a wrong
@@ -40,7 +61,7 @@
   // "typically serialize to {}" except arrays, and claims Date and RegExp keep
   // their String form:
   //   https://developer.chrome.com/docs/extensions/reference/api/storage/StorageArea#method-set
-  // A real Chromium 147 extension (2026-11-11 probe) stores Date, RegExp, Map
+  // Measured (see the header): a real Chromium 147 extension stores Date, RegExp, Map
   // and Set as {}, keeps the own enumerable properties of any other object
   // (class instance, Error), drops object members that are undefined, a
   // function or a non-finite number, and turns those into null inside an
@@ -357,7 +378,8 @@
     let requestAnswer = options.permissionRequestAnswer === true;
     // request needs a user gesture: the call must come within the transient
     // activation of a click (about 5 s in Chrome; awaits in between do not end
-    // it). Outside one Chrome rejects, measured in a real extension:
+    // it; the length is from a manual check, not the probe). Outside one
+    // Chrome rejects (measured):
     //   "This function must be called during a user gesture"
     // https://developer.chrome.com/docs/extensions/reference/api/permissions
     let gestureUntil = options.userGesture ? Infinity : 0;
@@ -394,7 +416,7 @@
     // gives "". $name$ is a placeholder (case-insensitive) whose content holds
     // $1..$9 for the substitutions; "$$" is a literal "$". At most 9 substitutions.
     // Names match case-insensitively, and a $1 written straight in the message
-    // is substituted too (both measured in Chromium 147, 2026-11-11).
+    // is substituted too (both measured, see the header).
     // https://developer.chrome.com/docs/extensions/how-to/ui/localization-message-formats
     const messages = options.messages || {};
     chrome.i18n = {
