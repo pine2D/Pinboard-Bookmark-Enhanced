@@ -14,6 +14,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import noSilentCatch from "./scripts/eslint-rules/no-silent-catch.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 
@@ -78,6 +79,7 @@ export default [
   {
     files: ["*.js"],
     ignores: ["vendor/**"],
+    plugins: { pbp: { rules: { "no-silent-catch": noSilentCatch } } },
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "script",
@@ -105,6 +107,9 @@ export default [
       "no-unsafe-negation": "error",
       "no-async-promise-executor": "error",
       "require-atomic-updates": "off",
+      // A catch must rethrow, log, or read the error (CLAUDE.md, "吞异常必须留痕").
+      // Old occurrences live in scripts/eslint-suppressions.json; new ones fail.
+      "pbp/no-silent-catch": "error",
       // postMessage's targetOrigin must never be the literal "*" (K110):
       // it's the browser's own delivery filter, the only thing that keeps
       // an embedded third-party frame's playback-position leaks (e.g.

@@ -122,6 +122,8 @@ echo "  Theme group: blocks when a docs/theme-surface token/composer/tool or one
 echo "  the three generated-region CSS files changes and any factory gate fails."
 echo "  UI group: blocks when a surface HTML/JS file carries inline spacing or a"
 echo "  new unregistered structural class (layout-lint, ui-vocabulary-lint)."
+echo "  JS group: blocks when a staged .js/.mjs has a syntax error, or a staged root"
+echo "  .js fails eslint (silent catch included) or script-graph-lint."
 echo "  Fix:    node docs/theme-surface/tools/sync-all.mjs   (theme)"
 echo "          reuse/register the primitive, see .claude/rules/ui-primitives.md (UI)"
 echo "  --no-verify is not an option in this repo (CLAUDE.md); CI reruns everything."

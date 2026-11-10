@@ -94,7 +94,12 @@ git ls-files -- '*.js' '*.mjs' |
 echo "[eslint] correctness lint over runtime scripts (config: eslint.config.mjs)"
 # ESLint lives in .qa-scan's dev-only node_modules (same precedent as
 # playwright); the flat config self-collects this repo's cross-file globals.
-ESLINT_USE_FLAT_CONFIG=true npx --prefix .qa-scan eslint .
+# --suppressions-location holds the old silent catches (pbp/no-silent-catch);
+# a new one fails here, and a fixed one fails until `--prune-suppressions`.
+ESLINT_USE_FLAT_CONFIG=true npx --prefix .qa-scan eslint . --suppressions-location scripts/eslint-suppressions.json
+
+echo "[eslint-silent-catch] checking the no-silent-catch rule against valid and invalid samples"
+node "tests/eslint-silent-catch-tests.mjs"
 
 echo "[script-graph] checking executeScript page functions are closure-free"
 # Immediately after eslint, and for the blind spot eslint structurally has:

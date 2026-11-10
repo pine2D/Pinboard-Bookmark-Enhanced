@@ -38,7 +38,9 @@ UI_VOCAB_CHANGED=$(printf '%s
 AUDIT_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(audit[^/]*|ui-render-audit|qa-drive|options-help-render-audit)\.mjs|tests/(audit[^/]*-tests|pinboard-theme-render-tests|render-audit-checklist)\.mjs|scripts/(verify|pre-commit-hook)\.sh)$')
 REGISTERS_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(\.claude/(decisions|acceptance-debt|flake-ledger)\.md|scripts/registers-lint\.mjs|tests/registers-lint-tests\.mjs)$')
 RULES_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(CLAUDE\.md|AGENTS\.md|PRODUCT\.md|\.claude/rules/[^/]+\.md|\.claude/skills/.+|\.claude/expiring-items\.md|scripts/rules-lint(-allow)?\.(mjs|json)|tests/rules-lint-tests\.mjs)$')
-if [ -z "$CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ]; then
+JS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '\.(js|mjs)$' | grep -vE '^vendor/')
+JS_ROOT_CHANGED=$(printf '%s\n' "$JS_CHANGED" | grep -E '^[^/]+\.js$')
+if [ -z "$CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ]; then
   exit 0
 fi
 
@@ -65,6 +67,37 @@ if [ -n "$RULES_CHANGED" ]; then
     echo ""
     echo "[rules-lint] COMMIT BLOCKED — a rule file, the index or a number claim is out of step (see the message above)" >&2
     exit 1
+  fi
+fi
+
+# ---- JS group: syntax, eslint and script-graph on staged scripts ----
+if [ -n "$JS_CHANGED" ]; then
+  echo "[js-syntax] node --check on staged .js/.mjs"
+  for f in $JS_CHANGED; do
+    if ! node --check "$REPO_ROOT/$f"; then
+      echo ""
+      echo "[js-syntax] COMMIT BLOCKED — syntax error in $f (fix it, then stage again)" >&2
+      exit 1
+    fi
+  done
+  if [ -n "$JS_ROOT_CHANGED" ]; then
+    if [ -d "$REPO_ROOT/.qa-scan/node_modules/eslint" ]; then
+      echo "[eslint] linting staged root scripts"
+      # shellcheck disable=SC2086
+      if ! (cd "$REPO_ROOT" && ESLINT_USE_FLAT_CONFIG=true npx --prefix .qa-scan eslint --suppressions-location scripts/eslint-suppressions.json $JS_ROOT_CHANGED); then
+        echo ""
+        echo "[eslint] COMMIT BLOCKED — fix the lines above; a silent catch needs a console.warn, a throw, a read of the error, or a '// swallow-ok: <reason>' comment" >&2
+        exit 1
+      fi
+    else
+      echo "[eslint] skipped: .qa-scan/node_modules/eslint not found (run CI or verify.sh to cover it)" >&2
+    fi
+    echo "[script-graph] checking executeScript page functions are closure-free"
+    if ! node "$REPO_ROOT/scripts/script-graph-lint.mjs"; then
+      echo ""
+      echo "[script-graph] COMMIT BLOCKED — an executeScript page function reaches outside its own body (see the message above)" >&2
+      exit 1
+    fi
   fi
 fi
 

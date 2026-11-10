@@ -8,7 +8,7 @@ description: Bookmark Enhanced 的提交钩子分路与发版流程（bump-versi
 > 自根 CLAUDE.md「发布流程」迁来（2026-11-05）。「对外材料只讲核心」「用户看得到的文字都要说人话」「用户可见文案 / README 改动」三条跨领域规则仍在根 CLAUDE.md 的「提交、发布与对外文案」一节（原文），写 README、商店文案、release notes 或任何界面文字前读那里；新增数据出口须同步 privacy.md 三处的规则在根文件「跨领域安全铁律」。
 
 ```bash
-git commit -m "fix(...): ..."   # pre-commit 两组触发：主题源/三份 CSS → 8 道工厂门；UI 消费侧按文件分路——四个表面 HTML、popup/options/library(-*).js、listbox.js 与 md-dict.js → layout-lint + ui-contract + ui-vocabulary，md-preview.css 与 dict-*.js → layout-lint + ui-contract，其余 md-*.js、shared.js 与词汇注册表/基线 → ui-vocabulary；全套 verify 由 push 后 CI 兜底（禁止 --no-verify）
+git commit -m "fix(...): ..."   # pre-commit 三组触发：JS 脚本 → node --check，根目录 *.js 另跑 eslint（含吞异常规则）与 script-graph-lint；主题源/三份 CSS → 8 道工厂门；UI 消费侧按文件分路——四个表面 HTML、popup/options/library(-*).js、listbox.js 与 md-dict.js → layout-lint + ui-contract + ui-vocabulary，md-preview.css 与 dict-*.js → layout-lint + ui-contract，其余 md-*.js、shared.js 与词汇注册表/基线 → ui-vocabulary；全套 verify 由 push 后 CI 兜底（禁止 --no-verify）
                                 # 其中 layout-lint + ui-vocabulary 两道静态门在 Claude Code 里由 .claude/settings.json 的 PostToolUse 钩子在编辑时即跑（JS 范围与 ui-vocabulary 触发组一致，含 md-dict.js；dict-*.js 不铸类名、两道门都不读它，不在编辑期钩子内，ui-contract 只在 commit 时跑）；该钩子另覆盖主题工厂生成物——popup/options/library.css 命中时改跑 layout-lint + css-region-audit，pinboard-themes.js 命中时改跑 handedit-audit（各按脚本实际读取的文件路由，不空跑），红了指向 sync-all；composers/pilots 源文件不在编辑期钩子内（中间态会误报，留给 commit 时的 8 道工厂门）。没有编辑期钩子的工具（Codex 等）改完文件后自行执行 node scripts/ui-consumer-lint.mjs --file <路径>
 bash scripts/bump-version.sh    # 按 commit 类型 bump manifest（feat→minor / fix→patch）
 git push origin main

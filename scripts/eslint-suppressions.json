@@ -1,0 +1,277 @@
+{
+  "ai-cache.js": {
+    "pbp/no-silent-catch": {
+      "count": 9
+    }
+  },
+  "ai.js": {
+    "pbp/no-silent-catch": {
+      "count": 33
+    }
+  },
+  "anki-connect.js": {
+    "pbp/no-silent-catch": {
+      "count": 2
+    }
+  },
+  "ask-archive.js": {
+    "pbp/no-silent-catch": {
+      "count": 9
+    }
+  },
+  "background.js": {
+    "pbp/no-silent-catch": {
+      "count": 97
+    }
+  },
+  "bili-player-bridge.js": {
+    "pbp/no-silent-catch": {
+      "count": 7
+    }
+  },
+  "bookmark-services.js": {
+    "pbp/no-silent-catch": {
+      "count": 1
+    }
+  },
+  "dict-archive.js": {
+    "pbp/no-silent-catch": {
+      "count": 10
+    }
+  },
+  "dict-entry.js": {
+    "pbp/no-silent-catch": {
+      "count": 10
+    }
+  },
+  "dict-evidence.js": {
+    "pbp/no-silent-catch": {
+      "count": 4
+    }
+  },
+  "dict-pack.js": {
+    "pbp/no-silent-catch": {
+      "count": 12
+    }
+  },
+  "eudic-sync.js": {
+    "pbp/no-silent-catch": {
+      "count": 1
+    }
+  },
+  "export-targets.js": {
+    "pbp/no-silent-catch": {
+      "count": 1
+    }
+  },
+  "i18n.js": {
+    "pbp/no-silent-catch": {
+      "count": 7
+    }
+  },
+  "jina.js": {
+    "pbp/no-silent-catch": {
+      "count": 3
+    }
+  },
+  "library-ask.js": {
+    "pbp/no-silent-catch": {
+      "count": 1
+    }
+  },
+  "library-notes.js": {
+    "pbp/no-silent-catch": {
+      "count": 6
+    }
+  },
+  "library-vocab.js": {
+    "pbp/no-silent-catch": {
+      "count": 26
+    }
+  },
+  "library.js": {
+    "pbp/no-silent-catch": {
+      "count": 10
+    }
+  },
+  "md-ai-core.js": {
+    "pbp/no-silent-catch": {
+      "count": 11
+    }
+  },
+  "md-ask.js": {
+    "pbp/no-silent-catch": {
+      "count": 40
+    }
+  },
+  "md-bookmark.js": {
+    "pbp/no-silent-catch": {
+      "count": 2
+    }
+  },
+  "md-convert.js": {
+    "pbp/no-silent-catch": {
+      "count": 12
+    }
+  },
+  "md-dict.js": {
+    "pbp/no-silent-catch": {
+      "count": 24
+    }
+  },
+  "md-embed.js": {
+    "pbp/no-silent-catch": {
+      "count": 12
+    }
+  },
+  "md-epub.js": {
+    "pbp/no-silent-catch": {
+      "count": 2
+    }
+  },
+  "md-export-send.js": {
+    "pbp/no-silent-catch": {
+      "count": 8
+    }
+  },
+  "md-highlight.js": {
+    "pbp/no-silent-catch": {
+      "count": 36
+    }
+  },
+  "md-mermaid.js": {
+    "pbp/no-silent-catch": {
+      "count": 6
+    }
+  },
+  "md-preview-theme-early.js": {
+    "pbp/no-silent-catch": {
+      "count": 5
+    }
+  },
+  "md-preview.js": {
+    "pbp/no-silent-catch": {
+      "count": 59
+    }
+  },
+  "md-reader.js": {
+    "pbp/no-silent-catch": {
+      "count": 28
+    }
+  },
+  "md-skim.js": {
+    "pbp/no-silent-catch": {
+      "count": 12
+    }
+  },
+  "md-translate.js": {
+    "pbp/no-silent-catch": {
+      "count": 44
+    }
+  },
+  "md-video.js": {
+    "pbp/no-silent-catch": {
+      "count": 115
+    }
+  },
+  "md-vocab-echo.js": {
+    "pbp/no-silent-catch": {
+      "count": 9
+    }
+  },
+  "notes-sync.js": {
+    "pbp/no-silent-catch": {
+      "count": 6
+    }
+  },
+  "options-backup.js": {
+    "pbp/no-silent-catch": {
+      "count": 6
+    }
+  },
+  "options-theme-early.js": {
+    "pbp/no-silent-catch": {
+      "count": 7
+    }
+  },
+  "options-vocab.js": {
+    "pbp/no-silent-catch": {
+      "count": 9
+    }
+  },
+  "options.js": {
+    "pbp/no-silent-catch": {
+      "count": 43
+    }
+  },
+  "pinboard-sort.js": {
+    "pbp/no-silent-catch": {
+      "count": 5
+    }
+  },
+  "pinboard-style.js": {
+    "pbp/no-silent-catch": {
+      "count": 6
+    }
+  },
+  "popup-ai.js": {
+    "pbp/no-silent-catch": {
+      "count": 6
+    }
+  },
+  "popup-batch.js": {
+    "pbp/no-silent-catch": {
+      "count": 4
+    }
+  },
+  "popup-offline.js": {
+    "pbp/no-silent-catch": {
+      "count": 3
+    }
+  },
+  "popup-tags.js": {
+    "pbp/no-silent-catch": {
+      "count": 7
+    }
+  },
+  "popup-theme-early.js": {
+    "pbp/no-silent-catch": {
+      "count": 6
+    }
+  },
+  "popup.js": {
+    "pbp/no-silent-catch": {
+      "count": 36
+    }
+  },
+  "shared.js": {
+    "pbp/no-silent-catch": {
+      "count": 56
+    }
+  },
+  "site-rules.js": {
+    "pbp/no-silent-catch": {
+      "count": 10
+    }
+  },
+  "vocab-gdrive.js": {
+    "pbp/no-silent-catch": {
+      "count": 12
+    }
+  },
+  "vocab-send.js": {
+    "pbp/no-silent-catch": {
+      "count": 3
+    }
+  },
+  "vocab-store.js": {
+    "pbp/no-silent-catch": {
+      "count": 16
+    }
+  },
+  "wayback.js": {
+    "pbp/no-silent-catch": {
+      "count": 2
+    }
+  }
+}
