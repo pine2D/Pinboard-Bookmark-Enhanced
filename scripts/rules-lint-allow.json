@@ -1,0 +1,7 @@
+[
+  { "file": ".claude/rules/promo-assets.md", "token": ".qa-scan/promo-video/**", "reason": "The promo video project is gitignored (.qa-scan/ keeps only package files and run-test.mjs), so no tracked file matches. The rule still has to load for it." },
+  { "file": ".claude/rules/dict.md", "token": "controlsHost", "reason": "Named on purpose as an option md-dict.js no longer accepts. It is meant to be absent from the code." },
+  { "file": ".claude/skills/live-ai-test/SKILL.md", "token": ".qa-scan/report/", "reason": "Gitignored output folder that exists only after a run." },
+  { "file": "CLAUDE.md", "token": ".qa-scan/report/", "reason": "Gitignored output folder that exists only after a run." },
+  { "file": ".claude/skills/release/SKILL.md", "token": "release/", "reason": "Gitignored build output folder, named as one of the folders left out of the ZIP." }
+]

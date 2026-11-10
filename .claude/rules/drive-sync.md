@@ -11,6 +11,7 @@ paths:
   - "tests/notes-gdrive-tests.html"
   - "tests/options-drive-sync-tests.html"
   - "tests/drive-scopes-tests.html"
+  - "tests/drive-migration-tests.html"
 ---
 
 # Google Drive 连接层深水区（生词 / 高亮笔记 / AI 词条归档 / Ask 归档共用）

@@ -34,7 +34,8 @@ UI_VOCAB_CHANGED=$(printf '%s
 ' "$STAGED" | grep -E "$UI_VOCAB_RE")
 AUDIT_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(audit[^/]*|ui-render-audit|qa-drive|options-help-render-audit)\.mjs|tests/(audit[^/]*-tests|pinboard-theme-render-tests|render-audit-checklist)\.mjs|scripts/(verify|pre-commit-hook)\.sh)$')
 REGISTERS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(\.claude/(decisions|acceptance-debt|flake-ledger)\.md|scripts/registers-lint\.mjs|tests/registers-lint-tests\.mjs)$')
-if [ -z "$CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ]; then
+RULES_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(CLAUDE\.md|AGENTS\.md|PRODUCT\.md|\.claude/rules/[^/]+\.md|\.claude/skills/.+|\.claude/expiring-items\.md|scripts/rules-lint(-allow)?\.(mjs|json)|tests/rules-lint-tests\.mjs)$')
+if [ -z "$CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ]; then
   exit 0
 fi
 
@@ -51,6 +52,15 @@ if [ -n "$REGISTERS_CHANGED" ]; then
   if ! node "$REPO_ROOT/scripts/registers-lint.mjs" || ! node "$REPO_ROOT/tests/registers-lint-tests.mjs"; then
     echo ""
     echo "[registers] COMMIT BLOCKED — a register file breaks its format or expiry rule (see the message above)" >&2
+    exit 1
+  fi
+fi
+
+if [ -n "$RULES_CHANGED" ]; then
+  echo "[rules-lint] checking the CLAUDE.md index, rule files, references and number claims"
+  if ! node "$REPO_ROOT/scripts/rules-lint.mjs" || ! node "$REPO_ROOT/tests/rules-lint-tests.mjs"; then
+    echo ""
+    echo "[rules-lint] COMMIT BLOCKED — a rule file, the index or a number claim is out of step (see the message above)" >&2
     exit 1
   fi
 fi

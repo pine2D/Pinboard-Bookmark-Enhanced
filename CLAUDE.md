@@ -1,7 +1,7 @@
 # Bookmark Enhanced 项目配置
 
 作者：pine2D
-更新：2026-11-05
+更新：2026-11-10
 
 > 本文件只保留每个会话都需要的跨领域约定。子系统深水区规则在 `.claude/rules/`（按 paths 匹配自动加载），按任务的流程在 `.claude/skills/`（按描述触发），有到期日的一次性迁移在 `.claude/expiring-items.md`；三者都列在文末索引表。不自动加载 rules 或 skills 的工具（Codex 等）在改对应文件或执行对应任务前，按索引表先读。机器可验证的铁律已由 pre-commit / verify.sh / release 硬门强制——prose 是提醒，lint 是底线。
 
@@ -152,14 +152,14 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 |------|------|
 | shared.js、background.js、options.js、options-backup.js、bookmark-services.js、popup.js、popup-offline.js、popup-batch.js、md-bookmark.js、vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js（存储路由 / 同步 / 书签连接 / 离线队列） | `.claude/rules/storage-sync.md` |
 | background.js、manifest.json、SW 用 importScripts 载入的数据模块（bookmark-services / vocab-store / notes-sync / dict-archive / ask-archive 及其 *-gdrive.js、wayback.js）、pinboard-style.js、pinboard-sort.js、bili-player-bridge.js | `.claude/rules/mv3.md` |
-| 四个表面 HTML/CSS、popup / options / library 及其 *-*.js、listbox.js、shared.js、md-*.js（UI 文本、字体栈、图标） | `.claude/rules/ui-fonts-icons.md` |
+| 四个表面 HTML/CSS、popup.js、popup-*.js、options.js、options-*.js、library.js、library-*.js、listbox.js、shared.js、md-*.js（UI 文本、字体栈、图标） | `.claude/rules/ui-fonts-icons.md` |
 | 四个表面 HTML/CSS、shared.js、listbox.js、ui-vocabulary.json 与基线（新增任何 UI 元素；library 运行时创建值盒子的 library.js / library-vocab.js / library-notes.js 也要先读） | `.claude/rules/ui-primitives.md` |
-| docs/theme-surface/**、popup/options/library.css、pinboard-themes.js、render-audit 家族（ui-render-audit / audit-render-scenarios / render-audit-ledger / checklist / known-failures）、ui-contract-tests、theme-*-tests | `.claude/rules/theme-factory.md` |
+| docs/theme-surface/**、popup.css、options.css、library.css、pinboard-themes.js、render-audit 家族（ui-render-audit / audit-render-scenarios / render-audit-ledger / checklist / known-failures）、ui-contract-tests、theme-*-tests | `.claude/rules/theme-factory.md` |
 | scripts/audit*.mjs、tests/audit*-tests.mjs、qa-drive、ci-fonts、verify.sh、.qa-scan/run-test.mjs（选审计场景、`--font=ci`） | `.claude/rules/audit.md` |
 | vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js、options-vocab.js、library-vocab.js、library-notes.js、md-highlight.js、anki-connect.js、eudic-sync.js、vocab-send.js | `.claude/rules/vocab-sync.md` |
-| vocab-gdrive.js、notes-gdrive.js、dict-archive-gdrive.js、ask-archive-gdrive.js、options-vocab.js、library.js、background.js、Drive 相关测试页（连接层 / 身份缓存 / 错误码 / OAuth / 权限） | `.claude/rules/drive-sync.md` |
+| vocab-gdrive.js、notes-gdrive.js、dict-archive-gdrive.js、ask-archive-gdrive.js、options-vocab.js、library.js、background.js、tests/ 下的 vocab-gdrive-tests.html、notes-gdrive-tests.html、options-drive-sync-tests.html、drive-scopes-tests.html、drive-migration-tests.html（连接层 / 身份缓存 / 错误码 / OAuth / 权限） | `.claude/rules/drive-sync.md` |
 | dict-archive.js、dict-archive-gdrive.js、ask-archive.js、ask-archive-gdrive.js、library-ask.js | `.claude/rules/archive-sync.md` |
-| md-preview.*、md-preview-theme-early.js、md-translate / md-ask / md-reader / md-highlight / md-ai-core / md-bookmark 等 md-*.js、bili-player-bridge.js | `.claude/rules/md-preview.md` |
+| md-preview.*、md-preview-theme-early.js、md-translate.js、md-ask.js、md-reader.js、md-highlight.js、md-ai-core.js、md-bookmark.js、md-skim.js、md-convert.js、md-epub.js、md-mermaid.js、md-export-send.js、md-video.js、bili-player-bridge.js | `.claude/rules/md-preview.md` |
 | md-dict.js、md-vocab-echo.js、ai-cache.js、library-vocab.js（查词界面） | `.claude/rules/dict.md` |
 | dict-entry.js、dict-evidence.js、md-dict.js（AI 词条与补充的生成） | `.claude/rules/dict-entry.md` |
 | dict-pack.js、options-vocab.js、md-dict.js、library-vocab.js（离线词典包） | `.claude/rules/dict-pack.md` |

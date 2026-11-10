@@ -10,6 +10,8 @@ paths:
   - "md-preview.css"
   - "shared.js"
   - "listbox.js"
+  - "library-vocab.js"
+  - "library-notes.js"
   - "docs/theme-surface/ui-vocabulary.json"
   - "scripts/ui-vocabulary-baseline.json"
 ---

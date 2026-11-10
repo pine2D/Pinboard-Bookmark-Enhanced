@@ -33,7 +33,7 @@ A Chrome extension for Pinboard, Karakeep, and linkding that turns a bookmark in
 - Distributed on the Chrome Web Store (ID `pnjndmjhljjbdlbejeenkepdalokfooh`) and as release ZIPs on GitHub.
 - Popup, options, and library are short-lived, single-render surfaces opened many times a day. The reader is a long-session reading surface.
 - Main usage environment: high-DPI / 4K Windows with cold starts. This is the reference for font and first-paint behavior.
-- Connected tools: AI providers (14, plus OpenAI-compatible endpoints), Obsidian, Notion, NotebookLM, GitHub Gist, webhooks, Wayback Machine, Free Dictionary, offline CC-CEDICT and user-supplied ECDICT, AnkiConnect, Eudic, Google Drive, YouTube and bilibili subtitles.
+- Connected tools: AI providers (17, plus OpenAI-compatible endpoints), Obsidian, Notion, NotebookLM, GitHub Gist, webhooks, Wayback Machine, Free Dictionary, offline CC-CEDICT and user-supplied ECDICT, AnkiConnect, Eudic, Google Drive, YouTube and bilibili subtitles.
 
 ## Capabilities and Constraints
 

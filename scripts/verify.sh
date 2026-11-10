@@ -30,7 +30,7 @@ fi
 
 echo "[browser] running $# HTML suites"
 browser_failures=0
-# Run the 358-case synchronous conversion suite before the lighter pages.
+# Run the large synchronous conversion suite before the lighter pages.
 echo "[browser] tests/md-convert-tests.html"
 if ! node ".qa-scan/run-test.mjs" "tests/md-convert-tests.html"; then
   browser_failures=$((browser_failures + 1))
@@ -196,6 +196,10 @@ node "scripts/docs-lint.mjs"
 echo "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger) + lint self-tests"
 node "scripts/registers-lint.mjs"
 node "tests/registers-lint-tests.mjs"
+
+echo "[rules-lint] checking CLAUDE.md index, rule files, skills, backticked references and number claims + lint self-tests"
+node "scripts/rules-lint.mjs"
+node "tests/rules-lint-tests.mjs"
 
 echo "[store-descriptions] checking CWS store copy is regenerated from the READMEs"
 node "scripts/sync-store-descriptions.mjs" --check
