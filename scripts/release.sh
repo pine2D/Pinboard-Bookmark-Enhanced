@@ -9,6 +9,7 @@ usage() {
     "  --build-only    Build and smoke-test the ZIP without publishing or syncing" \
     "  --overwrite     Rebuild a local ZIP or resume an exact-HEAD draft; published releases stay immutable" \
     "  --docs-ok       Skip the docs freshness gate" \
+    "  --accept-debt   Continue despite overdue items in .claude/acceptance-debt.md" \
     "  --skip-smoke    Skip ZIP install smoke (release-script debugging only)" \
     "  --no-overwrite  Deprecated no-op; immutable-by-default is now enforced" \
     "  -h, --help      Show this help"
@@ -17,6 +18,7 @@ usage() {
 BUILD_ONLY=0
 OVERWRITE=0
 DOCS_OK=0
+ACCEPT_DEBT=0
 SKIP_SMOKE=0
 
 while [ "$#" -gt 0 ]; do
@@ -24,6 +26,7 @@ while [ "$#" -gt 0 ]; do
     --build-only) BUILD_ONLY=1 ;;
     --overwrite) OVERWRITE=1 ;;
     --docs-ok) DOCS_OK=1 ;;
+    --accept-debt) ACCEPT_DEBT=1 ;;
     --skip-smoke) SKIP_SMOKE=1 ;;
     --no-overwrite)
       echo "  [release] WARN: --no-overwrite is deprecated; releases are immutable by default." >&2
@@ -323,6 +326,19 @@ else
     fi
     echo "  Docs gate OK (${FEAT_COUNT} feat commit(s); docs files touched: ${DOCS_TOUCHED})"
   fi
+fi
+
+# ---- Step 0b: Acceptance debt gate ----
+#
+# .claude/acceptance-debt.md lists checks only a human can do. Every open item
+# is printed; an overdue one aborts (node prints the reason) unless
+# --accept-debt is given. All logic lives in scripts/registers-lint.mjs.
+if [ "${BUILD_ONLY}" -eq 1 ]; then
+  echo "  --build-only: skipping acceptance debt gate"
+elif [ "${ACCEPT_DEBT}" -eq 1 ]; then
+  node scripts/registers-lint.mjs --release-gate --accept-debt
+else
+  node scripts/registers-lint.mjs --release-gate
 fi
 
 # Note: README version badge is dynamic (shields.io reads GitHub release tag),

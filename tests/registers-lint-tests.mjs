@@ -1,0 +1,227 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import {
+  lintDecisions, lintAcceptanceDebt, lintFlakeLedger, openAcceptanceItems,
+} from '../scripts/registers-lint.mjs';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const today = '2026-11-10';
+const T = { today };
+
+// ---- fixtures: written by hand in the documented file shapes ----
+const DEC_HEAD = '| 日期 | 裁决 | 理由 | 范围 |\n|---|---|---|---|\n';
+const decisions = (...rows) => `# 裁决登记册\n\n## 不做的功能\n\n${DEC_HEAD}${rows.join('\n')}\n`;
+const DEC_OK = '| 2026-08-03 | 不做甲 | 用户否决 | 资料库 |';
+
+const AD_PENDING_HEAD = '| 编号 | 登记日 | 来源 | 验什么 | 怎么验 | 到期日 |\n|---|---|---|---|---|---|\n';
+const AD_DONE_HEAD = '| 编号 | 清账日 | 结果 |\n|---|---|---|\n';
+const debt = (pending = [], done = []) =>
+  `# 验收欠账\n\n## 待验\n\n${AD_PENDING_HEAD}${pending.join('\n')}\n\n## 已清\n\n${AD_DONE_HEAD}${done.join('\n')}\n`;
+const pend = (id, due, reg = '2026-11-01') => `| ${id} | ${reg} | 来源 | 验什么 | 怎么验 | ${due} |`;
+
+const FL_HEAD = '| 日期 | 用例 | 现象 | 状态 | 到期日 |\n|---|---|---|---|---|\n';
+const flake = (...rows) => `# 抖动台账\n\n## 记录\n\n${FL_HEAD}${rows.join('\n')}\n`;
+const fl = (c, status, due = '-', date = '2026-11-01') => `| ${date} | ${c} | 现象 | ${status} | ${due} |`;
+
+const has = (list, re) => list.some((m) => re.test(m));
+
+// ---- decisions ----
+test('decisions: valid sample passes; escaped pipe stays inside the cell', () => {
+  const r = lintDecisions(decisions(DEC_OK, '| 2026-08-04 | 乙 \\| 丙 | 理由 | 范围 |'), T);
+  assert.deepEqual(r, { errors: [], warnings: [] });
+});
+test('decisions: wrong header is an error with file and line', () => {
+  const text = decisions(DEC_OK).replace('| 范围 |', '| 地点 |');
+  const r = lintDecisions(text, T);
+  assert.ok(has(r.errors, /decisions\.md:5:.*表头/), r.errors.join('\n'));
+});
+test('decisions: a row with a missing cell fails', () => {
+  const r = lintDecisions(decisions('| 2026-08-03 | 不做甲 | 用户否决 |'), T);
+  assert.ok(has(r.errors, /decisions\.md:7:/), r.errors.join('\n'));
+});
+test('decisions: an empty cell fails', () => {
+  const r = lintDecisions(decisions('| 2026-08-03 | 不做甲 |  | 资料库 |'), T);
+  assert.ok(has(r.errors, /decisions\.md:7:.*空/), r.errors.join('\n'));
+});
+test('decisions: calendar-invalid date fails', () => {
+  const r = lintDecisions(decisions('| 2026-02-30 | 不做甲 | 理由 | 范围 |'), T);
+  assert.ok(has(r.errors, /decisions\.md:7:.*日期/), r.errors.join('\n'));
+});
+test('decisions: future date fails, today passes', () => {
+  assert.ok(has(lintDecisions(decisions('| 2026-11-11 | 甲 | 理由 | 范围 |'), T).errors, /未来|晚于今天/));
+  assert.deepEqual(lintDecisions(decisions('| 2026-11-10 | 甲 | 理由 | 范围 |'), T).errors, []);
+});
+test('decisions: same date + decision twice fails; same decision on another date passes', () => {
+  const dup = lintDecisions(decisions(DEC_OK, DEC_OK), T);
+  assert.ok(has(dup.errors, /decisions\.md:8:.*重复/), dup.errors.join('\n'));
+  assert.deepEqual(lintDecisions(decisions(DEC_OK, DEC_OK.replace('2026-08-03', '2026-08-04')), T).errors, []);
+});
+test('decisions: no data rows fails', () => {
+  assert.ok(has(lintDecisions(decisions(), T).errors, /至少一行/));
+  assert.ok(has(lintDecisions('# 空\n', T).errors, /至少一行/));
+});
+test('decisions: every table is checked, not just the first', () => {
+  const text = decisions(DEC_OK) + '\n## 另一组\n\n| 日期 | 裁决 |\n|---|---|\n| 2026-08-03 | x |\n';
+  assert.ok(has(lintDecisions(text, T).errors, /表头/));
+});
+
+// ---- acceptance debt ----
+test('debt: valid sample passes, empty 已清 table is allowed', () => {
+  const r = lintAcceptanceDebt(debt([pend('A-001', '2026-12-10')]), T);
+  assert.deepEqual(r, { errors: [], warnings: [] });
+  assert.deepEqual(lintAcceptanceDebt(debt([], []), T), { errors: [], warnings: [] });
+});
+test('debt: id format error', () => {
+  const r = lintAcceptanceDebt(debt([pend('B-1', '2026-12-10')]), T);
+  assert.ok(has(r.errors, /acceptance-debt\.md:\d+:.*编号/), r.errors.join('\n'));
+});
+test('debt: duplicate id inside 待验, and across the two tables', () => {
+  const dup = lintAcceptanceDebt(debt([pend('A-001', '2026-12-10'), pend('A-001', '2026-12-11')]), T);
+  assert.ok(has(dup.errors, /重复/), dup.errors.join('\n'));
+  const cross = lintAcceptanceDebt(debt([pend('A-001', '2026-12-10')], ['| A-001 | 2026-11-09 | 通过 |']), T);
+  assert.ok(has(cross.errors, /重复/), cross.errors.join('\n'));
+});
+test('debt: invalid due date fails', () => {
+  const r = lintAcceptanceDebt(debt([pend('A-001', '2026-13-01')]), T);
+  assert.ok(has(r.errors, /到期日/), r.errors.join('\n'));
+});
+test('debt: overdue 1 and 14 days warn, 15 days errors, not-yet-due and due-today are silent', () => {
+  const day = (n) => { const d = new Date(Date.UTC(2026, 10, 10 - n)); return d.toISOString().slice(0, 10); };
+  const one = lintAcceptanceDebt(debt([pend('A-001', day(1))]), T);
+  assert.equal(one.errors.length, 0); assert.equal(one.warnings.length, 1);
+  assert.match(one.warnings[0], /A-001/);
+  const fourteen = lintAcceptanceDebt(debt([pend('A-001', day(14))]), T);
+  assert.equal(fourteen.errors.length, 0); assert.equal(fourteen.warnings.length, 1);
+  const fifteen = lintAcceptanceDebt(debt([pend('A-001', day(15))]), T);
+  assert.equal(fifteen.errors.length, 1); assert.match(fifteen.errors[0], /A-001/);
+  assert.deepEqual(lintAcceptanceDebt(debt([pend('A-001', day(0))]), T), { errors: [], warnings: [] });
+  assert.deepEqual(lintAcceptanceDebt(debt([pend('A-001', day(-3))]), T), { errors: [], warnings: [] });
+});
+test('debt: 已清 row without result fails; invalid or future 清账日 fails', () => {
+  assert.ok(has(lintAcceptanceDebt(debt([], ['| A-001 | 2026-11-09 |  |']), T).errors, /结果/));
+  assert.ok(has(lintAcceptanceDebt(debt([], ['| A-001 | 2026-11-31 | 通过 |']), T).errors, /清账日/));
+  assert.ok(has(lintAcceptanceDebt(debt([], ['| A-001 | 2026-11-11 | 通过 |']), T).errors, /清账日/));
+});
+test('debt: wrong header and missing section fail; future 登记日 fails', () => {
+  const bad = debt([pend('A-001', '2026-12-10')]).replace('| 怎么验 |', '| 如何 |');
+  assert.ok(has(lintAcceptanceDebt(bad, T).errors, /表头/));
+  assert.ok(has(lintAcceptanceDebt('# x\n\n## 待验\n', T).errors, /已清|表/));
+  assert.ok(has(lintAcceptanceDebt(debt([pend('A-001', '2026-12-10', '2026-11-11')]), T).errors, /登记日/));
+});
+test('openAcceptanceItems: returns every pending row with overdueDays', () => {
+  const items = openAcceptanceItems(debt([pend('A-001', '2026-11-05'), pend('A-002', '2026-12-10')], ['| A-009 | 2026-11-09 | 通过 |']), T);
+  assert.equal(items.length, 2);
+  assert.deepEqual(items.map((i) => i.id), ['A-001', 'A-002']);
+  assert.equal(items[0].due, '2026-11-05'); assert.equal(items[0].overdueDays, 5);
+  assert.equal(items[0].what, '验什么');
+  assert.ok(items[1].overdueDays <= 0);
+});
+
+// ---- flake ledger ----
+test('flake: valid sample passes', () => {
+  const r = lintFlakeLedger(flake(fl('用例甲', '未处理'), fl('用例乙', '已根治 abc1234'), fl('用例丙', '已隔离', '2026-12-01')), T);
+  assert.deepEqual(r, { errors: [], warnings: [] });
+});
+test('flake: status outside the allowed set fails; 已根治 needs a commit id', () => {
+  assert.ok(has(lintFlakeLedger(flake(fl('甲', '处理中')), T).errors, /flake-ledger\.md:7:.*状态/));
+  assert.ok(has(lintFlakeLedger(flake(fl('甲', '已根治')), T).errors, /提交号/));
+});
+test('flake: 已隔离 without a valid due date fails; other statuses must write -', () => {
+  assert.ok(has(lintFlakeLedger(flake(fl('甲', '已隔离', '-')), T).errors, /到期日/));
+  assert.ok(has(lintFlakeLedger(flake(fl('甲', '已隔离', '2026-02-30')), T).errors, /到期日/));
+  assert.ok(has(lintFlakeLedger(flake(fl('甲', '未处理', '2026-12-01')), T).errors, /到期日/));
+});
+test('flake: 已隔离 overdue 1 day warns, 15 days errors', () => {
+  const w = lintFlakeLedger(flake(fl('甲', '已隔离', '2026-11-09')), T);
+  assert.equal(w.errors.length, 0); assert.equal(w.warnings.length, 1);
+  const e = lintFlakeLedger(flake(fl('甲', '已隔离', '2026-10-26')), T);
+  assert.equal(e.errors.length, 1);
+});
+test('flake: same case twice with a 未处理 row fails; both 已根治 passes', () => {
+  const bad = lintFlakeLedger(flake(fl('甲', '已根治 abc1234'), fl('甲', '未处理')), T);
+  assert.ok(has(bad.errors, /甲.*(第二次|根治或隔离)/), bad.errors.join('\n'));
+  const ok = lintFlakeLedger(flake(fl('甲', '已根治 abc1234'), fl('甲', '已根治 def5678', '-', '2026-11-02')), T);
+  assert.deepEqual(ok.errors, []);
+  const single = lintFlakeLedger(flake(fl('甲', '未处理'), fl('乙', '未处理')), T);
+  assert.deepEqual(single.errors, []);
+});
+test('flake: wrong header, empty case, invalid or future date fail', () => {
+  assert.ok(has(lintFlakeLedger(flake(fl('甲', '未处理')).replace('| 现象 |', '| 说明 |'), T).errors, /表头/));
+  assert.ok(has(lintFlakeLedger(flake(fl(' ', '未处理')), T).errors, /用例/));
+  assert.ok(has(lintFlakeLedger(flake(fl('甲', '未处理', '-', '2026-02-30')), T).errors, /日期/));
+  assert.ok(has(lintFlakeLedger(flake(fl('甲', '未处理', '-', '2026-11-11')), T).errors, /日期/));
+});
+
+// ---- the committed registers pass with the real clock fixed ----
+test('the three committed registers lint clean', () => {
+  const r = spawnSync('node', [join(ROOT, 'scripts/registers-lint.mjs')], { encoding: 'utf8', env: { ...process.env, PBP_LINT_TODAY: today } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /PASS/);
+});
+
+// ---- command line ----
+function withDir(files, fn) {
+  const dir = mkdtempSync(join(tmpdir(), 'registers-lint-'));
+  try {
+    for (const [name, body] of Object.entries(files)) writeFileSync(join(dir, name), body);
+    return fn(dir);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+const run = (dir, args = [], todayStr = today) =>
+  spawnSync('node', [join(ROOT, 'scripts/registers-lint.mjs'), ...args], {
+    encoding: 'utf8', env: { ...process.env, PBP_REGISTERS_DIR: dir, PBP_LINT_TODAY: todayStr },
+  });
+const set = (over = {}) => ({
+  'decisions.md': decisions(DEC_OK),
+  'acceptance-debt.md': debt([pend('A-001', '2026-12-10')]),
+  'flake-ledger.md': flake(fl('甲', '未处理')),
+  ...over,
+});
+
+test('cli: clean files print PASS and exit 0', () => withDir(set(), (d) => {
+  const r = run(d); assert.equal(r.status, 0, r.stdout + r.stderr); assert.match(r.stdout, /PASS/);
+}));
+test('cli: an error exits 1 and names the file and line', () => withDir(set({ 'decisions.md': decisions('| 2026-02-30 | a | b | c |') }), (d) => {
+  const r = run(d); assert.equal(r.status, 1); assert.match(r.stdout + r.stderr, /decisions\.md:7/);
+}));
+test('cli: only warnings print WARN and exit 0', () => withDir(set({ 'acceptance-debt.md': debt([pend('A-001', '2026-11-05')]) }), (d) => {
+  const r = run(d); assert.equal(r.status, 0, r.stdout + r.stderr); assert.match(r.stdout + r.stderr, /WARN/);
+}));
+test('cli: a missing register file is an error', () => withDir({ 'decisions.md': decisions(DEC_OK) }, (d) => {
+  assert.equal(run(d).status, 1);
+}));
+test('cli: --release-gate lists pending items and passes when none is overdue', () => withDir(set(), (d) => {
+  const r = run(d, ['--release-gate']);
+  assert.equal(r.status, 0, r.stdout + r.stderr); assert.match(r.stdout, /A-001/);
+}));
+test('cli: --release-gate blocks on an overdue item and points at --accept-debt', () => withDir(set({ 'acceptance-debt.md': debt([pend('A-001', '2026-11-05'), pend('A-002', '2026-12-10')]) }), (d) => {
+  const r = run(d, ['--release-gate']);
+  assert.equal(r.status, 1); const out = r.stdout + r.stderr;
+  assert.match(out, /A-001/); assert.match(out, /A-002/); assert.match(out, /--accept-debt/);
+}));
+test('cli: --release-gate --accept-debt lists accepted overdue items and exits 0', () => withDir(set({ 'acceptance-debt.md': debt([pend('A-001', '2026-11-05')]) }), (d) => {
+  const r = run(d, ['--release-gate', '--accept-debt']);
+  assert.equal(r.status, 0, r.stdout + r.stderr); assert.match(r.stdout, /A-001/); assert.match(r.stdout, /接受|accept/i);
+}));
+test('cli: --release-gate also fails on a format error, even with --accept-debt', () => withDir(set({ 'flake-ledger.md': flake(fl('甲', '处理中')) }), (d) => {
+  assert.equal(run(d, ['--release-gate']).status, 1);
+  assert.equal(run(d, ['--release-gate', '--accept-debt']).status, 1);
+}));
+test('cli: an item overdue beyond 14 days blocks the gate and the plain run', () => withDir(set({ 'acceptance-debt.md': debt([pend('A-001', '2026-10-01')]) }), (d) => {
+  assert.equal(run(d).status, 1);
+  assert.equal(run(d, ['--release-gate', '--accept-debt']).status, 1);
+}));
+
+// ---- release.sh surface ----
+test('release.sh parses and documents --accept-debt; unknown flag exits 2', () => {
+  assert.equal(spawnSync('bash', ['-n', join(ROOT, 'scripts/release.sh')]).status, 0);
+  const help = spawnSync('bash', [join(ROOT, 'scripts/release.sh'), '--help'], { encoding: 'utf8' });
+  assert.equal(help.status, 0); assert.match(help.stdout, /--accept-debt/);
+  const bad = spawnSync('bash', [join(ROOT, 'scripts/release.sh'), '--no-such-flag'], { encoding: 'utf8' });
+  assert.equal(bad.status, 2);
+});

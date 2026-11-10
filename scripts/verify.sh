@@ -193,6 +193,10 @@ node "scripts/options-help-render-audit.mjs"
 echo "[docs-lint] checking README x9 mirror + prose contracts + .claude/expiring-items.md 临时事项 expiry dates"
 node "scripts/docs-lint.mjs"
 
+echo "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger) + lint self-tests"
+node "scripts/registers-lint.mjs"
+node "tests/registers-lint-tests.mjs"
+
 echo "[store-descriptions] checking CWS store copy is regenerated from the READMEs"
 node "scripts/sync-store-descriptions.mjs" --check
 
