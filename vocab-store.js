@@ -1212,7 +1212,12 @@ function _pbpVocabImportedWord(owner, record) {
   }) ? word : null;
 }
 
-async function pbpVocabImportRecords(owner, records, limit = 100) {
+// options.onlyMissing (restoring a restore point, options-backup.js): write
+// only words this owner does not have now, in the same transaction that reads
+// them, and leave every existing word exactly as it is. A word with a
+// tombstone counts as missing and comes back as a new live version.
+async function pbpVocabImportRecords(owner, records, limit = 100, options = {}) {
+  const onlyMissing = options?.onlyMissing === true;
   const scope = owner || "ownerless";
   const max = Math.max(0, Math.min(100, Number.isFinite(limit) ? Math.floor(limit) : 100));
   const input = Array.isArray(records) ? records.slice(0, max) : [];
@@ -1223,6 +1228,9 @@ async function pbpVocabImportRecords(owner, records, limit = 100) {
   const result = await _pbpVocabLocalMutation(scope, unique.map((record) => ({ id: record.id, imported: record })),
     (current, item) => {
       const incoming = item.imported;
+      if (current && onlyMissing) {
+        return { changed: false, deleted: false, recordKey: pbpDictCacheKeyPublic(current.language, current.term), word: current, result: current };
+      }
       const word = current ? {
         ...incoming,
         id: current.id, owner: current.owner, term: current.term, language: current.language,

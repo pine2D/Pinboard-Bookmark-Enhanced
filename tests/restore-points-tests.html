@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Restore Point Tests</title>
+<!-- The real options stylesheet, so computed display checks on the Data tab
+     see what the page sees (the global [hidden] rule included). -->
+<link rel="stylesheet" href="../options.css">
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; } .fail { color: #c00; font-weight: bold; }
+#ui-host { position: fixed; left: -9999px; top: 0; width: 900px; }
+</style></head>
+<body>
+<h1>Restore point tests</h1>
+<div id="summary"></div>
+<div id="results"></div>
+<div id="ui-host"></div>
+<!--
+  restore-points.js against the real store modules: vocabulary is seeded with
+  vocab-store.js's own writer (pbpVocabSaveWord) and highlights with
+  notes-sync.js's (pbpNotesWriteRecord), the shapes the reader and the
+  dictionary write. The restore round trip runs the real pbpApplyBackupPayload
+  and reads the sync metadata back from the real stores. The Data tab cases
+  mount the Backup & Restore markup taken from options.html itself, under the
+  real options.css. The service worker's onInstalled listener is sliced out of
+  background.js, the pattern background-lifecycle-tests.html uses.
+-->
+<script>
+// The options page boot is not wanted here; setupBackup is called directly.
+document.addEventListener("DOMContentLoaded", (event) => event.stopImmediatePropagation(), { once: true });
+// i18n.js is not loaded: t() echoes the key and its arguments.
+function t(key, ...args) { return args.length ? key + "(" + args.join("|") + ")" : key; }
+function uiLangToBCP47() { return "en"; }
+
+// chrome.storage hands back structured clones; so does this fake.
+const localArea = {};
+const syncArea = {};
+function makeArea(data) {
+  return {
+    async get(keys) {
+      if (keys === null || keys === undefined) return structuredClone(data);
+      if (typeof keys === "string") return keys in data ? { [keys]: structuredClone(data[keys]) } : {};
+      if (Array.isArray(keys)) {
+        const out = {};
+        keys.forEach((key) => { if (key in data) out[key] = structuredClone(data[key]); });
+        return out;
+      }
+      const out = Object.assign({}, keys);
+      Object.keys(keys).forEach((key) => { if (key in data) out[key] = structuredClone(data[key]); });
+      return out;
+    },
+    async getKeys() { return Object.keys(data); },
+    async set(obj) { for (const [key, value] of Object.entries(obj)) data[key] = structuredClone(value); },
+    async remove(keys) { [].concat(keys).forEach((key) => { delete data[key]; }); },
+  };
+}
+globalThis.chrome = {
+  storage: { local: makeArea(localArea), sync: makeArea(syncArea), onChanged: { addListener() {} } },
+  runtime: { getManifest: () => ({ version: "9.9.9" }), sendMessage: () => Promise.resolve() },
+  i18n: { getMessage: () => "", getUILanguage: () => "en" },
+};
+</script>
+<script src="../shared.js"></script>
+<script src="../export-targets.js"></script>
+<script src="../vocab-store.js"></script>
+<script src="../notes-sync.js"></script>
+<script src="../restore-points.js"></script>
+<script src="../options-backup.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond; ok ? pass++ : fail++;
+  const row = document.createElement("div");
+  row.className = "case " + (ok ? "pass" : "fail");
+  row.textContent = `${ok ? "PASS" : "FAIL"}  ${name}${ok || !detail ? "" : "\n   " + detail}`;
+  root.appendChild(row);
+}
+const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Real values for the real credential fields: every API_KEY_FIELDS entry and
+// every export target's secret keys (pbpExportTargetSecretKeys), in both
+// storage areas and in what the settings reader hands back.
+const SECRETS = {};
+API_KEY_FIELDS.forEach((key) => { SECRETS[key] = "SECRET-" + key + "-7f3a"; });
+const SECRET_TARGETS = {};
+Object.keys(PBP_EXPORT_TARGETS).forEach((targetId) => {
+  SECRET_TARGETS[targetId] = { enabled: true };
+  pbpExportTargetSecretKeys(targetId).forEach((key) => {
+    SECRET_TARGETS[targetId][key] = key === "url"
+      ? "https://hook.example/SECRET-et-" + targetId + "-url"
+      : "SECRET-et-" + targetId + "-" + key;
+  });
+});
+const SECRET_VALUES = [
+  ...Object.values(SECRETS),
+  ...Object.values(SECRET_TARGETS).flatMap((cfg) => Object.entries(cfg).filter(([key]) => key !== "enabled").map(([, value]) => value)),
+];
+function seedSecrets() {
+  for (const area of [localArea, syncArea]) {
+    Object.assign(area, structuredClone(SECRETS));
+    area.exportTargets = structuredClone(SECRET_TARGETS);
+    area.optTheme = "dark";
+  }
+}
+
+// The live personal library is whatever this says; every reader goes through
+// the real pbpPersonalLibraryAccount, which reads it from settings.
+let account = "alice";
+pbpReadSettingsWithSecrets = async (defaults) => ({
+  ...(defaults || {}), ...SECRETS, exportTargets: structuredClone(SECRET_TARGETS), personalLibraryAccount: account,
+});
+persistSettings = async () => ({ ok: true });
+
+const exportableKeys = Object.keys(SETTINGS_DEFAULTS).filter((key) => !API_KEY_FIELDS.includes(key));
+
+async function deleteDb(name) {
+  if (name === "pbp-vocab" && _pbpVocabDbPromise) { (await _pbpVocabDbPromise).close(); _pbpVocabDbPromise = null; }
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = resolve; request.onerror = () => reject(request.error); request.onblocked = () => resolve();
+  });
+}
+async function resetAll() {
+  for (const key of Object.keys(localArea)) delete localArea[key];
+  for (const key of Object.keys(syncArea)) delete syncArea[key];
+  for (const name of ["pbp-restore-points", "pbp-vocab"]) await deleteDb(name);
+}
+
+// Every record in every store of the restore point database, as stored.
+async function rawRestoreDb() {
+  const db = await new Promise((resolve, reject) => {
+    const request = indexedDB.open(PBP_RESTORE_POINT_DB);
+    request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+  });
+  try {
+    const out = { version: db.version };
+    for (const name of db.objectStoreNames) {
+      out[name] = await new Promise((resolve, reject) => {
+        const request = db.transaction(name).objectStore(name).getAll();
+        request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+      });
+    }
+    return out;
+  } finally { db.close(); }
+}
+// Writes one meta row and its payload straight into the stores, the way an
+// earlier build left them, without going through the commit code.
+async function rawRestorePut(meta, point) {
+  await pbpRestorePointList("nobody");
+  const db = await new Promise((resolve, reject) => {
+    const request = indexedDB.open(PBP_RESTORE_POINT_DB);
+    request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+  });
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(["meta", "points"], "readwrite");
+      tx.objectStore("meta").put(meta);
+      tx.objectStore("points").put(point);
+      tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error);
+    });
+  } finally { db.close(); }
+}
+const sameIds = (raw) => (raw.meta || []).map((row) => row.id).sort().join() === (raw.points || []).map((row) => row.id).sort().join();
+
+// The restore point database refuses to open; every other database works.
+async function withFailingRestoreDb(fn) {
+  const realOpen = IDBFactory.prototype.open;
+  const realWarn = console.warn;
+  const warnings = [];
+  IDBFactory.prototype.open = function (name, ...rest) {
+    if (name === PBP_RESTORE_POINT_DB) throw new DOMException("disk is gone", "UnknownError");
+    return realOpen.call(this, name, ...rest);
+  };
+  console.warn = (...args) => { warnings.push(args.join(" ")); };
+  try { return await fn(warnings); } finally { IDBFactory.prototype.open = realOpen; console.warn = realWarn; }
+}
+async function quietly(fn) {
+  const realWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => { warnings.push(args.join(" ")); };
+  try { return { value: await fn(), warnings }; } finally { console.warn = realWarn; }
+}
+
+async function seedWord(owner, term, gloss = "a gloss") {
+  // The context shape the reader's dictionary saves (md-dict.js).
+  const saved = await pbpVocabSaveWord(pbpDictOwnerScope(owner), { term, language: "en", gloss,
+    context: { quote: term + " in a sentence", articleUrl: "https://example.test/article", articleTitle: "Article", highlightId: null, createdAt: 1700000000000 } });
+  if (!saved) throw new Error("fixture: word not saved");
+  return saved;
+}
+
+let articleCount = 0;
+async function seedArticle(owner, quotes) {
+  const url = `https://example.test/page-${++articleCount}`;
+  const key = pbpNotesArticleKey(url);
+  const scope = pbpDictOwnerScope(owner);
+  const items = quotes.map((quote, index) => ({
+    id: `h${articleCount}-${index}`, n: index, quote, prefix: "before ", suffix: " after",
+    note: index === 0 ? "a note on " + quote : "", color: 1 + (index % 5), ts: 1700000000000 + index,
+    owner: scope, fp: "fp" + index,
+  }));
+  await pbpNotesWriteRecord(key, { v: 1, url, title: "Page " + articleCount, items }, scope,
+    { getCurrentOwner: async () => scope });
+  return key;
+}
+
+const applyOptions = (extra) => ({ exportableKeys, saveOverlayWithFallback: async () => ({}), ...extra });
+
+async function run() {
+  // ---------- metadata and empties ----------
+  await resetAll();
+  check("an empty library creates no restore point", await pbpRestorePointCreate("delete") === null &&
+    (await pbpRestorePointList("alice")).length === 0);
+  localArea.pbp_hl_last_color = 3;
+  check("the reader's last colour alone is not library data and creates nothing",
+    await pbpRestorePointCreate("delete") === null);
+
+  await seedWord("alice", "apple");
+  await seedWord("alice", "banana");
+  await seedArticle("alice", ["first quote", "second quote"]);
+  // Credentials and settings sit in storage, and the settings reader returns
+  // them, before the point is taken.
+  seedSecrets();
+  check("fixture: every credential is in storage and in the settings reader when the point is taken",
+    SECRET_VALUES.length > API_KEY_FIELDS.length && API_KEY_FIELDS.every((key) => localArea[key] === SECRETS[key]) &&
+    (await pbpReadSettingsWithSecrets({})).exportTargets.webhook?.url === SECRET_TARGETS.webhook.url);
+  const first = await pbpRestorePointCreate("delete");
+  const listed = await pbpRestorePointList("alice");
+  check("a point records reason, owner, version and per-kind counts",
+    first && first.reason === "delete" && first.owner === "alice" && first.extensionVersion === "9.9.9" &&
+    first.counts.articles === 1 && first.counts.highlights === 2 && first.counts.vocabulary === 2 &&
+    !Number.isNaN(Date.parse(first.createdAt)), JSON.stringify(first));
+  check("list returns metadata only, never the payload",
+    listed.length === 1 && listed.every((row) => !("payload" in row)), JSON.stringify(listed));
+  {
+    const dump = JSON.stringify(await rawRestoreDb());
+    const leaked = SECRET_VALUES.filter((value) => dump.includes(value));
+    check("no credential value appears anywhere in the stored records of either store",
+      dump.includes("apple") && leaked.length === 0, leaked.join(", "));
+  }
+
+  // ---------- duplicates ----------
+  const again = await pbpRestorePointCreate("import");
+  check("identical content is not stored twice; the newest point comes back",
+    again && again.id === first.id && (await pbpRestorePointList("alice")).length === 1);
+  localArea.pbp_hl_last_color = 4;
+  check("a changed last-used colour does not count as new content",
+    (await pbpRestorePointCreate("import"))?.id === first.id);
+
+  // ---------- payload contents ----------
+  const payload = await pbpRestorePointRead(first.id, "alice");
+  const topKeys = Object.keys(payload || {});
+  const allowed = ["_backup", "_schemaVersion", "_highlights", "_highlightsOwner", "_vocabulary"];
+  const serialized = JSON.stringify(payload);
+  check("the payload holds only the library sections and backup metadata",
+    topKeys.length > 0 && topKeys.every((key) => allowed.includes(key)), topKeys.join(","));
+  check("no settings or credential key from the real registries appears in the payload",
+    topKeys.every((key) => !Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, key) && !API_KEY_FIELDS.includes(key)) &&
+    !serialized.includes("SECRET") && !("exportTargets" in payload) && !("customOverlayCSS" in payload) && !("savedThemes" in payload));
+  check("sync state, vectors and tombstones stay out of the payload",
+    !/notesSync|"vector"|"dot"|tombstone|outbox/.test(serialized));
+  check("the payload is labelled as a restore point and carries no last-used colour",
+    payload._backup.source === "restore-point" && payload._schemaVersion === 3 &&
+    !("pbp_hl_last_color" in payload._highlights) && payload._highlightsOwner === "alice");
+  const prepared = pbpPreflightBackupPayload(payload, exportableKeys);
+  check("the payload passes the import preflight with nothing outside the library sections",
+    Object.keys(prepared.safeData).length === 0 && prepared.secretData === null &&
+    prepared.importedThemes === undefined && prepared.vocabulary.records.length === 2);
+  let claimsSecrets = null;
+  try {
+    pbpPreflightBackupPayload({ ...payload, _backup: { ...payload._backup, includesSecrets: true } }, exportableKeys);
+  } catch (error) { claimsSecrets = error; }
+  check("a restore point that claims credentials is rejected", claimsSecrets instanceof TypeError);
+  for (const area of [localArea, syncArea]) {
+    API_KEY_FIELDS.forEach((key) => { delete area[key]; });
+    delete area.exportTargets; delete area.optTheme;
+  }
+
+  // ---------- preflight at create time ----------
+  {
+    const realBuild = pbpBuildBackupSnapshot;
+    await seedWord("alice", "preflight");
+    const before = (await rawRestoreDb());
+    const outcomes = [];
+    for (const extra of [{ _highlightsOwner: 5 }, { optTheme: "dark" }, { _schemaVersion: 2 },
+      { _vocabulary: { owner: "alice", records: [{ id: "bogus", term: 7 }] } }]) {
+      pbpBuildBackupSnapshot = (settings, options) => ({ ...realBuild(settings, options), ...extra });
+      try { outcomes.push(await quietly(() => pbpRestorePointCreate("delete"))); }
+      finally { pbpBuildBackupSnapshot = realBuild; }
+    }
+    const after = await rawRestoreDb();
+    check("a payload that fails the export/import preflight is warned about and nothing is stored",
+      outcomes.every((outcome) => outcome.value === null && outcome.warnings.some((line) => line.includes("[restore-points] create failed"))) &&
+      after.meta.length === before.meta.length && after.points.length === before.points.length,
+      JSON.stringify(outcomes.map((outcome) => outcome.warnings)));
+    check("the same payload without the fault is stored", (await pbpRestorePointCreate("delete"))?.counts?.vocabulary === 3);
+  }
+
+  // ---------- owner isolation ----------
+  check("read refuses another owner", await pbpRestorePointRead(first.id, "bob") === null &&
+    await pbpRestorePointRead(first.id, "") === null && (await pbpRestorePointRead(first.id, "alice")) !== null);
+  account = "bob";
+  await seedWord("bob", "cherry");
+  const bobPoint = await pbpRestorePointCreate("delete");
+  account = "alice";
+  for (let i = 0; i < 6; i++) {
+    await seedWord("alice", "word" + i);
+    await pbpRestorePointCreate("delete");
+  }
+  const alicePoints = await pbpRestorePointList("alice");
+  const bobPoints = await pbpRestorePointList("bob");
+  check("pruning keeps the newest 5 per owner, in both stores",
+    alicePoints.length === PBP_RESTORE_POINT_KEEP && PBP_RESTORE_POINT_KEEP === 5 &&
+    alicePoints[0].counts.vocabulary === 9 && alicePoints[4].counts.vocabulary === 5 &&
+    alicePoints.every((row, index) => index === 0 || row.createdAt <= alicePoints[index - 1].createdAt) &&
+    sameIds(await rawRestoreDb()),
+    JSON.stringify(alicePoints.map((row) => row.counts.vocabulary)));
+  check("pruning never touches another owner's points",
+    bobPoints.length === 1 && bobPoints[0].id === bobPoint.id && bobPoints[0].counts.vocabulary === 1);
+
+  // ---------- owner change between read and write ----------
+  {
+    const realAll = pbpVocabAll;
+    const before = (await pbpRestorePointList("alice")).map((row) => row.id).join();
+    await seedWord("alice", "switched");
+    pbpVocabAll = async (scope) => { const rows = await realAll(scope); account = "bob"; return rows; };
+    let result;
+    try { result = await pbpRestorePointCreate("delete"); } finally { pbpVocabAll = realAll; account = "alice"; }
+    check("a library switch between the reads and the write writes nothing",
+      result === null && (await pbpRestorePointList("alice")).map((row) => row.id).join() === before &&
+      (await pbpRestorePointList("bob")).length === 1);
+  }
+
+  // ---------- concurrent creates ----------
+  {
+    await resetAll();
+    account = "alice";
+    await seedWord("alice", "con-a");
+    const payloadA = await _pbpRestorePointReadPayload("alice");
+    await seedWord("alice", "con-b");
+    const payloadB = await _pbpRestorePointReadPayload("alice");
+    await seedWord("alice", "con-c");
+    const payloadC = await _pbpRestorePointReadPayload("alice");
+    const digestOf = (p) => _pbpRestorePointDigest(p);
+    const [digestA, digestB, digestC] = await Promise.all([digestOf(payloadA), digestOf(payloadB), digestOf(payloadC)]);
+    const realRead = _pbpRestorePointReadPayload;
+    const race = async (queue, reasons) => {
+      // Read now, like a real snapshot: the time is the read's own.
+      _pbpRestorePointReadPayload = async () => {
+        const copy = structuredClone(queue.shift());
+        copy._backup.createdAt = new Date().toISOString();
+        return copy;
+      };
+      try { return await Promise.all(reasons.map((reason) => pbpRestorePointCreate(reason))); }
+      finally { _pbpRestorePointReadPayload = realRead; }
+    };
+    for (const [label, order] of [["A then B", [payloadA, payloadB]], ["B then A", [payloadB, payloadA]]]) {
+      await deleteDb(PBP_RESTORE_POINT_DB);
+      // Five earlier points, all different from A and B.
+      for (let i = 0; i < 5; i++) {
+        await seedWord("alice", `con-${label}-${i}`);
+        await pbpRestorePointCreate("delete");
+      }
+      const made = await race(order.slice(), ["delete", "import"]);
+      const raw = await rawRestoreDb();
+      const digests = raw.meta.map((row) => row.digest);
+      check(`two concurrent creates with different content (${label}) leave 5 points, both new ones kept, both stores in step`,
+        made.every((row) => row && row.id) && raw.meta.length === 5 && raw.points.length === 5 && sameIds(raw) &&
+        digests.includes(digestA) && digests.includes(digestB) && new Set(digests).size === 5,
+        JSON.stringify({ meta: raw.meta.length, points: raw.points.length }));
+    }
+    await deleteDb(PBP_RESTORE_POINT_DB);
+    await pbpRestorePointCreate("delete");
+    const made = await race([payloadC, payloadC], ["delete", "delete"]);
+    const raw = await rawRestoreDb();
+    check("two concurrent creates with identical content leave exactly one point of it",
+      raw.meta.filter((row) => row.digest === digestC).length === 1 && raw.meta.length === 2 && sameIds(raw) &&
+      made[0]?.id && made[0].id === made[1]?.id, JSON.stringify(raw.meta.map((row) => row.digest.slice(0, 14))));
+  }
+
+  // ---------- one update point per owner ----------
+  {
+    await resetAll();
+    account = "alice";
+    await seedWord("alice", "u0");
+    const a = await pbpRestorePointCreate("delete");
+    await seedWord("alice", "u1");
+    const u1 = await pbpRestorePointCreate("update");
+    await seedWord("alice", "u2");
+    const c = await pbpRestorePointCreate("delete");
+    await seedWord("alice", "u3");
+    const u2 = await pbpRestorePointCreate("update");
+    account = "bob";
+    await seedWord("bob", "bob-u");
+    const bobUpdate = await pbpRestorePointCreate("update");
+    account = "alice";
+    const rows = await pbpRestorePointList("alice");
+    const raw = await rawRestoreDb();
+    check("a new update point replaces the owner's older one and keeps every other point",
+      rows.map((row) => row.id).join() === [u2.id, c.id, a.id].join() &&
+      !raw.points.some((row) => row.id === u1.id) && !raw.meta.some((row) => row.id === u1.id) && sameIds(raw),
+      JSON.stringify(rows.map((row) => row.reason)));
+    check("replacing the update point never touches another owner's update point",
+      (await pbpRestorePointList("bob")).map((row) => row.id).join() === bobUpdate.id);
+  }
+  {
+    // Four older points, a reload, then a delete with nothing changed since,
+    // then another reload that makes six: the oldest goes.
+    await resetAll();
+    account = "alice";
+    const older = [];
+    for (const term of ["w1", "w2", "w3", "w4"]) {
+      await seedWord("alice", term);
+      older.push(await pbpRestorePointCreate("delete"));
+      await tick(5);
+    }
+    await seedWord("alice", "before-delete");
+    const update = await pbpRestorePointCreate("update");
+    await tick(10);
+    const del = await pbpRestorePointCreate("delete");
+    const relabelled = (await pbpRestorePointList("alice")).find((row) => row.id === update.id);
+    await tick(5);
+    await seedWord("alice", "after-delete");
+    const nextUpdate = await pbpRestorePointCreate("update");
+    const rows = await pbpRestorePointList("alice");
+    const kept = await pbpRestorePointRead(update.id, "alice");
+    const keptTerms = kept?._vocabulary?.records.map((record) => record.term) || [];
+    check("a delete with the same content as the update point takes it over, so the next update point does not replace it",
+      del.id === update.id && del.reason === "delete" && relabelled?.reason === "delete" &&
+      rows.filter((row) => row.reason === "update").length === 1 &&
+      keptTerms.includes("before-delete") && !keptTerms.includes("after-delete") && sameIds(await rawRestoreDb()),
+      JSON.stringify(rows.map((row) => row.reason)));
+    check("the taken-over point gets the delete's time, stays in order and the limit of 5 still prunes the oldest",
+      Date.parse(relabelled?.createdAt) > Date.parse(update.createdAt) && del.createdAt === relabelled.createdAt &&
+      rows.map((row) => row.id).join() === [nextUpdate.id, update.id, older[3].id, older[2].id, older[1].id].join() &&
+      (await pbpRestorePointRead(older[0].id, "alice")) === null,
+      JSON.stringify(rows.map((row) => [row.reason, row.createdAt])));
+  }
+  {
+    // Only an update point is taken over. A delete or import point keeps its
+    // reason and time when the same content comes in with another reason.
+    await resetAll();
+    account = "alice";
+    await seedWord("alice", "kept");
+    const del = await pbpRestorePointCreate("delete");
+    await tick(5);
+    const asImport = await pbpRestorePointCreate("import");
+    const asUpdate = await pbpRestorePointCreate("update");
+    await seedWord("alice", "more");
+    const imp = await pbpRestorePointCreate("import");
+    await tick(5);
+    const asDelete = await pbpRestorePointCreate("delete");
+    const rows = await pbpRestorePointList("alice");
+    check("a delete or import point is not relabelled by a same-content create with another reason",
+      asImport.id === del.id && asImport.reason === "delete" && asUpdate.id === del.id && asUpdate.reason === "delete" &&
+      asDelete.id === imp.id && asDelete.reason === "import" &&
+      rows.map((row) => row.reason).join() === "import,delete" &&
+      rows[1].createdAt === del.createdAt && rows[0].createdAt === imp.createdAt,
+      JSON.stringify(rows.map((row) => [row.reason, row.createdAt])));
+  }
+
+  // ---------- list reads metadata only ----------
+  {
+    await resetAll();
+    account = "alice";
+    await seedArticle("alice", ["x".repeat(2 * 1024 * 1024)]);
+    const big = await pbpRestorePointCreate("delete");
+    const realTransaction = IDBDatabase.prototype.transaction;
+    let touched = 0;
+    IDBDatabase.prototype.transaction = function (names, ...rest) {
+      if (this.name === PBP_RESTORE_POINT_DB && [].concat(names).includes(PBP_RESTORE_POINT_STORE)) {
+        touched++;
+        throw new DOMException("payload store opened", "InvalidStateError");
+      }
+      return realTransaction.call(this, names, ...rest);
+    };
+    let rows = null, error = null;
+    try { rows = await pbpRestorePointList("alice"); } catch (e) { error = e; } finally {
+      IDBDatabase.prototype.transaction = realTransaction;
+    }
+    check("list works when reading payloads would throw, and with a 2 MB payload stored",
+      !error && touched === 0 && rows?.length === 1 && rows[0].id === big.id && rows[0].counts.highlights === 1,
+      String(error));
+  }
+
+  // ---------- points written by the first build (DB v1) ----------
+  {
+    await resetAll();
+    account = "alice";
+    await seedWord("alice", "legacy");
+    const legacyPayload = await _pbpRestorePointReadPayload("alice");
+    const legacy = {
+      id: "rp-" + legacyPayload._backup.createdAt + "-v1", createdAt: legacyPayload._backup.createdAt, reason: "delete",
+      owner: "alice", extensionVersion: "9.9.8", counts: _pbpRestorePointCounts(legacyPayload),
+      digest: await _pbpRestorePointDigest(legacyPayload), payload: legacyPayload,
+    };
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.open(PBP_RESTORE_POINT_DB, 1);
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore("points", { keyPath: "id" }).createIndex("ownerCreated", ["owner", "createdAt"], { unique: false });
+      };
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction("points", "readwrite");
+        tx.objectStore("points").put(legacy);
+        tx.objectStore("points").put({ id: "rp-broken-v1", owner: "", createdAt: "", reason: "delete", payload: { big: "orphan" } });
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onabort = () => reject(tx.error);
+      };
+      request.onerror = () => reject(request.error);
+    });
+    const rows = await pbpRestorePointList("alice");
+    const read = await pbpRestorePointRead(legacy.id, "alice");
+    const raw = await rawRestoreDb();
+    check("a v1 database upgrades: its points are listed, readable and in both stores",
+      raw.version === PBP_RESTORE_POINT_DB_VERSION && rows.length === 1 && rows[0].id === legacy.id &&
+      rows[0].extensionVersion === "9.9.8" && !("payload" in rows[0]) &&
+      JSON.stringify(read) === JSON.stringify(legacyPayload) && sameIds(raw), JSON.stringify(rows));
+    check("a v1 record without a usable owner or time is deleted by the upgrade, not left orphaned",
+      !raw.points.some((row) => row.id === "rp-broken-v1") && raw.points.length === 1);
+    await seedWord("alice", "after-upgrade");
+    const next = await pbpRestorePointCreate("delete");
+    check("after the upgrade new points join the old ones", (await pbpRestorePointList("alice")).map((row) => row.id).join() === [next.id, legacy.id].join());
+  }
+
+  // ---------- failures never reach the caller ----------
+  {
+    const warnings = [];
+    const { result, threw } = await withFailingRestoreDb(async (lines) => {
+      let outcome;
+      try { outcome = { result: await pbpRestorePointCreate("delete"), threw: false }; } catch (_) { outcome = { threw: true }; }
+      warnings.push(...lines);
+      return outcome;
+    });
+    check("a failing database resolves null with a name/message warning instead of throwing",
+      !threw && result === null && warnings.some((line) => line.includes("UnknownError") && line.includes("disk is gone")) &&
+      !warnings.some((line) => line.includes("alice") || line.includes("apple")), warnings.join(" / "));
+    const badReason = await quietly(() => pbpRestorePointCreate("daily"));
+    check("an unknown reason creates nothing and does not throw", badReason.value === null);
+  }
+  {
+    const realAll = pbpVocabAll;
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    await seedWord("alice", "late");
+    const before = (await pbpRestorePointList("alice")).map((row) => row.id).join();
+    pbpVocabAll = async (scope) => { await gate; return realAll(scope); };
+    const started = Date.now();
+    let bounded;
+    try {
+      bounded = (await quietly(async () => {
+        const value = await pbpRestorePointCreateBounded("delete", 60);
+        release();
+        await tick(150);
+        return value;
+      })).value;
+    } finally { pbpVocabAll = realAll; }
+    check("a snapshot still reading at its bound gives up and is never written later",
+      bounded === null && Date.now() - started < 1000 &&
+      (await pbpRestorePointList("alice")).map((row) => row.id).join() === before);
+    check("the wait bound for user actions is a few seconds", PBP_RESTORE_POINT_WAIT_MS >= 1000 && PBP_RESTORE_POINT_WAIT_MS <= 5000);
+  }
+
+  // ---------- round trip through the real import path ----------
+  await resetAll();
+  account = "alice";
+  const scope = pbpDictOwnerScope("alice");
+  await seedWord("alice", "keep");
+  await seedWord("alice", "gone");
+  const roundArticle = await seedArticle("alice", ["kept quote"]);
+  const roundItemId = localArea[roundArticle].items[0].id;
+  const deletePoint = await pbpRestorePointCreate("delete");
+  const goneId = (await pbpVocabAll(scope)).find((row) => row.term === "gone").id;
+  await pbpVocabBatchDelete([goneId], scope);
+  await pbpNotesWriteRecord(roundArticle, null, scope, { getCurrentOwner: async () => scope });
+  // The tombstones, as the real stores hold them.
+  const vocabTomb = (await _pbpVocabSyncRows(`record:${scope}:`)).find((row) => row.deleted === true);
+  const notesTomb = localArea[roundArticle]?.notesSync?.owners?.[scope]?.events?.[roundItemId];
+  check("fixture: the delete left a word tombstone and a highlight tombstone",
+    (await pbpVocabAll(scope)).length === 1 && !(localArea[roundArticle]?.items || []).length &&
+    vocabTomb && notesTomb && notesTomb.deleted === true, JSON.stringify({ vocabTomb, notesTomb }));
+  const restorePayload = await pbpRestorePointRead(deletePoint.id, "alice");
+  let listAtVocabWrite = null;
+  const listBefore = JSON.stringify(await pbpRestorePointList("alice"));
+  const applied = await pbpApplyBackupPayload(restorePayload, applyOptions({
+    restorePoint: true,
+    sections: { settings: true, themes: true, highlights: true, vocabulary: true, secrets: true },
+    importVocabulary: async (owner, batch, limit, options) => {
+      listAtVocabWrite = await pbpRestorePointList("alice");
+      return pbpVocabImportRecords(owner, batch, limit, options);
+    },
+  }));
+  const restoredWords = (await pbpVocabAll(scope)).map((row) => row.term).sort();
+  const restoredItems = (localArea[roundArticle]?.items || []).map((item) => item.quote);
+  check("restoring a point brings the deleted word and highlight back",
+    applied.highlights === "applied" && applied.vocabulary === "applied" &&
+    restoredWords.join() === "gone,keep" && restoredItems.join() === "kept quote",
+    JSON.stringify({ applied, restoredWords, restoredItems }));
+  {
+    const event = localArea[roundArticle]?.notesSync?.owners?.[scope]?.events?.[roundItemId];
+    const pending = localArea[roundArticle]?.notesSync?.owners?.[scope]?.pending?.[roundItemId];
+    const device = notesTomb.dot.deviceId;
+    const outbox = (await pbpNotesSyncSnapshot(scope, "")).outbox || [];
+    check("the restored highlight is live and waiting to sync, with a version past its tombstone",
+      event && event.deleted === false && pending === true && event.vector[device] > notesTomb.vector[device] &&
+      outbox.some((row) => row.event.recordKey.endsWith("|" + encodeURIComponent(roundItemId)) && row.event.deleted === false),
+      JSON.stringify({ event, pending }));
+    const record = (await _pbpVocabSyncRows(`record:${scope}:`)).find((row) => row.recordKey === vocabTomb.recordKey);
+    const queued = (await pbpVocabListOutbox(scope)).find((row) => row.recordKey === vocabTomb.recordKey);
+    const vocabDevice = vocabTomb.dot.deviceId;
+    check("the restored word is live and waiting to sync, with a version past its tombstone",
+      record && record.deleted === false && queued && queued.event.deleted === false &&
+      queued.event.vector[vocabDevice] > vocabTomb.vector[vocabDevice] && record.vector[vocabDevice] > vocabTomb.vector[vocabDevice],
+      JSON.stringify({ record, queued }));
+  }
+  check("a restore point only restores the library sections",
+    applied.settings === "skipped" && applied.themes === "skipped" && applied.secrets === "skipped" && applied.fromRestorePoint === true);
+  check("a restore takes no restore point and leaves the list as it was",
+    JSON.stringify(listAtVocabWrite) === listBefore && JSON.stringify(await pbpRestorePointList("alice")) === listBefore &&
+    !applied.restorePointId && !("restoreBlocked" in applied), JSON.stringify({ listBefore, listAtVocabWrite }));
+  check("\"restore\" is not a reason restore points are taken for", !PBP_RESTORE_POINT_REASONS.includes("restore") &&
+    (await quietly(() => pbpRestorePointCreate("restore"))).value === null);
+
+  {
+    // A plain import still goes ahead when its point fails.
+    const fileWords = (await pbpVocabAll(scope)).filter((row) => row.term === "gone");
+    await pbpVocabBatchDelete(fileWords.map((row) => row.id), scope);
+    const manualFile = pbpBuildBackupSnapshot({}, { vocabulary: { owner: "alice", records: fileWords } });
+    const plain = await withFailingRestoreDb(() => pbpApplyBackupPayload(manualFile, applyOptions({})));
+    check("a plain import with a failing restore point store still applies",
+      plain.vocabulary === "applied" && plain.restorePointId === "" &&
+      (await pbpVocabAll(scope)).some((row) => row.term === "gone"), JSON.stringify(plain));
+
+    // Points an earlier build stored with reason "restore" still list and restore.
+    await pbpVocabBatchDelete([(await pbpVocabAll(scope)).find((row) => row.term === "gone").id], scope);
+    await rawRestorePut({ id: "rp-legacy-restore", createdAt: new Date().toISOString(), reason: "restore", owner: "alice",
+      extensionVersion: "9.9.8", counts: _pbpRestorePointCounts(restorePayload), digest: "legacy-restore" },
+    { id: "rp-legacy-restore", owner: "alice", payload: restorePayload });
+    const legacyRow = (await pbpRestorePointList("alice")).find((row) => row.id === "rp-legacy-restore");
+    const legacyPayload = await pbpRestorePointRead("rp-legacy-restore", "alice");
+    const legacyApplied = await pbpApplyBackupPayload(legacyPayload, applyOptions({ restorePoint: true }));
+    check("a point stored with the old \"restore\" reason lists as an import point and still restores",
+      legacyRow?.reason === "import" && legacyApplied.vocabulary === "applied" &&
+      (await pbpVocabAll(scope)).some((row) => row.term === "gone"), JSON.stringify({ legacyRow, legacyApplied }));
+  }
+
+  // ---------- a file never gets restore point treatment ----------
+  {
+    let wrote = false;
+    const reasons = [];
+    const realPersist = persistSettings;
+    persistSettings = async () => { wrote = true; return { ok: true }; };
+    try {
+      const forged = { ...restorePayload, optTheme: "dark" };
+      const forgedPrepared = pbpPreflightBackupPayload(forged, exportableKeys);
+      const asFile = pbpBuildBackupPreview(forgedPrepared, "alice", { enabled: true, localFallbackKeys: [] });
+      check("a file labelled \"restore-point\" is previewed as an ordinary file",
+        asFile.restorePoint === false && asFile.sections.settings.enabled && asFile.syncWarning === true);
+      const fileApplied = await pbpApplyBackupPayload(forged, applyOptions({
+        takeRestorePoint: async (reason) => { reasons.push(reason); return null; },
+      }));
+      check("applying that file is a plain import: reason \"import\", settings written",
+        reasons.join() === "import" && wrote === true && fileApplied.settings === "applied" &&
+        fileApplied.fromRestorePoint === false, JSON.stringify({ reasons, fileApplied }));
+      wrote = false;
+      const asPoint = pbpBuildBackupPreview(forgedPrepared, "alice", { enabled: true, localFallbackKeys: [] }, { restorePoint: true });
+      check("read from the restore point list, the preview offers only highlights and vocabulary",
+        asPoint.restorePoint === true && !asPoint.sections.settings.enabled && !asPoint.sections.themes.enabled &&
+        !asPoint.sections.secrets.enabled && asPoint.sections.highlights.enabled && asPoint.sections.vocabulary.enabled &&
+        asPoint.syncWarning === false);
+      await pbpApplyBackupPayload(forged, applyOptions({ restorePoint: true, takeRestorePoint: async () => ({ id: "x" }),
+        sections: { settings: true, themes: true, highlights: false, vocabulary: false } }));
+      check("applying a restore point never writes settings", wrote === false);
+    } finally { persistSettings = realPersist; }
+  }
+
+  // ---------- trigger: backup import ----------
+  {
+    await seedWord("alice", "before-import");
+    const manual = pbpBuildBackupSnapshot({}, {
+      vocabulary: { owner: "alice", records: (await pbpVocabAll(scope)).slice(0, 1) },
+    });
+    let seen = null;
+    await pbpApplyBackupPayload(manual, applyOptions({
+      sections: { settings: false, themes: false, highlights: true, vocabulary: true },
+      importVocabulary: async (owner, batch, limit) => {
+        seen = (await pbpRestorePointList("alice"))[0];
+        return pbpVocabImportRecords(owner, batch, limit);
+      },
+    }));
+    check("importing a backup with vocabulary takes an \"import\" point before writing",
+      seen && seen.reason === "import" && seen.counts.vocabulary === 3, JSON.stringify(seen));
+    const calls = [];
+    const take = async (reason) => { calls.push(reason); return null; };
+    await pbpApplyBackupPayload({ _schemaVersion: 3, _backup: manual._backup, optTheme: "dark" }, applyOptions({ takeRestorePoint: take }));
+    await pbpApplyBackupPayload(manual, applyOptions({ takeRestorePoint: take, sections: { highlights: false, vocabulary: false } }));
+    check("a settings-only import, or one with both library sections unticked, takes no point", calls.length === 0, calls.join());
+    const order = [];
+    const realPersist = persistSettings;
+    persistSettings = async () => { order.push("settings"); return { ok: true }; };
+    try {
+      await pbpApplyBackupPayload({ ...manual, optTheme: "dark" }, applyOptions({
+        takeRestorePoint: async (reason) => { order.push("point:" + reason); return null; },
+        importVocabulary: async (owner, batch, limit) => { order.push("vocabulary"); return pbpVocabImportRecords(owner, batch, limit); },
+      }));
+    } finally { persistSettings = realPersist; }
+    check("the import point comes before the settings write too", order[0] === "point:import" && order.includes("settings"), order.join());
+  }
+
+  // ---------- trigger: service worker update ----------
+  {
+    const source = await fetch("../background.js").then((response) => response.text());
+    const start = source.indexOf("chrome.runtime.onInstalled.addListener(");
+    const end = source.indexOf("\n});\n", start);
+    const slice = start >= 0 && end > start ? source.slice(start, end + 4) : "";
+    const makeListener = (createStub) => {
+      let listener = null;
+      const fakeChrome = { runtime: { onInstalled: { addListener: (fn) => { listener = fn; } } } };
+      if (slice) {
+        new Function("chrome", "primeSettings", "pbpReconcileBookmarkService", "readOfflineQueueWithIds", "pbpRestorePointCreate", slice)(
+          fakeChrome, () => Promise.resolve(), () => Promise.resolve(), () => Promise.resolve(), createStub);
+      }
+      return listener;
+    };
+    const calls = [];
+    let finish = null;
+    const listener = makeListener((reason) => { calls.push(reason); return new Promise((resolve) => { finish = resolve; }); });
+    let updateDone = null;
+    if (listener) {
+      listener({ reason: "install" });
+      listener({ reason: "chrome_update" });
+      updateDone = listener({ reason: "update" });
+    }
+    check("onInstalled takes an \"update\" point on an extension update and on nothing else",
+      !!listener && calls.join() === "update", JSON.stringify({ found: !!slice, calls }));
+    let settled = false;
+    Promise.resolve(updateDone).then(() => { settled = true; });
+    await tick(20);
+    const pendingWhileWriting = settled === false && updateDone instanceof Promise;
+    if (finish) finish(null);
+    await tick(0);
+    check("the onInstalled listener stays pending until the update point is written", pendingWhileWriting && settled === true);
+    const failing = makeListener(() => Promise.reject(new DOMException("quota", "QuotaExceededError")));
+    const outcome = await quietly(async () => { try { await failing({ reason: "update" }); return "resolved"; } catch (_) { return "rejected"; } });
+    check("a failing update point is warned about and does not reject the listener",
+      outcome.value === "resolved" && outcome.warnings.some((line) => line.includes("[restore-points]") && line.includes("QuotaExceededError")),
+      outcome.warnings.join(" / "));
+    const imports = (source.match(/importScripts\(([\s\S]*?)\);/) || [])[1] || "";
+    const order = ["shared.js", "vocab-store.js", "notes-sync.js", "restore-points.js"].map((name) => imports.indexOf(`"${name}"`));
+    check("the service worker loads restore-points.js after the modules it reads",
+      order.every((index) => index >= 0) && order[3] > order[0] && order[3] > order[1] && order[3] > order[2]);
+    for (const page of ["options.html", "library.html"]) {
+      const html = await fetch("../" + page).then((response) => response.text());
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const scripts = [...doc.querySelectorAll("script[src]")].map((node) => node.getAttribute("src"));
+      const at = (name) => scripts.indexOf(name);
+      check(`${page} loads restore-points.js after shared.js, vocab-store.js and notes-sync.js`,
+        at("restore-points.js") > at("shared.js") && at("restore-points.js") > at("vocab-store.js") &&
+        at("restore-points.js") > at("notes-sync.js") && at("shared.js") >= 0);
+    }
+  }
+
+  // ---------- restoring adds back only what is missing ----------
+  {
+    await resetAll();
+    account = "alice";
+    const own = pbpDictOwnerScope("alice");
+    await seedWord("alice", "steady");
+    const changing = await seedWord("alice", "changing");
+    await seedWord("alice", "dropped");
+    const article = await seedArticle("alice", ["stays", "removed later"]);
+    const point = await pbpRestorePointCreate("delete");
+    const pointPayload = await pbpRestorePointRead(point.id, "alice");
+    // After the point: a new highlight on the same article, a word's status
+    // and note changed, another highlight and another word deleted.
+    const stored = localArea[article];
+    const removedId = stored.items[1].id;
+    const added = { id: "after-point", n: 2, quote: "added after the point", prefix: "", suffix: "", note: "fresh", color: 2,
+      ts: 1700000009999, owner: own, fp: "fp-after" };
+    await pbpNotesWriteRecord(article, { v: 1, url: stored.url, title: stored.title, items: [stored.items[0], added] }, own,
+      { getCurrentOwner: async () => own });
+    await pbpVocabBatchSetStatus([changing.id], own, "known");
+    await pbpVocabSetNote(changing.id, own, "my own note");
+    await pbpVocabBatchDelete([(await pbpVocabAll(own)).find((row) => row.term === "dropped").id], own);
+    const changedBefore = (await pbpVocabAll(own)).find((row) => row.id === changing.id);
+    const changedMetaBefore = (await _pbpVocabSyncRows(`record:${own}:`)).find((row) => row.recordKey === _pbpVocabRecordKey(own, changedBefore));
+    const addedBefore = structuredClone(localArea[article].items.find((item) => item.id === "after-point"));
+    const addedEventBefore = structuredClone(localArea[article].notesSync.owners[own].events["after-point"]);
+    const vocabMetaBefore = await _pbpVocabSyncRows(`record:${own}:`);
+    const notesTombsBefore = Object.entries(localArea[article].notesSync.owners[own].events).filter(([, event]) => event.deleted).map(([id]) => id);
+    check("fixture: one highlight and one word are tombstones before the restore",
+      notesTombsBefore.join() === removedId && vocabMetaBefore.filter((row) => row.deleted).length === 1);
+
+    const applied = await pbpApplyBackupPayload(pointPayload, applyOptions({ restorePoint: true }));
+    const items = localArea[article].items;
+    const events = localArea[article].notesSync.owners[own].events;
+    const pending = localArea[article].notesSync.owners[own].pending;
+    check("a restore keeps a highlight made after the point exactly as it is",
+      applied.highlights === "applied" && JSON.stringify(items.find((item) => item.id === "after-point")) === JSON.stringify(addedBefore) &&
+      JSON.stringify(events["after-point"]) === JSON.stringify(addedEventBefore), JSON.stringify(items.map((item) => item.id)));
+    check("a restore brings the deleted highlight back live and waiting to sync",
+      items.some((item) => item.id === removedId && item.quote === "removed later") &&
+      events[removedId]?.deleted === false && pending[removedId] === true);
+    const words = await pbpVocabAll(own);
+    const changedAfter = words.find((row) => row.id === changing.id);
+    const changedMetaAfter = (await _pbpVocabSyncRows(`record:${own}:`)).find((row) => row.recordKey === changedMetaBefore.recordKey);
+    check("a restore leaves a word changed after the point untouched (status, note, version)",
+      JSON.stringify(changedAfter) === JSON.stringify(changedBefore) && changedAfter.status === "known" && changedAfter.note === "my own note" &&
+      JSON.stringify(changedMetaAfter) === JSON.stringify(changedMetaBefore));
+    const vocabMetaAfter = await _pbpVocabSyncRows(`record:${own}:`);
+    const outbox = await pbpVocabListOutbox(own);
+    const droppedMeta = vocabMetaAfter.find((row) => !vocabMetaBefore.some((old) => old.recordKey === row.recordKey && JSON.stringify(old) === JSON.stringify(row)));
+    check("a restore brings the deleted word back live and waiting to sync",
+      words.some((row) => row.term === "dropped") && applied.vocabularyApplied === 1 && droppedMeta && droppedMeta.deleted === false &&
+      outbox.some((row) => row.recordKey === droppedMeta.recordKey && row.event.deleted === false), JSON.stringify(applied));
+    check("the restore wrote no deletion or tombstone anywhere",
+      vocabMetaAfter.every((row) => row.deleted === false) && outbox.every((row) => row.event.deleted === false) &&
+      Object.values(events).every((event) => event.deleted === false) &&
+      ((await pbpNotesSyncSnapshot(own, "")).outbox || []).every((row) => row.event.deleted === false));
+    check("the restore point preview counts what is missing, not totals",
+      JSON.stringify(await pbpRestorePointMissingCounts(pointPayload, "alice")) === JSON.stringify({ highlights: 0, vocabulary: 0 }));
+
+    // The same payload as a file keeps today's per-article replace.
+    await pbpVocabBatchDelete([(await pbpVocabAll(own)).find((row) => row.term === "dropped").id], own);
+    check("before a restore, the preview counts the missing rows",
+      JSON.stringify(await pbpRestorePointMissingCounts(pointPayload, "alice")) === JSON.stringify({ highlights: 0, vocabulary: 1 }));
+    const asFile = await pbpApplyBackupPayload(pointPayload, applyOptions({}));
+    check("a file import of the same payload still replaces the article's highlights (unchanged behaviour)",
+      asFile.highlights === "applied" && localArea[article].items.map((item) => item.id).sort().join() === pointPayload._highlights[article].items.map((item) => item.id).sort().join() &&
+      !localArea[article].items.some((item) => item.id === "after-point") &&
+      localArea[article].notesSync.owners[own].events["after-point"].deleted === true);
+  }
+
+  // ---------- early highlights without ids ----------
+  {
+    await resetAll();
+    account = "alice";
+    const own = pbpDictOwnerScope("alice");
+    const url = "https://example.test/early";
+    const early = pbpNotesArticleKey(url);
+    // The stored shape the reader wrote before items had ids.
+    localArea[early] = { v: 1, url, title: "Early", items: ["one", "two", "three"].map((quote, n) => ({
+      n, quote, prefix: "p ", suffix: " s", note: "", color: 1, ts: 1600000000000 + n, owner: own })) };
+    const other = await seedArticle("alice", ["other kept", "other removed"]);
+    const point = await pbpRestorePointCreate("delete");
+    const pointPayload = await pbpRestorePointRead(point.id, "alice");
+    // An ordinary write gives the three items legacy ids; then one goes.
+    const rec = localArea[early];
+    await pbpNotesWriteRecord(early, { ...rec, title: "Early (renamed)" }, own, { getCurrentOwner: async () => own });
+    const identified = localArea[early].items;
+    await pbpNotesWriteRecord(early, { ...localArea[early], items: identified.filter((item) => item.quote !== "two") }, own,
+      { getCurrentOwner: async () => own });
+    const otherRec = localArea[other];
+    await pbpNotesWriteRecord(other, { ...otherRec, items: otherRec.items.slice(0, 1) }, own, { getCurrentOwner: async () => own });
+    const earlyAdd = pbpAddMissingHighlightBackupRecord(localArea[early], pointPayload._highlights[early], own);
+    check("fixture: the point holds id-less items and storage now has legacy ids",
+      pointPayload._highlights[early].items.every((item) => !item.id) && identified.every((item) => /^legacy-/.test(item.id)));
+    check("an id-less highlight matches its identified copy, so only the deleted one counts as missing",
+      earlyAdd && earlyAdd.items.length === 3 && earlyAdd.items[2].quote === "two" &&
+      JSON.stringify(await pbpRestorePointMissingCounts(pointPayload, "alice")) === JSON.stringify({ highlights: 2, vocabulary: 0 }));
+    const applied = await pbpApplyBackupPayload(pointPayload, applyOptions({ restorePoint: true }));
+    const ids = localArea[early].items.map((item) => item.id);
+    check("restoring brings back exactly the deleted early highlight, with no duplicate ids, and goes on to the next article",
+      applied.highlights === "applied" && ids.length === 3 && new Set(ids).size === 3 &&
+      localArea[early].items.filter((item) => item.quote === "two").length === 1 &&
+      localArea[other].items.map((item) => item.quote).sort().join() === "other kept,other removed",
+      JSON.stringify({ applied: applied.highlights, ids }));
+
+    // One article that cannot be written does not stop the others.
+    const order = Object.keys(pointPayload._highlights).filter((key) => key !== "pbp_hl_last_color");
+    for (const key of order) {
+      const now = localArea[key];
+      await pbpNotesWriteRecord(key, { ...now, items: now.items.slice(0, 1) }, own, { getCurrentOwner: async () => own });
+    }
+    const realWrite = pbpNotesWriteRecord;
+    pbpNotesWriteRecord = async (key, ...rest) => {
+      if (key === order[0]) throw Object.assign(new Error("local_store"), { code: "local_store" });
+      return realWrite(key, ...rest);
+    };
+    let partial;
+    try { partial = (await quietly(() => pbpApplyBackupPayload(pointPayload, applyOptions({ restorePoint: true })))).value; }
+    finally { pbpNotesWriteRecord = realWrite; }
+    check("one article failing marks the section failed but the later articles are still restored",
+      order.length === 2 && partial.highlights === "failed" && localArea[order[0]].items.length === 1 &&
+      localArea[order[1]].items.length === pointPayload._highlights[order[1]].items.length, JSON.stringify(partial));
+
+    // A library switch after the first article stops the rest: the scope
+    // decided at the start no longer holds.
+    for (const key of order) {
+      const now = localArea[key];
+      await pbpNotesWriteRecord(key, { ...now, items: now.items.slice(0, 1) }, own, { getCurrentOwner: async () => own });
+    }
+    let switched = false;
+    pbpNotesWriteRecord = async (key, ...rest) => {
+      const out = await realWrite(key, ...rest);
+      if (key === order[0]) { account = "mallory"; switched = true; }
+      return out;
+    };
+    let aborted;
+    try { aborted = await quietly(() => pbpApplyBackupPayload(pointPayload, applyOptions({ restorePoint: true }))); }
+    finally { pbpNotesWriteRecord = realWrite; account = "alice"; }
+    check("a library switch midway through a restore writes the first article and none after it",
+      switched && aborted.value.highlights === "failed" &&
+      localArea[order[0]].items.length === pointPayload._highlights[order[0]].items.length &&
+      localArea[order[1]].items.length === 1 && aborted.warnings.some((line) => line.includes("highlight owner mismatch")),
+      JSON.stringify({ result: aborted.value, warnings: aborted.warnings }));
+
+    // Stored items that still have no id: an incoming item with an id that no
+    // stored item has is matched once more by its text against them.
+    const item = (n, quote, extra) => ({ n, quote, prefix: "p ", suffix: " s", note: "", color: 1, ts: 1700000000000 + n, owner: own, ...extra });
+    const storedShape = { v: 1, url, title: "Early", items: [item(0, "kept"), item(1, "twin", { id: "hl-local" })] };
+    const incomingShape = { v: 1, url, title: "Early", items: [
+      item(0, "kept", { id: "legacy-abc-0" }), item(1, "twin", { id: "hl-remote" }), item(2, "gone", { id: "hl-gone" })] };
+    // A restore point whose sections are present but empty offers neither.
+    const emptyRows = { highlights: { [early]: { v: 1, url, title: "Early", items: [] } }, highlightsOwner: "alice",
+      vocabulary: { owner: "alice", records: [] } };
+    const emptyPreview = pbpBuildBackupPreview(emptyRows, "alice", null, { restorePoint: true });
+    const filePreview = pbpBuildBackupPreview(emptyRows, "alice", null, {});
+    check("a restore point section with no entries is not offered; a file's still is",
+      emptyPreview.sections.highlights.enabled === false && emptyPreview.sections.vocabulary.enabled === false &&
+      filePreview.sections.highlights.enabled === true && filePreview.sections.vocabulary.enabled === true,
+      JSON.stringify({ point: emptyPreview.sections, file: filePreview.sections }));
+    const added = pbpAddMissingHighlightBackupRecord(storedShape, incomingShape, own);
+    check("an incoming highlight with an unmatched id counts as present when a stored item without an id has its text",
+      added && added.items.map((row) => row.id || "-").join() === "-,hl-local,hl-remote,hl-gone",
+      JSON.stringify(added && added.items.map((row) => row.id || "-")));
+  }
+
+  // ---------- Data tab ----------
+  await resetAll();
+  account = "carol";
+  {
+    const html = await fetch("../options.html").then((response) => response.text());
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const section = doc.getElementById("sec-backup-restore")?.closest("section.settings-section");
+    const host = document.getElementById("ui-host");
+    if (section) host.appendChild(document.importNode(section, true));
+    URL.createObjectURL = () => "blob:restore-point-test";
+    URL.revokeObjectURL = () => {};
+    HTMLAnchorElement.prototype.click = function () {};
+    const lastExport = document.getElementById("backup-last-export");
+    const list = document.getElementById("restore-point-list");
+    const empty = document.getElementById("restore-point-empty");
+    const status = () => document.getElementById("import-status").textContent;
+    const waitFor = async (predicate, rounds = 60) => { for (let i = 0; i < rounds && !predicate(); i++) await tick(25); return predicate(); };
+
+    // First paint: nothing about restore points shows until the read answers.
+    const realList = pbpRestorePointList;
+    let releaseList;
+    const listGate = new Promise((resolve) => { releaseList = resolve; });
+    pbpRestorePointList = async (...args) => { await listGate; return realList(...args); };
+    setupBackup({ exportableKeys, saveOverlayWithFallback: async () => ({}) });
+    await tick(40);
+    check("before the list read answers, neither the empty line nor the list shows",
+      !!section && empty?.hidden === true && list?.hidden === true &&
+      getComputedStyle(empty).display === "none" && getComputedStyle(list).display === "none");
+    pbpRestorePointList = realList;
+    releaseList();
+    await tick(50);
+    check("the Data tab says Never before any export", lastExport?.textContent === "backupLastExportNever");
+    check("the Data tab shows one plain sentence when there are no restore points",
+      list?.hidden === true && empty?.hidden === false && empty.textContent === "restorePointsEmpty" &&
+      getComputedStyle(list).display === "none" && getComputedStyle(empty).display !== "none");
+    pbpRestorePointList = async () => { throw new DOMException("gone", "UnknownError"); };
+    await quietly(async () => { document.dispatchEvent(new Event("visibilitychange")); await tick(50); });
+    pbpRestorePointList = realList;
+    check("a failed list read shows the failure line, not the empty line",
+      empty.hidden === false && empty.textContent === "restorePointsReadFailed" && list.hidden === true);
+
+    document.getElementById("export-settings").click();
+    let stamped = "";
+    for (let i = 0; i < 40 && !stamped; i++) { await tick(25); stamped = localArea[PBP_BACKUP_LAST_EXPORT_KEY] || ""; }
+    check("a manual export records when it happened, in local storage",
+      typeof stamped === "string" && Math.abs(Date.parse(stamped) - Date.now()) < 60000 && !(PBP_BACKUP_LAST_EXPORT_KEY in syncArea));
+    check("the export time is not a setting and Storage Management never clears it",
+      !Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, PBP_BACKUP_LAST_EXPORT_KEY) && pbpIsNeverClearKey(PBP_BACKUP_LAST_EXPORT_KEY) &&
+      !exportableKeys.includes(PBP_BACKUP_LAST_EXPORT_KEY));
+    await tick(50);
+    check("the Data tab shows the last export time", lastExport.textContent === pbpBackupCreatedLabel(stamped) && lastExport.textContent !== "backupLastExportNever");
+
+    await seedWord("carol", "date");
+    const carolArticle = await seedArticle("carol", ["carol quote"]);
+    const carolPoint = await pbpRestorePointCreate("delete");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await tick(80);
+    const rows = [...list.children];
+    const button = rows[0]?.querySelector("button");
+    check("the Data tab lists the restore points with time, reason, counts and a Restore button",
+      rows.length === 1 && list.hidden === false && empty.hidden === true &&
+      rows[0].querySelector("dt").textContent === pbpBackupCreatedLabel(carolPoint.createdAt) &&
+      rows[0].querySelector("dd span").textContent === "restorePointSummary(restorePointReasonDelete|1|1|1)" &&
+      button?.textContent === "restorePointRestore" && button.getAttribute("aria-label").startsWith("restorePointRestoreAria("),
+      rows.map((row) => row.textContent).join(" / "));
+    // The library moved on since the point: one word is gone.
+    await seedWord("carol", "elder");
+    const carolScope = pbpDictOwnerScope("carol");
+    await pbpVocabBatchDelete([(await pbpVocabAll(carolScope)).find((row) => row.term === "date").id], carolScope);
+    button?.click();
+    await tick(120);
+    const previewHost = document.getElementById("backup-import-preview");
+    const resultHost = document.getElementById("backup-import-result");
+    const hiddenRow = (id) => document.getElementById(id)?.closest(".pref-row, .backup-preview-counts > div")?.hidden === true;
+    check("the restore point preview says it only adds back what is missing, with counts",
+      document.getElementById("backup-preview-semantics").textContent === "restorePointPreviewMissing(0|1)",
+      document.getElementById("backup-preview-semantics").textContent);
+    const semanticsEl = document.getElementById("backup-preview-semantics");
+    const countsEl = previewHost.querySelector(".backup-preview-counts");
+    const legendText = () => previewHost.querySelector(".backup-section-picker legend").textContent;
+    check("a restore point preview uses restore wording and leaves the personal library out of the totals",
+      document.getElementById("backup-preview-title").textContent === "restorePointPreviewTitle" &&
+      legendText() === "restorePointChooseSections" && status().includes("restorePointPreviewReady") &&
+      document.getElementById("backup-preview-highlights").textContent === "restorePointPreviewHighlights(1|1)" &&
+      document.getElementById("backup-preview-vocabulary").textContent === "restorePointPreviewVocabulary(1)",
+      [document.getElementById("backup-preview-title").textContent, legendText(), status(),
+        document.getElementById("backup-preview-highlights").textContent].join(" / "));
+    check("the missing-count line comes before the totals",
+      !!(semanticsEl.compareDocumentPosition(countsEl) & Node.DOCUMENT_POSITION_FOLLOWING));
+    check("Restore opens the import preview with only highlights and vocabulary",
+      previewHost.hidden === false &&
+      ["backup-section-settings", "backup-section-themes", "backup-section-secrets", "backup-preview-settings", "backup-preview-themes", "backup-preview-secrets"].every(hiddenRow) &&
+      document.getElementById("backup-section-highlights").checked && document.getElementById("backup-section-vocabulary").checked &&
+      getComputedStyle(document.getElementById("backup-preview-settings").parentElement).display === "none");
+    document.getElementById("backup-import-apply").click();
+    await waitFor(() => !resultHost.hidden);
+    await tick(80);
+    check("applying from the Data tab restores and takes no new point",
+      document.getElementById("backup-result-vocabulary").textContent === "backupStatusApplied" &&
+      document.getElementById("backup-result-settings").parentElement.hidden === true &&
+      getComputedStyle(document.getElementById("backup-result-settings").parentElement).display === "none" &&
+      list.children.length === 1 && (await pbpRestorePointList("carol")).length === 1 &&
+      (await pbpVocabAll(carolScope)).some((row) => row.term === "date"),
+      [...list.children].map((row) => row.textContent).join(" / "));
+
+    // A file that calls itself a restore point is an ordinary file here.
+    const forged = { ...(await pbpRestorePointRead(carolPoint.id, "carol")), optTheme: "dark" };
+    await seedWord("carol", "fig");
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([JSON.stringify(forged)], "forged.json", { type: "application/json" }));
+    const input = document.getElementById("import-settings-file");
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change"));
+    await waitFor(() => !previewHost.hidden && !document.getElementById("backup-section-settings").disabled);
+    check("a forged restore point file gets the ordinary preview, settings included",
+      previewHost.hidden === false && document.getElementById("backup-preview-semantics").textContent === "backupPreviewSemantics" && !hiddenRow("backup-section-settings") && !hiddenRow("backup-preview-settings") &&
+      document.getElementById("backup-section-settings").checked);
+    check("a file keeps the import wording, with the line after the totals",
+      document.getElementById("backup-preview-title").textContent === "backupPreviewTitle" &&
+      legendText() === "backupChooseSections" && status().includes("backupPreviewReady") &&
+      document.getElementById("backup-preview-highlights").textContent.startsWith("backupPreviewHighlights(") &&
+      !!(semanticsEl.compareDocumentPosition(countsEl) & Node.DOCUMENT_POSITION_PRECEDING),
+      [document.getElementById("backup-preview-title").textContent, legendText(), status()].join(" / "));
+    document.getElementById("backup-import-apply").click();
+    await waitFor(() => !resultHost.hidden);
+    await waitFor(() => list.children[0]?.textContent.includes("restorePointReasonImport"));
+    check("applying it takes an \"import\" point and reports every section",
+      list.children[0]?.querySelector("dd span").textContent.startsWith("restorePointSummary(restorePointReasonImport|") &&
+      document.getElementById("backup-result-settings").parentElement.hidden === false &&
+      document.getElementById("backup-result-settings").textContent === "backupStatusApplied",
+      [...list.children].map((row) => row.textContent).join(" / "));
+
+    // A point with nothing missing: one plain line, nothing to apply.
+    list.children[0].querySelector("button").click();
+    await waitFor(() => !previewHost.hidden);
+    check("a restore point with nothing missing says so and offers no Apply",
+      document.getElementById("backup-preview-semantics").textContent === "restorePointPreviewNothingMissing" &&
+      document.getElementById("backup-import-apply").disabled === true,
+      document.getElementById("backup-preview-semantics").textContent);
+    // Another point that has something missing turns Apply back on.
+    await pbpVocabBatchDelete([(await pbpVocabAll(carolScope)).find((row) => row.term === "date").id], carolScope);
+    list.children[1].querySelector("button").click();
+    await waitFor(() => semanticsEl.textContent !== "restorePointPreviewNothingMissing");
+    check("after Nothing is missing, picking a point with something missing turns Apply back on",
+      semanticsEl.textContent === "restorePointPreviewMissing(0|1)" && document.getElementById("backup-import-apply").disabled === false,
+      semanticsEl.textContent);
+    // A point that holds no highlights offers no highlights checkbox.
+    delete localArea[carolArticle];
+    await pbpRestorePointCreate("delete");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await tick(80);
+    list.children[0].querySelector("button").click();
+    await waitFor(() => document.getElementById("backup-preview-highlights").textContent === "restorePointPreviewHighlights(0|0)");
+    const hlBox = document.getElementById("backup-section-highlights");
+    check("a section the restore point holds nothing of gets no checkbox, the totals stay",
+      hiddenRow("backup-section-highlights") && getComputedStyle(hlBox.closest(".pref-row")).display === "none" &&
+      hlBox.checked === false && hlBox.disabled === true && !hiddenRow("backup-section-vocabulary") &&
+      document.getElementById("backup-section-vocabulary").checked && !hiddenRow("backup-preview-highlights"),
+      document.getElementById("backup-preview-highlights").textContent);
+    // Clear restore points: this library's only, after a confirm.
+    const gone = [...list.children][0]?.querySelector("button");
+    account = "dave";
+    await seedWord("dave", "other library");
+    const davePoint = await pbpRestorePointCreate("delete");
+    account = "carol";
+    const clear = document.getElementById("restore-point-clear");
+    check("the clear control shows when this library has points", clear && clear.hidden === false && getComputedStyle(clear).display !== "none");
+    const carolBefore = (await pbpRestorePointList("carol")).length;
+    clear.click();
+    document.querySelector(".confirm-popover .confirm-no")?.click();
+    await tick(50);
+    check("cancelling the clear confirm deletes nothing", carolBefore > 0 && (await pbpRestorePointList("carol")).length === carolBefore);
+    clear.click();
+    const popover = document.querySelector(".confirm-popover");
+    const confirmText = popover?.textContent || "";
+    popover?.querySelector(".confirm-yes")?.click();
+    await waitFor(() => list.children.length === 0);
+    const raw = await rawRestoreDb();
+    check("confirming clears this library's points from both stores and keeps another library's",
+      confirmText.includes("restorePointsClearConfirm") && (await pbpRestorePointList("carol")).length === 0 &&
+      (await pbpRestorePointList("dave")).map((row) => row.id).join() === davePoint.id &&
+      raw.meta.length === 1 && raw.points.length === 1 && sameIds(raw));
+    check("with no points left the clear control is hidden",
+      clear.hidden === true && getComputedStyle(clear).display === "none" && empty.hidden === false);
+    gone?.click();
+    await tick(80);
+    check("a restore point that disappeared says so and opens no preview",
+      status().includes("restorePointGone") && previewHost.hidden === true);
+  }
+}
+
+run().catch((error) => check("suite crashed", false, error && (error.stack || error.message))).finally(() => {
+  document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+  document.title = (fail ? "FAIL" : "PASS") + ` restore-points ${pass}/${pass + fail}`;
+});
+</script>
+</body></html>

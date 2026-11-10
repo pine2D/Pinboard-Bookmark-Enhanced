@@ -2424,7 +2424,12 @@ function _pbpVocabSyncSelectionUi() {
     const help = _pbpVocabGroupHelpEl();
     if (help) help.hidden = !noMatch;
   }
-  if (deleteBtn) deleteBtn.disabled = _vocabBatchBusy || !selectedCount;
+  if (deleteBtn) {
+    deleteBtn.disabled = _vocabBatchBusy || !selectedCount;
+    // Busy covers the restore point wait too (pbpLibRestorePointBeforeDelete).
+    if (_vocabBatchBusy) deleteBtn.setAttribute("aria-busy", "true");
+    else deleteBtn.removeAttribute("aria-busy");
+  }
   const knownBtn = $id("vocab-mark-known");
   const learningBtn = $id("vocab-mark-learning");
   if (knownBtn) knownBtn.disabled = _vocabBatchBusy || !selectedCount;
@@ -3071,7 +3076,7 @@ function _pbpVocabBatchDeleteSelected() {
   const ids = [..._vocabSelected];
   showConfirmPopover(button, {
     msg: t("vocabBatchDeleteConfirm", String(ids.length)),
-    detail: pbpLibDeleteDetail("libraryDeleteVocabDetail"),
+    detail: pbpLibDeleteDetail("libraryDeleteVocabBatchDetail"),
     yesText: t("delete"),
     noText: t("cancel"),
     onConfirm: async () => {
@@ -3081,10 +3086,15 @@ function _pbpVocabBatchDeleteSelected() {
         _pbpVocabFocusStable();
         return;
       }
+      // Busy (delete disabled) from here, through the restore point wait.
       _pbpVocabSetBatchBusy(true);
-      const gen = ++_vocabRenderGen;
+      let gen = _vocabRenderGen;
       let owner = null;
       try {
+        // A restore point of the library as it is before this delete (restore-
+        // points.js). Bounded and never rejects, so it cannot block the delete.
+        await pbpLibRestorePointBeforeDelete();
+        gen = ++_vocabRenderGen;
         owner = await pbpVocabCurrentOwner();
         const ok = await pbpVocabBatchDelete(ids, owner);
         if (ok) {

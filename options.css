@@ -1715,6 +1715,20 @@ html.motion-ready .backup-import-result:not([hidden]) {
 .backup-preview-counts dt,
 .backup-import-result > div > :first-child { color: var(--opt-fg-muted); }
 .backup-preview-counts dd { min-width: 0; margin: 0; }
+/* Last export time and the restore point list under the backup buttons.
+   Rows and blocks these hide go by the hidden attribute, which the global
+   [hidden] rule above enforces. */
+.backup-history { margin: var(--opt-sp-5) 0 0; }
+.restore-point-none { margin: 0; color: var(--opt-fg-muted); }
+#restore-point-list { margin: 0; }
+/* The restore points block is a subsection of Backup & Restore: the same gap
+   as .settings-section siblings, here after the last-export row. */
+.backup-history + .settings-section { margin-top: var(--opt-subsection-gap); }
+#restore-point-clear { margin-top: var(--opt-sp-4); }
+#restore-point-list dd {
+  display: flex; align-items: center; flex-wrap: wrap;
+  justify-content: space-between; gap: var(--opt-sp-4);
+}
 .backup-preview-warning:empty { display: none; }
 /* The section picker sits inside the bordered preview card, so it draws no
    frame of its own -- a framed fieldset inside a framed card read as a box in

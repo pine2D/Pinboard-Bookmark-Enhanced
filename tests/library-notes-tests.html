@@ -1466,14 +1466,33 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("batch delete asks first and counts the highlights, not the pages",
     batchPop && batchPop.querySelector(".confirm-msg").textContent.includes("notesBatchDeleteConfirm:2"),
     batchPop && batchPop.textContent);
+  check("the batch confirm says a restore point is kept instead of \"can't be undone\"",
+    batchPop?.querySelector(".confirm-detail")?.textContent.startsWith("libraryDeleteNotesBatchDetail"),
+    batchPop?.querySelector(".confirm-detail")?.textContent);
   // Another tab writes a NEW highlight to the same page while the confirm is
   // on screen. The batch must rewrite from a fresh read, not from the scan
   // snapshot it is looping over -- a read-modify-write off the stale copy
   // discards this silently, and nothing on screen would ever say so.
   store["pbp_hl_alpha"] = { ...store["pbp_hl_alpha"], items: [...store["pbp_hl_alpha"].items,
     { id: "a4", n: 4, quote: "arrived from another tab mid-confirm", color: 2, note: "", ts: 350 }] };
-  batchPop.querySelector(".confirm-yes").click();
-  await settle(() => !_notesBatchBusy);
+  // The restore point (restore-points.js) is taken after the confirm and
+  // before the first write: at call time the page still has all four items.
+  const batchPoints = [];
+  globalThis.pbpRestorePointCreateBounded = async (reason) => {
+    const trigger = $id("notes-batch-delete");
+    batchPoints.push({ reason, items: store["pbp_hl_alpha"].items.length,
+      busy: trigger.disabled && trigger.getAttribute("aria-busy") === "true" });
+    return null;
+  };
+  try {
+    batchPop.querySelector(".confirm-yes").click();
+    await settle(() => !_notesBatchBusy);
+  } finally { delete globalThis.pbpRestorePointCreateBounded; }
+  check("a confirmed batch delete takes one \"delete\" restore point before writing",
+    batchPoints.length === 1 && batchPoints[0].reason === "delete" && batchPoints[0].items === 4,
+    JSON.stringify(batchPoints));
+  check("the batch Delete button is disabled and busy while the restore point is taken, and not after",
+    batchPoints[0]?.busy === true && !$id("notes-batch-delete").hasAttribute("aria-busy"), JSON.stringify(batchPoints));
   check("a highlight written elsewhere during the confirm is not clobbered",
     store["pbp_hl_alpha"].items.some((it) => it.id === "a4") &&
     rowKeys().includes("pbp_hl_alpha#a4"),
@@ -1507,8 +1526,34 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   check("delete asks first, naming the page it removes",
     popover && popover.querySelector(".confirm-msg").textContent.includes("Alpha article"),
     popover && popover.textContent);
-  popover.querySelector(".confirm-yes").click();
-  await settle(() => !rowKeys().includes("pbp_hl_alpha#"));
+  check("the by-article confirm says a restore point is kept",
+    popover?.querySelector(".confirm-detail")?.textContent.startsWith("libraryDeleteNotesBatchDetail"),
+    popover?.querySelector(".confirm-detail")?.textContent);
+  {
+    // A single highlight takes no restore point, so its text stays.
+    const realConfirm = showConfirmPopover;
+    let seen = null;
+    showConfirmPopover = (anchor, options) => { seen = options; return true; };
+    try { _pbpNotesDeleteOne({ key: "pbp_hl_alpha#a2", row: { key: "pbp_hl_alpha" }, item: { id: "a2" } }, document.createElement("button")); }
+    finally { showConfirmPopover = realConfirm; }
+    check("a single highlight delete keeps its own confirm text", seen && seen.detail.startsWith("libraryDeleteNotesDetail"), seen && seen.detail);
+  }
+  const pagePoints = [];
+  const pageTrigger = visibleDelete();
+  globalThis.pbpRestorePointCreateBounded = async (reason) => {
+    pagePoints.push({ reason, items: (store["pbp_hl_alpha"]?.items || []).length,
+      busy: pageTrigger.disabled && pageTrigger.getAttribute("aria-busy") === "true" });
+    return null;
+  };
+  try {
+    popover.querySelector(".confirm-yes").click();
+    await settle(() => !rowKeys().includes("pbp_hl_alpha#"));
+  } finally { delete globalThis.pbpRestorePointCreateBounded; }
+  check("a confirmed delete by article takes one \"delete\" restore point before writing",
+    pagePoints.length === 1 && pagePoints[0].reason === "delete" && pagePoints[0].items === 2,
+    JSON.stringify(pagePoints));
+  check("the page Delete button is disabled and busy while the restore point is taken",
+    pagePoints[0]?.busy === true, JSON.stringify(pagePoints));
   check("confirming removes every row of that page",
     !rowKeys().includes("pbp_hl_alpha#"), rowKeys());
   check("the detail falls back to the empty state after its highlight is gone",

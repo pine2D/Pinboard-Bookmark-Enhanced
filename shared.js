@@ -1298,6 +1298,11 @@ const PBP_RECLAIM_CATEGORIES = {
   misc: { keys: ["pbp_ai_usage", "pbpThinkReject", "pbpAiParamFix"], prefixes: ["pbpDictFailures:", "pbpDictNeg:"] },
 };
 
+// When this device last wrote a manual backup file (ISO string). Local only:
+// not a setting, so it is not synced, not exported and not reset; never
+// cleared by Storage Management (pbpIsNeverClearKey).
+const PBP_BACKUP_LAST_EXPORT_KEY = "backupLastExportAt";
+
 // Second line of defense (belt-and-suspenders): even if a caller passes a bogus
 // or over-broad category, these keys are NEVER removed. The allowlist above is
 // the primary guard; this makes accidental deletion structurally impossible.
@@ -1305,6 +1310,7 @@ function pbpIsNeverClearKey(key) {
   if (typeof key !== "string") return true;
   // Pending user data / in-progress state.
   if (key === "offlineQueue" || key === "batch_progress") return true;
+  if (key === PBP_BACKUP_LAST_EXPORT_KEY) return true;
   if (key.startsWith("_tagGov")) return true;              // _tagGovAiGroups / _tagGovLastRun / _tagGovIgnored
   if (key.startsWith("md_preview_data")) return true;      // md_preview_data + md_preview_data_<uuid> handoffs
   if (key.startsWith("pbp_hl_")) return true;               // pbp_hl_<urlKey> highlight sets + pbp_hl_last_color (user data, never reclaimable)
@@ -1322,6 +1328,21 @@ function pbpIsNeverClearKey(key) {
 
 function pbpIsHighlightBackupKey(key) {
   return typeof key === "string" && key.startsWith("pbp_hl_");
+}
+
+// Every pbp_hl_ record in local storage, as the backup layer reads them: the
+// manual export and restore points (restore-points.js) share this read so the
+// two cannot drift. Chrome 130+ lists keys without deserializing values, then
+// fetches only the highlight records, instead of get(null) deserializing the
+// entire local area (jina_md_ page caches included). min_chrome is 123 < 130,
+// so the get(null) fallback stays. pbp_hl_last_color is kept here (it is a
+// pbp_hl_ key); callers decide whether they want it.
+async function pbpReadHighlightBackupSource() {
+  if (typeof chrome.storage.local.getKeys === "function") {
+    const keys = (await chrome.storage.local.getKeys()).filter(pbpIsHighlightBackupKey);
+    return keys.length ? chrome.storage.local.get(keys) : {};
+  }
+  return chrome.storage.local.get(null);
 }
 
 // The display rule md-highlight.js's pbpHlItemVisibleFor applies, restated for
@@ -1465,6 +1486,40 @@ function pbpMergeHighlightBackupRecord(stored, incoming, ownerScope) {
   return Object.assign({}, incoming, { items: incomingItems.concat(foreign) });
 }
 
+// The restore point counterpart (options-backup.js, restoring a point read
+// with pbpRestorePointRead): only items missing now are added back. Every
+// stored item stays exactly as it is, whoever owns it, and nothing is
+// removed. An incoming item with an id is present when a stored item has that
+// id. One without an id is present when a stored item has the same text
+// identity, with or without an id: the first ordinary write to an article
+// gives its id-less items "legacy-" ids (notes-sync.js normalizeLegacy), so an
+// id-less item in an older point must still match its now-identified copy.
+// The text identity is the one normalizeLegacy hashes. Returns null when
+// nothing is missing, so the caller writes nothing. Pure.
+function pbpAddMissingHighlightBackupRecord(stored, incoming, ownerScope) {
+  const incomingItems = (incoming && Array.isArray(incoming.items)) ? incoming.items : [];
+  if (!stored || typeof stored !== "object" || Array.isArray(stored) || !Array.isArray(stored.items)) {
+    return incomingItems.length ? incoming : null;
+  }
+  const hasId = (item) => !!(item && typeof item.id === "string" && item.id);
+  const textIdentity = (item) => "text:" + JSON.stringify([item?.quote, item?.prefix || "", item?.suffix || "",
+    item?.ts, item?.side || "orig", item?.lang || ""]);
+  // An incoming item with an id that no stored id matches is also present
+  // when a stored item WITHOUT an id has its text identity: that stored copy
+  // has simply not been written through notes-sync since.
+  const present = new Set();
+  const idlessText = new Set();
+  stored.items.forEach((item) => {
+    if (hasId(item)) present.add("id:" + item.id);
+    else idlessText.add(textIdentity(item));
+    present.add(textIdentity(item));
+  });
+  const missing = incomingItems.filter((item) => pbpHighlightBackupItemInScope(item, ownerScope) &&
+    !(hasId(item) ? present.has("id:" + item.id) || idlessText.has(textIdentity(item)) : present.has(textIdentity(item))));
+  if (!missing.length) return null;
+  return Object.assign({}, stored, { items: stored.items.concat(missing) });
+}
+
 function pbpIsPlainRecord(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value);
@@ -1534,12 +1589,23 @@ function pbpBackupSchemaVersion(data) {
   throw new TypeError("unsupported backup schema");
 }
 
+// "manual" is a file the user exported; "restore-point" is a payload read
+// from this device's restore points (restore-points.js), which only ever
+// holds highlights and vocabulary.
+// The label alone grants nothing: only a payload the options page read with
+// pbpRestorePointRead is treated as a restore (options-backup.js).
+const PBP_BACKUP_SOURCES = Object.freeze(["manual", "restore-point"]);
+
 function pbpSanitizeBackupMetadata(value) {
   if (!pbpIsPlainRecord(value) ||
       Object.keys(value).some((key) => !["createdAt", "extensionVersion", "source", "includesSecrets"].includes(key)) ||
       typeof value.createdAt !== "string" || typeof value.extensionVersion !== "string" ||
-      value.source !== "manual") {
+      !PBP_BACKUP_SOURCES.includes(value.source)) {
     throw pbpBackupValueError("_backup");
+  }
+  // A restore point never carries credentials (restore-points.js).
+  if (value.source === "restore-point" && Object.prototype.hasOwnProperty.call(value, "includesSecrets")) {
+    throw pbpBackupValueError("_backup.includesSecrets");
   }
   // Opt-in credential carrier. Absent on every backup this extension wrote
   // before the option existed, so it must stay optional — but when present it
@@ -1555,10 +1621,37 @@ function pbpSanitizeBackupMetadata(value) {
   const metadata = {
     createdAt: value.createdAt,
     extensionVersion: value.extensionVersion,
-    source: "manual",
+    source: value.source,
   };
   if (value.includesSecrets === true) metadata.includesSecrets = true;
   return metadata;
+}
+
+// The library half of the backup preflight: schema, _backup, highlights and
+// vocabulary. options-backup.js pbpPreflightBackupPayload runs it for every
+// export and import, then checks the settings; restore-points.js runs it on
+// each restore point before storing it.
+function pbpPreflightBackupLibrary(data) {
+  const schemaVersion = pbpBackupSchemaVersion(data);
+  const metadata = schemaVersion === 3
+    ? pbpSanitizeBackupMetadata(data._backup)
+    : undefined;
+  if (Object.prototype.hasOwnProperty.call(data, "_highlights") && !pbpIsPlainRecord(data._highlights)) {
+    throw pbpBackupValueError("_highlights");
+  }
+  if (Object.prototype.hasOwnProperty.call(data, "_highlightsOwner") && typeof data._highlightsOwner !== "string") {
+    throw pbpBackupValueError("_highlightsOwner");
+  }
+  const vocabulary = schemaVersion === 3 && Object.prototype.hasOwnProperty.call(data, "_vocabulary")
+    ? pbpSanitizeBackupVocabulary(data._vocabulary)
+    : undefined;
+  return {
+    schemaVersion,
+    metadata,
+    highlights: data._highlights,
+    highlightsOwner: data._highlightsOwner,
+    vocabulary,
+  };
 }
 
 function pbpCanonicalBackupOwner(value) {
@@ -1671,7 +1764,11 @@ function pbpBackupLocalFallbackFields(prepared, syncState, sections) {
     });
 }
 
-function pbpBuildBackupPreview(prepared, currentOwner, syncState) {
+// options.restorePoint is the caller saying the payload was read from this
+// device's restore points (pbpRestorePointRead). It never comes from the
+// payload: a file that labels itself "restore-point" is previewed as the
+// ordinary file it is.
+function pbpBuildBackupPreview(prepared, currentOwner, syncState, options) {
   const highlights = pbpCleanHighlightBackup(prepared && prepared.highlights);
   const highlightRows = Object.entries(highlights)
     .filter(([key, value]) => key !== "pbp_hl_last_color" && value && Array.isArray(value.items));
@@ -1694,22 +1791,28 @@ function pbpBuildBackupPreview(prepared, currentOwner, syncState) {
     pbpHighlightBackupOwnerAllowed(prepared.highlightsOwner, currentOwner, true);
   const highlightOwnerMismatch = prepared?.highlights !== undefined && !highlightAllowed;
   const secretCount = typeof prepared?.secretCount === "number" ? prepared.secretCount : 0;
+  // A restore point offers its two library sections and nothing else, even if
+  // the payload somehow carried more.
+  const restorePoint = options?.restorePoint === true;
   const sections = {
     settings: {
-      enabled: !!(Object.keys(prepared.safeData || {}).length ||
+      enabled: !restorePoint && !!(Object.keys(prepared.safeData || {}).length ||
         prepared.customCSS !== undefined || prepared.customOverlayCSS !== undefined),
     },
-    themes: { enabled: Array.isArray(prepared.importedThemes) && prepared.importedThemes.length > 0 },
-    highlights: { enabled: prepared.highlights !== undefined && highlightAllowed },
-    vocabulary: { enabled: !!vocabulary && !ownerMismatch },
+    themes: { enabled: !restorePoint && Array.isArray(prepared.importedThemes) && prepared.importedThemes.length > 0 },
+    // A restore point offers only what it holds: an empty section is not
+    // offered at all.
+    highlights: { enabled: prepared.highlights !== undefined && highlightAllowed && (!restorePoint || highlightRows.some(([, value]) => value.items.length > 0)) },
+    vocabulary: { enabled: !!vocabulary && !ownerMismatch && (!restorePoint || vocabulary.records.length > 0) },
     // Credentials are their own section so "restore my settings" never has to
     // mean "and overwrite the keys on this device".
-    secrets: { enabled: secretCount > 0 },
+    secrets: { enabled: !restorePoint && secretCount > 0 },
   };
   const localFallbackKeys = pbpBackupLocalFallbackFields(prepared, syncState, sections);
   return {
     schemaVersion: prepared.schemaVersion,
     metadata: prepared.metadata || null,
+    restorePoint,
     settingsCount: Object.keys(prepared.safeData || {}).length,
     // Settings the preflight skipped as invalid without rejecting the file
     // (pbpSanitizeBackupSettings): the preview names them, since the device
@@ -1734,7 +1837,8 @@ function pbpBuildBackupPreview(prepared, currentOwner, syncState) {
     languages,
     ownerMismatch,
     highlightOwnerMismatch,
-    syncWarning: !!(syncState && syncState.enabled),
+    // Settings are what sync carries, and a restore point has none.
+    syncWarning: !restorePoint && !!(syncState && syncState.enabled),
     localFallbackKeys,
     sections,
   };
@@ -3855,19 +3959,26 @@ function pbpBackupFilename(date = new Date(), includeSecrets = false) {
 // extra.includeSecrets carries API_KEY_FIELDS and the untouched export-target
 // credentials into the file. It is opt-in per export and never defaults on:
 // the result is a plaintext key file, not a settings file.
+//
+// extra.libraryOnly builds a restore point (restore-points.js) instead: the
+// same highlight and vocabulary sections and nothing else, with no settings,
+// overlay, themes or credentials, and _backup.source "restore-point".
 function pbpBuildBackupSnapshot(settings, extra) {
   const s = settings || {};
   const x = extra || {};
-  const includeSecrets = x.includeSecrets === true;
+  const libraryOnly = x.libraryOnly === true;
+  const includeSecrets = !libraryOnly && x.includeSecrets === true;
   const payload = {};
-  Object.keys(SETTINGS_DEFAULTS).forEach((key) => {
-    if (!includeSecrets && API_KEY_FIELDS.includes(key)) return;
-    if (Object.prototype.hasOwnProperty.call(s, key)) payload[key] = s[key];
-  });
-  if (payload.exportTargets && !includeSecrets) payload.exportTargets = pbpStripExportTargetTokens(payload.exportTargets);
-  payload.customOverlayCSS = typeof x.overlay === "string" ? x.overlay : "";
-  payload.savedThemes = pbpSanitizeBackupThemes(Array.isArray(x.savedThemes) ? x.savedThemes : []);
-  if (s.backupIncludeHighlights !== false && x.highlights) {
+  if (!libraryOnly) {
+    Object.keys(SETTINGS_DEFAULTS).forEach((key) => {
+      if (!includeSecrets && API_KEY_FIELDS.includes(key)) return;
+      if (Object.prototype.hasOwnProperty.call(s, key)) payload[key] = s[key];
+    });
+    if (payload.exportTargets && !includeSecrets) payload.exportTargets = pbpStripExportTargetTokens(payload.exportTargets);
+    payload.customOverlayCSS = typeof x.overlay === "string" ? x.overlay : "";
+    payload.savedThemes = pbpSanitizeBackupThemes(Array.isArray(x.savedThemes) ? x.savedThemes : []);
+  }
+  if ((libraryOnly || s.backupIncludeHighlights !== false) && x.highlights) {
     payload._highlights = x.highlights;
     if (x.highlightsOwner) payload._highlightsOwner = x.highlightsOwner;
   }
@@ -3875,7 +3986,7 @@ function pbpBuildBackupSnapshot(settings, extra) {
   payload._backup = {
     createdAt: new Date().toISOString(),
     extensionVersion: String(globalThis.chrome?.runtime?.getManifest?.().version || ""),
-    source: "manual",
+    source: libraryOnly ? "restore-point" : "manual",
   };
   if (includeSecrets) payload._backup.includesSecrets = true;
   payload._schemaVersion = 3;

@@ -738,6 +738,16 @@ let _libDriveGen = 0;
 // which the confirmation says (pbpLibDeleteDetail).
 let _libDriveConnected = false;
 
+// The batch delete and the delete by article (vocabulary and notes) keep a
+// restore point of the library first (restore-points.js), after the user
+// confirmed and before the first write. Bounded and never rejects, so a slow
+// or failing snapshot never stops the delete. Single-row deletes do not take
+// one. A page without restore-points.js loaded skips it.
+async function pbpLibRestorePointBeforeDelete() {
+  if (typeof pbpRestorePointCreateBounded !== "function") return null;
+  return pbpRestorePointCreateBounded("delete");
+}
+
 // The second line of a delete confirmation: what else goes and that it is
 // final, plus the other devices when this one syncs through Google Drive.
 // CJK sentences end in a full-width stop and join without a space.

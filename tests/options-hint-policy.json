@@ -38,7 +38,7 @@
       "optWaybackS3Hint", "popupFollowHint", "promptsHint", "saveAsThemeHint", "skimEnableHint", "storageIntro",
       "summaryPromptHint", "syncApiKeysHint", "tagPresetsHint", "tagPromptHint",
       "translateGlossaryHint", "vocabDriveConnectionHint", "vocabDriveDisclosure",
-      "personalLibraryHint", "bookmarkKarakeepHint",
+      "personalLibraryHint", "bookmarkKarakeepHint", "restorePointsHelp",
       "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint",
       "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
       "optRespectTagCaseHint", "optAutoDescriptionHint", "tagSeparatorHint", "mdExportExtendedMetaHelp",

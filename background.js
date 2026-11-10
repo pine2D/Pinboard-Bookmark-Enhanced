@@ -3,7 +3,7 @@
 // ============================================================
 
 importScripts(
-  "i18n.js", "shared.js", "bookmark-services.js", "vocab-store.js", "vocab-gdrive.js", "notes-sync.js", "notes-gdrive.js",
+  "i18n.js", "shared.js", "bookmark-services.js", "vocab-store.js", "vocab-gdrive.js", "notes-sync.js", "notes-gdrive.js", "restore-points.js",
   "ai-cache.js", "dict-archive.js", "dict-archive-gdrive.js", "ask-archive.js", "ask-archive-gdrive.js", "ai.js", "jina.js", "wayback.js"
 );
 
@@ -4499,12 +4499,22 @@ chrome.runtime.onStartup.addListener(() => {
 
 // Install/update: prime SETTINGS_DEFAULTS so the first popup open is fast for users whose
 // storage doesn't have every key yet (storage.get(missing-key) is measurably slower).
-chrome.runtime.onInstalled.addListener(({ reason }) => {
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   if (reason === "install" || reason === "update") {
     primeSettings().catch(() => {});
     // Records the service this device used before the device key existed.
     pbpReconcileBookmarkService().catch(error => console.warn("[bookmark-service] install reconcile failed:", error?.name, error?.message));
     readOfflineQueueWithIds().catch(() => {});
+  }
+  // The first start of a new version keeps a restore point of the personal
+  // library (restore-points.js). Awaited, so the listener stays pending while
+  // the snapshot is read and written; the event has just restarted the
+  // worker's idle clock and the snapshot takes well under its 30 s. No UI
+  // waits on it, so it is not bounded. pbpRestorePointCreate warns and
+  // resolves null on its own failures; the catch covers anything else.
+  if (reason === "update") {
+    try { await pbpRestorePointCreate("update"); }
+    catch (error) { console.warn("[restore-points] update point failed:", error?.name, error?.message); }
   }
 });
 

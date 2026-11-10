@@ -1709,6 +1709,21 @@
           <span class="save-status" id="import-status" role="status" aria-live="polite"></span>
         </div>
         <span class="save-status backup-export-note" id="backup-export-note" role="status" aria-live="polite"></span>
+        <dl class="backup-preview-counts backup-history">
+          <div><dt data-i18n="backupLastExportLabel">Last export</dt><dd id="backup-last-export" data-i18n="backupLastExportNever">Never</dd></div>
+        </dl>
+        <section class="settings-section" aria-labelledby="restore-points-title">
+          <div class="fg context-help-host" data-help-role="group">
+            <div class="bl subhead" role="heading" aria-level="3" id="restore-points-title" data-i18n="restorePointsTitle">Restore points</div>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="restorePointsHelp">Restore points stay on this device. They are not in backup files or sync, and uninstalling the extension deletes them.</p>
+            </details>
+          </div>
+          <p class="restore-point-none" id="restore-point-empty" data-i18n="restorePointsEmpty" hidden>No restore points yet.</p>
+          <dl class="backup-preview-counts" id="restore-point-list" aria-labelledby="restore-points-title" hidden></dl>
+          <button type="button" class="btn btn-sm danger" id="restore-point-clear" data-i18n="restorePointsClear" hidden>Clear restore points</button>
+        </section>
         <section class="backup-import-preview" id="backup-import-preview" aria-labelledby="backup-preview-title" hidden>
           <h3 id="backup-preview-title" data-i18n="backupPreviewTitle">Import preview</h3>
           <p id="backup-preview-meta"></p>
@@ -1780,6 +1795,7 @@
   <script defer src="shared.js"></script>
   <script defer src="vocab-store.js"></script>
   <script defer src="notes-sync.js"></script>
+  <script defer src="restore-points.js"></script>
   <script defer src="ai-cache.js"></script>
   <script defer src="ai.js"></script>
   <script defer src="options-connectivity.js"></script>

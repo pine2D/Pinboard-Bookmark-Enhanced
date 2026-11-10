@@ -1349,6 +1349,104 @@
     "message": "Thèmes personnalisés : $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupLastExportLabel": {
+    "message": "Dernier export"
+  },
+  "backupLastExportNever": {
+    "message": "Jamais"
+  },
+  "restorePointsTitle": {
+    "message": "Points de restauration"
+  },
+  "restorePointsHelp": {
+    "message": "Les points de restauration restent sur cet appareil. Ils ne sont ni dans les fichiers de sauvegarde ni dans la synchronisation. Ils sont supprimés si vous désinstallez l’extension."
+  },
+  "restorePointsEmpty": {
+    "message": "Aucun point de restauration pour l’instant."
+  },
+  "restorePointsReadFailed": {
+    "message": "Impossible de charger les points de restauration."
+  },
+  "restorePointSummary": {
+    "message": "$REASON$. Pages : $PAGES$ ; surlignages : $HIGHLIGHTS$ ; mots : $WORDS$",
+    "placeholders": {
+      "reason": { "content": "$1" },
+      "pages": { "content": "$2" },
+      "highlights": { "content": "$3" },
+      "words": { "content": "$4" }
+    }
+  },
+  "restorePointReasonImport": {
+    "message": "Avant l’import d’une sauvegarde"
+  },
+  "restorePointReasonDelete": {
+    "message": "Avant une suppression dans la bibliothèque"
+  },
+  "restorePointReasonUpdate": {
+    "message": "Après une mise à jour de l’extension"
+  },
+  "restorePointRestore": {
+    "message": "Restaurer…"
+  },
+  "restorePointRestoreAria": {
+    "message": "Revenir à l’état du $WHEN$",
+    "placeholders": {
+      "when": { "content": "$1" }
+    }
+  },
+  "restorePointGone": {
+    "message": "Ce point de restauration n’existe plus."
+  },
+  "restorePointPreviewMissing": {
+    "message": "Remet seulement ce qui manque (surlignages : $HIGHLIGHTS$, mots : $WORDS$). Rien de ce que vous avez maintenant ne change.",
+    "placeholders": {
+      "highlights": { "content": "$1" },
+      "words": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewAddsBack": {
+    "message": "Remet seulement ce qui manque. Rien de ce que vous avez maintenant ne change."
+  },
+  "restorePointPreviewNothingMissing": {
+    "message": "Rien ne manque, il n’y a donc rien à restaurer."
+  },
+  "restorePointPreviewTitle": {
+    "message": "Aperçu de la restauration"
+  },
+  "restorePointChooseSections": {
+    "message": "Choisir les éléments à restaurer"
+  },
+  "restorePointPreviewReady": {
+    "message": "L’aperçu de la restauration est prêt."
+  },
+  "restorePointPreviewHighlights": {
+    "message": "Pages : $PAGES$ ; entrées : $ITEMS$",
+    "placeholders": {
+      "pages": { "content": "$1" },
+      "items": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewVocabulary": {
+    "message": "Entrées de vocabulaire : $COUNT$",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "restorePointsClear": {
+    "message": "Effacer les points de restauration"
+  },
+  "restorePointsClearConfirm": {
+    "message": "Supprimer tous les points de restauration de cette bibliothèque ?"
+  },
+  "restorePointsClearDetail": {
+    "message": "Vos mots, surlignages et notes restent tels quels."
+  },
+  "restorePointsClearYes": {
+    "message": "Effacer"
+  },
+  "restorePointsClearFailed": {
+    "message": "Impossible d’effacer les points de restauration."
+  },
   "backupPreviewHighlights": {
     "message": "Pages : $PAGES$ ; entrées : $ITEMS$ ; bibliothèque personnelle : $OWNER$",
     "placeholders": {
@@ -4655,6 +4753,8 @@
   "vocabBatchMarkLearning": { "message": "À revoir" },
   "libraryDeleteVocabDetail": { "message": "Les contextes et les notes sont supprimés aussi. Cette action est irréversible." },
   "libraryDeleteNotesDetail": { "message": "Cette action est irréversible." },
+  "libraryDeleteVocabBatchDetail": { "message": "Les contextes et les notes sont supprimés aussi. Avant la suppression, un point de restauration est enregistré : vous pourrez récupérer ces mots dans Paramètres > Données." },
+  "libraryDeleteNotesBatchDetail": { "message": "Avant la suppression, un point de restauration est enregistré : vous pourrez récupérer ces surlignages dans Paramètres > Données." },
   "libraryDeleteDriveDetail": { "message": "Vos autres appareils les supprimeront à leur prochaine synchronisation avec Google Drive." },
   "libraryEditGroups": { "message": "Modifier les groupes" },
   "libraryNotePlaceholder": { "message": "Notez ce qui vous aide : associations, mots à ne pas confondre, rappels d’usage. Enregistré quand vous quittez le champ" },

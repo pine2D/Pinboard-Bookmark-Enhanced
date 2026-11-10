@@ -677,7 +677,12 @@ function _pbpNotesSyncSelectionUi(hits) {
   const deleteBtn = $id("notes-batch-delete");
   if (allBtn) allBtn.disabled = _notesBatchBusy || visible.size === 0;
   if (invertBtn) invertBtn.disabled = _notesBatchBusy || visible.size === 0;
-  if (deleteBtn) deleteBtn.disabled = _notesBatchBusy || !count;
+  if (deleteBtn) {
+    deleteBtn.disabled = _notesBatchBusy || !count;
+    // Busy covers the restore point wait too (pbpLibRestorePointBeforeDelete).
+    if (_notesBatchBusy) deleteBtn.setAttribute("aria-busy", "true");
+    else deleteBtn.removeAttribute("aria-busy");
+  }
 }
 
 function _pbpNotesRowEl(key) {
@@ -1967,7 +1972,7 @@ function _pbpNotesDelete(row, anchor) {
   const revision = _notesAuthRevision;
   showConfirmPopover(anchor, {
     msg: t("notesDeleteConfirm", label),
-    detail: pbpLibDeleteDetail("libraryDeleteNotesDetail"),
+    detail: pbpLibDeleteDetail("libraryDeleteNotesBatchDetail"),
     yesText: t("delete"),
     noText: t("cancel"),
     onConfirm: async () => {
@@ -1981,7 +1986,21 @@ function _pbpNotesDelete(row, anchor) {
       if (anchor) anchor.classList.remove("is-error");
       const priorErr = _pbpNotesRowEl(_pbpNotesSelectedKey);
       if (priorErr) priorErr.classList.remove("is-error");
+      // Busy until the delete is settled, the export button's pattern
+      // (library-vocab.js _pbpVocabRunExport): the restore point below can
+      // take up to its wait bound, and a second click must not start a
+      // second delete meanwhile. A rebuilt list drops the button anyway.
+      if (anchor) { anchor.disabled = true; anchor.setAttribute("aria-busy", "true"); }
+      const settleAnchor = () => {
+        if (!anchor) return;
+        const refocus = document.activeElement === document.body || document.activeElement === anchor;
+        anchor.removeAttribute("aria-busy");
+        anchor.disabled = false;
+        if (refocus && anchor.isConnected) anchor.focus({ preventScroll: true });
+      };
       try {
+        // A restore point before the first write; see pbpLibRestorePointBeforeDelete.
+        await pbpLibRestorePointBeforeDelete();
         // Read AND rewrite inside the record's lock, byte-for-byte the batch
         // delete's shape below, and for the same two reasons. The lock stops
         // a reader tab from committing between this get and this set (its own
@@ -2012,10 +2031,12 @@ function _pbpNotesDelete(row, anchor) {
           // be proven either; fail closed.)
           _notesOwnerCache = null;
           await _pbpNotesRefreshPreservingState();
+          settleAnchor();
           _pbpNotesSetStatus(t("vocabSelectionChanged"));
           return;
         }
       } catch (e) {
+        settleAnchor();
         // A swallowed failure looked identical to success (popover closed,
         // row still there, zero feedback). Pin it to the row it happened on
         // and leave a trace -- name/message only, never note content.
@@ -2034,6 +2055,7 @@ function _pbpNotesDelete(row, anchor) {
         _pbpNotesSetStatus(_pbpNotesDeleteFailedText());
         return;
       }
+      if (anchor) { anchor.removeAttribute("aria-busy"); anchor.disabled = false; }
       _notesAllRows = _notesAllRows.filter((e) => e.row.key !== row.key);
       // The detail was reading one of the highlights that just went away.
       if (_pbpNotesSelectedKey && _pbpNotesSelectedKey.startsWith(row.key + "#")) _pbpNotesRenderDetail(null);
@@ -2124,7 +2146,7 @@ function _pbpNotesBatchDelete() {
   const ownerAtOpen = _notesOwnerCache, revision = _notesAuthRevision;
   showConfirmPopover(button, {
     msg: t(pbpLibCountKey(snapshot.length, "notesBatchDeleteConfirmOne", "notesBatchDeleteConfirm"), String(snapshot.length)),
-    detail: pbpLibDeleteDetail("libraryDeleteNotesDetail"),
+    detail: pbpLibDeleteDetail("libraryDeleteNotesBatchDetail"),
     yesText: t("delete"),
     noText: t("cancel"),
     onConfirm: async () => {
@@ -2152,6 +2174,8 @@ function _pbpNotesBatchDelete() {
       let failed = 0;
       let changed = false;
       try {
+        // A restore point before the first write; see pbpLibRestorePointBeforeDelete.
+        await pbpLibRestorePointBeforeDelete();
         for (const { row } of _notesAllRows) {
           // Pages this batch does not touch cost nothing: hit keys are
           // `${row.key}#${id}`, so the selection already says which records

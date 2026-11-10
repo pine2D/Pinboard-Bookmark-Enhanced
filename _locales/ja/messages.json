@@ -1349,6 +1349,104 @@
     "message": "カスタムテーマ：$COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupLastExportLabel": {
+    "message": "前回のエクスポート"
+  },
+  "backupLastExportNever": {
+    "message": "なし"
+  },
+  "restorePointsTitle": {
+    "message": "復元ポイント"
+  },
+  "restorePointsHelp": {
+    "message": "復元ポイントはこのデバイスにだけ保存されます。バックアップファイルや同期には含まれません。拡張機能をアンインストールすると削除されます。"
+  },
+  "restorePointsEmpty": {
+    "message": "復元ポイントはまだありません。"
+  },
+  "restorePointsReadFailed": {
+    "message": "復元ポイントを読み込めませんでした。"
+  },
+  "restorePointSummary": {
+    "message": "$REASON$。ページ：$PAGES$、ハイライト：$HIGHLIGHTS$、単語：$WORDS$",
+    "placeholders": {
+      "reason": { "content": "$1" },
+      "pages": { "content": "$2" },
+      "highlights": { "content": "$3" },
+      "words": { "content": "$4" }
+    }
+  },
+  "restorePointReasonImport": {
+    "message": "バックアップのインポート前"
+  },
+  "restorePointReasonDelete": {
+    "message": "ライブラリでの削除前"
+  },
+  "restorePointReasonUpdate": {
+    "message": "拡張機能の更新後"
+  },
+  "restorePointRestore": {
+    "message": "復元…"
+  },
+  "restorePointRestoreAria": {
+    "message": "$WHEN$ の状態に戻す",
+    "placeholders": {
+      "when": { "content": "$1" }
+    }
+  },
+  "restorePointGone": {
+    "message": "この復元ポイントはもうありません。"
+  },
+  "restorePointPreviewMissing": {
+    "message": "足りないものだけを戻します（ハイライト：$HIGHLIGHTS$、単語：$WORDS$）。今あるものは変わりません。",
+    "placeholders": {
+      "highlights": { "content": "$1" },
+      "words": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewAddsBack": {
+    "message": "足りないものだけを戻します。今あるものは変わりません。"
+  },
+  "restorePointPreviewNothingMissing": {
+    "message": "足りないものはないので、復元するものはありません。"
+  },
+  "restorePointPreviewTitle": {
+    "message": "復元のプレビュー"
+  },
+  "restorePointChooseSections": {
+    "message": "復元する項目を選択"
+  },
+  "restorePointPreviewReady": {
+    "message": "復元のプレビューを表示しました。"
+  },
+  "restorePointPreviewHighlights": {
+    "message": "ページ：$PAGES$、項目：$ITEMS$",
+    "placeholders": {
+      "pages": { "content": "$1" },
+      "items": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewVocabulary": {
+    "message": "単語レコード：$COUNT$",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "restorePointsClear": {
+    "message": "復元ポイントを消去"
+  },
+  "restorePointsClearConfirm": {
+    "message": "このライブラリの復元ポイントをすべて削除しますか？"
+  },
+  "restorePointsClearDetail": {
+    "message": "単語、ハイライト、メモそのものはそのまま残ります。"
+  },
+  "restorePointsClearYes": {
+    "message": "消去"
+  },
+  "restorePointsClearFailed": {
+    "message": "復元ポイントを消去できませんでした。"
+  },
   "backupPreviewHighlights": {
     "message": "ページ：$PAGES$、項目：$ITEMS$、個人ライブラリ：$OWNER$",
     "placeholders": {
@@ -4655,6 +4753,8 @@
   "vocabBatchMarkLearning": { "message": "学習中に戻す" },
   "libraryDeleteVocabDetail": { "message": "文脈とメモも一緒に削除されます。元に戻せません。" },
   "libraryDeleteNotesDetail": { "message": "元に戻せません。" },
+  "libraryDeleteVocabBatchDetail": { "message": "文脈とメモも一緒に削除されます。削除の前に復元ポイントを保存するので、「設定 > データ」からこれらの単語を復元できます。" },
+  "libraryDeleteNotesBatchDetail": { "message": "削除の前に復元ポイントを保存するので、「設定 > データ」からこれらのハイライトを復元できます。" },
   "libraryDeleteDriveDetail": { "message": "ほかのデバイスでも、次回の Google Drive 同期で削除されます。" },
   "libraryEditGroups": { "message": "グループを編集" },
   "libraryNotePlaceholder": { "message": "連想、紛らわしい語、使い方のメモなどを書けます。入力欄から離れると自動で保存されます" },

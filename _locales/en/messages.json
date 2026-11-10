@@ -1357,6 +1357,104 @@
     "message": "Custom themes: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupLastExportLabel": {
+    "message": "Last export"
+  },
+  "backupLastExportNever": {
+    "message": "Never"
+  },
+  "restorePointsTitle": {
+    "message": "Restore points"
+  },
+  "restorePointsHelp": {
+    "message": "Restore points stay on this device. Backup files and sync don't include them. Uninstalling the extension deletes them."
+  },
+  "restorePointsEmpty": {
+    "message": "No restore points yet."
+  },
+  "restorePointsReadFailed": {
+    "message": "Couldn't load restore points."
+  },
+  "restorePointSummary": {
+    "message": "$REASON$. Pages: $PAGES$; highlights: $HIGHLIGHTS$; words: $WORDS$",
+    "placeholders": {
+      "reason": { "content": "$1" },
+      "pages": { "content": "$2" },
+      "highlights": { "content": "$3" },
+      "words": { "content": "$4" }
+    }
+  },
+  "restorePointReasonImport": {
+    "message": "Before importing a backup"
+  },
+  "restorePointReasonDelete": {
+    "message": "Before deleting in the library"
+  },
+  "restorePointReasonUpdate": {
+    "message": "After an extension update"
+  },
+  "restorePointRestore": {
+    "message": "Restore…"
+  },
+  "restorePointRestoreAria": {
+    "message": "Restore from $WHEN$",
+    "placeholders": {
+      "when": { "content": "$1" }
+    }
+  },
+  "restorePointGone": {
+    "message": "This restore point is no longer available."
+  },
+  "restorePointPreviewMissing": {
+    "message": "Adds back what is missing (highlights: $HIGHLIGHTS$, words: $WORDS$). Nothing you have now is changed.",
+    "placeholders": {
+      "highlights": { "content": "$1" },
+      "words": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewAddsBack": {
+    "message": "Adds back what is missing. Nothing you have now is changed."
+  },
+  "restorePointPreviewNothingMissing": {
+    "message": "Nothing is missing, so there is nothing to restore."
+  },
+  "restorePointPreviewTitle": {
+    "message": "Restore preview"
+  },
+  "restorePointChooseSections": {
+    "message": "Choose what to restore"
+  },
+  "restorePointPreviewReady": {
+    "message": "Restore preview ready."
+  },
+  "restorePointPreviewHighlights": {
+    "message": "Pages: $PAGES$; entries: $ITEMS$",
+    "placeholders": {
+      "pages": { "content": "$1" },
+      "items": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewVocabulary": {
+    "message": "Vocabulary records: $COUNT$",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "restorePointsClear": {
+    "message": "Clear restore points"
+  },
+  "restorePointsClearConfirm": {
+    "message": "Delete all restore points of this library?"
+  },
+  "restorePointsClearDetail": {
+    "message": "Your words, highlights and notes stay as they are."
+  },
+  "restorePointsClearYes": {
+    "message": "Clear"
+  },
+  "restorePointsClearFailed": {
+    "message": "Couldn't clear restore points."
+  },
   "backupPreviewHighlights": {
     "message": "Pages: $PAGES$; entries: $ITEMS$; personal library: $OWNER$",
     "placeholders": {
@@ -4665,6 +4763,8 @@
   "vocabBatchMarkLearning": { "message": "Back to learning" },
   "libraryDeleteVocabDetail": { "message": "Contexts and notes go too. This can't be undone." },
   "libraryDeleteNotesDetail": { "message": "This can't be undone." },
+  "libraryDeleteVocabBatchDetail": { "message": "Contexts and notes go too. Before deleting, a restore point is saved so you can bring these words back from Settings > Data." },
+  "libraryDeleteNotesBatchDetail": { "message": "Before deleting, a restore point is saved so you can bring these highlights back from Settings > Data." },
   "libraryDeleteDriveDetail": { "message": "Your other devices delete them at their next Google Drive sync." },
   "libraryEditGroups": { "message": "Edit groups" },
   "libraryNotePlaceholder": { "message": "Write anything: associations, easily confused words, usage reminders. Saved when you leave the box" },

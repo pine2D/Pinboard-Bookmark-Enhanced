@@ -1349,6 +1349,104 @@
     "message": "Motywy niestandardowe: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupLastExportLabel": {
+    "message": "Ostatni eksport"
+  },
+  "backupLastExportNever": {
+    "message": "Nigdy"
+  },
+  "restorePointsTitle": {
+    "message": "Punkty przywracania"
+  },
+  "restorePointsHelp": {
+    "message": "Punkty przywracania zostają na tym urządzeniu. Nie trafiają do plików kopii zapasowej ani do synchronizacji. Odinstalowanie rozszerzenia je usuwa."
+  },
+  "restorePointsEmpty": {
+    "message": "Nie ma jeszcze punktów przywracania."
+  },
+  "restorePointsReadFailed": {
+    "message": "Nie udało się wczytać punktów przywracania."
+  },
+  "restorePointSummary": {
+    "message": "$REASON$. Strony: $PAGES$; zaznaczenia: $HIGHLIGHTS$; słówka: $WORDS$",
+    "placeholders": {
+      "reason": { "content": "$1" },
+      "pages": { "content": "$2" },
+      "highlights": { "content": "$3" },
+      "words": { "content": "$4" }
+    }
+  },
+  "restorePointReasonImport": {
+    "message": "Przed importem kopii zapasowej"
+  },
+  "restorePointReasonDelete": {
+    "message": "Przed usunięciem w bibliotece"
+  },
+  "restorePointReasonUpdate": {
+    "message": "Po aktualizacji rozszerzenia"
+  },
+  "restorePointRestore": {
+    "message": "Przywróć…"
+  },
+  "restorePointRestoreAria": {
+    "message": "Przywróć stan z $WHEN$",
+    "placeholders": {
+      "when": { "content": "$1" }
+    }
+  },
+  "restorePointGone": {
+    "message": "Ten punkt przywracania już nie istnieje."
+  },
+  "restorePointPreviewMissing": {
+    "message": "Przywraca tylko to, czego brakuje (zaznaczenia: $HIGHLIGHTS$, słówka: $WORDS$). To, co masz teraz, się nie zmieni.",
+    "placeholders": {
+      "highlights": { "content": "$1" },
+      "words": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewAddsBack": {
+    "message": "Przywraca tylko to, czego brakuje. To, co masz teraz, się nie zmieni."
+  },
+  "restorePointPreviewNothingMissing": {
+    "message": "Niczego nie brakuje, więc nie ma czego przywracać."
+  },
+  "restorePointPreviewTitle": {
+    "message": "Podgląd przywracania"
+  },
+  "restorePointChooseSections": {
+    "message": "Wybierz dane do przywrócenia"
+  },
+  "restorePointPreviewReady": {
+    "message": "Podgląd przywracania jest gotowy."
+  },
+  "restorePointPreviewHighlights": {
+    "message": "Strony: $PAGES$; wpisy: $ITEMS$",
+    "placeholders": {
+      "pages": { "content": "$1" },
+      "items": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewVocabulary": {
+    "message": "Zapisane słówka: $COUNT$",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "restorePointsClear": {
+    "message": "Wyczyść punkty przywracania"
+  },
+  "restorePointsClearConfirm": {
+    "message": "Usunąć wszystkie punkty przywracania tej biblioteki?"
+  },
+  "restorePointsClearDetail": {
+    "message": "Słówka, zaznaczenia i notatki zostają bez zmian."
+  },
+  "restorePointsClearYes": {
+    "message": "Wyczyść"
+  },
+  "restorePointsClearFailed": {
+    "message": "Nie udało się wyczyścić punktów przywracania."
+  },
   "backupPreviewHighlights": {
     "message": "Strony: $PAGES$; wpisy: $ITEMS$; biblioteka osobista: $OWNER$",
     "placeholders": {
@@ -4655,6 +4753,8 @@
   "vocabBatchMarkLearning": { "message": "Do nauki" },
   "libraryDeleteVocabDetail": { "message": "Konteksty i notatki też zostaną usunięte. Tej operacji nie można cofnąć." },
   "libraryDeleteNotesDetail": { "message": "Tej operacji nie można cofnąć." },
+  "libraryDeleteVocabBatchDetail": { "message": "Konteksty i notatki też zostaną usunięte. Przed usunięciem zapisujemy punkt przywracania, więc te słówka odzyskasz w Ustawienia > Dane." },
+  "libraryDeleteNotesBatchDetail": { "message": "Przed usunięciem zapisujemy punkt przywracania, więc te zaznaczenia odzyskasz w Ustawienia > Dane." },
   "libraryDeleteDriveDetail": { "message": "Pozostałe urządzenia usuną je przy następnej synchronizacji z Dyskiem Google." },
   "libraryEditGroups": { "message": "Edytuj grupy" },
   "libraryNotePlaceholder": { "message": "Zapisz skojarzenia, mylone słowa, wskazówki użycia. Zapisuje się po opuszczeniu pola" },

@@ -13,6 +13,7 @@ function ownership(name) {
   if (/^dict-(?:entry|usage|evidence|archive)$/.test(name)) return ['library', 'md-preview'];
   if (name === 'ask-history') return ['md-preview'];
   if (/^ask-archive(?:-|$)/.test(name)) return ['background', 'library', 'md-preview'];
+  if (name === 'restore-points') return ['background', 'library', 'options'];
   if (name === 'tag-gov-layout') return ['options'];
   if (name === 'save-pipeline' || name.startsWith('bookmark-service')) return ['background', 'popup', 'md-preview'];
   if (['icon-state', 'wayback', 'url-strip'].includes(name)) return ['background'];

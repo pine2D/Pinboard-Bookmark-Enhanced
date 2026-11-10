@@ -228,12 +228,10 @@ function pbpSanitizeBackupSettings(data, exportableKeys, dropped) {
 }
 
 function pbpPreflightBackupPayload(data, exportableKeys) {
-  const schemaVersion = pbpBackupSchemaVersion(data);
+  const library = pbpPreflightBackupLibrary(data);
+  const { schemaVersion, metadata } = library;
   const droppedKeys = [];
   const safeData = pbpSanitizeBackupSettings(data, exportableKeys, droppedKeys);
-  const metadata = schemaVersion === 3
-    ? pbpSanitizeBackupMetadata(data._backup)
-    : undefined;
   let customCSS;
   let customOverlayCSS;
   // Type checks only — no size gate. An oversize overlay from a legacy backup
@@ -250,15 +248,6 @@ function pbpPreflightBackupPayload(data, exportableKeys) {
   const importedThemes = Object.prototype.hasOwnProperty.call(data, "savedThemes")
     ? pbpSanitizeBackupThemes(data.savedThemes)
     : undefined;
-  if (Object.prototype.hasOwnProperty.call(data, "_highlights") && !pbpIsPlainRecord(data._highlights)) {
-    throw pbpBackupValueError("_highlights");
-  }
-  if (Object.prototype.hasOwnProperty.call(data, "_highlightsOwner") && typeof data._highlightsOwner !== "string") {
-    throw pbpBackupValueError("_highlightsOwner");
-  }
-  const vocabulary = schemaVersion === 3 && Object.prototype.hasOwnProperty.call(data, "_vocabulary")
-    ? pbpSanitizeBackupVocabulary(data._vocabulary)
-    : undefined;
   const secretData = pbpSanitizeBackupSecrets(data);
   return {
     schemaVersion,
@@ -270,9 +259,9 @@ function pbpPreflightBackupPayload(data, exportableKeys) {
     customCSS,
     customOverlayCSS,
     importedThemes,
-    highlights: data._highlights,
-    highlightsOwner: data._highlightsOwner,
-    vocabulary,
+    highlights: library.highlights,
+    highlightsOwner: library.highlightsOwner,
+    vocabulary: library.vocabulary,
   };
 }
 
@@ -388,7 +377,10 @@ function pbpBackupHighlightWithRecordLock(key, work) {
 // required, not optional: a caller that forgets it fails loudly instead of
 // writing unverified. Same cadence as the vocabulary import, which re-checks
 // before and after every batch.
-async function pbpBackupWriteHighlights(cleaned, ownerScope, verifyOwner) {
+// addMissing (restoring a restore point): pbpAddMissingHighlightBackupRecord
+// instead of the per-article replace, and a record with nothing missing is
+// not written at all.
+async function pbpBackupWriteHighlights(cleaned, ownerScope, verifyOwner, { addMissing = false } = {}) {
   const records = [];
   const rest = {};
   for (const [key, value] of Object.entries(cleaned || {})) {
@@ -396,25 +388,41 @@ async function pbpBackupWriteHighlights(cleaned, ownerScope, verifyOwner) {
     else rest[key] = value;
   }
   if (Object.keys(rest).length) await chrome.storage.local.set(rest);
+  // One article that cannot be written (a corrupt stored record, a write the
+  // notes store refuses) no longer stops the rest: the loop goes on and the
+  // section reports failed at the end. An account switch still aborts at
+  // once, as it always did: the scope decided above is stale for every later
+  // article, so continuing would write into the wrong library.
+  let failed = 0;
   for (const [key, value] of records) {
     await verifyOwner();
     // Read and write inside the same lock: the merge is only sound against the
     // record as it stands at write time.
-    await pbpBackupHighlightWithRecordLock(key, async () => {
+    try { await pbpBackupHighlightWithRecordLock(key, async () => {
       // The lock and the storage read can both wait long enough for an account
       // switch. Re-check each boundary before committing this owner's merge.
       await verifyOwner();
       const stored = await chrome.storage.local.get(key);
       await verifyOwner();
-      const record = pbpMergeHighlightBackupRecord(stored[key], value, ownerScope);
+      const record = addMissing
+        ? pbpAddMissingHighlightBackupRecord(stored[key], value, ownerScope)
+        : pbpMergeHighlightBackupRecord(stored[key], value, ownerScope);
+      if (!record) return;
       if (typeof pbpNotesWriteRecord === "function") {
         await pbpNotesWriteRecord(key,record,ownerScope,{locked:true,getCurrentOwner:async()=>{
           await verifyOwner(); return ownerScope;
         }});
       } else await chrome.storage.local.set({ [key]: record });
-    });
+    }); } catch (error) {
+      await verifyOwner();
+      if (error?.code === "account_changed") throw error;
+      // Name and message only, never highlight text or the page.
+      console.warn("[backup] highlight record failed:", error?.name, error?.message);
+      failed++;
+    }
   }
   await verifyOwner();
+  if (failed) throw new Error("highlight records failed: " + failed);
 }
 
 // No DB is created by this probe. Any existing reading record or active Drive
@@ -517,6 +525,8 @@ async function pbpApplyBackupPayload(data, {
   readCurrentOwner,
   importVocabulary,
   onVocabularyProgress,
+  takeRestorePoint,
+  restorePoint = false,
 }) {
   const prepared = pbpPreflightBackupPayload(data, exportableKeys);
   const { schemaVersion, safeData, customCSS, customOverlayCSS, importedThemes } = prepared;
@@ -530,6 +540,12 @@ async function pbpApplyBackupPayload(data, {
     highlights: true,
     vocabulary: true,
   }, sections || {}, { secrets: (sections || {}).secrets === true });
+  // A restore point (restore-points.js) only ever restores the two library
+  // sections, whatever the payload claims to carry. `restorePoint` is set by
+  // the caller that read the payload with pbpRestorePointRead; a file that
+  // labels itself "restore-point" is an ordinary import.
+  const fromRestorePoint = restorePoint === true;
+  if (fromRestorePoint) Object.assign(selected, { settings: false, themes: false, secrets: false });
   const result = {
     settings: "skipped",
     themes: "skipped",
@@ -539,10 +555,25 @@ async function pbpApplyBackupPayload(data, {
     secretsSkipped: 0,
     vocabularyApplied: 0,
     vocabularyProcessed: 0,
+    fromRestorePoint,
   };
   const getOwner = readCurrentOwner || (async () => {
     return pbpPersonalLibraryAccount({initialize:false});
   });
+
+  // An import keeps a restore point of the library as it is now, before the
+  // first write of any section, whenever it can change highlights or
+  // vocabulary. Bounded and never throws (pbpRestorePointCreateBounded); a
+  // failed point does not stop the import. Restoring from a point takes none:
+  // it only adds back what is missing, so a point could not undo it and would
+  // only use up one of the kept slots (2026-11-10 ruling).
+  if (!fromRestorePoint &&
+      ((selected.highlights && prepared.highlights !== undefined) || (selected.vocabulary && prepared.vocabulary))) {
+    const takePoint = takeRestorePoint ||
+      (typeof pbpRestorePointCreateBounded === "function" ? pbpRestorePointCreateBounded : null);
+    const point = takePoint ? await takePoint("import") : null;
+    result.restorePointId = point?.id || "";
+  }
 
   const hasSettings = Object.keys(safeData).length ||
     customCSS !== undefined || customOverlayCSS !== undefined;
@@ -687,9 +718,12 @@ async function pbpApplyBackupPayload(data, {
         const cleaned = pbpScopeHighlightBackupImport(pbpCleanHighlightBackup(prepared.highlights), ownerScope);
         // Per-record locked read-modify-write; see pbpBackupWriteHighlights.
         // Empty input writes nothing and still reports applied, as the flat set did.
+        // A restore point only adds back what is missing (2026-11-10 ruling):
+        // a per-article replace would drop highlights made since, and the
+        // deletion would reach other devices through Drive.
         await pbpBackupWriteHighlights(cleaned, ownerScope, async () => {
           if (pbpBackupOwnerScope(await getOwner()) !== ownerScope) throw new Error("highlight owner mismatch");
-        });
+        }, { addMissing: fromRestorePoint });
         result.highlights = "applied";
       }
     } catch (error) {
@@ -711,7 +745,8 @@ async function pbpApplyBackupPayload(data, {
       for (let offset = 0; offset < prepared.vocabulary.records.length; offset += 100) {
         if (pbpBackupOwnerScope(await getOwner()) !== scope) throw new Error("vocabulary owner mismatch");
         const batch = prepared.vocabulary.records.slice(offset, offset + 100);
-        const imported = await importer(scope, batch, 100);
+        // A restore point never changes or merges into a word that exists now.
+        const imported = await importer(scope, batch, 100, fromRestorePoint ? { onlyMissing: true } : undefined);
         if (!imported || !imported.ok) throw new Error("vocabulary import failed");
         // Two different numbers, and the UI wants them in two different places.
         // The importer skips a record whose stored copy already matches the
@@ -770,6 +805,13 @@ async function pbpApplyBackupPayload(data, {
     ? "importPartial" : "importedReload";
   return result;
 }
+
+// Plain-words reason for each restore point (restore-points.js reasons).
+const PBP_RESTORE_POINT_REASON_KEYS = Object.freeze({
+  import: "restorePointReasonImport",
+  delete: "restorePointReasonDelete",
+  update: "restorePointReasonUpdate",
+});
 
 // A settings/theme import is written behind the form's back: every control on
 // this page was filled once at load, so after "Apply selected" the form kept
@@ -831,6 +873,9 @@ function pbpBackupCreatedLabel(createdAt) {
 function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, beforeExport, beforeApply, afterApply, onApplied }) {
   let selectionToken = 0;
   let selectionText = "";
+  // True only while the selection came from pbpRestorePointRead (the Data
+  // tab's list), never from what a payload says about itself.
+  let selectionIsRestorePoint = false;
   let busyToken = null;
   const secretsToggle = $id("opt-backup-include-secrets");
   const secretsWarning = $id("backup-secrets-warning");
@@ -864,6 +909,38 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     if (importButton) importButton.disabled = false;
     if (apply) apply.disabled = true;
   };
+  // A restore point holds highlights and vocabulary only, so its preview and
+  // result leave the other sections out instead of listing them as empty.
+  const showLibrarySectionsOnly = (libraryOnly, sections) => {
+    ["settings", "themes", "secrets"].forEach((key) => {
+      const count = $id(`backup-preview-${key}`)?.parentElement;
+      if (count) count.hidden = libraryOnly;
+      const pick = $id(`backup-section-${key}`)?.closest(".pref-row");
+      if (pick) pick.hidden = libraryOnly;
+      const outcome = $id(`backup-result-${key}`)?.parentElement;
+      if (outcome) outcome.hidden = libraryOnly;
+    });
+    // A section the restore point holds nothing of gets no checkbox.
+    if (sections) {
+      ["highlights", "vocabulary"].forEach((key) => {
+        const pick = $id(`backup-section-${key}`)?.closest(".pref-row");
+        if (pick) pick.hidden = libraryOnly && !sections[key]?.enabled;
+      });
+    }
+  };
+  // Restore wording for a restore point; a file keeps the import wording.
+  const setPreviewWording = (restorePoint) => {
+    setPreviewText("backup-preview-title", t(restorePoint ? "restorePointPreviewTitle" : "backupPreviewTitle"));
+    const legend = document.querySelector("#backup-import-preview .backup-section-picker legend");
+    if (legend) legend.textContent = t(restorePoint ? "restorePointChooseSections" : "backupChooseSections");
+    // What will happen comes first for a restore point, before the totals.
+    const semantics = $id("backup-preview-semantics");
+    const counts = document.querySelector("#backup-import-preview .backup-preview-counts");
+    if (semantics && counts) {
+      if (restorePoint) counts.before(semantics);
+      else counts.after(semantics);
+    }
+  };
   const renderPreview = (preview) => {
     const metadata = preview.metadata || {};
     setPreviewText("backup-preview-meta", t(
@@ -878,17 +955,19 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       ? t("backupPreviewSettingsOverlay", String(preview.settingsCount), String(preview.overlayBytes))
       : t("backupPreviewSettings", String(preview.settingsCount)));
     setPreviewText("backup-preview-themes", t("backupPreviewThemes", String(preview.themeCount)));
-    setPreviewText("backup-preview-highlights", t(
-      "backupPreviewHighlights",
-      String(preview.highlightPages),
-      String(preview.highlightEntries),
-      preview.highlightsOwner || t("backupPreviewLegacyOwner")
-    ));
-    setPreviewText("backup-preview-vocabulary", t(
-      "backupPreviewVocabulary",
-      String(preview.vocabularyCount),
-      preview.vocabularyOwner || t("backupPreviewNone")
-    ));
+    // A restore point always belongs to the current library, so its rows
+    // leave the personal library out.
+    setPreviewText("backup-preview-highlights", preview.restorePoint
+      ? t("restorePointPreviewHighlights", String(preview.highlightPages), String(preview.highlightEntries))
+      : t("backupPreviewHighlights",
+        String(preview.highlightPages),
+        String(preview.highlightEntries),
+        preview.highlightsOwner || t("backupPreviewLegacyOwner")));
+    setPreviewText("backup-preview-vocabulary", preview.restorePoint
+      ? t("restorePointPreviewVocabulary", String(preview.vocabularyCount))
+      : t("backupPreviewVocabulary",
+        String(preview.vocabularyCount),
+        preview.vocabularyOwner || t("backupPreviewNone")));
     setPreviewText("backup-preview-secrets", t("backupPreviewSecrets", String(preview.secretCount)));
     const languages = Object.entries(preview.languages)
       .sort(([left], [right]) => left.localeCompare(right))
@@ -931,8 +1010,19 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       // not the default that "Apply selected" happens to carry along.
       checkbox.checked = key === "secrets" ? false : preview.sections[key].enabled;
     });
+    showLibrarySectionsOnly(preview.restorePoint === true, preview.sections);
+    setPreviewWording(preview.restorePoint === true);
+    // A restore point only adds back what is missing; a file replaces per
+    // article and merges vocabulary (backupPreviewSemantics).
+    const missing = preview.missing;
+    const nothingMissing = !!(preview.restorePoint && missing && !missing.highlights && !missing.vocabulary);
+    setPreviewText("backup-preview-semantics", !preview.restorePoint ? t("backupPreviewSemantics")
+      : nothingMissing ? t("restorePointPreviewNothingMissing")
+        : missing ? t("restorePointPreviewMissing", String(missing.highlights), String(missing.vocabulary))
+          : t("restorePointPreviewAddsBack"));
     const apply = $id("backup-import-apply");
-    if (apply) apply.disabled = !Object.values(preview.sections).some((section) => section.enabled);
+    // Restoring would write nothing, so there is nothing to apply.
+    if (apply) apply.disabled = nothingMissing || !Object.values(preview.sections).some((section) => section.enabled);
     const host = $id("backup-import-preview");
     if (host) host.hidden = false;
     return warnings.length;
@@ -948,6 +1038,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     ["settings", "themes", "highlights", "vocabulary", "secrets"].forEach((key) => {
       setPreviewText(`backup-result-${key}`, t(statusKeys[result[key]] || "backupStatusFailed"));
     });
+    showLibrarySectionsOnly(result.fromRestorePoint === true);
     const resultHost = $id("backup-import-result");
     if (resultHost) resultHost.hidden = false;
     const status = $id("import-status");
@@ -975,6 +1066,87 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
   }
 
   $id("import-settings").addEventListener("click", () => $id("import-settings-file").click());
+
+  // Last export time and this library's restore points (restore-points.js).
+  // Both are local to this device. Rendered at load, after an export, after
+  // an apply, and whenever the page comes back into view (a delete in the
+  // library tab takes a point while this page sits in the background).
+  let historyRun = 0;
+  const renderBackupHistory = async () => {
+    const lastExportEl = $id("backup-last-export");
+    const list = $id("restore-point-list");
+    const empty = $id("restore-point-empty");
+    const clear = $id("restore-point-clear");
+    if (!lastExportEl || !list || !empty) return;
+    const run = ++historyRun;
+    let lastExport = "";
+    try {
+      const stored = await chrome.storage.local.get(PBP_BACKUP_LAST_EXPORT_KEY);
+      if (typeof stored?.[PBP_BACKUP_LAST_EXPORT_KEY] === "string") lastExport = stored[PBP_BACKUP_LAST_EXPORT_KEY];
+    } catch (error) {
+      console.warn("[backup] last-export read failed:", error?.name, error?.message);
+    }
+    let points = null;
+    try {
+      points = typeof pbpRestorePointList === "function" ? await pbpRestorePointList(await readOwner()) : [];
+    } catch (error) {
+      console.warn("[backup] restore point list failed:", error?.name, error?.message);
+    }
+    if (run !== historyRun) return;
+    lastExportEl.textContent = lastExport ? pbpBackupCreatedLabel(lastExport) : t("backupLastExportNever");
+    const rows = (points || []).map((point) => {
+      const when = pbpBackupCreatedLabel(point.createdAt);
+      const row = document.createElement("div");
+      const term = document.createElement("dt");
+      term.textContent = when;
+      const detail = document.createElement("dd");
+      const summary = document.createElement("span");
+      summary.textContent = t("restorePointSummary",
+        t(PBP_RESTORE_POINT_REASON_KEYS[point.reason] || "restorePointReasonImport"),
+        String(point.counts?.articles || 0), String(point.counts?.highlights || 0), String(point.counts?.vocabulary || 0));
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn btn-sm";
+      button.textContent = t("restorePointRestore");
+      button.setAttribute("aria-label", t("restorePointRestoreAria", when));
+      button.addEventListener("click", () => openRestorePoint(point.id));
+      detail.append(summary, button);
+      row.append(term, detail);
+      return row;
+    });
+    list.replaceChildren(...rows);
+    list.hidden = !rows.length;
+    if (clear) clear.hidden = !rows.length;
+    empty.hidden = rows.length > 0;
+    empty.textContent = t(points ? "restorePointsEmpty" : "restorePointsReadFailed");
+  };
+  const refreshBackupHistory = () => {
+    renderBackupHistory().catch((error) => console.warn("[backup] history render failed:", error?.name, error?.message));
+  };
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshBackupHistory();
+  });
+  // Clears this library's restore points only (pbpRestorePointClear), after
+  // the confirm every destructive Settings action uses.
+  const clearButton = $id("restore-point-clear");
+  clearButton?.addEventListener("click", () => {
+    showConfirmPopover(clearButton, {
+      msg: t("restorePointsClearConfirm"),
+      detail: t("restorePointsClearDetail"),
+      yesText: t("restorePointsClearYes"),
+      noText: t("cancel"),
+      onConfirm: async () => {
+        try {
+          await pbpRestorePointClear(await readOwner());
+        } catch (error) {
+          console.warn("[backup] restore point clear failed:", error?.name, error?.message);
+          setStatusIcon($id("import-status"), false, t("restorePointsClearFailed"));
+        }
+        refreshBackupHistory();
+      },
+    });
+  });
+  refreshBackupHistory();
 
   const runExport = async () => {
     try {
@@ -1044,23 +1216,12 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       };
       let highlightsOwnerDropped = false;
       if (raw.backupIncludeHighlights !== false) {
-        let allLocal;
-        if (typeof chrome.storage.local.getKeys === "function") {
-          // Chrome 130+: list keys without deserializing values, then fetch
-          // only the highlight records, instead of get(null) deserializing
-          // the ENTIRE local area (jina_md_ page caches included). Do NOT
-          // copy background.js's pbpClaimLegacyHighlightOwners filter
-          // (`k !== "pbp_hl_last_color"`) -- that one-shot migration doesn't
-          // care about the color preference, but this backup must keep
-          // pbp_hl_last_color: pbpBuildHighlightBackup writes it into the
-          // export below. pbpIsHighlightBackupKey (shared.js) is prefix-only,
-          // so it keeps it. min_chrome is 123 < 130, so the get(null)
-          // fallback below stays.
-          const keys = (await chrome.storage.local.getKeys()).filter(pbpIsHighlightBackupKey);
-          allLocal = keys.length ? await chrome.storage.local.get(keys) : {};
-        } else {
-          allLocal = await chrome.storage.local.get(null);
-        }
+        // The read restore points use too (shared.js). It keeps
+        // pbp_hl_last_color, which this backup must carry:
+        // pbpBuildHighlightBackup writes it into the export below. Do NOT
+        // copy background.js's pbpClaimLegacyHighlightOwners filter
+        // (`k !== "pbp_hl_last_color"`) here.
+        const allLocal = await pbpReadHighlightBackupSource();
         // Either path is a real round trip another tab can switch accounts
         // across. The same re-check the vocabulary branch below makes after
         // its own read: `owner` both filters the items and becomes the file's
@@ -1127,6 +1288,14 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       const a = document.createElement("a");
       a.href = url; a.download = pbpBackupFilename(new Date(), includeSecrets); a.click();
       URL.revokeObjectURL(url);
+      // The file is out; remember when. A failed write only costs the line
+      // on this page, so it is reported and not treated as a failed export.
+      try {
+        await chrome.storage.local.set({ [PBP_BACKUP_LAST_EXPORT_KEY]: new Date().toISOString() });
+      } catch (error) {
+        console.warn("[export] last-export time not saved:", error?.name, error?.message);
+      }
+      refreshBackupHistory();
     } catch (err) {
       console.error("[export] failed", err);
       const status = $id("import-status");
@@ -1163,19 +1332,24 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     });
   });
 
-  $id("import-settings-file").addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  // A new selection (a file, or a restore point) replaces whatever preview
+  // or result is on screen and strands any read still in flight.
+  const beginSelection = () => {
     const token = ++selectionToken;
     selectionText = "";
+    selectionIsRestorePoint = false;
     resetBusyForSelection();
     const previewHost = $id("backup-import-preview");
     if (previewHost) previewHost.hidden = true;
     const resultHost = $id("backup-import-result");
     if (resultHost) resultHost.hidden = true;
+    return token;
+  };
+
+  // Shared by the file picker and the restore point list: both end in the
+  // same preview, and Apply re-reads selectionText either way.
+  const showPreview = async (text, token, fromRestorePoint = false) => {
     try {
-      const text = await file.text();
-      if (token !== selectionToken) return;
       const data = JSON.parse(text);
       const prepared = pbpPreflightBackupPayload(data, exportableKeys);
       const [currentOwner, local] = await Promise.all([
@@ -1184,13 +1358,19 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       ]);
       if (token !== selectionToken) return;
       selectionText = text;
+      selectionIsRestorePoint = fromRestorePoint === true;
       const adoptOwner = await pbpBackupLibraryIdentity(prepared, {vocabulary:true,highlights:true});
       if (token !== selectionToken) return;
       const preview = pbpBuildBackupPreview(prepared, adoptOwner || currentOwner, {
         enabled: local.optSyncEnabled === true,
         localFallbackKeys: pbpDetectLargeLocalFallbacks(local),
-      });
+      }, { restorePoint: selectionIsRestorePoint });
       preview.libraryAdoption = !!adoptOwner;
+      if (selectionIsRestorePoint && typeof pbpRestorePointMissingCounts === "function") {
+        try { preview.missing = await pbpRestorePointMissingCounts(data, currentOwner); }
+        catch (error) { console.warn("[backup] missing count failed:", error?.name, error?.message); }
+        if (token !== selectionToken) return;
+      }
       let serviceState = null;
       try { serviceState = await pbpReadBookmarkServiceState(); }
       catch (error) { console.warn("[import] bookmark service read failed:", error?.name, error?.message); }
@@ -1207,7 +1387,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       const warningCount = renderPreview(preview);
       const status = $id("import-status");
       if (warningCount === 0) {
-        setStatusIcon(status, true, t("backupPreviewReady"));
+        setStatusIcon(status, true, t(preview.restorePoint ? "restorePointPreviewReady" : "backupPreviewReady"));
       } else if (status) {
         status.textContent = "";
       }
@@ -1220,8 +1400,41 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       const field = pbpBackupErrorField(err);
       setStatusIcon(status, false, field ? t("importInvalidField", field) : t("importInvalid"));
     }
+  };
+
+  $id("import-settings-file").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const token = beginSelection();
+    try {
+      const text = await file.text();
+      if (token === selectionToken) await showPreview(text, token);
+    } catch (err) {
+      console.error("[import] failed", err);
+      if (token === selectionToken) setStatusIcon($id("import-status"), false, t("importInvalid"));
+    }
     e.target.value = "";
   });
+
+  // Restore goes through the same preview as a file: pick, check, apply.
+  // The point is read for the current library only (pbpRestorePointRead).
+  const openRestorePoint = async (id) => {
+    const token = beginSelection();
+    let payload = null;
+    try {
+      payload = await pbpRestorePointRead(id, await readOwner());
+    } catch (error) {
+      console.warn("[backup] restore point read failed:", error?.name, error?.message);
+    }
+    if (token !== selectionToken) return;
+    if (!payload) {
+      setStatusIcon($id("import-status"), false, t("restorePointGone"));
+      refreshBackupHistory();
+      return;
+    }
+    await showPreview(JSON.stringify(payload), token, true);
+    if (token === selectionToken) $id("backup-import-preview")?.scrollIntoView?.({ block: "nearest" });
+  };
 
   // The preview's way out (2026-10-20, options critique 4): before this the
   // only exit was picking another file, so "did closing it import anything?"
@@ -1231,6 +1444,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     if (busyToken !== null) return;
     ++selectionToken;
     selectionText = "";
+    selectionIsRestorePoint = false;
     const previewHost = $id("backup-import-preview");
     if (previewHost) previewHost.hidden = true;
     const status = $id("import-status");
@@ -1241,6 +1455,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
   $id("backup-import-apply")?.addEventListener("click", async () => {
     const token = selectionToken;
     const text = selectionText;
+    const restorePoint = selectionIsRestorePoint;
     if (!text) return;
     let applyPaused = false;
     setApplyBusy(token, true);
@@ -1260,6 +1475,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
         saveOverlayWithFallback,
         loadThemes,
         sections: selected,
+        restorePoint,
         onVocabularyProgress: (done, total) => {
           setPreviewText("backup-import-progress", t(
             "backupImportProgress",
@@ -1268,6 +1484,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
           ));
         },
       });
+      refreshBackupHistory();
       if (token === selectionToken) {
         renderResult(applied);
         if (onApplied) {

@@ -1349,6 +1349,104 @@
     "message": "自訂主題：$COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupLastExportLabel": {
+    "message": "上次匯出"
+  },
+  "backupLastExportNever": {
+    "message": "從未"
+  },
+  "restorePointsTitle": {
+    "message": "還原點"
+  },
+  "restorePointsHelp": {
+    "message": "還原點只會保存在這部裝置上，不會放進備份檔案，也不會同步。解除安裝擴充功能後會一併刪除。"
+  },
+  "restorePointsEmpty": {
+    "message": "還沒有還原點。"
+  },
+  "restorePointsReadFailed": {
+    "message": "無法讀取還原點。"
+  },
+  "restorePointSummary": {
+    "message": "$REASON$。頁面：$PAGES$；標記：$HIGHLIGHTS$；生詞：$WORDS$",
+    "placeholders": {
+      "reason": { "content": "$1" },
+      "pages": { "content": "$2" },
+      "highlights": { "content": "$3" },
+      "words": { "content": "$4" }
+    }
+  },
+  "restorePointReasonImport": {
+    "message": "匯入備份前"
+  },
+  "restorePointReasonDelete": {
+    "message": "資料庫中刪除前"
+  },
+  "restorePointReasonUpdate": {
+    "message": "擴充功能更新後"
+  },
+  "restorePointRestore": {
+    "message": "還原…"
+  },
+  "restorePointRestoreAria": {
+    "message": "還原到 $WHEN$ 的狀態",
+    "placeholders": {
+      "when": { "content": "$1" }
+    }
+  },
+  "restorePointGone": {
+    "message": "找不到這個還原點了。"
+  },
+  "restorePointPreviewMissing": {
+    "message": "只補回缺少的內容（標記 $HIGHLIGHTS$，生詞 $WORDS$），現有的內容不會變動。",
+    "placeholders": {
+      "highlights": { "content": "$1" },
+      "words": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewAddsBack": {
+    "message": "只補回缺少的內容，現有的內容不會變動。"
+  },
+  "restorePointPreviewNothingMissing": {
+    "message": "沒有缺少的內容，不需要還原。"
+  },
+  "restorePointPreviewTitle": {
+    "message": "還原預覽"
+  },
+  "restorePointChooseSections": {
+    "message": "選擇要還原的內容"
+  },
+  "restorePointPreviewReady": {
+    "message": "還原預覽已準備好。"
+  },
+  "restorePointPreviewHighlights": {
+    "message": "頁面：$PAGES$；記錄：$ITEMS$",
+    "placeholders": {
+      "pages": { "content": "$1" },
+      "items": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewVocabulary": {
+    "message": "生詞記錄：$COUNT$",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "restorePointsClear": {
+    "message": "清除還原點"
+  },
+  "restorePointsClearConfirm": {
+    "message": "刪除這個資料庫的所有還原點？"
+  },
+  "restorePointsClearDetail": {
+    "message": "生詞、標記和筆記本身不受影響。"
+  },
+  "restorePointsClearYes": {
+    "message": "清除"
+  },
+  "restorePointsClearFailed": {
+    "message": "無法清除還原點。"
+  },
   "backupPreviewHighlights": {
     "message": "頁面：$PAGES$；記錄：$ITEMS$；個人資料庫：$OWNER$",
     "placeholders": {
@@ -4655,6 +4753,8 @@
   "vocabBatchMarkLearning": { "message": "恢復為學習中" },
   "libraryDeleteVocabDetail": { "message": "語境和筆記會一併刪除，無法復原。" },
   "libraryDeleteNotesDetail": { "message": "刪除後無法復原。" },
+  "libraryDeleteVocabBatchDetail": { "message": "語境和筆記會一併刪除。刪除前會先留一個還原點，之後可以在「設定 > 資料」把這些生詞還原回來。" },
+  "libraryDeleteNotesBatchDetail": { "message": "刪除前會先留一個還原點，之後可以在「設定 > 資料」把這些標記還原回來。" },
   "libraryDeleteDriveDetail": { "message": "其他裝置在下次 Google Drive 同步時亦會刪除。" },
   "libraryEditGroups": { "message": "編輯群組" },
   "libraryNotePlaceholder": { "message": "寫點甚麼：聯想、易混淆的詞、用法提醒。離開輸入框時會自動儲存" },

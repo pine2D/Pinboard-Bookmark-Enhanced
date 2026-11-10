@@ -1389,11 +1389,39 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     check("successful mutation with refresh failure moves focus to visible search", document.activeElement === $id("vocab-search") && !$id("vocab-search").closest("[hidden]"));
 
     await prepareSelection();
-    pbpVocabBatchDelete = async () => true;
+    // The restore point (restore-points.js) is taken after the confirm and
+    // before the store delete.
+    const pointOrder = [];
+    {
+      const realConfirm = showConfirmPopover;
+      const seen = [];
+      showConfirmPopover = (anchor, options) => { seen.push(options.detail); return true; };
+      try {
+        _pbpVocabBatchDeleteSelected();
+        _pbpVocabDeleteRow({ id: "x", term: "x" }, document.createElement("button"));
+      } finally { showConfirmPopover = realConfirm; }
+      check("the batch confirm says a restore point is kept; a single delete keeps its own text",
+        seen.length === 2 && seen[0].startsWith("libraryDeleteVocabBatchDetail") && seen[1].startsWith("libraryDeleteVocabDetail") &&
+        !seen[1].startsWith("libraryDeleteVocabBatchDetail"), JSON.stringify(seen));
+    }
+    let busyAtPoint = false;
+    globalThis.pbpRestorePointCreateBounded = async (reason) => {
+      const trigger = $id("vocab-batch-delete");
+      busyAtPoint = trigger.disabled && trigger.getAttribute("aria-busy") === "true";
+      pointOrder.push("point:" + reason);
+      return null;
+    };
+    pbpVocabBatchDelete = async () => { pointOrder.push("delete"); return true; };
     _pbpVocabReloadAfterMutation = async () => true;
-    _pbpVocabBatchDeleteSelected();
-    document.querySelector(".confirm-yes").click();
-    await task(); await task();
+    try {
+      _pbpVocabBatchDeleteSelected();
+      check("no restore point is taken before the delete is confirmed", pointOrder.length === 0);
+      document.querySelector(".confirm-yes").click();
+      await task(); await task();
+    } finally { delete globalThis.pbpRestorePointCreateBounded; }
+    check("a confirmed batch delete takes a \"delete\" restore point before deleting", pointOrder.join() === "point:delete,delete", pointOrder.join());
+    check("the batch Delete button is disabled and busy while the restore point is taken, and not after",
+      busyAtPoint === true && !$id("vocab-batch-delete").hasAttribute("aria-busy"));
     check("successful batch delete moves focus to visible search", document.activeElement === $id("vocab-search") && !$id("vocab-search").closest("[hidden]"));
 
     await prepareSelection();

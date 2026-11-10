@@ -1349,6 +1349,104 @@
     "message": "Eigene Themes: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupLastExportLabel": {
+    "message": "Letzter Export"
+  },
+  "backupLastExportNever": {
+    "message": "Nie"
+  },
+  "restorePointsTitle": {
+    "message": "Wiederherstellungspunkte"
+  },
+  "restorePointsHelp": {
+    "message": "Wiederherstellungspunkte bleiben auf diesem Gerät. Sie sind nicht in Sicherungsdateien und werden nicht synchronisiert. Wenn du die Erweiterung deinstallierst, werden sie gelöscht."
+  },
+  "restorePointsEmpty": {
+    "message": "Noch keine Wiederherstellungspunkte."
+  },
+  "restorePointsReadFailed": {
+    "message": "Wiederherstellungspunkte konnten nicht geladen werden."
+  },
+  "restorePointSummary": {
+    "message": "$REASON$. Seiten: $PAGES$; Markierungen: $HIGHLIGHTS$; Vokabeln: $WORDS$",
+    "placeholders": {
+      "reason": { "content": "$1" },
+      "pages": { "content": "$2" },
+      "highlights": { "content": "$3" },
+      "words": { "content": "$4" }
+    }
+  },
+  "restorePointReasonImport": {
+    "message": "Vor dem Import einer Sicherung"
+  },
+  "restorePointReasonDelete": {
+    "message": "Vor dem Löschen in der Bibliothek"
+  },
+  "restorePointReasonUpdate": {
+    "message": "Nach einem Update der Erweiterung"
+  },
+  "restorePointRestore": {
+    "message": "Wiederherstellen…"
+  },
+  "restorePointRestoreAria": {
+    "message": "Stand vom $WHEN$ wiederherstellen",
+    "placeholders": {
+      "when": { "content": "$1" }
+    }
+  },
+  "restorePointGone": {
+    "message": "Dieser Wiederherstellungspunkt ist nicht mehr da."
+  },
+  "restorePointPreviewMissing": {
+    "message": "Fügt nur wieder hinzu, was fehlt (Markierungen: $HIGHLIGHTS$, Vokabeln: $WORDS$). Was jetzt da ist, bleibt unverändert.",
+    "placeholders": {
+      "highlights": { "content": "$1" },
+      "words": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewAddsBack": {
+    "message": "Fügt nur wieder hinzu, was fehlt. Was jetzt da ist, bleibt unverändert."
+  },
+  "restorePointPreviewNothingMissing": {
+    "message": "Es fehlt nichts, also gibt es nichts wiederherzustellen."
+  },
+  "restorePointPreviewTitle": {
+    "message": "Wiederherstellungsvorschau"
+  },
+  "restorePointChooseSections": {
+    "message": "Wiederherzustellende Inhalte auswählen"
+  },
+  "restorePointPreviewReady": {
+    "message": "Die Wiederherstellungsvorschau ist bereit."
+  },
+  "restorePointPreviewHighlights": {
+    "message": "Seiten: $PAGES$; Einträge: $ITEMS$",
+    "placeholders": {
+      "pages": { "content": "$1" },
+      "items": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewVocabulary": {
+    "message": "Vokabeleinträge: $COUNT$",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "restorePointsClear": {
+    "message": "Wiederherstellungspunkte löschen"
+  },
+  "restorePointsClearConfirm": {
+    "message": "Alle Wiederherstellungspunkte dieser Bibliothek löschen?"
+  },
+  "restorePointsClearDetail": {
+    "message": "Deine Vokabeln, Markierungen und Notizen bleiben, wie sie sind."
+  },
+  "restorePointsClearYes": {
+    "message": "Löschen"
+  },
+  "restorePointsClearFailed": {
+    "message": "Wiederherstellungspunkte konnten nicht gelöscht werden."
+  },
   "backupPreviewHighlights": {
     "message": "Seiten: $PAGES$; Einträge: $ITEMS$; persönliche Bibliothek: $OWNER$",
     "placeholders": {
@@ -4655,6 +4753,8 @@
   "vocabBatchMarkLearning": { "message": "Wieder lernen" },
   "libraryDeleteVocabDetail": { "message": "Kontexte und Notizen werden mitgelöscht. Das lässt sich nicht rückgängig machen." },
   "libraryDeleteNotesDetail": { "message": "Das lässt sich nicht rückgängig machen." },
+  "libraryDeleteVocabBatchDetail": { "message": "Kontexte und Notizen werden mitgelöscht. Vorher wird ein Wiederherstellungspunkt gespeichert, damit du diese Vokabeln unter Einstellungen > Daten zurückholen kannst." },
+  "libraryDeleteNotesBatchDetail": { "message": "Vorher wird ein Wiederherstellungspunkt gespeichert, damit du diese Markierungen unter Einstellungen > Daten zurückholen kannst." },
   "libraryDeleteDriveDetail": { "message": "Deine anderen Geräte löschen sie beim nächsten Abgleich mit Google Drive ebenfalls." },
   "libraryEditGroups": { "message": "Gruppen bearbeiten" },
   "libraryNotePlaceholder": { "message": "Schreib etwas dazu: Assoziationen, Verwechslungsgefahr, Hinweise zur Verwendung. Wird beim Verlassen des Felds gespeichert" },

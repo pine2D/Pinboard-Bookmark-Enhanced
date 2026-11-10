@@ -1349,6 +1349,104 @@
     "message": "Пользовательских тем: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupLastExportLabel": {
+    "message": "Последний экспорт"
+  },
+  "backupLastExportNever": {
+    "message": "Никогда"
+  },
+  "restorePointsTitle": {
+    "message": "Точки восстановления"
+  },
+  "restorePointsHelp": {
+    "message": "Точки восстановления хранятся только на этом устройстве. Они не попадают в файлы резервных копий и не синхронизируются. При удалении расширения они тоже удаляются."
+  },
+  "restorePointsEmpty": {
+    "message": "Точек восстановления пока нет."
+  },
+  "restorePointsReadFailed": {
+    "message": "Не удалось загрузить точки восстановления."
+  },
+  "restorePointSummary": {
+    "message": "$REASON$. Страниц: $PAGES$; выделений: $HIGHLIGHTS$; слов: $WORDS$",
+    "placeholders": {
+      "reason": { "content": "$1" },
+      "pages": { "content": "$2" },
+      "highlights": { "content": "$3" },
+      "words": { "content": "$4" }
+    }
+  },
+  "restorePointReasonImport": {
+    "message": "Перед импортом резервной копии"
+  },
+  "restorePointReasonDelete": {
+    "message": "Перед удалением в библиотеке"
+  },
+  "restorePointReasonUpdate": {
+    "message": "После обновления расширения"
+  },
+  "restorePointRestore": {
+    "message": "Восстановить…"
+  },
+  "restorePointRestoreAria": {
+    "message": "Вернуть состояние на $WHEN$",
+    "placeholders": {
+      "when": { "content": "$1" }
+    }
+  },
+  "restorePointGone": {
+    "message": "Этой точки восстановления больше нет."
+  },
+  "restorePointPreviewMissing": {
+    "message": "Возвращает только то, чего не хватает (выделений: $HIGHLIGHTS$, слов: $WORDS$). То, что есть сейчас, не меняется.",
+    "placeholders": {
+      "highlights": { "content": "$1" },
+      "words": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewAddsBack": {
+    "message": "Возвращает только то, чего не хватает. То, что есть сейчас, не меняется."
+  },
+  "restorePointPreviewNothingMissing": {
+    "message": "Ничего не пропало, восстанавливать нечего."
+  },
+  "restorePointPreviewTitle": {
+    "message": "Предварительный просмотр восстановления"
+  },
+  "restorePointChooseSections": {
+    "message": "Выберите данные для восстановления"
+  },
+  "restorePointPreviewReady": {
+    "message": "Предварительный просмотр восстановления готов."
+  },
+  "restorePointPreviewHighlights": {
+    "message": "Страниц: $PAGES$; записей: $ITEMS$",
+    "placeholders": {
+      "pages": { "content": "$1" },
+      "items": { "content": "$2" }
+    }
+  },
+  "restorePointPreviewVocabulary": {
+    "message": "Сохранённые слова: $COUNT$",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "restorePointsClear": {
+    "message": "Очистить точки восстановления"
+  },
+  "restorePointsClearConfirm": {
+    "message": "Удалить все точки восстановления этой библиотеки?"
+  },
+  "restorePointsClearDetail": {
+    "message": "Сами слова, выделения и заметки останутся на месте."
+  },
+  "restorePointsClearYes": {
+    "message": "Очистить"
+  },
+  "restorePointsClearFailed": {
+    "message": "Не удалось очистить точки восстановления."
+  },
   "backupPreviewHighlights": {
     "message": "Страниц: $PAGES$; записей: $ITEMS$; личная библиотека: $OWNER$",
     "placeholders": {
@@ -4655,6 +4753,8 @@
   "vocabBatchMarkLearning": { "message": "Учить снова" },
   "libraryDeleteVocabDetail": { "message": "Контексты и заметки тоже удалятся. Это действие нельзя отменить." },
   "libraryDeleteNotesDetail": { "message": "Это действие нельзя отменить." },
+  "libraryDeleteVocabBatchDetail": { "message": "Контексты и заметки тоже удалятся. Перед удалением сохраняется точка восстановления, и эти слова можно будет вернуть в разделе «Настройки > Данные»." },
+  "libraryDeleteNotesBatchDetail": { "message": "Перед удалением сохраняется точка восстановления, и эти выделения можно будет вернуть в разделе «Настройки > Данные»." },
   "libraryDeleteDriveDetail": { "message": "На других устройствах они удалятся при следующей синхронизации с Google Диском." },
   "libraryEditGroups": { "message": "Изменить группы" },
   "libraryNotePlaceholder": { "message": "Запишите ассоциации, похожие слова, подсказки по употреблению. Сохраняется, когда вы уходите из поля" },
