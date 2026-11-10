@@ -127,7 +127,7 @@ const OLD_LABELS = [
   "[render-audit] checking hand-written render oracle (contrast + geometry + media preferences)",
   "[options-help-render] checking semantic roles and raster alignment",
   "[docs-lint] checking README x9 mirror + prose contracts + .claude/expiring-items.md 临时事项 expiry dates",
-  "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger) + lint self-tests",
+  "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger, store ledger) + lint self-tests",
   "[rules-lint] checking CLAUDE.md index, rule files, skills, backticked references and number claims + lint self-tests",
   "[store-descriptions] checking CWS store copy is regenerated from the READMEs",
   "[hooks] checking installed git hooks still delegate to the tracked scripts",

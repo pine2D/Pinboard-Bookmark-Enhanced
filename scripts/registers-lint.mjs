@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Lint for the three registers under .claude/: decisions.md, acceptance-debt.md,
-// flake-ledger.md. Format contract: each file's header note and the Task 0
+// Lint for the four registers under .claude/: decisions.md, acceptance-debt.md,
+// flake-ledger.md, store-ledger.md. Format contract: each file's header note and the Task 0
 // brief. Expiry uses the same 14-day grace window as docs-lint's 临时事项 check:
 // overdue 1-14 days WARNs, more than 14 days FAILs.
 //
@@ -8,9 +8,11 @@
 // The CLI reads the files; PBP_LINT_TODAY and PBP_REGISTERS_DIR override the
 // date and the directory (command-line tests only).
 //
-//   node scripts/registers-lint.mjs                       check the three files
+//   node scripts/registers-lint.mjs                       check the four files
+//   node scripts/registers-lint.mjs --store-check 3.0.4   may this version go to the store yet?
 //   node scripts/registers-lint.mjs --release-gate        list 待验; exit 1 on overdue
 //   node scripts/registers-lint.mjs --release-gate --accept-debt
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +25,15 @@ const PENDING_HEADER = ["编号", "登记日", "来源", "验什么", "怎么验
 const DONE_HEADER = ["编号", "清账日", "结果"];
 const FLAKE_HEADER = ["日期", "用例", "现象", "状态", "到期日"];
 const ID_RE = /^A-\d{3}$/;
+const STORE_SUBMIT_HEADER = ["版本", "提交日", "结果", "结果日", "备注"];
+const STORE_DATA_HEADER = ["日期", "周用户", "安装", "卸载", "评分", "评价数"];
+const STORE_RESULTS = ["审核中", "通过", "被拒", "撤回"];
+const VERSION_RE = /^\d+\.\d+\.\d+$/;
+// Release policy (user ruling 2026-11-10): a candidate is used for three days
+// before it goes to the store, and the store gets a version every 2-4 weeks.
+export const STORE_SOAK_DAYS = 3;
+export const STORE_GAP_MIN_DAYS = 14;
+export const STORE_GAP_MAX_DAYS = 28;
 
 // ---- parsing ----
 function splitCells(line) {
@@ -265,6 +276,99 @@ export function lintFlakeLedgerDetailed(text, { today }) {
   return { errors, warnings, dueErrors };
 }
 
+// ---- store-ledger.md ----
+function storeTables(text) {
+  const tables = parseTables(text);
+  return { all: tables, submits: tables.find((t) => t.heading === "提交"), data: tables.find((t) => t.heading === "数据") };
+}
+export function lintStoreLedger(text, { today }) {
+  const errors = [], warnings = [];
+  const at = (n) => `store-ledger.md:${n}:`;
+  const { all, submits, data } = storeTables(text);
+  checkStructure(all, (h) => h === "提交" || h === "数据", "「## 提交」和「## 数据」", at, errors);
+  if (!submits) errors.push("store-ledger.md: 缺少「## 提交」下的表");
+  else if (checkShape(submits, STORE_SUBMIT_HEADER, at, errors)) {
+    const seen = new Map();
+    for (const row of submits.rows) {
+      if (!checkRow(row, STORE_SUBMIT_HEADER, at, errors)) continue;
+      const [version, sent, result, resultDay, note] = row.cells;
+      if (!VERSION_RE.test(version)) errors.push(`${at(row.line)} 版本 "${version}" 不是 3.0.3 这种形式`);
+      const sentOk = sent === "-" || checkPastDate(sent, "提交日", row, today, at, errors);
+      if (!STORE_RESULTS.includes(result)) { errors.push(`${at(row.line)} 结果 "${result}" 不在允许范围内（${STORE_RESULTS.join("、")}）`); continue; }
+      if (result === "审核中") {
+        if (sent === "-") errors.push(`${at(row.line)} 「审核中」的提交日不能写 -`);
+        if (resultDay !== "-") errors.push(`${at(row.line)} 「审核中」的结果日要写 -，出结果后再把两格一起改`);
+      } else if (resultDay !== "-" && checkPastDate(resultDay, "结果日", row, today, at, errors)) {
+        if (sentOk && sent !== "-" && parseDate(resultDay) < parseDate(sent)) errors.push(`${at(row.line)} 结果日 ${resultDay} 早于提交日 ${sent}`);
+      }
+      if (result === "被拒" && note === "-") errors.push(`${at(row.line)} 「被拒」要在备注里写原因`);
+      const key = `${version}\u0000${sent}`;
+      if (seen.has(key)) errors.push(`${at(row.line)} 重复的「版本 + 提交日」，第 ${seen.get(key)} 行已有`);
+      else seen.set(key, row.line);
+    }
+  }
+  if (!data) errors.push("store-ledger.md: 缺少「## 数据」下的表");
+  else if (checkShape(data, STORE_DATA_HEADER, at, errors)) {
+    const days = new Map();
+    for (const row of data.rows) {
+      if (!checkRow(row, STORE_DATA_HEADER, at, errors)) continue;
+      const [day, ...nums] = row.cells;
+      checkPastDate(day, "日期", row, today, at, errors);
+      if (days.has(day)) errors.push(`${at(row.line)} 日期 ${day} 重复，第 ${days.get(day)} 行已有`);
+      else days.set(day, row.line);
+      nums.forEach((v, i) => {
+        const label = STORE_DATA_HEADER[i + 1];
+        if (v === "-") return;
+        if (!/^\d+(\.\d+)?$/.test(v)) errors.push(`${at(row.line)} 「${label}」"${v}" 要写数字，没有就写 -`);
+        else if (label === "评分" && Number(v) > 5) errors.push(`${at(row.line)} 评分 ${v} 超过 5`);
+        else if (label !== "评分" && v.includes(".")) errors.push(`${at(row.line)} 「${label}」"${v}" 要写整数`);
+      });
+      if (nums.every((v) => v === "-")) errors.push(`${at(row.line)} 这一行没有任何数字`);
+    }
+  }
+  return { errors, warnings };
+}
+
+// May `version` (released on `releasedOn`) go to the store today? `ready` only
+// reflects the three-day rule; the 2-4 week spacing is advice in `lines`.
+export function storeReadiness(text, { today, version, releasedOn }) {
+  const lines = [];
+  const used = daysBetween(today, releasedOn);
+  const ready = used >= STORE_SOAK_DAYS;
+  if (ready) lines.push(`v${version} 发版于 ${releasedOn}，已用 ${used} 天，满 ${STORE_SOAK_DAYS} 天`);
+  else {
+    const first = new Date(parseDate(releasedOn) + STORE_SOAK_DAYS * DAY_MS).toISOString().slice(0, 10);
+    lines.push(`v${version} 发版于 ${releasedOn}，只用了 ${used} 天，不满 ${STORE_SOAK_DAYS} 天。最早 ${first} 提交`);
+  }
+  const { submits } = storeTables(text);
+  const rows = submits && sameHeader(submits.header, STORE_SUBMIT_HEADER)
+    ? submits.rows.filter((r) => r.cells.length === STORE_SUBMIT_HEADER.length) : [];
+  const mine = rows.find((r) => r.cells[0] === version && r.cells[2] !== "被拒" && r.cells[2] !== "撤回");
+  if (mine) lines.push(`台账里已有 v${version} 的提交记录（${mine.cells[2]}）`);
+  const live = rows.filter((r) => r.cells[2] !== "撤回");
+  const dated = live.filter((r) => parseDate(r.cells[1]) !== null).sort((a, b) => parseDate(b.cells[1]) - parseDate(a.cells[1]));
+  if (!live.length) lines.push("台账里还没有商店提交记录");
+  else if (!dated.length) lines.push(`上次提交 v${live[live.length - 1].cells[0]} 没记提交日，算不出间隔`);
+  else {
+    const [lastVersion, lastDay] = dated[0].cells;
+    const gap = daysBetween(today, lastDay);
+    const note = gap < STORE_GAP_MIN_DAYS ? `不到 ${STORE_GAP_MIN_DAYS} 天，没有急事可以再等`
+      : gap > STORE_GAP_MAX_DAYS ? `已超过 ${STORE_GAP_MAX_DAYS} 天` : `在 ${STORE_GAP_MIN_DAYS} 到 ${STORE_GAP_MAX_DAYS} 天之间`;
+    lines.push(`上次提交 v${lastVersion}（${lastDay}），距今 ${gap} 天，${note}`);
+  }
+  return { ready, lines };
+}
+
+// The day a version was tagged. PBP_STORE_RELEASED_ON overrides it (tests).
+function releasedOn(version, repoRoot) {
+  if (process.env.PBP_STORE_RELEASED_ON) return process.env.PBP_STORE_RELEASED_ON;
+  const env = { ...process.env };
+  for (const k of Object.keys(env)) if (k.startsWith("GIT_")) delete env[k];
+  try {
+    return execFileSync("git", ["log", "-1", "--format=%cs", `v${version}^{commit}`], { cwd: repoRoot, env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch { return ""; }
+}
+
 // ---- command line ----
 function localToday() {
   const n = new Date();
@@ -276,12 +380,29 @@ function main(argv) {
   const acceptDebt = argv.includes("--accept-debt");
   const today = process.env.PBP_LINT_TODAY || localToday();
   if (parseDate(today) === null) { console.error(`[registers] PBP_LINT_TODAY "${today}" 不是合法日期`); return 2; }
-  const dir = process.env.PBP_REGISTERS_DIR ||
-    join(dirname(fileURLToPath(import.meta.url)), "..", ".claude");
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const dir = process.env.PBP_REGISTERS_DIR || join(repoRoot, ".claude");
+  const storeAt = argv.indexOf("--store-check");
+  if (storeAt !== -1) {
+    const version = (argv[storeAt + 1] || "").replace(/^v/, "");
+    if (!VERSION_RE.test(version)) { console.error("[registers] 用法：--store-check <版本>，例如 --store-check 3.0.4"); return 2; }
+    let text;
+    try { text = readFileSync(join(dir, "store-ledger.md"), "utf8"); }
+    catch (e) { console.error(`[registers] store-ledger.md: 读不到文件（${e.code || e.message}）`); return 2; }
+    const bad = lintStoreLedger(text, { today }).errors;
+    if (bad.length) { for (const e of bad) console.error(`[registers] FAIL ${e}`); console.error("[registers] 商店台账格式有错，先修好"); return 2; }
+    const day = releasedOn(version, repoRoot);
+    if (parseDate(day) === null) { console.error(`[registers] 找不到 tag v${version} 的日期，先确认这个版本已经发版`); return 2; }
+    if (parseDate(day) > parseDate(today)) { console.error(`[registers] v${version} 的发版日 ${day} 晚于今天 ${today}`); return 2; }
+    const r = storeReadiness(text, { today, version, releasedOn: day });
+    for (const l of r.lines) console.log(`[registers] ${l}`);
+    return r.ready ? 0 : 1;
+  }
   const files = [
     ["decisions.md", (t, o) => ({ ...lintDecisions(t, o), dueErrors: [] })],
     ["acceptance-debt.md", lintAcceptanceDebtDetailed],
     ["flake-ledger.md", lintFlakeLedgerDetailed],
+    ["store-ledger.md", (t, o) => ({ ...lintStoreLedger(t, o), dueErrors: [] })],
   ];
   const errors = [], warnings = [], dueErrors = [];
   const texts = {};
