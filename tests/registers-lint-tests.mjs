@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import {
   lintDecisions, lintAcceptanceDebt, lintFlakeLedger, openAcceptanceItems,
+  lintStoreLedger, storeReadiness,
 } from '../scripts/registers-lint.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,6 +28,12 @@ const pend = (id, due, reg = '2026-11-01') => `| ${id} | ${reg} | 来源 | 验�
 const FL_HEAD = '| 日期 | 用例 | 现象 | 状态 | 到期日 |\n|---|---|---|---|---|\n';
 const flake = (...rows) => `# 抖动台账\n\n## 记录\n\n${FL_HEAD}${rows.join('\n')}\n`;
 const fl = (c, status, due = '-', date = '2026-11-01') => `| ${date} | ${c} | 现象 | ${status} | ${due} |`;
+
+const ST_SUB_HEAD = '| 版本 | 提交日 | 结果 | 结果日 | 备注 |\n|---|---|---|---|---|\n';
+const ST_DATA_HEAD = '| 日期 | 周用户 | 安装 | 卸载 | 评分 | 评价数 |\n|---|---|---|---|---|---|\n';
+const store = (subs = [], data = []) =>
+  `# 商店台账\n\n## 提交\n\n${ST_SUB_HEAD}${subs.join('\n')}\n\n## 数据\n\n${ST_DATA_HEAD}${data.join('\n')}\n`;
+const sb = (v, sent, result, day = '-', note = '-') => `| ${v} | ${sent} | ${result} | ${day} | ${note} |`;
 
 const has = (list, re) => list.some((m) => re.test(m));
 
@@ -157,6 +164,78 @@ test('flake: wrong header, empty case, invalid or future date fail', () => {
   assert.ok(has(lintFlakeLedger(flake(fl('甲', '未处理', '-', '2026-11-11')), T).errors, /日期/));
 });
 
+// ---- store ledger ----
+test('store: valid sample passes, with empty data, unknown dates and a review in progress', () => {
+  const text = store([sb('3.0.1', '-', '通过', '-', '日期没记'), sb('3.0.3', '2026-11-01', '被拒', '2026-11-03', '关键词堆砌'), sb('3.0.4', '2026-11-09', '审核中')],
+    ['| 2026-11-10 | 120 | 9 | 2 | 4.5 | 3 |', '| 2026-11-03 | 118 | - | - | - | - |']);
+  assert.deepEqual(lintStoreLedger(text, T), { errors: [], warnings: [] });
+  assert.deepEqual(lintStoreLedger(store(), T), { errors: [], warnings: [] });
+});
+test('store: both tables are required and the headers are fixed', () => {
+  assert.ok(has(lintStoreLedger('# 商店台账\n', T).errors, /缺少「## 提交」/));
+  assert.ok(has(lintStoreLedger('# 商店台账\n', T).errors, /缺少「## 数据」/));
+  assert.ok(has(lintStoreLedger(store().replace('| 备注 |', '| 说明 |'), T).errors, /store-ledger\.md:5: 表头/));
+  assert.ok(has(lintStoreLedger(store().replace('## 数据', '## 别的'), T).errors, /只允许在/));
+});
+test('store: submission rows reject bad versions, results and dates', () => {
+  const e = (row) => lintStoreLedger(store([row]), T).errors;
+  assert.ok(has(e(sb('v3.0.3', '2026-11-01', '通过')), /版本/));
+  assert.ok(has(e(sb('3.0', '2026-11-01', '通过')), /版本/));
+  assert.ok(has(e(sb('3.0.3', '2026-11-01', '过了')), /结果/));
+  assert.ok(has(e(sb('3.0.3', '2026-02-30', '通过')), /提交日/));
+  assert.ok(has(e(sb('3.0.3', '2026-11-11', '审核中')), /晚于今天/));
+  assert.ok(has(e(sb('3.0.3', '2026-11-01', '通过', '2026-11-11')), /结果日/));
+  assert.ok(has(e(sb('3.0.3', '2026-11-05', '通过', '2026-11-03')), /早于提交日/));
+  assert.ok(has(e(sb('3.0.3', '', '通过')), /是空的/));
+  assert.ok(has(e('| 3.0.3 | 2026-11-01 | 通过 | - |'), /4 格/));
+});
+test('store: a review in progress needs a submit day and no result day; a rejection needs a reason', () => {
+  const e = (row) => lintStoreLedger(store([row]), T).errors;
+  assert.ok(has(e(sb('3.0.3', '-', '审核中')), /提交日不能写 -/));
+  assert.ok(has(e(sb('3.0.3', '2026-11-01', '审核中', '2026-11-03')), /结果日要写 -/));
+  assert.ok(has(e(sb('3.0.3', '2026-11-01', '被拒', '2026-11-03')), /原因/));
+  assert.deepEqual(e(sb('3.0.3', '2026-11-01', '撤回', '2026-11-02')), []);
+});
+test('store: the same version may be submitted again on another day, not twice on one day', () => {
+  const again = store([sb('3.0.3', '2026-11-01', '被拒', '2026-11-02', '原因'), sb('3.0.3', '2026-11-04', '通过', '2026-11-05')]);
+  assert.deepEqual(lintStoreLedger(again, T).errors, []);
+  const twice = store([sb('3.0.3', '2026-11-01', '撤回'), sb('3.0.3', '2026-11-01', '通过')]);
+  assert.ok(has(lintStoreLedger(twice, T).errors, /重复的「版本 \+ 提交日」/));
+});
+test('store: data rows need a past unique day and real numbers', () => {
+  const e = (...rows) => lintStoreLedger(store([], rows), T).errors;
+  assert.ok(has(e('| 2026-11-11 | 1 | 1 | 1 | 4 | 1 |'), /晚于今天/));
+  assert.ok(has(e('| 2026-11-01 | 1 | 1 | 1 | 4 | 1 |', '| 2026-11-01 | 2 | 1 | 1 | 4 | 1 |'), /重复/));
+  assert.ok(has(e('| 2026-11-01 | 约100 | 1 | 1 | 4 | 1 |'), /周用户.*数字/));
+  assert.ok(has(e('| 2026-11-01 | 1.5 | 1 | 1 | 4 | 1 |'), /整数/));
+  assert.ok(has(e('| 2026-11-01 | 1 | 1 | 1 | 5.1 | 1 |'), /超过 5/));
+  assert.ok(has(e('| 2026-11-01 | -3 | 1 | 1 | 4 | 1 |'), /数字/));
+  assert.ok(has(e('| 2026-11-01 | - | - | - | - | - |'), /没有任何数字/));
+  assert.ok(has(e('| 2026-11-01 | 1 | 1 | 1 | 4 |'), /5 格/));
+});
+test('store: a table row that is not parsed is reported, not skipped', () => {
+  assert.ok(has(lintStoreLedger(store() + '\n> | 3.0.9 | 2026-11-01 | 通过 | - | - |\n', T).errors, /引用块或列表/));
+});
+test('readiness: the three-day rule decides ready, counted from the release day', () => {
+  const at = (releasedOn) => storeReadiness(store(), { today, version: '3.0.4', releasedOn });
+  assert.equal(at('2026-11-08').ready, false);
+  assert.match(at('2026-11-08').lines[0], /只用了 2 天.*最早 2026-11-11/);
+  assert.equal(at('2026-11-07').ready, true);
+  assert.match(at('2026-11-07').lines[0], /已用 3 天/);
+  assert.match(at('2026-11-07').lines.join('\n'), /还没有商店提交记录/);
+});
+test('readiness: the gap is measured from the newest dated submission and ignores withdrawn ones', () => {
+  const gap = (subs, todayStr = today) => storeReadiness(store(subs), { today: todayStr, version: '3.0.4', releasedOn: '2026-11-01' }).lines.join('\n');
+  const rows = [sb('3.0.2', '2026-10-28', '通过', '2026-10-30'), sb('3.0.1', '2026-10-01', '通过', '2026-10-02'), sb('3.0.3', '2026-11-08', '撤回')];
+  assert.match(gap(rows), /上次提交 v3\.0\.2（2026-10-28），距今 13 天，不到 14 天/);
+  assert.match(gap(rows, '2026-11-11'), /距今 14 天，在 14 到 28 天之间/);
+  assert.match(gap(rows, '2026-11-25'), /距今 28 天，在 14 到 28 天之间/);
+  assert.match(gap(rows, '2026-11-26'), /距今 29 天，已超过 28 天/);
+  assert.match(gap([sb('3.0.3', '-', '通过')]), /没记提交日/);
+  assert.match(gap([sb('3.0.4', '2026-11-05', '审核中')]), /已有 v3\.0\.4 的提交记录（审核中）/);
+  assert.doesNotMatch(gap([sb('3.0.4', '2026-11-05', '被拒', '2026-11-06', '原因')]), /已有 v3\.0\.4/);
+});
+
 // ---- command line ----
 function withDir(files, fn) {
   const dir = mkdtempSync(join(tmpdir(), 'registers-lint-'));
@@ -173,6 +252,7 @@ const set = (over = {}) => ({
   'decisions.md': decisions(DEC_OK),
   'acceptance-debt.md': debt([pend('A-001', '2026-12-10')]),
   'flake-ledger.md': flake(fl('甲', '未处理')),
+  'store-ledger.md': store([sb('3.0.3', '2026-11-01', '通过', '2026-11-03')]),
   ...over,
 });
 
@@ -184,6 +264,23 @@ test('cli: an error exits 1 and names the file and line', () => withDir(set({ 'd
 }));
 test('cli: only warnings print WARN and exit 0', () => withDir(set({ 'acceptance-debt.md': debt([pend('A-001', '2026-11-05')]) }), (d) => {
   const r = run(d); assert.equal(r.status, 0, r.stdout + r.stderr); assert.match(r.stdout + r.stderr, /WARN/);
+}));
+const check = (dir, version, releasedOn, todayStr = today) =>
+  spawnSync('node', [join(ROOT, 'scripts/registers-lint.mjs'), '--store-check', version], {
+    encoding: 'utf8', env: { ...process.env, PBP_REGISTERS_DIR: dir, PBP_LINT_TODAY: todayStr, PBP_STORE_RELEASED_ON: releasedOn },
+  });
+test('cli: --store-check exits 0 after three days, 1 before, 2 when it cannot tell', () => withDir(set(), (d) => {
+  const ok = check(d, 'v3.0.4', '2026-11-07'); assert.equal(ok.status, 0, ok.stdout + ok.stderr); assert.match(ok.stdout, /满 3 天/);
+  const early = check(d, '3.0.4', '2026-11-09'); assert.equal(early.status, 1); assert.match(early.stdout, /最早 2026-11-12/);
+  assert.equal(check(d, '3.0', '2026-11-07').status, 2);
+  assert.equal(check(d, '3.0.4', 'someday').status, 2);
+  assert.equal(check(d, '3.0.4', '2026-11-12').status, 2);
+}));
+test('cli: --store-check refuses a broken ledger instead of reading around it', () => withDir(set({ 'store-ledger.md': store([sb('3.0.3', '2026-11-01', '过了')]) }), (d) => {
+  const r = check(d, '3.0.4', '2026-11-01'); assert.equal(r.status, 2); assert.match(r.stderr, /结果/);
+}));
+test('cli: a broken store ledger fails the plain run', () => withDir(set({ 'store-ledger.md': store([sb('3.0.3', '-', '审核中')]) }), (d) => {
+  const r = run(d); assert.equal(r.status, 1); assert.match(r.stderr, /store-ledger\.md:7/);
 }));
 test('cli: a missing register file is an error', () => withDir({ 'decisions.md': decisions(DEC_OK) }, (d) => {
   assert.equal(run(d).status, 1);
