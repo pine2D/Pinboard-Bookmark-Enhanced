@@ -7,13 +7,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { recordFlake, tailLines } from '../scripts/flake-record.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+// First thing, before anything is spawned: forget every git variable the
+// caller handed down. A pre-commit hook, `git rebase -x` and `git bisect run`
+// all export GIT_DIR and friends, and this file builds a throwaway repo at
+// load time. With GIT_DIR inherited, its `git init` and `git add -A` rewrote
+// the real repo once (2026-11-10). cleanEnv() below is the second line of
+// defence, makeSandbox() checks where git really landed, and the last test
+// in this file proves all of it against a decoy repo.
+for (const k of Object.keys(process.env)) if (k.startsWith('GIT_')) delete process.env[k];
+
+const SELF = fileURLToPath(import.meta.url);
+const ROOT = join(dirname(SELF), '..');
 const GROUPS = ['static', 'pages', 'render', 'journeys'];
 // The gates of `sh scripts/verify.sh` at 34a8a91c, the commit before the
 // groups existed, written out by reading that script. Every one must still be
@@ -160,17 +171,6 @@ function dry(args) {
   return { ...r, commands, stages, labels };
 }
 
-test('the test environment drops git variables a hook would hand down', () => {
-  const saved = { GIT_DIR: process.env.GIT_DIR, GIT_INDEX_FILE: process.env.GIT_INDEX_FILE };
-  process.env.GIT_DIR = '/nonexistent/.git';
-  process.env.GIT_INDEX_FILE = '/nonexistent/index';
-  try {
-    assert.deepEqual(Object.keys(cleanEnv()).filter((k) => k.startsWith('GIT_')), []);
-  } finally {
-    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
-  }
-});
-
 const key = (c) => `${c.group}\t${c.command}`;
 
 // ---------- Part 1: the real command list ----------
@@ -286,6 +286,8 @@ const key = [relative(process.cwd(), fileURLToPath(import.meta.url)), ...process
 const state = process.env.STUB_STATE;
 appendFileSync(join(state, 'calls.log'), key + '\\n');
 const has = (name) => (process.env[name] || '').split('|').includes(key);
+const leaked = Object.keys(process.env).filter((k) => k.startsWith('GIT_'));
+if (leaked.length) { console.log('stub: git variable reached a gate: ' + leaked.join(' ') + ' in ' + key); process.exit(5); }
 if (has('STUB_SLOW')) await new Promise((r) => setTimeout(r, 700));
 if (has('STUB_FAIL_ALWAYS')) { console.log('stub: always failing ' + key); process.exit(3); }
 if (has('STUB_FAIL_ONCE')) {
@@ -320,11 +322,23 @@ function makeSandbox() {
   put('.bin/npx', '#!/bin/sh\necho "stub npx $*"\n', 0o755);
   const git = spawnSync('git', ['init', '-q'], { cwd: dir, env: cleanEnv() });
   assert.equal(git.status, 0, 'git init');
+  // Refuse to go on unless git is looking at the sandbox and nothing else.
+  const where = spawnSync('git', ['rev-parse', '--absolute-git-dir'], { cwd: dir, env: cleanEnv(), encoding: 'utf8' });
+  const expected = join(realpathSync(dir), '.git');
+  if (where.status !== 0 || realpathSync(where.stdout.trim()) !== expected) {
+    throw new Error(`sandbox git points at "${where.stdout.trim()}", not ${expected}; refusing to touch it`);
+  }
   assert.equal(spawnSync('git', ['add', '-A'], { cwd: dir, env: cleanEnv() }).status, 0, 'git add');
   return dir;
 }
 
 const box = makeSandbox();
+// Self-check mode for the decoy-repo test at the end: do everything this file
+// does to git at load time, then stop before any test runs.
+if (process.env.PBP_VG_SELFCHECK === '1') {
+  rmSync(box, { recursive: true, force: true });
+  process.exit(0);
+}
 test.after(() => rmSync(box, { recursive: true, force: true }));
 
 function run(args, extra = {}) {
@@ -549,4 +563,61 @@ test('a real no-argument run calls exactly what the dry run lists', () => {
   const real = run([]);
   assert.equal(real.status, 0, real.out);
   assert.deepEqual([...real.calls].sort(), expected);
+});
+
+// ---------- Part 3: git variables from the caller ----------
+
+test('static: a tracked script with a syntax error stops the run at [syntax]', () => {
+  for (const name of ['zz-broken.js', 'zz-broken.mjs']) {
+    writeFileSync(join(box, name), 'const = ;\n');
+    assert.equal(spawnSync('git', ['add', name], { cwd: box, env: cleanEnv() }).status, 0);
+    try {
+      const r = run(['--group=static']);
+      assert.notEqual(r.status, 0, `${name}: ${r.out}`);
+      assert.match(r.out, new RegExp(name.replace('.', '\\.')), r.out);
+      assert.match(r.stdout, /\[syntax\] /);
+      assert.doesNotMatch(r.stdout, /\[eslint\] /, 'the run must stop at the syntax stage');
+    } finally {
+      spawnSync('git', ['rm', '-q', '--cached', name], { cwd: box, env: cleanEnv() });
+      rmSync(join(box, name), { force: true });
+    }
+  }
+});
+
+test('verify.sh drops inherited git variables before any gate runs', () => {
+  // GIT_DIR points at the sandbox itself, so nothing real is in reach. Every
+  // stub exits 5 if a GIT_* variable gets through.
+  for (const g of GROUPS) {
+    const r = run([`--group=${g}`], { env: { GIT_DIR: join(box, '.git'), GIT_WORK_TREE: box, GIT_PREFIX: '' } });
+    assert.equal(r.status, 0, `${g}: ${r.out}`);
+    assert.doesNotMatch(r.out, /git variable reached a gate/);
+  }
+});
+
+test('with hook-style git variables set, loading this file leaves the pointed-at repo alone', () => {
+  // A decoy repo stands in for the real one. Never point these at a real checkout.
+  const decoy = mkdtempSync(join(tmpdir(), 'pbp-verify-groups-decoy-'));
+  try {
+    const git = (...args) => spawnSync('git', args, { cwd: decoy, env: cleanEnv(), encoding: 'utf8' });
+    assert.equal(git('init', '-q').status, 0);
+    writeFileSync(join(decoy, 'keep.txt'), 'keep\n');
+    git('add', '-A');
+    assert.equal(git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '-q', '-m', 'decoy').status, 0);
+    const snapshot = () => ({
+      head: git('rev-parse', 'HEAD').stdout.trim(),
+      index: createHash('sha1').update(readFileSync(join(decoy, '.git/index'))).digest('hex'),
+      config: readFileSync(join(decoy, '.git/config'), 'utf8'),
+      files: git('ls-files').stdout,
+      status: git('status', '--porcelain').stdout,
+    });
+    const before = snapshot();
+    const child = spawnSync(process.execPath, [SELF], {
+      cwd: ROOT, encoding: 'utf8',
+      env: { ...cleanEnv(), PBP_VG_SELFCHECK: '1', GIT_DIR: join(decoy, '.git'), GIT_INDEX_FILE: join(decoy, '.git/index'), GIT_WORK_TREE: decoy },
+    });
+    assert.equal(child.status, 0, child.stdout + child.stderr);
+    assert.deepEqual(snapshot(), before);
+  } finally {
+    rmSync(decoy, { recursive: true, force: true });
+  }
 });

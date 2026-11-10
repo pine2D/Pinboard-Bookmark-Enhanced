@@ -82,6 +82,13 @@ fi
 if [ -z "$SELECTED" ]; then
   SELECTED=$ALL_GROUPS
 fi
+# Forget git variables the caller handed down (a hook, `git rebase -x`,
+# `git bisect run`). Some gates build throwaway repos; with GIT_DIR inherited
+# they would write to the real one. ROOT is already resolved, and git finds the
+# repo from the working directory from here on.
+for git_var in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
+  unset "$git_var"
+done
 DRY=${PBP_VERIFY_DRY:-}
 RETRY=${PBP_RETRY_FLAKY:-}
 REPORT_DIR=${PBP_QA_REPORT_DIR:-$HOME/.local/share/pbp-qa-report}
