@@ -31,9 +31,16 @@ test('new file fails', () => {
   assert.match(out[0], /c\.js/);
 });
 test('new file with zero count passes', () => assert.deepEqual(compareBaselines(base, { ...base, 'c.js': entry(0) }), []));
-test('unrelated rule keys are ignored', () => {
-  const next = { 'a.js': { ...entry(5), 'no-unused-vars': { count: 99 } }, 'z.js': entry(7, 'no-undef') };
-  assert.deepEqual(compareBaselines(base, next), []);
+test('any other rule in the new baseline fails, beside the allowed rule or alone', () => {
+  const next = { 'a.js': { ...entry(5), 'no-unused-vars': { count: 1 } }, 'z.js': entry(7, 'no-undef') };
+  const out = compareBaselines(base, next);
+  assert.equal(out.length, 2, out.join('\n'));
+  assert.match(out[0], /a\.js: rule no-unused-vars is not allowed/);
+  assert.match(out[1], /z\.js: rule no-undef is not allowed/);
+});
+test('another rule that was already in the old baseline still fails', () => {
+  const old = { 'a.js': { ...entry(5), 'no-undef': { count: 1 } } };
+  assert.equal(compareBaselines(old, old).length, 1);
 });
 test('old baseline without the rule: any count in the new one fails', () => {
   const out = compareBaselines({ 'a.js': entry(1, 'no-undef') }, { 'a.js': entry(1) });

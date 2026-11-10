@@ -40,7 +40,8 @@ REGISTERS_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(\.claude/(
 RULES_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(CLAUDE\.md|AGENTS\.md|PRODUCT\.md|\.claude/rules/[^/]+\.md|\.claude/skills/.+|\.claude/expiring-items\.md|scripts/rules-lint(-allow)?\.(mjs|json)|tests/rules-lint-tests\.mjs)$')
 JS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '\.(js|mjs)$' | grep -vE '^vendor/')
 JS_ROOT_CHANGED=$(printf '%s\n' "$JS_CHANGED" | grep -E '^[^/]+\.js$')
-ESLINT_BASELINE_STAGED=$(printf '%s\n' "$STAGED" | grep -E '^scripts/eslint-suppressions\.json$')
+# Deletions count here too: dropping the baseline and adding it back later would let it grow.
+ESLINT_BASELINE_STAGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^scripts/eslint-suppressions\.json$')
 ESLINT_RULE_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(eslint\.config\.mjs|scripts/eslint-rules/[^/]+\.mjs|scripts/eslint-suppressions\.json|tests/eslint-silent-catch-tests\.mjs)$')
 ESLINT_TOOLS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/eslint-baseline-check\.mjs|tests/eslint-baseline-tests\.mjs)$')
 if [ -z "$CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ]; then
@@ -93,6 +94,13 @@ if [ -n "$JS_CHANGED" ] || [ -n "$ESLINT_BASELINE_STAGED" ] || [ -n "$ESLINT_TOO
   # The silent-catch baseline only shrinks: compare the staged copy with HEAD.
   # A baseline that is new at HEAD has nothing to compare with and passes.
   if [ -n "$ESLINT_BASELINE_STAGED" ] && git cat-file -e HEAD:scripts/eslint-suppressions.json 2>/dev/null; then
+    if ! git cat-file -e :scripts/eslint-suppressions.json 2>/dev/null; then
+      echo ""
+      echo "[eslint-baseline] COMMIT BLOCKED — scripts/eslint-suppressions.json cannot be deleted or renamed." >&2
+      echo "  Restore it: git restore --staged --worktree scripts/eslint-suppressions.json" >&2
+      echo "  To shrink it, fix an old silent catch and run eslint with --prune-suppressions." >&2
+      exit 1
+    fi
     BASELINE_TMP=$(mktemp -d)
     git show HEAD:scripts/eslint-suppressions.json > "$BASELINE_TMP/old.json"
     git show :scripts/eslint-suppressions.json > "$BASELINE_TMP/new.json"
@@ -136,6 +144,7 @@ if [ -n "$JS_CHANGED" ] || [ -n "$ESLINT_BASELINE_STAGED" ] || [ -n "$ESLINT_TOO
           echo "  3. 'suppressions left that do not occur anymore' means you fixed an old silent catch. Prune the baseline and stage it:" >&2
           echo "       ESLINT_USE_FLAT_CONFIG=true npx --prefix .qa-scan eslint --suppressions-location scripts/eslint-suppressions.json --prune-suppressions ${ESLINT_FILES}" >&2
           echo "       git add scripts/eslint-suppressions.json" >&2
+          echo "  4. Anything else (no-undef, a config error): fix what eslint reports above. Do not add other rules to the baseline." >&2
           exit 1
         fi
         echo "[script-graph] checking executeScript page functions are closure-free"
