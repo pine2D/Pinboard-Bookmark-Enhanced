@@ -97,6 +97,7 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 ## 测试与夹具
 
 - tests/ 全部 file:// 直开、不依赖构建；改逻辑同时跑对应测试页。
+- 新测试加载真实文件并用 `tests/fixtures/chrome-mock.js`，不再按标记切源码（切片锚点有只减不增的基线）；没被测试跑过的函数用 `node scripts/coverage-report.mjs` 查。细则见 `.claude/rules/audit.md`。
 - **测试产物放仓库外**：用户的 Windows Chrome 直接把仓库根目录当作已解压扩展加载，仓库里的文件越多，Chrome 启动越慢。2026-11-05 实测：仓库约 12.6 万个文件，其中 11 万个是测试报告，Chrome 启动约 128 秒后才出窗口。截图、渲染与审计报告、真实测试留证一律写到 `$PBP_QA_REPORT_DIR`（默认 `~/.local/share/pbp-qa-report`）。qa-drive、readme-shots、cws-shots 默认已写到这里；`audit.mjs --report` 也别指向仓库内；新脚本读同一个变量。已归档的 dict-* 真实测试驱动按指纹锁定，仍写到仓库内的 `.qa-scan/report/`，跑完那一轮就把留证移到上面的目录。`.qa-scan/` 只放工具依赖与宣传片工程，仓库内文件数保持在约 2 万以内（`find . -type f | wc -l`）。
 - **远端 API 响应夹具按真实抓包/官方 schema 手写，禁止用写入侧构造器生成**——「我和我自己一致」的自测全绿仍会真机 corrupt（2026-07 Drive 事故）。补纯函数谓词的单测不构成修复，runner 路径的夹具本身必须换成服务端形状；校验器越严（精确 key 集合 / 派生字段相等 / canonical 重序列化），这种自洽假安全感越强。夹具默认值用 `=== undefined` 判定，`||` 会吞掉 `""` 这类合法边界值。
 - 断言要泛化到类别而不是枚举实例；新增或审查断言先问「这条检查漏判的最简单反例长什么样」，别只问「现在能不能过」。
@@ -164,7 +165,7 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 | 四个表面 HTML/CSS、popup.js、popup-*.js、options.js、options-*.js、library.js、library-*.js、listbox.js、shared.js、md-*.js（UI 文本、字体栈、图标） | `.claude/rules/ui-fonts-icons.md` |
 | 四个表面 HTML/CSS、shared.js、listbox.js、ui-vocabulary.json 与基线（新增任何 UI 元素；library 运行时创建值盒子的 library.js / library-vocab.js / library-notes.js 也要先读） | `.claude/rules/ui-primitives.md` |
 | docs/theme-surface/**、popup.css、options.css、library.css、pinboard-themes.js、render-audit 家族（ui-render-audit / audit-render-scenarios / render-audit-ledger / checklist / known-failures）、ui-contract-tests、theme-*-tests | `.claude/rules/theme-factory.md` |
-| scripts/audit*.mjs、tests/audit*-tests.mjs、qa-drive、ci-fonts、verify.sh、.qa-scan/run-test.mjs（选审计场景、`--font=ci`） | `.claude/rules/audit.md` |
+| scripts/audit*.mjs、tests/audit*-tests.mjs、qa-drive、ci-fonts、verify.sh、.qa-scan/run-test.mjs、slice-anchor-lint、coverage-report、tests/fixtures/chrome-mock.js（选审计场景、`--font=ci`、新测试怎么写） | `.claude/rules/audit.md` |
 | vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js、options-vocab.js、library-vocab.js、library-notes.js、md-highlight.js、anki-connect.js、eudic-sync.js、vocab-send.js | `.claude/rules/vocab-sync.md` |
 | vocab-gdrive.js、notes-gdrive.js、dict-archive-gdrive.js、ask-archive-gdrive.js、options-vocab.js、library.js、background.js、tests/ 下的 vocab-gdrive-tests.html、notes-gdrive-tests.html、options-drive-sync-tests.html、drive-scopes-tests.html、drive-migration-tests.html（连接层 / 身份缓存 / 错误码 / OAuth / 权限） | `.claude/rules/drive-sync.md` |
 | dict-archive.js、dict-archive-gdrive.js、ask-archive.js、ask-archive-gdrive.js、library-ask.js | `.claude/rules/archive-sync.md` |

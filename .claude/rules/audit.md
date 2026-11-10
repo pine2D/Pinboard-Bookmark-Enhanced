@@ -10,6 +10,9 @@ paths:
   - "scripts/flake-record.mjs"
   - "tests/verify-groups-tests.mjs"
   - ".qa-scan/run-test.mjs"
+  - "scripts/slice-anchor-lint.mjs"
+  - "scripts/coverage-report.mjs"
+  - "tests/fixtures/chrome-mock.js"
 ---
 
 # 开发审计：按场景选择与 CI 字体环境
@@ -38,6 +41,12 @@ paths:
 - 设了 `PBP_RETRY_FLAKY=1`，`pages`、`render`、`journeys` 里失败的命令会再跑一次。第二次通过算通过，但要记一条抖动。第二次还失败就是失败。`static` 从不重跑。本机默认不重跑，CI 会设这个变量。
 - 抖动写进报告目录的 `flakes.jsonl`，一行一条，有日期、阶段、用例、提交号和第一次失败的最后几行。CI 里还会打出警告，并写进运行摘要。每组的报告目录都会作为运行产物上传。
 - 看到抖动，按 `.claude/flake-ledger.md` 的规则补记一行，不能当没发生。
+
+## 测试接缝：真实加载、切片基线与覆盖报告
+
+- 新写的测试页用 `<script src>` 加载真实的运行时文件，按它所在页面的加载顺序带上它需要的脚本，chrome API 用 `tests/fixtures/chrome-mock.js`。例子是 `tests/popup-offline-tests.html`。只给测试页里确实拿不到的东西写桩，并在页内写明原因。
+- 不要再从源码里按标记切代码来跑或断言。`scripts/slice-anchor-lint.mjs` 统计这类切片锚点，`scripts/slice-anchor-baseline.json` 只减不增，verify 的 static 组和提交前钩子都会拦新增。删掉锚点后运行 `node scripts/slice-anchor-lint.mjs --update`；确实躲不开时用 `--update --allow-growth "<原因>"`，原因会写进基线。`--list --cleanup` 列出标记只在目标文件注释里的锚点，以及没有检查“找不到”的锚点。
+- 想知道哪些函数没有测试页跑过，运行 `node scripts/coverage-report.mjs`，可以只带几个测试页路径。报告写到 `$PBP_QA_REPORT_DIR/coverage/never-run.md`。从源码切出来交给 `new Function` 跑的代码不算在原文件头上。这是开发工具，不进 verify，也不进 CI。
 
 ## CI 字体环境
 
