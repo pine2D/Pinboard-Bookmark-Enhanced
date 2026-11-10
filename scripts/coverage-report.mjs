@@ -27,7 +27,7 @@
 // Exit 0 when the report was written, even if some pages failed (they are
 // named in the report; their coverage up to the failure still counts).
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -41,7 +41,16 @@ const require = createRequire(join(ROOT, '.qa-scan', 'package.json'));
 export function reportDir(env = process.env, cwd = process.cwd()) {
   return resolve(cwd, env.PBP_QA_REPORT_DIR || join(homedir(), '.local/share/pbp-qa-report'), 'coverage');
 }
-export const isInside = (dir, root) => dir === root || dir.startsWith(root + '/');
+// Inside the repo, after following symlinks: the nearest folder of dir that
+// exists is resolved, so a link pointing into the repo is caught too.
+export function isInside(dir, root) {
+  const real = (p) => { try { return realpathSync(p); } catch { return null; } };
+  let base = dir; const rest = [];
+  while (!existsSync(base) && dirname(base) !== base) { rest.unshift(base.slice(dirname(base).length + 1)); base = dirname(base); }
+  const full = join(real(base) || base, ...rest);
+  const r = real(root) || root;
+  return full === r || full.startsWith(r + '/');
+}
 
 export function runtimeScripts(root = ROOT) {
   return readdirSync(root).filter((n) => n.endsWith('.js') && statSync(join(root, n)).isFile()).sort();

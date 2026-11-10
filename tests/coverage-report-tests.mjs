@@ -4,7 +4,7 @@
 // function that only ran through a sliced copy (new Function) is still listed.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -73,4 +73,17 @@ test('a relative PBP_QA_REPORT_DIR is made absolute before the inside-repo check
   assert.equal(r.status, 2, r.stdout + r.stderr);
   assert.match(r.stderr, /refusing to write inside the repo/);
   assert.ok(!readdirSync(root).includes('.cov-should-not-exist'));
+});
+
+test('a report folder reached through a symlink into the repo is refused', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const tmp = mkdtempSync(join(tmpdir(), 'pbp-cov-link-'));
+  try {
+    symlinkSync(join(root, 'tests'), join(tmp, 'link'));
+    assert.ok(isInside(join(tmp, 'link', 'not-yet', 'coverage'), root));
+    assert.ok(!isInside(join(tmp, 'plain', 'coverage'), root));
+    const r = spawnSync(process.execPath, ['scripts/coverage-report.mjs'], { cwd: root, encoding: 'utf8', env: { ...process.env, PBP_QA_REPORT_DIR: join(tmp, 'link', 'not-yet') } });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.ok(!readdirSync(join(root, 'tests')).includes('not-yet'));
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
 });
