@@ -1,0 +1,123 @@
+name: Render trial (Windows)
+
+# One-week trial (.claude/expiring-items.md): run the render group on a Windows
+# runner and compare its failures with the Linux job in ci.yml. It is its own
+# workflow so release.sh, which only reads the "CI" workflow, never waits on it.
+# A failing gate does not fail the job: the result goes to the step summary and
+# to results.jsonl in the artifact. Only a broken trial (no gate ran) fails.
+
+on:
+  schedule:
+    - cron: '23 19 * * *'
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - .github/workflows/render-windows-trial.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  render:
+    name: render gates on Windows
+    runs-on: windows-2025
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      PBP_QA_REPORT_DIR: ${{ runner.temp }}/pbp-qa-report
+    steps:
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: .qa-scan/package-lock.json
+
+      - name: Install QA dependencies
+        run: npm ci --prefix .qa-scan
+
+      - name: Install bundled Chromium
+        run: npx --prefix .qa-scan playwright install chromium
+
+      - name: Record the fonts the UI font stacks name
+        run: |
+          mkdir -p "$PBP_QA_REPORT_DIR"
+          ls /c/Windows/Fonts > "$PBP_QA_REPORT_DIR/fonts.txt"
+          {
+            echo "### Fonts on the runner"
+            echo
+            echo "| file | present |"
+            echo "|---|---|"
+            for f in segoeui.ttf msyh.ttc msjh.ttc YuGothR.ttc meiryo.ttc malgun.ttf simsun.ttc consola.ttf CascadiaMono.ttf seguiemj.ttf; do
+              if grep -qix "$f" "$PBP_QA_REPORT_DIR/fonts.txt"; then echo "| $f | yes |"; else echo "| $f | no |"; fi
+            done
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run each render gate and record its result
+        run: |
+          gates="$PBP_QA_REPORT_DIR/gates.txt"
+          results="$PBP_QA_REPORT_DIR/results.jsonl"
+          PBP_VERIFY_DRY=1 sh scripts/verify.sh --group=render | sed -n 's/^\[dry\]\[render\] //p' > "$gates"
+          total=$(grep -c . "$gates" || true)
+          if [ "$total" -eq 0 ]; then
+            echo "::error::verify.sh listed no render gate, so the trial ran nothing"
+            exit 1
+          fi
+          {
+            echo "### Render gates on Windows ($GITHUB_SHA)"
+            echo
+            echo "| gate | result | seconds |"
+            echo "|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          n=0
+          failed=0
+          while IFS= read -r cmd <&3; do
+            n=$((n + 1))
+            log="$PBP_QA_REPORT_DIR/gate-$n.log"
+            start=$(date +%s)
+            rc=0
+            $cmd > "$log" 2>&1 || rc=$?
+            secs=$(( $(date +%s) - start ))
+            if [ "$rc" -eq 0 ]; then result=pass; else result="FAIL ($rc)"; failed=$((failed + 1)); fi
+            echo "[$n/$total] $result in ${secs}s: $cmd"
+            echo "| \`$cmd\` | $result | $secs |" >> "$GITHUB_STEP_SUMMARY"
+            printf '{"sha":"%s","event":"%s","gate":"%s","rc":%s,"seconds":%s}\n' "$GITHUB_SHA" "$GITHUB_EVENT_NAME" "$cmd" "$rc" "$secs" >> "$results"
+            if [ "$rc" -ne 0 ]; then
+              echo "::group::last lines of $cmd"
+              tail -n 60 "$log"
+              echo "::endgroup::"
+            fi
+          done 3< "$gates"
+          if [ "$failed" -gt 0 ]; then
+            echo "::warning::$failed of $total render gates failed on Windows (trial, not blocking)"
+          fi
+
+      - name: Upload logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pbp-render-windows-trial
+          path: ${{ runner.temp }}/pbp-qa-report
+          retention-days: 30
+          overwrite: true
+          if-no-files-found: ignore
