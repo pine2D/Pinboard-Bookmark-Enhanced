@@ -97,6 +97,39 @@ test('A: file names inside parentheses in the row are checked too', () => {
   assert.ok(has(errorsOf(files), /c\.js.*不在它的 paths/), 'c.js sits only in the parenthesis');
   assert.deepEqual(errorsOf({ ...files, '.claude/rules/alpha.md': rule(['a.js', 'b.js', 'c.js']) }), []);
 });
+test('A: a name the index cannot resolve is an error', () => {
+  const rowFor = (first) => base({ 'CLAUDE.md': index(row(first, '.claude/rules/alpha.md')) });
+  // misspelt name with a known extension
+  assert.ok(has(errorsOf(rowFor('a.js、md-higlight.js')), /md-higlight\.js.*找不到/));
+  // old shorthand with slashes
+  assert.ok(has(errorsOf(rowFor('a.js、popup/options/library.css')), /popup\/options\/library\.css.*找不到/));
+  // a glob with an extension that matches nothing
+  assert.ok(has(errorsOf(rowFor('a.js、old-*.js')), /old-\*\.js.*没有匹配/));
+  // a glob ending in .* that matches nothing
+  assert.ok(has(errorsOf(rowFor('a.js、gone.*')), /gone\.\*.*没有匹配/));
+  // a name that resolves is fine, and a glob without an extension stays quiet
+  assert.deepEqual(errorsOf({ ...rowFor('a.js、b.js、docs/**') }), []);
+  // the allow-list excuses it
+  const entry = { file: 'CLAUDE.md', token: 'md-higlight.js', reason: 'test' };
+  assert.deepEqual(errorsOf(rowFor('a.js、b.js、md-higlight.js'), { allow: [entry] }), []);
+});
+test('A: unresolved names are checked on register rows too', () => {
+  const files = base({
+    'CLAUDE.md': index(row('a.js、b.js', '.claude/rules/alpha.md'), row('裁决 nope.js', '.claude/decisions.md')),
+    '.claude/decisions.md': '# d\n',
+  });
+  assert.ok(has(errorsOf(files), /nope\.js.*找不到/));
+});
+test('A: a bare name shared by two tracked files asks for the path', () => {
+  const files = base({
+    'CLAUDE.md': index(row('a.js、b.js、smoke.mjs', '.claude/rules/alpha.md')),
+    '.claude/rules/alpha.md': rule(['a.js', 'b.js', 'scripts/smoke.mjs', 'tests/smoke.mjs']),
+    'scripts/smoke.mjs': '', 'tests/smoke.mjs': '',
+  });
+  assert.ok(has(errorsOf(files), /smoke\.mjs.*2 个同名文件.*写出路径/), errorsOf(files).join('\n'));
+  // with the path written out it passes
+  assert.deepEqual(errorsOf({ ...files, 'CLAUDE.md': index(row('a.js、b.js、scripts/smoke.mjs', '.claude/rules/alpha.md')) }), []);
+});
 test('A: a missing index table fails', () => {
   const e = errorsOf(base({ 'CLAUDE.md': '# Proj\n' }));
   assert.ok(has(e, /找不到.*索引表/), e.join('\n'));
@@ -164,6 +197,12 @@ test('B: the allow-list file and the lint itself never count as evidence for a n
 test('B: a name family wildcard with no slash and no extension is not a path', () => {
   assert.deepEqual(errorsOf(doc('keys `pbp-*` and `field-*`\n')), []);
 });
+test('B: a name ending in .* is a path glob and needs a match', () => {
+  assert.ok(has(errorsOf(doc('files `ghost.*` here\n')), /ghost\.\*/));
+  assert.deepEqual(errorsOf({ ...doc('files `a.*` here\n') }), []);
+  const entry = { file: '.claude/rules/alpha.md', token: 'ghost.*', reason: 'a variable' };
+  assert.deepEqual(errorsOf(doc('files `ghost.*` here\n'), { allow: [entry] }), []);
+});
 test('B: fenced code blocks are not scanned', () => {
   assert.deepEqual(errorsOf(doc('```\n`missing/file.js`\n```\n')), []);
 });
@@ -195,7 +234,7 @@ test('B: AGENTS.md and skills are in scope', () => {
 
 // ---- C: number claims ----
 const claimOf = (n, mode = 'exact') => [{
-  label: '测试页数', file: 'CLAUDE.md', re: /(\d+)\+? 套页/g, mode,
+  label: '测试页数', re: /(\d+)\+? 套页/g, mode, expect: { 'CLAUDE.md': 1 },
   actual: (ctx) => ctx.files.filter((f) => /^tests\/.*-tests\.html$/.test(f)).length,
 }];
 const withClaim = (said, pages) => {
@@ -217,12 +256,34 @@ test('C: an "N+" claim fails only when the real value is below N', () => {
 test('C: every occurrence of a claim is checked', () => {
   const files = withClaim(3, 3);
   files['CLAUDE.md'] += '\n又写 5 套页\n';
-  assert.ok(has(errorsOf(files, { claims: claimOf(3) }), /写 5，实际是 3/));
+  const claims = [{ ...claimOf(3)[0], expect: { 'CLAUDE.md': 2 } }];
+  assert.ok(has(errorsOf(files, { claims }), /写 5，实际是 3/));
+});
+test('C: a second occurrence in another file is found and its number checked', () => {
+  const files = withClaim(3, 3);
+  files['.claude/rules/alpha.md'] = rule(['a.js', 'b.js'], '这里也写 5 套页\n');
+  const claims = [{ ...claimOf(3)[0], expect: { 'CLAUDE.md': 1, '.claude/rules/alpha.md': 1 } }];
+  assert.ok(has(errorsOf(files, { claims }), /alpha\.md:\d+:.*写 5，实际是 3/));
+  // the same file, when the claim table does not list it, is a count error
+  const e = errorsOf(files, { claims: claimOf(3) });
+  assert.ok(has(e, /alpha\.md.*找到 1 处，预期 0 处/), e.join('\n'));
+});
+test('C: an occurrence count that differs from the expected one is an error', () => {
+  const files = withClaim(3, 3);
+  // one occurrence reworded away: the other still matches, but the count is off
+  const claims = [{ ...claimOf(3)[0], expect: { 'CLAUDE.md': 2 } }];
+  const e = errorsOf(files, { claims });
+  assert.ok(has(e, /CLAUDE\.md.*找到 1 处，预期 2 处/), e.join('\n'));
+  // one extra occurrence
+  const more = withClaim(3, 3);
+  more['CLAUDE.md'] += '\n再写 3 套页\n';
+  assert.ok(has(errorsOf(more, { claims: claimOf(3) }), /找到 2 处，预期 1 处/));
 });
 test('C: a claim whose wording vanished from the doc is an error, not a silent skip', () => {
   const e = errorsOf(base(), { claims: claimOf(3) });
-  assert.ok(has(e, /找不到数字声明/), e.join('\n'));
-  const e2 = errorsOf(base(), { claims: [{ ...claimOf(3)[0], file: 'NOPE.md' }] });
+  assert.ok(has(e, /找到 0 处/), e.join('\n'));
+  assert.ok(has(e, /找到 0 处，预期 1 处/), e.join('\n'));
+  const e2 = errorsOf(base(), { claims: [{ ...claimOf(3)[0], expect: { 'NOPE.md': 1 } }] });
   assert.ok(has(e2, /NOPE\.md.*不存在/), e2.join('\n'));
 });
 const AI_SRC = `
@@ -241,8 +302,10 @@ const _AI_BESPOKE_PROVIDERS = {
 // (plus one helper page that must not count), 3 pilots, 4 provider ids.
 function claimsTree() {
   const files = base({
-    'CLAUDE.md': base()['CLAUDE.md'] + '\n_locales/（2 locale）\n×2 locale\nREADME*.md ×2\nHTML 测试页 2+ 套\n3 套站点主题\n',
-    '.claude/rules/theme-factory.md': rule(['a.js'], '3 套 preset 渲染\n'),
+    'CLAUDE.md': base()['CLAUDE.md'] + '\n_locales/（2 locale）\n×2 locale\nREADME*.md ×2\nREADME×2\nHTML 测试页 2+ 套\n3 套站点主题\n3 套 pinboard.in 站点主题\n',
+    '.claude/rules/theme-factory.md': rule(['a.js'], '3 套 preset 渲染\n3 个站点主题\n3 套预设\n'),
+    '.claude/rules/l10n.md': rule(['a.js'], '×2 locale 镜像；README ×2 结构\n'),
+    '.claude/skills/release/SKILL.md': '---\nname: release\n---\n\nREADME×2\n',
     'PRODUCT.md': '- AI providers (4, plus OpenAI-compatible endpoints)\n',
     'ai.js': AI_SRC,
     '_locales/en/messages.json': '{}', '_locales/ja/messages.json': '{}',
@@ -250,7 +313,7 @@ function claimsTree() {
     'tests/a-tests.html': '', 'tests/b-tests.html': '', 'tests/helper.html': '',
     'docs/theme-surface/pilots/x.tokens.json': '{}', 'docs/theme-surface/pilots/y.tokens.json': '{}', 'docs/theme-surface/pilots/z.tokens.json': '{}',
   });
-  files['CLAUDE.md'] = files['CLAUDE.md'].replace('| 迁移 |', '| 主题 | `.claude/rules/theme-factory.md` |\n| 迁移 |');
+  files['CLAUDE.md'] = files['CLAUDE.md'].replace('| 迁移 |', '| 主题 | `.claude/rules/theme-factory.md` |\n| 文案 | `.claude/rules/l10n.md` |\n| 发 | `.claude/skills/release/SKILL.md` |\n| 迁移 |');
   return files;
 }
 test('C: the default claim table counts locales, themes and test pages from the file list', () => {
@@ -261,11 +324,25 @@ test('C: the default claim table counts locales, themes and test pages from the 
   assert.ok(has(e, /locale 数.*写 2，实际是 3/), e.join('\n'));
   // one README more
   assert.ok(has(errorsOf({ ...files, 'README.fr.md': '' }, { claims: CLAIMS }), /README 数.*写 2，实际是 3/));
-  // a pilot fewer: both theme claims go red
+  // a pilot fewer: every theme occurrence (2 in CLAUDE.md, 3 in theme-factory.md) goes red
   const f2 = { ...files };
   delete f2['docs/theme-surface/pilots/z.tokens.json'];
   const e2 = errorsOf(f2, { claims: CLAIMS });
-  assert.equal(e2.filter((m) => /站点主题数.*写 3，实际是 2/.test(m)).length, 2, e2.join('\n'));
+  assert.equal(e2.filter((m) => /站点主题数.*写 3，实际是 2/.test(m)).length, 5, e2.join('\n'));
+  // each wording is located: change one at a time in the other docs
+  for (const [file, from, to] of [
+    ['CLAUDE.md', '3 套 pinboard.in 站点主题', '4 套 pinboard.in 站点主题'],
+    ['.claude/rules/theme-factory.md', '3 个站点主题', '4 个站点主题'],
+    ['.claude/rules/theme-factory.md', '3 套预设', '4 套预设'],
+    ['CLAUDE.md', 'README×2', 'README×3'],
+    ['.claude/rules/l10n.md', 'README ×2', 'README ×3'],
+    ['.claude/skills/release/SKILL.md', 'README×2', 'README×3'],
+    ['.claude/rules/l10n.md', '×2 locale', '×3 locale'],
+  ]) {
+    assert.ok(files[file].includes(from), `${file} lacks ${from}`);
+    const e = errorsOf({ ...files, [file]: files[file].replace(from, to) }, { claims: CLAIMS });
+    assert.ok(has(e, new RegExp(`${file.replace(/[.]/g, '\\.')}:\\d+:.*写 [34]，实际是 [23]`)), `${from}: ${e.join('\n')}`);
+  }
   // "2+" with only one test page: red; the helper page without -tests does not count
   const f3 = { ...files };
   delete f3['tests/b-tests.html'];
@@ -277,7 +354,7 @@ test('C: the default claim table counts locales, themes and test pages from the 
 
 test('C: the provider count comes from the ai.js AST and leaves out "custom"', () => {
   assert.deepEqual(objectKeysFromSource(AI_SRC, 'OPENAI_COMPAT_PROVIDERS'), ['openai', 'my-gw', 'custom']);
-  const provider = CLAIMS.filter((c) => c.file === 'PRODUCT.md');
+  const provider = CLAIMS.filter((c) => 'PRODUCT.md' in c.expect);
   assert.equal(provider.length, 1);
   const files = (said) => ({ ...base(), 'PRODUCT.md': `- AI providers (${said}, plus OpenAI-compatible endpoints)\n`, 'ai.js': AI_SRC });
   assert.deepEqual(errorsOf(files(4), { claims: provider }), []);

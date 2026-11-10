@@ -157,23 +157,27 @@ export function objectKeysFromSource(source, name) {
 }
 const readText = (root, rel) => readFileSync(join(root, rel), "utf8");
 
-// Each claim: where the number is written (file + a pattern with one capture
-// group, only used to locate it) and where the real value comes from.
+// Each claim: a pattern with one capture group (only used to locate the
+// number), how many times each file is expected to say it, and where the real
+// value comes from. Every doc in the rule scope (plus PRODUCT.md) is scanned.
+// A hit count that differs from `expect` is an error, so a reworded or newly
+// added occurrence cannot hide behind another one.
 // mode "exact": equal; mode "min": the doc says "N+", real value must be >= N.
+const localeCount = (ctx) => new Set(ctx.files.filter((f) => /^_locales\/[^/]+\//.test(f)).map((f) => f.split("/")[1])).size;
+const themeCount = (ctx) => ctx.files.filter((f) => /^docs\/theme-surface\/pilots\/[^/]+\.tokens\.json$/.test(f)).length;
 export const CLAIMS = [
-  { label: "locale 数", file: "CLAUDE.md", re: /_locales\/（(\d+) locale）/g, mode: "exact",
-    actual: (ctx) => new Set(ctx.files.filter((f) => /^_locales\/[^/]+\//.test(f)).map((f) => f.split("/")[1])).size },
-  { label: "locale 数", file: "CLAUDE.md", re: /×(\d+) locale/g, mode: "exact",
-    actual: (ctx) => new Set(ctx.files.filter((f) => /^_locales\/[^/]+\//.test(f)).map((f) => f.split("/")[1])).size },
-  { label: "README 数", file: "CLAUDE.md", re: /README\*\.md ×(\d+)/g, mode: "exact",
+  { label: "locale 数", re: /(?:_locales\/（|×)(\d+) locale/g, mode: "exact",
+    expect: { "CLAUDE.md": 2, ".claude/rules/l10n.md": 1 }, actual: localeCount },
+  { label: "README 数", re: /README ?(?:\*\.md ?)?×(\d+)/g, mode: "exact",
+    expect: { "CLAUDE.md": 2, ".claude/rules/l10n.md": 1, ".claude/skills/release/SKILL.md": 1 },
     actual: (ctx) => ctx.files.filter((f) => /^README(\.[^/]+)?\.md$/.test(f)).length },
-  { label: "测试页数", file: "CLAUDE.md", re: /HTML 测试页 (\d+)\+ 套/g, mode: "min",
+  { label: "测试页数", re: /HTML 测试页 (\d+)\+ 套/g, mode: "min",
+    expect: { "CLAUDE.md": 1 },
     actual: (ctx) => ctx.files.filter((f) => /^tests\/[^/]*-tests\.html$/.test(f)).length },
-  { label: "站点主题数", file: "CLAUDE.md", re: /(\d+) 套站点主题/g, mode: "exact",
-    actual: (ctx) => ctx.files.filter((f) => /^docs\/theme-surface\/pilots\/[^/]+\.tokens\.json$/.test(f)).length },
-  { label: "站点主题数", file: ".claude/rules/theme-factory.md", re: /(\d+) 套 preset/g, mode: "exact",
-    actual: (ctx) => ctx.files.filter((f) => /^docs\/theme-surface\/pilots\/[^/]+\.tokens\.json$/.test(f)).length },
-  { label: "AI 服务商数", file: "PRODUCT.md", re: /AI providers \((\d+)[,)]/g, mode: "exact",
+  { label: "站点主题数", re: /(\d+) ?(?:套|个) ?(?:pinboard\.in )?(?:站点主题|预设|preset)/g, mode: "exact",
+    expect: { "CLAUDE.md": 2, ".claude/rules/theme-factory.md": 3 }, actual: themeCount },
+  { label: "AI 服务商数", re: /AI providers \((\d+)[,)]/g, mode: "exact",
+    expect: { "PRODUCT.md": 1 },
     // ids in OPENAI_COMPAT_PROVIDERS + _AI_BESPOKE_PROVIDERS, minus "custom" (user-added endpoints)
     actual: (ctx) => {
       const src = readText(ctx.root, "ai.js");
@@ -227,18 +231,33 @@ export function lintRules(root, { files = listFiles(root), allow = [], claims = 
         listed.add(ref);
         if (!tracked(ref)) errors.push(`CLAUDE.md:${row.line}: 索引引用的 ${ref} 不存在`);
       }
+      // Resolve every name in the first column. A name that finds nothing, or a
+      // bare name that finds several files, is an error: it must not slip past
+      // the coverage check below.
+      const resolved = [];
+      for (const tok of namedTokens(row.first)) {
+        const ext = (/\.([A-Za-z0-9*]+)$/.exec(tok) || [])[1];
+        let matches;
+        if (tracked(tok)) matches = [tok];
+        else if (hasGlob(tok)) {
+          matches = files.filter((f) => globToRegex(tok)?.test(f));
+          const fileGlob = tok.endsWith(".*") || (ext && PATH_EXTS.has(ext));
+          if (matches.length === 0 && fileGlob && !excused("CLAUDE.md", tok)) {
+            errors.push(`CLAUDE.md:${row.line}: 索引里的通配「${tok}」没有匹配任何已跟踪文件`);
+          }
+        } else {
+          const same = tok.includes("/") ? [] : files.filter((f) => basename(f) === tok);
+          matches = same.length === 1 ? same : [];
+          if (same.length === 0 && !excused("CLAUDE.md", tok)) errors.push(`CLAUDE.md:${row.line}: 索引里的「${tok}」在仓库里找不到对应文件（拼错了，或路径要写全）`);
+          else if (same.length > 1 && !excused("CLAUDE.md", tok)) errors.push(`CLAUDE.md:${row.line}: 索引里的「${tok}」有 ${same.length} 个同名文件（${same.join("、")}），请写出路径`);
+        }
+        resolved.push({ tok, matches });
+      }
       const ruleRefs = row.refs.filter((r) => /^\.claude\/rules\/[^/]+\.md$/.test(r) && frontPaths.has(r));
       for (const rr of ruleRefs) {
         const regs = frontPaths.get(rr).map(globToRegex);
         const covered = (f) => regs.some((re) => re.test(f));
-        for (const tok of namedTokens(row.first)) {
-          let matches;
-          if (tracked(tok)) matches = [tok];
-          else if (hasGlob(tok)) matches = files.filter((f) => globToRegex(tok).test(f));
-          else {
-            const same = files.filter((f) => basename(f) === tok);
-            matches = same.length === 1 ? same : [];
-          }
+        for (const { tok, matches } of resolved) {
           for (const m of matches) {
             if (!covered(m) && !excused(rr, `索引点名:${m}`)) {
               errors.push(`CLAUDE.md:${row.line}: 索引说「${tok}」归 ${rr} 管，但 ${m} 不在它的 paths: 里（补 paths:，或把索引改成实际覆盖的文件）`);
@@ -320,7 +339,8 @@ export function lintRules(root, { files = listFiles(root), allow = [], claims = 
         // path
         const ext = /\.([A-Za-z0-9]+)$/.exec(w);
         // A wildcard with no slash and no extension (pbp-*, field-*) names a family, not a path.
-        const nameFamily = hasGlob(w) && !w.includes("/") && !ext;
+        // One ending in .* (md-preview.*) is a file glob.
+        const nameFamily = hasGlob(w) && !w.includes("/") && !ext && !w.endsWith(".*");
         const pathLike = !nameFamily && /^[A-Za-z0-9_@.*+\/][\w@.*+\/-]*$/.test(w) && /[A-Za-z0-9]/.test(w) && (hasGlob(w) || w.endsWith("/") || (ext && PATH_EXTS.has(ext[1].toLowerCase())));
         if (nameFamily) continue;
         if (pathLike) {
@@ -337,18 +357,27 @@ export function lintRules(root, { files = listFiles(root), allow = [], claims = 
 
   // ---------- C ----------
   const ctx = { root, files };
+  const claimScope = [...new Set([...scope, ...(tracked("PRODUCT.md") ? ["PRODUCT.md"] : [])])];
   for (const c of claims) {
-    if (!tracked(c.file)) { errors.push(`${c.file}: 数字声明「${c.label}」所在的文件不存在`); continue; }
-    const text = readText(root, c.file);
-    const found = [...text.matchAll(new RegExp(c.re.source, c.re.flags.includes("g") ? c.re.flags : c.re.flags + "g"))];
-    if (found.length === 0) { errors.push(`${c.file}: 找不到数字声明「${c.label}」（${c.re}），文档改了写法的话同步改 lint 的声明表`); continue; }
+    const missing = Object.keys(c.expect).filter((f) => !tracked(f));
+    for (const f of missing) errors.push(`${f}: 数字声明「${c.label}」所在的文件不存在`);
     let actual;
-    try { actual = c.actual(ctx); } catch (e) { errors.push(`${c.file}: 算「${c.label}」的实际值失败：${e.message}`); continue; }
-    for (const m of found) {
-      const said = Number(m[1]);
-      const line = text.slice(0, m.index).split("\n").length;
-      if (c.mode === "min" ? actual < said : actual !== said) {
-        errors.push(`${c.file}:${line}: 「${c.label}」文档写 ${said}${c.mode === "min" ? "+" : ""}，实际是 ${actual}`);
+    try { actual = c.actual(ctx); } catch (e) { errors.push(`${c.label}: 算实际值失败：${e.message}`); continue; }
+    const flags = c.re.flags.includes("g") ? c.re.flags : c.re.flags + "g";
+    for (const file of claimScope) {
+      const text = readText(root, file);
+      const found = [...text.matchAll(new RegExp(c.re.source, flags))];
+      const want = c.expect[file] ?? 0;
+      if (missing.includes(file)) continue;
+      if (found.length !== want) {
+        errors.push(`${file}: 数字声明「${c.label}」（${c.re}）找到 ${found.length} 处，预期 ${want} 处。文档改了写法或新增了这个数字的话，同步改 lint 的声明表`);
+      }
+      for (const m of found) {
+        const said = Number(m[1]);
+        const line = text.slice(0, m.index).split("\n").length;
+        if (c.mode === "min" ? actual < said : actual !== said) {
+          errors.push(`${file}:${line}: 「${c.label}」文档写 ${said}${c.mode === "min" ? "+" : ""}，实际是 ${actual}`);
+        }
       }
     }
   }

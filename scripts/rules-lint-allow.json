@@ -3,5 +3,6 @@
   { "file": ".claude/rules/dict.md", "token": "controlsHost", "reason": "Named on purpose as an option md-dict.js no longer accepts. It is meant to be absent from the code." },
   { "file": ".claude/skills/live-ai-test/SKILL.md", "token": ".qa-scan/report/", "reason": "Gitignored output folder that exists only after a run." },
   { "file": "CLAUDE.md", "token": ".qa-scan/report/", "reason": "Gitignored output folder that exists only after a run." },
-  { "file": ".claude/skills/release/SKILL.md", "token": "release/", "reason": "Gitignored build output folder, named as one of the folders left out of the ZIP." }
+  { "file": ".claude/skills/release/SKILL.md", "token": "release/", "reason": "Gitignored build output folder, named as one of the folders left out of the ZIP." },
+  { "file": ".claude/rules/dict-pack.md", "token": "cur.*", "reason": "A variable name with a property wildcard in prose (cur.*), not a file path." }
 ]

@@ -159,7 +159,7 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 | vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js、options-vocab.js、library-vocab.js、library-notes.js、md-highlight.js、anki-connect.js、eudic-sync.js、vocab-send.js | `.claude/rules/vocab-sync.md` |
 | vocab-gdrive.js、notes-gdrive.js、dict-archive-gdrive.js、ask-archive-gdrive.js、options-vocab.js、library.js、background.js、tests/ 下的 vocab-gdrive-tests.html、notes-gdrive-tests.html、options-drive-sync-tests.html、drive-scopes-tests.html、drive-migration-tests.html（连接层 / 身份缓存 / 错误码 / OAuth / 权限） | `.claude/rules/drive-sync.md` |
 | dict-archive.js、dict-archive-gdrive.js、ask-archive.js、ask-archive-gdrive.js、library-ask.js | `.claude/rules/archive-sync.md` |
-| md-preview.*、md-preview-theme-early.js、md-translate.js、md-ask.js、md-reader.js、md-highlight.js、md-ai-core.js、md-bookmark.js、md-skim.js、md-convert.js、md-epub.js、md-mermaid.js、md-export-send.js、md-video.js、bili-player-bridge.js | `.claude/rules/md-preview.md` |
+| md-preview.*、md-preview-theme-early.js、md-translate.js、md-ask.js、md-reader.js、md-highlight.js、md-ai-core.js、md-bookmark.js、md-skim.js、md-convert.js、md-epub.js、md-mermaid.js、md-export-send.js、md-video.js、md-dict.js、md-vocab-echo.js、bili-player-bridge.js | `.claude/rules/md-preview.md` |
 | md-dict.js、md-vocab-echo.js、ai-cache.js、library-vocab.js（查词界面） | `.claude/rules/dict.md` |
 | dict-entry.js、dict-evidence.js、md-dict.js（AI 词条与补充的生成） | `.claude/rules/dict-entry.md` |
 | dict-pack.js、options-vocab.js、md-dict.js、library-vocab.js（离线词典包） | `.claude/rules/dict-pack.md` |

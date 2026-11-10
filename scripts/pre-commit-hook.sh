@@ -23,6 +23,9 @@
 #               since July are how 23 inline styles and 27 ad-hoc wrapper
 #               classes reached the settings page.
 STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+# The rules and registers groups also care about deletions and rename sources:
+# removing a rule file or a register breaks the index without changing a kept file.
+STAGED_WITH_DELETES=$(git diff --cached --name-only --no-renames)
 THEME_RE='^(docs/theme-surface/(pilots/[^/]+\.tokens\.json|composers/[^/]+\.mjs|tools/[^/]+\.mjs|tools/override-debt-baseline\.json|manifest\.json|tokens\.schema\.json)|pinboard-themes\.js|popup\.css|options\.css|library\.css)$'
 UI_HTML_RE='^((popup|options|library|md-preview)\.html|md-preview\.css|(popup|options|library)(-[a-z-]+)?\.js|listbox\.js|md-dict\.js|dict-[a-z-]+\.js)$'
 UI_VOCAB_RE='^((popup|options|library|md-preview)\.html|(popup|options|library)(-[a-z-]+)?\.js|listbox\.js|md-[a-z-]+\.js|shared\.js|docs/theme-surface/ui-vocabulary\.json|scripts/ui-vocabulary-baseline\.json|scripts/ui-vocabulary-lint\.mjs)$'
@@ -33,8 +36,8 @@ UI_HTML_CHANGED=$(printf '%s
 UI_VOCAB_CHANGED=$(printf '%s
 ' "$STAGED" | grep -E "$UI_VOCAB_RE")
 AUDIT_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(audit[^/]*|ui-render-audit|qa-drive|options-help-render-audit)\.mjs|tests/(audit[^/]*-tests|pinboard-theme-render-tests|render-audit-checklist)\.mjs|scripts/(verify|pre-commit-hook)\.sh)$')
-REGISTERS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(\.claude/(decisions|acceptance-debt|flake-ledger)\.md|scripts/registers-lint\.mjs|tests/registers-lint-tests\.mjs)$')
-RULES_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(CLAUDE\.md|AGENTS\.md|PRODUCT\.md|\.claude/rules/[^/]+\.md|\.claude/skills/.+|\.claude/expiring-items\.md|scripts/rules-lint(-allow)?\.(mjs|json)|tests/rules-lint-tests\.mjs)$')
+REGISTERS_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(\.claude/(decisions|acceptance-debt|flake-ledger)\.md|scripts/registers-lint\.mjs|tests/registers-lint-tests\.mjs)$')
+RULES_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(CLAUDE\.md|AGENTS\.md|PRODUCT\.md|\.claude/rules/[^/]+\.md|\.claude/skills/.+|\.claude/expiring-items\.md|scripts/rules-lint(-allow)?\.(mjs|json)|tests/rules-lint-tests\.mjs)$')
 if [ -z "$CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ]; then
   exit 0
 fi

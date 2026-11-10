@@ -16,6 +16,8 @@ paths:
   - "md-video.js"
   - "bili-player-bridge.js"
   - "md-bookmark.js"
+  - "md-dict.js"
+  - "md-vocab-echo.js"
   - "md-preview-theme-early.js"
 ---
 
