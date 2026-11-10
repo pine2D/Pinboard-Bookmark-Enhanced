@@ -98,6 +98,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/batch-dedup-tests.html": 52,
   "tests/bookmark-services-tests.html": 186,
   "tests/bili-bridge-tests.html": 3,
+  "tests/chrome-mock-tests.html": 15,
   "tests/contrast-tests.html": 6,
   "tests/confirm-layout-tests.html": 142,
   "tests/dict-pack-tests.html": 333,

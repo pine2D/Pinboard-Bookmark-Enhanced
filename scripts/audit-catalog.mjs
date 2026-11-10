@@ -17,7 +17,7 @@ function ownership(name) {
   if (name === 'tag-gov-layout') return ['options'];
   if (name === 'save-pipeline' || name.startsWith('bookmark-service')) return ['background', 'popup', 'md-preview'];
   if (['icon-state', 'wayback', 'url-strip'].includes(name)) return ['background'];
-  if (/^audit-|^registers-lint|^rules-lint|^eslint-silent-catch|^eslint-baseline|^slice-anchor-lint|^coverage-report|^verify-groups|^mutate-check|^run-test-print-counts|^ui-contract-scan/.test(name)) return ['tooling'];
+  if (/^audit-|^registers-lint|^rules-lint|^eslint-silent-catch|^eslint-baseline|^slice-anchor-lint|^coverage-report|^chrome-mock|^verify-groups|^mutate-check|^run-test-print-counts|^ui-contract-scan/.test(name)) return ['tooling'];
   if (/^popup-|^ai-tags|^tag-gov|^union-tags|^offline-queue|^batch-/.test(name)) return ['popup'];
   if (/^options-|^settings-/.test(name)) return ['options'];
   if (/^library-/.test(name)) return ['library'];

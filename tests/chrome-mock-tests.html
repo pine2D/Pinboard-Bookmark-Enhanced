@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Chrome Mock Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 4px 8px; margin: 4px 0; white-space: pre-wrap; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+</style></head>
+<body>
+<h1>tests/fixtures/chrome-mock.js</h1>
+<div id="results"></div>
+<script src="fixtures/chrome-mock.js"></script>
+<script>
+// Self-test of the shared chrome mock: callback/promise parity, lastError
+// lifetime, onChanged payloads, failure injection and the other APIs it
+// offers. Expected values are written from the Chrome extension reference
+// (cited in the mock), not read back from the mock.
+let passed = 0, failed = 0;
+async function test(name, fn) {
+  const div = document.createElement("div");
+  try { await fn(); passed++; div.className = "case pass"; div.textContent = "PASS " + name; }
+  catch (e) { failed++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + (e && e.message); }
+  document.getElementById("results").appendChild(div);
+}
+function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
+const eq = (a, b, msg) => assert(JSON.stringify(a) === JSON.stringify(b), (msg || "") + " got " + JSON.stringify(a) + " want " + JSON.stringify(b));
+const viaCallback = (fn, ...args) => new Promise((resolve) => fn(...args, (value) => resolve({ value, lastError: chrome.runtime.lastError })));
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+(async () => {
+  await test("storage get: callback and promise give the same result for every key form", async () => {
+    const m = pbpChromeMock.install({ storage: { local: { a: 1, b: { x: [1, 2] }, c: "s" } } });
+    for (const keys of [null, undefined, "a", ["a", "missing"], { a: 0, missing: "def" }]) {
+      const promised = await chrome.storage.local.get(keys);
+      const called = await viaCallback(chrome.storage.local.get.bind(chrome.storage.local), keys);
+      eq(called.value, promised, "parity for " + JSON.stringify(keys));
+      assert(called.lastError === undefined, "lastError set on success");
+    }
+    eq(await chrome.storage.local.get(null), { a: 1, b: { x: [1, 2] }, c: "s" }, "null gives everything");
+    eq(await chrome.storage.local.get({ a: 0, missing: "def" }), { a: 1, missing: "def" }, "defaults fill missing keys");
+    eq(await chrome.storage.local.get(["a", "missing"]), { a: 1 }, "missing keys are absent");
+    assert(m.callsOf("storage.local.get").length === 13, "every call recorded: " + m.callsOf("storage.local.get").length);
+  });
+
+  await test("storage values are copies: mutating a result or the set argument changes nothing", async () => {
+    pbpChromeMock.install();
+    const item = { list: [1] };
+    await chrome.storage.sync.set({ item });
+    item.list.push(2);
+    const got = await chrome.storage.sync.get("item");
+    got.item.list.push(3);
+    eq((await chrome.storage.sync.get("item")).item, { list: [1] });
+  });
+
+  await test("set/remove/clear: callback form returns undefined to the callback and works like the promise form", async () => {
+    pbpChromeMock.install();
+    const r1 = await viaCallback(chrome.storage.local.set.bind(chrome.storage.local), { k: 1 });
+    assert(r1.value === undefined && r1.lastError === undefined, "set callback");
+    assert((await chrome.storage.local.set({ j: 2 })) === undefined, "set promise resolves undefined");
+    await viaCallback(chrome.storage.local.remove.bind(chrome.storage.local), "k");
+    eq(await chrome.storage.local.get(null), { j: 2 });
+    await chrome.storage.local.clear();
+    eq(await chrome.storage.local.get(null), {});
+  });
+
+  await test("onChanged: (changes, areaName) with oldValue/newValue, only changed keys, area event too", async () => {
+    pbpChromeMock.install({ storage: { local: { a: 1, b: 2 } } });
+    const seen = [], areaSeen = [];
+    chrome.storage.onChanged.addListener((changes, area) => seen.push([changes, area]));
+    chrome.storage.local.onChanged.addListener((changes) => areaSeen.push(changes));
+    await chrome.storage.local.set({ a: 1, b: 3, c: 4 });
+    eq(seen, [[{ b: { oldValue: 2, newValue: 3 }, c: { newValue: 4 } }, "local"]], "set");
+    eq(areaSeen, [{ b: { oldValue: 2, newValue: 3 }, c: { newValue: 4 } }], "area event has no area argument");
+    await chrome.storage.local.set({ a: 1 });
+    assert(seen.length === 1, "an unchanged value fires nothing");
+    await chrome.storage.local.remove(["a", "nope"]);
+    eq(seen[1], [{ a: { oldValue: 1 } }, "local"], "remove");
+    await chrome.storage.local.clear();
+    eq(seen[2], [{ b: { oldValue: 3 }, c: { oldValue: 4 } }, "local"], "clear");
+    await chrome.storage.session.set({ s: 1 });
+    eq(seen[3], [{ s: { newValue: 1 } }, "session"], "session area name");
+  });
+
+  await test("lastError: undefined outside, set only while the failing callback runs", async () => {
+    const m = pbpChromeMock.install();
+    m.failNext("storage.local.get", "boom");
+    assert(chrome.runtime.lastError === undefined, "set before the call");
+    let inside;
+    await new Promise((resolve) => chrome.storage.local.get("x", (value) => { inside = { value, err: chrome.runtime.lastError }; resolve(); }));
+    eq(inside.err, { message: "boom" }, "lastError inside");
+    assert(inside.value === undefined, "a failing callback gets no result");
+    assert(chrome.runtime.lastError === undefined, "still set after the callback");
+    await tick();
+    assert(chrome.runtime.lastError === undefined, "still set a task later");
+  });
+
+  await test("lastError: the promise form rejects and never sets lastError", async () => {
+    const m = pbpChromeMock.install();
+    m.failNext("storage.sync.set", { message: "nope" });
+    let caught, during;
+    try { await chrome.storage.sync.set({ a: 1 }); } catch (e) { caught = e; during = chrome.runtime.lastError; }
+    assert(caught instanceof Error && caught.message === "nope", "rejects with an Error");
+    assert(during === undefined, "lastError set in the promise form");
+    eq(await chrome.storage.sync.get(null), {}, "a failed set wrote nothing");
+  });
+
+  await test("lastError: a callback that never reads it is recorded as unchecked", async () => {
+    const m = pbpChromeMock.install();
+    m.failNext("storage.local.get", "ignored");
+    m.failNext("storage.local.set", "read");
+    await new Promise((resolve) => chrome.storage.local.get("x", () => resolve()));
+    await new Promise((resolve) => chrome.storage.local.set({ x: 1 }, () => { void chrome.runtime.lastError; resolve(); }));
+    eq(m.unchecked, ["ignored"]);
+  });
+
+  await test("failNext is one-shot; a count makes several calls fail", async () => {
+    const m = pbpChromeMock.install({ storage: { local: { a: 1 } } });
+    m.failNext("storage.local.get", "x", 2);
+    const errs = [];
+    for (let i = 0; i < 3; i++) { try { await chrome.storage.local.get("a"); errs.push(null); } catch (e) { errs.push(e.message); } }
+    eq(errs, ["x", "x", null]);
+  });
+
+  await test("quota: sync per-item and total limits fail like Chrome and write nothing; injected quota error", async () => {
+    const m = pbpChromeMock.install();
+    assert(chrome.storage.sync.QUOTA_BYTES === 102400 && chrome.storage.sync.QUOTA_BYTES_PER_ITEM === 8192, "sync quota constants");
+    assert(chrome.storage.local.QUOTA_BYTES === 10485760, "local quota constant");
+    let err = await viaCallback(chrome.storage.sync.set.bind(chrome.storage.sync), { big: "x".repeat(9000) });
+    eq(err.lastError, { message: "QUOTA_BYTES_PER_ITEM quota exceeded" });
+    eq(await chrome.storage.sync.get(null), {}, "nothing written");
+    const items = {};
+    for (let i = 0; i < 14; i++) items["k" + i] = "y".repeat(8000);
+    err = await chrome.storage.sync.set(items).then(() => null, (e) => e.message);
+    assert(err === "QUOTA_BYTES quota exceeded", "total quota: " + err);
+    m.failNext("storage.local.set", { quota: true });
+    err = await chrome.storage.local.set({ a: 1 }).then(() => null, (e) => e.message);
+    assert(err === "QUOTA_BYTES quota exceeded", "injected quota: " + err);
+    eq(await chrome.storage.local.get(null), {});
+  });
+
+  await test("runtime.sendMessage: no receiver fails; a receiver answers both forms with a copy", async () => {
+    const m = pbpChromeMock.install();
+    const none = await viaCallback(chrome.runtime.sendMessage, { type: "x" });
+    eq(none.lastError, { message: "Could not establish connection. Receiving end does not exist." });
+    let gotMessage;
+    m.onSendMessage(async (message, sender) => { gotMessage = message; return { ok: true, echo: message.type, sender: sender.id }; });
+    const msg = { type: "ping" };
+    const cb = await viaCallback(chrome.runtime.sendMessage, msg);
+    const pr = await chrome.runtime.sendMessage(msg);
+    eq(cb.value, pr, "parity");
+    eq(pr, { ok: true, echo: "ping", sender: chrome.runtime.id });
+    assert(gotMessage !== msg, "the receiver got a copy");
+    m.onSendMessage(() => undefined);
+    assert((await chrome.runtime.sendMessage({ type: "q" })) === undefined, "no answer gives undefined");
+    m.failNext("runtime.sendMessage", "Extension context invalidated.");
+    const rej = await chrome.runtime.sendMessage({ type: "q" }).then(() => null, (e) => e.message);
+    assert(rej === "Extension context invalidated.", "injected rejection");
+  });
+
+  await test("runtime.onMessage: (message, sender, sendResponse); true keeps the channel open", async () => {
+    const m = pbpChromeMock.install();
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === "sync") sendResponse({ n: 1 });
+      if (message.type === "async") { setTimeout(() => sendResponse({ n: 2 }), 5); return true; }
+      return undefined;
+    });
+    eq(await m.dispatchMessage({ type: "sync" }), { n: 1 });
+    eq(await m.dispatchMessage({ type: "async" }), { n: 2 });
+    assert((await m.dispatchMessage({ type: "other" })) === undefined, "no response");
+    assert(chrome.runtime.onMessage.hasListeners(), "hasListeners");
+    assert(chrome.runtime.getURL("/popup.html") === "chrome-extension://" + chrome.runtime.id + "/popup.html", "getURL");
+  });
+
+  await test("alarms: create/get/getAll/clear and onAlarm with the Alarm shape", async () => {
+    const m = pbpChromeMock.install();
+    await chrome.alarms.create("tick", { periodInMinutes: 5 });
+    chrome.alarms.create("once", { when: 1000 });
+    await tick();
+    eq((await chrome.alarms.get("once")), { name: "once", scheduledTime: 1000 });
+    const tickAlarm = await chrome.alarms.get("tick");
+    assert(tickAlarm.periodInMinutes === 5 && typeof tickAlarm.scheduledTime === "number", "periodic alarm");
+    eq((await chrome.alarms.getAll()).map((a) => a.name).sort(), ["once", "tick"]);
+    const fired = [];
+    chrome.alarms.onAlarm.addListener((a) => fired.push(a.name));
+    m.fireAlarm("once");
+    m.fireAlarm("tick");
+    eq(fired, ["once", "tick"]);
+    assert((await chrome.alarms.get("once")) === undefined, "a one-shot alarm is gone after it fires");
+    assert((await chrome.alarms.clear("tick")) === true && (await chrome.alarms.clear("tick")) === false, "clear resolves wasCleared");
+  });
+
+  await test("tabs: query by active/currentWindow/url, get of a missing id fails", async () => {
+    pbpChromeMock.install({ tabs: [{ url: "https://a.test/x", active: true }, { url: "https://b.test/", windowId: 2, active: true }] });
+    eq((await chrome.tabs.query({ active: true, currentWindow: true })).map((t) => t.url), ["https://a.test/x"]);
+    eq((await chrome.tabs.query({ url: "https://*.test/*" })).length, 2);
+    const miss = await viaCallback(chrome.tabs.get, 9);
+    eq(miss.lastError, { message: "No tab with id: 9." });
+    const made = await chrome.tabs.create({ url: "https://c.test/" });
+    assert(made.id === 3 && made.active === true, "create returns a Tab");
+  });
+
+  await test("permissions: contains/request resolve booleans; a granted request fires onAdded", async () => {
+    const m = pbpChromeMock.install({ permissions: { origins: ["https://api.example/*"] } });
+    assert(await chrome.permissions.contains({ origins: ["https://api.example/*"] }), "granted origin");
+    assert(!(await chrome.permissions.contains({ origins: ["https://other.example/*"] })), "other origin");
+    assert((await chrome.permissions.request({ origins: ["https://other.example/*"] })) === false, "declined by default");
+    const added = [];
+    chrome.permissions.onAdded.addListener((p) => added.push(p));
+    m.setPermissionRequestAnswer(true);
+    assert((await chrome.permissions.request({ origins: ["https://other.example/*"] })) === true, "accepted");
+    eq(added, [{ origins: ["https://other.example/*"] }]);
+    const cb = await viaCallback(chrome.permissions.contains, { origins: ["https://other.example/*"] });
+    assert(cb.value === true, "callback form");
+  });
+
+  await test("i18n.getMessage: placeholders with $1..$9, $$ and unknown names", async () => {
+    pbpChromeMock.install({ messages: {
+      hello: { message: "Hi $NAME$, $COUNT$ new", placeholders: { name: { content: "$1" }, count: { content: "$2" } } },
+      price: { message: "Costs $$5 $what$", placeholders: { what: { content: "($1)" } } },
+      plain: { message: "No args" },
+    } });
+    assert(chrome.i18n.getMessage("hello", ["Ann", "3"]) === "Hi Ann, 3 new", chrome.i18n.getMessage("hello", ["Ann", "3"]));
+    assert(chrome.i18n.getMessage("hello", "Ann") === "Hi Ann,  new", "a string substitution, missing second");
+    assert(chrome.i18n.getMessage("price", ["x"]) === "Costs $5 (x)", chrome.i18n.getMessage("price", ["x"]));
+    assert(chrome.i18n.getMessage("plain", ["ignored"]) === "No args", "no placeholders");
+    assert(chrome.i18n.getMessage("missing") === "", "unknown name gives empty string");
+    assert(chrome.i18n.getUILanguage() === "en", "UI language");
+  });
+
+  document.title = (failed ? "FAIL" : "PASS") + " " + passed + "/" + (passed + failed);
+})();
+</script>
+</body></html>
