@@ -12,8 +12,9 @@
 //   split with a literal separator whose result is kept (indexed, destructured,
 //     assigned);
 //   a call to a test-local helper that does one of the above with a marker it
-//     takes as a parameter (extractFunction(src, "name"), fnSource(src, sig)),
-//     counted at each call site that passes a literal marker.
+//     takes as a parameter (extractFunction(src, "name"), fnSource(src, sig),
+//     or block("start", "end") over a source in its closure), counted at each
+//     call site that passes a literal marker.
 // A literal marker is a string, a template without ${}, a regex literal, a
 // `+` chain of those, or a const bound to one of them.
 // includes / startsWith / RegExp#test are presence checks and never count.
@@ -558,7 +559,7 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
       const mp = markerNode && markerParam(markerNode);
       if (mp) {
         const list = helperMarkerParams.get(mp.fn) || [];
-        list.push({ index: mp.index, form, checked: isIndex ? (isPresenceCompare(n) || checkedIndex(n)) : form === 'split' ? false : checkedMatch(n) });
+        list.push({ index: mp.index, form, targets: [...receiverTaint.targets], checked: isIndex ? (isPresenceCompare(n) || checkedIndex(n)) : form === 'split' ? false : checkedMatch(n) });
         helperMarkerParams.set(mp.fn, list);
       } else survey.computedMarker++;
       continue;
@@ -584,10 +585,11 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
     const fn = fnOfCallee(n);
     const list = fn && helperMarkerParams.get(fn);
     if (!list) continue;
-    // the source argument: any argument holding runtime source
+    // The source: an argument holding runtime source, or else the source the
+    // helper reads from its closure (const block = (a, b) => source.slice(...)).
     let targets = null;
     for (const a of n.arguments) { const t = flat(T(a)); if (t) targets = union(targets, t); }
-    if (!targets) continue;
+    if (!targets) targets = src(list.flatMap((h) => h.targets));
     for (const index of [...new Set(list.map((h) => h.index))]) {
       const lit = literalOf(n.arguments[index], constOf);
       if (!lit) continue;

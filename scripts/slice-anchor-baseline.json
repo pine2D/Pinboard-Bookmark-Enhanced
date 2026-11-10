@@ -1,15 +1,31 @@
 {
   "note": "Slice anchors per test file (scripts/slice-anchor-lint.mjs). Only shrinks: refresh with --update after removing anchors. New tests load the real file with tests/fixtures/chrome-mock.js instead of cutting source.",
-  "total": 1212,
+  "total": 1318,
   "files": {
     "tests/background-active-tab-tests.html": {
-      "count": 28
+      "count": 44,
+      "growth": [
+        {
+          "date": "2026-11-10",
+          "from": 28,
+          "to": 44,
+          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
+        }
+      ]
     },
     "tests/background-lifecycle-tests.html": {
       "count": 22
     },
     "tests/batch-dedup-tests.html": {
-      "count": 12
+      "count": 20,
+      "growth": [
+        {
+          "date": "2026-11-10",
+          "from": 12,
+          "to": 20,
+          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
+        }
+      ]
     },
     "tests/bookmark-live-preflight-tests.mjs": {
       "count": 2
@@ -51,7 +67,15 @@
       "count": 3
     },
     "tests/offline-queue-tests.html": {
-      "count": 6
+      "count": 12,
+      "growth": [
+        {
+          "date": "2026-11-10",
+          "from": 6,
+          "to": 12,
+          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
+        }
+      ]
     },
     "tests/options-ai-custom-tests.html": {
       "count": 4
@@ -72,10 +96,26 @@
       "count": 6
     },
     "tests/popup-draft-tests.html": {
-      "count": 13
+      "count": 40,
+      "growth": [
+        {
+          "date": "2026-11-10",
+          "from": 13,
+          "to": 40,
+          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
+        }
+      ]
     },
     "tests/popup-save-tests.html": {
-      "count": 362
+      "count": 372,
+      "growth": [
+        {
+          "date": "2026-11-10",
+          "from": 362,
+          "to": 372,
+          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
+        }
+      ]
     },
     "tests/reader-bookmark-tests.html": {
       "count": 18
@@ -84,7 +124,15 @@
       "count": 2
     },
     "tests/save-pipeline-tests.html": {
-      "count": 63
+      "count": 71,
+      "growth": [
+        {
+          "date": "2026-11-10",
+          "from": 63,
+          "to": 71,
+          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
+        }
+      ]
     },
     "tests/settings-persist-tests.html": {
       "count": 36
@@ -96,7 +144,15 @@
       "count": 6
     },
     "tests/ui-contract-tests.mjs": {
-      "count": 533
+      "count": 564,
+      "growth": [
+        {
+          "date": "2026-11-10",
+          "from": 533,
+          "to": 564,
+          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
+        }
+      ]
     },
     "tests/vocab-background-tests.html": {
       "count": 24

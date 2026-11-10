@@ -56,6 +56,10 @@ function bodyOf(source, name) { return source.slice(source.indexOf("function " +
   assert.equal(helpers[2].checked, false, 'bodyOf does not');
   assert.equal(a.filter((x) => x.form === 'indexOf').length, 1, 'the helper\'s own literal end marker still counts, once');
 });
+test('a helper reading the source from its closure counts at its call sites', () => {
+  const a = anchorsOf(`(async () => { ${LOAD} const block = (from, to) => { const s = src.indexOf(from); const e = src.indexOf(to, s); if (s < 0 || e < 0) throw 1; return src.slice(s, e); }; block("function k(", "function l("); })();`);
+  assert.deepEqual(a.map((x) => [x.form, x.marker.value, x.targets[0], x.checked]), [['helper:block', 'function k(', 'popup.js', true], ['helper:block', 'function l(', 'popup.js', true]]);
+});
 test('sources reached through Promise.all, .then(r => r.text()), objects, params and for-of', () => {
   const a = anchorsOf(`
 function cut(text) { return text.slice(text.indexOf("A1")); }
