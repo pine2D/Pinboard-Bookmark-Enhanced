@@ -124,7 +124,7 @@ function parseIndex(text) {
 
 // Names a row's first column points at: file names with an extension, or globs.
 function namedTokens(first) {
-  const s = first.replace(/[（(][^）)]*[）)]/g, " ");
+  const s = first;
   const out = [];
   for (const m of s.matchAll(/[A-Za-z0-9_.*\/-]+/g)) {
     const t = m[0].replace(/\.+$/, "").replace(/^\/+|\/+$/g, "");

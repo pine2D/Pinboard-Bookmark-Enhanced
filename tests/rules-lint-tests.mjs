@@ -92,6 +92,11 @@ test('A: rows for registers and skills are accepted; the frontmatter check only 
   delete missing['.claude/decisions.md'];
   assert.ok(has(errorsOf(missing), /decisions\.md.*不存在/));
 });
+test('A: file names inside parentheses in the row are checked too', () => {
+  const files = base({ 'CLAUDE.md': index(row('a.js（运行时创建时也读 c.js）', '.claude/rules/alpha.md')), 'c.js': '' });
+  assert.ok(has(errorsOf(files), /c\.js.*不在它的 paths/), 'c.js sits only in the parenthesis');
+  assert.deepEqual(errorsOf({ ...files, '.claude/rules/alpha.md': rule(['a.js', 'b.js', 'c.js']) }), []);
+});
 test('A: a missing index table fails', () => {
   const e = errorsOf(base({ 'CLAUDE.md': '# Proj\n' }));
   assert.ok(has(e, /找不到.*索引表/), e.join('\n'));
