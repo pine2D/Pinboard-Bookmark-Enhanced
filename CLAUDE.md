@@ -131,7 +131,7 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 三份登记册放在 `.claude/` 根，格式由 `scripts/registers-lint.mjs` 检查（pre-commit / verify.sh / CI）。
 
 - `.claude/decisions.md`：用户拍过板的取舍和否决过的方案。提新功能、做评审或审计前先读，里面列出的事不要再当新建议提。派子代理做评审时，把相关条目写进提示词。只记用户明确做的裁决。
-- `.claude/acceptance-debt.md`：要人在真实环境里做的检查。每条有到期日，发版时 `scripts/release.sh` 会列出来，有过期的就中止。
+- `.claude/acceptance-debt.md`：要人在真实环境里做的检查。每条有到期日，发版时 `scripts/release.sh` 会列出来，有过期的就中止，加 `--accept-debt` 才继续。过期超过 14 天 CI 会红，这时 `--accept-debt` 也没用，只能清账或改到期日。
 - `.claude/flake-ledger.md`：时过时不过的测试。重跑后通过也要记一行，同一个用例第二次上榜就必须根治或隔离。
 
 ## 与 Claude Code 协作

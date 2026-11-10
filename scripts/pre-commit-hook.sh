@@ -6,7 +6,10 @@
 # design-language gates. Blocks on any failure.
 #
 # Installed as .git/hooks/pre-commit via scripts/setup-hooks.sh
-# Two trigger groups, one `git diff` call:
+# Trigger groups, from two `git diff --cached` listings (the second one also
+# sees deletions). The first two are described here; the registers, rules-lint,
+# JS, eslint-baseline, audit-scope and verify-groups groups are described next
+# to their variables below:
 #   THEME_RE -- theme-factory sources, pinboard-themes.js and the three
 #               generated-region CSS files: the full read-only factory pipeline.
 #   UI_*_RE  -- the CONSUMER side of the design language: the four surface HTML

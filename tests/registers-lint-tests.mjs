@@ -258,6 +258,28 @@ test('structure: a header row without a separator row is an error (all three fil
   assert.ok(has(lintFlakeLedger(nosep(flake(fl('甲', '未处理'))), T).errors, /分隔行/), 'flake');
 });
 
+test('structure: a row without its leading pipe is an error, and the gate does not lose sight of it', () => {
+  const text = debt([pend('A-001', '2026-12-10')]).replace(/(\| A-001 [^\n]*\n)/, '$1A-002 | 2026-09-01 | s | w | h | 2026-10-01 |\n');
+  assert.ok(text.includes('\nA-002 |'), 'fixture');
+  const r = lintAcceptanceDebt(text, T);
+  assert.ok(has(r.errors, /开头少了 \|/), r.errors.join('\n'));
+  const dropLead = (t) => t.replace(/\n\| (2026-\d\d-\d\d \|)/, '\n$1');
+  assert.ok(has(lintDecisions(dropLead(decisions(DEC_OK)), T).errors, /开头少了 \|/), 'decisions');
+  assert.ok(has(lintFlakeLedger(dropLead(flake(fl('甲', '未处理'))), T).errors, /开头少了 \|/), 'flake');
+});
+test('structure: a table inside a blockquote or a list item is an error', () => {
+  for (const prefix of ['> ', '- ', '  > ', '1. ']) {
+    const nest = (t) => t.split('\n').map((l) => (l.startsWith('|') ? prefix + l : l)).join('\n');
+    assert.ok(has(lintAcceptanceDebt(nest(debt([pend('A-001', '2026-12-10')])), T).errors, /引用块或列表/), `debt ${prefix}`);
+    assert.ok(has(lintDecisions(nest(decisions(DEC_OK)), T).errors, /引用块或列表/), `decisions ${prefix}`);
+    assert.ok(has(lintFlakeLedger(nest(flake(fl('甲', '未处理'))), T).errors, /引用块或列表/), `flake ${prefix}`);
+  }
+});
+test('structure: prose with one pipe or an escaped pipe is not mistaken for a row', () => {
+  const text = decisions(DEC_OK).replace('\n## ', '\n> 说明里写 a | b 这样一个竖线，或者 x \\\\| y \\\\| z。\n\n## ');
+  assert.deepEqual(lintDecisions(text, T).errors, []);
+});
+
 // ---- release.sh surface ----
 test('release.sh parses and documents --accept-debt; unknown flag exits 2', () => {
   assert.equal(spawnSync('bash', ['-n', join(ROOT, 'scripts/release.sh')]).status, 0);

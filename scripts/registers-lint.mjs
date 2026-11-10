@@ -42,8 +42,12 @@ function splitCells(line) {
 const isSeparator = (line) => /^\s*\|[\s:|-]+\|\s*$/.test(line) && line.includes("-");
 
 // Every Markdown table: { heading (nearest "## ..." above), headerLine, header, rows: [{ line, cells }] }.
-// `tables.orphans` lists table-looking lines ("|...") that are not part of any
-// parsed table, e.g. a header row whose separator row is missing.
+// `tables.orphans` lists table-looking lines that are not part of any parsed
+// table: a header row whose separator row is missing, a row without its
+// leading "|", and a table inside a blockquote or a list item. GitHub renders
+// all of these as table rows, so skipping them would hide entries from the
+// lint and from the release gate.
+const unescapedPipes = (s) => (s.replace(/\\\|/g, "").match(/\|/g) || []).length;
 function parseTables(text) {
   const lines = text.split("\n");
   const tables = [];
@@ -52,8 +56,13 @@ function parseTables(text) {
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
     if (/^##\s/.test(l)) { heading = l.replace(/^##\s+/, "").trim(); continue; }
-    if (!l.trim().startsWith("|")) continue;
-    if (!lines[i + 1] || !isSeparator(lines[i + 1])) { tables.orphans.push({ line: i + 1, text: l.trim() }); continue; }
+    if (!l.trim().startsWith("|")) {
+      const bare = l.replace(/^\s*(?:>\s*|[-*+]\s+|\d+[.)]\s+)+/, "");
+      if (bare !== l && bare.startsWith("|")) tables.orphans.push({ line: i + 1, text: l.trim(), why: "nested" });
+      else if (unescapedPipes(l) >= 2) tables.orphans.push({ line: i + 1, text: l.trim(), why: "no-leading-pipe" });
+      continue;
+    }
+    if (!lines[i + 1] || !isSeparator(lines[i + 1])) { tables.orphans.push({ line: i + 1, text: l.trim(), why: "no-separator" }); continue; }
     const t = { heading, headerLine: i + 1, header: splitCells(l), rows: [] };
     i += 2;
     for (; i < lines.length && lines[i].trim().startsWith("|"); i++) t.rows.push({ line: i + 1, cells: splitCells(lines[i]) });
@@ -84,7 +93,9 @@ function sameHeader(a, b) {
 // table under one heading. `allowed(heading)` says which headings may hold a table.
 function checkStructure(tables, allowed, allowedText, at, errors) {
   for (const o of tables.orphans) {
-    errors.push(`${at(o.line)} 这一行像表格，但表头行后面没有分隔行 |---|---|，整张表会被跳过`);
+    if (o.why === "nested") errors.push(`${at(o.line)} 表格不能放在引用块或列表里，这一行不会被检查。把它移到顶格`);
+    else if (o.why === "no-leading-pipe") errors.push(`${at(o.line)} 这一行像表格行，但开头少了 |，不会被检查。在行首补上 |`);
+    else errors.push(`${at(o.line)} 这一行像表格，但表头行后面没有分隔行 |---|---|，整张表会被跳过`);
   }
   const perHeading = new Map();
   for (const t of tables) {
