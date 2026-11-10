@@ -207,10 +207,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const offlineClearEnd = source.indexOf("// ===================== Helpers", offlineClearStart);
     assert(offlineClearStart >= 0 && offlineClearEnd > offlineClearStart, "showOfflineQueueStatus source not found");
     const offlineClearSource = source.slice(offlineClearStart, offlineClearEnd);
-    const onRemoveStart = popupOfflineSource.indexOf("async function onRemove(queueId) {");
-    const onRemoveEnd = popupOfflineSource.indexOf("async function toggle(ev) {", onRemoveStart);
-    assert(onRemoveStart >= 0 && onRemoveEnd > onRemoveStart, "onRemove source not found");
-    const onRemoveSource = popupOfflineSource.slice(onRemoveStart, onRemoveEnd);
     const rebasePopupTags = new Function("unionTags", `${tagHelperSource}\nreturn pbpRebasePopupTags;`)(unionTags);
 
     function createElementStub(initial = {}) {
@@ -868,50 +864,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(view({ reason: "network" }).message === "pinboardErrorOffline", "pinboard offline copy changed");
       assert(view({ reason: "gateway_basic" }).message === "saveFailedGeneric", "pinboard must not use the gateway table");
     });
-    test("offline retry copy follows the queued item's service", () => {
-      const fnStart = popupOfflineSource.indexOf("function retryFailureMessage(result, service) {");
-      const fnEnd = popupOfflineSource.indexOf("\n  }\n", fnStart);
-      assert(fnStart >= 0 && fnEnd > fnStart, "retryFailureMessage source not found");
-      const message = new Function("t", "POSTS_ADD_URI_BUDGET", "pbpBookmarkFailureKey",
-        popupOfflineSource.slice(fnStart, fnEnd + 4) + "\nreturn retryFailureMessage;"
-      )((key, ...args) => args.length ? `${key}:${args.join(":")}` : key, 4000, pbpBookmarkFailureKey);
-      assert(message({ reason: "not_logged_in", httpStatus: 401 }, "linkding") === "bookmarkErrAuth", "linkding auth failure not named");
-      assert(message({ reason: "gateway_basic" }, "linkding") === "bookmarkErrGatewayBasic", "gateway failure not named");
-      assert(message({ reason: "not_logged_in" }, "pinboard") === "batchNotLoggedIn", "pinboard copy changed");
-      assert(message({ reason: "tag_too_long", tag: "y".repeat(65), httpStatus: 500 }, "linkding") === "bookmarkErrTagTooLong:" + "y".repeat(40) + "\u2026:64", "the over-long tag is not named");
-      for (const service of ["linkding", "karakeep"]) {
-        for (const [result, copy] of [
-          [{ reason: "permission" }, "bookmarkPermissionDenied"], [{ reason: "network" }, "bookmarkErrNetwork"], [{ reason: "timeout" }, "bookmarkErrTimeout"],
-          [{ reason: "server", httpStatus: 503 }, "bookmarkErrServer"], [{ reason: "remote", httpStatus: 400 }, "bookmarkErrRemote:400"],
-          [{ reason: "payload_too_large", httpStatus: 413 }, "bookmarkErrTooLarge"], [{ reason: "account_changed" }, "bookmarkErrAccountChanged"],
-        ]) assert(message(result, service) === copy, service + " " + result.reason + " -> " + message(result, service));
-      }
-      // A partial retry whose Read Later step hit duplicate lists names the cause;
-      // any other partial keeps the generic copy.
-      for (const service of ["linkding", "karakeep"]) {
-        assert(message({ reason: "partial", failedStep: "read_later", error: "read_later_list" }, service) === "bookmarkErrReadLaterList", service + " duplicate-list partial not named");
-        assert(message({ reason: "partial", failedStep: "read_later" }, service) === "offlineRetryFailed", service + " other partial changed");
-      }
-      // Pinboard keeps its own copy for the same inputs.
-      assert(message({ reason: "network" }, "pinboard") === "networkError", "pinboard network copy changed");
-      assert(message({ reason: "account_changed" }, "pinboard") === "offlineRetryAccountChanged", "pinboard account copy changed");
-      assert(message({ reason: "remote", httpStatus: 400 }, "pinboard") === "offlineRetryFailed", "pinboard remote copy changed");
-    });
-
-    // X4-S01: a manual retry that meets a Pinboard server fault or rate limit gets the
-    // same localized copy as the save path, never a bare status code.
-    test("offline retry names Pinboard server faults and rate limits", () => {
-      const fnStart = popupOfflineSource.indexOf("function retryFailureMessage(result, service) {");
-      const fnEnd = popupOfflineSource.indexOf("\n  }\n", fnStart);
-      const message = new Function("t", "POSTS_ADD_URI_BUDGET", "pbpBookmarkFailureKey",
-        popupOfflineSource.slice(fnStart, fnEnd + 4) + "\nreturn retryFailureMessage;"
-      )((key, ...args) => args.length ? `${key}:${args.join(":")}` : key, 4000, pbpBookmarkFailureKey);
-      for (const status of [500, 502, 503, 504, 599]) assert(message({ reason: "http", httpStatus: status }, "pinboard") === "pinboardErrorServer", status + " -> " + message({ reason: "http", httpStatus: status }, "pinboard"));
-      assert(message({ reason: "http", httpStatus: 429 }, "pinboard") === "pinboardErrorRateLimit", "429 -> " + message({ reason: "http", httpStatus: 429 }, "pinboard"));
-      assert(message({ reason: "http", httpStatus: 408 }, "pinboard") === "pinboardApiError:HTTP 408", "408 -> " + message({ reason: "http", httpStatus: 408 }, "pinboard"));
-      assert(message({ reason: "http", httpStatus: 400 }, "pinboard") === "pinboardErrRejected:400", "400 -> " + message({ reason: "http", httpStatus: 400 }, "pinboard"));
-    });
-
     // X5-03 / X5-04: a redraw that removes or hides the focused control hands focus to a
     // neighbour; focus that was never in the bar is left alone.
     // X5-02: deleting a recent bookmark takes the focused button with the row.
@@ -1175,22 +1127,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(enMessages[key]?.message, "en catalogue lacks " + key);
       }
       assert(!/offline\)/i.test(enMessages.offlineQueued.message), "the queue bar still blames the network");
-    });
-
-    await testAsync("the offline row's Retry on a record that is already gone refreshes and shows no error", async () => {
-      const start = popupOfflineSource.indexOf("async function onRetry(");
-      const end = popupOfflineSource.indexOf("async function onRemove(", start);
-      assert(start >= 0 && end > start, "onRetry source not found");
-      for (const [resp, wantError] of [[{ ok: false, result: { status: "gone", reason: "gone" } }, false], [{ ok: false, result: { reason: "network" } }, true], [null, true]]) {
-        const log = { refreshed: 0, shown: [] };
-        const btn = { disabled: false, classList: { add() {}, remove() {} }, innerHTML: "" };
-        const onRetry = new Function("retryItem", "refreshBar", "showStatus", "retryFailureMessage", "PBP_ICONS", "setTimeout",
-          popupOfflineSource.slice(start, end) + "\nreturn onRetry;")(
-          async () => resp, async () => { log.refreshed++; }, (...a) => log.shown.push(a), (r) => "fail:" + (r?.reason || ""), { refresh: "" }, () => {});
-        await onRetry("q1", btn, "pinboard");
-        assert((log.shown.length > 0) === wantError, JSON.stringify(resp) + " shown=" + JSON.stringify(log.shown));
-        if (!wantError) assert(log.refreshed === 1 && btn.disabled === true, "gone did not refresh the bar");
-      }
     });
 
     test("unchanged submitted tags retain the existing union behavior", () => {
@@ -4751,23 +4687,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(resetSource.includes('settings.pinboardToken = ""') && resetSource.includes("window.location.reload()"), "session reset does not clear memory and reload");
     });
 
-    // B38/B51: the retry outcome copy runs through the real retryFailureMessage.
-    test("offline retry failures are localized and name an account switch", () => {
-      const fnStart = popupOfflineSource.indexOf("function retryFailureMessage(result, service) {");
-      const fnEnd = popupOfflineSource.indexOf("\n  }\n", fnStart);
-      assert(fnStart >= 0 && fnEnd > fnStart, "retryFailureMessage source not found");
-      const message = new Function("t", "POSTS_ADD_URI_BUDGET", "pbpBookmarkFailureKey",
-        popupOfflineSource.slice(fnStart, fnEnd + 4) + "\nreturn retryFailureMessage;"
-      )((key, ...args) => args.length ? `${key}:${args.join(":")}` : key, 4000, pbpBookmarkFailureKey);
-      assert(message({ status: "failed", reason: "api", detail: "missing url" }) === "pinboardApiError:missing url",
-        "API failure kept a hard-coded English prefix");
-      assert(message({ status: "failed", reason: "account_changed" }) === "offlineRetryAccountChanged",
-        "an account switch was reported as a token failure");
-      assert(!popupOfflineSource.includes('"(untitled)"'), "untitled queue rows are not localized");
-    });
-
     // ---- Offline queue remove / clear: promise-form sendMessage failure paths ----
-    // K54: onRemove (popup-offline.js) and the clear_offline_queue confirm
+    // K54: onRemove (popup-offline.js; its cases now load the real file in
+    // tests/popup-offline-tests.html) and the clear_offline_queue confirm
     // handler (popup.js) used to be callback-style sends that never read
     // chrome.runtime.lastError. They were converted to the promise form used
     // elsewhere in the repo (popup.js:11 pinboard_api_call, popup.js:471,
@@ -4787,20 +4709,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
       window.removeEventListener("unhandledrejection", onUnhandled);
       return { result, unhandled };
-    }
-
-    function createOfflineRemoveHarness(sendMessageImpl) {
-      const warns = [];
-      const sent = [];
-      let refreshCount = 0;
-      const dependencies = {
-        chrome: { runtime: { sendMessage: (...args) => { sent.push(args[0]); return sendMessageImpl(...args); } } },
-        console: { warn: (...args) => warns.push(args) },
-        refreshBar: async () => { refreshCount++; },
-      };
-      const names = Object.keys(dependencies);
-      const onRemove = new Function(...names, `${onRemoveSource}\nreturn onRemove;`)(...names.map((name) => dependencies[name]));
-      return { onRemove, warns, sent, refreshCount: () => refreshCount };
     }
 
     function createOfflineClearHarness(sendMessageImpl) {
@@ -4841,34 +4749,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
         sent,
       };
     }
-
-    await testAsync("offline remove: a rejecting send resolves false, warns once (no queue content), and still refreshes with no unhandled rejection", async () => {
-      const harness = createOfflineRemoveHarness(async () => { throw new Error("ctx invalidated"); });
-      const { result, unhandled } = await runWithRejectionGuard(() => harness.onRemove("q1"));
-      assert(result === false, "a rejecting send did not resolve false");
-      assert(unhandled === 0, "onRemove let a rejection escape unhandled");
-      assert(harness.warns.length === 1 && harness.warns[0][0] === "offline remove message failed:" && harness.warns[0][1] === "ctx invalidated", "the transport failure left no (or the wrong) console trace: " + JSON.stringify(harness.warns));
-      assert(!harness.warns.some((args) => args.some((a) => typeof a === "string" && a.includes("q1"))), "the console trace leaked the queue id");
-      assert(harness.refreshCount() === 1, "a rejecting send skipped the list refresh");
-      assert(harness.sent.length === 1 && harness.sent[0].type === "remove_offline_item" && harness.sent[0].queueId === "q1", "the message shape or queueId was dropped: " + JSON.stringify(harness.sent));
-    });
-
-    await testAsync("offline remove: a resolved { ok: false } resolves false, does not warn, and still refreshes", async () => {
-      const harness = createOfflineRemoveHarness(async () => ({ ok: false }));
-      const result = await harness.onRemove("q2");
-      assert(result === false, "a handler-reported failure did not resolve false");
-      assert(harness.warns.length === 0, "a normally-resolved failure was mistaken for a transport error");
-      assert(harness.refreshCount() === 1, "a handler-reported failure skipped the list refresh");
-      assert(harness.sent.length === 1 && harness.sent[0].type === "remove_offline_item" && harness.sent[0].queueId === "q2", "the message shape or queueId was dropped: " + JSON.stringify(harness.sent));
-    });
-
-    await testAsync("offline remove: a resolved { ok: true } resolves true and still refreshes", async () => {
-      const harness = createOfflineRemoveHarness(async () => ({ ok: true }));
-      const result = await harness.onRemove("q3");
-      assert(result === true, "a successful remove did not resolve true");
-      assert(harness.refreshCount() === 1, "a successful remove skipped the list refresh");
-      assert(harness.sent.length === 1 && harness.sent[0].type === "remove_offline_item" && harness.sent[0].queueId === "q3", "the message shape or queueId was dropped: " + JSON.stringify(harness.sent));
-    });
 
     await testAsync("offline clear: a rejecting send warns once and still refreshes via PPOffline (no unhandled rejection)", async () => {
       const harness = createOfflineClearHarness(async () => { throw new Error("ctx invalidated"); });

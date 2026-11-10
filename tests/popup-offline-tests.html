@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Popup Offline Tests</title>
+<link rel="stylesheet" href="../popup.css">
+<style>
+#results { font-family: monospace; padding: 16px; }
+.case { padding: 4px 8px; margin: 4px 0; white-space: pre-wrap; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+</style></head>
+<body>
+<!-- The queue bar markup of popup.html, plus the controls restoreFocus falls back to. -->
+<div id="fixture">
+  <input type="text" id="url-input" readonly>
+  <button id="submit-btn" class="btn">Save</button>
+  <p id="status-msg" class="status-msg hidden" role="status" aria-live="polite"></p>
+  <div id="offline-queue-bar" class="offline-bar hidden">
+    <button type="button" id="offline-queue-toggle" class="offline-toggle" aria-expanded="false">
+      <span id="offline-queue-chevron" aria-hidden="true"></span>
+      <span id="offline-queue-text"></span>
+    </button>
+    <button type="button" id="offline-queue-clear" class="offline-clear"><span class="btn-ic" data-ic="cross"></span><span class="link-label">Clear</span></button>
+  </div>
+  <div id="offline-queue-list" class="offline-queue-list hidden"></div>
+</div>
+<div id="results"></div>
+
+<!-- popup-offline.js loaded for real, after the scripts it needs, in popup.html's order:
+     i18n.js (t), shared.js ($id, PBP_ICONS, showConfirmPopover, the pbpBookmark* and
+     pbpOfflineQueue* helpers), popup-offline.js. The chrome API is the shared mock. -->
+<script src="fixtures/chrome-mock.js"></script>
+<script>
+// The i18n table is filled from _locales/en before the cases run (getMessage
+// reads it then). Each message echoes its key and its placeholders in
+// argument order, so a case can tell which key and arguments t() chose:
+// t("pinboardApiError", "HTTP 408") renders "pinboardApiError:HTTP 408".
+window.__messages = {};
+window.__mock = pbpChromeMock.install({ messages: window.__messages });
+</script>
+<script src="../i18n.js"></script>
+<script src="../shared.js"></script>
+<script>
+// Stub, the only one: showStatus lives in popup.js, whose top level boots the
+// whole popup (session check, service worker proxy, tab query, form wiring).
+// popup-offline.js calls it only to show a failed retry; record the calls.
+window.__statuses = [];
+function showStatus(...args) { window.__statuses.push(args); }
+</script>
+<script src="../popup-offline.js"></script>
+<script>
+let passed = 0, failed = 0;
+async function test(name, fn) {
+  const div = document.createElement("div");
+  try { await fn(); passed++; div.className = "case pass"; div.textContent = "PASS " + name; }
+  catch (e) { failed++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + (e && e.message); }
+  document.getElementById("results").appendChild(div);
+}
+function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
+const mock = window.__mock;
+const byId = (id) => document.getElementById(id);
+async function until(fn, label) {
+  for (let i = 0; i < 200; i++) { if (fn()) return; await new Promise((r) => setTimeout(r, 5)); }
+  throw new Error("timed out waiting for " + label);
+}
+
+// The other end of runtime.sendMessage: the service worker's offline-queue
+// handlers (background.js), answering with what each case sets.
+const worker = { queue: [], account: "", retryReply: null, removeReply: { ok: true }, removeThrows: null };
+mock.onSendMessage(async (message) => {
+  if (message.type === "get_offline_queue") return { ok: true, queue: worker.queue, pause: null, account: worker.account };
+  if (message.type === "retry_offline_item") return worker.retryReply;
+  if (message.type === "remove_offline_item") return worker.removeReply;
+  return undefined;
+});
+const sent = (type) => mock.callsOf("runtime.sendMessage").filter((c) => c.args[0] && c.args[0].type === type);
+
+async function showRows(queue) {
+  worker.queue = queue;
+  await window.PPOffline.refresh();
+  if (byId("offline-queue-toggle").getAttribute("aria-expanded") !== "true") byId("offline-queue-toggle").click();
+  await until(() => byId("offline-queue-list").querySelectorAll(".offline-queue-item").length === queue.length, "the queue rows");
+  return [...byId("offline-queue-list").querySelectorAll(".offline-queue-item")];
+}
+
+(async () => {
+  const en = await (await fetch("../_locales/en/messages.json")).json();
+  for (const [key, entry] of Object.entries(en)) {
+    const names = Object.entries(entry.placeholders || {})
+      .sort((a, b) => Number(String(a[1].content).slice(1)) - Number(String(b[1].content).slice(1))).map(([n]) => n);
+    window.__messages[key] = { message: key + names.map((n) => ":$" + n + "$").join(""), placeholders: entry.placeholders };
+  }
+  window.PPOffline.init();
+  const message = window.PPOffline.retryFailureMessage;
+
+  // ---- retry copy (was: retryFailureMessage cut out of the source in popup-save-tests.html) ----
+  await test("offline retry copy follows the queued item's service", () => {
+    assert(message({ reason: "not_logged_in", httpStatus: 401 }, "linkding") === "bookmarkErrAuth", "linkding auth failure not named");
+    assert(message({ reason: "gateway_basic" }, "linkding") === "bookmarkErrGatewayBasic", "gateway failure not named");
+    assert(message({ reason: "not_logged_in" }, "pinboard") === "batchNotLoggedIn", "pinboard copy changed");
+    assert(message({ reason: "tag_too_long", tag: "y".repeat(65), httpStatus: 500 }, "linkding") === "bookmarkErrTagTooLong:" + "y".repeat(40) + "…:64", "the over-long tag is not named: " + message({ reason: "tag_too_long", tag: "y".repeat(65), httpStatus: 500 }, "linkding"));
+    for (const service of ["linkding", "karakeep"]) {
+      for (const [result, copy] of [
+        [{ reason: "permission" }, "bookmarkPermissionDenied"], [{ reason: "network" }, "bookmarkErrNetwork"], [{ reason: "timeout" }, "bookmarkErrTimeout"],
+        [{ reason: "server", httpStatus: 503 }, "bookmarkErrServer"], [{ reason: "remote", httpStatus: 400 }, "bookmarkErrRemote:400"],
+        [{ reason: "payload_too_large", httpStatus: 413 }, "bookmarkErrTooLarge"], [{ reason: "account_changed" }, "bookmarkErrAccountChanged"],
+      ]) assert(message(result, service) === copy, service + " " + result.reason + " -> " + message(result, service));
+    }
+    for (const service of ["linkding", "karakeep"]) {
+      assert(message({ reason: "partial", failedStep: "read_later", error: "read_later_list" }, service) === "bookmarkErrReadLaterList", service + " duplicate-list partial not named");
+      assert(message({ reason: "partial", failedStep: "read_later" }, service) === "offlineRetryFailed", service + " other partial changed");
+    }
+    assert(message({ reason: "network" }, "pinboard") === "networkError", "pinboard network copy changed");
+    assert(message({ reason: "account_changed" }, "pinboard") === "offlineRetryAccountChanged", "pinboard account copy changed");
+    assert(message({ reason: "remote", httpStatus: 400 }, "pinboard") === "offlineRetryFailed", "pinboard remote copy changed");
+  });
+
+  await test("offline retry names Pinboard server faults and rate limits", () => {
+    for (const status of [500, 502, 503, 504, 599]) assert(message({ reason: "http", httpStatus: status }, "pinboard") === "pinboardErrorServer", status + " -> " + message({ reason: "http", httpStatus: status }, "pinboard"));
+    assert(message({ reason: "http", httpStatus: 429 }, "pinboard") === "pinboardErrorRateLimit", "429 -> " + message({ reason: "http", httpStatus: 429 }, "pinboard"));
+    assert(message({ reason: "http", httpStatus: 408 }, "pinboard") === "pinboardApiError:HTTP 408", "408 -> " + message({ reason: "http", httpStatus: 408 }, "pinboard"));
+    assert(message({ reason: "http", httpStatus: 400 }, "pinboard") === "pinboardErrRejected:400", "400 -> " + message({ reason: "http", httpStatus: 400 }, "pinboard"));
+  });
+
+  await test("offline retry failures are localized and name an account switch; an untitled row is localized", async () => {
+    assert(message({ status: "failed", reason: "api", detail: "missing url" }) === "pinboardApiError:missing url", "API failure kept a hard-coded English prefix");
+    assert(message({ status: "failed", reason: "account_changed" }) === "offlineRetryAccountChanged", "an account switch was reported as a token failure");
+    const [row] = await showRows([{ queueId: "u1", account: "" }]);
+    const title = row.querySelector(".offline-queue-title").textContent;
+    assert(title === "offlineQueueUntitled", "untitled queue row: " + title);
+  });
+
+  // ---- Retry on a row (was: onRetry cut out of the source in popup-save-tests.html) ----
+  await test("the offline row's Retry on a record that is already gone refreshes and shows no error", async () => {
+    const warn = console.warn; const warns = [];
+    console.warn = (...a) => warns.push(a);
+    try {
+      for (const [label, setUp, wantError] of [
+        ["gone", () => { worker.retryReply = { ok: false, result: { status: "gone", reason: "gone" } }; }, false],
+        ["network", () => { worker.retryReply = { ok: false, result: { reason: "network" } }; }, true],
+        ["no answer", () => { mock.failNext("runtime.sendMessage", "Could not establish connection. Receiving end does not exist."); }, true],
+      ]) {
+        const [row] = await showRows([{ queueId: "q1", url: "https://a.example/", title: "A", account: "" }]);
+        const btn = row.querySelector(".offline-queue-retry");
+        window.__statuses.length = 0;
+        const refreshesBefore = sent("get_offline_queue").length;
+        setUp();
+        btn.click();
+        if (wantError) await until(() => window.__statuses.length > 0, label + " error");
+        else await until(() => sent("get_offline_queue").length > refreshesBefore, label + " refresh");
+        await new Promise((r) => setTimeout(r, 20));
+        assert((window.__statuses.length > 0) === wantError, label + " shown=" + JSON.stringify(window.__statuses));
+        if (!wantError) assert(sent("get_offline_queue").length === refreshesBefore + 1 && btn.disabled === true, label + ": gone did not refresh the bar");
+        if (wantError) {
+          const [where, text, kind] = window.__statuses[0];
+          assert(where === "status-msg" && kind === "error" && text === "networkError", label + " status: " + JSON.stringify(window.__statuses[0]));
+          assert(btn.disabled === false, label + ": the button stayed disabled");
+        }
+        const retries = sent("retry_offline_item");
+        assert(retries[retries.length - 1].args[0].queueId === "q1", label + ": the retry message lost its queueId");
+      }
+      assert(warns.length === 1 && warns[0][0] === "offline retry message failed:", "an unanswered retry left no console trace: " + JSON.stringify(warns));
+    } finally { console.warn = warn; worker.retryReply = null; }
+  });
+
+  // ---- Remove a row (was: onRemove cut out of the source in popup-save-tests.html) ----
+  // Driven through the row's real remove button and shared.js's real confirm
+  // popover. onRemove's boolean result is not observable from the page (the
+  // confirm ignores it), so these check what is: the trace, the message and
+  // the redraw.
+  async function removeRow(queueId, reply, rejectWith) {
+    const warn = console.warn; const warns = [];
+    console.warn = (...a) => warns.push(a);
+    let unhandled = 0;
+    const onUnhandled = () => { unhandled++; };
+    window.addEventListener("unhandledrejection", onUnhandled);
+    try {
+      worker.removeReply = reply;
+      const [row] = await showRows([{ queueId, url: "https://b.example/", title: "B", account: "" }]);
+      row.querySelector(".offline-queue-remove").click();
+      const yes = document.querySelector(".confirm-popover .confirm-yes");
+      assert(yes, "the remove confirm did not open");
+      const refreshesBefore = sent("get_offline_queue").length;
+      const removesBefore = sent("remove_offline_item").length;
+      if (rejectWith) mock.failNext("runtime.sendMessage", rejectWith);
+      yes.click();
+      await until(() => sent("get_offline_queue").length > refreshesBefore, "the redraw after remove");
+      await new Promise((r) => setTimeout(r, 20));
+      const removes = sent("remove_offline_item").slice(removesBefore);
+      return { warns, unhandled, removes, refreshes: sent("get_offline_queue").length - refreshesBefore };
+    } finally {
+      window.removeEventListener("unhandledrejection", onUnhandled);
+      console.warn = warn;
+    }
+  }
+
+  await test("offline remove: a rejecting send warns once (no queue content), still refreshes, no unhandled rejection", async () => {
+    const r = await removeRow("q1", { ok: true }, "ctx invalidated");
+    assert(r.unhandled === 0, "onRemove let a rejection escape unhandled");
+    assert(r.warns.length === 1 && r.warns[0][0] === "offline remove message failed:" && r.warns[0][1] === "ctx invalidated", "the transport failure left no (or the wrong) console trace: " + JSON.stringify(r.warns));
+    assert(!r.warns.some((args) => args.some((a) => typeof a === "string" && a.includes("q1"))), "the console trace leaked the queue id");
+    assert(r.refreshes === 1, "a rejecting send skipped the list refresh");
+    assert(r.removes.length === 1 && r.removes[0].args[0].type === "remove_offline_item" && r.removes[0].args[0].queueId === "q1", "the message shape or queueId was dropped: " + JSON.stringify(r.removes));
+  });
+
+  await test("offline remove: a resolved { ok: false } does not warn and still refreshes", async () => {
+    const r = await removeRow("q2", { ok: false });
+    assert(r.warns.length === 0, "a normally-resolved failure was mistaken for a transport error");
+    assert(r.refreshes === 1, "a handler-reported failure skipped the list refresh");
+    assert(r.removes.length === 1 && r.removes[0].args[0].queueId === "q2", "the message shape or queueId was dropped: " + JSON.stringify(r.removes));
+  });
+
+  await test("offline remove: a resolved { ok: true } still refreshes", async () => {
+    const r = await removeRow("q3", { ok: true });
+    assert(r.warns.length === 0, "a successful remove warned");
+    assert(r.refreshes === 1, "a successful remove skipped the list refresh");
+    assert(r.removes.length === 1 && r.removes[0].args[0].queueId === "q3", "the message shape or queueId was dropped: " + JSON.stringify(r.removes));
+  });
+
+  document.title = (failed ? "FAIL" : "PASS") + " " + passed + "/" + (passed + failed);
+})();
+</script>
+</body></html>
