@@ -108,12 +108,12 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 
 ## Theme Factory（改主题源 / 三份 UI CSS / pinboard-themes.js 前必读 rules/theme-factory.md）
 
-13 套站点主题与扩展三表面（popup/options/library）主题均由 `docs/theme-surface/` token-driven 生成。**唯一工作流**：改 `composers/*.mjs` 或 `pilots/*.tokens.json` → `node docs/theme-surface/tools/sync-all.mjs` → commit。**禁止手工编辑** `pinboard-themes.js` 与三份 CSS 里的六个 `@generated:*` 区——pre-commit（含 css-region-audit / handedit-audit 的 8 道门）会拦截，但 `ui-token-coverage` 与 `contrast-audit` 只在 sync-all / verify.sh 里，改生成区前必须手动跑一次。组件原语 generated，页面级布局与间距 token 的 `:root` 定义手写。规范：COMPONENTS.md；新主题：NEW_THEME.md。
+13 套站点主题与扩展三表面（popup/options/library）主题均由 `docs/theme-surface/` token-driven 生成。**唯一工作流**：改 `composers/*.mjs` 或 `pilots/*.tokens.json` → `node docs/theme-surface/tools/sync-all.mjs` → commit。**禁止手工编辑** `pinboard-themes.js` 与三份 CSS 里的六个 `@generated:*` 区——pre-commit（含 css-region-audit / handedit-audit 的 8 道门）会拦截，但 `ui-token-coverage` 与 `contrast-audit` 只在 sync-all / verify.sh 里，改生成区前必须手动跑一次。组件原语 generated，页面级布局与间距 token 的 `:root` 定义手写。规范：COMPONENTS.md；新主题：NEW_THEME.md。pinboard.in 站点主题只修不加（2026-11-10 用户裁决），不再新增预设。
 
 ## 提交、发布与对外文案
 
 - **提交**：pre-commit 按改动文件分路跑门，全套 verify 由 push 后 CI 兜底，禁止 `--no-verify`。Claude Code 由 `.claude/settings.json` 的 PostToolUse 钩子在编辑时跑 `scripts/ui-consumer-lint.mjs`；没有编辑期钩子的工具（Codex 等）改完文件后自行执行 `node scripts/ui-consumer-lint.mjs --file <路径>`。
-- **发版**：bump / push / release.sh、发版文档硬门、打包规则、扩展 ID 分层、ZIP smoke 与钩子分路详情都在 `.claude/skills/release/SKILL.md`。`bash scripts/release.sh` 只有带 `--build-only` 时不发布，其余任何运行都会直接发布。
+- **发版**：bump / push / release.sh、发版文档硬门、打包规则、扩展 ID 分层、ZIP smoke 与钩子分路详情都在 `.claude/skills/release/SKILL.md`。`bash scripts/release.sh` 只有带 `--build-only` 时不发布，其余任何运行都会直接发布。发版分两条线（2026-11-10 用户裁决）：GitHub release 随时发；商店两到四周提交一版，候选版先自己用满三天再提交。
 - **对外材料只讲核心（用户已反复强调，2026-11-05 第五次）**：README×9、`docs/index.md`、商店描述（`docs/cws-assets/store-descriptions.md`，由 README 生成）以及宣传图和视频，都写给潜在用户看。只写核心功能，每个功能一句话，最多两句。实现细节、选项名、数字规格、边界条件、试点功能和操作步骤都不写，这些放在设置页提示或 release notes 里。新功能默认不进 README：能并进已有条目就并，只有本身就是卖点时才单列一条。docs-lint 会检查条目数和每条长度；超限时删内容，不许调阈值。子代理写这些材料时，要把这一条原文写进它的提示词。
 - **用户看得到的文字都要说人话（2026-11-05 用户要求）**：适用于界面标签、设置提示、错误与状态信息、README、商店文案和宣传材料。
   - **写法**：用短句和常用词，直接说用户能做什么、会发生什么。不解释实现原理。
@@ -125,6 +125,14 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 ## 临时事项
 
 有到期日的一次性迁移与清扫登记在 `.claude/expiring-items.md`，到期日由 docs-lint（verify.sh / CI）检查：超期 14 天内 WARN、超过 14 天 FAIL。新增一次性迁移时在那里登记。
+
+## 登记册
+
+三份登记册放在 `.claude/` 根，格式由 `scripts/registers-lint.mjs` 检查（pre-commit / verify.sh / CI）。
+
+- `.claude/decisions.md`：用户拍过板的取舍和否决过的方案。提新功能、做评审或审计前先读，里面列出的事不要再当新建议提。派子代理做评审时，把相关条目写进提示词。只记用户明确做的裁决。
+- `.claude/acceptance-debt.md`：要人在真实环境里做的检查。每条有到期日，发版时 `scripts/release.sh` 会列出来，有过期的就中止。
+- `.claude/flake-ledger.md`：时过时不过的测试。重跑后通过也要记一行，同一个用例第二次上榜就必须根治或隔离。
 
 ## 与 Claude Code 协作
 
@@ -172,3 +180,6 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 | 发版、bump 版本、打 tag、release.sh、ZIP / CWS、弄清 pre-commit 分路 | `.claude/skills/release/SKILL.md` |
 | 任何真实 AI API 调用或测试 | `.claude/skills/live-ai-test/SKILL.md` |
 | 新增、改期或退役一次性迁移 | `.claude/expiring-items.md` |
+| 提新功能、做界面评审或审计、给评审类子代理写提示词 | `.claude/decisions.md` |
+| 留下要人验的事、清账、发版前看欠账 | `.claude/acceptance-debt.md` |
+| 测试重跑后才通过、处理 CI 抖动 | `.claude/flake-ledger.md` |

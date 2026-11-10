@@ -16,6 +16,7 @@ bash scripts/release.sh         # 打 ZIP + GH release + changelog；--build-onl
 ```
 
 - **发版前文档核查（release.sh 硬门）**：自上个 tag 有 feat commit 而 README×9 / CLAUDE.md / docs/privacy.md / docs/index.md / theme-surface 文档全未改动时直接中止；确认无需更新用 `--docs-ok` 显式跳过。新增任何数据出口（新 API 调用、新导出目标、新 AI 触发面）必须同步 privacy.md 的 Network Requests / Permissions / Third-Party 三处。privacy.md 与 index.md 走 GitHub Pages，push 即生效，不依赖扩展发版。
+- **两条线（2026-11-10 用户裁决）**：GitHub release 随时发。商店两到四周提交一版，候选版先自己用满三天再提交。往商店提交前先确认候选版是哪个 tag、已经用了几天。
 - **验收欠账门（release.sh）**：发版时列出 `.claude/acceptance-debt.md` 的全部待验条目，有过期的就中止；确认要带着欠账发版，加 `--accept-debt`。`--build-only` 跳过这道门。
 - **打包规则**：root 的 `*.html` / `*.js` / `*.css` / `manifest.json` 自动进 ZIP，递归包含 `vendor/ icons/ _locales/`；`tests/ scripts/ docs/ release/ *.md` 与隐藏目录排除。新增非上述后缀/位置的运行时资源必须改 release.sh 的 INCLUDE_DIRS / TOP_LEVEL_PATTERNS；sanity check 断言 manifest 与所有 HTML 引用的文件都在 ZIP 内，少一个 exit 1。
 - **扩展 ID 分层**：源码 manifest 固定开发 ID `feoognahlmfmbllpmgailahcnjppiegb`（开发公钥 + 开发 OAuth client，可与 CWS 版并存）；release.sh 校验源码身份后只在 ZIP 内替换为 CWS 公钥与生产 OAuth client，正式版固定 CWS ID `pnjndmjhljjbdlbejeenkepdalokfooh`。严禁占位 client ID/secret。Drive 两个 OAuth client 对同一 Google 账号 appDataFolder 的互通性 smoke 测不到，发布前需人工实测（细则见 `.claude/rules/drive-sync.md`「Google Drive OAuth 构建契约」）。
