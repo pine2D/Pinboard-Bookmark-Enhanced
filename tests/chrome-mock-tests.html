@@ -50,6 +50,14 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
     const got = await chrome.storage.sync.get("item");
     got.item.list.push(3);
     eq((await chrome.storage.sync.get("item")).item, { list: [1] });
+    // Storage serialization, as a real Chromium 147 extension stores it
+    // (2026-11-11 probe): Date / RegExp / Map / Set become {}, other objects
+    // keep their own enumerable fields, undefined / function / NaN members
+    // drop, and become null inside an array.
+    class K { constructor() { this.x = 1; } }
+    await chrome.storage.local.set({ d: new Date(0), re: /a/g, m: new Map([[1, 2]]), k: new K(), inf: Infinity, f: () => 1,
+      arr: [1, undefined, NaN, () => 1, new Date(0), null], big: { a: undefined, b: NaN, c: "ok", d: new Date(0) } });
+    eq(await chrome.storage.local.get(null), { d: {}, re: {}, m: {}, k: { x: 1 }, arr: [1, null, null, null, {}, null], big: { c: "ok", d: {} } });
   });
 
   await test("set/remove/clear: callback form returns undefined to the callback and works like the promise form", async () => {
@@ -203,11 +211,22 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
     const m = pbpChromeMock.install({ permissions: { origins: ["https://api.example/*"] } });
     assert(await chrome.permissions.contains({ origins: ["https://api.example/*"] }), "granted origin");
     assert(!(await chrome.permissions.contains({ origins: ["https://other.example/*"] })), "other origin");
+    let outside = null;
+    try { await chrome.permissions.request({ origins: ["https://other.example/*"] }); } catch (e) { outside = e.message; }
+    assert(outside === "This function must be called during a user gesture", "no gesture rejects: " + outside);
+    const cbOutside = await viaCallback(chrome.permissions.request, { origins: ["https://other.example/*"] });
+    assert(cbOutside.lastError && cbOutside.lastError.message === outside, "no gesture: lastError in the callback form");
+    m.userGesture();
     assert((await chrome.permissions.request({ origins: ["https://other.example/*"] })) === false, "declined by default");
     const added = [];
     chrome.permissions.onAdded.addListener((p) => added.push(p));
     m.setPermissionRequestAnswer(true);
     assert((await chrome.permissions.request({ origins: ["https://other.example/*"] })) === true, "accepted");
+    m.endUserGesture();
+    const late = chrome.permissions.request({ origins: ["https://late.example/*"] });
+    m.userGesture(); // a gesture after the call does not count: it is judged when called
+    let lateErr = null; try { await late; } catch (e) { lateErr = e.message; }
+    assert(lateErr === outside, "judged at call time");
     eq(added, [{ origins: ["https://other.example/*"] }]);
     const cb = await viaCallback(chrome.permissions.contains, { origins: ["https://other.example/*"] });
     assert(cb.value === true, "callback form");
@@ -224,6 +243,9 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
     assert(chrome.i18n.getMessage("price", ["x"]) === "Costs $5 (x)", chrome.i18n.getMessage("price", ["x"]));
     assert(chrome.i18n.getMessage("plain", ["ignored"]) === "No args", "no placeholders");
     assert(chrome.i18n.getMessage("missing") === "", "unknown name gives empty string");
+    // measured in Chromium 147: names match case-insensitively; $1 in the message itself is substituted
+    pbpChromeMock.install({ messages: { helloWorld: { message: "Hi $1 and $NAME$", placeholders: { name: { content: "$2" } } } } });
+    assert(chrome.i18n.getMessage("helloworld", ["A", "B"]) === "Hi A and B", chrome.i18n.getMessage("helloworld", ["A", "B"]));
     assert(chrome.i18n.getUILanguage() === "en", "UI language");
   });
 

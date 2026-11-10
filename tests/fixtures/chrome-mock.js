@@ -14,9 +14,49 @@
 // they are not taken from the code under test.
 //   https://developer.chrome.com/docs/extensions/reference/api/runtime#property-lastError
 //   https://developer.chrome.com/docs/extensions/develop/concepts/promises
+//
+// permissions.request rejects unless the test says a click happened:
+//   mock.userGesture();  // the next 5 s count as inside a user gesture
+// (or install({ userGesture: true }) for the whole page).
+//
+// Known differences that are NOT modelled; a test that depends on one of
+// these needs a real browser. Behaviour marked "measured" was checked in a
+// real Chromium 147 extension on 2026-11-11.
+//   - storage.onChanged timing: here listeners run before the set() callback
+//     or promise settles; Chrome promises no order between the two.
+//   - Argument checking: Chrome throws a TypeError synchronously for a wrong
+//     argument type (measured: storage.get(42) throws "Error in invocation of
+//     storage.get(...)"); here most calls accept anything, and the few that
+//     check fail asynchronously.
+//   - runtime.sendMessage: when a listener exists but never answers, Chrome
+//     resolves with undefined (measured), and so does a handler here that
+//     returns undefined; a listener that returns true and then never calls
+//     sendResponse, or a port closed by navigation, is not modelled.
 (function () {
   "use strict";
+  // Messages are JSON-serialized (a Date becomes its ISO string).
   const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+  // Storage serializes differently from JSON. The reference says objects
+  // "typically serialize to {}" except arrays, and claims Date and RegExp keep
+  // their String form:
+  //   https://developer.chrome.com/docs/extensions/reference/api/storage/StorageArea#method-set
+  // A real Chromium 147 extension (2026-11-11 probe) stores Date, RegExp, Map
+  // and Set as {}, keeps the own enumerable properties of any other object
+  // (class instance, Error), drops object members that are undefined, a
+  // function or a non-finite number, and turns those into null inside an
+  // array. This follows the measured behaviour.
+  const MISSING = Symbol("missing");
+  function serialize(v, inArray) {
+    const gone = inArray ? null : MISSING;
+    if (v === null || typeof v === "string" || typeof v === "boolean") return v;
+    if (typeof v === "number") return Number.isFinite(v) ? v : gone;
+    if (typeof v !== "object") return gone; // undefined, function, symbol, bigint
+    if (Array.isArray(v)) return v.map((x) => serialize(x, true));
+    const out = {};
+    for (const k of Object.keys(v)) { const r = serialize(v[k], false); if (r !== MISSING) out[k] = r; }
+    return out;
+  }
+  const stored = (v) => { const r = serialize(v, false); return r === MISSING ? undefined : r; };
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
   // https://developer.chrome.com/docs/extensions/reference/api/events#type-Event
@@ -103,7 +143,7 @@
     const globalChanged = makeEvent("storage.onChanged", record);
     const sizeOf = (key, value) => key.length + JSON.stringify(value).length;
     function makeArea(area) {
-      const data = new Map(Object.entries(clone((options.storage && options.storage[area]) || {})));
+      const data = new Map(Object.entries(stored((options.storage && options.storage[area]) || {})));
       stores[area] = data;
       const onChanged = makeEvent("storage." + area + ".onChanged", record);
       const notify = (changes) => {
@@ -122,7 +162,7 @@
             if (typeof keys === "string") keys = [keys];
             if (Array.isArray(keys)) { for (const k of keys) if (data.has(k)) out[k] = clone(data.get(k)); return out; }
             if (typeof keys === "object") {
-              for (const [k, d] of Object.entries(keys)) out[k] = data.has(k) ? clone(data.get(k)) : clone(d);
+              for (const [k, d] of Object.entries(keys)) out[k] = data.has(k) ? clone(data.get(k)) : stored(d);
               return out;
             }
             throw new Error("Error in invocation of storage.get(optional [string|array|object] keys, function callback)");
@@ -132,7 +172,7 @@
           return invoke("storage." + area + ".set", args, (items) => {
             const next = new Map(data);
             for (const [k, v] of Object.entries(items || {})) {
-              const value = clone(v);
+              const value = stored(v);
               if (value === undefined) continue;
               if (q.QUOTA_BYTES_PER_ITEM && sizeOf(k, value) > q.QUOTA_BYTES_PER_ITEM) throw new Error("QUOTA_BYTES_PER_ITEM quota exceeded");
               next.set(k, value);
@@ -142,7 +182,7 @@
             if (total > q.QUOTA_BYTES && !(area === "local" && options.unlimitedStorage)) throw new Error("QUOTA_BYTES quota exceeded");
             const changes = {};
             for (const [k, v] of Object.entries(items || {})) {
-              const value = clone(v);
+              const value = stored(v);
               if (value === undefined) continue;
               const had = data.has(k);
               if (had && same(data.get(k), value)) continue;
@@ -315,20 +355,30 @@
     // contains/request/remove take { permissions?, origins? } and resolve to a boolean.
     const granted = { permissions: new Set((options.permissions && options.permissions.permissions) || []), origins: new Set((options.permissions && options.permissions.origins) || []) };
     let requestAnswer = options.permissionRequestAnswer === true;
+    // request needs a user gesture: the call must come within the transient
+    // activation of a click (about 5 s in Chrome; awaits in between do not end
+    // it). Outside one Chrome rejects, measured in a real extension:
+    //   "This function must be called during a user gesture"
+    // https://developer.chrome.com/docs/extensions/reference/api/permissions
+    let gestureUntil = options.userGesture ? Infinity : 0;
     const has = (p = {}) => (p.permissions || []).every((x) => granted.permissions.has(x)) && (p.origins || []).every((x) => granted.origins.has(x));
     chrome.permissions = {
       onAdded: makeEvent("permissions.onAdded", record),
       onRemoved: makeEvent("permissions.onRemoved", record),
       contains: (...args) => invoke("permissions.contains", args, (p) => has(p)),
       getAll: (...args) => invoke("permissions.getAll", args, () => ({ permissions: [...granted.permissions], origins: [...granted.origins] })),
-      request: (...args) => invoke("permissions.request", args, (p = {}) => {
+      request: (...args) => {
+        const inGesture = Date.now() < gestureUntil; // judged when called, not when run
+        return invoke("permissions.request", args, (p = {}) => {
+        if (!inGesture) throw new Error("This function must be called during a user gesture");
         if (has(p)) return true;
         if (!requestAnswer) return false;
         (p.permissions || []).forEach((x) => granted.permissions.add(x));
         (p.origins || []).forEach((x) => granted.origins.add(x));
         chrome.permissions.onAdded.dispatch(clone(p));
         return true;
-      }),
+        });
+      },
       remove: (...args) => invoke("permissions.remove", args, (p = {}) => {
         const had = has(p);
         (p.permissions || []).forEach((x) => granted.permissions.delete(x));
@@ -343,19 +393,23 @@
     // A messages.json table: { name: { message, placeholders? } }. Unknown name
     // gives "". $name$ is a placeholder (case-insensitive) whose content holds
     // $1..$9 for the substitutions; "$$" is a literal "$". At most 9 substitutions.
+    // Names match case-insensitively, and a $1 written straight in the message
+    // is substituted too (both measured in Chromium 147, 2026-11-11).
     // https://developer.chrome.com/docs/extensions/how-to/ui/localization-message-formats
     const messages = options.messages || {};
     chrome.i18n = {
       getMessage(name, substitutions) {
         record("i18n.getMessage", [name, substitutions]);
-        const entry = messages[name];
+        const lower = String(name).toLowerCase();
+        const entry = messages[name] || messages[Object.keys(messages).find((k) => k.toLowerCase() === lower)];
         if (!entry || typeof entry.message !== "string") return "";
         const subs = substitutions === undefined ? [] : [].concat(substitutions).slice(0, 9).map(String);
         const fill = (text) => text.replace(/\$(\d)/g, (m, d) => (d === "0" ? m : subs[Number(d) - 1] ?? ""));
         const placeholders = {};
         for (const [k, v] of Object.entries(entry.placeholders || {})) placeholders[k.toLowerCase()] = v && v.content !== undefined ? String(v.content) : "";
-        return entry.message.replace(/\$\$|\$([A-Za-z0-9_@]+)\$/g, (m, key) => {
+        return entry.message.replace(/\$\$|\$([A-Za-z0-9_@]+)\$|\$([1-9])/g, (m, key, digit) => {
           if (m === "$$") return "$";
+          if (digit) return subs[Number(digit) - 1] ?? "";
           const content = placeholders[key.toLowerCase()];
           return content === undefined ? m : fill(content);
         });
@@ -382,6 +436,9 @@
       dispatchMessage,
       fireAlarm,
       setPermissionRequestAnswer(v) { requestAnswer = v === true; },
+      // A click happened: permissions.request works for the next ms.
+      userGesture(ms = 5000) { gestureUntil = Date.now() + ms; },
+      endUserGesture() { gestureUntil = 0; },
       storageData: (area) => Object.fromEntries([...stores[area]].map(([k, v]) => [k, clone(v)])),
       tabs,
     };
