@@ -9,12 +9,22 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same branch cancels the run still going for the older one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   verify:
+    name: verify (${{ matrix.group }})
     runs-on: ubuntu-24.04   # Playwright 1.59 cannot install Chromium deps on ubuntu-latest (26.04)
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [static, pages, render, journeys]
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -34,8 +44,43 @@ jobs:
       - name: Install bundled Chromium
         run: npx --prefix .qa-scan playwright install --with-deps chromium
 
-      - name: Verify source and tests
-        run: xvfb-run -a sh scripts/verify.sh
+      - name: Verify source and tests (${{ matrix.group }})
+        run: xvfb-run -a sh scripts/verify.sh --group="$VERIFY_GROUP"
+        env:
+          VERIFY_GROUP: ${{ matrix.group }}
+          PBP_QA_REPORT_DIR: ${{ runner.temp }}/pbp-qa-report
+          PBP_RETRY_FLAKY: '1'
+
+      - name: Upload logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pbp-qa-report-${{ matrix.group }}
+          path: ${{ runner.temp }}/pbp-qa-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+  release-zip:
+    name: Build and smoke-test release ZIP
+    runs-on: ubuntu-24.04   # Playwright 1.59 cannot install Chromium deps on ubuntu-latest (26.04)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: .qa-scan/package-lock.json
+
+      - name: Install QA dependencies
+        run: npm ci --prefix .qa-scan
+
+      - name: Install bundled Chromium
+        run: npx --prefix .qa-scan playwright install --with-deps chromium
 
       - name: Build and smoke-test release ZIP
         run: xvfb-run -a bash scripts/release.sh --build-only

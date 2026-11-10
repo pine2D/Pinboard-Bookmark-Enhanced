@@ -6,6 +6,9 @@ paths:
   - "scripts/ci-fonts-env.mjs"
   - "scripts/ci-fonts.conf"
   - "scripts/verify.sh"
+  - "scripts/run-html-suites.mjs"
+  - "scripts/flake-record.mjs"
+  - "tests/verify-groups-tests.mjs"
   - ".qa-scan/run-test.mjs"
 ---
 
@@ -24,6 +27,16 @@ paths:
 - `.qa-scan/run-test.mjs` 的改动里，只增删或改 `EXPECTED_RESULTS` 的 `"tests/<页>.html": N,` 条目行时，推荐收窄为这些条目对应的测试页；同一补丁含其他任何改动则不收窄，回到全部 html 测试页（`expectedCountPages`，`scripts/audit-plan.mjs`）。改完条数用 `node .qa-scan/run-test.mjs --print-counts tests/<页>.html` 取实际行数。
 - 真实调度层是 `scripts/audit-*-scenarios.mjs`；新增场景在此注册并提供实际 opener/driver。运行报告比较计划/完成 ID，记录各任务耗时，子进程失败、漏执行、打开失败均不能通过。局部审计禁写全局基线、不做全局 STALE 清理。`--sweep` 仍是发现模式，不能替代正式选中场景的门禁。
 - 改几何须对受影响场景补 `--font=ci`；native/ci 可同轴选取，入口分别设置字体环境。站点主题保持 native，不套扩展 UI 的 CI 字体配置。共同设置/基线前置允许保留，不能因此运行未选页面。同一轮已通过检查除非有新改动或新问题，不重复执行。
+
+## verify 分组与抖动重跑
+
+- `scripts/verify.sh` 不带参数或只带 `--all` 时，照旧跑全部门。`--group=<组名>` 只跑一组，可以写多次，也可以用逗号连写。组名只有 `static`、`pages`、`render`、`journeys`，写错直接报错退出。`--group` 不能和交给 `scripts/audit.mjs` 的参数混用。
+- `static` 不开浏览器，或者只做很轻的浏览器检查。`pages` 是 `tests/*-tests.html` 测试页。`render` 是看真实渲染结果的门。`journeys` 是真扩展的 node 测试和 qa-drive 契约。CI 每组一个任务，并行跑。
+- 新加的门在 `scripts/verify.sh` 里写成 `gate <组名> <命令>`，只归一个组。设 `PBP_VERIFY_DRY=1` 会列出每条命令和所属的组，不执行。`tests/verify-groups-tests.mjs` 用它检查四个组合起来不多不少。
+- 测试页由 `scripts/run-html-suites.mjs` 并行跑。`PBP_PAGE_JOBS` 改同时跑的页数，设成 1 就一页接一页跑。每页的完整输出和 render-audit 各分片的日志都存在报告目录里。
+- 设了 `PBP_RETRY_FLAKY=1`，`pages`、`render`、`journeys` 里失败的命令会再跑一次。第二次通过算通过，但要记一条抖动。第二次还失败就是失败。`static` 从不重跑。本机默认不重跑，CI 会设这个变量。
+- 抖动写进报告目录的 `flakes.jsonl`，一行一条，有日期、阶段、用例、提交号和第一次失败的最后几行。CI 里还会打出警告，并写进运行摘要。每组的报告目录都会作为运行产物上传。
+- 看到抖动，按 `.claude/flake-ledger.md` 的规则补记一行，不能当没发生。
 
 ## CI 字体环境
 
