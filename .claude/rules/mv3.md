@@ -11,6 +11,7 @@ paths:
   - "dict-archive-gdrive.js"
   - "ask-archive.js"
   - "ask-archive-gdrive.js"
+  - "restore-points.js"
   - "wayback.js"
   - "pinboard-style.js"
   - "pinboard-sort.js"

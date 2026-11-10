@@ -32,7 +32,7 @@ popup.* + popup-{ai,batch,offline,tags,theme-early}.js       # 主弹窗（AI �
 options.* + options-{connectivity,backup,vocab,theme-early}.js  # 设置页（联通测试、JSON 备份、生词设置侧）
 library.* + library-{vocab,notes,ask}.js   # 资料库页（索引 + 详情平铺双栏，owner 隔离；library-ask.js 按文章与会话浏览、继续提问和删除 Ask 历史）；listbox.js 是 options/library 共用列表框
 md-preview.* + md-*.js           # 阅读器及其子模块；md-preview-theme-early.js 首帧明暗；bili-player-bridge.js 是 B 站播放器桥
-vocab-store.js / notes-sync.js / dict-archive.js / ask-archive.js  # 四类个人资料的本机写边界；各自的 *-gdrive.js 是 SW-only Drive 同步
+vocab-store.js / notes-sync.js / dict-archive.js / ask-archive.js  # 四类个人资料的本机写边界；各自的 *-gdrive.js 是 SW-only Drive 同步；restore-points.js 是生词与高亮笔记的本机还原点
 dict-pack.js / dict-entry.js / dict-evidence.js   # 离线词典包 / AI 词条与补充 / 原文用例检索
 ai.js / ai-cache.js              # AI 调用核心（popup/options/library/md-preview 共载）/ 结果 IDB 缓存
 bookmark-services.js / export-targets.js / anki-connect.js / eudic-sync.js / vocab-send.js  # Karakeep/linkding 适配（统一保存入口在 background.js）/ Send-to 注册表（纯层）/ 生词外发（本机 AnkiConnect / 欧路 OpenAPI；纯层，测试页可载）
@@ -160,7 +160,7 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 | 改这些文件 / 做这件事 | 必读 |
 |------|------|
 | shared.js、background.js、options.js、options-backup.js、bookmark-services.js、popup.js、popup-offline.js、popup-batch.js、md-bookmark.js、vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js（存储路由 / 同步 / 书签连接 / 离线队列） | `.claude/rules/storage-sync.md` |
-| background.js、manifest.json、SW 用 importScripts 载入的数据模块（bookmark-services / vocab-store / notes-sync / dict-archive / ask-archive 及其 *-gdrive.js、wayback.js）、pinboard-style.js、pinboard-sort.js、bili-player-bridge.js | `.claude/rules/mv3.md` |
+| background.js、manifest.json、SW 用 importScripts 载入的数据模块（bookmark-services / vocab-store / notes-sync / dict-archive / ask-archive 及其 *-gdrive.js、restore-points.js、wayback.js）、pinboard-style.js、pinboard-sort.js、bili-player-bridge.js | `.claude/rules/mv3.md` |
 | 四个表面 HTML/CSS、popup.js、popup-*.js、options.js、options-*.js、library.js、library-*.js、listbox.js、shared.js、md-*.js（UI 文本、字体栈、图标） | `.claude/rules/ui-fonts-icons.md` |
 | 四个表面 HTML/CSS、shared.js、listbox.js、ui-vocabulary.json 与基线（新增任何 UI 元素；library 运行时创建值盒子的 library.js / library-vocab.js / library-notes.js 也要先读） | `.claude/rules/ui-primitives.md` |
 | docs/theme-surface/**、popup.css、options.css、library.css、pinboard-themes.js、render-audit 家族（ui-render-audit / audit-render-scenarios / render-audit-ledger / checklist / known-failures）、ui-contract-tests、theme-*-tests | `.claude/rules/theme-factory.md` |
@@ -172,7 +172,7 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 | md-dict.js、md-vocab-echo.js、ai-cache.js、library-vocab.js（查词界面） | `.claude/rules/dict.md` |
 | dict-entry.js、dict-evidence.js、md-dict.js（AI 词条与补充的生成） | `.claude/rules/dict-entry.md` |
 | dict-pack.js、options-vocab.js、md-dict.js、library-vocab.js（离线词典包） | `.claude/rules/dict-pack.md` |
-| options-backup.js（备份 schema v3 / 凭据 opt-in） | `.claude/rules/backup.md` |
+| options-backup.js（备份 schema v3 / 凭据 opt-in）、restore-points.js（还原点） | `.claude/rules/backup.md` |
 | md-embed.js、background.js、zip-install-smoke.mjs（DNR 防盗链修复） | `.claude/rules/hotlink-dnr.md` |
 | ai.js、popup-ai.js、options-connectivity.js（关思考与参数方言、popup AI 代理） | `.claude/rules/ai-providers.md` |
 | ai.js、dict-entry.js（响应完整性、流式契约、任务输出要求、能力记录） | `.claude/rules/ai-response.md` |

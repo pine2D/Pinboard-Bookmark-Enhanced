@@ -5,7 +5,7 @@ title: Privacy Policy
 
 # Privacy Policy: Bookmark Enhanced
 
-**Last updated:** 2026-11-04
+**Last updated:** 2026-11-10
 
 ## Summary
 
@@ -34,6 +34,8 @@ Extension settings, caches, and temporary state are stored locally by default. B
 | CC-CEDICT offline dictionary pack (Chinese word, pinyin, and definition records from a file you import) | IndexedDB (`pbp-dict-packs`) | No |
 | Offline English–Chinese dictionary pack in the ECDICT CSV field layout (headword, a lookup key derived from it, and Chinese definition text, all from a file you import), plus a record of how many entries were stored, when, the entry-selection level used, the decoded byte count, and a CRC32 checksum of those bytes for diagnostics | IndexedDB (`pbp-dict-packs`) | No |
 | Multilingual dictionaries imported from Yomitan v3 ZIP files: words, readings and text definitions; dictionary title/revision, word and definition languages, source/license information, import metadata, and per-dictionary enabled settings | IndexedDB (`pbp-multidict`) | No; dictionary packs are also excluded from manual JSON backups |
+| Restore points: copies of the personal library's vocabulary, highlights and notes, taken before a backup import, before a batch delete or a delete by article in the Library page, and on the first start after an extension update; each holds the library's identity, the reason, the time and the extension version; the newest 5 per personal library are kept | IndexedDB (`pbp-restore-points`) | No; never in manual JSON backups or Google Drive. Uninstalling the extension deletes them |
+| Time of the last manual backup export | `chrome.storage.local` | No |
 | Tag cache & tag-cleanup state (scoped to the bookmark connection; tag cleanup is Pinboard-only) | `chrome.storage.local` | No |
 | Video reading-view choice (per video: reading or timeline, with a last-used timestamp; account-scoped keys include a non-secret plaintext account owner; at most 50 recent entries) | `chrome.storage.local` | No |
 | Bookmark-status cache (account-scoped in memory) | Service Worker memory | No |
