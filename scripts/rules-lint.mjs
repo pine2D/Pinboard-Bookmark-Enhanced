@@ -176,6 +176,11 @@ export const CLAIMS = [
     actual: (ctx) => ctx.files.filter((f) => /^tests\/[^/]*-tests\.html$/.test(f)).length },
   { label: "站点主题数", re: /(\d+) ?(?:套|个) ?(?:pinboard\.in )?(?:站点主题|预设|preset)/g, mode: "exact",
     expect: { "CLAUDE.md": 2, ".claude/rules/theme-factory.md": 3 }, actual: themeCount },
+  // The same number in two other wordings. One pattern per wording keeps a single capture group.
+  { label: "站点主题数", re: /(\d+) themes for pinboard\.in/g, mode: "exact",
+    expect: { "PRODUCT.md": 1 }, actual: themeCount },
+  { label: "站点主题数", re: /(\d+)\/\d+ pilot/g, mode: "exact",
+    expect: { ".claude/rules/ui-fonts-icons.md": 1 }, actual: themeCount },
   { label: "AI 服务商数", re: /AI providers \((\d+)[,)]/g, mode: "exact",
     expect: { "PRODUCT.md": 1 },
     // ids in OPENAI_COMPAT_PROVIDERS + _AI_BESPOKE_PROVIDERS, minus "custom" (user-added endpoints)
@@ -361,6 +366,9 @@ export function lintRules(root, { files = listFiles(root), allow = [], claims = 
   for (const c of claims) {
     const missing = Object.keys(c.expect).filter((f) => !tracked(f));
     for (const f of missing) errors.push(`${f}: 数字声明「${c.label}」所在的文件不存在`);
+    for (const f of Object.keys(c.expect)) {
+      if (tracked(f) && !claimScope.includes(f)) errors.push(`${f}: 数字声明「${c.label}」的 expect 写了检查范围外的文件，这一条不会被检查`);
+    }
     let actual;
     try { actual = c.actual(ctx); } catch (e) { errors.push(`${c.label}: 算实际值失败：${e.message}`); continue; }
     const flags = c.re.flags.includes("g") ? c.re.flags : c.re.flags + "g";
@@ -370,7 +378,8 @@ export function lintRules(root, { files = listFiles(root), allow = [], claims = 
       const want = c.expect[file] ?? 0;
       if (missing.includes(file)) continue;
       if (found.length !== want) {
-        errors.push(`${file}: 数字声明「${c.label}」（${c.re}）找到 ${found.length} 处，预期 ${want} 处。文档改了写法或新增了这个数字的话，同步改 lint 的声明表`);
+        const at = found.map((m) => text.slice(0, m.index).split("\n").length).join("、") || "无";
+        errors.push(`${file}: 数字声明「${c.label}」（${c.re}）找到 ${found.length} 处（行 ${at}），预期 ${want} 处。文档改了写法或新增了这个数字的话，同步改 scripts/rules-lint.mjs 里 CLAIMS 的 expect`);
       }
       for (const m of found) {
         const said = Number(m[1]);

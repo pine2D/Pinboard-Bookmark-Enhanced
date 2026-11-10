@@ -266,23 +266,23 @@ test('C: a second occurrence in another file is found and its number checked', (
   assert.ok(has(errorsOf(files, { claims }), /alpha\.md:\d+:.*写 5，实际是 3/));
   // the same file, when the claim table does not list it, is a count error
   const e = errorsOf(files, { claims: claimOf(3) });
-  assert.ok(has(e, /alpha\.md.*找到 1 处，预期 0 处/), e.join('\n'));
+  assert.ok(has(e, /alpha\.md.*找到 1 处（行 [^）]*），预期 0 处/), e.join('\n'));
 });
 test('C: an occurrence count that differs from the expected one is an error', () => {
   const files = withClaim(3, 3);
   // one occurrence reworded away: the other still matches, but the count is off
   const claims = [{ ...claimOf(3)[0], expect: { 'CLAUDE.md': 2 } }];
   const e = errorsOf(files, { claims });
-  assert.ok(has(e, /CLAUDE\.md.*找到 1 处，预期 2 处/), e.join('\n'));
+  assert.ok(has(e, /CLAUDE\.md.*找到 1 处（行 [^）]*），预期 2 处/), e.join('\n'));
   // one extra occurrence
   const more = withClaim(3, 3);
   more['CLAUDE.md'] += '\n再写 3 套页\n';
-  assert.ok(has(errorsOf(more, { claims: claimOf(3) }), /找到 2 处，预期 1 处/));
+  assert.ok(has(errorsOf(more, { claims: claimOf(3) }), /找到 2 处（行 [^）]*），预期 1 处/));
 });
 test('C: a claim whose wording vanished from the doc is an error, not a silent skip', () => {
   const e = errorsOf(base(), { claims: claimOf(3) });
   assert.ok(has(e, /找到 0 处/), e.join('\n'));
-  assert.ok(has(e, /找到 0 处，预期 1 处/), e.join('\n'));
+  assert.ok(has(e, /找到 0 处（行 [^）]*），预期 1 处/), e.join('\n'));
   const e2 = errorsOf(base(), { claims: [{ ...claimOf(3)[0], expect: { 'NOPE.md': 1 } }] });
   assert.ok(has(e2, /NOPE\.md.*不存在/), e2.join('\n'));
 });
@@ -306,14 +306,15 @@ function claimsTree() {
     '.claude/rules/theme-factory.md': rule(['a.js'], '3 套 preset 渲染\n3 个站点主题\n3 套预设\n'),
     '.claude/rules/l10n.md': rule(['a.js'], '×2 locale 镜像；README ×2 结构\n'),
     '.claude/skills/release/SKILL.md': '---\nname: release\n---\n\nREADME×2\n',
-    'PRODUCT.md': '- AI providers (4, plus OpenAI-compatible endpoints)\n',
+    'PRODUCT.md': '- AI providers (4, plus OpenAI-compatible endpoints)\n- 3 themes for pinboard.in plus custom CSS\n',
+    '.claude/rules/ui-fonts-icons.md': rule(['a.js'], '3/3 pilot 的字体栈\n'),
     'ai.js': AI_SRC,
     '_locales/en/messages.json': '{}', '_locales/ja/messages.json': '{}',
     'README.md': '', 'README.ja.md': '',
     'tests/a-tests.html': '', 'tests/b-tests.html': '', 'tests/helper.html': '',
     'docs/theme-surface/pilots/x.tokens.json': '{}', 'docs/theme-surface/pilots/y.tokens.json': '{}', 'docs/theme-surface/pilots/z.tokens.json': '{}',
   });
-  files['CLAUDE.md'] = files['CLAUDE.md'].replace('| 迁移 |', '| 主题 | `.claude/rules/theme-factory.md` |\n| 文案 | `.claude/rules/l10n.md` |\n| 发 | `.claude/skills/release/SKILL.md` |\n| 迁移 |');
+  files['CLAUDE.md'] = files['CLAUDE.md'].replace('| 迁移 |', '| 主题 | `.claude/rules/theme-factory.md` |\n| 文案 | `.claude/rules/l10n.md` |\n| 字体 | `.claude/rules/ui-fonts-icons.md` |\n| 发 | `.claude/skills/release/SKILL.md` |\n| 迁移 |');
   return files;
 }
 test('C: the default claim table counts locales, themes and test pages from the file list', () => {
@@ -324,16 +325,18 @@ test('C: the default claim table counts locales, themes and test pages from the 
   assert.ok(has(e, /locale 数.*写 2，实际是 3/), e.join('\n'));
   // one README more
   assert.ok(has(errorsOf({ ...files, 'README.fr.md': '' }, { claims: CLAIMS }), /README 数.*写 2，实际是 3/));
-  // a pilot fewer: every theme occurrence (2 in CLAUDE.md, 3 in theme-factory.md) goes red
+  // a pilot fewer: every theme occurrence (2 in CLAUDE.md, 3 in theme-factory.md, PRODUCT.md, ui-fonts-icons.md) goes red
   const f2 = { ...files };
   delete f2['docs/theme-surface/pilots/z.tokens.json'];
   const e2 = errorsOf(f2, { claims: CLAIMS });
-  assert.equal(e2.filter((m) => /站点主题数.*写 3，实际是 2/.test(m)).length, 5, e2.join('\n'));
+  assert.equal(e2.filter((m) => /站点主题数.*写 3，实际是 2/.test(m)).length, 7, e2.join('\n'));
   // each wording is located: change one at a time in the other docs
   for (const [file, from, to] of [
     ['CLAUDE.md', '3 套 pinboard.in 站点主题', '4 套 pinboard.in 站点主题'],
     ['.claude/rules/theme-factory.md', '3 个站点主题', '4 个站点主题'],
     ['.claude/rules/theme-factory.md', '3 套预设', '4 套预设'],
+    ['PRODUCT.md', '3 themes for pinboard.in', '4 themes for pinboard.in'],
+    ['.claude/rules/ui-fonts-icons.md', '3/3 pilot', '4/4 pilot'],
     ['CLAUDE.md', 'README×2', 'README×3'],
     ['.claude/rules/l10n.md', 'README ×2', 'README ×3'],
     ['.claude/skills/release/SKILL.md', 'README×2', 'README×3'],
@@ -341,7 +344,7 @@ test('C: the default claim table counts locales, themes and test pages from the 
   ]) {
     assert.ok(files[file].includes(from), `${file} lacks ${from}`);
     const e = errorsOf({ ...files, [file]: files[file].replace(from, to) }, { claims: CLAIMS });
-    assert.ok(has(e, new RegExp(`${file.replace(/[.]/g, '\\.')}:\\d+:.*写 [34]，实际是 [23]`)), `${from}: ${e.join('\n')}`);
+    assert.ok(has(e, new RegExp(`${file.replace(/[.\/]/g, '\\$&')}:\\d+:.*写 [34]，实际是 [23]`)), `${from}: ${e.join('\n')}`);
   }
   // "2+" with only one test page: red; the helper page without -tests does not count
   const f3 = { ...files };
@@ -354,7 +357,7 @@ test('C: the default claim table counts locales, themes and test pages from the 
 
 test('C: the provider count comes from the ai.js AST and leaves out "custom"', () => {
   assert.deepEqual(objectKeysFromSource(AI_SRC, 'OPENAI_COMPAT_PROVIDERS'), ['openai', 'my-gw', 'custom']);
-  const provider = CLAIMS.filter((c) => 'PRODUCT.md' in c.expect);
+  const provider = CLAIMS.filter((c) => c.label === 'AI 服务商数');
   assert.equal(provider.length, 1);
   const files = (said) => ({ ...base(), 'PRODUCT.md': `- AI providers (${said}, plus OpenAI-compatible endpoints)\n`, 'ai.js': AI_SRC });
   assert.deepEqual(errorsOf(files(4), { claims: provider }), []);
@@ -393,4 +396,17 @@ test('CLI: a malformed allow file exits 1', () => {
   const root = repo({ ...claimsTree(), 'scripts/rules-lint-allow.json': '{not json' });
   const r = spawnSync(process.execPath, [SCRIPT, '--root', root], { encoding: 'utf8' });
   assert.equal(r.status, 1);
+});
+
+test('C: an expect entry for a file outside the scanned scope is an error', () => {
+  const files = { ...claimsTree(), 'docs/index.md': '3 套站点主题\n' };
+  const claims = [{ label: 'x', re: /(\d+) 套站点主题/g, mode: 'exact', expect: { 'docs/index.md': 1 }, actual: () => 3 }];
+  const e = errorsOf(files, { claims });
+  assert.ok(has(e, /docs\/index\.md.*检查范围外/), e.join('\n'));
+});
+test('C: a count mismatch names the lines it found', () => {
+  const files = claimsTree();
+  files['PRODUCT.md'] += '3 themes for pinboard.in again\n';
+  const e = errorsOf(files, { claims: CLAIMS });
+  assert.ok(has(e, /PRODUCT\.md.*找到 2 处（行 2、3），预期 1 处/), e.join('\n'));
 });
