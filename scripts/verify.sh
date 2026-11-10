@@ -246,6 +246,10 @@ gate static node "tests/eslint-silent-catch-tests.mjs"
 stage "[eslint-baseline] checking the silent-catch baseline check against growing and shrinking samples"
 gate static node "tests/eslint-baseline-tests.mjs"
 
+stage "[slice-anchor] counting tests that cut runtime source by a marker against the shrink-only baseline + lint self-test"
+gate static node "scripts/slice-anchor-lint.mjs"
+gate static node "tests/slice-anchor-lint-tests.mjs"
+
 stage "[script-graph] checking executeScript page functions are closure-free"
 # Immediately after eslint, and for the blind spot eslint structurally has:
 # no-undef is fed the UNION of every root script's top-level declarations, so a

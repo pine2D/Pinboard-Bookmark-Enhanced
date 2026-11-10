@@ -134,7 +134,12 @@ const OLD_LABELS = [
   "[theme] checking generated theme integrity",
 ];
 const NEW_LABEL = '[verify-groups] checking that the verify groups cover every gate exactly once';
-const EXPECTED_LABELS = [OLD_LABELS[0], NEW_LABEL, ...OLD_LABELS.slice(1)];
+// Added after the split (2026-11-10): the slice-anchor baseline, right after
+// the eslint baseline it is modelled on, with its two static commands.
+const SLICE_LABEL = '[slice-anchor] counting tests that cut runtime source by a marker against the shrink-only baseline + lint self-test';
+const SLICE_COMMANDS = ['node scripts/slice-anchor-lint.mjs', 'node tests/slice-anchor-lint-tests.mjs'];
+const afterEslintBaseline = OLD_LABELS.findIndex((l) => l.startsWith('[eslint-baseline]')) + 1;
+const EXPECTED_LABELS = [OLD_LABELS[0], NEW_LABEL, ...OLD_LABELS.slice(1, afterEslintBaseline), SLICE_LABEL, ...OLD_LABELS.slice(afterEslintBaseline)];
 const JOURNEY_STAGES = ['bookmark-services', 'ask-history', 'selection', 'draft', 'options-save', 'translate-stop',
   'layouts', 'journey', 'discovery', 'reader-save-export'];
 
@@ -187,6 +192,10 @@ test('every gate of the pre-split script is still listed', () => {
   const missing = OLD_FIXED_COMMANDS.filter((c) => !listed.has(c));
   assert.deepEqual(missing, []);
   assert.equal(new Set(OLD_FIXED_COMMANDS).size, OLD_FIXED_COMMANDS.length, 'the frozen list has no repeats');
+});
+
+test('the slice-anchor gate runs in the static group', () => {
+  for (const c of SLICE_COMMANDS) assert.ok(full.commands.some((x) => x.command === c && x.group === 'static'), `${c} must be a static gate`);
 });
 
 test('the glob gates follow the directory', () => {

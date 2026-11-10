@@ -1,0 +1,105 @@
+{
+  "note": "Slice anchors per test file (scripts/slice-anchor-lint.mjs). Only shrinks: refresh with --update after removing anchors. New tests load the real file with tests/fixtures/chrome-mock.js instead of cutting source.",
+  "total": 1212,
+  "files": {
+    "tests/background-active-tab-tests.html": {
+      "count": 28
+    },
+    "tests/background-lifecycle-tests.html": {
+      "count": 22
+    },
+    "tests/batch-dedup-tests.html": {
+      "count": 12
+    },
+    "tests/bookmark-live-preflight-tests.mjs": {
+      "count": 2
+    },
+    "tests/bookmark-services-tests.html": {
+      "count": 8
+    },
+    "tests/drive-migration-tests.html": {
+      "count": 9
+    },
+    "tests/drive-scopes-tests.html": {
+      "count": 15
+    },
+    "tests/export-targets-tests.html": {
+      "count": 6
+    },
+    "tests/frame-candidate-tests.html": {
+      "count": 5
+    },
+    "tests/i18n-parity-tests.html": {
+      "count": 1
+    },
+    "tests/jina-cache-tests.html": {
+      "count": 4
+    },
+    "tests/md-convert-tests.html": {
+      "count": 1
+    },
+    "tests/md-dict-tests.html": {
+      "count": 2
+    },
+    "tests/md-highlight-commit-tests.html": {
+      "count": 4
+    },
+    "tests/md-send-menu-tests.html": {
+      "count": 6
+    },
+    "tests/md-video-tests.html": {
+      "count": 3
+    },
+    "tests/offline-queue-tests.html": {
+      "count": 6
+    },
+    "tests/options-ai-custom-tests.html": {
+      "count": 4
+    },
+    "tests/options-context-help-tests.html": {
+      "count": 1
+    },
+    "tests/options-reset-tests.html": {
+      "count": 2
+    },
+    "tests/options-usability-tests.html": {
+      "count": 4
+    },
+    "tests/pinboard-style-cloak-tests.html": {
+      "count": 3
+    },
+    "tests/popup-ai-sw-tests.html": {
+      "count": 6
+    },
+    "tests/popup-draft-tests.html": {
+      "count": 13
+    },
+    "tests/popup-save-tests.html": {
+      "count": 362
+    },
+    "tests/reader-bookmark-tests.html": {
+      "count": 18
+    },
+    "tests/restore-points-tests.html": {
+      "count": 2
+    },
+    "tests/save-pipeline-tests.html": {
+      "count": 63
+    },
+    "tests/settings-persist-tests.html": {
+      "count": 36
+    },
+    "tests/tag-gov-entity-tests.html": {
+      "count": 1
+    },
+    "tests/theme-ui-derive-tests.mjs": {
+      "count": 6
+    },
+    "tests/ui-contract-tests.mjs": {
+      "count": 533
+    },
+    "tests/vocab-background-tests.html": {
+      "count": 24
+    }
+  }
+}
