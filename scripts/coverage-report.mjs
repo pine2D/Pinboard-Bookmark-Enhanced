@@ -30,11 +30,18 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const require = createRequire(join(ROOT, '.qa-scan', 'package.json'));
+
+// The report folder, made absolute first: a relative PBP_QA_REPORT_DIR is
+// read against the current folder, which may be the repo.
+export function reportDir(env = process.env, cwd = process.cwd()) {
+  return resolve(cwd, env.PBP_QA_REPORT_DIR || join(homedir(), '.local/share/pbp-qa-report'), 'coverage');
+}
+export const isInside = (dir, root) => dir === root || dir.startsWith(root + '/');
 
 export function runtimeScripts(root = ROOT) {
   return readdirSync(root).filter((n) => n.endsWith('.js') && statSync(join(root, n)).isFile()).sort();
@@ -166,10 +173,9 @@ export function renderMarkdown(summary, { failedPages = [], date = new Date().to
 }
 
 function main(argv) {
-  const reportRoot = process.env.PBP_QA_REPORT_DIR || join(homedir(), '.local/share/pbp-qa-report');
-  const outDir = join(reportRoot, 'coverage');
+  const outDir = reportDir();
   const rawDir = join(outDir, 'raw');
-  if (outDir.startsWith(ROOT + '/')) { console.error(`[coverage] refusing to write inside the repo (${outDir}); set PBP_QA_REPORT_DIR outside it`); return 2; }
+  if (isInside(outDir, ROOT)) { console.error(`[coverage] refusing to write inside the repo (${outDir}); set PBP_QA_REPORT_DIR outside it`); return 2; }
   rmSync(rawDir, { recursive: true, force: true });
   mkdirSync(rawDir, { recursive: true });
   const run = spawnSync(process.execPath, ['scripts/run-html-suites.mjs', ...argv], {

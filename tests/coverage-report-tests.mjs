@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { executedSet, functionsOf, mergeCoverage, renderMarkdown } from '../scripts/coverage-report.mjs';
+import { executedSet, functionsOf, isInside, mergeCoverage, renderMarkdown, reportDir } from '../scripts/coverage-report.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE_JS = 'tests/fixtures/coverage-fixture.js';
@@ -61,4 +61,16 @@ test('a runtime file no page loaded lists every function and says so', () => {
   const summary = mergeCoverage([{ page: 'tests/x.html', entries: [] }], { root: ROOT, files: [FIXTURE_JS] });
   assert.equal(summary.files[FIXTURE_JS].neverRun.length, 5);
   assert.match(renderMarkdown(summary), /not loaded by any page/);
+});
+
+test('a relative PBP_QA_REPORT_DIR is made absolute before the inside-repo check', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const dir = reportDir({ PBP_QA_REPORT_DIR: 'out' }, root);
+  assert.equal(dir, join(root, 'out', 'coverage'));
+  assert.ok(isInside(dir, root));
+  assert.ok(!isInside('/elsewhere/coverage', root));
+  const r = spawnSync(process.execPath, ['scripts/coverage-report.mjs'], { cwd: root, encoding: 'utf8', env: { ...process.env, PBP_QA_REPORT_DIR: '.cov-should-not-exist' } });
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /refusing to write inside the repo/);
+  assert.ok(!readdirSync(root).includes('.cov-should-not-exist'));
 });
