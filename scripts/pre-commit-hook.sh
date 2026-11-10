@@ -44,7 +44,8 @@ JS_ROOT_CHANGED=$(printf '%s\n' "$JS_CHANGED" | grep -E '^[^/]+\.js$')
 ESLINT_BASELINE_STAGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^scripts/eslint-suppressions\.json$')
 ESLINT_RULE_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(eslint\.config\.mjs|scripts/eslint-rules/[^/]+\.mjs|scripts/eslint-suppressions\.json|tests/eslint-silent-catch-tests\.mjs)$')
 ESLINT_TOOLS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/eslint-baseline-check\.mjs|tests/eslint-baseline-tests\.mjs)$')
-if [ -z "$CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ]; then
+VERIFY_GROUPS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(verify\.sh|run-html-suites\.mjs|flake-record\.mjs)|tests/verify-groups-tests\.mjs)$')
+if [ -z "$CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ]; then
   exit 0
 fi
 
@@ -165,6 +166,15 @@ if [ -n "$AUDIT_CHANGED" ]; then
   for scope_test in "$REPO_ROOT"/tests/audit*-tests.mjs; do
     node "$scope_test" || exit 1
   done
+fi
+
+if [ -n "$VERIFY_GROUPS_CHANGED" ]; then
+  echo "[verify-groups] checking that the verify groups still cover every gate exactly once"
+  if ! node "$REPO_ROOT/tests/verify-groups-tests.mjs"; then
+    echo ""
+    echo "[verify-groups] COMMIT BLOCKED — verify.sh, the page runner or the flake recorder no longer match tests/verify-groups-tests.mjs (see the message above)" >&2
+    exit 1
+  fi
 fi
 
 if [ -n "$CHANGED" ]; then

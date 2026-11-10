@@ -32,7 +32,8 @@ paths:
 
 - `scripts/verify.sh` 不带参数或只带 `--all` 时，照旧跑全部门。`--group=<组名>` 只跑一组，可以写多次，也可以用逗号连写。组名只有 `static`、`pages`、`render`、`journeys`，写错直接报错退出。`--group` 不能和交给 `scripts/audit.mjs` 的参数混用。
 - `static` 不开浏览器，或者只做很轻的浏览器检查。`pages` 是 `tests/*-tests.html` 测试页。`render` 是看真实渲染结果的门。`journeys` 是真扩展的 node 测试和 qa-drive 契约。CI 每组一个任务，并行跑。
-- 新加的门在 `scripts/verify.sh` 里写成 `gate <组名> <命令>`，只归一个组。设 `PBP_VERIFY_DRY=1` 会列出每条命令和所属的组，不执行。`tests/verify-groups-tests.mjs` 用它检查四个组合起来不多不少。
+- 新加的门在 `scripts/verify.sh` 里写成 `gate <组名> <命令>`，只归一个组。设 `PBP_VERIFY_DRY=1` 会列出每条命令和所属的组，不执行。`tests/verify-groups-tests.mjs` 用它检查四个组合起来不多不少。干跑只管 `--group` 这条路，`--changed` 等参数仍会真的运行 `scripts/audit.mjs`。
+- 改了 `scripts/verify.sh`、`scripts/run-html-suites.mjs`、`scripts/flake-record.mjs` 或 `tests/verify-groups-tests.mjs`，提交前钩子会跑 `tests/verify-groups-tests.mjs`，失败就拦下。
 - 测试页由 `scripts/run-html-suites.mjs` 并行跑。`PBP_PAGE_JOBS` 改同时跑的页数，设成 1 就一页接一页跑。每页的完整输出和 render-audit 各分片的日志都存在报告目录里。
 - 设了 `PBP_RETRY_FLAKY=1`，`pages`、`render`、`journeys` 里失败的命令会再跑一次。第二次通过算通过，但要记一条抖动。第二次还失败就是失败。`static` 从不重跑。本机默认不重跑，CI 会设这个变量。
 - 抖动写进报告目录的 `flakes.jsonl`，一行一条，有日期、阶段、用例、提交号和第一次失败的最后几行。CI 里还会打出警告，并写进运行摘要。每组的报告目录都会作为运行产物上传。
