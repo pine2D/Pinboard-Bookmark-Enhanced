@@ -190,6 +190,10 @@ if [ -n "$SLICE_CHANGED" ]; then
     fi
     rm -rf "$SLICE_TMP"
   fi
+  # The count reads the working tree, like every other group in this hook
+  # (node --check, eslint): a new anchor staged while the refreshed baseline
+  # is left unstaged passes here. CI runs the same lint on the pushed tree
+  # against the committed baseline and catches that.
   if [ -d "$REPO_ROOT/.qa-scan/node_modules/espree" ] && [ -d "$REPO_ROOT/.qa-scan/node_modules/eslint-scope" ]; then
     echo "[slice-anchor] counting slice anchors in tests/ against scripts/slice-anchor-baseline.json"
     if ! node "$REPO_ROOT/scripts/slice-anchor-lint.mjs"; then

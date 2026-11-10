@@ -45,7 +45,7 @@ paths:
 ## 测试接缝：真实加载、切片基线与覆盖报告
 
 - 新写的测试页用 `<script src>` 加载真实的运行时文件，按它所在页面的加载顺序带上它需要的脚本，chrome API 用 `tests/fixtures/chrome-mock.js`。例子是 `tests/popup-offline-tests.html`。只给测试页里确实拿不到的东西写桩，并在页内写明原因。
-- 不要再从源码里按标记切代码来跑或断言。`scripts/slice-anchor-lint.mjs` 统计这类切片锚点，`scripts/slice-anchor-baseline.json` 只减不增，verify 的 static 组和提交前钩子都会拦新增。删掉锚点后运行 `node scripts/slice-anchor-lint.mjs --update`；确实躲不开时用 `--update --allow-growth "<原因>"`，原因会写进基线。`--list --cleanup` 列出标记只在目标文件注释里的锚点，以及没有检查“找不到”的锚点。
+- 不要再从源码里按标记切代码来跑或断言。`scripts/slice-anchor-lint.mjs` 统计这类切片锚点，`scripts/slice-anchor-baseline.json` 只减不增，verify 的 static 组和提交前钩子都会拦新增。删掉锚点后运行 `node scripts/slice-anchor-lint.mjs --update`；确实躲不开时用 `--update --allow-growth "<原因>"`，原因会写进基线。`--list --cleanup` 列出标记只在目标文件注释里的锚点，以及没有检查“找不到”的锚点。两道门分工不同：提交前钩子比较 HEAD 与暂存区的基线，新增条目必须带原因记录；CI 和 verify 只拿当前树的计数对照已提交的基线，不检查原因。钩子按工作区计数，暂存了新锚点却没暂存刷新后的基线也能提交，这种情况由 CI 拦下。
 - 想知道哪些函数没有测试页跑过，运行 `node scripts/coverage-report.mjs`，可以只带几个测试页路径。报告写到 `$PBP_QA_REPORT_DIR/coverage/never-run.md`。从源码切出来交给 `new Function` 跑的代码不算在原文件头上。这是开发工具，不进 verify，也不进 CI。
 
 ## CI 字体环境
