@@ -166,6 +166,46 @@ test('.cjs and .htm test files are scanned', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+
+// ---- review round 2 ----
+const LATE = 'const [src] = await Promise.all([fetch("../popup.js").then((response) => response.text())]);\n';
+test('split with a regex separator counts; a whitespace-only separator does not', () => {
+  const a = anchorsOf(`(async () => { ${LOAD} src.split(/<div\\b/)[0]; src.split(/\\}\\s*else/).slice(1); src.split(/\\r?\\n/)[1]; src.split(/\\s+/)[0]; src.split(/\\n/).pop(); src.split("\\n")[2]; })();`);
+  assert.deepEqual(a.map((x) => x.marker.value), ['<div\\b', '\\}\\s*else']);
+});
+test('a loader cutting the text of its path parameter counts at its call sites (read and block-bodied then)', () => {
+  const a = anchorsOf(`import { readFileSync } from "node:fs"; import { join } from "node:path"; const ROOT = "/r";
+function audit(f) { const s = readFileSync(join(ROOT, f), "utf8"); return s.slice(s.indexOf("A3")); }
+audit("popup.js");
+const load = (f) => fetch("../" + f).then((r) => { return r.text(); });
+const t = await load("background.js"); t.slice(t.indexOf("B3"));`, 'tests/x-tests.mjs');
+  assert.deepEqual(a.map((x) => [x.marker.value, x.targets.join()]), [['A3', 'popup.js'], ['B3', 'background.js']]);
+});
+test('containers built before the source is known: objects merge member by member too', () => {
+  const a = anchorsOf(`(async () => { ${LATE} const early = await (await fetch("../background.js")).text(); const box = { e: early, s: src }; box.s.slice(box.s.indexOf("O3")); })();`);
+  assert.deepEqual(a.map((x) => [x.marker.value, x.targets.join()]), [['O3', 'popup.js']]);
+});
+test('the array from a const regex exec carries the source; split pieces by shift() and at(); Object.values', () => {
+  const a = anchorsOf(`(async () => { ${LOAD} const RE = /function z\\(/; const m = RE.exec(src); m.input.length; const piece = m[0]; piece.slice(piece.indexOf("Z3"));
+  src.split("// T3").shift(); src.split("// U3").at(-1); const o = { a: src }; for (const v of Object.values(o)) v.slice(v.indexOf("V3")); })();`);
+  assert.deepEqual(markers(a).sort(), ['// T3', '// U3', 'V3', 'Z3', 'function z\\(']);
+});
+test('node: a read of each name in a literal array; a root listing filtered to docs is not source', () => {
+  const a = anchorsOf(`import { readFileSync, readdirSync } from "node:fs"; import { join } from "node:path"; const ROOT = "/r";
+const read = (f) => readFileSync(join(ROOT, f), "utf8");
+for (const f of ["popup.css", "background.js"]) { const s = read(f); s.slice(s.indexOf("W3")); }
+for (const f of readdirSync(ROOT).filter((n) => n.endsWith(".md"))) { const d = read(f); d.slice(d.indexOf("not-source")); }
+for (const f of readdirSync(ROOT).filter((n) => /\\.json$/.test(n))) { const d = read(f); d.slice(d.indexOf("not-source-2")); }`, 'tests/x-tests.mjs');
+  assert.deepEqual(a.map((x) => [x.marker.value, x.targets.join()]), [['W3', 'background.js,popup.css']]);
+});
+test('a held match read only through .length is a count; one read otherwise is a cut', () => {
+  const a = anchorsOf(`(async () => { ${LOAD} const caps = src.match(/c1/g) || []; caps.length === 0; const hits = src.match(/c2/g) || []; hits.length && hits.join(" "); })();`);
+  assert.deepEqual(markers(a), ['c2']);
+});
+test('a template with a const and new RegExp(literal) are literal markers', () => {
+  const a = anchorsOf(`(async () => { ${LOAD} const NAME = "foo"; src.slice(src.indexOf(\`function \${NAME}(\`)); src.match(new RegExp("bar\\\\(", "g"))[0]; })();`);
+  assert.deepEqual(markers(a), ['function foo(', 'bar\\(']);
+});
 // ---- what does not count ----
 test('presence checks do not count', () => {
   const a = anchorsOf(`(async () => { ${LOAD} if (src.indexOf("x") === -1) throw 1; assert(src.indexOf("y") >= 0); src.includes("z"); /w/.test(src); if (src.match(/v/)) 1; assert(src.match(/u/), "m"); return src.indexOf("t") !== -1 && !src.match(/s/); })();`);
