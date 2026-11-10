@@ -7,40 +7,67 @@
 // holds the text of a runtime root file (a repo-root *.js / *.html / *.css):
 //   indexOf / lastIndexOf / search with a literal marker, unless the call is
 //     only a presence check (compared straight away with -1 or 0);
-//   match / matchAll / RegExp#exec with a literal regex, unless the result is
-//     only used as a boolean (if / ! / && / ?: / passed straight to an assert);
-//   split with a literal separator whose result is kept (indexed, destructured,
-//     assigned);
+//   match / matchAll / RegExp#exec with a literal regex (written inline or held
+//     in a const, as the argument or as the exec receiver), unless the result
+//     is only used as a boolean (if / while / ?: test, operand of !, compared
+//     with null, passed straight to an assert, or a && / || chain that itself
+//     sits in one of those places; (src.match(re) || [])[1] keeps the value),
+//     or only its .length is read ((src.match(/x/g) || []).length counts
+//     occurrences and cuts nothing);
+//   split with a literal separator when one piece is taken: [k], .pop(),
+//     .shift(), .at(k), .slice(k), destructuring, or the array kept in a
+//     variable that is later read one of those ways;
 //   a call to a test-local helper that does one of the above with a marker it
-//     takes as a parameter (extractFunction(src, "name"), fnSource(src, sig),
-//     or block("start", "end") over a source in its closure), counted at each
-//     call site that passes a literal marker.
+//     takes as a parameter, counted at each call site that passes a literal
+//     marker: extractFunction(src, "name"), fnSource(src, sig), a helper reading
+//     the source from its closure (block("start", "end")), a method of an
+//     object literal (H.cut(src, "x")), a marker inside an options object
+//     (cut(src, { start: "x" })), and a wrapper that hands its own parameter on
+//     (fn = (n) => extract(src, "function " + n); fn("foo") counts "foo").
 // A literal marker is a string, a template without ${}, a regex literal, a
-// `+` chain of those, or a const bound to one of them.
+// `+` chain of those, a const (or a let / var written only once) bound to one
+// of them, or the loop variable of for (const m of ["a", "b"]), which counts
+// once per element.
 // includes / startsWith / RegExp#test are presence checks and never count.
 //
 // How source text is told from other data. The test JS is parsed with espree
-// and scoped with eslint-scope (from .qa-scan/node_modules); .html files give
-// their inline <script> blocks. A value is runtime source when it comes from
-//   fetch("../<root file>") followed by .text() (await, .then(r => r.text()),
-//     Promise.all destructuring), or
-//   readFileSync / readFile on a path whose literal names a root file
-//     (join(ROOT, "popup.js"), a local read("popup.js") loader), or
+// and scoped with eslint-scope (from .qa-scan/node_modules, optimistic mode so
+// a direct eval() does not unresolve the scope); .html / .htm files give their
+// inline <script> blocks; .js / .mjs / .cjs files are read whole. A value is
+// runtime source when it comes from
+//   fetch("../<root file>") (or new URL("../<root file>", ...), or a name bound
+//     to fetch such as const realFetch = window.fetch) followed by .text():
+//     await, .then(r => r.text()), a block-bodied or function callback that
+//     returns r.text(), the parameter of a later .then(src => ...), Promise.all
+//     destructuring; or
+//   readFileSync / readFile on a path whose literal names a root file, directly
+//     or through a const (const P = join(ROOT, "popup.js")), a local
+//     read("popup.js") loader, or a loop variable over readdirSync(ROOT)
+//     (target "?"); or
 //   string methods (slice, substring, replace, trim, ...) and + on such a value,
 //   function parameters that receive such a value at a call site in the same
-//     file, array / object members and for-of / map callback parameters.
+//     file, array / object members (including obj[k] = source and
+//     Object.entries / Object.values), for-of and map / forEach callback
+//     parameters.
 // indexOf on anything else (a rendered string, an array of ids, a fixture
 // JSON) is not an anchor. Comments and string contents in the test are never
 // read as code, so a commented-out cut or a marker inside a message string
 // cannot count.
 //
-// Known misses (a cut that is not counted): source text obtained in a way the
-// list above does not follow (a global set by another script, a value passed
-// through postMessage or an object built at run time, Function.prototype.
-// toString of a loaded function); a marker computed at run time (not literal);
-// a helper defined in another file; a fetch whose path is built from a
-// variable counts with target "?". These keep the count low, never high; the
-// baseline still stops the forms it does see from growing.
+// Known misses (a cut that is not counted). Each keeps the count low, never
+// high; the baseline still stops the forms it does see from growing.
+//   Source: a global set by another script or page, a value passed through
+//     postMessage, this / class fields, Function.prototype.toString of a
+//     loaded function, a fetch or read whose path sits in a variable written
+//     more than once or comes from anything but a literal, a const, a parameter
+//     or a readdirSync(ROOT) loop.
+//   Markers: computed at run time; a let / var assigned again; markers walked
+//     with ["a", "b"].forEach(m => ...) or any loop other than for-of over a
+//     literal array; markers spread into a call.
+//   Helpers: defined in another file; reached through .call / .apply, a
+//     computed name or an object built at run time; a class method; a helper
+//     taking its options destructured (function cut(s, { start })); a split
+//     result handed to another function before a piece is taken.
 //
 // Usage:
 //   node scripts/slice-anchor-lint.mjs            check against the baseline
@@ -93,7 +120,7 @@ export function testFiles(root = ROOT) {
     for (const name of readdirSync(d).sort()) {
       const p = join(d, name);
       if (statSync(p).isDirectory()) walk(p);
-      else if (/\.(html|mjs|js)$/.test(name)) out.push(relative(root, p).split('\\').join('/'));
+      else if (/\.(html?|mjs|cjs|js)$/.test(name)) out.push(relative(root, p).split('\\').join('/'));
     }
   };
   if (existsSync(dir)) walk(dir);
@@ -102,7 +129,7 @@ export function testFiles(root = ROOT) {
 
 // Inline <script> blocks of an HTML file, with their line offset and type.
 export function scriptBlocks(text, file) {
-  if (!file.endsWith('.html')) return [{ code: text, line: 0, module: file.endsWith('.mjs') }];
+  if (!/\.html?$/.test(file)) return [{ code: text, line: 0, module: file.endsWith('.mjs') }];
   const out = [];
   const re = /<script(\s[^>]*)?>([\s\S]*?)<\/script\s*>/gi;
   let m;
@@ -162,6 +189,17 @@ function union(a, b) {
   if (a.kind === 'src' && b.kind === 'src') return src([...a.targets, ...b.targets]);
   if (a.kind === b.kind && a.kind === 'resp') return { kind: 'resp', targets: new Set([...a.targets, ...b.targets]) };
   if (a.kind === 'src') return a; if (b.kind === 'src') return b;
+  // Containers merge member by member, so a value learnt in a later pass is
+  // not dropped (const sites = [[source, "k"]] before source is known).
+  if (a.kind === 'arr' && b.kind === 'arr') {
+    const n = Math.max(a.items.length, b.items.length);
+    return { kind: 'arr', items: Array.from({ length: n }, (_, i) => union(a.items[i] || null, b.items[i] || null)), any: union(a.any, b.any) };
+  }
+  if (a.kind === 'obj' && b.kind === 'obj') {
+    const props = new Map(a.props);
+    for (const [k, v] of b.props) props.set(k, union(props.get(k) || null, v));
+    return { kind: 'obj', props, any: union(a.any, b.any) };
+  }
   return a;
 }
 function flat(t) { // any source text reachable inside t
@@ -219,7 +257,9 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
   loadParsers();
   const { ast, sourceType } = parse(code, module);
   walk(ast, () => {});
-  const sm = eslintScope.analyze(ast, { ecmaVersion: 2024, sourceType, nodejsScope: false });
+  // optimistic: a direct eval() in a scope would otherwise make eslint-scope
+  // leave every name there unresolved, and the source taint would be lost.
+  const sm = eslintScope.analyze(ast, { ecmaVersion: 2024, sourceType, nodejsScope: false, optimistic: true });
   const varOf = new Map(); // Identifier node -> Variable
   for (const scope of sm.scopes) {
     for (const ref of scope.references) if (ref.resolved) varOf.set(ref.identifier, ref.resolved);
@@ -227,14 +267,63 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
   }
   const taintOfVar = new Map();
   const fnOfVar = new Map(); // Variable -> function node
-  const constOf = (id) => {
+  // The initializer of a binding that is written once: a const, or a let/var
+  // never assigned again.
+  const initOf = (id) => {
     const v = varOf.get(id);
     if (!v || v.defs.length !== 1) return undefined;
     const d = v.defs[0];
-    if (d.type === 'Variable' && d.parent.kind === 'const' && d.node.init && d.node.id.type === 'Identifier') {
-      return literalOf(d.node.init, () => undefined);
-    }
-    return undefined;
+    if (d.type !== 'Variable' || !d.node.init || d.node.id.type !== 'Identifier') return undefined;
+    if (d.parent.kind !== 'const' && v.references.filter((r) => r.isWrite()).length > 1) return undefined;
+    return d.node.init;
+  };
+  const constOf = (id) => {
+    const init = initOf(id);
+    return init ? literalOf(init, () => undefined) : undefined;
+  };
+  // fetch, or a name bound to it (const realFetch = window.fetch).
+  const isFetch = (id) => {
+    if (id.name === 'fetch') return true;
+    const init = initOf(id);
+    return !!init && ((init.type === 'Identifier' && init.name === 'fetch') || memberName(init) === 'fetch');
+  };
+  // A loop variable over a listing of the repo root (readdirSync(ROOT)): some root file.
+  const fromRootListing = (id) => {
+    const v = varOf.get(id);
+    const d = v && v.defs.length === 1 ? v.defs[0] : null;
+    const loop = d && d.type === 'Variable' && d.parent && d.parent.parent;
+    if (!loop || loop.type !== 'ForOfStatement' || loop.left !== d.parent) return false;
+    let hit = false;
+    const visit = (n) => {
+      if (!n || hit || isFn(n)) return;
+      if (n.type === 'CallExpression' && calleeName(n) === 'readdirSync' && n.arguments[0] && !hasString(n.arguments[0])) { hit = true; return; }
+      for (const c of children(n)) visit(c);
+    };
+    visit(loop.right);
+    return hit;
+  };
+  const hasString = (n) => {
+    if (!n || isFn(n)) return false;
+    if (n.type === 'Literal' && typeof n.value === 'string') return true;
+    if (n.type === 'TemplateLiteral') return true;
+    return children(n).some(hasString);
+  };
+  const isRegexNode = (n) => { const l = n && literalOf(n, constOf); return !!(l && l.kind === 'regex'); };
+  // Every literal marker an expression can stand for: itself, or the literal
+  // elements of the array a for-of loop variable walks.
+  const markersOf = (node) => {
+    const lit = literalOf(node, constOf);
+    if (lit) return [lit];
+    if (!node || node.type !== 'Identifier') return [];
+    const v = varOf.get(node);
+    const d = v && v.defs.length === 1 ? v.defs[0] : null;
+    const loop = d && d.type === 'Variable' && d.parent && d.parent.parent;
+    if (!loop || loop.type !== 'ForOfStatement' || loop.left !== d.parent || d.node.id.type !== 'Identifier') return [];
+    let arr = loop.right;
+    if (arr.type === 'Identifier') arr = initOf(arr);
+    if (!arr || arr.type !== 'ArrayExpression') return [];
+    const lits = arr.elements.map((e) => literalOf(e, constOf));
+    return lits.every(Boolean) ? lits : [];
   };
   for (const scope of sm.scopes) {
     for (const v of scope.variables) {
@@ -244,22 +333,43 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
       }
     }
   }
+  // Methods of an object literal bound to a name: const H = { cut(s, m) {...} }.
+  const objMethods = new Map(); // Variable -> Map(name -> function node)
+  for (const scope of sm.scopes) {
+    for (const v of scope.variables) {
+      const d = v.defs.length === 1 ? v.defs[0] : null;
+      if (!d || d.type !== 'Variable' || !d.node.init || d.node.init.type !== 'ObjectExpression' || d.node.id.type !== 'Identifier') continue;
+      const m = new Map();
+      for (const p of d.node.init.properties) {
+        if (p.type === 'Property' && !p.computed && p.key.type === 'Identifier' && isFn(p.value)) m.set(p.key.name, p.value);
+      }
+      if (m.size) objMethods.set(v, m);
+    }
+  }
+  const allFns = [...fnOfVar.values(), ...[...objMethods.values()].flatMap((m) => [...m.values()])];
   const fnReturn = new Map(); // function node -> taint of its return value
   const paramOwner = new Map(); // Variable of a param -> { fn, index }
-  for (const [, fn] of fnOfVar) {
+  for (const fn of allFns) {
     fn.params.forEach((p, index) => {
       if (p.type === 'Identifier') { const v = varOf.get(p); if (v) paramOwner.set(v, { fn, index }); }
       if (p.type === 'AssignmentPattern' && p.left.type === 'Identifier') { const v = varOf.get(p.left); if (v) paramOwner.set(v, { fn, index }); }
     });
   }
   const fnOfCallee = (call) => {
-    if (call.callee.type !== 'Identifier') return null;
-    const v = varOf.get(call.callee);
+    const c = call.callee;
+    if (c.type === 'MemberExpression' && !c.computed && c.object.type === 'Identifier' && c.property.type === 'Identifier') {
+      const v = varOf.get(c.object);
+      const m = v && objMethods.get(v);
+      return (m && m.get(c.property.name)) || null;
+    }
+    if (c.type !== 'Identifier') return null;
+    const v = varOf.get(c);
     return v ? fnOfVar.get(v) || null : null;
   };
 
   function pathStrings(node) { // string literals inside a path expression, plus whether a param is used
-    const strs = []; let paramIndex = null;
+    const strs = []; let paramIndex = null; let listed = false;
+    const seen = new Set();
     const visit = (n) => {
       if (!n || typeof n.type !== 'string') return;
       const lit = literalOf(n, constOf);
@@ -268,6 +378,10 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
         const v = varOf.get(n);
         const owner = v && paramOwner.get(v);
         if (owner && owner.fn === enclosingFn(n) && paramIndex === null) paramIndex = owner.index;
+        // const P = join(ROOT, "popup.js"); const u = new URL("../popup.js", location.href)
+        if (!owner && fromRootListing(n)) listed = true;
+        const init = !owner && initOf(n);
+        if (init && !isFn(init) && !seen.has(init)) { seen.add(init); visit(init); }
         return;
       }
       if (n.type === 'TemplateLiteral') { n.quasis.forEach((q) => strs.push(q.value.cooked)); n.expressions.forEach(visit); return; }
@@ -275,13 +389,14 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
       for (const c of children(n)) visit(c);
     };
     visit(node);
-    return { strs, paramIndex };
+    return { strs, paramIndex, listed };
   }
 
   function evalPathCall(argNode, viaFetch) {
-    const { strs, paramIndex } = pathStrings(argNode);
+    const { strs, paramIndex, listed } = pathStrings(argNode);
     const target = runtimeTargetOfPath(strs, runtime);
     if (target) return { targets: [target] };
+    if (listed && !strs.some((x) => /(^|\/)(tests|fixtures|docs|scripts|_locales|vendor)(\/|$)/.test(x))) return { targets: ['?'] };
     if (paramIndex !== null) return { param: paramIndex };
     if (viaFetch && strs.length && /^\.\.\//.test(strs[0]) && !strs.some((s) => /\.json\b|_locales|fixtures/.test(s))) return { targets: ['?'] };
     return null;
@@ -332,7 +447,7 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
   function TCall(call) {
     const name = calleeName(call);
     const recv = call.callee.type === 'MemberExpression' ? call.callee.object : null;
-    if (call.callee.type === 'Identifier' && name === 'fetch' && call.arguments[0]) {
+    if (call.callee.type === 'Identifier' && isFetch(call.callee) && call.arguments[0]) {
       const r = evalPathCall(call.arguments[0], true);
       if (r && r.targets) return { kind: 'resp', targets: new Set(r.targets) };
       if (r && r.param !== undefined) return { kind: 'param', index: r.param, resp: true };
@@ -350,25 +465,20 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
       if (name === 'text' && rt && rt.kind === 'param' && rt.resp) return { kind: 'param', index: rt.index };
       if (name === 'then' && rt && (rt.kind === 'resp' || rt.kind === 'src' || (rt.kind === 'param'))) {
         const cb = call.arguments[0];
-        if (rt.kind === 'resp' && isFn(cb)) {
-          const body = cb.body.type === 'BlockStatement' ? null : cb.body;
-          if (body && body.type === 'CallExpression' && memberName(body.callee) === 'text') return src(rt.targets);
-          if (body && body.type === 'CallExpression' && memberName(body.callee) === 'json') return null;
-          return null;
-        }
+        if (rt.kind !== 'param' && isFn(cb)) return cbReturn(cb); // its first parameter gets rt below
         if (rt.kind === 'param' && rt.resp && isFn(cb)) {
           const body = cb.body.type === 'BlockStatement' ? null : cb.body;
           if (body && body.type === 'CallExpression' && memberName(body.callee) === 'text') return { kind: 'param', index: rt.index };
           return null;
         }
-        return rt.kind === 'src' ? rt : null;
+        return null;
       }
       if (name === 'all' && recv.type === 'Identifier' && recv.name === 'Promise') return T(call.arguments[0]);
       const f = flat(rt);
       if (rt && rt.kind === 'src' && STRING_METHODS.has(name)) return rt;
       if (rt && rt.kind === 'src' && name === 'split') return { kind: 'arr', items: [], any: rt };
       if (rt && rt.kind === 'src' && (name === 'match' || name === 'exec')) return { kind: 'arr', items: [], any: rt };
-      if (recv.type === 'Literal' && recv.regex && name === 'exec') {
+      if (isRegexNode(recv) && name === 'exec') {
         const a = flat(T(call.arguments[0]));
         return a ? { kind: 'arr', items: [], any: a } : null;
       }
@@ -377,6 +487,7 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
         return { kind: 'arr', items: [], any: f };
       }
       if (rt && rt.kind === 'arr' && name === 'join') return f;
+      if (name === 'entries' && recv.type === 'Identifier' && recv.name === 'Object') { const o = flat(T(call.arguments[0])); return o ? { kind: 'arr', items: [], any: { kind: 'arr', items: [null, o], any: null } } : null; }
       if (name === 'values' && recv.type === 'Identifier' && recv.name === 'Object') { const o = T(call.arguments[0]); return o ? { kind: 'arr', items: [], any: flat(o) } : null; }
     }
     const fn = fnOfCallee(call);
@@ -439,16 +550,24 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
     let changed = false;
     for (const n of nodes) {
       if (n.type === 'VariableDeclarator' && n.init) changed = assignPattern(n.id, T(n.init), changed);
-      else if (n.type === 'AssignmentExpression' && n.operator === '=') changed = assignPattern(n.left, T(n.right), changed);
+      else if (n.type === 'AssignmentExpression' && n.operator === '=' && n.left.type === 'MemberExpression' && n.left.object.type === 'Identifier') {
+        // sources[f] = await res.text(): the object holds source
+        const r = flat(T(n.right));
+        if (r) changed = assignPattern(n.left.object, { kind: 'obj', props: new Map(), any: r }, changed);
+      } else if (n.type === 'AssignmentExpression' && n.operator === '=') changed = assignPattern(n.left, T(n.right), changed);
       else if (n.type === 'AssignmentExpression' && n.operator === '+=') { const r = flat(T(n.right)); if (r) changed = assignPattern(n.left, r, changed); }
       else if (n.type === 'ForOfStatement') {
-        const t = T(n.right); const item = t && (t.kind === 'arr' ? flat(t) : t.kind === 'obj' ? flat(t) : null);
+        const t = T(n.right); const item = t && (t.kind === 'arr' ? (t.any || flat(t)) : t.kind === 'obj' ? flat(t) : null);
         const target = n.left.type === 'VariableDeclaration' ? n.left.declarations[0].id : n.left;
         if (item) changed = assignPattern(target, item, changed);
       } else if (n.type === 'CallExpression') {
         const fn = fnOfCallee(n);
         if (fn) n.arguments.forEach((a, i) => { const p = fn.params[i]; if (p && a.type !== 'SpreadElement') changed = assignPattern(p, T(a), changed); });
         const name = calleeName(n);
+        if (n.callee.type === 'MemberExpression' && name === 'then' && isFn(n.arguments[0])) {
+          const t = T(n.callee.object);
+          if (t && t.kind !== 'param') changed = assignPattern(n.arguments[0].params[0], t, changed);
+        }
         if (n.callee.type === 'MemberExpression' && /^(map|forEach|filter|some|every|find|flatMap|reduce)$/.test(name)) {
           const t = T(n.callee.object);
           const cb = n.arguments[0];
@@ -482,10 +601,21 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
     if (!p) return false;
     if (p.type === 'UnaryExpression' && p.operator === '!') return true;
     if ((p.type === 'IfStatement' || p.type === 'ConditionalExpression' || p.type === 'WhileStatement') && p.test === call) return true;
-    if (p.type === 'LogicalExpression') return true;
+    // (src.match(re) || [])[1] keeps the value: a logical expression is a
+    // boolean use only where the logical expression itself is one.
+    if (p.type === 'LogicalExpression') return isBooleanUse(p);
     if (p.type === 'CallExpression' && p.arguments.includes(call) && ASSERTISH.test(calleeName(p) || '')) return true;
     if (p.type === 'BinaryExpression' && /^(===|!==|==|!=)$/.test(p.operator) && [p.left, p.right].some((x) => x.type === 'Literal' && x.value === null)) return true;
     return false;
+  };
+  // (src.match(/x/g) || []).length or src.match(/x/g).length: counts
+  // occurrences, like a presence check; nothing is cut out.
+  const isCountUse = (call) => {
+    let e = call;
+    if (e.parent && e.parent.type === 'LogicalExpression' && e.parent.operator === '||' && e.parent.left === e
+      && e.parent.right.type === 'ArrayExpression' && e.parent.right.elements.length === 0) e = e.parent;
+    const p = e.parent;
+    return !!(p && p.type === 'MemberExpression' && p.object === e && !p.computed && p.property.name === 'length');
   };
   // The variable the call result is stored in, if any.
   const holder = (call) => {
@@ -512,7 +642,18 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
       // Read straight away (m[1], .index): a miss throws a TypeError, so it cannot pass quietly.
       return !!(call.parent && call.parent.type === 'MemberExpression' && call.parent.object === call && !call.parent.optional);
     }
-    return v.references.some((ref) => isBooleanUse(ref.identifier) || (ref.identifier.parent && ref.identifier.parent.type === 'MemberExpression' && !ref.identifier.parent.optional && ref.identifier.parent.object === ref.identifier));
+    const guards = (id) => isBooleanUse(id) || (id.parent && id.parent.type === 'LogicalExpression' && id.parent.left === id);
+    return v.references.some((ref) => guards(ref.identifier) || (ref.identifier.parent && ref.identifier.parent.type === 'MemberExpression' && !ref.identifier.parent.optional && ref.identifier.parent.object === ref.identifier));
+  };
+  // One piece of a split is taken: [k], .pop(), .shift(), .at(k), .slice(k), or destructuring.
+  const takesPiece = (e) => {
+    const p = e.parent;
+    if (!p) return false;
+    if (p.type === 'MemberExpression' && p.object === e) {
+      if (p.computed) return p.property.type === 'Literal' && typeof p.property.value === 'number';
+      return /^(pop|shift|at|slice)$/.test(p.property.name) && p.parent && p.parent.type === 'CallExpression' && p.parent.callee === p;
+    }
+    return p.type === 'VariableDeclarator' && p.init === e && p.id.type === 'ArrayPattern';
   };
   const markerParam = (argNode) => { // index of the enclosing fn's param the marker is built from
     const fn = enclosingFn(argNode);
@@ -522,13 +663,18 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
       if (!n || found !== null || isFn(n)) return;
       if (n.type === 'Identifier') {
         const v = varOf.get(n); const o = v && paramOwner.get(v);
-        if (o && o.fn === fn) found = o.index;
+        if (o && o.fn === fn) {
+          found = o.index;
+          // cut(s, { start: "x" }): the marker is a property of the parameter
+          if (n.parent && n.parent.type === 'MemberExpression' && n.parent.object === n && !n.parent.computed) prop = n.parent.property.name;
+        }
         return;
       }
       for (const c of children(n)) visit(c);
     };
+    let prop = null;
     visit(argNode);
-    return found === null ? null : { fn, index: found };
+    return found === null ? null : { fn, index: found, prop };
   };
 
   for (const n of nodes) {
@@ -544,7 +690,7 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
     const recv = n.callee.object;
     let receiverTaint;
     let form = name;
-    if (recv.type === 'Literal' && recv.regex && name === 'exec') { receiverTaint = flat(T(n.arguments[0])); form = 'exec'; }
+    if (isRegexNode(recv) && name === 'exec') { receiverTaint = flat(T(n.arguments[0])); form = 'exec'; }
     else if (ANCHOR_METHODS.has(name)) receiverTaint = T(recv);
     else if (name === 'includes' || name === 'startsWith' || name === 'endsWith' || name === 'test') {
       const t = name === 'test' ? flat(T(n.arguments[0])) : T(recv);
@@ -553,31 +699,58 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
     } else continue;
     if (!receiverTaint || receiverTaint.kind !== 'src') continue;
     const markerNode = form === 'exec' ? recv : n.arguments[0];
-    const lit = literalOf(markerNode, constOf);
+    const lits = markersOf(markerNode);
+    const lit = lits[0];
     const isIndex = form === 'indexOf' || form === 'lastIndexOf' || form === 'search';
     if (!lit) {
       const mp = markerNode && markerParam(markerNode);
       if (mp) {
         const list = helperMarkerParams.get(mp.fn) || [];
-        list.push({ index: mp.index, form, targets: [...receiverTaint.targets], checked: isIndex ? (isPresenceCompare(n) || checkedIndex(n)) : form === 'split' ? false : checkedMatch(n) });
+        list.push({ index: mp.index, prop: mp.prop, form, targets: [...receiverTaint.targets], checked: isIndex ? (isPresenceCompare(n) || checkedIndex(n)) : form === 'split' ? false : checkedMatch(n) });
         helperMarkerParams.set(mp.fn, list);
       } else survey.computedMarker++;
       continue;
     }
     if (isIndex && isPresenceCompare(n)) { survey.presence++; continue; }
-    if ((form === 'match' || form === 'exec' || form === 'matchAll') && isBooleanUse(n)) { survey.presence++; continue; }
+    if ((form === 'match' || form === 'exec' || form === 'matchAll') && (isBooleanUse(n) || isCountUse(n))) { survey.presence++; continue; }
     // split cuts only when one piece is taken: [k] or destructuring; a split
     // on whitespace (lines, words) walks the whole text and locates nothing.
     if (form === 'split') {
       const p = n.parent;
-      const piece = (p && p.type === 'MemberExpression' && p.object === n && p.computed && p.property.type === 'Literal' && typeof p.property.value === 'number')
-        || (p && p.type === 'VariableDeclarator' && p.init === n && p.id.type === 'ArrayPattern');
+      const h = holder(n);
+      const piece = takesPiece(n) || (h && h.references.some((ref) => !ref.isWrite() && takesPiece(ref.identifier)));
       if (!piece || lit.kind !== 'string' || /^\s*$/.test(lit.value)) { survey.presence++; continue; }
     }
-    anchors.push({
-      file, line: lineOf(n), form, marker: lit, targets: [...receiverTaint.targets].sort(),
-      checked: isIndex ? checkedIndex(n) : form === 'split' ? false : checkedMatch(n),
-    });
+    for (const marker of lits) {
+      anchors.push({
+        file, line: lineOf(n), form, marker, targets: [...receiverTaint.targets].sort(),
+        checked: isIndex ? checkedIndex(n) : form === 'split' ? false : checkedMatch(n),
+      });
+    }
+  }
+  // Wrappers: a function that hands its own parameter to a helper as the
+  // marker is a helper too (fn = (n) => extract(s, "function " + n)).
+  for (let grew = true, round = 0; grew && round < 8; round++) {
+    grew = false;
+    for (const n of nodes) {
+      if (n.type !== 'CallExpression') continue;
+      const fn = fnOfCallee(n);
+      const list = fn && helperMarkerParams.get(fn);
+      if (!list) continue;
+      for (const h of list.slice()) {
+        const arg = n.arguments[h.index];
+        if (!arg || markersOf(arg).length || (h.prop && arg.type === 'ObjectExpression')) continue;
+        const mp = markerParam(arg);
+        if (!mp || mp.fn === fn) continue;
+        const outer = helperMarkerParams.get(mp.fn) || [];
+        if (outer.some((o) => o.index === mp.index && o.prop === mp.prop && o.via === h)) continue;
+        let targets = h.targets;
+        for (const a of n.arguments) { const t = flat(T(a)); if (t) targets = [...new Set([...targets, ...t.targets])]; }
+        outer.push({ index: mp.index, prop: mp.prop, form: h.form, targets, checked: h.checked, via: h });
+        helperMarkerParams.set(mp.fn, outer);
+        grew = true;
+      }
+    }
   }
   // Helper call sites with a literal marker.
   for (const n of nodes) {
@@ -590,14 +763,22 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
     let targets = null;
     for (const a of n.arguments) { const t = flat(T(a)); if (t) targets = union(targets, t); }
     if (!targets) targets = src(list.flatMap((h) => h.targets));
-    for (const index of [...new Set(list.map((h) => h.index))]) {
-      const lit = literalOf(n.arguments[index], constOf);
-      if (!lit) continue;
-      const uses = list.filter((h) => h.index === index);
-      anchors.push({
-        file, line: lineOf(n), form: 'helper:' + (n.callee.name || '?'), marker: lit, targets: [...targets.targets].sort(),
-        checked: uses.every((h) => h.checked),
-      });
+    const slots = new Map();
+    for (const h of list) { const k = h.index + '\0' + (h.prop || ''); if (!slots.has(k)) slots.set(k, []); slots.get(k).push(h); }
+    for (const uses of slots.values()) {
+      const { index, prop } = uses[0];
+      let arg = n.arguments[index];
+      if (prop) {
+        if (!arg || arg.type !== 'ObjectExpression') continue;
+        const p = arg.properties.find((q) => q.type === 'Property' && !q.computed && q.key.type === 'Identifier' && q.key.name === prop);
+        arg = p && p.value;
+      }
+      for (const marker of markersOf(arg)) {
+        anchors.push({
+          file, line: lineOf(n), form: 'helper:' + (n.callee.name || memberName(n.callee) || '?'), marker, targets: [...targets.targets].sort(),
+          checked: uses.every((h) => h.checked),
+        });
+      }
     }
   }
   // Script injection: <script>.textContent / .text = <source>.

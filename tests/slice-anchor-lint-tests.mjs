@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import {
-  analyzeFile, compareCounts, nextBaseline, compareBaselineFiles, markerPlacement, cleanupList, scriptBlocks,
+  analyzeFile, testFiles, compareCounts, nextBaseline, compareBaselineFiles, markerPlacement, cleanupList, scriptBlocks,
 } from '../scripts/slice-anchor-lint.mjs';
 
 // A throwaway git repo is built below: forget every git variable the caller
@@ -91,6 +91,79 @@ test('a const marker resolves; a computed marker does not count', () => {
 test('an order assertion between two markers counts both (it locates, it does not test presence)', () => {
   const a = anchorsOf(`(async () => { ${LOAD} assert(src.indexOf("first") < src.indexOf("second"), "order"); })();`);
   assert.deepEqual(a.map((x) => x.marker.value), ['first', 'second']);
+});
+
+
+// ---- review round 1: ordinary spellings that used to slip past the count ----
+const markers = (a) => a.map((x) => x.marker.value);
+test('a direct eval in the same scope does not hide the source (script and module top level)', () => {
+  assert.deepEqual(markers(anchorsOf(`(async () => { const s = await (await fetch('../popup.js')).text(); eval(s.slice(s.indexOf('function foo'))); })();`)), ['function foo']);
+  assert.deepEqual(markers(anchorsOf(`import { readFileSync } from "node:fs"; const s = readFileSync("popup.js", "utf8"); eval(s.slice(s.indexOf("function bar")));`, 'tests/x-tests.mjs')), ['function bar']);
+});
+test('a match kept through || [] counts; a match inside an if test does not', () => {
+  const a = anchorsOf(`(async () => { ${LOAD} const v = (src.match(/K = (\\d+)/) || [])[1]; if (src.match(/a/) || src.match(/b/)) v; const n = (src.match(/d/g) || []).length + src.match(/e/g).length; return !(src.match(/c/) && 1); })();`);
+  assert.deepEqual(a.map((x) => x.marker.value), ['K = (\\d+)']);
+});
+test('a regex held in a const counts as the receiver of exec; test() stays a presence check', () => {
+  const a = anchorsOf(`(async () => { ${LOAD} const RE = /function z\\(/g; const m = RE.exec(src); const T = /y/; T.test(src); return m; })();`);
+  assert.deepEqual(a.map((x) => [x.form, x.marker.value]), [['exec', 'function z\\(']]);
+});
+test('source through block-bodied and function callbacks, a chained then, a fetch alias and a URL object', () => {
+  const a = anchorsOf(`
+fetch("../popup.js").then((r) => { return r.text(); }).then((s) => s.slice(s.indexOf("A2")));
+fetch("../popup.js").then(function (r) { return r.text(); }).then(function (s) { s.slice(s.indexOf("B2")); });
+(async () => {
+  const u = new URL("../popup.js", location.href);
+  const t = await (await fetch(u)).text(); t.slice(t.indexOf("C2"));
+  const realFetch = window.fetch;
+  const sources = {};
+  for (const f of ["popup.js"]) sources[f] = await (await realFetch("../" + f)).text();
+  for (const [f, code] of Object.entries(sources)) code.slice(code.indexOf("D2"));
+})();`);
+  assert.deepEqual(markers(a).sort(), ['A2', 'B2', 'C2', 'D2']);
+});
+test('an array built before its source is known still carries it (Promise.all of then callbacks)', () => {
+  const a = anchorsOf(`(async () => { const [source] = await Promise.all([fetch("../popup.js").then((response) => response.text())]);
+  const sites = [[source, "k"]]; for (const [s, key] of sites) s.slice(s.indexOf("S2")); })();`);
+  assert.deepEqual(markers(a), ['S2']);
+});
+test('node: a path held in a const, and a loop over the root listing', () => {
+  const a = anchorsOf(`import { readFileSync, readdirSync } from "node:fs"; import { join } from "node:path";
+const ROOT = "/r"; const P = join(ROOT, "popup.js"); const s = readFileSync(P, "utf8"); s.slice(s.indexOf("E2"));
+const read = (f) => readFileSync(join(ROOT, f), "utf8");
+for (const f of readdirSync(ROOT).filter((n) => n.endsWith(".js"))) { const src = read(f); src.slice(src.indexOf("F2")); }
+for (const f of readdirSync(join(ROOT, "tests"))) { const t = read(f); t.slice(t.indexOf("not-runtime")); }
+for (const g of readdirSync(ROOT)) { const d = readFileSync(join(ROOT, g), "utf8"); d.slice(d.indexOf("G3")); }`, 'tests/x-tests.mjs');
+  assert.deepEqual(a.map((x) => [x.marker.value, x.targets[0]]), [['E2', 'popup.js'], ['F2', '?'], ['G3', '?']]);
+});
+test('split pieces: pop(), slice(k), and a kept array read by index', () => {
+  const a = anchorsOf(`(async () => { ${LOAD} src.split("// G2").pop(); src.split("// H2").slice(1); const parts = src.split("// I2"); parts[1]; const all = src.split("// J2"); all.length; })();`);
+  assert.deepEqual(markers(a), ['// G2', '// H2', '// I2']);
+});
+test('helpers: a wrapper passing its parameter on, an object method, a marker in an options object', () => {
+  const a = anchorsOf(`
+function extract(s, m) { return s.slice(s.indexOf(m)); }
+const H = { cut(s, m) { return s.slice(s.indexOf(m)); } };
+function between(s, o) { return s.slice(s.indexOf(o.start), s.indexOf(o.end)); }
+(async () => { ${LOAD}
+  const fn = (n) => extract(src, "function " + n); fn("K2");
+  H.cut(src, "L2");
+  between(src, { start: "M2", end: "N2" });
+})();`);
+  assert.deepEqual(a.map((x) => [x.form, x.marker.value]).sort(), [['helper:between', 'M2'], ['helper:between', 'N2'], ['helper:cut', 'L2'], ['helper:fn', 'K2']]);
+});
+test('markers from a let written once and from a loop over a literal array; a reassigned let does not count', () => {
+  const a = anchorsOf(`(async () => { ${LOAD} let m = "O2"; src.slice(src.indexOf(m)); let w = "x"; w = location.hash; src.indexOf(w) + 1; for (const k of ["P2", "Q2"]) src.slice(src.indexOf(k)); })();`);
+  assert.deepEqual(markers(a), ['O2', 'P2', 'Q2']);
+});
+test('.cjs and .htm test files are scanned', () => {
+  const root = mkdtempSync(join(tmpdir(), 'pbp-slice-ext-'));
+  try {
+    mkdirSync(join(root, 'tests'));
+    for (const f of ['a.cjs', 'b.htm', 'c.txt']) writeFileSync(join(root, 'tests', f), '');
+    assert.deepEqual(testFiles(root), ['tests/a.cjs', 'tests/b.htm']);
+    assert.equal(analyzeFile(html(`(async () => { ${LOAD} src.slice(src.indexOf("R2")); })();`), 'tests/b.htm', RUNTIME).anchors.length, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 // ---- what does not count ----

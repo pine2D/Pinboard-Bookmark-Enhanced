@@ -1,7 +1,18 @@
 {
   "note": "Slice anchors per test file (scripts/slice-anchor-lint.mjs). Only shrinks: refresh with --update after removing anchors. New tests load the real file with tests/fixtures/chrome-mock.js instead of cutting source.",
-  "total": 1308,
+  "total": 1363,
   "files": {
+    "tests/ai-tags-tests.html": {
+      "count": 1,
+      "growth": [
+        {
+          "date": "2026-11-10",
+          "from": 0,
+          "to": 1,
+          "reason": "counting correction from review round 1: the lint now follows eval scopes, || [] fallbacks, const-held regexes, more fetch/read forms, split pieces, wrapper/object/options helpers and loop markers; every newly counted anchor already existed on main (old and new lint run on the same tree); no test changed"
+        }
+      ]
+    },
     "tests/background-active-tab-tests.html": {
       "count": 44,
       "growth": [
@@ -59,6 +70,17 @@
     },
     "tests/md-highlight-commit-tests.html": {
       "count": 4
+    },
+    "tests/md-preview-contrast-tests.mjs": {
+      "count": 2,
+      "growth": [
+        {
+          "date": "2026-11-10",
+          "from": 0,
+          "to": 2,
+          "reason": "counting correction from review round 1: the lint now follows eval scopes, || [] fallbacks, const-held regexes, more fetch/read forms, split pieces, wrapper/object/options helpers and loop markers; every newly counted anchor already existed on main (old and new lint run on the same tree); no test changed"
+        }
+      ]
     },
     "tests/md-send-menu-tests.html": {
       "count": 6
@@ -121,16 +143,30 @@
       "count": 18
     },
     "tests/restore-points-tests.html": {
-      "count": 2
+      "count": 3,
+      "growth": [
+        {
+          "date": "2026-11-10",
+          "from": 2,
+          "to": 3,
+          "reason": "counting correction from review round 1: the lint now follows eval scopes, || [] fallbacks, const-held regexes, more fetch/read forms, split pieces, wrapper/object/options helpers and loop markers; every newly counted anchor already existed on main (old and new lint run on the same tree); no test changed"
+        }
+      ]
     },
     "tests/save-pipeline-tests.html": {
-      "count": 71,
+      "count": 72,
       "growth": [
         {
           "date": "2026-11-10",
           "from": 63,
           "to": 71,
           "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
+        },
+        {
+          "date": "2026-11-10",
+          "from": 71,
+          "to": 72,
+          "reason": "counting correction from review round 1: the lint now follows eval scopes, || [] fallbacks, const-held regexes, more fetch/read forms, split pieces, wrapper/object/options helpers and loop markers; every newly counted anchor already existed on main (old and new lint run on the same tree); no test changed"
         }
       ]
     },
@@ -141,16 +177,30 @@
       "count": 1
     },
     "tests/theme-ui-derive-tests.mjs": {
-      "count": 6
+      "count": 15,
+      "growth": [
+        {
+          "date": "2026-11-10",
+          "from": 6,
+          "to": 15,
+          "reason": "counting correction from review round 1: the lint now follows eval scopes, || [] fallbacks, const-held regexes, more fetch/read forms, split pieces, wrapper/object/options helpers and loop markers; every newly counted anchor already existed on main (old and new lint run on the same tree); no test changed"
+        }
+      ]
     },
     "tests/ui-contract-tests.mjs": {
-      "count": 564,
+      "count": 605,
       "growth": [
         {
           "date": "2026-11-10",
           "from": 533,
           "to": 564,
           "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
+        },
+        {
+          "date": "2026-11-10",
+          "from": 564,
+          "to": 605,
+          "reason": "counting correction from review round 1: the lint now follows eval scopes, || [] fallbacks, const-held regexes, more fetch/read forms, split pieces, wrapper/object/options helpers and loop markers; every newly counted anchor already existed on main (old and new lint run on the same tree); no test changed"
         }
       ]
     },
