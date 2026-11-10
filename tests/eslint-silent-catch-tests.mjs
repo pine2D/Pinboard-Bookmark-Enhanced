@@ -60,3 +60,8 @@ ok('.catch with swallow-ok and a reason', 'p.catch(() => { /* swallow-ok: fire a
 bad('.catch with swallow-ok and no reason', 'p.catch(() => { /* swallow-ok: */ });');
 ok('.then(a, b) is not a .catch call', 'p.then(() => {}, () => {});');
 ok('a method named catch with a non-function argument', 'p.catch(null);');
+
+// ---- a write is not a read ----
+bad('catch binding that is only assigned', 'try { x(); } catch (e) { e = null; }');
+bad('.catch param that is only assigned via a default value', 'p.catch((e = 1) => {});');
+ok('catch binding assigned and then read', 'let m; try { x(); } catch (e) { e = e || 1; m = e; }');

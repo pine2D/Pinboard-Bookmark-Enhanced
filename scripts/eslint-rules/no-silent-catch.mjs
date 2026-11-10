@@ -78,7 +78,7 @@ export default {
       return sourceCode.getDeclaredVariables(declarer).some(
         (v) =>
           v.defs.some((d) => d.name && d.name.range[0] >= paramNode.range[0] && d.name.range[1] <= paramNode.range[1]) &&
-          v.references.length > 0,
+          v.references.some((r) => r.isRead()),
       );
     }
 

@@ -101,6 +101,9 @@ ESLINT_USE_FLAT_CONFIG=true npx --prefix .qa-scan eslint . --suppressions-locati
 echo "[eslint-silent-catch] checking the no-silent-catch rule against valid and invalid samples"
 node "tests/eslint-silent-catch-tests.mjs"
 
+echo "[eslint-baseline] checking the silent-catch baseline check against growing and shrinking samples"
+node "tests/eslint-baseline-tests.mjs"
+
 echo "[script-graph] checking executeScript page functions are closure-free"
 # Immediately after eslint, and for the blind spot eslint structurally has:
 # no-undef is fed the UNION of every root script's top-level declarations, so a

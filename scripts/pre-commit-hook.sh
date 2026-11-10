@@ -40,7 +40,10 @@ REGISTERS_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(\.claude/(
 RULES_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(CLAUDE\.md|AGENTS\.md|PRODUCT\.md|\.claude/rules/[^/]+\.md|\.claude/skills/.+|\.claude/expiring-items\.md|scripts/rules-lint(-allow)?\.(mjs|json)|tests/rules-lint-tests\.mjs)$')
 JS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '\.(js|mjs)$' | grep -vE '^vendor/')
 JS_ROOT_CHANGED=$(printf '%s\n' "$JS_CHANGED" | grep -E '^[^/]+\.js$')
-if [ -z "$CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ]; then
+ESLINT_BASELINE_STAGED=$(printf '%s\n' "$STAGED" | grep -E '^scripts/eslint-suppressions\.json$')
+ESLINT_RULE_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(eslint\.config\.mjs|scripts/eslint-rules/[^/]+\.mjs|scripts/eslint-suppressions\.json|tests/eslint-silent-catch-tests\.mjs)$')
+ESLINT_TOOLS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/eslint-baseline-check\.mjs|tests/eslint-baseline-tests\.mjs)$')
+if [ -z "$CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ]; then
   exit 0
 fi
 
@@ -70,33 +73,80 @@ if [ -n "$RULES_CHANGED" ]; then
   fi
 fi
 
-# ---- JS group: syntax, eslint and script-graph on staged scripts ----
-if [ -n "$JS_CHANGED" ]; then
-  echo "[js-syntax] node --check on staged .js/.mjs"
-  for f in $JS_CHANGED; do
-    if ! node --check "$REPO_ROOT/$f"; then
-      echo ""
-      echo "[js-syntax] COMMIT BLOCKED — syntax error in $f (fix it, then stage again)" >&2
-      exit 1
-    fi
-  done
-  if [ -n "$JS_ROOT_CHANGED" ]; then
-    if [ -d "$REPO_ROOT/.qa-scan/node_modules/eslint" ]; then
-      echo "[eslint] linting staged root scripts"
-      # shellcheck disable=SC2086
-      if ! (cd "$REPO_ROOT" && ESLINT_USE_FLAT_CONFIG=true npx --prefix .qa-scan eslint --suppressions-location scripts/eslint-suppressions.json $JS_ROOT_CHANGED); then
+# ---- JS group: syntax, baseline, eslint and script-graph on staged scripts ----
+if [ -n "$JS_CHANGED" ] || [ -n "$ESLINT_BASELINE_STAGED" ] || [ -n "$ESLINT_TOOLS_CHANGED" ]; then
+  if [ -n "$JS_CHANGED" ]; then
+    echo "[js-syntax] node --check on staged .js/.mjs"
+    # One name per line, so a file name with a space stays whole. The loop runs
+    # in a pipeline subshell, so its exit status is what the `if` tests.
+    if ! printf '%s\n' "$JS_CHANGED" | while IFS= read -r f; do
+      if ! node --check "$REPO_ROOT/$f"; then
         echo ""
-        echo "[eslint] COMMIT BLOCKED — fix the lines above; a silent catch needs a console.warn, a throw, a read of the error, or a '// swallow-ok: <reason>' comment" >&2
+        echo "[js-syntax] COMMIT BLOCKED — syntax error in $f (fix it, then stage again)" >&2
         exit 1
       fi
-    else
-      echo "[eslint] skipped: .qa-scan/node_modules/eslint not found (run CI or verify.sh to cover it)" >&2
-    fi
-    echo "[script-graph] checking executeScript page functions are closure-free"
-    if ! node "$REPO_ROOT/scripts/script-graph-lint.mjs"; then
-      echo ""
-      echo "[script-graph] COMMIT BLOCKED — an executeScript page function reaches outside its own body (see the message above)" >&2
+    done; then
       exit 1
+    fi
+  fi
+
+  # The silent-catch baseline only shrinks: compare the staged copy with HEAD.
+  # A baseline that is new at HEAD has nothing to compare with and passes.
+  if [ -n "$ESLINT_BASELINE_STAGED" ] && git cat-file -e HEAD:scripts/eslint-suppressions.json 2>/dev/null; then
+    BASELINE_TMP=$(mktemp -d)
+    git show HEAD:scripts/eslint-suppressions.json > "$BASELINE_TMP/old.json"
+    git show :scripts/eslint-suppressions.json > "$BASELINE_TMP/new.json"
+    if ! node "$REPO_ROOT/scripts/eslint-baseline-check.mjs" "$BASELINE_TMP/old.json" "$BASELINE_TMP/new.json"; then
+      rm -rf "$BASELINE_TMP"
+      echo ""
+      echo "[eslint-baseline] COMMIT BLOCKED — the baseline only shrinks (see the message above)" >&2
+      exit 1
+    fi
+    rm -rf "$BASELINE_TMP"
+  fi
+  if [ -n "$ESLINT_TOOLS_CHANGED" ]; then
+    echo "[eslint-baseline] checking the baseline check against its samples"
+    if ! node "$REPO_ROOT/tests/eslint-baseline-tests.mjs"; then
+      echo ""
+      echo "[eslint-baseline] COMMIT BLOCKED — the baseline check self-test failed" >&2
+      exit 1
+    fi
+  fi
+
+  # eslint, the rule self-test and script-graph-lint all need .qa-scan/node_modules.
+  if [ -n "$JS_ROOT_CHANGED" ] || [ -n "$ESLINT_RULE_CHANGED" ]; then
+    if [ -d "$REPO_ROOT/.qa-scan/node_modules/eslint" ] && [ -d "$REPO_ROOT/.qa-scan/node_modules/espree" ]; then
+      if [ -n "$ESLINT_RULE_CHANGED" ]; then
+        echo "[eslint-silent-catch] checking the no-silent-catch rule against its samples"
+        if ! node "$REPO_ROOT/tests/eslint-silent-catch-tests.mjs"; then
+          echo ""
+          echo "[eslint-silent-catch] COMMIT BLOCKED — the rule self-test failed (see the message above)" >&2
+          exit 1
+        fi
+      fi
+      if [ -n "$JS_ROOT_CHANGED" ]; then
+        echo "[eslint] linting staged root scripts"
+        if ! (cd "$REPO_ROOT" && printf '%s\n' "$JS_ROOT_CHANGED" | tr '\n' '\0' | ESLINT_USE_FLAT_CONFIG=true xargs -0 npx --prefix .qa-scan eslint --suppressions-location scripts/eslint-suppressions.json); then
+          ESLINT_FILES=$(printf '%s' "$JS_ROOT_CHANGED" | tr '\n' ' ')
+          echo ""
+          echo "[eslint] COMMIT BLOCKED — read the messages above, then pick the case that matches." >&2
+          echo "  1. A silent catch needs a console.warn, a throw, a read of the error, or a '// swallow-ok: <reason>' comment inside it." >&2
+          echo "  2. A long list for one file means the file is over its baseline count and eslint lists ALL its silent catches." >&2
+          echo "     The new one is in the lines you changed: git diff --cached -U0 -- <file>" >&2
+          echo "  3. 'suppressions left that do not occur anymore' means you fixed an old silent catch. Prune the baseline and stage it:" >&2
+          echo "       ESLINT_USE_FLAT_CONFIG=true npx --prefix .qa-scan eslint --suppressions-location scripts/eslint-suppressions.json --prune-suppressions ${ESLINT_FILES}" >&2
+          echo "       git add scripts/eslint-suppressions.json" >&2
+          exit 1
+        fi
+        echo "[script-graph] checking executeScript page functions are closure-free"
+        if ! node "$REPO_ROOT/scripts/script-graph-lint.mjs"; then
+          echo ""
+          echo "[script-graph] COMMIT BLOCKED — an executeScript page function reaches outside its own body (see the message above)" >&2
+          exit 1
+        fi
+      fi
+    else
+      echo "[eslint] WARNING: .qa-scan/node_modules (eslint, espree) not found, so eslint, the rule self-test and script-graph-lint were skipped (run CI or verify.sh to cover them)" >&2
     fi
   fi
 fi
