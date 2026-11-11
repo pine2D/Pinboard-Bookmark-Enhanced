@@ -78,6 +78,19 @@ if [ -n "$REGISTERS_CHANGED" ]; then
     echo ""
     echo "[registers] COMMIT BLOCKED — a register file breaks its format or expiry rule (see the message above)" >&2
     exit 1
+  fi  # A changed default model must not keep the date that verified the old one.
+  # The first commit of the ledger has no HEAD copy to compare with and passes.
+  if printf '%s\n' "$STAGED" | grep -qx '\.claude/freshness-ledger\.md' && git cat-file -e HEAD:.claude/freshness-ledger.md 2>/dev/null; then
+    FRESH_TMP=$(mktemp -d)
+    git show HEAD:.claude/freshness-ledger.md > "$FRESH_TMP/old.md"
+    git show :.claude/freshness-ledger.md > "$FRESH_TMP/new.md"
+    if ! node "$REPO_ROOT/scripts/registers-lint.mjs" --compare-freshness "$FRESH_TMP/old.md" "$FRESH_TMP/new.md"; then
+      rm -rf "$FRESH_TMP"
+      echo ""
+      echo "[registers] COMMIT BLOCKED — a default model changed but kept its old 最近核实 date (see the message above)" >&2
+      exit 1
+    fi
+    rm -rf "$FRESH_TMP"
   fi
 fi
 

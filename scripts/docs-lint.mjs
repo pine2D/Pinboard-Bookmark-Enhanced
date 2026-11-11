@@ -19,7 +19,7 @@
 // tempItems() is exported for scripts/registers-lint.mjs --due-within (the
 // weekly sentinel and scripts/doctor.mjs read due dates through it); the lint
 // itself only runs when this file is the entry point.
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const READMES = [
@@ -203,4 +203,10 @@ if (errors.length) {
 console.log(`[docs-lint] PASS - ${READMES.length} READMEs mirrored (${counts[0].bullets} bullets, ${counts[0].subs} subsections), delimiter policy + EN prose dash ban hold, ${TEMP_FILE} 临时事项 到期日 all in the future`);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
+// True when this file is the entry point, also when it was started through a
+// symlink (argv[1] is the link; import.meta.url is the resolved file).
+function isMainModule() {
+  try { return !!process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url); } catch { return false; }
+}
+
+if (isMainModule()) main();

@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import {
   lintDecisions, lintAcceptanceDebt, lintFlakeLedger, openAcceptanceItems,
   lintStoreLedger, storeReadiness, lintFreshness, loadProviderDefaults, repoFileInfo, dueItems,
-  FRESH_STALE_DAYS,
+  FRESH_STALE_DAYS, compareFreshness,
 } from '../scripts/registers-lint.mjs';
 import { tempItems } from '../scripts/docs-lint.mjs';
 
@@ -517,4 +517,45 @@ test('release.sh parses and documents --accept-debt; unknown flag exits 2', () =
   assert.equal(help.status, 0); assert.match(help.stdout, /--accept-debt/);
   const bad = spawnSync('bash', [join(ROOT, 'scripts/release.sh'), '--no-such-flag'], { encoding: 'utf8' });
   assert.equal(bad.status, 2);
+});
+
+// ---- release gate leaves the freshness ledger alone (it must never abort a release) ----
+test('cli: --release-gate neither reads freshness-ledger.md nor loads ai.js', () => withDir(set({
+  'ai.js': 'throw new Error("ai.js must not be evaluated by the release gate");\n',
+  'freshness-ledger.md': '| not | a | ledger |\n',
+}), (d) => {
+  const gate = run(d, ['--release-gate']);
+  assert.equal(gate.status, 0, gate.stdout + gate.stderr);
+  assert.doesNotMatch(gate.stdout + gate.stderr, /freshness|ai\.js/);
+  const plain = run(d);
+  assert.equal(plain.status, 1, 'the plain run still checks the ledger');
+  assert.match(plain.stderr, /ai\.js/);
+}));
+
+// ---- a changed default model must not keep its old date ----
+const ledger = (rows) => fresh(rows, []);
+test('compareFreshness: a changed model that keeps a date fails; 未核实, a new date or an unchanged model pass', () => {
+  const head = ledger([fm('alpha', 'a-1', '2026-10-01'), fm('beta', 'b-2')]);
+  assert.match(compareFreshness(head, ledger([fm('alpha', 'a-2', '2026-10-01'), fm('beta', 'b-2')])).join('\n'), /alpha 的默认模型从 a-1 改成了 a-2，最近核实还是 2026-10-01/);
+  assert.deepEqual(compareFreshness(head, ledger([fm('alpha', 'a-2'), fm('beta', 'b-2')])), []);
+  assert.deepEqual(compareFreshness(head, ledger([fm('alpha', 'a-2', '2026-11-05'), fm('beta', 'b-2')])), []);
+  assert.deepEqual(compareFreshness(head, ledger([fm('alpha', 'a-1', '2026-10-01'), fm('beta', 'b-3')])), [], 'beta was 未核实 and stays 未核实');
+  assert.deepEqual(compareFreshness(head, ledger([fm('alpha', 'a-1', '2026-10-01'), fm('beta', 'b-2'), fm('gamma', 'g-1', '2026-10-01')])), [], 'a new row has nothing to compare with');
+  assert.deepEqual(compareFreshness('', ledger([fm('alpha', 'a-2', '2026-10-01')])), [], 'first commit of the file');
+});
+test('cli: --compare-freshness exits 1 on a kept date, 0 otherwise, 2 without two files', () => withDir({
+  'old.md': ledger([fm('alpha', 'a-1', '2026-10-01')]),
+  'kept.md': ledger([fm('alpha', 'a-2', '2026-10-01')]),
+  'cleared.md': ledger([fm('alpha', 'a-2')]),
+}, (d) => {
+  const cmp = (...f) => spawnSync('node', [join(ROOT, 'scripts/registers-lint.mjs'), '--compare-freshness', ...f.map((x) => join(d, x))], { encoding: 'utf8' });
+  const bad = cmp('old.md', 'kept.md'); assert.equal(bad.status, 1); assert.match(bad.stderr, /改成 未核实/);
+  assert.equal(cmp('old.md', 'cleared.md').status, 0);
+  assert.equal(cmp('old.md').status, 2);
+  assert.equal(cmp('old.md', 'missing.md').status, 2);
+}));
+test('the pre-commit hook calls the comparison with the HEAD copy of the ledger', () => {
+  const hook = readFileSync(join(ROOT, 'scripts/pre-commit-hook.sh'), 'utf8');
+  assert.match(hook, /git show HEAD:\.claude\/freshness-ledger\.md/);
+  assert.match(hook, /registers-lint\.mjs" --compare-freshness/);
 });

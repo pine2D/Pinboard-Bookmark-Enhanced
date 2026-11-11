@@ -37,19 +37,40 @@
 | Pinboard | tests/bookmark-live-pinboard-mock.mjs | 未核实 | 本机模拟的 v1 接口 |
 | Pinboard | tests/save-pipeline-tests.html | 未核实 | 手写的 posts/get 响应 |
 | Pinboard | tests/popup-save-tests.html | 未核实 | - |
+| Pinboard | tests/background-active-tab-tests.html | 未核实 | - |
+| Pinboard | tests/batch-dedup-tests.html | 未核实 | - |
+| Pinboard | tests/popup-tag-cache-tests.html | 未核实 | - |
+| Pinboard | tests/reader-bookmark-tests.html | 未核实 | 注释说按真实的 posts/get 响应手写 |
+| Pinboard | tests/settings-persist-tests.html | 未核实 | - |
+| Pinboard | tests/tag-gov-tests.html | 未核实 | - |
+| Pinboard | tests/tag-gov-entity-tests.html | 未核实 | 注释写明 tags/get、posts/all、posts/add 的响应形状 |
 | Karakeep | tests/bookmark-services-tests.html | 未核实 | - |
 | linkding | tests/bookmark-services-tests.html | 未核实 | - |
 | Karakeep | tests/bookmark-live-preflight-tests.mjs | 未核实 | 注释说形状取自 Karakeep 0.34.1，没写日期 |
+| Karakeep | tests/bookmark-service-runtime-tests.mjs | 未核实 | - |
+| Karakeep | tests/popup-save-tests.html | 未核实 | - |
+| Karakeep | tests/reader-bookmark-tests.html | 未核实 | - |
 | linkding | tests/bookmark-live-preflight-tests.mjs | 未核实 | 注释说形状取自 linkding 1.47，没写日期 |
+| linkding | tests/bookmark-service-runtime-tests.mjs | 未核实 | - |
+| linkding | tests/popup-save-tests.html | 未核实 | - |
+| linkding | tests/reader-bookmark-tests.html | 未核实 | - |
 | Google Drive | tests/vocab-gdrive-tests.html | 未核实 | - |
 | Google Drive | tests/notes-gdrive-tests.html | 未核实 | - |
 | Google Drive | tests/dict-archive-tests.html | 未核实 | - |
 | Google Drive | tests/ask-archive-tests.html | 未核实 | - |
 | Google Drive | tests/drive-scopes-tests.html | 未核实 | - |
+| Google Drive | tests/options-drive-sync-tests.html | 未核实 | - |
 | OpenAI、Anthropic、Gemini、Ollama | tests/ai-completion-tests.html | 未核实 | 注释说按官方 schema 手写 |
 | OpenAI 兼容接口 | tests/popup-ai-sw-tests.html | 未核实 | - |
 | OpenAI 兼容接口 | tests/fixtures/dict-live-responses.mjs | 未核实 | - |
 | OpenAI 兼容接口 | tests/fixtures/dict-chat-stream.mjs | 未核实 | 流式响应 |
+| OpenAI 兼容接口 | tests/md-ai-tests.html | 未核实 | - |
+| OpenAI 兼容接口 | tests/dict-entry-tests.html | 未核实 | - |
+| OpenAI 兼容接口 | tests/dict-settings-tests.html | 未核实 | 流式响应 |
+| OpenAI 兼容接口 | tests/dict-protocol-tests.html | 未核实 | - |
+| OpenAI 兼容接口 | tests/dict-live-test-tests.mjs | 未核实 | - |
+| OpenAI 兼容接口 | tests/fixtures/dict-litellm-responses.mjs | 未核实 | - |
+| OpenAI 兼容接口 | tests/fixtures/dict-redesign-r2-responses.mjs | 未核实 | - |
 | OpenAI 兼容接口、MediaWiki | tests/fixtures/dict-redesign-responses.mjs | 未核实 | - |
 | DeepSeek | tests/fixtures/dict-deepseek-collocations.json | 2026-10-25 | 原文："Captured successful DeepSeek collocations response from the explicitly authorized 2026-10-25 synthetic provider lookup." |
 | LiteLLM | tests/fixtures/dict-live-malformed-responses.js:1 | 2026-10-26 | 原文：// Reviewed synthetic-term answers captured on 2026-10-26 through LiteLLM. |
@@ -63,4 +84,13 @@
 | YouTube 字幕 | tests/md-video-tests.html:429 | 2026-10-24 | 原文：section("YouTube layered captions (v9QtM6qnG50, captured 2026-10-24)"); |
 | B 站字幕 | tests/md-video-tests.html | 未核实 | - |
 | Notion | tests/export-targets-tests.html | 未核实 | - |
+| Notion | tests/md-send-menu-tests.html | 未核实 | - |
 | GitHub Gist | tests/export-targets-tests.html | 未核实 | - |
+| Anthropic | tests/md-ai-tests.html | 未核实 | - |
+| Anthropic | tests/dict-protocol-tests.html | 未核实 | - |
+| Gemini | tests/md-ai-tests.html | 未核实 | - |
+| Gemini | tests/dict-protocol-tests.html | 未核实 | - |
+| Ollama | tests/md-ai-tests.html | 未核实 | - |
+| Ollama | tests/dict-protocol-tests.html | 未核实 | - |
+| MediaWiki | tests/library-vocab-tests.html | 未核实 | - |
+| MediaWiki | tests/dict-evidence-tests.html | 未核实 | - |

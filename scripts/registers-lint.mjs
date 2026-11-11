@@ -14,10 +14,14 @@
 //                                                         list what is due within N days or overdue:
 //                                                         临时事项, acceptance debt, stale freshness rows
 //   node scripts/registers-lint.mjs --store-check 3.0.4   may this version go to the store yet?
+//   node scripts/registers-lint.mjs --compare-freshness <HEAD 版> <暂存版>
+//                                                         a changed default model must not keep the old date
 //   node scripts/registers-lint.mjs --release-gate        list 待验; exit 1 on overdue
+//                                                         (the four registers only: freshness-ledger.md
+//                                                         and ai.js are never read here)
 //   node scripts/registers-lint.mjs --release-gate --accept-debt
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
@@ -481,6 +485,30 @@ export function lintFreshness(text, { today, providers, fileInfo }) {
   return { errors, warnings, unverified, stale };
 }
 
+// A default model changed while its 最近核实 date stayed: the date belongs to
+// the old model, so it must be cleared or replaced. Pure: the committed text
+// (HEAD) and the staged text. Only rows present in both are compared; a first
+// commit of the file has nothing to compare with and passes.
+export function compareFreshness(oldText, newText) {
+  const rows = (text) => {
+    const t = parseTables(text).find((x) => x.heading === "默认模型");
+    const out = new Map();
+    if (!t || !sameHeader(t.header, FRESH_MODEL_HEADER)) return out;
+    for (const r of t.rows) if (r.cells.length === FRESH_MODEL_HEADER.length) out.set(r.cells[0], { model: r.cells[1], verified: r.cells[2], line: r.line });
+    return out;
+  };
+  const before = rows(oldText), after = rows(newText);
+  const errors = [];
+  for (const [id, now] of after) {
+    const was = before.get(id);
+    if (!was || was.model === now.model) continue;
+    if (now.verified === was.verified && now.verified !== FRESH_UNVERIFIED) {
+      errors.push(`freshness-ledger.md:${now.line}: ${id} 的默认模型从 ${was.model} 改成了 ${now.model}，最近核实还是 ${now.verified}。这个日期核实的是旧模型：改成 ${FRESH_UNVERIFIED}，或者改成核实新模型的那一天`);
+    }
+  }
+  return errors;
+}
+
 // ---- due soon (weekly sentinel, scripts/doctor.mjs) ----
 // What needs attention within `within` days, read with the same parsers the
 // lints use: 临时事项 (docs-lint's tempItems), pending acceptance debt, and
@@ -543,6 +571,18 @@ function main(argv) {
   if (parseDate(today) === null) { console.error(`[registers] PBP_LINT_TODAY "${today}" 不是合法日期`); return 2; }
   const repoRoot = process.env.PBP_REPO_ROOT || join(dirname(fileURLToPath(import.meta.url)), "..");
   const dir = process.env.PBP_REGISTERS_DIR || join(repoRoot, ".claude");
+  const cmpAt = argv.indexOf("--compare-freshness");
+  if (cmpAt !== -1) {
+    const [oldFile, newFile] = argv.slice(cmpAt + 1, cmpAt + 3);
+    if (!oldFile || !newFile) { console.error("[registers] 用法：--compare-freshness <旧文件> <新文件>"); return 2; }
+    let oldText, newText;
+    try { oldText = readFileSync(oldFile, "utf8"); newText = readFileSync(newFile, "utf8"); }
+    catch (e) { console.error(`[registers] 读不到文件（${e.code || e.message}）`); return 2; }
+    const errs = compareFreshness(oldText, newText);
+    for (const e of errs) console.error(`[registers] FAIL ${e}`);
+    if (!errs.length) console.log("[registers] freshness-ledger.md: 改过默认模型的行都没有沿用旧日期");
+    return errs.length ? 1 : 0;
+  }
   const dueAt = argv.indexOf("--due-within");
   if (dueAt !== -1) {
     const raw = argv[dueAt + 1] || "";
@@ -576,9 +616,14 @@ function main(argv) {
     for (const l of r.lines) console.log(`[registers] ${l}`);
     return r.ready ? 0 : 1;
   }
+  // The release gate checks the four registers it always did. A freshness
+  // problem is caught by pre-commit and CI and never stops a release, so the
+  // gate neither reads freshness-ledger.md nor evaluates ai.js.
   let providers = null, providerError = "";
-  try { providers = loadProviderDefaults(repoRoot); }
-  catch (e) { providerError = e.message; }
+  if (!releaseGate) {
+    try { providers = loadProviderDefaults(repoRoot); }
+    catch (e) { providerError = e.message; }
+  }
   let unverified = 0;
   const lintFresh = (t, o) => {
     if (!providers) return { errors: [`freshness-ledger.md: 读不到 ai.js 里的服务商注册表（${providerError}）`], warnings: [], dueErrors: [] };
@@ -591,7 +636,7 @@ function main(argv) {
     ["acceptance-debt.md", lintAcceptanceDebtDetailed],
     ["flake-ledger.md", lintFlakeLedgerDetailed],
     ["store-ledger.md", (t, o) => ({ ...lintStoreLedger(t, o), dueErrors: [] })],
-    ["freshness-ledger.md", lintFresh],
+    ...(releaseGate ? [] : [["freshness-ledger.md", lintFresh]]),
   ];
   const errors = [], warnings = [], dueErrors = [];
   const texts = {};
@@ -632,6 +677,12 @@ function main(argv) {
   return 1;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+// True when this file is the entry point, also when it was started through a
+// symlink (argv[1] is the link; import.meta.url is the resolved file).
+function isMainModule() {
+  try { return !!process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url); } catch { return false; }
+}
+
+if (isMainModule()) {
   process.exitCode = main(process.argv.slice(2));
 }
