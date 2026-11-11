@@ -7,8 +7,9 @@ name: Weekly sentinel
 # findings.jsonl and scripts/sentinel-report.mjs writes the report. Only a
 # check that could not run at all fails the job (and is reported too).
 # With findings, a schedule or manual run replaces the body of the one open
-# issue labelled "sentinel" and adds a short comment (user ruling 2026-11-11,
-# .claude/decisions.md). Without findings nothing is touched. A pull request
+# issue labelled "sentinel" (user ruling 2026-11-11, .claude/decisions.md) and
+# adds a short comment only when the set of findings differs from the last
+# report, so a finding that stays put notifies once. Without findings nothing is touched. A pull request
 # run, or a manual run with dry_run, only shows what it would write.
 # It is not named "CI": release.sh only reads that workflow.
 
@@ -43,14 +44,16 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  # Pinned: the npx package that installs Chrome for Testing.
+  # Installs Chrome for Testing. Dependabot does not track this pin; bump it by
+  # hand when the install step breaks or about once a quarter, to a version at least two weeks old.
   PUPPETEER_BROWSERS: '@puppeteer/browsers@3.2.6'
 
 jobs:
   sentinel:
     name: weekly checks
     runs-on: ubuntu-24.04   # Playwright 1.59 cannot install Chromium deps on ubuntu-latest (26.04)
-    timeout-minutes: 60
+    # Above the sum of the step timeouts below, so the report step always gets to run.
+    timeout-minutes: 110
     outputs:
       write: ${{ steps.report.outputs.write }}
       body_b64: ${{ steps.report.outputs.body_b64 }}
@@ -78,15 +81,21 @@ jobs:
           cache-dependency-path: .qa-scan/package-lock.json
 
       - name: Install QA dependencies
+        id: deps
+        timeout-minutes: 10
         run: npm ci --prefix .qa-scan
 
       # Also installs the system libraries Chrome for Testing needs.
       - name: Install bundled Chromium
+        id: chromium
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        timeout-minutes: 10
         run: npx --prefix .qa-scan playwright install --with-deps chromium
 
       - name: Vendored libraries against npm
         id: vendor
         if: ${{ !cancelled() }}
+        timeout-minutes: 3
         run: |
           rc=0
           bash scripts/update-vendor.sh --check-only > "$SENTINEL_DIR/vendor.log" 2>&1 || rc=$?
@@ -94,7 +103,8 @@ jobs:
 
       - name: .qa-scan packages against npm
         id: npm
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        timeout-minutes: 3
         run: |
           rc=0
           npm outdated --prefix .qa-scan --json > "$SENTINEL_DIR/npm.json" 2> "$SENTINEL_DIR/npm.err" || rc=$?
@@ -103,6 +113,7 @@ jobs:
       - name: Links in the docs
         id: links
         if: ${{ !cancelled() }}
+        timeout-minutes: 10
         run: |
           rc=0
           node scripts/link-check.mjs --json "$SENTINEL_DIR/links.json" > "$SENTINEL_DIR/links.log" 2>&1 || rc=$?
@@ -112,6 +123,7 @@ jobs:
       - name: Register items due within 14 days
         id: due
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
         run: |
           rc=0
           node scripts/registers-lint.mjs --due-within 14 --json > "$SENTINEL_DIR/due.json" 2> "$SENTINEL_DIR/due.err" || rc=$?
@@ -122,7 +134,8 @@ jobs:
       # failure there is only a note when the ZIP itself was built.
       - name: Build the release ZIP
         id: zip
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        timeout-minutes: 10
         run: |
           rc=0
           xvfb-run -a bash scripts/release.sh --build-only --overwrite > "$SENTINEL_DIR/release.log" 2>&1 || rc=$?
@@ -135,53 +148,100 @@ jobs:
           echo "SENTINEL_ZIP=$zip" >> "$GITHUB_ENV"
 
       # Render gates are not run here: their baselines belong to the bundled Chromium.
-      - name: Test pages and ZIP smoke on Chrome for Testing stable and beta
-        id: browser
-        if: ${{ !cancelled() }}
+      - name: Test pages and ZIP smoke on Chrome for Testing stable
+        id: browser_stable
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        timeout-minutes: 25
+        env:
+          CHANNEL: stable
+          # A page that fails once and passes on the retry is not a finding (as in ci.yml).
+          PBP_RETRY_FLAKY: '1'
         run: |
-          for ch in stable beta; do
-            log="$SENTINEL_DIR/cft-$ch.log"
-            exe=""
-            if npx --yes "$PUPPETEER_BROWSERS" install "chrome@$ch" --path "$RUNNER_TEMP/cft" > "$log" 2>&1; then
-              exe=$(sed -n 's/^chrome@[^ ]* \(.*\)$/\1/p' "$log" | tail -n 1)
-            fi
-            if [ -z "$exe" ] || [ ! -x "$exe" ]; then
-              echo "::warning::Chrome for Testing $ch could not be installed"
-              node scripts/sentinel-report.mjs add browser --findings "$FINDINGS" --channel "$ch" --install-failed
-              continue
-            fi
-            version=$("$exe" --version 2>/dev/null || true)
-            echo "$ch: $version"
-            pages=0
-            PBP_BROWSER_EXECUTABLE="$exe" xvfb-run -a node scripts/run-html-suites.mjs > "$SENTINEL_DIR/pages-$ch.log" 2>&1 || pages=$?
-            tail -n 5 "$SENTINEL_DIR/pages-$ch.log"
-            smoke=0
-            if [ -n "$SENTINEL_ZIP" ]; then
-              PBP_BROWSER_EXECUTABLE="$exe" xvfb-run -a node scripts/zip-install-smoke.mjs --zip "$SENTINEL_ZIP" > "$SENTINEL_DIR/smoke-$ch.log" 2>&1 || smoke=$?
-              tail -n 3 "$SENTINEL_DIR/smoke-$ch.log"
-            fi
-            node scripts/sentinel-report.mjs add browser --findings "$FINDINGS" --channel "$ch" --version "$version" \
-              --pages-log "$SENTINEL_DIR/pages-$ch.log" --pages-exit "$pages" --smoke-exit "$smoke"
-          done
+          # Its own report folder, so the other channel cannot overwrite these logs.
+          export PBP_QA_REPORT_DIR="$RUNNER_TEMP/pbp-qa-report/cft-$CHANNEL"
+          mkdir -p "$PBP_QA_REPORT_DIR"
+          log="$SENTINEL_DIR/cft-$CHANNEL.log"
+          exe=""
+          if npx --yes "$PUPPETEER_BROWSERS" install "chrome@$CHANNEL" --path "$RUNNER_TEMP/cft" > "$log" 2>&1; then
+            exe=$(sed -n 's/^chrome@[^ ]* \(.*\)$/\1/p' "$log" | tail -n 1)
+          fi
+          if [ -z "$exe" ] || [ ! -x "$exe" ]; then
+            echo "::warning::Chrome for Testing $CHANNEL could not be installed"
+            node scripts/sentinel-report.mjs add browser --findings "$FINDINGS" --channel "$CHANNEL" --install-failed
+            exit 0
+          fi
+          version=$("$exe" --version 2>/dev/null || true)
+          echo "$CHANNEL: $version"
+          pages=0
+          PBP_BROWSER_EXECUTABLE="$exe" xvfb-run -a node scripts/run-html-suites.mjs > "$SENTINEL_DIR/pages-$CHANNEL.log" 2>&1 || pages=$?
+          tail -n 5 "$SENTINEL_DIR/pages-$CHANNEL.log"
+          smoke=0
+          if [ -n "${SENTINEL_ZIP:-}" ]; then
+            PBP_BROWSER_EXECUTABLE="$exe" xvfb-run -a node scripts/zip-install-smoke.mjs --zip "$SENTINEL_ZIP" > "$SENTINEL_DIR/smoke-$CHANNEL.log" 2>&1 || smoke=$?
+            tail -n 3 "$SENTINEL_DIR/smoke-$CHANNEL.log"
+          fi
+          node scripts/sentinel-report.mjs add browser --findings "$FINDINGS" --channel "$CHANNEL" --version "$version" \
+            --pages-log "$SENTINEL_DIR/pages-$CHANNEL.log" --pages-exit "$pages" --smoke-exit "$smoke"
+
+      - name: Test pages and ZIP smoke on Chrome for Testing beta
+        id: browser_beta
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        timeout-minutes: 25
+        env:
+          CHANNEL: beta
+          # A page that fails once and passes on the retry is not a finding (as in ci.yml).
+          PBP_RETRY_FLAKY: '1'
+        run: |
+          # Its own report folder, so the other channel cannot overwrite these logs.
+          export PBP_QA_REPORT_DIR="$RUNNER_TEMP/pbp-qa-report/cft-$CHANNEL"
+          mkdir -p "$PBP_QA_REPORT_DIR"
+          log="$SENTINEL_DIR/cft-$CHANNEL.log"
+          exe=""
+          if npx --yes "$PUPPETEER_BROWSERS" install "chrome@$CHANNEL" --path "$RUNNER_TEMP/cft" > "$log" 2>&1; then
+            exe=$(sed -n 's/^chrome@[^ ]* \(.*\)$/\1/p' "$log" | tail -n 1)
+          fi
+          if [ -z "$exe" ] || [ ! -x "$exe" ]; then
+            echo "::warning::Chrome for Testing $CHANNEL could not be installed"
+            node scripts/sentinel-report.mjs add browser --findings "$FINDINGS" --channel "$CHANNEL" --install-failed
+            exit 0
+          fi
+          version=$("$exe" --version 2>/dev/null || true)
+          echo "$CHANNEL: $version"
+          pages=0
+          PBP_BROWSER_EXECUTABLE="$exe" xvfb-run -a node scripts/run-html-suites.mjs > "$SENTINEL_DIR/pages-$CHANNEL.log" 2>&1 || pages=$?
+          tail -n 5 "$SENTINEL_DIR/pages-$CHANNEL.log"
+          smoke=0
+          if [ -n "${SENTINEL_ZIP:-}" ]; then
+            PBP_BROWSER_EXECUTABLE="$exe" xvfb-run -a node scripts/zip-install-smoke.mjs --zip "$SENTINEL_ZIP" > "$SENTINEL_DIR/smoke-$CHANNEL.log" 2>&1 || smoke=$?
+            tail -n 3 "$SENTINEL_DIR/smoke-$CHANNEL.log"
+          fi
+          node scripts/sentinel-report.mjs add browser --findings "$FINDINGS" --channel "$CHANNEL" --version "$version" \
+            --pages-log "$SENTINEL_DIR/pages-$CHANNEL.log" --pages-exit "$pages" --smoke-exit "$smoke"
 
       - name: Write the report
         id: report
         if: ${{ !cancelled() }}
+        timeout-minutes: 3
         env:
           DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
           OUTCOMES: >-
+            deps=${{ steps.deps.outcome }}
+            chromium=${{ steps.chromium.outcome }}
             vendor=${{ steps.vendor.outcome }}
             npm=${{ steps.npm.outcome }}
             links=${{ steps.links.outcome }}
             due=${{ steps.due.outcome }}
             zip=${{ steps.zip.outcome }}
-            browser=${{ steps.browser.outcome }}
+            browser_stable=${{ steps.browser_stable.outcome }}
+            browser_beta=${{ steps.browser_beta.outcome }}
         run: |
-          # A check step that itself crashed could not record anything: report it as broken.
+          # A step that crashed or ran out of time could not record anything:
+          # report it as broken. A skipped step was skipped because the install
+          # it depends on failed, and that install is reported here already.
           for pair in $OUTCOMES; do
             name=${pair%%=*}
             outcome=${pair#*=}
-            if [ "$outcome" != "success" ]; then
+            if [ "$outcome" != "success" ] && [ "$outcome" != "skipped" ]; then
               node scripts/sentinel-report.mjs add broken --findings "$FINDINGS" --check "$name" --message "the $name step ended with $outcome"
             fi
           done
@@ -213,12 +273,24 @@ jobs:
     name: update the sentinel issue
     needs: sentinel
     # Runs after a failed sentinel job too, so a broken check is still reported.
-    if: ${{ !cancelled() && needs.sentinel.outputs.write == 'true' }}
+    # The event check repeats the report's own rule: a pull request never writes.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.sentinel.outputs.write == 'true' }}
     runs-on: ubuntu-24.04
+    # One writer at a time across all refs and events, so a scheduled run and a
+    # manual run cannot both find no issue and each create one.
+    concurrency:
+      group: sentinel-issue
+      cancel-in-progress: false
     permissions:
+      contents: read
       issues: write
     steps:
-      - name: Replace the issue body and add a comment
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Replace the issue body; comment when the findings changed
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -227,14 +299,19 @@ jobs:
         run: |
           printf '%s' "$BODY_B64" | base64 -d > "$RUNNER_TEMP/body.md"
           printf '%s' "$COMMENT_B64" | base64 -d > "$RUNNER_TEMP/comment.md"
-          if ! gh label list --limit 200 --json name --jq '.[].name' | grep -qx sentinel; then
-            gh label create sentinel --color 5319e7 --description "Weekly sentinel findings"
-          fi
+          gh label create sentinel --color 5319e7 --description "Weekly sentinel findings" --force
           num=$(gh issue list --label sentinel --state open --limit 1 --json number --jq '.[0].number // empty')
           if [ -z "$num" ]; then
             url=$(gh issue create --title "Weekly sentinel" --label sentinel --body-file "$RUNNER_TEMP/body.md")
             num=${url##*/}
+            comment=true
           else
+            gh issue view "$num" --json body --jq .body > "$RUNNER_TEMP/previous.md"
+            comment=$(node scripts/sentinel-report.mjs should-comment --previous "$RUNNER_TEMP/previous.md" --body "$RUNNER_TEMP/body.md")
             gh issue edit "$num" --body-file "$RUNNER_TEMP/body.md"
           fi
-          gh issue comment "$num" --body-file "$RUNNER_TEMP/comment.md"
+          if [ "$comment" = "true" ]; then
+            gh issue comment "$num" --body-file "$RUNNER_TEMP/comment.md"
+          else
+            echo "same findings as the last report: body replaced, no comment"
+          fi

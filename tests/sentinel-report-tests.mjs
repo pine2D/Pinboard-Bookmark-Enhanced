@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import {
   vendorRecords, npmRecords, linkRecords, dueRecords, browserRecords, failedPages,
-  buildReport, decide, escapeText, code, parseRecords,
+  buildReport, decide, escapeText, code, parseRecords, findingsDigest, shouldComment, readDigest, truncate, TEXT_LIMIT,
 } from '../scripts/sentinel-report.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -180,6 +180,98 @@ test('cli: add appends records, report writes body, comment, summary and outputs
     assert.match(out('workflow_dispatch', 'true').o, /write=false/);
     assert.ok(existsSync(join(dir, 'body.md')));
     rmSync(f);
-    assert.match(out('schedule', 'false').o, /write=false/, 'no findings file means no findings');
+    const missing = out('schedule', 'false');
+    assert.match(missing.o, /write=true\nbroken=true/, 'a missing findings file is a broken sentinel, not a clean week');
+    assert.match(missing.s, /findings file is missing/);
+    writeFileSync(join(dir, 'prev.md'), readFileSync(join(dir, 'body.md'), 'utf8'));
+    const sc = (...a) => cli('should-comment', ...a).stdout.trim();
+    assert.equal(sc('--previous', join(dir, 'prev.md'), '--body', join(dir, 'body.md')), 'false');
+    assert.equal(sc('--previous', join(dir, 'none.md'), '--body', join(dir, 'body.md')), 'true');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// ---- nothing verified is not a clean week ----
+test('vendor: exit 2 with every line UNVERIFIED is broken; one verified row keeps it a note', () => {
+  const allUnverified = `  package       current     latest      status
+  defuddle      0.19.4      ?           UNVERIFIED (fetch-error: network; not counted as drift, but NOT confirmed current either)
+  turndown      7.2.4       ?           UNVERIFIED (fetch-error: network; not counted as drift, but NOT confirmed current either)
+  openrouter    openai/gpt-oss-20b  UNVERIFIED (fetch-error: network; not counted as drift, but NOT confirmed live either)
+`;
+  assert.deepEqual(kinds(vendorRecords(allUnverified, 2)), ['vendor/broken/scripts/update-vendor.sh --check-only']);
+  const oneOk = allUnverified + '  marked        18.1.0      18.1.0      ok\n';
+  assert.deepEqual(vendorRecords(oneOk, 2).map((r) => r.kind), ['note', 'note', 'note']);
+});
+test('links: every link timing out or failing on the network is broken, not a list of notes', () => {
+  const down = { results: [
+    { url: 'https://a.org/', result: 'unverifiable', detail: 'timeout', files: ['README.md'] },
+    { url: 'https://b.org/', result: 'unverifiable', detail: 'network error (ECONNRESET)', files: ['README.md'] },
+  ] };
+  assert.deepEqual(kinds(linkRecords(down, 0)), ['links/broken/scripts/link-check.mjs']);
+  const mixed = { results: [...down.results, { url: 'https://c.org/', result: 'unverifiable', detail: '403', files: ['README.md'] }] };
+  assert.deepEqual(linkRecords(mixed, 0).map((r) => r.kind), ['note', 'note', 'note']);
+  assert.deepEqual(linkRecords({ results: [] }, 0), [], 'no links at all is not a failure');
+});
+
+// ---- digest: comment only when the set of findings changed ----
+const F = (subject, message = 'm', check = 'npm') => ({ check, kind: 'finding', subject, message, key: `${check}|finding|${subject}|${message}` });
+const bodyOf = (records, extra = {}) => buildReport({ records, event: 'schedule', runUrl: 'https://github.com/o/r/actions/runs/1', date: '2026-11-16', ...extra }).body;
+test('digest: the same findings in another order, on another day, from another run give the same digest', () => {
+  const a = [F('eslint'), F('playwright'), { check: 'links', kind: 'note', subject: 'x', message: 'y', key: 'k' }];
+  const b = [F('playwright'), F('eslint')];
+  assert.equal(findingsDigest(a), findingsDigest(b), 'order and notes do not count');
+  const prev = bodyOf(a);
+  const next = bodyOf(b, { date: '2026-11-23', runUrl: 'https://github.com/o/r/actions/runs/2' });
+  assert.equal(readDigest(prev), readDigest(next));
+  assert.equal(shouldComment({ previousBody: prev, body: next }), false);
+});
+test('digest: one finding added or removed, or no issue yet, means a comment', () => {
+  const prev = bodyOf([F('eslint'), F('playwright')]);
+  assert.equal(shouldComment({ previousBody: prev, body: bodyOf([F('eslint'), F('playwright'), F('pngjs')]) }), true);
+  assert.equal(shouldComment({ previousBody: prev, body: bodyOf([F('eslint')]) }), true);
+  assert.equal(shouldComment({ previousBody: prev, body: bodyOf([F('eslint', 'installed 1, latest 3')]) }), true, 'a new upstream version is a new finding');
+  assert.equal(shouldComment({ previousBody: null, body: prev }), true);
+  assert.equal(shouldComment({ previousBody: '', body: prev }), true);
+  assert.equal(shouldComment({ previousBody: '## an old body without a digest', body: prev }), true);
+});
+test('digest: a due item counting down its days is the same finding', () => {
+  const due = (days) => dueRecords({ items: [{ where: 'expiring-items.md:12', what: '复盘', due: '2026-11-18', daysLeft: days }], problems: [] }, 0);
+  assert.notEqual(due(7)[0].message, due(1)[0].message);
+  assert.equal(findingsDigest(due(7)), findingsDigest(due(1)));
+  assert.equal(findingsDigest(parseRecords(JSON.stringify(due(7)[0]))), findingsDigest(due(1)), 'the key survives the JSON lines file');
+});
+
+// ---- size limit ----
+test('truncate: body and comment stay under the GitHub limit, end with a pointer to the run, keep the digest', () => {
+  const many = Array.from({ length: 3000 }, (_, i) => F('package-' + i, 'x'.repeat(40)));
+  const r = buildReport({ records: many, event: 'schedule', runUrl: 'https://github.com/o/r/actions/runs/5', date: '2026-11-16' });
+  for (const t of [r.body, r.comment]) {
+    assert.ok(t.length <= TEXT_LIMIT && TEXT_LIMIT < 65536, `${t.length}`);
+    assert.match(t.trimEnd().split('\n').pop(), /^_The report was cut .*\[run log\]\(https:\/\/github\.com\/o\/r\/actions\/runs\/5\)\._$/);
+  }
+  assert.equal(readDigest(r.body), findingsDigest(many));
+  assert.equal(truncate('short', 'u'), 'short');
+  const cut = truncate('a\n'.repeat(200), 'u', 200);
+  assert.ok(cut.length <= 200, `${cut.length}`); assert.match(cut, /^a\n/); assert.match(cut, /cut at about 200/);
+});
+
+// ---- started through a symlink, every script still runs its main ----
+test('scripts run when invoked through a symlinked path', async () => {
+  const { symlinkSync } = await import('node:fs');
+  const dir = mkdtempSync(join(tmpdir(), 'pbp-symlink-main-'));
+  try {
+    const link = (name) => { const p = join(dir, name); symlinkSync(join(ROOT, 'scripts', name), p); return p; };
+    const runIt = (name, args, cwd = ROOT) => spawnSync(process.execPath, [link(name), ...args], { cwd, encoding: 'utf8' });
+    writeFileSync(join(dir, 'empty.md'), 'no links\n');
+    const cases = [
+      ['docs-lint.mjs', [], /\[docs-lint\] (PASS|FAIL)/],
+      ['link-check.mjs', [join(dir, 'empty.md')], /\[link-check\] 0 links/],
+      ['sentinel-report.mjs', ['nonsense'], /\[sentinel-report\]/],
+      ['registers-lint.mjs', ['--due-within', 'x'], /--due-within <天数>/],
+      ['doctor.mjs', ['--help'], /Usage: node scripts\/doctor\.mjs/],
+    ];
+    for (const [name, args, want] of cases) {
+      const r = runIt(name, args);
+      assert.match(r.stdout + r.stderr, want, `${name} printed nothing through a symlink`);
+    }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

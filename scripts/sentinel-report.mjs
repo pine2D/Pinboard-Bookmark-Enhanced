@@ -21,9 +21,11 @@
 //        [--install-failed] [--pages-log L --pages-exit N] [--smoke-exit N]
 //   node scripts/sentinel-report.mjs add broken  --findings F --check C --message M
 //   node scripts/sentinel-report.mjs add note    --findings F --check C --subject S --message M
+//   node scripts/sentinel-report.mjs should-comment --previous P --body B   (prints true or false)
 //   node scripts/sentinel-report.mjs report --findings F --event E [--dry-run true]
 //        --run-url U --sha S --date D --summary S --body B --comment C --output O
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { appendFileSync, existsSync, readFileSync, writeFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const ISSUE_TITLE = "Weekly sentinel";
@@ -33,7 +35,11 @@ const CHECK_TITLES = {
   browser: "Chrome for Testing channels", due: "Registers due soon", sentinel: "Sentinel itself",
 };
 
-const rec = (check, kind, subject, message) => ({ check, kind, subject: String(subject), message: String(message) });
+// `key` identifies the finding across weeks (findingsDigest); it defaults to
+// the whole record and leaves out anything that changes by itself, such as a
+// day count.
+const rec = (check, kind, subject, message, key) => ({ check, kind, subject: String(subject), message: String(message),
+  key: key === undefined ? `${check}|${kind}|${subject}|${message}` : String(key) });
 
 // ---- parsers: tool output -> records ----
 
@@ -41,10 +47,13 @@ const rec = (check, kind, subject, message) => ({ check, kind, subject: String(s
 export function vendorRecords(output, exit) {
   if (![0, 1, 2].includes(exit)) return [rec("vendor", "broken", "scripts/update-vendor.sh --check-only", `exited ${exit}`)];
   const out = [];
+  let verified = 0;
   for (const line of output.split("\n")) {
+    if (/^\s{2}\S+\s+\S+\s+\S+\s+ok\b/.test(line) || /^\s{2}openrouter\s+\S+\s+ok\b/.test(line)) verified++;
     const pkg = /^\s{2}(\S+)\s+(\S+)\s+(\S+)\s+(BEHIND|manual|UNVERIFIED)/.exec(line);
     if (pkg) {
       const [, name, cur, latest, status] = pkg;
+      if (status !== "UNVERIFIED") verified++;
       if (status === "BEHIND") out.push(rec("vendor", "finding", name, `vendored ${cur}, latest on npm ${latest}`));
       else if (status === "manual") out.push(rec("vendor", "finding", name, "has no entry in vendor/vendor-lock.json"));
       else out.push(rec("vendor", "note", name, "the npm registry did not answer, so this package was not checked"));
@@ -52,11 +61,14 @@ export function vendorRecords(output, exit) {
     }
     const or = /^\s{2}openrouter\s+(\S+)\s+(DEAD|UNVERIFIED)/.exec(line);
     if (or) {
+      if (or[2] === "DEAD") verified++;
       if (or[2] === "DEAD") out.push(rec("vendor", "finding", `openrouter ${or[1]}`, "the OpenRouter default model is no longer in the OpenRouter model list"));
       else out.push(rec("vendor", "note", "openrouter", "the OpenRouter model list was not checked"));
     }
   }
   if (exit === 1 && !out.some((r) => r.kind === "finding")) out.push(rec("vendor", "broken", "scripts/update-vendor.sh --check-only", "reported drift in a form this report cannot read"));
+  // Nothing confirmed either way is not a clean week.
+  if (exit === 2 && verified === 0) return [rec("vendor", "broken", "scripts/update-vendor.sh --check-only", "could not verify a single package or model (registry unreachable?)")];
   return out;
 }
 
@@ -90,6 +102,8 @@ export function linkRecords(json, exit) {
     else if (r.result === "unverifiable") out.push(rec("links", "note", r.url, `could not be verified (${r.detail}), ${where}`));
   }
   if (exit === 1 && !out.some((r) => r.kind === "finding")) out.push(rec("links", "broken", "scripts/link-check.mjs", "exited 1 but listed no broken link"));
+  const unreachable = (r) => r.result === "unverifiable" && /^(timeout|network error)/.test(r.detail);
+  if (json.results.length && json.results.every(unreachable)) return [rec("links", "broken", "scripts/link-check.mjs", `none of the ${json.results.length} links answered (timeout or network error); the network is probably down`)];
   return out;
 }
 
@@ -99,7 +113,8 @@ export function dueRecords(json, exit) {
     return [rec("due", "broken", "scripts/registers-lint.mjs --due-within", `exited ${exit} without a readable list`)];
   }
   const out = json.items.map((i) => rec("due", "finding", i.where,
-    `${i.what}: due ${i.due}, ${i.daysLeft < 0 ? `${-i.daysLeft} days overdue` : i.daysLeft === 0 ? "due today" : `in ${i.daysLeft} days`}`));
+    `${i.what}: due ${i.due}, ${i.daysLeft < 0 ? `${-i.daysLeft} days overdue` : i.daysLeft === 0 ? "due today" : `in ${i.daysLeft} days`}`,
+    `due|${i.where}|${i.what}|${i.due}`));
   for (const p of json.problems) out.push(rec("due", "finding", ".claude/", p));
   return out;
 }
@@ -142,7 +157,7 @@ export function parseRecords(text) {
     try {
       const r = JSON.parse(line);
       if (!["finding", "broken", "note"].includes(r.kind)) throw new Error("bad kind");
-      out.push(rec(r.check, r.kind, r.subject, r.message));
+      out.push(rec(r.check, r.kind, r.subject, r.message, typeof r.key === "string" ? r.key : undefined));
     } catch { out.push(rec("sentinel", "broken", "findings.jsonl", `line ${i + 1} is not a valid record`)); }
   }
   return out;
@@ -171,25 +186,57 @@ function grouped(records) {
   return out;
 }
 
+// ---- digest: comment only when the set of findings changed ----
+// The digest covers the keys of findings and broken checks, sorted and
+// deduplicated, so the order of the checks, the run date and the run id never
+// change it. It sits in the issue body as an HTML comment.
+export function findingsDigest(records) {
+  const keys = [...new Set(records.filter((r) => r.kind !== "note").map((r) => r.key))].sort();
+  return createHash("sha256").update(keys.join("\n")).digest("hex").slice(0, 32);
+}
+const DIGEST_RE = /<!-- sentinel-digest: ([0-9a-f]{8,64}) -->/;
+export function digestLine(digest) { return `<!-- sentinel-digest: ${digest} -->`; }
+export function readDigest(body) { const m = DIGEST_RE.exec(body || ""); return m ? m[1] : ""; }
+// The new body always replaces the old one; a comment (which is what notifies)
+// goes out only for a new issue or a changed set of findings.
+export function shouldComment({ previousBody, body }) {
+  if (previousBody === null || previousBody === undefined || !String(previousBody).trim()) return true;
+  const before = readDigest(previousBody), now = readDigest(body);
+  return !before || !now || before !== now;
+}
+
+// GitHub rejects an issue body or comment over 65536 characters.
+export const TEXT_LIMIT = 60000;
+export function truncate(text, runUrl, limit = TEXT_LIMIT) {
+  if (text.length <= limit) return text;
+  const tail = `\n\n_The report was cut at about ${limit} characters. The full report is in the [run log](${runUrl})._\n`;
+  let cut = text.slice(0, Math.max(0, limit - tail.length));
+  const nl = cut.lastIndexOf("\n");
+  if (nl > 0) cut = cut.slice(0, nl);
+  return cut + tail;
+}
+
 export function buildReport({ records, event, dryRun = false, runUrl, sha = "", date }) {
   const findings = records.filter((r) => r.kind === "finding");
   const broken = records.filter((r) => r.kind === "broken");
   const notes = records.filter((r) => r.kind === "note");
   const decision = decide({ event, dryRun, records });
-  const head = [`## ${ISSUE_TITLE}`, "", `Latest run with findings: ${escapeText(date)}, [run log](${runUrl})${sha ? `, commit ${code(sha.slice(0, 8))}` : ""}.`, ""];
+  const digest = findingsDigest(records);
+  const head = [digestLine(digest), "", `## ${ISSUE_TITLE}`, "", `Latest run with findings: ${escapeText(date)}, [run log](${runUrl})${sha ? `, commit ${code(sha.slice(0, 8))}` : ""}.`, ""];
   const bodyLines = [...head];
   if (broken.length) bodyLines.push(`### Checks that could not run (${broken.length})`, "", ...grouped(broken));
   if (findings.length) bodyLines.push(`### Findings (${findings.length})`, "", ...grouped(findings));
   if (!broken.length && !findings.length) bodyLines.push("No findings.", "");
   bodyLines.push("This body is replaced on every run that has findings. Each such run also adds one comment.", "");
-  const body = bodyLines.join("\n");
-  const comment = [`${escapeText(date)}: ${findings.length} finding(s)${broken.length ? `, ${broken.length} check(s) could not run` : ""}. [Run log](${runUrl})`, "",
+  const body = truncate(bodyLines.join("\n"), runUrl);
+  const commentText = [`${escapeText(date)}: ${findings.length} finding(s)${broken.length ? `, ${broken.length} check(s) could not run` : ""}. [Run log](${runUrl})`, "",
     ...[...broken, ...findings].map(line), ""].join("\n");
+  const comment = truncate(commentText, runUrl);
   // The decision comes first; on a pull request or dry run it reads "would
   // update the issue" and the body that would be written follows.
   const summary = [`**Issue:** ${escapeText(decision.reason)}`, "", body,
     ...(notes.length ? [`### Notes for this run only (${notes.length})`, "", ...grouped(notes)] : []), ""].join("\n");
-  return { body, comment, summary, write: decision.write, broken: broken.length > 0, decision };
+  return { body, comment, summary, digest, write: decision.write, broken: broken.length > 0, decision };
 }
 
 // ---- command line ----
@@ -209,7 +256,7 @@ const num = (v) => (v === undefined || v === true || !/^-?\d+$/.test(String(v)) 
 function main(argv) {
   const [cmd, kind] = argv;
   const o = args(argv.slice(1));
-  if (!o.findings) { console.error("[sentinel-report] --findings <file> is required"); return 2; }
+  if (!o.findings && cmd !== "should-comment") { console.error("[sentinel-report] --findings <file> is required"); return 2; }
   if (cmd === "add") {
     let records;
     if (kind === "vendor") records = vendorRecords(readOr(o.log), num(o.exit));
@@ -226,8 +273,17 @@ function main(argv) {
     console.log(`[sentinel-report] ${kind}: ${records.filter((r) => r.kind === "finding").length} finding(s), ${records.filter((r) => r.kind === "broken").length} broken, ${records.filter((r) => r.kind === "note").length} note(s)`);
     return 0;
   }
+  if (cmd === "should-comment") {
+    // Prints true or false: --previous is the issue body now on GitHub (missing or empty means no issue yet).
+    const previous = o.previous && existsSync(o.previous) ? readFileSync(o.previous, "utf8") : null;
+    console.log(String(shouldComment({ previousBody: previous, body: readOr(o.body) })));
+    return 0;
+  }
   if (cmd === "report") {
-    const r = buildReport({ records: parseRecords(readOr(o.findings)), event: String(o.event || ""), dryRun: o["dry-run"] === "true" || o["dry-run"] === true,
+    // No findings file means the checks never wrote anything: that is a broken sentinel, not a clean week.
+    const records = existsSync(o.findings) ? parseRecords(readFileSync(o.findings, "utf8"))
+      : [rec("sentinel", "broken", "findings.jsonl", "the findings file is missing, so no check recorded a result")];
+    const r = buildReport({ records, event: String(o.event || ""), dryRun: o["dry-run"] === "true" || o["dry-run"] === true,
       runUrl: String(o["run-url"] || ""), sha: String(o.sha || ""), date: String(o.date || "") });
     if (o.summary) appendFileSync(o.summary, r.summary + "\n");
     if (o.body) writeFileSync(o.body, r.body);
@@ -240,4 +296,10 @@ function main(argv) {
   return 2;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) process.exitCode = main(process.argv.slice(2));
+// True when this file is the entry point, also when it was started through a
+// symlink (argv[1] is the link; import.meta.url is the resolved file).
+function isMainModule() {
+  try { return !!process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url); } catch { return false; }
+}
+
+if (isMainModule()) process.exitCode = main(process.argv.slice(2));
