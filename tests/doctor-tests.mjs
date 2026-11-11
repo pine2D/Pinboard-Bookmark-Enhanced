@@ -121,13 +121,16 @@ test('file count: over the limit warns; .git is not counted', () => {
   assert.equal(over.status, 'warn'); assert.match(over.line, new RegExp(`${n} files.*over the ${n - 1} limit`));
 });
 
-test('qa-stray: untracked output files at the .qa-scan top level are listed; tracked and kept ones are not', () => {
+test('qa-stray: untracked entries at the .qa-scan top level are listed, whatever their name; tracked and kept ones are not', () => {
   const d = sandbox();
   assert.equal(statusOf(d, 'qa-stray').status, 'ok');
-  put(d, '.qa-scan/run.log', 'x'); put(d, '.qa-scan/shot.png', 'x'); put(d, '.qa-scan/report/a.html', 'x'); put(d, '.qa-scan/promo-video/out.mp4', 'x');
+  put(d, '.qa-scan/run.log', 'x'); put(d, '.qa-scan/Q3 notes (copy)', 'x'); put(d, '.qa-scan/report/a.html', 'x'); put(d, '.qa-scan/promo-video/out.mp4', 'x');
   const s = statusOf(d, 'qa-stray');
-  assert.equal(s.status, 'warn'); assert.match(s.line, /^3 untracked/); assert.match(s.line, /report, run\.log, shot\.png/);
+  assert.equal(s.status, 'warn'); assert.match(s.line, /^3 untracked entries/); assert.match(s.line, /Q3 notes \(copy\), report, run\.log/);
   assert.doesNotMatch(s.line, /run-test|package|node_modules|promo-video/);
+  // A file git does not ignore is just as stray as an ignored one.
+  put(d, '.gitignore', '.fake-chrome\n.qa-scan/node_modules\n');
+  assert.match(statusOf(d, 'qa-stray').line, /^3 untracked entries/);
 });
 
 test('tags: offline and no origin skip; missing release tags warn; an unreachable origin is a failure, not "none missing"', () => {

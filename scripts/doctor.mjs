@@ -34,10 +34,9 @@ tags against origin, register items due within 14 days, baseline sizes.
 const FILE_LIMIT_DEFAULT = 20000;
 const DUE_WITHIN = 14;
 const HOOKS = [["pre-commit", "pre-commit-hook.sh"], ["commit-msg", "commit-msg-hook.sh"]];
-// .qa-scan/ holds tool dependencies and the promo video project; anything else
-// untracked that looks like output belongs in $PBP_QA_REPORT_DIR.
+// .qa-scan/ holds tool dependencies and the promo video project (CLAUDE.md);
+// anything else untracked there belongs in $PBP_QA_REPORT_DIR.
 const QA_KEEP = new Set(["node_modules", "promo-video"]);
-const ARTIFACT_RE = /\.(log|png|jpe?g|webp|gif|mp4|webm|mov|html|txt|jsonl|zip|trace|har)$|report|screenshot|shots?$|trace/i;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -129,15 +128,17 @@ function checkFileCount() {
 }
 
 function checkQaStray() {
-  const dir = join(ROOT, ".qa-scan");
-  if (!existsSync(dir)) return skip("qa-stray", ".qa-scan/ does not exist");
-  const tracked = git(["ls-files", "--", ".qa-scan"]);
-  if (!tracked.ok) return warn("qa-stray", "git ls-files failed, so stray files were not checked", "git ls-files -- .qa-scan");
-  const trackedTop = new Set(tracked.out.split("\n").filter(Boolean).map((f) => f.split("/")[1]));
-  const stray = readdirSync(dir).filter((name) => !trackedTop.has(name) && !QA_KEEP.has(name) && ARTIFACT_RE.test(name)).sort();
-  if (!stray.length) return ok("qa-stray", "no stray logs, screenshots or reports in .qa-scan/");
+  if (!existsSync(join(ROOT, ".qa-scan"))) return skip("qa-stray", ".qa-scan/ does not exist");
+  // Untracked entries at the top of .qa-scan/, ignored or not, as git sees them;
+  // only the tool dependencies and the promo video project belong there.
+  const plain = git(["ls-files", "--others", "--directory", "--exclude-standard", "--", ".qa-scan"]);
+  const ignored = git(["ls-files", "--others", "--directory", "--ignored", "--exclude-standard", "--", ".qa-scan"]);
+  if (!plain.ok || !ignored.ok) return warn("qa-stray", "git ls-files failed, so stray files were not checked", "git ls-files --others -- .qa-scan");
+  const top = new Set(`${plain.out}\n${ignored.out}`.split("\n").filter(Boolean).map((f) => f.split("/")[1]).filter(Boolean));
+  const stray = [...top].filter((name) => !QA_KEEP.has(name)).sort();
+  if (!stray.length) return ok("qa-stray", "nothing untracked in .qa-scan/ besides node_modules and promo-video");
   const shown = stray.slice(0, 5).join(", ") + (stray.length > 5 ? ", ..." : "");
-  return warn("qa-stray", `${stray.length} untracked output file(s) in .qa-scan/: ${shown}`, "move them to \"$PBP_QA_REPORT_DIR\" (default ~/.local/share/pbp-qa-report)");
+  return warn("qa-stray", `${stray.length} untracked entr${stray.length === 1 ? "y" : "ies"} in .qa-scan/: ${shown}`, "move logs, screenshots and reports to \"$PBP_QA_REPORT_DIR\" (default ~/.local/share/pbp-qa-report); keep only node_modules and promo-video there");
 }
 
 const RELEASE_TAG = /^v\d+\.\d+\.\d+$/;
