@@ -7,7 +7,7 @@
 #
 # Installed as .git/hooks/pre-commit via scripts/setup-hooks.sh
 # Trigger groups, from two `git diff --cached` listings (the second one also
-# sees deletions). The first two are described here; the registers, rules-lint,
+# sees deletions). The first two are described here; the registers, doctor, rules-lint,
 # JS, eslint-baseline, slice-anchor, audit-scope and verify-groups groups are described next
 # to their variables below:
 #   THEME_RE -- theme-factory sources, pinboard-themes.js and the three
@@ -50,13 +50,15 @@ JS_ROOT_CHANGED=$(printf '%s\n' "$JS_CHANGED" | grep -E '^[^/]+\.js$')
 ESLINT_BASELINE_STAGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^scripts/eslint-suppressions\.json$')
 ESLINT_RULE_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(eslint\.config\.mjs|scripts/eslint-rules/[^/]+\.mjs|scripts/eslint-suppressions\.json|tests/eslint-silent-catch-tests\.mjs)$')
 ESLINT_TOOLS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/eslint-baseline-check\.mjs|tests/eslint-baseline-tests\.mjs)$')
+# Doctor group: the local setup doctor, its self-test and the registers code it imports.
+DOCTOR_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(doctor|registers-lint|docs-lint)\.mjs|tests/doctor-tests\.mjs)$')
 VERIFY_GROUPS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(verify\.sh|run-html-suites\.mjs|flake-record\.mjs)|tests/verify-groups-tests\.mjs)$')
 # Slice-anchor group: any test file, the lint, its self-test or its baseline
 # (deletions too: dropping the baseline and adding it back would reset it).
 SLICE_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(tests/.+\.(html|mjs|js)|scripts/slice-anchor-(lint\.mjs|baseline\.json))$')
 SLICE_BASELINE_STAGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^scripts/slice-anchor-baseline\.json$')
 SLICE_TOOLS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/slice-anchor-lint\.mjs|tests/slice-anchor-lint-tests\.mjs)$')
-if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ]; then
+if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ]; then
   exit 0
 fi
 
@@ -73,6 +75,15 @@ if [ -n "$REGISTERS_CHANGED" ]; then
   if ! node "$REPO_ROOT/scripts/registers-lint.mjs" || ! node "$REPO_ROOT/tests/registers-lint-tests.mjs"; then
     echo ""
     echo "[registers] COMMIT BLOCKED — a register file breaks its format or expiry rule (see the message above)" >&2
+    exit 1
+  fi
+fi
+
+if [ -n "$DOCTOR_CHANGED" ]; then
+  echo "[doctor] checking the local setup doctor in throwaway repos"
+  if ! node "$REPO_ROOT/tests/doctor-tests.mjs"; then
+    echo ""
+    echo "[doctor] COMMIT BLOCKED — the doctor self-test failed (see the message above)" >&2
     exit 1
   fi
 fi

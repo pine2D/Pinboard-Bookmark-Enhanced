@@ -141,9 +141,13 @@ const SLICE_COMMANDS = ['node scripts/slice-anchor-lint.mjs', 'node tests/slice-
 const afterEslintBaseline = OLD_LABELS.findIndex((l) => l.startsWith('[eslint-baseline]')) + 1;
 // Reworded 2026-11-11: the registers stage names the fifth register, freshness-ledger.md.
 const REGISTERS_LABEL_OLD = "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger, store ledger) + lint self-tests";
+const DOCTOR_LABEL = '[doctor] checking the read-only local setup doctor in throwaway repos';
 const REGISTERS_LABEL = "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger, store ledger, freshness ledger) + lint self-tests";
 const EXPECTED_LABELS = [OLD_LABELS[0], NEW_LABEL, ...OLD_LABELS.slice(1, afterEslintBaseline), SLICE_LABEL, ...OLD_LABELS.slice(afterEslintBaseline)]
-  .map((l) => (l === REGISTERS_LABEL_OLD ? REGISTERS_LABEL : l));
+  .map((l) => (l === REGISTERS_LABEL_OLD ? REGISTERS_LABEL : l))
+  // Added 2026-11-11, right after the registers whose parser they share: the
+  // local doctor's self-test.
+  .flatMap((l) => (l === REGISTERS_LABEL ? [l, DOCTOR_LABEL] : [l]));
 const JOURNEY_STAGES = ['bookmark-services', 'ask-history', 'selection', 'draft', 'options-save', 'translate-stop',
   'layouts', 'journey', 'discovery', 'reader-save-export'];
 
@@ -196,6 +200,10 @@ test('every gate of the pre-split script is still listed', () => {
   const missing = OLD_FIXED_COMMANDS.filter((c) => !listed.has(c));
   assert.deepEqual(missing, []);
   assert.equal(new Set(OLD_FIXED_COMMANDS).size, OLD_FIXED_COMMANDS.length, 'the frozen list has no repeats');
+});
+
+test('the doctor self-test runs in the static group', () => {
+  assert.ok(full.commands.some((x) => x.command === 'node tests/doctor-tests.mjs' && x.group === 'static'));
 });
 
 test('the slice-anchor gate runs in the static group', () => {
