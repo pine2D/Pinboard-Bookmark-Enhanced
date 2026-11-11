@@ -17,7 +17,7 @@
 // Loopback, example domains and URL templates are skipped; URLs inside code
 // spans and fenced code are not links and are not read at all.
 // Exit 0 when nothing is broken, 1 when something is, 2 when a file cannot be read.
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -49,11 +49,14 @@ export function extractLinks(markdown) {
 
 const SKIP_HOSTS = /^(localhost|127(?:\.\d+){3}|0\.0\.0\.0|\[::1\]|::1)$|(^|\.)example\.(com|org|net)$|\.(example|invalid|test|localhost)$/i;
 // Why a link is not checked, or "" when it is.
-export function skipReason(url) {
+// PBP_LINK_CHECK_ALLOW_LOOPBACK=1 lets the command-line tests point links at a
+// local server; nothing else sets it.
+export function skipReason(url, { allowLoopback = process.env.PBP_LINK_CHECK_ALLOW_LOOPBACK === "1" } = {}) {
   if (/[{}$<>*]|%7B|%7D/i.test(url)) return "template";
   let u;
   try { u = new URL(url); } catch { return "not a URL"; }
   if (u.protocol !== "http:" && u.protocol !== "https:") return "not http";
+  if (allowLoopback && u.hostname === "127.0.0.1") return "";
   if (SKIP_HOSTS.test(u.hostname)) return "loopback or example";
   if (!u.hostname.includes(".")) return "no public host";
   return "";
@@ -163,6 +166,12 @@ async function main(argv) {
   return count("broken") ? 1 : 0;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+// True when this file is the entry point, also when it was started through a
+// symlink (argv[1] is the link; import.meta.url is the resolved file).
+function isMainModule() {
+  try { return !!process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url); } catch { return false; }
+}
+
+if (isMainModule()) {
   process.exitCode = await main(process.argv.slice(2));
 }

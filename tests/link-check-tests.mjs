@@ -23,6 +23,7 @@ const server = createServer((req, res) => {
     case '/missing': return send(404);
     case '/gone': return send(410);
     case '/no-head': return req.method === 'HEAD' ? send(405) : send(200);
+    case '/head-not-implemented': return req.method === 'HEAD' ? send(501) : send(200);
     case '/head-forbidden-get-ok': return req.method === 'HEAD' ? send(403) : send(200);
     case '/forbidden': return send(403);
     case '/auth': return send(401);
@@ -55,6 +56,10 @@ test('404 and 410 are broken, without retrying', async () => {
     const r = await check(p);
     assert.equal(r.result, 'broken', p); assert.equal(r.tries, 1, p);
   }
+});
+test('HEAD 501 falls back to GET', async () => {
+  assert.equal((await check('/head-not-implemented')).result, 'ok');
+  assert.deepEqual(methods('/head-not-implemented'), ['HEAD', 'GET']);
 });
 test('HEAD 405 or 403 falls back to GET', async () => {
   assert.equal((await check('/no-head')).result, 'ok');
@@ -124,5 +129,24 @@ test('cli: a file with only skipped links makes no request and exits 0; --json w
     const j = JSON.parse(readFileSync(out, 'utf8'));
     assert.deepEqual(j.results, []); assert.equal(j.skipped.length, 2);
     assert.equal(spawnSync(process.execPath, [join(ROOT, 'scripts/link-check.mjs'), join(dir, 'missing.md')], { encoding: 'utf8' }).status, 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('cli: exits 1 when a link is broken, 0 when the rest is only unverifiable', async () => {
+  const { spawn } = await import('node:child_process');
+  const dir = mkdtempSync(join(tmpdir(), 'pbp-link-check-cli-'));
+  // The server runs in this process, so the CLI is spawned asynchronously.
+  const cli = (file) => new Promise((done) => {
+    const c = spawn(process.execPath, [join(ROOT, 'scripts/link-check.mjs'), file], { env: { ...process.env, PBP_LINK_CHECK_ALLOW_LOOPBACK: '1' } });
+    let out = ''; c.stdout.on('data', (b) => { out += b; }); c.stderr.on('data', (b) => { out += b; });
+    c.on('close', (status) => done({ status, out }));
+  });
+  try {
+    writeFileSync(join(dir, 'bad.md'), `[a](${base}/ok) [b](${base}/missing) [c](${base}/forbidden)\n`);
+    writeFileSync(join(dir, 'meh.md'), `[a](${base}/ok) [c](${base}/forbidden) [d](${base}/busy)\n`);
+    const bad = await cli(join(dir, 'bad.md'));
+    assert.equal(bad.status, 1, bad.out); assert.match(bad.out, /broken 1, unverifiable 1/);
+    const meh = await cli(join(dir, 'meh.md'));
+    assert.equal(meh.status, 0, meh.out); assert.match(meh.out, /broken 0, unverifiable 2/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
