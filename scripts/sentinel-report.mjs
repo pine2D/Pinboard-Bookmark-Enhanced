@@ -227,7 +227,7 @@ export function buildReport({ records, event, dryRun = false, runUrl, sha = "", 
   if (broken.length) bodyLines.push(`### Checks that could not run (${broken.length})`, "", ...grouped(broken));
   if (findings.length) bodyLines.push(`### Findings (${findings.length})`, "", ...grouped(findings));
   if (!broken.length && !findings.length) bodyLines.push("No findings.", "");
-  bodyLines.push("This body is replaced on every run that has findings. Each such run also adds one comment.", "");
+  bodyLines.push("This body is replaced on every run that has findings. A comment is added only when the set of findings changes.", "");
   const body = truncate(bodyLines.join("\n"), runUrl);
   const commentText = [`${escapeText(date)}: ${findings.length} finding(s)${broken.length ? `, ${broken.length} check(s) could not run` : ""}. [Run log](${runUrl})`, "",
     ...[...broken, ...findings].map(line), ""].join("\n");
