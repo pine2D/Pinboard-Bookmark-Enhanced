@@ -50,7 +50,9 @@ pipeline segments by rendered DOM blocks, so treat shares as estimates.
 <div id="hits"></div>
 
 <script>
-window.chrome = window.chrome || {
+// A full Chrome build gives every page a window.chrome with only loadTimes/csi/app,
+// so test for the extension API itself; the headless shell has no window.chrome at all.
+window.chrome = (window.chrome && window.chrome.i18n) ? window.chrome : {
   i18n: { getMessage: () => "" },
   storage: { local: { get: async (d) => d || {} } }
 };

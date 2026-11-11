@@ -23,7 +23,9 @@ h2 { margin-top: 24px; font-size: 16px; }
 <script src="../vendor/purify.min.js"></script>
 <script src="../md-convert.js"></script>
 <script>
-window.chrome = window.chrome || {
+// A full Chrome build gives every page a window.chrome with only loadTimes/csi/app,
+// so test for the extension API itself; the headless shell has no window.chrome at all.
+window.chrome = (window.chrome && window.chrome.i18n) ? window.chrome : {
   i18n: { getMessage: () => "" },
   storage: { local: { get: async (defaults) => defaults || {} } }
 };
