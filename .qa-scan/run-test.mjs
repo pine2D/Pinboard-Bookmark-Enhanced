@@ -27,6 +27,9 @@
 // registered page that never reaches its count is UNCONFIRMED, exit 1, even if it
 // announced its end below that count (the message says so). It edits nothing and
 // leaves the normal mode untouched; exit 0 unless the page could not be measured.
+//        PBP_BROWSER_EXECUTABLE=<path> node .qa-scan/run-test.mjs tests/<file>.html
+// PBP_BROWSER_EXECUTABLE (the weekly sentinel) launches that browser binary
+// instead of the bundled Chromium. Unset or empty, nothing changes.
 //        PBP_COVERAGE_DIR=<dir> node .qa-scan/run-test.mjs tests/<file>.html
 // PBP_COVERAGE_DIR (dev tool, scripts/coverage-report.mjs) also records V8 JS
 // coverage for the page and writes <dir>/<page>.json: url + per-function
@@ -41,6 +44,7 @@ const argv = process.argv.slice(2);
 const printCounts = argv.includes("--print-counts");
 const onlyFilter = (process.env.PBP_ONLY || "").trim();
 const coverageDir = (process.env.PBP_COVERAGE_DIR || "").trim();
+const browserExecutable = (process.env.PBP_BROWSER_EXECUTABLE || "").trim();
 if (onlyFilter && printCounts) {
   console.error("ERROR: PBP_ONLY cannot be combined with --print-counts (a filtered page has no row count to print)");
   process.exit(2);
@@ -232,7 +236,7 @@ try {
 
   const dom = await bounded("test", TEST_TIMEOUT_MS, async () => {
     const taskStartedAt = Date.now();
-    browser = await chromium.launch();
+    browser = await (browserExecutable ? chromium.launch({ executablePath: browserExecutable }) : chromium.launch());
     browser.once("disconnected", () => { browserDisconnected = true; });
     const page = await browser.newPage();
     page.on("pageerror", (error) => runtimeErrors.push("PAGEERROR: " + error.message));

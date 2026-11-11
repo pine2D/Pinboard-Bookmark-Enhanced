@@ -17,6 +17,9 @@
 //   node scripts/zip-install-smoke.mjs
 //   node scripts/zip-install-smoke.mjs --zip release/pinboard-bookmark-enhanced-v2.71.zip
 //   node scripts/zip-install-smoke.mjs --keep-tmp  # leave extracted dir for inspection
+//   PBP_BROWSER_EXECUTABLE=<path> node scripts/zip-install-smoke.mjs  # another browser binary
+//     (the weekly sentinel runs Chrome for Testing this way; unset or empty
+//     means the bundled Chromium, as before)
 //
 // EXIT
 //   0 → all checks passed
@@ -199,7 +202,9 @@ console.log(`  present: ${REQUIRED_RUNTIME_FILES.join(', ')}`);
 console.log('[zip-smoke] launching Chromium with extension loaded...');
 let ctx;
 try {
+  const browserExecutable = (process.env.PBP_BROWSER_EXECUTABLE || '').trim();
   ctx = await chromium.launchPersistentContext(userDataDir, {
+    ...(browserExecutable ? { executablePath: browserExecutable } : {}),
     headless: false, // MV3 extensions require headed (or 'new' headless on recent Chrome)
     args: [
       `--disable-extensions-except=${extPath}`,
