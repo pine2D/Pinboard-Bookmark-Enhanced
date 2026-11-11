@@ -39,7 +39,10 @@ UI_HTML_CHANGED=$(printf '%s
 UI_VOCAB_CHANGED=$(printf '%s
 ' "$STAGED" | grep -E "$UI_VOCAB_RE")
 AUDIT_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(audit[^/]*|ui-render-audit|qa-drive|options-help-render-audit)\.mjs|tests/(audit[^/]*-tests|pinboard-theme-render-tests|render-audit-checklist)\.mjs|scripts/(verify|pre-commit-hook)\.sh)$')
-REGISTERS_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(\.claude/(decisions|acceptance-debt|flake-ledger|store-ledger)\.md|scripts/registers-lint\.mjs|tests/registers-lint-tests\.mjs)$')
+# Registers group: the five registers, the lint and its tests, plus the files
+# freshness-ledger.md is checked against (ai.js holds the provider registry,
+# shared.js loads before it) and docs-lint.mjs, whose 临时事项 parser the lint imports.
+REGISTERS_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(\.claude/(decisions|acceptance-debt|flake-ledger|store-ledger|freshness-ledger)\.md|scripts/(registers-lint|docs-lint)\.mjs|tests/registers-lint-tests\.mjs|ai\.js|shared\.js)$')
 RULES_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(CLAUDE\.md|AGENTS\.md|PRODUCT\.md|\.claude/rules/[^/]+\.md|\.claude/skills/.+|\.claude/expiring-items\.md|scripts/rules-lint(-allow)?\.(mjs|json)|tests/rules-lint-tests\.mjs)$')
 JS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '\.(js|mjs)$' | grep -vE '^vendor/')
 JS_ROOT_CHANGED=$(printf '%s\n' "$JS_CHANGED" | grep -E '^[^/]+\.js$')

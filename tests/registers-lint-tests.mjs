@@ -1,14 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import {
   lintDecisions, lintAcceptanceDebt, lintFlakeLedger, openAcceptanceItems,
-  lintStoreLedger, storeReadiness,
+  lintStoreLedger, storeReadiness, lintFreshness, loadProviderDefaults, repoFileInfo, dueItems,
+  FRESH_STALE_DAYS,
 } from '../scripts/registers-lint.mjs';
+import { tempItems } from '../scripts/docs-lint.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const today = '2026-11-10';
@@ -236,19 +239,149 @@ test('readiness: the gap is measured from the newest dated submission and ignore
   assert.doesNotMatch(gap([sb('3.0.4', '2026-11-05', '被拒', '2026-11-06', '原因')]), /已有 v3\.0\.4/);
 });
 
+// ---- freshness-ledger.md ----
+// A fixture registry: the default models are computed, so only evaluating
+// ai.js (not a regex over its text) reads them right.
+const FAKE_ROOT = {
+  'shared.js': 'const SETTINGS_DEFAULTS = { alphaModel: "a-1" };\n',
+  'ai.js': 'const OPENAI_COMPAT_PROVIDERS = {\n  alpha: { defaultModel: "a-" + (1) },\n  custom: { defaultModel: "" },\n};\n' +
+    'const _AI_BESPOKE_PROVIDERS = { beta: { defaultModel: ["b", "2"].join("-") } };\n',
+  'fixture-tests.html': '<!doctype html>\n<script>\nconst FAKE_REPLY = {};\n</script>\n',
+};
+const FM_HEAD = '| 服务商 | 默认模型 | 最近核实 | 备注 |\n|---|---|---|---|\n';
+const FF_HEAD = '| 服务 | 位置 | 最近核实 | 备注 |\n|---|---|---|---|\n';
+const fresh = (models, fixtures) => `# 核实台账\n\n## 默认模型\n\n${FM_HEAD}${models.join('\n')}\n\n## 远端夹具\n\n${FF_HEAD}${fixtures.join('\n')}\n`;
+const fm = (id, model, date = '未核实') => `| ${id} | ${model} | ${date} | - |`;
+const ff = (svc, place, date = '未核实') => `| ${svc} | ${place} | ${date} | - |`;
+const PROVIDERS = { alpha: 'a-1', beta: 'b-2' };
+const files = { 'tests/x-tests.html': 'one\ntwo\nconst FAKE_REPLY = 1;\n' };
+const FILE_INFO = (p) => (Object.hasOwn(files, p) ? { lines: files[p].split('\n').length, text: files[p] } : null);
+const lf = (text, opts = {}) => lintFreshness(text, { today, providers: PROVIDERS, fileInfo: FILE_INFO, ...opts });
+const okModels = [fm('alpha', 'a-1'), fm('beta', 'b-2')];
+
+test('freshness: valid sample passes and counts 未核实 rows', () => {
+  const r = lf(fresh(okModels, [ff('Svc', 'tests/x-tests.html', '2026-11-01'), ff('Svc', 'tests/x-tests.html:3'), ff('Svc', 'tests/x-tests.html#FAKE_REPLY')]));
+  assert.deepEqual(r.errors, []); assert.deepEqual(r.warnings, []);
+  assert.equal(r.unverified, 4);
+});
+test('freshness: a malformed row, a bad date and a future date fail', () => {
+  assert.match(lf(fresh(okModels, ['| Svc | tests/x-tests.html | 未核实 |'])).errors.join('\n'), /3 格，应为 4 格/);
+  assert.match(lf(fresh(okModels, [ff('Svc', 'tests/x-tests.html', '2026-02-30')])).errors.join('\n'), /不是合法的 YYYY-MM-DD/);
+  assert.match(lf(fresh(okModels, [ff('Svc', 'tests/x-tests.html', 'last week')])).errors.join('\n'), /不是合法的 YYYY-MM-DD/);
+  assert.match(lf(fresh(okModels, [ff('Svc', 'tests/x-tests.html', '2026-11-11')])).errors.join('\n'), /晚于今天/);
+  assert.match(lf(fresh([fm('alpha', 'a-1', '2026-11-11'), fm('beta', 'b-2')], [])).errors.join('\n'), /晚于今天/);
+  assert.equal(lf(fresh(okModels, [ff('Svc', 'tests/x-tests.html', today)])).errors.length, 0, 'today is not in the future');
+});
+test('freshness: a 位置 that does not exist, or points past the file, fails', () => {
+  const err = (place) => lf(fresh(okModels, [ff('Svc', place)])).errors.join('\n');
+  assert.match(err('tests/gone-tests.html'), /不存在/);
+  assert.match(err('tests/x-tests.html:99'), /没有第 99 行/);
+  assert.match(err('tests/x-tests.html#NO_SUCH'), /找不到夹具名/);
+  for (const bad of ['/abs/tests/x-tests.html', '../tests/x-tests.html', 'tests/../tests/x-tests.html', 'tests/x-tests.html junk']) assert.match(err(bad), /相对路径/, bad);
+});
+test('freshness: a missing provider, an extra provider and a changed default model fail', () => {
+  assert.match(lf(fresh([fm('alpha', 'a-1')], [])).errors.join('\n'), /服务商 beta（默认模型 b-2）.*没有行/);
+  assert.match(lf(fresh([...okModels, fm('gone', 'g-1')], [])).errors.join('\n'), /gone 在 ai\.js 里已经没有了/);
+  const changed = lf(fresh([fm('alpha', 'a-0', '2026-11-01'), fm('beta', 'b-2')], [])).errors.join('\n');
+  assert.match(changed, /alpha 的默认模型在 ai\.js 里是 a-1，这里写的是 a-0/);
+  assert.match(lf(fresh([...okModels, fm('alpha', 'a-1')], [])).errors.join('\n'), /alpha 重复/);
+});
+test('freshness: older than 90 days warns and never fails; 90 days is still fresh', () => {
+  const old = lf(fresh([fm('alpha', 'a-1', '2026-08-11'), fm('beta', 'b-2')], [ff('Svc', 'tests/x-tests.html', '2026-01-01')]));
+  assert.deepEqual(old.errors, []);
+  assert.equal(old.warnings.length, 2); assert.match(old.warnings[0], /91 天/);
+  assert.equal(old.stale.length, 2);
+  const edge = lf(fresh([fm('alpha', 'a-1', '2026-08-12'), fm('beta', 'b-2')], []));
+  assert.deepEqual(edge.warnings, []); assert.equal(FRESH_STALE_DAYS, 90);
+});
+test('freshness: both tables are required and the headers are fixed', () => {
+  assert.match(lf('# x\n\n## 默认模型\n\n' + FM_HEAD + okModels.join('\n') + '\n').errors.join('\n'), /缺少「## 远端夹具」/);
+  assert.match(lf(fresh(okModels, []).replace('| 服务 | 位置 |', '| 服务 | 文件 |')).errors.join('\n'), /表头必须是/);
+  assert.match(lf(fresh(okModels, []) + '\n## 其他\n\n' + FF_HEAD).errors.join('\n'), /只允许在/);
+});
+test('freshness: the registry is read by evaluating ai.js, not by matching its text', () => withDir(FAKE_ROOT, (d) => {
+  assert.deepEqual(loadProviderDefaults(d), { alpha: 'a-1', beta: 'b-2' });
+}));
+test('freshness: the real registry has every provider row, and the real ledger matches it', () => {
+  const real = loadProviderDefaults(ROOT);
+  assert.ok(Object.keys(real).length >= 10, 'the real registry lists the built-in providers');
+  assert.ok(!Object.hasOwn(real, 'custom'));
+  for (const m of Object.values(real)) assert.ok(m.length > 0);
+  const r = lintFreshness(readFileSync(join(ROOT, '.claude/freshness-ledger.md'), 'utf8'), { today: '2026-11-11', providers: real, fileInfo: repoFileInfo(ROOT) });
+  assert.deepEqual(r.errors, []);
+  const dropOne = { ...real, zz_new_provider: 'zz-1' };
+  assert.match(lintFreshness(readFileSync(join(ROOT, '.claude/freshness-ledger.md'), 'utf8'), { today: '2026-11-11', providers: dropOne, fileInfo: repoFileInfo(ROOT) }).errors.join('\n'), /zz_new_provider/);
+});
+
+// ---- 临时事项 parser shared with docs-lint, and the due-soon list ----
+const TEMP = (lines) => `# x\n\n## 临时事项（说明）\n\n${lines.join('\n')}\n\n## 别的\n\n- **不算（到期日 2000-01-01）**\n`;
+test('tempItems: kinds and dates, only inside the section', () => {
+  const items = tempItems(TEMP(['- （甲已于 2026-01-01 退役）', '- **乙（到期日 2026-11-20）**：说明', '- 丙没有标记', '- **丁（到期日 不定）**', '- **戊（到期日 2026-02-30）**', '  - 子项（到期日 2000-01-01）']));
+  assert.deepEqual(items.map((i) => [i.kind, i.due]), [['history', null], ['due', '2026-11-20'], ['no-marker', null], ['no-date', null], ['invalid-date', '2026-02-30']]);
+  assert.equal(items[1].title, '乙（到期日 2026-11-20）');
+  assert.equal(items[1].lineNo, 6);
+  assert.equal(tempItems('# 没有这一节\n'), null);
+});
+test('dueItems: due within N days or overdue, from all three sources, sorted', () => withDir({
+  ...FAKE_ROOT,
+  'expiring-items.md': TEMP(['- **近（到期日 2026-11-20）**', '- **远（到期日 2027-01-01）**', '- **过（到期日 2026-11-01）**']),
+  'acceptance-debt.md': debt([pend('A-001', '2026-11-24'), pend('A-002', '2026-11-25')]),
+  'freshness-ledger.md': fresh([fm('alpha', 'a-1', '2026-08-01'), fm('beta', 'b-2', '2026-10-01')], [ff('Fake', 'fixture-tests.html')]),
+}, (d) => {
+  const r = dueItems({ dir: d, root: d, today, within: 14 });
+  assert.deepEqual(r.problems, []);
+  // alpha was checked 2026-08-01, so it turned stale on 2026-10-30; A-002 (15 days) and 远 stay out.
+  assert.deepEqual(r.items.map((i) => [i.source, i.due, i.daysLeft]), [
+    ['freshness', '2026-10-30', -11], ['expiring-items', '2026-11-01', -9], ['expiring-items', '2026-11-20', 10], ['acceptance-debt', '2026-11-24', 14],
+  ]);
+  assert.match(r.items.find((i) => i.source === 'freshness').what, /alpha/);
+}));
+test('dueItems: an unreadable or malformed register is a problem, not an empty list', () => withDir({
+  ...FAKE_ROOT,
+  'expiring-items.md': TEMP(['- 没有标记']),
+  'freshness-ledger.md': fresh([fm('alpha', 'a-1')], []),
+}, (d) => {
+  const r = dueItems({ dir: d, root: d, today, within: 14 });
+  const all = r.problems.join('\n');
+  assert.match(all, /acceptance-debt\.md: 读不到文件/);
+  assert.match(all, /到期日写法不对/);
+  assert.match(all, /beta/);
+}));
+test('cli: --due-within --json lists items and exits 0; a problem exits 2; a bad number exits 2', () => withDir(set({
+  'expiring-items.md': TEMP(['- **近（到期日 2026-11-20）**']),
+}), (d) => {
+  const r = run(d, ['--due-within', '14', '--json']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const j = JSON.parse(r.stdout);
+  assert.equal(j.today, today); assert.equal(j.within, 14);
+  assert.deepEqual(j.items.map((i) => i.due), ['2026-11-20']);
+  assert.equal(run(d, ['--due-within', '5', '--json']).status, 0);
+  assert.deepEqual(JSON.parse(run(d, ['--due-within', '5', '--json']).stdout).items, []);
+  assert.equal(run(d, ['--due-within', 'soon']).status, 2);
+  const plain = run(d, ['--due-within', '14']);
+  assert.match(plain.stdout, /还有 10 天（2026-11-20）/);
+  rmSync(join(d, 'expiring-items.md'));
+  assert.equal(run(d, ['--due-within', '14', '--json']).status, 2);
+}));
+
 // ---- command line ----
 function withDir(files, fn) {
   const dir = mkdtempSync(join(tmpdir(), 'registers-lint-'));
   try {
-    for (const [name, body] of Object.entries(files)) writeFileSync(join(dir, name), body);
+    for (const [name, body] of Object.entries(files)) {
+      mkdirSync(dirname(join(dir, name)), { recursive: true });
+      writeFileSync(join(dir, name), body);
+    }
     return fn(dir);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 const run = (dir, args = [], todayStr = today) =>
   spawnSync('node', [join(ROOT, 'scripts/registers-lint.mjs'), ...args], {
-    encoding: 'utf8', env: { ...process.env, PBP_REGISTERS_DIR: dir, PBP_LINT_TODAY: todayStr },
+    encoding: 'utf8', env: { ...process.env, PBP_REGISTERS_DIR: dir, PBP_REPO_ROOT: dir, PBP_LINT_TODAY: todayStr },
   });
 const set = (over = {}) => ({
+  ...FAKE_ROOT,
+  'freshness-ledger.md': fresh([fm('alpha', 'a-1'), fm('beta', 'b-2')], [ff('Fake', 'fixture-tests.html')]),
   'decisions.md': decisions(DEC_OK),
   'acceptance-debt.md': debt([pend('A-001', '2026-12-10')]),
   'flake-ledger.md': flake(fl('甲', '未处理')),

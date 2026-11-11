@@ -139,7 +139,11 @@ const NEW_LABEL = '[verify-groups] checking that the verify groups cover every g
 const SLICE_LABEL = '[slice-anchor] counting tests that cut runtime source by a marker against the shrink-only baseline + lint self-test';
 const SLICE_COMMANDS = ['node scripts/slice-anchor-lint.mjs', 'node tests/slice-anchor-lint-tests.mjs'];
 const afterEslintBaseline = OLD_LABELS.findIndex((l) => l.startsWith('[eslint-baseline]')) + 1;
-const EXPECTED_LABELS = [OLD_LABELS[0], NEW_LABEL, ...OLD_LABELS.slice(1, afterEslintBaseline), SLICE_LABEL, ...OLD_LABELS.slice(afterEslintBaseline)];
+// Reworded 2026-11-11: the registers stage names the fifth register, freshness-ledger.md.
+const REGISTERS_LABEL_OLD = "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger, store ledger) + lint self-tests";
+const REGISTERS_LABEL = "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger, store ledger, freshness ledger) + lint self-tests";
+const EXPECTED_LABELS = [OLD_LABELS[0], NEW_LABEL, ...OLD_LABELS.slice(1, afterEslintBaseline), SLICE_LABEL, ...OLD_LABELS.slice(afterEslintBaseline)]
+  .map((l) => (l === REGISTERS_LABEL_OLD ? REGISTERS_LABEL : l));
 const JOURNEY_STAGES = ['bookmark-services', 'ask-history', 'selection', 'draft', 'options-save', 'translate-stop',
   'layouts', 'journey', 'discovery', 'reader-save-export'];
 

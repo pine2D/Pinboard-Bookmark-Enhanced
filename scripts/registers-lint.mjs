@@ -1,21 +1,27 @@
 #!/usr/bin/env node
-// Lint for the four registers under .claude/: decisions.md, acceptance-debt.md,
-// flake-ledger.md, store-ledger.md. Format contract: each file's header note and the Task 0
+// Lint for the five registers under .claude/: decisions.md, acceptance-debt.md,
+// flake-ledger.md, store-ledger.md, freshness-ledger.md. Format contract: each file's header note and the Task 0
 // brief. Expiry uses the same 14-day grace window as docs-lint's 临时事项 check:
 // overdue 1-14 days WARNs, more than 14 days FAILs.
 //
 // The lint* functions are pure (text + { today } in, { errors, warnings } out).
 // The CLI reads the files; PBP_LINT_TODAY and PBP_REGISTERS_DIR override the
-// date and the directory (command-line tests only).
+// date and the directory, and PBP_REPO_ROOT the tree that holds ai.js and the
+// fixture files freshness-ledger.md points at (command-line tests only).
 //
-//   node scripts/registers-lint.mjs                       check the four files
+//   node scripts/registers-lint.mjs                       check the five files
+//   node scripts/registers-lint.mjs --due-within 14 [--json]
+//                                                         list what is due within N days or overdue:
+//                                                         临时事项, acceptance debt, stale freshness rows
 //   node scripts/registers-lint.mjs --store-check 3.0.4   may this version go to the store yet?
 //   node scripts/registers-lint.mjs --release-gate        list 待验; exit 1 on overdue
 //   node scripts/registers-lint.mjs --release-gate --accept-debt
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
+import { tempItems } from "./docs-lint.mjs";
 
 export const GRACE_DAYS = 14;
 const DAY_MS = 86400000;
@@ -369,6 +375,161 @@ function releasedOn(version, repoRoot) {
   } catch { return ""; }
 }
 
+// ---- freshness-ledger.md ----
+// Every provider's factory-default model and every remote-API fixture carries
+// the day it was last checked against the real service. The provider list and
+// the default models come from ai.js itself (loadProviderDefaults), so a new
+// provider, a removed one or a changed default fails here until its row is
+// updated, and updating it is the moment to check it again.
+const FRESH_MODEL_HEADER = ["服务商", "默认模型", "最近核实", "备注"];
+const FRESH_FIXTURE_HEADER = ["服务", "位置", "最近核实", "备注"];
+export const FRESH_UNVERIFIED = "未核实";
+export const FRESH_STALE_DAYS = 90;
+const LOCATION_RE = /^([^\s:#]+)(?::(\d+)|#(\S+))?$/;
+
+// Evaluates shared.js and ai.js in a fresh context, the way
+// tests/bookmark-live-preflight-tests.mjs loads them, and reads the two
+// provider tables. Returns { id: defaultModel } without "custom" (user-added
+// endpoints have no factory default; scripts/rules-lint.mjs counts the same way).
+export function loadProviderDefaults(root) {
+  const ctx = vm.createContext({ console: { log() {}, warn() {}, error() {}, info() {}, debug() {} }, URL, TextEncoder, TextDecoder,
+    setTimeout, clearTimeout, btoa, atob, encodeURIComponent, decodeURIComponent, escape, unescape });
+  for (const file of ["shared.js", "ai.js"]) vm.runInContext(readFileSync(join(root, file), "utf8"), ctx, { filename: file });
+  const tables = vm.runInContext("({ compat: OPENAI_COMPAT_PROVIDERS, bespoke: _AI_BESPOKE_PROVIDERS })", ctx);
+  const out = {};
+  for (const table of [tables.compat, tables.bespoke]) {
+    for (const [id, cfg] of Object.entries(table)) {
+      if (id === "custom") continue;
+      out[id] = String(cfg.defaultModel);
+    }
+  }
+  return out;
+}
+
+// What a 位置 cell points at, for lintFreshness. null when the file is missing.
+export function repoFileInfo(root) {
+  return (rel) => {
+    const abs = join(root, rel);
+    if (!existsSync(abs) || !statSync(abs).isFile()) return null;
+    const text = readFileSync(abs, "utf8");
+    return { lines: text.split("\n").length, text };
+  };
+}
+
+function checkVerified(value, row, today, at, errors, warnings, stale, what) {
+  if (value === FRESH_UNVERIFIED) return 1;
+  if (!checkPastDate(value, "最近核实", row, today, at, errors)) return 0;
+  const age = daysBetween(today, value);
+  if (age > FRESH_STALE_DAYS) {
+    warnings.push(`${at(row.line)} ${what} 最近核实 ${value}，已过去 ${age} 天，超过 ${FRESH_STALE_DAYS} 天，有空时再核实一次`);
+    stale.push({ line: row.line, what, date: value, age });
+  }
+  return 0;
+}
+
+// Pure: text + { today, providers: { id: model }, fileInfo(path) -> null | { lines, text } }.
+// Returns { errors, warnings, unverified, stale }.
+export function lintFreshness(text, { today, providers, fileInfo }) {
+  const errors = [], warnings = [], stale = [];
+  let unverified = 0;
+  const at = (n) => `freshness-ledger.md:${n}:`;
+  const all = parseTables(text);
+  checkStructure(all, (h) => h === "默认模型" || h === "远端夹具", "「## 默认模型」和「## 远端夹具」", at, errors);
+  const models = all.find((t) => t.heading === "默认模型");
+  const fixtures = all.find((t) => t.heading === "远端夹具");
+  if (!models) errors.push("freshness-ledger.md: 缺少「## 默认模型」下的表");
+  else if (checkShape(models, FRESH_MODEL_HEADER, at, errors)) {
+    const seen = new Map();
+    for (const row of models.rows) {
+      if (!checkRow(row, FRESH_MODEL_HEADER, at, errors)) continue;
+      const [id, model, verified] = row.cells;
+      if (seen.has(id)) { errors.push(`${at(row.line)} 服务商 ${id} 重复，第 ${seen.get(id)} 行已有`); continue; }
+      seen.set(id, row.line);
+      if (!Object.hasOwn(providers, id)) { errors.push(`${at(row.line)} 服务商 ${id} 在 ai.js 里已经没有了，删掉这一行`); continue; }
+      if (providers[id] !== model) {
+        errors.push(`${at(row.line)} ${id} 的默认模型在 ai.js 里是 ${providers[id]}，这里写的是 ${model}。改成新模型，核实过再填日期，没核实就写 ${FRESH_UNVERIFIED}`);
+        continue;
+      }
+      unverified += checkVerified(verified, row, today, at, errors, warnings, stale, `${id} 的默认模型 ${model}`);
+    }
+    for (const id of Object.keys(providers)) {
+      if (!seen.has(id)) errors.push(`freshness-ledger.md: ai.js 里的服务商 ${id}（默认模型 ${providers[id]}）在「## 默认模型」里没有行`);
+    }
+  }
+  if (!fixtures) errors.push("freshness-ledger.md: 缺少「## 远端夹具」下的表");
+  else if (checkShape(fixtures, FRESH_FIXTURE_HEADER, at, errors)) {
+    const seen = new Map();
+    for (const row of fixtures.rows) {
+      if (!checkRow(row, FRESH_FIXTURE_HEADER, at, errors)) continue;
+      const [service, place, verified] = row.cells;
+      const key = `${service}\u0000${place}`;
+      if (seen.has(key)) { errors.push(`${at(row.line)} 「${service}」+「${place}」重复，第 ${seen.get(key)} 行已有`); continue; }
+      seen.set(key, row.line);
+      const m = LOCATION_RE.exec(place);
+      const path = m && m[1];
+      if (!m || isAbsolute(path) || normalize(path).startsWith("..") || normalize(path) !== path) {
+        errors.push(`${at(row.line)} 位置 "${place}" 要写仓库内的相对路径，可以带 :行号 或 #夹具名`);
+        continue;
+      }
+      const info = fileInfo(path);
+      if (!info) { errors.push(`${at(row.line)} 位置 ${path} 这个文件不存在`); continue; }
+      if (m[2] && Number(m[2]) > info.lines) { errors.push(`${at(row.line)} ${path} 只有 ${info.lines} 行，没有第 ${m[2]} 行`); continue; }
+      if (m[3] && !info.text.includes(m[3])) { errors.push(`${at(row.line)} ${path} 里找不到夹具名 ${m[3]}`); continue; }
+      unverified += checkVerified(verified, row, today, at, errors, warnings, stale, `${service} 夹具 ${place}`);
+    }
+  }
+  return { errors, warnings, unverified, stale };
+}
+
+// ---- due soon (weekly sentinel, scripts/doctor.mjs) ----
+// What needs attention within `within` days, read with the same parsers the
+// lints use: 临时事项 (docs-lint's tempItems), pending acceptance debt, and
+// freshness rows older than FRESH_STALE_DAYS (due = the day they turned stale).
+// A register that cannot be read is listed in `problems`, never left out quietly.
+export function dueItems({ dir, root, today, within }) {
+  const items = [], problems = [];
+  const read = (name) => {
+    try { return readFileSync(join(dir, name), "utf8"); }
+    catch (e) { problems.push(`${name}: 读不到文件（${e.code || e.message}）`); return null; }
+  };
+  const push = (source, where, what, due) => {
+    const daysLeft = -daysBetween(today, due);
+    if (daysLeft <= within) items.push({ source, where, what, due, daysLeft });
+  };
+  const temp = read("expiring-items.md");
+  if (temp !== null) {
+    const list = tempItems(temp);
+    if (list === null) problems.push("expiring-items.md: 找不到「## 临时事项」一节");
+    else for (const i of list) {
+      if (i.kind === "due") push("expiring-items", `expiring-items.md:${i.lineNo}`, i.title, i.due);
+      else if (i.kind !== "history") problems.push(`expiring-items.md:${i.lineNo}: 「${i.title}」的到期日写法不对`);
+    }
+  }
+  const debt = read("acceptance-debt.md");
+  if (debt !== null) {
+    for (const i of openAcceptanceItems(debt, { today })) {
+      if (parseDate(i.due) === null) problems.push(`acceptance-debt.md: ${i.id} 的到期日 "${i.due}" 不是合法日期`);
+      else push("acceptance-debt", `acceptance-debt.md ${i.id}`, i.what, i.due);
+    }
+  }
+  const fresh = read("freshness-ledger.md");
+  if (fresh !== null) {
+    let providers;
+    try { providers = loadProviderDefaults(root); }
+    catch (e) { problems.push(`ai.js: 读不到服务商注册表（${e.message}）`); }
+    if (providers) {
+      const r = lintFreshness(fresh, { today, providers, fileInfo: repoFileInfo(root) });
+      for (const e of r.errors) problems.push(e);
+      for (const st of r.stale) {
+        const due = new Date(parseDate(st.date) + FRESH_STALE_DAYS * DAY_MS).toISOString().slice(0, 10);
+        push("freshness", `freshness-ledger.md:${st.line}`, `${st.what} 该再核实了`, due);
+      }
+    }
+  }
+  items.sort((a, b) => a.daysLeft - b.daysLeft || a.where.localeCompare(b.where));
+  return { items, problems };
+}
+
 // ---- command line ----
 function localToday() {
   const n = new Date();
@@ -380,8 +541,25 @@ function main(argv) {
   const acceptDebt = argv.includes("--accept-debt");
   const today = process.env.PBP_LINT_TODAY || localToday();
   if (parseDate(today) === null) { console.error(`[registers] PBP_LINT_TODAY "${today}" 不是合法日期`); return 2; }
-  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const repoRoot = process.env.PBP_REPO_ROOT || join(dirname(fileURLToPath(import.meta.url)), "..");
   const dir = process.env.PBP_REGISTERS_DIR || join(repoRoot, ".claude");
+  const dueAt = argv.indexOf("--due-within");
+  if (dueAt !== -1) {
+    const raw = argv[dueAt + 1] || "";
+    if (!/^\d+$/.test(raw)) { console.error("[registers] 用法：--due-within <天数> [--json]，例如 --due-within 14"); return 2; }
+    const r = dueItems({ dir, root: repoRoot, today, within: Number(raw) });
+    if (argv.includes("--json")) {
+      console.log(JSON.stringify({ today, within: Number(raw), ...r }, null, 2));
+    } else {
+      console.log(`[registers] ${raw} 天内到期或已过期 ${r.items.length} 条`);
+      for (const i of r.items) {
+        const tag = i.daysLeft < 0 ? `已过期 ${-i.daysLeft} 天` : i.daysLeft === 0 ? "今天到期" : `还有 ${i.daysLeft} 天`;
+        console.log(`  ${tag}（${i.due}）  ${i.where}  ${i.what}`);
+      }
+      for (const p of r.problems) console.error(`[registers] FAIL ${p}`);
+    }
+    return r.problems.length ? 2 : 0;
+  }
   const storeAt = argv.indexOf("--store-check");
   if (storeAt !== -1) {
     const version = (argv[storeAt + 1] || "").replace(/^v/, "");
@@ -398,11 +576,22 @@ function main(argv) {
     for (const l of r.lines) console.log(`[registers] ${l}`);
     return r.ready ? 0 : 1;
   }
+  let providers = null, providerError = "";
+  try { providers = loadProviderDefaults(repoRoot); }
+  catch (e) { providerError = e.message; }
+  let unverified = 0;
+  const lintFresh = (t, o) => {
+    if (!providers) return { errors: [`freshness-ledger.md: 读不到 ai.js 里的服务商注册表（${providerError}）`], warnings: [], dueErrors: [] };
+    const r = lintFreshness(t, { ...o, providers, fileInfo: repoFileInfo(repoRoot) });
+    unverified = r.unverified;
+    return { errors: r.errors, warnings: r.warnings, dueErrors: [] };
+  };
   const files = [
     ["decisions.md", (t, o) => ({ ...lintDecisions(t, o), dueErrors: [] })],
     ["acceptance-debt.md", lintAcceptanceDebtDetailed],
     ["flake-ledger.md", lintFlakeLedgerDetailed],
     ["store-ledger.md", (t, o) => ({ ...lintStoreLedger(t, o), dueErrors: [] })],
+    ["freshness-ledger.md", lintFresh],
   ];
   const errors = [], warnings = [], dueErrors = [];
   const texts = {};
@@ -415,6 +604,7 @@ function main(argv) {
   }
   for (const w of warnings) console.log(`[registers] WARN ${w}`);
   for (const e of errors) console.error(`[registers] FAIL ${e}`);
+  if (unverified) console.log(`[registers] freshness-ledger.md 里 ${unverified} 行还没对真实服务核实过（${FRESH_UNVERIFIED}）`);
 
   if (!releaseGate) {
     for (const d of dueErrors) console.error(`[registers] FAIL ${d.m}`);

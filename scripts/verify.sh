@@ -380,7 +380,7 @@ gate render node "scripts/options-help-render-audit.mjs"
 stage "[docs-lint] checking README x9 mirror + prose contracts + .claude/expiring-items.md 临时事项 expiry dates"
 gate static node "scripts/docs-lint.mjs"
 
-stage "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger, store ledger) + lint self-tests"
+stage "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger, store ledger, freshness ledger) + lint self-tests"
 gate static node "scripts/registers-lint.mjs"
 gate static node "tests/registers-lint-tests.mjs"
 

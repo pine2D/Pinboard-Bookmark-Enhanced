@@ -129,12 +129,13 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 
 ## 登记册
 
-四份登记册放在 `.claude/` 根，格式由 `scripts/registers-lint.mjs` 检查（pre-commit / verify.sh / CI）。
+五份登记册放在 `.claude/` 根，格式由 `scripts/registers-lint.mjs` 检查（pre-commit / verify.sh / CI）。
 
 - `.claude/decisions.md`：用户拍过板的取舍和否决过的方案。提新功能、做评审或审计前先读，里面列出的事不要再当新建议提。派子代理做评审时，把相关条目写进提示词。只记用户明确做的裁决。
 - `.claude/acceptance-debt.md`：要人在真实环境里做的检查。每条有到期日，发版时 `scripts/release.sh` 会列出来，有过期的就中止，加 `--accept-debt` 才继续。过期超过 14 天 CI 会红，这时 `--accept-debt` 也没用，只能清账或改到期日。
 - `.claude/flake-ledger.md`：时过时不过的测试。重跑后通过也要记一行，同一个用例第二次上榜就必须根治或隔离。
 - `.claude/store-ledger.md`：商店的提交记录和后台数据。用户说了提交、过审、被拒或报了后台数字，就记一行。往商店提交前跑 `node scripts/registers-lint.mjs --store-check <版本>`。
+- `.claude/freshness-ledger.md`：每个服务商的默认模型和每个远端服务夹具，上次对真实服务核实的日期。改默认模型时同时改这一行，lint 会拦。拿真实服务核实，每次都要用户明确授权。
 
 ## 与 Claude Code 协作
 
@@ -186,3 +187,4 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 | 留下要人验的事、清账、发版前看欠账 | `.claude/acceptance-debt.md` |
 | 测试重跑后才通过、处理 CI 抖动 | `.claude/flake-ledger.md` |
 | 往商店提交、记审核结果或后台数据 | `.claude/store-ledger.md` |
+| 改服务商默认模型，改或新增远端服务的测试夹具 | `.claude/freshness-ledger.md` |
