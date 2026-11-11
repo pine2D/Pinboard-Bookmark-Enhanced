@@ -387,6 +387,10 @@ gate static node "tests/registers-lint-tests.mjs"
 stage "[doctor] checking the read-only local setup doctor in throwaway repos"
 gate static node "tests/doctor-tests.mjs"
 
+stage "[sentinel] checking the weekly sentinel's link check and report against local fixtures"
+gate static node "tests/link-check-tests.mjs"
+gate static node "tests/sentinel-report-tests.mjs"
+
 stage "[rules-lint] checking CLAUDE.md index, rule files, skills, backticked references and number claims + lint self-tests"
 gate static node "scripts/rules-lint.mjs"
 gate static node "tests/rules-lint-tests.mjs"

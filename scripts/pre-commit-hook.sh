@@ -7,7 +7,7 @@
 #
 # Installed as .git/hooks/pre-commit via scripts/setup-hooks.sh
 # Trigger groups, from two `git diff --cached` listings (the second one also
-# sees deletions). The first two are described here; the registers, doctor, rules-lint,
+# sees deletions). The first two are described here; the registers, doctor, sentinel, rules-lint,
 # JS, eslint-baseline, slice-anchor, audit-scope and verify-groups groups are described next
 # to their variables below:
 #   THEME_RE -- theme-factory sources, pinboard-themes.js and the three
@@ -52,13 +52,15 @@ ESLINT_RULE_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(eslint\.config\.mjs|s
 ESLINT_TOOLS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/eslint-baseline-check\.mjs|tests/eslint-baseline-tests\.mjs)$')
 # Doctor group: the local setup doctor, its self-test and the registers code it imports.
 DOCTOR_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(doctor|registers-lint|docs-lint)\.mjs|tests/doctor-tests\.mjs)$')
+# Sentinel group: the weekly sentinel's workflow, its two scripts and their self-tests.
+SENTINEL_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(link-check|sentinel-report)\.mjs|tests/(link-check|sentinel-report)-tests\.mjs|\.github/workflows/sentinel\.yml)$')
 VERIFY_GROUPS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(verify\.sh|run-html-suites\.mjs|flake-record\.mjs)|tests/verify-groups-tests\.mjs)$')
 # Slice-anchor group: any test file, the lint, its self-test or its baseline
 # (deletions too: dropping the baseline and adding it back would reset it).
 SLICE_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^(tests/.+\.(html|mjs|js)|scripts/slice-anchor-(lint\.mjs|baseline\.json))$')
 SLICE_BASELINE_STAGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^scripts/slice-anchor-baseline\.json$')
 SLICE_TOOLS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/slice-anchor-lint\.mjs|tests/slice-anchor-lint-tests\.mjs)$')
-if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ]; then
+if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ] && [ -z "$SENTINEL_CHANGED" ]; then
   exit 0
 fi
 
@@ -84,6 +86,15 @@ if [ -n "$DOCTOR_CHANGED" ]; then
   if ! node "$REPO_ROOT/tests/doctor-tests.mjs"; then
     echo ""
     echo "[doctor] COMMIT BLOCKED — the doctor self-test failed (see the message above)" >&2
+    exit 1
+  fi
+fi
+
+if [ -n "$SENTINEL_CHANGED" ]; then
+  echo "[sentinel] checking the link check and the report against local fixtures"
+  if ! node "$REPO_ROOT/tests/link-check-tests.mjs" || ! node "$REPO_ROOT/tests/sentinel-report-tests.mjs"; then
+    echo ""
+    echo "[sentinel] COMMIT BLOCKED — a sentinel self-test failed (see the message above)" >&2
     exit 1
   fi
 fi

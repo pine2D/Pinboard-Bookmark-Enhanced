@@ -1,0 +1,240 @@
+name: Weekly sentinel
+
+# Looks once a week for things that change outside this repo: vendored
+# libraries behind npm, .qa-scan packages behind npm, dead links in the docs,
+# the test pages and the release ZIP on Chrome for Testing stable and beta,
+# and register items coming due. No check fails the job; each one appends to
+# findings.jsonl and scripts/sentinel-report.mjs writes the report. Only a
+# check that could not run at all fails the job (and is reported too).
+# With findings, a schedule or manual run replaces the body of the one open
+# issue labelled "sentinel" and adds a short comment (user ruling 2026-11-11,
+# .claude/decisions.md). Without findings nothing is touched. A pull request
+# run, or a manual run with dry_run, only shows what it would write.
+# It is not named "CI": release.sh only reads that workflow.
+
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Show the report without writing the issue
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - .github/workflows/sentinel.yml
+      - scripts/sentinel-report.mjs
+      - scripts/link-check.mjs
+      - scripts/update-vendor.sh
+      - scripts/registers-lint.mjs
+      - scripts/docs-lint.mjs
+      - scripts/run-html-suites.mjs
+      - scripts/zip-install-smoke.mjs
+      - scripts/release.sh
+      - .qa-scan/run-test.mjs
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Pinned: the npx package that installs Chrome for Testing.
+  PUPPETEER_BROWSERS: '@puppeteer/browsers@3.2.6'
+
+jobs:
+  sentinel:
+    name: weekly checks
+    runs-on: ubuntu-24.04   # Playwright 1.59 cannot install Chromium deps on ubuntu-latest (26.04)
+    timeout-minutes: 60
+    outputs:
+      write: ${{ steps.report.outputs.write }}
+      body_b64: ${{ steps.report.outputs.body_b64 }}
+      comment_b64: ${{ steps.report.outputs.comment_b64 }}
+    steps:
+      # runner.temp is not available in job-level env, so the paths are set here.
+      - name: Set the report folders
+        run: |
+          echo "PBP_QA_REPORT_DIR=$RUNNER_TEMP/pbp-qa-report" >> "$GITHUB_ENV"
+          echo "SENTINEL_DIR=$RUNNER_TEMP/sentinel" >> "$GITHUB_ENV"
+          echo "FINDINGS=$RUNNER_TEMP/sentinel/findings.jsonl" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/sentinel" "$RUNNER_TEMP/pbp-qa-report"
+          : > "$RUNNER_TEMP/sentinel/findings.jsonl"
+
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: .qa-scan/package-lock.json
+
+      - name: Install QA dependencies
+        run: npm ci --prefix .qa-scan
+
+      # Also installs the system libraries Chrome for Testing needs.
+      - name: Install bundled Chromium
+        run: npx --prefix .qa-scan playwright install --with-deps chromium
+
+      - name: Vendored libraries against npm
+        id: vendor
+        if: ${{ !cancelled() }}
+        run: |
+          rc=0
+          bash scripts/update-vendor.sh --check-only > "$SENTINEL_DIR/vendor.log" 2>&1 || rc=$?
+          node scripts/sentinel-report.mjs add vendor --findings "$FINDINGS" --log "$SENTINEL_DIR/vendor.log" --exit "$rc"
+
+      - name: .qa-scan packages against npm
+        id: npm
+        if: ${{ !cancelled() }}
+        run: |
+          rc=0
+          npm outdated --prefix .qa-scan --json > "$SENTINEL_DIR/npm.json" 2> "$SENTINEL_DIR/npm.err" || rc=$?
+          node scripts/sentinel-report.mjs add npm --findings "$FINDINGS" --log "$SENTINEL_DIR/npm.json" --exit "$rc"
+
+      - name: Links in the docs
+        id: links
+        if: ${{ !cancelled() }}
+        run: |
+          rc=0
+          node scripts/link-check.mjs --json "$SENTINEL_DIR/links.json" > "$SENTINEL_DIR/links.log" 2>&1 || rc=$?
+          tail -n 1 "$SENTINEL_DIR/links.log"
+          node scripts/sentinel-report.mjs add links --findings "$FINDINGS" --log "$SENTINEL_DIR/links.json" --exit "$rc"
+
+      - name: Register items due within 14 days
+        id: due
+        if: ${{ !cancelled() }}
+        run: |
+          rc=0
+          node scripts/registers-lint.mjs --due-within 14 --json > "$SENTINEL_DIR/due.json" 2> "$SENTINEL_DIR/due.err" || rc=$?
+          node scripts/sentinel-report.mjs add due --findings "$FINDINGS" --log "$SENTINEL_DIR/due.json" --exit "$rc"
+
+      # The smoke on each channel needs a ZIP. release.sh also smoke-tests it
+      # on the bundled Chromium; that result belongs to the CI workflow, so a
+      # failure there is only a note when the ZIP itself was built.
+      - name: Build the release ZIP
+        id: zip
+        if: ${{ !cancelled() }}
+        run: |
+          rc=0
+          xvfb-run -a bash scripts/release.sh --build-only --overwrite > "$SENTINEL_DIR/release.log" 2>&1 || rc=$?
+          zip=$(ls release/*.zip 2>/dev/null | head -n 1 || true)
+          if [ -z "$zip" ]; then
+            node scripts/sentinel-report.mjs add broken --findings "$FINDINGS" --check browser --message "the release ZIP could not be built (release.sh --build-only exited $rc), so no channel ran the install smoke"
+          elif [ "$rc" -ne 0 ]; then
+            node scripts/sentinel-report.mjs add note --findings "$FINDINGS" --check browser --subject scripts/release.sh --message "built the ZIP but exited $rc; its bundled-Chromium smoke is the CI workflow's job"
+          fi
+          echo "SENTINEL_ZIP=$zip" >> "$GITHUB_ENV"
+
+      # Render gates are not run here: their baselines belong to the bundled Chromium.
+      - name: Test pages and ZIP smoke on Chrome for Testing stable and beta
+        id: browser
+        if: ${{ !cancelled() }}
+        run: |
+          for ch in stable beta; do
+            log="$SENTINEL_DIR/cft-$ch.log"
+            exe=""
+            if npx --yes "$PUPPETEER_BROWSERS" install "chrome@$ch" --path "$RUNNER_TEMP/cft" > "$log" 2>&1; then
+              exe=$(sed -n 's/^chrome@[^ ]* \(.*\)$/\1/p' "$log" | tail -n 1)
+            fi
+            if [ -z "$exe" ] || [ ! -x "$exe" ]; then
+              echo "::warning::Chrome for Testing $ch could not be installed"
+              node scripts/sentinel-report.mjs add browser --findings "$FINDINGS" --channel "$ch" --install-failed
+              continue
+            fi
+            version=$("$exe" --version 2>/dev/null || true)
+            echo "$ch: $version"
+            pages=0
+            PBP_BROWSER_EXECUTABLE="$exe" xvfb-run -a node scripts/run-html-suites.mjs > "$SENTINEL_DIR/pages-$ch.log" 2>&1 || pages=$?
+            tail -n 5 "$SENTINEL_DIR/pages-$ch.log"
+            smoke=0
+            if [ -n "$SENTINEL_ZIP" ]; then
+              PBP_BROWSER_EXECUTABLE="$exe" xvfb-run -a node scripts/zip-install-smoke.mjs --zip "$SENTINEL_ZIP" > "$SENTINEL_DIR/smoke-$ch.log" 2>&1 || smoke=$?
+              tail -n 3 "$SENTINEL_DIR/smoke-$ch.log"
+            fi
+            node scripts/sentinel-report.mjs add browser --findings "$FINDINGS" --channel "$ch" --version "$version" \
+              --pages-log "$SENTINEL_DIR/pages-$ch.log" --pages-exit "$pages" --smoke-exit "$smoke"
+          done
+
+      - name: Write the report
+        id: report
+        if: ${{ !cancelled() }}
+        env:
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          OUTCOMES: >-
+            vendor=${{ steps.vendor.outcome }}
+            npm=${{ steps.npm.outcome }}
+            links=${{ steps.links.outcome }}
+            due=${{ steps.due.outcome }}
+            zip=${{ steps.zip.outcome }}
+            browser=${{ steps.browser.outcome }}
+        run: |
+          # A check step that itself crashed could not record anything: report it as broken.
+          for pair in $OUTCOMES; do
+            name=${pair%%=*}
+            outcome=${pair#*=}
+            if [ "$outcome" != "success" ]; then
+              node scripts/sentinel-report.mjs add broken --findings "$FINDINGS" --check "$name" --message "the $name step ended with $outcome"
+            fi
+          done
+          node scripts/sentinel-report.mjs report --findings "$FINDINGS" --event "$GITHUB_EVENT_NAME" --dry-run "$DRY_RUN" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --sha "$GITHUB_SHA" --date "$(date -u +%F)" \
+            --summary "$GITHUB_STEP_SUMMARY" --body "$SENTINEL_DIR/body.md" --comment "$SENTINEL_DIR/comment.md" --output "$GITHUB_OUTPUT"
+          echo "body_b64=$(base64 -w0 "$SENTINEL_DIR/body.md")" >> "$GITHUB_OUTPUT"
+          echo "comment_b64=$(base64 -w0 "$SENTINEL_DIR/comment.md")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sentinel-logs
+          path: |
+            ${{ runner.temp }}/sentinel
+            ${{ runner.temp }}/pbp-qa-report
+          retention-days: 14
+          overwrite: true
+          if-no-files-found: ignore
+
+      - name: Fail when a check could not run
+        if: ${{ !cancelled() && steps.report.outputs.broken == 'true' }}
+        run: |
+          echo "::error::at least one sentinel check could not run; see the step summary"
+          exit 1
+
+  issue:
+    name: update the sentinel issue
+    needs: sentinel
+    # Runs after a failed sentinel job too, so a broken check is still reported.
+    if: ${{ !cancelled() && needs.sentinel.outputs.write == 'true' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - name: Replace the issue body and add a comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BODY_B64: ${{ needs.sentinel.outputs.body_b64 }}
+          COMMENT_B64: ${{ needs.sentinel.outputs.comment_b64 }}
+        run: |
+          printf '%s' "$BODY_B64" | base64 -d > "$RUNNER_TEMP/body.md"
+          printf '%s' "$COMMENT_B64" | base64 -d > "$RUNNER_TEMP/comment.md"
+          if ! gh label list --limit 200 --json name --jq '.[].name' | grep -qx sentinel; then
+            gh label create sentinel --color 5319e7 --description "Weekly sentinel findings"
+          fi
+          num=$(gh issue list --label sentinel --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -z "$num" ]; then
+            url=$(gh issue create --title "Weekly sentinel" --label sentinel --body-file "$RUNNER_TEMP/body.md")
+            num=${url##*/}
+          else
+            gh issue edit "$num" --body-file "$RUNNER_TEMP/body.md"
+          fi
+          gh issue comment "$num" --body-file "$RUNNER_TEMP/comment.md"
