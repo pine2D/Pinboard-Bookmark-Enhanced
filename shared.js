@@ -5293,3 +5293,54 @@ function pbpTypoApplyVars(fontTier, leadingTier) {
   else st.setProperty("--pbp-prose-leading", String(PBP_TYPO_LEADINGS[String(t2.leading)]));
   return t2;
 }
+
+// ===================== Runtime message catalog =====================
+// Single source of truth: scripts/runtime-messages-source.mjs
+// Regenerate with: node scripts/sync-runtime-messages.mjs --write
+// @generated:runtime-messages start (catalog)
+const PBP_RUNTIME_MESSAGES = Object.freeze({
+  mdReaderBookmarkState: "mdReaderBookmarkState",
+  mdReaderBookmarkSave: "mdReaderBookmarkSave",
+  mdReaderBookmarkDelete: "mdReaderBookmarkDelete",
+  PBP_READER_BOOKMARK_COMMAND: "PBP_READER_BOOKMARK_COMMAND",
+  get_site_prefs: "get_site_prefs",
+  bookmark_connect: "bookmark_connect",
+  bookmark_api: "bookmark_api",
+  PBP_RESET_PINBOARD_AUTH: "PBP_RESET_PINBOARD_AUTH",
+  get_bookmark_data: "get_bookmark_data",
+  lookup_bookmark: "lookup_bookmark",
+  PBP_POPUP_DRAFT: "PBP_POPUP_DRAFT",
+  get_offline_queue: "get_offline_queue",
+  PBP_AI_CALL: "PBP_AI_CALL",
+  save_intent: "save_intent",
+  archive_url: "archive_url",
+  bookmark_deleted: "bookmark_deleted",
+  saveTabSet: "saveTabSet",
+  startBatchSave: "startBatchSave",
+  pinboard_api_call: "pinboard_api_call",
+  retry_offline_item: "retry_offline_item",
+  remove_offline_item: "remove_offline_item",
+  clear_offline_queue: "clear_offline_queue",
+  test_pinboard_token: "test_pinboard_token",
+  imgFixInstallReferer: "imgFixInstallReferer",
+  imgFixRemoveReferer: "imgFixRemoveReferer",
+  imgFixResetTab: "imgFixResetTab",
+  reextractMarkdown: "reextractMarkdown",
+  PBP_VOCAB_DIRTY: "PBP_VOCAB_DIRTY",
+  PBP_NOTES_DIRTY: "PBP_NOTES_DIRTY",
+  PBP_DICT_ARCHIVE_DIRTY: "PBP_DICT_ARCHIVE_DIRTY",
+  PBP_ASK_ARCHIVE_DIRTY: "PBP_ASK_ARCHIVE_DIRTY",
+  PBP_DICT_ARCHIVE_SYNC: "PBP_DICT_ARCHIVE_SYNC",
+  PBP_ASK_ARCHIVE_RESTORE: "PBP_ASK_ARCHIVE_RESTORE",
+  vocabDriveConnect: "vocabDriveConnect",
+  vocabDriveStatus: "vocabDriveStatus",
+  vocabDriveClearNotices: "vocabDriveClearNotices",
+  vocabDriveSyncNow: "vocabDriveSyncNow",
+  vocabDriveDisconnect: "vocabDriveDisconnect",
+  PBP_VOCAB_SYNCED: "PBP_VOCAB_SYNCED",
+  PBP_NOTES_SYNCED: "PBP_NOTES_SYNCED",
+  PBP_DICT_ARCHIVE_SYNCED: "PBP_DICT_ARCHIVE_SYNCED",
+  PBP_ASK_ARCHIVE_SYNCED: "PBP_ASK_ARCHIVE_SYNCED",
+  PBP_DRIVE_CONNECT_AUTHORIZED: "PBP_DRIVE_CONNECT_AUTHORIZED",
+});
+// @generated:runtime-messages end (catalog)
