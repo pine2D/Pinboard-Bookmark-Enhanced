@@ -213,9 +213,10 @@ assertEq(pbpDictNormalizeEntry(null), null, "null json -> null");
 assertEq(pbpDictNormalizeEntry({ entries: [{ partOfSpeech: "noun" }] }), null, "no ipa/sense/form -> null");
 
 section("pbpDictEntriesAreFormOfOnly");
-// Payloads captured verbatim from freedictionaryapi.com on 2026-07-31, NOT
-// produced by the normalizer (server-fixture rule). An inflected form comes
-// back as a grammar pointer with no definition of its own.
+// Payloads captured verbatim from freedictionaryapi.com on 2026-07-31 and
+// re-verified on 2026-11-13, NOT produced by the normalizer (server-fixture
+// rule). An inflected form comes back as a grammar pointer with no definition
+// of its own.
 const FDA_APROVECHO = { /* es/aprovecho */
   word: "aprovecho",
   entries: [{
@@ -234,7 +235,7 @@ const FDA_PSA = { /* pl/psa -- marker sits in the LAST slot the tag cap keeps */
   word: "psa",
   entries: [{
     language: { code: "pl", name: "Polish" }, partOfSpeech: "noun",
-    pronunciations: [], forms: [],
+    pronunciations: [{ type: "ipa", text: "/ˈpsa/", tags: [] }], forms: [],
     senses: [{
       definition: "accusative/genitive singular of pies",
       tags: ["accusative", "animal not person", "form of", "genitive", "masculine", "singular"],
@@ -242,7 +243,7 @@ const FDA_PSA = { /* pl/psa -- marker sits in the LAST slot the tag cap keeps */
     }],
     synonyms: [], antonyms: []
   }],
-  source: { url: "https://en.wiktionary.org/wiki/psa", license: { name: "CC BY-SA 4.0", url: "" } }
+  source: { url: "https://en.wiktionary.org/wiki/psa", license: { name: "CC BY-SA 4.0", url: "https://creativecommons.org/licenses/by-sa/4.0/" } }
 };
 const FDA_FOUND = { /* en/found -- pointer entry AND real entries in one payload */
   word: "found",
