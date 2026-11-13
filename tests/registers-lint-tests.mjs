@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import {
   lintDecisions, lintAcceptanceDebt, lintFlakeLedger, openAcceptanceItems,
-  lintStoreLedger, storeReadiness, lintFreshness, loadProviderDefaults, repoFileInfo, dueItems,
+  lintStoreLedger, storeReadiness, latestApprovedStoreVersion, lintFreshness, loadProviderDefaults, repoFileInfo, dueItems,
   FRESH_STALE_DAYS, compareFreshness,
 } from '../scripts/registers-lint.mjs';
 import { tempItems } from '../scripts/docs-lint.mjs';
@@ -559,3 +559,32 @@ test('the pre-commit hook calls the comparison with the HEAD copy of the ledger'
   assert.match(hook, /git show HEAD:\.claude\/freshness-ledger\.md/);
   assert.match(hook, /registers-lint\.mjs" --compare-freshness/);
 });
+
+test('latestApprovedStoreVersion: picks highest approved version, ignores pending/rejected/withdrawn', () => {
+  assert.equal(latestApprovedStoreVersion(store([sb('3.0.3', '-', '通过', '-')])), '3.0.3');
+  assert.equal(latestApprovedStoreVersion(store([
+    sb('3.0.3', '-', '通过', '-'),
+    sb('3.0.5', '2026-11-08', '审核中', '-'),
+    sb('3.0.4', '2026-11-05', '通过', '2026-11-06'),
+    sb('3.0.6', '2026-11-09', '被拒', '2026-11-10', 'missing icon'),
+    sb('3.0.7', '2026-11-10', '撤回', '-'),
+  ])), '3.0.4');
+  assert.equal(latestApprovedStoreVersion(store([sb('3.0.4', '2026-11-08', '审核中', '-')])), null);
+});
+
+test('cli: --latest-store-tag prints v<ver> and exits 0; exits 1 when none approved; 2 on bad/missing ledger', () => withDir(set(), (d) => {
+  const ok = run(d, ['--latest-store-tag']);
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  assert.equal(ok.stdout.trim(), 'v3.0.3');
+
+  writeFileSync(join(d, 'store-ledger.md'), store([sb('3.0.4', '2026-11-08', '审核中', '-')]));
+  const none = run(d, ['--latest-store-tag']);
+  assert.equal(none.status, 1);
+  assert.match(none.stderr, /没有结果为「通过」/);
+
+  writeFileSync(join(d, 'store-ledger.md'), '| broken |\n');
+  assert.equal(run(d, ['--latest-store-tag']).status, 2);
+
+  rmSync(join(d, 'store-ledger.md'));
+  assert.equal(run(d, ['--latest-store-tag']).status, 2);
+}));

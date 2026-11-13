@@ -14,6 +14,7 @@
 //                                                         list what is due within N days or overdue:
 //                                                         临时事项, acceptance debt, stale freshness rows
 //   node scripts/registers-lint.mjs --store-check 3.0.4   may this version go to the store yet?
+//   node scripts/registers-lint.mjs --latest-store-tag    print v<version> of latest approved row
 //   node scripts/registers-lint.mjs --compare-freshness <HEAD 版> <暂存版>
 //                                                         a changed default model must not keep the old date
 //   node scripts/registers-lint.mjs --release-gate        list 待验; exit 1 on overdue
@@ -369,6 +370,26 @@ export function storeReadiness(text, { today, version, releasedOn }) {
   return { ready, lines };
 }
 
+function compareSemverParts(a, b) {
+  const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+// Latest approved ("通过") version in store-ledger.md, e.g. "3.0.3", or null.
+export function latestApprovedStoreVersion(text) {
+  const { submits } = storeTables(text);
+  if (!submits || !sameHeader(submits.header, STORE_SUBMIT_HEADER)) return null;
+  const approved = submits.rows
+    .filter((r) => r.cells.length === STORE_SUBMIT_HEADER.length && VERSION_RE.test(r.cells[0]) && r.cells[2] === "通过")
+    .map((r) => r.cells[0]);
+  if (!approved.length) return null;
+  return approved.sort((a, b) => compareSemverParts(b, a))[0];
+}
+
 // The day a version was tagged. PBP_STORE_RELEASED_ON overrides it (tests).
 function releasedOn(version, repoRoot) {
   if (process.env.PBP_STORE_RELEASED_ON) return process.env.PBP_STORE_RELEASED_ON;
@@ -615,6 +636,17 @@ function main(argv) {
     const r = storeReadiness(text, { today, version, releasedOn: day });
     for (const l of r.lines) console.log(`[registers] ${l}`);
     return r.ready ? 0 : 1;
+  }
+  if (argv.includes("--latest-store-tag")) {
+    let text;
+    try { text = readFileSync(join(dir, "store-ledger.md"), "utf8"); }
+    catch (e) { console.error(`[registers] store-ledger.md: 读不到文件（${e.code || e.message}）`); return 2; }
+    const bad = lintStoreLedger(text, { today }).errors;
+    if (bad.length) { for (const e of bad) console.error(`[registers] FAIL ${e}`); console.error("[registers] 商店台账格式有错，先修好"); return 2; }
+    const version = latestApprovedStoreVersion(text);
+    if (!version) { console.error("[registers] FAIL store-ledger.md: 「## 提交」里没有结果为「通过」的版本"); return 1; }
+    console.log("v" + version);
+    return 0;
   }
   // The release gate checks the four registers it always did. A freshness
   // problem is caught by pre-commit and CI and never stops a release, so the
