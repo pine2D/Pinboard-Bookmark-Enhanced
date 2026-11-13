@@ -1,0 +1,81 @@
+name: Bug report
+description: Report a reproducible bug in Bookmark Enhanced
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before submitting, review the [Troubleshooting guide](https://pine2d.github.io/Pinboard-Bookmark-Enhanced/troubleshooting.html). For security vulnerabilities, use [Private Vulnerability Reporting](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/security/advisories/new) instead of a public issue.
+
+  - type: checkboxes
+    id: privacy_check
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed API keys, tokens, private URLs, and personal bookmark text from my report.
+          required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Popup (saving bookmarks, tags, summary, batch, offline queue)
+        - Reader (clean view, translation, Ask, dictionary lookup, video transcript)
+        - Library (vocabulary, highlights & notes, saved Ask history)
+        - Settings (connections, AI providers, sync, dictionary packs, backup)
+        - Pinboard site themes / sort / unread badge
+        - Upgrade or installation
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_channel
+    attributes:
+      label: Installation channel
+      options:
+        - Chrome Web Store
+        - GitHub Release ZIP (unpacked)
+        - Git checkout (unpacked)
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_actual
+    attributes:
+      label: Expected vs. actual behavior
+      placeholder: |
+        Expected: ...
+        Actual: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Support Diagnostics JSON
+      description: Open Extension Settings > Backup & Diagnostics > Support Diagnostics and click "Copy diagnostics". That JSON omits credentials, account names, URLs, and page content.
+      render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: console_errors
+    attributes:
+      label: Console or Service Worker errors (optional)
+      description: Any red errors from DevTools on the affected page or the chrome://extensions/ Service Worker inspector.
+      render: text
+    validations:
+      required: false

@@ -201,6 +201,8 @@ fi
   const releaseSource = readFileSync(resolve(root, "scripts/release.sh"), "utf8");
   check(releaseSource.includes('python3 "${REPO_ROOT}/scripts/changelog.py"'),
     "release.sh must generate its changelog through scripts/changelog.py, or this fixture tests a file nothing runs");
+  check(releaseSource.includes("### Upgrading"),
+    "release.sh release notes template must include the fixed ### Upgrading guidance section");
   const clRepo = resolve(temp, "changelog-repo");
   mkdirSync(clRepo, { recursive: true });
   const git = (...args) => spawnSync("git", args, { cwd: clRepo, encoding: "utf8" });

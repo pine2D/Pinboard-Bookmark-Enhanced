@@ -27,7 +27,7 @@ const READMES = [
   "README.ja.md", "README.de.md", "README.fr.md", "README.pl.md", "README.ru.md",
 ];
 const DASH_DELIM_ALLOWED = new Set(["README.pl.md", "README.ru.md"]);
-const EN_PROSE_DASH_BAN = ["README.md", "docs/privacy.md"];
+const EN_PROSE_DASH_BAN = ["README.md", "SECURITY.md", "docs/privacy.md", "docs/troubleshooting.md", "docs/data-format.md"];
 
 // ---- 4. Temporary items: expiry has a 14-day grace window ----
 // One-time migrations/sweeps are registered in TEMP_FILE under "## 临时事项"

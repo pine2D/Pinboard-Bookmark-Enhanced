@@ -3,7 +3,7 @@
 // the weekly sentinel (.github/workflows/sentinel.yml); not part of verify.sh,
 // which stays offline.
 //
-//   node scripts/link-check.mjs                  README*.md, docs/privacy.md, docs/index.md
+//   node scripts/link-check.mjs                  README*.md, SECURITY.md, docs/privacy.md, docs/index.md, docs/troubleshooting.md, docs/data-format.md
 //   node scripts/link-check.mjs a.md b.md        only these files
 //   node scripts/link-check.mjs --json out.json  also write every result as JSON
 //
@@ -142,7 +142,14 @@ export async function checkAll(urls, options = {}) {
 // ---- command line ----
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export function defaultFiles(root = ROOT) {
-  return [...readdirSync(root).filter((f) => /^README(\.[^/]+)?\.md$/.test(f)).sort(), "docs/privacy.md", "docs/index.md"];
+  return [
+    ...readdirSync(root).filter((f) => /^README(\.[^/]+)?\.md$/.test(f)).sort(),
+    "SECURITY.md",
+    "docs/privacy.md",
+    "docs/index.md",
+    "docs/troubleshooting.md",
+    "docs/data-format.md",
+  ];
 }
 
 async function main(argv) {
