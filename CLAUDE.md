@@ -57,14 +57,14 @@ docs/superpowers/ DESIGN-IS-2026-07-22/ release/   # gitignored 本地产物（.
 | 书签缓存 | URL 书签状态 TTL 5 分钟 |
 | Storage prime | 冷启动慢，靠 chrome.alarms 周期性预热 SETTINGS_DEFAULTS |
 | 图标 | 工具栏 `pin-*` 分 default（未收藏）/ saved（已收藏）/ toread（待读）三套，商店与通知用 `app-*`；全部由 `node scripts/gen-icons.mjs` 生成，勿手改 PNG |
-| Commit message | conventional commits（feat / fix / refactor / perf / docs / style / chore），英文 |
+| Commit message | conventional commits（feat / fix / refactor / perf / docs / style / chore 等），英文；由 `scripts/commit-msg-hook.sh` + `scripts/commit-msg-lint.mjs` 门禁把关 |
 
 ## 存储与同步边界（摘要）
 
 唯一权威表述在 `.claude/rules/storage-sync.md`，改存储路由、同步、备份、书签连接或离线队列前先读。最要紧的几条：
 
 - 三条通道：Chrome Sync 只放普通设置（`optSyncEnabled` 是每设备 local 开关；凭据仅在 `syncApiKeys=true` 时随 sync）；Google Drive 只同步个人资料库的生词、高亮与笔记、完整 AI 词条及补充、Ask 问答记录（`drive.appdata`，不接管设置、凭据）；手工 JSON schema v3 是明文文件，凭据两端默认关、fail-closed。
-- 凭据（API key / token / password / 导出目标）不能硬编码，默认存 `chrome.storage.local`；缓存、大对象、瞬态状态一律 local，sync 写后检查 `lastError`；离线队列禁止保存 token。
+- 凭据（API key / token / password / 导出目标）不能硬编码，默认存 `chrome.storage.local`；缓存、大对象、瞬态状态一律 local，sync 写后检查 `lastError`（均由 `scripts/hard-rules-lint.mjs` 静态门把关）；离线队列禁止保存 token。
 - 个人资料库 owner（`personalLibraryAccount`）与书签连接身份分开；本机实际保存到的服务是只存 local 的 `bookmarkServiceActive`，读取一律经 `pbpReadSettingsWithSecrets`。
 
 ## 跨领域安全铁律
