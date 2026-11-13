@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Library Listbox Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="92"><title>Library Listbox Tests</title>
 <style>
 .case.pass{color:#0a0}.case.fail{color:#c00;font-weight:bold}
 .fixture{position:absolute;left:-10000px;top:0;width:800px;height:900px;border:0}
@@ -25,7 +25,7 @@
 // - check(name, condition, detail) is the one row writer for appended
 //   cases (report/assert/test stay for the primitive queue).
 // - The page keeps no TOTAL: run-test.mjs counts .pass/.fail rows against
-//   EXPECTED_RESULTS, so a task that adds cases raises only that number.
+//   <meta name="pbp-expected-count">, so a task that adds cases raises only that number.
 // - An independent <script> block appended before </body> (T4b) runs on
 //   its own and reports through check(); nothing awaits it.
 // - Page-level suites (T6, T7) define their constants and async functions
