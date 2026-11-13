@@ -601,6 +601,7 @@ const SETTINGS_DEFAULTS = {
   linkdingUrl: "", linkdingToken: "",
   personalLibraryAccount: "",
   aiProvider: "gemini",
+  // @generated:ai-providers start (settings-defaults)
   geminiApiKey: "", geminiModel: "gemini-3.5-flash-lite",
   openaiApiKey: "", openaiModel: "gpt-5.4-nano", openaiBaseUrl: "https://api.openai.com/v1",
   claudeApiKey: "", claudeModel: "claude-haiku-4-5",
@@ -619,6 +620,7 @@ const SETTINGS_DEFAULTS = {
   commandcodeApiKey: "", commandcodeModel: "deepseek/deepseek-v4-flash", commandcodeProtocol: "openai",
   ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3.2",
   customApiKey: "", customModel: "", customBaseUrl: "",
+  // @generated:ai-providers end (settings-defaults)
   // More custom provider entries (aiCustomProviders, non-secret) with sealed
   // keys in slots 2..8; customDisplayName / customProtocol belong to the first
   // entry ("custom", slot 1). The retired customName stays out of here (R1).
@@ -3635,6 +3637,10 @@ async function persistSettings(data) {
 // Completions or Anthropic Messages. One list for every reader of a format
 // setting (ai.js resolver, Settings selects, the entry sanitizer below).
 const PBP_AI_PROTOCOLS = Object.freeze(["openai", "anthropic"]);
+// @generated:ai-providers start (provider-lists)
+const PBP_AI_PROVIDER_IDS = Object.freeze(["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ark","opencode","commandcode","ollama","custom"]);
+const PBP_AI_FALLBACK_ORDER = Object.freeze(["gemini","openai","claude","deepseek","qwen","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","minimax","ark","opencode","commandcode","ollama","custom"]);
+// @generated:ai-providers end (provider-lists)
 
 // Entry "custom" is slot 1 (customBaseUrl / customApiKey / customModel /
 // customDisplayName / customProtocol). Further entries live in the synced
@@ -3767,7 +3773,14 @@ function pbpAiCustomEntries(s) {
   return out.concat(pbpSanitizeAiCustomProviders(st.aiCustomProviders) || []);
 }
 
-const API_KEY_FIELDS = ["pinboardToken","karakeepToken","linkdingToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","arkApiKey","opencodeApiKey","commandcodeApiKey","customApiKey","customApiKey2","customApiKey3","customApiKey4","customApiKey5","customApiKey6","customApiKey7","customApiKey8","jinaApiKey","waybackS3Key","waybackS3Secret","dictAnkiKey","dictEudicToken"];
+const API_KEY_FIELDS = [
+  "pinboardToken", "karakeepToken", "linkdingToken",
+  // @generated:ai-providers start (api-key-fields)
+  "geminiApiKey", "openaiApiKey", "claudeApiKey", "deepseekApiKey", "qwenApiKey", "minimaxApiKey", "openrouterApiKey", "groqApiKey", "mistralApiKey", "cohereApiKey", "siliconflowApiKey", "zhipuApiKey", "kimiApiKey", "arkApiKey", "opencodeApiKey", "commandcodeApiKey", "customApiKey",
+  // @generated:ai-providers end (api-key-fields)
+  "customApiKey2", "customApiKey3", "customApiKey4", "customApiKey5", "customApiKey6", "customApiKey7", "customApiKey8",
+  "jinaApiKey", "waybackS3Key", "waybackS3Secret", "dictAnkiKey", "dictEudicToken",
+];
 
 // ---- PBP_AI_CALL override whitelist (K44) ----------------------------------
 // Non-secret settings a popup PBP_AI_CALL message may override for one call: the
@@ -3795,16 +3808,11 @@ const API_KEY_FIELDS = ["pinboardToken","karakeepToken","linkdingToken","geminiA
 // fails if any of them is absent from this list.
 const PBP_AI_OVERRIDE_FIELDS = Object.freeze([
   "aiProvider", "aiTagLang", "aiSummaryLang", "aiTagSeparator", "optRespectTagCase",
-  "geminiModel", "openaiModel", "claudeModel", "deepseekModel", "qwenModel",
-  "minimaxModel", "openrouterModel", "groqModel", "mistralModel", "cohereModel",
-  "siliconflowModel", "zhipuModel", "kimiModel", "arkModel", "opencodeModel", "commandcodeModel",
-  "ollamaModel", "customModel",
+  // @generated:ai-providers start (override-fields)
+  "geminiModel", "openaiModel", "claudeModel", "deepseekModel", "qwenModel", "minimaxModel", "openrouterModel", "groqModel", "mistralModel", "cohereModel", "siliconflowModel", "zhipuModel", "kimiModel", "arkModel", "opencodeModel", "commandcodeModel", "ollamaModel", "customModel",
   "openaiBaseUrl", "ollamaBaseUrl", "customBaseUrl",
-  // Region, workspace and API format pick the request host and caller. They
-  // ride the bus like the base URLs above; the worker's resolver validates
-  // them again (an unknown region or format, or a malformed workspace ID,
-  // fails closed before any request).
   "qwenRegion", "qwenWorkspaceId", "arkRegion", "opencodeProtocol", "commandcodeProtocol",
+  // @generated:ai-providers end (override-fields)
   // The first custom entry's format, and the entry list (an entry id in
   // aiProvider resolves through it). The display name is not here: it never
   // enters a fingerprint.

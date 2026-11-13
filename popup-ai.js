@@ -422,19 +422,12 @@ const _aiFallbackTried = { tags: new Set(), summary: new Set() };
 let _aiErrorLastSettings = null;
 
 // Fallback provider order: stable list, current provider gets skipped.
-const AI_PROVIDER_ORDER = [
-  "gemini", "openai", "claude", "deepseek", "qwen", "openrouter", "groq",
-  "mistral", "cohere", "siliconflow", "zhipu", "kimi", "minimax",
-  "ark", "opencode", "commandcode",
-  "ollama", "custom"
-];
+// @generated:ai-providers start (popup-order)
+const AI_PROVIDER_ORDER = ["gemini","openai","claude","deepseek","qwen","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","minimax","ark","opencode","commandcode","ollama","custom"];
 const AI_PROVIDER_LABEL = {
-  gemini: "Gemini", openai: "OpenAI", claude: "Claude", deepseek: "DeepSeek",
-  qwen: "Model Studio", minimax: "MiniMax", openrouter: "OpenRouter", groq: "Groq",
-  mistral: "Mistral", cohere: "Cohere", siliconflow: "SiliconFlow", zhipu: "Zhipu",
-  kimi: "Kimi", ark: "Volcengine Ark", opencode: "OpenCode Zen", commandcode: "Command Code",
-  ollama: "Ollama", custom: "Custom"
+  gemini: "Gemini", openai: "OpenAI", claude: "Claude", deepseek: "DeepSeek", qwen: "Model Studio", minimax: "MiniMax", openrouter: "OpenRouter", groq: "Groq", mistral: "Mistral", cohere: "Cohere", siliconflow: "SiliconFlow", zhipu: "Zhipu", kimi: "Kimi", ark: "Volcengine Ark", opencode: "OpenCode Zen", commandcode: "Command Code", ollama: "Ollama", custom: "Custom",
 };
+// @generated:ai-providers end (popup-order)
 // Display name for status/error text: brand names stay literal; the custom
 // endpoint, Alibaba Cloud Model Studio (written 百炼 in Chinese) and
 // Volcengine Ark (火山方舟) translate.

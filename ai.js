@@ -361,32 +361,25 @@ async function handleAIError(res, provider) {
 //   resolver picks a regional host first and never reads a format for it, so
 //   an entry declaring both would report protocol_unknown for a format it
 //   never uses. Give a provider one or the other (or neither).
+// @generated:ai-providers start (openai-compat)
 const OPENAI_COMPAT_PROVIDERS = {
-  openai:      { keyField: "openaiApiKey",      base: "https://api.openai.com/v1",                         baseField: "openaiBaseUrl", modelField: "openaiModel",      defaultModel: "gpt-5.4-nano",                thinkingOff: { reasoning_effort: "none" }, tokenField: "max_completion_tokens" },
-  deepseek:    { keyField: "deepseekApiKey",    base: "https://api.deepseek.com/v1",                                            modelField: "deepseekModel",    defaultModel: "deepseek-v4-flash",               thinkingOff: { thinking: { type: "disabled" } } },  // v4-flash defaults thinking ON; 4xx self-heal (deepseek-reasoner rejects it)
-  qwen:        { keyField: "qwenApiKey",        base: "https://dashscope.aliyuncs.com/compatible-mode/v1",                      modelField: "qwenModel",        defaultModel: "qwen-flash",                      thinkingOff: { enable_thinking: false },
-                 regionField: "qwenRegion",
-                 regions: { beijing: "https://dashscope.aliyuncs.com/compatible-mode/v1", singapore: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", virginia: "https://dashscope-us.aliyuncs.com/compatible-mode/v1", tokyo: "" },
-                 workspaceField: "qwenWorkspaceId",
-                 workspaceRegions: { beijing: "cn-beijing", singapore: "ap-southeast-1", virginia: "us-east-1", tokyo: "ap-northeast-1" },
-                 workspaceTemplate: "https://{ws}.{region}.maas.aliyuncs.com/compatible-mode/v1" },  // Alibaba Cloud Model Studio; regions and dedicated hosts per the official Base URL overview
-  minimax:     { keyField: "minimaxApiKey",     base: "https://api.minimaxi.com/v1",                                            modelField: "minimaxModel",     defaultModel: "MiniMax-M2",                      thinkingOff: { thinking: { type: "disabled" } }, thinkingFallback: { reasoning_effort: "low" } },  // Servers requiring thinking use the documented low effort after refusing disabled.
-  openrouter:  { keyField: "openrouterApiKey",  base: "https://openrouter.ai/api/v1",                                           modelField: "openrouterModel",  defaultModel: "openai/gpt-oss-20b",              thinkingOff: { reasoning: { enabled: false } } },  // paid slug: the :free twin lost every serving endpoint
-  groq:        { keyField: "groqApiKey",        base: "https://api.groq.com/openai/v1",                                         modelField: "groqModel",        defaultModel: "openai/gpt-oss-20b" },               // no thinkingOff: groq's disable dialect is per-model (gpt-oss takes reasoning_effort low|medium|high; other families take "none"), unverified on a live key
-  mistral:     { keyField: "mistralApiKey",     base: "https://api.mistral.ai/v1",                                              modelField: "mistralModel",     defaultModel: "mistral-small-latest",            thinkingOff: { reasoning_effort: "none" } },
-  cohere:      { keyField: "cohereApiKey",      base: "https://api.cohere.ai/compatibility/v1",                                 modelField: "cohereModel",      defaultModel: "command-r7b-12-2024",             thinkingOff: { reasoning_effort: "none" } },
-  siliconflow: { keyField: "siliconflowApiKey", base: "https://api.siliconflow.cn/v1",                                          modelField: "siliconflowModel", defaultModel: "Qwen/Qwen3-8B",                   thinkingOff: { enable_thinking: false } },
-  zhipu:       { keyField: "zhipuApiKey",       base: "https://open.bigmodel.cn/api/paas/v4",                                   modelField: "zhipuModel",       defaultModel: "glm-4.7-flash",                   thinkingOff: { thinking: { type: "disabled" } } },
-  kimi:        { keyField: "kimiApiKey",        base: "https://api.moonshot.cn/v1",                                             modelField: "kimiModel",        defaultModel: "kimi-k2.6",                       thinkingOff: { thinking: { type: "disabled" } } },
-  ark:         { keyField: "arkApiKey",         base: "https://ark.cn-beijing.volces.com/api/v3",                               modelField: "arkModel",         defaultModel: "doubao-seed-2-0-mini-260428",     thinkingOff: { thinking: { type: "disabled" } },
-                 regionField: "arkRegion",
-                 regions: { cn: "https://ark.cn-beijing.volces.com/api/v3", intl: "https://ark.ap-southeast.bytepluses.com/api/v3" } },  // Volcengine Ark; intl = BytePlus ModelArk (a separate account; model IDs differ). thinkingOff per Ark's deep-thinking doc
-  opencode:    { keyField: "opencodeApiKey",    base: "https://opencode.ai/inference/openai/v1",                                modelField: "opencodeModel",    defaultModel: "glm-5.3-flash",
-                 protocolField: "opencodeProtocol", anthropicBase: "https://opencode.ai/inference/anthropic/v1" },  // no thinkingOff: a gateway forwarding to upstream models whose dialects differ
-  commandcode: { keyField: "commandcodeApiKey", base: "https://api.commandcode.ai/provider/v1",                                  modelField: "commandcodeModel", defaultModel: "deepseek/deepseek-v4-flash",
-                 protocolField: "commandcodeProtocol", anthropicBase: "https://api.commandcode.ai/provider/v1" },  // no thinkingOff: a gateway forwarding to upstream models whose dialects differ
-  custom:      { keyField: "customApiKey",      base: "",                                                  baseField: "customBaseUrl", modelField: "customModel",      defaultModel: "" },                          // no thinkingOff: dialect unknown
+  openai: { keyField: "openaiApiKey", base: "https://api.openai.com/v1", baseField: "openaiBaseUrl", modelField: "openaiModel", defaultModel: "gpt-5.4-nano", thinkingOff: { reasoning_effort: "none" }, tokenField: "max_completion_tokens" },
+  deepseek: { keyField: "deepseekApiKey", base: "https://api.deepseek.com/v1", modelField: "deepseekModel", defaultModel: "deepseek-v4-flash", thinkingOff: { thinking: { type: "disabled" } } },  // v4-flash defaults thinking ON; 4xx self-heal (deepseek-reasoner rejects it)
+  qwen: { keyField: "qwenApiKey", base: "https://dashscope.aliyuncs.com/compatible-mode/v1", modelField: "qwenModel", defaultModel: "qwen-flash", thinkingOff: { enable_thinking: false }, regionField: "qwenRegion", regions: { beijing: "https://dashscope.aliyuncs.com/compatible-mode/v1", singapore: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", virginia: "https://dashscope-us.aliyuncs.com/compatible-mode/v1", tokyo: "" }, workspaceField: "qwenWorkspaceId", workspaceRegions: { beijing: "cn-beijing", singapore: "ap-southeast-1", virginia: "us-east-1", tokyo: "ap-northeast-1" }, workspaceTemplate: "https://{ws}.{region}.maas.aliyuncs.com/compatible-mode/v1" },  // Alibaba Cloud Model Studio; regions and dedicated hosts per the official Base URL overview
+  minimax: { keyField: "minimaxApiKey", base: "https://api.minimaxi.com/v1", modelField: "minimaxModel", defaultModel: "MiniMax-M2", thinkingOff: { thinking: { type: "disabled" } }, thinkingFallback: { reasoning_effort: "low" } },  // Servers requiring thinking use the documented low effort after refusing disabled.
+  openrouter: { keyField: "openrouterApiKey", base: "https://openrouter.ai/api/v1", modelField: "openrouterModel", defaultModel: "openai/gpt-oss-20b", thinkingOff: { reasoning: { enabled: false } } },  // paid slug: the :free twin lost every serving endpoint
+  groq: { keyField: "groqApiKey", base: "https://api.groq.com/openai/v1", modelField: "groqModel", defaultModel: "openai/gpt-oss-20b" },  // no thinkingOff: groq's disable dialect is per-model (gpt-oss takes reasoning_effort low|medium|high; other families take "none"), unverified on a live key
+  mistral: { keyField: "mistralApiKey", base: "https://api.mistral.ai/v1", modelField: "mistralModel", defaultModel: "mistral-small-latest", thinkingOff: { reasoning_effort: "none" } },
+  cohere: { keyField: "cohereApiKey", base: "https://api.cohere.ai/compatibility/v1", modelField: "cohereModel", defaultModel: "command-r7b-12-2024", thinkingOff: { reasoning_effort: "none" } },
+  siliconflow: { keyField: "siliconflowApiKey", base: "https://api.siliconflow.cn/v1", modelField: "siliconflowModel", defaultModel: "Qwen/Qwen3-8B", thinkingOff: { enable_thinking: false } },
+  zhipu: { keyField: "zhipuApiKey", base: "https://open.bigmodel.cn/api/paas/v4", modelField: "zhipuModel", defaultModel: "glm-4.7-flash", thinkingOff: { thinking: { type: "disabled" } } },
+  kimi: { keyField: "kimiApiKey", base: "https://api.moonshot.cn/v1", modelField: "kimiModel", defaultModel: "kimi-k2.6", thinkingOff: { thinking: { type: "disabled" } } },
+  ark: { keyField: "arkApiKey", base: "https://ark.cn-beijing.volces.com/api/v3", modelField: "arkModel", defaultModel: "doubao-seed-2-0-mini-260428", thinkingOff: { thinking: { type: "disabled" } }, regionField: "arkRegion", regions: { cn: "https://ark.cn-beijing.volces.com/api/v3", intl: "https://ark.ap-southeast.bytepluses.com/api/v3" } },  // Volcengine Ark; intl = BytePlus ModelArk (a separate account; model IDs differ). thinkingOff per Ark's deep-thinking doc
+  opencode: { keyField: "opencodeApiKey", base: "https://opencode.ai/inference/openai/v1", modelField: "opencodeModel", defaultModel: "glm-5.3-flash", protocolField: "opencodeProtocol", anthropicBase: "https://opencode.ai/inference/anthropic/v1" },  // no thinkingOff: a gateway forwarding to upstream models whose dialects differ
+  commandcode: { keyField: "commandcodeApiKey", base: "https://api.commandcode.ai/provider/v1", modelField: "commandcodeModel", defaultModel: "deepseek/deepseek-v4-flash", protocolField: "commandcodeProtocol", anthropicBase: "https://api.commandcode.ai/provider/v1" },  // no thinkingOff: a gateway forwarding to upstream models whose dialects differ
+  custom: { keyField: "customApiKey", base: "", baseField: "customBaseUrl", modelField: "customModel", defaultModel: "" },  // no thinkingOff: dialect unknown
 };
+// @generated:ai-providers end (openai-compat)
 
 // ---- Unified AI target resolver ----
 // One place that answers "where does this provider's request go, with which
@@ -395,16 +388,17 @@ const OPENAI_COMPAT_PROVIDERS = {
 // dictionary provenance, video punctuation key, status page -- reads it, so
 // they can no longer drift apart (tests/md-ai-tests.html pins each output in
 // its provider-resolution golden).
-// The bespoke callers' own table (gemini / claude / ollama). A plain literal:
-// the K81 gate in tests/ui-contract-tests.mjs evaluates it and compares each
-// defaultModel with SETTINGS_DEFAULTS. callGemini and callOllama still carry
-// their own fallback models, which K81 keeps equal to these; callAnthropicMessages
-// has none and sends only the resolved target.model.
+// The bespoke callers' own table (gemini / claude / ollama), generated from
+// scripts/ai-providers-source.mjs so it cannot drift from SETTINGS_DEFAULTS.
+// callGemini and callOllama read their fallback model/base from this table;
+// callAnthropicMessages has none and sends only the resolved target.model.
+// @generated:ai-providers start (bespoke)
 const _AI_BESPOKE_PROVIDERS = {
-  gemini: { protocol: "gemini",    keyField: "geminiApiKey", modelField: "geminiModel", defaultModel: "gemini-3.5-flash-lite", base: "https://generativelanguage.googleapis.com" },
-  claude: { protocol: "anthropic", keyField: "claudeApiKey", modelField: "claudeModel", defaultModel: "claude-haiku-4-5",      base: "https://api.anthropic.com/v1" },
-  ollama: { protocol: "ollama",    keyField: "",             modelField: "ollamaModel", defaultModel: "llama3.2",              base: "http://localhost:11434", baseField: "ollamaBaseUrl" },
+  gemini: { protocol: "gemini", keyField: "geminiApiKey", modelField: "geminiModel", defaultModel: "gemini-3.5-flash-lite", base: "https://generativelanguage.googleapis.com" },
+  claude: { protocol: "anthropic", keyField: "claudeApiKey", modelField: "claudeModel", defaultModel: "claude-haiku-4-5", base: "https://api.anthropic.com/v1" },
+  ollama: { protocol: "ollama", keyField: "", modelField: "ollamaModel", defaultModel: "llama3.2", base: "http://localhost:11434", baseField: "ollamaBaseUrl" },
 };
+// @generated:ai-providers end (bespoke)
 
 // Resolve a provider's base URL (per-provider baseField override wins).
 function _openaiCompatBase(cfg, s) {
@@ -1159,7 +1153,7 @@ const _GEMINI_THINKING_CFG = { thinkingOff: { thinkingConfig: { thinkingBudget: 
   endpoint: "https://generativelanguage.googleapis.com/v1beta" };
 
 async function callGemini(s, prompt, opts = {}) {
-  const model = opts.model || s.geminiModel || "gemini-3.5-flash-lite";
+  const model = opts.model || s.geminiModel || _AI_BESPOKE_PROVIDERS.gemini.defaultModel;
   return _aiWithDialectFallback("gemini", model, _GEMINI_THINKING_CFG, (extraBody) =>
     _callGeminiOnce(s, model, prompt, opts, extraBody));
 }
@@ -1228,7 +1222,7 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
 }
 
 async function callOllama(s, prompt, opts = {}) {
-  const base = (s.ollamaBaseUrl || "http://localhost:11434").replace(/\/+$/, "");
+  const base = (s.ollamaBaseUrl || _AI_BESPOKE_PROVIDERS.ollama.base).replace(/\/+$/, "");
   if (typeof opts.beforeRequest === "function") {
     await opts.beforeRequest();
     opts.signal?.throwIfAborted();
@@ -1240,7 +1234,7 @@ async function callOllama(s, prompt, opts = {}) {
     // size the output budget per request (AI punctuation batches) silently got
     // the server default and truncated long outputs.
     body: JSON.stringify({
-      model: opts.model || s.ollamaModel || "llama3.2", messages: [{ role: "user", content: prompt }], stream: false,
+      model: opts.model || s.ollamaModel || _AI_BESPOKE_PROVIDERS.ollama.defaultModel, messages: [{ role: "user", content: prompt }], stream: false,
       ...(opts.jsonMode ? { format: opts.responseSchema || "json" } : {}),
       options: { num_predict: opts.maxTokens || 1024 }
     })
@@ -1898,7 +1892,7 @@ async function _streamOpenAICompat(baseUrl, apiKey, model, prompt, opts, onDelta
 }
 
 async function _streamGemini(s, prompt, opts, onDelta) {
-  const model = opts.model || s.geminiModel || "gemini-3.5-flash-lite";
+  const model = opts.model || s.geminiModel || _AI_BESPOKE_PROVIDERS.gemini.defaultModel;
   const generationConfig = {
     temperature: opts.temperature !== undefined ? opts.temperature : 0.3,
     maxOutputTokens: opts.maxTokens || 1024
@@ -1982,12 +1976,12 @@ async function _streamAnthropicMessages(target, prompt, opts, onDelta) {
 }
 
 async function _streamOllama(s, prompt, opts, onDelta) {
-  const base = (s.ollamaBaseUrl || "http://localhost:11434").replace(/\/+$/, "");
+  const base = (s.ollamaBaseUrl || _AI_BESPOKE_PROVIDERS.ollama.base).replace(/\/+$/, "");
   const messages = [];
   if (opts.system) messages.push({ role: "system", content: opts.system });
   messages.push({ role: "user", content: prompt });
   const body = {
-    model: opts.model || s.ollamaModel || "llama3.2",
+    model: opts.model || s.ollamaModel || _AI_BESPOKE_PROVIDERS.ollama.defaultModel,
     messages,
     stream: true,
     // Same format field as callOllama; no `think` field on either path.
@@ -2097,7 +2091,7 @@ async function _aiStreamDispatch(s, prompt, opts, cb, control) {
     // Ask and skim declare neither and keep the direct, thinking-on request.
     const lowEffort = opts.reasoningEffort === "minimum" || opts.reasoningEffort === "low";
     if (!opts.noThinking && !lowEffort) return _streamGemini(s, prompt, opts, cb);
-    const gModel = opts.model || s.geminiModel || "gemini-3.5-flash-lite";
+    const gModel = opts.model || s.geminiModel || _AI_BESPOKE_PROVIDERS.gemini.defaultModel;
     return _aiWithDialectFallback("gemini", gModel, _GEMINI_THINKING_CFG, (extraBody) =>
       _streamGemini(s, prompt, { ...opts, model: gModel, extraBody }, cb), control);
   }
@@ -2412,6 +2406,7 @@ function pbpAiErrorText(err) {
 // click; nothing here fetches them. Providers without a public page (zhipu,
 // siliconflow) and the user's own servers (ollama, custom) have no entry.
 // `name` is the short brand the link reads with, in every locale.
+// @generated:ai-providers start (status-pages)
 const PBP_AI_STATUS_PAGES = {
   openai: { url: "https://status.openai.com/", name: "OpenAI" },
   claude: { url: "https://status.claude.com/", name: "Claude" },
@@ -2425,6 +2420,7 @@ const PBP_AI_STATUS_PAGES = {
   cohere: { url: "https://status.cohere.com/", name: "Cohere" },
   kimi: { url: "https://status.moonshot.cn/", name: "Kimi" },
 };
+// @generated:ai-providers end (status-pages)
 
 // The status page worth offering for this failure, or "". Only failures where
 // the service itself may be down or overloaded qualify: 5xx, 408, a 429 that

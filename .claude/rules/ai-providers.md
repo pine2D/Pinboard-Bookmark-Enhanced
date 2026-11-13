@@ -1,11 +1,18 @@
 ---
 paths:
+  - "scripts/ai-providers-source.mjs"
+  - "scripts/sync-ai-providers.mjs"
   - "ai.js"
+  - "shared.js"
   - "popup-ai.js"
+  - "options.html"
+  - "options.js"
   - "options-connectivity.js"
 ---
 
-# AI provider 深水区：关思考（thinking/reasoning）方言
+# AI provider 深水区：单一事实源与关思考（thinking/reasoning）方言
+
+**18 家内置 provider 的单一事实源在 `scripts/ai-providers-source.mjs`**：新增 provider、修改默认模型、默认端点、支持页面、地域或协议字段时，只改 `scripts/ai-providers-source.mjs`，随后运行 `node scripts/sync-ai-providers.mjs --write` 生成 `ai.js`、`shared.js`、`popup-ai.js`、`options.html`、`options.js`、`options-connectivity.js` 中所有 `@generated:ai-providers` 区块并同步 `options.html` 输入框 `value=` 属性，再用 `node scripts/sync-ai-providers.mjs --check` 校验零漂移且根目录运行时脚本无第二份手写副本（由 pre-commit、UI 契约测试与 `verify.sh` 静态门强制把关）。不要手工编辑 `@generated:ai-providers` 区块，也不要在运行时脚本里手写平行的 provider 数组或默认模型字面量。
 
 **勿凭记忆改 provider 表**——model 字段是自由文本，blanket 关思考字段会打到用户切换后的不兼容模型（400/422）。机制：`ai.js` 的 `OPENAI_COMPAT_PROVIDERS` 每家用 per-provider `thinkingOff` 方言字段（非 always-on `extraBody`），经 `_aiWithDialectFallback` 仅在 400/422 明确指出该思考参数不支持时调整字段 + `storage.local` 记忆。
 
