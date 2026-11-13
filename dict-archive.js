@@ -160,6 +160,7 @@ function _pbpDictArchiveRequest(request) {
     request.onerror = () => reject(request.error);
   });
 }
+/** @returns {Promise<void>} */
 function _pbpDictArchiveDone(transaction) {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
@@ -174,7 +175,7 @@ function _pbpDictArchiveDirty(owner) {
 
 function pbpCreateDictArchiveStore({
   database = globalThis.indexedDB, dbName = PBP_DICT_ARCHIVE_DB,
-  getCurrentOwner = async () => {
+  getCurrentOwner = async (_options) => {
     const owner = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : null;
     return owner ? _pbpDictArchiveOwner(owner) : null;
   },

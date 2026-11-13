@@ -59,7 +59,7 @@ function pbpNotesValidateEvent(event, expectedRecordKey, leaf = false) {
   if (event.deleted) return !Object.hasOwn(event,"value");
   const value = event.value, item = value?.item;
   const identity = _pbpNotesIdentity(event.recordKey);
-  if (!_pbpVocabOnlyKeys(value,["url","title","item"]) || Object.keys(value).length !== 3 ||
+  if (!identity || !_pbpVocabOnlyKeys(value,["url","title","item"]) || Object.keys(value).length !== 3 ||
       typeof value.url !== "string" || !value.url || pbpDictSafeUrl(value.url) !== value.url ||
       pbpNotesArticleKey(value.url) !== identity.key || typeof value.title !== "string" ||
       !_pbpVocabOnlyKeys(item,["id","n","quote","prefix","suffix","color","note","ts","fp","side","lang","noteVariants"]) ||
@@ -145,7 +145,7 @@ function pbpNotesMergeEvents(left, right) {
 }
 
 function _pbpNotesSyncError(code) {
-  const error = new Error(code); error.code = code; return error;
+  return Object.assign(new Error(code), /** @type {{ code: string, retryable?: boolean }} */ ({ code }));
 }
 
 async function _pbpNotesOwnerHash(owner) {
@@ -156,11 +156,16 @@ async function _pbpNotesOwnerHash(owner) {
 function pbpCreateNotesSyncStore({
   storage = typeof chrome !== "undefined" ? chrome.storage.local : null,
   locks = typeof navigator !== "undefined" ? navigator.locks : null,
-  getCurrentOwner = async()=>{
+  getCurrentOwner = async(_options)=>{
     const owner = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
     return owner === "ownerless" ? "" : owner;
   }
 } = {}) {
+  const store = () => {
+    if (!storage) throw _pbpNotesSyncError("local_store");
+    return storage;
+  };
+  const getMany = async(keysOrNull) => /** @type {Record<string, any>} */ (await store().get(keysOrNull));
   const withLock = (name,run) => {
     // Chrome extension contexts support Web Locks. Sync must fail closed if
     // unavailable, rather than race the existing reader/library writers.
@@ -174,11 +179,11 @@ function pbpCreateNotesSyncStore({
     if (!/^acct_.+/.test(owner) || await _pbpNotesOwnerHash(owner) !== ownerHash) throw _pbpNotesSyncError("account_changed");
     await checkOwner(owner,options);
   };
-  const read = async(key) => (await storage.get(key))[key];
+  const read = async(key) => (await getMany(key))[key];
   const stateKey = (kind,id) => PBP_NOTES_SYNC_PREFIX + kind + "_" + encodeURIComponent(id);
   const accountId = (permissionId,ownerHash) => permissionId + ":" + ownerHash;
   const batchId = (permissionId,ownerHash,fileId) => accountId(permissionId,ownerHash) + ":" + fileId;
-  const keys = async() => storage.getKeys ? storage.getKeys() : Object.keys(await storage.get(null));
+  const keys = async() => { const s = store(); return s.getKeys ? s.getKeys() : Object.keys(await getMany(null)); };
   const isArticleKey = key => /^pbp_hl_[0-9a-f]{8}$/.test(key);
   const articleKeys = async() => (await keys()).filter(isArticleKey);
   // Bounded batch size for the lock-free seed prefilter: one storage IPC per
@@ -211,7 +216,7 @@ function pbpCreateNotesSyncStore({
   const getMeta = async() => withLock("pbp-notes-device",async()=>{
     let deviceId=await read(PBP_NOTES_DEVICE_KEY);
     if (!_pbpVocabDeviceId(deviceId)) {
-      deviceId=crypto.randomUUID(); await storage.set({[PBP_NOTES_DEVICE_KEY]:deviceId});
+      deviceId=crypto.randomUUID(); await store().set({[PBP_NOTES_DEVICE_KEY]:deviceId});
     }
     return {deviceId};
   });
@@ -272,8 +277,8 @@ function pbpCreateNotesSyncStore({
         updated=saveOwnerState(updated,owner,state);
       }
       await checkOwner(owner);
-      if (!(updated.items || []).length && !updated.notesSync) await storage.remove(key);
-      else await storage.set({[key]:updated});
+      if (!(updated.items || []).length && !updated.notesSync) await store().remove(key);
+      else await store().set({[key]:updated});
       return updated;
     };
     return locked ? work() : withLock(PBP_NOTES_SYNC_RECORD_LOCK_PREFIX+key,work);
@@ -295,7 +300,7 @@ function pbpCreateNotesSyncStore({
     const all=await articleKeys();
     for (let start=0;start<all.length;start+=SEED_SCAN_CHUNK) {
       const chunk=all.slice(start,start+SEED_SCAN_CHUNK);
-      const values=await storage.get(chunk);
+      const values=await getMany(chunk);
       for (const key of chunk) rows.push(...pendingRows(values[key],owner));
     }
     return rows;
@@ -316,7 +321,7 @@ function pbpCreateNotesSyncStore({
       const all=await articleKeys();
       for (let start=0;start<all.length && processed<limit;start+=SEED_SCAN_CHUNK) {
         const chunk=all.slice(start,start+SEED_SCAN_CHUNK);
-        const values=await storage.get(chunk);
+        const values=await getMany(chunk);
         for (const key of chunk) {
           if (processed>=limit) break;
           if (!seedCandidate(key,values[key],owner)) continue;
@@ -342,7 +347,9 @@ function pbpCreateNotesSyncStore({
     }
     const grouped=new Map();
     for (const body of batches) for (const event of body.entries) {
-      const key=_pbpNotesIdentity(event.recordKey).key;
+      const ident=_pbpNotesIdentity(event.recordKey);
+      if (!ident) return {ok:false,error:"invalid_remote_page"};
+      const key=ident.key;
       if (!grouped.has(key)) grouped.set(key,[]);
       grouped.get(key).push(event);
     }
@@ -355,7 +362,9 @@ function pbpCreateNotesSyncStore({
         await checkOwner(owner);
         const state=ownerState(rec,owner);
         for (const remote of events) {
-          const id=_pbpNotesIdentity(remote.recordKey).id;
+          const ident=_pbpNotesIdentity(remote.recordKey);
+          if (!ident) throw _pbpNotesSyncError("invalid_remote_page");
+          const id=ident.id;
           const local=eventOf(rec,owner,id,state.events[id]);
           if (!local && rec.items.some(it=>it.owner===owner && it.id===id)) throw _pbpNotesSyncError("local_store");
           const result=local ? pbpNotesMergeEvents(local,remote) : {kind:"apply",event:remote,requeue:false};
@@ -377,7 +386,7 @@ function pbpCreateNotesSyncStore({
         }
         rec=saveOwnerState(rec,owner,state);
         await checkOwner(owner);
-        await storage.set({[key]:rec});
+        await store().set({[key]:rec});
       });
       if (cursorCommit && !await putAccountState(cursorCommit)) throw _pbpNotesSyncError("local_store");
       return {ok:true,applied,merged,ignored};
@@ -395,7 +404,7 @@ function pbpCreateNotesSyncStore({
       const state=ownerState(rec,owner);
       for (const id of Object.keys(state.events)) { eventOf(rec,owner,id,state.events[id]);state.pending[id]=true;count++; }
       if (!Object.keys(state.events).length) return;
-      await checkOwner(owner);await storage.set({[key]:saveOwnerState(rec,owner,state)});
+      await checkOwner(owner);await store().set({[key]:saveOwnerState(rec,owner,state)});
     });
     return count;
   }
@@ -404,7 +413,7 @@ function pbpCreateNotesSyncStore({
   async function checkedStateWrite(key,value,options) {
     const owner=await getCurrentOwner(options);
     if (!/^acct_.+/.test(owner)) throw _pbpNotesSyncError("account_changed");
-    await checkHash(owner,value.ownerHash,options); await storage.set({[key]:value}); return true;
+    await checkHash(owner,value.ownerHash,options); await store().set({[key]:value}); return true;
   }
   // Owner checks call Drive about(); a connection failure there is the
   // runner's verdict to record, not a failed local write.
@@ -429,7 +438,7 @@ function pbpCreateNotesSyncStore({
     try {
       const options={requireDriveAccount:false};
       const owner=await getCurrentOwner(options);await checkHash(owner,ownerHash,options);
-      await storage.remove(stateKey("preflight",ownerHash));return true;
+      await store().remove(stateKey("preflight",ownerHash));return true;
     } catch (error) { return stateFailure(error); }
   }
   // Pending IDs live in the owner's article records and are shared by every
@@ -442,18 +451,18 @@ function pbpCreateNotesSyncStore({
       const owner=await getCurrentOwner(); await checkHash(owner,ownerHash);
       return await withLock("pbp-notes-batches",async()=>{
         const activeKey=stateKey("active",ownerHash),rowKey=stateKey("account",accountId(permissionId,ownerHash));
-        const values=await storage.get([activeKey,rowKey]);
+        const values=await getMany([activeKey,rowKey]);
         if (values[activeKey]?.permissionId===permissionId) return true;
-        const writes={[activeKey]:{ownerHash,permissionId}};
+        const writes=/** @type {Record<string, any>} */ ({[activeKey]:{ownerHash,permissionId}});
         if (values[rowKey]) writes[rowKey]={...values[rowKey],needsCheckpoint:true};
-        await checkOwner(owner); await storage.set(writes); return true;
+        await checkOwner(owner); await store().set(writes); return true;
       });
     } catch (error) { return stateFailure(error); }
   }
   async function listPendingBatches(permissionId,ownerHash) {
     const prefix=stateKey("batch",accountId(permissionId,ownerHash)+":");
     const selected=(await keys()).filter(key=>key.startsWith(prefix));
-    const values=selected.length ? await storage.get(selected) : {};
+    const values=selected.length ? await getMany(selected) : /** @type {Record<string, any>} */ ({});
     return Object.values(values).filter(row=>row.drivePermissionId===permissionId && row.ownerHash===ownerHash);
   }
   async function freezeOutbox(owner,permissionId,ownerHash,fileId,batch) {
@@ -466,9 +475,11 @@ function pbpCreateNotesSyncStore({
       const frozen={key,drivePermissionId:permissionId,ownerHash,driveFileId:fileId,body:batch.body,bytes:batch.bytes};
       const old=await read(key);
       if (old && old.body!==frozen.body) throw _pbpNotesSyncError("local_store");
-      await checkOwner(owner); await storage.set({[key]:frozen});
+      await checkOwner(owner); await store().set({[key]:frozen});
       for (const event of body.entries) {
-        const {key:articleKey,id}=_pbpNotesIdentity(event.recordKey);
+        const ident=_pbpNotesIdentity(event.recordKey);
+        if (!ident) throw _pbpNotesSyncError("local_store");
+        const {key:articleKey,id}=ident;
         await withLock(PBP_NOTES_SYNC_RECORD_LOCK_PREFIX+articleKey,async()=>{
           await checkOwner(owner);
           const rec=await read(articleKey); if (!rec) return;
@@ -476,7 +487,7 @@ function pbpCreateNotesSyncStore({
           const current=eventOf(rec,owner,id,state.events[id]);
           if (!current || !pbpVocabEventContentEqual(current,event)) return;
           delete state.pending[id];
-          await checkOwner(owner);await storage.set({[articleKey]:saveOwnerState(rec,owner,state)});
+          await checkOwner(owner);await store().set({[articleKey]:saveOwnerState(rec,owner,state)});
         });
       }
       return frozen;
@@ -485,7 +496,7 @@ function pbpCreateNotesSyncStore({
   async function deletePendingBatch(permissionId,ownerHash,fileId) {
     try {
       const owner=await getCurrentOwner();await checkHash(owner,ownerHash);
-      await storage.remove(stateKey("batch",batchId(permissionId,ownerHash,fileId)));return true;
+      await store().remove(stateKey("batch",batchId(permissionId,ownerHash,fileId)));return true;
     } catch (error) { return stateFailure(error); }
   }
   async function snapshot(owner,ownerHash) {
@@ -496,7 +507,7 @@ function pbpCreateNotesSyncStore({
     const recordKeys=allKeys.filter(isArticleKey);
     const accountKeys=allKeys.filter(key=>key.startsWith(PBP_NOTES_SYNC_PREFIX+"account_"));
     const wanted=[...recordKeys,...accountKeys];
-    const values=wanted.length ? await storage.get(wanted) : {};
+    const values=wanted.length ? await getMany(wanted) : /** @type {Record<string, any>} */ ({});
     const outbox=[],notices=[];
     for (const key of recordKeys) {
       const rec=values[key];
@@ -518,7 +529,7 @@ function pbpCreateNotesSyncStore({
       for (const key of await articleKeys()) await withLock(PBP_NOTES_SYNC_RECORD_LOCK_PREFIX+key,async()=>{
         await checkOwner(owner); const rec=await read(key); if (!rec) return;
         const state=ownerState(rec,owner); if (!Object.keys(state.notices).length) return;
-        state.notices=Object.create(null);await checkOwner(owner);await storage.set({[key]:saveOwnerState(rec,owner,state)});
+        state.notices=Object.create(null);await checkOwner(owner);await store().set({[key]:saveOwnerState(rec,owner,state)});
       });
       return true;
     } catch (error) {

@@ -101,6 +101,7 @@ function _pbpAskArchiveRequest(request) {
     request.onerror = () => reject(request.error);
   });
 }
+/** @returns {Promise<void>} */
 function _pbpAskArchiveDone(transaction) {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
@@ -115,7 +116,7 @@ function _pbpAskArchiveDirty(owner) {
 
 function pbpCreateAskArchiveStore({
   database = globalThis.indexedDB, dbName = PBP_ASK_ARCHIVE_DB,
-  getCurrentOwner = async () => {
+  getCurrentOwner = async (_options) => {
     const owner = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : null;
     return owner ? _pbpAskArchiveOwner(owner) : null;
   },
