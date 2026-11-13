@@ -30,6 +30,7 @@ const PBP_BACKUP_TARGET_FIELDS = Object.freeze({
 // backup carrying the retired value becomes wholly unimportable, settings and
 // themes included. Any addition or removal must ship a compatible read path
 // for files written by earlier releases.
+// @generated:settings-schema start (backup-enums)
 const PBP_BACKUP_ENUMS = Object.freeze({
   optTheme: ["auto", "light", "dark"],
   bookmarkService: ["pinboard", "karakeep", "linkding"],
@@ -40,22 +41,17 @@ const PBP_BACKUP_ENUMS = Object.freeze({
   selectionTrigger: ["icon", "hotkey", "off"],
   dictDefaultView: ["dictionary", "ai-saved", "ai-generate"],
   dictLearnerLevel: ["", "beginner", "intermediate", "advanced"],
-  // Each region enum must equal the keys of its registry entry's `regions` in
-  // ai.js's OPENAI_COMPAT_PROVIDERS (settings-persist-tests evaluates the
-  // registry and compares).
   qwenRegion: ["beijing", "singapore", "virginia", "tokyo"],
   arkRegion: ["cn", "intl"],
-  // The formats ai.js _aiProtocolOf accepts for an entry with a protocolField.
   opencodeProtocol: ["openai", "anthropic"],
   commandcodeProtocol: ["openai", "anthropic"],
-  // The first custom entry's format; equals shared.js PBP_AI_PROTOCOLS.
   customProtocol: ["openai", "anthropic"],
 });
 
-// Provider region/format enums whose out-of-table value is dropped (key by
-// key) instead of rejecting the whole file; every other enum above still throws.
-const PBP_BACKUP_DROP_ON_UNKNOWN_ENUM = new Set(
-  ["qwenRegion", "arkRegion", "opencodeProtocol", "commandcodeProtocol", "customProtocol"]);
+const PBP_BACKUP_DROP_ON_UNKNOWN_ENUM = new Set([
+  "qwenRegion", "arkRegion", "opencodeProtocol", "commandcodeProtocol", "customProtocol",
+]);
+// @generated:settings-schema end (backup-enums)
 
 // Per-provider preview model overrides: keys must look like provider ids and
 // values like model names. Bounded (entry count / value length) because backup
