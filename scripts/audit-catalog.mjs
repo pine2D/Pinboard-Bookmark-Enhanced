@@ -27,6 +27,7 @@ function ownership(name) {
   if (/^theme-/.test(name)) return ['popup', 'options', 'library', 'pinboard'];
   if (/^ui-|^i18n-|^a11y|^contrast|^confirm-layout|^escape-html/.test(name)) return ui;
   if (/^vocab-|^notes-|^drive-|^anki-|^eudic-/.test(name)) return ['background', 'library', 'options', 'md-preview'];
+  if (name === 'ai-providers-source') return ['background', 'popup', 'options', 'tooling'];
   if (/^ai-|^export-|^jina-/.test(name)) return ['background', 'popup', 'options', 'md-preview'];
   if (/^background-/.test(name)) return ['background'];
   throw new Error(`Audit suite has no surface owner: ${name}; register it in audit-catalog.mjs`);
@@ -53,7 +54,7 @@ export const TEST_SCENARIOS = testFiles.filter(name => name !== 'pinboard-theme-
     id: 'test.' + base, runner: name.endsWith('.html') ? 'html' : 'node', file,
     surfaces, features: features(base), kinds: ['popup-label-fit', 'confirm-layout'].includes(base) ? ['layout', 'i18n'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history', 'bookmark-service-runtime', 'upgrade-path'].includes(base) ? 'logic' : 'contract'],
     browser: ['popup-label-fit', 'confirm-layout', 'ask-history', 'library-ask-history', 'bookmark-service-runtime', 'bookmark-live-preflight', 'upgrade-path'].includes(base),
-    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base === 'bookmark-live-preflight' ? ['scripts/bookmark-service-live.mjs'] : []), ...(base === 'mutate-check' ? ['scripts/mutate-check.mjs'] : []), ...(base === 'upgrade-path' ? ['restore-points.js', 'vocab-store.js', 'notes-sync.js', 'dict-archive.js', 'ask-archive.js', '.claude/store-ledger.md'] : []), ...(/^dict-(?:entry|usage|evidence|archive)$/.test(base) ? ['dict-entry.js', 'dict-evidence.js', 'dict-archive.js'] : []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
+    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base === 'ai-providers-source' ? ['scripts/ai-providers-source.mjs', 'scripts/sync-ai-providers.mjs'] : []), ...(base === 'bookmark-live-preflight' ? ['scripts/bookmark-service-live.mjs'] : []), ...(base === 'mutate-check' ? ['scripts/mutate-check.mjs'] : []), ...(base === 'upgrade-path' ? ['restore-points.js', 'vocab-store.js', 'notes-sync.js', 'dict-archive.js', 'ask-archive.js', '.claude/store-ledger.md'] : []), ...(/^dict-(?:entry|usage|evidence|archive)$/.test(base) ? ['dict-entry.js', 'dict-evidence.js', 'dict-archive.js'] : []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
     dependencies: [], axes: {},
   };
 });
@@ -68,6 +69,7 @@ export const STATIC_SCENARIOS = [
   staticRow('vendor-lock', 'scripts/vendor-lock-check.mjs', ['tooling'], ['vendor/**']),
   staticRow('docs', 'scripts/docs-lint.mjs', ['tooling'], ['README*.md', '.claude/expiring-items.md', 'docs/index.md', 'docs/privacy.md'], ['docs']),
   staticRow('store-copy', 'scripts/sync-store-descriptions.mjs', ['tooling'], ['README*.md', 'docs/cws-assets/**'], ['docs'], ['--check']),
+  staticRow('ai-providers', 'scripts/sync-ai-providers.mjs', ['background', 'popup', 'options'], ['scripts/ai-providers-source.mjs', 'ai.js', 'shared.js', 'popup-ai.js', 'options.html', 'options.js', 'options-connectivity.js'], ['generation', 'contract'], ['--check']),
   staticRow('theme-sync', 'docs/theme-surface/tools/sync-all.mjs', ['popup', 'options', 'library', 'pinboard'], ['docs/theme-surface/**', 'pinboard-themes.js', 'popup.css', 'options.css', 'library.css'], ['generation'], ['--check']),
   ...['token-coverage', 'cascade-lint', 'override-drift', 'handedit-audit'].map(name => staticRow(name, `docs/theme-surface/tools/${name}.mjs`, ['popup', 'options', 'library', 'pinboard'], ['docs/theme-surface/**', 'pinboard-themes.js'], ['generation'])),
 ];
