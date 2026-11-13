@@ -9,32 +9,26 @@ function pbpLiveAiSettingsSnapshot(provider) {
   function getOptVal(id, fallback) { return $id(id)?.value?.trim() || fallback || ""; }
   const out = {
     aiProvider: provider,
+    // @generated:ai-providers start (live-snapshot)
     geminiApiKey: getOptVal("opt-gemini-key"), geminiModel: getOptVal("opt-gemini-model", "gemini-3.5-flash-lite"),
     openaiApiKey: getOptVal("opt-openai-key"), openaiModel: getOptVal("opt-openai-model", "gpt-5.4-nano"), openaiBaseUrl: getOptVal("opt-openai-baseurl", "https://api.openai.com/v1"),
     claudeApiKey: getOptVal("opt-claude-key"), claudeModel: getOptVal("opt-claude-model", "claude-haiku-4-5"),
     deepseekApiKey: getOptVal("opt-deepseek-key"), deepseekModel: getOptVal("opt-deepseek-model", "deepseek-v4-flash"),
-    qwenApiKey: getOptVal("opt-qwen-key"), qwenModel: getOptVal("opt-qwen-model", "qwen-flash"),
-    // The default only stands in for a missing element: a select showing no
-    // option ("", a region this version does not know) is passed through so
-    // the resolver fails it closed instead of testing Beijing.
-    qwenRegion: $id("opt-qwen-region")?.value ?? "beijing", qwenWorkspaceId: getOptVal("opt-qwen-workspace"),
+    qwenApiKey: getOptVal("opt-qwen-key"), qwenModel: getOptVal("opt-qwen-model", "qwen-flash"), qwenRegion: $id("opt-qwen-region")?.value ?? "beijing", qwenWorkspaceId: getOptVal("opt-qwen-workspace"),
     minimaxApiKey: getOptVal("opt-minimax-key"), minimaxModel: getOptVal("opt-minimax-model", "MiniMax-M2"),
     openrouterApiKey: getOptVal("opt-openrouter-key"), openrouterModel: getOptVal("opt-openrouter-model", "openai/gpt-oss-20b"),
-    ollamaBaseUrl: getOptVal("opt-ollama-baseurl", "http://localhost:11434"), ollamaModel: getOptVal("opt-ollama-model", "llama3.2"),
     groqApiKey: getOptVal("opt-groq-key"), groqModel: getOptVal("opt-groq-model", "openai/gpt-oss-20b"),
     mistralApiKey: getOptVal("opt-mistral-key"), mistralModel: getOptVal("opt-mistral-model", "mistral-small-latest"),
     cohereApiKey: getOptVal("opt-cohere-key"), cohereModel: getOptVal("opt-cohere-model", "command-r7b-12-2024"),
     siliconflowApiKey: getOptVal("opt-siliconflow-key"), siliconflowModel: getOptVal("opt-siliconflow-model", "Qwen/Qwen3-8B"),
     zhipuApiKey: getOptVal("opt-zhipu-key"), zhipuModel: getOptVal("opt-zhipu-model", "glm-4.7-flash"),
     kimiApiKey: getOptVal("opt-kimi-key"), kimiModel: getOptVal("opt-kimi-model", "kimi-k2.6"),
-    // Region and format selects pass "" through like the Model Studio region.
-    arkApiKey: getOptVal("opt-ark-key"), arkModel: getOptVal("opt-ark-model", "doubao-seed-2-0-mini-260428"),
-    arkRegion: $id("opt-ark-region")?.value ?? "cn",
-    opencodeApiKey: getOptVal("opt-opencode-key"), opencodeModel: getOptVal("opt-opencode-model", "glm-5.3-flash"),
-    opencodeProtocol: $id("opt-opencode-protocol")?.value ?? "openai",
-    commandcodeApiKey: getOptVal("opt-commandcode-key"), commandcodeModel: getOptVal("opt-commandcode-model", "deepseek/deepseek-v4-flash"),
-    commandcodeProtocol: $id("opt-commandcode-protocol")?.value ?? "openai",
+    arkApiKey: getOptVal("opt-ark-key"), arkModel: getOptVal("opt-ark-model", "doubao-seed-2-0-mini-260428"), arkRegion: $id("opt-ark-region")?.value ?? "cn",
+    opencodeApiKey: getOptVal("opt-opencode-key"), opencodeModel: getOptVal("opt-opencode-model", "glm-5.3-flash"), opencodeProtocol: $id("opt-opencode-protocol")?.value ?? "openai",
+    commandcodeApiKey: getOptVal("opt-commandcode-key"), commandcodeModel: getOptVal("opt-commandcode-model", "deepseek/deepseek-v4-flash"), commandcodeProtocol: $id("opt-commandcode-protocol")?.value ?? "openai",
+    ollamaBaseUrl: getOptVal("opt-ollama-baseurl", "http://localhost:11434"), ollamaModel: getOptVal("opt-ollama-model", "llama3.2"),
     customApiKey: getOptVal("opt-custom-key"), customModel: getOptVal("opt-custom-model"), customBaseUrl: getOptVal("opt-custom-baseurl"),
+    // @generated:ai-providers end (live-snapshot)
   };
   // The custom entries' unsaved edits live in the editor model, not in the
   // shared panel's fields (which show one entry at a time).
@@ -697,7 +691,7 @@ function setupApiTests() {
     }
   }
 
-  ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ark","opencode","commandcode","ollama","custom"].forEach(p => {
+  PBP_AI_PROVIDER_IDS.forEach(p => {
     // One listener per button (R13): the shared custom button tests the
     // entry the picker shows.
     $id(`test-${p}`)?.addEventListener("click", () => testAIProvider(p === "custom" ? (pbpOptAiCustomActiveId() || "custom") : p));

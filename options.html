@@ -562,6 +562,7 @@
         </div>
         <div class="fg entry-block">
           <select id="opt-ai-provider" aria-labelledby="sec-ai-provider" data-listbox>
+          <!-- @generated:ai-providers start (provider-select) -->
             <optgroup data-i18n-label="providerGroupKey" label="Cloud (API key)">
               <option value="gemini" data-i18n="provGemini">Google Gemini</option>
               <option value="openai" data-i18n="provOpenai">OpenAI (ChatGPT)</option>
@@ -586,6 +587,7 @@
             <optgroup data-i18n-label="providerGroupCompat" label="Custom">
               <option value="custom">Custom</option>
             </optgroup>
+          <!-- @generated:ai-providers end (provider-select) -->
           </select>
           <p class="hint" data-i18n="aiKeyLocalHint">AI is optional: saving and reading work without it. Each API key stays in this browser and is sent only to its own provider.</p>
           <div class="fg-actions">

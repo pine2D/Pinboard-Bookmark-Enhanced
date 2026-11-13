@@ -81,10 +81,9 @@ if (typeof document !== "undefined") {
 const PBP_CONNECTION_HEALTH_KEY = "_connectionHealthV1";
 const PBP_CONNECTION_HEALTH_IDS = new Set([
   "pinboard", "anki", "eudic",
-  ...["gemini", "openai", "claude", "deepseek", "qwen", "minimax", "openrouter",
-    "groq", "mistral", "cohere", "siliconflow", "zhipu", "kimi", "ark", "opencode", "commandcode",
-    "ollama", "custom"]
-    .map((provider) => `ai:${provider}`),
+  // @generated:ai-providers start (health-ids)
+  "ai:gemini", "ai:openai", "ai:claude", "ai:deepseek", "ai:qwen", "ai:minimax", "ai:openrouter", "ai:groq", "ai:mistral", "ai:cohere", "ai:siliconflow", "ai:zhipu", "ai:kimi", "ai:ark", "ai:opencode", "ai:commandcode", "ai:ollama", "ai:custom",
+  // @generated:ai-providers end (health-ids)
 ]);
 let _connectionHealthWriteTail = Promise.resolve();
 // A custom provider list entry is admitted by its id pattern alone; the Set
@@ -1979,25 +1978,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     ai: {
       fields: {
         "opt-ai-provider": "gemini",
-        "opt-gemini-model": "gemini-3.5-flash-lite", "opt-openai-model": "gpt-5.4-nano",
-        "opt-openai-baseurl": "https://api.openai.com/v1", "opt-claude-model": "claude-haiku-4-5",
-        "opt-deepseek-model": "deepseek-v4-flash", "opt-qwen-model": "qwen-flash",
-        "opt-qwen-region": "beijing", "opt-qwen-workspace": "",
-        "opt-minimax-model": "MiniMax-M2", "opt-openrouter-model": "openai/gpt-oss-20b",
-        "opt-groq-model": "openai/gpt-oss-20b", "opt-mistral-model": "mistral-small-latest",
-        "opt-cohere-model": "command-r7b-12-2024", "opt-siliconflow-model": "Qwen/Qwen3-8B",
-        "opt-zhipu-model": "glm-4.7-flash", "opt-kimi-model": "kimi-k2.6",
-        "opt-ark-model": "doubao-seed-2-0-mini-260428", "opt-ark-region": "cn",
-        "opt-opencode-model": "glm-5.3-flash", "opt-opencode-protocol": "openai",
-        "opt-commandcode-model": "deepseek/deepseek-v4-flash", "opt-commandcode-protocol": "openai",
-        "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2"
+        // @generated:ai-providers start (panel-defaults-fields)
+        "opt-gemini-model": "gemini-3.5-flash-lite", "opt-openai-model": "gpt-5.4-nano", "opt-openai-baseurl": "https://api.openai.com/v1", "opt-claude-model": "claude-haiku-4-5", "opt-deepseek-model": "deepseek-v4-flash", "opt-qwen-model": "qwen-flash", "opt-qwen-region": "beijing", "opt-qwen-workspace": "", "opt-minimax-model": "MiniMax-M2", "opt-openrouter-model": "openai/gpt-oss-20b", "opt-groq-model": "openai/gpt-oss-20b", "opt-mistral-model": "mistral-small-latest", "opt-cohere-model": "command-r7b-12-2024", "opt-siliconflow-model": "Qwen/Qwen3-8B", "opt-zhipu-model": "glm-4.7-flash", "opt-kimi-model": "kimi-k2.6", "opt-ark-model": "doubao-seed-2-0-mini-260428", "opt-ark-region": "cn", "opt-opencode-model": "glm-5.3-flash", "opt-opencode-protocol": "openai", "opt-commandcode-model": "deepseek/deepseek-v4-flash", "opt-commandcode-protocol": "openai", "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2",
+        // @generated:ai-providers end (panel-defaults-fields)
       },
       keepsSecrets: true,
       // The custom panel shows one stored provider entry: a reset keeps the
       // entries (they are records the user added, like the keys), so its
       // fields are not reset either.
-      skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-ark-key","opt-opencode-key","opt-commandcode-key","opt-custom-key",
-        "opt-custom-name","opt-custom-protocol","opt-custom-baseurl","opt-custom-model"]
+      skip: [
+        // @generated:ai-providers start (panel-defaults-skip)
+        "opt-gemini-key", "opt-openai-key", "opt-claude-key", "opt-deepseek-key", "opt-qwen-key", "opt-minimax-key", "opt-openrouter-key", "opt-groq-key", "opt-mistral-key", "opt-cohere-key", "opt-siliconflow-key", "opt-zhipu-key", "opt-kimi-key", "opt-ark-key", "opt-opencode-key", "opt-commandcode-key", "opt-custom-key",
+        // @generated:ai-providers end (panel-defaults-skip)
+        "opt-custom-name", "opt-custom-protocol", "opt-custom-baseurl", "opt-custom-model",
+      ],
     },
     "ai-behavior": {
       fields: {
@@ -3313,12 +3307,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const fieldMap = {
     "opt-pinboard-token": s.pinboardToken,
     "opt-ai-provider": s.aiProvider,
+    // @generated:ai-providers start (field-map)
     "opt-gemini-key": s.geminiApiKey, "opt-gemini-model": s.geminiModel,
     "opt-openai-key": s.openaiApiKey, "opt-openai-model": s.openaiModel, "opt-openai-baseurl": s.openaiBaseUrl,
     "opt-claude-key": s.claudeApiKey, "opt-claude-model": s.claudeModel,
     "opt-deepseek-key": s.deepseekApiKey, "opt-deepseek-model": s.deepseekModel,
-    "opt-qwen-key": s.qwenApiKey, "opt-qwen-model": s.qwenModel,
-    "opt-qwen-region": s.qwenRegion, "opt-qwen-workspace": s.qwenWorkspaceId,
+    "opt-qwen-key": s.qwenApiKey, "opt-qwen-model": s.qwenModel, "opt-qwen-region": s.qwenRegion, "opt-qwen-workspace": s.qwenWorkspaceId,
     "opt-minimax-key": s.minimaxApiKey, "opt-minimax-model": s.minimaxModel,
     "opt-openrouter-key": s.openrouterApiKey, "opt-openrouter-model": s.openrouterModel,
     "opt-groq-key": s.groqApiKey, "opt-groq-model": s.groqModel,
@@ -3331,6 +3325,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-opencode-key": s.opencodeApiKey, "opt-opencode-model": s.opencodeModel, "opt-opencode-protocol": s.opencodeProtocol,
     "opt-commandcode-key": s.commandcodeApiKey, "opt-commandcode-model": s.commandcodeModel, "opt-commandcode-protocol": s.commandcodeProtocol,
     "opt-ollama-baseurl": s.ollamaBaseUrl, "opt-ollama-model": s.ollamaModel,
+    // @generated:ai-providers end (field-map)
     "opt-ai-tag-lang": s.aiTagLang, "opt-ai-summary-lang": s.aiSummaryLang, "opt-ai-cache-duration": s.aiCacheDuration,
     "opt-custom-tag-prompt": s.customTagPrompt, "opt-custom-summary-prompt": s.customSummaryPrompt,
     "opt-batch-tag": s.optBatchTag, "opt-lang": s.optLang, "opt-theme": s.optTheme,
@@ -3978,7 +3973,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- Provider field toggle ----
   // Same order as popup-ai.js AI_PROVIDER_ORDER (K81): deleting the current
   // custom entry falls back along it.
-  const providers = ["gemini","openai","claude","deepseek","qwen","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","minimax","ark","opencode","commandcode","ollama","custom"];
+  const providers = PBP_AI_FALLBACK_ORDER;
   // Reader tab's model-override input follows the selected provider: stash the
   // visible value under the outgoing provider, show the incoming provider's
   // entry (absent -> empty, NOT the legacy single key: showing a stale
@@ -4402,6 +4397,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       batchSkipExisting: $id("batch-skip-existing").checked,
       // AI Provider & Keys
       aiProvider: $id("opt-ai-provider").value,
+      // @generated:ai-providers start (collect-form)
       geminiApiKey: obfuscateKey($id("opt-gemini-key").value.trim()),
       geminiModel: $id("opt-gemini-model").value.trim() || "gemini-3.5-flash-lite",
       openaiApiKey: obfuscateKey($id("opt-openai-key").value.trim()),
@@ -4413,12 +4409,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       deepseekModel: $id("opt-deepseek-model").value.trim() || "deepseek-v4-flash",
       qwenApiKey: obfuscateKey($id("opt-qwen-key").value.trim()),
       qwenModel: $id("opt-qwen-model").value.trim() || "qwen-flash",
-      // Saved as typed (trimmed): an invalid ID fails closed when read, never
-      // turned into "" here, which would silently fall back to Beijing.
       qwenWorkspaceId: $id("opt-qwen-workspace").value.trim(),
-      // Only a region or format the registry declares is written. A select
-      // showing no option (a stored value this version does not know) omits
-      // the key, so the stored value is kept rather than rewritten.
       ...pbpOptKnownEnumPatch("qwenRegion", $id("opt-qwen-region").value, Object.keys(OPENAI_COMPAT_PROVIDERS.qwen.regions)),
       minimaxApiKey: obfuscateKey($id("opt-minimax-key").value.trim()),
       minimaxModel: $id("opt-minimax-model").value.trim() || "MiniMax-M2",
@@ -4447,6 +4438,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ...pbpOptKnownEnumPatch("commandcodeProtocol", $id("opt-commandcode-protocol").value, PBP_AI_PROTOCOLS),
       ollamaBaseUrl: $id("opt-ollama-baseurl").value.trim() || "http://localhost:11434",
       ollamaModel: $id("opt-ollama-model").value.trim() || "llama3.2",
+      // @generated:ai-providers end (collect-form)
       // Every custom entry (customDisplayName/Protocol/BaseUrl/ApiKey/Model,
       // aiCustomProviders and the key slots) comes from the editor model.
       ...pbpOptAiCustomCollect(pbpOptAiCustomEditorState),
@@ -4895,13 +4887,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   // built with t(); a language that arrives after first paint (synced from
   // another device) would otherwise leave them in the old one.
   document.addEventListener("pbp:i18n-applied", scheduleConnectionOverview);
-  for (const id of ["opt-pinboard-token", "opt-ai-provider", "opt-gemini-key", "opt-openai-key",
-    "opt-claude-key", "opt-deepseek-key", "opt-qwen-key", "opt-minimax-key", "opt-openrouter-key",
-    "opt-groq-key", "opt-mistral-key", "opt-cohere-key", "opt-siliconflow-key", "opt-zhipu-key",
-    "opt-kimi-key", "opt-ollama-baseurl", "opt-custom-key", "opt-custom-baseurl", "dict-anki-port",
-    "dict-eudic-token", "opt-qwen-region", "opt-qwen-workspace", "opt-ark-key", "opt-opencode-key",
-    "opt-commandcode-key", "opt-ark-region", "opt-opencode-protocol", "opt-commandcode-protocol",
-    "opt-custom-protocol", "opt-custom-name"]) {
+  for (const id of ["opt-pinboard-token", "opt-ai-provider",
+    // @generated:ai-providers start (overview-inputs)
+    "opt-gemini-key", "opt-openai-key", "opt-claude-key", "opt-deepseek-key", "opt-qwen-key", "opt-qwen-region", "opt-qwen-workspace", "opt-minimax-key", "opt-openrouter-key", "opt-groq-key", "opt-mistral-key", "opt-cohere-key", "opt-siliconflow-key", "opt-zhipu-key", "opt-kimi-key", "opt-ark-key", "opt-ark-region", "opt-opencode-key", "opt-opencode-protocol", "opt-commandcode-key", "opt-commandcode-protocol", "opt-ollama-baseurl", "opt-custom-key", "opt-custom-baseurl",
+    // @generated:ai-providers end (overview-inputs)
+    "dict-anki-port", "dict-eudic-token", "opt-custom-protocol", "opt-custom-name",
+  ]) {
     const el = $id(id);
     el?.addEventListener(el.tagName === "SELECT" ? "change" : "input", scheduleConnectionOverview);
   }
