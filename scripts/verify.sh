@@ -416,6 +416,10 @@ stage "[runtime-messages] checking runtime message single-source sync, MV3 onMes
 gate static node "scripts/sync-runtime-messages.mjs" --check
 gate static node "tests/runtime-messages-tests.mjs"
 
+stage "[hard-rules] checking sync storage write error handling and credential literal gates + self-tests"
+gate static node "scripts/hard-rules-lint.mjs"
+gate static node "tests/hard-rules-lint-tests.mjs"
+
 stage "[hooks] checking installed git hooks still delegate to the tracked scripts"
 gate static sh "scripts/setup-hooks.sh" --check
 

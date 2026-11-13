@@ -64,7 +64,8 @@ AI_PROVIDERS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(ai-provider
 SETTINGS_SCHEMA_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(settings-schema|sync-settings-schema|ai-providers-source)\.mjs|tests/settings-schema-tests\.mjs|shared\.js|options-backup\.js|options\.html|options\.js)$')
 TYPECHECK_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^((vocab-store|bookmark-services|export-targets|dict-archive|ask-archive|notes-sync)\.js|scripts/(typecheck-data-layer\.mjs|jsconfig\.data-layer\.json|types/data-layer-globals\.d\.ts)|tests/typecheck-data-layer-tests\.mjs|\.qa-scan/package(-lock)?\.json)$')
 RUNTIME_MESSAGES_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^([^/]+\.js|scripts/(runtime-messages-source|sync-runtime-messages)\.mjs|tests/runtime-messages-tests\.mjs)$')
-if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ] && [ -z "$SENTINEL_CHANGED" ] && [ -z "$AI_PROVIDERS_CHANGED" ] && [ -z "$SETTINGS_SCHEMA_CHANGED" ] && [ -z "$TYPECHECK_CHANGED" ] && [ -z "$RUNTIME_MESSAGES_CHANGED" ]; then
+HARD_RULES_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '[^[:space:]]' | grep -vE '^vendor/')
+if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ] && [ -z "$SENTINEL_CHANGED" ] && [ -z "$AI_PROVIDERS_CHANGED" ] && [ -z "$SETTINGS_SCHEMA_CHANGED" ] && [ -z "$TYPECHECK_CHANGED" ] && [ -z "$RUNTIME_MESSAGES_CHANGED" ] && [ -z "$HARD_RULES_CHANGED" ]; then
   exit 0
 fi
 
@@ -321,6 +322,27 @@ if [ -n "$RUNTIME_MESSAGES_CHANGED" ]; then
     fi
   else
     echo "[runtime-messages] WARNING: .qa-scan/node_modules/espree not found, so the runtime-messages AST gate was skipped (run CI or verify.sh to cover it)" >&2
+  fi
+fi
+
+if [ -n "$HARD_RULES_CHANGED" ]; then
+  if [ -d "$REPO_ROOT/.qa-scan/node_modules/espree" ] && [ -f "$REPO_ROOT/shared.js" ]; then
+    echo "[hard-rules] checking sync storage write error handling and credential literal gates"
+    if ! node "$REPO_ROOT/scripts/hard-rules-lint.mjs"; then
+      echo ""
+      echo "[hard-rules] COMMIT BLOCKED — sync storage write error handling or credential literal check failed (see the message above)" >&2
+      exit 1
+    fi
+    if printf '%s\n' "$STAGED" | grep -qE '^(scripts/(hard-rules-lint\.mjs|commit-msg-lint\.mjs|commit-msg-hook\.sh)|tests/hard-rules-lint-tests\.mjs)$'; then
+      echo "[hard-rules] running hard-rules and commit-msg lint self-tests"
+      if ! node "$REPO_ROOT/tests/hard-rules-lint-tests.mjs"; then
+        echo ""
+        echo "[hard-rules] COMMIT BLOCKED — hard-rules or commit-msg lint self-test failed" >&2
+        exit 1
+      fi
+    fi
+  else
+    echo "[hard-rules] WARNING: .qa-scan/node_modules/espree not found, so hard-rules-lint was skipped (run CI or verify.sh to cover it)" >&2
   fi
 fi
 

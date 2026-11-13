@@ -2,6 +2,7 @@
 paths:
   - "scripts/settings-schema.mjs"
   - "scripts/sync-settings-schema.mjs"
+  - "scripts/hard-rules-lint.mjs"
   - "shared.js"
   - "background.js"
   - "options.html"
@@ -30,8 +31,8 @@ paths:
 
 - **设置项契约单表（`scripts/settings-schema.mjs`）**：非 AI provider 设置项的默认值、预热排除、凭据标记、备份枚举及设置页加载/收集/重置绑定统一定义在 `scripts/settings-schema.mjs`（内置 AI provider 字段仍在 `scripts/ai-providers-source.mjs`）。增删改设置项后运行 `node scripts/sync-settings-schema.mjs --write` 同步 `shared.js`、`options-backup.js`、`options.js` 的 `@generated:settings-schema` 区块与 `options.html` 静态默认属性，再用 `--check` 校验零漂移、面板重置/复选框 DOM 全覆盖及无手写漏网项（由 pre-commit、`tests/ui-contract-tests.mjs` 与 `scripts/verify.sh` 静态门把关）。
 
-- 凭据（API key / token / password / 导出目标）不能硬编码。默认存 `chrome.storage.local`；仅当本机 `optSyncEnabled=true` 且账号级 `syncApiKeys=true` 时用 sync；旧云端已有非空 secret 时迁移保留 `syncApiKeys=true`，避免升级丢凭据。
-- sync 配额：单 item ≤8KB、总约 100KB、写入限流；写后检查 `lastError`。缓存、大对象、瞬态状态一律 local。
+- 凭据（API key / token / password / 导出目标）不能硬编码（由 `scripts/hard-rules-lint.mjs` 扫描运行期默认字面量与入库文件凭据特征，经 pre-commit 与 `scripts/verify.sh` 静态门把关）。默认存 `chrome.storage.local`；仅当本机 `optSyncEnabled=true` 且账号级 `syncApiKeys=true` 时用 sync；旧云端已有非空 secret 时迁移保留 `syncApiKeys=true`，避免升级丢凭据。
+- sync 配额：单 item ≤8KB、总约 100KB、写入限流；写后检查 `lastError`，Promise 写入须消费拒绝分支且事件回调内须有 `try/catch`（由 `scripts/hard-rules-lint.mjs` 静态门把关）。缓存、大对象、瞬态状态一律 local。
 - 生词及其 Drive 协议状态在 IndexedDB（vocab-store.js 是生词唯一写入口）；高亮与笔记及其 Drive 协议状态走 notes-sync.js 的统一写边界；逐设备连接标记与共享连接层状态（`driveConnState:<ownerHash>`）在 local。
 - **离线队列**只存 local：新记录**仅**保存保存模式、URL、标题、备注、描述（linkding Description）、标签、私密/稍后读/归档标志、可选布尔共享修改意图（`sharedExplicit`，只来自用户可见的共享操作）、书签时间、队列 ID/入队时间、非秘密书签连接身份绑定，以及重放失败后的非秘密失败标记（`failure`：失败码、HTTP 状态、发生时间与 429 限流截止时间；原因明确、重试也不会改变结果的失败据此标为需要处理，不再自动重试，由用户手动重试或删除；限流按 Retry-After 推迟，至多 1 小时）——此外一律不存（不存响应体），禁止保存 token；legacy token 记录读取时改写为账号绑定并删除 token。重放必须用当前登录 token 且服务和连接身份与队列绑定精确一致，否则保留队列并 fail-closed。
 
