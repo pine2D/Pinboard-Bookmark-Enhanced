@@ -303,14 +303,16 @@ test('freshness: the registry is read by evaluating ai.js, not by matching its t
   assert.deepEqual(loadProviderDefaults(d), { alpha: 'a-1', beta: 'b-2' });
 }));
 test('freshness: the real registry has every provider row, and the real ledger matches it', () => {
+  const n = new Date();
+  const realToday = [n.getFullYear(), String(n.getMonth() + 1).padStart(2, '0'), String(n.getDate()).padStart(2, '0')].join('-');
   const real = loadProviderDefaults(ROOT);
   assert.ok(Object.keys(real).length >= 10, 'the real registry lists the built-in providers');
   assert.ok(!Object.hasOwn(real, 'custom'));
   for (const m of Object.values(real)) assert.ok(m.length > 0);
-  const r = lintFreshness(readFileSync(join(ROOT, '.claude/freshness-ledger.md'), 'utf8'), { today: '2026-11-11', providers: real, fileInfo: repoFileInfo(ROOT) });
+  const r = lintFreshness(readFileSync(join(ROOT, '.claude/freshness-ledger.md'), 'utf8'), { today: realToday, providers: real, fileInfo: repoFileInfo(ROOT) });
   assert.deepEqual(r.errors, []);
   const dropOne = { ...real, zz_new_provider: 'zz-1' };
-  assert.match(lintFreshness(readFileSync(join(ROOT, '.claude/freshness-ledger.md'), 'utf8'), { today: '2026-11-11', providers: dropOne, fileInfo: repoFileInfo(ROOT) }).errors.join('\n'), /zz_new_provider/);
+  assert.match(lintFreshness(readFileSync(join(ROOT, '.claude/freshness-ledger.md'), 'utf8'), { today: realToday, providers: dropOne, fileInfo: repoFileInfo(ROOT) }).errors.join('\n'), /zz_new_provider/);
 });
 
 // ---- 临时事项 parser shared with docs-lint, and the due-soon list ----

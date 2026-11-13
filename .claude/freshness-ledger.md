@@ -76,7 +76,7 @@
 | LiteLLM | tests/fixtures/dict-live-malformed-responses.js:1 | 2026-10-26 | 原文：// Reviewed synthetic-term answers captured on 2026-10-26 through LiteLLM. |
 | Jina Reader | tests/jina-cache-tests.html | 未核实 | - |
 | Wayback Machine | tests/wayback-tests.html | 未核实 | - |
-| Free Dictionary | tests/md-dict-tests.html:216 | 2026-07-31 | 原文：// Payloads captured verbatim from freedictionaryapi.com on 2026-07-31, NOT |
+| Free Dictionary | tests/md-dict-tests.html:216 | 2026-11-13 | 2026-11-13 复核 es/aprovecho、pl/psa、en/found 线上响应；pl/psa 同步新增 IPA |
 | Free Dictionary | tests/library-vocab-tests.html | 未核实 | 照 md-dict-tests.html 的样本手写 |
 | Free Dictionary | tests/library-listbox-tests.html | 未核实 | 照 md-dict-tests.html 的样本手写 |
 | 欧路词典 | tests/eudic-sync-tests.html | 未核实 | 只模拟到调用层的返回值 |
