@@ -62,7 +62,8 @@ SLICE_BASELINE_STAGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^scripts
 SLICE_TOOLS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/slice-anchor-lint\.mjs|tests/slice-anchor-lint-tests\.mjs)$')
 AI_PROVIDERS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(ai-providers-source|sync-ai-providers)\.mjs|tests/ai-providers-source-tests\.mjs|ai\.js|shared\.js|popup-ai\.js|options\.html|options\.js|options-connectivity\.js)$')
 SETTINGS_SCHEMA_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(settings-schema|sync-settings-schema|ai-providers-source)\.mjs|tests/settings-schema-tests\.mjs|shared\.js|options-backup\.js|options\.html|options\.js)$')
-if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ] && [ -z "$SENTINEL_CHANGED" ] && [ -z "$AI_PROVIDERS_CHANGED" ] && [ -z "$SETTINGS_SCHEMA_CHANGED" ]; then
+TYPECHECK_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^((vocab-store|bookmark-services|export-targets|dict-archive|ask-archive|notes-sync)\.js|scripts/(typecheck-data-layer\.mjs|jsconfig\.data-layer\.json|types/data-layer-globals\.d\.ts)|tests/typecheck-data-layer-tests\.mjs|\.qa-scan/package(-lock)?\.json)$')
+if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ] && [ -z "$SENTINEL_CHANGED" ] && [ -z "$AI_PROVIDERS_CHANGED" ] && [ -z "$SETTINGS_SCHEMA_CHANGED" ] && [ -z "$TYPECHECK_CHANGED" ]; then
   exit 0
 fi
 
@@ -293,6 +294,19 @@ if [ -n "$SETTINGS_SCHEMA_CHANGED" ]; then
     fi
   else
     echo "[settings-schema] WARNING: .qa-scan/node_modules/espree not found, so the settings-schema sync gate was skipped (run CI or verify.sh to cover it)" >&2
+  fi
+fi
+
+if [ -n "$TYPECHECK_CHANGED" ]; then
+  if [ -d "$REPO_ROOT/.qa-scan/node_modules/typescript" ] && [ -d "$REPO_ROOT/.qa-scan/node_modules/@types/chrome" ]; then
+    echo "[typecheck] checking JSDoc and null-safety types on the pure data-layer modules"
+    if ! node "$REPO_ROOT/scripts/typecheck-data-layer.mjs" || ! node "$REPO_ROOT/tests/typecheck-data-layer-tests.mjs"; then
+      echo ""
+      echo "[typecheck] COMMIT BLOCKED — pure data-layer typecheck or its self-tests failed (see the message above)" >&2
+      exit 1
+    fi
+  else
+    echo "[typecheck] WARNING: .qa-scan/node_modules (typescript, @types/chrome) not found, so the data-layer typecheck gate was skipped (run: npm ci --prefix .qa-scan)" >&2
   fi
 fi
 

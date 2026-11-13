@@ -29,6 +29,7 @@ function ownership(name) {
   if (/^ui-|^i18n-|^a11y|^contrast|^confirm-layout|^escape-html/.test(name)) return ui;
   if (/^vocab-|^notes-|^drive-|^anki-|^eudic-/.test(name)) return ['background', 'library', 'options', 'md-preview'];
   if (name === 'ai-providers-source') return ['background', 'popup', 'options', 'tooling'];
+  if (name === 'typecheck-data-layer') return ['background', 'popup', 'options', 'library', 'md-preview', 'tooling'];
   if (/^ai-|^export-|^jina-/.test(name)) return ['background', 'popup', 'options', 'md-preview'];
   if (/^background-/.test(name)) return ['background'];
   throw new Error(`Audit suite has no surface owner: ${name}; register it in audit-catalog.mjs`);
@@ -55,7 +56,7 @@ export const TEST_SCENARIOS = testFiles.filter(name => name !== 'pinboard-theme-
     id: 'test.' + base, runner: name.endsWith('.html') ? 'html' : 'node', file,
     surfaces, features: features(base), kinds: ['popup-label-fit', 'confirm-layout'].includes(base) ? ['layout', 'i18n'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history', 'bookmark-service-runtime', 'upgrade-path'].includes(base) ? 'logic' : 'contract'],
     browser: ['popup-label-fit', 'confirm-layout', 'ask-history', 'library-ask-history', 'bookmark-service-runtime', 'bookmark-live-preflight', 'upgrade-path'].includes(base),
-    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base === 'ai-providers-source' ? ['scripts/ai-providers-source.mjs', 'scripts/sync-ai-providers.mjs'] : []), ...(base === 'settings-schema' ? ['scripts/settings-schema.mjs', 'scripts/sync-settings-schema.mjs'] : []), ...(base === 'bookmark-live-preflight' ? ['scripts/bookmark-service-live.mjs'] : []), ...(base === 'mutate-check' ? ['scripts/mutate-check.mjs'] : []), ...(base === 'upgrade-path' ? ['restore-points.js', 'vocab-store.js', 'notes-sync.js', 'dict-archive.js', 'ask-archive.js', '.claude/store-ledger.md'] : []), ...(/^dict-(?:entry|usage|evidence|archive)$/.test(base) ? ['dict-entry.js', 'dict-evidence.js', 'dict-archive.js'] : []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
+    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base === 'ai-providers-source' ? ['scripts/ai-providers-source.mjs', 'scripts/sync-ai-providers.mjs'] : []), ...(base === 'settings-schema' ? ['scripts/settings-schema.mjs', 'scripts/sync-settings-schema.mjs'] : []), ...(base === 'typecheck-data-layer' ? ['scripts/typecheck-data-layer.mjs', 'scripts/jsconfig.data-layer.json', 'scripts/types/data-layer-globals.d.ts', 'vocab-store.js', 'bookmark-services.js', 'export-targets.js', 'dict-archive.js', 'ask-archive.js', 'notes-sync.js'] : []), ...(base === 'bookmark-live-preflight' ? ['scripts/bookmark-service-live.mjs'] : []), ...(base === 'mutate-check' ? ['scripts/mutate-check.mjs'] : []), ...(base === 'upgrade-path' ? ['restore-points.js', 'vocab-store.js', 'notes-sync.js', 'dict-archive.js', 'ask-archive.js', '.claude/store-ledger.md'] : []), ...(/^dict-(?:entry|usage|evidence|archive)$/.test(base) ? ['dict-entry.js', 'dict-evidence.js', 'dict-archive.js'] : []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
     dependencies: [], axes: {},
   };
 });
@@ -64,6 +65,7 @@ const staticRow = (id, file, surfaces, inputs, kinds = ['contract'], args = []) 
 });
 export const STATIC_SCENARIOS = [
   staticRow('script-graph', 'scripts/script-graph-lint.mjs', ['background', ...ui], ['*.js'], ['syntax', 'security']),
+  staticRow('typecheck-data-layer', 'scripts/typecheck-data-layer.mjs', ['background', ...ui], ['scripts/jsconfig.data-layer.json', 'scripts/types/data-layer-globals.d.ts', 'vocab-store.js', 'bookmark-services.js', 'export-targets.js', 'dict-archive.js', 'ask-archive.js', 'notes-sync.js'], ['syntax', 'contract']),
   staticRow('ui-vocabulary', 'scripts/ui-vocabulary-lint.mjs', ui, ['*.html', '*.js', 'docs/theme-surface/ui-vocabulary.json']),
   staticRow('layout', 'docs/theme-surface/tools/layout-lint.mjs', ui, ['*.html', '*.css'], ['layout', 'contract']),
   staticRow('network-exits', 'scripts/network-exits-check.mjs', ['background'], ['manifest.json', 'docs/network-exits.json', 'docs/privacy.md', '*.js'], ['security']),
