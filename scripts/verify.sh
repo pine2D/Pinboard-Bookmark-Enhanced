@@ -259,6 +259,10 @@ stage "[script-graph] checking executeScript page functions are closure-free"
 # bundle symbol that will not exist there and still lint clean.
 gate static node "scripts/script-graph-lint.mjs"
 
+stage "[typecheck] checking JSDoc and null-safety types on the pure data-layer modules + self-tests"
+gate static node "scripts/typecheck-data-layer.mjs"
+gate static node "tests/typecheck-data-layer-tests.mjs"
+
 stage "[vendor-lock] verifying vendored artifacts against vendor/vendor-lock.json"
 gate static node "scripts/vendor-lock-check.mjs"
 

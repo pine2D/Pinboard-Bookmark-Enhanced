@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "useUnknownInCatchVariables": false,
+    "moduleDetection": "legacy",
+    "skipLibCheck": true,
+    "typeRoots": ["../.qa-scan/node_modules/@types"],
+    "types": ["chrome"]
+  },
+  "files": [
+    "./types/data-layer-globals.d.ts",
+    "../vocab-store.js",
+    "../bookmark-services.js",
+    "../export-targets.js",
+    "../dict-archive.js",
+    "../ask-archive.js",
+    "../notes-sync.js"
+  ]
+}
