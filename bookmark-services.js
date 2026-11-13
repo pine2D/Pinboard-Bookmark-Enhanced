@@ -2,7 +2,7 @@
 // dispatch-time connection guard and persists any Read Later list identity.
 // API contracts: linkding.link/api and Karakeep's published /api/v1 OpenAPI.
 function pbpBookmarkServiceError(code, status) {
-  const error = Object.assign(new Error(code), { code });
+  const error = Object.assign(new Error(code), /** @type {{ code: string, status?: number, retryAfter?: number }} */ ({ code }));
   if (Number.isInteger(status)) error.status = status;
   return error;
 }

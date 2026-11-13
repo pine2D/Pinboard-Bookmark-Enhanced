@@ -108,7 +108,7 @@ function _pbpVocabCodePointCompare(left, right) {
     const an = ai.next();
     const bn = bi.next();
     if (an.done || bn.done) return an.done === bn.done ? 0 : (an.done ? -1 : 1);
-    const diff = an.value.codePointAt(0) - bn.value.codePointAt(0);
+    const diff = /** @type {number} */ (an.value.codePointAt(0)) - /** @type {number} */ (bn.value.codePointAt(0));
     if (diff) return diff;
   }
 }
@@ -418,6 +418,7 @@ function _pbpVocabWordValue(record) {
 
 function _pbpVocabStoredEvent(metadata, word) {
   if (!metadata || typeof metadata.recordKey !== "string") return null;
+  /** @type {Record<string, any>} */
   const event = {
     recordKey: metadata.recordKey,
     vector: metadata.vector,
@@ -1223,8 +1224,9 @@ async function pbpVocabImportRecords(owner, records, limit = 100, options = {}) 
   const input = Array.isArray(records) ? records.slice(0, max) : [];
   if (!input.length) return { ok: true, processed: 0, written: 0, remaining: 0 };
   const imported = input.map((record) => _pbpVocabImportedWord(scope, record));
-  if (imported.some((record) => !record)) return { ok: false, processed: 0, written: 0, remaining: records.length };
-  const unique = [...new Map(imported.map((record) => [record.id, record])).values()];
+  const valid = imported.filter((record) => record !== null);
+  if (valid.length !== imported.length) return { ok: false, processed: 0, written: 0, remaining: records.length };
+  const unique = [...new Map(valid.map((record) => [record.id, record])).values()];
   const result = await _pbpVocabLocalMutation(scope, unique.map((record) => ({ id: record.id, imported: record })),
     (current, item) => {
       const incoming = item.imported;

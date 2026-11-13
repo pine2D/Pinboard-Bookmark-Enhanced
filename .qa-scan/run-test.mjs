@@ -169,7 +169,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/vocab-background-tests.html": 17,
   "tests/vocab-gdrive-tests.html": 115,
   "tests/vocab-store-tests.html": 100,
-  "tests/notes-sync-tests.html": 54,
+  "tests/notes-sync-tests.html": 55,
   "tests/notes-gdrive-tests.html": 17,
   "tests/options-drive-sync-tests.html": 41,
   "tests/drive-scopes-tests.html": 105,

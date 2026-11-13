@@ -283,5 +283,16 @@ test("failed notice clear leaves a console trace without account or note data",a
  f.fail(false);
  assert((await f.store().snapshot(OWNER,HASH)).notices.length===1,"notice must survive the failed clear");
 });
+test("missing storage fails closed with local_store instead of raw TypeError",async()=>{
+ const f=fixture();
+ const broken=pbpCreateNotesSyncStore({storage:null,locks:f.options.locks,getCurrentOwner:f.options.getCurrentOwner});
+ // 最简单漏判反例：只给 withLock 做了空值失败闭合，listOutbox / writeRecord 直接调 storage.get/set 抛原始 TypeError。
+ let outboxErr=null;
+ try { await broken.listOutbox(OWNER); } catch (err) { outboxErr=err; }
+ assert(outboxErr&&outboxErr.code==="local_store","expected local_store on listOutbox, got "+(outboxErr&&outboxErr.message));
+ let writeErr=null;
+ try { await broken.writeRecord(KEY,{v:1,url:URL_,title:"T",items:[item("n","hl-1")]},OWNER); } catch (err) { writeErr=err; }
+ assert(writeErr&&writeErr.code==="local_store","expected local_store on writeRecord, got "+(writeErr&&writeErr.message));
+});
 (async()=>{let pass=0,fail=0;for(const c of cases){const row=document.createElement("div");try{await c.run();row.className="pass";pass++;row.textContent=c.name;}catch(error){row.className="fail";fail++;row.textContent=c.name+": "+error.message;}document.getElementById("results").appendChild(row);}document.getElementById("summary").textContent=`${pass} passed, ${fail} failed`;})();
 </script></body></html>
