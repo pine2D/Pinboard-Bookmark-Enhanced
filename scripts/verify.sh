@@ -400,6 +400,10 @@ gate static node "tests/rules-lint-tests.mjs"
 stage "[store-descriptions] checking CWS store copy is regenerated from the READMEs"
 gate static node "scripts/sync-store-descriptions.mjs" --check
 
+stage "[ai-providers] checking AI provider single-source sync and AST no-second-copy gate + self-tests"
+gate static node "scripts/sync-ai-providers.mjs" --check
+gate static node "tests/ai-providers-source-tests.mjs"
+
 stage "[hooks] checking installed git hooks still delegate to the tracked scripts"
 gate static sh "scripts/setup-hooks.sh" --check
 
