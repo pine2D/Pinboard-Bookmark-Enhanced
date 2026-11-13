@@ -790,7 +790,7 @@ async function pbpLibRefreshDriveLine() {
       line = null;
     } else {
       const owner = await pbpVocabCurrentOwner();
-      const response = await chrome.runtime.sendMessage({ type: "vocabDriveStatus" });
+      const response = await chrome.runtime.sendMessage({ type: PBP_RUNTIME_MESSAGES.vocabDriveStatus });
       // Re-read after the round trip: an account switch while the worker was
       // answering must not paint the previous account's state.
       const ownerNow = await pbpVocabCurrentOwner();
@@ -822,7 +822,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((message) => {
-      if (message && (message.type === "PBP_VOCAB_SYNCED" || message.type === "PBP_NOTES_SYNCED" || message.type === "PBP_DICT_ARCHIVE_SYNCED" || message.type === "PBP_ASK_ARCHIVE_SYNCED")) pbpLibRefreshDriveLine();
+      if (message && (message.type === PBP_RUNTIME_MESSAGES.PBP_VOCAB_SYNCED || message.type === PBP_RUNTIME_MESSAGES.PBP_NOTES_SYNCED || message.type === PBP_RUNTIME_MESSAGES.PBP_DICT_ARCHIVE_SYNCED || message.type === PBP_RUNTIME_MESSAGES.PBP_ASK_ARCHIVE_SYNCED)) pbpLibRefreshDriveLine();
     });
   }
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
