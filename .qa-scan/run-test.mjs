@@ -9,13 +9,13 @@
 //        PBP_ONLY=<case name part>[,<part>...] node .qa-scan/run-test.mjs tests/<file>.html
 // PBP_ONLY (dev-time only) runs just the cases whose name contains a part
 // (case-insensitive), for pages that load tests/fixtures/case-filter.js. The
-// row count is NOT checked against EXPECTED_RESULTS then: the run says
+// row count is NOT checked against pbp-expected-count then: the run says
 // "FILTERED ... row count not checked", reports how many cases ran, and exits
 // 1 only for a failure, a page error, a stall or no matching case (exit 2 when
 // the page has no filter support). It is never a substitute for the full run.
 //        node .qa-scan/run-test.mjs --print-counts tests/<file>.html [more.html ...]
 // --print-counts only reports: the rows a page actually rendered next to its
-// EXPECTED_RESULTS entry. The page is measured once its registered count (any row,
+// <meta name="pbp-expected-count"> declaration. The page is measured once its registered count (any row,
 // when unregistered) has been reached and no new row has come for a quiet window.
 // A page's own end signal (document.title starting with PASS/FAIL, or a non-empty
 // #summary) shortens that window to 1.5s, but only a trusted one: it was not yet
@@ -86,101 +86,42 @@ const CLEANUP_TIMEOUT_MS = 5000;
 // thread is genuinely wedged" scenario this fix exists for.
 const SAFETY_MARGIN_MS = 1000;
 
-// Completion is explicit: each suite must emit exactly this many DOM result
-// ROWS carrying a pass/fail/skip class. NOTE: the row unit varies per page --
+// Completion is explicit: each suite declares `<meta name="pbp-expected-count" content="N">`
+// in its `<head>` and must emit exactly that many DOM result ROWS carrying a
+// pass/fail/skip class. NOTE: the row unit varies per page --
 // md-dict/dict-pack/anki/eudic emit one row per assertion, md-ai emits one
 // row per test() block. Count rows in the page, not assert calls; an
-// unregistered suite is rejected instead of guessed complete.
-const EXPECTED_RESULTS = Object.freeze({
-  "tests/a11y-tests.html": 34,
-  "tests/ai-cache-tests.html": 32,
-  "tests/ai-completion-tests.html": 121,
-  "tests/ai-tags-tests.html": 173,
-  "tests/anki-connect-tests.html": 72,
-  "tests/background-active-tab-tests.html": 56,
-  "tests/background-lifecycle-tests.html": 72,
-  "tests/batch-dedup-tests.html": 52,
-  "tests/bookmark-services-tests.html": 186,
-  "tests/bili-bridge-tests.html": 3,
-  "tests/chrome-mock-tests.html": 15,
-  "tests/contrast-tests.html": 6,
-  "tests/confirm-layout-tests.html": 142,
-  "tests/dict-pack-tests.html": 333,
-  "tests/dict-evidence-tests.html": 83,
-  "tests/dict-entry-tests.html": 114,
-  "tests/dict-language-tests.html": 33,
-  "tests/dict-ledger-tests.html": 20,
-  "tests/dict-negcache-tests.html": 17,
-  "tests/dict-protocol-tests.html": 18,
-  "tests/dict-settings-tests.html": 8,
-  "tests/dict-usage-tests.html": 139,
-  "tests/dict-archive-tests.html": 63,
-  "tests/ask-archive-tests.html": 39,
-  "tests/ask-archive-client-tests.html": 14,
-  "tests/escape-html-tests.html": 8,
-  "tests/eudic-sync-tests.html": 39,
-  "tests/export-targets-tests.html": 153,
-  "tests/frame-candidate-tests.html": 26,
-  "tests/i18n-parity-tests.html": 257,
-  "tests/i18n-cache-tests.html": 17,
-  "tests/icon-state-tests.html": 11,
-  "tests/jina-cache-tests.html": 32,
-  "tests/library-listbox-tests.html": 92,
-  "tests/library-notes-tests.html": 326,
-  "tests/library-vocab-tests.html": 588,
-  "tests/md-ai-tests.html": 1167,
-  "tests/md-ask-export-tests.html": 42,
-  "tests/reader-bookmark-tests.html": 112,
-  "tests/reader-dict-panel-tests.html": 18,
-  "tests/md-ai-setup-tests.html": 18,
-  "tests/md-convert-tests.html": 942,
-  "tests/md-dict-tests.html": 938,
-  "tests/md-embed-tests.html": 54,
-  "tests/md-explain-layout-tests.html": 17,
-  "tests/md-highlight-commit-tests.html": 279,
-  "tests/md-mermaid-tests.html": 14,
-  "tests/md-send-menu-tests.html": 35,
-  "tests/md-video-tests.html": 604,
-  "tests/offline-queue-tests.html": 40,
-  "tests/options-notes-tests.html": 36,
-  "tests/options-ai-custom-tests.html": 29,
-  "tests/options-context-help-tests.html": 35,
-  "tests/options-listbox-tests.html": 49,
-  "tests/options-reset-tests.html": 14,
-  "tests/options-usability-tests.html": 104,
-  "tests/options-vocab-tests.html": 207,
-  "tests/pinboard-sort-tests.html": 45,
-  "tests/pinboard-style-cloak-tests.html": 21,
-  "tests/popup-ai-sw-tests.html": 62,
-  "tests/popup-offline-tests.html": 7,
-  "tests/popup-tag-cache-tests.html": 49,
-  "tests/popup-save-tests.html": 314,
-  "tests/popup-draft-tests.html": 86,
-  "tests/restore-points-tests.html": 98,
-  "tests/save-pipeline-tests.html": 124,
-  "tests/settings-cache-invalidate-tests.html": 8,
-  "tests/settings-persist-tests.html": 561,
-  "tests/tag-gov-layout-tests.html": 7,
-  "tests/tag-gov-reserve-tests.html": 2,
-  "tests/tag-gov-entity-tests.html": 16,
-  "tests/tag-gov-tests.html": 75,
-  "tests/union-tags-tests.html": 24,
-  "tests/url-strip-tests.html": 28,
-  "tests/vocab-background-tests.html": 17,
-  "tests/vocab-gdrive-tests.html": 115,
-  "tests/vocab-store-tests.html": 100,
-  "tests/notes-sync-tests.html": 55,
-  "tests/notes-gdrive-tests.html": 17,
-  "tests/options-drive-sync-tests.html": 41,
-  "tests/drive-scopes-tests.html": 105,
-  "tests/drive-migration-tests.html": 20,
-  "tests/wayback-tests.html": 45,
-  // Not a suite: the fixture page of tests/coverage-report-tests.mjs.
-  "tests/fixtures/coverage-fixture.html": 2,
-});
-const expected = EXPECTED_RESULTS[rel];
+// undeclared suite is rejected instead of guessed complete.
+async function readDeclaredExpectedCount(absPath, relPath) {
+  let html = "";
+  try {
+    html = await readFile(absPath, "utf8");
+  } catch (err) {
+    if (err && err.code === "ENOENT") return undefined;
+    throw err;
+  }
+  const stripped = html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<(script|style|template)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
+  const metas = [...stripped.matchAll(/<meta\b[^>]*>/gi)]
+    .map((m) => m[0])
+    .filter((tag) => /\bname\s*=\s*(?:"pbp-expected-count"|'pbp-expected-count'|pbp-expected-count)(?=[\s/>])/i.test(tag));
+  if (metas.length === 0) return undefined;
+  if (metas.length > 1) {
+    console.error(`ERROR: multiple <meta name="pbp-expected-count"> declarations in ${relPath}`);
+    process.exit(2);
+  }
+  const contentMatch = /\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s/>]+))/i.exec(metas[0]);
+  const raw = contentMatch ? (contentMatch[1] ?? contentMatch[2] ?? contentMatch[3] ?? "") : "";
+  if (!/^[1-9]\d*$/.test(raw)) {
+    console.error(`ERROR: invalid <meta name="pbp-expected-count"> value ${JSON.stringify(raw)} in ${relPath} (expected a positive integer)`);
+    process.exit(2);
+  }
+  return Number(raw);
+}
+const expected = await readDeclaredExpectedCount(abs, rel);
 if (expected === undefined && !printCounts && !onlyFilter) {
-  console.error(`ERROR: no expected result count registered for ${rel}`);
+  console.error(`ERROR: no expected result count (<meta name="pbp-expected-count">) registered for ${rel}`);
   process.exit(2);
 }
 
@@ -275,7 +216,7 @@ try {
 
     // Real deadline (not the old timeout: 0 — infinite, leaving only the
     // outer bounded("test", TEST_TIMEOUT_MS) to ever cut this off). A suite
-    // that stalls (EXPECTED_RESULTS miscounted, an awaited mock that never
+    // that stalls (pbp-expected-count miscounted, an awaited mock that never
     // settles, a case that dies mid-block) needs to fall through to the
     // sampling below instead of vanishing into one opaque "test timed out"
     // line once the outer deadline eventually fires. Computed from actual
@@ -427,7 +368,7 @@ try {
     // exit code 2 already set above
   } else if (onlyFilter) {
     const c = dom.cases || { seen: 0, ran: 0, pending: 0 };
-    console.log(`FILTERED (PBP_ONLY=${onlyFilter}): ran ${c.ran} of ${c.seen} cases, pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} rows=${total}; 已过滤，未做条数核对 (row count not checked against EXPECTED_RESULTS)${dom.stalled ? ` STALLED(pending=${c.pending}, last row: "${(dom.lastRows && dom.lastRows[dom.lastRows.length - 1]) || ""}")` : ""}`);
+    console.log(`FILTERED (PBP_ONLY=${onlyFilter}): ran ${c.ran} of ${c.seen} cases, pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} rows=${total}; 已过滤，未做条数核对 (row count not checked against pbp-expected-count)${dom.stalled ? ` STALLED(pending=${c.pending}, last row: "${(dom.lastRows && dom.lastRows[dom.lastRows.length - 1]) || ""}")` : ""}`);
     if (dom.sampleError) console.error(`ERROR: diagnostic sample failed: ${dom.sampleError}`);
     if (dom.failures?.length) console.error("failures:\n  " + dom.failures.join("\n  "));
     if (runtimeErrors.length) console.error("errors:\n  " + runtimeErrors.slice(0, 25).join("\n  "));

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const repo = fileURLToPath(new URL('../', import.meta.url));
@@ -32,13 +32,27 @@ let shortened = patchOnce(source, ': 30000;', ': 16000;', 'the TEST_TIMEOUT_MS d
 shortened = patchOnce(shortened, 'trusted: false, windowMs: 3000 }', `trusted: false, windowMs: ${3000 * SCALE} }`, 'the initial quiet window');
 shortened = patchOnce(shortened, 'seen.trusted ? 1500 : summary && !summaryFilled ? 10000 : 3000;', `seen.trusted ? ${1500 * SCALE} : summary && !summaryFilled ? ${10000 * SCALE} : ${3000 * SCALE};`, 'the quiet-window choice');
 shortened = patchOnce(shortened, 'watch ? watch.windowMs : 3000', `watch ? watch.windowMs : ${3000 * SCALE}`, 'the sampled quiet window');
-const registered = shortened.replace('Object.freeze({', 'Object.freeze({\n  "tests/gap-tests.html": 3,\n  "tests/extra-tests.html": 2,\n  "tests/low-tests.html": 2,\n  "tests/summary-tests.html": 2,\n  "tests/title-tests.html": 2,\n  "tests/short-tests.html": 3,\n  "tests/early-tests.html": 2,\n  "tests/late-tests.html": 2,\n  "tests/latesum-tests.html": 2,\n  "tests/sigstall-tests.html": 3,\n  "tests/fmt-tests.html": 2,\n  "tests/g1-tests.html": 3,\n  "tests/g2-tests.html": 2,');
-assert.notEqual(registered, shortened, 'the EXPECTED_RESULTS table moved');
 // A 16s outer deadline (instead of 30s; about 9s of waiting for rows) so the UNCONFIRMED cases below end quickly.
-writeFileSync(join(tree, '.qa-scan/run-test.mjs'), registered);
+writeFileSync(join(tree, '.qa-scan/run-test.mjs'), shortened);
 writeFileSync(join(tree, '.qa-scan/package.json'), '{"type":"module"}');
+const DECLARED = {
+  'gap-tests.html': 3,
+  'extra-tests.html': 2,
+  'low-tests.html': 2,
+  'summary-tests.html': 2,
+  'title-tests.html': 2,
+  'short-tests.html': 3,
+  'early-tests.html': 2,
+  'late-tests.html': 2,
+  'latesum-tests.html': 2,
+  'sigstall-tests.html': 3,
+  'fmt-tests.html': 2,
+  'g1-tests.html': 3,
+  'g2-tests.html': 2,
+};
+const metaFor = name => Object.hasOwn(DECLARED, name) ? `<meta name="pbp-expected-count" content="${DECLARED[name]}">` : '';
 // rows: [[delayMs, class], ...] appended one by one after load.
-const page = (name, rows) => writeFileSync(join(tree, 'tests', name), `<!doctype html><meta charset=utf-8><title>${name}</title><body><script>
+const page = (name, rows) => writeFileSync(join(tree, 'tests', name), `<!doctype html><meta charset=utf-8>${metaFor(name)}<title>${name}</title><body><script>
 for (const [delay, cls] of ${JSON.stringify(rows)}) setTimeout(() => { const d = document.createElement('div'); d.className = cls; d.textContent = cls; document.body.append(d); }, delay);
 </script>`);
 // Pauses of 2.2s between rows: longer than any "count held still" heuristic a few seconds wide would tolerate.
@@ -48,17 +62,17 @@ page('unreg-tests.html', [[0, 'pass'], [t(2200), 'pass']]);
 // A registered count that is too low: the third row arrives 2s after the second.
 page('low-tests.html', [[0, 'pass'], [t(100), 'pass'], [t(2100), 'pass']]);
 // Pages that announce their own end: the extra row comes after any plausible quiet window.
-writeFileSync(join(tree, 'tests/summary-tests.html'), `<!doctype html><meta charset=utf-8><title>summary</title><body><div id="summary"></div><script>
+writeFileSync(join(tree, 'tests/summary-tests.html'), `<!doctype html><meta charset=utf-8>${metaFor('summary-tests.html')}<title>summary</title><body><div id="summary"></div><script>
 const add = () => { const d = document.createElement('div'); d.className = 'pass'; d.textContent = 'ok'; document.body.append(d); };
 add(); setTimeout(add, ${t(100)}); setTimeout(add, ${t(4000)});
 setTimeout(() => { document.getElementById('summary').textContent = '3 passed, 0 failed'; }, ${t(4100)});
 </script>`);
-writeFileSync(join(tree, 'tests/title-tests.html'), `<!doctype html><meta charset=utf-8><title>title</title><body><script>
+writeFileSync(join(tree, 'tests/title-tests.html'), `<!doctype html><meta charset=utf-8>${metaFor('title-tests.html')}<title>title</title><body><script>
 const add = () => { const d = document.createElement('div'); d.className = 'pass'; d.textContent = 'ok'; document.body.append(d); };
 add(); setTimeout(add, ${t(100)}); setTimeout(() => { document.title = 'PASS title'; }, ${t(300)});
 </script>`);
 // A title that says PASS from the start (some suites write theirs at load) while rows still come.
-writeFileSync(join(tree, 'tests/early-tests.html'), `<!doctype html><meta charset=utf-8><title>PASS early</title><body><script>
+writeFileSync(join(tree, 'tests/early-tests.html'), `<!doctype html><meta charset=utf-8>${metaFor('early-tests.html')}<title>PASS early</title><body><script>
 const add = () => { const d = document.createElement('div'); d.className = 'pass'; d.textContent = 'ok'; document.body.append(d); };
 add(); setTimeout(add, ${t(800)}); setTimeout(add, ${t(1400)});
 </script>`);
@@ -66,24 +80,24 @@ add(); setTimeout(add, ${t(800)}); setTimeout(add, ${t(1400)});
 const rows3 = `add(); setTimeout(add, ${t(100)}); setTimeout(add, ${t(2100)});`;
 const add = `const add = () => { const d = document.createElement('div'); d.className = 'pass'; d.textContent = 'ok'; document.body.append(d); };`;
 for (const name of ['late-tests.html', 'lateunreg-tests.html']) {
-  writeFileSync(join(tree, 'tests', name), `<!doctype html><meta charset=utf-8><title>PASS late</title><body><script>${add} ${rows3}</script>`);
+  writeFileSync(join(tree, 'tests', name), `<!doctype html><meta charset=utf-8>${metaFor(name)}<title>PASS late</title><body><script>${add} ${rows3}</script>`);
 }
-writeFileSync(join(tree, 'tests/latesum-tests.html'), `<!doctype html><meta charset=utf-8><title>latesum</title><body><div id="summary"></div><script>${add}
+writeFileSync(join(tree, 'tests/latesum-tests.html'), `<!doctype html><meta charset=utf-8>${metaFor('latesum-tests.html')}<title>latesum</title><body><div id="summary"></div><script>${add}
 document.getElementById('summary').textContent = 'SUMMARY: 2 passed, 0 failed'; ${rows3}</script>`);
 // Announces its end after 2 rows, but 3 are registered.
-writeFileSync(join(tree, 'tests/sigstall-tests.html'), `<!doctype html><meta charset=utf-8><title>sigstall</title><body><script>${add}
+writeFileSync(join(tree, 'tests/sigstall-tests.html'), `<!doctype html><meta charset=utf-8>${metaFor('sigstall-tests.html')}<title>sigstall</title><body><script>${add}
 add(); setTimeout(add, ${t(100)}); setTimeout(() => { document.title = 'PASS sigstall'; }, ${t(300)});</script>`);
 // Another summary format (pass=N fail=M, as ten suites write it), filled in at the end.
-writeFileSync(join(tree, 'tests/fmt-tests.html'), `<!doctype html><meta charset=utf-8><title>fmt</title><body><div id="summary"></div><script>${add}
+writeFileSync(join(tree, 'tests/fmt-tests.html'), `<!doctype html><meta charset=utf-8>${metaFor('fmt-tests.html')}<title>fmt</title><body><div id="summary"></div><script>${add}
 add(); setTimeout(add, ${t(100)}); setTimeout(() => { document.getElementById('summary').textContent = 'pass=2 fail=0'; }, ${t(300)});</script>`);
 // Unregistered, #summary still empty through a 3.5s pause, filled after the last row (md-video shape).
 writeFileSync(join(tree, 'tests/slowsum-tests.html'), `<!doctype html><meta charset=utf-8><title>slowsum</title><body><div id="summary"></div><script>${add}
 add(); setTimeout(add, ${t(100)}); setTimeout(add, ${t(3600)}); setTimeout(() => { document.getElementById('summary').textContent = '3 passed, 0 failed'; }, ${t(3700)});</script>`);
 // g1: registered 3, the title says PASS after two rows, then a row comes at once and another 2s later.
-writeFileSync(join(tree, 'tests/g1-tests.html'), `<!doctype html><meta charset=utf-8><title>g1</title><body><script>${add}
+writeFileSync(join(tree, 'tests/g1-tests.html'), `<!doctype html><meta charset=utf-8>${metaFor('g1-tests.html')}<title>g1</title><body><script>${add}
 add(); setTimeout(add, ${t(100)}); setTimeout(() => { document.title = 'PASS g1'; }, ${t(300)}); setTimeout(add, ${t(400)}); setTimeout(add, ${t(2400)});</script>`);
 // g2: registered 2, title PASS and both rows already there at load, a third row 2s later.
-writeFileSync(join(tree, 'tests/g2-tests.html'), `<!doctype html><meta charset=utf-8><title>PASS g2</title><body><script>${add}
+writeFileSync(join(tree, 'tests/g2-tests.html'), `<!doctype html><meta charset=utf-8>${metaFor('g2-tests.html')}<title>PASS g2</title><body><script>${add}
 add(); add(); setTimeout(add, ${t(2000)});</script>`);
 // g3: unregistered, a trusted-looking signal after two rows, a third row 2s after it.
 writeFileSync(join(tree, 'tests/g3-tests.html'), `<!doctype html><meta charset=utf-8><title>g3</title><body><script>${add}
@@ -207,4 +221,24 @@ test('a signal that was showing at the first poll is untrusted even with no row 
 test('an unregistered page does not shorten its window to follow a signal', async () => {
   const r = await run('g3-tests.html');
   assert.match(r.stdout, /total=3 expected=unregistered NOT REGISTERED/, r.stdout + r.stderr);
+});
+test('normal mode rejects missing, non-integer, or duplicate pbp-expected-count meta tags with exit 2 and ignores script/comment decoys', () => {
+  const missing = spawnSync(process.execPath, [join(tree, '.qa-scan/run-test.mjs'), 'tests/unreg-tests.html'], { cwd: tree, encoding: 'utf8' });
+  assert.equal(missing.status, 2);
+  assert.match(missing.stderr, /no expected result count/);
+
+  writeFileSync(join(tree, 'tests/bad-num.html'), '<!doctype html><meta name="pbp-expected-count" content="zero"><title>bad</title>');
+  const badNum = spawnSync(process.execPath, [join(tree, '.qa-scan/run-test.mjs'), 'tests/bad-num.html'], { cwd: tree, encoding: 'utf8' });
+  assert.equal(badNum.status, 2);
+  assert.match(badNum.stderr, /invalid <meta name="pbp-expected-count">/);
+
+  writeFileSync(join(tree, 'tests/dup-meta.html'), '<!doctype html><meta name="pbp-expected-count" content="1"><meta name="pbp-expected-count" content="2"><title>dup</title>');
+  const dup = spawnSync(process.execPath, [join(tree, '.qa-scan/run-test.mjs'), 'tests/dup-meta.html'], { cwd: tree, encoding: 'utf8' });
+  assert.equal(dup.status, 2);
+  assert.match(dup.stderr, /multiple <meta name="pbp-expected-count">/);
+
+  writeFileSync(join(tree, 'tests/decoy-only.html'), '<!doctype html><!-- <meta name="pbp-expected-count" content="5"> --><title>decoy</title><script>const s = `<meta name="pbp-expected-count" content="5">`;</script>');
+  const decoy = spawnSync(process.execPath, [join(tree, '.qa-scan/run-test.mjs'), 'tests/decoy-only.html'], { cwd: tree, encoding: 'utf8' });
+  assert.equal(decoy.status, 2);
+  assert.match(decoy.stderr, /no expected result count/);
 });

@@ -28,7 +28,7 @@ paths:
 - surface 是多值归属，选 reader 会包含真实依赖其他表面的 journey；需要单面流程时选具体 scenario，计划会展示其表面与前置。
 - 例：`--scenario=qa.popup.login`；`--scenario=qa.options.layout.ai --locale=de --viewport=320 --scheme=dark --density=compact`；`--scenario=render.library.sweep.notes-color-menu` 会包含 notes-detail 前置；`--scenario=qa.reader.controls.ask --locale=de --viewport=360 --scheme=dark --density=large` 只运行 Ask 子流程。先加 `--plan` 审阅，移去它即执行。
 - 影响推荐按消费者与功能估计，计划列明依据；`listbox.js` 对应 options/library，已证明仅新增图标时按新增符号使用方缩小范围，无法判定的共享改动明确扩大理由。推荐不是依赖分析证明，未映射输入会告警，需用显式场景补齐。已知纯逻辑改动用 `--kind=logic,contract,security`，不为其运行视觉矩阵。
-- `.qa-scan/run-test.mjs` 的改动里，只增删或改 `EXPECTED_RESULTS` 的 `"tests/<页>.html": N,` 条目行时，推荐收窄为这些条目对应的测试页；同一补丁含其他任何改动则不收窄，回到全部 html 测试页（`expectedCountPages`，`scripts/audit-plan.mjs`）。改完条数用 `node .qa-scan/run-test.mjs --print-counts tests/<页>.html` 取实际行数。
+- 每个 HTML 测试页在自身 `<head>` 声明 `<meta name="pbp-expected-count" content="N">`（由 `.qa-scan/run-test.mjs` 读取核对，缺省、非正整数或重复声明在常规模式下均以退出码 2 拒绝）；改动 `tests/<页>.html`（含调整期望行数）时 `scripts/audit-plan.mjs` 仅推荐对应测试页，而改动 `.qa-scan/run-test.mjs` 本身则保持保守全集推荐。改完条数可用 `node .qa-scan/run-test.mjs --print-counts tests/<页>.html` 取实际行数。
 - 真实调度层是 `scripts/audit-*-scenarios.mjs`；新增场景在此注册并提供实际 opener/driver。运行报告比较计划/完成 ID，记录各任务耗时，子进程失败、漏执行、打开失败均不能通过。局部审计禁写全局基线、不做全局 STALE 清理。`--sweep` 仍是发现模式，不能替代正式选中场景的门禁。
 - 改几何须对受影响场景补 `--font=ci`；native/ci 可同轴选取，入口分别设置字体环境。站点主题保持 native，不套扩展 UI 的 CI 字体配置。共同设置/基线前置允许保留，不能因此运行未选页面。同一轮已通过检查除非有新改动或新问题，不重复执行。
 
