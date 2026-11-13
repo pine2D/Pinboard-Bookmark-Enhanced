@@ -1346,7 +1346,7 @@ let _pbpMultiPackController = null;
 let _pbpMultiPackFocus = null;
 
 function _pbpMultiPackFocusAt(node) {
-  return $id("multi-pack-list")?.contains(node) && node?.matches("button[data-pack-id][data-pack-action]")
+  return $id("multi-pack-list")?.contains(node) && node?.matches("button[data-pack-id][data-pack-action]:not(:disabled)")
     ? { id:node.dataset.packId, action:node.dataset.packAction } : null;
 }
 function _pbpMultiPackRestoreFocus(closingControl = null) {
@@ -1375,13 +1375,17 @@ function _pbpMultiPackStatus(key, tone = "pending", ...args) {
   _pbpPackSetStatus($id("multi-pack-status"), t(key, ...args), tone);
 }
 function _pbpMultiPackLock(busy) {
-  // Disabling a focused button blurs it before any IDB/notification awaits.
+  // Disabling a focused button blurs it before any IDB/notification awaits;
+  // call blur() explicitly because Chrome 157+ defers disabled-element blur.
   if (busy) _pbpMultiPackFocus=_pbpMultiPackFocusAt(document.activeElement) || _pbpMultiPackFocus;
   _pbpMultiPackBusy = busy;
   for (const id of ["multi-pack-choose", "multi-pack-install", "multi-pack-source-language", "multi-pack-target-language", "multi-pack-source-url", "multi-pack-license"]) {
     const el = $id(id); if (el) el.disabled = busy;
   }
   for (const button of $id("multi-pack-list")?.querySelectorAll("button") || []) button.disabled = busy;
+  if (busy && $id("multi-pack-section")?.contains(document.activeElement) && document.activeElement.disabled) {
+    document.activeElement.blur();
+  }
   if (!busy) _pbpMultiPackRestoreFocus();
 }
 function _pbpMultiPackLanguage(code) {

@@ -148,7 +148,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/options-listbox-tests.html": 49,
   "tests/options-reset-tests.html": 14,
   "tests/options-usability-tests.html": 104,
-  "tests/options-vocab-tests.html": 206,
+  "tests/options-vocab-tests.html": 207,
   "tests/pinboard-sort-tests.html": 45,
   "tests/pinboard-style-cloak-tests.html": 21,
   "tests/popup-ai-sw-tests.html": 62,
