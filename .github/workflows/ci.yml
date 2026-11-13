@@ -39,6 +39,12 @@ jobs:
           cache: npm
           cache-dependency-path: .qa-scan/package-lock.json
 
+      - name: Fetch latest approved store tag (journeys)
+        if: matrix.group == 'journeys'
+        run: |
+          TAG="$(node tests/upgrade-path-tests.mjs --print-tag)"
+          git fetch --depth 1 --no-tags origin tag "$TAG"
+
       - name: Install QA dependencies
         run: npm ci --prefix .qa-scan
 
