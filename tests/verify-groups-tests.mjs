@@ -143,13 +143,15 @@ const afterEslintBaseline = OLD_LABELS.findIndex((l) => l.startsWith('[eslint-ba
 const REGISTERS_LABEL_OLD = "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger, store ledger) + lint self-tests";
 const DOCTOR_LABEL = '[doctor] checking the read-only local setup doctor in throwaway repos';
 const SENTINEL_LABEL = "[sentinel] checking the weekly sentinel's link check and report against local fixtures";
+const UPGRADE_LABEL = '[upgrade-path] store baseline upgrade to current tree';
 const REGISTERS_LABEL = "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger, store ledger, freshness ledger) + lint self-tests";
 const EXPECTED_LABELS = [OLD_LABELS[0], NEW_LABEL, ...OLD_LABELS.slice(1, afterEslintBaseline), SLICE_LABEL, ...OLD_LABELS.slice(afterEslintBaseline)]
   .map((l) => (l === REGISTERS_LABEL_OLD ? REGISTERS_LABEL : l))
   // Added 2026-11-11, right after the registers whose parser they share: the
   // local doctor's self-test.
-  .flatMap((l) => (l === REGISTERS_LABEL ? [l, DOCTOR_LABEL, SENTINEL_LABEL] : [l]));
-const JOURNEY_STAGES = ['bookmark-services', 'ask-history', 'selection', 'draft', 'options-save', 'translate-stop',
+  .flatMap((l) => (l === REGISTERS_LABEL ? [l, DOCTOR_LABEL, SENTINEL_LABEL] : [l]))
+  .flatMap((l) => (l.startsWith('[ask-history]') ? [l, UPGRADE_LABEL] : [l]));
+const JOURNEY_STAGES = ['bookmark-services', 'ask-history', 'upgrade-path', 'selection', 'draft', 'options-save', 'translate-stop',
   'layouts', 'journey', 'discovery', 'reader-save-export'];
 
 // Environment without anything from the caller's CI or retry settings. GIT_*

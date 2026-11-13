@@ -200,6 +200,8 @@ gate journeys node tests/bookmark-live-preflight-tests.mjs
 stage "[ask-history] reader and library Ask history against an isolated archive"
 gate journeys node tests/ask-history-tests.mjs
 gate journeys node tests/library-ask-history-tests.mjs
+stage "[upgrade-path] store baseline upgrade to current tree"
+gate journeys node tests/upgrade-path-tests.mjs
 stage "[mutate-check] self-test: restore, exactly-once, crash backup"
 gate static node tests/mutate-check-tests.mjs
 stage "[run-test] self-test: --print-counts waits for the registered count"

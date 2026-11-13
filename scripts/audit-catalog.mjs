@@ -14,6 +14,7 @@ function ownership(name) {
   if (name === 'ask-history') return ['md-preview'];
   if (/^ask-archive(?:-|$)/.test(name)) return ['background', 'library', 'md-preview'];
   if (name === 'restore-points') return ['background', 'library', 'options'];
+  if (name === 'upgrade-path') return ['background', 'library', 'options', 'popup'];
   if (name === 'tag-gov-layout') return ['options'];
   if (name === 'save-pipeline' || name.startsWith('bookmark-service')) return ['background', 'popup', 'md-preview'];
   if (['icon-state', 'wayback', 'url-strip'].includes(name)) return ['background'];
@@ -50,9 +51,9 @@ export const TEST_SCENARIOS = testFiles.filter(name => name !== 'pinboard-theme-
   const file = 'tests/' + name;
   return {
     id: 'test.' + base, runner: name.endsWith('.html') ? 'html' : 'node', file,
-    surfaces, features: features(base), kinds: ['popup-label-fit', 'confirm-layout'].includes(base) ? ['layout', 'i18n'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history', 'bookmark-service-runtime'].includes(base) ? 'logic' : 'contract'],
-    browser: ['popup-label-fit', 'confirm-layout', 'ask-history', 'library-ask-history', 'bookmark-service-runtime', 'bookmark-live-preflight'].includes(base),
-    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base === 'bookmark-live-preflight' ? ['scripts/bookmark-service-live.mjs'] : []), ...(base === 'mutate-check' ? ['scripts/mutate-check.mjs'] : []), ...(/^dict-(?:entry|usage|evidence|archive)$/.test(base) ? ['dict-entry.js', 'dict-evidence.js', 'dict-archive.js'] : []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
+    surfaces, features: features(base), kinds: ['popup-label-fit', 'confirm-layout'].includes(base) ? ['layout', 'i18n'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history', 'bookmark-service-runtime', 'upgrade-path'].includes(base) ? 'logic' : 'contract'],
+    browser: ['popup-label-fit', 'confirm-layout', 'ask-history', 'library-ask-history', 'bookmark-service-runtime', 'bookmark-live-preflight', 'upgrade-path'].includes(base),
+    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base === 'bookmark-live-preflight' ? ['scripts/bookmark-service-live.mjs'] : []), ...(base === 'mutate-check' ? ['scripts/mutate-check.mjs'] : []), ...(base === 'upgrade-path' ? ['restore-points.js', 'vocab-store.js', 'notes-sync.js', 'dict-archive.js', 'ask-archive.js', '.claude/store-ledger.md'] : []), ...(/^dict-(?:entry|usage|evidence|archive)$/.test(base) ? ['dict-entry.js', 'dict-evidence.js', 'dict-archive.js'] : []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
     dependencies: [], axes: {},
   };
 });
