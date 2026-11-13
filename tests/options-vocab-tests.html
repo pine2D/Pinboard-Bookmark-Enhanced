@@ -332,6 +332,27 @@ delete document.documentElement.dataset.theme;
       action("enabled").focus();pending=[];action("enabled").click();
       document.body.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));await finalRefresh();
       check("clicking non-focusable space outside the row cancels pending focus restoration",document.activeElement===document.body);
+      {
+        const activeDesc=Object.getOwnPropertyDescriptor(Document.prototype,"activeElement")||Object.getOwnPropertyDescriptor(DocumentOrShadowRoot.prototype,"activeElement");
+        let stickyDisabled=null;
+        const origBlur=HTMLElement.prototype.blur;
+        HTMLElement.prototype.blur=function(){if(this===stickyDisabled)stickyDisabled=null;return origBlur.apply(this,arguments);};
+        if(activeDesc?.get){
+          Object.defineProperty(document,"activeElement",{configurable:true,get(){
+            return (stickyDisabled&&stickyDisabled.isConnected)?stickyDisabled:activeDesc.get.call(document);
+          }});
+        }
+        try {
+          const targetBtn=action("enabled");
+          targetBtn.focus();stickyDisabled=targetBtn;pending=[];targetBtn.click();
+          document.body.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));await finalRefresh();
+          check("deferred disabled-button blur (Chrome 157) still cancels focus restoration on outside pointerdown",document.activeElement===document.body);
+        } finally {
+          stickyDisabled=null;
+          HTMLElement.prototype.blur=origBlur;
+          delete document.activeElement;
+        }
+      }
 
       action("delete").focus();pending=[];channel.postMessage({type:"changed"});await until(()=>pending.length===1);pending[0](snapshot());await task();pending=null;
       check("a refresh from another page preserves the currently focused pack action",owns("delete"));
