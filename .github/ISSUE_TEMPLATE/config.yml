@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability (private advisory)
+    url: https://github.com/pine2D/Pinboard-Bookmark-Enhanced/security/advisories/new
+    about: Report XSS, permission bypasses, or credential leaks privately instead of opening a public issue.
+  - name: Troubleshooting guide
+    url: https://pine2d.github.io/Pinboard-Bookmark-Enhanced/troubleshooting.html
+    about: Check common fixes for bookmark connections, AI requests, Google Drive sync, subtitles, Anki/Eudic, and upgrades.

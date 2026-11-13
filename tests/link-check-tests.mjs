@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { checkUrl, checkAll, collectLinks, extractLinks, skipReason, USER_AGENT } from '../scripts/link-check.mjs';
+import { checkUrl, checkAll, collectLinks, defaultFiles, extractLinks, skipReason, USER_AGENT } from '../scripts/link-check.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const hits = [];
@@ -118,6 +118,14 @@ test('collectLinks dedupes across files and remembers where each link is', () =>
   assert.deepEqual(links.get('https://one.org/').files, ['a.md', 'b.md']);
   assert.deepEqual([...skipped.keys()], ['http://localhost/']);
 });
+test('defaultFiles includes READMEs, SECURITY.md, and outward-facing docs pages, and all are readable', () => {
+  const files = defaultFiles(ROOT);
+  for (const required of ['README.md', 'SECURITY.md', 'docs/privacy.md', 'docs/index.md', 'docs/troubleshooting.md', 'docs/data-format.md']) {
+    assert.ok(files.includes(required), `defaultFiles must include ${required}`);
+    assert.ok(readFileSync(join(ROOT, required), 'utf8').length > 0);
+  }
+});
+
 test('cli: a file with only skipped links makes no request and exits 0; --json writes the results', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pbp-link-check-'));
   try {

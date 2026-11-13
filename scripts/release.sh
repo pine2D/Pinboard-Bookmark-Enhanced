@@ -631,7 +631,12 @@ ${CHANGELOG}
 1. Download \`${ZIP_NAME}\` below
 2. Unzip to a local folder
 3. Open \`chrome://extensions/\`, enable **Developer mode**
-4. Click **Load unpacked**, select the unzipped folder"
+4. Click **Load unpacked**, select the unzipped folder
+
+### Upgrading
+- **Chrome Web Store**: Updates apply automatically; on first startup after an update, the extension records a local restore point (\`pbp-restore-points\`) before running storage migrations.
+- **Unpacked ZIP**: Extract \`${ZIP_NAME}\` over the **same folder path** you previously loaded and click **Reload** on \`chrome://extensions/\`. Do not remove the extension or load a new directory path, which assigns a new extension ID and isolates existing IndexedDB and local storage data.
+- **Docs**: [Troubleshooting](https://pine2d.github.io/Pinboard-Bookmark-Enhanced/troubleshooting.html) · [Data Formats](https://pine2d.github.io/Pinboard-Bookmark-Enhanced/data-format.html)"
 
 verify_publish_snapshot() {
   local current_head remote_refs remote_sha

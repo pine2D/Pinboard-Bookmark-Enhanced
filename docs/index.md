@@ -19,6 +19,8 @@ The reader plays YouTube videos through `yt-embed.html` on this site. The page o
 ## Documents
 
 - [Privacy Policy](./privacy.html)
+- [Troubleshooting](./troubleshooting.html)
+- [Data Formats](./data-format.html)
 
 ## Source
 

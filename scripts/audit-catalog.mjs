@@ -71,7 +71,7 @@ export const STATIC_SCENARIOS = [
   staticRow('layout', 'docs/theme-surface/tools/layout-lint.mjs', ui, ['*.html', '*.css'], ['layout', 'contract']),
   staticRow('network-exits', 'scripts/network-exits-check.mjs', ['background'], ['manifest.json', 'docs/network-exits.json', 'docs/privacy.md', '*.js'], ['security']),
   staticRow('vendor-lock', 'scripts/vendor-lock-check.mjs', ['tooling'], ['vendor/**']),
-  staticRow('docs', 'scripts/docs-lint.mjs', ['tooling'], ['README*.md', '.claude/expiring-items.md', 'docs/index.md', 'docs/privacy.md'], ['docs']),
+  staticRow('docs', 'scripts/docs-lint.mjs', ['tooling'], ['README*.md', 'SECURITY.md', '.claude/expiring-items.md', 'docs/index.md', 'docs/privacy.md', 'docs/troubleshooting.md', 'docs/data-format.md'], ['docs']),
   staticRow('store-copy', 'scripts/sync-store-descriptions.mjs', ['tooling'], ['README*.md', 'docs/cws-assets/**'], ['docs'], ['--check']),
   staticRow('ai-providers', 'scripts/sync-ai-providers.mjs', ['background', 'popup', 'options'], ['scripts/ai-providers-source.mjs', 'ai.js', 'shared.js', 'popup-ai.js', 'options.html', 'options.js', 'options-connectivity.js'], ['generation', 'contract'], ['--check']),
   staticRow('settings-schema', 'scripts/sync-settings-schema.mjs', ['background', 'options'], ['scripts/settings-schema.mjs', 'scripts/ai-providers-source.mjs', 'shared.js', 'options-backup.js', 'options.html', 'options.js'], ['generation', 'contract'], ['--check']),
