@@ -412,6 +412,10 @@ stage "[settings-schema] checking settings schema single-source sync, DOM covera
 gate static node "scripts/sync-settings-schema.mjs" --check
 gate static node "tests/settings-schema-tests.mjs"
 
+stage "[runtime-messages] checking runtime message single-source sync, MV3 onMessage channel rules and AST parity + self-tests"
+gate static node "scripts/sync-runtime-messages.mjs" --check
+gate static node "tests/runtime-messages-tests.mjs"
+
 stage "[hooks] checking installed git hooks still delegate to the tracked scripts"
 gate static sh "scripts/setup-hooks.sh" --check
 

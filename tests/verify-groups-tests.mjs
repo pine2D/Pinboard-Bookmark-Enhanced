@@ -150,6 +150,8 @@ const SETTINGS_SCHEMA_LABEL = '[settings-schema] checking settings schema single
 const SETTINGS_SCHEMA_COMMANDS = ['node scripts/sync-settings-schema.mjs --check', 'node tests/settings-schema-tests.mjs'];
 const TYPECHECK_LABEL = '[typecheck] checking JSDoc and null-safety types on the pure data-layer modules + self-tests';
 const TYPECHECK_COMMANDS = ['node scripts/typecheck-data-layer.mjs', 'node tests/typecheck-data-layer-tests.mjs'];
+const RUNTIME_MESSAGES_LABEL = '[runtime-messages] checking runtime message single-source sync, MV3 onMessage channel rules and AST parity + self-tests';
+const RUNTIME_MESSAGES_COMMANDS = ['node scripts/sync-runtime-messages.mjs --check', 'node tests/runtime-messages-tests.mjs'];
 const REGISTERS_LABEL = "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger, store ledger, freshness ledger) + lint self-tests";
 const EXPECTED_LABELS = [OLD_LABELS[0], NEW_LABEL, ...OLD_LABELS.slice(1, afterEslintBaseline), SLICE_LABEL, ...OLD_LABELS.slice(afterEslintBaseline)]
   .map((l) => (l === REGISTERS_LABEL_OLD ? REGISTERS_LABEL : l))
@@ -158,7 +160,7 @@ const EXPECTED_LABELS = [OLD_LABELS[0], NEW_LABEL, ...OLD_LABELS.slice(1, afterE
   .flatMap((l) => (l === REGISTERS_LABEL ? [l, DOCTOR_LABEL, SENTINEL_LABEL] : [l]))
   .flatMap((l) => (l.startsWith('[ask-history]') ? [l, UPGRADE_LABEL] : [l]))
   .flatMap((l) => (l.startsWith('[script-graph]') ? [l, TYPECHECK_LABEL] : [l]))
-  .flatMap((l) => (l === '[store-descriptions] checking CWS store copy is regenerated from the READMEs' ? [l, AI_PROVIDERS_LABEL, SETTINGS_SCHEMA_LABEL] : [l]));
+  .flatMap((l) => (l === '[store-descriptions] checking CWS store copy is regenerated from the READMEs' ? [l, AI_PROVIDERS_LABEL, SETTINGS_SCHEMA_LABEL, RUNTIME_MESSAGES_LABEL] : [l]));
 const JOURNEY_STAGES = ['bookmark-services', 'ask-history', 'upgrade-path', 'selection', 'draft', 'options-save', 'translate-stop',
   'layouts', 'journey', 'discovery', 'reader-save-export'];
 
@@ -233,6 +235,10 @@ test('the settings-schema gate runs in the static group', () => {
 
 test('the typecheck gate runs in the static group', () => {
   for (const c of TYPECHECK_COMMANDS) assert.ok(full.commands.some((x) => x.command === c && x.group === 'static'), `${c} must be a static gate`);
+});
+
+test('the runtime-messages gate runs in the static group', () => {
+  for (const c of RUNTIME_MESSAGES_COMMANDS) assert.ok(full.commands.some((x) => x.command === c && x.group === 'static'), `${c} must be a static gate`);
 });
 
 test('the glob gates follow the directory', () => {
