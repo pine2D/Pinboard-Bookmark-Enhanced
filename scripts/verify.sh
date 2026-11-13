@@ -404,6 +404,10 @@ stage "[ai-providers] checking AI provider single-source sync and AST no-second-
 gate static node "scripts/sync-ai-providers.mjs" --check
 gate static node "tests/ai-providers-source-tests.mjs"
 
+stage "[settings-schema] checking settings schema single-source sync, DOM coverage and AST gate + self-tests"
+gate static node "scripts/sync-settings-schema.mjs" --check
+gate static node "tests/settings-schema-tests.mjs"
+
 stage "[hooks] checking installed git hooks still delegate to the tracked scripts"
 gate static sh "scripts/setup-hooks.sh" --check
 
