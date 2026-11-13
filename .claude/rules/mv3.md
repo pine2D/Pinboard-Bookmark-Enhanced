@@ -28,7 +28,7 @@ paths:
 - **optional permission 的 API 在调用点现取**：权限未授予时 `chrome.identity` 等整个命名空间不存在，SW 顶层或默认参数捕获会把 `undefined` 钉死一整个 worker 世代（新用户首次连接的必经顺序，2026-07 真实事故；范式见 vocab-gdrive.js 的 `identityApi()`，测试注入的 fixture 仍优先）。调试注意：给 SW 开着 DevTools 会阻止它被回收，「重启一下就好了」的推理此时不成立。
 - **吞异常必须留痕**：把平台 API 异常折叠成产品错误码前，先 `console.warn` 出 `error.name` / `error.message`（不含 token、邮箱、生词内容）。eslint 规则 `pbp/no-silent-catch` 守这一条：空 catch 或不读错误的 catch 会报错。旧的写法记在 `scripts/eslint-suppressions.json`，只许减不许增，提交钩子会拒绝变大的基线。修掉一处旧的以后，运行 prune 并提交 json，命令见钩子的报错。确实要吞时，在 catch 块里写 `// swallow-ok: 理由`，理由不能空。
 - **监听器与 importScripts 只能在 SW 顶层同步执行**；async 注册在 MV3 不保证生效。
-- **onMessage 异步响应**：`return true` 保持通道，且该 listener 不能是 async 函数（二者只能取一）。
+- **onMessage 异步响应与消息单源**：`return true` 保持通道，且该 listener 不能是 async 函数（二者只能取一）；纯广播观察者不得 `return true` 或调用 `sendResponse`。运行时消息目录统一在 `scripts/runtime-messages-source.mjs` 登记并由 `scripts/sync-runtime-messages.mjs` 生成 `shared.js` 的 `PBP_RUNTIME_MESSAGES` 及执行 AST 双向对账与通道检查。
 - **CSP**：禁 eval / 远程代码；只能远程取数据（JSON/CSS）。Defuddle 因此本地 vendor。
 - **content script**：仅 pinboard.in 注入、保持瘦身；`document_start` 仅主题注入需要（pinboard-sort.js 是第二段注册，`document_idle`）。
 - **setIcon**：仅状态真正变化时调用 + 缓存 ImageData，别每个 tab 事件重新 fetch PNG（回归修复见 `9b689c1`）。

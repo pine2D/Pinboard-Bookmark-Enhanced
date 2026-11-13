@@ -63,7 +63,8 @@ SLICE_TOOLS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/slice-anchor-
 AI_PROVIDERS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(ai-providers-source|sync-ai-providers)\.mjs|tests/ai-providers-source-tests\.mjs|ai\.js|shared\.js|popup-ai\.js|options\.html|options\.js|options-connectivity\.js)$')
 SETTINGS_SCHEMA_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(settings-schema|sync-settings-schema|ai-providers-source)\.mjs|tests/settings-schema-tests\.mjs|shared\.js|options-backup\.js|options\.html|options\.js)$')
 TYPECHECK_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^((vocab-store|bookmark-services|export-targets|dict-archive|ask-archive|notes-sync)\.js|scripts/(typecheck-data-layer\.mjs|jsconfig\.data-layer\.json|types/data-layer-globals\.d\.ts)|tests/typecheck-data-layer-tests\.mjs|\.qa-scan/package(-lock)?\.json)$')
-if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ] && [ -z "$SENTINEL_CHANGED" ] && [ -z "$AI_PROVIDERS_CHANGED" ] && [ -z "$SETTINGS_SCHEMA_CHANGED" ] && [ -z "$TYPECHECK_CHANGED" ]; then
+RUNTIME_MESSAGES_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^([^/]+\.js|scripts/(runtime-messages-source|sync-runtime-messages)\.mjs|tests/runtime-messages-tests\.mjs)$')
+if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ] && [ -z "$SENTINEL_CHANGED" ] && [ -z "$AI_PROVIDERS_CHANGED" ] && [ -z "$SETTINGS_SCHEMA_CHANGED" ] && [ -z "$TYPECHECK_CHANGED" ] && [ -z "$RUNTIME_MESSAGES_CHANGED" ]; then
   exit 0
 fi
 
@@ -307,6 +308,19 @@ if [ -n "$TYPECHECK_CHANGED" ]; then
     fi
   else
     echo "[typecheck] WARNING: .qa-scan/node_modules (typescript, @types/chrome) not found, so the data-layer typecheck gate was skipped (run: npm ci --prefix .qa-scan)" >&2
+  fi
+fi
+
+if [ -n "$RUNTIME_MESSAGES_CHANGED" ]; then
+  if [ -d "$REPO_ROOT/.qa-scan/node_modules/espree" ]; then
+    echo "[runtime-messages] checking runtime message single-source sync, MV3 onMessage channel rules and AST parity"
+    if ! node "$REPO_ROOT/scripts/sync-runtime-messages.mjs" --check || ! node "$REPO_ROOT/tests/runtime-messages-tests.mjs"; then
+      echo ""
+      echo "[runtime-messages] COMMIT BLOCKED — runtime messages drifted, an unregistered sender/listener exists, or MV3 onMessage channel rules failed (run: node scripts/sync-runtime-messages.mjs --write)" >&2
+      exit 1
+    fi
+  else
+    echo "[runtime-messages] WARNING: .qa-scan/node_modules/espree not found, so the runtime-messages AST gate was skipped (run CI or verify.sh to cover it)" >&2
   fi
 fi
 
