@@ -1,6 +1,6 @@
 {
   "note": "Slice anchors per test file (scripts/slice-anchor-lint.mjs). Only shrinks: refresh with --update after removing anchors. New tests load the real file with tests/fixtures/chrome-mock.js instead of cutting source.",
-  "total": 1346,
+  "total": 1327,
   "files": {
     "tests/ai-tags-tests.html": {
       "count": 1,
@@ -188,7 +188,7 @@
       ]
     },
     "tests/ui-contract-tests.mjs": {
-      "count": 588,
+      "count": 569,
       "growth": [
         {
           "date": "2026-11-10",

@@ -1,7 +1,10 @@
 ---
 paths:
+  - "scripts/settings-schema.mjs"
+  - "scripts/sync-settings-schema.mjs"
   - "shared.js"
   - "background.js"
+  - "options.html"
   - "options.js"
   - "options-backup.js"
   - "bookmark-services.js"
@@ -24,6 +27,8 @@ paths:
 | Chrome Sync | 普通设置；另行启用时含凭据 | `optSyncEnabled` 是**每设备** local 开关，普通设置据此路由 sync/local；不含生词、高亮、缓存、任务状态 |
 | Google Drive | 固定个人资料库 owner 的生词、高亮与笔记、完整 AI 词条及补充、Ask 问答记录 | 每设备单独连接；连接即同步四类、断开即停止，不设按类型开关；共享连接层状态 `driveConnState:<ownerHash>` 只存 local；只用 `drive.appdata`；不接管设置、凭据 |
 | 手工 JSON schema v3 | 设置、主题 + 用户分项选择的高亮/生词/凭据 | 明文文件；导入先预览分项选择；凭据两端默认关、fail-closed（详见 rules/backup.md） |
+
+- **设置项契约单表（`scripts/settings-schema.mjs`）**：非 AI provider 设置项的默认值、预热排除、凭据标记、备份枚举及设置页加载/收集/重置绑定统一定义在 `scripts/settings-schema.mjs`（内置 AI provider 字段仍在 `scripts/ai-providers-source.mjs`）。增删改设置项后运行 `node scripts/sync-settings-schema.mjs --write` 同步 `shared.js`、`options-backup.js`、`options.js` 的 `@generated:settings-schema` 区块与 `options.html` 静态默认属性，再用 `--check` 校验零漂移、面板重置/复选框 DOM 全覆盖及无手写漏网项（由 pre-commit、`tests/ui-contract-tests.mjs` 与 `scripts/verify.sh` 静态门把关）。
 
 - 凭据（API key / token / password / 导出目标）不能硬编码。默认存 `chrome.storage.local`；仅当本机 `optSyncEnabled=true` 且账号级 `syncApiKeys=true` 时用 sync；旧云端已有非空 secret 时迁移保留 `syncApiKeys=true`，避免升级丢凭据。
 - sync 配额：单 item ≤8KB、总约 100KB、写入限流；写后检查 `lastError`。缓存、大对象、瞬态状态一律 local。

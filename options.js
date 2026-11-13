@@ -1949,157 +1949,186 @@ document.addEventListener("DOMContentLoaded", async () => {
   // switches belong with its connection), so _syncResetBtnVisibility hides
   // "Reset This Tab" there.
   const PANEL_DEFAULTS = {
+    // @generated:settings-schema start (panel-defaults-before-ai)
     popup: {
       fields: {
-        "opt-check-bookmark-status": true, "opt-auto-close": true, "offline-queue-enabled": true,
-        "opt-show-search": false, "opt-show-recent": false, "opt-show-badge": false,
+        "opt-check-bookmark-status": true,
+        "opt-auto-close": true,
+        "offline-queue-enabled": true,
+        "opt-show-search": false,
+        "opt-show-recent": false,
+        "opt-show-badge": false,
         "opt-show-suggest-tags": true,
-        "opt-show-ai-summary": true, "opt-show-ai-tags": true,
-        "opt-show-quick-links": true, "opt-show-quick-row": true,
-        "opt-popup-width-custom": ""
+        "opt-show-ai-summary": true,
+        "opt-show-ai-tags": true,
+        "opt-show-quick-links": true,
+        "opt-show-quick-row": true,
+        "opt-popup-width-custom": "",
       },
       radios: { "popup-width-preset": "550" },
       nested: {
         urlClean: {
-          "opt-urlclean-enabled": true, "opt-urlclean-on-open": true, "opt-urlclean-on-paste": true,
-          "opt-urlclean-aggressive": false, "opt-urlclean-custom": [], "opt-urlclean-exclude": []
-        }
-      }
+          "opt-urlclean-enabled": true,
+          "opt-urlclean-on-open": true,
+          "opt-urlclean-on-paste": true,
+          "opt-urlclean-aggressive": false,
+          "opt-urlclean-custom": [],
+          "opt-urlclean-exclude": [],
+        },
+      },
     },
     bookmarks: {
       fields: {
-        "opt-private-default": false, "opt-private-incognito": true, "opt-readlater-default": false,
-        "opt-auto-description": true, "opt-blockquote": true, "opt-include-referrer": false,
-        "opt-respect-tag-case": true, "opt-tag-presets": "",
-        "opt-bgsave-merge": true, "opt-bgsave-skip": false, "opt-bgsave-overwrite": false
+        "opt-private-default": false,
+        "opt-private-incognito": true,
+        "opt-readlater-default": false,
+        "opt-auto-description": true,
+        "opt-blockquote": true,
+        "opt-include-referrer": false,
+        "opt-respect-tag-case": true,
+        "opt-tag-presets": "",
+        "opt-bgsave-merge": true,
+        "opt-bgsave-skip": false,
+        "opt-bgsave-overwrite": false,
       },
-      radios: { "tag-sync-mode": "cached" }
+      radios: { "tag-sync-mode": "cached" },
     },
+    // @generated:settings-schema end (panel-defaults-before-ai)
     ai: {
       fields: {
+        // @generated:settings-schema start (panel-defaults-ai-fields-head)
         "opt-ai-provider": "gemini",
+        // @generated:settings-schema end (panel-defaults-ai-fields-head)
         // @generated:ai-providers start (panel-defaults-fields)
         "opt-gemini-model": "gemini-3.5-flash-lite", "opt-openai-model": "gpt-5.4-nano", "opt-openai-baseurl": "https://api.openai.com/v1", "opt-claude-model": "claude-haiku-4-5", "opt-deepseek-model": "deepseek-v4-flash", "opt-qwen-model": "qwen-flash", "opt-qwen-region": "beijing", "opt-qwen-workspace": "", "opt-minimax-model": "MiniMax-M2", "opt-openrouter-model": "openai/gpt-oss-20b", "opt-groq-model": "openai/gpt-oss-20b", "opt-mistral-model": "mistral-small-latest", "opt-cohere-model": "command-r7b-12-2024", "opt-siliconflow-model": "Qwen/Qwen3-8B", "opt-zhipu-model": "glm-4.7-flash", "opt-kimi-model": "kimi-k2.6", "opt-ark-model": "doubao-seed-2-0-mini-260428", "opt-ark-region": "cn", "opt-opencode-model": "glm-5.3-flash", "opt-opencode-protocol": "openai", "opt-commandcode-model": "deepseek/deepseek-v4-flash", "opt-commandcode-protocol": "openai", "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2",
         // @generated:ai-providers end (panel-defaults-fields)
       },
       keepsSecrets: true,
-      // The custom panel shows one stored provider entry: a reset keeps the
-      // entries (they are records the user added, like the keys), so its
-      // fields are not reset either.
       skip: [
         // @generated:ai-providers start (panel-defaults-skip)
         "opt-gemini-key", "opt-openai-key", "opt-claude-key", "opt-deepseek-key", "opt-qwen-key", "opt-minimax-key", "opt-openrouter-key", "opt-groq-key", "opt-mistral-key", "opt-cohere-key", "opt-siliconflow-key", "opt-zhipu-key", "opt-kimi-key", "opt-ark-key", "opt-opencode-key", "opt-commandcode-key", "opt-custom-key",
         // @generated:ai-providers end (panel-defaults-skip)
+        // @generated:settings-schema start (panel-defaults-ai-skip-tail)
         "opt-custom-name", "opt-custom-protocol", "opt-custom-baseurl", "opt-custom-model",
+        // @generated:settings-schema end (panel-defaults-ai-skip-tail)
       ],
     },
+    // @generated:settings-schema start (panel-defaults-after-ai)
     "ai-behavior": {
       fields: {
-        "opt-ai-tag-lang": "en", "opt-ai-summary-lang": "auto", "opt-ai-cache-duration": "60",
-        "opt-ai-auto-tags": false, "opt-ai-use-transcript": true, "opt-ai-tag-separator": "-",
-        "opt-custom-tag-prompt": "", "opt-custom-summary-prompt": ""
+        "opt-ai-tag-lang": "en",
+        "opt-ai-summary-lang": "auto",
+        "opt-ai-cache-duration": "60",
+        "opt-ai-auto-tags": false,
+        "opt-ai-use-transcript": true,
+        "opt-ai-tag-separator": "-",
+        "opt-custom-tag-prompt": "",
+        "opt-custom-summary-prompt": "",
       },
       radios: { "ai-content-source": "local" },
-      // The Jina Reader key sits here now, under the content-source choice it serves.
       keepsSecrets: true,
-      skip: ["opt-jina-key"]
+      skip: ["opt-jina-key"],
     },
     reader: {
       fields: {
-        "opt-preview-ai-enabled": true, "opt-preview-skim": false, "opt-preview-ai-model": "",
-        "translate-target-lang": "auto", "translate-target-lang-custom": "", "opt-tr-hotkey-confirm": true,
-        "opt-translate-glossary": "", "opt-selection-trigger": "icon",
-        // Video pages (moved here from the Export tab, settings batch A1):
-        // defaults mirror shared.js mdVideoLangPref / mdVideoDarkScheme /
-        // mdVideoPauseOnLookup / mdVideoUseLogin.
-        "opt-md-video-lang": "", "opt-md-video-dark": false,
-        "opt-md-video-pause-lookup": true, "opt-md-video-use-login": true
+        "opt-preview-ai-enabled": true,
+        "opt-preview-skim": false,
+        "opt-preview-ai-model": "",
+        "translate-target-lang": "auto",
+        "translate-target-lang-custom": "",
+        "opt-tr-hotkey-confirm": true,
+        "opt-translate-glossary": "",
+        "opt-selection-trigger": "icon",
+        "opt-md-video-lang": "",
+        "opt-md-video-dark": false,
+        "opt-md-video-pause-lookup": true,
+        "opt-md-video-use-login": true,
       },
-      // The model override is kept per provider; the field above shows only the
-      // current provider's. Clear the rest too, so a reset leaves no override
-      // behind (explicit "" means no override, unlike a missing key).
       after: () => {
         for (const k of Object.keys(_previewModelMap)) _previewModelMap[k] = "";
         scheduleAutoSave();
-      }
+      },
     },
     quick: {
       fields: {
-        "qs-auto-notes": true, "qs-blockquote": true, "qs-default-tags": "", "qs-ai-tags": false, "qs-ai-summary": false,
-        "rl-auto-notes": true, "rl-blockquote": true, "rl-default-tags": "", "rl-ai-tags": false, "rl-ai-summary": false,
-        "opt-batch-tag-enabled": true, "opt-batch-tag": "batch_saved",
-        "batch-ai-tags": false, "batch-ai-summary": false, "batch-skip-existing": false,
-        // Notifications moved here from the old General tab with their section.
-        "notify-quick-save": true, "notify-read-later": true, "notify-tab-set": true,
-        "notify-batch-save": true, "notify-errors": true
-      }
+        "qs-auto-notes": true,
+        "qs-blockquote": true,
+        "qs-default-tags": "",
+        "qs-ai-tags": false,
+        "qs-ai-summary": false,
+        "rl-auto-notes": true,
+        "rl-blockquote": true,
+        "rl-default-tags": "",
+        "rl-ai-tags": false,
+        "rl-ai-summary": false,
+        "opt-batch-tag-enabled": true,
+        "opt-batch-tag": "batch_saved",
+        "batch-ai-tags": false,
+        "batch-ai-summary": false,
+        "batch-skip-existing": false,
+        "notify-quick-save": true,
+        "notify-read-later": true,
+        "notify-tab-set": true,
+        "notify-batch-save": true,
+        "notify-errors": true,
+      },
     },
     markdown: {
       fields: {
-        "opt-md-frontmatter": true, "opt-md-extended-meta": true,
-        "opt-md-image-policy": "keep", "opt-md-include-toc": false,
-        "opt-md-include-hl": true
-      },
-      // The Send-to credentials are not static fields, so they cannot be
-      // listed in skip; the reset re-renders the cards through
-      // pbpExportTargetsResetSeed instead, which carries them over.
-      keepsSecrets: true
-    },
-    archive: {
-      // Credentials live ONLY in skip: applyPanelReset iterates fields and
-      // never consults skip, so listing them in both cleared the S3 keys
-      // while the confirm dialog promised they were kept.
-      fields: {
-        "opt-wayback-enabled": false, "opt-wayback-batch": false,
-        "opt-wayback-skip-private": true
+        "opt-md-frontmatter": true,
+        "opt-md-extended-meta": true,
+        "opt-md-image-policy": "keep",
+        "opt-md-include-toc": false,
+        "opt-md-include-hl": true,
       },
       keepsSecrets: true,
-      skip: ["opt-wayback-s3key", "opt-wayback-s3secret"]
+    },
+    archive: {
+      fields: {
+        "opt-wayback-enabled": false,
+        "opt-wayback-batch": false,
+        "opt-wayback-skip-private": true,
+      },
+      keepsSecrets: true,
+      skip: ["opt-wayback-s3key", "opt-wayback-s3secret"],
     },
     appearance: {
       fields: {
-        "opt-theme": "auto", "opt-popup-follow-theme": true, "opt-custom-font": "",
-        "opt-custom-css": ""
+        "opt-theme": "auto",
+        "opt-popup-follow-theme": true,
+        "opt-custom-font": "",
+        "opt-custom-css": "",
       },
-      // The active Pinboard preset is closure state (currentPresetKey), not a
-      // form control, so the fields walk cannot reach it (Codex r2 M3):
-      // applyPreset("") clears it, refreshes the preset buttons/preview and
-      // re-applies the page theme, then autosaves. applyPreset is a hoisted
-      // function declaration in this same scope.
-      after: () => applyPreset("")
-      // The interface language moved to this tab but is deliberately not part of
-      // its reset: a language change only lands through the select's own
-      // save-and-reload path, and a silent field write would leave the page in
-      // the old language while storage already says "auto".
+      after: () => applyPreset(""),
     },
     storage: {
-      // The Data tab: backup scope toggles. Chrome Sync and Google Drive are
-      // connections, not preferences, and are never reset from here.
       fields: {
         "opt-backup-include-highlights": true,
-        "opt-backup-include-vocabulary": true
+        "opt-backup-include-vocabulary": true,
       },
-      skip: ["opt-sync-enabled"]
+      skip: ["opt-sync-enabled"],
     },
     tags: {
-      // No skip and no keepsSecrets: this panel holds no credential at all.
-      // The empty array it used to carry was truthy, so the confirm dialog
-      // promised "(keys kept)" over nothing.
-      fields: { "opt-tag-sort-by-pop": true }
+      fields: {
+        "opt-tag-sort-by-pop": true,
+      },
     },
     vocab: {
       fields: {
         "dict-echo-enabled": true,
         "dict-default-view": "dictionary",
-        "dict-learner-native-language": "", "dict-learner-level": "",
-        "dict-definition-lang": "", "dict-definition-lang-custom": "",
+        "dict-learner-native-language": "",
+        "dict-learner-level": "",
+        "dict-definition-lang": "",
+        "dict-definition-lang-custom": "",
         "dict-anki-format": "legacy",
         "dict-anki-deck": "Pinboard Vocab",
-        "dict-anki-port": "8765"
+        "dict-anki-port": "8765",
       },
       keepsSecrets: true,
-      skip: ["dict-anki-key", "dict-eudic-token"]
-    }
+      skip: ["dict-anki-key", "dict-eudic-token"],
+    },
+    // @generated:settings-schema end (panel-defaults-after-ai)
   };
   if (typeof window !== "undefined") window.__PBP_PANEL_DEFAULTS = PANEL_DEFAULTS;
   // Late-bind for _syncResetBtnVisibility (declared before PANEL_DEFAULTS —
@@ -3305,8 +3334,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   // A region or API format this version does not know leaves its select on no
   // option (value ""); saving then omits the key, so the stored value survives.
   const fieldMap = {
+    // @generated:settings-schema start (field-map-head)
     "opt-pinboard-token": s.pinboardToken,
     "opt-ai-provider": s.aiProvider,
+    // @generated:settings-schema end (field-map-head)
     // @generated:ai-providers start (field-map)
     "opt-gemini-key": s.geminiApiKey, "opt-gemini-model": s.geminiModel,
     "opt-openai-key": s.openaiApiKey, "opt-openai-model": s.openaiModel, "opt-openai-baseurl": s.openaiBaseUrl,
@@ -3326,11 +3357,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-commandcode-key": s.commandcodeApiKey, "opt-commandcode-model": s.commandcodeModel, "opt-commandcode-protocol": s.commandcodeProtocol,
     "opt-ollama-baseurl": s.ollamaBaseUrl, "opt-ollama-model": s.ollamaModel,
     // @generated:ai-providers end (field-map)
-    "opt-ai-tag-lang": s.aiTagLang, "opt-ai-summary-lang": s.aiSummaryLang, "opt-ai-cache-duration": s.aiCacheDuration,
-    "opt-custom-tag-prompt": s.customTagPrompt, "opt-custom-summary-prompt": s.customSummaryPrompt,
-    "opt-batch-tag": s.optBatchTag, "opt-lang": s.optLang, "opt-theme": s.optTheme,
-    "qs-default-tags": s.qsDefaultTags, "rl-default-tags": s.rlDefaultTags,
-    "opt-custom-font": s.customFont, "opt-custom-css": s.customOverlayCSS,
+    // @generated:settings-schema start (field-map-tail)
+    "opt-ai-tag-lang": s.aiTagLang,
+    "opt-ai-summary-lang": s.aiSummaryLang,
+    "opt-ai-cache-duration": s.aiCacheDuration,
+    "opt-custom-tag-prompt": s.customTagPrompt,
+    "opt-custom-summary-prompt": s.customSummaryPrompt,
+    "opt-batch-tag": s.optBatchTag,
+    "opt-lang": s.optLang,
+    "opt-theme": s.optTheme,
+    "qs-default-tags": s.qsDefaultTags,
+    "rl-default-tags": s.rlDefaultTags,
+    "opt-custom-font": s.customFont,
+    "opt-custom-css": s.customOverlayCSS,
     "opt-ai-tag-separator": s.aiTagSeparator,
     "opt-jina-key": s.jinaApiKey,
     "opt-tag-presets": s.tagPresets,
@@ -3343,7 +3382,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "dict-anki-deck": s.dictAnkiDeck || "",
     "dict-anki-port": s.dictAnkiPort || "8765",
     "dict-anki-key": s.dictAnkiKey || "",
-    "dict-eudic-token": s.dictEudicToken || ""
+    "dict-eudic-token": s.dictEudicToken || "",
+    // @generated:settings-schema end (field-map-tail)
   };
   for (const [id, val] of Object.entries(fieldMap)) {
     const el = $id(id);
@@ -3398,24 +3438,35 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- Fill checkbox fields ----
   const checkMap = {
-    "opt-private-default": s.optPrivateDefault, "opt-private-incognito": s.optPrivateIncognito,
-    "opt-readlater-default": s.optReadlaterDefault, "opt-auto-description": s.optAutoDescription,
-    "opt-blockquote": s.optBlockquote, "opt-include-referrer": s.optIncludeReferrer,
+    // @generated:settings-schema start (check-map)
+    "opt-private-default": s.optPrivateDefault,
+    "opt-private-incognito": s.optPrivateIncognito,
+    "opt-readlater-default": s.optReadlaterDefault,
+    "opt-auto-description": s.optAutoDescription,
+    "opt-blockquote": s.optBlockquote,
+    "opt-include-referrer": s.optIncludeReferrer,
     "opt-ai-auto-tags": s.optAiAutoTags,
-    "opt-ai-use-transcript": s.aiUseTranscript !== false, // default-true boolean: absent on pre-key settings
-    "qs-auto-notes": s.qsAutoNotes, "qs-blockquote": s.qsBlockquote,
-    "qs-ai-tags": s.qsAiTags, "qs-ai-summary": s.qsAiSummary,
-    "rl-auto-notes": s.rlAutoNotes, "rl-blockquote": s.rlBlockquote,
-    "rl-ai-tags": s.rlAiTags, "rl-ai-summary": s.rlAiSummary,
+    "opt-ai-use-transcript": s.aiUseTranscript !== false,
+    "qs-auto-notes": s.qsAutoNotes,
+    "qs-blockquote": s.qsBlockquote,
+    "qs-ai-tags": s.qsAiTags,
+    "qs-ai-summary": s.qsAiSummary,
+    "rl-auto-notes": s.rlAutoNotes,
+    "rl-blockquote": s.rlBlockquote,
+    "rl-ai-tags": s.rlAiTags,
+    "rl-ai-summary": s.rlAiSummary,
     "opt-batch-tag-enabled": s.optBatchTagEnabled,
     "opt-backup-include-highlights": s.backupIncludeHighlights !== false,
     "opt-backup-include-vocabulary": s.backupIncludeVocabulary !== false,
-    "batch-ai-tags": s.batchAiTags, "batch-ai-summary": s.batchAiSummary,
+    "batch-ai-tags": s.batchAiTags,
+    "batch-ai-summary": s.batchAiSummary,
     "batch-skip-existing": s.batchSkipExisting,
-    "opt-show-recent": s.optShowRecent, "opt-show-search": s.optShowSearch,
+    "opt-show-recent": s.optShowRecent,
+    "opt-show-search": s.optShowSearch,
     "notify-quick-save": s.notifyQuickSave,
     "notify-read-later": s.notifyReadLater,
-    "notify-tab-set": s.notifyTabSet, "notify-batch-save": s.notifyBatchSave,
+    "notify-tab-set": s.notifyTabSet,
+    "notify-batch-save": s.notifyBatchSave,
     "notify-errors": s.notifyErrors,
     "opt-respect-tag-case": s.optRespectTagCase,
     "offline-queue-enabled": s.offlineQueueEnabled,
@@ -3445,7 +3496,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-preview-ai-enabled": s.previewAiEnabled !== false,
     "opt-preview-skim": s.previewSkimEnabled === true,
     "opt-tr-hotkey-confirm": s.trHotkeyConfirm !== false,
-    "dict-echo-enabled": s.dictEchoEnabled === true
+    "dict-echo-enabled": s.dictEchoEnabled === true,
+    // @generated:settings-schema end (check-map)
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = $id(id);
@@ -4365,9 +4417,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   function collectSettingsFromForm() {
     const _ets = collectExportTargets();
     return {
-      // Bookmarks
       // No bookmarkService: the radios only pick which connection form shows.
       // The service switches on Connect / Pinboard login (pbpSwitchBookmarkService).
+      // @generated:settings-schema start (collect-form-head)
       pinboardToken: obfuscateKey($id("opt-pinboard-token").value.trim()),
       optPrivateDefault: $id("opt-private-default").checked,
       optPrivateIncognito: $id("opt-private-incognito").checked,
@@ -4378,13 +4430,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       optRespectTagCase: $id("opt-respect-tag-case").checked,
       bgSaveMode: document.querySelector('input[name="bgsave-mode"]:checked')?.value || "merge",
       offlineQueueEnabled: $id("offline-queue-enabled").checked,
-      // Quick Actions
       qsAutoNotes: $id("qs-auto-notes").checked,
       qsBlockquote: $id("qs-blockquote").checked,
       qsDefaultTags: $id("qs-default-tags").value.trim(),
       qsAiTags: $id("qs-ai-tags").checked,
       qsAiSummary: $id("qs-ai-summary").checked,
-      // Read Later
       rlAutoNotes: $id("rl-auto-notes").checked,
       rlBlockquote: $id("rl-blockquote").checked,
       rlDefaultTags: $id("rl-default-tags").value.trim(),
@@ -4395,8 +4445,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       batchAiTags: $id("batch-ai-tags").checked,
       batchAiSummary: $id("batch-ai-summary").checked,
       batchSkipExisting: $id("batch-skip-existing").checked,
-      // AI Provider & Keys
       aiProvider: $id("opt-ai-provider").value,
+      // @generated:settings-schema end (collect-form-head)
       // @generated:ai-providers start (collect-form)
       geminiApiKey: obfuscateKey($id("opt-gemini-key").value.trim()),
       geminiModel: $id("opt-gemini-model").value.trim() || "gemini-3.5-flash-lite",
@@ -4442,16 +4492,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Every custom entry (customDisplayName/Protocol/BaseUrl/ApiKey/Model,
       // aiCustomProviders and the key slots) comes from the editor model.
       ...pbpOptAiCustomCollect(pbpOptAiCustomEditorState),
-      // AI Behavior & Prompts
+      // @generated:settings-schema start (collect-form-tail)
       optAiAutoTags: $id("opt-ai-auto-tags").checked,
       aiUseTranscript: $id("opt-ai-use-transcript").checked,
       aiTagLang: $id("opt-ai-tag-lang").value,
       aiSummaryLang: $id("opt-ai-summary-lang").value,
-      aiCacheDuration: (() => {
-        const raw = $id("opt-ai-cache-duration").value;
-        const n = (raw === "" || raw == null) ? 60 : parseInt(raw, 10);
-        return Math.min(10080, Math.max(0, Number.isNaN(n) ? 60 : n));
-      })(),
       aiTagSeparator: $id("opt-ai-tag-separator").value,
       aiContentSource: document.querySelector('input[name="ai-content-source"]:checked')?.value || "local",
       tagSyncMode: document.querySelector('input[name="tag-sync-mode"]:checked')?.value || "cached",
@@ -4464,59 +4509,29 @@ document.addEventListener("DOMContentLoaded", async () => {
       mdExportIncludeToc: $id("opt-md-include-toc").checked,
       mdExportIncludeHighlights: $id("opt-md-include-hl").checked,
       mdVideoUseLogin: $id("opt-md-video-use-login").checked,
-      // Normalised with the parser the pickers consume (shared.js), so the
-      // stored value is canonical ("en, zh-hant") and spacing/case noise
-      // never reaches storage; the slice mirrors the input's maxlength.
-      mdVideoLangPref: pbpVideoLangPrefsClamp(pbpVideoLangPrefs($id("opt-md-video-lang").value), 80),
       mdVideoPauseOnLookup: $id("opt-md-video-pause-lookup").checked,
       mdVideoDarkScheme: $id("opt-md-video-dark").checked,
-      exportTargets: _ets,
-      // Mirror obsidian into legacy keys so popup.js "Send to Obsidian" strip (which still
-      // reads obsidianEnabled/Vault/Folder) stays in sync. P2 migrates popup to read exportTargets.
-      obsidianEnabled: !!(_ets.obsidian && _ets.obsidian.enabled),
-      obsidianVault: (_ets.obsidian && _ets.obsidian.vault) || "",
-      obsidianFolder: (_ets.obsidian && _ets.obsidian.folder) || "",
-      // Preview-page AI (md-preview explain / ask / translate)
       previewAiEnabled: $id("opt-preview-ai-enabled").checked,
       previewSkimEnabled: $id("opt-preview-skim").checked,
-      // Per-provider override: commit the visible input under the provider it
-      // belongs to, persist the whole map, and retire the legacy single key
-      // (folded into the map at load; left non-empty it would keep leaking
-      // into providers the map has no entry for via md-ai-core's fallback).
-      previewAiModelByProvider: (() => {
-        _previewModelMap[_previewModelProvider] = $id("opt-preview-ai-model").value.trim();
-        return { ..._previewModelMap };
-      })(),
-      previewAiModel: "",
-      translateTargetLang: resolveTranslateTargetLang(),
       translateGlossary: $id("opt-translate-glossary").value,
       trHotkeyConfirm: $id("opt-tr-hotkey-confirm").checked,
       dictEchoEnabled: $id("dict-echo-enabled").checked,
-      dictDefinitionLang: resolveDictDefinitionLang(),
-      dictDefaultView: pbpDictDefaultView({ dictDefaultView: $id("dict-default-view").value }),
-      dictLearnerNativeLanguage: $id("dict-learner-native-language").value.replace(/[\p{Cc}\p{Cf}]/gu, "").trim().slice(0, 80),
-      dictLearnerLevel: ["beginner", "intermediate", "advanced"].includes($id("dict-learner-level").value) ? $id("dict-learner-level").value : "",
-      dictAnkiFormat: $id("dict-anki-format").value === "multilingual" ? "multilingual" : "legacy",
       dictAnkiDeck: $id("dict-anki-deck").value.trim(),
       dictAnkiPort: $id("dict-anki-port").value.trim(),
       dictAnkiKey: obfuscateKey($id("dict-anki-key").value.trim()),
       dictEudicToken: obfuscateKey($id("dict-eudic-token").value.trim()),
       selectionTrigger: $id("opt-selection-trigger").value,
-      // Appearance
       optLang: $id("opt-lang").value,
       optTheme: $id("opt-theme").value,
       optShowSearch: $id("opt-show-search").checked,
       optShowRecent: $id("opt-show-recent").checked,
       optShowBadge: $id("opt-show-badge").checked,
-      // Notifications
       notifyQuickSave: $id("notify-quick-save").checked,
       notifyReadLater: $id("notify-read-later").checked,
       notifyTabSet: $id("notify-tab-set").checked,
       notifyBatchSave: $id("notify-batch-save").checked,
       notifyErrors: $id("notify-errors").checked,
-      // Custom Style (font here; overlay CSS saved separately via syncSetLarge below)
       customFont: $id("opt-custom-font").value.trim(),
-      // New toggles
       optCheckBookmarkStatus: $id("opt-check-bookmark-status").checked,
       linkdingPreload: $id("opt-linkding-preload").checked,
       linkdingBrowserMetadata: $id("opt-linkding-browser-metadata").checked,
@@ -4536,35 +4551,44 @@ document.addEventListener("DOMContentLoaded", async () => {
       waybackS3Key: obfuscateKey($id("opt-wayback-s3key").value.trim()),
       waybackS3Secret: obfuscateKey($id("opt-wayback-s3secret").value.trim()),
       backupIncludeHighlights: $id("opt-backup-include-highlights").checked,
-      // Persisted like its highlights twin: the box is auto-save bound and
-      // defaults to ON, so leaving it unpersisted flashed "Saved" and then put
-      // the whole account's vocabulary back into the next plaintext export.
-      // (The credentials box next to it is deliberately per-export instead --
-      // see options-backup.js's "never remembered" note.)
       backupIncludeVocabulary: $id("opt-backup-include-vocabulary").checked,
+      // @generated:settings-schema end (collect-form-tail)
+      // Bespoke / computed setting collectors (AST-verified against SETTINGS_SCHEMA)
+      aiCacheDuration: (() => {
+        const raw = $id("opt-ai-cache-duration").value;
+        const n = (raw === "" || raw == null) ? 60 : parseInt(raw, 10);
+        return Math.min(10080, Math.max(0, Number.isNaN(n) ? 60 : n));
+      })(),
+      mdVideoLangPref: pbpVideoLangPrefsClamp(pbpVideoLangPrefs($id("opt-md-video-lang").value), 80),
+      exportTargets: _ets,
+      obsidianEnabled: !!(_ets.obsidian && _ets.obsidian.enabled),
+      obsidianVault: (_ets.obsidian && _ets.obsidian.vault) || "",
+      obsidianFolder: (_ets.obsidian && _ets.obsidian.folder) || "",
+      previewAiModelByProvider: (() => {
+        _previewModelMap[_previewModelProvider] = $id("opt-preview-ai-model").value.trim();
+        return { ..._previewModelMap };
+      })(),
+      previewAiModel: "",
+      translateTargetLang: resolveTranslateTargetLang(),
+      dictDefinitionLang: resolveDictDefinitionLang(),
+      dictDefaultView: pbpDictDefaultView({ dictDefaultView: $id("dict-default-view").value }),
+      dictLearnerNativeLanguage: $id("dict-learner-native-language").value.replace(/[\p{Cc}\p{Cf}]/gu, "").trim().slice(0, 80),
+      dictLearnerLevel: ["beginner", "intermediate", "advanced"].includes($id("dict-learner-level").value) ? $id("dict-learner-level").value : "",
+      dictAnkiFormat: $id("dict-anki-format").value === "multilingual" ? "multilingual" : "legacy",
       themePresetKey: currentPresetKey,
       urlClean: {
         enabled: $id("opt-urlclean-enabled").checked,
         onPopupOpen: $id("opt-urlclean-on-open").checked,
         onPaste: $id("opt-urlclean-on-paste").checked,
         aggressiveMode: $id("opt-urlclean-aggressive").checked,
-        // Bounded before the value reaches persistSettings: urlClean rides the
-        // single non-chunked storage.set(), where one item over 8KB rejects the
-        // whole settings batch. Same collection-time clamp family as
-        // pbpVideoLangPrefsClamp above.
         customParams: pbpParamListClamp($id("opt-urlclean-custom").value.split("\n").map(s => s.trim()).filter(Boolean)),
         excludeParams: pbpParamListClamp($id("opt-urlclean-exclude").value.split("\n").map(s => s.trim()).filter(Boolean)),
       },
-      // ---- Popup width (B9) ----
       ...(() => {
         const selectedPreset = document.querySelector('input[name="popup-width-preset"]:checked')?.value;
         let popupWidthToSave = 550;
         if (selectedPreset === "custom") {
           const raw = parseInt($id("opt-popup-width-custom").value, 10);
-          // Clamp the stored value but do NOT write back to the input — that
-          // would clobber partial keystrokes during auto-save (e.g. typing "6"
-          // for an eventual "600" would snap to 420). The blur/Enter handler
-          // is responsible for cleaning up the displayed value.
           popupWidthToSave = Math.max(420, Math.min(720, isNaN(raw) ? 550 : raw));
         } else if (selectedPreset) {
           popupWidthToSave = parseInt(selectedPreset, 10);

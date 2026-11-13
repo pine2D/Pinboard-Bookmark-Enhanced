@@ -594,13 +594,18 @@ function isStaleCacheEntry(entry, now, ttlMs) {
 }
 
 const SETTINGS_DEFAULTS = {
+  // @generated:settings-schema start (settings-defaults-head)
   pinboardToken: "",
   bookmarkService: "pinboard",
-  karakeepUrl: "", karakeepToken: "",
-  karakeepReadLaterListId: "", karakeepReadLaterListOwner: "",
-  linkdingUrl: "", linkdingToken: "",
+  karakeepUrl: "",
+  karakeepToken: "",
+  karakeepReadLaterListId: "",
+  karakeepReadLaterListOwner: "",
+  linkdingUrl: "",
+  linkdingToken: "",
   personalLibraryAccount: "",
   aiProvider: "gemini",
+  // @generated:settings-schema end (settings-defaults-head)
   // @generated:ai-providers start (settings-defaults)
   geminiApiKey: "", geminiModel: "gemini-3.5-flash-lite",
   openaiApiKey: "", openaiModel: "gpt-5.4-nano", openaiBaseUrl: "https://api.openai.com/v1",
@@ -621,60 +626,88 @@ const SETTINGS_DEFAULTS = {
   ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3.2",
   customApiKey: "", customModel: "", customBaseUrl: "",
   // @generated:ai-providers end (settings-defaults)
-  // More custom provider entries (aiCustomProviders, non-secret) with sealed
-  // keys in slots 2..8; customDisplayName / customProtocol belong to the first
-  // entry ("custom", slot 1). The retired customName stays out of here (R1).
-  customDisplayName: "", customProtocol: "openai", aiCustomProviders: [],
-  customApiKey2: "", customApiKey3: "", customApiKey4: "", customApiKey5: "", customApiKey6: "", customApiKey7: "", customApiKey8: "",
-  aiTagLang: "en", aiSummaryLang: "auto", aiCacheDuration: 60,
-  aiContentSource: "local", jinaApiKey: "",
-  customTagPrompt: "", customSummaryPrompt: "",
-  optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false,
-  optAutoDescription: true, optBlockquote: true, optIncludeReferrer: false,
+  // @generated:settings-schema start (settings-defaults-tail)
+  customDisplayName: "",
+  customProtocol: "openai",
+  aiCustomProviders: [],
+  customApiKey2: "",
+  customApiKey3: "",
+  customApiKey4: "",
+  customApiKey5: "",
+  customApiKey6: "",
+  customApiKey7: "",
+  customApiKey8: "",
+  aiTagLang: "en",
+  aiSummaryLang: "auto",
+  aiCacheDuration: 60,
+  aiContentSource: "local",
+  jinaApiKey: "",
+  customTagPrompt: "",
+  customSummaryPrompt: "",
+  optPrivateDefault: false,
+  optPrivateIncognito: true,
+  optReadlaterDefault: false,
+  optAutoDescription: true,
+  optBlockquote: true,
+  optIncludeReferrer: false,
   optAiAutoTags: false,
-  qsAutoNotes: true, qsBlockquote: true, qsDefaultTags: "", qsAiTags: false, qsAiSummary: false,
-  rlAutoNotes: true, rlBlockquote: true, rlDefaultTags: "", rlAiTags: false, rlAiSummary: false,
-  optBatchTagEnabled: true, optBatchTag: "batch_saved",
-  batchAiTags: false, batchAiSummary: false, batchSkipExisting: false,
+  qsAutoNotes: true,
+  qsBlockquote: true,
+  qsDefaultTags: "",
+  qsAiTags: false,
+  qsAiSummary: false,
+  rlAutoNotes: true,
+  rlBlockquote: true,
+  rlDefaultTags: "",
+  rlAiTags: false,
+  rlAiSummary: false,
+  optBatchTagEnabled: true,
+  optBatchTag: "batch_saved",
+  batchAiTags: false,
+  batchAiSummary: false,
+  batchSkipExisting: false,
   optLang: "auto",
-  optShowRecent: false, optShowSearch: false, optTheme: "auto",
-  notifyQuickSave: true, notifyReadLater: true,
-  notifyTabSet: true, notifyBatchSave: true, notifyErrors: true,
+  optShowRecent: false,
+  optShowSearch: false,
+  optTheme: "auto",
+  notifyQuickSave: true,
+  notifyReadLater: true,
+  notifyTabSet: true,
+  notifyBatchSave: true,
+  notifyErrors: true,
   customFont: "",
-  optRespectTagCase: true, aiTagSeparator: "-",
-  offlineQueueEnabled: true, optShowBadge: false,
-  tagSyncMode: "cached", // "fresh" | "cached" | "prewarmed"
-  optCheckBookmarkStatus: true, optShowSuggestTags: true,
-  // linkding only: check each page while browsing (toolbar icon, popup ready
-  // at once). Off by default: every check makes the server fetch the page.
+  optRespectTagCase: true,
+  aiTagSeparator: "-",
+  offlineQueueEnabled: true,
+  optShowBadge: false,
+  tagSyncMode: "cached",
+  optCheckBookmarkStatus: true,
+  optShowSuggestTags: true,
   linkdingPreload: false,
-  // linkding only: a new bookmark's title and Description come from the
-  // browser's page (on) or from what linkding read in its check (off).
   linkdingBrowserMetadata: true,
-  // linkding only: after the popup or quick save creates a bookmark, ask the
-  // SingleFile extension to save the page (it uploads to linkding itself).
   linkdingSingleFile: false,
-  optShowAiSummary: true, optShowAiTags: true,
-  optShowQuickLinks: true, optShowQuickRow: true,
-  tagPresets: "", optAutoCloseAfterSave: true,
-  themePresetKey: "", optPopupFollowTheme: true,
+  optShowAiSummary: true,
+  optShowAiTags: true,
+  optShowQuickLinks: true,
+  optShowQuickRow: true,
+  tagPresets: "",
+  optAutoCloseAfterSave: true,
+  themePresetKey: "",
+  optPopupFollowTheme: true,
   popupWidth: 550,
-  mdExportFrontmatter: true, mdExportImagePolicy: "keep", mdExportIncludeToc: false,
-  mdExportIncludeHighlights: true, mdExportIncludeAsk: false,
-  // Default-on: attaches author/published/site/image/words to export meta when
-  // available. Off = byte-identical legacy exports (X4).
+  mdExportFrontmatter: true,
+  mdExportImagePolicy: "keep",
+  mdExportIncludeToc: false,
+  mdExportIncludeHighlights: true,
+  mdExportIncludeAsk: false,
   mdExportExtendedMeta: true,
-  obsidianEnabled: false, obsidianVault: "", obsidianFolder: "",
-  // Registry-driven "Send to ▾" per-target config (Obsidian, GitHub Gist, …).
-  // MUST live here: options loads settings via get(SETTINGS_DEFAULTS), so a key
-  // absent from this object is never fetched — the card renders empty on reload
-  // and a subsequent save overwrites the stored value (github had no legacy
-  // mirror to fall back on, unlike obsidian*).
+  obsidianEnabled: false,
+  obsidianVault: "",
+  obsidianFolder: "",
   exportTargets: {},
   urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] },
-  // pinboard.in tag-page "sort by popularity" control (site enhancement, default on)
   tagSortByPopEnabled: true,
-  bgSaveMode: "merge", // "merge" | "skip" | "overwrite"
+  bgSaveMode: "merge",
   waybackArchiveEnabled: false,
   waybackArchiveBatch: false,
   waybackSkipPrivate: true,
@@ -682,42 +715,31 @@ const SETTINGS_DEFAULTS = {
   waybackS3Secret: "",
   backupIncludeHighlights: true,
   backupIncludeVocabulary: true,
-  // md-preview in-page AI (explain / ask / translate)
   previewAiEnabled: true,
-  // R11 skim layer (key-points summary): default OFF, unlike previewAiEnabled --
-  // generation runs automatically on every article open (no user click per
-  // use), so it spends AI tokens without an explicit per-use invocation. The
-  // user must opt in explicitly (spec: docs/superpowers/specs/2026-07-07-skim-layer-design.md).
   previewSkimEnabled: false,
   previewAiModel: "",
-  // Per-provider preview model override map {providerId: model}. previewAiModel
-  // above is the legacy single-key value (provider unknown); it applies only for
-  // providers the map has never recorded (see pbpAiResolveModelOverride).
   previewAiModelByProvider: {},
   translateTargetLang: "auto",
   translateGlossary: "",
-  trHotkeyConfirm: true,    // reader t key asks first when the rail price is not visible / >= 5000 tokens
-  dictEchoEnabled: true,    // md-vocab-echo: underline saved vocab words in the reader
-  dictDefinitionLang: "",   // AI entry definitions; empty follows the interface language
-  dictAiAutoGenerate: false, // Legacy preference, read only for migration
-  dictDefaultView: "dictionary", // dictionary / ai-saved / ai-generate
-  dictLearnerNativeLanguage: "", // Optional learner profile, never inferred from interface language
+  trHotkeyConfirm: true,
+  dictEchoEnabled: true,
+  dictDefinitionLang: "",
+  dictAiAutoGenerate: false,
+  dictDefaultView: "dictionary",
+  dictLearnerNativeLanguage: "",
   dictLearnerLevel: "",
-  dictAnkiFormat: "legacy", // Explicit opt-in uses a separate multilingual note type
-  dictAnkiDeck: "Pinboard Vocab", // anki-connect: target deck for Send to Anki
-  dictAnkiPort: "8765",         // anki-connect: AnkiConnect port (host stays loopback-only)
-  dictAnkiKey: "",              // anki-connect: optional AnkiConnect API key (credential)
-  dictEudicToken: "",           // eudic-sync: Eudic OpenAPI authorization (credential)
-  // md-video: send YouTube login cookies with the extension page's own
-  // fallback watch-page scrape (only used when no www.youtube.com tab is
-  // open) -- anonymous fallback requests are refused as bot traffic, so on
-  // by default.
+  dictAnkiFormat: "legacy",
+  dictAnkiDeck: "Pinboard Vocab",
+  dictAnkiPort: "8765",
+  dictAnkiKey: "",
+  dictEudicToken: "",
   mdVideoUseLogin: true,
-  mdVideoLangPref: "",        // ordered caption-language preference, "" = auto (research T6.1)
-  mdVideoPauseOnLookup: true, // pause the player while a word is looked up (research T3.5)
-  mdVideoDarkScheme: false,   // open video pages in the dark reading palette (reader theme model 2026-08-25)
-  aiUseTranscript: true, // popup AI: prefer the video's subtitles as the content on video pages -- only where the caption origin grant already stands (contains only, never prompts)
-  selectionTrigger: "icon"
+  mdVideoLangPref: "",
+  mdVideoPauseOnLookup: true,
+  mdVideoDarkScheme: false,
+  aiUseTranscript: true,
+  selectionTrigger: "icon",
+  // @generated:settings-schema end (settings-defaults-tail)
 };
 
 // These SETTINGS_DEFAULTS values are stored through the large-value codec when
@@ -2960,7 +2982,9 @@ async function pbpDrainOfflineQueue(queueIds, { getItem, sendItem, removeItem, o
 //   aiCustomProviders -- a missing list reads as [] and only a user action
 //   writes it; a primed [] on a fresh device would win last-writer-wins over
 //   the list the cloud already holds and erase every synced entry.
+// @generated:settings-schema start (prime-excluded-keys)
 const PRIME_EXCLUDED_KEYS = ["bgSaveMode", "dictAiAutoGenerate", "aiCustomProviders"];
+// @generated:settings-schema end (prime-excluded-keys)
 
 function pbpDictDefaultView(settings = {}) {
   if (["dictionary", "ai-saved", "ai-generate"].includes(settings.dictDefaultView)) return settings.dictDefaultView;
@@ -3774,12 +3798,15 @@ function pbpAiCustomEntries(s) {
 }
 
 const API_KEY_FIELDS = [
+  // @generated:settings-schema start (api-key-fields-head)
   "pinboardToken", "karakeepToken", "linkdingToken",
+  // @generated:settings-schema end (api-key-fields-head)
   // @generated:ai-providers start (api-key-fields)
   "geminiApiKey", "openaiApiKey", "claudeApiKey", "deepseekApiKey", "qwenApiKey", "minimaxApiKey", "openrouterApiKey", "groqApiKey", "mistralApiKey", "cohereApiKey", "siliconflowApiKey", "zhipuApiKey", "kimiApiKey", "arkApiKey", "opencodeApiKey", "commandcodeApiKey", "customApiKey",
   // @generated:ai-providers end (api-key-fields)
-  "customApiKey2", "customApiKey3", "customApiKey4", "customApiKey5", "customApiKey6", "customApiKey7", "customApiKey8",
-  "jinaApiKey", "waybackS3Key", "waybackS3Secret", "dictAnkiKey", "dictEudicToken",
+  // @generated:settings-schema start (api-key-fields-tail)
+  "customApiKey2", "customApiKey3", "customApiKey4", "customApiKey5", "customApiKey6", "customApiKey7", "customApiKey8", "jinaApiKey", "waybackS3Key", "waybackS3Secret", "dictAnkiKey", "dictEudicToken",
+  // @generated:settings-schema end (api-key-fields-tail)
 ];
 
 // ---- PBP_AI_CALL override whitelist (K44) ----------------------------------
