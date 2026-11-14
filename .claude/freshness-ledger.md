@@ -76,6 +76,7 @@
 | LiteLLM | tests/fixtures/dict-live-malformed-responses.js:1 | 2026-10-26 | 原文：// Reviewed synthetic-term answers captured on 2026-10-26 through LiteLLM. |
 | Jina Reader | tests/jina-cache-tests.html | 未核实 | - |
 | DeepSeek Fetch | tests/jina-cache-tests.html | 未核实 | 按 2026-11-13 官方 schema 手写 |
+| DeepSeek OCR | tests/md-ocr-tests.html | 未核实 | 按 2026-11-13 官方 schema 手写 |
 | Wayback Machine | tests/wayback-tests.html | 未核实 | - |
 | Free Dictionary | tests/md-dict-tests.html:216 | 2026-11-13 | 2026-11-13 复核 es/aprovecho、pl/psa、en/found 线上响应；pl/psa 同步新增 IPA |
 | Free Dictionary | tests/library-vocab-tests.html | 未核实 | 照 md-dict-tests.html 的样本手写 |

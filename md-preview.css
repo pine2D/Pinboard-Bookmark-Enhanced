@@ -1280,6 +1280,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
 .rail-ident h1 { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .rail-ident a { display: block; margin-top: var(--sp-1); font-size: 12px; color: var(--fg-muted); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rail-ident a:hover { color: var(--link); }
+.rail-ident a:not([href]):hover { color: var(--fg-muted); cursor: default; }
 .rail-ident a .url-host { font-weight: 600; }
 /* X2: bookmarked badge — higher specificity than ".rail-ident a" above so it
    doesn't inherit that rule's display:block (wrong for a pill-shaped badge);
@@ -3814,7 +3815,9 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 #rail-history-pop:popover-open { display: flex; }
 #rail-history-pop button { font-family: inherit; }
 #rail-history-pop .panel-head > .rh-title,
-#rendered-view .es-history .panel-head > .rh-title {
+#ocr-drop-pop .panel-head > .rh-title,
+#rendered-view .es-history .panel-head > .rh-title,
+#rendered-view .es-ocr .panel-head > .rh-title {
   margin: 0;
   padding: 0;
   border: 0;
@@ -3912,7 +3915,8 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 .rh-remove:hover { background: var(--btn-hover); border-color: transparent; color: var(--fg); }
 .rh-remove svg { width: 13px; height: 13px; }
 
-.empty-state.es-history {
+.empty-state.es-history,
+.empty-state.es-ocr {
   max-width: 520px;
   margin: 0 auto;
   display: flex;
@@ -3921,8 +3925,10 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   gap: var(--sp-3);
   text-align: left;
 }
-#rendered-view .empty-state.es-history p { margin: 0; }
-.empty-state.es-history > .rh-empty-lead {
+#rendered-view .empty-state.es-history p,
+#rendered-view .empty-state.es-ocr p { margin: 0; }
+.empty-state.es-history > .rh-empty-lead,
+.empty-state.es-ocr > .rh-empty-lead {
   font-size: 14px;
   line-height: 1.55;
   color: var(--fg);
@@ -3948,10 +3954,40 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
-.empty-state.es-history > .row {
+.empty-state.es-history > .row,
+.empty-state.es-ocr > .row {
   justify-content: flex-start;
   margin-top: 0;
 }
+.ocr-purpose-opt {
+  gap: var(--sp-2);
+  margin-top: 0;
+  font-size: 13px;
+  color: var(--fg);
+  cursor: pointer;
+  justify-content: flex-start;
+}
+.es-ocr .action-btn[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: wait;
+}
+#rail-history-pop > #rh-import-ocr-btn {
+  width: 100%;
+  justify-content: flex-start;
+}
+#ocr-drop-pop {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(420px, calc(100vw - 2 * var(--sp-4)));
+  max-height: calc(100dvh - 2 * var(--sp-4));
+  overflow: auto;
+  display: none;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+#ocr-drop-pop:popover-open { display: flex; }
+#ocr-drop-pop button { font-family: inherit; }
 .hl-card-dot {
   width: 22px; height: 22px; padding: 0;
   border-radius: 50%;
@@ -4548,7 +4584,7 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
 @media print {
   #explain-pop:popover-open, #pb-hl-bar:popover-open, #pb-hl-card:popover-open,
   #fn-pop:popover-open, #search-pop:popover-open, #kbd-help-pop:popover-open,
-  #rail-history-pop:popover-open,
+  #rail-history-pop:popover-open, #ocr-drop-pop:popover-open,
   #typo-pop, #typo-pop:popover-open { display: none; }
 }
 
@@ -5129,6 +5165,7 @@ details#video-description .desc-body a { color: var(--link); }
    pushes it there (the head rule's own .rail-sec-label does the same). */
 #reader-source-details > summary > span:first-child { flex: 1 1 auto; min-width: 0; }
 #reader-source-details[open] > summary .rail-sec-tri { transform: translateY(1px) rotate(225deg); }
+#reader-source-details > #btn-import-ocr { width: 100%; margin-top: var(--sp-2); justify-content: center; white-space: normal; overflow-wrap: anywhere; }
 
 
 /* Reader save and export controls use the existing 26px chrome rung. */

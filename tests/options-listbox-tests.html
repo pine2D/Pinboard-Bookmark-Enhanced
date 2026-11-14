@@ -1165,7 +1165,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     const group = host.querySelector(".pref-group");
     assert(group, "renderStoragePanel never emitted a .pref-group");
     const rows = [...group.querySelectorAll(":scope > .pref-row")];
-    assert(rows.length === 4, "expected 4 storage category rows (jina/urls/tags/misc), got " + rows.length);
+    assert(rows.length === 5, "expected 5 storage category rows (jina/urls/tags/ocr/misc), got " + rows.length);
     const picks = [...group.querySelectorAll(":scope > .pref-row > label.pick.pick-box")];
     assert(picks.length === rows.length,
       "every storage category .pref-row must have a label.pick.pick-box child, got " + picks.length + " of " + rows.length);
@@ -1174,11 +1174,13 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       assert(l.querySelector(".pick-text") && l.querySelector('.pick-mark[aria-hidden="true"]'),
         "storage pick row is missing its .pick-text/.pick-mark");
     });
-    // STORAGE_CATS (options.js) has jina/urls/misc defaultOn:true, tags
+    // STORAGE_CATS (options.js) has jina/urls/misc defaultOn:true, tags/ocr
     // defaultOn:false -- seeded with data, the three defaultOn categories
     // must come up checked (cb.checked = c.defaultOn && m.keys.length > 0).
     const checked = group.querySelectorAll(".storage-cat-cb:checked");
     assert(checked.length === 3, "expected 3 default-on categories checked (jina/urls/misc, seeded with data), got " + checked.length);
+    const ocrCb = group.querySelector('.storage-cat-cb[data-cat="ocr"]');
+    assert(ocrCb && ocrCb.disabled && !ocrCb.checked, "empty ocr category must render disabled and unchecked");
     const disabledCb = group.querySelector('.storage-cat-cb[data-cat="tags"]');
     assert(disabledCb && disabledCb.disabled, "the empty tags category (0 matching keys) must render disabled");
     assert(!disabledCb.checked, "a disabled category must not start checked");

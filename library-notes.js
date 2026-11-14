@@ -43,7 +43,8 @@ function pbpNotesMatch(rec, q) {
   if (!query) return true;
   if (!rec || typeof rec !== "object") return false;
   const title = typeof rec.title === "string" ? rec.title : "";
-  const url = typeof rec.url === "string" ? rec.url : "";
+  const rawUrl = typeof rec.url === "string" ? rec.url : "";
+  const url = typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(rawUrl) ? "" : rawUrl;
   if (title.toLowerCase().includes(query) || url.toLowerCase().includes(query)) return true;
   const items = Array.isArray(rec.items) ? rec.items : [];
   for (const it of items) {
@@ -435,6 +436,9 @@ function _pbpNotesPageHits(rowKey) {
 }
 
 function _pbpNotesHostname(url) {
+  if (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url)) {
+    return typeof t === "function" ? t("mdOcrLocalDocBadge") : "Local OCR";
+  }
   try { return new URL(String(url || "")).hostname; } catch (_) { return ""; }
 }
 
@@ -833,7 +837,8 @@ function _pbpNotesBuildHead(hit, count) {
   head.className = "notes-detail-head";
   const title = document.createElement("h2");
   title.className = "notes-detail-source lib-first-line";
-  const href = typeof pbpDictSafeUrl === "function" ? pbpDictSafeUrl(hit.row.url) : "";
+  const isLocalDoc = typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(hit.row.url);
+  const href = !isLocalDoc && typeof pbpDictSafeUrl === "function" ? pbpDictSafeUrl(hit.row.url) : "";
   const label = hit.row.title || _pbpNotesHostname(hit.row.url) || t("notesUnknownPage");
   // The head is rebuilt on every render, so the mark follows the title shown.
   if (PBP_NOTES_CJK_RE.test(label)) title.classList.add("lib-cjk");
@@ -1134,7 +1139,8 @@ function _pbpNotesBuildSide(hit, pageHits, pageTs) {
   title.className = "lib-hang-label notes-side-title lib-first-line";
   title.textContent = t("libraryThisPage");
   side.appendChild(title);
-  const href = typeof pbpDictSafeUrl === "function" ? pbpDictSafeUrl(hit.row.url) : "";
+  const isLocalDoc = typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(hit.row.url);
+  const href = !isLocalDoc && typeof pbpDictSafeUrl === "function" ? pbpDictSafeUrl(hit.row.url) : "";
   if (href) {
     const open = document.createElement("a");
     open.className = "btn btn-sm notes-open-original";
@@ -1962,7 +1968,8 @@ async function _pbpNotesChooseColor(session, color) {
 // not load; that is fine because the tests exercise only the pure layer and
 // never invoke this handler.
 function _pbpNotesDelete(row, anchor) {
-  const label = row.title || row.url || t("notesUnknownPage");
+  const isLocalDoc = typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(row.url);
+  const label = row.title || (isLocalDoc ? t("mdOcrLocalDocBadge") : row.url) || t("notesUnknownPage");
   // The account whose rows this popover was opened over. The popover is a
   // body child dismissed only by Escape / an outside pointerdown / scroll / an
   // answer, so an account switch (another tab, or another device through sync)

@@ -1712,6 +1712,46 @@ html[data-theme] #jina-md-history-pop { color: var(--pp-fg); }
   box-shadow: var(--pp-focus-ring);
 }
 .pp-rh-remove svg { width: 13px; height: 13px; }
+#jina-md-history-pop > .divider {
+  border: none;
+  border-top: 1px solid var(--pp-divider);
+  margin: 0;
+}
+#pp-rh-import-ocr {
+  width: 100%;
+  height: var(--pp-control-h);
+  display: flex;
+  align-items: center;
+  gap: var(--pp-sp-3);
+  padding: 0 var(--pp-sp-4);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--pp-radius-md);
+  color: var(--pp-fg);
+  font-family: inherit;
+  font-size: var(--pp-text-body);
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--pp-motion-state), color var(--pp-motion-state), border-color var(--pp-motion-state), box-shadow var(--pp-motion-state);
+}
+#pp-rh-import-ocr .pp-rh-label { line-height: 16px; }
+#pp-rh-import-ocr:hover {
+  background: var(--pp-btn-hover);
+  color: var(--pp-btn-fg);
+}
+#pp-rh-import-ocr:hover svg { color: var(--pp-btn-fg); }
+#pp-rh-import-ocr:focus-visible {
+  outline: none;
+  border-color: var(--pp-focus-bd);
+  box-shadow: var(--pp-focus-ring);
+}
+#pp-rh-import-ocr svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--pp-fg-muted);
+}
 
 /* Batch progress bar — visible while batch save iterates over tabs */
 /* Positioning context for the cancel button, which must live OUTSIDE the

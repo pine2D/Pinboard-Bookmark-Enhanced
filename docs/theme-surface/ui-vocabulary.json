@@ -502,6 +502,7 @@
       "files": [
         "md-preview.html",
         "md-preview.js",
+        "md-ocr.js",
         "md-reader.js",
         "md-bookmark.js",
         "md-highlight.js",
@@ -606,6 +607,7 @@
         "desc-body",
         "engine-status",
         "es-history",
+        "es-ocr",
         "exp-scope",
         "exp-tgl",
         "fmt-name",
@@ -629,6 +631,7 @@
         "icon-only",
         "kbd-help-chip",
         "kbd-help-desc",
+        "ocr-purpose-opt",
         "pb-copy-code",
         "pb-hl-dict-btn",
         "pb-hl-dot",

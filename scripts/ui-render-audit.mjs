@@ -10439,6 +10439,13 @@ async function runSweep(page, sw, extBase) {
         await page.waitForTimeout(500);
         await scan("md-preview", "history-empty");
       }
+
+      if (wants("md-preview", "ocr-import")) {
+        await page.goto(`${extBase}md-preview.html?import=ocr`, { waitUntil: "load", timeout: TIMEOUT_MS });
+        await page.waitForSelector(".empty-state.es-ocr .rh-match", { timeout: TIMEOUT_MS });
+        await page.waitForTimeout(200);
+        await scan("md-preview", "ocr-import");
+      }
     }
   }
 

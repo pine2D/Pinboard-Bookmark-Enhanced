@@ -133,7 +133,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     name === 'dict-entry-paid-negative' ? { target: DICT_PAID_NEGATIVE_TARGET, locales: DICT_PAID_NEGATIVE_LOCALES }
       : name === 'reader-bookmark-quote-error' ? { target: '#reader-bookmark-editor-status[data-state="error"]', locales: READER_BOOKMARK_QUOTE_LOCALES }
       : name === 'explain-image' ? { target: '#explain-pop[data-mode="image"]:popover-open' }
-      : name === 'ask-image-att' ? { target: '#ask-img-att:not([hidden])' } : {})), context('video', [], { target: '.pbv-bar' }), context('history-empty', [], { target: '.empty-state.es-history .rh-match' })],
+      : name === 'ask-image-att' ? { target: '#ask-img-att:not([hidden])' } : {})), context('video', [], { target: '.pbv-bar' }), context('history-empty', [], { target: '.empty-state.es-history .rh-match' }), context('ocr-import', [], { target: '.empty-state.es-ocr .rh-match' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
     context('form', [], { target: '#url-input' }), context('title-error', ['form'], { target: '#desc-char-count.over-limit' }), context('linkding-sharing', ['form'], { target: '#share-check' }), context('linkding-description', ['form'], { target: '#linkding-description-input' }), context('reader-history', [], { target: '#jina-md-history-pop:popover-open' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),

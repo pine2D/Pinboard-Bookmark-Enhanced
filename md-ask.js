@@ -2422,6 +2422,7 @@ function _pbpAskExportLabel(key, fallback) {
   return value && value !== key ? value : fallback;
 }
 function _pbpAskExportSafeUrl(value) {
+  if (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(value)) return "";
   try {
     const u = new URL(String(value || ""));
     return /^https?:$/.test(u.protocol) && !u.username && !u.password ? u.href : "";

@@ -5403,6 +5403,320 @@ function pbpTypoApplyVars(fontTier, leadingTier) {
   return t2;
 }
 
+// ===================== Local OCR Document Identity & Store =====================
+// RFC 2606 reserved `.invalid` identity for locally imported PDFs and images
+// recognized via DeepSeek OCR. Accepted by `pbpDictSafeUrl` so highlights,
+// notes, vocabulary contexts, and Ask archives bind and sync by content SHA-256
+// without schema churn, while `pbpIsLocalDocUrl` prevents external navigation,
+// host-permission requests, bookmark-service writes, and `.invalid` URLs in exports.
+const PBP_LOCAL_DOC_HOST = "pbp-local-doc.invalid";
+const PBP_LOCAL_DOC_PREFIX = "https://pbp-local-doc.invalid/sha256/";
+const PBP_LOCAL_DOC_URL_RE = /^https:\/\/pbp-local-doc\.invalid\/sha256\/([0-9a-f]{64})$/;
+const PBP_OCR_CANDIDATE_PATH_RE = /\.(?:pdf|png|jpe?g|webp)$/i;
+const PBP_OCR_DB_NAME = "pbp-ocr-docs";
+const PBP_OCR_DB_VERSION = 1;
+const PBP_OCR_STORE_NAME = "docs";
+const PBP_OCR_MAX_DOCS = 30;
+const PBP_OCR_MAX_BYTES = 50 * 1024 * 1024;
+
+function pbpIsLocalDocUrl(rawUrl) {
+  return typeof rawUrl === "string" && PBP_LOCAL_DOC_URL_RE.test(rawUrl.trim());
+}
+
+function pbpLocalDocSha256(rawUrl) {
+  if (typeof rawUrl !== "string") return "";
+  const m = PBP_LOCAL_DOC_URL_RE.exec(rawUrl.trim());
+  return m ? m[1] : "";
+}
+
+function pbpLocalDocUrlFromSha256(sha256) {
+  if (typeof sha256 !== "string") return "";
+  const hex = sha256.trim().toLowerCase();
+  return /^[0-9a-f]{64}$/.test(hex) ? PBP_LOCAL_DOC_PREFIX + hex : "";
+}
+
+function pbpIsOcrCandidateUrl(rawUrl) {
+  if (typeof rawUrl !== "string" || !rawUrl.trim()) return false;
+  const text = rawUrl.trim();
+  if (text.length > 8192 || pbpIsLocalDocUrl(text)) return false;
+  if (!pbpEndpointOriginPattern(text)) return false;
+  try {
+    const u = new URL(text);
+    const pathname = u.pathname || "";
+    if (PBP_OCR_CANDIDATE_PATH_RE.test(pathname)) return true;
+    if (/^(?:export\.)?arxiv\.org$/i.test(u.hostname) && /^\/pdf\/[^/]+$/i.test(pathname)) return true;
+    return false;
+  } catch (_) {
+    // swallow-ok: malformed URL cannot be an OCR candidate
+    return false;
+  }
+}
+
+function _pbpOcrDocKeyUrl(rawUrl) {
+  if (pbpIsLocalDocUrl(rawUrl)) return rawUrl.trim();
+  const safe = pbpReaderHistorySafeUrl(rawUrl);
+  if (!safe) return "";
+  try {
+    return stripTrackingParams(safe, {}).cleaned || safe;
+  } catch (_) {
+    // swallow-ok: fallback to validated safe URL when tracker strip fails
+    return safe;
+  }
+}
+
+function _pbpOcrUtf8Bytes(str) {
+  if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(String(str || "")).byteLength;
+  return String(str || "").length * 2;
+}
+
+function _pbpOcrNormalizeRecord(raw, now = Date.now()) {
+  if (!raw || typeof raw !== "object") return null;
+  // Security & storage invariant: never accept or persist raw binary PDF/image payloads.
+  if (raw.bytes !== undefined || raw.blob !== undefined || raw.file !== undefined || raw.arrayBuffer !== undefined) {
+    return null;
+  }
+  const markdown = typeof raw.markdown === "string" ? raw.markdown : "";
+  if (!markdown.trim()) return null;
+  const url = _pbpOcrDocKeyUrl(raw.url);
+  if (!url) return null;
+  const sha256 = typeof raw.sha256 === "string" && /^[0-9a-f]{64}$/i.test(raw.sha256.trim())
+    ? raw.sha256.trim().toLowerCase()
+    : pbpLocalDocSha256(url);
+  const sourceUrl = pbpIsLocalDocUrl(raw.sourceUrl) ? "" : (pbpReaderHistorySafeUrl(raw.sourceUrl) || (pbpIsLocalDocUrl(url) ? "" : url));
+  const fileName = typeof raw.fileName === "string" ? raw.fileName.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 240) : "";
+  const mimeType = typeof raw.mimeType === "string" ? raw.mimeType.trim().slice(0, 80) : "";
+  const purpose = raw.purpose === "rich_layout_recognition" ? "rich_layout_recognition" : "text_recognition";
+  const pageCount = Number.isFinite(Number(raw.pageCount)) && Number(raw.pageCount) > 0 ? Math.floor(Number(raw.pageCount)) : 1;
+  const truncatedPages = Array.isArray(raw.truncatedPages)
+    ? raw.truncatedPages.map((n) => Math.floor(Number(n))).filter((n) => Number.isFinite(n) && n > 0)
+    : [];
+  const createdAt = Number.isFinite(Number(raw.createdAt)) && Number(raw.createdAt) > 0 ? Math.floor(Number(raw.createdAt)) : Math.floor(now);
+  const accessedAt = Number.isFinite(Number(raw.accessedAt)) && Number(raw.accessedAt) > 0 ? Math.floor(Number(raw.accessedAt)) : Math.floor(now);
+  const metaJson = JSON.stringify({ url, sha256, sourceUrl, fileName, mimeType, purpose, pageCount, truncatedPages, createdAt, accessedAt });
+  const byteSize = _pbpOcrUtf8Bytes(markdown) + _pbpOcrUtf8Bytes(metaJson);
+  return {
+    url, sha256, sourceUrl, fileName, mimeType, purpose,
+    pageCount, truncatedPages, markdown, byteSize, createdAt, accessedAt,
+  };
+}
+
+let _pbpOcrDbPromise = null;
+function _pbpOcrOpenDB() {
+  if (_pbpOcrDbPromise) return _pbpOcrDbPromise;
+  if (typeof indexedDB === "undefined" || !indexedDB) return Promise.resolve(null);
+  _pbpOcrDbPromise = new Promise((resolve) => {
+    let req;
+    try {
+      req = indexedDB.open(PBP_OCR_DB_NAME, PBP_OCR_DB_VERSION);
+    } catch (e) {
+      console.warn("[ocr-store] open threw:", e?.name, e?.message);
+      _pbpOcrDbPromise = null;
+      resolve(null);
+      return;
+    }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(PBP_OCR_STORE_NAME)) {
+        const store = db.createObjectStore(PBP_OCR_STORE_NAME, { keyPath: "url" });
+        store.createIndex("by_accessed", "accessedAt", { unique: false });
+        store.createIndex("by_sha256", "sha256", { unique: false });
+      }
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => {
+        try { db.close(); } catch (_) { /* swallow-ok: closing stale IDB handle */ }
+        _pbpOcrDbPromise = null;
+      };
+      resolve(db);
+    };
+    req.onerror = () => {
+      console.warn("[ocr-store] open failed:", req.error?.name, req.error?.message);
+      _pbpOcrDbPromise = null;
+      resolve(null);
+    };
+    req.onblocked = () => {
+      console.warn("[ocr-store] open blocked");
+      _pbpOcrDbPromise = null;
+      resolve(null);
+    };
+  });
+  return _pbpOcrDbPromise;
+}
+
+async function pbpOcrDocsPut(rawRecord, opts = {}) {
+  const now = Number.isFinite(opts.now) ? Math.floor(opts.now) : Date.now();
+  const maxDocs = Number.isInteger(opts.maxDocs) && opts.maxDocs > 0 ? opts.maxDocs : PBP_OCR_MAX_DOCS;
+  const maxBytes = Number.isInteger(opts.maxBytes) && opts.maxBytes > 0 ? opts.maxBytes : PBP_OCR_MAX_BYTES;
+  const record = _pbpOcrNormalizeRecord({ ...rawRecord, accessedAt: now }, now);
+  if (!record || record.byteSize > maxBytes) return null;
+  const db = await _pbpOcrOpenDB();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    let tx;
+    try {
+      tx = db.transaction(PBP_OCR_STORE_NAME, "readwrite");
+    } catch (e) {
+      console.warn("[ocr-store] put transaction failed:", e?.name, e?.message);
+      _pbpOcrDbPromise = null;
+      resolve(null);
+      return;
+    }
+    const store = tx.objectStore(PBP_OCR_STORE_NAME);
+    const getAllReq = store.getAll();
+    getAllReq.onsuccess = () => {
+      const existing = Array.isArray(getAllReq.result) ? getAllReq.result : [];
+      const prior = existing.find((row) => row && row.url === record.url);
+      if (prior && Number.isFinite(prior.createdAt) && !rawRecord.createdAt) {
+        record.createdAt = prior.createdAt;
+      }
+      const others = existing
+        .filter((row) => row && typeof row.url === "string" && row.url !== record.url)
+        .sort((a, b) => (Number(a.accessedAt) || 0) - (Number(b.accessedAt) || 0));
+      let totalDocs = 1 + others.length;
+      let totalBytes = record.byteSize + others.reduce((sum, r) => sum + (Number(r.byteSize) || 0), 0);
+      while (others.length > 0 && (totalDocs > maxDocs || totalBytes > maxBytes)) {
+        const victim = others.shift();
+        totalDocs -= 1;
+        totalBytes -= Number(victim.byteSize) || 0;
+        store.delete(victim.url);
+      }
+      store.put(record);
+    };
+    tx.oncomplete = () => resolve(record);
+    tx.onerror = () => {
+      console.warn("[ocr-store] put failed:", tx.error?.name, tx.error?.message);
+      resolve(null);
+    };
+    tx.onabort = () => resolve(null);
+  });
+}
+
+async function pbpOcrDocsGet(rawUrl, opts = {}) {
+  const keyUrl = _pbpOcrDocKeyUrl(rawUrl);
+  if (!keyUrl) return null;
+  const db = await _pbpOcrOpenDB();
+  if (!db) return null;
+  const touch = opts.touch !== false;
+  const now = Number.isFinite(opts.now) ? Math.floor(opts.now) : Date.now();
+  return new Promise((resolve) => {
+    let tx;
+    try {
+      tx = db.transaction(PBP_OCR_STORE_NAME, touch ? "readwrite" : "readonly");
+    } catch (e) {
+      console.warn("[ocr-store] get transaction failed:", e?.name, e?.message);
+      _pbpOcrDbPromise = null;
+      resolve(null);
+      return;
+    }
+    const store = tx.objectStore(PBP_OCR_STORE_NAME);
+    const req = store.get(keyUrl);
+    let out = null;
+    req.onsuccess = () => {
+      const hit = _pbpOcrNormalizeRecord(req.result, now);
+      if (!hit) return;
+      if (touch) {
+        hit.accessedAt = now;
+        try { store.put(hit); } catch (_) { /* swallow-ok: LRU touch best-effort */ }
+      }
+      out = hit;
+    };
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => resolve(out);
+    tx.onabort = () => resolve(null);
+  });
+}
+
+async function pbpOcrDocsFindBySha256(sha256, purpose) {
+  if (typeof sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(sha256.trim())) return null;
+  const hex = sha256.trim().toLowerCase();
+  const wantedPurpose = purpose === "rich_layout_recognition" ? "rich_layout_recognition" : "text_recognition";
+  const db = await _pbpOcrOpenDB();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    let tx;
+    try {
+      tx = db.transaction(PBP_OCR_STORE_NAME, "readonly");
+    } catch (e) {
+      console.warn("[ocr-store] sha256 lookup failed:", e?.name, e?.message);
+      _pbpOcrDbPromise = null;
+      resolve(null);
+      return;
+    }
+    const store = tx.objectStore(PBP_OCR_STORE_NAME);
+    const req = store.indexNames.contains("by_sha256")
+      ? store.index("by_sha256").getAll(hex)
+      : store.getAll();
+    req.onsuccess = () => {
+      const rows = Array.isArray(req.result) ? req.result : [];
+      const matches = rows
+        .map((r) => _pbpOcrNormalizeRecord(r))
+        .filter((r) => r && r.sha256 === hex && r.purpose === wantedPurpose)
+        .sort((a, b) => (b.accessedAt || 0) - (a.accessedAt || 0));
+      resolve(matches[0] || null);
+    };
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function pbpOcrDocsMeasure() {
+  const db = await _pbpOcrOpenDB();
+  if (!db) return { keys: [], bytes: 0, count: 0 };
+  return new Promise((resolve) => {
+    let tx;
+    try {
+      tx = db.transaction(PBP_OCR_STORE_NAME, "readonly");
+    } catch (e) {
+      console.warn("[ocr-store] measure transaction failed:", e?.name, e?.message);
+      _pbpOcrDbPromise = null;
+      resolve({ keys: [], bytes: 0, count: 0 });
+      return;
+    }
+    const req = tx.objectStore(PBP_OCR_STORE_NAME).getAll();
+    req.onsuccess = () => {
+      const rows = Array.isArray(req.result) ? req.result : [];
+      let bytes = 0;
+      let count = 0;
+      for (const r of rows) {
+        const norm = _pbpOcrNormalizeRecord(r);
+        if (!norm) continue;
+        count += 1;
+        bytes += norm.byteSize;
+      }
+      resolve({
+        keys: Array.from({ length: count }, (_, idx) => "ocr_doc_" + idx),
+        bytes,
+        count,
+      });
+    };
+    req.onerror = () => resolve({ keys: [], bytes: 0, count: 0 });
+  });
+}
+
+async function pbpOcrDocsClear() {
+  const before = await pbpOcrDocsMeasure();
+  const db = await _pbpOcrOpenDB();
+  if (!db) return { freed: 0, count: 0, failed: true };
+  return new Promise((resolve) => {
+    let tx;
+    try {
+      tx = db.transaction(PBP_OCR_STORE_NAME, "readwrite");
+    } catch (e) {
+      console.warn("[ocr-store] clear transaction failed:", e?.name, e?.message);
+      _pbpOcrDbPromise = null;
+      resolve({ freed: 0, count: 0, failed: true });
+      return;
+    }
+    tx.objectStore(PBP_OCR_STORE_NAME).clear();
+    tx.oncomplete = () => resolve({ freed: before.bytes, count: before.count, failed: false });
+    tx.onerror = () => {
+      console.warn("[ocr-store] clear failed:", tx.error?.name, tx.error?.message);
+      resolve({ freed: 0, count: 0, failed: true });
+    };
+    tx.onabort = () => resolve({ freed: 0, count: 0, failed: true });
+  });
+}
+
 // ===================== Reader Preview History (md-preview) =====================
 // Metadata-only ring buffer in chrome.storage.local (pbp_reader_history, max 25
 // items). Survives temporary extension disable/re-enable (which closes open
@@ -5427,7 +5741,9 @@ function pbpReaderHistorySafeUrl(rawUrl) {
 // loopback http://localhost|127.0.0.1|[::1]/* only. Calling permissions.request
 // on any other plain http:// origin throws in Chromium, so delegate to
 // pbpEndpointOriginPattern to enforce exact HTTPS / literal loopback patterns.
+// Local `.invalid` OCR document URLs stay strictly on-device and never request a host.
 function pbpReaderHistoryRequestableOrigin(rawUrl) {
+  if (pbpIsLocalDocUrl(rawUrl)) return "";
   return pbpEndpointOriginPattern(rawUrl) || "";
 }
 
@@ -5443,9 +5759,15 @@ function pbpReaderHistoryIdentity(rawUrl) {
 }
 
 function pbpReaderHistoryHost(entry) {
+  const rawTarget = entry && (entry.url || entry.sourceTabUrl);
+  if (pbpIsLocalDocUrl(rawTarget)) {
+    const customSite = entry && typeof entry.site === "string" ? entry.site.trim() : "";
+    if (customSite && customSite.toLowerCase() !== PBP_LOCAL_DOC_HOST) return customSite;
+    return typeof t === "function" ? t("mdOcrLocalDocBadge") : "Local OCR";
+  }
   const site = entry && typeof entry.site === "string" ? entry.site.trim() : "";
   if (site) return site;
-  const safe = pbpReaderHistorySafeUrl(entry && (entry.url || entry.sourceTabUrl));
+  const safe = pbpReaderHistorySafeUrl(rawTarget);
   if (!safe) return "";
   try {
     return new URL(safe).hostname.replace(/^www\./i, "");
@@ -5637,8 +5959,14 @@ async function pbpOpenReaderFromHistory(entry, opts = {}) {
     }
   }
 
+  const isLocalDoc = pbpIsLocalDocUrl(articleUrl);
   const engine = pbpNormalizeExtractEngine(norm.engine);
-  if (chrome.permissions?.contains && chrome.permissions?.request) {
+  // Keep permission requests synchronous with the click gesture (no IDB await
+  // ahead of chrome.permissions.request). Online PDF/image entries recorded
+  // under engine==="local" come from DeepSeek OCR, which either restores from
+  // IndexedDB in md-preview.js or renders the foreground OCR confirmation card.
+  const isOcrHistoryEntry = !isLocalDoc && engine === "local" && pbpIsOcrCandidateUrl(articleUrl);
+  if (!isLocalDoc && !isOcrHistoryEntry && chrome.permissions?.contains && chrome.permissions?.request) {
     const neededPattern = pbpRemoteExtractOriginPattern(engine)
       || pbpReaderHistoryRequestableOrigin(targetUrl);
     if (neededPattern) {
@@ -5657,11 +5985,13 @@ async function pbpOpenReaderFromHistory(entry, opts = {}) {
 
   let urlClean = SETTINGS_DEFAULTS.urlClean;
   let cleanFailed = false;
-  try {
-    urlClean = (await (await getSettingsStorage()).get({ urlClean })).urlClean;
-  } catch (e) {
-    console.warn("[reader-history] urlClean read failed:", e?.name, e?.message);
-    cleanFailed = true;
+  if (!isLocalDoc) {
+    try {
+      urlClean = (await (await getSettingsStorage()).get({ urlClean })).urlClean;
+    } catch (e) {
+      console.warn("[reader-history] urlClean read failed:", e?.name, e?.message);
+      cleanFailed = true;
+    }
   }
   let account = "";
   try {
@@ -5679,13 +6009,15 @@ async function pbpOpenReaderFromHistory(entry, opts = {}) {
       [slotKey]: {
         pending: true,
         historyReopen: true,
+        ...(isLocalDoc ? { localOcrReopen: true, ocrFileName: norm.site || "" } : {}),
+        ...(isOcrHistoryEntry ? { ocrCachedReopen: true } : {}),
         engine,
-        source: engine,
+        source: (isLocalDoc || isOcrHistoryEntry) ? "deepseek-ocr" : engine,
         tabId: null,
         url: articleUrl,
-        baseUrl: articleUrl,
+        baseUrl: isLocalDoc ? "" : articleUrl,
         sourceTabUrl: targetUrl,
-        bookmarkUrl: cleanFailed ? articleUrl : pbpBookmarkLookupUrl(articleUrl, urlClean),
+        bookmarkUrl: isLocalDoc ? "" : (cleanFailed ? articleUrl : pbpBookmarkLookupUrl(articleUrl, urlClean)),
         title: norm.title,
         site: norm.site,
         sourceIncognito: false,

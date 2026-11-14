@@ -133,6 +133,10 @@
       <button id="btn-raw" class="toggle-btn" data-i18n="mdViewRaw" aria-pressed="false">Raw</button>
       <button id="btn-rendered" class="toggle-btn active" data-i18n="mdViewRendered" aria-pressed="true">Rendered</button>
     </div>
+    <button type="button" id="btn-import-ocr" class="action-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+      <span class="btn-label" data-i18n="mdOcrImportBtn">Import PDF or image (OCR)…</span>
+    </button>
     </details>
   </aside>
   <main>
@@ -165,6 +169,7 @@
   <script defer src="notes-sync.js"></script>
   <script defer src="ai.js"></script>
   <script defer src="ai-cache.js"></script>
+  <script defer src="md-ocr.js"></script>
   <script defer src="md-preview.js"></script>
   <script defer src="md-ai-core.js"></script>
   <script defer src="md-translate.js"></script>

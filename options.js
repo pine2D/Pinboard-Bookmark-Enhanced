@@ -854,7 +854,7 @@ async function pbpBuildSanitizedDiagnostics() {
   const knownBatchErrors = new Set(["cancelled", "interrupted", "account_changed", "not_logged_in"]);
   const batchError = !progress?.error ? null : (knownBatchErrors.has(progress.error) ? progress.error : "failed");
   const [identity, aiHost, driveApi, ankiHost, eudicHost, localBytes, syncBytes, sessionBytes,
-    storageEst, aiCacheStats] = await Promise.all([
+    storageEst, aiCacheStats, ocrDocsStats] = await Promise.all([
     contains({ permissions: ["identity"] }),
     aiPattern ? contains({ origins: [aiPattern] }) : Promise.resolve(null),
     contains({ origins: ["https://www.googleapis.com/*"] }),
@@ -864,6 +864,7 @@ async function pbpBuildSanitizedDiagnostics() {
     bytes(chrome.storage.session, "session"),
     storageEstimate(),
     typeof pbpAiCacheStats === "function" ? pbpAiCacheStats() : Promise.resolve(null),
+    typeof pbpOcrDocsMeasure === "function" ? pbpOcrDocsMeasure() : Promise.resolve(null),
   ]);
   return {
     schemaVersion: 1,
@@ -901,6 +902,7 @@ async function pbpBuildSanitizedDiagnostics() {
     // dictctx2_ keys embed the looked-up word and summary_owner_ embeds the
     // Pinboard account name.
     aiCache: aiCacheStats,
+    ocrDocs: ocrDocsStats,
     state: {
       offlineQueueCount: Array.isArray(local.offlineQueue) ? local.offlineQueue.length : 0,
       batch: progress ? {
@@ -1830,6 +1832,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: "jina", labelKey: "storageCatJina", defaultOn: true },
     { id: "urls", labelKey: "storageCatUrls", defaultOn: true },
     { id: "tags", labelKey: "storageCatTags", defaultOn: false },
+    { id: "ocr", labelKey: "storageCatOcr", defaultOn: false },
     { id: "misc", labelKey: "storageCatMisc", defaultOn: true },
   ];
   function showStorageStatus(msg, kind) {
@@ -1845,7 +1848,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     const host = $id("storage-cats");
     if (!host) return;
     let measured = null;
-    try { measured = await pbpMeasureLocalStorage(); } catch (_) { measured = null; }
+    try {
+      const [localStats, ocrStats] = await Promise.all([
+        pbpMeasureLocalStorage(),
+        typeof pbpOcrDocsMeasure === "function" ? pbpOcrDocsMeasure() : Promise.resolve({ count: 0, bytes: 0 }),
+      ]);
+      measured = localStats ? {
+        ...localStats,
+        ocr: {
+          keys: Array.from({ length: Math.max(0, Number(ocrStats?.count) || 0) }, (_, i) => String(i)),
+          bytes: Math.max(0, Number(ocrStats?.bytes) || 0),
+        },
+      } : null;
+    } catch (_) { measured = null; }
     host.textContent = "";
     if (!measured) {
       const p = document.createElement("p");
@@ -1924,7 +1939,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         // without rolling back, so the rows have to come from the fresh re-read
         // below, not from an optimistic update. `failed` is what keeps that
         // case from reading as a successful "Freed 0 B.".
-        ({ freed, failed } = await pbpReclaimLocalStorage(cats));
+        const localCats = cats.filter((c) => c !== "ocr");
+        const wantOcr = cats.includes("ocr");
+        if (localCats.length) {
+          ({ freed, failed } = await pbpReclaimLocalStorage(localCats));
+        }
+        if (wantOcr && typeof pbpOcrDocsClear === "function") {
+          const ocrRes = await pbpOcrDocsClear();
+          freed += Math.max(0, Number(ocrRes?.freed) || 0);
+          if (ocrRes?.failed) failed = true;
+        }
       } catch (e) {
         console.warn("[storage] clear failed:", e?.name, e?.message);
         failed = true;

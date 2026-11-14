@@ -593,7 +593,10 @@
     if (reopen) return edit();
   }
 
+  const isLocalDoc = (u) => typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(u);
+
   window.pbpReaderBookmarkAction = function (action) {
+    if (!context || isLocalDoc(context.url) || isLocalDoc(context.bookmarkUrl)) return;
     if (action === "edit") return edit();
     if (action !== "save" && action !== "later") return;
     if (tagFix) {
@@ -626,11 +629,20 @@
 
   document.addEventListener("pbp:rendered", event => {
     const next = {...event.detail, account:event.detail?.bookmarkAccount ?? event.detail?.account};
+    if (isLocalDoc(next?.url) || isLocalDoc(next?.bookmarkUrl)) {
+      closeEditor();
+      generation++; recheckConnection = false; context = null; state = { known: false }; inflight = false; deleting = false; editorStatusKey = ""; tagFix = null;
+      if (id("section")) id("section").hidden = true;
+      if (id("footer")) id("footer").hidden = true;
+      return;
+    }
     // A second render of the same article must not unlock an in-flight write.
     if (context?.url === next?.url && context?.account === next?.account) return;
     closeEditor();
     generation++; recheckConnection = false; context = next; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
     mount();
+    if (id("section")) id("section").hidden = false;
+    if (id("footer")) id("footer").hidden = false;
     // No bookmark connection: nothing to look up. The buttons stay disabled and
     // the bar says where to connect (it is not an account switch).
     if (!context?.account) { inflight = false; showStatus("bgSetToken"); return; }
@@ -648,6 +660,13 @@
     recheckIfPending(true);
   });
   document.addEventListener("pbp:bookmark-account-changed", event => {
+    if (isLocalDoc(event.detail?.url) || isLocalDoc(event.detail?.bookmarkUrl)) {
+      generation++; recheckConnection = false; context = null; state = { known: false }; inflight = false; deleting = false; editorStatusKey = ""; tagFix = null;
+      closeEditor();
+      if (id("section")) id("section").hidden = true;
+      if (id("footer")) id("footer").hidden = true;
+      return;
+    }
     generation++; recheckConnection = false; context = event.detail || null; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
     closeEditor();
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) { input.value = ""; input.checked = false; }

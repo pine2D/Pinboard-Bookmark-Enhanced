@@ -16,9 +16,13 @@ function pbpLibAskSafeUrl(value) {
     return /^https?:$/.test(url.protocol) && !url.username && !url.password ? url.href : "";
   } catch (_) { return ""; }
 }
+function pbpLibAskExternalUrl(value) {
+  if (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(value)) return "";
+  return pbpLibAskSafeUrl(value);
+}
 function pbpLibAskFilter(sessions, query) {
   const needle = String(query || "").trim().normalize("NFKC").toLocaleLowerCase();
-  return sessions.filter(session => !needle || [session.title, session.url,
+  return sessions.filter(session => !needle || [session.title, pbpLibAskExternalUrl(session.url),
     ...session.records.flatMap(record => [record.q, record.a])]
     .some(value => String(value || "").normalize("NFKC").toLocaleLowerCase().includes(needle)));
 }
@@ -30,7 +34,11 @@ function pbpLibAskEvidence(record) {
   return [...rows.values()];
 }
 function pbpLibAskExport(session) {
-  const parts = ["# " + String(session.title || session.url).replace(/[\r\n]/g, " "), "<" + session.url.replace(/[<>\s]/g, encodeURIComponent) + ">"];
+  const extSessionUrl = pbpLibAskExternalUrl(session.url);
+  const parts = [
+    "# " + String(session.title || extSessionUrl || t("mdOcrLocalDocBadge")).replace(/[\r\n]/g, " "),
+    ...(extSessionUrl ? ["<" + extSessionUrl.replace(/[<>\s]/g, encodeURIComponent) + ">"] : []),
+  ];
   const replaced = new Set(session.records.map(record => record.replacesId).filter(Boolean));
   for (const record of session.records) {
     if (replaced.has(record.id)) parts.push("### " + t("askVersions"));
@@ -38,7 +46,7 @@ function pbpLibAskExport(session) {
       [record.model, new Date(record.ts).toISOString()].filter(Boolean).join(" · "), pbpAiParseCites(record.a).body);
     for (const source of pbpLibAskEvidence(record)) {
       const state = source.state === "matched" ? "askExportMatched" : source.state === "source-changed" ? "askExportSourceChanged" : "askExportUnverified";
-      const url = pbpLibAskSafeUrl(source.deepUrl || source.sourceUrl || session.url);
+      const url = pbpLibAskExternalUrl(source.deepUrl || source.sourceUrl || session.url);
       parts.push("P" + source.p + "\n\n> " + String(source.quote || "").replace(/\n/g, "\n> ") +
         "\n\n" + t(state) + (url ? "\n\n<" + url.replace(/[<>\s]/g, encodeURIComponent) + ">" : ""));
     }
@@ -93,7 +101,7 @@ function _pbpLibAskAnswer(record) {
   template.content.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
   for (const image of template.content.querySelectorAll("img")) image.replaceWith(document.createTextNode(image.alt || ""));
   for (const link of template.content.querySelectorAll("a")) {
-    const safe = pbpLibAskSafeUrl(link.getAttribute("href"));
+    const safe = pbpLibAskExternalUrl(link.getAttribute("href"));
     if (safe) { link.href = safe; link.target = "_blank"; link.rel = "noopener noreferrer"; }
     else link.removeAttribute("href");
   }
@@ -116,9 +124,10 @@ function _pbpLibAskRenderDetail() {
     $id("ask-library-list").querySelector('[aria-current="true"]')?.focus({ preventScroll: true });
   }, true);
   back.classList.add("ask-library-back"); host.append(back);
-  const title = _pbpLibAskElement("h2", "ask-library-title", session.title || session.url); title.dir = "auto";
-  const link = _pbpLibAskElement("a", "ask-library-source", session.url);
-  link.href = session.url; link.target = "_blank"; link.rel = "noopener noreferrer";
+  const extUrl = pbpLibAskExternalUrl(session.url);
+  const title = _pbpLibAskElement("h2", "ask-library-title", session.title || extUrl || t("mdOcrLocalDocBadge")); title.dir = "auto";
+  const link = extUrl ? _pbpLibAskElement("a", "ask-library-source", extUrl) : _pbpLibAskElement("p", "ask-library-source", t("mdOcrLocalDocBadge"));
+  if (extUrl) { link.href = extUrl; link.target = "_blank"; link.rel = "noopener noreferrer"; }
   const actions = _pbpLibAskElement("div", "ask-library-actions");
   const continueButton = _pbpLibAskButton("messageSquareText", "askContinueConversation", event => _pbpLibAskContinue(session, event.currentTarget));
   continueButton.disabled = _libAskOpening.has(_libAskOwner + "\n" + session.id);
@@ -142,7 +151,7 @@ function _pbpLibAskRenderDetail() {
         const quote = _pbpLibAskElement("blockquote", "", source.quote); quote.dir = "auto";
         const key = source.state === "matched" ? "askExportMatched" : source.state === "source-changed" ? "askExportSourceChanged" : "askExportUnverified";
         const note = _pbpLibAskElement("p", "ask-library-stamp", "P" + source.p + " · " + t(key));
-        const url = pbpLibAskSafeUrl(source.deepUrl || source.sourceUrl || session.url);
+        const url = pbpLibAskExternalUrl(source.deepUrl || source.sourceUrl || session.url);
         if (url) { const a = _pbpLibAskElement("a", "", t("askOpenSource")); a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer"; note.append(" ", a); }
         details.append(quote, note);
       }
@@ -229,7 +238,7 @@ function _pbpLibAskRenderList(resetLimit) {
   const articles = new Map();
   for (const session of shown) { if (!articles.has(session.url)) articles.set(session.url, []); articles.get(session.url).push(session); }
   for (const sessions of articles.values()) {
-    const heading = _pbpLibAskElement("h3", "ask-library-page", sessions[0].title || sessions[0].url); heading.dir = "auto"; list.append(heading);
+    const heading = _pbpLibAskElement("h3", "ask-library-page", sessions[0].title || pbpLibAskExternalUrl(sessions[0].url) || t("mdOcrLocalDocBadge")); heading.dir = "auto"; list.append(heading);
     for (const session of sessions) {
       const button = _pbpLibAskElement("button", "ask-library-hit"); button.type = "button"; button.dataset.session = session.id;
       button.tabIndex = session.id === _libAskSelected || (!hasSelected && session === rows[0]) ? 0 : -1;
@@ -294,7 +303,7 @@ async function _pbpLibAskDownload(session) {
 }
 function _pbpLibAskDelete(session, anchor) {
   const owner = _libAskOwner, revision = _libAskRevision;
-  showConfirmPopover(anchor, { msg: t("askDeleteConversationTitle"), subject: session.records[0]?.q || session.title || session.url,
+  showConfirmPopover(anchor, { msg: t("askDeleteConversationTitle"), subject: session.records[0]?.q || session.title || pbpLibAskExternalUrl(session.url) || t("mdOcrLocalDocBadge"),
     detail: t("askDeleteConversationDetail"), yesText: t("delete"), noText: t("askClearNo"),
     onConfirm: async () => {
       try {
@@ -314,6 +323,44 @@ async function _pbpLibAskContinue(session, button) {
   let key = "";
   try {
     if (!await _pbpLibAskCurrent(owner, revision)) return;
+    const isLocalDoc = typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url);
+    const isOcrCandidate = !isLocalDoc && typeof pbpIsOcrCandidateUrl === "function" && pbpIsOcrCandidateUrl(url);
+    if (isLocalDoc || isOcrCandidate) {
+      let urlClean = SETTINGS_DEFAULTS.urlClean, cleanFailed = false;
+      if (!isLocalDoc) {
+        try { urlClean = (await (await getSettingsStorage()).get({ urlClean })).urlClean; }
+        catch (error) { cleanFailed = true; console.warn("[library] urlClean read failed:", error?.name, error?.message); }
+      }
+      let account = "";
+      try { account = (await pbpReadBookmarkConnection()).account || ""; }
+      catch (error) { console.warn("[library] bookmark connection read failed:", error?.name, error?.message); }
+      if (!await _pbpLibAskCurrent(owner, revision)) return;
+      key = crypto.randomUUID();
+      await chrome.storage.local.set({
+        ["md_preview_data_" + key]: {
+          pending: true,
+          ...(isLocalDoc ? { localOcrReopen: true } : { ocrCachedReopen: true }),
+          engine: "local",
+          source: "deepseek-ocr",
+          tabId: null,
+          url,
+          baseUrl: isLocalDoc ? "" : url,
+          sourceTabUrl: url,
+          bookmarkUrl: isLocalDoc ? "" : (cleanFailed ? url : pbpBookmarkLookupUrl(url, urlClean)),
+          title: session.title,
+          sourceIncognito: false,
+          account,
+          tags: [],
+          description: "",
+          ts: Date.now()
+        }
+      });
+      if (!await _pbpLibAskCurrent(owner, revision)) return;
+      const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect(url)) ? "&video=1" : "";
+      await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html") + "?k=" + key + "&askSession=" + encodeURIComponent(session.id) + videoQ });
+      key = "";
+      return;
+    }
     const origin = new URL(url).origin + "/*";
     let allowed = await chrome.permissions.contains({ origins: [origin] });
     if (!await _pbpLibAskCurrent(owner, revision)) return;

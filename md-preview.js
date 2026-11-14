@@ -52,17 +52,27 @@ function renderEmptyState(message, actionKey) {
     const p = document.createElement("p");
     p.textContent = message;
     wrap.appendChild(p);
-    if (actionKey) {
+    if (actionKey || typeof pbpOcrOpenImportEntry === "function") {
       // Same .row shell as renderErrorState's actions, so both states space
       // their buttons from the message the same way.
       const row = document.createElement("div");
       row.className = "row";
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "action-btn";
-      button.textContent = t(actionKey);
-      button.addEventListener("click", () => window.close());
-      row.appendChild(button);
+      if (actionKey) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "action-btn";
+        button.textContent = t(actionKey);
+        button.addEventListener("click", () => window.close());
+        row.appendChild(button);
+      }
+      if (typeof pbpOcrOpenImportEntry === "function") {
+        const importBtn = document.createElement("button");
+        importBtn.type = "button";
+        importBtn.className = actionKey ? "action-btn es-quiet" : "action-btn";
+        importBtn.textContent = t("mdOcrImportBtn");
+        importBtn.addEventListener("click", () => pbpOcrOpenImportEntry({ forceInPlace: true }));
+        row.appendChild(importBtn);
+      }
       wrap.appendChild(row);
     }
     view.replaceChildren(wrap);
@@ -88,6 +98,7 @@ function renderEmptyState(message, actionKey) {
 // three equal faces gave no answer to "what do I do now").
 function pbpOriginalOpenHref(openUrl) {
   if (typeof openUrl !== "string" || !openUrl) return "";
+  if (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(openUrl)) return "";
   try {
     const u = new URL(openUrl);
     return (u.protocol === "https:" || u.protocol === "http:") ? u.href : "";
@@ -587,9 +598,18 @@ function renderBookmarkBadge(resp, url, service, home) {
 // Built via DOM API (textContent/createElement), never innerHTML, since `url`
 // is page-supplied data (sanitize discipline). Non-absolute/unparsable URLs
 // (no scheme, "about:", etc.) fall back to plain text.
-function fillPreviewUrl(url) {
+function fillPreviewUrl(url, fallbackLabel) {
   const urlEl = document.getElementById("preview-url");
   if (!urlEl) return;
+  if (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url)) {
+    urlEl.removeAttribute("href");
+    urlEl.removeAttribute("target");
+    const label = fallbackLabel || (typeof t === "function" ? t("mdOcrLocalDocBadge") : "Local OCR");
+    urlEl.textContent = label;
+    urlEl.title = label;
+    return;
+  }
+  urlEl.target = "_blank";
   urlEl.href = url || "#";
   urlEl.textContent = "";
   if (!url) { urlEl.removeAttribute("title"); return; }
@@ -1182,6 +1202,14 @@ function renderHistoryEmptyState(initialItems, currentKey, opts) {
     closeBtn.textContent = t("mdPreviewClose");
     closeBtn.addEventListener("click", () => window.close());
     foot.appendChild(closeBtn);
+    if (typeof pbpOcrOpenImportEntry === "function") {
+      const importBtn = document.createElement("button");
+      importBtn.type = "button";
+      importBtn.className = "action-btn es-quiet";
+      importBtn.textContent = t("mdOcrImportBtn");
+      importBtn.addEventListener("click", () => pbpOcrOpenImportEntry({ forceInPlace: true }));
+      foot.appendChild(importBtn);
+    }
     if (rest.length === 0) {
       const clearOnlyBtn = document.createElement("button");
       clearOnlyBtn.type = "button";
@@ -1308,6 +1336,23 @@ async function _pbpRailHistoryPopulate(pop, anchorBtn) {
       }));
     });
     frag.appendChild(listEl);
+  }
+
+  if (typeof pbpOcrOpenImportEntry === "function") {
+    const importBtn = document.createElement("button");
+    importBtn.type = "button";
+    importBtn.id = "rh-import-ocr-btn";
+    importBtn.className = "action-btn";
+    importBtn.innerHTML = (typeof PBP_ICONS !== "undefined" && PBP_ICONS.doc) || "";
+    const lab = document.createElement("span");
+    lab.className = "btn-label";
+    lab.textContent = t("mdOcrImportBtn");
+    importBtn.appendChild(lab);
+    importBtn.addEventListener("click", () => {
+      try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
+      pbpOcrOpenImportEntry();
+    });
+    frag.appendChild(importBtn);
   }
 
   pop.replaceChildren(frag);
@@ -1519,6 +1564,14 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   const info = data[MP_KEY];
   if (!info) {
     pbpReaderSchemeVideoSettled();
+    let wantOcrImport = false;
+    try { wantOcrImport = new URLSearchParams(location.search).get("import") === "ocr"; }
+    catch (_) { /* swallow-ok: unavailable location search */ }
+    if (wantOcrImport && typeof pbpOcrRenderPanel === "function") {
+      setupDrawer();
+      pbpOcrRenderPanel({ mode: "local" });
+      return;
+    }
     const historyItems = typeof pbpReaderHistoryRead === "function" ? await pbpReaderHistoryRead() : [];
     if (historyItems.length > 0) {
       renderHistoryEmptyState(historyItems, k || "");
@@ -1611,6 +1664,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   const published = info.published || "";
   const site = info.site || "";
   const image = info.image || "";
+  const ocrFileName = typeof info.ocrFileName === "string" ? info.ocrFileName : "";
 
   // X2 bookmarked badge. It asks nobody: the reader's bookmark bar (md-bookmark.js)
   // looks the address up once per open and publishes pbp:bookmark-state, which is
@@ -1685,6 +1739,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     return "Defuddle";
   }
   function deepseekUnavailableReason(rawUrl) {
+    if (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(rawUrl)) return "protocol";
     if (!/^https?:\/\//i.test(rawUrl)) return "protocol";
     if (rawUrl.length > 8192) return "invalid_url";
     try {
@@ -1697,6 +1752,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     }
   }
   function engineUnavailable(e) {
+    if (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(srcUrlForSwitch)) return true;
     if (e === "jina") return !/^https?:\/\//i.test(srcUrlForSwitch);
     if (e === "deepseek") return !!deepseekUnavailableReason(srcUrlForSwitch);
     if (srcTabId) return false;
@@ -1909,7 +1965,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     document.body.classList.add("md-shell");
     const titleEl0 = document.getElementById("preview-title");
     if (titleEl0) { titleEl0.textContent = title || t("mdPreviewUntitled"); titleEl0.title = title || ""; }
-    fillPreviewUrl(url); // otherwise the shell's "open the original page" link stays href="#" with no text
+    fillPreviewUrl(url, ocrFileName || title); // otherwise the shell's "open the original page" link stays href="#" with no text
     document.title = (title || "Markdown") + " — " + t("tabReader"); // the page is "Reader" everywhere now (batch 2 B4)
     // video-mode BEFORE any extraction work: the page is a watch page no
     // matter how the extraction turns out, so the shell should not spend the
@@ -2094,6 +2150,24 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         let host = frameOrigin;
         try { host = new URL(frameOrigin).host; } catch (_) {}
         renderErrorState(t("mdPreviewFrameHint", host), () => grantFrameAndRetry(attemptedEngine, frameOrigin), true, null, url);
+      } else if (
+        attemptedEngine === "local" &&
+        typeof pbpIsOcrCandidateUrl === "function" &&
+        pbpIsOcrCandidateUrl(url) &&
+        typeof pbpOcrRenderPanel === "function" &&
+        !(typeof pbpVideoDetect === "function" && pbpVideoDetect(sourceTabUrl || url))
+      ) {
+        const sourceDetails = document.getElementById("reader-source-details");
+        if (sourceDetails && (!engineUnavailable("jina") || !engineUnavailable("deepseek"))) sourceDetails.open = true;
+        attemptedEngine = "";
+        applyAvailability("");
+        setEngineStatus("DeepSeek OCR", false);
+        pbpOcrRenderPanel({
+          mode: "online", url, title, sourceTabUrl, bookmarkUrl, site,
+          sourceIncognito, bookmarkDraft, account: bookmarkAccount, tags, description
+        });
+        inFlight = false;
+        return;
       } else {
         // The other engine, when this page can use it: Defuddle needs the
         // source tab, Jina / DeepSeek an http(s) URL (engineUnavailable). The rail's
@@ -2241,6 +2315,52 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // video/caption follow-up. Registering twice is impossible -- a successful
     // attempt reloads the page instead of falling through.
     setupDrawer();
+    const _isLocalOcr = info.localOcrReopen === true || (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url));
+    const _isOnlineOcr = !_isLocalOcr && (info.ocrCandidate === true || info.ocrCachedReopen === true || info.source === "deepseek-ocr");
+    if (_isLocalOcr || _isOnlineOcr) {
+      const _cachedOcr = typeof pbpOcrDocsGet === "function" ? await pbpOcrDocsGet(url) : null;
+      if (_cachedOcr && _cachedOcr.markdown) {
+        await chrome.storage.local.set({
+          [MP_KEY]: {
+            markdown: _cachedOcr.markdown,
+            title: title || _cachedOcr.fileName || "",
+            url,
+            baseUrl: _isLocalOcr ? "" : baseUrl,
+            sourceTabUrl,
+            ...handedBookmarkUrl,
+            ocrFileName: _cachedOcr.fileName || ocrFileName,
+            source: "deepseek-ocr",
+            engine: "local",
+            site: _isLocalOcr ? (_cachedOcr.fileName || site) : site,
+            sourceIncognito,
+            bookmarkDraft: _isLocalOcr ? null : bookmarkDraft,
+            account: bookmarkAccount,
+            tags: _isLocalOcr ? [] : tags,
+            description: _isLocalOcr ? "" : description,
+            ts: Date.now(),
+            nonce: _pageNonce
+          }
+        });
+        location.reload();
+        return;
+      }
+      if (_isLocalOcr && typeof pbpOcrRenderPanel === "function") {
+        pbpOcrRenderPanel({ mode: "local", leadText: t("mdOcrEvictedLead") });
+        return;
+      }
+      if (_isOnlineOcr && typeof pbpOcrRenderPanel === "function") {
+        attemptedEngine = "";
+        applyAvailability("");
+        setEngineStatus("DeepSeek OCR", false);
+        const sourceDetails = document.getElementById("reader-source-details");
+        if (sourceDetails && (!engineUnavailable("jina") || !engineUnavailable("deepseek"))) sourceDetails.open = true;
+        pbpOcrRenderPanel({
+          mode: "online", url, title, sourceTabUrl, bookmarkUrl, site,
+          sourceIncognito, bookmarkDraft, account: bookmarkAccount, tags, description
+        });
+        return;
+      }
+    }
     await attemptExtract(info.engine); // awaited so a synchronous throw here still reaches the IIFE's top-level .catch()
     return;
   }
@@ -2451,6 +2571,11 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         // while re-extracting, and a failed attempt otherwise read "Untitled".
         restore: true, title: title || "", url, tabId: srcTabId, sourceTabUrl,
         engine: pbpNormalizeExtractEngine(source),
+        ...(source === "deepseek-ocr" ? {
+          source: "deepseek-ocr",
+          ocrFileName,
+          ...(typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url) ? { localOcrReopen: true } : { ocrCandidate: true })
+        } : {}),
         sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
       };
@@ -2541,12 +2666,13 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   const clippedDate = todayIso();
   // Shared export metadata + per-export option resolution (used by Copy/Download MD and Download .html).
   function buildMeta() {
+    const isLocalDoc = typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url);
     const meta = {
       title: title || "",
-      url: url || "",
+      url: isLocalDoc ? "" : (url || ""),
       date: clippedDate,
       tags,
-      source: source === "jina" ? "jina" : (source === "deepseek" ? "deepseek" : "defuddle")
+      source: source === "deepseek-ocr" ? "deepseek-ocr" : (source === "jina" ? "jina" : (source === "deepseek" ? "deepseek" : "defuddle"))
     };
     if (pbpBookmarkAccountService(bookmarkAccount) === "linkding") {
       if (bookmarkDescription) meta.description = bookmarkDescription;
@@ -2561,8 +2687,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     if (exportSettings.mdExportExtendedMeta !== false) {
       const trimmedAuthor = author.trim();
       if (trimmedAuthor) meta.author = trimmedAuthor.slice(0, 200);
-      let resolvedSite = site.trim();
-      if (!resolvedSite) {
+      let resolvedSite = (isLocalDoc && typeof PBP_LOCAL_DOC_HOST === "string" && site.trim() === PBP_LOCAL_DOC_HOST) ? "" : site.trim();
+      if (!resolvedSite && !isLocalDoc) {
         try { resolvedSite = new URL(url).hostname; } catch (_) { resolvedSite = ""; }
       }
       if (resolvedSite) meta.site = resolvedSite.slice(0, 200);
@@ -2950,7 +3076,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   previewTitleEl.title = title || t("mdPreviewUntitled");
   const articleTitleEl = document.getElementById("article-title");
   articleTitleEl.textContent = title || t("mdPreviewUntitled");
-  fillPreviewUrl(url);
+  fillPreviewUrl(url, ocrFileName || title);
 
   // X2: the bookmarked badge is drawn from the bookmark bar's lookup (above).
 
@@ -2960,12 +3086,13 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   } else {
     tokenEl.style.display = "none";
   }
-  const curEngine = pbpNormalizeExtractEngine(source);
+  const curEngine = source === "deepseek-ocr" ? "" : pbpNormalizeExtractEngine(source);
   let switching = false;
   const enginePermissionMissing = new Set();
 
   if (sourceEl) {
     applyAvailability(curEngine);
+    if (source === "deepseek-ocr") setEngineStatus("DeepSeek OCR", false);
     sourceEl.querySelectorAll(".src-seg").forEach((seg) => {
       seg.addEventListener("click", async () => {
         const e = seg.getAttribute("data-engine");
@@ -3130,7 +3257,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // covers), and not a committed video transcript (re-extracting would
   // overwrite it -- same guard as attemptExtract).
   function imgFixCanRefresh() {
-    if (source === "jina" || source === "deepseek" || !srcTabId) return false;
+    if (source === "jina" || source === "deepseek" || source === "deepseek-ocr" || !srcTabId) return false;
+    if (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(sourceTabUrl)) return false;
     if (window.pbpVideoDoc && window.pbpVideoDoc.committed === true) return false;
     try { return new URL(sourceTabUrl).protocol === "https:"; } catch (_) { return false; }
   }

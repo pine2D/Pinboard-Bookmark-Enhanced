@@ -81,6 +81,9 @@ function pbpVocabSendZhFor(w, zhMap) {
 // and pre-joining here would either double-escape or smuggle markup through.
 function pbpVocabSendCanonicalRow(w, zhMap, tag) {
   const zh = pbpVocabSendZhFor(w, zhMap);
+  const firstCtx = w.contexts && w.contexts[0];
+  const rawSrc = (firstCtx && firstCtx.articleUrl) || "";
+  const isLocalSrc = typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(rawSrc);
   return {
     term: w.term,
     // Only pbpAnkiNoteFromRow reads these two (they become note tags);
@@ -90,7 +93,7 @@ function pbpVocabSendCanonicalRow(w, zhMap, tag) {
     reading: w.ipa || "",
     definition: (w.gloss || "").replace(/\s*\n\s*/g, " "),
     contexts: (Array.isArray(w.contexts) ? w.contexts : []).map((c) => c && c.quote).filter(Boolean),
-    source: (w.contexts && w.contexts[0] && w.contexts[0].articleUrl) || "",
+    source: isLocalSrc ? ((firstCtx && firstCtx.articleTitle) || "") : rawSrc,
     license: [w.license, w.sourceUrl].filter(Boolean).join(" "),
     zh,
     // Labelled so the local Chinese never looks like it came from the online
@@ -132,7 +135,9 @@ async function pbpVocabSendCompleteRows(words, owner, zhMap, tag) {
       contexts: (Array.isArray(w.contexts) ? w.contexts : []).map((context) => {
         const copy = {};
         for (const key of ["quote", "articleUrl", "articleTitle", "highlightId", "createdAt"]) {
-          if (context && Object.hasOwn(context, key)) copy[key] = context[key];
+          if (!context || !Object.hasOwn(context, key)) continue;
+          if (key === "articleUrl" && typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(context[key])) continue;
+          copy[key] = context[key];
         }
         return copy;
       }),

@@ -1617,6 +1617,51 @@ async function htmlToMarkdownAsync(html, opts) {
           showStatus("status-msg", jinaMdBtn.title, "error");
           return;
         }
+        if (
+          typeof pbpIsOcrCandidateUrl === "function" &&
+          pbpIsOcrCandidateUrl(tab.url || url) &&
+          !(typeof pbpVideoDetect === "function" && pbpVideoDetect(tab.url || url))
+        ) {
+          let openedOcr = false;
+          try {
+            const k = crypto.randomUUID();
+            const handoffNotes = $id("description-input")?.value || "";
+            const handoffSummaryRange = pbpPopupHandoffSummaryRange(handoffNotes);
+            const handoff = pbpPopupReaderHandoff(tab.url || url, tab);
+            await chrome.storage.local.set({
+              ["md_preview_data_" + k]: {
+                pending: true,
+                ocrCandidate: true,
+                engine: actualEngine,
+                source: "deepseek-ocr",
+                tabId: tab.id,
+                url,
+                baseUrl: url,
+                sourceTabUrl: tab.url || url,
+                bookmarkUrl: handoff.bookmarkUrl,
+                sourceIncognito: handoff.sourceIncognito,
+                title: $id("title-input")?.value || "",
+                account: sessionAccount,
+                tags: Array.isArray(currentTags) ? currentTags.slice() : [],
+                description: handoffNotes,
+                bookmarkDraft: {
+                  ...handoff.flags,
+                  ...(pbpBookmarkServiceId(settings) === "linkding"
+                    ? (pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionText($id("linkding-description-input")?.value) } : {})
+                    : handoffSummaryRange ? { notes: handoffNotes, summaryRange: handoffSummaryRange } : {}),
+                },
+                ts: Date.now()
+              }
+            });
+            const ocrVideoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect(tab.url || url)) ? "&video=1" : "";
+            await chrome.tabs.create({ url: "md-preview.html?k=" + k + ocrVideoQ });
+            openedOcr = true;
+          } catch (_) { /* swallow-ok: storage/tab failure falls through to standard error feedback */ }
+          if (openedOcr) {
+            setBtnIcon(jinaMdBtn, "doc", origLabel); jinaMdBtn.disabled = false; jinaMdBtn.title = "";
+            return;
+          }
+        }
         jinaMdBtn.innerHTML = PBP_ICONS.cross + " " + t("jinaFailed");
         const extractMessage = result.error === "site_target_missing" ? t("mdSiteTargetMissing")
           : result.error === "deepseek_key_missing" ? t("deepseekFetchKeyMissing")
@@ -3806,6 +3851,27 @@ async function _populatePopupReaderHistory(pop, anchorBtn) {
     });
     frag.appendChild(listEl);
   }
+
+  const divEl = document.createElement("div");
+  divEl.className = "divider";
+  frag.appendChild(divEl);
+
+  const importBtn = document.createElement("button");
+  importBtn.type = "button";
+  importBtn.id = "pp-rh-import-ocr";
+  importBtn.innerHTML = PBP_ICONS.doc;
+  const importLabel = document.createElement("span");
+  importLabel.className = "pp-rh-label";
+  importLabel.textContent = t("mdOcrImportBtn");
+  importBtn.appendChild(importLabel);
+  importBtn.addEventListener("click", async () => {
+    try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
+    if (chrome.tabs?.create && chrome.runtime?.getURL) {
+      const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect("")) ? "&video=1" : "";
+      await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html?import=ocr" + videoQ) });
+    }
+  });
+  frag.appendChild(importBtn);
 
   pop.replaceChildren(frag);
 }

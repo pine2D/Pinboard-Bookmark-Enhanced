@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="12"><title>DeepSeek OCR Tests</title>
+<link rel="stylesheet" href="../md-preview.css">
+<style>
+#results { font-family: monospace; padding: 16px; max-width: 960px; }
+.case { padding: 4px 8px; margin: 4px 0; white-space: pre-wrap; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+#fixture { padding: 8px 16px; }
+</style></head>
+<body>
+<div id="fixture">
+  <aside class="rail" id="rail">
+    <div class="rail-ident">
+      <h1 id="preview-title">Reader</h1>
+      <button type="button" class="action-btn icon-only" id="rail-history-btn"></button>
+      <button type="button" class="action-btn icon-only" id="rail-settings-btn"></button>
+      <a id="preview-url" class="preview-url" href="https://example.com/current">example.com/current</a>
+    </div>
+    <div class="rail-section" id="reader-bookmark-section"></div>
+  </aside>
+  <main>
+    <div id="rendered-view"></div>
+    <div id="reader-bookmark-footer"></div>
+  </main>
+</div>
+<div id="results"></div>
+
+<script src="../i18n.js"></script>
+<script src="../shared.js"></script>
+<script src="../ai.js"></script>
+<script src="../md-ocr.js"></script>
+<script src="../md-preview.js"></script>
+<script src="fixtures/case-filter.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script>pbpChromeMock.install();</script>
+<script src="../md-ai-core.js"></script>
+<script src="../md-bookmark.js"></script>
+<script src="../md-ask.js"></script>
+<script src="../library-ask.js"></script>
+<script src="../vocab-store.js"></script>
+<script src="../vocab-send.js"></script>
+<script>
+const resultsEl = document.getElementById("results");
+let passed = 0, failed = 0;
+
+async function test(name, fn) {
+  const done = pbpCaseGate(name);
+  if (!done) return;
+  const div = document.createElement("div");
+  try {
+    await fn();
+    passed++;
+    div.className = "case pass";
+    div.textContent = "PASS " + name;
+  } catch (err) {
+    failed++;
+    div.className = "case fail";
+    div.textContent = "FAIL " + name + "\n  " + (err && err.stack ? err.stack : err);
+  }
+  resultsEl.appendChild(div);
+  done();
+}
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || "assertion failed");
+}
+
+function buildEchoMessages(enTable) {
+  const out = {};
+  for (const [key, entry] of Object.entries(enTable)) {
+    const names = Object.entries(entry.placeholders || {})
+      .sort((a, b) => Number(String(a[1].content).slice(1)) - Number(String(b[1].content).slice(1)))
+      .map(([n]) => n);
+    out[key] = { message: key + names.map((n) => ":$" + n + "$").join(""), placeholders: entry.placeholders };
+  }
+  return out;
+}
+
+function makePdfBytes(pageCount) {
+  const parts = ["%PDF-1.7\n1 0 obj\n<< /Type /Pages /Count " + pageCount + " >>\nendobj\n"];
+  for (let i = 0; i < pageCount; i++) {
+    parts.push((i + 2) + " 0 obj\n<< /Type /Page /Parent 1 0 R >>\nendobj\n");
+  }
+  parts.push("%%EOF\n");
+  return new TextEncoder().encode(parts.join(""));
+}
+
+const PNG_MAGIC = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d]);
+const JPEG_MAGIC = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+const WEBP_MAGIC = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]);
+
+(async () => {
+  const en = await (await fetch("../_locales/en/messages.json")).json();
+  const messages = buildEchoMessages(en);
+
+  function freshMock(opts = {}) {
+    const m = pbpChromeMock.install({
+      messages,
+      userGesture: opts.userGesture !== false,
+      permissionRequestAnswer: opts.permissionRequestAnswer !== false,
+      permissions: opts.permissions || { origins: ["https://api.deepseek.com/*"] },
+      storage: opts.storage || { local: {} },
+      tabs: opts.tabs || [],
+    });
+    initI18n();
+    return m;
+  }
+
+  // 1. Synthetic local-doc URL and online OCR candidate URL predicates
+  await test("pbpIsLocalDocUrl, pbpLocalDocUrlFromSha256, and pbpIsOcrCandidateUrl classify synthetic and candidate URLs strictly", async () => {
+    const sha = "a".repeat(64);
+    const localUrl = pbpLocalDocUrlFromSha256(sha);
+    assert(localUrl === "https://pbp-local-doc.invalid/sha256/" + sha, "unexpected synthetic URL: " + localUrl);
+    assert(pbpIsLocalDocUrl(localUrl) === true, "valid synthetic URL rejected");
+    assert(pbpLocalDocSha256(localUrl) === sha, "sha256 extraction mismatch");
+    assert(pbpIsLocalDocUrl("https://pbp-local-doc.invalid/sha256/short") === false, "short hash must fail");
+    assert(pbpIsLocalDocUrl("http://pbp-local-doc.invalid/sha256/" + sha) === false, "http scheme must fail");
+    assert(pbpIsLocalDocUrl("https://pbp-local-doc.invalid/sha256/" + sha + "/extra") === false, "extra path must fail");
+    assert(pbpLocalDocUrlFromSha256("not-hex") === "", "invalid sha must return empty");
+
+    assert(pbpIsOcrCandidateUrl("https://arxiv.org/pdf/2501.01234.pdf") === true, ".pdf URL should match");
+    assert(pbpIsOcrCandidateUrl("https://arxiv.org/pdf/2501.01234") === true, "arxiv /pdf/ route should match");
+    assert(pbpIsOcrCandidateUrl("https://cdn.example.com/scan.webp?token=1") === true, ".webp URL should match");
+    assert(pbpIsOcrCandidateUrl("https://user:pass@example.com/secret.pdf") === false, "credentialed URL must fail");
+    assert(pbpIsOcrCandidateUrl("http://192.168.1.1/doc.pdf") === false, "LAN HTTP URL must fail");
+    assert(pbpIsOcrCandidateUrl(localUrl) === false, "synthetic local doc URL must not be an online OCR candidate");
+    assert(pbpIsOcrCandidateUrl("https://example.com/article.html") === false, "HTML URL must not match");
+  });
+
+  // 2. Magic byte detection, spoofed HTML rejection, size cap, and 1,000-page PDF limit
+  await test("pbpOcrDetectMagicFormat and pbpOcrValidateInput enforce magic bytes, 100 MB ceiling, and 1,000-page PDF limit", async () => {
+    const pdf3 = makePdfBytes(3);
+    assert(pbpOcrDetectMagicFormat(pdf3)?.ext === "pdf", "PDF magic failed");
+    assert(pbpOcrDetectMagicFormat(PNG_MAGIC)?.ext === "png", "PNG magic failed");
+    assert(pbpOcrDetectMagicFormat(JPEG_MAGIC)?.ext === "jpg", "JPEG magic failed");
+    assert(pbpOcrDetectMagicFormat(WEBP_MAGIC)?.ext === "webp", "WebP magic failed");
+
+    const okPdf = pbpOcrValidateInput({ bytes: pdf3, fileName: "paper", mimeType: "application/pdf" });
+    assert(okPdf.ok === true && okPdf.fileName === "paper.pdf" && okPdf.estimatedPages === 3, "valid PDF rejected");
+
+    // HTML login page served from a .pdf URL must be rejected by magic bytes before upload
+    const htmlSpoof = new TextEncoder().encode("<!DOCTYPE html><html><body>Sign in</body></html>");
+    const spoofRes = pbpOcrValidateInput({ bytes: htmlSpoof, fileName: "paper.pdf", mimeType: "application/pdf" });
+    assert(spoofRes.ok === false && spoofRes.code === "unsupported_type", "HTML spoof should fail magic check");
+
+    const emptyRes = pbpOcrValidateInput({ byteLength: 0, fileName: "empty.pdf", mimeType: "application/pdf" });
+    assert(emptyRes.ok === false && emptyRes.code === "empty_file", "empty file should fail");
+
+    const hugeRes = pbpOcrValidateInput({ byteLength: 100 * 1024 * 1024 + 1, fileName: "big.pdf", mimeType: "application/pdf" });
+    assert(hugeRes.ok === false && hugeRes.code === "file_too_large", ">100 MB should fail");
+
+    const pdf1001 = makePdfBytes(1001);
+    const pagesRes = pbpOcrValidateInput({ bytes: pdf1001, fileName: "long.pdf", mimeType: "application/pdf" });
+    assert(pagesRes.ok === false && pagesRes.code === "too_many_pages", ">1,000 pages should fail");
+  });
+
+  // 3. Strict 2-field multipart builder (purpose + file only, never Files API)
+  await test("pbpOcrBuildFormData emits strictly two multipart fields (purpose and named File) without Files API fields", async () => {
+    const blob = new Blob([PNG_MAGIC], { type: "image/png" });
+    const fd = pbpOcrBuildFormData(blob, "slide-01.png", "rich_layout_recognition");
+    const entries = Array.from(fd.entries());
+    assert(entries.length === 2, "FormData must contain strictly 2 fields, got " + entries.length);
+    assert(entries[0][0] === "purpose" && entries[0][1] === "rich_layout_recognition", "purpose field mismatch");
+    assert(entries[1][0] === "file" && entries[1][1] instanceof File && entries[1][1].name === "slide-01.png", "file field mismatch");
+
+    const fdDefault = pbpOcrBuildFormData(blob, "../bad\\path/scan.png", "unexpected_mode");
+    const defEntries = Array.from(fdDefault.entries());
+    assert(defEntries[0][1] === "text_recognition", "unknown purpose must normalize to text_recognition");
+    assert(defEntries[1][1].name === "scan.png", "path traversal characters must be stripped from filename");
+  });
+
+  // 4. Grounding tag stripper (fullwidth U+FF5C and ASCII |)
+  await test("pbpOcrStripGroundingTags strips fullwidth U+FF5C and ASCII grounding spans while preserving Markdown tables and math", async () => {
+    const raw = [
+      "<｜ref｜>title<｜/ref｜><｜box｜>[[102, 84, 512, 130]]<｜/box｜>",
+      "# Theorem 1",
+      "",
+      "<|ref|>equation<|/ref|><|box|>[[100, 160, 480, 210]]<|/box|>",
+      "$$E = mc^2$$",
+      "",
+      "| Col A | Col B |",
+      "| --- | --- |",
+      "| 1 | 2 |",
+      "<｜end▁of▁sentence｜>"
+    ].join("\n");
+    const cleaned = pbpOcrStripGroundingTags(raw);
+    assert(!cleaned.includes("ref") && !cleaned.includes("box") && !cleaned.includes("end▁of▁sentence"), "grounding tokens leaked: " + cleaned);
+    assert(cleaned.includes("# Theorem 1"), "heading lost");
+    assert(cleaned.includes("$$E = mc^2$$"), "LaTeX math lost");
+    assert(cleaned.includes("| Col A | Col B |"), "Markdown table pipe syntax corrupted");
+  });
+
+  // 5. Hand-written DeepSeek /v1/tools/ocr server schema fixtures
+  await test("pbpOcrParseResponse handles leading keep-alive newlines, page sorting, length truncation notices, and HTTP 200 error payloads", async () => {
+    freshMock();
+    // Hand-written per 2026-11-13 DeepSeek /v1/tools/ocr response schema (out-of-order pages + leading keep-alive heartbeats)
+    const serverBody = "\n\n\n" + JSON.stringify({
+      id: "ocr-req-20261113-9f2a",
+      object: "ocr",
+      purpose: "rich_layout_recognition",
+      page_count: 2,
+      pages: [
+        {
+          index: 1,
+          text: "<｜ref｜>text<｜/ref｜><｜box｜>[[50,50,400,200]]<｜/box｜>\nSecond page body",
+          finish_reason: "length"
+        },
+        {
+          index: 0,
+          text: "# First Page Title\n\nIntroductory paragraph.",
+          finish_reason: "stop"
+        }
+      ],
+      usage: {
+        processed_pages: 2
+      }
+    });
+    const ok = pbpOcrParseResponse(200, serverBody, { purpose: "rich_layout_recognition" });
+    assert(ok.ok === true, "valid response rejected");
+    assert(ok.pageCount === 2, "pageCount mismatch");
+    assert(JSON.stringify(ok.truncatedPages) === "[2]", "truncatedPages mismatch: " + JSON.stringify(ok.truncatedPages));
+    assert(ok.markdown.indexOf("# First Page Title") < ok.markdown.indexOf("Second page body"), "pages were not sorted by index");
+    assert(ok.markdown.includes("mdOcrTruncatedPage:2"), "truncation blockquote missing: " + ok.markdown);
+
+    // HTTP 200 carrying an asynchronous stream error object after keep-alive newlines
+    const err200 = "\n\n{\"error\":{\"message\":\"Corrupted PDF xref table\",\"type\":\"invalid_request_error\",\"code\":\"invalid_file\"}}";
+    const bad200 = pbpOcrParseResponse(200, err200);
+    assert(bad200.ok === false && bad200.code === "bad_request" && bad200.detail === "Corrupted PDF xref table", "HTTP 200 error object mishandled");
+
+    assert(pbpOcrParseResponse(401, "{\"error\":{\"message\":\"Invalid API key\"}}").code === "deepseek_auth", "401 must map to deepseek_auth");
+    assert(pbpOcrParseResponse(413, "{\"error\":{\"message\":\"Request entity too large\"}}").code === "file_too_large", "413 must map to file_too_large");
+    assert(pbpOcrParseResponse(429, "{\"error\":{\"message\":\"Rate limit reached\"}}").code === "rate_limited", "429 must map to rate_limited");
+  });
+
+  // 6. IndexedDB pbp-ocr-docs LRU bounds and binary-field rejection
+  await test("pbp-ocr-docs IndexedDB store enforces 30-doc and byte-budget LRU eviction and rejects raw binary fields", async () => {
+    freshMock();
+    await pbpOcrDocsClear();
+    const sha0 = "0".repeat(64);
+    const u0 = pbpLocalDocUrlFromSha256(sha0);
+
+    const rejectedRes = await pbpOcrDocsPut({ url: u0, sha256: sha0, markdown: "# Doc", bytes: new Uint8Array([1, 2, 3]) });
+    assert(rejectedRes === null, "pbpOcrDocsPut must reject raw binary fields");
+    assert((await pbpOcrDocsGet(u0)) === null, "rejected binary record must not be stored");
+
+    // Insert 4 docs with a tight custom maxDocs=2 & maxBytes=5000 cap
+    for (let i = 1; i <= 3; i++) {
+      const sha = String(i).repeat(64);
+      await pbpOcrDocsPut({
+        url: pbpLocalDocUrlFromSha256(sha),
+        sha256: sha,
+        fileName: `doc-${i}.pdf`,
+        mimeType: "application/pdf",
+        purpose: "text_recognition",
+        pageCount: 1,
+        markdown: `# Doc ${i}\n\n` + "x".repeat(400),
+      }, { maxDocs: 2, maxBytes: 5000, now: 1000 + i * 10 });
+    }
+    assert((await pbpOcrDocsGet(pbpLocalDocUrlFromSha256("1".repeat(64)))) === null, "oldest doc-1 should be evicted when maxDocs=2");
+    assert((await pbpOcrDocsGet(pbpLocalDocUrlFromSha256("2".repeat(64)))) !== null, "doc-2 should remain");
+    assert((await pbpOcrDocsGet(pbpLocalDocUrlFromSha256("3".repeat(64)))) !== null, "doc-3 should remain");
+
+    const stats = await pbpOcrDocsMeasure();
+    assert(stats.count === 2 && stats.bytes > 800, "pbpOcrDocsMeasure mismatch: " + JSON.stringify(stats));
+
+    // Purpose separation in pbpOcrDocsFindBySha256
+    const sha3 = "3".repeat(64);
+    assert((await pbpOcrDocsFindBySha256(sha3, "text_recognition")) !== null, "same purpose lookup should hit");
+    assert((await pbpOcrDocsFindBySha256(sha3, "rich_layout_recognition")) === null, "different purpose lookup must miss");
+
+    await pbpOcrDocsClear();
+    assert((await pbpOcrDocsMeasure()).count === 0, "pbpOcrDocsClear did not empty store");
+  });
+
+  // 7. Stateless upload + SHA-256 cache reuse without second network call
+  await test("pbpOcrRunUpload uploads statelessly with Bearer auth, caches Markdown by SHA-256 + purpose, and reuses cache without network", async () => {
+    freshMock({
+      permissions: { origins: ["https://api.deepseek.com/*"] },
+      storage: { local: { deepseekApiKey: obfuscateKey("sk-test-ocr-key") } },
+    });
+    await pbpOcrDocsClear();
+    const origFetch = window.fetch;
+    const calls = [];
+    window.fetch = async (url, init) => {
+      calls.push({ url, init });
+      return new Response(
+        "\n" + JSON.stringify({
+          id: "ocr-live-sim-1",
+          object: "ocr",
+          purpose: "text_recognition",
+          page_count: 1,
+          pages: [{ index: 0, text: "# Scanned Handout\n\nClean text.", finish_reason: "stop" }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    };
+    try {
+      const pdfBytes = makePdfBytes(1);
+      const first = await pbpOcrRunUpload({
+        bytes: pdfBytes,
+        fileName: "handout.pdf",
+        mimeType: "application/pdf",
+        purpose: "text_recognition",
+      });
+      assert(first.ok === true && first.cached === false, "first upload should succeed over network");
+      assert(calls.length === 1, "expected 1 fetch call");
+      assert(calls[0].url === "https://api.deepseek.com/v1/tools/ocr", "wrong endpoint: " + calls[0].url);
+      assert(calls[0].init.headers.Authorization === "Bearer sk-test-ocr-key", "missing Bearer header");
+      assert(!("Content-Type" in calls[0].init.headers), "manual Content-Type header must not be set on multipart upload");
+      assert(calls[0].init.credentials === "omit" && calls[0].init.redirect === "error", "credentials/redirect policy mismatch");
+      assert(pbpIsLocalDocUrl(first.doc.url), "local upload must assign synthetic pbp-local-doc.invalid URL");
+
+      // Second upload with identical bytes + purpose reuses local cache with 0 network calls (even if API key were absent)
+      const second = await pbpOcrRunUpload({
+        bytes: pdfBytes,
+        fileName: "renamed-copy.pdf",
+        mimeType: "application/pdf",
+        purpose: "text_recognition",
+      });
+      assert(second.ok === true && second.cached === true, "second upload should hit local SHA-256 cache");
+      assert(calls.length === 1, "cache hit must not call fetch");
+      assert(second.doc.markdown === "# Scanned Handout\n\nClean text.", "cached markdown mismatch");
+    } finally {
+      window.fetch = origFetch;
+      await pbpOcrDocsClear();
+    }
+  });
+
+  // 8. Missing key, missing permission, and timeout error handling in pbpOcrRunUpload
+  await test("pbpOcrRunUpload classifies missing DeepSeek key, missing host permission, auth failure, rate limit, and timeout", async () => {
+    await pbpOcrDocsClear();
+    const pdfBytes = makePdfBytes(1);
+
+    freshMock({
+      permissions: { origins: ["https://api.deepseek.com/*"] },
+      storage: { local: {} },
+    });
+    const noKey = await pbpOcrRunUpload({ bytes: pdfBytes, fileName: "a.pdf", mimeType: "application/pdf" });
+    assert(noKey.ok === false && noKey.code === "deepseek_key_missing", "missing key should fail closed");
+
+    freshMock({
+      permissions: { origins: [] },
+      storage: { local: { deepseekApiKey: obfuscateKey("sk-test") } },
+    });
+    const noPerm = await pbpOcrRunUpload({ bytes: pdfBytes, fileName: "a.pdf", mimeType: "application/pdf" });
+    assert(noPerm.ok === false && noPerm.code === "host_permission" && noPerm.origin === "https://api.deepseek.com", "missing host permission should return host_permission");
+
+    freshMock({
+      permissions: { origins: ["https://api.deepseek.com/*"] },
+      storage: { local: { deepseekApiKey: obfuscateKey("sk-test") } },
+    });
+    const origFetch = window.fetch;
+    window.fetch = (_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener("abort", () => {
+        const err = new DOMException("Aborted", "AbortError");
+        reject(err);
+      }, { once: true });
+    });
+    try {
+      const timedOut = await pbpOcrRunUpload({ bytes: pdfBytes, fileName: "a.pdf", mimeType: "application/pdf", timeoutMs: 1000 });
+      assert(timedOut.ok === false && timedOut.code === "timeout", "hung fetch should report timeout, got " + JSON.stringify(timedOut));
+    } finally {
+      window.fetch = origFetch;
+    }
+  });
+
+  // 9. Remote PDF/image bytes fetcher enforces cookieless GET, redirect:error, and streaming byte cap
+  await test("pbpOcrFetchRemoteBytes fetches cookielessly with redirect:error and aborts streams exceeding maxBytes", async () => {
+    const origFetch = window.fetch;
+    let seenInit = null;
+    window.fetch = async (_url, init) => {
+      seenInit = init;
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array(64));
+          controller.enqueue(new Uint8Array(64));
+          controller.close();
+        }
+      });
+      return new Response(stream, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": "attachment; filename*=UTF-8''2026%20Report.pdf"
+        }
+      });
+    };
+    try {
+      const ok = await pbpOcrFetchRemoteBytes("https://docs.example.com/download?id=7", null, 200, 2000);
+      assert(ok.ok === true && ok.bytes.byteLength === 128 && ok.fileName === "2026 Report.pdf", "stream read failed");
+      assert(seenInit.credentials === "omit" && seenInit.redirect === "error", "remote fetch must omit credentials and reject redirects");
+
+      const tooBig = await pbpOcrFetchRemoteBytes("https://docs.example.com/download?id=7", null, 100, 2000);
+      assert(tooBig.ok === false && tooBig.code === "file_too_large", "stream exceeding maxBytes must abort with file_too_large");
+
+      const localRefused = await pbpOcrFetchRemoteBytes("https://pbp-local-doc.invalid/sha256/" + "b".repeat(64));
+      assert(localRefused.ok === false && localRefused.code === "unsupported_type", "synthetic local URL must never be fetched");
+    } finally {
+      window.fetch = origFetch;
+    }
+  });
+
+  // 10. History reopen gesture preservation and local-doc zero-permission reopen
+  await test("pbpOpenReaderFromHistory preserves MV3 click gesture for online PDFs and skips host permission for local OCR docs", async () => {
+    const localUrl = pbpLocalDocUrlFromSha256("c".repeat(64));
+    const mockLocal = freshMock({
+      permissions: { origins: [] },
+      userGesture: false,
+    });
+    assert(pbpReaderHistoryRequestableOrigin(localUrl) === "", "local OCR URL must never have a requestable origin");
+    assert(pbpReaderHistoryHost({ url: localUrl, site: "" }) === "mdOcrLocalDocBadge", "local OCR host label fallback failed");
+
+    const localRes = await pbpOpenReaderFromHistory({
+      url: localUrl,
+      sourceTabUrl: localUrl,
+      title: "Imported Paper",
+      site: "paper.pdf",
+      engine: "local",
+    });
+    assert(localRes.ok === true, "local OCR history reopen failed");
+    assert(mockLocal.callsOf("permissions.request").length === 0, "local OCR reopen must not request host permissions");
+    const createdTab = mockLocal.callsOf("tabs.create")[0].args[0];
+    const slotKey = "md_preview_data_" + new URL(createdTab.url).searchParams.get("k");
+    const slot = (await chrome.storage.local.get(slotKey))[slotKey];
+    assert(slot && slot.localOcrReopen === true && slot.ocrFileName === "paper.pdf", "localOcrReopen flag missing on handoff slot");
+
+    // Online PDF history reopen defers origin prompt until confirmation card (in case IDB cache still holds it),
+    // while ordinary HTML history reopen requests exact origin synchronously while user gesture is live.
+    const mockOnlinePdf = freshMock({
+      permissions: { origins: [] },
+      userGesture: false,
+    });
+    const onlineRes = await pbpOpenReaderFromHistory({
+      url: "https://arxiv.org/pdf/2501.99999.pdf",
+      sourceTabUrl: "https://arxiv.org/pdf/2501.99999.pdf",
+      title: "Online ArXiv PDF",
+      site: "arxiv.org",
+      engine: "local",
+    });
+    assert(onlineRes.ok === true, "online PDF history reopen failed");
+    assert(mockOnlinePdf.callsOf("permissions.request").length === 0, "online PDF reopen must not prompt before checking OCR cache");
+    const onlineKey = "md_preview_data_" + new URL(mockOnlinePdf.callsOf("tabs.create")[0].args[0].url).searchParams.get("k");
+    const onlineSlot = (await chrome.storage.local.get(onlineKey))[onlineKey];
+    assert(onlineSlot && onlineSlot.ocrCachedReopen === true, "online PDF reopen must set ocrCachedReopen");
+
+    const mockHtml = freshMock({
+      permissions: { origins: [] },
+      userGesture: true,
+      permissionRequestAnswer: true,
+    });
+    const htmlRes = await pbpOpenReaderFromHistory({
+      url: "https://example.com/article",
+      sourceTabUrl: "https://example.com/article",
+      title: "Regular Article",
+      site: "example.com",
+      engine: "local",
+    });
+    assert(htmlRes.ok === true && mockHtml.callsOf("permissions.request").length === 1, "HTML reopen must synchronously request origin on click gesture");
+  });
+
+  // 11. Zero synthetic URL leakage across Reader links, Bookmark bar, Ask exports, and Vocab TSV/Anki rows
+  await test("Local OCR synthetic URLs never leak into Reader original-link hrefs, Ask Markdown exports, or Vocabulary TSV/Anki rows", async () => {
+    const mock = freshMock();
+    const localUrl = pbpLocalDocUrlFromSha256("d".repeat(64));
+
+    assert(pbpOriginalOpenHref(localUrl) === "", "pbpOriginalOpenHref must return empty for local OCR URL");
+    fillPreviewUrl(localUrl, "slides.pdf");
+    const previewLink = document.getElementById("preview-url");
+    assert(!previewLink.hasAttribute("href"), "#preview-url must drop href attribute on local OCR doc");
+    assert(previewLink.textContent === "slides.pdf", "#preview-url should display filename label");
+
+    // Bookmark bar must stay hidden and dispatch zero runtime messages on local OCR doc
+    document.dispatchEvent(new CustomEvent("pbp:rendered", {
+      detail: { url: localUrl, bookmarkUrl: "", title: "Slides", account: "alice" }
+    }));
+    await new Promise((r) => setTimeout(r, 20));
+    assert(document.getElementById("reader-bookmark-section").hidden === true, "reader bookmark section must hide on local OCR doc");
+    assert(document.getElementById("reader-bookmark-footer").hidden === true, "reader bookmark footer must hide on local OCR doc");
+    assert(mock.callsOf("runtime.sendMessage").length === 0, "reader bookmark module must send zero IPC for local OCR doc");
+
+    // Reader Ask & Library Ask Markdown exports
+    assert(_pbpAskExportSafeUrl(localUrl) === "", "_pbpAskExportSafeUrl leaked synthetic URL");
+    const libAskMd = pbpLibAskExport({
+      title: "Scanned Lecture",
+      url: localUrl,
+      records: [{
+        q: "What is the main claim?",
+        a: "Energy is conserved [1].",
+        ts: 1700000000000,
+        model: "deepseek-flash",
+        citations: [{ num: 1, quote: "Total energy stays constant.", url: localUrl }],
+      }],
+    });
+    assert(!libAskMd.includes("pbp-local-doc.invalid"), "Library Ask export leaked synthetic URL:\n" + libAskMd);
+    assert(libAskMd.includes("# Scanned Lecture"), "Library Ask export lost document title");
+
+    // Vocab canonical & complete TSV / Anki rows
+    const vocabRecord = {
+      id: pbpDictVocabKey("owner-1", "en", "invariant"),
+      owner: "owner-1",
+      term: "invariant",
+      language: "en",
+      gloss: "unchanging quantity",
+      contexts: [{ quote: "An invariant of motion.", articleUrl: localUrl, articleTitle: "Scanned Lecture", savedAt: 1700000000000 }],
+      createdAt: 1700000000000,
+      updatedAt: 1700000000000,
+    };
+    const canonicalRow = pbpVocabSendCanonicalRow(vocabRecord, null);
+    assert(canonicalRow && !canonicalRow.source.includes("pbp-local-doc.invalid"), "canonical Anki/TSV row leaked synthetic URL: " + canonicalRow.source);
+    assert(canonicalRow.source === "Scanned Lecture", "canonical source should retain title without synthetic URL");
+
+    const completeRows = await pbpVocabSendCompleteRows([vocabRecord], "owner-1", null);
+    const serializedComplete = JSON.stringify(completeRows);
+    assert(!serializedComplete.includes("pbp-local-doc.invalid"), "complete TSV/Anki row leaked synthetic URL: " + serializedComplete);
+  });
+
+  // 12. Reader OCR import panel UI staging and rich-layout toggle
+  await test("pbpOcrRenderPanel renders paid confirmation UI, toggles rich_layout_recognition, and stages local files cleanly", async () => {
+    freshMock();
+    pbpOcrRenderPanel({ mode: "local" });
+    const panel = document.querySelector("#rendered-view > .empty-state.es-ocr");
+    assert(Boolean(panel), ".es-ocr panel did not mount");
+    const richCheck = panel.querySelector("#ocr-main-rich-layout");
+    assert(richCheck && richCheck.checked === false, "rich_layout_recognition checkbox must default to unchecked");
+    assert(panel.textContent.includes("mdOcrPaidNotice"), "paid billing disclosure missing from OCR panel");
+
+    const validFile = new File([makePdfBytes(2)], "chapter-1.pdf", { type: "application/pdf" });
+    pbpOcrRenderPanel({ mode: "local", initialFile: validFile });
+    const stagedPanel = document.querySelector("#rendered-view > .empty-state.es-ocr");
+    assert(stagedPanel.querySelector(".rh-item-title").textContent === "chapter-1.pdf", "staged filename not displayed");
+    assert(stagedPanel.querySelector(".action-btn.es-primary").textContent === "mdOcrRunBtn", "primary button did not switch to Convert with DeepSeek OCR");
+  });
+
+  document.title = (failed === 0 ? "PASS" : "FAIL") + ` (${passed}/${passed + failed})`;
+})();
+</script>
+</body></html>

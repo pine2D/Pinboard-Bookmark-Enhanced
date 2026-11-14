@@ -1013,7 +1013,8 @@ function _pbpVocabRenderDetail(w, enterNarrow, reconcileOnly = false) {
       fig.appendChild(quote);
       const source = document.createElement("figcaption");
       source.className = "vocab-context-source";
-      const safeHref = pbpDictSafeUrl(c.articleUrl);
+      const isLocalDoc = typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(c.articleUrl);
+      const safeHref = isLocalDoc ? "" : pbpDictSafeUrl(c.articleUrl);
       if (safeHref) {
         const link = document.createElement("a");
         link.className = "notes-row-open";
@@ -1029,10 +1030,15 @@ function _pbpVocabRenderDetail(w, enterNarrow, reconcileOnly = false) {
         // Static PBP_ICONS constant (already aria-hidden), never page content.
         link.insertAdjacentHTML("beforeend", PBP_ICONS.extOpen.replace('<svg ', '<svg class="ext-icon" '));
         source.appendChild(link);
+      } else if (isLocalDoc && c.articleTitle) {
+        const docText = document.createElement("span");
+        docText.className = "notes-row-open-text";
+        docText.textContent = c.articleTitle;
+        source.appendChild(docText);
       }
       const meta = document.createElement("span");
       meta.className = "vocab-context-meta";
-      let site = "";
+      let site = isLocalDoc ? t("mdOcrLocalDocBadge") : "";
       if (safeHref) {
         try { site = new URL(safeHref).hostname.replace(/^www\./, ""); } catch (_) {}
       }
