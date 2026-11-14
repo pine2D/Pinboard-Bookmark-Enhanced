@@ -43,7 +43,7 @@ icons/  _locales/（9 locale）  vendor/（Defuddle 等，由 update-vendor.sh �
 tests/                           # file:// 直开的 HTML 测试页 80+ 套 + render-audit / ui-contract 等 .mjs（不入 release ZIP）
 scripts/                         # 质量门：verify.sh（门的权威清单以其自身的阶段 echo 为准）/ pre-commit-hook.sh / commit-msg-hook.sh / ui-consumer-lint.mjs（编辑期）；发布链：bump-version.sh / release.sh / zip-install-smoke.mjs；工具：doctor.mjs（只读检查本机环境）/ setup-hooks.sh / update-vendor.sh / sync-runtime.sh / qa-drive.mjs / perf 与截图辅助若干
 docs/                            # GitHub Pages（index.md / privacy.md / _layouts / assets / screenshots / cws-assets）；docs/theme-surface/ 主题工厂（composers/ pilots/ tools/ qa-harness/ snapshots/ + COMPONENTS.md / NEW_THEME.md / README.md）；docs/site-rules/ 站点适配器编写文档 + 调试脚本
-docs/superpowers/ DESIGN-IS-2026-07-22/ release/   # gitignored 本地产物（.qa-scan/ 仅 package*.json 与 run-test.mjs 入库）
+docs/superpowers/ release/       # gitignored 本地产物（.qa-scan/ 仅 package*.json 与 run-test.mjs 入库）
 ```
 
 ## 开发约定

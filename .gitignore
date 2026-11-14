@@ -28,7 +28,6 @@ release/
 # Internal planning/design drafts (superpowers skill output)
 docs/superpowers/
 .superpowers/
-DESIGN-IS-2026-07-22/
 .codex/
 
 # Local bookmark-service integration environment (never publish).
