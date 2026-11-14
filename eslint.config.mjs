@@ -67,6 +67,7 @@ export const PAGE_GLOBALS = [
   "isSecureContext", "reportError", "XMLHttpRequest", "IDBKeyRange", "BroadcastChannel",
   "TextDecoderStream", "TextEncoderStream", "DOMException", "IDBDatabase",
   "IDBTransaction", "IDBObjectStore", "IDBRequest",
+  "AudioContext", "OfflineAudioContext", "MediaRecorder",
 ];
 
 const browserGlobals = Object.fromEntries(PAGE_GLOBALS.map((g) => [g, "readonly"]));

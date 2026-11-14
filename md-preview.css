@@ -3612,7 +3612,25 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 }
 #ask-input::placeholder { color: var(--fg-muted); opacity: 1; }
 #ask-input:focus-visible { outline: none; }
+.ask-voice-status {
+  padding: 0 var(--sp-3);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--fg-secondary);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.ask-voice-status[hidden] { display: none; }
+.ask-voice-status[data-tone="error"],
+.ask-voice-status[data-tone="warn"] { color: var(--danger); }
 .ask-actions { display: flex; align-items: flex-end; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+#ask-mic {
+  flex: none; width: 26px; height: 26px; padding: 0; justify-content: center;
+}
+#ask-mic[hidden] { display: none; }
+#ask-mic svg { width: 14px; height: 14px; flex-shrink: 0; }
+#ask-mic[data-voice-state="recording"] { border-color: var(--danger); color: var(--danger); }
+#ask-mic[data-voice-state="transcribing"] { border-color: var(--link); color: var(--link-on-raised); }
 #ask-send, #ask-stop {
   flex: none; width: 26px; height: 26px; padding: 0; justify-content: center;
   background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised);
@@ -4042,9 +4060,9 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 }
 .hl-card-ai svg { width: 15px; height: 15px; }
 .hl-card-ai-explain:hover, .hl-card-ai-translate:hover, .hl-card-ai-ask:hover { background: var(--btn-hover); }
-/* .action-btn's 150ms fade for all five card buttons (they share its look). */
+/* .action-btn's 150ms fade for all card buttons (they share its look). */
 .hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask,
-.hl-card-save, .hl-card-delete {
+.hl-card-save, .hl-card-delete, .hl-card-mic {
   transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, color var(--motion-state) ease;
 }
 .hl-card-note {
@@ -4058,16 +4076,26 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   resize: vertical;
   box-sizing: border-box;
 }
+.hl-card-voice-status {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--fg-secondary);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.hl-card-voice-status[hidden] { display: none; }
+.hl-card-voice-status[data-tone="error"],
+.hl-card-voice-status[data-tone="warn"] { color: var(--danger); }
 /* The n key exists so a keyboard reader can write a note, so the card it
    opens joins the reader's 2px link focus ring instead of the UA default
    (same offsets as #ask-input and the explain-pop buttons). */
 .hl-card-note:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .hl-card-ai-explain:focus-visible, .hl-card-ai-translate:focus-visible, .hl-card-ai-ask:focus-visible,
-.hl-card-save:focus-visible, .hl-card-delete:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.hl-card-save:focus-visible, .hl-card-delete:focus-visible, .hl-card-mic:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 /* Delete (icon, left) vs Save (text CTA, right): delete asks first in a
-   confirm popover, and the row's full width keeps the two apart. */
-.hl-card-foot { display: flex; justify-content: space-between; gap: var(--sp-2); }
-.hl-card-save, .hl-card-delete {
+   confirm popover, and margin-right:auto keeps Delete isolated on the left. */
+.hl-card-foot { display: flex; align-items: center; gap: var(--sp-2); }
+.hl-card-save, .hl-card-delete, .hl-card-mic {
   padding: var(--sp-1) var(--sp-2);
   line-height: 16px; /* md rung in px: 4+16+4+2 = 26 under any font (CI's fallback gave 23.33 with `normal`) */
   border: 1px solid var(--btn-border);
@@ -4077,18 +4105,31 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   font-size: 12px;
   cursor: pointer;
 }
-.hl-card-save:hover, .hl-card-delete:hover { background: var(--btn-hover); }
+.hl-card-save:hover, .hl-card-delete:hover, .hl-card-mic:hover { background: var(--btn-hover); }
 /* Icon-only override AFTER the shared text-button rule -- same specificity,
    so source order is what keeps padding at 0 (a 4px 10px pad inside the fixed
    cell would leave the 13px cross a sliver of content box; Codex catch). */
 .hl-card-delete {
   color: var(--danger);
+  margin-right: auto;
   width: 26px; /* square on the md rung (was 28) */
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
 }
+.hl-card-mic {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.hl-card-mic[hidden] { display: none; }
+.hl-card-mic[data-voice-state="recording"] { border-color: var(--danger); color: var(--danger); }
+.hl-card-mic[data-voice-state="transcribing"] { border-color: var(--link); color: var(--link-on-raised); }
 
 
 /* ---- Highlight notebook list (md-highlight.js, spec 2026-07-04 sec.2) ---- */

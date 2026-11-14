@@ -64,7 +64,7 @@
       "disclosedAs": "Gemini"
     },
     "api.deepseek.com": {
-      "purpose": "AI provider: DeepSeek, optional DeepSeek Fetch article extraction, and optional stateless DeepSeek OCR document conversion (BYO key, user-selected)",
+      "purpose": "AI provider: DeepSeek, optional DeepSeek Fetch article extraction, optional stateless DeepSeek OCR document conversion, optional DeepSeek TTS pronunciation, and optional DeepSeek ASR short voice input (BYO key, user-selected)",
       "disclosedAs": "DeepSeek"
     },
     "dashscope.aliyuncs.com": {

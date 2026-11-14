@@ -46,6 +46,7 @@ const PBP_BACKUP_ENUMS = Object.freeze({
   opencodeProtocol: ["openai", "anthropic"],
   commandcodeProtocol: ["openai", "anthropic"],
   customProtocol: ["openai", "anthropic"],
+  dictTtsVoice: ["browser", "stella", "tide"],
 });
 
 const PBP_BACKUP_DROP_ON_UNKNOWN_ENUM = new Set([

@@ -2295,16 +2295,29 @@ function _pbpHlEnsureCard() {
   note.addEventListener("blur", _pbpHlCommitNote);
   card.appendChild(note);
 
+  const voiceStatus = document.createElement("div");
+  voiceStatus.className = "hl-card-voice-status";
+  voiceStatus.setAttribute("role", "status");
+  voiceStatus.setAttribute("aria-live", "polite");
+  voiceStatus.hidden = true;
+  card.appendChild(voiceStatus);
+
   const foot = document.createElement("div");
   foot.className = "hl-card-foot";
-  // Delete left, Save right (space-between): the delete asks first
-  // (_pbpHlDeleteCurrent -> showConfirmPopover), and the physical distance from
-  // the commit CTA keeps the two from being mis-hit in the first place.
+  // Delete left, Save right: the delete asks first (_pbpHlDeleteCurrent ->
+  // showConfirmPopover), and margin-right:auto on Delete keeps it isolated on
+  // the left even when the opt-in voice-input button sits beside Save.
   const del = document.createElement("button");
   del.type = "button";
   del.className = "hl-card-delete";
   del.addEventListener("click", _pbpHlDeleteCurrent);
   foot.appendChild(del);
+  const mic = document.createElement("button");
+  mic.type = "button";
+  mic.className = "hl-card-mic";
+  mic.hidden = true;
+  mic.setAttribute("aria-pressed", "false");
+  foot.appendChild(mic);
   const save = document.createElement("button");
   save.type = "button";
   save.className = "hl-card-save";
@@ -2313,10 +2326,24 @@ function _pbpHlEnsureCard() {
   card.appendChild(foot);
 
   card.addEventListener("toggle", (e) => {
-    if (e.newState === "closed") _pbpHlCardItemId = null;
+    if (e.newState === "closed") {
+      if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("hl-note");
+      _pbpHlCardItemId = null;
+    }
   });
   document.body.appendChild(card);
   _pbpHlCard = card;
+  if (typeof window.pbpSpeechRegisterTarget === "function") {
+    window.pbpSpeechRegisterTarget({
+      id: "hl-note",
+      button: mic,
+      statusEl: voiceStatus,
+      getTextarea: () => card.querySelector(".hl-card-note"),
+      captureContext: () => ({ itemId: _pbpHlCardItemId }),
+      isTargetValid: (ctx) => !!ctx.itemId && card.matches(":popover-open") && _pbpHlCardItemId === ctx.itemId,
+      onLayoutChange: () => { if (card.matches(":popover-open")) _pbpHlPlaceCard(card); },
+    });
+  }
   return card;
 }
 
@@ -2404,6 +2431,7 @@ function _pbpHlApplyCardI18n(card) {
   _hlIconBtn(".hl-card-ai-explain", PBP_ICONS.robot, t("hlCardExplain"));
   _hlIconBtn(".hl-card-ai-translate", PBP_ICONS.translate, t("hlCardTranslate"));
   _hlIconBtn(".hl-card-ai-ask", PBP_ICONS.ask, t("hlCardAsk"));
+  if (typeof window.pbpSpeechReapplyI18n === "function") window.pbpSpeechReapplyI18n();
 }
 
 // Single entry point for both the click-hit-detection path (Step 2) and Task 4's
@@ -2432,6 +2460,9 @@ function _pbpHlOpenCard(id) {
   }
 
   const card = _pbpHlEnsureCard();
+  if (_pbpHlCardItemId !== id && typeof window.pbpSpeechCancelTarget === "function") {
+    window.pbpSpeechCancelTarget("hl-note");
+  }
   _pbpHlApplyCardI18n(card);
   _pbpHlCardItemId = id;
   card.querySelector(".hl-card-quote").textContent = item.quote || ""; // textContent only (spec sec.6)
@@ -2610,6 +2641,7 @@ async function _pbpHlDeleteItem(id, btn) {
 
 function _pbpHlDeleteCurrent() {
   if (!_pbpHlState || !_pbpHlCardItemId) return;
+  if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("hl-note");
   // Confirm before the only destructive action in the reader (highlight +
   // note, no undo) -- the same anchored popover every other surface uses.
   // shared.js promotes it into the top layer above this [popover] card.

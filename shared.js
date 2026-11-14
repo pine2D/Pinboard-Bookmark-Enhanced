@@ -199,6 +199,8 @@ const PBP_ICONS = {
   // Lucide v0.525.0 arrow-left: library's narrow-mode "back to the list"
   // (library redesign 2026-10-03). Not cross -- going back is not a close.
   arrowLeft: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>',
+  // Lucide v0.525.0 mic: short voice input in Ask and highlight notes (md-speech.js).
+  mic: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect width="6" height="13" x="9" y="2" rx="3"/></svg>',
 };
 
 // Render "<check|cross icon> text" into a status element. The SVG uses currentColor so
@@ -782,6 +784,8 @@ const SETTINGS_DEFAULTS = {
   mdVideoDarkScheme: false,
   aiUseTranscript: true,
   selectionTrigger: "icon",
+  readerVoiceInputEnabled: false,
+  dictTtsVoice: "browser",
   // @generated:settings-schema end (settings-defaults-tail)
 };
 
@@ -6067,6 +6071,340 @@ async function pbpOpenReaderFromHistory(entry, opts = {}) {
     catch (e2) { console.warn("[reader-history] rollback slot cleanup failed:", e2?.name, e2?.message); }
     return { ok: false, reason: "tab_failed" };
   }
+}
+
+// ===================== DeepSeek Speech (TTS & ASR) + Local TTS Cache =====================
+const PBP_DEEPSEEK_TTS_ENDPOINT = "https://api.deepseek.com/v1/tools/tts";
+const PBP_DEEPSEEK_ASR_ENDPOINT = "https://api.deepseek.com/v1/tools/asr";
+const PBP_DEEPSEEK_TTS_VOICES = Object.freeze(["stella", "tide"]);
+const PBP_DEEPSEEK_TTS_LANGS = Object.freeze(["zh", "yue", "en", "ja", "ko", "ms", "ar", "id", "th", "vi"]);
+const PBP_DEEPSEEK_TTS_MAX_CHARS = 500;
+const PBP_WAV_MAX_BYTES = 16 * 1024 * 1024;
+const PBP_TTS_CACHE_DB_NAME = "pbp-tts-cache";
+const PBP_TTS_CACHE_DB_VERSION = 1;
+const PBP_TTS_CACHE_STORE_NAME = "clips";
+const PBP_TTS_CACHE_MAX_ENTRIES = 200;
+const PBP_TTS_CACHE_MAX_BYTES = 25 * 1024 * 1024;
+
+function pbpNormalizeDictTtsVoice(raw) {
+  return raw === "stella" || raw === "tide" ? raw : "browser";
+}
+
+function pbpNormalizeTtsText(text) {
+  return String(text || "").normalize("NFC").trim().replace(/\s+/g, " ");
+}
+
+// DeepSeek TTS supports 10 languages: zh, yue, en, ja, ko, ms, ar, id, th, vi.
+// Returns the canonical language code when supported, or "" so callers silently
+// fall back to window.speechSynthesis (e.g. de/fr/es/pl/ru or ambiguous Latin).
+function pbpDeepseekTtsResolveLang(rawLang, text) {
+  const s = String(rawLang || "").trim().toLowerCase().replace(/_/g, "-");
+  let primary = "";
+  if (s === "zh-yue" || s.startsWith("yue")) primary = "yue";
+  else if (s.startsWith("cmn")) primary = "zh";
+  else if (s === "in" || s.startsWith("in-")) primary = "id";
+  else if (s) primary = s.split("-")[0];
+  if (primary && primary !== "und") {
+    return PBP_DEEPSEEK_TTS_LANGS.includes(primary) ? primary : "";
+  }
+  const sample = pbpNormalizeTtsText(text);
+  if (!sample) return "";
+  if (/[\u3040-\u30ff\u31f0-\u31ff]/.test(sample)) return "ja";
+  if (/[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/.test(sample)) return "ko";
+  if (/[\u0e00-\u0e7f]/.test(sample)) return "th";
+  if (/[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]/.test(sample)) return "ar";
+  if (/[\u3400-\u9fff\uf900-\ufaff]/.test(sample)) return "zh";
+  return "";
+}
+
+function _pbpToUint8Bytes(input) {
+  if (!input) return null;
+  if (input instanceof Uint8Array) return input;
+  if (input instanceof ArrayBuffer) return new Uint8Array(input);
+  if (ArrayBuffer.isView(input)) return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+  return null;
+}
+
+function pbpValidateWavBytes(input) {
+  const bytes = _pbpToUint8Bytes(input);
+  if (!bytes || bytes.byteLength < 44) return { ok: false, reason: "too_short" };
+  if (bytes.byteLength > PBP_WAV_MAX_BYTES) return { ok: false, reason: "too_large" };
+  if (bytes[0] !== 0x52 || bytes[1] !== 0x49 || bytes[2] !== 0x46 || bytes[3] !== 0x46
+      || bytes[8] !== 0x57 || bytes[9] !== 0x41 || bytes[10] !== 0x56 || bytes[11] !== 0x45) {
+    return { ok: false, reason: "not_riff_wave" };
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 12;
+  let hasFmt = false;
+  let hasData = false;
+  let sampleRate = 0;
+  let channels = 0;
+  while (offset + 8 <= bytes.byteLength) {
+    const id = String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]);
+    const chunkSize = view.getUint32(offset + 4, true);
+    const bodyStart = offset + 8;
+    const remaining = bytes.byteLength - bodyStart;
+    if (id === "fmt ") {
+      if (chunkSize < 16 || chunkSize > remaining) return { ok: false, reason: "bad_fmt" };
+      const audioFormat = view.getUint16(bodyStart, true);
+      channels = view.getUint16(bodyStart + 2, true);
+      sampleRate = view.getUint32(bodyStart + 4, true);
+      if ((audioFormat !== 1 && audioFormat !== 3 && audioFormat !== 0xfffe)
+          || channels < 1 || channels > 8
+          || sampleRate < 4000 || sampleRate > 192000) {
+        return { ok: false, reason: "unsupported_fmt" };
+      }
+      hasFmt = true;
+    } else if (id === "data") {
+      if (chunkSize === 0xffffffff) {
+        if (remaining <= 0) return { ok: false, reason: "empty_data" };
+        hasData = true;
+        break;
+      }
+      if (chunkSize === 0 || chunkSize > remaining) return { ok: false, reason: "bad_data" };
+      hasData = true;
+    } else if (chunkSize > remaining) {
+      return { ok: false, reason: "truncated_chunk" };
+    }
+    const padded = chunkSize + (chunkSize & 1);
+    if (padded > remaining) break;
+    offset = bodyStart + padded;
+  }
+  if (!hasFmt || !hasData) return { ok: false, reason: "missing_chunks" };
+  return { ok: true, byteLength: bytes.byteLength, sampleRate, channels };
+}
+
+async function pbpTtsCacheKey(voice, lang, text) {
+  const normVoice = pbpNormalizeDictTtsVoice(voice);
+  if (normVoice === "browser") return "";
+  const normText = pbpNormalizeTtsText(text);
+  if (!normText || normText.length > PBP_DEEPSEEK_TTS_MAX_CHARS) return "";
+  const normLang = pbpDeepseekTtsResolveLang(lang, normText);
+  if (!normLang) return "";
+  if (typeof crypto === "undefined" || !crypto?.subtle?.digest) return "";
+  const raw = new TextEncoder().encode(`${normVoice}|${normLang}|${normText}`);
+  const digest = await crypto.subtle.digest("SHA-256", raw);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function _pbpTtsNormalizeRecord(raw, now = Date.now()) {
+  if (!raw || typeof raw !== "object") return null;
+  const key = typeof raw.key === "string" && /^[0-9a-f]{64}$/i.test(raw.key.trim())
+    ? raw.key.trim().toLowerCase()
+    : "";
+  if (!key) return null;
+  const voice = pbpNormalizeDictTtsVoice(raw.voice);
+  if (voice === "browser") return null;
+  const lang = typeof raw.lang === "string" && PBP_DEEPSEEK_TTS_LANGS.includes(raw.lang) ? raw.lang : "";
+  if (!lang) return null;
+  const srcBytes = _pbpToUint8Bytes(raw.wavBytes);
+  const check = pbpValidateWavBytes(srcBytes);
+  if (!check.ok) return null;
+  const wavBytes = srcBytes.byteOffset === 0 && srcBytes.byteLength === srcBytes.buffer.byteLength
+    ? srcBytes
+    : srcBytes.slice();
+  const createdAt = Number.isFinite(Number(raw.createdAt)) && Number(raw.createdAt) > 0 ? Math.floor(Number(raw.createdAt)) : Math.floor(now);
+  const accessedAt = Number.isFinite(Number(raw.accessedAt)) && Number(raw.accessedAt) > 0 ? Math.floor(Number(raw.accessedAt)) : Math.floor(now);
+  const byteSize = wavBytes.byteLength + 128;
+  return { key, voice, lang, wavBytes, byteSize, createdAt, accessedAt };
+}
+
+let _pbpTtsDbPromise = null;
+function _pbpTtsOpenDB() {
+  if (_pbpTtsDbPromise) return _pbpTtsDbPromise;
+  if (typeof indexedDB === "undefined" || !indexedDB) return Promise.resolve(null);
+  _pbpTtsDbPromise = new Promise((resolve) => {
+    let req;
+    try {
+      req = indexedDB.open(PBP_TTS_CACHE_DB_NAME, PBP_TTS_CACHE_DB_VERSION);
+    } catch (e) {
+      console.warn("[tts-cache] open threw:", e?.name, e?.message);
+      _pbpTtsDbPromise = null;
+      resolve(null);
+      return;
+    }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(PBP_TTS_CACHE_STORE_NAME)) {
+        const store = db.createObjectStore(PBP_TTS_CACHE_STORE_NAME, { keyPath: "key" });
+        store.createIndex("by_accessed", "accessedAt", { unique: false });
+      }
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => {
+        try { db.close(); } catch (_) { /* swallow-ok: closing stale IDB handle */ }
+        _pbpTtsDbPromise = null;
+      };
+      resolve(db);
+    };
+    req.onerror = () => {
+      console.warn("[tts-cache] open failed:", req.error?.name, req.error?.message);
+      _pbpTtsDbPromise = null;
+      resolve(null);
+    };
+    req.onblocked = () => {
+      console.warn("[tts-cache] open blocked");
+      _pbpTtsDbPromise = null;
+      resolve(null);
+    };
+  });
+  return _pbpTtsDbPromise;
+}
+
+async function pbpTtsCachePut(rawRecord, opts = {}) {
+  if (!rawRecord || typeof rawRecord !== "object") return null;
+  const now = Number.isFinite(opts.now) ? Math.floor(opts.now) : Date.now();
+  const maxEntries = Number.isInteger(opts.maxEntries) && opts.maxEntries > 0 ? opts.maxEntries : PBP_TTS_CACHE_MAX_ENTRIES;
+  const maxBytes = Number.isInteger(opts.maxBytes) && opts.maxBytes > 0 ? opts.maxBytes : PBP_TTS_CACHE_MAX_BYTES;
+  const voice = pbpNormalizeDictTtsVoice(rawRecord.voice);
+  const lang = pbpDeepseekTtsResolveLang(rawRecord.lang, rawRecord.text);
+  const key = typeof rawRecord.key === "string" && /^[0-9a-f]{64}$/i.test(rawRecord.key)
+    ? rawRecord.key.toLowerCase()
+    : await pbpTtsCacheKey(voice, lang, rawRecord.text);
+  if (!key || !lang || voice === "browser") return null;
+  const record = _pbpTtsNormalizeRecord({
+    key,
+    voice,
+    lang,
+    wavBytes: rawRecord.wavBytes,
+    createdAt: rawRecord.createdAt,
+    accessedAt: now,
+  }, now);
+  if (!record || record.byteSize > maxBytes) return null;
+  const db = await _pbpTtsOpenDB();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    let tx;
+    try {
+      tx = db.transaction(PBP_TTS_CACHE_STORE_NAME, "readwrite");
+    } catch (e) {
+      console.warn("[tts-cache] put transaction failed:", e?.name, e?.message);
+      _pbpTtsDbPromise = null;
+      resolve(null);
+      return;
+    }
+    const store = tx.objectStore(PBP_TTS_CACHE_STORE_NAME);
+    const getAllReq = store.getAll();
+    getAllReq.onsuccess = () => {
+      const existing = Array.isArray(getAllReq.result) ? getAllReq.result : [];
+      const prior = existing.find((row) => row && row.key === record.key);
+      if (prior && Number.isFinite(prior.createdAt) && !rawRecord.createdAt) {
+        record.createdAt = prior.createdAt;
+      }
+      const others = existing
+        .filter((row) => row && typeof row.key === "string" && row.key !== record.key)
+        .sort((a, b) => (Number(a.accessedAt) || 0) - (Number(b.accessedAt) || 0));
+      let totalEntries = 1 + others.length;
+      let totalBytes = record.byteSize + others.reduce((sum, r) => sum + (Number(r.byteSize) || 0), 0);
+      while (others.length > 0 && (totalEntries > maxEntries || totalBytes > maxBytes)) {
+        const victim = others.shift();
+        totalEntries -= 1;
+        totalBytes -= Number(victim.byteSize) || 0;
+        store.delete(victim.key);
+      }
+      store.put(record);
+    };
+    tx.oncomplete = () => resolve(record);
+    tx.onerror = () => {
+      console.warn("[tts-cache] put failed:", tx.error?.name, tx.error?.message);
+      resolve(null);
+    };
+    tx.onabort = () => resolve(null);
+  });
+}
+
+async function pbpTtsCacheGet(voice, lang, text, opts = {}) {
+  const key = await pbpTtsCacheKey(voice, lang, text);
+  if (!key) return null;
+  const db = await _pbpTtsOpenDB();
+  if (!db) return null;
+  const touch = opts.touch !== false;
+  const now = Number.isFinite(opts.now) ? Math.floor(opts.now) : Date.now();
+  return new Promise((resolve) => {
+    let tx;
+    try {
+      tx = db.transaction(PBP_TTS_CACHE_STORE_NAME, touch ? "readwrite" : "readonly");
+    } catch (e) {
+      console.warn("[tts-cache] get transaction failed:", e?.name, e?.message);
+      _pbpTtsDbPromise = null;
+      resolve(null);
+      return;
+    }
+    const store = tx.objectStore(PBP_TTS_CACHE_STORE_NAME);
+    const req = store.get(key);
+    let out = null;
+    req.onsuccess = () => {
+      const hit = _pbpTtsNormalizeRecord(req.result, now);
+      if (!hit) return;
+      if (touch) {
+        hit.accessedAt = now;
+        try { store.put(hit); } catch (_) { /* swallow-ok: LRU touch best-effort */ }
+      }
+      out = hit;
+    };
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => resolve(out);
+    tx.onabort = () => resolve(null);
+  });
+}
+
+async function pbpTtsCacheMeasure() {
+  const db = await _pbpTtsOpenDB();
+  if (!db) return { keys: [], bytes: 0, count: 0 };
+  return new Promise((resolve) => {
+    let tx;
+    try {
+      tx = db.transaction(PBP_TTS_CACHE_STORE_NAME, "readonly");
+    } catch (e) {
+      console.warn("[tts-cache] measure transaction failed:", e?.name, e?.message);
+      _pbpTtsDbPromise = null;
+      resolve({ keys: [], bytes: 0, count: 0 });
+      return;
+    }
+    const req = tx.objectStore(PBP_TTS_CACHE_STORE_NAME).getAll();
+    req.onsuccess = () => {
+      const rows = Array.isArray(req.result) ? req.result : [];
+      let bytes = 0;
+      let count = 0;
+      for (const r of rows) {
+        const norm = _pbpTtsNormalizeRecord(r);
+        if (!norm) continue;
+        count += 1;
+        bytes += norm.byteSize;
+      }
+      resolve({
+        keys: Array.from({ length: count }, (_, idx) => "tts_clip_" + idx),
+        bytes,
+        count,
+      });
+    };
+    req.onerror = () => resolve({ keys: [], bytes: 0, count: 0 });
+  });
+}
+
+async function pbpTtsCacheClear() {
+  const before = await pbpTtsCacheMeasure();
+  const db = await _pbpTtsOpenDB();
+  if (!db) return { freed: 0, count: 0, failed: true };
+  return new Promise((resolve) => {
+    let tx;
+    try {
+      tx = db.transaction(PBP_TTS_CACHE_STORE_NAME, "readwrite");
+    } catch (e) {
+      console.warn("[tts-cache] clear transaction failed:", e?.name, e?.message);
+      _pbpTtsDbPromise = null;
+      resolve({ freed: 0, count: 0, failed: true });
+      return;
+    }
+    tx.objectStore(PBP_TTS_CACHE_STORE_NAME).clear();
+    tx.oncomplete = () => resolve({ freed: before.bytes, count: before.count, failed: false });
+    tx.onerror = () => {
+      console.warn("[tts-cache] clear failed:", tx.error?.name, tx.error?.message);
+      resolve({ freed: 0, count: 0, failed: true });
+    };
+    tx.onabort = () => resolve({ freed: 0, count: 0, failed: true });
+  });
 }
 
 // ===================== Runtime message catalog =====================

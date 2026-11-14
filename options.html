@@ -1116,6 +1116,22 @@
         </div>
       </section>
       <section class="settings-section">
+        <h2 class="section-title" id="sec-reader-voice" data-i18n="secReaderVoice">Voice Input</h2>
+        <div class="pref-group" role="group" aria-labelledby="sec-reader-voice">
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label class="switch"><input type="checkbox" role="switch" id="opt-reader-voice-input" aria-labelledby="opt-reader-voice-input-label" /> <span class="switch-text" id="opt-reader-voice-input-label" data-i18n="readerVoiceInputLabel">Show voice input buttons in Ask and highlight notes (DeepSeek ASR)</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="readerVoiceInputHint">Records up to 2 minutes from your microphone when you click the mic button, sends the clip to DeepSeek ASR using your DeepSeek API key, and inserts the text so you can edit it before saving or sending. Billed per audio minute.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
+        </div>
+        <div class="fg entry-block" id="deepseek-voice-unavailable" hidden>
+          <p class="hint hint-warn" role="status" aria-live="polite"></p>
+          <div class="fg-actions"><button type="button" class="btn btn-sm" id="deepseek-voice-setup-btn" data-i18n="deepseekFetchSetupBtn">Set up DeepSeek</button></div>
+        </div>
+      </section>
+      <section class="settings-section">
         <h2 class="section-title" data-i18n="kbdHelpTitle">Keyboard Shortcuts</h2>
         <div class="fg entry-block">
           <div class="bl" id="md-shortcut-label" data-i18n="mdShortcutLabel">Open the reader</div>
@@ -1207,6 +1223,22 @@
             <option value="intermediate" data-i18n="dictLearnerLevelIntermediate">Intermediate</option>
             <option value="advanced" data-i18n="dictLearnerLevelAdvanced">Advanced</option>
           </select>
+        </div>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="dict-tts-voice" data-i18n="dictTtsVoiceLabel">Pronunciation voice</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="dictTtsVoiceHint">Stella and Tide use DeepSeek TTS with your DeepSeek API key (Chinese, Cantonese, English, Japanese, Korean, Malay, Arabic, Indonesian, Thai, and Vietnamese; billed per character) and cache audio on this device. Other languages use the browser voice automatically.</p>
+          </details>
+          <select id="dict-tts-voice" data-listbox>
+            <option value="browser" data-i18n="dictTtsVoiceBrowser">Browser speech</option>
+            <option value="stella" data-i18n="dictTtsVoiceStella">DeepSeek Stella (female)</option>
+            <option value="tide" data-i18n="dictTtsVoiceTide">DeepSeek Tide (male)</option>
+          </select>
+        </div>
+        <div class="fg entry-block" id="deepseek-tts-unavailable" hidden>
+          <p class="hint hint-warn" role="status" aria-live="polite"></p>
+          <div class="fg-actions"><button type="button" class="btn btn-sm" id="deepseek-tts-setup-btn" data-i18n="deepseekFetchSetupBtn">Set up DeepSeek</button></div>
         </div>
         <details class="disclosure" data-acc-key="vocab-reading">
           <summary data-i18n="vocabReadingSection">Reading Hints</summary>

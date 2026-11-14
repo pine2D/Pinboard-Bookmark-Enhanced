@@ -1560,4 +1560,38 @@ export const SETTINGS_SCHEMA = deepFreeze([
       htmlDefault: { check: "value" },
     },
   },
+  {
+    key: "readerVoiceInputEnabled",
+    section: "tail",
+    defaultValue: false,
+    options: {
+      panel: "reader",
+      domId: "opt-reader-voice-input",
+      reset: { mode: "field", order: 13 },
+      load: { map: "checkMap", order: 59, form: "===true" },
+      collect: { section: "tail", order: 55, kind: "checked" },
+      htmlDefault: { check: "checkbox" },
+    },
+  },
+  {
+    key: "dictTtsVoice",
+    section: "tail",
+    defaultValue: "browser",
+    backupEnum: ["browser", "stella", "tide"],
+    backupEnumOrder: 15,
+    options: {
+      panel: "vocab",
+      domId: "dict-tts-voice",
+      reset: { mode: "field", order: 6 },
+      load: {
+        map: "fieldMap",
+        section: "tail",
+        order: 26,
+        form: "customExpr",
+        expr: `s.dictTtsVoice === "stella" || s.dictTtsVoice === "tide" ? s.dictTtsVoice : "browser"`,
+      },
+      collect: { section: "tail", order: 56, kind: "value" },
+      htmlDefault: { check: "value" },
+    },
+  },
 ]);

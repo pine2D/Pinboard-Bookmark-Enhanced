@@ -38,8 +38,8 @@ function makeTempWorkspace(t) {
   return dir;
 }
 
-test("schema exports 122 deeply frozen non-provider settings disjoint from AI_PROVIDERS", () => {
-  assert.equal(SETTINGS_SCHEMA.length, 122);
+test("schema exports 124 deeply frozen non-provider settings disjoint from AI_PROVIDERS", () => {
+  assert.equal(SETTINGS_SCHEMA.length, 124);
   assert.equal(REGION_SPECS.length, 15);
   assert.ok(Object.isFrozen(SETTINGS_SCHEMA));
   assert.ok(Object.isFrozen(SETTINGS_SCHEMA[0]));
@@ -49,7 +49,7 @@ test("schema exports 122 deeply frozen non-provider settings disjoint from AI_PR
   assert.ok(Object.isFrozen(NON_SETTING_CHECKBOX_ALLOWLIST));
 
   const schemaKeys = new Set(SETTINGS_SCHEMA.map((e) => e.key));
-  assert.equal(schemaKeys.size, 122);
+  assert.equal(schemaKeys.size, 124);
 
   const aiKeys = new Set();
   for (const p of AI_PROVIDERS) {
@@ -64,7 +64,7 @@ test("schema exports 122 deeply frozen non-provider settings disjoint from AI_PR
   for (const k of schemaKeys) {
     assert.equal(aiKeys.has(k), false, `key "${k}" must not overlap AI_PROVIDERS`);
   }
-  assert.equal(schemaKeys.size + aiKeys.size, 165);
+  assert.equal(schemaKeys.size + aiKeys.size, 167);
   assert.deepEqual(validateSettingsSchema(), []);
 });
 

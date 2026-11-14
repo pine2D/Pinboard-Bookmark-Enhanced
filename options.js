@@ -327,19 +327,28 @@ async function renderConnectionOverview() {
     }
   }
   const deepseekSrcOn = $id("opt-ai-src-deepseek")?.checked === true;
+  const deepseekVoiceOn = $id("opt-reader-voice-input")?.checked === true;
+  const dictTtsVal = $id("dict-tts-voice")?.value || "browser";
+  const deepseekTtsOn = dictTtsVal === "stella" || dictTtsVal === "tide";
   const deepseekKeyReady = !!$id("opt-deepseek-key")?.value.trim();
-  const deepseekFetchPerm = deepseekSrcOn && deepseekKeyReady && typeof PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN === "string"
+  const deepseekPerm = (deepseekSrcOn || deepseekVoiceOn || deepseekTtsOn)
+    && deepseekKeyReady && typeof PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN === "string"
     ? await permissionFor({ origins: [PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN] })
     : null;
-  const deepseekFetchNote = $id("deepseek-fetch-unavailable");
-  if (deepseekFetchNote) {
-    const dead = deepseekSrcOn && (!deepseekKeyReady || deepseekFetchPerm === false);
-    deepseekFetchNote.hidden = !dead;
+  for (const [on, noteId, btnId, keyMissingKey, accessMissingKey] of [
+    [deepseekSrcOn, "deepseek-fetch-unavailable", "deepseek-fetch-setup-btn", "deepseekFetchKeyMissingHint", "deepseekFetchAccessMissingHint"],
+    [deepseekVoiceOn, "deepseek-voice-unavailable", "deepseek-voice-setup-btn", "deepseekVoiceKeyMissingHint", "deepseekVoiceAccessMissingHint"],
+    [deepseekTtsOn, "deepseek-tts-unavailable", "deepseek-tts-setup-btn", "deepseekTtsKeyMissingHint", "deepseekTtsAccessMissingHint"],
+  ]) {
+    const noteEl = $id(noteId);
+    if (!noteEl) continue;
+    const dead = on && (!deepseekKeyReady || deepseekPerm === false);
+    noteEl.hidden = !dead;
     if (dead) {
-      const msgEl = deepseekFetchNote.querySelector("p");
-      const btnEl = $id("deepseek-fetch-setup-btn");
+      const msgEl = noteEl.querySelector("p");
+      const btnEl = $id(btnId);
       const btnKey = deepseekKeyReady ? "deepseekFetchGrantBtn" : "deepseekFetchSetupBtn";
-      if (msgEl) msgEl.textContent = t(deepseekKeyReady ? "deepseekFetchAccessMissingHint" : "deepseekFetchKeyMissingHint");
+      if (msgEl) msgEl.textContent = t(deepseekKeyReady ? accessMissingKey : keyMissingKey);
       if (btnEl) { btnEl.setAttribute("data-i18n", btnKey); btnEl.textContent = t(btnKey); }
     }
   }
@@ -1833,6 +1842,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: "urls", labelKey: "storageCatUrls", defaultOn: true },
     { id: "tags", labelKey: "storageCatTags", defaultOn: false },
     { id: "ocr", labelKey: "storageCatOcr", defaultOn: false },
+    { id: "tts", labelKey: "storageCatTts", defaultOn: false },
     { id: "misc", labelKey: "storageCatMisc", defaultOn: true },
   ];
   function showStorageStatus(msg, kind) {
@@ -1849,15 +1859,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!host) return;
     let measured = null;
     try {
-      const [localStats, ocrStats] = await Promise.all([
+      const [localStats, ocrStats, ttsStats] = await Promise.all([
         pbpMeasureLocalStorage(),
         typeof pbpOcrDocsMeasure === "function" ? pbpOcrDocsMeasure() : Promise.resolve({ count: 0, bytes: 0 }),
+        typeof pbpTtsCacheMeasure === "function" ? pbpTtsCacheMeasure() : Promise.resolve({ count: 0, bytes: 0 }),
       ]);
       measured = localStats ? {
         ...localStats,
         ocr: {
           keys: Array.from({ length: Math.max(0, Number(ocrStats?.count) || 0) }, (_, i) => String(i)),
           bytes: Math.max(0, Number(ocrStats?.bytes) || 0),
+        },
+        tts: {
+          keys: Array.from({ length: Math.max(0, Number(ttsStats?.count) || 0) }, (_, i) => String(i)),
+          bytes: Math.max(0, Number(ttsStats?.bytes) || 0),
         },
       } : null;
     } catch (_) { measured = null; }
@@ -1939,8 +1954,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         // without rolling back, so the rows have to come from the fresh re-read
         // below, not from an optimistic update. `failed` is what keeps that
         // case from reading as a successful "Freed 0 B.".
-        const localCats = cats.filter((c) => c !== "ocr");
+        const localCats = cats.filter((c) => c !== "ocr" && c !== "tts");
         const wantOcr = cats.includes("ocr");
+        const wantTts = cats.includes("tts");
         if (localCats.length) {
           ({ freed, failed } = await pbpReclaimLocalStorage(localCats));
         }
@@ -1948,6 +1964,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           const ocrRes = await pbpOcrDocsClear();
           freed += Math.max(0, Number(ocrRes?.freed) || 0);
           if (ocrRes?.failed) failed = true;
+        }
+        if (wantTts && typeof pbpTtsCacheClear === "function") {
+          const ttsRes = await pbpTtsCacheClear();
+          freed += Math.max(0, Number(ttsRes?.freed) || 0);
+          if (ttsRes?.failed) failed = true;
         }
       } catch (e) {
         console.warn("[storage] clear failed:", e?.name, e?.message);
@@ -2084,6 +2105,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-md-video-dark": false,
         "opt-md-video-pause-lookup": true,
         "opt-md-video-use-login": true,
+        "opt-reader-voice-input": false,
       },
       after: () => {
         for (const k of Object.keys(_previewModelMap)) _previewModelMap[k] = "";
@@ -2162,6 +2184,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "dict-learner-level": "",
         "dict-definition-lang": "",
         "dict-definition-lang-custom": "",
+        "dict-tts-voice": "browser",
         "dict-anki-format": "legacy",
         "dict-anki-deck": "Pinboard Vocab",
         "dict-anki-port": "8765",
@@ -3424,6 +3447,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "dict-anki-port": s.dictAnkiPort || "8765",
     "dict-anki-key": s.dictAnkiKey || "",
     "dict-eudic-token": s.dictEudicToken || "",
+    "dict-tts-voice": s.dictTtsVoice === "stella" || s.dictTtsVoice === "tide" ? s.dictTtsVoice : "browser",
     // @generated:settings-schema end (field-map-tail)
   };
   for (const [id, val] of Object.entries(fieldMap)) {
@@ -3538,6 +3562,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-preview-skim": s.previewSkimEnabled === true,
     "opt-tr-hotkey-confirm": s.trHotkeyConfirm !== false,
     "dict-echo-enabled": s.dictEchoEnabled === true,
+    "opt-reader-voice-input": s.readerVoiceInputEnabled === true,
     // @generated:settings-schema end (check-map)
   };
   for (const [id, val] of Object.entries(checkMap)) {
@@ -4593,6 +4618,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       waybackS3Secret: obfuscateKey($id("opt-wayback-s3secret").value.trim()),
       backupIncludeHighlights: $id("opt-backup-include-highlights").checked,
       backupIncludeVocabulary: $id("opt-backup-include-vocabulary").checked,
+      readerVoiceInputEnabled: $id("opt-reader-voice-input").checked,
+      dictTtsVoice: $id("dict-tts-voice").value,
       // @generated:settings-schema end (collect-form-tail)
       // Bespoke / computed setting collectors (AST-verified against SETTINGS_SCHEMA)
       aiCacheDuration: (() => {
@@ -4975,16 +5002,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   for (const radio of document.querySelectorAll('input[name="ai-content-source"]')) {
     radio.addEventListener("change", scheduleConnectionOverview);
   }
-  $id("deepseek-fetch-setup-btn")?.addEventListener("click", async () => {
-    if ($id("opt-deepseek-key")?.value.trim() && typeof PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN === "string" && chrome.permissions?.request) {
-      try { await chrome.permissions.request({ origins: [PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN] }); }
-      catch (e) { console.warn("[options] DeepSeek Fetch permission request failed:", e?.name, e?.message); }
-      scheduleConnectionOverview();
-      return;
-    }
-    const targetId = $id("opt-ai-provider")?.value === "deepseek" ? "opt-deepseek-key" : "opt-ai-provider-btn";
-    pbpOpenOptionsTarget("ai", targetId);
-  });
+  $id("opt-reader-voice-input")?.addEventListener("change", scheduleConnectionOverview);
+  $id("dict-tts-voice")?.addEventListener("change", scheduleConnectionOverview);
+  for (const setupBtnId of ["deepseek-fetch-setup-btn", "deepseek-voice-setup-btn", "deepseek-tts-setup-btn"]) {
+    $id(setupBtnId)?.addEventListener("click", async () => {
+      if ($id("opt-deepseek-key")?.value.trim() && typeof PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN === "string" && chrome.permissions?.request) {
+        try { await chrome.permissions.request({ origins: [PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN] }); }
+        catch (e) { console.warn("[options] DeepSeek permission request failed:", e?.name, e?.message); }
+        scheduleConnectionOverview();
+        return;
+      }
+      const targetId = $id("opt-ai-provider")?.value === "deepseek" ? "opt-deepseek-key" : "opt-ai-provider-btn";
+      pbpOpenOptionsTarget("ai", targetId);
+    });
+  }
   chrome.storage.onChanged?.addListener((changes, area) => {
     if (area === "local" && (changes[PBP_CONNECTION_HEALTH_KEY] || changes.vocabDriveConnected)) {
       scheduleConnectionOverview();

@@ -9138,6 +9138,23 @@ async function openReaderSurface(name) {
       await wait(300);
       return shown(document.getElementById("ask-img-att"));
     }
+    case "ask-voice-input": {
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true });
+      if (typeof pbpSpeechRefreshConfig === "function") await pbpSpeechRefreshConfig();
+      const btn = document.getElementById("ask-open");
+      const panel = document.getElementById("ask-panel");
+      if (btn && (!panel || panel.hidden)) btn.click();
+      await wait(300);
+      return shown(document.getElementById("ask-mic"));
+    }
+    case "hl-card-voice-input": {
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true });
+      if (typeof pbpSpeechRefreshConfig === "function") await pbpSpeechRefreshConfig();
+      if (typeof _pbpHlOpenCard !== "function") return false;
+      _pbpHlOpenCard("h1");
+      await wait(500);
+      return shown(document.querySelector(".hl-card-mic"));
+    }
   }
   return false;
 }
@@ -9178,6 +9195,18 @@ function closeReaderSurface(name) {
       const btn = document.getElementById("ask-open");
       const panel = document.getElementById("ask-panel");
       if (btn && panel && !panel.hidden) btn.click();
+      return;
+    }
+    case "ask-voice-input": {
+      chrome.storage.local.set({ readerVoiceInputEnabled: false });
+      const btn = document.getElementById("ask-open");
+      const panel = document.getElementById("ask-panel");
+      if (btn && panel && !panel.hidden) btn.click();
+      return;
+    }
+    case "hl-card-voice-input": {
+      chrome.storage.local.set({ readerVoiceInputEnabled: false });
+      hide(document.getElementById("pb-hl-card"));
       return;
     }
     default: hide(document.getElementById(name));

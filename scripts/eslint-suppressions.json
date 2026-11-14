@@ -101,7 +101,7 @@
   },
   "md-ask.js": {
     "pbp/no-silent-catch": {
-      "count": 40
+      "count": 39
     }
   },
   "md-bookmark.js": {
@@ -116,7 +116,7 @@
   },
   "md-dict.js": {
     "pbp/no-silent-catch": {
-      "count": 24
+      "count": 23
     }
   },
   "md-embed.js": {

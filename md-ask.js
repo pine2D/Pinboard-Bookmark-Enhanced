@@ -317,8 +317,11 @@ function _pbpReaderSelectView(view) {
   if (!panel) return;
   _pbpReaderPanelRevision++;
   _pbpReaderPanelView = view === "dict" ? "dict" : "ask";
-  if (_pbpReaderPanelView === "ask") _pbpAskBuildPanel();
-  else {
+  if (_pbpReaderPanelView === "ask") {
+    if (typeof pbpDictStopSpeak === "function") pbpDictStopSpeak();
+    _pbpAskBuildPanel();
+  } else {
+    if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("ask");
     _pbpReaderDictDocked = true;
     if (_pbpReaderDictSession?.host === "bubble") _pbpReaderMoveDict(_pbpReaderDictSession, "panel");
   }
@@ -538,8 +541,10 @@ function _pbpAskBuildPanel() {
     '  </div>',
     '  <textarea id="ask-input" rows="2" dir="auto" maxlength="4000" data-i18n-placeholder="askPlaceholder" data-i18n-aria="askTitle" aria-describedby="ask-input-hint"></textarea>',
     '  <button type="button" id="ask-scope-near" class="action-btn" aria-pressed="false" hidden data-i18n="askScopeNear" data-i18n-title="askScopeNearHint" data-i18n-aria="askScopeNear"></button>',
+    '  <div id="ask-voice-status" class="ask-voice-status" role="status" aria-live="polite" hidden></div>',
     '  <div class="ask-actions">',
     '    <div id="ask-meta" aria-live="polite"></div>',
+    '    <button type="button" id="ask-mic" class="action-btn" hidden aria-pressed="false" data-i18n-title="mdAsrMicStart" data-i18n-aria="mdAsrMicStart">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.mic : "") + '</button>',
     '    <button type="button" id="ask-stop" class="action-btn" hidden data-i18n-title="askStop" data-i18n-aria="askStop">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.stop : "") + '</button>',
     '    <button type="submit" id="ask-send" class="action-btn" data-i18n-title="askSend" data-i18n-aria="askSend">' + PBP_ASK_SEND_SVG + '</button>',
     '  </div>',
@@ -621,6 +626,24 @@ function _pbpAskBuildPanel() {
       _pbpAskOnSubmit();
     }
   });
+  if (typeof window.pbpSpeechRegisterTarget === "function") {
+    window.pbpSpeechRegisterTarget({
+      id: "ask",
+      button: panel.querySelector("#ask-mic"),
+      statusEl: panel.querySelector("#ask-voice-status"),
+      getTextarea: () => document.getElementById("ask-input"),
+      captureContext: () => ({
+        sessionId: _pbpAskState?.sessionId || "",
+        articleRev: _pbpAskArticleRev,
+      }),
+      isTargetValid: (ctx) => _pbpAskIsOpen()
+        && _pbpReaderPanelView === "ask"
+        && !!_pbpAskState
+        && _pbpAskState.sessionId === ctx.sessionId
+        && _pbpAskArticleRev === ctx.articleRev
+        && !document.getElementById("ask-input")?.disabled,
+    });
+  }
   return panel;
 }
 
@@ -700,7 +723,11 @@ function _pbpAskSettleAnchor(anchor) {
 // overlays the page). Esc and the close button dismiss it.
 function _pbpAskSetOpen(open, view = "ask") {
   const panel = _pbpReaderEnsurePanel();
-  if (!open) _pbpReaderPanelRevision++;
+  if (!open) {
+    _pbpReaderPanelRevision++;
+    if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("ask");
+    if (typeof pbpDictStopSpeak === "function") pbpDictStopSpeak();
+  }
   if (open) {
     _pbpReaderSelectView(view);
     const drawerWasOpen = document.body.classList.contains("rail-open");
@@ -871,13 +898,18 @@ function _pbpAskArchiveStatus() {
   if (label) label.hidden = !!st.records?.length;
   const create = document.getElementById("ask-new");
   if (create) create.disabled = st.running || st.archiveLoading || !!pending.length;
-  const input = document.getElementById("ask-input"), send = document.getElementById("ask-send");
+  const input = document.getElementById("ask-input"), send = document.getElementById("ask-send"), mic = document.getElementById("ask-mic");
   const unavailable = !pbpAiAvailable(st.s);
+  const inputDisabled = unavailable || !!st.archiveError || !!st.archiveMissing || st.archiveLoading;
   if (input) {
-    input.disabled = unavailable || !!st.archiveError || !!st.archiveMissing || st.archiveLoading;
+    input.disabled = inputDisabled;
     input.placeholder = t(unavailable ? "askConfigureToContinue" : "askPlaceholder");
   }
-  if (send && !st.running) send.disabled = unavailable || !!st.archiveError || !!st.archiveMissing || st.archiveLoading;
+  if (mic) {
+    if (inputDisabled && typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("ask");
+    mic.disabled = inputDisabled;
+  }
+  if (send && !st.running) send.disabled = inputDisabled;
 }
 async function _pbpAskRefreshArchivedView(st) {
   if (_pbpAskState !== st || st.running || _pbpAskUnpersisted.some(item => item.sessionId === st.sessionId)) return;
@@ -905,6 +937,7 @@ async function _pbpAskPersistArchive(pending) {
 function _pbpAskNewConversation() {
   const st = _pbpAskState;
   if (!st || st.running || _pbpAskUnpersisted.some(item => item.account === st.account && item.sessionId === st.sessionId)) return;
+  if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("ask");
   st.archiveRev = (st.archiveRev || 0) + 1;
   st.sessionId = crypto.randomUUID(); st.archiveSession = null; st.archiveAllRecords = [];
   st.archiveReady = Promise.resolve(null); st.archiveStale = false; st.archiveLoading = false; st.archiveError = false; st.archiveMissing = false; st.temporary = false;
@@ -1009,6 +1042,7 @@ async function _pbpAskClearThread() {
 // declarations hoist file-wide). Until then submit is a silent no-op
 // (typeof on an undeclared identifier is safe, never a ReferenceError).
 function _pbpAskOnSubmit() {
+  if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("ask");
   if (typeof _pbpAskSend === "function") _pbpAskSend().catch(() => {});
 }
 
@@ -4871,10 +4905,11 @@ function _pbpExplainEnsurePop() {
     if (e.newState === "closed") {
       if (_pbpReaderDictSession?.host === "bubble" && _pbpReaderDictSession.root.parentElement === pop) _pbpReaderForgetDict(true);
       if (_pbpExplainAbort) _pbpExplainAbort.abort();
-      // speechSynthesis is page-level, not popover-level: without this a
-      // pronunciation started from the dictionary view keeps talking after
-      // the panel is gone. pbpDictSpeak only cancels on the NEXT click.
-      try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (_) {}
+      // speechSynthesis and DeepSeek TTS Audio are page-level, not popover-level:
+      // without this a pronunciation started from the dictionary view keeps
+      // talking after the panel is gone. pbpDictSpeak only cancels on NEXT click.
+      if (typeof pbpDictStopSpeak === "function") pbpDictStopSpeak();
+      else { try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (_) { /* swallow-ok: speechSynthesis optional */ } }
       _pbpExplainSetPinned(pop, false);
       _pbpExplainDrag = null;
       _pbpExplainResizeEnd();

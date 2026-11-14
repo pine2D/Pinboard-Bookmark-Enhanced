@@ -1473,12 +1473,13 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   // host, same shape as Archive's #opt-wayback-batch) has 1 plain switch
   // (opt-preview-ai-enabled) + 1 rewrapped choice host (opt-preview-skim) +
   // opt-tr-hotkey-confirm (2026-10-21) +
-  // 3 video-group switches (opt-md-video-dark/-pause-lookup/-use-login) = 6,
+  // 3 video-group switches (opt-md-video-dark/-pause-lookup/-use-login) +
+  // 1 voice-input switch (opt-reader-voice-input) = 7,
   // every one a `.pref-row` now -- reader joins this loop instead of getting
   // its own marker/switch-count exemption.
   // quick: 12 own switches + the 5 Notifications switches it took from the
   // old General tab (2026-10-15 IA).
-  const STAGE3A_PANELS = [["bookmarks", 7], ["quick", 17], ["ai-behavior", 2], ["archive", 3], ["reader", 6]];
+  const STAGE3A_PANELS = [["bookmarks", 7], ["quick", 17], ["ai-behavior", 2], ["archive", 3], ["reader", 7]];
 
   for (const [id, switchCount] of STAGE3A_PANELS) {
     await test(`stage3a: every switch in the ${id} panel sits in a .pref-row`, async () => {
@@ -1537,7 +1538,7 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     const aiPicks = [...aiBehavior.querySelectorAll("label.pick")];
     assert(bmPicks.length === 6, "expected 6 label.pick in panel-bookmarks, got " + bmPicks.length);
     assert(popupPicks.length === 4, "expected 4 label.pick in panel-popup, got " + popupPicks.length);
-    assert(aiPicks.length === 2, "expected 2 label.pick in panel-ai-behavior, got " + aiPicks.length);
+    assert(aiPicks.length === 3, "expected 3 label.pick in panel-ai-behavior, got " + aiPicks.length);
     for (const l of [...bmPicks, ...popupPicks, ...aiPicks]) {
       assert(l.firstElementChild?.matches('input[type="radio"]'),
         "label.pick's first child element must be the radio input, got " + (l.firstElementChild?.outerHTML || "none"));

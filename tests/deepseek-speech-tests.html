@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="14"><title>DeepSeek Speech (TTS &amp; ASR) Tests</title>
+<link rel="stylesheet" href="../md-preview.css">
+<style>
+#results { font-family: monospace; padding: 16px; max-width: 960px; }
+.case { padding: 4px 8px; margin: 4px 0; white-space: pre-wrap; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+#fixture { padding: 8px 16px; }
+</style></head>
+<body>
+<div id="fixture">
+  <aside class="rail" id="rail">
+    <div class="rail-ident">
+      <h1 id="preview-title">Reader</h1>
+      <button type="button" class="action-btn icon-only" id="rail-history-btn"></button>
+      <button type="button" class="action-btn icon-only" id="rail-settings-btn"></button>
+      <a id="preview-url" class="preview-url" href="https://example.com/speech">example.com/speech</a>
+    </div>
+    <div class="rail-section" id="reader-bookmark-section"></div>
+  </aside>
+  <main>
+    <div id="rendered-view"><p data-pbp-block="0">First paragraph for highlight note dictation.</p><p data-pbp-block="1">Second paragraph for item switch guard.</p></div>
+    <div id="reader-bookmark-footer"></div>
+  </main>
+</div>
+<div id="results"></div>
+
+<script src="fixtures/case-filter.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script>pbpChromeMock.install({ userGesture: true });</script>
+<script src="../i18n.js"></script>
+<script src="../shared.js"></script>
+<script src="../vocab-store.js"></script>
+<script src="../notes-sync.js"></script>
+<script src="../ai.js"></script>
+<script src="../ai-cache.js"></script>
+<script src="../md-preview.js"></script>
+<script src="../md-ai-core.js"></script>
+<script src="../md-translate.js"></script>
+<script src="../dict-archive.js"></script>
+<script src="../dict-evidence.js"></script>
+<script src="../dict-entry.js"></script>
+<script src="../md-dict.js"></script>
+<script src="../md-speech.js"></script>
+<script src="../ask-archive.js"></script>
+<script src="../md-ask.js"></script>
+<script src="../md-highlight.js"></script>
+<script>
+const resultsEl = document.getElementById("results");
+let passed = 0, failed = 0;
+
+async function test(name, fn) {
+  const done = pbpCaseGate(name);
+  if (!done) return;
+  const div = document.createElement("div");
+  try {
+    await fn();
+    passed++;
+    div.className = "case pass";
+    div.textContent = "PASS " + name;
+  } catch (err) {
+    failed++;
+    div.className = "case fail";
+    div.textContent = "FAIL " + name + "\n  " + (err && err.stack ? err.stack : err);
+  }
+  resultsEl.appendChild(div);
+  done();
+}
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || "assertion failed");
+}
+
+function makeTestWav(frameCount = 320, sampleRate = 16000) {
+  const samples = new Float32Array(frameCount);
+  for (let i = 0; i < frameCount; i++) {
+    samples[i] = Math.sin((2 * Math.PI * 440 * i) / sampleRate) * 0.5;
+  }
+  return pbpAsrEncodePcm16Wav(samples, sampleRate);
+}
+
+// Hand-written DeepSeek /v1/tools/asr fixture per 2026-11-13 official schema:
+// response JSON { request_id, text, duration_ms } (optionally preceded by \n heartbeats).
+const ASR_FIXTURE_BODY = '\n\n{"request_id":"req_asr_20261113_01","text":"Summarize the key empirical findings.","duration_ms":2450}';
+
+(async () => {
+  const en = await (await fetch("../_locales/en/messages.json")).json();
+  chrome.i18n = pbpChromeMock.create({ messages: en }).chrome.i18n;
+  applyI18n();
+  await pbpTtsCacheClear();
+
+  await test("1. pbpDeepseekTtsResolveLang gates strictly to the 10 supported DeepSeek TTS languages", () => {
+    for (const [code, expected] of [
+      ["zh-CN", "zh"], ["cmn-Hans", "zh"], ["yue", "yue"], ["zh-yue", "yue"],
+      ["en-US", "en"], ["ja", "ja"], ["ko-KR", "ko"], ["ms", "ms"],
+      ["ar-SA", "ar"], ["id", "id"], ["in-ID", "id"], ["th", "th"], ["vi", "vi"],
+    ]) {
+      assert(pbpDeepseekTtsResolveLang(code, "hello") === expected, `expected ${code} -> ${expected}`);
+    }
+    for (const unsupported of ["de", "de-DE", "fr", "es", "it", "pt", "nl", "pl", "ru", "sv"]) {
+      assert(pbpDeepseekTtsResolveLang(unsupported, "Schadenfreude") === "", `expected ${unsupported} -> ""`);
+    }
+    // Ambiguous Latin with missing/und language must NOT guess English (could be de/fr/pl)
+    assert(pbpDeepseekTtsResolveLang("und", "Schadenfreude") === "", "und Latin must fall back to browser");
+    assert(pbpDeepseekTtsResolveLang("", "bonjour") === "", "empty lang Latin must fall back to browser");
+    // Unambiguous non-Latin scripts with und resolve safely
+    assert(pbpDeepseekTtsResolveLang("und", "かな") === "ja", "Kana -> ja");
+    assert(pbpDeepseekTtsResolveLang("und", "한글") === "ko", "Hangul -> ko");
+    assert(pbpDeepseekTtsResolveLang("und", "ภาษาไทย") === "th", "Thai -> th");
+    assert(pbpDeepseekTtsResolveLang("und", "العربية") === "ar", "Arabic -> ar");
+    assert(pbpDeepseekTtsResolveLang("und", "图书馆") === "zh", "Han -> zh");
+  });
+
+  await test("2. pbpValidateWavBytes accepts valid PCM WAV and rejects JSON-200, truncated, or empty-data payloads", () => {
+    const validWav = makeTestWav(160, 24000);
+    const res = pbpValidateWavBytes(validWav);
+    assert(res.ok === true && res.sampleRate === 24000 && res.channels === 1, "valid WAV rejected");
+
+    const jsonErr = new TextEncoder().encode('{"error":{"message":"rate limit exceeded"}}');
+    assert(pbpValidateWavBytes(jsonErr).ok === false, "JSON body must be rejected");
+
+    const tooShort = validWav.slice(0, 30);
+    assert(pbpValidateWavBytes(tooShort).ok === false, "short header must be rejected");
+
+    const truncatedData = validWav.slice(0, validWav.byteLength - 10);
+    assert(pbpValidateWavBytes(truncatedData).ok === false, "truncated data chunk must be rejected");
+
+    const emptyWav = pbpAsrEncodePcm16Wav(new Float32Array(0), 16000);
+    assert(pbpValidateWavBytes(emptyWav).ok === false, "zero-frame WAV must be rejected");
+  });
+
+  await test("3. pbp-tts-cache hashes keys (no plaintext headwords stored), enforces LRU caps, measures, and clears", async () => {
+    await pbpTtsCacheClear();
+    const wavA = makeTestWav(200, 16000);
+    const wavB = makeTestWav(240, 16000);
+    const wavC = makeTestWav(280, 16000);
+
+    const keyA = await pbpTtsCacheKey("stella", "en", "serendipity");
+    assert(/^[0-9a-f]{64}$/.test(keyA), "expected 64-hex SHA-256 key");
+    const keyTide = await pbpTtsCacheKey("tide", "en", "serendipity");
+    assert(keyA !== keyTide, "different voices must not collide");
+
+    const savedA = await pbpTtsCachePut({ voice: "stella", lang: "en", text: "serendipity", wavBytes: wavA }, { now: 1000, maxEntries: 2 });
+    assert(savedA && !("text" in savedA) && !JSON.stringify(savedA).includes("serendipity"), "plaintext term leaked into IDB record");
+
+    await pbpTtsCachePut({ voice: "stella", lang: "ja", text: "木漏れ日", wavBytes: wavB }, { now: 2000, maxEntries: 2 });
+    // Touch serendipity at t=3000 so 木漏れ日 becomes the oldest LRU entry
+    const hitA = await pbpTtsCacheGet("stella", "en", "serendipity", { now: 3000 });
+    assert(hitA && hitA.wavBytes.byteLength === wavA.byteLength, "expected cache hit for serendipity");
+
+    await pbpTtsCachePut({ voice: "tide", lang: "zh", text: "醍醐灌顶", wavBytes: wavC }, { now: 4000, maxEntries: 2 });
+    const evictedB = await pbpTtsCacheGet("stella", "ja", "木漏れ日", { touch: false });
+    const keptA = await pbpTtsCacheGet("stella", "en", "serendipity", { touch: false });
+    assert(evictedB === null && keptA !== null, "LRU eviction failed to keep touched entry");
+
+    const stats = await pbpTtsCacheMeasure();
+    assert(stats.count === 2 && stats.bytes > wavA.byteLength + wavC.byteLength, "measure mismatch: " + JSON.stringify(stats));
+    const cleared = await pbpTtsCacheClear();
+    assert(!cleared.failed && cleared.count === 2 && cleared.freed === stats.bytes, "clear mismatch");
+    const after = await pbpTtsCacheMeasure();
+    assert(after.count === 0 && after.bytes === 0, "cache not empty after clear");
+  });
+
+  function installMockSpeechSynthesis(mockSynth) {
+    const ownDesc = Object.getOwnPropertyDescriptor(window, "speechSynthesis");
+    Object.defineProperty(window, "speechSynthesis", { configurable: true, writable: true, value: mockSynth });
+    return () => {
+      if (ownDesc) Object.defineProperty(window, "speechSynthesis", ownDesc);
+      else delete window.speechSynthesis;
+    };
+  }
+
+  await test("4. pbpDictSpeak with default browser voice stays synchronous on speechSynthesis with zero network calls", async () => {
+    let restoreSynth = () => {};
+    const origUtt = window.SpeechSynthesisUtterance;
+    const origFetch = window.fetch;
+    let spoken = [];
+    let fetches = 0;
+    try {
+      window.SpeechSynthesisUtterance = function (txt) { this.text = txt; this.lang = ""; this.voice = null; };
+      restoreSynth = installMockSpeechSynthesis({
+        cancel() {},
+        getVoices: () => [{ lang: "en-US", localService: true, name: "Local EN" }],
+        speak(u) { spoken.push(u); },
+        addEventListener() {},
+        removeEventListener() {},
+      });
+      window.fetch = async () => { fetches++; throw new Error("unexpected network call"); };
+      await chrome.storage.local.set({ dictTtsVoice: "browser", deepseekApiKey: "sk-test-key" });
+      await pbpDictRefreshTtsConfig();
+
+      const ret = pbpDictSpeak("ephemeral", "en-US");
+      assert(ret === undefined, "browser voice path should stay synchronous");
+      assert(spoken.length === 1 && spoken[0].text === "ephemeral" && spoken[0].lang === "en", "browser speech utterance mismatch");
+      assert(fetches === 0, "browser voice must not call fetch");
+    } finally {
+      restoreSynth();
+      window.SpeechSynthesisUtterance = origUtt;
+      window.fetch = origFetch;
+    }
+  });
+
+  await test("5. pbpDictSpeak with DeepSeek Stella fetches /v1/tools/tts WAV once and replays warm cache with zero network calls", async () => {
+    await pbpTtsCacheClear();
+    const origFetch = window.fetch;
+    const origAudio = window.Audio;
+    let restoreSynth = () => {};
+    const origContains = chrome.permissions.contains;
+    const wavFixture = makeTestWav(240, 24000);
+    const calls = [];
+    const playedSrcs = [];
+    let browserSpoken = 0;
+    try {
+      restoreSynth = installMockSpeechSynthesis({
+        cancel() {},
+        getVoices: () => [{ lang: "en-US", localService: true }],
+        speak() { browserSpoken++; },
+        addEventListener() {},
+        removeEventListener() {},
+      });
+      chrome.permissions.contains = async () => true;
+      window.Audio = function () {
+        this.src = "";
+        this.play = async () => { playedSrcs.push(this.src); };
+        this.pause = () => {};
+        this.removeAttribute = () => { this.src = ""; };
+        this.load = () => {};
+      };
+      window.fetch = async (url, init) => {
+        calls.push({ url, init, body: JSON.parse(init.body) });
+        return new Response(wavFixture, { status: 200, headers: { "Content-Type": "audio/wav" } });
+      };
+      await chrome.storage.local.set({ dictTtsVoice: "stella", deepseekApiKey: obfuscateKey("sk-tts-live") });
+      await pbpDictRefreshTtsConfig();
+
+      await pbpDictSpeak("ephemeral", "en-US");
+      assert(calls.length === 1, "expected 1 TTS API call on cold miss");
+      assert(calls[0].url === "https://api.deepseek.com/v1/tools/tts", "wrong TTS endpoint");
+      assert(calls[0].init.credentials === "omit" && calls[0].init.redirect === "error", "credentials/redirect policy mismatch");
+      assert(calls[0].init.headers.Authorization === "Bearer sk-tts-live", "missing Bearer header");
+      assert(calls[0].body.text === "ephemeral" && calls[0].body.voice_id === "stella"
+        && calls[0].body.format === "wav" && calls[0].body.filter_markdown === true, "TTS request body mismatch");
+      assert(playedSrcs.length === 1 && browserSpoken === 0, "expected Audio playback without browser fallback");
+
+      // Second click on same headword must hit local IDB cache with zero network requests
+      await pbpDictSpeak("ephemeral", "en-US");
+      assert(calls.length === 1, "warm cache replay must not hit network");
+      assert(playedSrcs.length === 2 && browserSpoken === 0, "expected warm Audio replay");
+    } finally {
+      pbpDictStopSpeak();
+      window.fetch = origFetch;
+      window.Audio = origAudio;
+      restoreSynth();
+      chrome.permissions.contains = origContains;
+      await pbpTtsCacheClear();
+    }
+  });
+
+  await test("6. pbpDictSpeak with DeepSeek Tide silently falls back to browser speech for unsupported langs, >500 chars, missing key, or invalid WAV", async () => {
+    await pbpTtsCacheClear();
+    const origFetch = window.fetch;
+    let restoreSynth = () => {};
+    const origUtt = window.SpeechSynthesisUtterance;
+    const origContains = chrome.permissions.contains;
+    let fetches = 0;
+    let spoken = [];
+    try {
+      window.SpeechSynthesisUtterance = function (txt) { this.text = txt; this.lang = ""; };
+      restoreSynth = installMockSpeechSynthesis({
+        cancel() {},
+        getVoices: () => [{ lang: "de-DE", localService: true }],
+        speak(u) { spoken.push(u.text); },
+        addEventListener() {},
+        removeEventListener() {},
+      });
+      chrome.permissions.contains = async () => true;
+      window.fetch = async () => {
+        fetches++;
+        return new Response('{"error":"bad wav"}', { status: 200, headers: { "Content-Type": "application/json" } });
+      };
+      await chrome.storage.local.set({ dictTtsVoice: "tide", deepseekApiKey: "sk-tts-live" });
+      await pbpDictRefreshTtsConfig();
+
+      // Unsupported language (German, Polish) -> zero network calls, immediate browser fallback
+      pbpDictSpeak("Zeitgeist", "de");
+      pbpDictSpeak("chrząszcz", "pl");
+      assert(fetches === 0 && spoken.length === 2, "unsupported languages must skip network and speak via browser");
+
+      // > 500 characters -> zero network calls, immediate browser fallback
+      pbpDictSpeak("a".repeat(501), "en");
+      assert(fetches === 0 && spoken.length === 3, ">500 chars must skip network and speak via browser");
+
+      // Corrupt HTTP 200 JSON response -> rejected by pbpValidateWavBytes, falls back to browser speech
+      await pbpDictSpeak("resilience", "en");
+      assert(fetches === 1 && spoken.length === 4, "invalid WAV payload must fall back to browser speech");
+
+      // Missing API key -> zero additional network calls, falls back to browser speech
+      await chrome.storage.local.set({ dictTtsVoice: "tide", deepseekApiKey: "" });
+      await pbpDictRefreshTtsConfig();
+      await pbpDictSpeak("eloquence", "en");
+      assert(fetches === 1 && spoken.length === 5, "missing key must fall back to browser speech without network");
+    } finally {
+      pbpDictStopSpeak();
+      window.fetch = origFetch;
+      restoreSynth();
+      window.SpeechSynthesisUtterance = origUtt;
+      chrome.permissions.contains = origContains;
+    }
+  });
+
+  await test("7. pbpDictStopSpeak aborts in-flight DeepSeek TTS without triggering browser fallback", async () => {
+    const origFetch = window.fetch;
+    let restoreSynth = () => {};
+    const origContains = chrome.permissions.contains;
+    let aborted = false;
+    let browserSpoken = 0;
+    try {
+      restoreSynth = installMockSpeechSynthesis({
+        cancel() {},
+        getVoices: () => [{ lang: "en-US", localService: true }],
+        speak() { browserSpoken++; },
+        addEventListener() {},
+        removeEventListener() {},
+      });
+      chrome.permissions.contains = async () => true;
+      window.fetch = (_url, init) => new Promise((_resolve, reject) => {
+        init.signal.addEventListener("abort", () => {
+          aborted = true;
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      });
+      await chrome.storage.local.set({ dictTtsVoice: "stella", deepseekApiKey: obfuscateKey("sk-tts-live") });
+      await pbpDictRefreshTtsConfig();
+
+      const pending = pbpDictSpeak("cancellable", "en");
+      await new Promise((r) => setTimeout(r, 10));
+      pbpDictStopSpeak();
+      await pending;
+      assert(aborted === true, "in-flight TTS fetch was not aborted");
+      assert(browserSpoken === 0, "explicit stop must NOT fall back to browser speech");
+    } finally {
+      window.fetch = origFetch;
+      restoreSynth();
+      chrome.permissions.contains = origContains;
+    }
+  });
+
+  await test("8. pbpAsrMixToMono + pbpAsrDownsampleFloat32 + pbpAsrEncodePcm16Wav produce valid 16 kHz mono 16-bit PCM WAV", () => {
+    const left = new Float32Array(4800).fill(0.5);
+    const right = new Float32Array(4800).fill(-0.5);
+    const silentMono = pbpAsrMixToMono([left, right]);
+    assert(silentMono.length === 4800 && Math.abs(silentMono[0]) < 1e-6, "stereo average should cancel opposite phases");
+
+    const pulse48k = new Float32Array(4800);
+    for (let i = 0; i < 4800; i++) pulse48k[i] = i < 2400 ? 1.5 : -1.5; // tests clamping too
+    const mono16k = pbpAsrDownsampleFloat32(pulse48k, 48000, 16000);
+    assert(mono16k.length === 1600, "48kHz -> 16kHz 0.1s should yield 1600 samples, got " + mono16k.length);
+
+    const wav = pbpAsrEncodePcm16Wav(mono16k, 16000);
+    assert(wav.byteLength === 44 + 1600 * 2, "unexpected WAV byteLength: " + wav.byteLength);
+    const check = pbpValidateWavBytes(wav);
+    assert(check.ok && check.sampleRate === 16000 && check.channels === 1, "encoded WAV failed validation");
+    const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+    assert(view.getInt16(44, true) === 32767, "positive clamp should hit +32767");
+    assert(view.getInt16(44 + 1599 * 2, true) === -32768, "negative clamp should hit -32768");
+  });
+
+  await test("9. pbpAsrBuildFormData includes strictly a single named WAV file field", () => {
+    const wav = makeTestWav(160, 16000);
+    const fd = pbpAsrBuildFormData(wav, "clip.wav");
+    const entries = Array.from(fd.entries());
+    assert(entries.length === 1 && entries[0][0] === "file", "expected strictly 1 'file' field, got: " + entries.map((e) => e[0]).join(","));
+    const f = entries[0][1];
+    assert(f instanceof Blob && f.type === "audio/wav" && f.size === wav.byteLength, "WAV Blob metadata mismatch");
+    if (typeof File === "function") assert(f.name === "clip.wav", "expected file name clip.wav");
+  });
+
+  await test("10. pbpAsrParseResponse handles leading keepalive newlines and HTTP 200 error envelopes", () => {
+    const ok = pbpAsrParseResponse(200, ASR_FIXTURE_BODY);
+    assert(ok.ok === true && ok.text === "Summarize the key empirical findings."
+      && ok.requestId === "req_asr_20261113_01" && ok.durationMs === 2450, "valid ASR fixture parse failed");
+
+    const err200 = pbpAsrParseResponse(200, '\n{"error":{"message":"audio duration exceeds limit"}}');
+    assert(err200.ok === false && err200.code === "api_error", "HTTP 200 error object must fail");
+
+    const auth401 = pbpAsrParseResponse(401, '{"error":{"message":"invalid api key"}}');
+    assert(auth401.ok === false && auth401.code === "auth", "401 must map to auth");
+
+    const big413 = pbpAsrParseResponse(413, "");
+    assert(big413.ok === false && big413.code === "too_large", "413 must map to too_large");
+  });
+
+  await test("11. pbpAsrInsertTranscript inserts with smart Latin/CJK spacing, respects maxLength, and fires input", () => {
+    const ta = document.createElement("textarea");
+    ta.maxLength = 30;
+    document.body.appendChild(ta);
+    let inputEvents = 0;
+    ta.addEventListener("input", () => { inputEvents++; });
+    try {
+      assert(pbpAsrInsertTranscript(ta, "Hello") === true && ta.value === "Hello", "initial insert failed");
+      assert(pbpAsrInsertTranscript(ta, "world") === true && ta.value === "Hello world", "Latin space separator failed: " + ta.value);
+
+      ta.value = "你好";
+      ta.setSelectionRange(2, 2);
+      assert(pbpAsrInsertTranscript(ta, "世界") === true && ta.value === "你好世界", "CJK insert should not inject ASCII spaces: " + ta.value);
+
+      ta.maxLength = 10;
+      ta.value = "12345678";
+      ta.setSelectionRange(8, 8);
+      assert(pbpAsrInsertTranscript(ta, "abcdef") === true && ta.value.length === 10, "maxLength cap ignored: " + ta.value);
+      assert(inputEvents === 4, "expected 4 bubbling input events, got " + inputEvents);
+    } finally {
+      ta.remove();
+    }
+  });
+
+  await test("12. Ask #ask-mic records, stops tracks before network upload finishes, and appends editable text without submitting", async () => {
+    const origFetch = window.fetch;
+    const origMediaDevices = navigator.mediaDevices;
+    const origRecorder = window.MediaRecorder;
+    const origContains = chrome.permissions.contains;
+    let trackStopped = false;
+    let trackStoppedBeforeUpload = false;
+    let submitted = false;
+    try {
+      chrome.permissions.contains = async () => true;
+      await chrome.storage.local.set({
+        previewAiEnabled: true,
+        aiProvider: "deepseek",
+        deepseekApiKey: obfuscateKey("sk-asr-key"),
+        readerVoiceInputEnabled: false,
+      });
+      _pbpAiSettingsPromise = null;
+      await pbpSpeechRefreshConfig();
+
+      const view = document.getElementById("rendered-view");
+      view.innerHTML = '<p>First paragraph for highlight note dictation.</p><p>Second paragraph for item switch guard.</p>';
+      pbpAiIndexBlocks(view);
+      const detail = { url: "https://example.com/speech", title: "Speech Doc", account: "", markdown: "Hello world." };
+      _pbpAiSetupDetail = null;
+      await pbpAskInit(detail);
+      window.pbpAskOpenPanel("");
+      const micBtn = document.getElementById("ask-mic");
+      const askInput = document.getElementById("ask-input");
+      const askForm = document.getElementById("ask-form");
+      assert(micBtn && askInput && askForm, "Ask panel controls missing");
+      assert(micBtn.hidden === true, "#ask-mic must stay hidden when readerVoiceInputEnabled is false");
+
+      askForm.addEventListener("submit", () => { submitted = true; });
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true });
+      await pbpSpeechRefreshConfig();
+      assert(micBtn.hidden === false, "#ask-mic must appear when readerVoiceInputEnabled is true");
+
+      const wavClip = makeTestWav(320, 16000);
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: {
+          getUserMedia: async () => ({
+            getTracks: () => [{ stop() { trackStopped = true; } }],
+          }),
+        },
+      });
+      window.MediaRecorder = class FakeRecorder {
+        static isTypeSupported() { return true; }
+        constructor(stream) {
+          this.stream = stream;
+          this.state = "inactive";
+          this.mimeType = "audio/wav";
+          this.ondataavailable = null;
+          this.onstop = null;
+        }
+        start() {
+          this.state = "recording";
+          if (this.ondataavailable) this.ondataavailable({ data: new Blob([wavClip], { type: "audio/wav" }) });
+        }
+        stop() {
+          this.state = "inactive";
+          if (this.onstop) this.onstop();
+        }
+      };
+      window.fetch = async (url, init) => {
+        assert(url === "https://api.deepseek.com/v1/tools/asr", "unexpected ASR URL: " + url);
+        trackStoppedBeforeUpload = trackStopped;
+        assert(init.headers.Authorization === "Bearer sk-asr-key", "ASR auth header mismatch");
+        return new Response(ASR_FIXTURE_BODY, { status: 200, headers: { "Content-Type": "application/json" } });
+      };
+
+      // First click starts recording
+      micBtn.click();
+      for (let i = 0; i < 20 && micBtn.dataset.voiceState !== "recording"; i++) {
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      assert(micBtn.dataset.voiceState === "recording", "expected recording state on #ask-mic");
+
+      // Second click stops recording and transcribes
+      micBtn.click();
+      for (let i = 0; i < 30 && micBtn.dataset.voiceState; i++) {
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      assert(trackStoppedBeforeUpload === true, "MediaStreamTrack must be stopped BEFORE network upload");
+      assert(askInput.value === "Summarize the key empirical findings.", "transcript not inserted into #ask-input: " + askInput.value);
+      assert(submitted === false, "ASR must NEVER auto-submit #ask-form");
+    } finally {
+      pbpSpeechCancelAll();
+      if (typeof _pbpAskSetOpen === "function") _pbpAskSetOpen(false);
+      window.fetch = origFetch;
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: origMediaDevices });
+      window.MediaRecorder = origRecorder;
+      chrome.permissions.contains = origContains;
+    }
+  });
+
+  await test("13. Highlight card .hl-card-mic dictates into .hl-card-note and marks note dirty while keeping Delete isolated left", async () => {
+    const origFetch = window.fetch;
+    const origMediaDevices = navigator.mediaDevices;
+    const origRecorder = window.MediaRecorder;
+    const origContains = chrome.permissions.contains;
+    try {
+      chrome.permissions.contains = async () => true;
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true, deepseekApiKey: "sk-asr-hl" });
+      await pbpSpeechRefreshConfig();
+
+      pbpAiIndexBlocks(document.getElementById("rendered-view"));
+      _pbpHlState = {
+        url: "https://example.com/speech",
+        account: "",
+        items: [
+          { id: "hl_1", n: 1, quote: "First paragraph", note: "Initial.", color: 1 },
+          { id: "hl_2", n: 2, quote: "Second paragraph", note: "", color: 2 },
+        ],
+        ranges: {},
+        degraded: { hl_1: true, hl_2: true },
+        orphans: {},
+      };
+      window._pbpHlOpenCard("hl_1");
+      const card = document.getElementById("pb-hl-card");
+      const micBtn = card.querySelector(".hl-card-mic");
+      const delBtn = card.querySelector(".hl-card-delete");
+      const saveBtn = card.querySelector(".hl-card-save");
+      const noteEl = card.querySelector(".hl-card-note");
+      assert(card.matches(":popover-open") && !micBtn.hidden, "highlight card or .hl-card-mic not visible");
+      const delRect = delBtn.getBoundingClientRect();
+      const micRect = micBtn.getBoundingClientRect();
+      const saveRect = saveBtn.getBoundingClientRect();
+      assert(delRect.right <= micRect.left && micRect.right <= saveRect.left + 1, "footer layout must keep Delete left and Mic beside Save");
+
+      const wavClip = makeTestWav(200, 16000);
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) },
+      });
+      window.MediaRecorder = class FakeRecorder {
+        static isTypeSupported() { return true; }
+        constructor() { this.state = "inactive"; this.mimeType = "audio/wav"; }
+        start() { this.state = "recording"; this.ondataavailable?.({ data: new Blob([wavClip], { type: "audio/wav" }) }); }
+        stop() { this.state = "inactive"; this.onstop?.(); }
+      };
+      window.fetch = async () => new Response('{"request_id":"r2","text":"Appended note","duration_ms":900}', { status: 200 });
+
+      micBtn.click();
+      for (let i = 0; i < 20 && micBtn.dataset.voiceState !== "recording"; i++) await new Promise((r) => setTimeout(r, 10));
+      micBtn.click();
+      for (let i = 0; i < 30 && micBtn.dataset.voiceState; i++) await new Promise((r) => setTimeout(r, 10));
+
+      assert(noteEl.value === "Initial. Appended note", "expected appended highlight note, got: " + noteEl.value);
+      assert(_pbpHlNoteDirty === true, "highlight note must be marked dirty so Save/blur commits it");
+      assert(card.matches(":popover-open"), "dictation must keep highlight card open for review");
+    } finally {
+      pbpSpeechCancelAll();
+      const card = document.getElementById("pb-hl-card");
+      if (card?.matches(":popover-open")) card.hidePopover();
+      window.fetch = origFetch;
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: origMediaDevices });
+      window.MediaRecorder = origRecorder;
+      chrome.permissions.contains = origContains;
+    }
+  });
+
+  await test("14. Switching highlight card item while ASR upload is in flight cancels upload and never pollutes the new item's note", async () => {
+    const origFetch = window.fetch;
+    const origMediaDevices = navigator.mediaDevices;
+    const origRecorder = window.MediaRecorder;
+    const origContains = chrome.permissions.contains;
+    let uploadAborted = false;
+    try {
+      chrome.permissions.contains = async () => true;
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true, deepseekApiKey: "sk-asr-hl" });
+      await pbpSpeechRefreshConfig();
+
+      pbpAiIndexBlocks(document.getElementById("rendered-view"));
+      _pbpHlState = {
+        url: "https://example.com/speech",
+        account: "",
+        items: [
+          { id: "hl_A", n: 1, quote: "First paragraph", note: "Note A", color: 1 },
+          { id: "hl_B", n: 2, quote: "Second paragraph", note: "Note B", color: 2 },
+        ],
+        ranges: {},
+        degraded: { hl_A: true, hl_B: true },
+        orphans: {},
+      };
+      window._pbpHlOpenCard("hl_A");
+      const card = document.getElementById("pb-hl-card");
+      const micBtn = card.querySelector(".hl-card-mic");
+      const noteEl = card.querySelector(".hl-card-note");
+      const wavClip = makeTestWav(200, 16000);
+
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) },
+      });
+      window.MediaRecorder = class FakeRecorder {
+        static isTypeSupported() { return true; }
+        constructor() { this.state = "inactive"; this.mimeType = "audio/wav"; }
+        start() { this.state = "recording"; this.ondataavailable?.({ data: new Blob([wavClip], { type: "audio/wav" }) }); }
+        stop() { this.state = "inactive"; this.onstop?.(); }
+      };
+      let fetchStarted = false;
+      window.fetch = (_url, init) => new Promise((_resolve, reject) => {
+        fetchStarted = true;
+        init.signal.addEventListener("abort", () => {
+          uploadAborted = true;
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      });
+
+      micBtn.click();
+      for (let i = 0; i < 20 && micBtn.dataset.voiceState !== "recording"; i++) await new Promise((r) => setTimeout(r, 10));
+      micBtn.click();
+      for (let i = 0; i < 30 && !fetchStarted; i++) await new Promise((r) => setTimeout(r, 10));
+      assert(micBtn.dataset.voiceState === "transcribing" && fetchStarted, "expected transcribing state with in-flight upload");
+
+      // Switch to item B while item A's upload is still in flight
+      window._pbpHlOpenCard("hl_B");
+      await new Promise((r) => setTimeout(r, 20));
+      assert(uploadAborted === true, "switching highlight item must abort in-flight ASR upload");
+      assert(noteEl.value === "Note B", "item B note must remain untouched: " + noteEl.value);
+      assert(!micBtn.dataset.voiceState, "mic button must reset to idle on item B");
+    } finally {
+      pbpSpeechCancelAll();
+      const card = document.getElementById("pb-hl-card");
+      if (card?.matches(":popover-open")) card.hidePopover();
+      window.fetch = origFetch;
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: origMediaDevices });
+      window.MediaRecorder = origRecorder;
+      chrome.permissions.contains = origContains;
+    }
+  });
+
+  document.title = (failed === 0 ? "PASS" : "FAIL") + ` (${passed}/${passed + failed})`;
+})();
+</script>
+</body></html>
