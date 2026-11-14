@@ -99,7 +99,7 @@ Exported from **Settings > Backup & Diagnostics**, a manual backup is a UTF-8 JS
 Key rules of `_schemaVersion: 3`:
 
 - **Fail-closed credentials**: `API_KEY_FIELDS` and secret export-target fields (`token`, `webhook.url`) are stripped on export unless you explicitly opt in (`includesSecrets: true`, which also marks the filename `with credentials`). On import, credentials are ignored again unless you explicitly check credential import in the preview dialog.
-- **Device-local exclusions**: `personalLibraryAccount`, `bookmarkServiceActive`, `pinboardTokenVerified`, OAuth tokens, offline queues, caches, and dictionary packs are never exported into manual settings keys.
+- **Device-local exclusions**: `personalLibraryAccount`, `bookmarkServiceActive`, `pinboardTokenVerified`, `pbp_reader_history`, `backupLastExportAt`, OAuth tokens, offline queues, caches, and dictionary packs are never exported into manual settings keys.
 - **Restore points**: Snapshots in `pbp-restore-points` reuse the `_schemaVersion: 3` envelope with `"source": "restore-point"` and carry only `_schemaVersion`, `_backup`, `_highlights`, `_highlightsOwner`, and `_vocabulary`.
 
 ## 5. Google Drive `appDataFolder` batch files

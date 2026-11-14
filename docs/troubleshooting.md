@@ -47,6 +47,7 @@ Before changing settings or reporting a bug, open **Settings > Backup & Diagnost
 
 - **Upgrading an unpacked install safely**: Unzip the new release over the **same folder path** you originally loaded in `chrome://extensions/`, then click the reload icon on the extension card. Removing the extension or loading a new folder path assigns a new extension ID and isolates your previous IndexedDB and `chrome.storage.local` data.
 - **Restoring personal library data**: Bookmark Enhanced automatically records a local restore point (`pbp-restore-points`, up to 5 per personal library) before backup imports, before batch/article deletions in the Library, and on the first startup after an extension version update. Open **Settings > Backup & Diagnostics** to inspect or restore a local restore point, or import a manual JSON backup file.
+- **Reopening closed or expired reader tabs**: If `md-preview.html` tabs close when the extension is temporarily disabled or reloaded, click the arrow next to **Reader** in the popup (or the **Recent previews** button at the top of the reader rail) to reopen any of the 25 most recent non-incognito previews on this device. An expired `md-preview.html` tab reopened from browser history also shows **Reopen in Reader** and your recent list.
 
 ## Related documents
 

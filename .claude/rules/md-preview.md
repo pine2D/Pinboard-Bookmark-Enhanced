@@ -39,7 +39,7 @@ block 切分 → `pbpAiShield` 占位符 `⟦C/L/I/M/T\d+⟧` 屏蔽代码/链�
 
 ## explain-pop 会话与焦点
 
-固定状态和拖动位置只在当前页面会话有效，不写 storage。只在 closed → open 时记录焦点来源，固定重入和动作切换不得覆盖；Esc 或关闭按钮仅在焦点仍位于弹层内时恢复到仍连接且可见的来源，并使用 `preventScroll`。来源失效时临时借用当前可见阅读块的 `tabindex="-1"`，blur 后清理；外部点击若已把焦点移到弹层外，不得抢回。
+默认宽度（480px，视口两侧留 16px）、尺寸预设与拖拽调大小（`_pbpDictWindowSize`）、固定状态和拖动位置由查词、解释、翻译三动作共用，只在当前页面会话有效，不写 storage。只在 closed → open 时记录焦点来源，固定重入和动作切换不得覆盖；Esc 或关闭按钮仅在焦点仍位于弹层内时恢复到仍连接且可见的来源，并使用 `preventScroll`。来源失效时临时借用当前可见阅读块的 `tabindex="-1"`，blur 后清理；外部点击若已把焦点移到弹层外，不得抢回。
 
 ## 其他
 
@@ -49,6 +49,7 @@ block 切分 → `pbpAiShield` 占位符 `⟦C/L/I/M/T\d+⟧` 屏蔽代码/链�
 - 阅读视图**不提案 hover 触发的浮层交互**（用户真机反馈否决，历史上 tr 悬停气泡被点名全删）。
 - **明暗解析模型**（2026-08-25）：`pbpResolveReaderScheme` = 页内覆盖（`pbp_color_scheme`，local、按设备，「Aa」面板第三行）＞ 视频默认深色（`mdVideoDarkScheme`，仅 video-mode）＞ 全局 `optTheme`；阅读器永不套 Pinboard 预设。`md-preview-theme-early.js` 是它的 verbatim twin，靠 `pp-theme` / `md-preview-scheme` / `md-preview-video-dark` 三个 localStorage 镜像 + opener 附加的 `video=1` URL 参数在首帧前解析——改任何一侧必须同步另一侧。settings 类 `storage.onChanged` 一律经 `pbpSettingsAreaName()` 过滤非本机路由的 area，并在 `optSyncEnabled` 切换时整组重读。
 - `md-convert.js` 是 marked→DOMPurify 的单点 sanitize 中枢；导出与 frontmatter/byline 都走它。
+- **最近预览历史**（`PBP_READER_HISTORY_KEY` / `pbp_reader_history`）：`chrome.storage.local` 本机环形队列（上限 25 条，归入 `pbpIsNeverClearKey`），跳过无痕标签页与含凭据 URL，只存 URL、标题、站点名、抽取引擎、视频标记、时间与槽位键，不存正文与账号字段。打开菜单只读本机元数据；点击条目走 `pbpOpenReaderFromHistory`，优先聚焦槽位仍在的存活阅读器标签页，失效时仅在该次点击动作里按需申请文章精确 origin（或 `https://r.jina.ai`）并挂 `historyReopen` 重抽；`md-preview.html` 槽位失效时渲染带匹配卡与最近列表的 `.es-history` 空态。
 
 ## 视频面板（md-video.js）
 

@@ -1785,7 +1785,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | md-preview | `.msg-bar` | 状态/提示/错误条（padding sp-2 sp-3，与 `.send-status` / `.export-note` / `#ask-tip` 同一条家族；`data-state`） |
 | md-preview | `.pbv-transcript-heading` / `.pbv-transcript-source` | 字幕正文原有 h2 / 来源 blockquote 的元信息变体，不增加包装；仅屏幕显示为 13px、无底纹或分隔线，标题后距 sp-2、来源后距 sp-4，来源段落无额外 margin。原文、双语及仅译文共用此层级；打印和 Markdown 保留原有标题与来源语义。视频工具条复用 `.row`，组内 gap sp-2、按组换行；授权按钮和标点状态允许长文案在组内折行。 |
 | md-preview | `.send-menu` / `.send-mi` | 下拉菜单与菜单项 |
-| md-preview | `.pop-panel` | 浮层面板 chrome：`--surface` 底、`--border` 1px 边、`--radius-lg`、统一阴影、13px、内距 sp-3；高亮卡 / 脚注 / 字号面板 / 快捷键帮助 / 搜索条五个 popover 共用，id 规则只留各自的定位与尺寸（帮助对话框内距 sp-4、搜索条 sp-2 sp-3 属有意覆盖） |
+| md-preview | `.pop-panel` | 浮层面板 chrome：`--surface` 底、`--border` 1px 边、`--radius-lg`、统一阴影、13px、内距 sp-3；高亮卡 / 脚注 / 字号面板 / 快捷键帮助 / 搜索条 / 书签编辑 / 尺寸调节 / 选义保存 / 最近预览等浮层共用，id 规则只留各自的定位与尺寸（帮助对话框内距 sp-4、搜索条 sp-2 sp-3 属有意覆盖） |
 | md-preview | `.row` | 控件行（flex wrap，align center，gap sp-2）：导出开关行、翻译按钮行、字号步进行、高亮色板行、侧栏底部图标行；placement 归父级或 id |
 | md-preview | `.panel-head` | 面板标题行（flex，align center，gap sp-2；`> h2` flex:1、1.05em/600）：ask 面板、要点面板、词典卡头 |
 | md-preview | `.reader-panel-tabs` / `.reader-panel-view` | 共享阅读侧栏顶部的文字标签与独立视图；标签复用既有切换按钮，采用 tablist/tab/tabpanel 语义及方向键导航。视图 flex column、min-height:0，隐藏保留 DOM 与生成任务；不添加入场动画或第二份查词数据。 |
