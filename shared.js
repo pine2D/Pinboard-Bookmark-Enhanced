@@ -5943,7 +5943,13 @@ async function pbpOpenReaderFromHistory(entry, opts = {}) {
       if (matchTab && matchTab.id != null) {
         const slotKey = "md_preview_data_" + norm.lastKey;
         const slot = (await chrome.storage.local.get(slotKey))[slotKey];
-        if (slot && typeof slot === "object") {
+        const slotUrl = slot && typeof slot.url === "string" ? slot.url : "";
+        const slotTabUrl = slot && typeof slot.sourceTabUrl === "string" ? slot.sourceTabUrl : "";
+        const sameTarget = Boolean(
+          slot && typeof slot === "object" &&
+          (slotUrl === articleUrl || (targetUrl && (slotUrl === targetUrl || slotTabUrl === targetUrl)))
+        );
+        if (sameTarget) {
           await chrome.tabs.update(matchTab.id, { active: true });
           if (matchTab.windowId != null && chrome.windows?.update) {
             try { await chrome.windows.update(matchTab.windowId, { focused: true }); }
@@ -5952,7 +5958,9 @@ async function pbpOpenReaderFromHistory(entry, opts = {}) {
           void pbpReaderHistoryRecord({ ...norm, openedAt: Date.now() });
           return { ok: true, mode: "activated", tabId: matchTab.id, key: norm.lastKey };
         }
-        orphanedLiveTab = matchTab;
+        if (!slot || typeof slot !== "object") {
+          orphanedLiveTab = matchTab;
+        }
       }
     } catch (e) {
       console.warn("[reader-history] live tab probe failed:", e?.name, e?.message);

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="12"><title>DeepSeek OCR Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="16"><title>DeepSeek OCR Tests</title>
 <link rel="stylesheet" href="../md-preview.css">
 <style>
 #results { font-family: monospace; padding: 16px; max-width: 960px; }
@@ -40,6 +40,7 @@
 <script src="../library-ask.js"></script>
 <script src="../vocab-store.js"></script>
 <script src="../vocab-send.js"></script>
+<script src="../md-dict.js"></script>
 <script>
 const resultsEl = document.getElementById("results");
 let passed = 0, failed = 0;
@@ -530,6 +531,201 @@ const WEBP_MAGIC = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x0
     const stagedPanel = document.querySelector("#rendered-view > .empty-state.es-ocr");
     assert(stagedPanel.querySelector(".rh-item-title").textContent === "chapter-1.pdf", "staged filename not displayed");
     assert(stagedPanel.querySelector(".action-btn.es-primary").textContent === "mdOcrRunBtn", "primary button did not switch to Convert with DeepSeek OCR");
+  });
+
+  // 13. QA regression: <|det|> spans, inline <ref> recognized text, trailing layout headers, and empty image/figure boxes
+  await test("pbpOcrStripGroundingTags unwraps inline recognized <ref> text, strips <|det|> boxes, and drops empty image/footer boxes", async () => {
+    const detAndInline = [
+      "<|ref|>title<|/ref|><|det|>[[100, 80, 500, 120]]<|/det|>",
+      "## Overview",
+      "<｜ref｜>第一章 概述<｜/ref｜><｜box｜>[[52, 140, 948, 196]]<｜/box｜>",
+      "<|ref|>image<|/ref|><|det|>[[52, 220, 400, 480]]<|/det|>",
+      "<|ref|>text<|/ref|><|det|>[[52, 500, 948, 580]]<|/det|>",
+      "Main body paragraph.",
+      "<|ref|>footer<|/ref|><|det|>[[52, 920, 948, 960]]<|/det|>",
+    ].join("\n");
+    const out = pbpOcrStripGroundingTags(detAndInline);
+    assert(out.includes("## Overview"), "title markdown lost: " + out);
+    assert(out.includes("第一章 概述"), "inline grounded text inside <ref> was dropped: " + out);
+    assert(out.includes("Main body paragraph."), "body text lost: " + out);
+    assert(!out.includes("det") && !out.includes("[[") && !out.includes("image") && !out.includes("footer"), "grounding label/box leaked: " + out);
+
+    // Page containing only an empty figure grounding tag should clean to empty string
+    assert(pbpOcrStripGroundingTags("<|ref|>figure<|/ref|><|det|>[[10,10,90,90]]<|/det|>") === "", "empty figure box should clean to empty");
+    // Page containing only a single grounded word that collides with a non-image class name falls back to keeping that word
+    assert(pbpOcrStripGroundingTags("<|ref|>Abstract<|/ref|><|box|>[[10,10,90,40]]<|/box|>") === "Abstract", "single grounded word should survive");
+  });
+
+  // 14. QA regression: cancellation during permission wait & warm cache hit + cacheSaved:false when IDB write fails
+  await test("pbpOcrRunUpload honors abort on warm cache hits, reports cacheSaved:false on IDB failure, and pbpOcrAbortActive cancels pending permission prompts", async () => {
+    freshMock({
+      permissions: { origins: ["https://api.deepseek.com/*"] },
+      storage: { local: { deepseekApiKey: obfuscateKey("sk-test-cancel") } },
+    });
+    await pbpOcrDocsClear();
+    const pdfBytes = makePdfBytes(1);
+    const sha = await pbpOcrSha256Hex(pdfBytes);
+    const localUrl = pbpLocalDocUrlFromSha256(sha);
+    await pbpOcrDocsPut({
+      url: localUrl,
+      sha256: sha,
+      fileName: "cached.pdf",
+      mimeType: "application/pdf",
+      purpose: "text_recognition",
+      pageCount: 1,
+      markdown: "# Cached Body",
+    });
+
+    const preAborted = new AbortController();
+    preAborted.abort("user");
+    const abortedHit = await pbpOcrRunUpload({
+      bytes: pdfBytes,
+      fileName: "cached.pdf",
+      mimeType: "application/pdf",
+      purpose: "text_recognition",
+      signal: preAborted.signal,
+    });
+    assert(abortedHit.ok === false && abortedHit.code === "aborted", "pre-aborted warm cache hit must return aborted");
+
+    // Simulate IDB write failure (pbpOcrDocsPut returning null) after paid network upload
+    await pbpOcrDocsClear();
+    const origFetch = window.fetch;
+    const origPut = window.pbpOcrDocsPut;
+    window.fetch = async () => new Response(
+      JSON.stringify({
+        id: "ocr-no-idb",
+        object: "ocr",
+        purpose: "text_recognition",
+        page_count: 1,
+        pages: [{ index: 0, text: "# Paid Result", finish_reason: "stop" }],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+    window.pbpOcrDocsPut = async () => null;
+    try {
+      const uncachedRes = await pbpOcrRunUpload({
+        bytes: pdfBytes,
+        fileName: "paid.pdf",
+        mimeType: "application/pdf",
+        purpose: "text_recognition",
+      });
+      assert(uncachedRes.ok === true && uncachedRes.cacheSaved === false && uncachedRes.doc.cacheSaved === false, "IDB failure must flag cacheSaved:false");
+    } finally {
+      window.fetch = origFetch;
+      window.pbpOcrDocsPut = origPut;
+      await pbpOcrDocsClear();
+    }
+
+    // Cancel / engine-switch while chrome.permissions.request is still pending
+    let resolvePerm = null;
+    let fetchCount = 0;
+    const origPermReq = chrome.permissions.request;
+    chrome.permissions.request = () => new Promise((r) => { resolvePerm = r; });
+    window.fetch = async () => { fetchCount++; throw new Error("fetch should not run after abort"); };
+    try {
+      const staged = new File([pdfBytes], "race.pdf", { type: "application/pdf" });
+      pbpOcrRenderPanel({ mode: "local", initialFile: staged });
+      const runBtn = document.querySelector("#rendered-view > .empty-state.es-ocr .action-btn.es-primary");
+      runBtn.click();
+      await new Promise((r) => setTimeout(r, 10));
+      assert(typeof resolvePerm === "function", "permissions.request should be pending");
+      pbpOcrAbortActive("engine_switch");
+      resolvePerm(true);
+      await new Promise((r) => setTimeout(r, 20));
+      assert(fetchCount === 0, "upload started despite pbpOcrAbortActive during permission prompt");
+    } finally {
+      chrome.permissions.request = origPermReq;
+      window.fetch = origFetch;
+    }
+  });
+
+  // 15. QA regression: pbpOpenReaderFromHistory verifies live slot URL before tab reuse, and _pbpOcrDetectIncognito propagates incognito
+  await test("pbpOpenReaderFromHistory skips live tabs whose slot URL changed, and _pbpOcrDetectIncognito honors incognito hints", async () => {
+    const urlA = pbpLocalDocUrlFromSha256("e".repeat(64));
+    const urlB = pbpLocalDocUrlFromSha256("f".repeat(64));
+    const staleKey = "slot-reused-by-other-doc";
+    const mock = freshMock({
+      tabs: [{
+        id: 77,
+        windowId: 1,
+        url: chrome.runtime.getURL("md-preview.html") + "?k=" + staleKey,
+      }],
+      storage: {
+        local: {
+          ["md_preview_data_" + staleKey]: {
+            url: urlB,
+            sourceTabUrl: urlB,
+            title: "Different Document",
+          },
+        },
+      },
+    });
+    const reopened = await pbpOpenReaderFromHistory({
+      url: urlA,
+      sourceTabUrl: urlA,
+      title: "Original Document A",
+      site: "doc-a.pdf",
+      engine: "local",
+      lastKey: staleKey,
+    });
+    assert(reopened.ok === true && reopened.mode === "created", "must open a new tab rather than activating or overwriting a live tab showing another document: " + JSON.stringify(reopened));
+    assert(mock.callsOf("tabs.update").length === 0 && mock.callsOf("tabs.create").length === 1, "expected fresh tab creation instead of stale tab activation");
+
+    window._pbpReaderSourceIncognito = true;
+    try {
+      assert((await _pbpOcrDetectIncognito(false)) === true, "window._pbpReaderSourceIncognito=true must be detected");
+    } finally {
+      window._pbpReaderSourceIncognito = false;
+    }
+  });
+
+  // 16. QA regression: Vocabulary save on local OCR document preserves synthetic pbp-local-doc.invalid articleUrl
+  await test("pbpDictSaveCurrent preserves synthetic local OCR articleUrl when #preview-url has no href", async () => {
+    freshMock();
+    const localUrl = pbpLocalDocUrlFromSha256("9".repeat(64));
+    fillPreviewUrl(localUrl, "quantum-notes.pdf");
+    document.getElementById("preview-title").textContent = "Quantum Notes";
+    document.dispatchEvent(new CustomEvent("pbp:rendered", {
+      detail: { url: localUrl, bookmarkUrl: "", title: "Quantum Notes", account: "alice" }
+    }));
+
+    let savedPayload = null;
+    const origSaveWord = window.pbpVocabSaveWord;
+    const origCurrentOwner = window.pbpVocabCurrentOwner;
+    const origVocabGet = window.pbpVocabGet;
+    window.pbpVocabCurrentOwner = async () => _pbpDictOwner;
+    window.pbpVocabGet = async () => null;
+    window.pbpVocabSaveWord = async (owner, payload) => {
+      savedPayload = { owner, payload };
+      return { id: pbpDictVocabKey(owner, payload.language, payload.term), status: "new" };
+    };
+    const prevCur = _pbpDictCurrent;
+    try {
+      _pbpDictCurrent = {
+        owner: _pbpDictOwner,
+        term: "eigenstate",
+        lemma: "eigenstate",
+        lang: "en",
+        gloss: "state with definite observable value",
+        ipa: "",
+        sourceUrl: "",
+        license: "",
+        sentence: "Every eigenstate evolves by a phase factor.",
+        keptSaved: false,
+        fullEntryOnly: false,
+        packRevision: 1,
+        contextRevision: 1,
+      };
+      const ok = await pbpDictSaveCurrent();
+      assert(ok === true && savedPayload !== null, "pbpDictSaveCurrent failed on local OCR doc");
+      assert(savedPayload.payload.context.articleUrl === localUrl, "expected synthetic local OCR articleUrl, got: " + savedPayload.payload.context.articleUrl);
+      assert(savedPayload.payload.context.articleTitle === "Quantum Notes", "articleTitle mismatch");
+    } finally {
+      _pbpDictCurrent = prevCur;
+      window.pbpVocabSaveWord = origSaveWord;
+      window.pbpVocabCurrentOwner = origCurrentOwner;
+      window.pbpVocabGet = origVocabGet;
+    }
   });
 
   document.title = (failed === 0 ? "PASS" : "FAIL") + ` (${passed}/${passed + failed})`;

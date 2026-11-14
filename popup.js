@@ -3867,8 +3867,9 @@ async function _populatePopupReaderHistory(pop, anchorBtn) {
   importBtn.addEventListener("click", async () => {
     try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
     if (chrome.tabs?.create && chrome.runtime?.getURL) {
+      const incogQ = _activeTabAtOpen?.incognito === true ? "&incognito=1" : "";
       const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect("")) ? "&video=1" : "";
-      await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html?import=ocr" + videoQ) });
+      await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html?import=ocr" + incogQ + videoQ) });
     }
   });
   frag.appendChild(importBtn);

@@ -170,14 +170,47 @@ function pbpOcrBuildFormData(blob, fileName, purpose) {
   return fd;
 }
 
+const PBP_OCR_LAYOUT_LABELS = new Set([
+  "title", "sub_title", "subtitle", "text", "paragraph", "table", "table_caption",
+  "table_footnote", "image", "image_caption", "figure", "figure_caption", "formula",
+  "equation", "list", "list_item", "header", "footer", "page_number", "code",
+  "footnote", "reference", "abstract", "author", "seal", "handwriting", "caption",
+]);
+const PBP_OCR_EMPTY_LAYOUT_LABELS = new Set(["image", "figure", "seal"]);
+
 // Strip DeepSeek OCR grounding spans (`<｜ref｜>label<｜/ref｜><｜box｜>[[...]]<｜/box｜>`
-// using either fullwidth U+FF5C `｜` or ASCII `|`) and stray special tokens.
+// or `<|ref|>label<|/ref|><|det|>[[...]]<|/det|>`, using either fullwidth U+FF5C `｜`
+// or ASCII `|`). Layout class headers before recognized lines are dropped; inline
+// grounded text inside `<ref>...</ref>` is preserved without its bounding box.
 function pbpOcrStripGroundingTags(rawText) {
   if (typeof rawText !== "string" || !rawText) return "";
-  return rawText
-    .replace(/\r\n?/g, "\n")
-    .replace(/<[|｜]ref[|｜]>[\s\S]*?<[|｜]\/ref[|｜]>\s*<[|｜]box[|｜]>[\s\S]*?<[|｜]\/box[|｜]>[ \t]*\n?/g, "")
-    .replace(/<[|｜]box[|｜]>[\s\S]*?<[|｜]\/box[|｜]>/g, "")
+  let text = rawText.replace(/\r\n?/g, "\n");
+  if (!/<[|｜](?:ref|box|det|grounding|end▁of▁sentence)[|｜]>/.test(text)) {
+    return text.replace(/\n{3,}/g, "\n\n").trim();
+  }
+  const spanRe = /<[|｜]ref[|｜]>([\s\S]*?)<[|｜]\/ref[|｜]>\s*<[|｜](?:box|det)[|｜]>\s*\[\[[\s\S]*?\]\]\s*<[|｜]\/(?:box|det)[|｜]>([ \t]*\n?)/g;
+  // Probe whether removing layout-class spans leaves non-empty body content.
+  const strippedIfClass = text
+    .replace(spanRe, (_m, inner, tail) => {
+      const trimmed = String(inner || "").trim();
+      const lower = trimmed.toLowerCase();
+      if (PBP_OCR_EMPTY_LAYOUT_LABELS.has(lower) || PBP_OCR_LAYOUT_LABELS.has(lower)) return "";
+      return trimmed ? trimmed + (tail || "") : "";
+    })
+    .replace(/<[|｜](?:box|det)[|｜]>\s*\[\[[\s\S]*?\]\]\s*<[|｜]\/(?:box|det)[|｜]>/g, "")
+    .replace(/<[|｜]\/?(?:ref|box|grounding|det|end▁of▁sentence)[|｜]>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (strippedIfClass) return strippedIfClass;
+  // Fallback when the entire page consisted of a single grounded token whose text
+  // happened to match a non-image word (e.g. a slide containing only "Abstract").
+  return text
+    .replace(spanRe, (_m, inner, tail) => {
+      const trimmed = String(inner || "").trim();
+      if (!trimmed || PBP_OCR_EMPTY_LAYOUT_LABELS.has(trimmed.toLowerCase())) return "";
+      return trimmed + (tail || "");
+    })
+    .replace(/<[|｜](?:box|det)[|｜]>\s*\[\[[\s\S]*?\]\]\s*<[|｜]\/(?:box|det)[|｜]>/g, "")
     .replace(/<[|｜]\/?(?:ref|box|grounding|det|end▁of▁sentence)[|｜]>/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -421,18 +454,21 @@ async function _pbpOcrReadDeepseekKey() {
 }
 
 async function pbpOcrRunUpload({ bytes, fileName, mimeType, purpose, sourceUrl = "", force = false, signal, timeoutMs = PBP_OCR_TIMEOUT_MS } = {}) {
+  if (signal && signal.aborted) return { ok: false, code: "aborted" };
   const normalizedPurpose = pbpOcrNormalizePurpose(purpose);
   const check = pbpOcrValidateInput({ bytes, fileName, mimeType });
   if (!check.ok) return check;
 
   const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const sha256 = await pbpOcrSha256Hex(u8);
+  if (signal && signal.aborted) return { ok: false, code: "aborted" };
   const isOnlineSource = Boolean(sourceUrl && typeof pbpIsLocalDocUrl === "function" && !pbpIsLocalDocUrl(sourceUrl));
   const docUrl = isOnlineSource ? sourceUrl : pbpLocalDocUrlFromSha256(sha256);
   if (!docUrl) return { ok: false, code: "bad_request" };
 
   if (!force && typeof pbpOcrDocsFindBySha256 === "function") {
     const hit = await pbpOcrDocsFindBySha256(sha256, normalizedPurpose);
+    if (signal && signal.aborted) return { ok: false, code: "aborted" };
     if (hit && hit.markdown) {
       const reused = {
         url: docUrl,
@@ -446,17 +482,21 @@ async function pbpOcrRunUpload({ bytes, fileName, mimeType, purpose, sourceUrl =
         markdown: hit.markdown,
       };
       const saved = typeof pbpOcrDocsPut === "function" ? await pbpOcrDocsPut(reused) : null;
-      return { ok: true, cached: true, doc: saved || { ...hit, ...reused } };
+      if (signal && signal.aborted) return { ok: false, code: "aborted" };
+      const cacheSaved = Boolean(saved);
+      return { ok: true, cached: true, cacheSaved, doc: { ...(saved || { ...hit, ...reused }), cacheSaved } };
     }
   }
 
   const apiKey = await _pbpOcrReadDeepseekKey();
+  if (signal && signal.aborted) return { ok: false, code: "aborted" };
   if (!apiKey) return { ok: false, code: "deepseek_key_missing" };
 
   if (typeof chrome !== "undefined" && chrome.permissions?.contains) {
     let granted = false;
     try { granted = await chrome.permissions.contains({ origins: [PBP_OCR_ORIGIN_PATTERN] }); }
     catch (e) { console.warn("[ocr] permission check failed:", e?.name, e?.message); granted = false; }
+    if (signal && signal.aborted) return { ok: false, code: "aborted" };
     if (!granted) return { ok: false, code: "host_permission", origin: "https://api.deepseek.com" };
   }
 
@@ -509,6 +549,7 @@ async function pbpOcrRunUpload({ bytes, fileName, mimeType, purpose, sourceUrl =
     if (signal) signal.removeEventListener("abort", onCallerAbort);
   }
 
+  if (signal && signal.aborted) return { ok: false, code: "aborted" };
   const parsed = pbpOcrParseResponse(resp.status, rawText, { purpose: normalizedPurpose });
   if (!parsed.ok) return parsed;
 
@@ -524,10 +565,14 @@ async function pbpOcrRunUpload({ bytes, fileName, mimeType, purpose, sourceUrl =
     markdown: parsed.markdown,
   };
   const stored = typeof pbpOcrDocsPut === "function" ? await pbpOcrDocsPut(recordInput) : null;
+  if (signal && signal.aborted) return { ok: false, code: "aborted" };
+  const cacheSaved = Boolean(stored);
+  const fallbackDoc = { ...recordInput, byteSize: parsed.markdown.length, createdAt: Date.now(), accessedAt: Date.now() };
   return {
     ok: true,
     cached: false,
-    doc: stored || { ...recordInput, byteSize: parsed.markdown.length, createdAt: Date.now(), accessedAt: Date.now() },
+    cacheSaved,
+    doc: { ...(stored || fallbackDoc), cacheSaved },
   };
 }
 
@@ -538,6 +583,43 @@ let _pbpOcrHiddenInput = null;
 let _pbpOcrDropPop = null;
 let _pbpOcrPanelActiveAbort = null;
 let _pbpOcrDropActiveAbort = null;
+
+function pbpOcrAbortActive(reason = "aborted") {
+  if (_pbpOcrPanelActiveAbort) {
+    _pbpOcrPanelActiveAbort.abort(reason);
+    _pbpOcrPanelActiveAbort = null;
+  }
+  if (_pbpOcrDropActiveAbort) {
+    _pbpOcrDropActiveAbort.abort(reason);
+    _pbpOcrDropActiveAbort = null;
+  }
+}
+
+function _pbpOcrSyncIncognitoHint() {
+  if (typeof window !== "undefined" && window._pbpReaderSourceIncognito === true) return true;
+  try {
+    if (typeof location !== "undefined" && new URLSearchParams(location.search).get("incognito") === "1") return true;
+  } catch (_) { /* swallow-ok: location search unavailable */ }
+  if (typeof chrome !== "undefined" && chrome.extension?.inIncognitoContext === true) return true;
+  return false;
+}
+
+async function _pbpOcrDetectIncognito(explicitFlag) {
+  if (explicitFlag === true || _pbpOcrSyncIncognitoHint()) return true;
+  if (typeof chrome !== "undefined" && chrome.tabs?.getCurrent) {
+    try {
+      const tab = await chrome.tabs.getCurrent();
+      if (tab && tab.incognito === true) return true;
+    } catch (_) { /* swallow-ok: tabs.getCurrent unsupported in some contexts */ }
+  }
+  if (typeof chrome !== "undefined" && chrome.windows?.getCurrent) {
+    try {
+      const win = await chrome.windows.getCurrent();
+      if (win && win.incognito === true) return true;
+    } catch (_) { /* swallow-ok: windows.getCurrent unsupported */ }
+  }
+  return false;
+}
 
 function _pbpOcrTitleFromFileName(fileName) {
   const base = String(fileName || "").replace(/\.(?:pdf|png|jpe?g|webp)$/i, "").trim();
@@ -587,7 +669,8 @@ async function _pbpOcrOpenDocInReader(doc, handoff = {}, openInNewTab = false) {
     try { return new URLSearchParams(location.search).get("k") || ""; }
     catch (_) { /* swallow-ok: fallback to fresh UUID */ return ""; }
   })();
-  const k = (!openInNewTab && currentKey)
+  const sameDocAsSlot = Boolean(!openInNewTab && currentKey && typeof handoff.expectedUrl === "string" && handoff.expectedUrl === doc.url);
+  const k = sameDocAsSlot
     ? currentKey
     : ((typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
       ? crypto.randomUUID()
@@ -598,6 +681,7 @@ async function _pbpOcrOpenDocInReader(doc, handoff = {}, openInNewTab = false) {
     try { account = (await pbpReadBookmarkConnection()).account || ""; }
     catch (_) { /* swallow-ok: proceed with empty bookmark account */ }
   }
+  const sourceIncognito = await _pbpOcrDetectIncognito(handoff.sourceIncognito === true);
   const resolvedTitle = (typeof handoff.title === "string" && handoff.title.trim())
     ? handoff.title.trim()
     : (_pbpOcrTitleFromFileName(doc.fileName) || t("mdPreviewUntitled"));
@@ -610,10 +694,11 @@ async function _pbpOcrOpenDocInReader(doc, handoff = {}, openInNewTab = false) {
       sourceTabUrl: isLocal ? doc.url : (handoff.sourceTabUrl || doc.url),
       bookmarkUrl: isLocal ? "" : (handoff.bookmarkUrl || doc.url),
       ocrFileName: doc.fileName || "",
+      ocrCacheSaved: doc.cacheSaved !== false,
       source: "deepseek-ocr",
       engine: "local",
       site: isLocal ? (doc.fileName || "") : (handoff.site || ""),
-      sourceIncognito: handoff.sourceIncognito === true,
+      sourceIncognito,
       bookmarkDraft: isLocal ? null : (handoff.bookmarkDraft || null),
       account,
       tags: isLocal ? [] : (Array.isArray(handoff.tags) ? handoff.tags : []),
@@ -622,20 +707,22 @@ async function _pbpOcrOpenDocInReader(doc, handoff = {}, openInNewTab = false) {
     },
   });
   const askQ = (() => {
+    if (!sameDocAsSlot) return "";
     try {
       const s = new URLSearchParams(location.search).get("askSession");
-      return s && !openInNewTab ? "&askSession=" + encodeURIComponent(s) : "";
+      return s ? "&askSession=" + encodeURIComponent(s) : "";
     } catch (_) { /* swallow-ok: no askSession query */ return ""; }
   })();
+  const incogQ = sourceIncognito ? "&incognito=1" : "";
   if (openInNewTab && chrome.tabs?.create) {
     const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect(doc.url)) ? "&video=1" : "";
-    await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html") + "?k=" + encodeURIComponent(k) + videoQ });
+    await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html") + "?k=" + encodeURIComponent(k) + incogQ + videoQ });
     return true;
   }
   if (currentKey === k) {
     location.reload();
   } else {
-    location.replace("?k=" + encodeURIComponent(k) + askQ);
+    location.replace("?k=" + encodeURIComponent(k) + incogQ + askQ);
   }
   return true;
 }
@@ -823,7 +910,7 @@ function pbpOcrRenderPanel(opts = {}) {
     if (activeAbort) return;
     _pbpOcrEnsureFileInput((file) => {
       if (mode === "online") {
-        pbpOcrRenderPanel({ ...opts, mode: "local", initialFile: file, leadText: "" });
+        pbpOcrRenderPanel({ ...opts, mode: "local", initialFile: file, leadText: "", expectedUrl: onlineUrl });
       } else {
         stageLocalFile(file);
       }
@@ -837,24 +924,25 @@ function pbpOcrRenderPanel(opts = {}) {
       return;
     }
     errBar.hidden = true;
-    // MV3 gesture rule: request required exact origins synchronously on click
-    // before any storage/IDB/file await.
-    const docPattern = mode === "online" && typeof pbpEndpointOriginPattern === "function"
-      ? pbpEndpointOriginPattern(onlineUrl)
-      : "";
-    const permRes = await _pbpOcrRequestOriginsOnGesture(
-      docPattern ? [docPattern, PBP_OCR_ORIGIN_PATTERN] : [PBP_OCR_ORIGIN_PATTERN]
-    );
-    if (!permRes.ok) {
-      showErr(permRes);
-      return;
-    }
-
     const ac = new AbortController();
     activeAbort = ac;
     _pbpOcrPanelActiveAbort = ac;
     syncCard();
     try {
+      // MV3 gesture rule: request required exact origins synchronously on click
+      // before any storage/IDB/file await.
+      const docPattern = mode === "online" && typeof pbpEndpointOriginPattern === "function"
+        ? pbpEndpointOriginPattern(onlineUrl)
+        : "";
+      const permRes = await _pbpOcrRequestOriginsOnGesture(
+        docPattern ? [docPattern, PBP_OCR_ORIGIN_PATTERN] : [PBP_OCR_ORIGIN_PATTERN]
+      );
+      if (ac.signal.aborted || !wrap.isConnected) return;
+      if (!permRes.ok) {
+        showErr(permRes);
+        return;
+      }
+
       const purpose = richInput.checked ? "rich_layout_recognition" : "text_recognition";
       let uploadBytes = null;
       let uploadName = "";
@@ -862,6 +950,7 @@ function pbpOcrRenderPanel(opts = {}) {
       if (mode === "online") {
         primaryBtn.textContent = t("mdOcrFetchingFile");
         const fetched = await pbpOcrFetchRemoteBytes(onlineUrl, ac.signal);
+        if (ac.signal.aborted || !wrap.isConnected) return;
         if (!fetched.ok) {
           if (fetched.code !== "aborted") showErr(fetched);
           return;
@@ -872,6 +961,7 @@ function pbpOcrRenderPanel(opts = {}) {
         primaryBtn.textContent = t("mdOcrRunning");
       } else {
         const ab = await stagedFile.arrayBuffer();
+        if (ac.signal.aborted || !wrap.isConnected) return;
         uploadBytes = new Uint8Array(ab);
         uploadName = stagedFile.name;
         uploadMime = stagedFile.type;
@@ -885,11 +975,13 @@ function pbpOcrRenderPanel(opts = {}) {
         sourceUrl: mode === "online" ? onlineUrl : "",
         signal: ac.signal,
       });
+      if (ac.signal.aborted || !wrap.isConnected) return;
       if (!res.ok) {
         if (res.code !== "aborted") showErr(res);
         return;
       }
       await _pbpOcrOpenDocInReader(res.doc, {
+        expectedUrl: mode === "online" ? onlineUrl : (typeof opts.expectedUrl === "string" ? opts.expectedUrl : ""),
         title: mode === "online" ? (opts.title || _pbpOcrTitleFromFileName(res.doc.fileName)) : _pbpOcrTitleFromFileName(res.doc.fileName),
         sourceTabUrl: mode === "online" ? (opts.sourceTabUrl || onlineUrl) : res.doc.url,
         bookmarkUrl: mode === "online" ? (opts.bookmarkUrl || onlineUrl) : "",
@@ -901,12 +993,13 @@ function pbpOcrRenderPanel(opts = {}) {
         description: opts.description || "",
       }, false);
     } catch (e) {
+      if (ac.signal.aborted || !wrap.isConnected) return;
       console.warn("[ocr] run failed:", e?.name, e?.message);
       showErr({ code: "server_error" });
     } finally {
       if (activeAbort === ac) activeAbort = null;
       if (_pbpOcrPanelActiveAbort === ac) _pbpOcrPanelActiveAbort = null;
-      syncCard();
+      if (wrap.isConnected) syncCard();
     }
   });
 
@@ -920,12 +1013,18 @@ function pbpOcrOpenImportEntry(opts = {}) {
     document.body.classList.contains("md-shell") ||
     Boolean(document.querySelector("#rendered-view > .es-ocr"));
   if (inEmptyShell || opts.forceInPlace === true) {
-    pbpOcrRenderPanel({ mode: "local", initialFile: opts.initialFile || null });
+    pbpOcrRenderPanel({
+      mode: "local",
+      initialFile: opts.initialFile || null,
+      sourceIncognito: _pbpOcrSyncIncognitoHint(),
+      expectedUrl: typeof window !== "undefined" && typeof window._pbpCurrentReaderUrl === "string" ? window._pbpCurrentReaderUrl : "",
+    });
     return;
   }
   if (typeof chrome !== "undefined" && chrome.tabs?.create && chrome.runtime?.getURL) {
+    const incogQ = _pbpOcrSyncIncognitoHint() ? "&incognito=1" : "";
     const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect("")) ? "&video=1" : "";
-    void chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html?import=ocr" + videoQ) });
+    void chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html?import=ocr" + incogQ + videoQ) });
   }
 }
 
@@ -1012,12 +1111,6 @@ function _pbpOcrOpenDropDialogOnArticle(file) {
   runBtn.addEventListener("click", async () => {
     if (activeAbort || !pre.ok) return;
     errBar.hidden = true;
-    const permRes = await _pbpOcrRequestOriginsOnGesture([PBP_OCR_ORIGIN_PATTERN]);
-    if (!permRes.ok) {
-      errBar.textContent = pbpOcrErrorMessage(permRes);
-      errBar.hidden = false;
-      return;
-    }
     const ac = new AbortController();
     activeAbort = ac;
     _pbpOcrDropActiveAbort = ac;
@@ -1025,7 +1118,15 @@ function _pbpOcrOpenDropDialogOnArticle(file) {
     runBtn.textContent = t("mdOcrRunning");
     richInput.disabled = true;
     try {
+      const permRes = await _pbpOcrRequestOriginsOnGesture([PBP_OCR_ORIGIN_PATTERN]);
+      if (ac.signal.aborted || !runBtn.isConnected) return;
+      if (!permRes.ok) {
+        errBar.textContent = pbpOcrErrorMessage(permRes);
+        errBar.hidden = false;
+        return;
+      }
       const ab = await file.arrayBuffer();
+      if (ac.signal.aborted || !runBtn.isConnected) return;
       const res = await pbpOcrRunUpload({
         bytes: new Uint8Array(ab),
         fileName: file.name,
@@ -1033,6 +1134,7 @@ function _pbpOcrOpenDropDialogOnArticle(file) {
         purpose: richInput.checked ? "rich_layout_recognition" : "text_recognition",
         signal: ac.signal,
       });
+      if (ac.signal.aborted || !runBtn.isConnected) return;
       if (!res.ok) {
         if (res.code !== "aborted") {
           errBar.textContent = pbpOcrErrorMessage(res);
@@ -1040,18 +1142,24 @@ function _pbpOcrOpenDropDialogOnArticle(file) {
         }
         return;
       }
-      await _pbpOcrOpenDocInReader(res.doc, { title: _pbpOcrTitleFromFileName(res.doc.fileName) }, true);
+      await _pbpOcrOpenDocInReader(res.doc, {
+        title: _pbpOcrTitleFromFileName(res.doc.fileName),
+        sourceIncognito: _pbpOcrSyncIncognitoHint(),
+      }, true);
       try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover already hidden */ }
     } catch (e) {
+      if (ac.signal.aborted || !runBtn.isConnected) return;
       console.warn("[ocr] drop upload failed:", e?.name, e?.message);
       errBar.textContent = t("mdOcrErrFailed");
       errBar.hidden = false;
     } finally {
       if (activeAbort === ac) activeAbort = null;
       if (_pbpOcrDropActiveAbort === ac) _pbpOcrDropActiveAbort = null;
-      runBtn.disabled = false;
-      runBtn.textContent = t("mdOcrRunBtn");
-      richInput.disabled = false;
+      if (runBtn.isConnected) {
+        runBtn.disabled = false;
+        runBtn.textContent = t("mdOcrRunBtn");
+        richInput.disabled = false;
+      }
     }
   });
 
@@ -1084,7 +1192,12 @@ function pbpOcrInstallReaderHooks() {
       document.body.classList.contains("md-shell") ||
       Boolean(document.querySelector("#rendered-view > .es-ocr"));
     if (inEmptyShell) {
-      pbpOcrRenderPanel({ mode: "local", initialFile: file });
+      pbpOcrRenderPanel({
+        mode: "local",
+        initialFile: file,
+        sourceIncognito: _pbpOcrSyncIncognitoHint(),
+        expectedUrl: typeof window !== "undefined" && typeof window._pbpCurrentReaderUrl === "string" ? window._pbpCurrentReaderUrl : "",
+      });
     } else {
       _pbpOcrOpenDropDialogOnArticle(file);
     }

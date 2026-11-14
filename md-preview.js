@@ -1565,11 +1565,16 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   if (!info) {
     pbpReaderSchemeVideoSettled();
     let wantOcrImport = false;
-    try { wantOcrImport = new URLSearchParams(location.search).get("import") === "ocr"; }
-    catch (_) { /* swallow-ok: unavailable location search */ }
+    let urlIncognito = false;
+    try {
+      const sp = new URLSearchParams(location.search);
+      wantOcrImport = sp.get("import") === "ocr";
+      urlIncognito = sp.get("incognito") === "1";
+    } catch (_) { /* swallow-ok: unavailable location search */ }
+    window._pbpReaderSourceIncognito = urlIncognito;
     if (wantOcrImport && typeof pbpOcrRenderPanel === "function") {
       setupDrawer();
-      pbpOcrRenderPanel({ mode: "local" });
+      pbpOcrRenderPanel({ mode: "local", sourceIncognito: urlIncognito });
       return;
     }
     const historyItems = typeof pbpReaderHistoryRead === "function" ? await pbpReaderHistoryRead() : [];
@@ -1605,6 +1610,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // opening a fresh preview from the popup/shortcut seeds the real tab URL.
   let sourceTabUrl = (typeof info.sourceTabUrl === "string" && info.sourceTabUrl) || url || "";
   _pbpCurrentReaderUrl = url || sourceTabUrl || "";
+  window._pbpCurrentReaderUrl = _pbpCurrentReaderUrl;
   // The address the handoff looked this page's bookmark up under (shared.js
   // pbpBookmarkLookupUrl: the cleaned page address). The bookmark badge, the
   // reader's bookmark bar and the export metadata refresh speak in it; url
@@ -1638,7 +1644,11 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   let bookmarkAccount = typeof info.account === "string" ? info.account : "";
   let tags = Array.isArray(info.tags) ? info.tags : [];
   let description = info.description || "";
-  const sourceIncognito = info.sourceIncognito === true;
+  const sourceIncognito = info.sourceIncognito === true || (() => {
+    try { return new URLSearchParams(location.search).get("incognito") === "1"; }
+    catch (_) { /* swallow-ok: unavailable location search */ return false; }
+  })();
+  window._pbpReaderSourceIncognito = sourceIncognito;
   let bookmarkDraft = info.bookmarkDraft && typeof info.bookmarkDraft === "object" ? info.bookmarkDraft : null;
   // linkding keeps a Description beside its Notes (`description` above holds
   // the notes). Its exports carry both: the Description as `description` and
@@ -2299,6 +2309,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         seg.addEventListener("click", () => {
           const e = seg.getAttribute("data-engine");
           if (inFlight || e === attemptedEngine || seg.getAttribute("aria-disabled") === "true") return;
+          if (typeof pbpOcrAbortActive === "function") pbpOcrAbortActive("engine_switch");
           if (e === "local" && !srcTabId && info.historyReopen === true) retryExtract(e, null);
           else if ((e === "jina" || e === "deepseek") && shellPermissionMissing.has(e)) retryExtract(e, { error: "host_permission" });
           else attemptExtract(e);
@@ -2345,7 +2356,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         return;
       }
       if (_isLocalOcr && typeof pbpOcrRenderPanel === "function") {
-        pbpOcrRenderPanel({ mode: "local", leadText: t("mdOcrEvictedLead") });
+        pbpOcrRenderPanel({ mode: "local", leadText: t("mdOcrEvictedLead"), sourceIncognito, expectedUrl: url });
         return;
       }
       if (_isOnlineOcr && typeof pbpOcrRenderPanel === "function") {
@@ -2554,6 +2565,21 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // page never re-derives it, it only forwards whatever the payload that
   // opened it carried, so a second F5 keeps the timeline the first one
   // restored.
+  let _ocrCacheSaved = !(source === "deepseek-ocr" && info.ocrCacheSaved === false);
+  if (!_ocrCacheSaved && typeof pbpOcrDocsPut === "function") {
+    try {
+      const sha = typeof pbpLocalDocSha256 === "function" ? pbpLocalDocSha256(url) : "";
+      const retried = await pbpOcrDocsPut({
+        url,
+        sha256: sha,
+        sourceUrl: sha ? "" : url,
+        fileName: ocrFileName || "document",
+        purpose: "text_recognition",
+        markdown: canonicalMarkdown,
+      });
+      if (retried) _ocrCacheSaved = true;
+    } catch (_) { /* swallow-ok: fallback keeps markdown in MP_KEY slot below */ }
+  }
   const _restoreRecord = info.videoTranscript === true
     ? {
         videoTranscript: true, markdown: canonicalMarkdown,
@@ -2566,19 +2592,31 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
       }
-    : {
-        // title rides along (a few bytes): the shell names the page with it
-        // while re-extracting, and a failed attempt otherwise read "Untitled".
-        restore: true, title: title || "", url, tabId: srcTabId, sourceTabUrl,
-        engine: pbpNormalizeExtractEngine(source),
-        ...(source === "deepseek-ocr" ? {
-          source: "deepseek-ocr",
+    : (source === "deepseek-ocr" && !_ocrCacheSaved)
+      ? {
+          markdown: canonicalMarkdown,
+          ocrCacheSaved: false,
           ocrFileName,
-          ...(typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url) ? { localOcrReopen: true } : { ocrCandidate: true })
-        } : {}),
-        sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
-        nonce: _pageNonce
-      };
+          source: "deepseek-ocr",
+          engine: "local",
+          title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
+          site,
+          sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
+          nonce: _pageNonce
+        }
+      : {
+          // title rides along (a few bytes): the shell names the page with it
+          // while re-extracting, and a failed attempt otherwise read "Untitled".
+          restore: true, title: title || "", url, tabId: srcTabId, sourceTabUrl,
+          engine: pbpNormalizeExtractEngine(source),
+          ...(source === "deepseek-ocr" ? {
+            source: "deepseek-ocr",
+            ocrFileName,
+            ...(typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url) ? { localOcrReopen: true } : { ocrCandidate: true })
+          } : {}),
+          sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
+          nonce: _pageNonce
+        };
   try {
     // Same-slot stranger check as the committer (closing review H1): a
     // duplicated tab's commit landing during THIS page's first milliseconds

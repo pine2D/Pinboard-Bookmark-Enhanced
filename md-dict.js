@@ -1423,6 +1423,7 @@ let _pbpDictChildCtrl = null;    // the live run's own controller (child of md-a
 let _pbpDictParentCleanup = null; // removes the previous run's parent-abort listener
 let _pbpDictSaveTarget = null;   // {itemId} | {range} | null — explain-shaped
 let _pbpDictOwner = "ownerless"; // set from pbp:rendered detail.account (Task 8 listener)
+let _pbpDictArticleUrl = "";     // canonical document URL from pbp:rendered / pbp:article-replaced
 
 // Article-level CLD prior over the ORIGINAL prose (batch B). detectArticleLang
 // (md-preview.js) is a font/RTL script heuristic that names no Latin or
@@ -3782,7 +3783,8 @@ async function pbpDictSaveCurrent() {
   else if (target && target.range && typeof window.pbpHlItemIdAtRange === "function") {
     try { highlightId = window.pbpHlItemIdAtRange(target.range) || null; } catch (_) {}
   }
-  let articleUrl = pbpDictSafeUrl(urlEl ? urlEl.href : "");
+  const rawHref = urlEl && urlEl.hasAttribute("href") && urlEl.getAttribute("href") !== "#" ? urlEl.href : "";
+  let articleUrl = pbpDictSafeUrl(_pbpDictArticleUrl || rawHref);
   // (research T1.3) A word learned from a transcript keeps the SECOND it was
   // heard at: articleUrl becomes the watch-page deep link (?t=). The context
   // schema is untouched -- articleUrl was always a free URL, pbpDictSafeUrl
@@ -3894,6 +3896,7 @@ window.pbpDictOnActionSwitch = () => {
 function pbpDictOnArticle(detail) {
   const account = detail ? detail.account : "";
   _pbpDictOwner = pbpDictOwnerScope(account);
+  _pbpDictArticleUrl = detail && typeof detail.url === "string" ? detail.url : "";
   _pbpDictManualLang = ""; // language override is per-document, never carried over
   _pbpDictArticlePrior = null; // article CLD prior is per-document too
 }
