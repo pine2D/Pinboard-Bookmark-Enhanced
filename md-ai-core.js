@@ -759,7 +759,11 @@ function pbpAiCacheModelKey(s) {
 async function pbpAiRetryWithPermission(error, settings, retry) {
   if (error && error.code === "host_permission") {
     let granted = false;
-    try { granted = await requestAIHostPermissions(settings); } catch (_) {}
+    try {
+      granted = Array.isArray(error.additionalOrigins) && error.additionalOrigins.length
+        ? await requestAIHostPermissions(settings, error.additionalOrigins)
+        : await requestAIHostPermissions(settings);
+    } catch (_) {}
     if (!granted) return false;
   }
   await retry();

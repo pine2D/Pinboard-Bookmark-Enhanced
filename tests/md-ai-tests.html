@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="1167"><title>md-preview AI Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="1175"><title>md-preview AI Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1200px; }
 h2 { margin-top: 24px; font-size: 16px; }
@@ -22,6 +22,7 @@ h2 { margin-top: 24px; font-size: 16px; }
 <script src="../vendor/marked.min.js"></script>
 <script src="../vendor/purify.min.js"></script>
 <script src="../md-convert.js"></script>
+<script src="../md-embed.js"></script>
 <script>
 // A full Chrome build gives every page a window.chrome with only loadTimes/csi/app,
 // so test for the extension API itself; the headless shell has no window.chrome at all.
@@ -8780,13 +8781,19 @@ suiteIf("pbpAiStatusPageUrl: status link only when the service may be down", "pb
   const ds = { aiProvider: "deepseek" };
   const page = "https://status.deepseek.com/";
   test("service-side failures earn the provider's page", () => {
-    for (const err of [
-      { status: 503, message: "x" }, { status: 500, message: "x" }, { status: 529, message: "overloaded" },
-      { status: 408, message: "x" }, { status: 429, message: "Rate limit reached for requests" },
-      { message: "AI stream timeout" }, { name: "TimeoutError", message: "signal timed out" },
-      new TypeError("Failed to fetch"),
-      { code: "network", message: "offline text" },
-    ]) assertEq(pbpAiStatusPageUrl(ds, err), page, JSON.stringify(err));
+    const onlineDesc = Object.getOwnPropertyDescriptor(navigator, "onLine");
+    Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
+    try {
+      for (const err of [
+        { status: 503, message: "x" }, { status: 500, message: "x" }, { status: 529, message: "overloaded" },
+        { status: 408, message: "x" }, { status: 429, message: "Rate limit reached for requests" },
+        { message: "AI stream timeout" }, { name: "TimeoutError", message: "signal timed out" },
+        new TypeError("Failed to fetch"),
+        { code: "network", message: "offline text" },
+      ]) assertEq(pbpAiStatusPageUrl(ds, err), page, JSON.stringify(err));
+    } finally {
+      if (onlineDesc) Object.defineProperty(navigator, "onLine", onlineDesc); else delete navigator.onLine;
+    }
   });
   test("failures the user fixes get no link", () => {
     for (const err of [
@@ -15910,6 +15917,271 @@ suite("t key confirms before spending tokens the reader cannot see", () => {
   });
 })();
 
+</script>
+
+<script>
+suite("Reader Vision pure helpers (P1-C)", () => {
+  test("pbpVisionScaleDims keeps <=2048 intact and scales oversized axes proportionally", () => {
+    assertEq(JSON.stringify(pbpVisionScaleDims(1200, 800)), JSON.stringify({ width: 1200, height: 800 }), "under cap");
+    assertEq(JSON.stringify(pbpVisionScaleDims(4096, 2048)), JSON.stringify({ width: 2048, height: 1024 }), "landscape scaled");
+    const thin = pbpVisionScaleDims(10000, 3);
+    assertEq(thin.width, 2048, "longest capped");
+    assert(thin.height >= 1, "shortest clamped to >= 1");
+  });
+
+  test("pbpVisionImageLabel prefers alt, then informative filename, then fallback", () => {
+    assertEq(pbpVisionImageLabel("  Throughput   vs   Latency ", "https://cdn.example.com/fig1.png", "Image"), "Throughput vs Latency", "alt wins");
+    assertEq(pbpVisionImageLabel("", "https://cdn.example.com/assets/architecture-diagram.webp?v=2", "Image"), "architecture-diagram.webp", "filename");
+    assertEq(pbpVisionImageLabel("", "https://cdn.example.com/assets/image.png", "Diagram"), "Diagram", "generic filename skipped");
+    assertEq(pbpVisionImageLabel("", "data:image/png;base64,AAAA", "Diagram"), "Diagram", "data URI uses fallback");
+  });
+
+  test("pbpVisionBuildExplainPrompt and pbpVisionBuildTranslatePrompt include context and untrusted-content guard", () => {
+    const ex = pbpVisionBuildExplainPrompt({
+      title: "Latency Study",
+      alt: "p99 latency chart",
+      prevText: "Before optimization.",
+      blockText: "Figure 2 compares p99.",
+      nextText: "After optimization.",
+      answerLang: "Simplified Chinese"
+    });
+    assert(ex.system.includes("Simplified Chinese") && ex.system.includes("untrusted document content"), "explain system");
+    assert(ex.prompt.includes("Latency Study") && ex.prompt.includes("p99 latency chart") && ex.prompt.includes("Figure 2 compares p99."), "explain prompt");
+
+    const tr = pbpVisionBuildTranslatePrompt({
+      title: "Latency Study",
+      alt: "p99 latency chart",
+      blockText: "Figure 2 compares p99.",
+      targetLangName: "Japanese"
+    });
+    assert(tr.system.includes("Japanese") && tr.system.includes("Extract all legible text"), "translate system");
+    assert(tr.prompt.includes("context only -- do not translate"), "translate context guard");
+  });
+
+  test("pbpAskBuildPrompt({ hasImage: true }) adds image rule while keeping cache-friendly prefix order", () => {
+    const withoutImg = pbpAskBuildPrompt({
+      title: "Paper", context: "[P1] Baseline paragraph.", history: [{ q: "Old Q", a: "Old A" }], question: "What is in the chart?"
+    });
+    const withImg = pbpAskBuildPrompt({
+      title: "Paper", context: "[P1] Baseline paragraph.", history: [{ q: "Old Q", a: "Old A" }], question: "What is in the chart?", hasImage: true
+    });
+    assert(!withoutImg.system.includes("6. An image from the"), "no rule 6 without image");
+    assert(withImg.system.includes("6. An image from the article is attached"), "rule 6 present with image");
+    const iTitle = withImg.prompt.indexOf("TITLE: Paper");
+    const iArt = withImg.prompt.indexOf("ARTICLE:\n[P1] Baseline paragraph.");
+    const iHist = withImg.prompt.indexOf("PREVIOUS Q&A");
+    const iQ = withImg.prompt.indexOf("QUESTION: What is in the chart?");
+    assert(iTitle >= 0 && iTitle < iArt && iArt < iHist && iHist < iQ, "prompt prefix order preserved");
+  });
+});
+
+(async function () {
+  const origRequestAIHostPermissions = window.requestAIHostPermissions;
+  const host = document.createElement("div"); host.className = "suite";
+  const heading = document.createElement("h2"); heading.textContent = "Reader Vision DOM, permissions, and Ask attachment (P1-C)";
+  host.appendChild(heading); document.getElementById("results").appendChild(host);
+  function report(name, error) {
+    const row = document.createElement("div"); row.className = "case " + (error ? "fail" : "pass");
+    row.textContent = (error ? "FAIL " : "PASS ") + name + (error ? "\n  " + error.message : "");
+    if (error) FAIL++; else PASS++;
+    host.appendChild(row);
+  }
+  const atest = (name, fn) => atestNetSerial(name, fn, report);
+  // Let all earlier top-level async suites finish before mutating shared Ask/Explain singletons.
+  if (document.readyState !== "complete") {
+    await new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
+  }
+  let prevQ;
+  do { prevQ = __netStubQueue; await prevQ; await new Promise((r) => setTimeout(r, 20)); } while (prevQ !== __netStubQueue);
+  function makePngDataUrl(w = 16, h = 16) {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#2266aa";
+    ctx.fillRect(0, 0, w, h);
+    return c.toDataURL("image/png");
+  }
+
+  await atest("_pbpVisionLoadImage decodes data URI, enforces cross-origin host_permission, and fetches once granted", async () => {
+    const dataUrl = makePngDataUrl(16, 16);
+    const direct = await _pbpVisionLoadImage(null, dataUrl, "https://example.com/post");
+    assertEq(direct.mimeType, "image/png", "data URI mime");
+    assert(direct.base64.length > 20, "data URI base64");
+
+    const oldPerms = chrome.permissions;
+    const oldFetch = window.fetch;
+    let granted = false;
+    const pngBytes = Uint8Array.from(atob(direct.base64), (ch) => ch.charCodeAt(0));
+    chrome.permissions = {
+      contains: async ({ origins }) => granted && origins && origins[0] === "https://img.example.org/*"
+    };
+    window.fetch = async () => new Response(pngBytes, {
+      status: 200,
+      headers: { "content-type": "image/png" }
+    });
+    try {
+      let caught = null;
+      try {
+        await _pbpVisionLoadImage(null, "https://img.example.org/fig.png", "https://example.com/post");
+      } catch (e) { caught = e; }
+      assert(caught && caught.code === "host_permission", "ungranted throws host_permission");
+      assertEq(JSON.stringify(caught.additionalOrigins), JSON.stringify(["https://img.example.org"]), "additionalOrigins attached");
+
+      granted = true;
+      const remote = await _pbpVisionLoadImage(null, "https://img.example.org/fig.png", "https://example.com/post");
+      assertEq(remote.mimeType, "image/png", "remote mime");
+      assertEq(remote.base64, direct.base64, "remote base64 matches");
+    } finally {
+      chrome.permissions = oldPerms;
+      window.fetch = oldFetch;
+    }
+  });
+
+  await atest("pbpAiRetryWithPermission requests err.additionalOrigins before retrying", async () => {
+    const oldPerms = chrome.permissions;
+    const prevReqFn = window.requestAIHostPermissions;
+    const requested = [];
+    let retried = 0;
+    window.requestAIHostPermissions = origRequestAIHostPermissions;
+    chrome.permissions = {
+      request: async (q) => { requested.push(q); return requested.length === 1; }
+    };
+    try {
+      const err = Object.assign(new Error("Need image host"), {
+        code: "host_permission",
+        additionalOrigins: ["https://cdn.example.net"]
+      });
+      const ok = await pbpAiRetryWithPermission(err, { aiProvider: "deepseek", deepseekApiKey: "sk-test" }, async () => { retried++; });
+      assertEq(ok, true, "granted returns true");
+      assertEq(retried, 1, "retry callback invoked once");
+      assertEq(JSON.stringify(requested[0]), JSON.stringify({ origins: ["https://api.deepseek.com/*", "https://cdn.example.net/*"] }), "provider + image exact origin wildcards requested");
+
+      const denied = await pbpAiRetryWithPermission(err, { aiProvider: "deepseek", deepseekApiKey: "sk-test" }, async () => { retried++; });
+      assertEq(denied, false, "denied returns false");
+      assertEq(retried, 1, "retry callback not called on denial");
+    } finally {
+      window.requestAIHostPermissions = prevReqFn;
+      chrome.permissions = oldPerms;
+    }
+  });
+
+  await atest("clicking a figure image opens #explain-pop[data-mode=image] and ignores linked/broken/1x1 images", async () => {
+    const view = document.createElement("article");
+    view.id = "rendered-view";
+    const dataUrl = makePngDataUrl(24, 24);
+    const tinyUrl = makePngDataUrl(1, 1);
+    view.innerHTML =
+      '<p data-pb="1">Intro paragraph before chart.</p>' +
+      '<figure data-pb="2"><img id="vis-good" alt="System diagram" src="' + dataUrl + '"><figcaption>Figure 1</figcaption></figure>' +
+      '<p data-pb="3"><a href="https://example.com"><img id="vis-linked" alt="Linked" src="' + dataUrl + '"></a>' +
+      '<img id="vis-broken" class="pbp-img-broken" alt="Broken" src="' + dataUrl + '">' +
+      '<img id="vis-tiny" alt="Beacon" src="' + tinyUrl + '"></p>';
+    document.body.appendChild(view);
+    const oldStream = window.callAIStream;
+    const oldSettings = _pbpExplainSettings;
+    const oldAiOk = _pbpExplainAiOk;
+    const preventLinkNav = (ev) => { if (ev.target && ev.target.closest && ev.target.closest("a[href]")) ev.preventDefault(); };
+    window.addEventListener("click", preventLinkNav);
+    const calls = [];
+    window.callAIStream = async (s, prompt, opts, onDelta) => {
+      calls.push({ s, prompt, opts });
+      onDelta("Chart explanation.", "Chart explanation.");
+      return "Chart explanation.";
+    };
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      pbpAiIndexBlocks(view);
+      pbpExplainRefreshSettings({ aiEnabled: true, aiProvider: "deepseek", deepseekApiKey: "sk-test", deepseekModel: "deepseek-flash" });
+      if (!_pbpExplainImgClickWired) {
+        _pbpExplainImgClickWired = true;
+        document.addEventListener("click", _pbpExplainOnImageClick);
+      }
+      assert(document.body.classList.contains("vision-ready"), "vision-ready class set for deepseek-flash");
+
+      document.getElementById("vis-linked").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+      document.getElementById("vis-broken").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+      document.getElementById("vis-tiny").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+      assertEq(calls.length, 0, "linked, broken, and 1x1 images ignored");
+
+      document.getElementById("vis-good").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      assertEq(calls.length, 1, "valid figure image triggers explain stream");
+      assert(Array.isArray(calls[0].opts.images) && calls[0].opts.images.length === 1, "images payload passed to callAIStream");
+      assertEq(calls[0].opts.images[0].mimeType, "image/png", "stream image mimeType");
+      const pop = document.getElementById("explain-pop");
+      assert(!!pop && pop.dataset.mode === "image", "explain-pop in image mode");
+      assertEq(pop.querySelector('.xp-act[data-action="dict"]').hidden, true, "dict tab hidden in image mode");
+      assertEq(pop.querySelector(".xp-save").hidden, true, "save-as-note hidden in image mode");
+    } finally {
+      window.removeEventListener("click", preventLinkNav);
+      if (_pbpExplainPopEl) {
+        _pbpExplainClose(_pbpExplainPopEl);
+        _pbpExplainPopEl.remove();
+        _pbpExplainPopEl = null;
+      }
+      _pbpExplainCap = null;
+      _pbpExplainCtx = null;
+      window.callAIStream = oldStream;
+      pbpExplainRefreshSettings(oldSettings || { aiEnabled: false });
+      _pbpExplainAiOk = oldAiOk;
+      view.remove();
+    }
+  });
+
+  await atest("pbpAskAttachImage + _pbpAskSend sends transient image and persists plain-text prefix without base64", async () => {
+    const view = document.createElement("article");
+    view.id = "rendered-view";
+    view.innerHTML = '<p data-pb="1">Throughput improved by 42% in Q3.</p>';
+    const rail = document.createElement("aside");
+    rail.id = "rail";
+    rail.innerHTML = '<div class="view-toggle"></div>';
+    document.body.append(rail, view);
+
+    const oldStream = window.callAIStream;
+    const oldGetSettings = window.pbpAiGetSettings;
+    const oldAskState = _pbpAskState;
+    const oldAskOpenPanel = window.pbpAskOpenPanel;
+    const visionSettings = { aiEnabled: true, aiProvider: "openai", openaiApiKey: "sk-test", openaiModel: "gpt-5.4-mini" };
+    window.pbpAiGetSettings = async () => visionSettings;
+    const streamCalls = [];
+    window.callAIStream = async (s, prompt, opts, onDelta) => {
+      streamCalls.push({ s, prompt, opts });
+      const ans = 'The chart confirms 42% [P1].\n\nCITES:\nP1: "Throughput improved by 42% in Q3."';
+      onDelta(ans, ans);
+      return ans;
+    };
+    try {
+      _pbpAskState = null;
+      pbpAiIndexBlocks(view);
+      await pbpAskInit({ url: "https://example.com/vision-ask", title: "Q3 Report", account: "tester" });
+      const dataUrl = makePngDataUrl(20, 20);
+      pbpAskAttachImage({ el: null, src: dataUrl, alt: "Q3 Chart", label: "Q3 Chart" });
+      const bar = document.getElementById("ask-img-att");
+      assert(!!bar && bar.hidden === false, "attachment bar visible");
+      const ta = document.getElementById("ask-input");
+      ta.value = "What does this bar show?";
+      await _pbpAskSend();
+
+      assertEq(streamCalls.length, 1, "one Ask stream sent");
+      assert(Array.isArray(streamCalls[0].opts.images) && streamCalls[0].opts.images.length === 1, "Ask stream carries image payload");
+      assertEq(bar.hidden, true, "attachment bar cleared after send");
+      assertEq(_pbpAskState.records.length, 1, "one record recorded");
+      const savedQ = _pbpAskState.records[0].q;
+      assert(savedQ.includes("Q3 Chart") && savedQ.includes("What does this bar show?"), "plain-text image prefix in record.q");
+      assert(!JSON.stringify(_pbpAskState.records).includes(streamCalls[0].opts.images[0].base64.slice(0, 24)), "zero base64 stored in Ask records");
+    } finally {
+      if (_pbpAskIsOpen()) _pbpAskSetOpen(false);
+      if (_pbpReaderPanel) { _pbpReaderPanel.remove(); _pbpReaderPanel = null; }
+      document.getElementById("ask-section")?.remove();
+      window.pbpAskOpenPanel = oldAskOpenPanel;
+      _pbpAskState = oldAskState;
+      window.callAIStream = oldStream;
+      window.pbpAiGetSettings = oldGetSettings;
+      rail.remove();
+      view.remove();
+    }
+  });
+})();
 </script>
 
 </body></html>

@@ -2033,6 +2033,9 @@ html.motion-ready .msg-bar[data-state="busy"] { animation: msg-bar-busy-pulse 1.
   min-width: 88px; min-height: 56px;
   background: var(--surface);
 }
+body.vision-ready:not(.raw-active) #rendered-view img:not(.pbp-img-broken) {
+  cursor: pointer;
+}
 
 /* `scroll-behavior` is deliberately absent -- it cannot reach these calls; the
    guard lives in pbpScrollIntoView (shared.js). */
@@ -2156,6 +2159,9 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-2);
 }
+#explain-pop[data-mode="image"] .xp-act-group {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 .xp-window-actions {
   display: flex;
   flex: 0 0 auto;
@@ -2202,6 +2208,7 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
   cursor: pointer;
   transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, color var(--motion-state) ease;
 }
+.xp-act[hidden] { display: none; }
 .xp-act svg { width: 15px; height: 15px; }
 .xp-act:hover { background: var(--btn-hover); }
 /* Same pressed vocabulary as .toggle-btn.active (md-preview.css ~:265) --
@@ -3573,6 +3580,15 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   background: var(--btn-bg);
 }
 #ask-form:focus-within { outline: 2px solid var(--link); outline-offset: 1px; }
+.ask-img-att {
+  display: flex; align-items: center; gap: var(--sp-2); min-width: 0;
+  padding: var(--sp-2) var(--sp-2) 0 var(--sp-3);
+}
+.ask-img-att[hidden] { display: none; }
+.ask-img-name {
+  flex: 1; min-width: 0; font-size: 12px; line-height: 18px;
+  color: var(--fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 #ask-input {
   box-sizing: border-box; width: 100%; min-width: 0;
   /* Auto-grow from two to eight UI-sized lines, independent of prose size. */

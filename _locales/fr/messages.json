@@ -5497,5 +5497,15 @@
   "mdEngineExtractingNoteDeepseek": {"message":"La première extraction interroge DeepSeek (api.deepseek.com). Elle prend généralement quelques secondes, selon la mise en cache de la page, votre vitesse réseau et la taille de la page."},
   "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch ne récupère que les pages http(s) : il ne peut pas lire celle-ci."},
   "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch récupère les pages depuis ses propres serveurs : il ne voit pas ce qui demande d'être connecté."},
-  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch n'accepte que les URL http(s) standard jusqu'à 8 192 caractères sans identifiants intégrés."}
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch n'accepte que les URL http(s) standard jusqu'à 8 192 caractères sans identifiants intégrés."},
+  "visionActionExplain": {"message":"Expliquer l'image"},
+  "visionActionTranslate": {"message":"Traduire le texte de l'image"},
+  "visionDialogLabel": {"message":"Expliquer l'image"},
+  "visionAskWithImage": {"message":"Poser une question avec cette image"},
+  "visionImageFallbackLabel": {"message":"Illustration"},
+  "visionAskPrefix": {"message":"Image : $LABEL$","placeholders":{"label":{"content":"$1"}}},
+  "visionAskRemoveImage": {"message":"Retirer l'image jointe"},
+  "visionAskDefaultQuestion": {"message":"Que montre cette image dans le contexte de l'article ?"},
+  "visionImageLoadFailed": {"message":"Impossible de charger cette image pour l'analyse par l'IA."},
+  "visionImageTooLarge": {"message":"Cette image reste trop volumineuse pour être envoyée (plus de 4 Mo après réduction)."}
 }

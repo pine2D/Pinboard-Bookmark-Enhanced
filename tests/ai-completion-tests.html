@@ -1,4 +1,4 @@
-<!doctype html><meta charset="utf-8"><meta name="pbp-expected-count" content="121"><title>AI completion and required-thinking tests</title>
+<!doctype html><meta charset="utf-8"><meta name="pbp-expected-count" content="125"><title>AI completion and required-thinking tests</title>
 <div id="results"></div><div id="summary"></div>
 <script src="../i18n.js"></script><script src="../shared.js"></script><script src="../ai.js"></script>
 <script>
@@ -1268,6 +1268,65 @@ await test('Ollama string error bodies reach the message, code and status on bot
       assert(caught&&caught.status===status&&caught.message.includes(error)&&caught.code===code,mode+' '+status+': '+(caught&&caught.message)+'/'+(caught&&caught.code));
     }
   }
+});
+// ---- Reader vision multimodal support (P1-C) ----
+await test('pbpAiSupportsVision gates the four vision providers and rejects retired text-only DeepSeek models',async()=>{
+  assert(pbpAiSupportsVision({aiProvider:'openai',openaiApiKey:'k',openaiModel:'gpt-5.4-nano'})===true,'openai');
+  assert(pbpAiSupportsVision({aiProvider:'claude',claudeApiKey:'k',claudeModel:'claude-haiku-4-5'})===true,'claude');
+  assert(pbpAiSupportsVision({aiProvider:'gemini',geminiApiKey:'k',geminiModel:'gemini-3.5-flash-lite'})===true,'gemini');
+  assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-flash'})===true,'deepseek-flash');
+  assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-chat'})===false,'deepseek-chat');
+  assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-reasoner'})===false,'deepseek-reasoner');
+  assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-flash'},'deepseek-chat')===false,'override to deepseek-chat');
+  assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-chat'},'deepseek-flash')===true,'override to deepseek-flash');
+  assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'',deepseekModel:'deepseek-flash'})===false,'missing key');
+  for(const p of ['ollama','qwen','minimax','openrouter','custom']){
+    assert(pbpAiSupportsVision({aiProvider:p,[p+'ApiKey']:'k',customBaseUrl:'https://example.test/v1',ollamaBaseUrl:'http://127.0.0.1:11434'})===false,'non-vision '+p);
+  }
+});
+await test('vision wire payloads format multimodal content across OpenAI/DeepSeek, Anthropic and Gemini',async()=>{
+  const img={mimeType:'image/png',dataBase64:'iVBORw0KGgo='};
+  for(const s of [
+    {aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'gpt-5.4-nano'},
+    {aiProvider:'deepseek',deepseekApiKey:'fixture',deepseekModel:'deepseek-flash'}
+  ]){
+    reset([reply(PROTOCOLS[0].complete),STREAM_DONE.compatible]);
+    assert(await run({images:[img]},s)==='ready'&&await stream({images:[img]},s)==='ready',s.aiProvider+' run/stream');
+    for(const body of calls){
+      const content=body.messages[body.messages.length-1].content;
+      assert(Array.isArray(content)&&content.length===2&&content[0].type==='image_url'&&content[0].image_url.url==='data:image/png;base64,iVBORw0KGgo='&&content[1].type==='text'&&content[1].text==='Synthetic provider learning request',s.aiProvider+' wire: '+JSON.stringify(content));
+    }
+  }
+  reset([reply(PROTOCOLS[2].complete),STREAM_DONE.claude]);
+  assert(await run({images:[img]},PROTOCOLS[2].settings)==='ready'&&await stream({images:[img]},PROTOCOLS[2].settings)==='ready','claude run/stream');
+  for(const body of calls){
+    const content=body.messages[0].content;
+    assert(Array.isArray(content)&&content.length===2&&content[0].type==='image'&&content[0].source.type==='base64'&&content[0].source.media_type==='image/png'&&content[0].source.data==='iVBORw0KGgo='&&content[1].type==='text',JSON.stringify(content));
+  }
+  reset([reply(PROTOCOLS[1].complete),STREAM_DONE.gemini]);
+  assert(await run({images:[img]},PROTOCOLS[1].settings)==='ready'&&await stream({images:[img]},PROTOCOLS[1].settings)==='ready','gemini run/stream');
+  for(const body of calls){
+    const parts=body.contents[0].parts;
+    assert(Array.isArray(parts)&&parts.length===2&&parts[0].inlineData?.mimeType==='image/png'&&parts[0].inlineData?.data==='iVBORw0KGgo='&&parts[1].text==='Synthetic provider learning request',JSON.stringify(parts));
+  }
+});
+await test('text-only requests stay byte-identical when images is absent, empty, or unsupported MIME',async()=>{
+  const bad=[{mimeType:'image/svg+xml',dataBase64:'PHN2Zz4='}];
+  for(const p of [PROTOCOLS[0],PROTOCOLS[1],PROTOCOLS[2]]){
+    reset([reply(p.complete),reply(p.complete),reply(p.complete)]);
+    await run({},p.settings);await run({images:[]},p.settings);await run({images:bad},p.settings);
+    assert(raw.length===3&&raw[0]===raw[1]&&raw[0]===raw[2],p.name+' drifted: '+raw[0]+' vs '+raw[2]);
+  }
+});
+await test('vision capability memos isolate under :vision without poisoning text-only calls',async()=>{
+  const ds={aiProvider:'deepseek',deepseekApiKey:'fixture',deepseekModel:'deepseek-flash'};
+  const img={mimeType:'image/png',dataBase64:'iVBORw0KGgo='};
+  const vKey=JSON.stringify([2,'deepseek:vision','https://api.deepseek.com/v1','deepseek-flash']);
+  const tKey=JSON.stringify([2,'deepseek','https://api.deepseek.com/v1','deepseek-flash']);
+  reset([reply(OFF_REFUSED,400),reply(OK),reply(OK)]);
+  assert(await run({images:[img]},ds)==='ready','vision heal');
+  assert(stored.pbpThinkReject?.[vKey]?.rejected===true&&!stored.pbpThinkReject?.[tKey],'memo isolation: '+JSON.stringify(stored.pbpThinkReject));
+  assert(await run({},ds)==='ready'&&calls[2].thinking?.type==='disabled','text-only call was poisoned by :vision memo');
 });
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();

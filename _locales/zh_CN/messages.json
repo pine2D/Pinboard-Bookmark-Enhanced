@@ -5491,5 +5491,15 @@
   "mdEngineExtractingNoteDeepseek": {"message":"首次抽取需联网请求 DeepSeek（api.deepseek.com）；耗时取决于该页是否已被缓存、你的网速与页面大小，通常数秒。"},
   "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch 只能抓取 http(s) 页面，无法读取此页。"},
   "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch 从自己的服务器抓取页面，看不到需要登录才能看的内容。"},
-  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch 仅支持不超过 8,192 个字符且不含账号密码的标准 http(s) 网址。"}
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch 仅支持不超过 8,192 个字符且不含账号密码的标准 http(s) 网址。"},
+  "visionActionExplain": {"message":"解释图片"},
+  "visionActionTranslate": {"message":"翻译图中文字"},
+  "visionDialogLabel": {"message":"解释图片"},
+  "visionAskWithImage": {"message":"附带此图提问"},
+  "visionImageFallbackLabel": {"message":"图片"},
+  "visionAskPrefix": {"message":"图片：$LABEL$","placeholders":{"label":{"content":"$1"}}},
+  "visionAskRemoveImage": {"message":"移除附图"},
+  "visionAskDefaultQuestion": {"message":"结合正文，这张图片展示了什么？"},
+  "visionImageLoadFailed": {"message":"无法读取这张图片以供 AI 解析。"},
+  "visionImageTooLarge": {"message":"图片压缩后仍超过 4 MB，无法发送。"}
 }

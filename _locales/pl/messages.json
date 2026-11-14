@@ -5497,5 +5497,15 @@
   "mdEngineExtractingNoteDeepseek": {"message":"Pierwsza ekstrakcja pobiera dane przez DeepSeek (api.deepseek.com). Czas oczekiwania zależy od tego, czy strona jest w pamięci podręcznej, od szybkości sieci i rozmiaru strony, zwykle trwa kilka sekund."},
   "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch pobiera tylko strony http(s), więc nie odczyta tej strony."},
   "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch pobiera strony przez własne serwery, więc nie widzi treści dostępnych dopiero po zalogowaniu."},
-  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch obsługuje tylko standardowe adresy http(s) do 8192 znaków bez danych logowania w adresie."}
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch obsługuje tylko standardowe adresy http(s) do 8192 znaków bez danych logowania w adresie."},
+  "visionActionExplain": {"message":"Wyjaśnij obraz"},
+  "visionActionTranslate": {"message":"Przetłumacz tekst z obrazu"},
+  "visionDialogLabel": {"message":"Wyjaśnij obraz"},
+  "visionAskWithImage": {"message":"Zapytaj z tym obrazem"},
+  "visionImageFallbackLabel": {"message":"Obraz"},
+  "visionAskPrefix": {"message":"Obraz: $LABEL$","placeholders":{"label":{"content":"$1"}}},
+  "visionAskRemoveImage": {"message":"Usuń załączony obraz"},
+  "visionAskDefaultQuestion": {"message":"Co przedstawia ten obraz w kontekście artykułu?"},
+  "visionImageLoadFailed": {"message":"Nie udało się wczytać tego obrazu do analizy przez AI."},
+  "visionImageTooLarge": {"message":"Ten obraz jest za duży do wysłania (ponad 4 MB po zmniejszeniu)."}
 }

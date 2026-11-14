@@ -9104,6 +9104,40 @@ async function openReaderSurface(name) {
       await wait(300);
       return shown(document.querySelector(".confirm-popover"));
     }
+    case "explain-image": {
+      const p = document.querySelector("#rendered-view p");
+      if (!p || typeof _pbpExplainOpenPop !== "function") return false;
+      let img = document.getElementById("render-audit-vision-img");
+      if (!img) {
+        img = document.createElement("img");
+        img.id = "render-audit-vision-img";
+        img.alt = "Figure 1: Architecture diagram";
+        img.width = 48;
+        img.height = 32;
+        img.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+        p.appendChild(img);
+      }
+      const r = img.getBoundingClientRect();
+      _pbpExplainOpenPop({
+        text: img.alt,
+        rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height },
+        n: 1,
+        image: { el: img, src: img.src, alt: img.alt, label: img.alt }
+      }, "explain");
+      await wait(700);
+      const pop = document.getElementById("explain-pop");
+      return shown(pop) && pop.dataset.mode === "image";
+    }
+    case "ask-image-att": {
+      if (typeof pbpAskAttachImage !== "function") return false;
+      pbpAskAttachImage({
+        src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        alt: "Figure 1: Architecture diagram",
+        label: "Figure 1: Architecture diagram"
+      });
+      await wait(300);
+      return shown(document.getElementById("ask-img-att"));
+    }
   }
   return false;
 }
@@ -9133,6 +9167,19 @@ function closeReaderSurface(name) {
     case "send-menu": { const c = document.getElementById("send-caret"); const m = document.getElementById("send-menu"); if (c && m && !m.hidden) c.click(); return; }
     case "confirm-popover": { document.querySelector(".confirm-popover .confirm-no")?.click(); return; }
     case "tr-ask": { if (typeof _pbpTrAskClose === "function") _pbpTrAskClose(); return; }
+    case "explain-image": {
+      const pop = document.getElementById("explain-pop");
+      if (pop && typeof _pbpExplainClose === "function") _pbpExplainClose(pop);
+      document.getElementById("render-audit-vision-img")?.remove();
+      return;
+    }
+    case "ask-image-att": {
+      if (typeof _pbpAskSetAttachedImage === "function") _pbpAskSetAttachedImage(null);
+      const btn = document.getElementById("ask-open");
+      const panel = document.getElementById("ask-panel");
+      if (btn && panel && !panel.hidden) btn.click();
+      return;
+    }
     default: hide(document.getElementById(name));
   }
 }

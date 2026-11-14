@@ -24,7 +24,7 @@ export const RENDER_READER_CONTEXTS = Object.freeze([
   'explain-pop', 'explain-dict', 'dict-resize-menu', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-progress', 'dict-entry-result', 'dict-entry-details',
   'dict-entry-usage-busy', 'dict-entry-usage-error', 'dict-entry-usage-result',
   'dict-entry-panel', 'dict-entry-cached', 'dict-entry-folded', 'dict-entry-revealed', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'dict-entry-legacy', 'dict-save-bar', 'dict-save-change-menu', 'dict-save-saved', 'dict-entry-paid-negative', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop', 'rail-history-pop',
-  'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
+  'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask', 'explain-image', 'ask-image-att',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
 // The remembered paid learning actions (plan 3.3, ruling 2026-10-28) must stay
@@ -131,7 +131,9 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
   'md-preview': [context('reader', [], { target: '#rendered-view' }), ...RENDER_READER_CONTEXTS.map((name) => context(name,
     name === 'explain-dict' ? ['explain-pop'] : name === 'dict-resize-menu' ? ['explain-dict'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-progress' ? ['dict-entry-busy'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached', 'dict-entry-usage-busy', 'dict-entry-panel', 'dict-entry-folded'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-revealed' ? ['dict-entry-folded'] : name === 'dict-entry-usage-error' ? ['dict-entry-usage-busy'] : name === 'dict-entry-usage-result' ? ['dict-entry-usage-error'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : name === 'dict-save-change-menu' ? ['dict-save-bar'] : [],
     name === 'dict-entry-paid-negative' ? { target: DICT_PAID_NEGATIVE_TARGET, locales: DICT_PAID_NEGATIVE_LOCALES }
-      : name === 'reader-bookmark-quote-error' ? { target: '#reader-bookmark-editor-status[data-state="error"]', locales: READER_BOOKMARK_QUOTE_LOCALES } : {})), context('video', [], { target: '.pbv-bar' }), context('history-empty', [], { target: '.empty-state.es-history .rh-match' })],
+      : name === 'reader-bookmark-quote-error' ? { target: '#reader-bookmark-editor-status[data-state="error"]', locales: READER_BOOKMARK_QUOTE_LOCALES }
+      : name === 'explain-image' ? { target: '#explain-pop[data-mode="image"]:popover-open' }
+      : name === 'ask-image-att' ? { target: '#ask-img-att:not([hidden])' } : {})), context('video', [], { target: '.pbv-bar' }), context('history-empty', [], { target: '.empty-state.es-history .rh-match' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
     context('form', [], { target: '#url-input' }), context('title-error', ['form'], { target: '#desc-char-count.over-limit' }), context('linkding-sharing', ['form'], { target: '#share-check' }), context('linkding-description', ['form'], { target: '#linkding-description-input' }), context('reader-history', [], { target: '#jina-md-history-pop:popover-open' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),

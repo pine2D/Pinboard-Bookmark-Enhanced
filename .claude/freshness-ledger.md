@@ -60,7 +60,7 @@
 | Google Drive | tests/ask-archive-tests.html | 未核实 | - |
 | Google Drive | tests/drive-scopes-tests.html | 未核实 | - |
 | Google Drive | tests/options-drive-sync-tests.html | 未核实 | - |
-| OpenAI、Anthropic、Gemini、Ollama | tests/ai-completion-tests.html | 未核实 | 注释说按官方 schema 手写 |
+| OpenAI、Anthropic、Gemini、DeepSeek、Ollama | tests/ai-completion-tests.html | 未核实 | 按官方 schema 手写（含多模态图片输入） |
 | OpenAI 兼容接口 | tests/popup-ai-sw-tests.html | 未核实 | - |
 | OpenAI 兼容接口 | tests/fixtures/dict-live-responses.mjs | 未核实 | - |
 | OpenAI 兼容接口 | tests/fixtures/dict-chat-stream.mjs | 未核实 | 流式响应 |

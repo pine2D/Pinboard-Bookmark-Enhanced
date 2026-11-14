@@ -5497,5 +5497,15 @@
   "mdEngineExtractingNoteDeepseek": {"message":"Die erste Extraktion ruft DeepSeek (api.deepseek.com) ab. Sie dauert meist ein paar Sekunden, abhängig davon, ob die Seite zwischengespeichert ist, von deiner Netzwerkgeschwindigkeit und der Seitengröße."},
   "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch kann nur http(s)-Seiten abrufen und diese Seite daher nicht lesen."},
   "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch ruft Seiten über eigene Server ab und sieht deshalb nichts, wofür man angemeldet sein muss."},
-  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch akzeptiert nur reguläre http(s)-URLs mit bis zu 8.192 Zeichen ohne eingebettete Zugangsdaten."}
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch akzeptiert nur reguläre http(s)-URLs mit bis zu 8.192 Zeichen ohne eingebettete Zugangsdaten."},
+  "visionActionExplain": {"message":"Bild erklären"},
+  "visionActionTranslate": {"message":"Bildtext übersetzen"},
+  "visionDialogLabel": {"message":"Bild erklären"},
+  "visionAskWithImage": {"message":"Mit diesem Bild fragen"},
+  "visionImageFallbackLabel": {"message":"Bild"},
+  "visionAskPrefix": {"message":"Bild: $LABEL$","placeholders":{"label":{"content":"$1"}}},
+  "visionAskRemoveImage": {"message":"Angehängtes Bild entfernen"},
+  "visionAskDefaultQuestion": {"message":"Was zeigt dieses Bild im Zusammenhang mit dem Artikel?"},
+  "visionImageLoadFailed": {"message":"Dieses Bild konnte für die KI-Analyse nicht geladen werden."},
+  "visionImageTooLarge": {"message":"Dieses Bild ist zum Senden zu groß (über 4 MB nach dem Verkleinern)."}
 }

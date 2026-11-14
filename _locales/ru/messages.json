@@ -5497,5 +5497,15 @@
   "mdEngineExtractingNoteDeepseek": {"message":"При первом извлечении запрос идёт к DeepSeek (api.deepseek.com). Обычно это занимает несколько секунд в зависимости от кэша, скорости сети и размера страницы."},
   "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch загружает только страницы http(s), поэтому эту страницу прочитать не может."},
   "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch загружает страницы со своих серверов, поэтому не видит того, что доступно только после входа."},
-  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch принимает только обычные адреса http(s) длиной до 8192 символов без учётных данных в URL."}
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch принимает только обычные адреса http(s) длиной до 8192 символов без учётных данных в URL."},
+  "visionActionExplain": {"message":"Объяснить изображение"},
+  "visionActionTranslate": {"message":"Перевести текст на изображении"},
+  "visionDialogLabel": {"message":"Объяснить изображение"},
+  "visionAskWithImage": {"message":"Спросить об этом изображении"},
+  "visionImageFallbackLabel": {"message":"Изображение"},
+  "visionAskPrefix": {"message":"Изображение: $LABEL$","placeholders":{"label":{"content":"$1"}}},
+  "visionAskRemoveImage": {"message":"Убрать прикреплённое изображение"},
+  "visionAskDefaultQuestion": {"message":"Что показано на этом изображении в контексте статьи?"},
+  "visionImageLoadFailed": {"message":"Не удалось загрузить это изображение для анализа ИИ."},
+  "visionImageTooLarge": {"message":"Это изображение слишком велико для отправки (более 4 МБ после сжатия)."}
 }

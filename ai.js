@@ -609,7 +609,8 @@ function _aiCapabilityKey(provider, model, cfg) {
   // Versioned keys deliberately ignore old, unscoped decisions. Endpoint
   // changes and upgrades must get a fresh chance to accept their own dialect.
   const endpoint = String(cfg?.endpoint || cfg?.base || "").trim().replace(/\/+$/, "");
-  return JSON.stringify([2, provider, endpoint, model || ""]);
+  const scopedProvider = cfg?.capabilityScope ? provider + ":" + cfg.capabilityScope : provider;
+  return JSON.stringify([2, scopedProvider, endpoint, model || ""]);
 }
 function _aiCapabilityFresh(record) {
   return record && Number.isSafeInteger(record.expiresAt) && record.expiresAt > Date.now() &&
@@ -959,6 +960,40 @@ function pbpAiFirstConfiguredProvider(s, skip, { ollamaGranted = false, order = 
 // never a model-name list. Callers that pass none of these options get the
 // registered provider entry plus its endpoint and two false flags, which the
 // body dialect already defaulted to — their requests stay byte-identical.
+const _AI_VISION_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+function _aiNormalizeImages(opts) {
+  const raw = opts && opts.images;
+  if (!Array.isArray(raw) || !raw.length) return null;
+  const out = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const mimeType = String(item.mimeType || "").trim().toLowerCase();
+    if (!_AI_VISION_MIME_TYPES.has(mimeType)) continue;
+    const rawB64 = typeof item.base64 === "string" ? item.base64 : (typeof item.dataBase64 === "string" ? item.dataBase64 : "");
+    let base64 = rawB64.trim();
+    if (!base64) continue;
+    base64 = base64.replace(/^data:[^;,]+;base64,/i, "");
+    if (!base64) continue;
+    out.push({ mimeType, base64 });
+  }
+  return out.length ? out : null;
+}
+
+// Reader click-image multimodal support: enabled only for the four vision
+// providers (gemini, openai, claude, and deepseek on deepseek-flash or newer
+// vision models; retired text-only deepseek-chat/deepseek-reasoner excluded).
+function pbpAiSupportsVision(s, modelOverride) {
+  const target = pbpAiResolveTarget(s);
+  if (!target || target.error || !target.apiKey) return false;
+  const p = target.provider;
+  if (p === "gemini" || p === "openai" || p === "claude") return true;
+  if (p === "deepseek") {
+    const m = String(modelOverride || target.model || "").trim().toLowerCase();
+    return m !== "deepseek-chat" && m !== "deepseek-reasoner";
+  }
+  return false;
+}
+
 function _aiCompatCfg(s, p, opts = {}, target = pbpAiResolveTarget(s, p)) {
   const registered = target.protocol === "openai" ? target.cfg : null;
   if (!registered) throw new Error("Unknown provider: " + p);
@@ -970,7 +1005,8 @@ function _aiCompatCfg(s, p, opts = {}, target = pbpAiResolveTarget(s, p)) {
     ...(opts.totalOutputBudget === true ? { tokenField: "max_completion_tokens" } : {}),
     ...(!registered.thinkingOff && opts.reasoningEffort === "low" ? { thinkingOff: { reasoning_effort: "low" } } : {}),
     ...(!registered.thinkingOff && opts.reasoningEffort === "minimum"
-      ? { thinkingOff: { reasoning_effort: "none" }, thinkingFallback: { reasoning_effort: "low" } } : {})
+      ? { thinkingOff: { reasoning_effort: "none" }, thinkingFallback: { reasoning_effort: "low" } } : {}),
+    ...(_aiNormalizeImages(opts) ? { capabilityScope: "vision" } : {})
   };
 }
 
@@ -1154,7 +1190,8 @@ const _GEMINI_THINKING_CFG = { thinkingOff: { thinkingConfig: { thinkingBudget: 
 
 async function callGemini(s, prompt, opts = {}) {
   const model = opts.model || s.geminiModel || _AI_BESPOKE_PROVIDERS.gemini.defaultModel;
-  return _aiWithDialectFallback("gemini", model, _GEMINI_THINKING_CFG, (extraBody) =>
+  const cfg = _aiNormalizeImages(opts) ? { ..._GEMINI_THINKING_CFG, capabilityScope: "vision" } : _GEMINI_THINKING_CFG;
+  return _aiWithDialectFallback("gemini", model, cfg, (extraBody) =>
     _callGeminiOnce(s, model, prompt, opts, extraBody));
 }
 
@@ -1168,6 +1205,10 @@ async function _callGeminiOnce(s, model, prompt, opts, extraBody) {
   // Gemini's dialect nests under generationConfig, unlike the top-level merge
   // the OpenAI-compat callers use — apply the one relevant key explicitly.
   if (extraBody && extraBody.thinkingConfig) generationConfig.thinkingConfig = extraBody.thinkingConfig;
+  const imgs = _aiNormalizeImages(opts);
+  const parts = imgs
+    ? [...imgs.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.base64 } })), { text: prompt }]
+    : [{ text: prompt }];
   // Gemini API requires key as URL param (no Authorization header support) — API design limitation
   if (typeof opts.beforeRequest === "function") {
     await opts.beforeRequest();
@@ -1175,7 +1216,7 @@ async function _callGeminiOnce(s, model, prompt, opts, extraBody) {
   }
   const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${s.geminiApiKey}`, {
     method: "POST", headers: { "Content-Type": "application/json" }, signal: opts.signal,
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig })
+    body: JSON.stringify({ contents: [{ parts }], generationConfig })
   }, _aiCompletionTimeout(opts));
   if (!res.ok) await handleAIError(res, "Gemini");
   return _aiReadCompletion(res, "gemini", opts);
@@ -1183,6 +1224,10 @@ async function _callGeminiOnce(s, model, prompt, opts, extraBody) {
 
 async function callAnthropicMessages(target, prompt, opts = {}) {
   const maxTokens = opts.maxTokens || 1024;
+  const imgs = _aiNormalizeImages(opts);
+  const content = imgs
+    ? [...imgs.map((img) => ({ type: "image", source: { type: "base64", media_type: img.mimeType, data: img.base64 } })), { type: "text", text: prompt }]
+    : prompt;
   if (typeof opts.beforeRequest === "function") {
     await opts.beforeRequest();
     opts.signal?.throwIfAborted();
@@ -1190,7 +1235,7 @@ async function callAnthropicMessages(target, prompt, opts = {}) {
   const res = await fetchWithTimeout(target.endpoint.replace(/\/+$/, "") + "/messages", {
     method: "POST", signal: opts.signal,
     headers: { "Content-Type": "application/json", "x-api-key": target.apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-    body: JSON.stringify({ model: opts.model || target.model, max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] })
+    body: JSON.stringify({ model: opts.model || target.model, max_tokens: maxTokens, messages: [{ role: "user", content }] })
   }, _aiCompletionTimeout(opts));
   if (!res.ok) await handleAIError(res, _aiTransportLabel(target));
   return _aiReadCompletion(res, "claude", opts);
@@ -1200,6 +1245,10 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
   const maxTokens = opts.maxTokens || 1024;
   const headers = { "Content-Type": "application/json" };
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+  const imgs = _aiNormalizeImages(opts);
+  const content = imgs
+    ? [...imgs.map((img) => ({ type: "image_url", image_url: { url: "data:" + img.mimeType + ";base64," + img.base64 } })), { type: "text", text: prompt }]
+    : prompt;
   if (typeof opts.beforeRequest === "function") {
     await opts.beforeRequest();
     opts.signal?.throwIfAborted();
@@ -1208,7 +1257,7 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
     method: "POST", headers, signal: opts.signal,
     body: JSON.stringify({
       model,
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content }],
       ...(opts.omitTemperature ? {} : { temperature: 0.3 }),
       ...(opts.jsonMode && !opts.omitResponseFormat ? { response_format: opts.schemaMode && opts.responseSchema && !opts.omitJsonSchema
         ? { type: "json_schema", json_schema: { name: "response", strict: true, schema: opts.responseSchema } }
@@ -1857,7 +1906,11 @@ async function _streamOpenAICompat(baseUrl, apiKey, model, prompt, opts, onDelta
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
   const messages = [];
   if (opts.system) messages.push({ role: "system", content: opts.system });
-  messages.push({ role: "user", content: prompt });
+  const imgs = _aiNormalizeImages(opts);
+  const userContent = imgs
+    ? [...imgs.map((img) => ({ type: "image_url", image_url: { url: "data:" + img.mimeType + ";base64," + img.base64 } })), { type: "text", text: prompt }]
+    : prompt;
+  messages.push({ role: "user", content: userContent });
   let full = "";
   const usage = _pbpUsageSink(_pbpOpenAIUsage, opts);
   const contract = _pbpStreamContract("openai", opts);
@@ -1910,7 +1963,11 @@ async function _streamGemini(s, prompt, opts, onDelta) {
   // function without that wrapper.
   if (opts.extraBody && opts.extraBody.thinkingConfig) generationConfig.thinkingConfig = opts.extraBody.thinkingConfig;
   else if (opts.noThinking && !opts.extraBody) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-  const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig };
+  const imgs = _aiNormalizeImages(opts);
+  const parts = imgs
+    ? [...imgs.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.base64 } })), { text: prompt }]
+    : [{ text: prompt }];
+  const body = { contents: [{ parts }], generationConfig };
   if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
   let full = "";
   const usage = _pbpUsageSink(_pbpGeminiUsage, opts);
@@ -1943,10 +2000,14 @@ async function _streamGemini(s, prompt, opts, onDelta) {
 // nothing worth memoizing per (provider, model). Structure stays a prompt plus
 // strict parsing, never another protocol's response_format field.
 async function _streamAnthropicMessages(target, prompt, opts, onDelta) {
+  const imgs = _aiNormalizeImages(opts);
+  const userContent = imgs
+    ? [...imgs.map((img) => ({ type: "image", source: { type: "base64", media_type: img.mimeType, data: img.base64 } })), { type: "text", text: prompt }]
+    : prompt;
   const body = {
     model: opts.model || target.model,
     max_tokens: opts.maxTokens || 1024,
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content: userContent }],
     stream: true
   };
   if (opts.system) body.system = opts.system;
@@ -2092,7 +2153,8 @@ async function _aiStreamDispatch(s, prompt, opts, cb, control) {
     const lowEffort = opts.reasoningEffort === "minimum" || opts.reasoningEffort === "low";
     if (!opts.noThinking && !lowEffort) return _streamGemini(s, prompt, opts, cb);
     const gModel = opts.model || s.geminiModel || _AI_BESPOKE_PROVIDERS.gemini.defaultModel;
-    return _aiWithDialectFallback("gemini", gModel, _GEMINI_THINKING_CFG, (extraBody) =>
+    const gCfg = _aiNormalizeImages(opts) ? { ..._GEMINI_THINKING_CFG, capabilityScope: "vision" } : _GEMINI_THINKING_CFG;
+    return _aiWithDialectFallback("gemini", gModel, gCfg, (extraBody) =>
       _streamGemini(s, prompt, { ...opts, model: gModel, extraBody }, cb), control);
   }
   if (target.protocol === "anthropic") return _streamAnthropicMessages(target, prompt, opts, cb);

@@ -5497,5 +5497,15 @@
   "mdEngineExtractingNoteDeepseek": {"message":"初回の抽出は DeepSeek（api.deepseek.com）から取得します。待ち時間は、ページがキャッシュ済みかどうか、通信速度、ページの大きさによって変わります（通常は数秒）。"},
   "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch が取得できるのは http(s) のページだけのため、このページは読み取れません。"},
   "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch は自前のサーバーからページを取得するため、ログインしないと見られない内容は読み取れません。"},
-  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch は認証情報を含まない 8,192 文字以内の標準的な http(s) URL のみ対応しています。"}
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch は認証情報を含まない 8,192 文字以内の標準的な http(s) URL のみ対応しています。"},
+  "visionActionExplain": {"message":"画像を解説"},
+  "visionActionTranslate": {"message":"画像内の文字を翻訳"},
+  "visionDialogLabel": {"message":"画像を解説"},
+  "visionAskWithImage": {"message":"この画像を添えて質問する"},
+  "visionImageFallbackLabel": {"message":"画像"},
+  "visionAskPrefix": {"message":"画像：$LABEL$","placeholders":{"label":{"content":"$1"}}},
+  "visionAskRemoveImage": {"message":"添付した画像を外す"},
+  "visionAskDefaultQuestion": {"message":"本文の文脈において、この画像は何を示していますか？"},
+  "visionImageLoadFailed": {"message":"AI で読み取るための画像を読み込めませんでした。"},
+  "visionImageTooLarge": {"message":"縮小後も画像が 4 MB を超えているため送信できません。"}
 }
