@@ -70,9 +70,9 @@ export const AI_PROVIDERS = deepFreeze([
     keyField: "deepseekApiKey",
     base: "https://api.deepseek.com/v1",
     modelField: "deepseekModel",
-    defaultModel: "deepseek-v4-flash",
+    defaultModel: "deepseek-flash",
     thinkingOff: { thinking: { type: "disabled" } },
-    comment: "v4-flash defaults thinking ON; 4xx self-heal (deepseek-reasoner rejects it)",
+    comment: "deepseek-flash defaults thinking ON; 4xx self-heal (deepseek-reasoner rejects it)",
     statusPage: { url: "https://status.deepseek.com/", name: "DeepSeek", order: 4 },
   },
   {

@@ -2000,7 +2000,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-ai-provider": "gemini",
         // @generated:settings-schema end (panel-defaults-ai-fields-head)
         // @generated:ai-providers start (panel-defaults-fields)
-        "opt-gemini-model": "gemini-3.5-flash-lite", "opt-openai-model": "gpt-5.4-nano", "opt-openai-baseurl": "https://api.openai.com/v1", "opt-claude-model": "claude-haiku-4-5", "opt-deepseek-model": "deepseek-v4-flash", "opt-qwen-model": "qwen-flash", "opt-qwen-region": "beijing", "opt-qwen-workspace": "", "opt-minimax-model": "MiniMax-M2", "opt-openrouter-model": "openai/gpt-oss-20b", "opt-groq-model": "openai/gpt-oss-20b", "opt-mistral-model": "mistral-small-latest", "opt-cohere-model": "command-r7b-12-2024", "opt-siliconflow-model": "Qwen/Qwen3-8B", "opt-zhipu-model": "glm-4.7-flash", "opt-kimi-model": "kimi-k2.6", "opt-ark-model": "doubao-seed-2-0-mini-260428", "opt-ark-region": "cn", "opt-opencode-model": "glm-5.3-flash", "opt-opencode-protocol": "openai", "opt-commandcode-model": "deepseek/deepseek-v4-flash", "opt-commandcode-protocol": "openai", "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2",
+        "opt-gemini-model": "gemini-3.5-flash-lite", "opt-openai-model": "gpt-5.4-nano", "opt-openai-baseurl": "https://api.openai.com/v1", "opt-claude-model": "claude-haiku-4-5", "opt-deepseek-model": "deepseek-flash", "opt-qwen-model": "qwen-flash", "opt-qwen-region": "beijing", "opt-qwen-workspace": "", "opt-minimax-model": "MiniMax-M2", "opt-openrouter-model": "openai/gpt-oss-20b", "opt-groq-model": "openai/gpt-oss-20b", "opt-mistral-model": "mistral-small-latest", "opt-cohere-model": "command-r7b-12-2024", "opt-siliconflow-model": "Qwen/Qwen3-8B", "opt-zhipu-model": "glm-4.7-flash", "opt-kimi-model": "kimi-k2.6", "opt-ark-model": "doubao-seed-2-0-mini-260428", "opt-ark-region": "cn", "opt-opencode-model": "glm-5.3-flash", "opt-opencode-protocol": "openai", "opt-commandcode-model": "deepseek/deepseek-v4-flash", "opt-commandcode-protocol": "openai", "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2",
         // @generated:ai-providers end (panel-defaults-fields)
       },
       keepsSecrets: true,
@@ -4456,7 +4456,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       claudeApiKey: obfuscateKey($id("opt-claude-key").value.trim()),
       claudeModel: $id("opt-claude-model").value.trim() || "claude-haiku-4-5",
       deepseekApiKey: obfuscateKey($id("opt-deepseek-key").value.trim()),
-      deepseekModel: $id("opt-deepseek-model").value.trim() || "deepseek-v4-flash",
+      deepseekModel: $id("opt-deepseek-model").value.trim() || "deepseek-flash",
       qwenApiKey: obfuscateKey($id("opt-qwen-key").value.trim()),
       qwenModel: $id("opt-qwen-model").value.trim() || "qwen-flash",
       qwenWorkspaceId: $id("opt-qwen-workspace").value.trim(),

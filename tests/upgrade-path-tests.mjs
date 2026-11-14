@@ -556,6 +556,7 @@ async function runUpgradeRound(profileDir, oldStageDir, workExtDir, oldVersion, 
         '_webhookSyncScrubDone',
         '_hlOwnerClaimDone',
         '_driveScopeKeysRetiredDone',
+        '_retiredDeepseekModelsDone',
       ]);
     });
     const newMeta = materializeNewReleaseTree(workExtDir, oldVersion, mutateNewTree);
@@ -597,6 +598,7 @@ async function verifyPostUpgrade(launch, snapshot, { label }) {
         '_webhookSyncScrubDone',
         '_hlOwnerClaimDone',
         '_driveScopeKeysRetiredDone',
+        '_retiredDeepseekModelsDone',
       ]);
       const points = typeof pbpRestorePointList === 'function' ? await pbpRestorePointList(account) : [];
       return {
@@ -608,7 +610,8 @@ async function verifyPostUpgrade(launch, snapshot, { label }) {
     }, { account: snapshot.account });
     const allFlags = swState.flags._webhookSyncScrubDone === true &&
       swState.flags._hlOwnerClaimDone === true &&
-      swState.flags._driveScopeKeysRetiredDone === true;
+      swState.flags._driveScopeKeysRetiredDone === true &&
+      swState.flags._retiredDeepseekModelsDone === true;
     const hasUpdatePoint = swState.points.some((p) => p.reason === 'update');
     if (swState.hasRestorePointApi && allFlags && hasUpdatePoint) break;
     await new Promise((r) => setTimeout(r, 100));
@@ -623,6 +626,7 @@ async function verifyPostUpgrade(launch, snapshot, { label }) {
   assert.equal(swState.flags._webhookSyncScrubDone, true, `[${label}] _webhookSyncScrubDone not set`);
   assert.equal(swState.flags._hlOwnerClaimDone, true, `[${label}] _hlOwnerClaimDone not set`);
   assert.equal(swState.flags._driveScopeKeysRetiredDone, true, `[${label}] _driveScopeKeysRetiredDone not set`);
+  assert.equal(swState.flags._retiredDeepseekModelsDone, true, `[${label}] _retiredDeepseekModelsDone not set`);
 
   const updatePoint = swState.points.find((p) => p.reason === 'update');
   assert.ok(

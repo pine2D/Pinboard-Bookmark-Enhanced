@@ -13,7 +13,7 @@
 | 服务商 | 默认模型 | 最近核实 | 备注 |
 |---|---|---|---|
 | openai | gpt-5.4-nano | 未核实 | - |
-| deepseek | deepseek-v4-flash | 未核实 | - |
+| deepseek | deepseek-flash | 未核实 | 2026-11-13 官方文档更新默认模型名 |
 | qwen | qwen-flash | 未核实 | - |
 | minimax | MiniMax-M2 | 未核实 | - |
 | openrouter | openai/gpt-oss-20b | 未核实 | - |

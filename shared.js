@@ -612,7 +612,7 @@ const SETTINGS_DEFAULTS = {
   geminiApiKey: "", geminiModel: "gemini-3.5-flash-lite",
   openaiApiKey: "", openaiModel: "gpt-5.4-nano", openaiBaseUrl: "https://api.openai.com/v1",
   claudeApiKey: "", claudeModel: "claude-haiku-4-5",
-  deepseekApiKey: "", deepseekModel: "deepseek-v4-flash",
+  deepseekApiKey: "", deepseekModel: "deepseek-flash",
   qwenApiKey: "", qwenModel: "qwen-flash", qwenRegion: "beijing", qwenWorkspaceId: "",
   minimaxApiKey: "", minimaxModel: "MiniMax-M2",
   openrouterApiKey: "", openrouterModel: "openai/gpt-oss-20b",
@@ -4069,6 +4069,67 @@ function pbpStripExportTargetTokensOnly(ets) {
     delete cleaned[tid].token;
   }
   return cleaned;
+}
+
+// One-shot retirement rewrite for DeepSeek's retired 2026-11-13 slugs
+// ("deepseek-v4-flash" and "deepseek-v4-flash-vision-exp" -> "deepseek-flash").
+// Scoped strictly to official DeepSeek settings (`deepseekModel`,
+// `previewAiModelByProvider.deepseek`, and legacy `previewAiModel` when
+// `aiProvider === "deepseek"` without a map entry): never touches
+// `deepseek-v4-pro`, `deepseek-reasoner`, custom gateways, or 3rd-party
+// routers like `commandcode` (`deepseek/deepseek-v4-flash`). Retire by
+// 2027-01-15 (.claude/expiring-items.md).
+const PBP_RETIRED_DEEPSEEK_MODEL_FLAG = "_retiredDeepseekModelsDone";
+const PBP_RETIRED_DEEPSEEK_MODELS = Object.freeze([
+  "deepseek-v4-flash",
+  "deepseek-v4-flash-vision-exp",
+]);
+const PBP_DEEPSEEK_MODEL_REPLACEMENT = SETTINGS_DEFAULTS.deepseekModel;
+
+function pbpBuildRetiredDeepseekModelPatch(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const patch = {};
+  if (typeof raw.deepseekModel === "string" && PBP_RETIRED_DEEPSEEK_MODELS.includes(raw.deepseekModel)) {
+    patch.deepseekModel = PBP_DEEPSEEK_MODEL_REPLACEMENT;
+  }
+  const map = raw.previewAiModelByProvider;
+  const hasPlainMap = Boolean(map && typeof map === "object" && !Array.isArray(map));
+  const hasMapDeepseek = hasPlainMap && Object.prototype.hasOwnProperty.call(map, "deepseek");
+  if (hasMapDeepseek && typeof map.deepseek === "string" && PBP_RETIRED_DEEPSEEK_MODELS.includes(map.deepseek)) {
+    patch.previewAiModelByProvider = Object.assign({}, map, { deepseek: PBP_DEEPSEEK_MODEL_REPLACEMENT });
+  }
+  if (!hasMapDeepseek && raw.aiProvider === "deepseek"
+      && typeof raw.previewAiModel === "string" && PBP_RETIRED_DEEPSEEK_MODELS.includes(raw.previewAiModel)) {
+    patch.previewAiModel = PBP_DEEPSEEK_MODEL_REPLACEMENT;
+  }
+  return patch;
+}
+
+async function pbpMigrateRetiredDeepseekModels() {
+  try {
+    const doneRead = await chrome.storage.local.get(PBP_RETIRED_DEEPSEEK_MODEL_FLAG);
+    if (doneRead && doneRead[PBP_RETIRED_DEEPSEEK_MODEL_FLAG] === true) return;
+    await pbpWithSecretStorageLock(async () => {
+      const recheck = await chrome.storage.local.get(PBP_RETIRED_DEEPSEEK_MODEL_FLAG);
+      if (recheck && recheck[PBP_RETIRED_DEEPSEEK_MODEL_FLAG] === true) return;
+      const keys = ["deepseekModel", "previewAiModelByProvider", "previewAiModel", "aiProvider"];
+      const localRaw = await chrome.storage.local.get(keys);
+      const localPatch = pbpBuildRetiredDeepseekModelPatch(localRaw);
+      if (Object.keys(localPatch).length > 0) {
+        await chrome.storage.local.set(localPatch);
+      }
+      if (chrome.storage && chrome.storage.sync) {
+        const syncRaw = await chrome.storage.sync.get(keys);
+        const syncPatch = pbpBuildRetiredDeepseekModelPatch(syncRaw);
+        if (Object.keys(syncPatch).length > 0) {
+          await chrome.storage.sync.set(syncPatch);
+        }
+      }
+      await chrome.storage.local.set({ [PBP_RETIRED_DEEPSEEK_MODEL_FLAG]: true });
+    });
+  } catch (e) {
+    console.warn("[ai-migration] retired DeepSeek model rewrite failed:", e && e.name, e && e.message);
+  }
 }
 
 // Splits a saveAll-shaped batch into { main, secrets }:

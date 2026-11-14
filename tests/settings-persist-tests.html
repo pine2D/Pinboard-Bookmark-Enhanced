@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="561"><title>Settings Persistence Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="566"><title>Settings Persistence Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -6729,6 +6729,92 @@ async function run() {
           }
         }
         check("G28 copy: the switch notes exist in all nine locales with both service names: " + missing.join(", "), missing.length === 0);
+      }
+      {
+        const local = {
+          deepseekModel: "deepseek-v4-flash",
+          previewAiModelByProvider: { deepseek: "deepseek-v4-flash-vision-exp", openai: "gpt-5.4-nano" },
+        };
+        const sync = {
+          deepseekModel: "deepseek-v4-flash-vision-exp",
+          aiProvider: "deepseek",
+          previewAiModelByProvider: {},
+          previewAiModel: "deepseek-v4-flash",
+        };
+        install(local, sync);
+        await pbpMigrateRetiredDeepseekModels();
+        check("retired DeepSeek migration: rewrites deepseek-v4-flash and deepseek-v4-flash-vision-exp in local and sync while preserving other map entries",
+          local.deepseekModel === "deepseek-flash"
+          && local.previewAiModelByProvider.deepseek === "deepseek-flash"
+          && local.previewAiModelByProvider.openai === "gpt-5.4-nano"
+          && sync.deepseekModel === "deepseek-flash"
+          && sync.previewAiModel === "deepseek-flash"
+          && local[PBP_RETIRED_DEEPSEEK_MODEL_FLAG] === true);
+      }
+      {
+        const local = {
+          deepseekModel: "deepseek-v4-pro",
+          commandcodeModel: "deepseek/deepseek-v4-flash",
+          customModel: "deepseek-v4-flash",
+          aiProvider: "custom",
+          previewAiModel: "deepseek-v4-flash",
+          previewAiModelByProvider: { deepseek: "deepseek-reasoner", commandcode: "deepseek/deepseek-v4-flash" },
+        };
+        const sync = {
+          deepseekModel: "  deepseek-v4-flash  ",
+          aiProvider: "deepseek",
+          previewAiModelByProvider: { deepseek: "" },
+          previewAiModel: "deepseek-v4-flash",
+        };
+        install(local, sync);
+        await pbpMigrateRetiredDeepseekModels();
+        check("retired DeepSeek migration: preserves deepseek-v4-pro, deepseek-reasoner, padded strings, 3rd-party gateways, and explicit map override",
+          local.deepseekModel === "deepseek-v4-pro"
+          && local.commandcodeModel === "deepseek/deepseek-v4-flash"
+          && local.customModel === "deepseek-v4-flash"
+          && local.previewAiModel === "deepseek-v4-flash"
+          && local.previewAiModelByProvider.deepseek === "deepseek-reasoner"
+          && local.previewAiModelByProvider.commandcode === "deepseek/deepseek-v4-flash"
+          && sync.deepseekModel === "  deepseek-v4-flash  "
+          && sync.previewAiModel === "deepseek-v4-flash"
+          && local[PBP_RETIRED_DEEPSEEK_MODEL_FLAG] === true);
+      }
+      {
+        const local = { [PBP_RETIRED_DEEPSEEK_MODEL_FLAG]: true, deepseekModel: "deepseek-v4-flash" };
+        const sync = { deepseekModel: "deepseek-v4-flash-vision-exp" };
+        install(local, sync);
+        await pbpMigrateRetiredDeepseekModels();
+        check("retired DeepSeek migration: one-shot flag prevents overwriting a later user edit",
+          local.deepseekModel === "deepseek-v4-flash" && sync.deepseekModel === "deepseek-v4-flash-vision-exp");
+      }
+      {
+        const local = { deepseekModel: "deepseek-v4-flash" };
+        const sync = { deepseekModel: "deepseek-v4-flash-vision-exp" };
+        install(local, sync);
+        const origSyncSet = globalThis.chrome.storage.sync.set;
+        let warned = false;
+        const origWarn = console.warn;
+        console.warn = (...args) => {
+          if (String(args[0] || "").includes("[ai-migration]")) warned = true;
+        };
+        try {
+          globalThis.chrome.storage.sync.set = () => Promise.reject(new Error("QUOTA_BYTES"));
+          await pbpMigrateRetiredDeepseekModels();
+          const unsettledAfterFail = warned && local[PBP_RETIRED_DEEPSEEK_MODEL_FLAG] !== true;
+          globalThis.chrome.storage.sync.set = origSyncSet;
+          await pbpMigrateRetiredDeepseekModels();
+          check("retired DeepSeek migration: storage write failure logs warning and leaves flag unset for retry",
+            unsettledAfterFail
+            && sync.deepseekModel === "deepseek-flash"
+            && local[PBP_RETIRED_DEEPSEEK_MODEL_FLAG] === true);
+        } finally {
+          console.warn = origWarn;
+        }
+      }
+      {
+        const bgSource = await fetch("../background.js").then((r) => r.text());
+        check("retired DeepSeek migration: background.js invokes pbpMigrateRetiredDeepseekModels at top level",
+          /^pbpMigrateRetiredDeepseekModels\(\);$/m.test(bgSource));
       }
     } finally {
       globalThis.chrome = previousChrome;

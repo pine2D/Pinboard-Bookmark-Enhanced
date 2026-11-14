@@ -3028,6 +3028,11 @@ async function pbpScrubLegacySyncWebhookUrls() {
 }
 pbpScrubLegacySyncWebhookUrls();
 
+// One-shot rewrite of retired official DeepSeek model slugs ("deepseek-v4-flash"
+// and "deepseek-v4-flash-vision-exp" -> "deepseek-flash"). Defined in shared.js;
+// retire by 2027-01-15 (.claude/expiring-items.md, flag _retiredDeepseekModelsDone).
+pbpMigrateRetiredDeepseekModels();
+
 // One-shot claim migration (roadmap #19, approved 2026-08-29): pre-existing
 // highlight items carry no owner field — claim them for the CURRENT Pinboard
 // account so the new per-account visibility rule has a defined baseline
