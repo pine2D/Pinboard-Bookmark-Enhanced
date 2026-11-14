@@ -564,6 +564,7 @@ function _pbpAskBuildPanel() {
   if (_pbpAskState.attachedImage) _pbpAskSetAttachedImage(_pbpAskState.attachedImage);
   panel.querySelector("#ask-new").addEventListener("click", () => _pbpAskNewConversation());
   panel.querySelector("#ask-history").addEventListener("click", () => {
+    if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("ask");
     chrome.tabs.create({ url: chrome.runtime.getURL("library.html#ask") });
   });
   panel.querySelector("#ask-temporary").addEventListener("change", (event) => {

@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="588"><title>library-vocab Tests</title>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="590"><title>library-vocab Tests</title>
 <link rel="stylesheet" href="../library.css">
 <style>
 body{font-family:monospace;padding:16px}.case{padding:5px;border-bottom:1px solid #ddd}.pass{color:#176}.fail{color:#b00}
@@ -4848,6 +4848,17 @@ await (async () => {
       check("structure: an unknown-only library lookup has no enabled definition-save action", !select() && !save());
       entryOptions.onEntry(ai);
       check("meaning help: an unknown-only dictionary with hidden AI choices does not claim the word was saved", select()?.value === "" && save()?.disabled === true && select().dataset.listboxHelp === "dictMeaningChooseHelp");
+      const origStopSpeak = window.pbpDictStopSpeak;
+      let stopCalls = 0;
+      pbpDictStopSpeak = window.pbpDictStopSpeak = () => { stopCalls++; origStopSpeak?.(); };
+      try {
+        _pbpVocabResetRef(null);
+        check("speech cleanup: resetting or switching vocabulary detail stops active dictionary pronunciation", stopCalls === 1);
+        document.dispatchEvent(new CustomEvent("pbp-lib-view", { detail: { view: "notes" } }));
+        check("speech cleanup: leaving the vocabulary view stops active dictionary pronunciation", stopCalls === 2);
+      } finally {
+        pbpDictStopSpeak = window.pbpDictStopSpeak = origStopSpeak;
+      }
     } finally {
       _pbpVocabDictCtrl?.abort(); _pbpVocabDictChildCtrl?.abort(); _pbpVocabRenderDetail(null);
       _pbpDictEntryMount = old.mount; _pbpDictSlotRun = old.remote; _pbpDictEcdictSide = old.local;

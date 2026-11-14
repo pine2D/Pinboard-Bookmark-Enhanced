@@ -1856,23 +1856,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   async function renderStoragePanel() {
     const host = $id("storage-cats");
+    const retryBtn = $id("storage-retry-btn");
     if (!host) return;
     let measured = null;
     try {
       const [localStats, ocrStats, ttsStats] = await Promise.all([
         pbpMeasureLocalStorage(),
-        typeof pbpOcrDocsMeasure === "function" ? pbpOcrDocsMeasure() : Promise.resolve({ count: 0, bytes: 0 }),
-        typeof pbpTtsCacheMeasure === "function" ? pbpTtsCacheMeasure() : Promise.resolve({ count: 0, bytes: 0 }),
+        typeof pbpOcrDocsMeasure === "function" ? pbpOcrDocsMeasure() : Promise.resolve({ count: 0, bytes: 0, failed: false }),
+        typeof pbpTtsCacheMeasure === "function" ? pbpTtsCacheMeasure() : Promise.resolve({ count: 0, bytes: 0, failed: false }),
       ]);
       measured = localStats ? {
         ...localStats,
         ocr: {
           keys: Array.from({ length: Math.max(0, Number(ocrStats?.count) || 0) }, (_, i) => String(i)),
           bytes: Math.max(0, Number(ocrStats?.bytes) || 0),
+          failed: ocrStats?.failed === true,
         },
         tts: {
           keys: Array.from({ length: Math.max(0, Number(ttsStats?.count) || 0) }, (_, i) => String(i)),
           bytes: Math.max(0, Number(ttsStats?.bytes) || 0),
+          failed: ttsStats?.failed === true,
         },
       } : null;
     } catch (_) { measured = null; }
@@ -1882,6 +1885,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       p.className = "hint";
       p.textContent = t("storageMeasureFailed");
       host.appendChild(p);
+      if (retryBtn) retryBtn.hidden = false;
       syncStorageClearBtn();
       return;
     }
@@ -1891,8 +1895,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     // same checked/disabled logic as before.
     const group = document.createElement("div");
     group.className = "pref-group";
+    let anyFailed = false;
     STORAGE_CATS.forEach((c) => {
-      const m = measured[c.id] || { keys: [], bytes: 0 };
+      const m = measured[c.id] || { keys: [], bytes: 0, failed: false };
+      if (m.failed) anyFailed = true;
       const row = document.createElement("div");
       row.className = "pref-row";
       const label = document.createElement("label");
@@ -1903,12 +1909,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       cb.dataset.cat = c.id;
       // Empty categories must not present as "checked": a disabled checkbox
       // still matches the :checked collection query used by "clear selected".
-      cb.checked = c.defaultOn && m.keys.length > 0;
-      cb.disabled = m.keys.length === 0;
+      // Failed categories stay unchecked by default, remain selectable so the
+      // user can still attempt a clear, and surface storageMeasureFailed + Retry.
+      cb.checked = c.defaultOn && !m.failed && m.keys.length > 0;
+      cb.disabled = !m.failed && m.keys.length === 0;
       cb.dataset.bytes = String(m.bytes);
+      if (m.failed) cb.dataset.failed = "1";
       const span = document.createElement("span");
       span.className = "pick-text";
-      span.textContent = `${t(c.labelKey)} — ${pbpFormatBytes(m.bytes)} (${m.keys.length})`;
+      span.textContent = m.failed
+        ? `${t(c.labelKey)} — ${t("storageMeasureFailed")}`
+        : `${t(c.labelKey)} — ${pbpFormatBytes(m.bytes)} (${m.keys.length})`;
       const mark = document.createElement("span");
       mark.className = "pick-mark";
       mark.setAttribute("aria-hidden", "true");
@@ -1919,6 +1930,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       row.appendChild(label);
       group.appendChild(row);
     });
+    if (retryBtn) retryBtn.hidden = !anyFailed;
     host.appendChild(group);
     const totalP = document.createElement("p");
     totalP.className = "hint";
@@ -1938,6 +1950,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (total) total.textContent = t("storageReclaimable", pbpFormatBytes(checked.reduce((n, cb) => n + (Number(cb.dataset.bytes) || 0), 0)));
   }
   $id("storage-cats")?.addEventListener("change", syncStorageClearBtn);
+  $id("storage-retry-btn")?.addEventListener("click", async () => {
+    const status = $id("storage-status");
+    if (status) {
+      status.textContent = "";
+      status.className = "et-test-status hidden";
+    }
+    await renderStoragePanel();
+  });
   const _storageClearBtn = $id("storage-clear-btn");
   if (_storageClearBtn) {
     _storageClearBtn.addEventListener("click", async () => {

@@ -2321,7 +2321,10 @@ function _pbpHlEnsureCard() {
   const save = document.createElement("button");
   save.type = "button";
   save.className = "hl-card-save";
-  save.addEventListener("click", _pbpHlCommitNote);
+  save.addEventListener("click", () => {
+    if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("hl-note");
+    _pbpHlCommitNote();
+  });
   foot.appendChild(save);
   card.appendChild(foot);
 

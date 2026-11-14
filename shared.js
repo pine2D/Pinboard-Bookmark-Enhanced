@@ -5665,7 +5665,7 @@ async function pbpOcrDocsFindBySha256(sha256, purpose) {
 
 async function pbpOcrDocsMeasure() {
   const db = await _pbpOcrOpenDB();
-  if (!db) return { keys: [], bytes: 0, count: 0 };
+  if (!db) return { keys: [], bytes: 0, count: 0, failed: true };
   return new Promise((resolve) => {
     let tx;
     try {
@@ -5673,7 +5673,7 @@ async function pbpOcrDocsMeasure() {
     } catch (e) {
       console.warn("[ocr-store] measure transaction failed:", e?.name, e?.message);
       _pbpOcrDbPromise = null;
-      resolve({ keys: [], bytes: 0, count: 0 });
+      resolve({ keys: [], bytes: 0, count: 0, failed: true });
       return;
     }
     const req = tx.objectStore(PBP_OCR_STORE_NAME).getAll();
@@ -5691,9 +5691,13 @@ async function pbpOcrDocsMeasure() {
         keys: Array.from({ length: count }, (_, idx) => "ocr_doc_" + idx),
         bytes,
         count,
+        failed: false,
       });
     };
-    req.onerror = () => resolve({ keys: [], bytes: 0, count: 0 });
+    req.onerror = () => {
+      console.warn("[ocr-store] measure read failed:", req.error?.name, req.error?.message);
+      resolve({ keys: [], bytes: 0, count: 0, failed: true });
+    };
   });
 }
 
@@ -6137,8 +6141,12 @@ function pbpValidateWavBytes(input) {
   let offset = 12;
   let hasFmt = false;
   let hasData = false;
+  let audioFormat = 0;
   let sampleRate = 0;
   let channels = 0;
+  let bitsPerSample = 0;
+  let dataOffset = 0;
+  let dataSize = 0;
   while (offset + 8 <= bytes.byteLength) {
     const id = String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]);
     const chunkSize = view.getUint32(offset + 4, true);
@@ -6146,9 +6154,10 @@ function pbpValidateWavBytes(input) {
     const remaining = bytes.byteLength - bodyStart;
     if (id === "fmt ") {
       if (chunkSize < 16 || chunkSize > remaining) return { ok: false, reason: "bad_fmt" };
-      const audioFormat = view.getUint16(bodyStart, true);
+      audioFormat = view.getUint16(bodyStart, true);
       channels = view.getUint16(bodyStart + 2, true);
       sampleRate = view.getUint32(bodyStart + 4, true);
+      bitsPerSample = view.getUint16(bodyStart + 14, true);
       if ((audioFormat !== 1 && audioFormat !== 3 && audioFormat !== 0xfffe)
           || channels < 1 || channels > 8
           || sampleRate < 4000 || sampleRate > 192000) {
@@ -6158,10 +6167,14 @@ function pbpValidateWavBytes(input) {
     } else if (id === "data") {
       if (chunkSize === 0xffffffff) {
         if (remaining <= 0) return { ok: false, reason: "empty_data" };
+        dataOffset = bodyStart;
+        dataSize = remaining;
         hasData = true;
         break;
       }
       if (chunkSize === 0 || chunkSize > remaining) return { ok: false, reason: "bad_data" };
+      dataOffset = bodyStart;
+      dataSize = chunkSize;
       hasData = true;
     } else if (chunkSize > remaining) {
       return { ok: false, reason: "truncated_chunk" };
@@ -6171,7 +6184,16 @@ function pbpValidateWavBytes(input) {
     offset = bodyStart + padded;
   }
   if (!hasFmt || !hasData) return { ok: false, reason: "missing_chunks" };
-  return { ok: true, byteLength: bytes.byteLength, sampleRate, channels };
+  return {
+    ok: true,
+    byteLength: bytes.byteLength,
+    sampleRate,
+    channels,
+    audioFormat,
+    bitsPerSample,
+    dataOffset,
+    dataSize,
+  };
 }
 
 async function pbpTtsCacheKey(voice, lang, text) {
@@ -6351,7 +6373,7 @@ async function pbpTtsCacheGet(voice, lang, text, opts = {}) {
 
 async function pbpTtsCacheMeasure() {
   const db = await _pbpTtsOpenDB();
-  if (!db) return { keys: [], bytes: 0, count: 0 };
+  if (!db) return { keys: [], bytes: 0, count: 0, failed: true };
   return new Promise((resolve) => {
     let tx;
     try {
@@ -6359,7 +6381,7 @@ async function pbpTtsCacheMeasure() {
     } catch (e) {
       console.warn("[tts-cache] measure transaction failed:", e?.name, e?.message);
       _pbpTtsDbPromise = null;
-      resolve({ keys: [], bytes: 0, count: 0 });
+      resolve({ keys: [], bytes: 0, count: 0, failed: true });
       return;
     }
     const req = tx.objectStore(PBP_TTS_CACHE_STORE_NAME).getAll();
@@ -6377,9 +6399,13 @@ async function pbpTtsCacheMeasure() {
         keys: Array.from({ length: count }, (_, idx) => "tts_clip_" + idx),
         bytes,
         count,
+        failed: false,
       });
     };
-    req.onerror = () => resolve({ keys: [], bytes: 0, count: 0 });
+    req.onerror = () => {
+      console.warn("[tts-cache] measure read failed:", req.error?.name, req.error?.message);
+      resolve({ keys: [], bytes: 0, count: 0, failed: true });
+    };
   });
 }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="49"><title>Options Listbox Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="50"><title>Options Listbox Tests</title>
 <style>
 .case.pass{color:#0a0}.case.fail{color:#c00;font-weight:bold}
 #fixture{position:absolute;left:-10000px;top:0;width:1200px;height:900px;border:0}
@@ -1500,6 +1500,40 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     } finally {
       localStore.remove = origRemove;
       await localStore.remove("cached_user_tags");
+    }
+  });
+
+  test("storage panel surfaces storageMeasureFailed + Retry when pbpTtsCacheMeasure fails instead of disguising as empty", async () => {
+    const host = doc.getElementById("storage-cats");
+    const retryBtn = doc.getElementById("storage-retry-btn");
+    assert(retryBtn, "storage-retry-btn missing");
+    const origTtsMeasure = win.pbpTtsCacheMeasure;
+    const originalReplaceState = win.history.replaceState.bind(win.history);
+    win.history.replaceState = () => {};
+    try {
+      win.pbpTtsCacheMeasure = async () => ({ keys: [], bytes: 0, count: 0, failed: true });
+      doc.getElementById("tab-storage").click();
+      for (let i = 0; i < 40 && retryBtn.hidden; i++) await sleep(20);
+      const ttsCb = host.querySelector('.storage-cat-cb[data-cat="tts"]');
+      const ttsLabel = ttsCb?.closest("label.pick")?.querySelector(".pick-text")?.textContent || "";
+      assert(ttsLabel.includes(enMessages.storageMeasureFailed.message),
+        "failed TTS cache measure must show storageMeasureFailed, got: " + JSON.stringify(ttsLabel));
+      assert(ttsCb && !ttsCb.disabled && !ttsCb.checked,
+        "failed TTS cache category must stay unchecked and selectable for clear");
+      assert(retryBtn.hidden === false, "storage-retry-btn must appear when a category measure fails");
+
+      win.pbpTtsCacheMeasure = origTtsMeasure;
+      retryBtn.click();
+      for (let i = 0; i < 40 && !retryBtn.hidden; i++) await sleep(20);
+      const healedCb = host.querySelector('.storage-cat-cb[data-cat="tts"]');
+      const healedLabel = healedCb?.closest("label.pick")?.querySelector(".pick-text")?.textContent || "";
+      assert(!healedLabel.includes(enMessages.storageMeasureFailed.message),
+        "Retry should restore healthy measurement label, got: " + JSON.stringify(healedLabel));
+      assert(healedCb && healedCb.disabled && retryBtn.hidden === true,
+        "healthy empty TTS category should disable checkbox and hide Retry");
+    } finally {
+      win.pbpTtsCacheMeasure = origTtsMeasure;
+      win.history.replaceState = originalReplaceState;
     }
   });
 

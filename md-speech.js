@@ -7,6 +7,7 @@
 const PBP_ASR_SAMPLE_RATE = 16000;
 const PBP_ASR_WARN_SECONDS = 115;
 const PBP_ASR_MAX_SECONDS = 120;
+const PBP_ASR_MAX_SAMPLES = PBP_ASR_SAMPLE_RATE * PBP_ASR_MAX_SECONDS;
 const PBP_ASR_MAX_BYTES = 8 * 1024 * 1024;
 const PBP_ASR_TIMEOUT_MS = 60000;
 
@@ -66,13 +67,7 @@ function pbpAsrDownsampleFloat32(samples, inRate, outRate = PBP_ASR_SAMPLE_RATE)
   return out;
 }
 
-function pbpAsrEncodePcm16Wav(float32Mono, sampleRate = PBP_ASR_SAMPLE_RATE) {
-  const samples = float32Mono && float32Mono.length ? float32Mono : new Float32Array(0);
-  const rate = Math.max(4000, Math.min(192000, Math.round(Number(sampleRate) || PBP_ASR_SAMPLE_RATE)));
-  const dataBytes = samples.length * 2;
-  const buf = new ArrayBuffer(44 + dataBytes);
-  const bytes = new Uint8Array(buf);
-  const view = new DataView(buf);
+function _pbpAsrWriteWavHeader(view, bytes, rate, dataBytes) {
   const writeAscii = (off, str) => {
     for (let i = 0; i < str.length; i++) bytes[off + i] = str.charCodeAt(i) & 0xff;
   };
@@ -89,6 +84,16 @@ function pbpAsrEncodePcm16Wav(float32Mono, sampleRate = PBP_ASR_SAMPLE_RATE) {
   view.setUint16(34, 16, true); // bitsPerSample
   writeAscii(36, "data");
   view.setUint32(40, dataBytes, true);
+}
+
+function pbpAsrEncodePcm16Wav(float32Mono, sampleRate = PBP_ASR_SAMPLE_RATE) {
+  const samples = float32Mono && float32Mono.length ? float32Mono : new Float32Array(0);
+  const rate = Math.max(4000, Math.min(192000, Math.round(Number(sampleRate) || PBP_ASR_SAMPLE_RATE)));
+  const dataBytes = samples.length * 2;
+  const buf = new ArrayBuffer(44 + dataBytes);
+  const bytes = new Uint8Array(buf);
+  const view = new DataView(buf);
+  _pbpAsrWriteWavHeader(view, bytes, rate, dataBytes);
   let offset = 44;
   for (let i = 0; i < samples.length; i++) {
     const raw = Number(samples[i]);
@@ -111,9 +116,20 @@ async function pbpAsrDecodeToWavBytes(blob) {
   const rawBytes = new Uint8Array(rawBuf);
   if (typeof pbpValidateWavBytes === "function") {
     const precheck = pbpValidateWavBytes(rawBytes);
-    if (precheck.ok && precheck.sampleRate === PBP_ASR_SAMPLE_RATE && precheck.channels === 1) {
-      if (rawBytes.byteLength > PBP_ASR_MAX_BYTES) throw new Error("asr_too_large");
-      return rawBytes;
+    if (precheck.ok && precheck.sampleRate === PBP_ASR_SAMPLE_RATE && precheck.channels === 1
+        && precheck.audioFormat === 1 && precheck.bitsPerSample === 16) {
+      const maxDataBytes = PBP_ASR_MAX_SAMPLES * 2;
+      if (precheck.dataSize <= maxDataBytes) {
+        if (rawBytes.byteLength > PBP_ASR_MAX_BYTES) throw new Error("asr_too_large");
+        return rawBytes;
+      }
+      const evenMaxBytes = maxDataBytes - (maxDataBytes & 1);
+      const trimmedPcm = rawBytes.subarray(precheck.dataOffset, precheck.dataOffset + evenMaxBytes);
+      const cappedBuf = new ArrayBuffer(44 + trimmedPcm.byteLength);
+      const cappedBytes = new Uint8Array(cappedBuf);
+      _pbpAsrWriteWavHeader(new DataView(cappedBuf), cappedBytes, PBP_ASR_SAMPLE_RATE, trimmedPcm.byteLength);
+      cappedBytes.set(trimmedPcm, 44);
+      return cappedBytes;
     }
   }
   const Ctx = typeof AudioContext === "function"
@@ -135,12 +151,12 @@ async function pbpAsrDecodeToWavBytes(blob) {
   let mono = null;
   if (typeof OfflineAudioContext === "function") {
     try {
-      const targetFrames = Math.max(1, Math.ceil(decoded.duration * PBP_ASR_SAMPLE_RATE));
+      const targetFrames = Math.min(PBP_ASR_MAX_SAMPLES, Math.max(1, Math.ceil(decoded.duration * PBP_ASR_SAMPLE_RATE)));
       const offline = new OfflineAudioContext(1, targetFrames, PBP_ASR_SAMPLE_RATE);
       const source = offline.createBufferSource();
       source.buffer = decoded;
       source.connect(offline.destination);
-      source.start(0);
+      source.start(0, 0, PBP_ASR_MAX_SECONDS);
       const rendered = await offline.startRendering();
       mono = rendered.getChannelData(0);
     } catch (e) {
@@ -148,14 +164,19 @@ async function pbpAsrDecodeToWavBytes(blob) {
     }
   }
   if (!mono) {
+    const maxInFrames = Math.max(1, Math.ceil(decoded.sampleRate * PBP_ASR_MAX_SECONDS));
     const channels = [];
     for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
-      channels.push(decoded.getChannelData(ch));
+      const chData = decoded.getChannelData(ch);
+      channels.push(chData.length > maxInFrames ? chData.subarray(0, maxInFrames) : chData);
     }
     mono = pbpAsrDownsampleFloat32(pbpAsrMixToMono(channels), decoded.sampleRate, PBP_ASR_SAMPLE_RATE);
   }
   if (!mono || mono.length === 0) {
     throw new Error("asr_empty_audio");
+  }
+  if (mono.length > PBP_ASR_MAX_SAMPLES) {
+    mono = mono.subarray(0, PBP_ASR_MAX_SAMPLES);
   }
   const wavBytes = pbpAsrEncodePcm16Wav(mono, PBP_ASR_SAMPLE_RATE);
   if (wavBytes.byteLength > PBP_ASR_MAX_BYTES) {
@@ -327,11 +348,15 @@ async function pbpSpeechRefreshConfig() {
           _pbpSpeechOriginGranted = !!(await chrome.permissions.contains({ origins: [origin] }));
         }
         _pbpSpeechConfigLoaded = true;
-        if (!_pbpSpeechEnabled || !_pbpSpeechDeepseekKey) {
+        if (
+          !_pbpSpeechEnabled
+          || !_pbpSpeechDeepseekKey
+          || (!_pbpSpeechOriginGranted && !(_pbpSpeechSession && _pbpSpeechSession.awaitingPerm))
+        ) {
           pbpSpeechCancelAll();
         }
         for (const target of _pbpSpeechTargets.values()) {
-          if (!_pbpSpeechSession || _pbpSpeechSession.targetId !== target.id) {
+          if (!_pbpSpeechSession || _pbpSpeechSession.targetId !== target.id || _pbpSpeechSession.pending) {
             _pbpSpeechSyncTargetIdle(target, false);
           } else if (target.button) {
             target.button.hidden = !_pbpSpeechEnabled;
@@ -389,7 +414,7 @@ async function _pbpSpeechFinishRecording(sess) {
   const target = _pbpSpeechTargets.get(sess.targetId);
   const token = sess.token;
   try {
-    if (sess.recorder && sess.recorder.state !== "inactive") {
+    if (!sess.stopped && sess.recorder && sess.recorder.state !== "inactive") {
       await new Promise((resolve) => {
         sess.onStopResolve = resolve;
         try {
@@ -407,7 +432,7 @@ async function _pbpSpeechFinishRecording(sess) {
     sess.stream = null;
   }
   if (sess.cancelled || _pbpSpeechSession !== sess || token !== _pbpSpeechSeq) return;
-  if (!target || !_pbpSpeechEnabled || !target.isTargetValid(sess.context)) {
+  if (!target || !_pbpSpeechEnabled || !_pbpSpeechDeepseekKey || !_pbpSpeechOriginGranted || !target.isTargetValid(sess.context)) {
     pbpSpeechCancelTarget(sess.targetId);
     return;
   }
@@ -438,8 +463,9 @@ async function _pbpSpeechFinishRecording(sess) {
     const rawBlob = new Blob(sess.chunks, { type: sess.mimeType || "audio/webm" });
     sess.chunks = [];
     const wavBytes = await pbpAsrDecodeToWavBytes(rawBlob);
+    if (_pbpSpeechConfigPromise) await _pbpSpeechConfigPromise;
     if (sess.cancelled || _pbpSpeechSession !== sess || token !== _pbpSpeechSeq) return;
-    if (!target.isTargetValid(sess.context)) {
+    if (!_pbpSpeechEnabled || !_pbpSpeechDeepseekKey || !_pbpSpeechOriginGranted || !target.isTargetValid(sess.context)) {
       pbpSpeechCancelTarget(sess.targetId);
       return;
     }
@@ -510,7 +536,7 @@ async function _pbpSpeechToggle(targetId) {
   const target = _pbpSpeechTargets.get(targetId);
   if (!target || (target.button && target.button.disabled)) return;
   if (_pbpSpeechSession && _pbpSpeechSession.targetId === targetId) {
-    if (_pbpSpeechSession.finishing) {
+    if (_pbpSpeechSession.pending || _pbpSpeechSession.finishing) {
       pbpSpeechCancelTarget(targetId);
     } else {
       await _pbpSpeechFinishRecording(_pbpSpeechSession);
@@ -529,27 +555,57 @@ async function _pbpSpeechToggle(targetId) {
   pbpSpeechCancelAll();
   const token = ++_pbpSpeechSeq;
   const context = typeof target.captureContext === "function" ? target.captureContext() : {};
+  const sess = {
+    targetId,
+    token,
+    context,
+    pending: true,
+    awaitingPerm: Boolean(permPromise),
+    stopped: false,
+    stream: null,
+    recorder: null,
+    mimeType: "audio/webm",
+    chunks: [],
+    rawBytes: 0,
+    startedAt: 0,
+    timer: 0,
+    finishing: false,
+    cancelled: false,
+    onStopResolve: null,
+    abortCtrl: null,
+  };
+  _pbpSpeechSession = sess;
+  const clearPendingSession = () => {
+    if (_pbpSpeechSession === sess) _pbpSpeechSession = null;
+  };
 
   if (permPromise) {
     let granted = false;
     try { granted = !!(await permPromise); } catch (_) { /* swallow-ok: permission denied */ }
+    sess.awaitingPerm = false;
     if (granted) _pbpSpeechOriginGranted = true;
-    if (token !== _pbpSpeechSeq) return;
+    if (sess.cancelled || _pbpSpeechSession !== sess || token !== _pbpSpeechSeq) return;
   }
   if (!_pbpSpeechConfigLoaded) {
     await pbpSpeechRefreshConfig();
-    if (token !== _pbpSpeechSeq) return;
+    if (sess.cancelled || _pbpSpeechSession !== sess || token !== _pbpSpeechSeq) return;
   }
-  if (!_pbpSpeechEnabled || !target.isTargetValid(context)) return;
+  if (!_pbpSpeechEnabled || !target.isTargetValid(context)) {
+    clearPendingSession();
+    return;
+  }
   if (!_pbpSpeechDeepseekKey) {
+    clearPendingSession();
     _pbpSpeechShowStatus(target, t("deepseekFetchKeyMissing"), "error");
     return;
   }
   if (!_pbpSpeechOriginGranted) {
+    clearPendingSession();
     _pbpSpeechShowStatus(target, t("deepseekVoiceAccessMissingHint"), "error");
     return;
   }
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder !== "function") {
+    clearPendingSession();
     _pbpSpeechShowStatus(target, t("mdAsrErrMicUnavailable"), "error");
     return;
   }
@@ -560,13 +616,15 @@ async function _pbpSpeechToggle(targetId) {
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
   } catch (e) {
-    if (token !== _pbpSpeechSeq) return;
+    if (sess.cancelled || _pbpSpeechSession !== sess || token !== _pbpSpeechSeq) return;
+    clearPendingSession();
     const denied = e?.name === "NotAllowedError" || e?.name === "PermissionDeniedError" || e?.name === "SecurityError";
     _pbpSpeechShowStatus(target, t(denied ? "mdAsrErrMicDenied" : "mdAsrErrMicUnavailable"), "error");
     return;
   }
 
-  if (token !== _pbpSpeechSeq || !_pbpSpeechEnabled || !target.isTargetValid(context)) {
+  if (sess.cancelled || _pbpSpeechSession !== sess || token !== _pbpSpeechSeq || !_pbpSpeechEnabled || !_pbpSpeechDeepseekKey || !_pbpSpeechOriginGranted || !target.isTargetValid(context)) {
+    clearPendingSession();
     _pbpSpeechStopTracks(stream);
     return;
   }
@@ -576,29 +634,16 @@ async function _pbpSpeechToggle(targetId) {
   try {
     recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
   } catch (e) {
+    clearPendingSession();
     _pbpSpeechStopTracks(stream);
     console.warn("[md-speech] MediaRecorder init failed:", e?.name, e?.message);
     _pbpSpeechShowStatus(target, t("mdAsrErrMicUnavailable"), "error");
     return;
   }
 
-  const sess = {
-    targetId,
-    token,
-    context,
-    stream,
-    recorder,
-    mimeType: recorder.mimeType || mimeType || "audio/webm",
-    chunks: [],
-    rawBytes: 0,
-    startedAt: Date.now(),
-    timer: 0,
-    finishing: false,
-    cancelled: false,
-    onStopResolve: null,
-    abortCtrl: null,
-  };
-  _pbpSpeechSession = sess;
+  sess.stream = stream;
+  sess.recorder = recorder;
+  sess.mimeType = recorder.mimeType || mimeType || "audio/webm";
 
   recorder.ondataavailable = (ev) => {
     if (!ev?.data || ev.data.size <= 0) return;
@@ -616,22 +661,41 @@ async function _pbpSpeechToggle(targetId) {
     }
   };
   recorder.onstop = () => {
+    sess.stopped = true;
     if (typeof sess.onStopResolve === "function") {
       const done = sess.onStopResolve;
       sess.onStopResolve = null;
       done();
+    } else if (!sess.cancelled && !sess.finishing && _pbpSpeechSession === sess) {
+      void _pbpSpeechFinishRecording(sess);
     }
   };
+
+  const tracks = typeof stream.getTracks === "function" ? stream.getTracks() : [];
+  const onTrackEnded = () => {
+    if (_pbpSpeechSession !== sess || sess.cancelled || sess.finishing || sess.stopped) return;
+    const allEnded = tracks.length > 0 && tracks.every((tr) => tr && tr.readyState === "ended");
+    if (allEnded || tracks.length <= 1) {
+      void _pbpSpeechFinishRecording(sess);
+    }
+  };
+  for (const tr of tracks) {
+    if (typeof tr?.addEventListener === "function") {
+      tr.addEventListener("ended", onTrackEnded, { once: true });
+    }
+  }
 
   try {
     recorder.start(250);
   } catch (e) {
-    _pbpSpeechSession = null;
+    clearPendingSession();
     _pbpSpeechStopTracks(stream);
     console.warn("[md-speech] recorder.start failed:", e?.name, e?.message);
     _pbpSpeechShowStatus(target, t("mdAsrErrMicUnavailable"), "error");
     return;
   }
+  sess.pending = false;
+  sess.startedAt = Date.now();
 
   if (target.button) {
     target.button.dataset.voiceState = "recording";
@@ -687,7 +751,7 @@ function pbpSpeechRegisterTarget(spec) {
 
 function pbpSpeechReapplyI18n() {
   for (const target of _pbpSpeechTargets.values()) {
-    if (!_pbpSpeechSession || _pbpSpeechSession.targetId !== target.id) {
+    if (!_pbpSpeechSession || _pbpSpeechSession.targetId !== target.id || _pbpSpeechSession.pending) {
       _pbpSpeechSyncTargetIdle(target, true);
     } else if (target.button) {
       const stopLabel = t("mdAsrMicStop");

@@ -629,6 +629,9 @@ let _pbpDictDeepseekOriginGranted = false;
 let _pbpDictTtsConfigLoaded = false;
 let _pbpDictTtsConfigPromise = null;
 let _pbpDictTtsConfigDirty = false;
+let _pbpDictDeepseekActive = false;
+let _pbpDictActiveVoice = "";
+let _pbpDictDeepseekAwaitingPerm = false;
 let _pbpDictTtsAbort = null;
 let _pbpDictAudio = null;
 let _pbpDictAudioUrl = "";
@@ -674,25 +677,38 @@ async function pbpDictRefreshTtsConfig() {
   return _pbpDictTtsConfigPromise;
 }
 
+function _pbpReconcileActiveDeepseekTts() {
+  if (!_pbpDictDeepseekActive && !_pbpDictTtsAbort && !_pbpDictAudioUrl) return;
+  if (
+    _pbpDictTtsVoice === "browser"
+    || (_pbpDictActiveVoice && _pbpDictTtsVoice !== _pbpDictActiveVoice)
+    || !_pbpDictDeepseekKey
+    || (!_pbpDictDeepseekOriginGranted && !_pbpDictDeepseekAwaitingPerm)
+  ) {
+    pbpDictStopSpeak();
+  }
+}
+
 if (typeof chrome !== "undefined" && chrome?.storage) {
   pbpDictRefreshTtsConfig();
   chrome.storage.onChanged?.addListener((changes, area) => {
     if ((area === "local" || area === "sync")
         && (changes.dictTtsVoice || changes.deepseekApiKey || changes.optSyncEnabled || changes.syncApiKeys)) {
-      pbpDictRefreshTtsConfig().then(() => {
-        if (_pbpDictTtsVoice === "browser" || !_pbpDictDeepseekKey) {
-          if (_pbpDictTtsAbort || _pbpDictAudioUrl) pbpDictStopSpeak();
-        }
-      });
+      pbpDictRefreshTtsConfig().then(_pbpReconcileActiveDeepseekTts);
     }
   });
-  const _pbpRefreshPerm = () => { pbpDictRefreshTtsConfig(); };
+  const _pbpRefreshPerm = () => {
+    pbpDictRefreshTtsConfig().then(_pbpReconcileActiveDeepseekTts);
+  };
   chrome.permissions?.onAdded?.addListener(_pbpRefreshPerm);
   chrome.permissions?.onRemoved?.addListener(_pbpRefreshPerm);
 }
 
 function pbpDictStopSpeak() {
   _pbpDictSpeakSeq += 1;
+  _pbpDictDeepseekActive = false;
+  _pbpDictActiveVoice = "";
+  _pbpDictDeepseekAwaitingPerm = false;
   try {
     if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
   } catch (_) { /* swallow-ok: speechSynthesis optional */ }
@@ -775,6 +791,10 @@ async function _pbpDictPlayWavBytes(wavBytes, token, fallbackText, fallbackLang)
       try { URL.revokeObjectURL(url); } catch (_) { /* swallow-ok: blob url cleanup */ }
       _pbpDictAudioUrl = "";
     }
+    if (token === _pbpDictSpeakSeq) {
+      _pbpDictDeepseekActive = false;
+      _pbpDictActiveVoice = "";
+    }
   };
   audio.onended = releaseUrl;
   audio.onerror = releaseUrl;
@@ -790,26 +810,51 @@ async function _pbpDictPlayWavBytes(wavBytes, token, fallbackText, fallbackLang)
 }
 
 async function _pbpDictSpeakDeepseek(normText, rawLang, ttsLang, voice, token, permPromise) {
+  _pbpDictDeepseekActive = true;
+  _pbpDictActiveVoice = voice;
+  _pbpDictDeepseekAwaitingPerm = Boolean(permPromise);
+  const clearActive = () => {
+    if (token === _pbpDictSpeakSeq) {
+      _pbpDictDeepseekActive = false;
+      _pbpDictActiveVoice = "";
+      _pbpDictDeepseekAwaitingPerm = false;
+    }
+  };
   try {
     if (permPromise) {
       let granted = false;
       try { granted = !!(await permPromise); } catch (_) { /* swallow-ok: permission denied/unavailable */ }
+      _pbpDictDeepseekAwaitingPerm = false;
       if (granted) _pbpDictDeepseekOriginGranted = true;
       if (token !== _pbpDictSpeakSeq) return;
     }
-    if (!_pbpDictTtsConfigLoaded) {
+    if (!_pbpDictTtsConfigLoaded || _pbpDictTtsConfigPromise) {
       await pbpDictRefreshTtsConfig();
       if (token !== _pbpDictSpeakSeq) return;
     }
+    if (_pbpDictTtsVoice !== voice) {
+      clearActive();
+      return;
+    }
     if (typeof pbpTtsCacheGet === "function") {
       const cached = await pbpTtsCacheGet(voice, ttsLang, normText);
-      if (token !== _pbpDictSpeakSeq) return;
-      if (cached && cached.wavBytes) {
+      if (_pbpDictTtsConfigPromise) await _pbpDictTtsConfigPromise;
+      if (token !== _pbpDictSpeakSeq || _pbpDictTtsVoice !== voice) {
+        clearActive();
+        return;
+      }
+      if (cached && cached.wavBytes && _pbpDictDeepseekKey && _pbpDictDeepseekOriginGranted) {
         await _pbpDictPlayWavBytes(cached.wavBytes, token, normText, rawLang);
         return;
       }
     }
+    if (_pbpDictTtsConfigPromise) await _pbpDictTtsConfigPromise;
+    if (token !== _pbpDictSpeakSeq || _pbpDictTtsVoice !== voice) {
+      clearActive();
+      return;
+    }
     if (!_pbpDictDeepseekKey || !_pbpDictDeepseekOriginGranted) {
+      clearActive();
       _pbpDictSpeakBrowser(normText, rawLang, token);
       return;
     }
@@ -843,7 +888,11 @@ async function _pbpDictSpeakDeepseek(normText, rawLang, ttsLang, voice, token, p
       clearTimeout(timer);
       if (_pbpDictTtsAbort === ctrl) _pbpDictTtsAbort = null;
     }
-    if (token !== _pbpDictSpeakSeq) return;
+    if (_pbpDictTtsConfigPromise) await _pbpDictTtsConfigPromise;
+    if (token !== _pbpDictSpeakSeq || _pbpDictTtsVoice !== voice || !_pbpDictDeepseekKey || !_pbpDictDeepseekOriginGranted) {
+      clearActive();
+      return;
+    }
     const wavBytes = new Uint8Array(buf);
     const valid = typeof pbpValidateWavBytes === "function" ? pbpValidateWavBytes(wavBytes) : { ok: false };
     if (!valid.ok) throw new Error("invalid_wav:" + (valid.reason || "unknown"));
@@ -854,10 +903,15 @@ async function _pbpDictSpeakDeepseek(normText, rawLang, ttsLang, voice, token, p
         console.warn("[dict-tts] cache put failed:", e?.name, e?.message);
       }
     }
-    if (token !== _pbpDictSpeakSeq) return;
+    if (_pbpDictTtsConfigPromise) await _pbpDictTtsConfigPromise;
+    if (token !== _pbpDictSpeakSeq || _pbpDictTtsVoice !== voice || !_pbpDictDeepseekKey || !_pbpDictDeepseekOriginGranted) {
+      clearActive();
+      return;
+    }
     await _pbpDictPlayWavBytes(wavBytes, token, normText, rawLang);
   } catch (e) {
     if (token !== _pbpDictSpeakSeq) return;
+    clearActive();
     console.warn("[dict-tts] DeepSeek TTS failed, falling back to browser speech:", e?.name, e?.message);
     _pbpDictSpeakBrowser(normText, rawLang, token);
   }

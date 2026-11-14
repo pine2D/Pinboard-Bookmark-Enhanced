@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="14"><title>DeepSeek Speech (TTS &amp; ASR) Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="21"><title>DeepSeek Speech (TTS &amp; ASR) Tests</title>
 <link rel="stylesheet" href="../md-preview.css">
 <style>
 #results { font-family: monospace; padding: 16px; max-width: 960px; }
@@ -645,6 +645,327 @@ const ASR_FIXTURE_BODY = '\n\n{"request_id":"req_asr_20261113_01","text":"Summar
       Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: origMediaDevices });
       window.MediaRecorder = origRecorder;
       chrome.permissions.contains = origContains;
+    }
+  });
+
+  await test("15. Cancelling while getUserMedia is pending invalidates startup and stops late MediaStreamTracks", async () => {
+    const origMediaDevices = navigator.mediaDevices;
+    const origRecorder = window.MediaRecorder;
+    const origContains = chrome.permissions.contains;
+    let resolveGum = null;
+    let lateTrackStopped = false;
+    let recorderCreated = false;
+    try {
+      chrome.permissions.contains = async () => true;
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true, deepseekApiKey: obfuscateKey("sk-asr-pending") });
+      await pbpSpeechRefreshConfig();
+
+      window.pbpAskOpenPanel("");
+      const micBtn = document.getElementById("ask-mic");
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: {
+          getUserMedia: () => new Promise((resolve) => { resolveGum = resolve; }),
+        },
+      });
+      window.MediaRecorder = class FakeRecorder {
+        static isTypeSupported() { return true; }
+        constructor() { recorderCreated = true; }
+      };
+
+      micBtn.click();
+      for (let i = 0; i < 20 && !resolveGum; i++) await new Promise((r) => setTimeout(r, 5));
+      assert(typeof resolveGum === "function", "expected getUserMedia to be pending");
+
+      // Cancel while getUserMedia is still awaiting user microphone prompt
+      pbpSpeechCancelTarget("ask");
+      resolveGum({ getTracks: () => [{ stop() { lateTrackStopped = true; } }] });
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert(lateTrackStopped === true, "late-arriving MediaStreamTrack must be stopped immediately");
+      assert(recorderCreated === false, "cancelled pending startup must never instantiate MediaRecorder");
+      assert(!micBtn.dataset.voiceState, "mic button must stay idle after pending cancel");
+    } finally {
+      pbpSpeechCancelAll();
+      if (typeof _pbpAskSetOpen === "function") _pbpAskSetOpen(false);
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: origMediaDevices });
+      window.MediaRecorder = origRecorder;
+      chrome.permissions.contains = origContains;
+    }
+  });
+
+  await test("16. Revoking DeepSeek origin permission immediately cancels active ASR recording and blocks upload", async () => {
+    const origFetch = window.fetch;
+    const origMediaDevices = navigator.mediaDevices;
+    const origRecorder = window.MediaRecorder;
+    const origContains = chrome.permissions.contains;
+    let granted = true;
+    let fetches = 0;
+    let trackStopped = false;
+    try {
+      chrome.permissions.contains = async () => granted;
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true, deepseekApiKey: obfuscateKey("sk-asr-perm") });
+      await pbpSpeechRefreshConfig();
+
+      window.pbpAskOpenPanel("");
+      const micBtn = document.getElementById("ask-mic");
+      const wavClip = makeTestWav(160, 16000);
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: { getUserMedia: async () => ({ getTracks: () => [{ stop() { trackStopped = true; } }] }) },
+      });
+      window.MediaRecorder = class FakeRecorder {
+        static isTypeSupported() { return true; }
+        constructor() { this.state = "inactive"; this.mimeType = "audio/wav"; }
+        start() { this.state = "recording"; this.ondataavailable?.({ data: new Blob([wavClip], { type: "audio/wav" }) }); }
+        stop() { this.state = "inactive"; this.onstop?.(); }
+      };
+      window.fetch = async () => { fetches++; throw new Error("fetch must not run after permission revocation"); };
+
+      micBtn.click();
+      for (let i = 0; i < 20 && micBtn.dataset.voiceState !== "recording"; i++) await new Promise((r) => setTimeout(r, 10));
+      assert(micBtn.dataset.voiceState === "recording", "expected recording before revocation");
+
+      // Simulate chrome://extensions revoking https://api.deepseek.com/*
+      granted = false;
+      await pbpSpeechRefreshConfig();
+      await new Promise((r) => setTimeout(r, 20));
+
+      assert(trackStopped === true, "revoking origin permission must stop active microphone tracks");
+      assert(!micBtn.dataset.voiceState, "mic button must reset to idle on permission revocation");
+      assert(fetches === 0, "revoked permission must never dispatch ASR fetch");
+    } finally {
+      pbpSpeechCancelAll();
+      if (typeof _pbpAskSetOpen === "function") _pbpAskSetOpen(false);
+      window.fetch = origFetch;
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: origMediaDevices });
+      window.MediaRecorder = origRecorder;
+      chrome.permissions.contains = origContains;
+    }
+  });
+
+  await test("17. Switching dictTtsVoice back to browser while pbpTtsCacheGet is pending cancels stale DeepSeek TTS", async () => {
+    const origCacheGet = window.pbpTtsCacheGet;
+    const origFetch = window.fetch;
+    const origContains = chrome.permissions.contains;
+    let restoreSynth = () => {};
+    let resolveCache = null;
+    let fetches = 0;
+    try {
+      restoreSynth = installMockSpeechSynthesis({
+        cancel() {},
+        getVoices: () => [],
+        speak() {},
+        addEventListener() {},
+        removeEventListener() {},
+      });
+      chrome.permissions.contains = async () => true;
+      await chrome.storage.local.set({ dictTtsVoice: "stella", deepseekApiKey: obfuscateKey("sk-tts-switch") });
+      await pbpDictRefreshTtsConfig();
+
+      pbpTtsCacheGet = window.pbpTtsCacheGet = () => new Promise((resolve) => { resolveCache = resolve; });
+      window.fetch = async () => { fetches++; throw new Error("stale DeepSeek TTS must not call fetch"); };
+
+      const speakPromise = pbpDictSpeak("coalesce", "en");
+      for (let i = 0; i < 20 && !resolveCache; i++) await new Promise((r) => setTimeout(r, 5));
+      assert(typeof resolveCache === "function", "expected pbpTtsCacheGet to be pending");
+
+      // User switches pronunciation back to browser while cache read is still awaiting IDB
+      await chrome.storage.local.set({ dictTtsVoice: "browser" });
+      await pbpDictRefreshTtsConfig();
+      resolveCache(null);
+      await speakPromise;
+
+      assert(fetches === 0, "switching dictTtsVoice to browser during cache lookup must cancel DeepSeek fetch");
+    } finally {
+      pbpTtsCacheGet = window.pbpTtsCacheGet = origCacheGet;
+      window.fetch = origFetch;
+      chrome.permissions.contains = origContains;
+      restoreSynth();
+      pbpDictStopSpeak();
+    }
+  });
+
+  await test("18. pbpAsrDecodeToWavBytes clamps >120s audio to strictly 120.000s (1,920,000 frames)", async () => {
+    // 120.25s 16 kHz mono WAV fast-path (simulating 250ms timer overshoot)
+    const overlongSamples = new Float32Array(16000 * 120 + 4000);
+    const overlongWav = pbpAsrEncodePcm16Wav(overlongSamples, 16000);
+    const cappedFast = await pbpAsrDecodeToWavBytes(new Blob([overlongWav], { type: "audio/wav" }));
+    const checkFast = pbpValidateWavBytes(cappedFast);
+    assert(checkFast.ok && checkFast.dataSize === 16000 * 120 * 2,
+      "WAV fast-path must clamp dataSize to 3,840,000 bytes (120.000s), got " + checkFast.dataSize);
+
+    // 120.25s non-WAV AudioContext decode path
+    const origAudioCtx = window.AudioContext;
+    const origOfflineCtx = window.OfflineAudioContext;
+    try {
+      const rateIn = 8000;
+      const framesIn = Math.round(rateIn * 120.25);
+      const fakeChannel = new Float32Array(framesIn);
+      window.OfflineAudioContext = undefined;
+      window.AudioContext = class FakeAudioCtx {
+        async decodeAudioData() {
+          return {
+            sampleRate: rateIn,
+            length: framesIn,
+            duration: framesIn / rateIn,
+            numberOfChannels: 1,
+            getChannelData: () => fakeChannel,
+          };
+        }
+        async close() {}
+      };
+      const cappedDecoded = await pbpAsrDecodeToWavBytes(new Blob([new Uint8Array([1, 2, 3, 4])], { type: "audio/webm" }));
+      const checkDec = pbpValidateWavBytes(cappedDecoded);
+      assert(checkDec.ok && checkDec.sampleRate === 16000 && checkDec.dataSize === 16000 * 120 * 2,
+        "decoded path must clamp to 1,920,000 16kHz frames (3,840,000 bytes), got " + checkDec.dataSize);
+    } finally {
+      window.AudioContext = origAudioCtx;
+      window.OfflineAudioContext = origOfflineCtx;
+    }
+  });
+
+  await test("19. Natural MediaRecorder stop when microphone track ends finalizes UI and transcribes captured audio", async () => {
+    const origFetch = window.fetch;
+    const origMediaDevices = navigator.mediaDevices;
+    const origRecorder = window.MediaRecorder;
+    const origContains = chrome.permissions.contains;
+    let activeRecorder = null;
+    try {
+      chrome.permissions.contains = async () => true;
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true, deepseekApiKey: obfuscateKey("sk-asr-natural") });
+      await pbpSpeechRefreshConfig();
+
+      window.pbpAskOpenPanel("");
+      const micBtn = document.getElementById("ask-mic");
+      const askInput = document.getElementById("ask-input");
+      askInput.value = "";
+      const wavClip = makeTestWav(240, 16000);
+
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: { getUserMedia: async () => ({ getTracks: () => [{ readyState: "live", stop() { this.readyState = "ended"; } }] }) },
+      });
+      window.MediaRecorder = class FakeRecorder {
+        static isTypeSupported() { return true; }
+        constructor() { this.state = "inactive"; this.mimeType = "audio/wav"; activeRecorder = this; }
+        start() { this.state = "recording"; }
+        stop() { this.state = "inactive"; this.onstop?.(); }
+      };
+      window.fetch = async () => new Response('{"request_id":"r_nat","text":"Captured before mic unplugged","duration_ms":800}', { status: 200 });
+
+      micBtn.click();
+      for (let i = 0; i < 20 && micBtn.dataset.voiceState !== "recording"; i++) await new Promise((r) => setTimeout(r, 10));
+      assert(micBtn.dataset.voiceState === "recording" && activeRecorder, "expected active recording");
+
+      // Simulate OS/browser ending the track: final dataavailable followed by natural stop without user click
+      activeRecorder.ondataavailable?.({ data: new Blob([wavClip], { type: "audio/wav" }) });
+      activeRecorder.state = "inactive";
+      activeRecorder.onstop?.();
+
+      for (let i = 0; i < 30 && micBtn.dataset.voiceState; i++) await new Promise((r) => setTimeout(r, 10));
+      assert(!micBtn.dataset.voiceState, "natural recorder stop must not leave button stuck in recording");
+      assert(askInput.value === "Captured before mic unplugged", "expected captured audio to transcribe, got: " + askInput.value);
+    } finally {
+      pbpSpeechCancelAll();
+      if (typeof _pbpAskSetOpen === "function") _pbpAskSetOpen(false);
+      window.fetch = origFetch;
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: origMediaDevices });
+      window.MediaRecorder = origRecorder;
+      chrome.permissions.contains = origContains;
+    }
+  });
+
+  await test("20. pbpTtsCacheMeasure reports failed: true when IndexedDB open fails", async () => {
+    const desc = Object.getOwnPropertyDescriptor(window, "indexedDB") || Object.getOwnPropertyDescriptor(Window.prototype, "indexedDB");
+    try {
+      await pbpTtsCacheClear();
+      _pbpTtsDbPromise = null;
+      Object.defineProperty(window, "indexedDB", {
+        configurable: true,
+        value: {
+          open() { throw new DOMException("IDB denied", "SecurityError"); },
+        },
+      });
+      const failedStats = await pbpTtsCacheMeasure();
+      assert(failedStats.failed === true && failedStats.count === 0 && failedStats.bytes === 0,
+        "expected failed:true on IDB failure, got " + JSON.stringify(failedStats));
+    } finally {
+      _pbpTtsDbPromise = null;
+      if (desc) Object.defineProperty(window, "indexedDB", desc);
+      else delete window.indexedDB;
+    }
+    const healthyStats = await pbpTtsCacheMeasure();
+    assert(healthyStats.failed === false, "healthy IDB measure must report failed:false");
+  });
+
+  await test("21. #ask-history click and explicit .hl-card-save click cancel ASR while .hl-card-note blur preserves recording", async () => {
+    const origMediaDevices = navigator.mediaDevices;
+    const origRecorder = window.MediaRecorder;
+    const origContains = chrome.permissions.contains;
+    const origTabsCreate = chrome.tabs.create;
+    let openedUrls = [];
+    try {
+      chrome.permissions.contains = async () => true;
+      chrome.tabs.create = async (opts) => { openedUrls.push(opts.url); return { id: 99 }; };
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true, deepseekApiKey: obfuscateKey("sk-asr-exit") });
+      await pbpSpeechRefreshConfig();
+
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) },
+      });
+      window.MediaRecorder = class FakeRecorder {
+        static isTypeSupported() { return true; }
+        constructor() { this.state = "inactive"; this.mimeType = "audio/wav"; }
+        start() { this.state = "recording"; }
+        stop() { this.state = "inactive"; this.onstop?.(); }
+      };
+
+      // 1) #ask-history cancels active "ask" ASR session
+      window.pbpAskOpenPanel("");
+      const askMic = document.getElementById("ask-mic");
+      askMic.click();
+      for (let i = 0; i < 20 && askMic.dataset.voiceState !== "recording"; i++) await new Promise((r) => setTimeout(r, 10));
+      assert(askMic.dataset.voiceState === "recording", "expected #ask-mic recording");
+      document.getElementById("ask-history").click();
+      assert(!askMic.dataset.voiceState, "#ask-history click must cancel active #ask-mic recording");
+      assert(openedUrls.length === 1 && openedUrls[0].includes("library.html#ask"), "expected library.html#ask tab open");
+      if (typeof _pbpAskSetOpen === "function") _pbpAskSetOpen(false);
+
+      // 2) .hl-card-note blur preserves active "hl-note" ASR, whereas .hl-card-save cancels it
+      pbpAiIndexBlocks(document.getElementById("rendered-view"));
+      _pbpHlState = {
+        url: "https://example.com/speech",
+        account: "",
+        items: [{ id: "hl_exit", n: 1, quote: "First paragraph", note: "Draft", color: 1 }],
+        ranges: {},
+        degraded: { hl_exit: true },
+        orphans: {},
+      };
+      window._pbpHlOpenCard("hl_exit");
+      const card = document.getElementById("pb-hl-card");
+      const hlMic = card.querySelector(".hl-card-mic");
+      const hlNote = card.querySelector(".hl-card-note");
+      const hlSave = card.querySelector(".hl-card-save");
+      hlMic.click();
+      for (let i = 0; i < 20 && hlMic.dataset.voiceState !== "recording"; i++) await new Promise((r) => setTimeout(r, 10));
+      assert(hlMic.dataset.voiceState === "recording", "expected .hl-card-mic recording");
+
+      hlNote.dispatchEvent(new FocusEvent("blur"));
+      assert(hlMic.dataset.voiceState === "recording", "note blur must NOT cancel active recording");
+
+      hlSave.click();
+      assert(!hlMic.dataset.voiceState, "explicit .hl-card-save click must cancel active .hl-card-mic recording");
+    } finally {
+      pbpSpeechCancelAll();
+      const card = document.getElementById("pb-hl-card");
+      if (card?.matches(":popover-open")) card.hidePopover();
+      if (typeof _pbpAskSetOpen === "function") _pbpAskSetOpen(false);
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: origMediaDevices });
+      window.MediaRecorder = origRecorder;
+      chrome.permissions.contains = origContains;
+      chrome.tabs.create = origTabsCreate;
     }
   });
 

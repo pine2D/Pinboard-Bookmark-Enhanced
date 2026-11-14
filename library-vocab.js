@@ -1786,6 +1786,7 @@ function _pbpVocabRenderRefIdle(mode) {
 // open-to-look-up takes over the column (T7c).
 function _pbpVocabResetRef(w, reconcileOnly = false) {
   if (!reconcileOnly) _vocabLookupIntent++;
+  if (typeof pbpDictStopSpeak === "function") pbpDictStopSpeak();
   if (_pbpVocabDictCtrl) { _pbpVocabDictCtrl.abort(); _pbpVocabDictCtrl = null; }
   clearTimeout(_pbpVocabAutoTimer);
   _pbpVocabRelookedWordId = null;
@@ -1860,6 +1861,7 @@ function _pbpVocabLookupOther(term, lang, sentence = "", { derived = false } = {
   const host = $id("vocab-ref-result");
   if (!host || !term) return;
   _pbpVocabRelookedWordId = null;
+  if (typeof pbpDictStopSpeak === "function") pbpDictStopSpeak();
   if (_pbpVocabDictCtrl) _pbpVocabDictCtrl.abort();
   clearTimeout(_pbpVocabAutoTimer);
   const ctrl = _pbpVocabDictCtrl = new AbortController();
@@ -3761,7 +3763,11 @@ if (_vocabMarkLearning) _vocabMarkLearning.addEventListener("click", () => _pbpV
 // itself carries no such flag, so this is inferred from our own state.
 let _vocabViewShown = false;
 document.addEventListener("pbp-lib-view", (e) => {
-  if (e.detail.view !== "vocab") { _vocabViewShown = false; return; }
+  if (e.detail.view !== "vocab") {
+    if (typeof pbpDictStopSpeak === "function") pbpDictStopSpeak();
+    _vocabViewShown = false;
+    return;
+  }
   if (_vocabViewShown) { _pbpVocabSoftReload(); return; }
   _vocabViewShown = true;
   renderVocabPanel();
