@@ -2048,7 +2048,7 @@ html.motion-ready .msg-bar[data-state="busy"] { animation: msg-bar-busy-pulse 1.
   position: fixed;
   inset: auto;
   margin: 0;
-  width: min(420px, calc(100vw - 32px));
+  width: min(480px, calc(100vw - 32px));
   max-height: min(480px, calc(100vh - 32px));
   flex-direction: column;
   padding: 0;
@@ -2066,14 +2066,13 @@ html.motion-ready .msg-bar[data-state="busy"] { animation: msg-bar-busy-pulse 1.
   font-size: var(--panel-payload-fs);
 }
 #explain-pop:popover-open { display: flex; }
-#explain-pop[data-action="dict"] { width: min(480px, calc(100vw - 32px)); }
 #explain-pop[data-resized="true"] > :is(.xp-body, .reader-dict-session) { min-height: 0; flex: 1 1 0; }
-#explain-pop[data-action="dict"] > :is(.xp-head, .xp-foot) { flex-shrink: 0; }
+#explain-pop > :is(.xp-head, .xp-foot) { flex-shrink: 0; }
 
 #explain-pop.xp-resizing { user-select: none; }
 .xp-resize-hit { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .xp-resize { display: none; position: absolute; touch-action: none; pointer-events: auto; }
-#explain-pop[data-action="dict"] .xp-resize { display: block; }
+#explain-pop .xp-resize { display: block; }
 .xp-resize[data-edge="n"], .xp-resize[data-edge="s"] { left: 8px; right: 8px; height: 8px; cursor: ns-resize; }
 .xp-resize[data-edge="n"] { top: 0; }
 .xp-resize[data-edge="s"] { bottom: 0; }
@@ -2186,7 +2185,7 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
    T1 (dark-mode text fix round, Ruling 21). */
 .xp-pin[aria-pressed="true"] { background: var(--btn-hover); color: var(--link-on-raised); border-color: var(--link); }
 .xp-pin svg, .xp-close svg, .xp-dock svg, .xp-resize-grip svg { width: 14px; height: 14px; }
-#explain-pop:not([data-action="dict"]) :is(.xp-dock, .xp-resize-grip) { display: none; }
+#explain-pop:not([data-action="dict"]) .xp-dock { display: none; }
 .xp-act {
   /* Icon-only segment (icon audit P0): fixed-height cell, label in
      title/aria -- the grid's ellipsis fallback below can never fire now. */

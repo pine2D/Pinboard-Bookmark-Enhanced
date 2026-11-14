@@ -5146,7 +5146,7 @@
   "dictEntryUpdate": {"message": "Update this entry"},
   "dictEntryUpdateHint": {"message": "Uses tokens. The old entry is kept."},
   "dictPaidActionHint": {"message": "Calls AI and uses tokens."},
-  "dictResize": {"message": "Resize dictionary window"},
+  "dictResize": {"message": "Resize window"},
   "dictResizeWidth": {"message": "Width"},
   "dictResizeHeight": {"message": "Height"},
   "dictResizeReset": {"message": "Reset to default size"},

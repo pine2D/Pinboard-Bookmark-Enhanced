@@ -5135,7 +5135,7 @@
   "dictEntryUpdate": {"message": "Zaktualizuj hasło"},
   "dictEntryUpdateHint": {"message": "Zużywa tokeny. Poprzednie hasło zostaje zachowane."},
   "dictPaidActionHint": {"message": "Wywołuje AI i zużywa tokeny."},
-  "dictResize": {"message": "Zmień rozmiar okna słownika"},
+  "dictResize": {"message": "Zmień rozmiar okna"},
   "dictResizeWidth": {"message": "Szerokość"},
   "dictResizeHeight": {"message": "Wysokość"},
   "dictResizeReset": {"message": "Przywróć domyślny rozmiar"},

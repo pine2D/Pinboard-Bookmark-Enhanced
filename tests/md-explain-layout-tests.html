@@ -580,13 +580,13 @@ function assertLayout(frame, locale) {
       } finally { fx.frame.remove(); }
     }
   });
-  await test("dictionary view expands the shell without changing explain or translate width", async () => {
+  await test("dictionary, explain, and translate share one 480px default shell width", async () => {
     const frame = await makeFrame(800);
     try {
       const pop = frame.contentDocument.getElementById("explain-pop");
-      for (const [action, width] of [["dict", 480], ["translate", 420], ["explain", 420]]) {
+      for (const action of ["dict", "translate", "explain"]) {
         pop.dataset.action = action;
-        assert(Math.abs(pop.getBoundingClientRect().width - width) < 1, action + ": unexpected shell width");
+        assert(Math.abs(pop.getBoundingClientRect().width - 480) < 1, action + ": unexpected shell width");
       }
     } finally { frame.remove(); }
   });
@@ -601,6 +601,7 @@ function assertLayout(frame, locale) {
     win.t = key => messages[locale][key]?.message || key;
     win.pbpAiProviderName = () => "";
     win.pbpAiEffectiveModel = () => "";
+    win.pbpAiGetSettings = async () => ({});
     for (const name of ["shared.js", "md-ask.js"]) {
       const script = doc.createElement("script"); script.src = "../" + name;
       const ready = new Promise((resolve, reject) => {
@@ -670,10 +671,11 @@ function assertLayout(frame, locale) {
       assert(!fx.pop.classList.contains("xp-resizing"), "pointerup left drag state behind");
     } finally { fx.frame.remove(); }
   });
-  await test("dictionary size supports keyboard and click controls, reset, and keeps other actions unchanged", async () => {
+  await test("popover size supports keyboard, click, and pointer controls across dictionary, explain, and translate", async () => {
     const fx = await makeResizableFrame();
     try {
       const grip = fx.pop.querySelector(".xp-resize-grip");
+      const dock = fx.pop.querySelector(".xp-dock");
       grip.focus();
       const original = fx.pop.getBoundingClientRect();
       grip.dispatchEvent(new fx.win.KeyboardEvent("keydown", { key: "ArrowRight", shiftKey: true, bubbles: true, cancelable: true }));
@@ -686,19 +688,45 @@ function assertLayout(frame, locale) {
       menu.querySelector('button[data-axis="Height"][data-amount="32"]').click();
       const preferred = fx.pop.getBoundingClientRect();
       assert(preferred.height > original.height + 30, "click-only height control did not resize");
+      for (const action of ["explain", "translate", "dict"]) {
+        fx.pop.querySelector('[data-action="' + action + '"]').click();
+        await nextFrame(fx.win);
+        const cur = fx.pop.getBoundingClientRect();
+        assert(Math.abs(cur.width - preferred.width) < 1 && Math.abs(cur.height - preferred.height) < 1,
+          action + ": switching actions changed the resized shell (" + cur.width + "x" + cur.height + " vs " + preferred.width + "x" + preferred.height + ")");
+        assert(!menu.matches(":popover-open"), action + ": switching actions should close the transient size menu");
+        assert(fx.win.getComputedStyle(grip).display !== "none", action + ": resize grip should stay visible across all actions");
+        assert((fx.win.getComputedStyle(dock).display !== "none") === (action === "dict"), action + ": side-panel dock visibility should stay dictionary-only");
+      }
       fx.pop.querySelector('[data-action="explain"]').click();
-      assert(Math.abs(fx.pop.getBoundingClientRect().width - 420) < 1 && !fx.pop.style.height, "explain inherited dictionary geometry");
-      assert(!menu.matches(":popover-open") && fx.win.getComputedStyle(grip).display === "none", "size UI must only be visible in dictionary mode");
-      fx.pop.querySelector('[data-action="dict"]').click();
-      assert(Math.abs(fx.pop.getBoundingClientRect().width - preferred.width) < 1, "dictionary size was lost after switching actions");
+      await nextFrame(fx.win);
+      const se = fx.pop.querySelector('[data-edge="se"]');
+      const beforeExplainDrag = fx.pop.getBoundingClientRect();
+      resizePointer(fx, se, "pointerdown", beforeExplainDrag.right - 4, beforeExplainDrag.bottom - 4);
+      resizePointer(fx, se, "pointermove", beforeExplainDrag.right + 44, beforeExplainDrag.bottom + 28);
+      await nextFrame(fx.win);
+      resizePointer(fx, se, "pointerup", beforeExplainDrag.right + 44, beforeExplainDrag.bottom + 28);
+      const explainResized = fx.pop.getBoundingClientRect();
+      assert(explainResized.width > beforeExplainDrag.width + 40 && explainResized.height > beforeExplainDrag.height + 24,
+        "pointer resize did not work in explain mode");
+      fx.pop.querySelector('[data-action="translate"]').click();
+      await nextFrame(fx.win);
+      assert(Math.abs(fx.pop.getBoundingClientRect().width - explainResized.width) < 1 &&
+        Math.abs(fx.pop.getBoundingClientRect().height - explainResized.height) < 1,
+        "translate did not preserve the size set in explain mode");
       grip.click(); await nextFrame(fx.win); menu.querySelector(".xp-resize-reset").click();
-      assert(!fx.pop.dataset.resized && !fx.pop.style.height && Math.abs(fx.pop.getBoundingClientRect().width - 480) < 1,
-        "reset should restore the default width and natural height");
-      assert(fx.doc.activeElement === grip && !menu.matches(":popover-open"), "reset should close the controls and restore focus");
+      for (const action of ["translate", "explain", "dict"]) {
+        fx.pop.querySelector('[data-action="' + action + '"]').click();
+        await nextFrame(fx.win);
+        assert(!fx.pop.dataset.resized && !fx.pop.style.height && Math.abs(fx.pop.getBoundingClientRect().width - 480) < 1,
+          action + ": reset should restore the default 480px width and natural height");
+      }
+      assert(!menu.matches(":popover-open"), "reset should close the controls");
     } finally { fx.frame.remove(); }
     for (const locale of ["de", "ru", "zh_CN"]) {
       const narrow = await makeResizableFrame(320, 620, locale);
       try {
+        narrow.pop.querySelector('[data-action="explain"]').click(); await nextFrame(narrow.win);
         narrow.pop.querySelector(".xp-resize-grip").click(); await nextFrame(narrow.win);
         const menu = narrow.doc.getElementById("dict-resize-pop"), rect = menu.getBoundingClientRect();
         assert(rect.left >= 16 && rect.right <= 304 && menu.scrollWidth <= menu.clientWidth,
@@ -731,11 +759,16 @@ function assertLayout(frame, locale) {
       await nextFrame(fx.win);
       assert(Math.abs(fx.pop.getBoundingClientRect().width - preferred.width) < 1 && Math.abs(fx.pop.getBoundingClientRect().height - preferred.height) < 1,
         "re-expanding the viewport should recover the preferred size");
+      fx.pop.querySelector('[data-action="explain"]').click();
+      await nextFrame(fx.win);
       fx.win._pbpExplainClose(fx.pop);
       assert(parseFloat(fx.pop.style.maxHeight) === preferred.height,
-        "closing a tall resized window must not snap back to the default cap during its exit fade");
-      fx.pop.showPopover(); await nextFrame(fx.win);
-      assert(fx.pop.dataset.resized === "true", "closing and reopening should keep the reader-session size");
+        "closing a tall resized window in explain mode must not snap back to the default cap during its exit fade");
+      fx.win._pbpExplainOpenPop({ text: "reopen", n: 0, rect: { left: 40, right: 80, top: 40, bottom: 64 } }, "translate");
+      await nextFrame(fx.win);
+      assert(fx.pop.dataset.resized === "true" && Math.abs(fx.pop.getBoundingClientRect().width - preferred.width) < 1 &&
+        Math.abs(fx.pop.getBoundingClientRect().height - preferred.height) < 1,
+        "reopening in translate mode should keep the reader-session size");
     } finally { fx.frame.remove(); }
   });
 })();

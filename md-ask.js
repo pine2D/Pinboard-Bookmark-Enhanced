@@ -3449,15 +3449,6 @@ function _pbpExplainWriteDictRect(pop, rect, remember = false) {
 }
 
 function _pbpExplainFitDictSize(pop) {
-  if (_pbpExplainAction !== "dict") {
-    // Explain/translate keep their original selection-side height budget.
-    // Only dictionary geometry owns max-width and may clear that budget.
-    if (pop.style.maxWidth) pop.style.removeProperty("max-height");
-    for (const name of ["width", "height", "max-width"]) pop.style.removeProperty(name);
-    delete pop.dataset.resized;
-    if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
-    return;
-  }
   const bounds = pbpDictWindowBounds(_pbpExplainViewport());
   pop.style.maxWidth = bounds.maxWidth + "px";
   if (!_pbpDictWindowSize) {
@@ -3486,7 +3477,7 @@ function _pbpExplainResizeEnd() {
 function _pbpExplainResizeFlush() {
   _pbpExplainResizeFrame = 0;
   const drag = _pbpExplainResize;
-  if (!drag?.moved || _pbpExplainAction !== "dict") return;
+  if (!drag?.moved) return;
   _pbpExplainWriteDictRect(drag.pop, pbpDictWindowRect(drag.rect, drag.edge,
     drag.dx, drag.dy, _pbpExplainViewport()), true);
 }
@@ -3596,7 +3587,7 @@ function _pbpExplainInitResize(pop) {
     handle.className = "xp-resize"; handle.dataset.edge = edge;
     handle.setAttribute("aria-hidden", "true");
     handle.addEventListener("pointerdown", e => {
-      if (_pbpExplainAction !== "dict" || !e.isPrimary || e.button !== 0) return;
+      if (!e.isPrimary || e.button !== 0) return;
       _pbpExplainResizeEnd();
       if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
       _pbpExplainResize = { pop, handle, edge, pointerId: e.pointerId, rect: pop.getBoundingClientRect(),
@@ -3639,7 +3630,7 @@ function pbpExplainClampPosition(left, top, width, height, viewportWidth, viewpo
 function _pbpExplainPlace(pop, left, top) {
   const viewport = _pbpExplainViewport();
   const b = pbpDictWindowBounds(viewport);
-  const pos = _pbpExplainAction === "dict" ? {
+  const pos = (_pbpExplainAction === "dict" || _pbpDictWindowSize) ? {
     left: Math.max(b.left, Math.min(left, b.right - pop.offsetWidth)),
     top: Math.max(b.top, Math.min(top, b.bottom - pop.offsetHeight))
   } : pbpExplainClampPosition(left, top, pop.offsetWidth, pop.offsetHeight, window.innerWidth, window.innerHeight);
@@ -3717,12 +3708,12 @@ function _pbpExplainSetPinned(pop, pinned) {
 function _pbpExplainClose(pop, restoreFocus = false) {
   if (!pop || !pop.matches(":popover-open")) return;
   if (restoreFocus) _pbpExplainRestoreFocus(pop);
-  // Selection anchors and natural height budgets are per-open. Manual dictionary
+  // Selection anchors and natural height budgets are per-open. Manual window
   // geometry survives the exit transition and is fitted again on the next open.
   _pbpExplainAnchorBottom = null;
   _pbpExplainResizeEnd();
   if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
-  if (!(_pbpExplainAction === "dict" && _pbpDictWindowSize)) pop.style.removeProperty("max-height");
+  if (!_pbpDictWindowSize) pop.style.removeProperty("max-height");
   try { pop.hidePopover(); } catch (_) {}
 }
 
@@ -3889,6 +3880,7 @@ function _pbpExplainSyncActButtons(pop) {
   const dictHere = _pbpExplainAction === "dict" && _pbpReaderDictSession?.host === "bubble";
   pop.querySelectorAll(":scope > .xp-body, :scope > .xp-foot").forEach(el => { el.hidden = dictHere; });
   _pbpExplainResizeEnd();
+  if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
   _pbpExplainFitDictSize(pop);
   pop.querySelectorAll(".xp-act").forEach((btn) => {
     btn.setAttribute("aria-pressed", String(btn.dataset.action === _pbpExplainAction));
@@ -4253,7 +4245,7 @@ function _pbpExplainEnsurePop() {
   const fitViewport = () => {
     if (!pop.matches(":popover-open")) return;
     _pbpExplainResizeEnd();
-    if (_pbpExplainAction === "dict") _pbpExplainFitDictSize(pop);
+    _pbpExplainFitDictSize(pop);
     if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
     const rect = pop.getBoundingClientRect();
     _pbpExplainPlace(pop, rect.left, rect.top);
@@ -4675,7 +4667,7 @@ function _pbpExplainOpenPop(cap, initialAction) {
     // short to budget for, so the stylesheet cap and the clamp handle it.
     const cssCap = parseFloat(getComputedStyle(pop).maxHeight);
     const room = openDown ? below : above;
-    if (_pbpExplainAction === "dict" && _pbpDictWindowSize) {
+    if (_pbpDictWindowSize) {
       // A deliberate window size survives reopening; placement still follows
       // the new selection, with the visible viewport as its final boundary.
       _pbpExplainFitDictSize(pop);

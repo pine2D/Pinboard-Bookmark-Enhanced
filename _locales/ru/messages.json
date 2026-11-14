@@ -5135,7 +5135,7 @@
   "dictEntryUpdate": {"message": "Обновить статью"},
   "dictEntryUpdateHint": {"message": "Расходует токены. Прежняя статья сохраняется."},
   "dictPaidActionHint": {"message": "Обращается к ИИ и расходует токены."},
-  "dictResize": {"message": "Изменить размер окна словаря"},
+  "dictResize": {"message": "Изменить размер окна"},
   "dictResizeWidth": {"message": "Ширина"},
   "dictResizeHeight": {"message": "Высота"},
   "dictResizeReset": {"message": "Восстановить размер по умолчанию"},

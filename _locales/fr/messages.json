@@ -5135,7 +5135,7 @@
   "dictEntryUpdate": {"message": "Actualiser cette entrée"},
   "dictEntryUpdateHint": {"message": "Consomme des jetons. L’ancienne entrée est conservée."},
   "dictPaidActionHint": {"message": "Appelle l’IA et consomme des jetons."},
-  "dictResize": {"message": "Redimensionner la fenêtre du dictionnaire"},
+  "dictResize": {"message": "Redimensionner la fenêtre"},
   "dictResizeWidth": {"message": "Largeur"},
   "dictResizeHeight": {"message": "Hauteur"},
   "dictResizeReset": {"message": "Rétablir la taille par défaut"},

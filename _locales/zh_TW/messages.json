@@ -5135,7 +5135,7 @@
   "dictEntryUpdate": {"message": "更新此詞條"},
   "dictEntryUpdateHint": {"message": "會消耗 token，舊詞條會保留。"},
   "dictPaidActionHint": {"message": "會呼叫 AI 並消耗 token。"},
-  "dictResize": {"message": "調整查詞視窗大小"},
+  "dictResize": {"message": "調整視窗大小"},
   "dictResizeWidth": {"message": "寬度"},
   "dictResizeHeight": {"message": "高度"},
   "dictResizeReset": {"message": "恢復預設大小"},

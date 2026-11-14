@@ -5135,7 +5135,7 @@
   "dictEntryUpdate": {"message": "Eintrag aktualisieren"},
   "dictEntryUpdateHint": {"message": "Verbraucht Tokens. Der alte Eintrag bleibt erhalten."},
   "dictPaidActionHint": {"message": "Ruft die KI auf und verbraucht Tokens."},
-  "dictResize": {"message": "Größe des Wörterbuchfensters ändern"},
+  "dictResize": {"message": "Fenstergröße ändern"},
   "dictResizeWidth": {"message": "Breite"},
   "dictResizeHeight": {"message": "Höhe"},
   "dictResizeReset": {"message": "Standardgröße wiederherstellen"},

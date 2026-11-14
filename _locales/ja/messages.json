@@ -5135,7 +5135,7 @@
   "dictEntryUpdate": {"message": "この辞書項目を更新"},
   "dictEntryUpdateHint": {"message": "トークンを消費します。以前の辞書項目は残ります。"},
   "dictPaidActionHint": {"message": "AI を呼び出し、トークンを消費します。"},
-  "dictResize": {"message": "辞書ウィンドウのサイズを変更"},
+  "dictResize": {"message": "ウィンドウのサイズを変更"},
   "dictResizeWidth": {"message": "幅"},
   "dictResizeHeight": {"message": "高さ"},
   "dictResizeReset": {"message": "既定のサイズに戻す"},
