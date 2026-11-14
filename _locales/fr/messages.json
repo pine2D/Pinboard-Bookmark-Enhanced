@@ -5450,5 +5450,37 @@
   },
   "backupAdoptLibrary": {
     "message": "Votre bibliothèque personnelle est vide. Restaurer le vocabulaire ou les surlignages fera donc passer à la bibliothèque de la sauvegarde. Ses données Google Drive restent accessibles."
+  },
+  "readerHistoryBtn": {
+    "message": "Aperçus récents"
+  },
+  "readerHistoryTitle": {
+    "message": "Aperçus récents"
+  },
+  "readerHistoryEmpty": {
+    "message": "Aucun aperçu récent sur cet appareil pour le moment."
+  },
+  "readerHistoryClear": {
+    "message": "Effacer"
+  },
+  "readerHistoryRemove": {
+    "message": "Retirer de l’historique"
+  },
+  "readerHistoryRemoveItem": {
+    "message": "Retirer $TITLE$ de l’historique",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerHistoryReopen": {
+    "message": "Rouvrir dans le lecteur"
+  },
+  "readerHistoryExpiredLead": {
+    "message": "Cet aperçu n’est plus en cache. Rouvrez-le depuis l’adresse d’origine ou choisissez un autre aperçu récent."
+  },
+  "readerHistoryOpenFailed": {
+    "message": "Impossible de rouvrir cet aperçu. Essayez d’ouvrir la page d’origine."
   }
 }

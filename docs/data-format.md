@@ -13,7 +13,7 @@ Bookmark Enhanced stores your data locally in Chrome storage and IndexedDB, expo
 
 | Channel | Scope | What lives there |
 |---------|-------|------------------|
-| `chrome.storage.local` | Per browser profile | Default settings, credentials (when credential sync is off), `optSyncEnabled`, `bookmarkServiceActive`, `pinboardTokenVerified`, `personalLibraryAccount`, article highlights and notes (`pbp_hl_<hash>`), offline save queue (`offlineQueue`), Drive sync cursors/state (`driveConnState:<ownerHash>`), dictionary negative/failure memos, reader handoff state |
+| `chrome.storage.local` | Per browser profile | Default settings, credentials (when credential sync is off), `optSyncEnabled`, `bookmarkServiceActive`, `pinboardTokenVerified`, `personalLibraryAccount`, article highlights and notes (`pbp_hl_<hash>`), offline save queue (`offlineQueue`), Drive sync cursors/state (`driveConnState:<ownerHash>`), dictionary negative/failure memos, recent reader previews (`pbp_reader_history`), reader handoff state |
 | `chrome.storage.sync` | Chrome account (optional) | Ordinary settings from `SETTINGS_DEFAULTS` when `optSyncEnabled` is `true` (values exceeding `7800` UTF-8 bytes are split into chunk keys); credentials and export-target tokens only when `syncApiKeys` is also `true` |
 | `chrome.storage.session` | In-memory browser session | Unsaved popup drafts (24-hour TTL, separated between normal and incognito windows) |
 | IndexedDB (7 databases) | Per browser profile | Vocabulary, offline dictionary packs, Yomitan dictionaries, AI dictionary archive, Ask conversation archive, local restore points, AI response cache |

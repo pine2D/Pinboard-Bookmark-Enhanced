@@ -5450,5 +5450,37 @@
   },
   "backupAdoptLibrary": {
     "message": "個人資料庫是空的，還原生詞或標記時會改用備份所屬的資料庫，原有的 Drive 同步資料仍可使用。"
+  },
+  "readerHistoryBtn": {
+    "message": "最近預覽"
+  },
+  "readerHistoryTitle": {
+    "message": "最近預覽"
+  },
+  "readerHistoryEmpty": {
+    "message": "這部裝置還沒有最近預覽記錄。"
+  },
+  "readerHistoryClear": {
+    "message": "清除"
+  },
+  "readerHistoryRemove": {
+    "message": "從記錄中移除"
+  },
+  "readerHistoryRemoveItem": {
+    "message": "從記錄中移除 $TITLE$",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerHistoryReopen": {
+    "message": "在閱讀器中重新開啟"
+  },
+  "readerHistoryExpiredLead": {
+    "message": "目前的預覽快取已失效，可從原網址重新擷取，或開啟其他最近預覽。"
+  },
+  "readerHistoryOpenFailed": {
+    "message": "無法重新開啟這篇預覽，請改從原網頁開啟。"
   }
 }

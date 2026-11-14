@@ -5472,5 +5472,37 @@
   },
   "backupAdoptLibrary": {
     "message": "Your personal library is empty, so restoring vocabulary or highlights will switch to the backup's library. Its Google Drive data stays available."
+  },
+  "readerHistoryBtn": {
+    "message": "Recent previews"
+  },
+  "readerHistoryTitle": {
+    "message": "Recent previews"
+  },
+  "readerHistoryEmpty": {
+    "message": "No recent previews on this device yet."
+  },
+  "readerHistoryClear": {
+    "message": "Clear"
+  },
+  "readerHistoryRemove": {
+    "message": "Remove from history"
+  },
+  "readerHistoryRemoveItem": {
+    "message": "Remove $TITLE$ from history",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerHistoryReopen": {
+    "message": "Reopen in Reader"
+  },
+  "readerHistoryExpiredLead": {
+    "message": "This preview is no longer cached. Reopen it from the original address, or pick another recent preview."
+  },
+  "readerHistoryOpenFailed": {
+    "message": "Couldn't reopen this preview. Try opening the original page instead."
   }
 }

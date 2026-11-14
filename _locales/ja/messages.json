@@ -5450,5 +5450,37 @@
   },
   "backupAdoptLibrary": {
     "message": "個人ライブラリが空なので、単語帳やハイライトを復元するとバックアップのライブラリに切り替わります。その Google Drive のデータも引き続き使えます。"
+  },
+  "readerHistoryBtn": {
+    "message": "最近のプレビュー"
+  },
+  "readerHistoryTitle": {
+    "message": "最近のプレビュー"
+  },
+  "readerHistoryEmpty": {
+    "message": "この端末には最近のプレビューがまだありません。"
+  },
+  "readerHistoryClear": {
+    "message": "消去"
+  },
+  "readerHistoryRemove": {
+    "message": "履歴から削除"
+  },
+  "readerHistoryRemoveItem": {
+    "message": "$TITLE$ を履歴から削除",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerHistoryReopen": {
+    "message": "リーダーで開き直す"
+  },
+  "readerHistoryExpiredLead": {
+    "message": "このプレビューの一時データは残っていません。元のページから再取得するか、他の最近のプレビューを開けます。"
+  },
+  "readerHistoryOpenFailed": {
+    "message": "このプレビューを開き直せませんでした。元のページを直接開いてください。"
   }
 }

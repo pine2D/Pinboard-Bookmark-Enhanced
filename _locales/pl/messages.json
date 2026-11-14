@@ -5450,5 +5450,37 @@
   },
   "backupAdoptLibrary": {
     "message": "Twoja biblioteka osobista jest pusta, więc przywrócenie słówek lub wyróżnień przełączy Cię na bibliotekę z kopii zapasowej. Jej dane na Dysku Google pozostaną dostępne."
+  },
+  "readerHistoryBtn": {
+    "message": "Ostatnie podglądy"
+  },
+  "readerHistoryTitle": {
+    "message": "Ostatnie podglądy"
+  },
+  "readerHistoryEmpty": {
+    "message": "Na tym urządzeniu nie ma jeszcze ostatnich podglądów."
+  },
+  "readerHistoryClear": {
+    "message": "Wyczyść"
+  },
+  "readerHistoryRemove": {
+    "message": "Usuń z historii"
+  },
+  "readerHistoryRemoveItem": {
+    "message": "Usuń $TITLE$ z historii",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerHistoryReopen": {
+    "message": "Otwórz ponownie w czytniku"
+  },
+  "readerHistoryExpiredLead": {
+    "message": "Ten podgląd nie jest już w pamięci podręcznej. Otwórz go ponownie z oryginalnego adresu albo wybierz inny ostatni podgląd."
+  },
+  "readerHistoryOpenFailed": {
+    "message": "Nie udało się ponownie otworzyć tego podglądu. Spróbuj otworzyć oryginalną stronę."
   }
 }

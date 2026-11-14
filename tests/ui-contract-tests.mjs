@@ -6892,12 +6892,13 @@ function stripJsComments(input) {
     "md-preview.css: the .pbv-bar control family lost its :disabled state (opacity + not-allowed, same recipe as .src-seg:disabled) -- the family's own background/color mask the UA greying, so a disabled control is pixel-identical to a live one");
 }
 
-// .pop-panel (COMPONENTS.md §10.2): the five reader popovers take their chrome
+// .pop-panel (COMPONENTS.md §10.2): the reader popovers take their chrome
 // from the primitive; an id rule no longer paints a fill or a border, so a
 // creator that forgets the class ships a transparent, borderless popover.
 for (const [src, file, v, id] of [
   [mdReaderJsSource, "md-reader.js", "pop", "fn-pop"], [mdReaderJsSource, "md-reader.js", "pop", "search-pop"],
   [mdReaderJsSource, "md-reader.js", "pop", "kbd-help-pop"], [mdReaderJsSource, "md-reader.js", "pop", "typo-pop"],
+  [mdPreviewJs, "md-preview.js", "pop", "rail-history-pop"],
   [mdHighlightJs, "md-highlight.js", "card", "pb-hl-card"],
 ]) {
   check(new RegExp(`${v}\\.id = "${id}";\\s*\\n\\s*${v}\\.className = "pop-panel";`).test(src),
@@ -9909,6 +9910,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
     ["background.js", /startsWith\(chrome\.runtime\.getURL\("md-preview\.html"\)\)/, "URL prefix test in _imgFixIsPreviewUrl"],
     ["background.js", /chrome\.tabs\.query\(\{ url: chrome\.runtime\.getURL\("md-preview\.html"\) \+ "\*" \}\)/, "tabs.query match pattern (lookup only)"],
     ["background.js", /const base = chrome\.runtime\.getURL\("md-preview\.html"\);/, "orphan sweep prefix, only startsWith-tested against tab urls"],
+    ["shared.js", /chrome\.tabs\.query\(\{ url: chrome\.runtime\.getURL\("md-preview\.html"\) \+ "\*" \}\)/, "tabs.query match pattern for live reader tab activation"],
   ];
   const openCall = /\b(?:tabs|windows)\s*\.\s*(?:create|update)\b|\bwindow\s*\.\s*open\b|\bopen\s*\(|\blocation\s*(?:\.\s*(?:assign|replace|href)\b|\s*=)/;
   const exemptionHolds = (re, lineText) => re.test(lineText) && !openCall.test(lineText.replace(re, ""));

@@ -5450,5 +5450,37 @@
   },
   "backupAdoptLibrary": {
     "message": "Ваша личная библиотека пуста, поэтому при восстановлении слов или выделений вы перейдёте на библиотеку из резервной копии. Её данные на Google Диске останутся доступны."
+  },
+  "readerHistoryBtn": {
+    "message": "Недавние просмотры"
+  },
+  "readerHistoryTitle": {
+    "message": "Недавние просмотры"
+  },
+  "readerHistoryEmpty": {
+    "message": "На этом устройстве пока нет недавних просмотров."
+  },
+  "readerHistoryClear": {
+    "message": "Очистить"
+  },
+  "readerHistoryRemove": {
+    "message": "Удалить из истории"
+  },
+  "readerHistoryRemoveItem": {
+    "message": "Удалить $TITLE$ из истории",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerHistoryReopen": {
+    "message": "Открыть заново в режиме чтения"
+  },
+  "readerHistoryExpiredLead": {
+    "message": "Этот просмотр больше не хранится в кэше. Откройте его заново по исходному адресу или выберите другой недавний материал."
+  },
+  "readerHistoryOpenFailed": {
+    "message": "Не удалось открыть этот просмотр заново. Попробуйте открыть исходную страницу."
   }
 }

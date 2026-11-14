@@ -8090,7 +8090,7 @@ const SWEEP_CFG = {
       ".action-link", ".clear-all-link", ".reset-tab-btn",
       ".tr-link", ".xp-dict-more", ".xp-dict-lemma-link", ".pbp-img-fix-btn", ".pbv-time", // link-styled, no chrome (COMPONENTS.md §0); .pbv-time is the cue row's timestamp (24px hit floor)
       ".notes-excerpt-color",                       // inline semantic label action; 24px hit floor, can wrap in the hang column
-      "summary", ".rail-sec-head", ".notes-hit-btn", ".ask-library-hit", ".notes-card-head", ".notes-card-top", ".notes-excerpt-jump", ".connection-health-row", ".hl-item-main", ".send-mi", ".pbv-poster", // row rung: whole-row clickables / section headers / status cards / menu rows / the video poster card
+      "summary", ".rail-sec-head", ".notes-hit-btn", ".ask-library-hit", ".notes-card-head", ".notes-card-top", ".notes-excerpt-jump", ".connection-health-row", ".hl-item-main", ".rh-open", ".pp-rh-open", ".send-mi", ".pbv-poster", // row rung: whole-row clickables / section headers / status cards / menu rows / the video poster card
       ".listbox-pop[data-layout='meaning'] .listbox-opt", // the save-meaning list (dict redesign 3.2): a definition row of up to four lines plus its source line (COMPONENTS.md choice-text), a menu row like .send-mi
       ".theme-preset-btn", ".saved-theme-btn",       // borderless swatch pills (user-selected variant A, d57cdcf): the sm rung minus the collapsed frame
       ".tags-input-wrap > input", ".vocab-group-unit > input", ".source-badge > .src-seg", ".view-toggle > .toggle-btn", // fused-shell inners: the shell is measured instead
@@ -8113,7 +8113,7 @@ const SWEEP_CFG = {
     allowed: { options: [8], library: [8], popup: [8], "md-preview": [8] },
     exempt: [
       ".tabs, .lib-tabs",                                                     // tab strips
-      ".source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split, .typo-seg, .vocab-status-toggles, .notes-color-filters", // fused shells / segmented strips
+      ".source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split, .qbtn-split, .typo-seg, .vocab-status-toggles, .notes-color-filters", // fused shells / segmented strips
       ".header-icons, .xp-window-actions, .lib-cluster", // icon-button clusters: not button rows; clusterGap (family 12) holds them to 4px instead
       ".connection-health, .theme-presets-group, .kbd-help-chips, .rail-badges, .hl-filter-row", // status-card grid, swatch-pill / chip rows, the highlight legend (gap = two 6px hit pads)
       ".notes-card-top",                                                      // card head: title + chips, the remove X is absolutely positioned
@@ -8169,7 +8169,7 @@ const SWEEP_CFG = {
     // token, so it drops out of their live scale.
     names: ["sm", "md", "lg", "full", "tag", "box"],
     tokens: { options: [3, 8, 10], popup: [3, 8, 10], library: [4, 8, 12], "md-preview": [4, 8, 12] },
-    exemptWithin: ".source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split",
+    exemptWithin: ".source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split, .qbtn-split",
     valueBoxes: {
       options: '.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg textarea, .fg select, .listbox-btn, .mobile-tab-picker select, .options-search input[type="search"]',
       popup: "#url-input, #title-input, #description-input, #linkding-description-input, .tags-input-wrap, #token-input, #search-input",
@@ -9064,6 +9064,21 @@ async function openReaderSurface(name) {
     case "search-pop": { if (typeof _pbpSearchOpen !== "function") return false; _pbpSearchOpen(); await wait(300); return shown(document.getElementById("search-pop")); }
     case "kbd-help-pop": { if (typeof _pbpKbdHelpOpen !== "function") return false; _pbpKbdHelpOpen(); await wait(300); return shown(document.getElementById("kbd-help-pop")); }
     case "typo-pop": { const b = document.getElementById("rail-typo-btn"); if (!b) return false; b.click(); await wait(300); return shown(document.getElementById("typo-pop")); }
+    case "rail-history-pop": {
+      const b = document.getElementById("rail-history-btn");
+      if (!b) return false;
+      const curKey = new URLSearchParams(location.search).get("k") || "";
+      const now = Date.now();
+      await chrome.storage.local.set({
+        pbp_reader_history: [
+          { url: "https://example.com/render-audit-fixture", sourceTabUrl: "https://example.com/render-audit-fixture", title: "Render Audit Fixture", site: "example.com", engine: "local", isVideo: false, openedAt: now, lastKey: curKey },
+          { url: "https://example.org/second-fixture", sourceTabUrl: "https://example.org/second-fixture", title: "Second Reader Entry", site: "example.org", engine: "jina", isVideo: false, openedAt: now - 300000, lastKey: "other-key" },
+        ],
+      });
+      b.click();
+      await wait(300);
+      return shown(document.getElementById("rail-history-pop"));
+    }
     case "pb-hl-card": { if (typeof _pbpHlOpenCard !== "function") return false; _pbpHlOpenCard("h1"); await wait(500); return shown(document.getElementById("pb-hl-card")); }
     case "send-menu": {
       // the export section starts collapsed; a menu inside a collapsed section measures 0x0
@@ -10366,6 +10381,17 @@ async function runSweep(page, sw, extBase) {
         if (videoOk !== true) throw new Error(`SETUP: selected reader video workbench did not open (${videoOk})`);
         await scan("md-preview", "video");
       }
+
+      if (wants("md-preview", "history-empty")) {
+        const now = Date.now();
+        await sw.evaluate((rows) => chrome.storage.local.set({ pbp_reader_history: rows }), [
+          { url: "https://example.com/expired-article", sourceTabUrl: "https://example.com/expired-article", title: "Expired Reader Article", site: "example.com", engine: "local", isVideo: false, openedAt: now - 120000, lastKey: "render-audit-expired-key" },
+          { url: "https://example.org/earlier-note", sourceTabUrl: "https://example.org/earlier-note", title: "Earlier Saved Essay", site: "example.org", engine: "jina", isVideo: false, openedAt: now - 3600000, lastKey: "render-audit-earlier-key" },
+        ]);
+        await page.goto(`${extBase}md-preview.html?k=render-audit-expired-key`, { waitUntil: "load", timeout: TIMEOUT_MS });
+        await page.waitForTimeout(500);
+        await scan("md-preview", "history-empty");
+      }
     }
   }
 
@@ -10492,6 +10518,21 @@ async function runSweep(page, sw, extBase) {
       if (document.getElementById("description-input").value.includes("Generated summary")) throw new Error("AI entered Notes");
     });
     await scan("popup", "linkding-description");
+  }
+
+  if (wants("popup", "reader-history")) {
+    const now = Date.now();
+    await sw.evaluate((rows) => chrome.storage.local.set({ pbp_reader_history: rows }), [
+      { url: "https://example.com/render-audit-fixture", sourceTabUrl: "https://example.com/render-audit-fixture", title: "Render Audit Fixture", site: "example.com", engine: "local", isVideo: false, openedAt: now - 60000, lastKey: "popup-hist-1" },
+      { url: "https://example.org/second-fixture", sourceTabUrl: "https://example.org/second-fixture", title: "Second Reader Entry", site: "example.org", engine: "jina", isVideo: false, openedAt: now - 3600000, lastKey: "popup-hist-2" },
+    ]);
+    await page.goto(`${extBase}popup.html?_ra=sweephist`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.waitForTimeout(500);
+    await page.click("#jina-md-history-btn");
+    await page.waitForSelector("#jina-md-history-pop:popover-open .pp-rh-item", { timeout: TIMEOUT_MS });
+    await page.waitForTimeout(150);
+    await scan("popup", "reader-history");
+    await page.keyboard.press("Escape");
   }
 
   // ---- popup, hi-DPI width cap (2026-10-02). Chrome caps an action popup at

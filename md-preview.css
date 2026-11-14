@@ -1273,8 +1273,9 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
   z-index: 20;
   transition: transform 200ms var(--ease-drawer), visibility 0s;
 }
-.rail-ident { display: grid; grid-template-columns: minmax(0, 1fr) 24px; column-gap: var(--sp-2); align-items: start; }
-.rail-ident > #rail-settings-btn { grid-column: 2; grid-row: 1; width: 24px; height: 24px; padding: 0; }
+.rail-ident { display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px; column-gap: var(--sp-2); align-items: start; }
+.rail-ident > #rail-history-btn { grid-column: 2; grid-row: 1; width: 24px; height: 24px; padding: 0; }
+.rail-ident > #rail-settings-btn { grid-column: 3; grid-row: 1; width: 24px; height: 24px; padding: 0; }
 .rail-ident > a { grid-column: 1 / -1; }
 .rail-ident h1 { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .rail-ident a { display: block; margin-top: var(--sp-1); font-size: 12px; color: var(--fg-muted); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1712,9 +1713,9 @@ body.rail-open .rail-toggle .rail-toggle-close { display: block; }
     padding-left: calc(var(--rail-toggle-inset) + var(--rail-toggle-size) + var(--sp-3));
   }
   .rail-toggle { display: inline-flex; }
-  body.rail-open .rail-ident { grid-template-columns: minmax(0, 1fr) 24px 24px; }
+  body.rail-open .rail-ident { grid-template-columns: minmax(0, 1fr) 24px 24px 24px; }
   .rail-ident > .rail-toggle {
-    position: static; grid-column: 3; grid-row: 1;
+    position: static; grid-column: 4; grid-row: 1;
     width: 24px; height: 24px; box-shadow: none;
   }
   .rail-ident > .rail-toggle svg { width: 14px; height: 14px; }
@@ -3778,6 +3779,159 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   white-space: pre-wrap;
 }
 .hl-card-degraded { color: var(--danger); font-size: 12px; }
+
+/* ---- Reader History (#rail-history-pop + expired empty-state rescue) ---- */
+#rail-history-pop {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(320px, calc(100vw - 16px));
+  max-height: min(400px, calc(100vh - 16px));
+  display: none;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+#rail-history-pop:popover-open { display: flex; }
+#rail-history-pop button { font-family: inherit; }
+#rail-history-pop .panel-head > .rh-title,
+#rendered-view .es-history .panel-head > .rh-title {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--fg);
+}
+.rh-clear-btn {
+  flex: none;
+  font-size: 12px;
+  line-height: 18px;
+  padding: 3px var(--sp-2);
+  min-height: 26px;
+  background: transparent;
+  border-color: transparent;
+}
+.rh-clear-btn:hover { background: var(--btn-hover); border-color: transparent; }
+.rh-empty-msg {
+  margin: 0;
+  padding: var(--sp-2) 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg-muted);
+}
+.rh-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.rh-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.rh-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-0);
+  padding: var(--sp-1) var(--sp-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, color var(--motion-state) ease;
+}
+.rh-open[aria-current="true"] {
+  background: var(--code-bg);
+  border-color: var(--border);
+}
+.rh-open:hover {
+  background: var(--btn-hover);
+  color: var(--fg);
+}
+.rh-open:hover .rh-meta { color: var(--fg); }
+.rh-open:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.rh-item-title {
+  width: 100%;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rh-meta {
+  width: 100%;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rh-remove {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-muted);
+}
+.rh-remove:hover { background: var(--btn-hover); border-color: transparent; color: var(--fg); }
+.rh-remove svg { width: 13px; height: 13px; }
+
+.empty-state.es-history {
+  max-width: 520px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-3);
+  text-align: left;
+}
+#rendered-view .empty-state.es-history p { margin: 0; }
+.empty-state.es-history > .rh-empty-lead {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fg);
+}
+.rh-match {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.rh-match .rh-item-title {
+  white-space: normal;
+  font-size: 14px;
+  font-weight: 600;
+}
+.empty-state.es-history .rh-list {
+  max-height: 320px;
+  padding: var(--sp-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.empty-state.es-history > .row {
+  justify-content: flex-start;
+  margin-top: 0;
+}
 .hl-card-dot {
   width: 22px; height: 22px; padding: 0;
   border-radius: 50%;
@@ -4374,6 +4528,7 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
 @media print {
   #explain-pop:popover-open, #pb-hl-bar:popover-open, #pb-hl-card:popover-open,
   #fn-pop:popover-open, #search-pop:popover-open, #kbd-help-pop:popover-open,
+  #rail-history-pop:popover-open,
   #typo-pop, #typo-pop:popover-open { display: none; }
 }
 

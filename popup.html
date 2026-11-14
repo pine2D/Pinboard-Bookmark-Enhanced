@@ -147,7 +147,10 @@
     <div class="quick-row">
       <button id="save-tabset-btn" class="qbtn" data-i18n-title="saveTabsTitle"><span class="btn-ic" data-ic="tabs"></span><span data-i18n="saveTabsBtn">Save Tab Set</span></button>
       <button id="batch-bookmark-btn" class="qbtn" data-i18n-title="batchSaveTitle"><span class="btn-ic" data-ic="pin"></span><span data-i18n="batchSaveBtn">Batch Save</span></button>
-      <button id="jina-md-btn" class="qbtn" title="" data-i18n-title="jinaMarkdownBtn"><span class="btn-ic" data-ic="doc"></span><span class="jina-md-label" data-i18n="jinaMarkdownBtn">Reader</span></button>
+      <div id="jina-md-split" class="qbtn-split">
+        <button type="button" id="jina-md-btn" class="qbtn qbtn-primary" title="" data-i18n-title="jinaMarkdownBtn"><span class="btn-ic" data-ic="doc"></span><span class="jina-md-label" data-i18n="jinaMarkdownBtn">Reader</span></button>
+        <button type="button" id="jina-md-history-btn" class="qbtn qbtn-caret" title="Recent previews" data-i18n-title="readerHistoryBtn" aria-label="Recent previews" data-i18n-aria="readerHistoryBtn" aria-haspopup="dialog" aria-expanded="false"><span class="btn-ic" data-ic="arrowDown"></span></button>
+      </div>
     </div>
     <section id="batch-permission" class="batch-permission hidden" aria-labelledby="batch-permission-title">
       <p id="batch-permission-title" class="batch-permission-title"></p>

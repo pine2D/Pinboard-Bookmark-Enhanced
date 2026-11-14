@@ -78,6 +78,7 @@ const fieldDirtyFlags = { "title-input": false, "description-input": false, "lin
 // (checkExistingBookmark, loadBookmarkForEdit, AI tag rendering). Reset
 // wherever fieldDirtyFlags resets.
 let _tagsUserTouched = false;
+let _popupReaderHistoryPopEl = null;
 
 // K75: has the user changed anything in the form since it was last (re)loaded?
 // Gates the "discard current draft?" confirm before editing a different
@@ -1195,6 +1196,7 @@ async function showMain(token) {
   // PPOffline.refresh() call did.)
   setupTabSet();
   showOfflineQueueStatus();
+  setupReaderHistory();
 
   const isUnsupportedUrl = !pageInfo.url || (!pageInfo.url.startsWith("http://") && !pageInfo.url.startsWith("https://"));
   if (isUnsupportedUrl) {
@@ -3595,6 +3597,199 @@ if (typeof ResizeObserver === "function") {
     const hint = document.getElementById(id);
     if (hint) clipObserver.observe(hint);
   }
+}
+
+function _popupReaderHistoryMetaText(item) {
+  const host = typeof pbpReaderHistoryHost === "function" ? pbpReaderHistoryHost(item) : "";
+  const stamp = typeof pbpReaderHistoryFormatTime === "function" ? pbpReaderHistoryFormatTime(item && item.openedAt) : "";
+  return [host, stamp].filter(Boolean).join(" · ");
+}
+
+function _popupReaderHistoryErrText(res) {
+  if (res && res.reason === "permission_denied" && res.host) return t("aiErrorHostPermission", res.host);
+  return t("readerHistoryOpenFailed");
+}
+
+function _positionPopupReaderHistory(pop, anchorBtn) {
+  if (!pop || !anchorBtn || !pop.isConnected || !anchorBtn.isConnected) return;
+  const gap = 4;
+  const vv = window.visualViewport || null;
+  const vpLeft = Number.isFinite(vv?.offsetLeft) ? vv.offsetLeft : 0;
+  const vpTop = Number.isFinite(vv?.offsetTop) ? vv.offsetTop : 0;
+  const vpWidth = Number.isFinite(vv?.width) && vv.width > 0 ? vv.width : document.documentElement.clientWidth;
+  const vpHeight = Number.isFinite(vv?.height) && vv.height > 0 ? vv.height : document.documentElement.clientHeight;
+  const bodyRect = document.body.getBoundingClientRect();
+  const hasSurface = bodyRect && bodyRect.width > gap * 2;
+  const leftBound = Math.max(vpLeft + gap, hasSurface ? bodyRect.left + gap : vpLeft + gap);
+  const rightBound = Math.max(leftBound, Math.min(vpLeft + vpWidth - gap, hasSurface ? bodyRect.right - gap : vpLeft + vpWidth - gap));
+
+  pop.style.maxWidth = `${Math.max(0, Math.floor(rightBound - leftBound))}px`;
+  const anchorRect = anchorBtn.getBoundingClientRect();
+  const naturalHeight = pop.scrollHeight || pop.offsetHeight || 160;
+  const isActionPopupWindow = vpHeight <= document.body.offsetHeight + 4;
+  const desiredBottom = Math.ceil(anchorRect.bottom + gap + Math.min(naturalHeight, 320) + 8);
+  if (isActionPopupWindow && desiredBottom > document.body.offsetHeight) {
+    document.body.style.minHeight = `${Math.min(440, desiredBottom)}px`;
+  }
+
+  const place = () => {
+    if (!pop.isConnected || !anchorBtn.isConnected) return;
+    const curVpHeight = Number.isFinite(vv?.height) && vv.height > 0 ? vv.height : document.documentElement.clientHeight;
+    pop.style.maxHeight = `${Math.max(80, Math.floor(curVpHeight - gap * 2))}px`;
+    const aRect = anchorBtn.getBoundingClientRect();
+    const pRect = pop.getBoundingClientRect();
+    let left = aRect.right - pRect.width;
+    left = Math.max(leftBound, Math.min(left, rightBound - pRect.width));
+    const topBound = vpTop + gap;
+    const bottomBound = vpTop + curVpHeight - gap;
+    const below = aRect.bottom + gap;
+    let top = below + pRect.height <= bottomBound
+      ? below
+      : Math.max(topBound, aRect.top - pRect.height - gap);
+    top = Math.max(topBound, Math.min(top, bottomBound - pRect.height));
+    pop.style.left = `${Math.round(left)}px`;
+    pop.style.top = `${Math.round(top)}px`;
+  };
+  place();
+  if (isActionPopupWindow) requestAnimationFrame(place);
+}
+
+async function _populatePopupReaderHistory(pop, anchorBtn) {
+  const items = typeof pbpReaderHistoryRead === "function" ? await pbpReaderHistoryRead() : [];
+
+  const head = document.createElement("div");
+  head.className = "pp-rh-head";
+  const titleEl = document.createElement("span");
+  titleEl.className = "pp-rh-title";
+  titleEl.textContent = t("readerHistoryTitle");
+  head.appendChild(titleEl);
+
+  const clearBtn = document.createElement("button");
+  clearBtn.type = "button";
+  clearBtn.className = "pp-rh-clear";
+  clearBtn.textContent = t("readerHistoryClear");
+  clearBtn.hidden = items.length === 0;
+  clearBtn.addEventListener("click", async () => {
+    if (typeof pbpReaderHistoryClear === "function") await pbpReaderHistoryClear();
+    document.body.style.minHeight = "";
+    await _populatePopupReaderHistory(pop, anchorBtn);
+    if (pop.matches(":popover-open")) _positionPopupReaderHistory(pop, anchorBtn);
+  });
+  head.appendChild(clearBtn);
+
+  const errEl = document.createElement("div");
+  errEl.className = "pp-rh-err";
+  errEl.setAttribute("role", "alert");
+  errEl.hidden = true;
+
+  const frag = document.createDocumentFragment();
+  frag.appendChild(head);
+  frag.appendChild(errEl);
+
+  if (items.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "pp-rh-empty";
+    empty.textContent = t("readerHistoryEmpty");
+    frag.appendChild(empty);
+  } else {
+    let busy = false;
+    const listEl = document.createElement("div");
+    listEl.className = "pp-rh-list";
+    listEl.setAttribute("role", "list");
+    items.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "pp-rh-item";
+      row.setAttribute("role", "listitem");
+
+      const openBtn = document.createElement("button");
+      openBtn.type = "button";
+      openBtn.className = "pp-rh-open";
+      openBtn.title = item.url || "";
+
+      const labelEl = document.createElement("span");
+      labelEl.className = "pp-rh-label";
+      labelEl.dir = "auto";
+      labelEl.textContent = item.title || item.url || t("mdPreviewUntitled");
+      openBtn.appendChild(labelEl);
+
+      const metaText = _popupReaderHistoryMetaText(item);
+      if (metaText) {
+        const metaEl = document.createElement("span");
+        metaEl.className = "pp-rh-meta";
+        metaEl.textContent = metaText;
+        openBtn.appendChild(metaEl);
+      }
+
+      openBtn.addEventListener("click", async () => {
+        if (busy || typeof pbpOpenReaderFromHistory !== "function") return;
+        busy = true;
+        errEl.hidden = true;
+        try {
+          const res = await pbpOpenReaderFromHistory(item, { reuseCurrentTab: false });
+          if (res && res.ok) {
+            try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
+          } else {
+            errEl.textContent = _popupReaderHistoryErrText(res);
+            errEl.hidden = false;
+            if (pop.matches(":popover-open")) _positionPopupReaderHistory(pop, anchorBtn);
+          }
+        } finally {
+          busy = false;
+        }
+      });
+
+      const rmBtn = document.createElement("button");
+      rmBtn.type = "button";
+      rmBtn.className = "pp-rh-remove";
+      rmBtn.innerHTML = PBP_ICONS.cross;
+      rmBtn.title = t("readerHistoryRemove");
+      rmBtn.setAttribute("aria-label", t("readerHistoryRemoveItem", item.title || pbpReaderHistoryHost(item) || item.url || ""));
+      rmBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (typeof pbpReaderHistoryRemove === "function") await pbpReaderHistoryRemove(item.url);
+        document.body.style.minHeight = "";
+        await _populatePopupReaderHistory(pop, anchorBtn);
+        if (pop.matches(":popover-open")) _positionPopupReaderHistory(pop, anchorBtn);
+      });
+
+      row.appendChild(openBtn);
+      row.appendChild(rmBtn);
+      listEl.appendChild(row);
+    });
+    frag.appendChild(listEl);
+  }
+
+  pop.replaceChildren(frag);
+}
+
+function setupReaderHistory() {
+  const btn = $id("jina-md-history-btn");
+  if (!btn || btn.dataset.pbpHistoryBound === "1") return;
+  btn.dataset.pbpHistoryBound = "1";
+  btn.addEventListener("click", async () => {
+    if (!_popupReaderHistoryPopEl) {
+      const pop = document.createElement("div");
+      pop.id = "jina-md-history-pop";
+      pop.setAttribute("popover", "auto");
+      pop.setAttribute("role", "dialog");
+      pop.setAttribute("aria-label", t("readerHistoryTitle"));
+      pop.addEventListener("toggle", (e) => {
+        const open = e.newState === "open";
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+        if (!open) document.body.style.minHeight = "";
+      });
+      document.body.appendChild(pop);
+      _popupReaderHistoryPopEl = pop;
+    }
+    const pop = _popupReaderHistoryPopEl;
+    if (pop.matches(":popover-open")) {
+      try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
+      return;
+    }
+    await _populatePopupReaderHistory(pop, btn);
+    try { pop.showPopover(); } catch (_) { /* swallow-ok: detached or unsupported popover state */ return; }
+    _positionPopupReaderHistory(pop, btn);
+  });
 }
 const PBP_ALT_CHECKBOX_CODES = { KeyP: "private-check", KeyR: "readlater-check", KeyA: "archive-check" };
 const PBP_ALT_CHECKBOX_LETTERS = { p: "private-check", r: "readlater-check", a: "archive-check" };

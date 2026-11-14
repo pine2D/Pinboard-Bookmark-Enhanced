@@ -5444,5 +5444,37 @@
   },
   "backupAdoptLibrary": {
     "message": "个人资料库为空，恢复生词或高亮时会改用备份所属的资料库，原有 Drive 同步数据仍可使用。"
+  },
+  "readerHistoryBtn": {
+    "message": "最近预览"
+  },
+  "readerHistoryTitle": {
+    "message": "最近预览"
+  },
+  "readerHistoryEmpty": {
+    "message": "本机还没有最近预览记录。"
+  },
+  "readerHistoryClear": {
+    "message": "清空"
+  },
+  "readerHistoryRemove": {
+    "message": "从历史中移除"
+  },
+  "readerHistoryRemoveItem": {
+    "message": "从历史中移除 $TITLE$",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerHistoryReopen": {
+    "message": "在阅读器中重开"
+  },
+  "readerHistoryExpiredLead": {
+    "message": "当前预览缓存已失效，可从原网址重新提取，或打开其他最近预览。"
+  },
+  "readerHistoryOpenFailed": {
+    "message": "无法重新打开这篇预览，请改从原网页打开。"
   }
 }

@@ -137,6 +137,8 @@ const PBP_ICONS = {
   speaker: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>',
   checkCircle: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>',
   rotateCcw: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
+  // Lucide v0.525.0 history: recent reader previews (popup + md-preview).
+  history: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>',
   arrowUp: '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>',
   lock: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
   trash: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>',
@@ -1326,6 +1328,11 @@ const PBP_RECLAIM_CATEGORIES = {
 // not a setting, so it is not synced, not exported and not reset; never
 // cleared by Storage Management (pbpIsNeverClearKey).
 const PBP_BACKUP_LAST_EXPORT_KEY = "backupLastExportAt";
+// Recent Reader (md-preview) article metadata ring buffer (max 25 entries,
+// local-only, never synced or exported, cleared from the Recent Previews UI
+// itself rather than Storage Management's cache categories).
+const PBP_READER_HISTORY_KEY = "pbp_reader_history";
+const PBP_READER_HISTORY_LIMIT = 25;
 
 // Second line of defense (belt-and-suspenders): even if a caller passes a bogus
 // or over-broad category, these keys are NEVER removed. The allowlist above is
@@ -1334,7 +1341,7 @@ function pbpIsNeverClearKey(key) {
   if (typeof key !== "string") return true;
   // Pending user data / in-progress state.
   if (key === "offlineQueue" || key === "batch_progress") return true;
-  if (key === PBP_BACKUP_LAST_EXPORT_KEY) return true;
+  if (key === PBP_BACKUP_LAST_EXPORT_KEY || key === PBP_READER_HISTORY_KEY) return true;
   if (key.startsWith("_tagGov")) return true;              // _tagGovAiGroups / _tagGovLastRun / _tagGovIgnored
   if (key.startsWith("md_preview_data")) return true;      // md_preview_data + md_preview_data_<uuid> handoffs
   if (key.startsWith("pbp_hl_")) return true;               // pbp_hl_<urlKey> highlight sets + pbp_hl_last_color (user data, never reclaimable)
@@ -5292,6 +5299,333 @@ function pbpTypoApplyVars(fontTier, leadingTier) {
   if (t2.leading === 0) st.removeProperty("--pbp-prose-leading");
   else st.setProperty("--pbp-prose-leading", String(PBP_TYPO_LEADINGS[String(t2.leading)]));
   return t2;
+}
+
+// ===================== Reader Preview History (md-preview) =====================
+// Metadata-only ring buffer in chrome.storage.local (pbp_reader_history, max 25
+// items). Survives temporary extension disable/re-enable (which closes open
+// chrome-extension:// tabs while keeping storage.local intact) without storing
+// full-text article bodies or private bookmark/account data. Incognito source
+// tabs are never recorded.
+function pbpReaderHistorySafeUrl(rawUrl) {
+  if (typeof rawUrl !== "string" || !rawUrl.trim()) return "";
+  const text = rawUrl.trim();
+  try {
+    const u = new URL(text);
+    const authority = text.match(/^https?:\/\/([^/?#]*)(?:[/?#]|$)/i);
+    if (!authority || authority[1].includes("@") || u.username || u.password) return "";
+    return (u.protocol === "https:" || u.protocol === "http:") ? u.href : "";
+  } catch (_) {
+    // swallow-ok: malformed URL input returns empty string
+    return "";
+  }
+}
+
+// optional_host_permissions in manifest.json covers https://*/* and literal
+// loopback http://localhost|127.0.0.1|[::1]/* only. Calling permissions.request
+// on any other plain http:// origin throws in Chromium, so delegate to
+// pbpEndpointOriginPattern to enforce exact HTTPS / literal loopback patterns.
+function pbpReaderHistoryRequestableOrigin(rawUrl) {
+  return pbpEndpointOriginPattern(rawUrl) || "";
+}
+
+function pbpReaderHistoryIdentity(rawUrl) {
+  const safe = pbpReaderHistorySafeUrl(rawUrl);
+  if (!safe) return "";
+  try {
+    return stripTrackingParams(safe, {}).cleaned || safe;
+  } catch (e) {
+    console.warn("[reader-history] URL identity clean failed:", e?.name, e?.message);
+    return safe;
+  }
+}
+
+function pbpReaderHistoryHost(entry) {
+  const site = entry && typeof entry.site === "string" ? entry.site.trim() : "";
+  if (site) return site;
+  const safe = pbpReaderHistorySafeUrl(entry && (entry.url || entry.sourceTabUrl));
+  if (!safe) return "";
+  try {
+    return new URL(safe).hostname.replace(/^www\./i, "");
+  } catch (_) {
+    // swallow-ok: safe URL already validated; fallback to empty hostname
+    return "";
+  }
+}
+
+function pbpReaderHistoryFormatTime(openedAt, now = Date.now()) {
+  if (typeof openedAt !== "number" || !Number.isFinite(openedAt) || openedAt <= 0) return "";
+  const d = new Date(openedAt);
+  if (Number.isNaN(d.getTime())) return "";
+  const cur = new Date(now);
+  const sameDay = d.getFullYear() === cur.getFullYear() &&
+    d.getMonth() === cur.getMonth() &&
+    d.getDate() === cur.getDate();
+  const sameYear = d.getFullYear() === cur.getFullYear();
+  const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : undefined;
+  try {
+    if (sameDay) return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+    if (sameYear) return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
+    return d.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" });
+  } catch (_) {
+    // swallow-ok: unrecognized BCP-47 locale tag falls back to runtime default locale
+    if (sameDay) return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    if (sameYear) return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+}
+
+function pbpReaderHistoryNormalizeEntry(raw, fallbackTs = Date.now()) {
+  if (!raw || typeof raw !== "object" || raw.sourceIncognito === true) return null;
+  const sourceTabUrl = pbpReaderHistorySafeUrl(raw.sourceTabUrl || raw.url);
+  const url = pbpReaderHistorySafeUrl(raw.url) || sourceTabUrl;
+  if (!url) return null;
+  const title = typeof raw.title === "string" ? raw.title.replace(/\s+/g, " ").trim().slice(0, 300) : "";
+  const site = typeof raw.site === "string" ? raw.site.replace(/\s+/g, " ").trim().slice(0, 120) : "";
+  const engine = raw.engine === "jina" ? "jina" : "local";
+  const isVideo = raw.isVideo === true;
+  const lastKey = typeof raw.lastKey === "string" ? raw.lastKey.trim().slice(0, 80) : "";
+  const openedAt = (typeof raw.openedAt === "number" && Number.isFinite(raw.openedAt) && raw.openedAt > 0)
+    ? Math.floor(raw.openedAt)
+    : Math.floor(fallbackTs);
+  return { url, sourceTabUrl: sourceTabUrl || url, title, site, engine, isVideo, lastKey, openedAt };
+}
+
+function pbpReaderHistoryMerge(existingList, incoming, limit = PBP_READER_HISTORY_LIMIT, now = Date.now()) {
+  const next = pbpReaderHistoryNormalizeEntry(incoming, now);
+  const cap = Number.isInteger(limit) && limit > 0 ? limit : PBP_READER_HISTORY_LIMIT;
+  const normalizedExisting = [];
+  const seen = new Set();
+  if (Array.isArray(existingList)) {
+    for (const item of existingList) {
+      const n = pbpReaderHistoryNormalizeEntry(item, now);
+      if (!n) continue;
+      const id = pbpReaderHistoryIdentity(n.url);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      normalizedExisting.push(n);
+    }
+  }
+  if (!next) return normalizedExisting.slice(0, cap);
+  const nextId = pbpReaderHistoryIdentity(next.url);
+  const prior = normalizedExisting.find((row) => pbpReaderHistoryIdentity(row.url) === nextId);
+  const mergedHead = {
+    ...next,
+    title: next.title || (prior ? prior.title : ""),
+    site: next.site || (prior ? prior.site : ""),
+    lastKey: next.lastKey || (prior ? prior.lastKey : ""),
+  };
+  const rest = normalizedExisting.filter((row) => pbpReaderHistoryIdentity(row.url) !== nextId);
+  return [mergedHead, ...rest].slice(0, cap);
+}
+
+let _pbpReaderHistoryChain = Promise.resolve();
+function _pbpReaderHistoryEnqueue(work) {
+  const run = _pbpReaderHistoryChain.then(work, work);
+  _pbpReaderHistoryChain = run.catch(() => {
+    // swallow-ok: caller handles run's rejection; keep serial queue alive
+  });
+  return run;
+}
+
+async function pbpReaderHistoryRead() {
+  if (typeof chrome === "undefined" || !chrome.storage?.local) return [];
+  try {
+    const raw = (await chrome.storage.local.get(PBP_READER_HISTORY_KEY))[PBP_READER_HISTORY_KEY];
+    return pbpReaderHistoryMerge(Array.isArray(raw) ? raw : [], null, PBP_READER_HISTORY_LIMIT);
+  } catch (e) {
+    console.warn("[reader-history] read failed:", e?.name, e?.message);
+    return [];
+  }
+}
+
+function pbpReaderHistoryRecord(entry) {
+  if (!entry || typeof entry !== "object" || entry.sourceIncognito === true) return Promise.resolve(false);
+  if (typeof chrome === "undefined" || !chrome.storage?.local) return Promise.resolve(false);
+  return _pbpReaderHistoryEnqueue(async () => {
+    const now = Date.now();
+    const norm = pbpReaderHistoryNormalizeEntry(entry, now);
+    if (!norm) return false;
+    const raw = (await chrome.storage.local.get(PBP_READER_HISTORY_KEY))[PBP_READER_HISTORY_KEY];
+    const merged = pbpReaderHistoryMerge(Array.isArray(raw) ? raw : [], norm, PBP_READER_HISTORY_LIMIT, now);
+    await chrome.storage.local.set({ [PBP_READER_HISTORY_KEY]: merged });
+    return true;
+  }).catch((e) => {
+    console.warn("[reader-history] record failed:", e?.name, e?.message);
+    return false;
+  });
+}
+
+function pbpReaderHistoryRemove(targetUrl) {
+  if (typeof chrome === "undefined" || !chrome.storage?.local) return Promise.resolve([]);
+  const targetId = pbpReaderHistoryIdentity(targetUrl);
+  if (!targetId) return pbpReaderHistoryRead();
+  return _pbpReaderHistoryEnqueue(async () => {
+    const raw = (await chrome.storage.local.get(PBP_READER_HISTORY_KEY))[PBP_READER_HISTORY_KEY];
+    const current = pbpReaderHistoryMerge(Array.isArray(raw) ? raw : [], null, PBP_READER_HISTORY_LIMIT);
+    const filtered = current.filter((row) =>
+      pbpReaderHistoryIdentity(row.url) !== targetId &&
+      pbpReaderHistoryIdentity(row.sourceTabUrl) !== targetId);
+    if (filtered.length) await chrome.storage.local.set({ [PBP_READER_HISTORY_KEY]: filtered });
+    else await chrome.storage.local.remove(PBP_READER_HISTORY_KEY);
+    return filtered;
+  }).catch((e) => {
+    console.warn("[reader-history] remove failed:", e?.name, e?.message);
+    return [];
+  });
+}
+
+function pbpReaderHistoryClear() {
+  if (typeof chrome === "undefined" || !chrome.storage?.local) return Promise.resolve(false);
+  return _pbpReaderHistoryEnqueue(async () => {
+    await chrome.storage.local.remove(PBP_READER_HISTORY_KEY);
+    return true;
+  }).catch((e) => {
+    console.warn("[reader-history] clear failed:", e?.name, e?.message);
+    return false;
+  });
+}
+
+// Reopen a recent Reader entry from Popup or md-preview. Must run inside a
+// direct user click handler when host permission is not yet granted.
+//   1. If a non-incognito md-preview.html?k=<lastKey> tab is already open AND
+//      its storage slot still exists, focus it immediately instead of
+//      re-extracting.
+//   2. Otherwise request exact host permission when needed (Jina origin for
+//      engine==="jina"; exact https/localhost page origin for engine==="local"),
+//      mint a fresh pending+historyReopen slot with current bookmark connection
+//      ownership, and either navigate in place (opts.reuseCurrentTab), heal an
+//      orphaned tab, or open a new Reader tab.
+async function pbpOpenReaderFromHistory(entry, opts = {}) {
+  const norm = pbpReaderHistoryNormalizeEntry(entry);
+  if (!norm) return { ok: false, reason: "invalid_url" };
+  if (typeof chrome === "undefined" || !chrome.storage?.local || !chrome.runtime?.getURL) {
+    return { ok: false, reason: "unavailable" };
+  }
+  const reuseCurrentTab = opts.reuseCurrentTab === true;
+  const currentKey = typeof opts.currentKey === "string" ? opts.currentKey : "";
+  const targetUrl = norm.sourceTabUrl || norm.url;
+  const articleUrl = norm.url || targetUrl;
+
+  let orphanedLiveTab = null;
+  if (norm.lastKey && !(reuseCurrentTab && currentKey === norm.lastKey) && chrome.tabs?.query) {
+    try {
+      const openTabs = await chrome.tabs.query({ url: chrome.runtime.getURL("md-preview.html") + "*" });
+      const matchTab = Array.isArray(openTabs) ? openTabs.find((row) => {
+        if (!row || row.incognito || typeof row.url !== "string") return false;
+        try { return new URL(row.url).searchParams.get("k") === norm.lastKey; }
+        catch (_) { /* swallow-ok: malformed tab URL cannot match */ return false; }
+      }) : null;
+      if (matchTab && matchTab.id != null) {
+        const slotKey = "md_preview_data_" + norm.lastKey;
+        const slot = (await chrome.storage.local.get(slotKey))[slotKey];
+        if (slot && typeof slot === "object") {
+          await chrome.tabs.update(matchTab.id, { active: true });
+          if (matchTab.windowId != null && chrome.windows?.update) {
+            try { await chrome.windows.update(matchTab.windowId, { focused: true }); }
+            catch (e) { console.warn("[reader-history] window focus failed:", e?.name, e?.message); }
+          }
+          void pbpReaderHistoryRecord({ ...norm, openedAt: Date.now() });
+          return { ok: true, mode: "activated", tabId: matchTab.id, key: norm.lastKey };
+        }
+        orphanedLiveTab = matchTab;
+      }
+    } catch (e) {
+      console.warn("[reader-history] live tab probe failed:", e?.name, e?.message);
+    }
+  }
+
+  const engine = norm.engine === "jina" ? "jina" : "local";
+  if (chrome.permissions?.contains && chrome.permissions?.request) {
+    const neededPattern = engine === "jina"
+      ? PBP_JINA_ORIGIN_PATTERN
+      : pbpReaderHistoryRequestableOrigin(targetUrl);
+    if (neededPattern) {
+      let allowed = false;
+      try { allowed = await chrome.permissions.contains({ origins: [neededPattern] }); }
+      catch (e) { console.warn("[reader-history] permission check failed:", e?.name, e?.message); allowed = false; }
+      if (!allowed) {
+        try { allowed = await chrome.permissions.request({ origins: [neededPattern] }); }
+        catch (e) { console.warn("[reader-history] permission request failed:", e?.name, e?.message); allowed = false; }
+      }
+      if (!allowed) {
+        return { ok: false, reason: "permission_denied", host: neededPattern.replace(/\/\*$/, "") };
+      }
+    }
+  }
+
+  let urlClean = SETTINGS_DEFAULTS.urlClean;
+  let cleanFailed = false;
+  try {
+    urlClean = (await (await getSettingsStorage()).get({ urlClean })).urlClean;
+  } catch (e) {
+    console.warn("[reader-history] urlClean read failed:", e?.name, e?.message);
+    cleanFailed = true;
+  }
+  let account = "";
+  try {
+    account = (await pbpReadBookmarkConnection()).account || "";
+  } catch (e) {
+    console.warn("[reader-history] bookmark connection read failed:", e?.name, e?.message);
+  }
+
+  const newKey = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+    ? crypto.randomUUID()
+    : String(Date.now()) + "-" + String(Math.random()).slice(2);
+  const slotKey = "md_preview_data_" + newKey;
+  try {
+    await chrome.storage.local.set({
+      [slotKey]: {
+        pending: true,
+        historyReopen: true,
+        engine,
+        source: engine,
+        tabId: null,
+        url: articleUrl,
+        baseUrl: articleUrl,
+        sourceTabUrl: targetUrl,
+        bookmarkUrl: cleanFailed ? articleUrl : pbpBookmarkLookupUrl(articleUrl, urlClean),
+        title: norm.title,
+        site: norm.site,
+        sourceIncognito: false,
+        account,
+        tags: [],
+        description: "",
+        ts: Date.now(),
+      }
+    });
+  } catch (e) {
+    console.warn("[reader-history] handoff slot write failed:", e?.name, e?.message);
+    return { ok: false, reason: "storage_failed" };
+  }
+
+  const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect(targetUrl) || norm.isVideo) ? "&video=1" : "";
+  const isVideo = Boolean(videoQ);
+  try {
+    if (reuseCurrentTab) {
+      await pbpReaderHistoryRecord({ ...norm, isVideo, lastKey: newKey, openedAt: Date.now() });
+      const nav = typeof opts.navigate === "function" ? opts.navigate : (q) => location.replace(q);
+      nav("?k=" + newKey + videoQ);
+      return { ok: true, mode: "replaced", key: newKey };
+    }
+    if (orphanedLiveTab && orphanedLiveTab.id != null && chrome.tabs?.update) {
+      await chrome.tabs.update(orphanedLiveTab.id, { url: chrome.runtime.getURL("md-preview.html") + "?k=" + newKey + videoQ, active: true });
+      if (orphanedLiveTab.windowId != null && chrome.windows?.update) {
+        try { await chrome.windows.update(orphanedLiveTab.windowId, { focused: true }); }
+        catch (e) { console.warn("[reader-history] orphan window focus failed:", e?.name, e?.message); }
+      }
+      await pbpReaderHistoryRecord({ ...norm, isVideo, lastKey: newKey, openedAt: Date.now() });
+      return { ok: true, mode: "healed", tabId: orphanedLiveTab.id, key: newKey };
+    }
+    const created = await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html") + "?k=" + newKey + videoQ });
+    await pbpReaderHistoryRecord({ ...norm, isVideo, lastKey: newKey, openedAt: Date.now() });
+    return { ok: true, mode: "created", tabId: created?.id ?? null, key: newKey };
+  } catch (e) {
+    console.warn("[reader-history] open tab failed:", e?.name, e?.message);
+    try { await chrome.storage.local.remove(slotKey); }
+    catch (e2) { console.warn("[reader-history] rollback slot cleanup failed:", e2?.name, e2?.message); }
+    return { ok: false, reason: "tab_failed" };
+  }
 }
 
 // ===================== Runtime message catalog =====================

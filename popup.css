@@ -1530,6 +1530,188 @@ input[type="text"].search-field:focus-visible:not(:disabled) { box-shadow: var(-
   border-color: var(--pp-ok-bd);
   color: var(--pp-ok-fg);
 }
+.qbtn-split {
+  flex: 1 1 0;
+  min-width: max-content;
+  display: inline-flex;
+  align-items: stretch;
+}
+.qbtn-split > .qbtn-primary {
+  flex: 1 1 auto;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.qbtn-split > .qbtn-caret {
+  flex: 0 0 26px;
+  min-width: 26px;
+  padding: var(--pp-sp-2) 0;
+  margin-left: -1px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.qbtn-split > .qbtn:is(:hover, :focus-visible) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Recent Reader Previews Popover (#jina-md-history-pop) */
+#jina-md-history-pop {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  box-sizing: border-box;
+  width: 320px;
+  max-width: calc(100vw - 8px);
+  max-height: min(360px, calc(100vh - 8px));
+  display: none;
+  flex-direction: column;
+  gap: var(--pp-sp-4);
+  padding: var(--pp-sp-5);
+  background: var(--pp-bg);
+  color: var(--pp-fg);
+  border: 1px solid var(--pp-border);
+  border-radius: var(--pp-radius-lg);
+  box-shadow: var(--pp-shadow-lg);
+  font-size: var(--pp-text-body);
+}
+#jina-md-history-pop:popover-open { display: flex; }
+html[data-theme] #jina-md-history-pop { color: var(--pp-fg); }
+.pp-rh-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-sp-4);
+}
+.pp-rh-title {
+  font-size: var(--pp-text-body);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--pp-fg);
+}
+.pp-rh-clear {
+  flex: none;
+  min-width: 24px;
+  min-height: var(--pp-control-h);
+  padding: var(--pp-sp-2) var(--pp-sp-4);
+  font-family: inherit;
+  font-size: var(--pp-text-body-sm);
+  line-height: 16px;
+  color: var(--pp-fg);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--pp-radius-md);
+  cursor: pointer;
+  transition: background var(--pp-motion-state), color var(--pp-motion-state), border-color var(--pp-motion-state), box-shadow var(--pp-motion-state);
+}
+.pp-rh-clear:hover {
+  background: var(--pp-btn-hover);
+  color: var(--pp-btn-fg);
+}
+.pp-rh-clear:focus-visible {
+  outline: none;
+  border-color: var(--pp-focus-bd);
+  box-shadow: var(--pp-focus-ring);
+}
+.pp-rh-err {
+  padding: var(--pp-sp-2) var(--pp-sp-4);
+  font-size: var(--pp-text-body-sm);
+  line-height: 1.45;
+  color: var(--pp-warn-fg);
+  background: var(--pp-warn-bg);
+  border: 1px solid var(--pp-warn-bd);
+  border-radius: var(--pp-radius-md);
+}
+.pp-rh-empty {
+  padding: var(--pp-sp-2) 0;
+  font-size: var(--pp-text-body);
+  line-height: 1.5;
+  color: var(--pp-fg-muted);
+}
+.pp-rh-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-sp-2);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.pp-rh-item {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-sp-4);
+  min-width: 0;
+}
+.pp-rh-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--pp-sp-1);
+  padding: var(--pp-sp-2) var(--pp-sp-4);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--pp-radius-md);
+  color: var(--pp-fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--pp-motion-state), color var(--pp-motion-state), border-color var(--pp-motion-state), box-shadow var(--pp-motion-state);
+}
+.pp-rh-open:hover {
+  background: var(--pp-btn-hover);
+  color: var(--pp-btn-fg);
+}
+.pp-rh-open:hover .pp-rh-meta { color: var(--pp-btn-fg); }
+.pp-rh-open:focus-visible {
+  outline: none;
+  border-color: var(--pp-focus-bd);
+  box-shadow: var(--pp-focus-ring);
+}
+.pp-rh-label {
+  width: 100%;
+  font-size: var(--pp-text-body);
+  font-weight: 500;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pp-rh-meta {
+  width: 100%;
+  font-size: var(--pp-text-body-sm);
+  line-height: 1.35;
+  color: var(--pp-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pp-rh-remove {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--pp-radius-md);
+  color: var(--pp-fg-muted);
+  cursor: pointer;
+  transition: background var(--pp-motion-state), color var(--pp-motion-state), border-color var(--pp-motion-state), box-shadow var(--pp-motion-state);
+}
+.pp-rh-remove:hover {
+  background: var(--pp-btn-hover);
+  color: var(--pp-btn-fg);
+}
+.pp-rh-remove:focus-visible {
+  outline: none;
+  border-color: var(--pp-focus-bd);
+  box-shadow: var(--pp-focus-ring);
+}
+.pp-rh-remove svg { width: 13px; height: 13px; }
 
 /* Batch progress bar — visible while batch save iterates over tabs */
 /* Positioning context for the cancel button, which must live OUTSIDE the

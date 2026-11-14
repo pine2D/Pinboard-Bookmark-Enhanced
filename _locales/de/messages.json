@@ -5450,5 +5450,37 @@
   },
   "backupAdoptLibrary": {
     "message": "Deine persönliche Bibliothek ist leer. Beim Wiederherstellen von Vokabeln oder Markierungen wechselst du deshalb zur Bibliothek der Sicherung. Deren Google-Drive-Daten bleiben verfügbar."
+  },
+  "readerHistoryBtn": {
+    "message": "Letzte Vorschauen"
+  },
+  "readerHistoryTitle": {
+    "message": "Letzte Vorschauen"
+  },
+  "readerHistoryEmpty": {
+    "message": "Auf diesem Gerät gibt es noch keine letzten Vorschauen."
+  },
+  "readerHistoryClear": {
+    "message": "Leeren"
+  },
+  "readerHistoryRemove": {
+    "message": "Aus dem Verlauf entfernen"
+  },
+  "readerHistoryRemoveItem": {
+    "message": "$TITLE$ aus dem Verlauf entfernen",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerHistoryReopen": {
+    "message": "Im Reader erneut öffnen"
+  },
+  "readerHistoryExpiredLead": {
+    "message": "Diese Vorschau liegt nicht mehr im Zwischenspeicher. Du kannst sie von der Originalseite neu laden oder eine andere letzte Vorschau öffnen."
+  },
+  "readerHistoryOpenFailed": {
+    "message": "Diese Vorschau ließ sich nicht erneut öffnen. Öffne stattdessen die Originalseite."
   }
 }

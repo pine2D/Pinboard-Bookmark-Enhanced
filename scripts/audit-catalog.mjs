@@ -16,7 +16,7 @@ function ownership(name) {
   if (name === 'restore-points') return ['background', 'library', 'options'];
   if (name === 'upgrade-path') return ['background', 'library', 'options', 'popup'];
   if (name === 'tag-gov-layout') return ['options'];
-  if (name === 'save-pipeline' || name.startsWith('bookmark-service')) return ['background', 'popup', 'md-preview'];
+  if (name === 'save-pipeline' || name === 'reader-history' || name.startsWith('bookmark-service')) return ['background', 'popup', 'md-preview'];
   if (['icon-state', 'wayback', 'url-strip'].includes(name)) return ['background'];
   if (/^audit-|^registers-lint|^doctor|^link-check|^sentinel-report|^rules-lint|^hard-rules-lint|^eslint-silent-catch|^eslint-baseline|^slice-anchor-lint|^coverage-report|^chrome-mock|^verify-groups|^mutate-check|^run-test-print-counts|^ui-contract-scan/.test(name)) return ['tooling'];
   if (/^popup-|^ai-tags|^tag-gov|^union-tags|^offline-queue|^batch-/.test(name)) return ['popup'];

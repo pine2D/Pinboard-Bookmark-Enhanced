@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="10"><title>Reader History Tests</title>
+<link rel="stylesheet" href="../md-preview.css">
+<style>
+#results { font-family: monospace; padding: 16px; max-width: 960px; }
+.case { padding: 4px 8px; margin: 4px 0; white-space: pre-wrap; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+#fixture { padding: 8px 16px; }
+</style></head>
+<body>
+<div id="fixture">
+  <aside class="rail" id="rail">
+    <div class="rail-ident">
+      <h1 id="preview-title">Current Reader Article</h1>
+      <button type="button" class="action-btn icon-only" id="rail-history-btn" title="Recent previews" aria-label="Recent previews" aria-haspopup="dialog" aria-expanded="false"></button>
+      <button type="button" class="action-btn icon-only" id="rail-settings-btn" title="Settings" aria-label="Settings"></button>
+      <a id="preview-url" class="preview-url" href="https://example.com/current">example.com/current</a>
+    </div>
+  </aside>
+  <main><div id="rendered-view"></div></main>
+</div>
+<div id="results"></div>
+
+<!-- Load real runtime files before installing chrome mock so md-preview.js's
+     top-level boot IIFE exits cleanly at its typeof-chrome guard while leaving
+     all top-level functions live for testing. -->
+<script src="../i18n.js"></script>
+<script src="../shared.js"></script>
+<script src="../md-preview.js"></script>
+<script src="fixtures/case-filter.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script>
+const resultsEl = document.getElementById("results");
+let passed = 0, failed = 0;
+
+async function test(name, fn) {
+  const done = pbpCaseGate(name);
+  if (!done) return;
+  const div = document.createElement("div");
+  try {
+    await fn();
+    passed++;
+    div.className = "case pass";
+    div.textContent = "PASS " + name;
+  } catch (err) {
+    failed++;
+    div.className = "case fail";
+    div.textContent = "FAIL " + name + "\n  " + (err && err.stack ? err.stack : err);
+  }
+  resultsEl.appendChild(div);
+  done();
+}
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || "assertion failed");
+}
+
+async function until(pred, label) {
+  for (let i = 0; i < 200; i++) {
+    if (pred()) return;
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  throw new Error("timed out waiting for " + label);
+}
+
+function buildEchoMessages(enTable) {
+  const out = {};
+  for (const [key, entry] of Object.entries(enTable)) {
+    const names = Object.entries(entry.placeholders || {})
+      .sort((a, b) => Number(String(a[1].content).slice(1)) - Number(String(b[1].content).slice(1)))
+      .map(([n]) => n);
+    out[key] = { message: key + names.map((n) => ":$" + n + "$").join(""), placeholders: entry.placeholders };
+  }
+  return out;
+}
+
+(async () => {
+  const en = await (await fetch("../_locales/en/messages.json")).json();
+  const messages = buildEchoMessages(en);
+
+  function freshMock(opts = {}) {
+    const m = pbpChromeMock.install({
+      messages,
+      userGesture: opts.userGesture !== false,
+      permissionRequestAnswer: opts.permissionRequestAnswer !== false,
+      permissions: opts.permissions || { origins: [] },
+      storage: opts.storage || { local: {} },
+      tabs: opts.tabs || [],
+    });
+    initI18n();
+    return m;
+  }
+
+  // 1. Storage boundary, reclaim exclusion, and settings-cache isolation
+  await test("pbp_reader_history is protected from storage reclaim and excluded from synced settings", async () => {
+    const mock = freshMock({
+      storage: {
+        local: {
+          jina_md_cached_page: { markdown: "reclaimable" },
+        },
+      },
+    });
+    await pbpReaderHistoryRecord({ url: "https://example.com/keep", title: "Keep Me", lastKey: "k-keep" });
+    assert(PBP_READER_HISTORY_KEY === "pbp_reader_history", "unexpected key name");
+    assert(pbpIsNeverClearKey(PBP_READER_HISTORY_KEY) === true, "must be a never-clear key");
+    for (const [catName, cat] of Object.entries(PBP_RECLAIM_CATEGORIES)) {
+      assert(!pbpKeyMatchesCategory(PBP_READER_HISTORY_KEY, cat), "reclaim category matched pbp_reader_history: " + catName);
+    }
+    const reclaimRes = await pbpReclaimLocalStorage(Object.keys(PBP_RECLAIM_CATEGORIES));
+    assert(!reclaimRes.failed && reclaimRes.freed > 0, "expected jina cache to be reclaimed");
+    const surviving = await pbpReaderHistoryRead();
+    assert(surviving.length === 1 && surviving[0].url === "https://example.com/keep", "pbp_reader_history must survive storage reclaim");
+    assert(!Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, PBP_READER_HISTORY_KEY), "must not enter SETTINGS_DEFAULTS");
+    assert(pbpSettingsKeysChanged({ [PBP_READER_HISTORY_KEY]: { newValue: [] } }) === false, "history writes must not invalidate settings cache");
+    void mock;
+  });
+
+  // 2. Canonical deduplication, field allowlist, 25-item cap, and incognito/scheme rejection
+  await test("merge deduplicates tracker URLs, strips non-metadata fields, caps at 25, and skips incognito", async () => {
+    const mock = freshMock();
+    const incogRes = await pbpReaderHistoryRecord({
+      url: "https://example.com/secret",
+      title: "Incognito Page",
+      sourceIncognito: true,
+    });
+    assert(incogRes === false, "incognito preview must be skipped");
+    for (const badUrl of [
+      "chrome://extensions/",
+      "about:blank",
+      "file:///tmp/local.html",
+      "javascript:alert(1)",
+      "data:text/html,hi",
+      "https://user:pass@example.com/private",
+    ]) {
+      assert((await pbpReaderHistoryRecord({ url: badUrl, title: "Bad" })) === false, "rejected scheme stored: " + badUrl);
+    }
+    assert((await pbpReaderHistoryRead()).length === 0, "storage must still be empty");
+
+    // Concurrent writes serialize without lost updates
+    await Promise.all([1, 2, 3, 4, 5].map((i) => pbpReaderHistoryRecord({
+      url: `https://example.com/post-${i}`,
+      title: `Post ${i}`,
+      site: "Example",
+      engine: i % 2 ? "local" : "jina",
+      markdown: "# MUST NOT BE STORED",
+      account: "alice",
+      tags: ["secret-tag"],
+      token: "alice:12345",
+      lastKey: `k-${i}`,
+    })));
+    const afterFive = await pbpReaderHistoryRead();
+    assert(afterFive.length === 5, "expected 5 serialized items, got " + afterFive.length);
+    const allowedKeys = new Set(["url", "sourceTabUrl", "title", "site", "engine", "isVideo", "openedAt", "lastKey"]);
+    for (const item of afterFive) {
+      for (const k of Object.keys(item)) {
+        assert(allowedKeys.has(k), "unexpected field leaked into history entry: " + k);
+      }
+    }
+
+    // Tracker-decorated duplicate promotes to top and preserves prior title/site when empty
+    await pbpReaderHistoryRecord({
+      url: "https://example.com/post-1?utm_source=newsletter&fbclid=xyz",
+      title: "",
+      site: "",
+      engine: "jina",
+      lastKey: "k-1-new",
+    });
+    const deduped = await pbpReaderHistoryRead();
+    assert(deduped.length === 5, "tracker variant did not deduplicate: " + deduped.length);
+    assert(deduped[0].title === "Post 1" && deduped[0].site === "Example", "prior title/site lost on empty refresh");
+    assert(deduped[0].engine === "jina" && deduped[0].lastKey === "k-1-new", "updated engine/lastKey not kept");
+
+    // Cap at 25 items
+    for (let i = 6; i <= 30; i++) {
+      await pbpReaderHistoryRecord({ url: `https://example.com/post-${i}`, title: `Post ${i}`, openedAt: 1000 + i });
+    }
+    const capped = await pbpReaderHistoryRead();
+    assert(capped.length === PBP_READER_HISTORY_LIMIT && PBP_READER_HISTORY_LIMIT === 25, "expected 25 items, got " + capped.length);
+  });
+
+  // 3. Requestable origin validation
+  await test("pbpReaderHistoryRequestableOrigin permits only https and literal loopback http origins", () => {
+    assert(pbpReaderHistoryRequestableOrigin("https://sub.example.com:8443/a/b?q=1") === "https://sub.example.com:8443/*", "https origin");
+    assert(pbpReaderHistoryRequestableOrigin("http://localhost/docs") === "http://localhost/*", "portless localhost origin");
+    assert(pbpReaderHistoryRequestableOrigin("http://localhost:3000/docs") === "http://localhost:3000/*", "localhost port origin");
+    assert(pbpReaderHistoryRequestableOrigin("http://127.0.0.1:8080/p") === "http://127.0.0.1:8080/*", "127.0.0.1 origin");
+    assert(pbpReaderHistoryRequestableOrigin("http://[::1]:5173/") === "http://[::1]:5173/*", "ipv6 loopback origin");
+    for (const disallowed of [
+      "http://example.com/plain",
+      "http://192.168.1.10/lan",
+      "http://2130706433/",
+      "file:///home/user/doc.html",
+      "chrome://settings/",
+      "chrome-extension://abcdefghijklmnopabcdefghijklmnop/md-preview.html",
+      "https://user:secret@example.com/page",
+      "https://@example.com/page",
+    ]) {
+      assert(pbpReaderHistoryRequestableOrigin(disallowed) === "", "should reject origin: " + disallowed);
+    }
+  });
+
+  // 4. Live tab activation vs incognito isolation
+  await test("pbpOpenReaderFromHistory activates an open non-incognito reader tab when its storage slot still exists", async () => {
+    const extReader = "chrome-extension://abcdefghijklmnopabcdefghijklmnop/md-preview.html?k=live-slot-1";
+    const mock = freshMock({
+      permissionRequestAnswer: false,
+      storage: {
+        local: {
+          md_preview_data_live_other: { markdown: "x" },
+          "md_preview_data_live-slot-1": { markdown: "# Still Alive", title: "Live Doc", url: "https://example.com/live" },
+        },
+      },
+      tabs: [
+        { id: 11, windowId: 2, active: false, incognito: true, url: extReader },
+        { id: 12, windowId: 2, active: false, incognito: false, url: extReader },
+      ],
+    });
+    const res = await pbpOpenReaderFromHistory({
+      url: "https://example.com/live",
+      title: "Live Doc",
+      engine: "local",
+      lastKey: "live-slot-1",
+    });
+    assert(res.ok === true && res.mode === "activated" && res.tabId === 12, "expected live tab 12 activation, got " + JSON.stringify(res));
+    assert(mock.callsOf("permissions.request").length === 0, "live tab activation must not prompt for permissions");
+    assert(mock.callsOf("tabs.create").length === 0, "live tab activation must not open a duplicate tab");
+    assert(mock.tabs.find((t) => t.id === 12).active === true, "tab 12 was not activated");
+  });
+
+  // 5. Orphaned tab healing after extension disable/re-enable wiped storage slot
+  await test("pbpOpenReaderFromHistory heals an orphaned reader tab whose storage slot was wiped", async () => {
+    const orphanUrl = "chrome-extension://abcdefghijklmnopabcdefghijklmnop/md-preview.html?k=wiped-key";
+    const mock = freshMock({
+      storage: {
+        local: {
+          pinboardToken: obfuscateKey("bob:TOKEN123"),
+          pinboardTokenVerified: true,
+        },
+      },
+      tabs: [
+        { id: 21, windowId: 1, active: false, incognito: false, url: orphanUrl },
+      ],
+    });
+    const res = await pbpOpenReaderFromHistory({
+      url: "https://example.com/healed?utm_medium=social",
+      sourceTabUrl: "https://example.com/healed?utm_medium=social",
+      title: "Healed Article",
+      site: "Example",
+      engine: "local",
+      lastKey: "wiped-key",
+    });
+    assert(res.ok === true && res.mode === "healed" && res.tabId === 21 && res.key !== "wiped-key", "expected healed tab 21, got " + JSON.stringify(res));
+    const reqCalls = mock.callsOf("permissions.request");
+    assert(reqCalls.length === 1 && reqCalls[0].args[0].origins[0] === "https://example.com/*", "expected exact origin request");
+    const localData = mock.storageData("local");
+    const slot = localData["md_preview_data_" + res.key];
+    assert(slot && slot.pending === true && slot.historyReopen === true, "pending historyReopen slot not written");
+    assert(slot.account === "bob" && slot.bookmarkUrl === "https://example.com/healed", "fresh account/cleaned bookmarkUrl not stamped: " + JSON.stringify(slot));
+    const updatedTab = mock.tabs.find((t) => t.id === 21);
+    assert(updatedTab.url.endsWith("md-preview.html?k=" + res.key) && updatedTab.active === true, "orphaned tab URL was not updated");
+    const hist = await pbpReaderHistoryRead();
+    assert(hist[0].lastKey === res.key, "pbp_reader_history lastKey did not advance to healed key");
+  });
+
+  // 6. Permission denial leaves zero side effects for both local and Jina engines
+  await test("pbpOpenReaderFromHistory aborts cleanly with zero storage or tab side effects when permission is denied", async () => {
+    for (const [engine, expectedHost] of [["local", "https://locked.example.org"], ["jina", "https://r.jina.ai"]]) {
+      const mock = freshMock({ permissionRequestAnswer: false });
+      const res = await pbpOpenReaderFromHistory({
+        url: "https://locked.example.org/story",
+        title: "Locked Story",
+        engine,
+      });
+      assert(res.ok === false && res.reason === "permission_denied" && res.host === expectedHost,
+        engine + " denial mismatch: " + JSON.stringify(res));
+      const slotKeys = Object.keys(mock.storageData("local")).filter((k) => k.startsWith("md_preview_data_"));
+      assert(slotKeys.length === 0, engine + " wrote a preview slot despite denied permission");
+      assert(mock.callsOf("tabs.create").length === 0, engine + " opened a tab despite denied permission");
+    }
+  });
+
+  // 7. Video URL reopen preserves video=1 on both new-tab creation and in-place replacement
+  await test("pbpOpenReaderFromHistory marks video URLs with video=1 in both created and replaced modes", async () => {
+    const mock = freshMock();
+    const ytUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+    const created = await pbpOpenReaderFromHistory({ url: ytUrl, title: "Video Essay", engine: "local" });
+    assert(created.ok === true && created.mode === "created", "expected created mode");
+    assert(mock.tabs[0].url.includes("?k=" + created.key + "&video=1"), "missing video=1 on tabs.create: " + mock.tabs[0].url);
+
+    let replacedTarget = "";
+    const replaced = await pbpOpenReaderFromHistory(
+      { url: ytUrl, title: "Video Essay", engine: "local", lastKey: "expired-vid" },
+      { reuseCurrentTab: true, currentKey: "expired-vid", navigate: (q) => { replacedTarget = q; } }
+    );
+    assert(replaced.ok === true && replaced.mode === "replaced", "expected replaced mode");
+    assert(replacedTarget === "?k=" + replaced.key + "&video=1", "unexpected in-place navigation query: " + replacedTarget);
+  });
+
+  // 8. Expired/empty md-preview state: matched recovery card, per-row remove, Clear fallback, and pbpEngineErrText
+  await test("renderHistoryEmptyState highlights matched ?k= entry, removes items, and falls back to empty state on Clear", async () => {
+    const mock = freshMock({ permissionRequestAnswer: false });
+    await pbpReaderHistoryRecord({ url: "https://other.example.com/a", title: "Earlier Item", openedAt: 1000, lastKey: "k-other" });
+    await pbpReaderHistoryRecord({ url: "https://match.example.com/b", title: "Matched Expired Article", openedAt: 2000, lastKey: "k-expired" });
+
+    const navigated = [];
+    const items = await pbpReaderHistoryRead();
+    renderHistoryEmptyState(items, "k-expired", { navigate: (q) => navigated.push(q) });
+
+    const view = document.getElementById("rendered-view");
+    const matchCard = view.querySelector(".empty-state.es-history .rh-match");
+    assert(matchCard, "matched recovery card did not render");
+    assert(matchCard.querySelector(".rh-item-title").textContent === "Matched Expired Article", "wrong matched title");
+    const openOrig = matchCard.querySelector("a.action-btn");
+    assert(openOrig && openOrig.href === "https://match.example.com/b" && openOrig.rel === "noopener noreferrer", "Open original link malformed");
+
+    // Denied permission shows inline alert without navigating
+    matchCard.querySelector("button.es-primary").click();
+    const errBar = view.querySelector(".msg-bar.error");
+    await until(() => !errBar.hidden, "inline permission error");
+    assert(errBar.textContent === "aiErrorHostPermission:https://match.example.com", "unexpected error text: " + errBar.textContent);
+    assert(navigated.length === 0, "must not navigate when permission is denied");
+
+    // Removing the remaining non-matched row collapses .rh-list while keeping .rh-match + footer Clear
+    const rmBtn = view.querySelector(".rh-list .rh-remove");
+    assert(rmBtn, "remaining history row missing");
+    rmBtn.click();
+    await until(() => !view.querySelector(".rh-list"), "remaining list removed");
+    assert(!!view.querySelector(".empty-state.es-history .rh-match"), "matched card should stay after removing sibling item");
+
+    // Grant permission and reopen in place
+    mock.setPermissionRequestAnswer(true);
+    mock.userGesture();
+    view.querySelector(".rh-match button.es-primary").click();
+    await until(() => navigated.length === 1, "in-place reopen navigation");
+    assert(/^\?k=[0-9a-z-]+$/i.test(navigated[0]), "expected ?k=<uuid>, got " + navigated[0]);
+
+    // Footer Clear (shown when rest is empty) wipes history and falls back to standard empty state
+    const updatedKey = new URLSearchParams(navigated[0]).get("k");
+    renderHistoryEmptyState(await pbpReaderHistoryRead(), updatedKey);
+    const footClear = [...view.querySelectorAll(".empty-state.es-history > .row button")].find(
+      (b) => b.textContent === "readerHistoryClear"
+    );
+    assert(footClear, "footer Clear button missing when only matched item exists");
+    footClear.click();
+    await until(() => !!view.querySelector(".empty-state:not(.es-history)"), "did not fall back to standard empty state");
+    assert((await pbpReaderHistoryRead()).length === 0, "Clear button did not wipe history");
+
+    assert(
+      pbpEngineErrText({ error: "host_permission", pageOrigin: "https://news.example.org" }, "local") === "aiErrorHostPermission:https://news.example.org",
+      "pbpEngineErrText must report pageOrigin for local history reopen"
+    );
+  });
+
+  // 9. In-reader #rail-history-btn popover marks current article and opens other entries
+  await test("pbpRailHistoryBtnInit toggles #rail-history-pop, marks current article, and opens other entries", async () => {
+    const mock = freshMock();
+    _pbpCurrentReaderUrl = "https://example.com/current?utm_source=feed";
+    await pbpReaderHistoryRecord({ url: "https://example.org/other", title: "Other Article", openedAt: 1000, lastKey: "k-other" });
+    await pbpReaderHistoryRecord({ url: "https://example.com/current", title: "Current Reader Article", openedAt: 2000, lastKey: "k-cur" });
+
+    const btn = document.getElementById("rail-history-btn");
+    btn.click();
+    await until(() => {
+      const p = document.getElementById("rail-history-pop");
+      return p && p.matches(":popover-open") && p.querySelectorAll(".rh-item").length === 2;
+    }, "#rail-history-pop open with 2 rows");
+
+    const pop = document.getElementById("rail-history-pop");
+    assert(pop.classList.contains("pop-panel"), "#rail-history-pop must carry .pop-panel");
+    assert(btn.getAttribute("aria-expanded") === "true", "aria-expanded not set to true");
+    const openBtns = [...pop.querySelectorAll(".rh-open")];
+    assert(openBtns[0].getAttribute("aria-current") === "true", "current article row missing aria-current=true");
+    assert(!openBtns[1].hasAttribute("aria-current"), "non-current row falsely marked current");
+
+    // Clicking the current article simply closes the popover without creating a tab
+    openBtns[0].click();
+    await until(() => !pop.matches(":popover-open"), "popover closed on current click");
+    assert(mock.callsOf("tabs.create").length === 0, "clicking current article must not open a new tab");
+
+    // Reopen popover and click the other article
+    mock.userGesture();
+    btn.click();
+    await until(() => pop.matches(":popover-open"), "popover reopened");
+    pop.querySelectorAll(".rh-open")[1].click();
+    await until(() => mock.callsOf("tabs.create").length === 1, "other article opened in new tab");
+    assert(!pop.matches(":popover-open"), "popover did not close after opening other article");
+  });
+
+  // 10. Real popup.html boot: split-button caret stays enabled and functional on unsupported-url tabs
+  await test("popup #jina-md-history-btn opens history popover and reopens entries even on unsupported-url tabs", async () => {
+    const mock = freshMock({
+      storage: {
+        local: {
+          pinboardToken: obfuscateKey("alice:TOKEN999"),
+          pinboardTokenVerified: true,
+        },
+      },
+      tabs: [
+        { id: 1, windowId: 1, active: true, incognito: false, url: "chrome://extensions/", title: "Extensions" },
+      ],
+    });
+    mock.onSendMessage(async (msg) => {
+      if (msg && msg.type === "get_offline_queue") return { ok: true, queue: [], pause: null, account: "alice" };
+      return undefined;
+    });
+    await pbpReaderHistoryRecord({ url: "https://example.net/saved-read", title: "Saved Read", site: "example.net", openedAt: 3000, lastKey: "k-pop" });
+
+    const rawPopupHtml = await (await fetch("../popup.html")).text();
+    const injectedHtml = rawPopupHtml.replace(
+      "<head>",
+      '<head><base href="../"><script>window.chrome = window.parent.__pbpPopupFrameChrome;<\/script>'
+    );
+    window.__pbpPopupFrameChrome = mock.chrome;
+
+    const frame = document.createElement("iframe");
+    frame.style.cssText = "width:550px;height:360px;border:0;";
+    document.getElementById("fixture").appendChild(frame);
+    const fdoc = frame.contentDocument;
+    fdoc.open();
+    fdoc.write(injectedHtml);
+    fdoc.close();
+
+    await until(() => {
+      const mainSec = fdoc.getElementById("main-section");
+      const mainBtn = fdoc.getElementById("jina-md-btn");
+      const caretBtn = fdoc.getElementById("jina-md-history-btn");
+      return mainSec && mainSec.classList.contains("unsupported-url") &&
+        mainBtn && mainBtn.disabled === true &&
+        caretBtn && caretBtn.dataset.pbpHistoryBound === "1";
+    }, "popup unsupported-url boot with bound history caret");
+
+    const mainBtn = fdoc.getElementById("jina-md-btn");
+    const caretBtn = fdoc.getElementById("jina-md-history-btn");
+    assert(mainBtn.disabled === true && caretBtn.disabled === false, "caret must stay enabled when main Reader button is disabled");
+
+    caretBtn.click();
+    await until(() => {
+      const p = fdoc.getElementById("jina-md-history-pop");
+      return p && p.matches(":popover-open") && p.querySelectorAll(".pp-rh-item").length === 1;
+    }, "#jina-md-history-pop open with 1 row");
+
+    const pop = fdoc.getElementById("jina-md-history-pop");
+    assert(caretBtn.getAttribute("aria-expanded") === "true", "popup caret aria-expanded not true");
+    mock.userGesture();
+    pop.querySelector(".pp-rh-open").click();
+    await until(() => mock.callsOf("tabs.create").length === 1, "popup history click opened reader tab");
+    assert(!pop.matches(":popover-open"), "popup history popover did not close after opening reader");
+
+    // Reopen and Clear transitions to empty message
+    caretBtn.click();
+    await until(() => pop.matches(":popover-open"), "popup history reopened");
+    pop.querySelector(".pp-rh-clear").click();
+    await until(() => !!pop.querySelector(".pp-rh-empty"), "popup history empty placeholder");
+    assert((await pbpReaderHistoryRead()).length === 0, "popup Clear did not wipe pbp_reader_history");
+    frame.remove();
+    delete window.__pbpPopupFrameChrome;
+  });
+
+  document.title = (failed === 0 ? "PASS" : "FAIL") + ` (${passed}/${passed + failed})`;
+})();
+</script>
+</body></html>

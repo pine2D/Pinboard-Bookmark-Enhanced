@@ -116,7 +116,10 @@ function pbpEngineErrText(r, engine) {
   if (code === "site_target_missing") return t("mdSiteTargetMissing");
   if (code === "tab_unavailable" || code === "tab_navigated") return t("mdEngineTabGone");
   if (code === "empty") return engine === "jina" ? t("mdPreviewNoContent") + " " + t("mdEngineJinaNoLogin") : t("mdPreviewNoContent");
-  if (code === "host_permission") return t("aiErrorHostPermission", "https://r.jina.ai");
+  if (code === "host_permission") {
+    const origin = (r && typeof r.pageOrigin === "string" && r.pageOrigin) ? r.pageOrigin : "https://r.jina.ai";
+    return t("aiErrorHostPermission", origin);
+  }
   // "network" covers both this file's own sendMessage-throw catches and
   // jina.js's fetch-TypeError classification relayed unchanged through
   // background.js -- otherwise every offline failure fell into the generic
@@ -975,6 +978,347 @@ function pbpRailSettingsBtnInit() {
   if (btn) btn.addEventListener("click", () => pbpOpenOptionsTab("reader"));
 }
 
+let _pbpCurrentReaderUrl = "";
+let _pbpRailHistoryInited = false;
+let _pbpRailHistoryPopEl = null;
+
+function _pbpReaderHistoryMetaText(item) {
+  const host = typeof pbpReaderHistoryHost === "function" ? pbpReaderHistoryHost(item) : "";
+  const stamp = typeof pbpReaderHistoryFormatTime === "function" ? pbpReaderHistoryFormatTime(item && item.openedAt) : "";
+  return [host, stamp].filter(Boolean).join(" · ");
+}
+
+function _pbpReaderHistoryErrText(res) {
+  if (res && res.reason === "permission_denied" && res.host) return t("aiErrorHostPermission", res.host);
+  return t("readerHistoryOpenFailed");
+}
+
+function _pbpBuildReaderHistoryRow(item, { isCurrent = false, onOpen, onRemove }) {
+  const row = document.createElement("div");
+  row.className = "rh-item";
+  row.setAttribute("role", "listitem");
+
+  const openBtn = document.createElement("button");
+  openBtn.type = "button";
+  openBtn.className = "rh-open";
+  openBtn.title = item.url || "";
+  if (isCurrent) openBtn.setAttribute("aria-current", "true");
+
+  const titleEl = document.createElement("span");
+  titleEl.className = "rh-item-title";
+  titleEl.dir = "auto";
+  titleEl.textContent = item.title || item.url || t("mdPreviewUntitled");
+  openBtn.appendChild(titleEl);
+
+  const metaText = _pbpReaderHistoryMetaText(item);
+  if (metaText) {
+    const metaEl = document.createElement("span");
+    metaEl.className = "rh-meta";
+    metaEl.textContent = metaText;
+    openBtn.appendChild(metaEl);
+  }
+  openBtn.addEventListener("click", () => onOpen(item, openBtn));
+
+  const rmBtn = document.createElement("button");
+  rmBtn.type = "button";
+  rmBtn.className = "action-btn icon-only rh-remove";
+  rmBtn.innerHTML = PBP_ICONS.cross;
+  const rmLabel = t("readerHistoryRemoveItem", item.title || pbpReaderHistoryHost(item) || item.url || "");
+  rmBtn.title = t("readerHistoryRemove");
+  rmBtn.setAttribute("aria-label", rmLabel);
+  rmBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onRemove(item, rmBtn);
+  });
+
+  row.appendChild(openBtn);
+  row.appendChild(rmBtn);
+  return row;
+}
+
+function renderHistoryEmptyState(initialItems, currentKey, opts) {
+  const view = document.getElementById("rendered-view");
+  document.body.classList.add("md-empty");
+  if (!view) return;
+  view.removeAttribute("aria-busy");
+
+  function draw(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      renderEmptyState(t("mdPreviewEmpty"), "mdPreviewClose");
+      return;
+    }
+    const matched = currentKey ? items.find((row) => row && row.lastKey === currentKey) : null;
+    const rest = matched ? items.filter((row) => row !== matched) : items;
+
+    const wrap = document.createElement("div");
+    wrap.className = "empty-state es-history";
+    wrap.setAttribute("role", "status");
+
+    const lead = document.createElement("p");
+    lead.className = "rh-empty-lead";
+    lead.textContent = matched ? t("readerHistoryExpiredLead") : t("mdPreviewEmpty");
+    wrap.appendChild(lead);
+
+    const errBar = document.createElement("div");
+    errBar.className = "msg-bar error";
+    errBar.setAttribute("role", "alert");
+    errBar.hidden = true;
+    wrap.appendChild(errBar);
+
+    const showErr = (res) => {
+      errBar.textContent = _pbpReaderHistoryErrText(res);
+      errBar.hidden = false;
+    };
+
+    let busy = false;
+    const triggerReopen = async (targetItem) => {
+      if (busy || typeof pbpOpenReaderFromHistory !== "function") return;
+      busy = true;
+      errBar.hidden = true;
+      try {
+        const reopenOpts = { reuseCurrentTab: true, currentKey };
+        if (opts && typeof opts.navigate === "function") reopenOpts.navigate = opts.navigate;
+        const res = await pbpOpenReaderFromHistory(targetItem, reopenOpts);
+        if (!res || !res.ok) showErr(res);
+      } finally {
+        busy = false;
+      }
+    };
+
+    if (matched) {
+      const card = document.createElement("div");
+      card.className = "rh-match";
+      const mTitle = document.createElement("div");
+      mTitle.className = "rh-item-title";
+      mTitle.dir = "auto";
+      mTitle.textContent = matched.title || matched.url || t("mdPreviewUntitled");
+      card.appendChild(mTitle);
+      const mMetaText = _pbpReaderHistoryMetaText(matched);
+      if (mMetaText) {
+        const mMeta = document.createElement("div");
+        mMeta.className = "rh-meta";
+        mMeta.textContent = mMetaText;
+        card.appendChild(mMeta);
+      }
+      const mActions = document.createElement("div");
+      mActions.className = "row";
+      const reopenBtn = document.createElement("button");
+      reopenBtn.type = "button";
+      reopenBtn.className = "action-btn es-primary";
+      reopenBtn.textContent = t("readerHistoryReopen");
+      reopenBtn.addEventListener("click", () => triggerReopen(matched));
+      mActions.appendChild(reopenBtn);
+
+      const safeHref = pbpOriginalOpenHref(matched.url);
+      if (safeHref) {
+        const openOrig = document.createElement("a");
+        openOrig.className = "action-btn es-quiet";
+        openOrig.href = safeHref;
+        openOrig.target = "_blank";
+        openOrig.rel = "noopener noreferrer";
+        openOrig.innerHTML = (typeof PBP_ICONS !== "undefined" && PBP_ICONS.extOpen) || "";
+        const lab = document.createElement("span");
+        lab.textContent = t("libraryOpenOriginal");
+        openOrig.appendChild(lab);
+        mActions.appendChild(openOrig);
+      }
+      card.appendChild(mActions);
+      wrap.appendChild(card);
+    }
+
+    if (rest.length > 0) {
+      const head = document.createElement("div");
+      head.className = "panel-head";
+      const h2 = document.createElement("h2");
+      h2.className = "rh-title";
+      h2.textContent = t("readerHistoryTitle");
+      head.appendChild(h2);
+      const clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.className = "action-btn rh-clear-btn";
+      clearBtn.textContent = t("readerHistoryClear");
+      clearBtn.addEventListener("click", async () => {
+        if (typeof pbpReaderHistoryClear === "function") await pbpReaderHistoryClear();
+        draw([]);
+      });
+      head.appendChild(clearBtn);
+      wrap.appendChild(head);
+
+      const listEl = document.createElement("div");
+      listEl.className = "rh-list";
+      listEl.setAttribute("role", "list");
+      rest.forEach((item) => {
+        listEl.appendChild(_pbpBuildReaderHistoryRow(item, {
+          isCurrent: false,
+          onOpen: (targetItem) => triggerReopen(targetItem),
+          onRemove: async (targetItem) => {
+            const next = typeof pbpReaderHistoryRemove === "function"
+              ? await pbpReaderHistoryRemove(targetItem.url)
+              : [];
+            draw(next);
+          },
+        }));
+      });
+      wrap.appendChild(listEl);
+    }
+
+    const foot = document.createElement("div");
+    foot.className = "row";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "action-btn es-quiet";
+    closeBtn.textContent = t("mdPreviewClose");
+    closeBtn.addEventListener("click", () => window.close());
+    foot.appendChild(closeBtn);
+    if (rest.length === 0) {
+      const clearOnlyBtn = document.createElement("button");
+      clearOnlyBtn.type = "button";
+      clearOnlyBtn.className = "action-btn es-quiet";
+      clearOnlyBtn.textContent = t("readerHistoryClear");
+      clearOnlyBtn.addEventListener("click", async () => {
+        if (typeof pbpReaderHistoryClear === "function") await pbpReaderHistoryClear();
+        draw([]);
+      });
+      foot.appendChild(clearOnlyBtn);
+    }
+    wrap.appendChild(foot);
+
+    view.replaceChildren(wrap);
+  }
+
+  draw(initialItems);
+}
+
+function _pbpRailHistoryEnsurePop(anchorBtn) {
+  if (_pbpRailHistoryPopEl) return _pbpRailHistoryPopEl;
+  const pop = document.createElement("div");
+  pop.id = "rail-history-pop";
+  pop.className = "pop-panel";
+  pop.setAttribute("popover", "auto");
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", t("readerHistoryTitle"));
+  pop.addEventListener("toggle", (e) => {
+    if (anchorBtn) anchorBtn.setAttribute("aria-expanded", e.newState === "open" ? "true" : "false");
+  });
+  document.body.appendChild(pop);
+  _pbpRailHistoryPopEl = pop;
+  return pop;
+}
+
+function _pbpRailHistoryPosition(pop, anchorBtn) {
+  if (!pop || !anchorBtn) return;
+  const rect = anchorBtn.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - pop.offsetWidth - 8)) + "px";
+  const top = rect.bottom + 8 + pop.offsetHeight <= window.innerHeight - 8
+    ? rect.bottom + 8
+    : Math.max(8, rect.top - pop.offsetHeight - 8);
+  pop.style.top = Math.max(8, Math.min(top, window.innerHeight - pop.offsetHeight - 8)) + "px";
+}
+
+async function _pbpRailHistoryPopulate(pop, anchorBtn) {
+  const items = typeof pbpReaderHistoryRead === "function" ? await pbpReaderHistoryRead() : [];
+  const curKey = (() => {
+    try { return new URLSearchParams(location.search).get("k") || ""; }
+    catch (_) { /* swallow-ok: unavailable location search defaults to empty key */ return ""; }
+  })();
+
+  const head = document.createElement("div");
+  head.className = "panel-head";
+  const h2 = document.createElement("h2");
+  h2.className = "rh-title";
+  h2.textContent = t("readerHistoryTitle");
+  head.appendChild(h2);
+
+  const clearBtn = document.createElement("button");
+  clearBtn.type = "button";
+  clearBtn.className = "action-btn rh-clear-btn";
+  clearBtn.textContent = t("readerHistoryClear");
+  clearBtn.hidden = items.length === 0;
+  clearBtn.addEventListener("click", async () => {
+    if (typeof pbpReaderHistoryClear === "function") await pbpReaderHistoryClear();
+    await _pbpRailHistoryPopulate(pop, anchorBtn);
+    if (pop.matches(":popover-open")) _pbpRailHistoryPosition(pop, anchorBtn);
+  });
+  head.appendChild(clearBtn);
+
+  const errBar = document.createElement("div");
+  errBar.className = "msg-bar error";
+  errBar.setAttribute("role", "alert");
+  errBar.hidden = true;
+
+  const frag = document.createDocumentFragment();
+  frag.appendChild(head);
+  frag.appendChild(errBar);
+
+  if (items.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "rh-empty-msg";
+    empty.textContent = t("readerHistoryEmpty");
+    frag.appendChild(empty);
+  } else {
+    let busy = false;
+    const listEl = document.createElement("div");
+    listEl.className = "rh-list";
+    listEl.setAttribute("role", "list");
+    items.forEach((item) => {
+      const current = !!(
+        (curKey && item.lastKey === curKey) ||
+        (_pbpCurrentReaderUrl && typeof pbpSameBookmark === "function" && pbpSameBookmark(item.url, _pbpCurrentReaderUrl))
+      );
+      listEl.appendChild(_pbpBuildReaderHistoryRow(item, {
+        isCurrent: current,
+        onOpen: async (targetItem) => {
+          if (current) {
+            try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
+            return;
+          }
+          if (busy || typeof pbpOpenReaderFromHistory !== "function") return;
+          busy = true;
+          errBar.hidden = true;
+          try {
+            const res = await pbpOpenReaderFromHistory(targetItem, { reuseCurrentTab: false, currentKey: curKey });
+            if (res && res.ok) {
+              try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
+            } else {
+              errBar.textContent = _pbpReaderHistoryErrText(res);
+              errBar.hidden = false;
+              if (pop.matches(":popover-open")) _pbpRailHistoryPosition(pop, anchorBtn);
+            }
+          } finally {
+            busy = false;
+          }
+        },
+        onRemove: async (targetItem) => {
+          if (typeof pbpReaderHistoryRemove === "function") await pbpReaderHistoryRemove(targetItem.url);
+          await _pbpRailHistoryPopulate(pop, anchorBtn);
+          if (pop.matches(":popover-open")) _pbpRailHistoryPosition(pop, anchorBtn);
+        },
+      }));
+    });
+    frag.appendChild(listEl);
+  }
+
+  pop.replaceChildren(frag);
+}
+
+function pbpRailHistoryBtnInit() {
+  if (_pbpRailHistoryInited) return;
+  _pbpRailHistoryInited = true;
+  const btn = document.getElementById("rail-history-btn");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    const pop = _pbpRailHistoryEnsurePop(btn);
+    if (pop.matches(":popover-open")) {
+      try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
+      return;
+    }
+    if (typeof _pbpReaderHideOtherPopovers === "function") _pbpReaderHideOtherPopovers(pop);
+    await _pbpRailHistoryPopulate(pop, btn);
+    try { pop.showPopover(); } catch (_) { /* swallow-ok: detached or unsupported popover state */ return; }
+    _pbpRailHistoryPosition(pop, btn);
+  });
+}
+
 // K61 tail-delete: pure geometry for _pbpReaderSaveScroll's symmetric
 // bottom-of-article branch below (mirrors its existing top-of-article
 // `scrollY <= innerHeight` check). True when less than one viewport of
@@ -1038,6 +1382,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // always in the initial HTML, so one call before any render attempt
   // covers every outcome, including the extraction-failure shell.
   pbpRailSettingsBtnInit();
+  pbpRailHistoryBtnInit();
   // file://-safe bailout: tests/md-ai-tests.html loads this whole file (deferred
   // scripts, no extension context) to reach pbpRailCollapseState/pbpRailCollapsible
   // below -- neither needs anything past this point. Mirrors the same typeof-chrome
@@ -1162,7 +1507,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   const info = data[MP_KEY];
   if (!info) {
     pbpReaderSchemeVideoSettled();
-    renderEmptyState(t("mdPreviewEmpty"), "mdPreviewClose");
+    const historyItems = typeof pbpReaderHistoryRead === "function" ? await pbpReaderHistoryRead() : [];
+    if (historyItems.length > 0) {
+      renderHistoryEmptyState(historyItems, k || "");
+    } else {
+      renderEmptyState(t("mdPreviewEmpty"), "mdPreviewClose");
+    }
     return;
   }
   // Deferred cleanup (audit B5): the slot is REPLACED by the lighter restore
@@ -1174,7 +1524,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // this same payload instead.
 
   const { title, url, tokens, source } = info;
-  const srcTabId = info.tabId;
+  let srcTabId = info.tabId;
   const baseUrl = info.baseUrl || url || "";
   // Immutable source-tab identity (hotlink round): `url`/`baseUrl` can be
   // Jina's canonicalized d.url or (from the popup) an edited/tracker-stripped
@@ -1188,7 +1538,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // thing the guard exists to prevent. Reloading such a preview does NOT heal
   // it (the restore record carries this same fallback value forward); only
   // opening a fresh preview from the popup/shortcut seeds the real tab URL.
-  const sourceTabUrl = (typeof info.sourceTabUrl === "string" && info.sourceTabUrl) || url || "";
+  let sourceTabUrl = (typeof info.sourceTabUrl === "string" && info.sourceTabUrl) || url || "";
+  _pbpCurrentReaderUrl = url || sourceTabUrl || "";
   // The address the handoff looked this page's bookmark up under (shared.js
   // pbpBookmarkLookupUrl: the cleaned page address). The bookmark badge, the
   // reader's bookmark bar and the export metadata refresh speak in it; url
@@ -1319,7 +1670,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   function engineLabel(e) { return e === "jina" ? "Jina Reader" : "Defuddle"; }
   function engineUnavailable(e) {
     if (e === "jina") return !/^https?:\/\//i.test(srcUrlForSwitch);
-    return !srcTabId; // local needs the source tab
+    if (srcTabId) return false;
+    return !(info.historyReopen === true &&
+      typeof pbpReaderHistoryRequestableOrigin === "function" &&
+      !!pbpReaderHistoryRequestableOrigin(sourceTabUrl || url));
   }
   // Top-level pbpEngineErrText owns the code -> copy table (testable on the
   // file:// pages); `engine` = the engine that was tried.
@@ -1492,6 +1846,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // (3)-(5): revision bump, will-replace, canonical + DOM, replaced.
       if (typeof _applyArticleCommit === "function") _applyArticleCommit(md, { reason, aiPunct, videoState: o.videoState });
       else console.warn("[pbp-video] commit: no article runtime on this page yet -- payload written, the caller has to surface it");
+      if (!sourceIncognito && typeof pbpReaderHistoryRecord === "function") {
+        void pbpReaderHistoryRecord({
+          url, sourceTabUrl, title: title || fallbackTitle || "", site,
+          engine: source === "jina" ? "jina" : "local", isVideo: true, lastKey: k || "", sourceIncognito
+        });
+      }
       return true;
     } finally {
       // Every exit path, throws included: a lock leaked here would refuse
@@ -1545,11 +1905,91 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       try {
         if (engine === "jina" && failure && failure.error === "host_permission") {
           if (!await pbpRequestJinaHostPermission()) return;
+        } else if (engine === "local" && !srcTabId && info.historyReopen === true && typeof pbpReaderHistoryRequestableOrigin === "function") {
+          const reqOrigin = pbpReaderHistoryRequestableOrigin(sourceTabUrl || url);
+          if (reqOrigin && chrome.permissions?.request) {
+            let granted = false;
+            try { granted = await chrome.permissions.contains({ origins: [reqOrigin] }); }
+            catch (e) { console.warn("[reader-history] retry permission check failed:", e?.name, e?.message); }
+            if (!granted) {
+              try { granted = await chrome.permissions.request({ origins: [reqOrigin] }); }
+              catch (e) { console.warn("[reader-history] retry permission request failed:", e?.name, e?.message); granted = false; }
+            }
+            if (!granted) return;
+          }
         }
       } finally {
         inFlight = false;
       }
       await attemptExtract(engine);
+    }
+    async function ensureHistoryLocalTab() {
+      const target = sourceTabUrl || url;
+      const reqOrigin = typeof pbpReaderHistoryRequestableOrigin === "function"
+        ? pbpReaderHistoryRequestableOrigin(target)
+        : "";
+      if (!reqOrigin) return { ok: false, error: "tab_unavailable" };
+      let allowed = false;
+      try { allowed = await chrome.permissions.contains({ origins: [reqOrigin] }); }
+      catch (e) { console.warn("[reader-history] local permission check failed:", e?.name, e?.message); allowed = false; }
+      if (!allowed) return { ok: false, error: "host_permission", pageOrigin: reqOrigin.replace(/\/\*$/, "") };
+
+      let tab = null;
+      let createdTabId = null;
+      try {
+        const tabs = await chrome.tabs.query({ url: target });
+        if (Array.isArray(tabs)) tab = tabs.find((row) => row && row.url === target && !row.incognito) || null;
+        if (!tab) {
+          tab = await chrome.tabs.create({ url: target, active: false });
+          createdTabId = tab && tab.id != null ? tab.id : null;
+        }
+        if (!tab || tab.id == null) return { ok: false, error: "tab_unavailable" };
+        if (tab.status !== "complete") {
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => finish(new Error("source_load_timeout")), 30000);
+            const onUpdated = (id, change) => { if (id === tab.id && change.status === "complete") finish(); };
+            const onRemoved = (id) => { if (id === tab.id) finish(new Error("tab_removed")); };
+            function finish(err) {
+              clearTimeout(timeout);
+              try { chrome.tabs.onUpdated.removeListener(onUpdated); } catch (_) { /* swallow-ok: listener teardown best-effort */ }
+              try { chrome.tabs.onRemoved?.removeListener?.(onRemoved); } catch (_) { /* swallow-ok: listener teardown best-effort */ }
+              if (err) reject(err); else resolve();
+            }
+            chrome.tabs.onUpdated.addListener(onUpdated);
+            chrome.tabs.onRemoved?.addListener?.(onRemoved);
+            chrome.tabs.get(tab.id).then((cur) => { if (cur && cur.status === "complete") finish(); }, finish);
+          });
+        }
+        const current = await chrome.tabs.get(tab.id);
+        const curOrigin = current && typeof current.url === "string"
+          ? (typeof pbpReaderHistoryRequestableOrigin === "function" ? pbpReaderHistoryRequestableOrigin(current.url) : "")
+          : "";
+        if (!curOrigin || curOrigin !== reqOrigin) {
+          if (createdTabId != null) {
+            try { await chrome.tabs.remove(createdTabId); }
+            catch (e) { console.warn("[reader-history] navigated temp tab close failed:", e?.name, e?.message); }
+          }
+          return { ok: false, error: "tab_navigated" };
+        }
+        srcTabId = current.id;
+        sourceTabUrl = current.url;
+        try {
+          const curSlot = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
+          if (!(curSlot && typeof curSlot.nonce === "string" && curSlot.nonce !== _pageNonce && (curSlot.ts || 0) > _pageLoadTs)) {
+            await chrome.storage.local.set({ [MP_KEY]: { ...(curSlot || info), tabId: srcTabId, sourceTabUrl } });
+          }
+        } catch (e) {
+          console.warn("[reader-history] slot source tab update failed:", e?.name, e?.message);
+        }
+        return { ok: true };
+      } catch (e) {
+        console.warn("[reader-history] local source tab open failed:", e?.name, e?.message);
+        if (createdTabId != null) {
+          try { await chrome.tabs.remove(createdTabId); }
+          catch (e2) { console.warn("[reader-history] failed temp tab close failed:", e2?.name, e2?.message); }
+        }
+        return { ok: false, error: "tab_unavailable" };
+      }
     }
     // Embedded-frame pass (2026-08-25): the top document had nothing, but the
     // extractor reported one large cross-origin https frame. The button in the
@@ -1583,14 +2023,20 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         engine === "jina" ? t("mdEngineExtractingNoteJina") : ""
       );
       let pr;
-      try {
-        pr = await chrome.runtime.sendMessage({
-          type: "reextractMarkdown", tabId: srcTabId, url, engine, sourceTabUrl,
-          account: bookmarkAccount, tags, description, k,
-          frame: !!(opts && opts.frame), // embedded-frame pass, only from grantFrameAndRetry
-          frameOrigin: (opts && typeof opts.frameOrigin === "string") ? opts.frameOrigin : ""
-        });
-      } catch (_) { pr = { ok: false, error: "network" }; }
+      if (engine === "local" && !srcTabId && info.historyReopen === true) {
+        const prep = await ensureHistoryLocalTab();
+        if (!prep.ok) pr = prep;
+      }
+      if (!pr) {
+        try {
+          pr = await chrome.runtime.sendMessage({
+            type: "reextractMarkdown", tabId: srcTabId, url, engine, sourceTabUrl,
+            account: bookmarkAccount, tags, description, k,
+            frame: !!(opts && opts.frame), // embedded-frame pass, only from grantFrameAndRetry
+            frameOrigin: (opts && typeof opts.frameOrigin === "string") ? opts.frameOrigin : ""
+          });
+        } catch (_) { pr = { ok: false, error: "network" }; }
+      }
       // inFlight stays HELD past this point (audit B4): the old release here
       // let a .src-seg retry or engine switch run concurrently with the
       // video branch's caption session and payload writes below, racing two
@@ -1739,7 +2185,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         seg.addEventListener("click", () => {
           const e = seg.getAttribute("data-engine");
           if (inFlight || e === attemptedEngine || seg.getAttribute("aria-disabled") === "true") return;
-          attemptExtract(e);
+          if (e === "local" && !srcTabId && info.historyReopen === true) retryExtract(e, null);
+          else attemptExtract(e);
         });
       });
     }
@@ -1975,6 +2422,14 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       await chrome.storage.local.set({ [MP_KEY]: _restoreRecord });
     }
   } catch (_) { /* degrade to current behavior: next reload hits the empty state */ }
+  if (!sourceIncognito && typeof pbpReaderHistoryRecord === "function") {
+    void pbpReaderHistoryRecord({
+      url, sourceTabUrl, title: title || "", site: site || "",
+      engine: source === "jina" ? "jina" : "local",
+      isVideo: document.body.classList.contains("video-mode") || info.videoTranscript === true,
+      lastKey: k || "", sourceIncognito
+    });
+  }
 
   // Export-options defaults from settings (per-export overridable via the header row).
   // Read from the SAME storage area options.js writes to: sync when the user enabled
@@ -4420,6 +4875,7 @@ function setupDrawer() {
 // case.
 function pbpRailDrawerClose() {
   document.body.classList.remove("rail-open");
+  try { document.getElementById("rail-history-pop")?.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
   const toggle = document.getElementById("rail-toggle");
   const scrim = document.getElementById("rail-scrim");
   const rail = document.getElementById("rail");
