@@ -1270,14 +1270,17 @@ await test('Ollama string error bodies reach the message, code and status on bot
   }
 });
 // ---- Reader vision multimodal support (P1-C) ----
-await test('pbpAiSupportsVision gates the four vision providers and rejects retired text-only DeepSeek models',async()=>{
+await test('pbpAiSupportsVision gates the four vision providers and allows only deepseek-flash on DeepSeek',async()=>{
   assert(pbpAiSupportsVision({aiProvider:'openai',openaiApiKey:'k',openaiModel:'gpt-5.4-nano'})===true,'openai');
   assert(pbpAiSupportsVision({aiProvider:'claude',claudeApiKey:'k',claudeModel:'claude-haiku-4-5'})===true,'claude');
   assert(pbpAiSupportsVision({aiProvider:'gemini',geminiApiKey:'k',geminiModel:'gemini-3.5-flash-lite'})===true,'gemini');
   assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-flash'})===true,'deepseek-flash');
+  assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-v4-pro'})===false,'deepseek-v4-pro');
+  assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-custom-text'})===false,'custom deepseek slug');
   assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-chat'})===false,'deepseek-chat');
   assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-reasoner'})===false,'deepseek-reasoner');
   assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-flash'},'deepseek-chat')===false,'override to deepseek-chat');
+  assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-flash'},'deepseek-v4-pro')===false,'override to deepseek-v4-pro');
   assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-chat'},'deepseek-flash')===true,'override to deepseek-flash');
   assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'',deepseekModel:'deepseek-flash'})===false,'missing key');
   for(const p of ['ollama','qwen','minimax','openrouter','custom']){

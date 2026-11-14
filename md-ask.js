@@ -1672,12 +1672,15 @@ async function _pbpAskRun(question, aEl, opts) {
     // prior answer anchors on it and restates instead of re-answering.
     const promptHistory = (opts.replaceLast && st.rounds.length)
       ? st.rounds.slice(0, -1) : st.rounds;
-    const att = (opts.visionAttachment && typeof pbpAiSupportsVision === "function"
-      && pbpAiSupportsVision(runSettings, pbpAiResolveModelOverride(runSettings)))
-      ? opts.visionAttachment : null;
+    const reqAtt = opts.visionAttachment || null;
+    if (reqAtt && !(typeof pbpAiSupportsVision === "function"
+        && pbpAiSupportsVision(runSettings, pbpAiResolveModelOverride(runSettings)))) {
+      throw new Error(t("visionModelUnsupported"));
+    }
+    const att = reqAtt;
     let imgPayload = null;
     if (att) {
-      imgPayload = att.resolved || (att.resolved = await _pbpVisionLoadImage(att.el, att.src, st.url));
+      imgPayload = att.resolved || (att.resolved = await _pbpVisionLoadImage(att.el, att.src, st.url, { signal: runCtrl.signal }));
       if (runCtrl.signal.aborted) {
         const abortedErr = new Error("aborted");
         abortedErr.name = "AbortError";
@@ -1882,26 +1885,40 @@ async function _pbpAskSend() {
   if (!st || st.running) return;
   const ta = document.getElementById("ask-input");
   const rawQ = ta ? ta.value.trim() : "";
-  const att = (st.attachedImage && typeof pbpAiSupportsVision === "function"
-    && pbpAiSupportsVision(st.s, pbpAiResolveModelOverride(st.s)))
-    ? st.attachedImage : null;
+  const sendRev = _pbpAskArticleRev;
+  const initialAttached = st.attachedImage || null;
+  const visionSupported = typeof pbpAiSupportsVision === "function"
+    && pbpAiSupportsVision(st.s, pbpAiResolveModelOverride(st.s));
+  if (initialAttached && !visionSupported) {
+    _pbpAskSetAttachedImage(null);
+    return;
+  }
+  const att = initialAttached && visionSupported ? initialAttached : null;
   const userQ = rawQ || (att ? t("visionAskDefaultQuestion") : "");
   if (!userQ) { if (ta) ta.focus(); return; }
   if (!pbpAiAvailable(st.s)) return;
   if (_pbpAskArchiveEnabled()) {
     const revision = st.archiveRev || 0;
     try { await _pbpAskLoadArchive(st); } catch (_) { return; }
-    if (st !== _pbpAskState || (st.archiveRev || 0) !== revision || st.running || st.archiveMissing) return;
+    if (st !== _pbpAskState || _pbpAskArticleRev !== sendRev || (st.archiveRev || 0) !== revision
+        || st.running || st.archiveMissing || !pbpAiAvailable(st.s)
+        || (st.attachedImage || null) !== initialAttached) return;
+    if (att && !(typeof pbpAiSupportsVision === "function"
+        && pbpAiSupportsVision(st.s, pbpAiResolveModelOverride(st.s)))) {
+      _pbpAskSetAttachedImage(null);
+      return;
+    }
   }
+  const boundedUserQ = userQ.slice(0, 4000);
   const question = att
-    ? ("[" + _pbpVisionPrefixText(att.label) + "] " + userQ).slice(0, 4000)
-    : userQ;
+    ? "[" + _pbpVisionPrefixText(att.label) + "] " + boundedUserQ
+    : boundedUserQ;
   _pbpAskUpdateMeta(); // refresh the transparency line BEFORE the request
   const aEl = _pbpAskAppendRound(question);
   if (!aEl) return;
   if (ta) ta.value = "";
-  if (st.attachedImage) _pbpAskSetAttachedImage(null);
-  await _pbpAskRun(question, aEl, { newRound: true, visionAttachment: att, rawQuestion: userQ });
+  if (att && st.attachedImage === att) _pbpAskSetAttachedImage(null);
+  await _pbpAskRun(question, aEl, { newRound: true, visionAttachment: att, rawQuestion: boundedUserQ });
 }
 
 // ============================================================
@@ -2846,17 +2863,25 @@ function _pbpAskAddVersions(el) {
 
 function _pbpAskSyncRegenerate() {
   const btns = Array.from(document.querySelectorAll("#ask-thread .ask-regenerate"));
+  const visionOk = !!(_pbpAskState && typeof pbpAiSupportsVision === "function"
+    && pbpAiSupportsVision(_pbpAskState.s, pbpAiResolveModelOverride(_pbpAskState.s)));
   btns.forEach((btn, i) => {
     const latest = i === btns.length - 1;
     btn.hidden = !latest;
-    const unsaved = _pbpAskUnpersisted.some(item => item.record === btn.closest(".ask-a")?._askExportRecord);
-    btn.disabled = !latest || !_pbpAskState || !pbpAiAvailable(_pbpAskState.s) || (_pbpAskArchiveEnabled() && unsaved);
+    const aEl = btn.closest(".ask-a");
+    const unsaved = _pbpAskUnpersisted.some(item => item.record === aEl?._askExportRecord);
+    const visionBlocked = !!(aEl && aEl._askVisionAttachment && !visionOk);
+    btn.disabled = !latest || !_pbpAskState || !pbpAiAvailable(_pbpAskState.s) || (_pbpAskArchiveEnabled() && unsaved) || visionBlocked;
+    if (visionBlocked) btn.title = t("visionModelUnsupported");
+    else btn.removeAttribute("title");
   });
 }
 
 function _pbpAskRegenerate(el) {
   const st = _pbpAskState;
   if (!st || st.running || !pbpAiAvailable(st.s) || st.archiveMissing || st.archiveError || !el || !el.dataset.askQuestion) return;
+  if (el._askVisionAttachment && !(typeof pbpAiSupportsVision === "function"
+      && pbpAiSupportsVision(st.s, pbpAiResolveModelOverride(st.s)))) return;
   if (_pbpAskArchiveEnabled() && _pbpAskUnpersisted.some(item => item.record === el._askExportRecord)) return;
   // On a bubble whose last Regenerate failed, the real old answer is the
   // marked one: the current children also hold that failure's error bar and
@@ -3347,9 +3372,27 @@ function _pbpVisionBytesToBase64(bytes) {
   return btoa(bin);
 }
 
-function _pbpVisionEncodeCanvas(source, srcW, srcH, preferredMime) {
+function _pbpVisionThrowIfAborted(signal) {
+  if (signal && signal.aborted) {
+    const err = new Error("aborted");
+    err.name = "AbortError";
+    throw err;
+  }
+}
+
+function _pbpVisionCanvasBg() {
+  if (typeof document !== "undefined" && document.body && typeof getComputedStyle === "function") {
+    const bg = String(getComputedStyle(document.body).backgroundColor || "").trim();
+    if (bg && bg !== "transparent" && bg !== "rgba(0, 0, 0, 0)") return bg;
+  }
+  return "#ffffff";
+}
+
+function _pbpVisionEncodeCanvas(source, srcW, srcH, preferredMime, opts) {
+  const fillBg = opts && opts.fillBg ? String(opts.fillBg) : "";
+  const firstMime = preferredMime === "image/png" ? "image/png" : "image/webp";
   const attempts = [
-    { scale: 1, mime: preferredMime === "image/png" ? "image/png" : "image/webp", quality: 0.86 },
+    { scale: 1, mime: firstMime, quality: 0.86 },
     { scale: 1, mime: "image/jpeg", quality: 0.82 },
     { scale: 1, mime: "image/jpeg", quality: 0.68 },
     { scale: 0.7, mime: "image/jpeg", quality: 0.68 }
@@ -3363,13 +3406,13 @@ function _pbpVisionEncodeCanvas(source, srcW, srcH, preferredMime) {
     canvas.height = h;
     const ctx = canvas.getContext("2d");
     if (!ctx) break;
-    if (attempt.mime === "image/jpeg") {
-      ctx.fillStyle = "#ffffff";
+    if (attempt.mime === "image/jpeg" || fillBg) {
+      ctx.fillStyle = fillBg || "#ffffff";
       ctx.fillRect(0, 0, w, h);
     }
     ctx.drawImage(source, 0, 0, w, h);
     const dataUrl = canvas.toDataURL(attempt.mime, attempt.quality);
-    const m = dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,(.+)$/i);
+    const m = dataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/i);
     if (!m) continue;
     const base64 = m[2].replace(/\s+/g, "");
     if (_pbpVisionBase64Bytes(base64) <= PBP_VISION_MAX_BYTES) {
@@ -3377,6 +3420,89 @@ function _pbpVisionEncodeCanvas(source, srcW, srcH, preferredMime) {
     }
   }
   throw new Error(t("visionImageTooLarge"));
+}
+
+async function _pbpVisionDecodeSvgDataUri(dataUri, signal) {
+  _pbpVisionThrowIfAborted(signal);
+  const img = await new Promise((resolve, reject) => {
+    const el = new Image();
+    let settled = false;
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      el.src = "";
+      const err = new Error("aborted");
+      err.name = "AbortError";
+      reject(err);
+    };
+    if (signal) {
+      if (signal.aborted) { onAbort(); return; }
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+    el.onload = () => {
+      if (settled) return;
+      settled = true;
+      if (signal) signal.removeEventListener("abort", onAbort);
+      resolve(el);
+    };
+    el.onerror = () => {
+      if (settled) return;
+      settled = true;
+      if (signal) signal.removeEventListener("abort", onAbort);
+      reject(new Error(t("visionImageLoadFailed")));
+    };
+    el.src = dataUri;
+  });
+  return {
+    source: img,
+    width: img.naturalWidth || img.width || 800,
+    height: img.naturalHeight || img.height || 600
+  };
+}
+
+async function _pbpVisionTryFetchSvg(href, signal) {
+  const ctl = new AbortController();
+  const onParentAbort = () => ctl.abort();
+  if (signal) {
+    if (signal.aborted) _pbpVisionThrowIfAborted(signal);
+    signal.addEventListener("abort", onParentAbort, { once: true });
+  }
+  const timer = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const resp = await fetch(href, {
+      signal: ctl.signal,
+      credentials: "omit",
+      cache: "force-cache",
+      redirect: "error"
+    });
+    if (!resp.ok) return null;
+    const mime = (resp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (mime !== "image/svg+xml") return null;
+    const xml = await resp.text();
+    if (!xml || xml.length > 512 * 1024) return null;
+    let safeXml = xml;
+    if (typeof document !== "undefined" && typeof _pbpSanitizeSvgForImage === "function" && typeof _pbpSvgDims === "function") {
+      const doc = document.implementation.createHTMLDocument("");
+      const wrap = doc.createElement("div");
+      wrap.innerHTML = xml;
+      const svg = wrap.querySelector("svg");
+      if (!svg) return null;
+      const dims = _pbpSvgDims(svg) || { w: 800, h: 600 };
+      safeXml = _pbpSanitizeSvgForImage(svg, dims);
+      if (!safeXml) return null;
+    }
+    const b64 = typeof pbpB64Utf8 === "function"
+      ? pbpB64Utf8(safeXml)
+      : _pbpVisionBytesToBase64(new TextEncoder().encode(safeXml));
+    const decoded = await _pbpVisionDecodeSvgDataUri("data:image/svg+xml;base64," + b64, signal);
+    return _pbpVisionEncodeCanvas(decoded.source, decoded.width, decoded.height, "image/png", { fillBg: _pbpVisionCanvasBg() });
+  } catch (e) {
+    if (e && e.name === "AbortError" && signal && signal.aborted) throw e;
+    return null;
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener("abort", onParentAbort);
+  }
 }
 
 async function _pbpVisionDecodeBlob(blob) {
@@ -3405,30 +3531,51 @@ async function _pbpVisionDecodeBlob(blob) {
   }
 }
 
-async function _pbpVisionLoadImage(imgEl, srcUrl, pageUrl) {
+async function _pbpVisionLoadImage(imgEl, srcUrl, pageUrl, opts) {
+  const signal = opts && opts.signal ? opts.signal : null;
+  _pbpVisionThrowIfAborted(signal);
   const raw = String(srcUrl || (imgEl && (imgEl.currentSrc || imgEl.getAttribute("src"))) || "").trim();
   if (!raw) throw new Error(t("visionImageLoadFailed"));
+
+  if (/^data:image\/svg\+xml(?:;[^,]*)?,/i.test(raw)) {
+    if (imgEl && imgEl.complete && (imgEl.naturalWidth > 0 || imgEl.width > 0)) {
+      return _pbpVisionEncodeCanvas(
+        imgEl,
+        imgEl.naturalWidth || imgEl.width || 800,
+        imgEl.naturalHeight || imgEl.height || 600,
+        "image/png",
+        { fillBg: _pbpVisionCanvasBg() }
+      );
+    }
+    const svgDecoded = await _pbpVisionDecodeSvgDataUri(raw, signal);
+    return _pbpVisionEncodeCanvas(svgDecoded.source, svgDecoded.width, svgDecoded.height, "image/png", { fillBg: _pbpVisionCanvasBg() });
+  }
 
   const dataMatch = raw.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=\s]+)$/i);
   if (dataMatch) {
     const mimeType = dataMatch[1].toLowerCase();
     const base64 = dataMatch[2].replace(/\s+/g, "");
     const byteLen = _pbpVisionBase64Bytes(base64);
+    // Transcode GIF to static PNG so Gemini (no GIF support) and OpenAI
+    // (rejects animated GIFs) receive a universally supported raster format.
+    const needsTranscode = mimeType === "image/gif";
+    const targetMime = needsTranscode ? "image/png" : mimeType;
     if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
-      if (imgEl.naturalWidth <= PBP_VISION_MAX_DIM && imgEl.naturalHeight <= PBP_VISION_MAX_DIM && byteLen <= PBP_VISION_MAX_BYTES) {
+      if (!needsTranscode && imgEl.naturalWidth <= PBP_VISION_MAX_DIM && imgEl.naturalHeight <= PBP_VISION_MAX_DIM && byteLen <= PBP_VISION_MAX_BYTES) {
         return { mimeType, base64 };
       }
-      return _pbpVisionEncodeCanvas(imgEl, imgEl.naturalWidth, imgEl.naturalHeight, mimeType);
+      return _pbpVisionEncodeCanvas(imgEl, imgEl.naturalWidth, imgEl.naturalHeight, targetMime);
     }
     const bin = atob(base64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     const decoded = await _pbpVisionDecodeBlob(new Blob([bytes], { type: mimeType }));
     try {
-      if (decoded.width <= PBP_VISION_MAX_DIM && decoded.height <= PBP_VISION_MAX_DIM && byteLen <= PBP_VISION_MAX_BYTES) {
+      _pbpVisionThrowIfAborted(signal);
+      if (!needsTranscode && decoded.width <= PBP_VISION_MAX_DIM && decoded.height <= PBP_VISION_MAX_DIM && byteLen <= PBP_VISION_MAX_BYTES) {
         return { mimeType, base64 };
       }
-      return _pbpVisionEncodeCanvas(decoded.source, decoded.width, decoded.height, mimeType);
+      return _pbpVisionEncodeCanvas(decoded.source, decoded.width, decoded.height, targetMime);
     } finally {
       decoded.close();
     }
@@ -3440,7 +3587,10 @@ async function _pbpVisionLoadImage(imgEl, srcUrl, pageUrl) {
 
   let u;
   try { u = new URL(raw, pageUrl || (typeof location !== "undefined" ? location.href : undefined)); }
-  catch (_) { throw new Error(t("visionImageLoadFailed")); }
+  catch (_) {
+    // swallow-ok: invalid image URL maps to localized vision load error
+    throw new Error(t("visionImageLoadFailed"));
+  }
   const originPattern = typeof pbpEndpointOriginPattern === "function"
     ? pbpEndpointOriginPattern(u.href)
     : (u.protocol === "https:" ? u.origin + "/*" : null);
@@ -3448,6 +3598,7 @@ async function _pbpVisionLoadImage(imgEl, srcUrl, pageUrl) {
 
   if (typeof chrome !== "undefined" && chrome.permissions && typeof chrome.permissions.contains === "function") {
     const granted = await chrome.permissions.contains({ origins: [originPattern] });
+    _pbpVisionThrowIfAborted(signal);
     if (!granted) {
       const permErr = new Error(t("aiErrorHostPermission", u.origin));
       permErr.code = "host_permission";
@@ -3464,12 +3615,14 @@ async function _pbpVisionLoadImage(imgEl, srcUrl, pageUrl) {
   let got = null;
   if (typeof _pbpEmbedFetchOne === "function" && typeof pbpEmbedBudget === "function") {
     got = await _pbpEmbedFetchOne(u.href, pbpEmbedBudget(maxFetchBytes), fetchLimits);
+    _pbpVisionThrowIfAborted(signal);
     if (!got && typeof pbpImgFixWithReferer === "function" && pageUrl) {
       const retryMap = await pbpImgFixWithReferer([u.href], pageUrl, fetchLimits, pbpEmbedBudget(maxFetchBytes));
+      _pbpVisionThrowIfAborted(signal);
       got = retryMap.get(u.href) || null;
     }
   } else {
-    const resp = await fetch(u.href, { credentials: "omit", redirect: "error" });
+    const resp = await fetch(u.href, { credentials: "omit", redirect: "error", ...(signal ? { signal } : {}) });
     if (resp.ok) {
       const mime = (resp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
       if (/^image\/(?:png|jpeg|webp|gif)$/.test(mime)) {
@@ -3478,16 +3631,24 @@ async function _pbpVisionLoadImage(imgEl, srcUrl, pageUrl) {
       }
     }
   }
-  if (!got || !got.bytes || !got.bytes.byteLength) throw new Error(t("visionImageLoadFailed"));
+  if (!got || !got.bytes || !got.bytes.byteLength) {
+    const svgRaster = await _pbpVisionTryFetchSvg(u.href, signal);
+    if (svgRaster) return svgRaster;
+    throw new Error(t("visionImageLoadFailed"));
+  }
+  _pbpVisionThrowIfAborted(signal);
 
-  const decoded = await _pbpVisionDecodeBlob(new Blob([got.bytes], { type: got.mime })).catch(() => {
+  const decoded = await _pbpVisionDecodeBlob(new Blob([got.bytes], { type: got.mime })).catch((err) => {
+    if (err && err.name === "AbortError") throw err;
     throw new Error(t("visionImageLoadFailed"));
   });
   try {
-    if (decoded.width <= PBP_VISION_MAX_DIM && decoded.height <= PBP_VISION_MAX_DIM && got.bytes.byteLength <= PBP_VISION_MAX_BYTES) {
+    _pbpVisionThrowIfAborted(signal);
+    const needsTranscode = got.mime === "image/gif";
+    if (!needsTranscode && decoded.width <= PBP_VISION_MAX_DIM && decoded.height <= PBP_VISION_MAX_DIM && got.bytes.byteLength <= PBP_VISION_MAX_BYTES) {
       return { mimeType: got.mime, base64: _pbpVisionBytesToBase64(got.bytes) };
     }
-    return _pbpVisionEncodeCanvas(decoded.source, decoded.width, decoded.height, got.mime);
+    return _pbpVisionEncodeCanvas(decoded.source, decoded.width, decoded.height, needsTranscode ? "image/png" : got.mime);
   } finally {
     decoded.close();
   }
@@ -3499,15 +3660,51 @@ function _pbpExplainVisionReady(s) {
     && pbpAiSupportsVision(s, typeof pbpAiResolveModelOverride === "function" ? pbpAiResolveModelOverride(s) : undefined));
 }
 
-function _pbpExplainOnImageClick(e) {
-  if (!_pbpExplainVisionReady(_pbpExplainSettings)) return;
-  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-  if (document.body.classList.contains("raw-active")) return;
-  const img = e.target && typeof e.target.closest === "function" ? e.target.closest("#rendered-view img") : null;
-  if (!img || img.closest("a[href]") || img.classList.contains("pbp-img-broken")) return;
-  const sel = typeof window.getSelection === "function" ? window.getSelection() : null;
-  if (sel && !sel.isCollapsed && String(sel.toString() || "").trim()) return;
-  if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0 && img.naturalWidth <= 2 && img.naturalHeight <= 2) return;
+function _pbpExplainEligibleImage(img) {
+  if (!img || img.tagName !== "IMG") return false;
+  if (!img.closest("#rendered-view") || img.closest("a[href]") || img.classList.contains("pbp-img-broken")) return false;
+  if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0 && img.naturalWidth <= 2 && img.naturalHeight <= 2) return false;
+  const rawSrc = String(img.currentSrc || img.getAttribute("src") || "").trim();
+  return !!rawSrc;
+}
+
+function _pbpExplainSyncImageA11y() {
+  if (typeof document === "undefined") return;
+  const view = document.getElementById("rendered-view");
+  if (!view) return;
+  const active = _pbpExplainVisionReady(_pbpExplainSettings)
+    && !(document.body && document.body.classList.contains("raw-active"));
+  for (const img of view.querySelectorAll("img")) {
+    const ok = active && _pbpExplainEligibleImage(img);
+    if (ok) {
+      if (!img.hasAttribute("tabindex")) {
+        img.setAttribute("tabindex", "0");
+        img.dataset.pbpVisionTab = "1";
+      }
+      img.setAttribute("aria-haspopup", "dialog");
+      if (!String(img.getAttribute("alt") || "").trim() && !img.hasAttribute("aria-label")) {
+        const src = String(img.currentSrc || img.getAttribute("src") || "").trim();
+        img.setAttribute("aria-label", pbpVisionImageLabel("", src, t("visionImageFallbackLabel")));
+        img.dataset.pbpVisionLabel = "1";
+      }
+    } else {
+      if (img.dataset.pbpVisionTab === "1") {
+        img.removeAttribute("tabindex");
+        delete img.dataset.pbpVisionTab;
+      }
+      if (img.getAttribute("aria-haspopup") === "dialog") {
+        img.removeAttribute("aria-haspopup");
+      }
+      if (img.dataset.pbpVisionLabel === "1") {
+        img.removeAttribute("aria-label");
+        delete img.dataset.pbpVisionLabel;
+      }
+    }
+  }
+}
+
+function _pbpExplainActivateImage(img, fromKeyboard = false) {
+  if (!_pbpExplainEligibleImage(img)) return;
   const view = document.getElementById("rendered-view");
   if (view && typeof pbpAiBlocks === "function" && !pbpAiBlocks().length && typeof pbpAiIndexBlocks === "function") {
     pbpAiIndexBlocks(view);
@@ -3530,7 +3727,42 @@ function _pbpExplainOnImageClick(e) {
     n,
     image: { el: img, src: rawSrc, alt, label }
   };
-  if (typeof _pbpExplainOpenPop === "function") _pbpExplainOpenPop(cap, "explain");
+  if (typeof _pbpExplainOpenPop === "function") {
+    _pbpExplainOpenPop(cap, "explain");
+    if (fromKeyboard && _pbpExplainPopEl && _pbpExplainPopEl.matches(":popover-open")) {
+      const explainBtn = _pbpExplainPopEl.querySelector('.xp-act[data-action="explain"]');
+      if (explainBtn) _pbpExplainFocusPreventScroll(explainBtn);
+    }
+  }
+}
+
+function _pbpExplainOnImageClick(e) {
+  if (!_pbpExplainVisionReady(_pbpExplainSettings)) return;
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  if (document.body.classList.contains("raw-active")) return;
+  const img = e.target && typeof e.target.closest === "function" ? e.target.closest("#rendered-view img") : null;
+  if (!_pbpExplainEligibleImage(img)) return;
+  const sel = typeof window.getSelection === "function" ? window.getSelection() : null;
+  if (sel && !sel.isCollapsed && String(sel.toString() || "").trim()) return;
+  _pbpExplainActivateImage(img, false);
+}
+
+function _pbpExplainOnImageKeydown(e) {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  if (!_pbpExplainVisionReady(_pbpExplainSettings)) return;
+  if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  if (document.body.classList.contains("raw-active")) return;
+  const img = e.target && e.target.tagName === "IMG" ? e.target : null;
+  if (!_pbpExplainEligibleImage(img)) return;
+  e.preventDefault();
+  _pbpExplainActivateImage(img, true);
+}
+
+function _pbpExplainOnImageAssetEvent(e) {
+  const tEl = e && e.target;
+  if (tEl && tEl.tagName === "IMG" && typeof tEl.closest === "function" && tEl.closest("#rendered-view")) {
+    _pbpExplainSyncImageA11y();
+  }
 }
 
 function pbpExplainRefreshSettings(s) {
@@ -3539,6 +3771,7 @@ function pbpExplainRefreshSettings(s) {
   if (typeof document !== "undefined" && document.body) {
     document.body.classList.toggle("vision-ready", _pbpExplainVisionReady(s));
   }
+  _pbpExplainSyncImageA11y();
   if (_pbpExplainCap && _pbpExplainCap.image && !_pbpExplainVisionReady(s)) {
     if (_pbpExplainAbort) { _pbpExplainAbort.abort(); _pbpExplainAbort = null; }
     if (_pbpExplainPopEl) _pbpExplainClose(_pbpExplainPopEl);
@@ -3555,6 +3788,9 @@ function pbpExplainInit(detail) {
     if (!_pbpExplainImgClickWired) {
       _pbpExplainImgClickWired = true;
       document.addEventListener("click", _pbpExplainOnImageClick);
+      document.addEventListener("keydown", _pbpExplainOnImageKeydown);
+      document.addEventListener("load", _pbpExplainOnImageAssetEvent, true);
+      document.addEventListener("error", _pbpExplainOnImageAssetEvent, true);
     }
 
     // Refresh the explain-translate target language live when the user
@@ -4996,12 +5232,16 @@ async function _pbpExplainRun(cap, ctx, pop) {
   let started = false;
   let pending = "";
   let rafId = 0;
-  const flush = () => { rafId = 0; stream.textContent = pending; };
+  const flush = () => {
+    rafId = 0;
+    if (ctrl.signal.aborted || _pbpExplainAbort !== ctrl) return;
+    stream.textContent = pending;
+  };
   try {
     let imgPayload = null;
     if (cap.image) {
-      imgPayload = cap._resolvedImage || (cap._resolvedImage = await _pbpVisionLoadImage(cap.image.el, cap.image.src, _pbpExplainPage.url));
-      if (ctrl.signal.aborted) return;
+      imgPayload = cap._resolvedImage || (cap._resolvedImage = await _pbpVisionLoadImage(cap.image.el, cap.image.src, _pbpExplainPage.url, { signal: ctrl.signal }));
+      if (ctrl.signal.aborted || _pbpExplainAbort !== ctrl) return;
     }
     // temperature intentionally omitted: callAIStream defaults to 0.3 (the
     // existing ask/explain default). maxTokens 1024 per spec 5.3.
@@ -5012,11 +5252,13 @@ async function _pbpExplainRun(cap, ctx, pop) {
       signal: ctrl.signal,
       ...(imgPayload ? { images: [imgPayload] } : {})
     }, (delta, acc) => {
+      if (ctrl.signal.aborted || _pbpExplainAbort !== ctrl) return;
       if (!started) { started = true; body.replaceChildren(stream); }
       pending = acc; // markers can split across chunks: always render the accumulated text
       if (!rafId) rafId = requestAnimationFrame(flush); // rAF-throttled DOM writes
     });
     if (rafId) cancelAnimationFrame(rafId);
+    if (ctrl.signal.aborted || _pbpExplainAbort !== ctrl) return;
     // Final pass through the single sanitize point (renderMarkdown =
     // marked + DOMPurify, md-convert.js). Never innerHTML raw model text.
     const md = document.createElement("div");
@@ -5032,7 +5274,7 @@ async function _pbpExplainRun(cap, ctx, pop) {
     if (!cap.image && typeof window.pbpHlAttachNote === "function") save.hidden = false;
   } catch (e) {
     if (rafId) cancelAnimationFrame(rafId);
-    if (e && e.name === "AbortError") return; // closed or re-invoked: silent
+    if ((e && e.name === "AbortError") || ctrl.signal.aborted || _pbpExplainAbort !== ctrl) return; // closed or superseded: silent
     const wrap = document.createElement("div");
     wrap.className = "xp-error";
     const msg = document.createElement("p");
@@ -5247,6 +5489,9 @@ function _pbpAskOnArticleWillReplace(detail) {
 }
 
 function _pbpAskOnArticleReplaced(detail) {
+  if (detail && detail.url) _pbpExplainPage.url = detail.url;
+  if (detail && detail.title) _pbpExplainPage.title = detail.title;
+  _pbpExplainSyncImageA11y();
   // Runs after md-preview.js rebuilt the AI block index, so a chip's [Pn] would
   // now resolve against the NEW article: mark every existing chip stale before
   // the reader can click one.

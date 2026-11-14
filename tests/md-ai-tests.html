@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="1175"><title>md-preview AI Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="1179"><title>md-preview AI Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1200px; }
 h2 { margin-top: 24px; font-size: 16px; }
@@ -16095,6 +16095,9 @@ suite("Reader Vision pure helpers (P1-C)", () => {
       if (!_pbpExplainImgClickWired) {
         _pbpExplainImgClickWired = true;
         document.addEventListener("click", _pbpExplainOnImageClick);
+        document.addEventListener("keydown", _pbpExplainOnImageKeydown);
+        document.addEventListener("load", _pbpExplainOnImageAssetEvent, true);
+        document.addEventListener("error", _pbpExplainOnImageAssetEvent, true);
       }
       assert(document.body.classList.contains("vision-ready"), "vision-ready class set for deepseek-flash");
 
@@ -16170,6 +16173,260 @@ suite("Reader Vision pure helpers (P1-C)", () => {
       assert(savedQ.includes("Q3 Chart") && savedQ.includes("What does this bar show?"), "plain-text image prefix in record.q");
       assert(!JSON.stringify(_pbpAskState.records).includes(streamCalls[0].opts.images[0].base64.slice(0, 24)), "zero base64 stored in Ask records");
     } finally {
+      if (_pbpAskIsOpen()) _pbpAskSetOpen(false);
+      if (_pbpReaderPanel) { _pbpReaderPanel.remove(); _pbpReaderPanel = null; }
+      document.getElementById("ask-section")?.remove();
+      window.pbpAskOpenPanel = oldAskOpenPanel;
+      _pbpAskState = oldAskState;
+      window.callAIStream = oldStream;
+      window.pbpAiGetSettings = oldGetSettings;
+      rail.remove();
+      view.remove();
+    }
+  });
+
+  await atest("_pbpVisionLoadImage rasterizes SVG data URI and remote SVG to PNG and transcodes GIF to static PNG", async () => {
+    const svgXml = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="24" viewBox="0 0 32 24"><rect width="32" height="24" fill="#1e88e5"/><circle cx="16" cy="12" r="6" fill="#ffffff"/></svg>';
+    const svgDataUri = "data:image/svg+xml;base64," + btoa(svgXml);
+    const svgOut = await _pbpVisionLoadImage(null, svgDataUri, "https://example.com/post");
+    assertEq(svgOut.mimeType, "image/png", "SVG data URI rasterized to PNG");
+    assert(svgOut.base64.length > 20, "SVG PNG base64 non-empty");
+
+    const gifDataUri = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    const gifOut = await _pbpVisionLoadImage(null, gifDataUri, "https://example.com/post");
+    assertEq(gifOut.mimeType, "image/png", "GIF transcoded to static PNG");
+    assert(gifOut.base64.length > 20, "GIF PNG base64 non-empty");
+
+    const oldPerms = chrome.permissions;
+    const oldFetch = window.fetch;
+    chrome.permissions = { contains: async () => true };
+    window.fetch = async () => new Response(svgXml, {
+      status: 200,
+      headers: { "content-type": "image/svg+xml; charset=utf-8" }
+    });
+    try {
+      const remoteSvg = await _pbpVisionLoadImage(null, "https://svg.example.org/arch.svg", "https://example.com/post");
+      assertEq(remoteSvg.mimeType, "image/png", "remote SVG rasterized to PNG");
+      assert(remoteSvg.base64.length > 20, "remote SVG base64 non-empty");
+    } finally {
+      chrome.permissions = oldPerms;
+      window.fetch = oldFetch;
+    }
+  });
+
+  await atest("stale _pbpVisionLoadImage failure on superseded popover run never overwrites newer image explanation", async () => {
+    const view = document.createElement("article");
+    view.id = "rendered-view";
+    const fastPng = makePngDataUrl(24, 24);
+    view.innerHTML =
+      '<figure data-pb="1"><img id="vis-race-a" alt="Slow diagram" src="' + fastPng + '"></figure>' +
+      '<figure data-pb="2"><img id="vis-race-b" alt="Fast diagram" src="' + fastPng + '"></figure>';
+    document.body.appendChild(view);
+    Object.defineProperty(document.getElementById("vis-race-a"), "currentSrc", {
+      value: "https://slow.example.org/a.png",
+      configurable: true
+    });
+    const oldPerms = chrome.permissions;
+    const oldFetch = window.fetch;
+    const oldStream = window.callAIStream;
+    const oldSettings = _pbpExplainSettings;
+    const oldAiOk = _pbpExplainAiOk;
+    let rejectSlow = null;
+    chrome.permissions = { contains: async () => true };
+    window.fetch = () => new Promise((_, reject) => {
+      rejectSlow = () => reject(new Error("late network failure"));
+    });
+    window.callAIStream = async (_s, _p, _o, onDelta) => {
+      onDelta("Fast image explanation.", "Fast image explanation.");
+      return "Fast image explanation.";
+    };
+    try {
+      await new Promise((r) => setTimeout(r, 25));
+      pbpAiIndexBlocks(view);
+      pbpExplainRefreshSettings({ aiProvider: "deepseek", deepseekApiKey: "sk-test", deepseekModel: "deepseek-flash" });
+      document.getElementById("vis-race-a").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+      await new Promise((r) => setTimeout(r, 15));
+      document.getElementById("vis-race-b").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+      await new Promise((r) => setTimeout(r, 40));
+      if (rejectSlow) rejectSlow();
+      await new Promise((r) => setTimeout(r, 25));
+      const pop = document.getElementById("explain-pop");
+      assert(!!pop && pop.matches(":popover-open"), "popover stays open for run B");
+      assert(!pop.querySelector(".xp-error"), "stale run A error did not overwrite run B");
+      assert(pop.querySelector(".xp-body").textContent.includes("Fast image explanation."), "run B explanation intact");
+    } finally {
+      if (_pbpExplainPopEl) {
+        _pbpExplainClose(_pbpExplainPopEl);
+        _pbpExplainPopEl.remove();
+        _pbpExplainPopEl = null;
+      }
+      _pbpExplainCap = null;
+      _pbpExplainCtx = null;
+      chrome.permissions = oldPerms;
+      window.fetch = oldFetch;
+      window.callAIStream = oldStream;
+      pbpExplainRefreshSettings(oldSettings || { aiProvider: "deepseek", deepseekApiKey: "" });
+      _pbpExplainAiOk = oldAiOk;
+      view.remove();
+    }
+  });
+
+  await atest("keyboard Enter activates eligible #rendered-view img, focuses Explain tab, and Escape restores focus", async () => {
+    const view = document.createElement("article");
+    view.id = "rendered-view";
+    const dataUrl = makePngDataUrl(24, 24);
+    const tinyUrl = makePngDataUrl(1, 1);
+    view.innerHTML =
+      '<figure data-pb="1"><img id="vis-kb-good" src="' + dataUrl + '"></figure>' +
+      '<p data-pb="2"><a href="https://example.com"><img id="vis-kb-linked" alt="Linked" src="' + dataUrl + '"></a>' +
+      '<img id="vis-kb-tiny" alt="Dot" src="' + tinyUrl + '"></p>';
+    document.body.appendChild(view);
+    const oldStream = window.callAIStream;
+    const oldSettings = _pbpExplainSettings;
+    const oldAiOk = _pbpExplainAiOk;
+    window.callAIStream = async (_s, _p, _o, onDelta) => {
+      onDelta("Keyboard explanation.", "Keyboard explanation.");
+      return "Keyboard explanation.";
+    };
+    try {
+      await new Promise((r) => setTimeout(r, 30));
+      pbpAiIndexBlocks(view);
+      if (!_pbpExplainImgClickWired) {
+        _pbpExplainImgClickWired = true;
+        document.addEventListener("click", _pbpExplainOnImageClick);
+        document.addEventListener("keydown", _pbpExplainOnImageKeydown);
+        document.addEventListener("load", _pbpExplainOnImageAssetEvent, true);
+        document.addEventListener("error", _pbpExplainOnImageAssetEvent, true);
+      }
+      pbpExplainRefreshSettings({ aiProvider: "openai", openaiApiKey: "sk-test", openaiModel: "gpt-5.4-nano" });
+      const goodImg = document.getElementById("vis-kb-good");
+      const linkedImg = document.getElementById("vis-kb-linked");
+      const tinyImg = document.getElementById("vis-kb-tiny");
+      assertEq(goodImg.getAttribute("tabindex"), "0", "eligible image gets tabindex=0");
+      assertEq(goodImg.getAttribute("aria-haspopup"), "dialog", "eligible image gets aria-haspopup=dialog");
+      assert(!!goodImg.getAttribute("aria-label"), "alt-less eligible image gets fallback aria-label");
+      assert(!linkedImg.hasAttribute("tabindex"), "linked image excluded from tabindex");
+      assert(!tinyImg.hasAttribute("tabindex"), "1x1 image excluded from tabindex");
+
+      goodImg.focus();
+      goodImg.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      await new Promise((r) => setTimeout(r, 40));
+      const pop = document.getElementById("explain-pop");
+      assert(!!pop && pop.matches(":popover-open"), "Enter opened explain-pop");
+      assertEq(document.activeElement, pop.querySelector('.xp-act[data-action="explain"]'), "focus moved into Explain tab");
+
+      pop.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      assert(!pop.matches(":popover-open"), "Escape closed explain-pop");
+      assertEq(document.activeElement, goodImg, "Escape restored focus to image");
+    } finally {
+      if (_pbpExplainPopEl) {
+        _pbpExplainClose(_pbpExplainPopEl);
+        _pbpExplainPopEl.remove();
+        _pbpExplainPopEl = null;
+      }
+      _pbpExplainCap = null;
+      _pbpExplainCtx = null;
+      window.callAIStream = oldStream;
+      pbpExplainRefreshSettings(oldSettings || { aiProvider: "deepseek", deepseekApiKey: "" });
+      _pbpExplainAiOk = oldAiOk;
+      view.remove();
+    }
+  });
+
+  await atest("Ask vision guards: 4000-char question preserved, archive-await attachment swap bails cleanly, and non-vision switch fails closed", async () => {
+    const view = document.createElement("article");
+    view.id = "rendered-view";
+    view.innerHTML = '<p data-pb="1">Baseline latency is 12 ms.</p>';
+    const rail = document.createElement("aside");
+    rail.id = "rail";
+    rail.innerHTML = '<div class="view-toggle"></div>';
+    document.body.append(rail, view);
+
+    const oldStream = window.callAIStream;
+    const oldGetSettings = window.pbpAiGetSettings;
+    const oldAskState = _pbpAskState;
+    const oldAskOpenPanel = window.pbpAskOpenPanel;
+    const oldArchiveMigrate = window.pbpAskArchiveMigrate;
+    const oldArchiveRead = window.pbpAskArchiveRead;
+    let liveSettings = { aiProvider: "deepseek", deepseekApiKey: "sk-test", deepseekModel: "deepseek-flash" };
+    window.pbpAiGetSettings = async () => liveSettings;
+    let shouldFailStream = false;
+    const streamCalls = [];
+    window.callAIStream = async (s, prompt, opts, onDelta) => {
+      streamCalls.push({ s, prompt, opts });
+      if (shouldFailStream) throw new Error("network glitch");
+      const ans = 'Latency is 12 ms [P1].\n\nCITES:\nP1: "Baseline latency is 12 ms."';
+      onDelta(ans, ans);
+      return ans;
+    };
+    try {
+      _pbpAskState = null;
+      pbpAiIndexBlocks(view);
+      await pbpAskInit({ url: "https://example.com/vision-guards", title: "Latency", account: "tester" });
+      const pngA = makePngDataUrl(20, 20);
+      const pngB = makePngDataUrl(22, 22);
+
+      // 1) 4000-char user question keeps full 4000 chars after [Image: ...] prefix
+      pbpAskAttachImage({ el: null, src: pngA, alt: "Chart A", label: "Chart A" });
+      const ta = document.getElementById("ask-input");
+      const longUserQ = "q".repeat(4000);
+      ta.value = longUserQ + "EXTRA";
+      await _pbpAskSend();
+      assertEq(streamCalls.length, 1, "long question sent");
+      const savedLongQ = _pbpAskState.records[0].q;
+      assert(savedLongQ.endsWith(longUserQ) && !savedLongQ.includes("EXTRA"), "user question capped at 4000 before prefix, never truncated by prefix");
+
+      // 2) Switching to text-only deepseek-v4-pro disables Regenerate on vision round
+      const regenBtn = document.querySelector("#ask-thread .ask-regenerate");
+      assert(!!regenBtn && regenBtn.disabled === false, "Regenerate enabled on deepseek-flash");
+      liveSettings = { aiProvider: "deepseek", deepseekApiKey: "sk-test", deepseekModel: "deepseek-v4-pro" };
+      pbpAskRefreshSettings(liveSettings);
+      assertEq(regenBtn.disabled, true, "Regenerate disabled after switching to deepseek-v4-pro");
+      assertEq(regenBtn.title, t("visionModelUnsupported"), "Regenerate tooltip explains vision unsupported");
+
+      // 3) Failed vision round + switch to text-only model fails closed on Retry (never drops image)
+      liveSettings = { aiProvider: "deepseek", deepseekApiKey: "sk-test", deepseekModel: "deepseek-flash" };
+      pbpAskRefreshSettings(liveSettings);
+      shouldFailStream = true;
+      pbpAskAttachImage({ el: null, src: pngA, alt: "Chart Retry", label: "Chart Retry" });
+      ta.value = "Explain retry chart";
+      await _pbpAskSend();
+      assertEq(streamCalls.length, 2, "initial failed attempt hit callAIStream");
+      liveSettings = { aiProvider: "deepseek", deepseekApiKey: "sk-test", deepseekModel: "deepseek-v4-pro" };
+      pbpAskRefreshSettings(liveSettings);
+      shouldFailStream = false;
+      const retryBtns = document.querySelectorAll("#ask-thread .ask-retry");
+      const lastRetry = retryBtns[retryBtns.length - 1];
+      assert(!!lastRetry, "Retry button rendered");
+      lastRetry.click();
+      await new Promise((r) => setTimeout(r, 35));
+      assertEq(streamCalls.length, 2, "Retry failed closed before calling callAIStream without image");
+      const bubbles = document.querySelectorAll("#ask-thread .ask-a");
+      assert(bubbles[bubbles.length - 1].querySelector(".ask-err")?.textContent.includes(t("visionModelUnsupported")), "visionModelUnsupported error rendered on Retry");
+
+      // 4) Archive-await race: swapping attached image while _pbpAskLoadArchive awaits bails without clearing new attachment
+      liveSettings = { aiProvider: "deepseek", deepseekApiKey: "sk-test", deepseekModel: "deepseek-flash" };
+      pbpAskRefreshSettings(liveSettings);
+      let releaseArchive = null;
+      _pbpAskState.archiveReady = null;
+      window.pbpAskArchiveMigrate = async () => {};
+      window.pbpAskArchiveRead = () => new Promise((resolve) => { releaseArchive = () => resolve([]); });
+      const att1 = { el: null, src: pngA, alt: "First", label: "First" };
+      const att2 = { el: null, src: pngB, alt: "Second", label: "Second" };
+      pbpAskAttachImage(att1);
+      ta.value = "Race question";
+      const pendingSend = _pbpAskSend();
+      await new Promise((r) => setTimeout(r, 15));
+      pbpAskAttachImage(att2);
+      if (releaseArchive) releaseArchive();
+      await pendingSend;
+      assertEq(streamCalls.length, 2, "stale send bailed after attachment changed during archive await");
+      assertEq(_pbpAskState.attachedImage, att2, "newer attachment preserved");
+    } finally {
+      if (oldArchiveMigrate === undefined) delete window.pbpAskArchiveMigrate;
+      else window.pbpAskArchiveMigrate = oldArchiveMigrate;
+      if (oldArchiveRead === undefined) delete window.pbpAskArchiveRead;
+      else window.pbpAskArchiveRead = oldArchiveRead;
       if (_pbpAskIsOpen()) _pbpAskSetOpen(false);
       if (_pbpReaderPanel) { _pbpReaderPanel.remove(); _pbpReaderPanel = null; }
       document.getElementById("ask-section")?.remove();

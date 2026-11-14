@@ -2036,6 +2036,10 @@ html.motion-ready .msg-bar[data-state="busy"] { animation: msg-bar-busy-pulse 1.
 body.vision-ready:not(.raw-active) #rendered-view img:not(.pbp-img-broken) {
   cursor: pointer;
 }
+body.vision-ready:not(.raw-active) #rendered-view img[tabindex="0"]:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
 
 /* `scroll-behavior` is deliberately absent -- it cannot reach these calls; the
    guard lives in pbpScrollIntoView (shared.js). */
@@ -5204,5 +5208,6 @@ body.raw-active #reader-bookmark-footer { display: none; }
   .reader-check > svg { display: none; }
   .reader-check > input:focus-visible,
   #reader-bookmark-editor input:focus-visible,
-  #reader-bookmark-editor textarea:focus-visible { outline-color: Highlight; }
+  #reader-bookmark-editor textarea:focus-visible,
+  body.vision-ready:not(.raw-active) #rendered-view img[tabindex="0"]:focus-visible { outline-color: Highlight; }
 }

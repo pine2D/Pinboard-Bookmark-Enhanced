@@ -980,8 +980,9 @@ function _aiNormalizeImages(opts) {
 }
 
 // Reader click-image multimodal support: enabled only for the four vision
-// providers (gemini, openai, claude, and deepseek on deepseek-flash or newer
-// vision models; retired text-only deepseek-chat/deepseek-reasoner excluded).
+// providers (gemini, openai, claude, and deepseek exclusively on
+// deepseek-flash; text-only DeepSeek models such as deepseek-v4-pro,
+// deepseek-chat, and deepseek-reasoner return false).
 function pbpAiSupportsVision(s, modelOverride) {
   const target = pbpAiResolveTarget(s);
   if (!target || target.error || !target.apiKey) return false;
@@ -989,7 +990,8 @@ function pbpAiSupportsVision(s, modelOverride) {
   if (p === "gemini" || p === "openai" || p === "claude") return true;
   if (p === "deepseek") {
     const m = String(modelOverride || target.model || "").trim().toLowerCase();
-    return m !== "deepseek-chat" && m !== "deepseek-reasoner";
+    const visionModel = String((OPENAI_COMPAT_PROVIDERS.deepseek && OPENAI_COMPAT_PROVIDERS.deepseek.defaultModel) || "").trim().toLowerCase();
+    return !!visionModel && m === visionModel;
   }
   return false;
 }

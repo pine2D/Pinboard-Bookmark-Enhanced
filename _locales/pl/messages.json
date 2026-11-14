@@ -5507,5 +5507,6 @@
   "visionAskRemoveImage": {"message":"Usuń załączony obraz"},
   "visionAskDefaultQuestion": {"message":"Co przedstawia ten obraz w kontekście artykułu?"},
   "visionImageLoadFailed": {"message":"Nie udało się wczytać tego obrazu do analizy przez AI."},
-  "visionImageTooLarge": {"message":"Ten obraz jest za duży do wysłania (ponad 4 MB po zmniejszeniu)."}
+  "visionImageTooLarge": {"message":"Ten obraz jest za duży do wysłania (ponad 4 MB po zmniejszeniu)."},
+  "visionModelUnsupported": {"message":"Bieżący model AI nie obsługuje obrazów. Przełącz na model obsługujący obrazy, aby ponowić próbę."}
 }

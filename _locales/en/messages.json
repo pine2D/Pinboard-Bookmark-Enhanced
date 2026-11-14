@@ -5529,5 +5529,6 @@
   "visionAskRemoveImage": {"message":"Remove attached image"},
   "visionAskDefaultQuestion": {"message":"What does this image show in the context of the article?"},
   "visionImageLoadFailed": {"message":"Could not load this image for AI reading."},
-  "visionImageTooLarge": {"message":"This image is too large to send (over 4 MB after resizing)."}
+  "visionImageTooLarge": {"message":"This image is too large to send (over 4 MB after resizing)."},
+  "visionModelUnsupported": {"message":"Current AI model doesn't support images. Switch to a vision model to retry."}
 }

@@ -5507,5 +5507,6 @@
   "visionAskRemoveImage": {"message":"移除附圖"},
   "visionAskDefaultQuestion": {"message":"結合內文，這張圖片展示了甚麼？"},
   "visionImageLoadFailed": {"message":"無法讀取這張圖片以供 AI 解析。"},
-  "visionImageTooLarge": {"message":"圖片壓縮後仍超過 4 MB，無法傳送。"}
+  "visionImageTooLarge": {"message":"圖片壓縮後仍超過 4 MB，無法傳送。"},
+  "visionModelUnsupported": {"message":"目前 AI 模型不支援看圖，請切換到支援圖片的模型後再試。"}
 }

@@ -5507,5 +5507,6 @@
   "visionAskRemoveImage": {"message":"Angehängtes Bild entfernen"},
   "visionAskDefaultQuestion": {"message":"Was zeigt dieses Bild im Zusammenhang mit dem Artikel?"},
   "visionImageLoadFailed": {"message":"Dieses Bild konnte für die KI-Analyse nicht geladen werden."},
-  "visionImageTooLarge": {"message":"Dieses Bild ist zum Senden zu groß (über 4 MB nach dem Verkleinern)."}
+  "visionImageTooLarge": {"message":"Dieses Bild ist zum Senden zu groß (über 4 MB nach dem Verkleinern)."},
+  "visionModelUnsupported": {"message":"Das aktuelle KI-Modell unterstützt keine Bilder. Wechsle für einen neuen Versuch zu einem Bildmodell."}
 }

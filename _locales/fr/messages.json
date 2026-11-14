@@ -5507,5 +5507,6 @@
   "visionAskRemoveImage": {"message":"Retirer l'image jointe"},
   "visionAskDefaultQuestion": {"message":"Que montre cette image dans le contexte de l'article ?"},
   "visionImageLoadFailed": {"message":"Impossible de charger cette image pour l'analyse par l'IA."},
-  "visionImageTooLarge": {"message":"Cette image reste trop volumineuse pour être envoyée (plus de 4 Mo après réduction)."}
+  "visionImageTooLarge": {"message":"Cette image reste trop volumineuse pour être envoyée (plus de 4 Mo après réduction)."},
+  "visionModelUnsupported": {"message":"Le modèle d’IA actuel ne prend pas en charge les images. Passez à un modèle compatible pour réessayer."}
 }
