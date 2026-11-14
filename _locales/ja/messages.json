@@ -5493,6 +5493,7 @@
   "deepseekFetchAuthFailed": {"message":"DeepSeek API キーが無効か期限切れです。設定 > AI プロバイダー > DeepSeek で更新してください。"},
   "jinaMarkdownTitleDeepseek": {"message":"ページを Markdown に変換（DeepSeek Fetch）"},
   "batchPermExtractor": {"message":"$ENGINE$（ページ抽出）：$ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "batchPermProviderAndExtractor": {"message":"$PROVIDER$（AI プロバイダー）+ $ENGINE$（ページ抽出）：$ORIGIN$","placeholders":{"provider":{"content":"$1"},"engine":{"content":"$2"},"origin":{"content":"$3"}}},
   "mdEngineExtractingNoteDeepseek": {"message":"初回の抽出は DeepSeek（api.deepseek.com）から取得します。待ち時間は、ページがキャッシュ済みかどうか、通信速度、ページの大きさによって変わります（通常は数秒）。"},
   "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch が取得できるのは http(s) のページだけのため、このページは読み取れません。"},
   "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch は自前のサーバーからページを取得するため、ログインしないと見られない内容は読み取れません。"},

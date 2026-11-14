@@ -5493,6 +5493,7 @@
   "deepseekFetchAuthFailed": {"message":"La clé API DeepSeek est invalide ou expirée. Ouvrez Paramètres > Fournisseurs IA > DeepSeek pour la mettre à jour."},
   "jinaMarkdownTitleDeepseek": {"message":"Convertir la page en Markdown (DeepSeek Fetch)"},
   "batchPermExtractor": {"message":"$ENGINE$ (extraction de page) : $ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "batchPermProviderAndExtractor": {"message":"$PROVIDER$ (fournisseur d'IA) + $ENGINE$ (extraction de page) : $ORIGIN$","placeholders":{"provider":{"content":"$1"},"engine":{"content":"$2"},"origin":{"content":"$3"}}},
   "mdEngineExtractingNoteDeepseek": {"message":"La première extraction interroge DeepSeek (api.deepseek.com). Elle prend généralement quelques secondes, selon la mise en cache de la page, votre vitesse réseau et la taille de la page."},
   "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch ne récupère que les pages http(s) : il ne peut pas lire celle-ci."},
   "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch récupère les pages depuis ses propres serveurs : il ne voit pas ce qui demande d'être connecté."},

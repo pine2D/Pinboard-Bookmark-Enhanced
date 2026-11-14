@@ -53,6 +53,9 @@ function batchAiPermissionRows(origins, s) {
   const remoteLabel = remoteEngine === "deepseek" ? "DeepSeek Fetch" : (remoteEngine === "jina" ? "Jina Reader" : "");
   return origins.map(pattern => {
     const origin = pattern.replace(/\/\*$/, "");
+    if (pattern === providerOrigin && remoteOrigin && pattern === remoteOrigin) {
+      return t("batchPermProviderAndExtractor", providerName, remoteLabel, origin);
+    }
     if (pattern === providerOrigin) return t("batchPermProvider", providerName, origin);
     if (remoteOrigin && pattern === remoteOrigin) return t("batchPermExtractor", remoteLabel, origin);
     return origin;

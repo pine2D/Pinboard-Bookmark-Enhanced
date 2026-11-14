@@ -124,6 +124,8 @@ function _isValidDeepseekFetchUrl(url) {
 }
 
 // ---- DeepSeek Fetch API: fetch page as Markdown ----
+const _deepseekFetchInflight = new Map();
+
 async function fetchDeepseekMarkdown(url, options = {}) {
   if (!_isValidDeepseekFetchUrl(url)) {
     return { error: "invalid_url", code: "invalid_url", fallback: true };
@@ -151,62 +153,78 @@ async function fetchDeepseekMarkdown(url, options = {}) {
     return { error: "deepseek_key_missing", code: "deepseek_key_missing", authFailed: true, fallback: true };
   }
 
-  try {
-    await _ensureDeepseekFetchHostPermission();
-    const res = await fetchWithTimeout(PBP_DEEPSEEK_FETCH_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: `Bearer ${trimmedKey}`
-      },
-      body: JSON.stringify({ url })
-    }, 30000);
-    if (!res.ok) {
+  const inflightKey = !forceRefresh ? `${cacheKey}\n${trimmedKey}\n${resolveCacheMs(cacheDuration)}` : "";
+  if (inflightKey && _deepseekFetchInflight.has(inflightKey)) {
+    const shared = await _deepseekFetchInflight.get(inflightKey);
+    return { ...shared };
+  }
+
+  const runPromise = (async () => {
+    try {
+      await _ensureDeepseekFetchHostPermission();
+      const res = await fetchWithTimeout(PBP_DEEPSEEK_FETCH_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${trimmedKey}`
+        },
+        body: JSON.stringify({ url })
+      }, 30000);
+      if (!res.ok) {
+        return {
+          error: `DeepSeek Fetch API returned ${res.status}`,
+          status: res.status,
+          authFailed: res.status === 401 || res.status === 403,
+          fallback: true
+        };
+      }
+      const json = typeof res.text === "function"
+        ? JSON.parse((await res.text()).trimStart())
+        : await res.json();
+      if (json && json.error) {
+        const errMsg = typeof json.error === "string" ? json.error : (json.error.message || "DeepSeek Fetch API error");
+        return { error: errMsg, fallback: true };
+      }
+      const d = (json && typeof json.data === "object" && json.data) ? json.data : (json || {});
+      const rawMarkdown = typeof d.content === "string" ? d.content : (typeof d.markdown === "string" ? d.markdown : "");
+      const markdown = rawMarkdown.trim() ? rawMarkdown : "";
+      const result = {
+        markdown,
+        title: typeof d.title === "string" ? d.title : "",
+        url: (typeof d.url === "string" && d.url) ? d.url : url,
+        tokens: 0,
+        published: typeof d.publishedTime === "string" ? d.publishedTime : (typeof d.date === "string" ? d.date : "")
+      };
+
+      if (result.markdown.trim() && resolveCacheMs(cacheDuration) > 0) {
+        try {
+          await chrome.storage.local.set({ [cacheKey]: { result, timestamp: Date.now() } });
+        } catch (e) {
+          console.warn("[deepseek-fetch] cache write failed:", e && e.name);
+        }
+      }
+
+      return { ...result, fromCache: false };
+    } catch (e) {
+      if (e && e.code === "host_permission") {
+        return { error: "host_permission", code: "host_permission", fallback: true };
+      }
+      const offline = (e instanceof TypeError && /failed to fetch/i.test(e.message || "")) ||
+        (typeof navigator !== "undefined" && navigator.onLine === false);
       return {
-        error: `DeepSeek Fetch API returned ${res.status}`,
-        status: res.status,
-        authFailed: res.status === 401 || res.status === 403,
+        error: offline ? "network" : (e.message || "DeepSeek Fetch API request failed"),
+        timeout: !!(e && e.name === "TimeoutError"),
         fallback: true
       };
     }
-    const json = typeof res.text === "function"
-      ? JSON.parse((await res.text()).trimStart())
-      : await res.json();
-    if (json && json.error) {
-      const errMsg = typeof json.error === "string" ? json.error : (json.error.message || "DeepSeek Fetch API error");
-      return { error: errMsg, fallback: true };
-    }
-    const d = (json && typeof json.data === "object" && json.data) ? json.data : (json || {});
-    const rawMarkdown = typeof d.content === "string" ? d.content : (typeof d.markdown === "string" ? d.markdown : "");
-    const markdown = rawMarkdown.trim() ? rawMarkdown : "";
-    const result = {
-      markdown,
-      title: typeof d.title === "string" ? d.title : "",
-      url: (typeof d.url === "string" && d.url) ? d.url : url,
-      tokens: 0,
-      published: typeof d.publishedTime === "string" ? d.publishedTime : (typeof d.date === "string" ? d.date : "")
-    };
+  })();
 
-    if (result.markdown.trim() && resolveCacheMs(cacheDuration) > 0) {
-      try {
-        await chrome.storage.local.set({ [cacheKey]: { result, timestamp: Date.now() } });
-      } catch (e) {
-        console.warn("[deepseek-fetch] cache write failed:", e && e.name);
-      }
-    }
-
-    return { ...result, fromCache: false };
-  } catch (e) {
-    if (e && e.code === "host_permission") {
-      return { error: "host_permission", code: "host_permission", fallback: true };
-    }
-    const offline = (e instanceof TypeError && /failed to fetch/i.test(e.message || "")) ||
-      (typeof navigator !== "undefined" && navigator.onLine === false);
-    return {
-      error: offline ? "network" : (e.message || "DeepSeek Fetch API request failed"),
-      timeout: !!(e && e.name === "TimeoutError"),
-      fallback: true
-    };
+  if (inflightKey) _deepseekFetchInflight.set(inflightKey, runPromise);
+  try {
+    const out = await runPromise;
+    return { ...out };
+  } finally {
+    if (inflightKey) _deepseekFetchInflight.delete(inflightKey);
   }
 }

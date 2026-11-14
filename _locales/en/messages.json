@@ -5515,6 +5515,7 @@
   "deepseekFetchAuthFailed": {"message":"DeepSeek API key is invalid or expired. Open Settings > AI Providers > DeepSeek to update it."},
   "jinaMarkdownTitleDeepseek": {"message":"Convert page to Markdown (DeepSeek Fetch)"},
   "batchPermExtractor": {"message":"$ENGINE$ (page extractor): $ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "batchPermProviderAndExtractor": {"message":"$PROVIDER$ (AI provider) + $ENGINE$ (page extractor): $ORIGIN$","placeholders":{"provider":{"content":"$1"},"engine":{"content":"$2"},"origin":{"content":"$3"}}},
   "mdEngineExtractingNoteDeepseek": {"message":"First-time extraction fetches from DeepSeek (api.deepseek.com). It usually takes a few seconds, depending on whether the page is cached, your network speed, and the page size."},
   "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch can only fetch http(s) pages, so it can't read this one."},
   "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch fetches pages from its own servers, so it can't see anything that needs you to sign in."},

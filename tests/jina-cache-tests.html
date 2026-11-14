@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="38"><title>Jina &amp; DeepSeek Fetch Cache Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="40"><title>Jina &amp; DeepSeek Fetch Cache Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -12,6 +12,7 @@ body { font-family: monospace; padding: 16px; max-width: 900px; }
 <script src="../shared.js"></script>
 <script src="../ai.js"></script>
 <script src="../jina.js"></script>
+<script src="../popup-ai.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -276,6 +277,81 @@ function buildSuggestSweepHarness(source, options) {
       window.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: "invalid api key" } }) });
       const err401 = await fetchDeepseekMarkdown("https://example.com/auth", { apiKey: "sk-bad", cacheDuration: 60 });
       if (!err401.authFailed || err401.status !== 401) throw new Error("401 did not flag authFailed: " + JSON.stringify(err401));
+    });
+
+    await acheck("fetchDeepseekMarkdown coalesces concurrent non-refresh calls into one POST and isolates caller result copies", async () => {
+      let fetches = 0;
+      let releaseFetch;
+      const gate = new Promise((r) => { releaseFetch = r; });
+      const store = {};
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        storage: { local: {
+          get: async (k) => (k in store ? { [k]: store[k] } : {}),
+          set: async (obj) => { Object.assign(store, obj); }
+        } },
+        permissions: { contains: async () => true },
+      };
+      window.fetch = async () => {
+        fetches++;
+        await gate;
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ title: "Coalesced", content: "# Body\n\nParagraph." })
+        };
+      };
+      const p1 = fetchDeepseekMarkdown("https://example.com/concurrent", { apiKey: "sk-ds", cacheDuration: 60 });
+      const p2 = fetchDeepseekMarkdown("https://example.com/concurrent", { apiKey: "sk-ds", cacheDuration: 60 });
+      await new Promise((r) => setTimeout(r, 15));
+      releaseFetch();
+      const [r1, r2] = await Promise.all([p1, p2]);
+      r1._hasApiKey = true;
+      if (fetches !== 1) throw new Error("expected 1 fetch, got " + fetches);
+      if (r1.markdown !== "# Body\n\nParagraph." || r2.markdown !== "# Body\n\nParagraph.") throw new Error("unexpected markdown");
+      if (r2._hasApiKey === true) throw new Error("mutating r1 leaked into r2");
+    });
+
+    await acheck("ensurePageText coalesces concurrent Shift+Enter calls and keeps local namespace when DeepSeek falls back", async () => {
+      let fetches = 0;
+      let tabCalls = 0;
+      window.pbpAiVideoGrant = async () => null;
+      window.pbpMarkdownToPlainText = (md) => String(md || "").replace(/^#+\s+/gm, "").trim();
+      window.getPageInfoFromTab = async () => { tabCalls++; return { pageText: "Local Defuddle text" }; };
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        storage: { local: { get: async () => ({}), set: async () => {} } },
+        permissions: { contains: async () => true },
+        tabs: { query: async () => [{ id: 7, url: "https://example.com/post" }] },
+      };
+
+      // Case A: DeepSeek succeeds -> 1 network POST, both callers get "deepseek"
+      window.pageInfo = { url: "https://example.com/post", pageText: "" };
+      window.fetch = async () => {
+        fetches++;
+        await new Promise((r) => setTimeout(r, 15));
+        return { ok: true, status: 200, text: async () => JSON.stringify({ title: "T", content: "# Remote text" }) };
+      };
+      const sSuccess = { aiContentSource: "deepseek", deepseekApiKey: obfuscateKey("sk-ds"), aiCacheDuration: 0, aiUseTranscript: false };
+      const [srcA, srcB] = await Promise.all([ensurePageText(sSuccess, "ai-summary-btn"), ensurePageText(sSuccess, "ai-tags-btn")]);
+      if (fetches !== 1 || srcA !== "deepseek" || srcB !== "deepseek" || window.pageInfo.pageText !== "Remote text" || window.pageInfo._pbpTextSource !== "deepseek") {
+        throw new Error(`success case wrong: fetches=${fetches} src=${srcA}/${srcB} text=${window.pageInfo.pageText}`);
+      }
+
+      // Case B: DeepSeek fails (missing key / 401) -> falls back once to local Defuddle, NEVER tags _pbpTextSource as "deepseek"
+      fetches = 0;
+      tabCalls = 0;
+      window.pageInfo = { url: "https://example.com/fallback", pageText: "" };
+      window.fetch = async () => {
+        fetches++;
+        await new Promise((r) => setTimeout(r, 15));
+        return { ok: false, status: 401 };
+      };
+      const sFallback = { aiContentSource: "deepseek", deepseekApiKey: obfuscateKey("sk-expired"), aiCacheDuration: 0, aiUseTranscript: false };
+      const [fbA, fbB] = await Promise.all([ensurePageText(sFallback, "ai-summary-btn"), ensurePageText(sFallback, "ai-tags-btn")]);
+      if (fetches !== 1 || tabCalls !== 1 || fbA !== "local" || fbB !== "local" || window.pageInfo._pbpTextSource !== "local" || window.pageInfo.pageText !== "Local Defuddle text") {
+        throw new Error(`fallback case wrong: fetches=${fetches} tabCalls=${tabCalls} fb=${fbA}/${fbB} src=${window.pageInfo._pbpTextSource}`);
+      }
     });
 
     // ---- sweepSuggestCache honours the configured AI cache duration ----

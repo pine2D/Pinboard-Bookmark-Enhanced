@@ -93,40 +93,56 @@ async function ensurePageText(s, buttonId) {
   if (pageInfo.pageText) {
     return pageInfo._pbpTextSource || pbpNormalizeExtractEngine(s.aiContentSource);
   }
-  // Video pages (T7.13): the subtitles ARE the content. Only where the
-  // caption origin grant already stands (contains, never a prompt); any
-  // miss falls through to the configured source untouched.
-  if (s.aiUseTranscript !== false) {
-    const tx = await pbpAiTranscriptText(s, buttonId);
-    if (tx) { pageInfo.pageText = tx; pageInfo._pbpTextSource = "transcript"; return "transcript"; }
+  const ensureKey = `${pageInfo.url || ""}|${pbpNormalizeExtractEngine(s.aiContentSource)}|${s.aiUseTranscript !== false ? 1 : 0}`;
+  if (pageInfo._pbpEnsurePromise && pageInfo._pbpEnsureKey === ensureKey) {
+    return pageInfo._pbpEnsurePromise;
   }
-  if (s.aiContentSource === "jina") {
-    // Throws only on host_permission (surface the grant flow); any other
-    // failure leaves pageText empty and falls through to local Defuddle
-    // below. The old code returned unconditionally here - its warn log
-    // claimed "using local content" while nobody ever ran the local
-    // extractor (audit A9).
-    await enrichPageTextIfJina(s);
-    if (pageInfo.pageText) { pageInfo._pbpTextSource = "jina"; return "jina"; }
-  } else if (s.aiContentSource === "deepseek") {
-    await enrichPageTextIfDeepseek(s);
-    if (pageInfo.pageText) { pageInfo._pbpTextSource = "deepseek"; return "deepseek"; }
-  }
-  // Local source: lazy-inject Defuddle and pull full page text
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab) {
-      const info = await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: pageInfo.url });
-      if (info?.pageText) { pageInfo.pageText = info.pageText; pageInfo._pbpTextSource = "local"; }
+  const run = (async () => {
+    // Video pages (T7.13): the subtitles ARE the content. Only where the
+    // caption origin grant already stands (contains, never a prompt); any
+    // miss falls through to the configured source untouched.
+    if (s.aiUseTranscript !== false) {
+      const tx = await pbpAiTranscriptText(s, buttonId);
+      if (tx) { pageInfo.pageText = tx; pageInfo._pbpTextSource = "transcript"; return "transcript"; }
     }
-  } catch (_) { /* tab gone / inject failed — pageText stays empty, caller will surface aiNoContent */ }
-  return "local";
+    if (s.aiContentSource === "jina") {
+      // Throws only on host_permission (surface the grant flow); any other
+      // failure leaves pageText empty and falls through to local Defuddle
+      // below. The old code returned unconditionally here - its warn log
+      // claimed "using local content" while nobody ever ran the local
+      // extractor (audit A9).
+      const jinaText = await enrichPageTextIfJina(s);
+      if (jinaText) { pageInfo.pageText = jinaText; pageInfo._pbpTextSource = "jina"; return "jina"; }
+    } else if (s.aiContentSource === "deepseek") {
+      const deepseekText = await enrichPageTextIfDeepseek(s);
+      if (deepseekText) { pageInfo.pageText = deepseekText; pageInfo._pbpTextSource = "deepseek"; return "deepseek"; }
+    }
+    // Local source: lazy-inject Defuddle and pull full page text
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab) {
+        const info = await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: pageInfo.url });
+        if (info?.pageText) { pageInfo.pageText = info.pageText; pageInfo._pbpTextSource = "local"; }
+      }
+    } catch (_) { /* tab gone / inject failed — pageText stays empty, caller will surface aiNoContent */ }
+    return "local";
+  })();
+  pageInfo._pbpEnsurePromise = run;
+  pageInfo._pbpEnsureKey = ensureKey;
+  try {
+    return await run;
+  } finally {
+    if (pageInfo._pbpEnsurePromise === run) {
+      pageInfo._pbpEnsurePromise = null;
+      pageInfo._pbpEnsureKey = "";
+    }
+  }
 }
 
 async function enrichPageTextIfJina(s) {
   s = s || settings;
-  if (s.aiContentSource !== "jina") return;
-  if (!pageInfo?.url) return;
+  if (s.aiContentSource !== "jina") return "";
+  if (!pageInfo?.url) return "";
   try {
     const jinaKey = s.jinaApiKey ? deobfuscateKey(s.jinaApiKey) : "";
     const result = await fetchJinaMarkdown(pageInfo.url, {
@@ -148,18 +164,23 @@ async function enrichPageTextIfJina(s) {
       // eager-loads — settle the lazy load before use (throws into the catch
       // below on load failure, which degrades to local content as before).
       await ensureMdConvert();
-      pageInfo.pageText = markdownToPlainText(result.markdown);
+      const text = markdownToPlainText(result.markdown);
+      if (text) {
+        pageInfo.pageText = text;
+        return text;
+      }
     }
   } catch (e) {
     if (e?.code === "host_permission") throw e;
     console.warn("Jina content enrichment failed, using local content:", e.message);
   }
+  return "";
 }
 
 async function enrichPageTextIfDeepseek(s) {
   s = s || settings;
-  if (s.aiContentSource !== "deepseek") return;
-  if (!pageInfo?.url) return;
+  if (s.aiContentSource !== "deepseek") return "";
+  if (!pageInfo?.url) return "";
   try {
     const deepseekKey = s.deepseekApiKey ? deobfuscateKey(s.deepseekApiKey) : "";
     const result = await fetchDeepseekMarkdown(pageInfo.url, {
@@ -177,12 +198,17 @@ async function enrichPageTextIfDeepseek(s) {
       throw err;
     }
     if (!result.error && result.markdown) {
-      pageInfo.pageText = pbpMarkdownToPlainText(result.markdown);
+      const text = pbpMarkdownToPlainText(result.markdown);
+      if (text) {
+        pageInfo.pageText = text;
+        return text;
+      }
     }
   } catch (e) {
     if (e?.code === "host_permission") throw e;
     console.warn("DeepSeek Fetch content enrichment failed, using local content:", e.message);
   }
+  return "";
 }
 
 // The video page's caption grant, if it stands: the detected video, else

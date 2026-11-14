@@ -1526,6 +1526,8 @@ async function htmlToMarkdownAsync(html, opts) {
       setBtnIcon(jinaMdBtn, "doc", t("jinaConverting"));
 
       let result;
+      let actualEngine = pbpNormalizeExtractEngine(settings.aiContentSource);
+      let deepseekFallbackNotice = "";
       if (settings.aiContentSource === "jina") {
         const jinaKey = settings.jinaApiKey ? deobfuscateKey(settings.jinaApiKey) : "";
         result = await fetchJinaMarkdown(url, { apiKey: jinaKey, cacheDuration: settings.aiCacheDuration });
@@ -1537,7 +1539,25 @@ async function htmlToMarkdownAsync(html, opts) {
             && !(typeof pbpVideoDetect === "function" && pbpVideoDetect(tab.url || url))) {
           result = { error: "empty" };
         }
-        if (!result.error) result._hasApiKey = !!deepseekKey;
+        if (!result.error) {
+          result._hasApiKey = !!deepseekKey;
+        } else if (result.code !== "host_permission") {
+          const primaryErr = result;
+          const localResult = await extractLocalMarkdown(tab.id);
+          if (!localResult.error) {
+            result = localResult;
+            result._hasApiKey = false;
+            actualEngine = "local";
+            if (primaryErr.error === "deepseek_key_missing") {
+              deepseekFallbackNotice = t("deepseekFetchKeyMissing");
+            } else if (primaryErr.authFailed) {
+              deepseekFallbackNotice = t("deepseekFetchAuthFailed");
+            }
+          } else if (typeof localResult.frameOrigin === "string" && /^https:\/\/[^/]+$/.test(localResult.frameOrigin)) {
+            result = localResult;
+            actualEngine = "local";
+          }
+        }
       } else {
         result = await extractLocalMarkdown(tab.id);
         if (!result.error) result._hasApiKey = false;
@@ -1553,7 +1573,7 @@ async function htmlToMarkdownAsync(html, opts) {
           let opened = false;
           try {
             const k = crypto.randomUUID();
-            const engine = pbpNormalizeExtractEngine(settings.aiContentSource);
+            const engine = actualEngine;
             const handoffNotes = $id("description-input")?.value || "";
             const handoffSummaryRange = pbpPopupHandoffSummaryRange(handoffNotes);
             // The tab's own address, as the toolbar icon reads it.
@@ -1648,9 +1668,9 @@ async function htmlToMarkdownAsync(html, opts) {
         return meta;
       }
 
-      const exportSource = settings.aiContentSource === "jina"
+      const exportSource = actualEngine === "jina"
         ? "jina"
-        : (settings.aiContentSource === "deepseek" ? "deepseek" : "defuddle");
+        : (actualEngine === "deepseek" ? "deepseek" : "defuddle");
 
       // Reveal the action strip; the user picks Copy / Preview / Download / Obsidian.
       // No auto-copy: clicking Markdown must not silently clobber the clipboard, nor be
@@ -1745,7 +1765,7 @@ async function htmlToMarkdownAsync(html, opts) {
               description: $id("description-input")?.value || "",
               tokens: result.tokens || 0,
               hasApiKey: !!result._hasApiKey,
-              source: pbpNormalizeExtractEngine(settings.aiContentSource),
+              source: actualEngine,
               math: !!result.math,
               forum: !!result.forum,
               // X4: raw metadata transport -- md-preview.js reads these into
@@ -1878,6 +1898,9 @@ async function htmlToMarkdownAsync(html, opts) {
         } else if (obsBtn) {
           obsBtn.style.display = "none";
         }
+      }
+      if (deepseekFallbackNotice) {
+        showStatus("status-msg", deepseekFallbackNotice, "error", { remedy: true });
       }
 
       // No "Copied" state on the main button now — revert as soon as the strip is shown.

@@ -526,8 +526,11 @@ async function createUiHarness(storedProgress, now, opts = {}) {
 
     // Same-host deduplication when aiProvider is also DeepSeek
     const hDeepseek = await createPermissionHarness("https://api.deepseek.com/*");
-    const sameHost = hDeepseek.batchAiPermissionOrigins(sampleTabs, { aiProvider: "deepseek", aiContentSource: "deepseek", deepseekApiKey: "sk-ds" });
+    const sameHostCfg = { aiProvider: "deepseek", aiContentSource: "deepseek", deepseekApiKey: "sk-ds" };
+    const sameHost = hDeepseek.batchAiPermissionOrigins(sampleTabs, sameHostCfg);
     equal(sameHost.join(","), "https://api.deepseek.com/*");
+    const sameRows = hDeepseek.batchAiPermissionRows(sameHost, sameHostCfg);
+    equal(sameRows.join(" ; "), "batchPermProviderAndExtractor:provDeepseek:|DeepSeek Fetch|https://api.deepseek.com");
 
     // Missing DeepSeek key falls back to local per-tab extraction origins
     const keylessOrigins = hOpenai.batchAiPermissionOrigins(sampleTabs, { aiProvider: "openai", aiContentSource: "deepseek", deepseekApiKey: "" });

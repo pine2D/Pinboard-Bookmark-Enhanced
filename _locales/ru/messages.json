@@ -5493,6 +5493,7 @@
   "deepseekFetchAuthFailed": {"message":"API-ключ DeepSeek недействителен или просрочен. Откройте Настройки > AI-провайдеры > DeepSeek, чтобы обновить его."},
   "jinaMarkdownTitleDeepseek": {"message":"Преобразовать страницу в Markdown (DeepSeek Fetch)"},
   "batchPermExtractor": {"message":"$ENGINE$ (извлечение страниц): $ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "batchPermProviderAndExtractor": {"message":"$PROVIDER$ (AI-провайдер) + $ENGINE$ (извлечение страниц): $ORIGIN$","placeholders":{"provider":{"content":"$1"},"engine":{"content":"$2"},"origin":{"content":"$3"}}},
   "mdEngineExtractingNoteDeepseek": {"message":"При первом извлечении запрос идёт к DeepSeek (api.deepseek.com). Обычно это занимает несколько секунд в зависимости от кэша, скорости сети и размера страницы."},
   "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch загружает только страницы http(s), поэтому эту страницу прочитать не может."},
   "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch загружает страницы со своих серверов, поэтому не видит того, что доступно только после входа."},

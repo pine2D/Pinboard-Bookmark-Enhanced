@@ -4860,6 +4860,13 @@ check(markdownClickStart >= 0 && markdownClickEnd > markdownClickStart &&
   markdownClick.indexOf("await chrome.permissions.request({ origins: [remoteGrantPattern] })") === markdownClick.indexOf("await ") &&
   markdownClick.includes('result.code === "host_permission"') && markdownClick.includes('t("aiGrantRetry")'),
   "popup.js: Markdown host-permission recovery is not an exact-origin first-await grant and retry");
+check(
+  markdownClick.includes('result.code !== "host_permission"') &&
+  markdownClick.includes("const localResult = await extractLocalMarkdown(tab.id)") &&
+  markdownClick.includes('actualEngine = "local"') &&
+  markdownClick.includes("source: actualEngine") &&
+  markdownClick.includes("deepseekFallbackNotice"),
+  "popup.js: DeepSeek Fetch Reader flow must fall back to local extraction on non-permission errors and attribute actualEngine");
 
 const tagGovClickStart = optionsJs.indexOf('$id("tag-gov-ai-btn")?.addEventListener');
 const tagGovClickEnd = optionsJs.indexOf("await renderWaybackLog()", tagGovClickStart);

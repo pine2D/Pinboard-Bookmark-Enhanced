@@ -5493,6 +5493,7 @@
   "deepseekFetchAuthFailed": {"message":"Der DeepSeek-API-Schlüssel ist ungültig oder abgelaufen. Öffne Einstellungen > KI-Anbieter > DeepSeek, um ihn zu aktualisieren."},
   "jinaMarkdownTitleDeepseek": {"message":"Seite in Markdown umwandeln (DeepSeek Fetch)"},
   "batchPermExtractor": {"message":"$ENGINE$ (Seitenextraktion): $ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "batchPermProviderAndExtractor": {"message":"$PROVIDER$ (KI-Anbieter) + $ENGINE$ (Seitenextraktion): $ORIGIN$","placeholders":{"provider":{"content":"$1"},"engine":{"content":"$2"},"origin":{"content":"$3"}}},
   "mdEngineExtractingNoteDeepseek": {"message":"Die erste Extraktion ruft DeepSeek (api.deepseek.com) ab. Sie dauert meist ein paar Sekunden, abhängig davon, ob die Seite zwischengespeichert ist, von deiner Netzwerkgeschwindigkeit und der Seitengröße."},
   "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch kann nur http(s)-Seiten abrufen und diese Seite daher nicht lesen."},
   "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch ruft Seiten über eigene Server ab und sieht deshalb nichts, wofür man angemeldet sein muss."},
