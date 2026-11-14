@@ -5482,5 +5482,19 @@
   },
   "readerHistoryOpenFailed": {
     "message": "Не удалось открыть этот просмотр заново. Попробуйте открыть исходную страницу."
-  }
+  },
+  "aiContentSourceDeepseek": {"message":"DeepSeek Fetch"},
+  "aiContentSourceDeepseekHint": {"message":"Отправляет URL страницы в DeepSeek Fetch, который загружает страницу и возвращает очищенный Markdown. Использует ваш API-ключ DeepSeek с оплатой за каждый успешный запрос."},
+  "deepseekFetchKeyMissingHint": {"message":"Для DeepSeek Fetch нужен API-ключ DeepSeek. Пока он не указан, функции AI используют локальное извлечение."},
+  "deepseekFetchAccessMissingHint": {"message":"DeepSeek Fetch пока не может обратиться к api.deepseek.com. Разрешите доступ ниже, чтобы извлечение заработало."},
+  "deepseekFetchSetupBtn": {"message":"Настроить DeepSeek"},
+  "deepseekFetchGrantBtn": {"message":"Разрешить доступ"},
+  "deepseekFetchKeyMissing": {"message":"API-ключ DeepSeek не указан. Добавьте его в разделе Настройки > AI-провайдеры > DeepSeek."},
+  "deepseekFetchAuthFailed": {"message":"API-ключ DeepSeek недействителен или просрочен. Откройте Настройки > AI-провайдеры > DeepSeek, чтобы обновить его."},
+  "jinaMarkdownTitleDeepseek": {"message":"Преобразовать страницу в Markdown (DeepSeek Fetch)"},
+  "batchPermExtractor": {"message":"$ENGINE$ (извлечение страниц): $ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "mdEngineExtractingNoteDeepseek": {"message":"При первом извлечении запрос идёт к DeepSeek (api.deepseek.com). Обычно это занимает несколько секунд в зависимости от кэша, скорости сети и размера страницы."},
+  "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch загружает только страницы http(s), поэтому эту страницу прочитать не может."},
+  "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch загружает страницы со своих серверов, поэтому не видит того, что доступно только после входа."},
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch принимает только обычные адреса http(s) длиной до 8192 символов без учётных данных в URL."}
 }

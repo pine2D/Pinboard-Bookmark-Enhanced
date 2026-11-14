@@ -103,21 +103,25 @@ function pbpOriginalOpenHref(openUrl) {
 //   - otherwise (a transient or unknown Defuddle failure): retry.
 function pbpExtractFailPrimary(code, engine, hasAlt) {
   if (code === "host_permission" || !hasAlt) return "retry";
-  if (engine === "jina") return "alt";
+  if (engine === "jina" || engine === "deepseek") return "alt";
   return (code === "empty" || code === "tab_unavailable" || code === "tab_navigated") ? "alt" : "retry";
 }
 // Failure copy for one reextract answer. `engine` is the engine that was
-// tried; it only adds the reason Jina's empty answer needs (its servers carry
-// none of the reader's sign-ins). Codes come from background.js
-// extractForPreview / reextractMarkdown; anything unrecognised is the
-// generic line, never a guess.
+// tried; it adds the sign-in note for server-side extractors (Jina / DeepSeek)
+// on an empty answer. Codes come from background.js extractForPreview /
+// reextractMarkdown; anything unrecognised is the generic line, never a guess.
 function pbpEngineErrText(r, engine) {
   const code = r && r.error;
   if (code === "site_target_missing") return t("mdSiteTargetMissing");
   if (code === "tab_unavailable" || code === "tab_navigated") return t("mdEngineTabGone");
-  if (code === "empty") return engine === "jina" ? t("mdPreviewNoContent") + " " + t("mdEngineJinaNoLogin") : t("mdPreviewNoContent");
+  if (code === "empty") {
+    if (engine === "jina") return t("mdPreviewNoContent") + " " + t("mdEngineJinaNoLogin");
+    if (engine === "deepseek") return t("mdPreviewNoContent") + " " + t("mdEngineDeepseekNoLogin");
+    return t("mdPreviewNoContent");
+  }
   if (code === "host_permission") {
-    const origin = (r && typeof r.pageOrigin === "string" && r.pageOrigin) ? r.pageOrigin : "https://r.jina.ai";
+    const fallbackOrigin = engine === "deepseek" ? "https://api.deepseek.com" : "https://r.jina.ai";
+    const origin = (r && typeof r.pageOrigin === "string" && r.pageOrigin) ? r.pageOrigin : fallbackOrigin;
     return t("aiErrorHostPermission", origin);
   }
   // "network" covers both this file's own sendMessage-throw catches and
@@ -129,6 +133,9 @@ function pbpEngineErrText(r, engine) {
   if (code === "rate_limited") return t("pinboardErrorRateLimit");
   if (code === "timeout") return t("pinboardErrorTimeout");
   if (code === "jina_auth") return t("jinaAuthFailed");
+  if (code === "deepseek_key_missing") return t("deepseekFetchKeyMissing");
+  if (code === "deepseek_auth") return t("deepseekFetchAuthFailed");
+  if (code === "invalid_url") return t("mdEngineDeepseekInvalidUrl");
   return t("mdEngineExtractFailed");
 }
 function renderErrorState(message, retryFn, permissionRequired, alt, openUrl, primary) {
@@ -252,14 +259,19 @@ function pbpVideoHydrationResolveTrack(vTracks, selectedTrackKey) {
     : null;
 }
 
-// Jina extraction runs in the Service Worker, which cannot prompt. This helper is
-// called only from a retrying user click after the worker reported host_permission.
-async function pbpRequestJinaHostPermission() {
+// Server-side extraction (Jina / DeepSeek Fetch) runs in the Service Worker,
+// which cannot prompt. Called only from a retrying user click after the worker
+// reported host_permission.
+async function pbpRequestEngineHostPermission(engine) {
+  const originPattern = engine === "deepseek" ? PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN : PBP_JINA_ORIGIN_PATTERN;
   try {
-    return (await chrome.permissions.request({ origins: [PBP_JINA_ORIGIN_PATTERN] })) === true;
+    return (await chrome.permissions.request({ origins: [originPattern] })) === true;
   } catch (_) {
     return false;
   }
+}
+async function pbpRequestJinaHostPermission() {
+  return pbpRequestEngineHostPermission("jina");
 }
 
 // The page's one polite announcer. Deliberately OUTSIDE #rendered-view: that
@@ -1667,9 +1679,26 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     engineStatusEl.textContent = text || "";
     engineStatusEl.classList.toggle("error", !!isError);
   }
-  function engineLabel(e) { return e === "jina" ? "Jina Reader" : "Defuddle"; }
+  function engineLabel(e) {
+    if (e === "jina") return "Jina Reader";
+    if (e === "deepseek") return "DeepSeek Fetch";
+    return "Defuddle";
+  }
+  function deepseekUnavailableReason(rawUrl) {
+    if (!/^https?:\/\//i.test(rawUrl)) return "protocol";
+    if (rawUrl.length > 8192) return "invalid_url";
+    try {
+      const u = new URL(rawUrl);
+      if (!u.hostname || u.username || u.password) return "invalid_url";
+      return "";
+    } catch (_) {
+      // swallow-ok: URL parser validates rawUrl syntax
+      return "invalid_url";
+    }
+  }
   function engineUnavailable(e) {
     if (e === "jina") return !/^https?:\/\//i.test(srcUrlForSwitch);
+    if (e === "deepseek") return !!deepseekUnavailableReason(srcUrlForSwitch);
     if (srcTabId) return false;
     return !(info.historyReopen === true &&
       typeof pbpReaderHistoryRequestableOrigin === "function" &&
@@ -1701,6 +1730,9 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       if (!active && !unavail) seg.title = t("mdEngineSwitchTo", engineLabel(e));
       else if (unavail && e === "local") seg.title = t("mdEngineTabGone");
       else if (unavail && e === "jina") seg.title = t("mdEngineJinaNeedsHttp");
+      else if (unavail && e === "deepseek") {
+        seg.title = t(deepseekUnavailableReason(srcUrlForSwitch) === "protocol" ? "mdEngineDeepseekNeedsHttp" : "mdEngineDeepseekInvalidUrl");
+      }
       else seg.removeAttribute("title");
     });
   }
@@ -1822,7 +1854,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
             videoState: o.videoState,
             videoDescriptionMd: descMd,
             url, baseUrl, sourceTabUrl, tabId: srcTabId,
-            source: source === "jina" ? "jina" : "local",
+            source: pbpNormalizeExtractEngine(source),
             // The article's own metadata from the handoff (byline, date, hero
             // image, page language): exports and the reading language read it
             // from the payload, so a transcript that dropped it lost all four
@@ -1849,7 +1881,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       if (!sourceIncognito && typeof pbpReaderHistoryRecord === "function") {
         void pbpReaderHistoryRecord({
           url, sourceTabUrl, title: title || fallbackTitle || "", site,
-          engine: source === "jina" ? "jina" : "local", isVideo: true, lastKey: k || "", sourceIncognito
+          engine: pbpNormalizeExtractEngine(source), isVideo: true, lastKey: k || "", sourceIncognito
         });
       }
       return true;
@@ -1897,14 +1929,16 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // One function drives the initial attempt, the error state's retry button, and the
     // rail's engine-switch badge clicks — all funnel back through the same
     // reextractMarkdown message, never a separate channel.
-    let attemptedEngine = info.engine;
+    let attemptedEngine = pbpNormalizeExtractEngine(info.engine);
     let inFlight = false;
+    const shellPermissionMissing = new Set();
     async function retryExtract(engine, failure) {
       if (inFlight) return;
       inFlight = true;
       try {
-        if (engine === "jina" && failure && failure.error === "host_permission") {
-          if (!await pbpRequestJinaHostPermission()) return;
+        if ((engine === "jina" || engine === "deepseek") && failure && failure.error === "host_permission") {
+          if (!await pbpRequestEngineHostPermission(engine)) return;
+          shellPermissionMissing.delete(engine);
         } else if (engine === "local" && !srcTabId && info.historyReopen === true && typeof pbpReaderHistoryRequestableOrigin === "function") {
           const reqOrigin = pbpReaderHistoryRequestableOrigin(sourceTabUrl || url);
           if (reqOrigin && chrome.permissions?.request) {
@@ -2015,12 +2049,13 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // shell (audit B4): the reextract success path would overwrite the
       // transcript payload with a plain extraction and reload over it.
       if (window.pbpVideoDoc && window.pbpVideoDoc.committed === true) return;
+      engine = pbpNormalizeExtractEngine(engine);
       inFlight = true;
       attemptedEngine = engine;
       applyAvailability(engine);
       renderLoadingState(
         t("mdEngineExtracting", engineLabel(engine)),
-        engine === "jina" ? t("mdEngineExtractingNoteJina") : ""
+        engine === "jina" ? t("mdEngineExtractingNoteJina") : (engine === "deepseek" ? t("mdEngineExtractingNoteDeepseek") : "")
       );
       let pr;
       if (engine === "local" && !srcTabId && info.historyReopen === true) {
@@ -2043,6 +2078,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // writers for MP_KEY. Non-video pages release right after detection;
       // video pages hold it until this attempt's terminal decision.
       if (pr && pr.ok) { location.reload(); return; }
+      if ((engine === "jina" || engine === "deepseek") && pr && pr.error === "host_permission") shellPermissionMissing.add(engine);
+      else shellPermissionMissing.delete(engine);
       // An empty top document with one dominant cross-origin https frame:
       // offer the grant-and-retry for exactly that origin (see grantFrameAndRetry)
       // instead of the bare "no content" shell. Origin string only, https only.
@@ -2059,11 +2096,14 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         renderErrorState(t("mdPreviewFrameHint", host), () => grantFrameAndRetry(attemptedEngine, frameOrigin), true, null, url);
       } else {
         // The other engine, when this page can use it: Defuddle needs the
-        // source tab, Jina an http(s) URL (engineUnavailable). The rail's
+        // source tab, Jina / DeepSeek an http(s) URL (engineUnavailable). The rail's
         // engine switch lives in the collapsed "Source and extraction tools"
         // section, so it is opened too -- both ways out are then on screen.
-        const otherEngine = attemptedEngine === "jina" ? "local" : "jina";
-        const alt = engineUnavailable(otherEngine) ? null
+        const altCandidates = attemptedEngine === "local"
+          ? ["jina", "deepseek"]
+          : (attemptedEngine === "deepseek" ? ["local", "jina"] : ["local", "deepseek"]);
+        const otherEngine = altCandidates.find((c) => !engineUnavailable(c)) || "";
+        const alt = !otherEngine ? null
           : { label: t("mdEngineSwitchTo", engineLabel(otherEngine)), run: () => retryExtract(otherEngine, null) };
         const sourceDetails = document.getElementById("reader-source-details");
         if (alt && sourceDetails) sourceDetails.open = true;
@@ -2157,7 +2197,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           if (!(cur1 && typeof cur1.nonce === "string" && cur1.nonce !== _pageNonce && (cur1.ts || 0) > _pageLoadTs)) {
             await chrome.storage.local.set({ [MP_KEY]: {
               markdown: "", title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
-              source: attemptedEngine === "jina" ? "jina" : "local",
+              source: pbpNormalizeExtractEngine(attemptedEngine),
               sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(), nonce: _pageNonce
             } });
           }
@@ -2186,6 +2226,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           const e = seg.getAttribute("data-engine");
           if (inFlight || e === attemptedEngine || seg.getAttribute("aria-disabled") === "true") return;
           if (e === "local" && !srcTabId && info.historyReopen === true) retryExtract(e, null);
+          else if ((e === "jina" || e === "deepseek") && shellPermissionMissing.has(e)) retryExtract(e, { error: "host_permission" });
           else attemptExtract(e);
         });
       });
@@ -2400,7 +2441,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         videoState: info.videoState,
         videoDescriptionMd: (window.pbpVideoDoc && window.pbpVideoDoc.descriptionMarkdown) || "",
         title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
-        source: source === "jina" ? "jina" : "local",
+        source: pbpNormalizeExtractEngine(source),
         author, published, site, image, lang: info.lang || "",
         sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
@@ -2409,7 +2450,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         // title rides along (a few bytes): the shell names the page with it
         // while re-extracting, and a failed attempt otherwise read "Untitled".
         restore: true, title: title || "", url, tabId: srcTabId, sourceTabUrl,
-        engine: source === "jina" ? "jina" : "local",
+        engine: pbpNormalizeExtractEngine(source),
         sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
       };
@@ -2425,7 +2466,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   if (!sourceIncognito && typeof pbpReaderHistoryRecord === "function") {
     void pbpReaderHistoryRecord({
       url, sourceTabUrl, title: title || "", site: site || "",
-      engine: source === "jina" ? "jina" : "local",
+      engine: pbpNormalizeExtractEngine(source),
       isVideo: document.body.classList.contains("video-mode") || info.videoTranscript === true,
       lastKey: k || "", sourceIncognito
     });
@@ -2505,7 +2546,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       url: url || "",
       date: clippedDate,
       tags,
-      source: source === "jina" ? "jina" : "defuddle"
+      source: source === "jina" ? "jina" : (source === "deepseek" ? "deepseek" : "defuddle")
     };
     if (pbpBookmarkAccountService(bookmarkAccount) === "linkding") {
       if (bookmarkDescription) meta.description = bookmarkDescription;
@@ -2919,9 +2960,9 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   } else {
     tokenEl.style.display = "none";
   }
-  const curEngine = source === "jina" ? "jina" : "local";
+  const curEngine = pbpNormalizeExtractEngine(source);
   let switching = false;
-  let jinaPermissionMissing = false;
+  const enginePermissionMissing = new Set();
 
   if (sourceEl) {
     applyAvailability(curEngine);
@@ -2935,14 +2976,14 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         // property carries no explanation to lose, and applyAvailability
         // releases it on every path out of this handler.
         sourceEl.querySelectorAll(".src-seg").forEach((s) => { s.disabled = true; });
-        if (e === "jina" && jinaPermissionMissing) {
-          if (!await pbpRequestJinaHostPermission()) {
+        if ((e === "jina" || e === "deepseek") && enginePermissionMissing.has(e)) {
+          if (!await pbpRequestEngineHostPermission(e)) {
             switching = false;
             sourceEl.removeAttribute("aria-busy");
             applyAvailability(curEngine);
             return;
           }
-          jinaPermissionMissing = false;
+          enginePermissionMissing.delete(e);
         }
         seg.classList.add("loading");
         setEngineStatus(t("mdEngineExtracting", engineLabel(e)), false);
@@ -2955,7 +2996,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           });
         } catch (_) { r = { ok: false, error: "network" }; }
         if (r && r.ok) { location.reload(); return; }
-        if (e === "jina" && r && r.error === "host_permission") jinaPermissionMissing = true;
+        if ((e === "jina" || e === "deepseek") && r && r.error === "host_permission") enginePermissionMissing.add(e);
         // failure: keep current content, restore the control
         switching = false;
         sourceEl.removeAttribute("aria-busy");
@@ -3084,12 +3125,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   let imgRefreshRunning = false; // the refresh-the-source click is mid-flight
   let imgRefreshError = "";      // why the last refresh did not land (the row shows it)
   // The source-refresh offer needs what that path needs: the local engine (a
-  // Jina page is fetched server-side, with no tab to refresh), a live source
+  // Jina / DeepSeek page is fetched server-side, with no tab to refresh), a live source
   // tab handle, an https page (the only origins the optional grant ceiling
   // covers), and not a committed video transcript (re-extracting would
   // overwrite it -- same guard as attemptExtract).
   function imgFixCanRefresh() {
-    if (source === "jina" || !srcTabId) return false;
+    if (source === "jina" || source === "deepseek" || !srcTabId) return false;
     if (window.pbpVideoDoc && window.pbpVideoDoc.committed === true) return false;
     try { return new URL(sourceTabUrl).protocol === "https:"; } catch (_) { return false; }
   }

@@ -2303,7 +2303,10 @@ async function _pbpTrStart(st) {
   let summary = "";
   try {
     const activeSeg = document.querySelector("#source-badge .src-seg.active");
-    const source = (activeSeg && activeSeg.getAttribute("data-engine") === "jina") ? "jina" : "local";
+    const segEngine = activeSeg && activeSeg.getAttribute("data-engine");
+    const source = typeof pbpNormalizeExtractEngine === "function"
+      ? pbpNormalizeExtractEngine(segEngine)
+      : (segEngine === "jina" ? "jina" : "local");
     summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, await _pbpTrSummaryAccount(), st.s)) || "";
   } catch (_) {}
   if (st.rev !== runRev) return;
@@ -2892,7 +2895,10 @@ async function _pbpTrTranslateBlock(st, w, signal, lang = st.target.code, langNa
   let summary = "";
   try {
     const activeSeg = document.querySelector("#source-badge .src-seg.active");
-    const source = (activeSeg && activeSeg.getAttribute("data-engine") === "jina") ? "jina" : "local";
+    const segEngine = activeSeg && activeSeg.getAttribute("data-engine");
+    const source = typeof pbpNormalizeExtractEngine === "function"
+      ? pbpNormalizeExtractEngine(segEngine)
+      : (segEngine === "jina" ? "jina" : "local");
     summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, await _pbpTrSummaryAccount(), st.s)) || "";
   } catch (_) {}
   const out = [];

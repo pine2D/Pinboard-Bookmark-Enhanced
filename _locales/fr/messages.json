@@ -5482,5 +5482,19 @@
   },
   "readerHistoryOpenFailed": {
     "message": "Impossible de rouvrir cet aperçu. Essayez d’ouvrir la page d’origine."
-  }
+  },
+  "aiContentSourceDeepseek": {"message":"DeepSeek Fetch"},
+  "aiContentSourceDeepseekHint": {"message":"Envoie l'URL de la page à DeepSeek Fetch, qui récupère la page et renvoie du Markdown nettoyé. Utilise votre clé API DeepSeek et facture chaque requête réussie."},
+  "deepseekFetchKeyMissingHint": {"message":"DeepSeek Fetch nécessite une clé API DeepSeek. Tant qu'elle manque, les actions IA utilisent l'extraction locale."},
+  "deepseekFetchAccessMissingHint": {"message":"DeepSeek Fetch ne peut pas encore joindre api.deepseek.com. Accordez l'accès ci-dessous pour l'utiliser."},
+  "deepseekFetchSetupBtn": {"message":"Configurer DeepSeek"},
+  "deepseekFetchGrantBtn": {"message":"Autoriser l'accès"},
+  "deepseekFetchKeyMissing": {"message":"La clé API DeepSeek est manquante. Ajoutez-la dans Paramètres > Fournisseurs IA > DeepSeek."},
+  "deepseekFetchAuthFailed": {"message":"La clé API DeepSeek est invalide ou expirée. Ouvrez Paramètres > Fournisseurs IA > DeepSeek pour la mettre à jour."},
+  "jinaMarkdownTitleDeepseek": {"message":"Convertir la page en Markdown (DeepSeek Fetch)"},
+  "batchPermExtractor": {"message":"$ENGINE$ (extraction de page) : $ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "mdEngineExtractingNoteDeepseek": {"message":"La première extraction interroge DeepSeek (api.deepseek.com). Elle prend généralement quelques secondes, selon la mise en cache de la page, votre vitesse réseau et la taille de la page."},
+  "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch ne récupère que les pages http(s) : il ne peut pas lire celle-ci."},
+  "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch récupère les pages depuis ses propres serveurs : il ne voit pas ce qui demande d'être connecté."},
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch n'accepte que les URL http(s) standard jusqu'à 8 192 caractères sans identifiants intégrés."}
 }

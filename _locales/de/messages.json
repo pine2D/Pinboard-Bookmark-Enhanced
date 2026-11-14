@@ -5482,5 +5482,19 @@
   },
   "readerHistoryOpenFailed": {
     "message": "Diese Vorschau ließ sich nicht erneut öffnen. Öffne stattdessen die Originalseite."
-  }
+  },
+  "aiContentSourceDeepseek": {"message":"DeepSeek Fetch"},
+  "aiContentSourceDeepseekHint": {"message":"Sendet die Seiten-URL an DeepSeek Fetch, das die Seite abruft und bereinigtes Markdown zurückgibt. Nutzt deinen DeepSeek-API-Schlüssel und wird pro erfolgreichem Abruf berechnet."},
+  "deepseekFetchKeyMissingHint": {"message":"DeepSeek Fetch benötigt einen DeepSeek-API-Schlüssel. Bis du ihn einträgst, weichen KI-Aktionen auf die lokale Extraktion aus."},
+  "deepseekFetchAccessMissingHint": {"message":"DeepSeek Fetch erreicht api.deepseek.com noch nicht. Erteile unten den Zugriff, damit die Extraktion funktioniert."},
+  "deepseekFetchSetupBtn": {"message":"DeepSeek einrichten"},
+  "deepseekFetchGrantBtn": {"message":"Zugriff erlauben"},
+  "deepseekFetchKeyMissing": {"message":"Der DeepSeek-API-Schlüssel fehlt. Trag ihn unter Einstellungen > KI-Anbieter > DeepSeek ein."},
+  "deepseekFetchAuthFailed": {"message":"Der DeepSeek-API-Schlüssel ist ungültig oder abgelaufen. Öffne Einstellungen > KI-Anbieter > DeepSeek, um ihn zu aktualisieren."},
+  "jinaMarkdownTitleDeepseek": {"message":"Seite in Markdown umwandeln (DeepSeek Fetch)"},
+  "batchPermExtractor": {"message":"$ENGINE$ (Seitenextraktion): $ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "mdEngineExtractingNoteDeepseek": {"message":"Die erste Extraktion ruft DeepSeek (api.deepseek.com) ab. Sie dauert meist ein paar Sekunden, abhängig davon, ob die Seite zwischengespeichert ist, von deiner Netzwerkgeschwindigkeit und der Seitengröße."},
+  "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch kann nur http(s)-Seiten abrufen und diese Seite daher nicht lesen."},
+  "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch ruft Seiten über eigene Server ab und sieht deshalb nichts, wofür man angemeldet sein muss."},
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch akzeptiert nur reguläre http(s)-URLs mit bis zu 8.192 Zeichen ohne eingebettete Zugangsdaten."}
 }

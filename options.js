@@ -326,6 +326,23 @@ async function renderConnectionOverview() {
       providerNote.querySelector("p").textContent = t(aiConfigured ? "aiProviderAccessMissing" : "aiProviderKeyMissing");
     }
   }
+  const deepseekSrcOn = $id("opt-ai-src-deepseek")?.checked === true;
+  const deepseekKeyReady = !!$id("opt-deepseek-key")?.value.trim();
+  const deepseekFetchPerm = deepseekSrcOn && deepseekKeyReady && typeof PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN === "string"
+    ? await permissionFor({ origins: [PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN] })
+    : null;
+  const deepseekFetchNote = $id("deepseek-fetch-unavailable");
+  if (deepseekFetchNote) {
+    const dead = deepseekSrcOn && (!deepseekKeyReady || deepseekFetchPerm === false);
+    deepseekFetchNote.hidden = !dead;
+    if (dead) {
+      const msgEl = deepseekFetchNote.querySelector("p");
+      const btnEl = $id("deepseek-fetch-setup-btn");
+      const btnKey = deepseekKeyReady ? "deepseekFetchGrantBtn" : "deepseekFetchSetupBtn";
+      if (msgEl) msgEl.textContent = t(deepseekKeyReady ? "deepseekFetchAccessMissingHint" : "deepseekFetchKeyMissingHint");
+      if (btnEl) { btnEl.setAttribute("data-i18n", btnKey); btnEl.textContent = t(btnKey); }
+    }
+  }
   const selectedService = document.querySelector('input[name="bookmark-service"]:checked')?.value || "pinboard";
   const bookmarkSettings = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
   const bookmarkConnection = pbpBookmarkConnection({...bookmarkSettings,bookmarkService:selectedService});
@@ -3395,7 +3412,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   syncPromptStates();
 
   // AI Content Source radio
-  const srcRadio = document.querySelector(`input[name="ai-content-source"][value="${s.aiContentSource || 'local'}"]`);
+  const srcRadio = document.querySelector(`input[name="ai-content-source"][value="${pbpNormalizeExtractEngine(s.aiContentSource)}"]`);
   if (srcRadio) srcRadio.checked = true;
 
   // Tag Sync Mode radio
@@ -4931,6 +4948,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   for (const btn of [$id("onboard-next-ai-btn"), ...document.querySelectorAll("[data-ai-setup]")]) {
     btn?.addEventListener("click", () => pbpOpenOptionsTarget("ai", pbpAiSetupTarget()));
   }
+  for (const radio of document.querySelectorAll('input[name="ai-content-source"]')) {
+    radio.addEventListener("change", scheduleConnectionOverview);
+  }
+  $id("deepseek-fetch-setup-btn")?.addEventListener("click", async () => {
+    if ($id("opt-deepseek-key")?.value.trim() && typeof PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN === "string" && chrome.permissions?.request) {
+      try { await chrome.permissions.request({ origins: [PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN] }); }
+      catch (e) { console.warn("[options] DeepSeek Fetch permission request failed:", e?.name, e?.message); }
+      scheduleConnectionOverview();
+      return;
+    }
+    const targetId = $id("opt-ai-provider")?.value === "deepseek" ? "opt-deepseek-key" : "opt-ai-provider-btn";
+    pbpOpenOptionsTarget("ai", targetId);
+  });
   chrome.storage.onChanged?.addListener((changes, area) => {
     if (area === "local" && (changes[PBP_CONNECTION_HEALTH_KEY] || changes.vocabDriveConnected)) {
       scheduleConnectionOverview();

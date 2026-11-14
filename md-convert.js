@@ -676,6 +676,7 @@ function htmlToMarkdown(html, opts) {
 // ---- Convert Markdown to plain text (for AI prompts) ----
 // Moved verbatim from jina.js (behavior unchanged).
 function markdownToPlainText(markdown) {
+  if (typeof pbpMarkdownToPlainText === "function") return pbpMarkdownToPlainText(markdown);
   if (!markdown) return "";
   return markdown
     // Remove images

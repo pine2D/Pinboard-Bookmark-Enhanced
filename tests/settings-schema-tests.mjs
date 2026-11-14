@@ -82,7 +82,7 @@ test("live repository passes settings schema sync, DOM coverage, and AST gates",
 test("generated region drift in shared.js, options-backup.js, or options.js is caught and healed by --write", (t) => {
   const mutations = [
     { file: "shared.js", from: 'aiContentSource: "local",', to: 'aiContentSource: "jina",' },
-    { file: "options-backup.js", from: 'aiContentSource: ["local", "jina"],', to: 'aiContentSource: ["local"],' },
+    { file: "options-backup.js", from: 'aiContentSource: ["local", "jina", "deepseek"],', to: 'aiContentSource: ["local"],' },
     { file: "options.js", from: '"opt-ai-tag-lang": "en",', to: '"opt-ai-tag-lang": "auto",' },
   ];
 

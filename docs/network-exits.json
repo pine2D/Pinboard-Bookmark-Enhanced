@@ -64,7 +64,7 @@
       "disclosedAs": "Gemini"
     },
     "api.deepseek.com": {
-      "purpose": "AI provider: DeepSeek (BYO key, user-selected)",
+      "purpose": "AI provider: DeepSeek and optional DeepSeek Fetch article extraction (BYO key, user-selected)",
       "disclosedAs": "DeepSeek"
     },
     "dashscope.aliyuncs.com": {

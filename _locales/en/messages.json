@@ -5504,5 +5504,19 @@
   },
   "readerHistoryOpenFailed": {
     "message": "Couldn't reopen this preview. Try opening the original page instead."
-  }
+  },
+  "aiContentSourceDeepseek": {"message":"DeepSeek Fetch"},
+  "aiContentSourceDeepseekHint": {"message":"Sends the page URL to DeepSeek Fetch, which extracts the page and returns cleaned Markdown. Uses your DeepSeek API key and bills per successful request."},
+  "deepseekFetchKeyMissingHint": {"message":"DeepSeek Fetch needs a DeepSeek API key. Until you add one, AI actions fall back to local extraction."},
+  "deepseekFetchAccessMissingHint": {"message":"DeepSeek Fetch can't reach api.deepseek.com yet. Grant access below so extraction can use it."},
+  "deepseekFetchSetupBtn": {"message":"Set up DeepSeek"},
+  "deepseekFetchGrantBtn": {"message":"Grant access"},
+  "deepseekFetchKeyMissing": {"message":"DeepSeek API key is missing. Add it in Settings > AI Providers > DeepSeek."},
+  "deepseekFetchAuthFailed": {"message":"DeepSeek API key is invalid or expired. Open Settings > AI Providers > DeepSeek to update it."},
+  "jinaMarkdownTitleDeepseek": {"message":"Convert page to Markdown (DeepSeek Fetch)"},
+  "batchPermExtractor": {"message":"$ENGINE$ (page extractor): $ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "mdEngineExtractingNoteDeepseek": {"message":"First-time extraction fetches from DeepSeek (api.deepseek.com). It usually takes a few seconds, depending on whether the page is cached, your network speed, and the page size."},
+  "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch can only fetch http(s) pages, so it can't read this one."},
+  "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch fetches pages from its own servers, so it can't see anything that needs you to sign in."},
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch only accepts standard http(s) URLs up to 8,192 characters without embedded credentials."}
 }

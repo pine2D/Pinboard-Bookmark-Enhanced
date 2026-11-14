@@ -9,20 +9,34 @@ async function readBatchAccount() {
 }
 
 function batchAiPermissionOrigins(validTabs, s) {
-  // Only origins inside the manifest's optional_host_permissions ceiling
-  // (https, plus literal-loopback http) can be requested — one out-of-ceiling
-  // origin in the list makes the whole permissions.request throw, killing the
-  // grant for every https tab too. Plain-http tabs are simply not requested:
-  // they still SAVE fine (posts/add needs no host grant); only the AI
-  // extraction degrades, which the batch loop already tolerates per tab.
-  const requestable = (tab) => {
-    try {
-      const u = new URL(tab.url);
-      return u.protocol === "https:" ||
-        (u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname));
-    } catch (_) { return false; }
-  };
-  const origins = validTabs.filter(requestable).map(tab => new URL(tab.url).origin + "/*");
+  // When a remote content extractor is active (Jina, or DeepSeek Fetch with a
+  // configured key), Batch Save extracts server-side instead of injecting into
+  // every tab — request only that extractor's origin plus the AI provider's.
+  const remoteEngine = typeof pbpBatchRemoteExtractEngine === "function" ? pbpBatchRemoteExtractEngine(s) : "";
+  const remoteOrigin = remoteEngine && typeof pbpRemoteExtractOriginPattern === "function"
+    ? pbpRemoteExtractOriginPattern(remoteEngine)
+    : "";
+  const origins = [];
+  if (remoteOrigin) {
+    origins.push(remoteOrigin);
+  } else {
+    // Only origins inside the manifest's optional_host_permissions ceiling
+    // (https, plus literal-loopback http) can be requested — one out-of-ceiling
+    // origin in the list makes the whole permissions.request throw, killing the
+    // grant for every https tab too. Plain-http tabs are simply not requested:
+    // they still SAVE fine (posts/add needs no host grant); only the AI
+    // extraction degrades, which the batch loop already tolerates per tab.
+    const requestable = (tab) => {
+      try {
+        const u = new URL(tab.url);
+        return u.protocol === "https:" ||
+          (u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname));
+      } catch (_) { return false; }
+    };
+    for (const tab of validTabs.filter(requestable)) {
+      origins.push(new URL(tab.url).origin + "/*");
+    }
+  }
   const providerOrigin = _aiTargetOriginPattern(s);
   if (providerOrigin) origins.push(providerOrigin);
   return [...new Set(origins)];
@@ -32,9 +46,16 @@ function batchAiPermissionRows(origins, s) {
   const providerOrigin = _aiTargetOriginPattern(s);
   // The resolver's name: a built-in's Settings name, a custom entry's own.
   const providerName = pbpAiResolveTarget(s).label;
+  const remoteEngine = typeof pbpBatchRemoteExtractEngine === "function" ? pbpBatchRemoteExtractEngine(s) : "";
+  const remoteOrigin = remoteEngine && typeof pbpRemoteExtractOriginPattern === "function"
+    ? pbpRemoteExtractOriginPattern(remoteEngine)
+    : "";
+  const remoteLabel = remoteEngine === "deepseek" ? "DeepSeek Fetch" : (remoteEngine === "jina" ? "Jina Reader" : "");
   return origins.map(pattern => {
     const origin = pattern.replace(/\/\*$/, "");
-    return pattern === providerOrigin ? t("batchPermProvider", providerName, origin) : origin;
+    if (pattern === providerOrigin) return t("batchPermProvider", providerName, origin);
+    if (remoteOrigin && pattern === remoteOrigin) return t("batchPermExtractor", remoteLabel, origin);
+    return origin;
   });
 }
 

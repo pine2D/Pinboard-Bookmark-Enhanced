@@ -4418,19 +4418,19 @@ async function sweepSuggestCache() {
     let all;
     if (typeof chrome.storage.local.getKeys === "function") {
       const keys = (await chrome.storage.local.getKeys())
-        .filter((k) => k.startsWith("cached_suggest_") || k.startsWith("jina_md_"));
+        .filter((k) => k.startsWith("cached_suggest_") || k.startsWith("jina_md_") || k.startsWith("deepseek_md_"));
       all = keys.length ? await chrome.storage.local.get(keys) : {};
     } else {
       all = await chrome.storage.local.get(null);
     }
     const stale = Object.keys(all).filter((k) => {
       if (k.startsWith("cached_suggest_")) return isStaleCacheEntry(all[k], now, SUGGEST_STALE_MS);
-      if (k.startsWith("jina_md_")) return jinaStaleMs === 0 || isStaleCacheEntry(all[k], now, jinaStaleMs);
+      if (k.startsWith("jina_md_") || k.startsWith("deepseek_md_")) return jinaStaleMs === 0 || isStaleCacheEntry(all[k], now, jinaStaleMs);
       return false;
     });
     if (stale.length) await chrome.storage.local.remove(stale);
     await chrome.storage.local.set({ _suggestSweepTs: now });
-    if (stale.length) console.log(`[cache-sweep] evicted ${stale.length} stale entries (suggest + jina_md)`);
+    if (stale.length) console.log(`[cache-sweep] evicted ${stale.length} stale entries (suggest + page_md)`);
   } catch (e) {
     // MV3 rule: leave a trace. Name and message only, never keys or URLs.
     console.warn("[cache-sweep] suggest/jina sweep failed:", e?.name, e?.message);
@@ -5370,7 +5370,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       try { const u = new URL(message.frameOrigin); return (u.protocol === "https:" && u.origin === message.frameOrigin) ? u.origin : ""; }
       catch (_) { return ""; }
     })();
-    if (!url || (engine !== "local" && engine !== "jina")) {
+    if (!url || (engine !== "local" && engine !== "jina" && engine !== "deepseek")) {
       sendResponse({ ok: false, error: "bad_request" }); return true;
     }
     // Write back to the requesting tab's own token key so the reload reads the
@@ -5729,10 +5729,9 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     const useAiTags = s.batchAiTags && hasAIKey(s);
     const useAiSummary = s.batchAiSummary && hasAIKey(s);
     const linkding = currentAuth.service === "linkding";
-    // Batch extraction is always local Defuddle - cache under the matching
-    // namespace, never the configured aiContentSource (audit A3, same as
-    // saveFromBackground).
-    const aiCacheSource = "local";
+    const batchRemoteEngine = (useAiTags || useAiSummary) && typeof pbpBatchRemoteExtractEngine === "function"
+      ? pbpBatchRemoteExtractEngine(s)
+      : "";
 
     const userTagsTop = tagVocab.counts ? pbpTagsByCount(tagVocab.counts) : [];
 
@@ -5786,8 +5785,41 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         let notes = "";
         let linkdingSummary = "";
         let pageInfo = null;
+        let aiCacheSource = "local";
 
-        if (!settled && (useAiTags || useAiSummary || (linkding && s.optAutoDescription !== false))) {
+        if (!settled && batchRemoteEngine) {
+          try {
+            const remoteRes = batchRemoteEngine === "deepseek"
+              ? await fetchDeepseekMarkdown(tab.url, { apiKey: s.deepseekApiKey || "", cacheDuration: s.aiCacheDuration })
+              : await fetchJinaMarkdown(tab.url, { apiKey: s.jinaApiKey || "", cacheDuration: s.aiCacheDuration });
+            if (!remoteRes?.error && remoteRes?.markdown) {
+              const plain = typeof pbpMarkdownToPlainText === "function"
+                ? pbpMarkdownToPlainText(remoteRes.markdown)
+                : String(remoteRes.markdown).trim();
+              if (plain) {
+                pageInfo = { pageText: plain, title: remoteRes.title || tab.title || "", url: tab.url, contentType: "text/markdown" };
+                aiCacheSource = batchRemoteEngine;
+              }
+            }
+          } catch (e) { console.warn("batch: remote extract failed for", tab.url, e.message); }
+          if (!pageInfo?.pageText) {
+            let tabOriginGranted = false;
+            try {
+              const u = new URL(tab.url);
+              if (u.protocol === "https:" || (u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname))) {
+                tabOriginGranted = (await chrome.permissions.contains({ origins: [u.origin + "/*"] })) === true;
+              }
+            } catch (e) { console.warn("batch: tab origin check failed:", e?.name, e?.message); }
+            if (tabOriginGranted) {
+              try {
+                pageInfo = await getPageInfoFromTab(await resolveLiveTabId(tab), {
+                  withDefuddle: true, expectedUrl: tab.url
+                });
+                if (pageInfo?.pageText) aiCacheSource = "local";
+              } catch (e) { console.warn("batch: fallback local extract failed for", tab.url, e.message); }
+            }
+          }
+        } else if (!settled && (useAiTags || useAiSummary || (linkding && s.optAutoDescription !== false))) {
           try { pageInfo = await getPageInfoFromTab(await resolveLiveTabId(tab), {
             withDefuddle: !!(useAiTags || useAiSummary), expectedUrl: tab.url
           }); }
@@ -6219,6 +6251,31 @@ async function extractForPreview({ tabId, url, engine, sourceTabUrl, frame, fram
       published: r.published || ""
     };
   }
+  if (engine === "deepseek") {
+    const raw = await pbpReadSettingsWithSecrets({
+      deepseekApiKey: SETTINGS_DEFAULTS.deepseekApiKey,
+      aiCacheDuration: SETTINGS_DEFAULTS.aiCacheDuration
+    });
+    const key = raw.deepseekApiKey ? deobfuscateKey(raw.deepseekApiKey) : "";
+    const r = await fetchDeepseekMarkdown(url, { apiKey: key, cacheDuration: raw.aiCacheDuration });
+    if (r.error) {
+      const code = r.error === "host_permission" ? "host_permission"
+        : r.error === "deepseek_key_missing" ? "deepseek_key_missing"
+        : r.error === "invalid_url" ? "invalid_url"
+        : r.status === 429 ? "rate_limited"
+        : r.authFailed ? "deepseek_auth"
+        : r.timeout === true ? "timeout"
+        : r.error;
+      return { error: code };
+    }
+    if (!r.markdown || !r.markdown.trim()) return { error: "empty" };
+    return {
+      source: "deepseek", markdown: r.markdown, contentHtml: "",
+      title: r.title || "", url: r.url || url,
+      tokens: 0, hasApiKey: !!key, math: false,
+      published: r.published || ""
+    };
+  }
   // engine === "local" (Defuddle)
   if (!tabId) return { error: "tab_unavailable" };
   // Weak-handle guard: the stored tabId may now host a DIFFERENT page (user
@@ -6317,7 +6374,7 @@ async function openMarkdownPreviewFromShortcut() {
     (await getSettingsStorage()).get({ aiContentSource: SETTINGS_DEFAULTS.aiContentSource, urlClean: SETTINGS_DEFAULTS.urlClean }),
     getCurrentBookmarkAuth().catch(() => ({ account: "" })),
   ]);
-  const engine = raw.aiContentSource === "jina" ? "jina" : "local";
+  const engine = pbpNormalizeExtractEngine(raw.aiContentSource);
   // Per-open token key so two shortcut opens (or a shortcut + a popup Preview)
   // never share one storage slot and clobber each other before their tabs read.
   const k = crypto.randomUUID();

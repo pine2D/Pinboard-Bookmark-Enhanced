@@ -288,7 +288,7 @@ export const SETTINGS_SCHEMA = deepFreeze([
     key: "aiContentSource",
     section: "tail",
     defaultValue: "local",
-    backupEnum: ["local", "jina"],
+    backupEnum: ["local", "jina", "deepseek"],
     backupEnumOrder: 5,
     options: {
       panel: "ai-behavior",

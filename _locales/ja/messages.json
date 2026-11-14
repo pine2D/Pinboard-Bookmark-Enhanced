@@ -5482,5 +5482,19 @@
   },
   "readerHistoryOpenFailed": {
     "message": "このプレビューを開き直せませんでした。元のページを直接開いてください。"
-  }
+  },
+  "aiContentSourceDeepseek": {"message":"DeepSeek Fetch"},
+  "aiContentSourceDeepseekHint": {"message":"ページの URL を DeepSeek Fetch に送信し、ページを取得して整形済みの Markdown を返します。DeepSeek API キーを使用し、成功したリクエストごとに課金されます。"},
+  "deepseekFetchKeyMissingHint": {"message":"DeepSeek Fetch には DeepSeek API キーが必要です。入力するまではローカル抽出が使われます。"},
+  "deepseekFetchAccessMissingHint": {"message":"DeepSeek Fetch はまだ api.deepseek.com にアクセスできません。下のボタンから許可してください。"},
+  "deepseekFetchSetupBtn": {"message":"DeepSeek を設定"},
+  "deepseekFetchGrantBtn": {"message":"アクセスを許可"},
+  "deepseekFetchKeyMissing": {"message":"DeepSeek API キーが未設定です。設定 > AI プロバイダー > DeepSeek で入力してください。"},
+  "deepseekFetchAuthFailed": {"message":"DeepSeek API キーが無効か期限切れです。設定 > AI プロバイダー > DeepSeek で更新してください。"},
+  "jinaMarkdownTitleDeepseek": {"message":"ページを Markdown に変換（DeepSeek Fetch）"},
+  "batchPermExtractor": {"message":"$ENGINE$（ページ抽出）：$ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "mdEngineExtractingNoteDeepseek": {"message":"初回の抽出は DeepSeek（api.deepseek.com）から取得します。待ち時間は、ページがキャッシュ済みかどうか、通信速度、ページの大きさによって変わります（通常は数秒）。"},
+  "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch が取得できるのは http(s) のページだけのため、このページは読み取れません。"},
+  "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch は自前のサーバーからページを取得するため、ログインしないと見られない内容は読み取れません。"},
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch は認証情報を含まない 8,192 文字以内の標準的な http(s) URL のみ対応しています。"}
 }

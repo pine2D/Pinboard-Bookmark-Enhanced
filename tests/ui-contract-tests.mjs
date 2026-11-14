@@ -4754,21 +4754,21 @@ const jinaRetryEnd = mdPreviewJs.indexOf("async function attemptExtract(engine",
 const jinaRetry = mdPreviewJs.slice(jinaRetryStart, jinaRetryEnd);
 check(jinaRetryStart >= 0 && jinaRetryEnd > jinaRetryStart &&
   jinaRetry.indexOf("inFlight = true") >= 0 &&
-  jinaRetry.indexOf("inFlight = true") < jinaRetry.indexOf("await pbpRequestJinaHostPermission()") &&
-  jinaRetry.indexOf("await pbpRequestJinaHostPermission()") >= 0 &&
-  jinaRetry.indexOf("await pbpRequestJinaHostPermission()") < jinaRetry.indexOf("await attemptExtract(engine)") &&
+  jinaRetry.indexOf("inFlight = true") < jinaRetry.indexOf("await pbpRequestEngineHostPermission(engine)") &&
+  jinaRetry.indexOf("await pbpRequestEngineHostPermission(engine)") >= 0 &&
+  jinaRetry.indexOf("await pbpRequestEngineHostPermission(engine)") < jinaRetry.indexOf("await attemptExtract(engine)") &&
   /finally\s*\{\s*inFlight = false;/.test(jinaRetry),
-  "md-preview.js: Jina retry is not guarded before its exact-origin request");
-const switchRetryStart = mdPreviewJs.indexOf('if (e === "jina" && jinaPermissionMissing)');
+  "md-preview.js: remote-engine retry is not guarded before its exact-origin request");
+const switchRetryStart = mdPreviewJs.indexOf('if ((e === "jina" || e === "deepseek") && enginePermissionMissing.has(e))');
 const switchHandlerStart = mdPreviewJs.lastIndexOf('seg.addEventListener("click", async () => {', switchRetryStart);
 const switchRetryEnd = mdPreviewJs.indexOf("chrome.runtime.sendMessage", switchRetryStart) + "chrome.runtime.sendMessage".length;
 const switchRetry = mdPreviewJs.slice(switchHandlerStart, switchRetryEnd);
 check(switchHandlerStart >= 0 && switchRetryEnd > switchRetryStart &&
   switchRetry.indexOf("switching = true") >= 0 &&
-  switchRetry.indexOf("switching = true") < switchRetry.indexOf("await pbpRequestJinaHostPermission()") &&
-  switchRetry.indexOf("await pbpRequestJinaHostPermission()") < switchRetry.indexOf("chrome.runtime.sendMessage") &&
-  /if \(!await pbpRequestJinaHostPermission\(\)\) \{[\s\S]*?switching = false;[\s\S]*?applyAvailability\(curEngine\);[\s\S]*?return;/.test(switchRetry),
-  "md-preview.js: Jina engine retry is not guarded before its permission request");
+  switchRetry.indexOf("switching = true") < switchRetry.indexOf("await pbpRequestEngineHostPermission(e)") &&
+  switchRetry.indexOf("await pbpRequestEngineHostPermission(e)") < switchRetry.indexOf("chrome.runtime.sendMessage") &&
+  /if \(!await pbpRequestEngineHostPermission\(e\)\) \{[\s\S]*?switching = false;[\s\S]*?applyAvailability\(curEngine\);[\s\S]*?return;/.test(switchRetry),
+  "md-preview.js: remote-engine switch retry is not guarded before its permission request");
 const renderErrorState = mdPreviewJs.slice(
   mdPreviewJs.indexOf("function renderErrorState"),
   mdPreviewJs.indexOf("function pbpRequestJinaHostPermission")
@@ -4857,9 +4857,9 @@ check(markdownClickStart >= 0 && markdownClickEnd > markdownClickStart &&
   markdownClick.indexOf("jinaMdBtn.disabled = true") >= 0 &&
   markdownClick.indexOf("jinaMdBtn.disabled = true") < markdownClick.indexOf("await chrome.permissions.request") &&
   markdownClick.indexOf("jinaMdBtn.disabled = false") > markdownClick.indexOf("await chrome.permissions.request") &&
-  markdownClick.indexOf("await chrome.permissions.request({ origins: [PBP_JINA_ORIGIN_PATTERN] })") === markdownClick.indexOf("await ") &&
+  markdownClick.indexOf("await chrome.permissions.request({ origins: [remoteGrantPattern] })") === markdownClick.indexOf("await ") &&
   markdownClick.includes('result.code === "host_permission"') && markdownClick.includes('t("aiGrantRetry")'),
-  "popup.js: Markdown host-permission recovery is not a Jina-only first-await grant and retry");
+  "popup.js: Markdown host-permission recovery is not an exact-origin first-await grant and retry");
 
 const tagGovClickStart = optionsJs.indexOf('$id("tag-gov-ai-btn")?.addEventListener');
 const tagGovClickEnd = optionsJs.indexOf("await renderWaybackLog()", tagGovClickStart);

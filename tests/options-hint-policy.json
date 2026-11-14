@@ -27,7 +27,7 @@
       "#tag-gov-selected-count", "#tag-gov-entity-status", "#opt-theme-overridden", "optCheckBookmarkStatusLinkding"
     ],
     "help": [
-      "aiCacheHint", "aiContentSourceJinaHint", "aiContentSourceLocalHint", "archiveLogNote",
+      "aiCacheHint", "aiContentSourceDeepseekHint", "aiContentSourceJinaHint", "aiContentSourceLocalHint", "archiveLogNote",
       "backupIncludeHighlightsHint", "backupPlaintextDisclosure", "batchAiHint",
       "batchTagsHint", "bookmarkGatewayCfHint", "bookmarkGatewayCustomHint", "bookmarkGatewayNoneHint",
       "customCSSOverlayHelp", "diagnosticsHint", "dictDefaultViewHint", "dictDefinitionLangHint", "dictEchoHint",

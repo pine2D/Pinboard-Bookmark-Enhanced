@@ -49,6 +49,47 @@ const TEXTAREA_MAX_HEIGHT = 300;
 const TAG_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 const OVERLAY_BYTE_LIMIT = 50 * 1024;
 const PBP_JINA_ORIGIN_PATTERN = "https://r.jina.ai/*";
+const PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN = "https://api.deepseek.com/*";
+
+function pbpNormalizeExtractEngine(engine) {
+  return (engine === "jina" || engine === "deepseek") ? engine : "local";
+}
+
+function pbpRemoteExtractOriginPattern(engine) {
+  if (engine === "jina") return PBP_JINA_ORIGIN_PATTERN;
+  if (engine === "deepseek") return PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN;
+  return "";
+}
+
+function pbpHasDeepseekFetchKey(s) {
+  if (!s || typeof s.deepseekApiKey !== "string" || !s.deepseekApiKey.trim()) return false;
+  const raw = typeof deobfuscateKey === "function" ? deobfuscateKey(s.deepseekApiKey) : s.deepseekApiKey;
+  return !!String(raw || "").trim();
+}
+
+function pbpBatchRemoteExtractEngine(s) {
+  if (!s || typeof s !== "object") return "";
+  if (s.aiContentSource === "jina") return "jina";
+  if (s.aiContentSource === "deepseek" && pbpHasDeepseekFetchKey(s)) return "deepseek";
+  return "";
+}
+
+function pbpMarkdownToPlainText(markdown) {
+  if (!markdown) return "";
+  return String(markdown)
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1")
+    .replace(/_{1,3}([^_]+)_{1,3}/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/^>\s?/gm, "")
+    .replace(/^[-*_]{3,}\s*$/gm, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 const PBP_VOCAB_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 const PBP_VOCAB_DRIVE_ORIGIN_PATTERN = "https://www.googleapis.com/*";
 // Video caption origins (mirror md-video.js's IIFE-local YT_ORIGIN /
@@ -1313,7 +1354,7 @@ function batchIsRunning(progress, now, ttl) {
 // routes there), so "clear everything not in a blocklist" would wipe
 // credentials. A key is deleted ONLY if it matches a category below.
 const PBP_RECLAIM_CATEGORIES = {
-  jina: { keys: [], prefixes: ["jina_md_"] },                       // Jina page extract cache (usually the largest)
+  jina: { keys: [], prefixes: ["jina_md_", "deepseek_md_"] },        // Remote page extract caches (Jina Reader + DeepSeek Fetch)
   urls: { keys: ["cached_existing_urls"], prefixes: [] },           // legacy bookmark URL set residue
   tags: { keys: ["cached_user_tags"], prefixes: ["cached_suggest_"] }, // tag autocomplete caches
   // AI usage counter + think-reject memo + param-fix memo, plus the dictionary's
@@ -5443,7 +5484,7 @@ function pbpReaderHistoryNormalizeEntry(raw, fallbackTs = Date.now()) {
   if (!url) return null;
   const title = typeof raw.title === "string" ? raw.title.replace(/\s+/g, " ").trim().slice(0, 300) : "";
   const site = typeof raw.site === "string" ? raw.site.replace(/\s+/g, " ").trim().slice(0, 120) : "";
-  const engine = raw.engine === "jina" ? "jina" : "local";
+  const engine = pbpNormalizeExtractEngine(raw.engine);
   const isVideo = raw.isVideo === true;
   const lastKey = typeof raw.lastKey === "string" ? raw.lastKey.trim().slice(0, 80) : "";
   const openedAt = (typeof raw.openedAt === "number" && Number.isFinite(raw.openedAt) && raw.openedAt > 0)
@@ -5596,11 +5637,10 @@ async function pbpOpenReaderFromHistory(entry, opts = {}) {
     }
   }
 
-  const engine = norm.engine === "jina" ? "jina" : "local";
+  const engine = pbpNormalizeExtractEngine(norm.engine);
   if (chrome.permissions?.contains && chrome.permissions?.request) {
-    const neededPattern = engine === "jina"
-      ? PBP_JINA_ORIGIN_PATTERN
-      : pbpReaderHistoryRequestableOrigin(targetUrl);
+    const neededPattern = pbpRemoteExtractOriginPattern(engine)
+      || pbpReaderHistoryRequestableOrigin(targetUrl);
     if (neededPattern) {
       let allowed = false;
       try { allowed = await chrome.permissions.contains({ origins: [neededPattern] }); }

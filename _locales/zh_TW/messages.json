@@ -5482,5 +5482,19 @@
   },
   "readerHistoryOpenFailed": {
     "message": "無法重新開啟這篇預覽，請改從原網頁開啟。"
-  }
+  },
+  "aiContentSourceDeepseek": {"message":"DeepSeek Fetch"},
+  "aiContentSourceDeepseekHint": {"message":"把頁面 URL 傳送給 DeepSeek Fetch，由它擷取頁面並傳回清理過的 Markdown。使用你的 DeepSeek API Key，按成功次數計費。"},
+  "deepseekFetchKeyMissingHint": {"message":"DeepSeek Fetch 需要填寫 DeepSeek API Key。填好之前，AI 功能會改用本地擷取。"},
+  "deepseekFetchAccessMissingHint": {"message":"DeepSeek Fetch 還無法存取 api.deepseek.com，按下按鈕授權後即可使用。"},
+  "deepseekFetchSetupBtn": {"message":"設定 DeepSeek"},
+  "deepseekFetchGrantBtn": {"message":"授權存取"},
+  "deepseekFetchKeyMissing": {"message":"尚未填寫 DeepSeek API Key，請至設定 > AI 服務商 > DeepSeek 中新增。"},
+  "deepseekFetchAuthFailed": {"message":"DeepSeek API Key 無效或已過期，請至設定 > AI 服務商 > DeepSeek 中更新。"},
+  "jinaMarkdownTitleDeepseek": {"message":"將頁面轉換為 Markdown（DeepSeek Fetch）"},
+  "batchPermExtractor": {"message":"$ENGINE$（頁面擷取）：$ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "mdEngineExtractingNoteDeepseek": {"message":"首次擷取會連線至 DeepSeek（api.deepseek.com）取得內容。耗時通常數秒，取決於該頁面是否已被快取、你的網路速度與頁面大小。"},
+  "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch 只能擷取 http(s) 頁面，無法讀取此頁。"},
+  "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch 從自己的伺服器擷取頁面，看不到需要登入才能看的內容。"},
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch 僅支援不超過 8,192 個字元且不含帳號密碼的標準 http(s) 網址。"}
 }

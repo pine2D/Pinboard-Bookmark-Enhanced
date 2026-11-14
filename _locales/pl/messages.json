@@ -5482,5 +5482,19 @@
   },
   "readerHistoryOpenFailed": {
     "message": "Nie udało się ponownie otworzyć tego podglądu. Spróbuj otworzyć oryginalną stronę."
-  }
+  },
+  "aiContentSourceDeepseek": {"message":"DeepSeek Fetch"},
+  "aiContentSourceDeepseekHint": {"message":"Wysyła adres URL strony do DeepSeek Fetch, który pobiera stronę i zwraca oczyszczony Markdown. Używa twojego klucza API DeepSeek i nalicza opłatę za każde udane żądanie."},
+  "deepseekFetchKeyMissingHint": {"message":"DeepSeek Fetch wymaga klucza API DeepSeek. Dopóki go nie dodasz, funkcje AI korzystają z ekstrakcji lokalnej."},
+  "deepseekFetchAccessMissingHint": {"message":"DeepSeek Fetch nie ma jeszcze dostępu do api.deepseek.com. Udziel go poniżej, aby ekstrakcja mogła działać."},
+  "deepseekFetchSetupBtn": {"message":"Skonfiguruj DeepSeek"},
+  "deepseekFetchGrantBtn": {"message":"Udziel dostępu"},
+  "deepseekFetchKeyMissing": {"message":"Brakuje klucza API DeepSeek. Dodaj go w Ustawienia > Dostawcy AI > DeepSeek."},
+  "deepseekFetchAuthFailed": {"message":"Klucz API DeepSeek jest nieprawidłowy lub wygasł. Otwórz Ustawienia > Dostawcy AI > DeepSeek, aby go zaktualizować."},
+  "jinaMarkdownTitleDeepseek": {"message":"Konwertuj stronę do Markdown (DeepSeek Fetch)"},
+  "batchPermExtractor": {"message":"$ENGINE$ (ekstrakcja stron): $ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "mdEngineExtractingNoteDeepseek": {"message":"Pierwsza ekstrakcja pobiera dane przez DeepSeek (api.deepseek.com). Czas oczekiwania zależy od tego, czy strona jest w pamięci podręcznej, od szybkości sieci i rozmiaru strony, zwykle trwa kilka sekund."},
+  "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch pobiera tylko strony http(s), więc nie odczyta tej strony."},
+  "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch pobiera strony przez własne serwery, więc nie widzi treści dostępnych dopiero po zalogowaniu."},
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch obsługuje tylko standardowe adresy http(s) do 8192 znaków bez danych logowania w adresie."}
 }

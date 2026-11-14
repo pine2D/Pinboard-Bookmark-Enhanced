@@ -388,7 +388,7 @@ button, input, select, textarea { font-family: inherit; }
    sharing the row, md rung (13px face, 1 + 4 + 16 + 4 + 1 = 26px). The 20px sm
    rung above stays for the video-column toggles that reuse .src-seg. */
 .rail .source-badge { display: flex; width: 100%; background: var(--btn-bg); }
-.rail .source-badge > .src-seg { flex: 1 1 auto; min-width: 0; padding: var(--sp-1) var(--sp-3); font-size: 13px; line-height: 16px; text-align: center; }
+.rail .source-badge > .src-seg { flex: 1 1 auto; min-width: 0; padding: var(--sp-1) var(--sp-2); font-size: 13px; line-height: 16px; text-align: center; white-space: nowrap; }
 /* ...and its states: .toggle-btn's resting text, hover fill and pressed
    weight (the bare .src-seg keeps the sm rung's quieter fg-secondary and has
    no hover). :not(.loading) keeps the spinner's transparent label. */

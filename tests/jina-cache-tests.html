@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="32"><title>Jina Cache Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="38"><title>Jina &amp; DeepSeek Fetch Cache Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -159,18 +159,140 @@ function buildSuggestSweepHarness(source, options) {
       const result = await fetchJinaMarkdown("https://example.com/test", { cacheDuration: 0 });
       if (result.error || result.markdown !== "test" || fetches !== 1) throw new Error("non-extension compatibility failed");
     });
+
+    // ---- DeepSeek Fetch (POST https://api.deepseek.com/v1/tools/fetch, 2026-11-13 official schema) ----
+    await acheck("DeepSeek Fetch cache hit needs neither API key, permission check, nor fetch", async () => {
+      let checks = 0, fetches = 0;
+      const url = "https://example.com/ds-cached";
+      const key = `deepseek_md_${url}`;
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        storage: { local: { get: async () => ({ [key]: { result: { markdown: "# Cached DS", title: "DS" }, timestamp: Date.now() } }) } },
+        permissions: { contains: async () => { checks++; return false; } },
+      };
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      const result = await fetchDeepseekMarkdown(url, { apiKey: "", cacheDuration: 60 });
+      if (!result.fromCache || result.markdown !== "# Cached DS" || checks !== 0 || fetches !== 0) throw new Error("DeepSeek cache-first contract failed");
+    });
+
+    await acheck("DeepSeek Fetch missing API key fails with deepseek_key_missing before permission check or fetch", async () => {
+      let checks = 0, fetches = 0;
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        storage: { local: { get: async () => ({}) } },
+        permissions: { contains: async () => { checks++; return true; } },
+      };
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      const result = await fetchDeepseekMarkdown("https://example.com/no-key", { apiKey: "   ", cacheDuration: 60 });
+      if (result.error !== "deepseek_key_missing" || result.code !== "deepseek_key_missing" || checks !== 0 || fetches !== 0) {
+        throw new Error("missing key gate failed: " + JSON.stringify(result));
+      }
+    });
+
+    await acheck("DeepSeek Fetch rejects non-HTTP(S), credentialed, and >8192-char URLs locally", async () => {
+      let checks = 0, fetches = 0;
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        storage: { local: { get: async () => ({}) } },
+        permissions: { contains: async () => { checks++; return true; } },
+      };
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      const overlong = "https://example.com/" + "a".repeat(8180);
+      for (const bad of ["file:///tmp/a.html", "chrome://extensions/", "https://user:secret@example.com/p", overlong]) {
+        const res = await fetchDeepseekMarkdown(bad, { apiKey: "sk-test", cacheDuration: 60 });
+        if (res.error !== "invalid_url" || res.code !== "invalid_url") throw new Error("accepted bad URL " + bad.slice(0, 40) + ": " + JSON.stringify(res));
+      }
+      if (checks !== 0 || fetches !== 0) throw new Error("invalid URL touched permissions or network");
+    });
+
+    await acheck("DeepSeek Fetch permission denial returns host_permission with zero fetch", async () => {
+      let fetches = 0;
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      for (const mode of ["false", "throw", "missing"]) {
+        const permissions = mode === "missing" ? {} : { contains: async () => {
+          if (mode === "throw") throw new Error("unavailable");
+          return false;
+        } };
+        window.chrome = {
+          runtime: { id: "test-extension" },
+          storage: { local: { get: async () => ({}) } },
+          permissions,
+        };
+        const result = await fetchDeepseekMarkdown("https://example.com/denied", { apiKey: "sk-test", cacheDuration: 0 });
+        if (result.error !== "host_permission" || result.code !== "host_permission") throw new Error(mode + ": wrong result");
+      }
+      if (fetches !== 0) throw new Error("permission failure fetched");
+    });
+
+    await acheck("DeepSeek Fetch cache miss POSTs JSON body with Bearer key and caches 200 {title, content}", async () => {
+      let checked = null, reqUrl = "", reqInit = null;
+      const saved = {};
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        storage: { local: {
+          get: async () => ({}),
+          set: async (obj) => Object.assign(saved, obj),
+        } },
+        permissions: { contains: async (spec) => { checked = spec.origins; return true; } },
+      };
+      // Hand-authored from DeepSeek Fetch API docs (2026-11-13): 200 { title, content } (with keep-alive leading whitespace)
+      window.fetch = async (u, init) => {
+        reqUrl = u;
+        reqInit = init;
+        return new Response("  \n\n" + JSON.stringify({ title: "Official Spec", content: "# Clean Article\n\nBody." }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      };
+      const targetUrl = "https://example.com/article?id=1";
+      const result = await fetchDeepseekMarkdown(targetUrl, { apiKey: "sk-ds-123", cacheDuration: 60 });
+      if (checked?.[0] !== PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN || reqUrl !== PBP_DEEPSEEK_FETCH_URL) throw new Error("wrong endpoint or origin check");
+      if (reqInit?.method !== "POST" || reqInit?.headers?.Authorization !== "Bearer sk-ds-123") throw new Error("wrong method or auth header");
+      if (JSON.parse(reqInit.body).url !== targetUrl) throw new Error("wrong request JSON payload");
+      if (result.error || result.fromCache || result.title !== "Official Spec" || !result.markdown.includes("# Clean Article")) {
+        throw new Error("unexpected result: " + JSON.stringify(result));
+      }
+      const cached = saved[`deepseek_md_${targetUrl}`];
+      if (!cached || cached.result.markdown !== result.markdown) throw new Error("200 non-empty response was not cached");
+    });
+
+    await acheck("DeepSeek Fetch does not sticky-cache empty 200 content, surfaces 200 error payloads, and flags 401 authFailed", async () => {
+      const saved = {};
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        storage: { local: { get: async () => ({}), set: async (obj) => Object.assign(saved, obj) } },
+        permissions: { contains: async () => true },
+      };
+      window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ title: "Gate", content: "   " }) });
+      const emptyRes = await fetchDeepseekMarkdown("https://example.com/paywall", { apiKey: "sk-ds", cacheDuration: 60 });
+      if (emptyRes.error || emptyRes.markdown !== "" || Object.keys(saved).length !== 0) {
+        throw new Error("empty 200 must return empty markdown without caching: " + JSON.stringify(emptyRes));
+      }
+      window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ error: { message: "target blocked" } }) });
+      const err200 = await fetchDeepseekMarkdown("https://example.com/blocked", { apiKey: "sk-ds", cacheDuration: 60 });
+      if (err200.error !== "target blocked" || Object.keys(saved).length !== 0) {
+        throw new Error("200 error payload must fail without caching: " + JSON.stringify(err200));
+      }
+      window.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: "invalid api key" } }) });
+      const err401 = await fetchDeepseekMarkdown("https://example.com/auth", { apiKey: "sk-bad", cacheDuration: 60 });
+      if (!err401.authFailed || err401.status !== 401) throw new Error("401 did not flag authFailed: " + JSON.stringify(err401));
+    });
+
     // ---- sweepSuggestCache honours the configured AI cache duration ----
     const HOURS_2 = 2 * 60 * 60 * 1000;
     const entries = () => ({
       _suggestSweepTs: 0,
       "jina_md_https://example.com/a": { result: { markdown: "# A", title: "A", url: "https://example.com/a" }, timestamp: Date.now() - HOURS_2 },
+      "deepseek_md_https://example.com/a": { result: { markdown: "# DS A", title: "DS A", url: "https://example.com/a" }, timestamp: Date.now() - HOURS_2 },
       "cached_suggest_https://example.com/a": { data: [{ popular: ["news"] }, { recommended: ["news", "web"] }], timestamp: Date.now() - HOURS_2, account: "alice" },
     });
 
-    await acheck("sweep keeps a jina_md_ entry the user's longer AI cache duration still covers", async () => {
+    await acheck("sweep keeps a jina_md_ or deepseek_md_ entry the user's longer AI cache duration still covers", async () => {
       const h = buildSuggestSweepHarness(backgroundSource, { settings: { aiCacheDuration: 1440 }, entries: entries() });
       await h.run();
-      if (h.removed.includes("jina_md_https://example.com/a")) throw new Error("swept an entry the reader would still serve");
+      if (h.removed.includes("jina_md_https://example.com/a") || h.removed.includes("deepseek_md_https://example.com/a")) {
+        throw new Error("swept an entry the reader would still serve");
+      }
     });
 
     await acheck("sweep still drops a cached_suggest_ entry past its own hour, whatever the AI cache duration", async () => {
@@ -179,18 +301,22 @@ function buildSuggestSweepHarness(source, options) {
       if (!h.removed.includes("cached_suggest_https://example.com/a")) throw new Error("suggest cache outlived its own TTL");
     });
 
-    await acheck("sweep drops every jina_md_ entry when AI caching is turned off", async () => {
+    await acheck("sweep drops every jina_md_ and deepseek_md_ entry when AI caching is turned off", async () => {
       const fresh = entries();
       fresh["jina_md_https://example.com/a"].timestamp = Date.now();
+      fresh["deepseek_md_https://example.com/a"].timestamp = Date.now();
       const h = buildSuggestSweepHarness(backgroundSource, { settings: { aiCacheDuration: 0 }, entries: fresh });
       await h.run();
-      if (!h.removed.includes("jina_md_https://example.com/a")) throw new Error("disabled cache kept an unreachable entry forever");
+      if (!h.removed.includes("jina_md_https://example.com/a") || !h.removed.includes("deepseek_md_https://example.com/a")) {
+        throw new Error("disabled cache kept an unreachable entry forever");
+      }
     });
 
     // ---- Y4-05: read only the cache families, never the whole local area ----
     const mixed = () => ({
       ...entries(),
       "jina_md_https://example.com/fresh": { result: { markdown: "# F" }, timestamp: Date.now() },
+      "deepseek_md_https://example.com/fresh": { result: { markdown: "# DSF" }, timestamp: Date.now() },
       "highlights_https://example.com/a": [{ text: "keep me" }],
     });
     for (const noGetKeys of [false, true]) {
@@ -198,8 +324,8 @@ function buildSuggestSweepHarness(source, options) {
         const h = buildSuggestSweepHarness(backgroundSource, { settings: { aiCacheDuration: 60 }, entries: mixed(), noGetKeys });
         await h.run();
         if (noGetKeys ? h.calls.getNull !== 1 : (h.calls.getNull !== 0 || h.calls.getKeys !== 1)) throw new Error("wrong read path: " + JSON.stringify(h.calls));
-        if (h.removed.length !== 2 || !h.removed.includes("jina_md_https://example.com/a") || !h.removed.includes("cached_suggest_https://example.com/a")) throw new Error("removed " + JSON.stringify(h.removed));
-        if (!("jina_md_https://example.com/fresh" in h.data) || !("highlights_https://example.com/a" in h.data)) throw new Error("swept a live entry");
+        if (h.removed.length !== 3 || !h.removed.includes("jina_md_https://example.com/a") || !h.removed.includes("deepseek_md_https://example.com/a") || !h.removed.includes("cached_suggest_https://example.com/a")) throw new Error("removed " + JSON.stringify(h.removed));
+        if (!("jina_md_https://example.com/fresh" in h.data) || !("deepseek_md_https://example.com/fresh" in h.data) || !("highlights_https://example.com/a" in h.data)) throw new Error("swept a live entry");
       });
     }
 

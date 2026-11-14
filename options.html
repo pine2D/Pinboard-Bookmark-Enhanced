@@ -875,6 +875,17 @@
               <p class="hint context-help-body" data-i18n="aiContentSourceJinaHint">Sends the page URL to Jina Reader, which fetches the page and returns cleaned Markdown. Needs network; an API key is optional and raises the quota.</p>
             </details>
           </div>
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label class="pick"><input type="radio" name="ai-content-source" id="opt-ai-src-deepseek" value="deepseek" /> <span class="pick-text" data-i18n="aiContentSourceDeepseek">DeepSeek Fetch</span><span class="pick-mark" aria-hidden="true"></span></label>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="aiContentSourceDeepseekHint">Sends the page URL to DeepSeek Fetch, which extracts the page and returns cleaned Markdown. Uses your DeepSeek API key and bills per successful request.</p>
+            </details>
+          </div>
+        </div>
+        <div class="fg entry-block" id="deepseek-fetch-unavailable" hidden>
+          <p class="hint hint-warn" role="status" aria-live="polite"></p>
+          <div class="fg-actions"><button type="button" class="btn btn-sm" id="deepseek-fetch-setup-btn" data-i18n="deepseekFetchSetupBtn">Set up DeepSeek</button></div>
         </div>
         <!-- The subtitle switch is not a third source: it gets its own group, set
              off by the group gap, so it no longer reads as a third radio row

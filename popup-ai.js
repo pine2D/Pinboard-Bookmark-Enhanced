@@ -91,7 +91,7 @@ function clearAiProgress(buttonId) {
 async function ensurePageText(s, buttonId) {
   s = s || settings;
   if (pageInfo.pageText) {
-    return pageInfo._pbpTextSource || (s.aiContentSource === "jina" ? "jina" : "local");
+    return pageInfo._pbpTextSource || pbpNormalizeExtractEngine(s.aiContentSource);
   }
   // Video pages (T7.13): the subtitles ARE the content. Only where the
   // caption origin grant already stands (contains, never a prompt); any
@@ -108,6 +108,9 @@ async function ensurePageText(s, buttonId) {
     // extractor (audit A9).
     await enrichPageTextIfJina(s);
     if (pageInfo.pageText) { pageInfo._pbpTextSource = "jina"; return "jina"; }
+  } else if (s.aiContentSource === "deepseek") {
+    await enrichPageTextIfDeepseek(s);
+    if (pageInfo.pageText) { pageInfo._pbpTextSource = "deepseek"; return "deepseek"; }
   }
   // Local source: lazy-inject Defuddle and pull full page text
   try {
@@ -153,6 +156,35 @@ async function enrichPageTextIfJina(s) {
   }
 }
 
+async function enrichPageTextIfDeepseek(s) {
+  s = s || settings;
+  if (s.aiContentSource !== "deepseek") return;
+  if (!pageInfo?.url) return;
+  try {
+    const deepseekKey = s.deepseekApiKey ? deobfuscateKey(s.deepseekApiKey) : "";
+    const result = await fetchDeepseekMarkdown(pageInfo.url, {
+      apiKey: deepseekKey,
+      cacheDuration: s.aiCacheDuration
+    });
+    if (result.code === "host_permission") {
+      const origins = _aiRequiredOriginPatterns(s, [PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN]);
+      const hosts = origins
+        .map(pattern => pattern.replace(/\/\*$/, "")).join(", ");
+      const err = new Error(t("aiErrorHostPermission", hosts));
+      err.code = "host_permission";
+      err.permissionStage = "extracting";
+      err.permissionOrigins = origins;
+      throw err;
+    }
+    if (!result.error && result.markdown) {
+      pageInfo.pageText = pbpMarkdownToPlainText(result.markdown);
+    }
+  } catch (e) {
+    if (e?.code === "host_permission") throw e;
+    console.warn("DeepSeek Fetch content enrichment failed, using local content:", e.message);
+  }
+}
+
 // The video page's caption grant, if it stands: the detected video, else
 // null. contains() ONLY (never a prompt): the first grant belongs to the
 // preview's own "Enable subtitles & load video" click, never to a popup AI
@@ -173,7 +205,7 @@ async function pbpAiVideoGrant(s) {
 // pbpAiTranscriptText); a video without captions then finds its page-text
 // result under the actual source inside fetchAIArtifacts.
 async function pbpAiFastCached(kind, s, account) {
-  const src = (await pbpAiVideoGrant(s)) ? "transcript" : s.aiContentSource;
+  const src = (await pbpAiVideoGrant(s)) ? "transcript" : pbpNormalizeExtractEngine(s.aiContentSource);
   return getAICache(pageInfo.url, kind, s.aiCacheDuration, src, account, s);
 }
 
@@ -1149,7 +1181,7 @@ async function pbpAiCallViaSW({ s, mode, kind, prompt, url, source, account, inf
 // below sees one consistent provider/model/lang for the op's whole life.
 async function fetchAIArtifacts(kind, forceRefresh, account, s, source, resultMeta) {
   s = s || settings;
-  source = source || s.aiContentSource;
+  source = source || pbpNormalizeExtractEngine(s.aiContentSource);
   const url = pageInfo.url;
   const otherKind = kind === "summary" ? "tags" : "summary";
   // Inflight identity carries the same generation fingerprint as the

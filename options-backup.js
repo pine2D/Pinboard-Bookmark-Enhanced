@@ -36,7 +36,7 @@ const PBP_BACKUP_ENUMS = Object.freeze({
   bookmarkService: ["pinboard", "karakeep", "linkding"],
   bgSaveMode: ["merge", "skip", "overwrite"],
   tagSyncMode: ["fresh", "cached", "prewarmed"],
-  aiContentSource: ["local", "jina"],
+  aiContentSource: ["local", "jina", "deepseek"],
   mdExportImagePolicy: ["keep", "alt", "strip"],
   selectionTrigger: ["icon", "hotkey", "off"],
   dictDefaultView: ["dictionary", "ai-saved", "ai-generate"],

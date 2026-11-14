@@ -2208,11 +2208,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(popupFed === 2, "both popup builders must receive the relevance-ordered vocabulary, got " + popupFed);
     });
 
-    test("SW AI caches always use the local namespace (A3)", () => {
+    test("SW AI caches key by actual extraction source and never blindly by configured s.aiContentSource (A3)", () => {
       const swAiCalls = (backgroundSource.match(/s\.aiCacheDuration, aiCacheSource/g) || []).length;
       assert(swAiCalls === 16, "all 16 SW getAICache/setAICache calls must key by aiCacheSource, got " + swAiCalls);
       assert(!/s\.aiCacheDuration, s\.aiContentSource/.test(backgroundSource), "no SW AI cache call may key by the configured source");
-      assert((backgroundSource.match(/const aiCacheSource = "local"/g) || []).length === 2, "quick-save and batch both pin local");
+      assert((backgroundSource.match(/const aiCacheSource = "local"/g) || []).length === 1, "quick-save pins local");
+      assert((backgroundSource.match(/let aiCacheSource = "local"/g) || []).length === 1, "batch defaults per-tab cache source to local before remote upgrade");
     });
 
     test("SW combined call runs only when BOTH halves miss the cache (A16)", () => {

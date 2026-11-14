@@ -1490,8 +1490,10 @@ async function htmlToMarkdownAsync(html, opts) {
     }
   } catch (_) {}
   if (jinaMdBtn) {
-    let jinaGrantPending = false;
-    jinaMdBtn.title = settings.aiContentSource === "jina" ? t("jinaMarkdownTitleJina") : t("jinaMarkdownTitle");
+    let remoteGrantPattern = "";
+    jinaMdBtn.title = settings.aiContentSource === "jina"
+      ? t("jinaMarkdownTitleJina")
+      : (settings.aiContentSource === "deepseek" ? t("jinaMarkdownTitleDeepseek") : t("jinaMarkdownTitle"));
     // Residual guard only: chrome://, about:, file://, the PDF viewer and the
     // popup's own extension:// URL are already disabled in the unsupported-URL
     // branch above, which returns long before this line. What is left for this
@@ -1507,17 +1509,17 @@ async function htmlToMarkdownAsync(html, opts) {
       if (!url) return;
       jinaMdBtn.disabled = true;
 
-      if (jinaGrantPending) {
+      if (remoteGrantPattern) {
         let granted = false;
         try {
-          granted = await chrome.permissions.request({ origins: [PBP_JINA_ORIGIN_PATTERN] });
+          granted = await chrome.permissions.request({ origins: [remoteGrantPattern] });
         } catch (_) {}
         if (!granted) {
-          showStatus("status-msg", t("aiErrorHostPermission", PBP_JINA_ORIGIN_PATTERN.replace(/\/\*$/, "")), "error", { remedy: true });
+          showStatus("status-msg", t("aiErrorHostPermission", remoteGrantPattern.replace(/\/\*$/, "")), "error", { remedy: true });
           jinaMdBtn.disabled = false;
           return;
         }
-        jinaGrantPending = false;
+        remoteGrantPattern = "";
       }
 
       const origLabel = t("jinaMarkdownBtn");
@@ -1528,6 +1530,14 @@ async function htmlToMarkdownAsync(html, opts) {
         const jinaKey = settings.jinaApiKey ? deobfuscateKey(settings.jinaApiKey) : "";
         result = await fetchJinaMarkdown(url, { apiKey: jinaKey, cacheDuration: settings.aiCacheDuration });
         if (!result.error) result._hasApiKey = !!jinaKey;
+      } else if (settings.aiContentSource === "deepseek") {
+        const deepseekKey = settings.deepseekApiKey ? deobfuscateKey(settings.deepseekApiKey) : "";
+        result = await fetchDeepseekMarkdown(url, { apiKey: deepseekKey, cacheDuration: settings.aiCacheDuration });
+        if (!result.error && (!result.markdown || !result.markdown.trim())
+            && !(typeof pbpVideoDetect === "function" && pbpVideoDetect(tab.url || url))) {
+          result = { error: "empty" };
+        }
+        if (!result.error) result._hasApiKey = !!deepseekKey;
       } else {
         result = await extractLocalMarkdown(tab.id);
         if (!result.error) result._hasApiKey = false;
@@ -1543,7 +1553,7 @@ async function htmlToMarkdownAsync(html, opts) {
           let opened = false;
           try {
             const k = crypto.randomUUID();
-            const engine = settings.aiContentSource === "jina" ? "jina" : "local";
+            const engine = pbpNormalizeExtractEngine(settings.aiContentSource);
             const handoffNotes = $id("description-input")?.value || "";
             const handoffSummaryRange = pbpPopupHandoffSummaryRange(handoffNotes);
             // The tab's own address, as the toolbar icon reads it.
@@ -1579,19 +1589,30 @@ async function htmlToMarkdownAsync(html, opts) {
           }
         }
         if (result.code === "host_permission") {
-          jinaGrantPending = true;
+          const reqPattern = pbpRemoteExtractOriginPattern(settings.aiContentSource) || PBP_JINA_ORIGIN_PATTERN;
+          remoteGrantPattern = reqPattern;
           setBtnIcon(jinaMdBtn, "doc", t("aiGrantRetry"));
-          jinaMdBtn.title = t("aiErrorHostPermission", PBP_JINA_ORIGIN_PATTERN.replace(/\/\*$/, ""));
+          jinaMdBtn.title = t("aiErrorHostPermission", reqPattern.replace(/\/\*$/, ""));
           jinaMdBtn.disabled = false;
           showStatus("status-msg", jinaMdBtn.title, "error");
           return;
         }
         jinaMdBtn.innerHTML = PBP_ICONS.cross + " " + t("jinaFailed");
-        const extractMessage = result.error === "site_target_missing" ? t("mdSiteTargetMissing") : result.error;
+        const extractMessage = result.error === "site_target_missing" ? t("mdSiteTargetMissing")
+          : result.error === "deepseek_key_missing" ? t("deepseekFetchKeyMissing")
+          : result.error === "invalid_url" ? t("mdEngineDeepseekInvalidUrl")
+          : result.error === "empty" ? (t("mdPreviewNoContent") + " " + t("mdEngineDeepseekNoLogin"))
+          : result.error;
         jinaMdBtn.title = extractMessage;
         // Persistent, specific status — so the user can tell API-key vs other failures
-        if (settings.aiContentSource === "jina" && result.authFailed) {
+        if (result.error === "deepseek_key_missing") {
+          showStatus("status-msg", t("deepseekFetchKeyMissing"), "error", { remedy: true });
+        } else if (settings.aiContentSource === "deepseek" && result.authFailed) {
+          showStatus("status-msg", t("deepseekFetchAuthFailed"), "error", { remedy: true });
+        } else if (settings.aiContentSource === "jina" && result.authFailed) {
           showStatus("status-msg", t("jinaAuthFailed"), "error", { remedy: true });
+        } else if (result.error === "invalid_url" || result.error === "empty") {
+          showStatus("status-msg", extractMessage, "error");
         } else {
           showStatus("status-msg", t("jinaFailedDetail", extractMessage), "error");
         }
@@ -1627,6 +1648,10 @@ async function htmlToMarkdownAsync(html, opts) {
         return meta;
       }
 
+      const exportSource = settings.aiContentSource === "jina"
+        ? "jina"
+        : (settings.aiContentSource === "deepseek" ? "deepseek" : "defuddle");
+
       // Reveal the action strip; the user picks Copy / Preview / Download / Obsidian.
       // No auto-copy: clicking Markdown must not silently clobber the clipboard, nor be
       // aborted by a clipboard failure when the user only wanted preview/download/Obsidian.
@@ -1645,7 +1670,7 @@ async function htmlToMarkdownAsync(html, opts) {
           url: result.url || url,
           date: clippedDate,
           tags: Array.isArray(currentTags) ? currentTags.slice() : [],
-          source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
+          source: exportSource
         });
         const out = composeExport(markdown, meta, {
           frontmatter: settings.mdExportFrontmatter,
@@ -1720,7 +1745,7 @@ async function htmlToMarkdownAsync(html, opts) {
               description: $id("description-input")?.value || "",
               tokens: result.tokens || 0,
               hasApiKey: !!result._hasApiKey,
-              source: settings.aiContentSource || "local",
+              source: pbpNormalizeExtractEngine(settings.aiContentSource),
               math: !!result.math,
               forum: !!result.forum,
               // X4: raw metadata transport -- md-preview.js reads these into
@@ -1765,7 +1790,7 @@ async function htmlToMarkdownAsync(html, opts) {
           url: result.url || url,
           date: clippedDate,
           tags: Array.isArray(currentTags) ? currentTags.slice() : [],
-          source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
+          source: exportSource
         });
         const out = composeExport(markdown, meta, {
           frontmatter: settings.mdExportFrontmatter,
@@ -1786,7 +1811,7 @@ async function htmlToMarkdownAsync(html, opts) {
           url: result.url || url,
           date: clippedDate,
           tags: Array.isArray(currentTags) ? currentTags.slice() : [],
-          source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
+          source: exportSource
         });
         // Obsidian ALWAYS gets YAML frontmatter (registry semantics: the preview
         // page's export-targets.js row hardcodes obsidian.frontmatter = "inline",

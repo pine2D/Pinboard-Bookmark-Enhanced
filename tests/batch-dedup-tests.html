@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="52"><title>Batch Progress Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="54"><title>Batch Progress Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -48,7 +48,7 @@ async function createSaveTagsHarness(service, names, opts = {}) {
   }
   const settings = {bookmarkService:service, pinboardToken:"fixture-token", _aiTags:true, batchAiTags:true, ...(opts.settings || {})};
   const auth = {service, account:"test-owner", token:"fixture-token", baseUrl:"https://bookmarks.example/", epoch:0};
-  const calls = {intents:[], uris:[], names:[], progress:[], lookups:[], extracted:[], queries:0};
+  const calls = {intents:[], uris:[], names:[], progress:[], lookups:[], extracted:[], queries:0, remoteFetches:[], cacheSources:[]};
   const state = {epoch:0, account:auth.account};
   const dependencies = {
     getCurrentBookmarkAuth:async () => ({...auth, account:state.account, epoch:state.epoch}),
@@ -62,8 +62,16 @@ async function createSaveTagsHarness(service, names, opts = {}) {
     pbpBookmarkHostGranted:async () => true,
     loadSettings:async () => settings,
     pbpLoadTagVocab:async account => ({account, timestamp:Date.now(), counts:null, index:pbpTagVocabIndex(Object.fromEntries(names.map(name => [name, 1])))}),
-    pbpCanonicalTagName, pbpTagGroupKey,
-    chrome:{permissions:{contains:async () => true}, storage:{local:{get:async () => ({}), set:async () => {}}},
+    pbpCanonicalTagName, pbpTagGroupKey, pbpBatchRemoteExtractEngine, pbpMarkdownToPlainText,
+    fetchDeepseekMarkdown:opts.fetchDeepseekMarkdown || (async (url, o) => {
+      calls.remoteFetches.push({engine:"deepseek", url, apiKey:o?.apiKey});
+      return {markdown:"# DeepSeek Body", title:"DS Title", url};
+    }),
+    fetchJinaMarkdown:opts.fetchJinaMarkdown || (async (url, o) => {
+      calls.remoteFetches.push({engine:"jina", url, apiKey:o?.apiKey});
+      return {markdown:"# Jina Body", title:"Jina Title", url};
+    }),
+    chrome:{permissions:{contains:async (spec) => opts.containsOrigin ? opts.containsOrigin(spec?.origins?.[0] || "") : true}, storage:{local:{get:async () => ({}), set:async () => {}}},
       tabs:{query:async () => { calls.queries++; return (opts.liveTabs || []).map(lt => ({...lt})); }}},
     getPageInfoFromTab:async (tabId, o) => {
       calls.extracted.push({tabId, expectedUrl:o?.expectedUrl});
@@ -74,7 +82,8 @@ async function createSaveTagsHarness(service, names, opts = {}) {
     buildAutoNotes:() => "",
     pbpNotesDescription:() => "", pbpPageInfoReadable:info=>!!info&&info._pbpUnavailable!==true&&["","text/html","application/xhtml+xml"].includes(String(info.contentType||"").split(";")[0].trim()),
     hasAIKey:() => true,
-    getAICache:async () => names.slice(),
+    getAICache:async (_url, _type, _dur, src) => { calls.cacheSources.push(src); return names.slice(); },
+    setAICache:async () => {},
     callAI:async () => { throw new Error("unexpected AI request"); },
     showNotification() {},
     notifySaveFailure() { throw new Error("save failed"); },
@@ -499,6 +508,57 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     const rows = h.batchAiPermissionRows(["https://one.example/*", "https://b.example/*"], { ...chainBase, aiProvider: "custom-bbbbbb" });
     assert(rows[1].includes("Relay B") && rows[1].includes("https://b.example"), "the entry is not named: " + rows[1]);
     assert(!rows[1].includes("custom-bbbbbb") && !rows[1].includes("provCustom-bbbbbb"), "the raw id leaked: " + rows[1]);
+  });
+
+  await test("Batch AI permission origins and rows swap tab origins for Jina or keyed DeepSeek Fetch, falling back without DeepSeek key", async () => {
+    const sampleTabs = [{ url: "https://one.example/a" }, { url: "https://two.example/b" }];
+    const hOpenai = await createPermissionHarness("https://api.openai.com/*");
+    const jinaOrigins = hOpenai.batchAiPermissionOrigins(sampleTabs, { aiProvider: "openai", aiContentSource: "jina" });
+    equal(jinaOrigins.join(","), "https://r.jina.ai/*,https://api.openai.com/*");
+    const jinaRows = hOpenai.batchAiPermissionRows(jinaOrigins, { aiProvider: "openai", aiContentSource: "jina" });
+    equal(jinaRows.join(" ; "), "batchPermExtractor:Jina Reader|https://r.jina.ai ; batchPermProvider:provOpenai:|https://api.openai.com");
+
+    const dsKeyed = { aiProvider: "openai", aiContentSource: "deepseek", deepseekApiKey: "sk-ds" };
+    const dsOrigins = hOpenai.batchAiPermissionOrigins(sampleTabs, dsKeyed);
+    equal(dsOrigins.join(","), "https://api.deepseek.com/*,https://api.openai.com/*");
+    const dsRows = hOpenai.batchAiPermissionRows(dsOrigins, dsKeyed);
+    equal(dsRows.join(" ; "), "batchPermExtractor:DeepSeek Fetch|https://api.deepseek.com ; batchPermProvider:provOpenai:|https://api.openai.com");
+
+    // Same-host deduplication when aiProvider is also DeepSeek
+    const hDeepseek = await createPermissionHarness("https://api.deepseek.com/*");
+    const sameHost = hDeepseek.batchAiPermissionOrigins(sampleTabs, { aiProvider: "deepseek", aiContentSource: "deepseek", deepseekApiKey: "sk-ds" });
+    equal(sameHost.join(","), "https://api.deepseek.com/*");
+
+    // Missing DeepSeek key falls back to local per-tab extraction origins
+    const keylessOrigins = hOpenai.batchAiPermissionOrigins(sampleTabs, { aiProvider: "openai", aiContentSource: "deepseek", deepseekApiKey: "" });
+    equal(keylessOrigins.join(","), "https://one.example/*,https://two.example/*,https://api.openai.com/*");
+  });
+
+  await test("Batch AI remote DeepSeek Fetch extracts server-side, isolates cache namespace, and falls back only to granted tab origins", async () => {
+    const tabs = [
+      { id: 1, url: "https://ok.example/post", title: "OK" },
+      { id: 2, url: "https://granted.example/post", title: "Granted Fallback" },
+      { id: 3, url: "https://ungranted.example/post", title: "Ungranted Fallback" },
+    ];
+    const fetchedUrls = [];
+    const h = await createSaveTagsHarness("pinboard", ["ai-tag"], {
+      tabs,
+      liveTabs: tabs,
+      settings: { aiContentSource: "deepseek", deepseekApiKey: "sk-live" },
+      containsOrigin: (origin) => origin === "https://granted.example/*",
+      fetchDeepseekMarkdown: async (url, o) => {
+        fetchedUrls.push(url + ":" + o.apiKey);
+        if (url.includes("ok.example")) return { markdown: "# Extracted Markdown", title: "OK" };
+        return { error: "empty", markdown: "" };
+      },
+    });
+    await h.batch();
+    equal(fetchedUrls.length, 3, "every tab tried DeepSeek Fetch first");
+    equal(h.calls.extracted.map((e) => e.tabId).join(","), "2", "only the already-granted tab fell back to local injection");
+    equal(h.calls.cacheSources.join(","), "deepseek,local", "AI cache namespace matched actual extraction source per tab");
+    const last = h.calls.progress.at(-1);
+    equal(last.saved, 3, "all three bookmarks still saved");
+    equal(last.aiFailed, 1, "the ungranted remote-failed tab counted 1 AI failure");
   });
 
   await test("first AI click snapshots tabs and origins without requesting or starting", async () => {

@@ -5476,5 +5476,19 @@
   },
   "readerHistoryOpenFailed": {
     "message": "无法重新打开这篇预览，请改从原网页打开。"
-  }
+  },
+  "aiContentSourceDeepseek": {"message":"DeepSeek Fetch"},
+  "aiContentSourceDeepseekHint": {"message":"把页面 URL 发送给 DeepSeek Fetch，由它抓取页面并返回清洗后的 Markdown。使用你的 DeepSeek API Key，按成功次数计费。"},
+  "deepseekFetchKeyMissingHint": {"message":"DeepSeek Fetch 需要填写 DeepSeek API Key。填好之前，AI 功能会改用本地提取。"},
+  "deepseekFetchAccessMissingHint": {"message":"DeepSeek Fetch 还无法访问 api.deepseek.com，点下方按钮授权后即可使用。"},
+  "deepseekFetchSetupBtn": {"message":"设置 DeepSeek"},
+  "deepseekFetchGrantBtn": {"message":"授权访问"},
+  "deepseekFetchKeyMissing": {"message":"尚未填写 DeepSeek API Key，请到设置 > AI 服务商 > DeepSeek 中添加。"},
+  "deepseekFetchAuthFailed": {"message":"DeepSeek API Key 无效或已过期，请到设置 > AI 服务商 > DeepSeek 中更新。"},
+  "jinaMarkdownTitleDeepseek": {"message":"将页面转换为 Markdown（DeepSeek Fetch）"},
+  "batchPermExtractor": {"message":"$ENGINE$（页面抓取）：$ORIGIN$","placeholders":{"engine":{"content":"$1"},"origin":{"content":"$2"}}},
+  "mdEngineExtractingNoteDeepseek": {"message":"首次抽取需联网请求 DeepSeek（api.deepseek.com）；耗时取决于该页是否已被缓存、你的网速与页面大小，通常数秒。"},
+  "mdEngineDeepseekNeedsHttp": {"message":"DeepSeek Fetch 只能抓取 http(s) 页面，无法读取此页。"},
+  "mdEngineDeepseekNoLogin": {"message":"DeepSeek Fetch 从自己的服务器抓取页面，看不到需要登录才能看的内容。"},
+  "mdEngineDeepseekInvalidUrl": {"message":"DeepSeek Fetch 仅支持不超过 8,192 个字符且不含账号密码的标准 http(s) 网址。"}
 }
