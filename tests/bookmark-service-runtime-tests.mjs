@@ -48,6 +48,7 @@ const BLOCKS=[
   'changed elsewhere: tag merges, both-sided edits, long tag lists',
   'settings quick return to the previous service',
   'settings connection state and copy',
+  'settings DeepSeek extra guide and tool credentials',
 ];
 // Self-check before any browser starts: the list above and the block() calls
 // below must name exactly the same blocks, so a block added to one place only
@@ -2516,6 +2517,50 @@ try{
     assert.equal((await status.textContent()).trim(),'','a disconnected service shows a status after reload');
     await options.close();
     console.log('settings connection state: reopened status, subheadings, sharing hint, address mark, overview and language redraw passed');
+  });
+  await block('settings DeepSeek extra guide and tool credentials',[],async()=>{
+    await worker.evaluate(async()=>{
+      await chrome.storage.local.remove(['deepseekApiKey']);
+      await chrome.storage.sync.remove(['deepseekApiKey']);
+      await chrome.storage.local.set({aiProvider:'gemini'});
+    });
+    const options=await ctx.newPage();
+    try{
+      await options.goto(pageUrl+'options.html#ai');
+      await options.waitForFunction(()=>document.getElementById('panel-ai')?.classList.contains('active')&&document.getElementById('opt-ai-provider')?.value==='gemini'&&document.querySelector('#connection-health .connection-health-row'));
+      const guide=options.locator('#deepseek-extra-guide');
+      const toolsDet=options.locator('#deepseek-tools-credentials');
+      const toolsInput=options.locator('#opt-deepseek-tools-key');
+      assert(await guide.isVisible(),'#deepseek-extra-guide should show on AI Providers when no DeepSeek key is saved and Gemini is selected');
+      assert.equal(await options.locator('#deepseek-tools-credentials').evaluate(el=>el.open),false,'#deepseek-tools-credentials starts closed');
+
+      // Clicking "Add DeepSeek key" expands #deepseek-tools-credentials and focuses #opt-deepseek-tools-key without switching #opt-ai-provider.
+      await options.locator('#deepseek-extra-guide-btn').click();
+      await until(()=>options.evaluate(()=>document.getElementById('deepseek-tools-credentials')?.open===true&&document.activeElement?.id==='opt-deepseek-tools-key'),'#deepseek-extra-guide-btn opens tool credentials and focuses #opt-deepseek-tools-key');
+      assert.equal(await options.locator('#opt-ai-provider').inputValue(),'gemini','#deepseek-extra-guide-btn must not switch the selected AI provider');
+      assert(await options.locator('#hint-deepseek-tools-key').isVisible(),'#hint-deepseek-tools-key must be visible immediately when tool credentials open');
+
+      // Typing a key does not collapse #deepseek-extra-guide synchronously on first keystroke, then auto-collapses once auto-save completes.
+      await toolsInput.fill('sk-ds-guide-test');
+      assert(await guide.isVisible(),'#deepseek-extra-guide must not jump away before debounced save completes');
+      await until(async()=>await guide.isHidden(),'#deepseek-extra-guide auto-collapses once deepseekApiKey saves');
+
+      // Clearing the key and saving restores #deepseek-extra-guide; switching to DeepSeek hides both the top guide and bottom tools disclosure while showing #hint-deepseek-key.
+      await toolsInput.fill('');
+      await until(async()=>await guide.isVisible(),'clearing deepseekApiKey brings #deepseek-extra-guide back');
+      await options.evaluate(()=>{const sel=document.getElementById('opt-ai-provider');sel.value='deepseek';sel.dispatchEvent(new Event('change',{bubbles:true}));});
+      assert(await guide.isHidden(),'#deepseek-extra-guide hides when #fields-deepseek is already shown');
+      assert(await toolsDet.isHidden(),'#deepseek-tools-credentials hides when DeepSeek is the active provider');
+      assert(await options.locator('#hint-deepseek-key').isVisible(),'#hint-deepseek-key is always visible inside #fields-deepseek');
+    }finally{
+      await options.close();
+      await worker.evaluate(async()=>{
+        await chrome.storage.local.remove(['deepseekApiKey']);
+        await chrome.storage.sync.remove(['deepseekApiKey']);
+        await chrome.storage.local.set({aiProvider:'gemini'});
+      });
+    }
+    console.log('settings DeepSeek extra guide: top guide visibility, non-destructive jump, save collapse, and provider switch passed');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));

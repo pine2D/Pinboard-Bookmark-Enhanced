@@ -20,7 +20,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in), [Karakeep](https:/
 
 ### Speichern
 - **Beim Dienst deiner Wahl speichern**: Pinboard, Karakeep oder linkding; Titel, Beschreibung und markierter Text werden automatisch übernommen.
-- **KI-Tags und Zusammenfassungen**: direkt aus dem Artikel vorgeschlagen, mit deinem eigenen API-Schlüssel.
+- **KI-Tags und Zusammenfassungen**: direkt aus dem Artikel mit deinem eigenen API-Schlüssel; ein DeepSeek-Schlüssel schaltet auch PDF-/Bild-OCR und Sprachfunktionen frei.
 - **Offline speichern**: Was du offline speicherst, wartet und wird gesendet, sobald du wieder online bist.
 
 ### Lesen

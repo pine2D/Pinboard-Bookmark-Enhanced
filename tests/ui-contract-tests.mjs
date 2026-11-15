@@ -1739,7 +1739,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     "backupIncludeHighlightsHint",
     "optPopupWidthHelp",
     "tagPresetsHint", "batchTagsHint", "batchAiHint", "hintOpenAIBaseUrl",
-    "hintDeepseekKey", "hintDeepseekModel", "hintDeepseekToolsKey",
+    "hintDeepseekModel",
     "hintOllamaModel", "hintCustomBaseUrl", "hintCustomKey",
     "freeTierTitle", "freeTierResourcesPrefix", "openrouterTagline", "jinaFreeTierHint",
     "aiContentSourceLocalHint", "aiContentSourceJinaHint", "optAiUseTranscriptHint",
@@ -1895,8 +1895,8 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   // in different visual regions even though both are inside the same host.
   const helpBeforeControl = {
     tagPresetsHint: "opt-tag-presets", batchTagsHint: "opt-batch-tag",
-    hintOpenAIBaseUrl: "opt-openai-baseurl", hintDeepseekKey: "opt-deepseek-key",
-    hintDeepseekModel: "opt-deepseek-model", hintDeepseekToolsKey: "opt-deepseek-tools-key",
+    hintOpenAIBaseUrl: "opt-openai-baseurl",
+    hintDeepseekModel: "opt-deepseek-model",
     hintOllamaModel: "opt-ollama-model",
     hintCustomBaseUrl: "opt-custom-baseurl", hintCustomKey: "opt-custom-key",
     aiCacheHint: "opt-ai-cache-duration", tagSeparatorHint: "opt-ai-tag-separator",

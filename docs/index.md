@@ -7,7 +7,7 @@ title: Bookmark Enhanced
 
 A Chrome extension for [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) and [linkding](https://linkding.link): AI tags and summaries, a reader with translation and highlights, and 13 themes for pinboard.in.
 
-- Save to Pinboard, Karakeep or linkding, with AI tags and summaries that use your own API key.
+- Save to Pinboard, Karakeep or linkding, with AI tags and summaries from your own API key; a DeepSeek key adds PDF/image OCR and voice.
 - Read any page in a clean reader: translate it, ask it questions with cited answers, and look up words in place.
 - Keep highlights, notes, saved words and past questions in one library, synced through your own Google Drive.
 - Watch YouTube and bilibili videos beside a transcript that follows playback.

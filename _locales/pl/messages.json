@@ -1173,7 +1173,7 @@
     "message": "Nie wykryto problemów"
   },
   "onboardNextAi": {
-    "message": "Opcjonalny następny krok: skonfiguruj dostawcę AI, aby tagować i streszczać zakładki oraz tłumaczyć i zadawać pytania w czytniku."
+    "message": "Opcjonalny następny krok: skonfiguruj dostawcę AI, aby tagować i streszczać zakładki oraz tłumaczyć i zadawać pytania w czytniku. Klucz DeepSeek włącza także OCR plików PDF i obrazów, DeepSeek Fetch, wprowadzanie głosowe i wymowę słownikową."
   },
   "onboardNextAiLink": {
     "message": "Skonfiguruj AI"
@@ -5554,13 +5554,15 @@
   "mdAsrErrEmpty": {"message":"W nagraniu nie wykryto mowy."},
   "mdAsrErrTooLarge": {"message":"To nagranie przekracza limit 8 MB usługi DeepSeek ASR."},
   "mdAsrErrFailed": {"message":"Transkrypcja głosu nie powiodła się. Spróbuj ponownie za chwilę."},
-  "hintDeepseekKey": {"message":"Obsługuje również DeepSeek Fetch, OCR plików PDF i obrazów, wprowadzanie głosowe w czytniku oraz wymowę słownikową."},
+  "hintDeepseekKey": {"message":"Oprócz funkcji AI obsługuje także DeepSeek Fetch, OCR plików PDF i obrazów, wprowadzanie głosowe w czytniku, wymowę słownikową oraz (z modelem deepseek-flash) wyjaśnianie obrazów kliknięciem w czytniku."},
   "hintDeepseekModel": {"message":"Obsługuje modele deepseek-flash, deepseek-chat i deepseek-reasoner. Z modelem deepseek-flash kliknięcie obrazu w czytniku otwiera wyjaśnienie wizualne AI."},
-  "deepseekToolsCredentialsSection": {"message":"Dane dostępowe narzędzi DeepSeek"},
+  "deepseekToolsCredentialsSection": {"message":"Klucz narzędzi DeepSeek (OCR, Fetch, głos i wymowa)"},
   "deepseekToolsKeyReady": {"message":"Klucz API zapisany"},
   "hintDeepseekToolsKey": {"message":"Zapisz klucz API DeepSeek dla DeepSeek Fetch, OCR plików PDF i obrazów, wprowadzania głosowego w czytniku oraz wymowy słownikowej bez zmiany obecnego dostawcy AI."},
   "deepseekToolsConnectionName": {"message":"Narzędzia DeepSeek"},
   "previewAiModelDeepseekVisionNote": {"message":"Model deepseek-flash obsługuje również wyjaśnianie obrazów przez AI po kliknięciu w czytniku."},
   "mdOcrKeyMissingLead": {"message":"Dodaj klucz API DeepSeek w Ustawieniach, aby korzystać z OCR plików PDF i obrazów."},
-  "mdOcrEvictedOnlineLead": {"message":"Ten dokument OCR nie jest już zapisany w pamięci podręcznej na tym urządzeniu. Uruchom OCR ponownie lub wybierz plik lokalny."}
+  "mdOcrEvictedOnlineLead": {"message":"Ten dokument OCR nie jest już zapisany w pamięci podręcznej na tym urządzeniu. Uruchom OCR ponownie lub wybierz plik lokalny."},
+  "deepseekExtraGuide": {"message":"Zapisanie klucza API DeepSeek włącza DeepSeek Fetch, OCR plików PDF i obrazów, wprowadzanie głosowe w czytniku oraz wymowę słownikową bez zmiany obecnego dostawcy AI. Wybranie DeepSeek z modelem deepseek-flash pozwala też klikać obrazy w czytniku, aby uzyskać wyjaśnienie AI."},
+  "deepseekExtraGuideBtn": {"message":"Dodaj klucz DeepSeek"}
 }

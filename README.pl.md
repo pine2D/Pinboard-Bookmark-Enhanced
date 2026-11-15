@@ -20,7 +20,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in), [Karakeep](https://kara
 
 ### Zapisywanie
 - **Zapis w wybranej usłudze** — Pinboard, Karakeep lub linkding, z gotowym tytułem, opisem i zaznaczonym tekstem.
-- **Tagi i streszczenia AI** — propozycje na podstawie samego artykułu, z użyciem Twojego klucza API.
+- **Tagi i streszczenia AI** — propozycje na podstawie artykułu z Twoim kluczem API; klucz DeepSeek dodaje też OCR plików PDF i obrazów oraz funkcje głosowe.
 - **Zapis offline** — zapisane zakładki czekają i trafiają na miejsce, gdy znów będziesz online.
 
 ### Czytanie

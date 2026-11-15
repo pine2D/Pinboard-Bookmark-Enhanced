@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="107"><title>Options Usability Tests</title>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="108"><title>Options Usability Tests</title>
 <link rel="stylesheet" href="../options.css">
 <style>body{font-family:monospace;padding:16px}.case{padding:5px}.pass{color:#176}.fail{color:#b00}</style>
 </head><body>
@@ -1825,21 +1825,100 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       "wayback-log-clear must use the hidden attribute, not an inline display:none style");
   });
 
-  await test("panel-ai exposes DeepSeek capability hints and non-destructive #deepseek-tools-credentials disclosure", async () => {
+  await test("panel-ai and panel-general expose prominent DeepSeek capability reminders and always-visible credential hints", async () => {
+    const generalPanel = await panelDoc("general");
+    const onboardCopy = generalPanel?.querySelector('#onboard-next-ai p.hint[data-i18n="onboardNextAi"]');
+    assert(!!onboardCopy && /OCR/.test(onboardCopy.textContent) && /DeepSeek Fetch/.test(onboardCopy.textContent),
+      "#onboard-next-ai fallback copy must mention DeepSeek extra capabilities");
+
     const panel = await panelDoc("ai");
     assert(!!panel, "panel-ai is missing");
+    const headingHost = panel.querySelector("#sec-ai-provider")?.closest(".context-help-section");
+    const providerFg = panel.querySelector("#opt-ai-provider")?.closest(".fg.entry-block");
+    const extraGuide = panel.querySelector("#deepseek-extra-guide");
+    assert(headingHost?.nextElementSibling === providerFg,
+      "#sec-ai-provider's section host must stay immediately followed by #opt-ai-provider's .fg.entry-block for 12px heading spacing");
+    assert(providerFg?.nextElementSibling === extraGuide,
+      "#deepseek-extra-guide must sit immediately after #opt-ai-provider's .fg.entry-block");
+    assert(extraGuide.matches(".fg.entry-block[hidden][data-search-skip]") &&
+      !!extraGuide.querySelector('p.hint[data-i18n="deepseekExtraGuide"]') &&
+      !!extraGuide.querySelector('.fg-actions > button.btn.btn-sm#deepseek-extra-guide-btn[data-i18n="deepseekExtraGuideBtn"]'),
+      "#deepseek-extra-guide must use flat .fg.entry-block + p.hint + .fg-actions > button.btn.btn-sm and start hidden+data-search-skip");
+
     const dsFields = panel.querySelector("#fields-deepseek");
     assert(!!dsFields, "#fields-deepseek is missing");
-    assert(!!dsFields.querySelector('[data-i18n="hintDeepseekKey"]') && !!dsFields.querySelector('[data-i18n="hintDeepseekModel"]'),
-      "#fields-deepseek lost its API key / model contextual help disclosures");
+    const dsKeyHint = dsFields.querySelector('p.hint#hint-deepseek-key[data-i18n="hintDeepseekKey"]');
+    const dsModelHint = dsFields.querySelector('[data-i18n="hintDeepseekModel"]');
+    assert(!!dsKeyHint && !dsKeyHint.classList.contains("context-help-body") && !dsKeyHint.closest("details.context-help") &&
+      dsFields.querySelector("#opt-deepseek-key")?.getAttribute("aria-describedby") === "hint-deepseek-key",
+      "#hint-deepseek-key must be an always-visible p.hint linked from #opt-deepseek-key via aria-describedby");
+    assert(!!dsModelHint && !!dsModelHint.closest("details.context-help"),
+      "#fields-deepseek model contextual help disclosure must remain intact");
+
     const toolsDet = panel.querySelector('details.disclosure#deepseek-tools-credentials[data-acc-key="ai-deepseek-tools"]');
     assert(!!toolsDet, "#deepseek-tools-credentials disclosure is missing");
+    const toolsSummaryText = toolsDet.querySelector('summary [data-i18n="deepseekToolsCredentialsSection"]')?.textContent || "";
+    const toolsKeyHint = toolsDet.querySelector('p.hint#hint-deepseek-tools-key[data-i18n="hintDeepseekToolsKey"]');
+    assert(/OCR/.test(toolsSummaryText) && /Fetch/.test(toolsSummaryText),
+      "#deepseek-tools-credentials summary must name its extra capabilities: " + toolsSummaryText);
     assert(!!toolsDet.querySelector("#deepseek-tools-summary") &&
-      !!toolsDet.querySelector('input#opt-deepseek-tools-key[type="password"]') &&
-      !!toolsDet.querySelector('[data-i18n="hintDeepseekToolsKey"]') &&
+      !!toolsDet.querySelector('input#opt-deepseek-tools-key[type="password"][aria-describedby="hint-deepseek-tools-key"]') &&
+      !!toolsKeyHint && !toolsKeyHint.classList.contains("context-help-body") && !toolsKeyHint.closest("details.context-help") &&
       !!toolsDet.querySelector("button#test-deepseek-tools") &&
       !!toolsDet.querySelector("#test-deepseek-tools-status"),
-      "#deepseek-tools-credentials lost one of its summary/key/help/test controls");
+      "#deepseek-tools-credentials must expose an always-visible #hint-deepseek-tools-key and keep summary/key/test controls");
+  });
+
+  await test("settings search resolves DeepSeek extra capabilities to the active DeepSeek key input in English and zh_CN", async () => {
+    const html = await (await fetch("../options.html")).text();
+    const zhMsgs = await (await fetch("../_locales/zh_CN/messages.json")).json();
+    const applyLocale = (doc, dict) => {
+      doc.querySelectorAll("[data-i18n]").forEach((el) => {
+        const key = el.getAttribute("data-i18n");
+        if (dict[key]?.message) el.textContent = dict[key].message;
+      });
+    };
+
+    for (const [lang, dict, capQuery, btnQuery] of [
+      ["en", null, "ocr", "add deepseek key"],
+      ["zh_CN", zhMsgs, "网页提取", "填写 deepseek key"],
+    ]) {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      if (dict) applyLocale(doc, dict);
+
+      // 1. Default provider (Gemini) with guide dismissed/hidden: OCR / 网页提取 hits #deepseek-tools-credentials -> #opt-deepseek-tools-key
+      let index = pbpBuildSettingsSearchIndex(doc);
+      let hits = pbpSearchSettings(index, capQuery);
+      assert(hits.length > 0 && hits[0].panel === "ai" && hits[0].targetId === "opt-deepseek-tools-key",
+        `${lang} (gemini, guide hidden): expected top "${capQuery}" hit to target opt-deepseek-tools-key, got ` + JSON.stringify(hits[0]));
+      assert(pbpSearchSettings(index, btnQuery).length === 0,
+        `${lang}: hidden #deepseek-extra-guide button leaked into search index`);
+
+      // 2. Default provider (Gemini) with top guide shown (no DeepSeek key saved yet)
+      const guide = doc.getElementById("deepseek-extra-guide");
+      guide.hidden = false;
+      guide.removeAttribute("data-search-skip");
+      index = pbpBuildSettingsSearchIndex(doc);
+      const flashHits = pbpSearchSettings(index, "deepseek-flash");
+      assert(flashHits.some((e) => e.panel === "ai" && e.targetId === "deepseek-extra-guide-btn"),
+        `${lang} (guide shown): searching "deepseek-flash" should surface #deepseek-extra-guide-btn, got ` + JSON.stringify(flashHits));
+      const btnHits = pbpSearchSettings(index, btnQuery);
+      assert(btnHits.length === 1 && btnHits[0].targetId === "deepseek-extra-guide-btn",
+        `${lang} (guide shown): searching "${btnQuery}" should target deepseek-extra-guide-btn, got ` + JSON.stringify(btnHits));
+
+      // 3. DeepSeek selected as main AI provider (#fields-deepseek shown, #deepseek-tools-credentials + #deepseek-extra-guide hidden)
+      doc.getElementById("fields-gemini").hidden = true;
+      doc.getElementById("fields-deepseek").hidden = false;
+      const dsTools = doc.getElementById("deepseek-tools-credentials");
+      dsTools.hidden = true;
+      dsTools.setAttribute("data-search-skip", "");
+      guide.hidden = true;
+      guide.setAttribute("data-search-skip", "");
+      index = pbpBuildSettingsSearchIndex(doc);
+      hits = pbpSearchSettings(index, capQuery);
+      assert(hits.length > 0 && hits[0].panel === "ai" && hits[0].targetId === "opt-deepseek-key",
+        `${lang} (deepseek active): expected top "${capQuery}" hit to target opt-deepseek-key without hidden tools summary outranking it, got ` + JSON.stringify(hits));
+    }
   });
 
   await test("Connection Status shows a separate DeepSeek Tools row only when another AI provider is active and DeepSeek tools or key are present", async () => {

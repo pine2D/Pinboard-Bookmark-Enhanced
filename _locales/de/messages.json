@@ -1173,7 +1173,7 @@
     "message": "Keine Probleme gefunden"
   },
   "onboardNextAi": {
-    "message": "Optionaler nächster Schritt: Richte einen KI-Anbieter ein, um Lesezeichen zu taggen und zusammenzufassen und in der Leseansicht zu übersetzen und Fragen zu stellen."
+    "message": "Optionaler nächster Schritt: Richte einen KI-Anbieter ein, um Lesezeichen zu taggen und zusammenzufassen und in der Leseansicht zu übersetzen und Fragen zu stellen. Ein DeepSeek-Schlüssel aktiviert zusätzlich PDF- und Bild-OCR, DeepSeek Fetch, Spracheingabe und Wörterbuch-Aussprache."
   },
   "onboardNextAiLink": {
     "message": "KI einrichten"
@@ -5554,13 +5554,15 @@
   "mdAsrErrEmpty": {"message":"In dieser Aufnahme wurde keine Sprache erkannt."},
   "mdAsrErrTooLarge": {"message":"Diese Aufnahme überschreitet das 8-MB-Limit von DeepSeek ASR."},
   "mdAsrErrFailed": {"message":"Die Sprachtranskription ist fehlgeschlagen. Versuche es gleich noch einmal."},
-  "hintDeepseekKey": {"message":"Wird auch für DeepSeek Fetch, PDF- und Bild-OCR, Spracheingabe im Reader sowie Wörterbuch-Aussprache genutzt."},
+  "hintDeepseekKey": {"message":"Wird neben den KI-Funktionen auch für DeepSeek Fetch, PDF- und Bild-OCR, Spracheingabe im Reader, Wörterbuch-Aussprache sowie (mit deepseek-flash) die Bilderklärung per Klick im Reader genutzt."},
   "hintDeepseekModel": {"message":"Unterstützt deepseek-flash, deepseek-chat und deepseek-reasoner. Mit deepseek-flash öffnet ein Klick auf ein Bild im Reader die KI-Bilderklärung."},
-  "deepseekToolsCredentialsSection": {"message":"DeepSeek-Werkzeug-Zugangsdaten"},
+  "deepseekToolsCredentialsSection": {"message":"DeepSeek-Werkzeuge (OCR, Fetch, Sprache & TTS)"},
   "deepseekToolsKeyReady": {"message":"API-Schlüssel gespeichert"},
   "hintDeepseekToolsKey": {"message":"Speichere einen DeepSeek-API-Schlüssel für DeepSeek Fetch, PDF- und Bild-OCR, Spracheingabe im Reader und Wörterbuch-Aussprache, ohne deinen aktuellen KI-Anbieter zu wechseln."},
   "deepseekToolsConnectionName": {"message":"DeepSeek-Werkzeuge"},
   "previewAiModelDeepseekVisionNote": {"message":"deepseek-flash unterstützt im Reader außerdem die KI-Bilderklärung per Klick auf ein Bild."},
   "mdOcrKeyMissingLead": {"message":"Hinterlege in den Einstellungen einen DeepSeek-API-Schlüssel, um die PDF- und Bild-OCR zu nutzen."},
-  "mdOcrEvictedOnlineLead": {"message":"Dieses OCR-Dokument ist auf diesem Gerät nicht mehr zwischengespeichert. Führe die OCR erneut aus oder wähle eine lokale Datei."}
+  "mdOcrEvictedOnlineLead": {"message":"Dieses OCR-Dokument ist auf diesem Gerät nicht mehr zwischengespeichert. Führe die OCR erneut aus oder wähle eine lokale Datei."},
+  "deepseekExtraGuide": {"message":"Mit einem DeepSeek-API-Schlüssel kannst du DeepSeek Fetch, PDF- und Bild-OCR, Spracheingabe im Reader und Wörterbuch-Aussprache nutzen, ohne deinen aktuellen KI-Anbieter zu wechseln. Wählst du DeepSeek mit deepseek-flash, lassen sich Bilder im Reader außerdem per Klick erklären."},
+  "deepseekExtraGuideBtn": {"message":"DeepSeek-Schlüssel eintragen"}
 }

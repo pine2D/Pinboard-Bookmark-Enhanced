@@ -1181,7 +1181,7 @@
     "message": "No problems found"
   },
   "onboardNextAi": {
-    "message": "Optional next step: set up an AI provider to tag and summarize bookmarks, and to translate and ask questions in the reader."
+    "message": "Optional next step: set up an AI provider to tag and summarize bookmarks, and to translate and ask questions in the reader. Adding a DeepSeek key also enables PDF and image OCR, DeepSeek Fetch, voice input, and dictionary pronunciation."
   },
   "onboardNextAiLink": {
     "message": "Set up AI"
@@ -5576,13 +5576,15 @@
   "mdAsrErrEmpty": {"message":"No speech was detected in that recording."},
   "mdAsrErrTooLarge": {"message":"This recording exceeds DeepSeek ASR's 8 MB limit."},
   "mdAsrErrFailed": {"message":"Voice transcription failed. Try again in a moment."},
-  "hintDeepseekKey": {"message":"Also powers DeepSeek Fetch, PDF and image OCR, Reader voice input, and dictionary pronunciation."},
+  "hintDeepseekKey": {"message":"Also powers DeepSeek Fetch, PDF and image OCR, Reader voice input, dictionary pronunciation, and (with deepseek-flash) clicking images in Reader for AI explanation."},
   "hintDeepseekModel": {"message":"Supports deepseek-flash, deepseek-chat, and deepseek-reasoner. With deepseek-flash, clicking an image in Reader opens AI visual explanation."},
-  "deepseekToolsCredentialsSection": {"message":"DeepSeek Tool Credentials"},
+  "deepseekToolsCredentialsSection": {"message":"DeepSeek Tool Credentials (OCR, Fetch, Voice & TTS)"},
   "deepseekToolsKeyReady": {"message":"API key saved"},
   "hintDeepseekToolsKey": {"message":"Save a DeepSeek API key for DeepSeek Fetch, PDF and image OCR, Reader voice input, and dictionary pronunciation while keeping your current AI provider."},
   "deepseekToolsConnectionName": {"message":"DeepSeek Tools"},
   "previewAiModelDeepseekVisionNote": {"message":"deepseek-flash also supports clicking images in Reader for AI visual explanation."},
   "mdOcrKeyMissingLead": {"message":"Add a DeepSeek API key in Settings to use PDF and image OCR."},
-  "mdOcrEvictedOnlineLead": {"message":"This OCR document is no longer cached on this device. Run OCR again to convert it, or choose a local file."}
+  "mdOcrEvictedOnlineLead": {"message":"This OCR document is no longer cached on this device. Run OCR again to convert it, or choose a local file."},
+  "deepseekExtraGuide": {"message":"Save a DeepSeek API key to use DeepSeek Fetch, PDF and image OCR, Reader voice input, and dictionary pronunciation without switching your AI provider. Choosing DeepSeek with deepseek-flash also lets you click images in Reader for AI explanation."},
+  "deepseekExtraGuideBtn": {"message":"Add DeepSeek key"}
 }

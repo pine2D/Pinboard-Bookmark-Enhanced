@@ -1173,7 +1173,7 @@
     "message": "問題は見つかりません"
   },
   "onboardNextAi": {
-    "message": "任意の次のステップ：AI プロバイダーを設定すると、タグと要約を自動で作成し、リーダーで翻訳や質問ができます。"
+    "message": "任意の次のステップ：AI プロバイダーを設定すると、タグと要約を自動で作成し、リーダーで翻訳や質問ができます。DeepSeek キーを追加すると、PDF・画像 OCR、ページ抽出、音声入力、辞書の発音読み上げも使えます。"
   },
   "onboardNextAiLink": {
     "message": "AI を設定"
@@ -5554,13 +5554,15 @@
   "mdAsrErrEmpty": {"message":"録音から音声を検出できませんでした。"},
   "mdAsrErrTooLarge": {"message":"録音が DeepSeek ASR の上限（8 MB）を超えています。"},
   "mdAsrErrFailed": {"message":"音声の文字起こしに失敗しました。しばらくしてからもう一度お試しください。"},
-  "hintDeepseekKey": {"message":"DeepSeek Fetch、PDF・画像 OCR、リーダーの音声入力、辞書の発音読み上げにも使用されます。"},
+  "hintDeepseekKey": {"message":"通常の AI 機能に加え、DeepSeek Fetch ページ抽出、PDF・画像 OCR、リーダーの音声入力、辞書の発音読み上げ、deepseek-flash 利用時のリーダー内画像クリック解説にも使われます。"},
   "hintDeepseekModel": {"message":"deepseek-flash、deepseek-chat、deepseek-reasoner に対応。deepseek-flash では、リーダー内の画像をクリックして AI 画像解説を利用できます。"},
-  "deepseekToolsCredentialsSection": {"message":"DeepSeek ツール認証情報"},
+  "deepseekToolsCredentialsSection": {"message":"DeepSeek ツール認証情報（OCR・ページ抽出・音声）"},
   "deepseekToolsKeyReady": {"message":"API キー保存済み"},
   "hintDeepseekToolsKey": {"message":"現在の AI プロバイダーを変更せずに、DeepSeek Fetch、PDF・画像 OCR、リーダーの音声入力、辞書の発音読み上げ用の DeepSeek API キーを保存します。"},
   "deepseekToolsConnectionName": {"message":"DeepSeek ツール"},
   "previewAiModelDeepseekVisionNote": {"message":"deepseek-flash では、リーダー内の画像をクリックして AI 画像解説も利用できます。"},
   "mdOcrKeyMissingLead": {"message":"PDF・画像 OCR を使うには、設定で DeepSeek API キーを追加してください。"},
-  "mdOcrEvictedOnlineLead": {"message":"この OCR 文書はこの端末のキャッシュに残っていません。もう一度 OCR を実行するか、ローカルファイルを選択してください。"}
+  "mdOcrEvictedOnlineLead": {"message":"この OCR 文書はこの端末のキャッシュに残っていません。もう一度 OCR を実行するか、ローカルファイルを選択してください。"},
+  "deepseekExtraGuide": {"message":"DeepSeek API キーを保存すると、現在の AI プロバイダーを変えずに DeepSeek Fetch ページ抽出、PDF・画像 OCR、リーダーの音声入力、辞書の発音読み上げを使えます。プロバイダーに DeepSeek（deepseek-flash）を選ぶと、リーダー内の画像クリック解説も利用できます。"},
+  "deepseekExtraGuideBtn": {"message":"DeepSeek キーを入力"}
 }

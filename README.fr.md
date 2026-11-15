@@ -20,7 +20,7 @@ Une extension Chrome pour [Pinboard](https://pinboard.in), [Karakeep](https://ka
 
 ### Enregistrer
 - **Enregistrez dans le service de votre choix** : Pinboard, Karakeep ou linkding, avec le titre, la description et le texte sélectionné déjà remplis.
-- **Étiquettes et résumés par IA** : suggérés à partir de l’article lui-même, avec votre propre clé API.
+- **Étiquettes et résumés par IA** : suggérés d’après l’article avec votre propre clé API ; une clé DeepSeek ajoute aussi l’OCR PDF/image et les outils vocaux.
 - **Enregistrez hors ligne** : vos enregistrements patientent et partent dès que vous êtes de nouveau en ligne.
 
 ### Lire

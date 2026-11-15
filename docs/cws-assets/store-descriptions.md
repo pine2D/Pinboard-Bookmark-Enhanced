@@ -23,7 +23,7 @@
 
 # Save
 - Save to the service you choose: Pinboard, Karakeep or linkding, with the title, description and selected text filled in.
-- AI tags and summaries: suggested from the article itself, using your own API key.
+- AI tags and summaries: suggested from the article with your own API key; a DeepSeek key also adds PDF/image OCR and voice tools.
 - Save while offline: saves wait and go through once you are back online.
 
 # Read
@@ -54,7 +54,7 @@
 
 # 保存
 - 保存到你选的服务：Pinboard、Karakeep 或 linkding，标题、描述和选中文本自动填好。
-- AI 标签与摘要：根据文章内容自动生成，用的是你自己的 API Key。
+- AI 标签与摘要：自备 API Key 根据文章生成；配 DeepSeek Key 还支持 PDF/图片 OCR 与语音功能。
 - 断网也能保存：书签先存在本机，恢复联网后自动提交。
 
 # 阅读
@@ -85,7 +85,7 @@
 
 # 儲存
 - 儲存到你選的服務：Pinboard、Karakeep 或 linkding，標題、描述與選取文字自動填妥。
-- AI 標籤與摘要：根據文章正文提供建議，使用你自己的 API Key。
+- AI 標籤與摘要：自備 API Key 依文章正文產生；配 DeepSeek Key 還支援 PDF/圖片 OCR 與語音功能。
 - 離線也能儲存：書籤先存在本機，重新連線後自動送出。
 
 # 閱讀
@@ -116,7 +116,7 @@
 
 # 儲存
 - 儲存到你選擇的服務：Pinboard、Karakeep 或 linkding 都可以，標題、描述與選取文字會自動填好。
-- AI 標籤與摘要：根據文章內容提出建議，使用你自己的 API Key。
+- AI 標籤與摘要：自備 API Key 按文章內容產生；配 DeepSeek Key 亦支援 PDF/圖片 OCR 與語音功能。
 - 離線也能儲存：書籤會先存在本機，重新連線後自動提交。
 
 # 閱讀
@@ -147,7 +147,7 @@
 
 # Speichern
 - Beim Dienst deiner Wahl speichern: Pinboard, Karakeep oder linkding; Titel, Beschreibung und markierter Text werden automatisch übernommen.
-- KI-Tags und Zusammenfassungen: direkt aus dem Artikel vorgeschlagen, mit deinem eigenen API-Schlüssel.
+- KI-Tags und Zusammenfassungen: direkt aus dem Artikel mit deinem eigenen API-Schlüssel; ein DeepSeek-Schlüssel schaltet auch PDF-/Bild-OCR und Sprachfunktionen frei.
 - Offline speichern: Was du offline speicherst, wartet und wird gesendet, sobald du wieder online bist.
 
 # Lesen
@@ -178,7 +178,7 @@
 
 # Enregistrer
 - Enregistrez dans le service de votre choix : Pinboard, Karakeep ou linkding, avec le titre, la description et le texte sélectionné déjà remplis.
-- Étiquettes et résumés par IA : suggérés à partir de l’article lui-même, avec votre propre clé API.
+- Étiquettes et résumés par IA : suggérés d’après l’article avec votre propre clé API ; une clé DeepSeek ajoute aussi l’OCR PDF/image et les outils vocaux.
 - Enregistrez hors ligne : vos enregistrements patientent et partent dès que vous êtes de nouveau en ligne.
 
 # Lire
@@ -209,7 +209,7 @@
 
 # 保存
 - 選んだサービスに保存：Pinboard、Karakeep、linkding のいずれかに、タイトル・説明・選択テキストを自動入力して保存します。
-- AI タグ・要約：自分の API キーを使い、記事の内容からタグと要約を提案します。
+- AI タグ・要約：自分の API キーで記事から提案。DeepSeek キーなら PDF・画像 OCR や音声機能も使えます。
 - オフラインでも保存：保存はいったん待機し、オンラインに戻ると送信されます。
 
 # 読む
@@ -240,7 +240,7 @@
 
 # Zapisywanie
 - Zapis w wybranej usłudze — Pinboard, Karakeep lub linkding, z gotowym tytułem, opisem i zaznaczonym tekstem.
-- Tagi i streszczenia AI — propozycje na podstawie samego artykułu, z użyciem Twojego klucza API.
+- Tagi i streszczenia AI — propozycje na podstawie artykułu z Twoim kluczem API; klucz DeepSeek dodaje też OCR plików PDF i obrazów oraz funkcje głosowe.
 - Zapis offline — zapisane zakładki czekają i trafiają na miejsce, gdy znów będziesz online.
 
 # Czytanie
@@ -271,7 +271,7 @@
 
 # Сохранение
 - Сохраняйте в выбранный сервис — Pinboard, Karakeep или linkding, с уже заполненными заголовком, описанием и выделенным текстом.
-- AI-теги и краткое содержание — подбираются по самой статье с вашим собственным API-ключом.
+- AI-теги и краткое содержание — подбираются по статье с вашим API-ключом; ключ DeepSeek также добавляет OCR для PDF и изображений и голосовые функции.
 - Сохраняйте без сети — закладки подождут и отправятся, когда вы снова будете в сети.
 
 # Чтение

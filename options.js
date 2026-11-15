@@ -3539,10 +3539,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   const deepseekKeyInput = $id("opt-deepseek-key");
   const deepseekToolsKeyInput = $id("opt-deepseek-tools-key");
   const deepseekToolsSummary = $id("deepseek-tools-summary");
+  const deepseekExtraGuide = $id("deepseek-extra-guide");
+  let _savedDeepseekKeyPresent = !!(s.deepseekApiKey && String(s.deepseekApiKey).trim());
   function syncDeepseekToolsSummary() {
     if (!deepseekToolsSummary) return;
     const hasKey = !!(deepseekKeyInput?.value.trim() || deepseekToolsKeyInput?.value.trim());
     deepseekToolsSummary.textContent = hasKey ? t("deepseekToolsKeyReady") : "";
+  }
+  function syncDeepseekExtraGuide() {
+    if (!deepseekExtraGuide) return;
+    const dsPanelShown = $id("fields-deepseek")?.hidden === false;
+    const hideGuide = dsPanelShown || _savedDeepseekKeyPresent;
+    deepseekExtraGuide.hidden = hideGuide;
+    deepseekExtraGuide.toggleAttribute("data-search-skip", hideGuide);
   }
   if (deepseekToolsKeyInput) deepseekToolsKeyInput.value = s.deepseekApiKey || "";
   syncDeepseekToolsSummary();
@@ -4217,7 +4226,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (el) el.hidden = p !== shown; // native hidden: .pf reveal transition keys off [hidden]
     });
     const dsTools = $id("deepseek-tools-credentials");
-    if (dsTools) dsTools.hidden = shown === "deepseek";
+    if (dsTools) {
+      const dsSelected = shown === "deepseek";
+      dsTools.hidden = dsSelected;
+      dsTools.toggleAttribute("data-search-skip", dsSelected);
+    }
+    syncDeepseekExtraGuide();
     syncPreviewModelToProvider(selected);
     window.pbpListboxSync?.($id("opt-ai-provider"));
   }
@@ -4800,6 +4814,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           if ("mdVideoDarkScheme" in settingsDelta) {
             try { localStorage.setItem("md-preview-video-dark", data.mdVideoDarkScheme ? "1" : "0"); } catch (_) {}
           }
+          if ("deepseekApiKey" in settingsDelta) {
+            _savedDeepseekKeyPresent = !!data.deepseekApiKey;
+            syncDeepseekExtraGuide();
+          }
         },
       });
       await pbpRefreshSyncLocalFallbackStatus();
@@ -5136,6 +5154,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       pbpOpenOptionsTarget("ai", targetId);
     });
   }
+  $id("deepseek-extra-guide-btn")?.addEventListener("click", () => {
+    const targetId = $id("fields-deepseek")?.hidden === false ? "opt-deepseek-key" : "opt-deepseek-tools-key";
+    pbpOpenOptionsTarget("ai", targetId);
+  });
   chrome.storage.onChanged?.addListener((changes, area) => {
     if (area === "local" && (changes[PBP_CONNECTION_HEALTH_KEY] || changes.vocabDriveConnected)) {
       scheduleConnectionOverview();
@@ -5199,7 +5221,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (deepseekKeyInput) deepseekKeyInput.value = plain;
       if (deepseekToolsKeyInput) deepseekToolsKeyInput.value = plain;
       savedState.settings.deepseekApiKey = obfuscateKey(plain);
+      _savedDeepseekKeyPresent = !!plain;
       syncDeepseekToolsSummary();
+      syncDeepseekExtraGuide();
       scheduleConnectionOverview();
     }).catch((e) => {
       console.warn("[options] DeepSeek key refresh failed:", e?.name, e?.message);

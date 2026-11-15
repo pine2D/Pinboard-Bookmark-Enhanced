@@ -20,7 +20,7 @@ A Chrome extension for [Pinboard](https://pinboard.in), [Karakeep](https://karak
 
 ### Save
 - **Save to the service you choose**: Pinboard, Karakeep or linkding, with the title, description and selected text filled in.
-- **AI tags and summaries**: suggested from the article itself, using your own API key.
+- **AI tags and summaries**: suggested from the article with your own API key; a DeepSeek key also adds PDF/image OCR and voice tools.
 - **Save while offline**: saves wait and go through once you are back online.
 
 ### Read

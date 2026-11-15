@@ -1173,7 +1173,7 @@
     "message": "未發現問題"
   },
   "onboardNextAi": {
-    "message": "選用的下一步：設定 AI 服務商，用來自動產生標籤和摘要，並在閱讀器中翻譯、提問。"
+    "message": "選用的下一步：設定 AI 服務商，用來自動產生標籤和摘要，並在閱讀器中翻譯、提問；填寫 DeepSeek 金鑰亦可啟用 PDF 與圖片 OCR 匯入、網頁擷取、語音輸入及詞語發音。"
   },
   "onboardNextAiLink": {
     "message": "設定 AI"
@@ -5554,13 +5554,15 @@
   "mdAsrErrEmpty": {"message":"錄音中未偵測到語音內容。"},
   "mdAsrErrTooLarge": {"message":"錄音超過 DeepSeek ASR 的 8 MB 上限。"},
   "mdAsrErrFailed": {"message":"語音轉寫失敗，請稍後再試。"},
-  "hintDeepseekKey": {"message":"同時用於 DeepSeek Fetch、PDF 與圖片 OCR、閱讀頁語音輸入及詞語發音。"},
+  "hintDeepseekKey": {"message":"除一般 AI 功能外，亦用於網頁擷取（DeepSeek Fetch）、PDF 與圖片 OCR 匯入、閱讀頁語音輸入、詞語發音，以及使用 deepseek-flash 時點擊閱讀頁圖片解釋。"},
   "hintDeepseekModel": {"message":"支援 deepseek-flash、deepseek-chat 及 deepseek-reasoner；使用 deepseek-flash 時，在閱讀頁點擊圖片可調用 AI 解釋圖片。"},
-  "deepseekToolsCredentialsSection": {"message":"DeepSeek 工具憑證"},
+  "deepseekToolsCredentialsSection": {"message":"DeepSeek 工具憑證（OCR、網頁擷取、語音與發音）"},
   "deepseekToolsKeyReady": {"message":"已儲存 API 金鑰"},
   "hintDeepseekToolsKey": {"message":"保留目前 AI 服務商不變，單獨儲存用於 DeepSeek Fetch、PDF 與圖片 OCR、閱讀頁語音輸入及詞語發音的 DeepSeek API 金鑰。"},
   "deepseekToolsConnectionName": {"message":"DeepSeek 工具"},
   "previewAiModelDeepseekVisionNote": {"message":"deepseek-flash 亦支援在閱讀頁點擊圖片調用 AI 解釋圖片。"},
   "mdOcrKeyMissingLead": {"message":"請先在設定中填寫 DeepSeek API 金鑰，再使用 PDF 與圖片 OCR。"},
-  "mdOcrEvictedOnlineLead": {"message":"這份 OCR 文件在此裝置上的快取已清除，可重新辨識，或選擇本機檔案匯入。"}
+  "mdOcrEvictedOnlineLead": {"message":"這份 OCR 文件在此裝置上的快取已清除，可重新辨識，或選擇本機檔案匯入。"},
+  "deepseekExtraGuide": {"message":"填寫 DeepSeek API 金鑰可啟用網頁擷取（DeepSeek Fetch）、PDF 與圖片 OCR 匯入、閱讀頁語音輸入及詞語發音，無需切換目前的 AI 服務商。若選用 DeepSeek 搭配 deepseek-flash，亦支援在閱讀頁點擊圖片調用 AI 解釋。"},
+  "deepseekExtraGuideBtn": {"message":"填寫 DeepSeek 金鑰"}
 }

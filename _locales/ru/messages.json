@@ -1173,7 +1173,7 @@
     "message": "Проблем не обнаружено"
   },
   "onboardNextAi": {
-    "message": "Необязательный следующий шаг: настройте AI-провайдера, чтобы ставить теги и делать сводки закладок, а в режиме чтения переводить и задавать вопросы."
+    "message": "Необязательный следующий шаг: настройте AI-провайдера, чтобы ставить теги и делать сводки закладок, а в режиме чтения переводить и задавать вопросы. Ключ DeepSeek также включает OCR для PDF и изображений, DeepSeek Fetch, голосовой ввод и озвучивание словаря."
   },
   "onboardNextAiLink": {
     "message": "Настроить AI"
@@ -5554,13 +5554,15 @@
   "mdAsrErrEmpty": {"message":"В этой записи речь не обнаружена."},
   "mdAsrErrTooLarge": {"message":"Размер записи превышает лимит DeepSeek ASR в 8 МБ."},
   "mdAsrErrFailed": {"message":"Не удалось распознать речь. Повторите попытку чуть позже."},
-  "hintDeepseekKey": {"message":"Также используется для DeepSeek Fetch, OCR PDF и изображений, голосового ввода в режиме чтения и озвучивания словаря."},
+  "hintDeepseekKey": {"message":"Помимо обычных ИИ-функций используется для DeepSeek Fetch, OCR PDF и изображений, голосового ввода в режиме чтения, озвучивания словаря и (с моделью deepseek-flash) объяснения изображений по клику."},
   "hintDeepseekModel": {"message":"Поддерживает deepseek-flash, deepseek-chat и deepseek-reasoner. С моделью deepseek-flash нажатие на изображение в режиме чтения открывает объяснение ИИ."},
-  "deepseekToolsCredentialsSection": {"message":"Учётные данные инструментов DeepSeek"},
+  "deepseekToolsCredentialsSection": {"message":"Ключ инструментов DeepSeek (OCR, Fetch, голос и озвучка)"},
   "deepseekToolsKeyReady": {"message":"API-ключ сохранён"},
   "hintDeepseekToolsKey": {"message":"Сохраните API-ключ DeepSeek для DeepSeek Fetch, OCR PDF и изображений, голосового ввода в режиме чтения и озвучивания словаря, не меняя текущего AI-провайдера."},
   "deepseekToolsConnectionName": {"message":"Инструменты DeepSeek"},
   "previewAiModelDeepseekVisionNote": {"message":"Модель deepseek-flash также поддерживает объяснение изображений ИИ по нажатию в режиме чтения."},
   "mdOcrKeyMissingLead": {"message":"Добавьте API-ключ DeepSeek в настройках, чтобы использовать OCR для PDF и изображений."},
-  "mdOcrEvictedOnlineLead": {"message":"Этот OCR-документ больше не хранится в кэше на этом устройстве. Запустите OCR повторно или выберите локальный файл."}
+  "mdOcrEvictedOnlineLead": {"message":"Этот OCR-документ больше не хранится в кэше на этом устройстве. Запустите OCR повторно или выберите локальный файл."},
+  "deepseekExtraGuide": {"message":"Сохраните API-ключ DeepSeek, чтобы включить DeepSeek Fetch, OCR для PDF и изображений, голосовой ввод в режиме чтения и озвучивание словаря, не меняя текущего AI-провайдера. Если выбрать DeepSeek с моделью deepseek-flash, нажатие на изображение в режиме чтения также откроет объяснение ИИ."},
+  "deepseekExtraGuideBtn": {"message":"Добавить ключ DeepSeek"}
 }

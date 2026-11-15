@@ -285,7 +285,7 @@
         <!-- First-run follow-up, shown by renderConnectionOverview while the
              token is well-formed and no AI provider has a key yet. -->
         <div class="fg entry-block" id="onboard-next-ai" hidden>
-          <p class="hint" data-i18n="onboardNextAi">Optional next step: set up an AI provider to tag and summarize bookmarks, and to translate and ask questions in the reader.</p>
+          <p class="hint" data-i18n="onboardNextAi">Optional next step: set up an AI provider to tag and summarize bookmarks, and to translate and ask questions in the reader. Adding a DeepSeek key also enables PDF and image OCR, DeepSeek Fetch, voice input, and dictionary pronunciation.</p>
           <div class="fg-actions">
             <button type="button" class="btn btn-sm" id="onboard-next-ai-btn" data-i18n="onboardNextAiLink">Set up AI</button>
           </div>
@@ -596,6 +596,12 @@
           <p class="hint" id="ai-custom-limit-hint" data-i18n="aiCustomLimit" hidden>You can add up to 8 custom providers. Delete one to add another.</p>
           <p class="hint hint-warn" id="ai-custom-locked-hint" data-i18n="aiCustomLocked" role="status" aria-live="polite" hidden>The saved custom providers can't be read on this device, so they can't be added or deleted here.</p>
         </div>
+        <div class="fg entry-block" id="deepseek-extra-guide" hidden data-search-skip>
+          <p class="hint" data-i18n="deepseekExtraGuide">Save a DeepSeek API key to use DeepSeek Fetch, PDF and image OCR, Reader voice input, and dictionary pronunciation without switching your AI provider. Choosing DeepSeek with deepseek-flash also lets you click images in Reader for AI explanation.</p>
+          <div class="fg-actions">
+            <button type="button" class="btn btn-sm" id="deepseek-extra-guide-btn" data-i18n="deepseekExtraGuideBtn">Add DeepSeek key</button>
+          </div>
+        </div>
         <div class="fg entry-block" id="ai-provider-unavailable" hidden>
           <p class="hint hint-warn" role="status" aria-live="polite"></p>
         </div>
@@ -637,8 +643,8 @@
         <!-- DeepSeek -->
         <div class="pf" hidden id="fields-deepseek">
           <h3 class="sr-only" data-i18n="provDeepseek">DeepSeek</h3>
-          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-deepseek-key" data-i18n="labelApiKey">API Key</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintDeepseekKey">Also powers DeepSeek Fetch, PDF and image OCR, Reader voice input, and dictionary pronunciation.</p></details><span class="key-wrap"><input type="password" id="opt-deepseek-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-deepseek-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-deepseek-model" data-i18n="labelModel">Model</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintDeepseekModel">Supports deepseek-flash, deepseek-chat, and deepseek-reasoner. On DeepSeek V4, clicking an image in Reader opens AI visual explanation.</p></details><input type="text" id="opt-deepseek-model" value="deepseek-flash" /></div>
+          <div class="fg entry-block"><label class="bl" for="opt-deepseek-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-deepseek-key" placeholder="sk-…" aria-describedby="hint-deepseek-key" /><button type="button" class="key-toggle" data-target="opt-deepseek-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint" id="hint-deepseek-key" data-i18n="hintDeepseekKey">Also powers DeepSeek Fetch, PDF and image OCR, Reader voice input, dictionary pronunciation, and (with deepseek-flash) clicking images in Reader for AI explanation.</p><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-deepseek-model" data-i18n="labelModel">Model</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintDeepseekModel">Supports deepseek-flash, deepseek-chat, and deepseek-reasoner. With deepseek-flash, clicking an image in Reader opens AI visual explanation.</p></details><input type="text" id="opt-deepseek-model" value="deepseek-flash" /></div>
           <div class="fg-actions">
             <button class="btn btn-sm" id="test-deepseek" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-deepseek-status" role="status" aria-live="polite"></span>
@@ -854,15 +860,12 @@
         </div>
 
         <details class="disclosure" id="deepseek-tools-credentials" data-acc-key="ai-deepseek-tools">
-          <summary><span data-i18n="deepseekToolsCredentialsSection">DeepSeek Tool Credentials</span><span class="summary-state" id="deepseek-tools-summary"></span></summary>
+          <summary><span data-i18n="deepseekToolsCredentialsSection">DeepSeek Tool Credentials (OCR, Fetch, Voice &amp; TTS)</span><span class="summary-state" id="deepseek-tools-summary"></span></summary>
           <div class="disclosure-body">
-            <div class="fg entry-block context-help-host" data-help-role="field">
+            <div class="fg entry-block">
               <label class="bl" for="opt-deepseek-tools-key" data-i18n="labelApiKey">API Key</label>
-              <details class="context-help">
-                <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-                <p class="hint context-help-body" data-i18n="hintDeepseekToolsKey">Save a DeepSeek API key for DeepSeek Fetch, PDF and image OCR, Reader voice input, and dictionary pronunciation while keeping your current AI provider.</p>
-              </details>
-              <span class="key-wrap"><input type="password" id="opt-deepseek-tools-key" placeholder="sk-…" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="opt-deepseek-tools-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+              <span class="key-wrap"><input type="password" id="opt-deepseek-tools-key" placeholder="sk-…" autocomplete="off" spellcheck="false" aria-describedby="hint-deepseek-tools-key" /><button type="button" class="key-toggle" data-target="opt-deepseek-tools-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+              <p class="hint" id="hint-deepseek-tools-key" data-i18n="hintDeepseekToolsKey">Save a DeepSeek API key for DeepSeek Fetch, PDF and image OCR, Reader voice input, and dictionary pronunciation while keeping your current AI provider.</p>
               <p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p>
               <div class="fg-actions">
                 <button type="button" class="btn btn-sm" id="test-deepseek-tools" data-i18n="testConnection">Test connection</button>

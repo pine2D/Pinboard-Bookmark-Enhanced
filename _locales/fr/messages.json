@@ -1173,7 +1173,7 @@
     "message": "Aucun problème détecté"
   },
   "onboardNextAi": {
-    "message": "Étape suivante facultative : configurez un fournisseur IA pour étiqueter et résumer vos signets, et pour traduire et poser des questions en mode lecture."
+    "message": "Étape suivante facultative : configurez un fournisseur IA pour étiqueter et résumer vos signets, et pour traduire et poser des questions en mode lecture. Une clé DeepSeek active aussi l'OCR de PDF et d'images, DeepSeek Fetch, la saisie vocale et la prononciation du dictionnaire."
   },
   "onboardNextAiLink": {
     "message": "Configurer l’IA"
@@ -5554,13 +5554,15 @@
   "mdAsrErrEmpty": {"message":"Aucune parole n'a été détectée dans cet enregistrement."},
   "mdAsrErrTooLarge": {"message":"Cet enregistrement dépasse la limite de 8 Mo de DeepSeek ASR."},
   "mdAsrErrFailed": {"message":"Échec de la transcription vocale. Réessayez dans un instant."},
-  "hintDeepseekKey": {"message":"Sert aussi à DeepSeek Fetch, à l'OCR de PDF et d'images, à la saisie vocale du lecteur et à la prononciation du dictionnaire."},
+  "hintDeepseekKey": {"message":"Sert aussi à DeepSeek Fetch, à l'OCR de PDF et d'images, à la saisie vocale du lecteur, à la prononciation du dictionnaire et, avec deepseek-flash, à l'explication d'images par clic dans le lecteur."},
   "hintDeepseekModel": {"message":"Prend en charge deepseek-flash, deepseek-chat et deepseek-reasoner. Avec deepseek-flash, cliquer sur une image dans le lecteur ouvre l'explication visuelle par IA."},
-  "deepseekToolsCredentialsSection": {"message":"Identifiants des outils DeepSeek"},
+  "deepseekToolsCredentialsSection": {"message":"Identifiants des outils DeepSeek (OCR, Fetch, voix et TTS)"},
   "deepseekToolsKeyReady": {"message":"Clé API enregistrée"},
   "hintDeepseekToolsKey": {"message":"Enregistrez une clé API DeepSeek pour DeepSeek Fetch, l'OCR de PDF et d'images, la saisie vocale du lecteur et la prononciation du dictionnaire tout en gardant votre fournisseur d'IA actuel."},
   "deepseekToolsConnectionName": {"message":"Outils DeepSeek"},
   "previewAiModelDeepseekVisionNote": {"message":"deepseek-flash permet aussi d'expliquer les images par IA d'un clic dans le lecteur."},
   "mdOcrKeyMissingLead": {"message":"Ajoutez une clé API DeepSeek dans les Paramètres pour utiliser l'OCR de PDF et d'images."},
-  "mdOcrEvictedOnlineLead": {"message":"Ce document OCR n'est plus en cache sur cet appareil. Relancez l'OCR ou sélectionnez un fichier local."}
+  "mdOcrEvictedOnlineLead": {"message":"Ce document OCR n'est plus en cache sur cet appareil. Relancez l'OCR ou sélectionnez un fichier local."},
+  "deepseekExtraGuide": {"message":"Enregistrez une clé API DeepSeek pour activer DeepSeek Fetch, l'OCR de PDF et d'images, la saisie vocale du lecteur et la prononciation du dictionnaire sans changer votre fournisseur d'IA actuel. En choisissant DeepSeek avec deepseek-flash, un clic sur une image du lecteur ouvre aussi l'explication par IA."},
+  "deepseekExtraGuideBtn": {"message":"Ajouter une clé DeepSeek"}
 }

@@ -6,13 +6,13 @@
       "multiPackHint", "multiPackLanguageHint", "ecdictFormatNote", "dictPackImportHint"
     ],
     "credential": [
-      "tokenLocalHint", "bookmarkTokenLocalHint", "aiKeyLocalHint"
+      "tokenLocalHint", "bookmarkTokenLocalHint", "aiKeyLocalHint", "hintDeepseekKey", "hintDeepseekToolsKey"
     ],
     "obtain": [
       "hintApiToken", "getKey", "browseModelsAt", "dictEudicTokenHint", "multiPackBrowse", "optVideoLangCodesLink"
     ],
     "guide": [
-      "onboardNextAi", "batchRevokeHint", "aiCustomLimit", "optFollowNeedsPreset", "dependentsNeedParent",
+      "onboardNextAi", "deepseekExtraGuide", "batchRevokeHint", "aiCustomLimit", "optFollowNeedsPreset", "dependentsNeedParent",
       "bookmarkLinkdingSharingHint"
     ],
     "consequence": [
@@ -32,7 +32,7 @@
       "batchTagsHint", "bookmarkGatewayCfHint", "bookmarkGatewayCustomHint", "bookmarkGatewayNoneHint",
       "customCSSOverlayHelp", "diagnosticsHint", "dictDefaultViewHint", "dictDefinitionLangHint", "dictEchoHint",
       "dictEudicSupportedHint", "dictLearnerProfileHint", "dictTtsVoiceHint", "freeTierResourcesPrefix", "freeTierTitle",
-      "hintCustomBaseUrl", "hintCustomKey", "hintDeepseekKey", "hintDeepseekModel", "hintDeepseekToolsKey",
+      "hintCustomBaseUrl", "hintCustomKey", "hintDeepseekModel",
       "hintOllamaModel", "hintOpenAIBaseUrl", "jinaFreeTierHint",
       "mdExportImagePolicyHint", "openrouterTagline", "optAiUseTranscriptHint", "optPopupWidthHelp", "optSyncHint",
       "optThemeHint", "optVideoLangPrefHint", "optVideoUseLoginHint", "optWaybackBatchHint", "optWaybackHint",
