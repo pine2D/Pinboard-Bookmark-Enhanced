@@ -5531,7 +5531,7 @@
   "visionImageLoadFailed": {"message":"Could not load this image for AI reading."},
   "visionImageTooLarge": {"message":"This image is too large to send (over 4 MB after resizing)."},
   "visionModelUnsupported": {"message":"Current AI model doesn't support images. Switch to a vision model to retry."},
-  "mdOcrImportBtn": {"message":"Import PDF or image (OCR)…"},
+  "mdOcrImportBtn": {"message":"Import PDF or image (OCR)"},
   "mdOcrPanelTitleLocal": {"message":"Import PDF or image with DeepSeek OCR"},
   "mdOcrPanelTitleOnline": {"message":"Convert document with DeepSeek OCR"},
   "mdOcrDropHint": {"message":"Drop a PDF or image here, or choose a file"},
@@ -5575,5 +5575,13 @@
   "mdAsrErrMicUnavailable": {"message":"No working microphone was found."},
   "mdAsrErrEmpty": {"message":"No speech was detected in that recording."},
   "mdAsrErrTooLarge": {"message":"This recording exceeds DeepSeek ASR's 8 MB limit."},
-  "mdAsrErrFailed": {"message":"Voice transcription failed. Try again in a moment."}
+  "mdAsrErrFailed": {"message":"Voice transcription failed. Try again in a moment."},
+  "hintDeepseekKey": {"message":"Also powers DeepSeek Fetch, PDF and image OCR, Reader voice input, and dictionary pronunciation."},
+  "hintDeepseekModel": {"message":"Supports deepseek-flash, deepseek-chat, and deepseek-reasoner. On DeepSeek V4, clicking an image in Reader opens AI visual explanation."},
+  "deepseekToolsCredentialsSection": {"message":"DeepSeek Tool Credentials"},
+  "deepseekToolsKeyReady": {"message":"API key saved"},
+  "hintDeepseekToolsKey": {"message":"Save a DeepSeek API key for DeepSeek Fetch, PDF and image OCR, Reader voice input, and dictionary pronunciation while keeping your current AI provider."},
+  "deepseekToolsConnectionName": {"message":"DeepSeek Tools"},
+  "previewAiModelDeepseekVisionNote": {"message":"DeepSeek V4 models also support clicking images in Reader for AI visual explanation."},
+  "mdOcrKeyMissingLead": {"message":"Add a DeepSeek API key in Settings to use PDF and image OCR."}
 }

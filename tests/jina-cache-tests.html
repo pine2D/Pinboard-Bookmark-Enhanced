@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="40"><title>Jina &amp; DeepSeek Fetch Cache Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="45"><title>Jina &amp; DeepSeek Fetch Cache Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -53,6 +53,13 @@ check("save coercion clamps 99999 to 10080", coerce("99999") === 10080);
 const _i18nEntry = { message: "Delete $TERM$?", placeholders: { TERM: { content: "$1" } } };
 check("t() substitution: $&-containing arg passes through literally", _resolveMsg(_i18nEntry, ["$&"]) === "Delete $&?");
 check("t() substitution: normal arg still substitutes", _resolveMsg(_i18nEntry, ["Widget"]) === "Delete Widget?");
+
+// ---- DeepSeek key readiness & effective extract engine fallback ----
+check("pbpHasDeepseekKey rejects null / empty / whitespace", !pbpHasDeepseekKey(null) && !pbpHasDeepseekKey({ deepseekApiKey: "" }) && !pbpHasDeepseekKey({ deepseekApiKey: "   " }));
+check("pbpHasDeepseekKey accepts obfuscated non-empty key", pbpHasDeepseekKey({ deepseekApiKey: obfuscateKey("sk-live-deepseek") }));
+check("pbpEffectiveExtractEngine falls back from deepseek to local without key", pbpEffectiveExtractEngine({ aiContentSource: "deepseek", deepseekApiKey: "" }) === "local");
+check("pbpEffectiveExtractEngine preserves deepseek when key is configured", pbpEffectiveExtractEngine({ aiContentSource: "deepseek", deepseekApiKey: obfuscateKey("sk-live-deepseek") }) === "deepseek");
+check("pbpEffectiveExtractEngine preserves jina without DeepSeek key", pbpEffectiveExtractEngine({ aiContentSource: "jina", deepseekApiKey: "" }) === "jina");
 
 async function acheck(name, fn) {
   try { await fn(); check(name, true); }

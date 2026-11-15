@@ -231,7 +231,9 @@ async function pbpAiVideoGrant(s) {
 // pbpAiTranscriptText); a video without captions then finds its page-text
 // result under the actual source inside fetchAIArtifacts.
 async function pbpAiFastCached(kind, s, account) {
-  const src = (await pbpAiVideoGrant(s)) ? "transcript" : pbpNormalizeExtractEngine(s.aiContentSource);
+  const src = (await pbpAiVideoGrant(s))
+    ? "transcript"
+    : (typeof pbpEffectiveExtractEngine === "function" ? pbpEffectiveExtractEngine(s) : pbpNormalizeExtractEngine(s.aiContentSource));
   return getAICache(pageInfo.url, kind, s.aiCacheDuration, src, account, s);
 }
 

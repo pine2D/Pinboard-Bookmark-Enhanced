@@ -621,6 +621,22 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
   margin-left: 0;
   transform: translateY(var(--pick-mark-y, calc((var(--pick-row1-h) - 20px) / 2)));
 }
+/* Radio choice rows carry --opt-row-pad-y inside label.pick (row 1), so
+   pulling ::details-content up by that padding places the expanded answer 6px
+   (--opt-sp-3) below the option text instead of 16px away, while restoring the
+   same bottom padding before the next row's hairline. Symmetric -pad/+pad
+   margins sum to 0 when closed (height: 0), so closed row height and fold
+   motion stay jump-free. */
+.pref-row.context-help-host[data-help-role="choice"] > label.pick + .context-help::details-content {
+  position: relative;
+  z-index: 1;
+  margin-top: calc(-1 * var(--opt-row-pad-y));
+  margin-bottom: var(--opt-row-pad-y);
+  cursor: auto;
+}
+.pref-row.context-help-host[data-help-role="choice"] > label.pick + .context-help > .context-help-body {
+  margin-top: var(--opt-sp-3);
+}
 /* Choice hosts use the shared grid: the copy label shrink-wraps in column 1
    and the help target follows it in column 2, right after the copy -- where
    the two AI-content-source RADIO rows keep it.
@@ -804,6 +820,7 @@ label.switch > .context-help::details-content {
    ? a step away from the last button. */
 .disclosure-body > .context-help-action-row { margin: var(--opt-sp-4) 0 var(--opt-sp-5); }
 .context-help-action-row > .vocab-toolbar { margin: 0; }
+.fg.context-help-host[data-help-role="group"]:has(> .context-help[open]):has(+ .vocab-toolbar) { margin-bottom: var(--opt-sp-4); }
 .context-help-action-row > .vocab-toolbar > .save-status:empty { display: none; }
 .context-help { margin: 0; }
 .context-help > summary.context-help-toggle {
@@ -996,13 +1013,14 @@ label.switch > .context-help::details-content {
 /* Open: the answer hangs 4px under its label and keeps 8px from the control it
    precedes, so it reads as owned by the label, not the input (the test page
    pins both bands). Source order after the group rule: same specificity. */
-.context-help-host > .context-help > .context-help-body { margin-top: var(--opt-sp-2); }
+.context-help-host > .context-help > .context-help-body,
+.context-help-action-row > .context-help > .context-help-body { margin-top: var(--opt-sp-2); }
 .context-help-host > .context-help[open] + * { margin-top: var(--opt-sp-4); }
 .context-help-body + .context-help-body { margin-top: var(--opt-sp-1); }
 .context-help-link { margin-right: 0; }
 .context-help-inline { min-width: 0; }
 .context-help-inline .context-help-body { padding-right: 0; }
-.wayback-log-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--opt-sp-3); }
+.wayback-log-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--opt-sp-3); }
 .wayback-log-help { flex: 1; min-width: 0; }
 .wayback-log-heading .bl { margin-bottom: 0; }
 /* Base field recipe (width/padding/border/radius/background-color/font-size/
@@ -1916,7 +1934,8 @@ html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-
    restored 2026-10-30). The margin is what is left after both rows'
    padding, section gap - 2 x pad = 8 in both densities; it collapses with
    the first group's sp-6 - pad (4 / 8), never negative, so no box overlaps. */
-:is(.settings-section, .disclosure-body) > .pref-group + .pref-group { margin-top: calc(var(--opt-section-gap) - 2 * var(--opt-row-pad-y)); }
+:is(.settings-section, .disclosure-body) > .pref-group + .pref-group,
+:is(.settings-section, .disclosure-body) > .pref-group + :is([hidden], .hidden) + .pref-group { margin-top: calc(var(--opt-section-gap) - 2 * var(--opt-row-pad-y)); }
 /* A group that ends in a caption instead of a row (Appearance's "needs a
    preset" note) puts the row padding back under that caption as padding: a
    margin would collapse into the trims above and land 12px short. */

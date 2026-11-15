@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="16"><title>DeepSeek OCR Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="17"><title>DeepSeek OCR Tests</title>
 <link rel="stylesheet" href="../md-preview.css">
 <style>
 #results { font-family: monospace; padding: 16px; max-width: 960px; }
@@ -744,6 +744,45 @@ const DEEPSEEK_OCR_LIVE_20261115 = {
       window.pbpVocabCurrentOwner = origCurrentOwner;
       window.pbpVocabGet = origVocabGet;
     }
+  });
+
+  // 17. Missing DeepSeek API key renders setup card, suppresses drag/drop, and live-upgrades once key is saved
+  await test("missing DeepSeek API key renders setup CTA, suppresses drop popover, and live-upgrades when key arrives", async () => {
+    const mock = freshMock();
+    await chrome.storage.local.set({ deepseekApiKey: "" });
+    const ready0 = await pbpOcrRefreshConfig();
+    assert(ready0 === false && pbpOcrIsAvailable() === false, "expected OCR unavailable when deepseekApiKey is empty");
+
+    pbpOcrRenderPanel({ mode: "local" });
+    const missingPanel = document.querySelector("#rendered-view > .empty-state.es-ocr");
+    assert(missingPanel && missingPanel.dataset.ocrMissingKey === "1", "expected missing-key OCR panel");
+    assert(missingPanel.textContent.includes("mdOcrKeyMissingLead"), "expected mdOcrKeyMissingLead copy");
+    assert(!missingPanel.querySelector('input[type="file"]') && !document.getElementById("ocr-main-rich-layout"),
+      "file picker / convert controls must not render without DeepSeek API key");
+
+    const setupBtn = missingPanel.querySelector("button.es-primary");
+    assert(setupBtn && setupBtn.textContent === "deepseekFetchSetupBtn", "expected Set up DeepSeek CTA button");
+    setupBtn.click();
+    const createdTabs = mock.callsOf("tabs.create");
+    assert(createdTabs.length === 1 && String(createdTabs[0].args[0]?.url || "").endsWith("options.html#deepseek-key"),
+      "setup CTA must deep-link to options.html#deepseek-key, got: " + JSON.stringify(createdTabs));
+
+    const pngFile = new File([PNG_MAGIC], "dropped.png", { type: "image/png" });
+    const dt = new DataTransfer();
+    dt.items.add(pngFile);
+    const dropEv = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt });
+    window.dispatchEvent(dropEv);
+    const dropPop = document.getElementById("ocr-drop-pop");
+    assert(!dropPop || !dropPop.matches(":popover-open"), "window drop must not open OCR popover when DeepSeek key is missing");
+
+    await chrome.storage.local.set({ deepseekApiKey: obfuscateKey("sk-ocr-added") });
+    const ready1 = await pbpOcrRefreshConfig();
+    assert(ready1 === true && pbpOcrIsAvailable() === true, "expected OCR available after adding deepseekApiKey");
+    const upgradedPanel = document.querySelector("#rendered-view > .empty-state.es-ocr");
+    assert(upgradedPanel && upgradedPanel.dataset.ocrMissingKey !== "1" &&
+      !!document.getElementById("ocr-main-rich-layout") &&
+      upgradedPanel.querySelector("button.es-primary")?.textContent === "mdOcrChooseFile",
+      "mounted missing-key panel must live-upgrade to the file picker once deepseekApiKey is configured");
   });
 
   document.title = (failed === 0 ? "PASS" : "FAIL") + ` (${passed}/${passed + failed})`;

@@ -281,7 +281,7 @@ function _pbpSpeechSyncTargetIdle(target, keepStatus = false) {
   if (!target) return;
   const btn = target.button;
   if (btn) {
-    btn.hidden = !_pbpSpeechEnabled;
+    btn.hidden = !(_pbpSpeechEnabled && _pbpSpeechDeepseekKey);
     delete btn.dataset.voiceState;
     btn.setAttribute("aria-pressed", "false");
     btn.removeAttribute("aria-busy");
@@ -300,7 +300,7 @@ function _pbpSpeechSyncTargetIdle(target, keepStatus = false) {
 
 function _pbpSpeechShowStatus(target, text, tone = "info") {
   if (!target || !target.statusEl) return;
-  if (!text || !_pbpSpeechEnabled) {
+  if (!text || !_pbpSpeechEnabled || !_pbpSpeechDeepseekKey) {
     target.statusEl.textContent = "";
     delete target.statusEl.dataset.tone;
     target.statusEl.hidden = true;
@@ -359,7 +359,7 @@ async function pbpSpeechRefreshConfig() {
           if (!_pbpSpeechSession || _pbpSpeechSession.targetId !== target.id || _pbpSpeechSession.pending) {
             _pbpSpeechSyncTargetIdle(target, false);
           } else if (target.button) {
-            target.button.hidden = !_pbpSpeechEnabled;
+            target.button.hidden = !(_pbpSpeechEnabled && _pbpSpeechDeepseekKey);
           }
         }
       } while (_pbpSpeechConfigDirty);

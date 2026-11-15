@@ -5509,7 +5509,7 @@
   "visionImageLoadFailed": {"message":"Dieses Bild konnte für die KI-Analyse nicht geladen werden."},
   "visionImageTooLarge": {"message":"Dieses Bild ist zum Senden zu groß (über 4 MB nach dem Verkleinern)."},
   "visionModelUnsupported": {"message":"Das aktuelle KI-Modell unterstützt keine Bilder. Wechsle für einen neuen Versuch zu einem Bildmodell."},
-  "mdOcrImportBtn": {"message":"PDF oder Bild importieren (OCR)…"},
+  "mdOcrImportBtn": {"message":"PDF oder Bild importieren (OCR)"},
   "mdOcrPanelTitleLocal": {"message":"PDF oder Bild mit DeepSeek OCR importieren"},
   "mdOcrPanelTitleOnline": {"message":"Dokument mit DeepSeek OCR umwandeln"},
   "mdOcrDropHint": {"message":"PDF oder Bild hier ablegen oder Datei auswählen"},
@@ -5553,5 +5553,13 @@
   "mdAsrErrMicUnavailable": {"message":"Es wurde kein funktionierendes Mikrofon gefunden."},
   "mdAsrErrEmpty": {"message":"In dieser Aufnahme wurde keine Sprache erkannt."},
   "mdAsrErrTooLarge": {"message":"Diese Aufnahme überschreitet das 8-MB-Limit von DeepSeek ASR."},
-  "mdAsrErrFailed": {"message":"Die Sprachtranskription ist fehlgeschlagen. Versuche es gleich noch einmal."}
+  "mdAsrErrFailed": {"message":"Die Sprachtranskription ist fehlgeschlagen. Versuche es gleich noch einmal."},
+  "hintDeepseekKey": {"message":"Wird auch für DeepSeek Fetch, PDF- und Bild-OCR, Spracheingabe im Reader sowie Wörterbuch-Aussprache genutzt."},
+  "hintDeepseekModel": {"message":"Unterstützt deepseek-flash, deepseek-chat und deepseek-reasoner. Mit DeepSeek V4 öffnet ein Klick auf ein Bild im Reader die KI-Bilderklärung."},
+  "deepseekToolsCredentialsSection": {"message":"DeepSeek-Werkzeug-Zugangsdaten"},
+  "deepseekToolsKeyReady": {"message":"API-Schlüssel gespeichert"},
+  "hintDeepseekToolsKey": {"message":"Speichere einen DeepSeek-API-Schlüssel für DeepSeek Fetch, PDF- und Bild-OCR, Spracheingabe im Reader und Wörterbuch-Aussprache, ohne deinen aktuellen KI-Anbieter zu wechseln."},
+  "deepseekToolsConnectionName": {"message":"DeepSeek-Werkzeuge"},
+  "previewAiModelDeepseekVisionNote": {"message":"DeepSeek-V4-Modelle unterstützen im Reader außerdem die KI-Bilderklärung per Klick auf ein Bild."},
+  "mdOcrKeyMissingLead": {"message":"Hinterlege in den Einstellungen einen DeepSeek-API-Schlüssel, um die PDF- und Bild-OCR zu nutzen."}
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="21"><title>DeepSeek Speech (TTS &amp; ASR) Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="22"><title>DeepSeek Speech (TTS &amp; ASR) Tests</title>
 <link rel="stylesheet" href="../md-preview.css">
 <style>
 #results { font-family: monospace; padding: 16px; max-width: 960px; }
@@ -1003,6 +1003,44 @@ const ASR_FIXTURE_BODY = "\n\n" + '{"request_id":"req_asr_20261113_01","text":"S
       window.MediaRecorder = origRecorder;
       chrome.permissions.contains = origContains;
       chrome.tabs.create = origTabsCreate;
+    }
+  });
+
+  await test("22. Reader voice mic buttons stay hidden without DeepSeek API key and unhide when key is configured", async () => {
+    try {
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true, deepseekApiKey: "" });
+      await pbpSpeechRefreshConfig();
+
+      window.pbpAskOpenPanel("");
+      const askMic = document.getElementById("ask-mic");
+      pbpAiIndexBlocks(document.getElementById("rendered-view"));
+      _pbpHlState = {
+        url: "https://example.com/speech",
+        account: "",
+        items: [{ id: "hl_keygate", n: 1, quote: "First paragraph", note: "Note", color: 1 }],
+        ranges: {},
+        degraded: { hl_keygate: true },
+        orphans: {},
+      };
+      window._pbpHlOpenCard("hl_keygate");
+      const card = document.getElementById("pb-hl-card");
+      const hlMic = card.querySelector(".hl-card-mic");
+
+      assert(askMic && askMic.hidden === true, "#ask-mic must stay hidden when deepseekApiKey is empty");
+      assert(hlMic && hlMic.hidden === true, ".hl-card-mic must stay hidden when deepseekApiKey is empty");
+
+      await chrome.storage.local.set({ deepseekApiKey: obfuscateKey("sk-asr-ready") });
+      await pbpSpeechRefreshConfig();
+      assert(askMic.hidden === false && hlMic.hidden === false, "mic buttons must unhide once deepseekApiKey is configured");
+
+      await chrome.storage.local.set({ deepseekApiKey: "" });
+      await pbpSpeechRefreshConfig();
+      assert(askMic.hidden === true && hlMic.hidden === true, "removing deepseekApiKey must re-hide mic buttons");
+    } finally {
+      pbpSpeechCancelAll();
+      const card = document.getElementById("pb-hl-card");
+      if (card?.matches(":popover-open")) card.hidePopover();
+      if (typeof _pbpAskSetOpen === "function") _pbpAskSetOpen(false);
     }
   });
 

@@ -1421,7 +1421,7 @@ const disclosureKeys = [...optionsHtml.matchAll(
   /<details class="disclosure"(?: id="[^"]+")? data-acc-key="([^"]+)"/g
 )].map((match) => match[1]);
 check(disclosureKeys.join(",") ===
-  "connection-overview,vocab-reading,vocab-learning,vocab-multilingual-packs,vocab-ecdict-pack,vocab-dictionary-pack",
+  "connection-overview,ai-deepseek-tools,vocab-reading,vocab-learning,vocab-multilingual-packs,vocab-ecdict-pack,vocab-dictionary-pack",
   "options.html: settings disclosures lack stable pp-acc keys");
 check(optionsJs.includes('querySelectorAll("details[data-acc-key]")') &&
   /addEventListener\("toggle",[\s\S]{0,500}pbpAccSet\(det\.dataset\.accKey, det\.open\)/.test(optionsJs),
@@ -1739,6 +1739,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     "backupIncludeHighlightsHint",
     "optPopupWidthHelp",
     "tagPresetsHint", "batchTagsHint", "batchAiHint", "hintOpenAIBaseUrl",
+    "hintDeepseekKey", "hintDeepseekModel", "hintDeepseekToolsKey",
     "hintOllamaModel", "hintCustomBaseUrl", "hintCustomKey",
     "freeTierTitle", "freeTierResourcesPrefix", "openrouterTagline", "jinaFreeTierHint",
     "aiContentSourceLocalHint", "aiContentSourceJinaHint", "optAiUseTranscriptHint",
@@ -1894,7 +1895,9 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   // in different visual regions even though both are inside the same host.
   const helpBeforeControl = {
     tagPresetsHint: "opt-tag-presets", batchTagsHint: "opt-batch-tag",
-    hintOpenAIBaseUrl: "opt-openai-baseurl", hintOllamaModel: "opt-ollama-model",
+    hintOpenAIBaseUrl: "opt-openai-baseurl", hintDeepseekKey: "opt-deepseek-key",
+    hintDeepseekModel: "opt-deepseek-model", hintDeepseekToolsKey: "opt-deepseek-tools-key",
+    hintOllamaModel: "opt-ollama-model",
     hintCustomBaseUrl: "opt-custom-baseurl", hintCustomKey: "opt-custom-key",
     aiCacheHint: "opt-ai-cache-duration", tagSeparatorHint: "opt-ai-tag-separator",
     tagPromptHint: "opt-custom-tag-prompt",

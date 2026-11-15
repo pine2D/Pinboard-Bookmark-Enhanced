@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="104"><title>Options Usability Tests</title>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="106"><title>Options Usability Tests</title>
 <link rel="stylesheet" href="../options.css">
 <style>body{font-family:monospace;padding:16px}.case{padding:5px}.pass{color:#176}.fail{color:#b00}</style>
 </head><body>
@@ -1823,6 +1823,70 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     const clearBtn = panel.querySelector("#wayback-log-clear");
     assert(!!clearBtn && clearBtn.hasAttribute("hidden") && !clearBtn.getAttribute("style"),
       "wayback-log-clear must use the hidden attribute, not an inline display:none style");
+  });
+
+  await test("panel-ai exposes DeepSeek capability hints and non-destructive #deepseek-tools-credentials disclosure", async () => {
+    const panel = await panelDoc("ai");
+    assert(!!panel, "panel-ai is missing");
+    const dsFields = panel.querySelector("#fields-deepseek");
+    assert(!!dsFields, "#fields-deepseek is missing");
+    assert(!!dsFields.querySelector('[data-i18n="hintDeepseekKey"]') && !!dsFields.querySelector('[data-i18n="hintDeepseekModel"]'),
+      "#fields-deepseek lost its API key / model contextual help disclosures");
+    const toolsDet = panel.querySelector('details.disclosure#deepseek-tools-credentials[data-acc-key="ai-deepseek-tools"]');
+    assert(!!toolsDet, "#deepseek-tools-credentials disclosure is missing");
+    assert(!!toolsDet.querySelector("#deepseek-tools-summary") &&
+      !!toolsDet.querySelector('input#opt-deepseek-tools-key[type="password"]') &&
+      !!toolsDet.querySelector('[data-i18n="hintDeepseekToolsKey"]') &&
+      !!toolsDet.querySelector("button#test-deepseek-tools") &&
+      !!toolsDet.querySelector("#test-deepseek-tools-status"),
+      "#deepseek-tools-credentials lost one of its summary/key/help/test controls");
+  });
+
+  await test("Connection Status shows a separate DeepSeek Tools row only when another AI provider is active and DeepSeek tools or key are present", async () => {
+    const host = document.createElement("div");
+    host.innerHTML = '<input id="opt-deepseek-tools-key" type="password" value="" /><input id="opt-reader-voice-input" type="checkbox" />';
+    document.body.appendChild(host);
+    const toolsInput = document.getElementById("opt-deepseek-tools-key");
+    const voiceToggle = document.getElementById("opt-reader-voice-input");
+    const providerSel = document.getElementById("opt-ai-provider");
+    const realContains = chrome.permissions.contains;
+    try {
+      await renderConnectionOverview();
+      assert(![...document.querySelectorAll(".connection-health-row")].some((r) => r.textContent.includes("deepseekToolsConnectionName")),
+        "DeepSeek Tools row should stay absent when provider!=deepseek and neither key nor DeepSeek tool toggle is set");
+
+      voiceToggle.checked = true;
+      await renderConnectionOverview();
+      let dsRow = [...document.querySelectorAll(".connection-health-row")].find((r) => r.textContent.includes("deepseekToolsConnectionName"));
+      assert(!!dsRow && dsRow.textContent.includes("connectionNotConfigured"),
+        "enabling Reader voice input without a DeepSeek key must surface DeepSeek Tools as not configured");
+
+      voiceToggle.checked = false;
+      toolsInput.value = "sk-ds-tools-only";
+      chrome.permissions.contains = async (q) => !!(q.origins?.[0]?.includes("api.deepseek.com") || q.permissions?.includes("identity"));
+      await renderConnectionOverview();
+      dsRow = [...document.querySelectorAll(".connection-health-row")].find((r) => r.textContent.includes("deepseekToolsConnectionName"));
+      assert(!!dsRow && dsRow.textContent.includes("connectionNeverTested"),
+        "saving a DeepSeek tool key with api.deepseek.com granted must surface DeepSeek Tools in Connection Status: " + (dsRow ? dsRow.textContent : "missing"));
+
+      const dsOpt = document.createElement("option");
+      dsOpt.value = "deepseek";
+      dsOpt.textContent = "DeepSeek";
+      providerSel.appendChild(dsOpt);
+      providerSel.value = "deepseek";
+      try {
+        await renderConnectionOverview();
+        assert(![...document.querySelectorAll(".connection-health-row")].some((r) => r.textContent.includes("deepseekToolsConnectionName")),
+          "when DeepSeek is already the main AI provider, the separate DeepSeek Tools row must not duplicate it");
+      } finally {
+        providerSel.value = "openai";
+        dsOpt.remove();
+      }
+    } finally {
+      chrome.permissions.contains = realContains;
+      host.remove();
+      await renderConnectionOverview();
+    }
   });
 
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";

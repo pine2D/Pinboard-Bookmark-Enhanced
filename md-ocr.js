@@ -583,6 +583,71 @@ let _pbpOcrHiddenInput = null;
 let _pbpOcrDropPop = null;
 let _pbpOcrPanelActiveAbort = null;
 let _pbpOcrDropActiveAbort = null;
+let _pbpOcrKeyReady = false;
+let _pbpOcrKeyLoaded = false;
+let _pbpOcrConfigGen = 0;
+let _pbpOcrMountedPanelOpts = null;
+
+function pbpOcrIsAvailable() {
+  return _pbpOcrKeyReady;
+}
+
+function _pbpOcrSyncAvailabilityDom() {
+  if (typeof document === "undefined") return;
+  const srcImportBtn = document.getElementById("btn-import-ocr");
+  if (srcImportBtn) srcImportBtn.hidden = !_pbpOcrKeyReady;
+  if (!_pbpOcrKeyReady && _pbpOcrDropPop && !_pbpOcrDropActiveAbort) {
+    try {
+      if (_pbpOcrDropPop.matches(":popover-open")) _pbpOcrDropPop.hidePopover();
+    } catch (_) { /* swallow-ok: popover state check */ }
+  }
+  if (_pbpOcrMountedPanelOpts && !_pbpOcrPanelActiveAbort) {
+    const mounted = document.querySelector("#rendered-view > .empty-state.es-ocr");
+    if (mounted) {
+      const showingMissingKey = mounted.dataset.ocrMissingKey === "1";
+      if (showingMissingKey !== !_pbpOcrKeyReady) {
+        pbpOcrRenderPanel(_pbpOcrMountedPanelOpts);
+      }
+    } else {
+      _pbpOcrMountedPanelOpts = null;
+    }
+  }
+}
+
+function pbpOcrSetKeyAvailable(ready) {
+  _pbpOcrKeyLoaded = true;
+  _pbpOcrKeyReady = Boolean(ready);
+  _pbpOcrSyncAvailabilityDom();
+}
+
+async function pbpOcrRefreshConfig() {
+  const gen = ++_pbpOcrConfigGen;
+  let ready = false;
+  try {
+    let settings = null;
+    if (typeof pbpReadSettingsWithSecrets === "function") {
+      settings = await pbpReadSettingsWithSecrets({ deepseekApiKey: "" });
+    } else if (typeof chrome !== "undefined" && chrome.storage?.local?.get) {
+      settings = await chrome.storage.local.get({ deepseekApiKey: "" });
+    }
+    if (settings) {
+      ready = typeof pbpHasDeepseekKey === "function"
+        ? pbpHasDeepseekKey(settings)
+        : Boolean(String(
+          typeof deobfuscateKey === "function" && settings.deepseekApiKey
+            ? deobfuscateKey(settings.deepseekApiKey)
+            : (settings.deepseekApiKey || "")
+        ).trim());
+    }
+  } catch (_) {
+    // swallow-ok: transient storage read failure defaults OCR key availability to false
+    ready = false;
+  }
+  if (gen === _pbpOcrConfigGen) {
+    pbpOcrSetKeyAvailable(ready);
+  }
+  return _pbpOcrKeyReady;
+}
 
 function pbpOcrAbortActive(reason = "aborted") {
   if (_pbpOcrPanelActiveAbort) {
@@ -750,6 +815,10 @@ function pbpOcrRenderPanel(opts = {}) {
     _pbpOcrPanelActiveAbort.abort("replaced");
     _pbpOcrPanelActiveAbort = null;
   }
+  _pbpOcrMountedPanelOpts = { ...opts };
+  if (!_pbpOcrKeyLoaded && typeof chrome !== "undefined" && chrome.storage) {
+    void pbpOcrRefreshConfig();
+  }
   view.removeAttribute("aria-busy");
   const mode = opts.mode === "online" ? "online" : "local";
   const onlineUrl = mode === "online" && typeof opts.url === "string" ? opts.url : "";
@@ -780,6 +849,56 @@ function pbpOcrRenderPanel(opts = {}) {
     lead.className = "rh-empty-lead";
     lead.textContent = opts.leadText;
     wrap.appendChild(lead);
+  }
+
+  if (_pbpOcrKeyLoaded && !_pbpOcrKeyReady) {
+    wrap.dataset.ocrMissingKey = "1";
+    const card = document.createElement("div");
+    card.className = "rh-match";
+    const missingEl = document.createElement("div");
+    missingEl.className = "rh-meta";
+    missingEl.textContent = t("mdOcrKeyMissingLead");
+    const setupActions = document.createElement("div");
+    setupActions.className = "row";
+    const setupBtn = document.createElement("button");
+    setupBtn.type = "button";
+    setupBtn.className = "action-btn es-primary";
+    setupBtn.textContent = t("deepseekFetchSetupBtn");
+    setupBtn.addEventListener("click", () => {
+      if (typeof chrome !== "undefined" && chrome.tabs?.create && chrome.runtime?.getURL) {
+        void chrome.tabs.create({ url: chrome.runtime.getURL("options.html#deepseek-key") });
+      }
+    });
+    setupActions.appendChild(setupBtn);
+    if (mode === "online" && typeof pbpOriginalOpenHref === "function") {
+      const safeHref = pbpOriginalOpenHref(onlineUrl);
+      if (safeHref) {
+        const openOrig = document.createElement("a");
+        openOrig.className = "action-btn es-quiet";
+        openOrig.href = safeHref;
+        openOrig.target = "_blank";
+        openOrig.rel = "noopener noreferrer";
+        openOrig.innerHTML = (typeof PBP_ICONS !== "undefined" && PBP_ICONS.extOpen) || "";
+        const lab = document.createElement("span");
+        lab.textContent = t("libraryOpenOriginal");
+        openOrig.appendChild(lab);
+        setupActions.appendChild(openOrig);
+      }
+    }
+    card.append(missingEl, setupActions);
+    wrap.appendChild(card);
+
+    const foot = document.createElement("div");
+    foot.className = "row";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "action-btn es-quiet";
+    closeBtn.textContent = t("mdPreviewClose");
+    closeBtn.addEventListener("click", () => window.close());
+    foot.appendChild(closeBtn);
+    wrap.appendChild(foot);
+    view.replaceChildren(wrap);
+    return;
   }
 
   const errBar = document.createElement("div");
@@ -1174,17 +1293,27 @@ function pbpOcrInstallReaderHooks() {
 
   const srcImportBtn = document.getElementById("btn-import-ocr");
   if (srcImportBtn) {
+    srcImportBtn.hidden = !_pbpOcrKeyReady;
     srcImportBtn.addEventListener("click", () => pbpOcrOpenImportEntry());
+  }
+  if (typeof chrome !== "undefined" && chrome.storage) {
+    void pbpOcrRefreshConfig();
+    chrome.storage.onChanged?.addListener((changes, area) => {
+      if ((area === "local" || area === "sync") &&
+          (changes.deepseekApiKey || changes.optSyncEnabled || changes.syncApiKeys)) {
+        void pbpOcrRefreshConfig();
+      }
+    });
   }
 
   const hasFiles = (dt) => Boolean(dt && Array.from(dt.types || []).includes("Files"));
   document.addEventListener("dragover", (e) => {
-    if (!hasFiles(e.dataTransfer)) return;
+    if (!_pbpOcrKeyReady || !hasFiles(e.dataTransfer)) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
   });
   document.addEventListener("drop", (e) => {
-    if (!hasFiles(e.dataTransfer)) return;
+    if (!_pbpOcrKeyReady || !hasFiles(e.dataTransfer)) return;
     const file = e.dataTransfer.files && e.dataTransfer.files[0];
     if (!file) return;
     e.preventDefault();

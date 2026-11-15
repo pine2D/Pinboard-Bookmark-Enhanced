@@ -61,16 +61,23 @@ function pbpRemoteExtractOriginPattern(engine) {
   return "";
 }
 
-function pbpHasDeepseekFetchKey(s) {
+function pbpHasDeepseekKey(s) {
   if (!s || typeof s.deepseekApiKey !== "string" || !s.deepseekApiKey.trim()) return false;
   const raw = typeof deobfuscateKey === "function" ? deobfuscateKey(s.deepseekApiKey) : s.deepseekApiKey;
   return !!String(raw || "").trim();
+}
+const pbpHasDeepseekFetchKey = pbpHasDeepseekKey;
+
+function pbpEffectiveExtractEngine(s) {
+  const engine = pbpNormalizeExtractEngine(s && s.aiContentSource);
+  if (engine === "deepseek" && !pbpHasDeepseekKey(s)) return "local";
+  return engine;
 }
 
 function pbpBatchRemoteExtractEngine(s) {
   if (!s || typeof s !== "object") return "";
   if (s.aiContentSource === "jina") return "jina";
-  if (s.aiContentSource === "deepseek" && pbpHasDeepseekFetchKey(s)) return "deepseek";
+  if (s.aiContentSource === "deepseek" && pbpHasDeepseekKey(s)) return "deepseek";
   return "";
 }
 

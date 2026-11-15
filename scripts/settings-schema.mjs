@@ -42,8 +42,8 @@ export const PANEL_SCHEMA = deepFreeze({
     hasReset: true,
     position: "ai",
     keepsSecrets: true,
-    // Custom provider editor inputs reflect user-added records (kept on reset like API keys).
-    nonSettingSkip: ["opt-custom-name", "opt-custom-protocol", "opt-custom-baseurl", "opt-custom-model"],
+    // Custom provider editor inputs and DeepSeek tool-credential mirror are kept on reset like API keys.
+    nonSettingSkip: ["opt-custom-name", "opt-custom-protocol", "opt-custom-baseurl", "opt-custom-model", "opt-deepseek-tools-key"],
     resetAllowlist: {},
   },
   "ai-behavior": {

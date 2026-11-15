@@ -5509,7 +5509,7 @@
   "visionImageLoadFailed": {"message":"無法讀取這張圖片以供 AI 解析。"},
   "visionImageTooLarge": {"message":"圖片壓縮後仍超過 4 MB，無法傳送。"},
   "visionModelUnsupported": {"message":"目前 AI 模型不支援看圖，請切換到支援圖片的模型後再試。"},
-  "mdOcrImportBtn": {"message":"匯入 PDF 或圖片（OCR）…"},
+  "mdOcrImportBtn": {"message":"匯入 PDF 或圖片（OCR）"},
   "mdOcrPanelTitleLocal": {"message":"使用 DeepSeek OCR 匯入 PDF 或圖片"},
   "mdOcrPanelTitleOnline": {"message":"使用 DeepSeek OCR 轉換文件"},
   "mdOcrDropHint": {"message":"將 PDF 或圖片拖放到此處，或選擇本機檔案"},
@@ -5553,5 +5553,13 @@
   "mdAsrErrMicUnavailable": {"message":"找不到可用的麥克風。"},
   "mdAsrErrEmpty": {"message":"錄音中未偵測到語音內容。"},
   "mdAsrErrTooLarge": {"message":"錄音超過 DeepSeek ASR 的 8 MB 上限。"},
-  "mdAsrErrFailed": {"message":"語音轉寫失敗，請稍後再試。"}
+  "mdAsrErrFailed": {"message":"語音轉寫失敗，請稍後再試。"},
+  "hintDeepseekKey": {"message":"同時用於 DeepSeek Fetch、PDF 與圖片 OCR、閱讀頁語音輸入及單字發音。"},
+  "hintDeepseekModel": {"message":"支援 deepseek-flash、deepseek-chat 與 deepseek-reasoner；使用 DeepSeek V4 模型時，在閱讀頁點擊圖片可呼叫 AI 解釋圖片。"},
+  "deepseekToolsCredentialsSection": {"message":"DeepSeek 工具憑證"},
+  "deepseekToolsKeyReady": {"message":"已儲存 API 金鑰"},
+  "hintDeepseekToolsKey": {"message":"保留目前 AI 服務供應商不變，單獨儲存用於 DeepSeek Fetch、PDF 與圖片 OCR、閱讀頁語音輸入及單字發音的 DeepSeek API 金鑰。"},
+  "deepseekToolsConnectionName": {"message":"DeepSeek 工具"},
+  "previewAiModelDeepseekVisionNote": {"message":"DeepSeek V4 模型也支援在閱讀頁點擊圖片呼叫 AI 解釋圖片。"},
+  "mdOcrKeyMissingLead": {"message":"請先在設定中填寫 DeepSeek API 金鑰，再使用 PDF 與圖片 OCR。"}
 }

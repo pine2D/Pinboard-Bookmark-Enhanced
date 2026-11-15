@@ -5509,7 +5509,7 @@
   "visionImageLoadFailed": {"message":"AI で読み取るための画像を読み込めませんでした。"},
   "visionImageTooLarge": {"message":"縮小後も画像が 4 MB を超えているため送信できません。"},
   "visionModelUnsupported": {"message":"現在の AI モデルは画像に対応していません。画像対応モデルに切り替えてから再試行してください。"},
-  "mdOcrImportBtn": {"message":"PDF・画像を読み込む（OCR）…"},
+  "mdOcrImportBtn": {"message":"PDF・画像を読み込む（OCR）"},
   "mdOcrPanelTitleLocal": {"message":"DeepSeek OCR で PDF・画像を読み込む"},
   "mdOcrPanelTitleOnline": {"message":"DeepSeek OCR で文書を変換"},
   "mdOcrDropHint": {"message":"PDF や画像をここにドロップするか、ファイルを選択"},
@@ -5553,5 +5553,13 @@
   "mdAsrErrMicUnavailable": {"message":"使用可能なマイクが見つかりません。"},
   "mdAsrErrEmpty": {"message":"録音から音声を検出できませんでした。"},
   "mdAsrErrTooLarge": {"message":"録音が DeepSeek ASR の上限（8 MB）を超えています。"},
-  "mdAsrErrFailed": {"message":"音声の文字起こしに失敗しました。しばらくしてからもう一度お試しください。"}
+  "mdAsrErrFailed": {"message":"音声の文字起こしに失敗しました。しばらくしてからもう一度お試しください。"},
+  "hintDeepseekKey": {"message":"DeepSeek Fetch、PDF・画像 OCR、リーダーの音声入力、辞書の発音読み上げにも使用されます。"},
+  "hintDeepseekModel": {"message":"deepseek-flash、deepseek-chat、deepseek-reasoner に対応。DeepSeek V4 モデルでは、リーダー内の画像をクリックして AI 画像解説を利用できます。"},
+  "deepseekToolsCredentialsSection": {"message":"DeepSeek ツール認証情報"},
+  "deepseekToolsKeyReady": {"message":"API キー保存済み"},
+  "hintDeepseekToolsKey": {"message":"現在の AI プロバイダーを変更せずに、DeepSeek Fetch、PDF・画像 OCR、リーダーの音声入力、辞書の発音読み上げ用の DeepSeek API キーを保存します。"},
+  "deepseekToolsConnectionName": {"message":"DeepSeek ツール"},
+  "previewAiModelDeepseekVisionNote": {"message":"DeepSeek V4 モデルでは、リーダー内の画像をクリックして AI 画像解説も利用できます。"},
+  "mdOcrKeyMissingLead": {"message":"PDF・画像 OCR を使うには、設定で DeepSeek API キーを追加してください。"}
 }

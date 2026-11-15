@@ -1491,9 +1491,12 @@ async function htmlToMarkdownAsync(html, opts) {
   } catch (_) {}
   if (jinaMdBtn) {
     let remoteGrantPattern = "";
-    jinaMdBtn.title = settings.aiContentSource === "jina"
+    const effectivePreviewEngine = typeof pbpEffectiveExtractEngine === "function"
+      ? pbpEffectiveExtractEngine(settings)
+      : pbpNormalizeExtractEngine(settings.aiContentSource);
+    jinaMdBtn.title = effectivePreviewEngine === "jina"
       ? t("jinaMarkdownTitleJina")
-      : (settings.aiContentSource === "deepseek" ? t("jinaMarkdownTitleDeepseek") : t("jinaMarkdownTitle"));
+      : (effectivePreviewEngine === "deepseek" ? t("jinaMarkdownTitleDeepseek") : t("jinaMarkdownTitle"));
     // Residual guard only: chrome://, about:, file://, the PDF viewer and the
     // popup's own extension:// URL are already disabled in the unsupported-URL
     // branch above, which returns long before this line. What is left for this
@@ -1618,6 +1621,8 @@ async function htmlToMarkdownAsync(html, opts) {
           return;
         }
         if (
+          typeof pbpHasDeepseekKey === "function" &&
+          pbpHasDeepseekKey(settings) &&
           typeof pbpIsOcrCandidateUrl === "function" &&
           pbpIsOcrCandidateUrl(tab.url || url) &&
           !(typeof pbpVideoDetect === "function" && pbpVideoDetect(tab.url || url))
@@ -1666,7 +1671,11 @@ async function htmlToMarkdownAsync(html, opts) {
         const extractMessage = result.error === "site_target_missing" ? t("mdSiteTargetMissing")
           : result.error === "deepseek_key_missing" ? t("deepseekFetchKeyMissing")
           : result.error === "invalid_url" ? t("mdEngineDeepseekInvalidUrl")
-          : result.error === "empty" ? (t("mdPreviewNoContent") + " " + t("mdEngineDeepseekNoLogin"))
+          : result.error === "empty" ? (
+            actualEngine === "deepseek"
+              ? (t("mdPreviewNoContent") + " " + t("mdEngineDeepseekNoLogin"))
+              : (actualEngine === "jina" ? (t("mdPreviewNoContent") + " " + t("mdEngineJinaNoLogin")) : t("mdPreviewNoContent"))
+          )
           : result.error;
         jinaMdBtn.title = extractMessage;
         // Persistent, specific status — so the user can tell API-key vs other failures
@@ -3748,7 +3757,18 @@ function _positionPopupReaderHistory(pop, anchorBtn) {
 }
 
 async function _populatePopupReaderHistory(pop, anchorBtn) {
-  const items = typeof pbpReaderHistoryRead === "function" ? await pbpReaderHistoryRead() : [];
+  const [items, dsCfg] = await Promise.all([
+    typeof pbpReaderHistoryRead === "function" ? pbpReaderHistoryRead() : [],
+    typeof pbpReadSettingsWithSecrets === "function"
+      ? pbpReadSettingsWithSecrets({ deepseekApiKey: "" }).catch(() => {
+        // swallow-ok: fallback to empty key if secret read fails
+        return { deepseekApiKey: "" };
+      })
+      : { deepseekApiKey: "" },
+  ]);
+  const canImportOcr = typeof pbpHasDeepseekKey === "function"
+    ? pbpHasDeepseekKey(dsCfg)
+    : Boolean(String(dsCfg?.deepseekApiKey || "").trim());
 
   const head = document.createElement("div");
   head.className = "pp-rh-head";
@@ -3852,27 +3872,29 @@ async function _populatePopupReaderHistory(pop, anchorBtn) {
     frag.appendChild(listEl);
   }
 
-  const divEl = document.createElement("div");
-  divEl.className = "divider";
-  frag.appendChild(divEl);
+  if (canImportOcr) {
+    const divEl = document.createElement("div");
+    divEl.className = "divider";
+    frag.appendChild(divEl);
 
-  const importBtn = document.createElement("button");
-  importBtn.type = "button";
-  importBtn.id = "pp-rh-import-ocr";
-  importBtn.innerHTML = PBP_ICONS.doc;
-  const importLabel = document.createElement("span");
-  importLabel.className = "pp-rh-label";
-  importLabel.textContent = t("mdOcrImportBtn");
-  importBtn.appendChild(importLabel);
-  importBtn.addEventListener("click", async () => {
-    try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
-    if (chrome.tabs?.create && chrome.runtime?.getURL) {
-      const incogQ = _activeTabAtOpen?.incognito === true ? "&incognito=1" : "";
-      const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect("")) ? "&video=1" : "";
-      await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html?import=ocr" + incogQ + videoQ) });
-    }
-  });
-  frag.appendChild(importBtn);
+    const importBtn = document.createElement("button");
+    importBtn.type = "button";
+    importBtn.id = "pp-rh-import-ocr";
+    importBtn.innerHTML = PBP_ICONS.doc;
+    const importLabel = document.createElement("span");
+    importLabel.className = "pp-rh-label";
+    importLabel.textContent = t("mdOcrImportBtn");
+    importBtn.appendChild(importLabel);
+    importBtn.addEventListener("click", async () => {
+      try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
+      if (chrome.tabs?.create && chrome.runtime?.getURL) {
+        const incogQ = _activeTabAtOpen?.incognito === true ? "&incognito=1" : "";
+        const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect("")) ? "&video=1" : "";
+        await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html?import=ocr" + incogQ + videoQ) });
+      }
+    });
+    frag.appendChild(importBtn);
+  }
 
   pop.replaceChildren(frag);
 }

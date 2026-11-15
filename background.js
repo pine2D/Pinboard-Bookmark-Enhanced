@@ -6371,10 +6371,14 @@ async function openMarkdownPreviewFromShortcut() {
   // responsive; the preview page drives extraction via reextractMarkdown (the same
   // path as the in-preview toggle). Follow the aiContentSource setting (fresh read).
   const [raw, auth] = await Promise.all([
-    (await getSettingsStorage()).get({ aiContentSource: SETTINGS_DEFAULTS.aiContentSource, urlClean: SETTINGS_DEFAULTS.urlClean }),
+    pbpReadSettingsWithSecrets({
+      aiContentSource: SETTINGS_DEFAULTS.aiContentSource,
+      urlClean: SETTINGS_DEFAULTS.urlClean,
+      deepseekApiKey: SETTINGS_DEFAULTS.deepseekApiKey,
+    }),
     getCurrentBookmarkAuth().catch(() => ({ account: "" })),
   ]);
-  const engine = pbpNormalizeExtractEngine(raw.aiContentSource);
+  const engine = pbpEffectiveExtractEngine(raw);
   // Per-open token key so two shortcut opens (or a shortcut + a popup Preview)
   // never share one storage slot and clobber each other before their tabs read.
   const k = crypto.randomUUID();

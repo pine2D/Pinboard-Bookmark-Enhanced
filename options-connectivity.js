@@ -30,6 +30,7 @@ function pbpLiveAiSettingsSnapshot(provider) {
     customApiKey: getOptVal("opt-custom-key"), customModel: getOptVal("opt-custom-model"), customBaseUrl: getOptVal("opt-custom-baseurl"),
     // @generated:ai-providers end (live-snapshot)
   };
+  if (!out.deepseekApiKey) out.deepseekApiKey = getOptVal("opt-deepseek-tools-key");
   // The custom entries' unsaved edits live in the editor model, not in the
   // shared panel's fields (which show one entry at a time).
   if (pbpOptAiCustomEditorState) Object.assign(out, pbpOptAiCustomSnapshot(pbpOptAiCustomEditorState));
@@ -515,10 +516,11 @@ function setupApiTests() {
     }, ms));
   }
 
-  async function testAIProvider(provider) {
+  async function testAIProvider(provider, opts) {
     // Every custom entry shares the "custom" panel's button, status line and
     // key field; timers, in-flight guards and health records stay per entry.
-    const dom = pbpOptAiDomId(provider);
+    const dom = (opts && opts.domId) || pbpOptAiDomId(provider);
+    const statusKey = dom === "deepseek-tools" ? "deepseek-tools" : provider;
     const statusEl = $id(`test-${dom}-status`);
     if (!statusEl) return;
     // The shared line belongs to whichever entry the picker shows: a result
@@ -536,7 +538,7 @@ function setupApiTests() {
     if (btn?.disabled || pbpAiTestInflight.has(provider)) return;
     pbpAiTestInflight.add(provider);
     if (btn) btn.disabled = true;
-    cancelStatusClear(provider);
+    cancelStatusClear(statusKey);
     try {
       pending(t("testTesting"));
 
@@ -615,7 +617,10 @@ function setupApiTests() {
       }
 
       try {
-        const reply = await callAI(cs, "Reply with just the word: OK");
+        const callOpts = dom === "deepseek-tools" && typeof SETTINGS_DEFAULTS === "object" && SETTINGS_DEFAULTS?.deepseekModel
+          ? { model: SETTINGS_DEFAULTS.deepseekModel }
+          : undefined;
+        const reply = await callAI(cs, "Reply with just the word: OK", callOpts);
 
         // Second leg (K96): the Reader's per-provider model override. The call
         // above used the provider's CONFIGURED model -- the one popup tags and
@@ -639,7 +644,9 @@ function setupApiTests() {
         // in #opt-preview-ai-model -- without this, every Test click pays
         // for a second request probing a model the Reader will never call.
         // `!== false` matches options.js:242's own reading of this checkbox.
-        const ov = $id("opt-ai-provider")?.value === provider && $id("opt-preview-ai-enabled")?.checked !== false
+        const ov = dom !== "deepseek-tools"
+          && $id("opt-ai-provider")?.value === provider
+          && $id("opt-preview-ai-enabled")?.checked !== false
           ? ($id("opt-preview-ai-model")?.value || "").trim()
           : "";
         if (ov) {
@@ -660,14 +667,14 @@ function setupApiTests() {
           recordHealth(`ai:${provider}`, true, "connected");
           if (!live()) return;
           setStatusResult(statusEl, true, t("testOkWithOverride", (reply || "OK").substring(0, 20), ov));
-          scheduleStatusClear(provider, statusEl, 4000, live);
+          scheduleStatusClear(statusKey, statusEl, 4000, live);
           return;
         }
 
         recordHealth(`ai:${provider}`, true, "connected");
         if (!live()) return;
         setStatusResult(statusEl, true, t("testConnected", (reply || "OK").substring(0, 20)));
-        scheduleStatusClear(provider, statusEl, 4000, live);
+        scheduleStatusClear(statusKey, statusEl, 4000, live);
       } catch (err) {
         // Two names, one meaning: the request deadline is an AbortSignal.timeout
         // (TimeoutError) while a caller-driven cancel is AbortError — same pairing
@@ -696,6 +703,9 @@ function setupApiTests() {
     // entry the picker shows.
     $id(`test-${p}`)?.addEventListener("click", () => testAIProvider(p === "custom" ? (pbpOptAiCustomActiveId() || "custom") : p));
   });
+  $id("test-deepseek-tools")?.addEventListener("click", () => testAIProvider("deepseek", { domId: "deepseek-tools" }));
+  $id("opt-deepseek-key")?.addEventListener("input", () => clearFieldInvalid($id("opt-deepseek-tools-key")));
+  $id("opt-deepseek-tools-key")?.addEventListener("input", () => clearFieldInvalid($id("opt-deepseek-key")));
 
   // ---- Pinboard token: real-time format validation (shared.js rule) ----
   const tokenInput = $id("opt-pinboard-token");

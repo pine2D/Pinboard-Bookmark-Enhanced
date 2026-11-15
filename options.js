@@ -330,8 +330,10 @@ async function renderConnectionOverview() {
   const deepseekVoiceOn = $id("opt-reader-voice-input")?.checked === true;
   const dictTtsVal = $id("dict-tts-voice")?.value || "browser";
   const deepseekTtsOn = dictTtsVal === "stella" || dictTtsVal === "tide";
-  const deepseekKeyReady = !!$id("opt-deepseek-key")?.value.trim();
-  const deepseekPerm = (deepseekSrcOn || deepseekVoiceOn || deepseekTtsOn)
+  const deepseekKeyReady = !!($id("opt-deepseek-key")?.value.trim() || $id("opt-deepseek-tools-key")?.value.trim());
+  const showDeepseekToolsRow = provider !== "deepseek"
+    && (deepseekSrcOn || deepseekVoiceOn || deepseekTtsOn || deepseekKeyReady);
+  const deepseekPerm = (deepseekSrcOn || deepseekVoiceOn || deepseekTtsOn || showDeepseekToolsRow)
     && deepseekKeyReady && typeof PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN === "string"
     ? await permissionFor({ origins: [PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN] })
     : null;
@@ -366,6 +368,15 @@ async function renderConnectionOverview() {
       permission: selfHosted ? await permissionFor(bookmarkConnection.baseUrl ? {origins:[pbpEndpointOriginPattern(bookmarkConnection.baseUrl)]} : null) : true },
     { id: `ai:${provider}`, name: $id("opt-ai-provider")?.selectedOptions?.[0]?.textContent?.trim() || provider,
       panel: "ai", target: `test-${pbpOptAiDomId(provider)}`, configured: aiConfigured, permission: aiPermission },
+    ...(showDeepseekToolsRow ? [{
+      id: "ai:deepseek",
+      name: t("deepseekToolsConnectionName"),
+      panel: "ai",
+      target: deepseekKeyReady ? "test-deepseek-tools" : "opt-deepseek-tools-key",
+      configured: deepseekKeyReady,
+      needsKeyWarn: !deepseekKeyReady && (deepseekSrcOn || deepseekVoiceOn || deepseekTtsOn),
+      permission: deepseekPerm,
+    }] : []),
     { id: "drive", name: "Google Drive", panel: "storage", target: "vocab-drive-connect",
       connected: stored.vocabDriveConnected === true, permission: drivePermission },
     // The port input ships a default ("8765"), so a non-empty field proves
@@ -408,6 +419,9 @@ async function renderConnectionOverview() {
         // A self-hosted service is joined by Connect (URL + token + grant),
         // not by a bare token, so "Token needed" named the wrong step.
         stateKey = "connectionNotConnected";
+        stateClass = "warn";
+      } else if (item.needsKeyWarn) {
+        stateKey = "connectionNotConfigured";
         stateClass = "warn";
       } else {
         stateKey = "connectionNotConfigured";
@@ -1805,6 +1819,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Deep-link: options.html#<panel> activates that tab on load and when a
   // reused options tab is retargeted to a different hash.
   let _learnerProfilePending = false;
+  let _deepseekSetupPending = false;
   function _focusLearnerProfile() {
     if (!_learnerProfilePending || document.documentElement.dataset.optionsReady !== "1") return;
     _learnerProfilePending = false;
@@ -1816,17 +1831,39 @@ document.addEventListener("DOMContentLoaded", async () => {
       nativeLanguage.focus({ preventScroll: true });
     });
   }
+  function _focusDeepseekSetup() {
+    if (!_deepseekSetupPending || document.documentElement.dataset.optionsReady !== "1") return;
+    _deepseekSetupPending = false;
+    requestAnimationFrame(() => {
+      if (location.hash !== "#deepseek-key") return;
+      if (!$id("panel-ai")?.classList.contains("active")) return;
+      const targetId = $id("opt-ai-provider")?.value === "deepseek"
+        ? "opt-deepseek-key"
+        : "opt-deepseek-tools-key";
+      const target = $id(targetId);
+      if (!target) return;
+      pbpExpandOptionsAncestors(target);
+      (target.closest(".fg") || target).scrollIntoView({ block: "center", behavior: "instant" });
+      target.focus({ preventScroll: true });
+    });
+  }
   function _activateHashPanel() {
     const _hashPanel = (location.hash || "").replace(/^#/, "");
     if (!_hashPanel) return;
     const learningProfile = _hashPanel === "vocab-learning";
-    const _dlBtn = [..._tabBtns].find(btn => btn.dataset.panel === (learningProfile ? "vocab" : _hashPanel));
+    const deepseekSetup = _hashPanel === "deepseek-key";
+    const panelTarget = learningProfile ? "vocab" : (deepseekSetup ? "ai" : _hashPanel);
+    const _dlBtn = [..._tabBtns].find(btn => btn.dataset.panel === panelTarget);
     if (!_dlBtn) return;
     _dlBtn.click();
     if (learningProfile) {
       history.replaceState(null, "", "#vocab-learning");
       _learnerProfilePending = true;
       _focusLearnerProfile();
+    } else if (deepseekSetup) {
+      history.replaceState(null, "", "#deepseek-key");
+      _deepseekSetupPending = true;
+      _focusDeepseekSetup();
     }
   }
   _activateHashPanel();
@@ -2091,7 +2128,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-gemini-key", "opt-openai-key", "opt-claude-key", "opt-deepseek-key", "opt-qwen-key", "opt-minimax-key", "opt-openrouter-key", "opt-groq-key", "opt-mistral-key", "opt-cohere-key", "opt-siliconflow-key", "opt-zhipu-key", "opt-kimi-key", "opt-ark-key", "opt-opencode-key", "opt-commandcode-key", "opt-custom-key",
         // @generated:ai-providers end (panel-defaults-skip)
         // @generated:settings-schema start (panel-defaults-ai-skip-tail)
-        "opt-custom-name", "opt-custom-protocol", "opt-custom-baseurl", "opt-custom-model",
+        "opt-custom-name", "opt-custom-protocol", "opt-custom-baseurl", "opt-custom-model", "opt-deepseek-tools-key",
         // @generated:settings-schema end (panel-defaults-ai-skip-tail)
       ],
     },
@@ -3474,6 +3511,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const el = $id(id);
     if (el) el.value = val;
   }
+  const deepseekKeyInput = $id("opt-deepseek-key");
+  const deepseekToolsKeyInput = $id("opt-deepseek-tools-key");
+  const deepseekToolsSummary = $id("deepseek-tools-summary");
+  function syncDeepseekToolsSummary() {
+    if (!deepseekToolsSummary) return;
+    const hasKey = !!(deepseekKeyInput?.value.trim() || deepseekToolsKeyInput?.value.trim());
+    deepseekToolsSummary.textContent = hasKey ? t("deepseekToolsKeyReady") : "";
+  }
+  if (deepseekToolsKeyInput) deepseekToolsKeyInput.value = s.deepseekApiKey || "";
+  syncDeepseekToolsSummary();
   // Show default prompts as placeholder so users see them when field is empty
   $id("opt-custom-tag-prompt").placeholder = DEFAULT_TAG_PROMPT;
   $id("opt-custom-summary-prompt").placeholder = DEFAULT_SUMMARY_PROMPT;
@@ -4125,7 +4172,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const cap = $id("preview-ai-model-provider");
     const opt = $id("opt-ai-provider").selectedOptions[0];
-    if (cap) cap.textContent = t("previewAiModelFor", opt ? opt.textContent.trim() : selected);
+    if (cap) {
+      const baseText = t("previewAiModelFor", opt ? opt.textContent.trim() : selected);
+      cap.textContent = selected === "deepseek"
+        ? baseText + " " + t("previewAiModelDeepseekVisionNote")
+        : baseText;
+    }
   }
   function updateProviderFields() {
     const selected = $id("opt-ai-provider").value;
@@ -4139,10 +4191,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       const el = $id("fields-" + p);
       if (el) el.hidden = p !== shown; // native hidden: .pf reveal transition keys off [hidden]
     });
+    const dsTools = $id("deepseek-tools-credentials");
+    if (dsTools) dsTools.hidden = shown === "deepseek";
     syncPreviewModelToProvider(selected);
     window.pbpListboxSync?.($id("opt-ai-provider"));
   }
   updateProviderFields();
+  _focusDeepseekSetup();
   $id("opt-ai-provider").addEventListener("change", updateProviderFields);
 
   // ---- Custom entries: edit, add, delete ----
@@ -4934,6 +4989,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
   }
+  deepseekKeyInput?.addEventListener("input", () => {
+    if (deepseekToolsKeyInput && deepseekToolsKeyInput.value !== deepseekKeyInput.value) {
+      deepseekToolsKeyInput.value = deepseekKeyInput.value;
+    }
+    syncDeepseekToolsSummary();
+  });
+  deepseekToolsKeyInput?.addEventListener("input", () => {
+    if (deepseekKeyInput && deepseekKeyInput.value !== deepseekToolsKeyInput.value) {
+      deepseekKeyInput.value = deepseekToolsKeyInput.value;
+    }
+    syncDeepseekToolsSummary();
+  });
   bindAutoSave();
 
   function flashAutoSave(key = "optAutoSaved", fallback = "Saved", ok = true) {
@@ -4998,12 +5065,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   // The overview rows, its header count and the AI-unavailable hints are all
   // built with t(); a language that arrives after first paint (synced from
   // another device) would otherwise leave them in the old one.
-  document.addEventListener("pbp:i18n-applied", scheduleConnectionOverview);
+  document.addEventListener("pbp:i18n-applied", () => {
+    syncDeepseekToolsSummary();
+    syncPreviewModelToProvider($id("opt-ai-provider")?.value || "gemini");
+    scheduleConnectionOverview();
+  });
   for (const id of ["opt-pinboard-token", "opt-ai-provider",
     // @generated:ai-providers start (overview-inputs)
     "opt-gemini-key", "opt-openai-key", "opt-claude-key", "opt-deepseek-key", "opt-qwen-key", "opt-qwen-region", "opt-qwen-workspace", "opt-minimax-key", "opt-openrouter-key", "opt-groq-key", "opt-mistral-key", "opt-cohere-key", "opt-siliconflow-key", "opt-zhipu-key", "opt-kimi-key", "opt-ark-key", "opt-ark-region", "opt-opencode-key", "opt-opencode-protocol", "opt-commandcode-key", "opt-commandcode-protocol", "opt-ollama-baseurl", "opt-custom-key", "opt-custom-baseurl",
     // @generated:ai-providers end (overview-inputs)
-    "dict-anki-port", "dict-eudic-token", "opt-custom-protocol", "opt-custom-name",
+    "opt-deepseek-tools-key", "dict-anki-port", "dict-eudic-token", "opt-custom-protocol", "opt-custom-name",
   ]) {
     const el = $id(id);
     el?.addEventListener(el.tagName === "SELECT" ? "change" : "input", scheduleConnectionOverview);
@@ -5026,13 +5097,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   $id("dict-tts-voice")?.addEventListener("change", scheduleConnectionOverview);
   for (const setupBtnId of ["deepseek-fetch-setup-btn", "deepseek-voice-setup-btn", "deepseek-tts-setup-btn"]) {
     $id(setupBtnId)?.addEventListener("click", async () => {
-      if ($id("opt-deepseek-key")?.value.trim() && typeof PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN === "string" && chrome.permissions?.request) {
+      const hasDsKey = !!($id("opt-deepseek-key")?.value.trim() || $id("opt-deepseek-tools-key")?.value.trim());
+      if (hasDsKey && typeof PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN === "string" && chrome.permissions?.request) {
         try { await chrome.permissions.request({ origins: [PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN] }); }
         catch (e) { console.warn("[options] DeepSeek permission request failed:", e?.name, e?.message); }
         scheduleConnectionOverview();
         return;
       }
-      const targetId = $id("opt-ai-provider")?.value === "deepseek" ? "opt-deepseek-key" : "opt-ai-provider-btn";
+      const targetId = $id("opt-ai-provider")?.value === "deepseek" ? "opt-deepseek-key" : "opt-deepseek-tools-key";
       pbpOpenOptionsTarget("ai", targetId);
     });
   }
@@ -5072,6 +5144,26 @@ document.addEventListener("DOMContentLoaded", async () => {
       scheduleConnectionOverview();
     }).catch((e) => {
       console.warn("[options] token field refresh failed:", e?.name, e?.message);
+    });
+  });
+  let _deepseekFieldRefillTail = Promise.resolve();
+  chrome.storage.onChanged?.addListener((changes, area) => {
+    if ((area !== "sync" && area !== "local")
+        || !(changes.deepseekApiKey || changes.optSyncEnabled || changes.syncApiKeys)) return;
+    _deepseekFieldRefillTail = _deepseekFieldRefillTail.then(async () => {
+      if (!deepseekKeyInput && !deepseekToolsKeyInput) return;
+      if (document.hasFocus() && (document.activeElement === deepseekKeyInput || document.activeElement === deepseekToolsKeyInput)) return;
+      const fresh = await pbpReadSettingsWithSecrets({ deepseekApiKey: SETTINGS_DEFAULTS.deepseekApiKey });
+      const plain = deobfuscateKey(typeof fresh.deepseekApiKey === "string" ? fresh.deepseekApiKey : "");
+      const cur = (deepseekKeyInput?.value || deepseekToolsKeyInput?.value || "").trim();
+      if (cur === plain) return;
+      if (deepseekKeyInput) deepseekKeyInput.value = plain;
+      if (deepseekToolsKeyInput) deepseekToolsKeyInput.value = plain;
+      savedState.settings.deepseekApiKey = obfuscateKey(plain);
+      syncDeepseekToolsSummary();
+      scheduleConnectionOverview();
+    }).catch((e) => {
+      console.warn("[options] DeepSeek key refresh failed:", e?.name, e?.message);
     });
   });
   scheduleConnectionOverview();

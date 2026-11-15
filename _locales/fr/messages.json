@@ -5509,7 +5509,7 @@
   "visionImageLoadFailed": {"message":"Impossible de charger cette image pour l'analyse par l'IA."},
   "visionImageTooLarge": {"message":"Cette image reste trop volumineuse pour être envoyée (plus de 4 Mo après réduction)."},
   "visionModelUnsupported": {"message":"Le modèle d’IA actuel ne prend pas en charge les images. Passez à un modèle compatible pour réessayer."},
-  "mdOcrImportBtn": {"message":"Importer un PDF ou une image (OCR)…"},
+  "mdOcrImportBtn": {"message":"Importer un PDF ou une image (OCR)"},
   "mdOcrPanelTitleLocal": {"message":"Importer un PDF ou une image avec DeepSeek OCR"},
   "mdOcrPanelTitleOnline": {"message":"Convertir le document avec DeepSeek OCR"},
   "mdOcrDropHint": {"message":"Déposez un PDF ou une image ici, ou choisissez un fichier"},
@@ -5553,5 +5553,13 @@
   "mdAsrErrMicUnavailable": {"message":"Aucun microphone fonctionnel n'a été détecté."},
   "mdAsrErrEmpty": {"message":"Aucune parole n'a été détectée dans cet enregistrement."},
   "mdAsrErrTooLarge": {"message":"Cet enregistrement dépasse la limite de 8 Mo de DeepSeek ASR."},
-  "mdAsrErrFailed": {"message":"Échec de la transcription vocale. Réessayez dans un instant."}
+  "mdAsrErrFailed": {"message":"Échec de la transcription vocale. Réessayez dans un instant."},
+  "hintDeepseekKey": {"message":"Sert aussi à DeepSeek Fetch, à l'OCR de PDF et d'images, à la saisie vocale du lecteur et à la prononciation du dictionnaire."},
+  "hintDeepseekModel": {"message":"Prend en charge deepseek-flash, deepseek-chat et deepseek-reasoner. Avec DeepSeek V4, cliquer sur une image dans le lecteur ouvre l'explication visuelle par IA."},
+  "deepseekToolsCredentialsSection": {"message":"Identifiants des outils DeepSeek"},
+  "deepseekToolsKeyReady": {"message":"Clé API enregistrée"},
+  "hintDeepseekToolsKey": {"message":"Enregistrez une clé API DeepSeek pour DeepSeek Fetch, l'OCR de PDF et d'images, la saisie vocale du lecteur et la prononciation du dictionnaire tout en gardant votre fournisseur d'IA actuel."},
+  "deepseekToolsConnectionName": {"message":"Outils DeepSeek"},
+  "previewAiModelDeepseekVisionNote": {"message":"Les modèles DeepSeek V4 permettent aussi d'expliquer les images par IA d'un clic dans le lecteur."},
+  "mdOcrKeyMissingLead": {"message":"Ajoutez une clé API DeepSeek dans les Paramètres pour utiliser l'OCR de PDF et d'images."}
 }

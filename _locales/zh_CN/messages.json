@@ -5503,7 +5503,7 @@
   "visionImageLoadFailed": {"message":"无法读取这张图片以供 AI 解析。"},
   "visionImageTooLarge": {"message":"图片压缩后仍超过 4 MB，无法发送。"},
   "visionModelUnsupported": {"message":"当前 AI 模型不支持看图，请切换到支持图片的模型后再试。"},
-  "mdOcrImportBtn": {"message":"导入 PDF 或图片（OCR）…"},
+  "mdOcrImportBtn": {"message":"导入 PDF 或图片（OCR）"},
   "mdOcrPanelTitleLocal": {"message":"使用 DeepSeek OCR 导入 PDF 或图片"},
   "mdOcrPanelTitleOnline": {"message":"使用 DeepSeek OCR 转换文档"},
   "mdOcrDropHint": {"message":"将 PDF 或图片拖放到此处，或选择本地文件"},
@@ -5547,5 +5547,13 @@
   "mdAsrErrMicUnavailable": {"message":"未检测到可用的麦克风。"},
   "mdAsrErrEmpty": {"message":"未在录音中识别到语音内容。"},
   "mdAsrErrTooLarge": {"message":"录音大小超过 DeepSeek ASR 的 8 MB 上限。"},
-  "mdAsrErrFailed": {"message":"语音转写失败，请稍后再试。"}
+  "mdAsrErrFailed": {"message":"语音转写失败，请稍后再试。"},
+  "hintDeepseekKey": {"message":"同时用于 DeepSeek Fetch、PDF 与图片 OCR、阅读页语音输入和单词发音。"},
+  "hintDeepseekModel": {"message":"支持 deepseek-flash、deepseek-chat 和 deepseek-reasoner；使用 DeepSeek V4 模型时，在阅读页点击图片可调用 AI 解释图片。"},
+  "deepseekToolsCredentialsSection": {"message":"DeepSeek 工具凭据"},
+  "deepseekToolsKeyReady": {"message":"已保存 API Key"},
+  "hintDeepseekToolsKey": {"message":"保留当前 AI 服务商不变，单独保存用于 DeepSeek Fetch、PDF 与图片 OCR、阅读页语音输入和单词发音的 DeepSeek API Key。"},
+  "deepseekToolsConnectionName": {"message":"DeepSeek 工具"},
+  "previewAiModelDeepseekVisionNote": {"message":"DeepSeek V4 模型还支持在阅读页点击图片调用 AI 解释图片。"},
+  "mdOcrKeyMissingLead": {"message":"请先在设置中填写 DeepSeek API Key，再使用 PDF 与图片 OCR。"}
 }

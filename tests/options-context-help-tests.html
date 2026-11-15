@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="35"><title>Options Context Help Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="40"><title>Options Context Help Tests</title>
 <style>
 .case.pass{color:#0a0}.case.fail{color:#c00;font-weight:bold}
 #fixture{position:absolute;left:-10000px;top:0;width:1500px;height:9000px;border:0}
@@ -1252,6 +1252,93 @@ function test(name, fn) {
     }
     assert(wrapped > 0, "no copy wrapped at the narrow widths: the case this test exists for was not exercised");
     assert(!violations.length, violations.slice(0, 6).join("; ") + (violations.length > 6 ? ` (+${violations.length - 6} more)` : ""));
+  });
+
+  test("expanded radio .pick contextual help hugs its own radio copy in both density tiers", () => {
+    for (const key of ["aiContentSourceLocalHint", "aiContentSourceJinaHint", "aiContentSourceDeepseekHint"]) {
+      const { details, anchor, body } = parts(key);
+      const pickText = anchor.querySelector(":scope > .pick-text");
+      assert(anchor.matches("label.pick") && pickText, key + " lost its label.pick / .pick-text");
+      const nextRow = anchor.closest(".pref-row")?.nextElementSibling;
+      const nextText = nextRow?.matches(".pref-row") ? nextRow.querySelector("label.pick > .pick-text") : null;
+      for (const density of [null, "compact"]) {
+        if (density) doc.documentElement.dataset.density = density; else delete doc.documentElement.dataset.density;
+        details.open = true;
+        const ownerGap = textInkRect(body).top - textInkRect(pickText).bottom;
+        assert(ownerGap >= 4 && ownerGap <= 9, `${key} (${density || "comfortable"}) copy-to-answer gap=${ownerGap}`);
+        if (nextText) {
+          const nextGap = textInkRect(nextText).top - textInkRect(body).bottom;
+          assert(ownerGap < nextGap, `${key} (${density || "comfortable"}) answer closer to next row (${nextGap}) than own copy (${ownerGap})`);
+        }
+        details.open = false;
+      }
+      delete doc.documentElement.dataset.density;
+    }
+  });
+
+  test("back-to-back .pref-group blocks keep section-gap separation across a hidden status block", () => {
+    const readVar = (name) => parseFloat(frame.contentWindow.getComputedStyle(doc.documentElement).getPropertyValue(name));
+    const { details, anchor } = parts("aiContentSourceDeepseekHint");
+    const radioGroup = anchor.closest(".pref-group");
+    const hiddenBridge = radioGroup?.nextElementSibling;
+    const switchGroup = hiddenBridge?.nextElementSibling;
+    assert(radioGroup && hiddenBridge?.id === "deepseek-fetch-unavailable" && hiddenBridge.hidden && switchGroup?.matches(".pref-group"),
+      "AI Content Source group -> hidden #deepseek-fetch-unavailable -> switch .pref-group structure changed");
+    for (const density of [null, "compact"]) {
+      if (density) doc.documentElement.dataset.density = density; else delete doc.documentElement.dataset.density;
+      const expectedMarginTop = readVar("--opt-section-gap") - 2 * readVar("--opt-row-pad-y");
+      const actualMarginTop = parseFloat(frame.contentWindow.getComputedStyle(switchGroup).marginTop);
+      assert(Math.abs(actualMarginTop - expectedMarginTop) < 0.5,
+        `${density || "comfortable"} second .pref-group marginTop=${actualMarginTop}, expected ${expectedMarginTop}`);
+    }
+    delete doc.documentElement.dataset.density;
+    details.open = false;
+  });
+
+  test("expanded action-row contextual help preserves a 4px top margin under its buttons", () => {
+    for (const key of ["saveAsThemeHint", "ecdictHint", "dictPackHint"]) {
+      const { details, host, body } = parts(key);
+      assert(host.classList.contains("context-help-action-row"), key + " is no longer a .context-help-action-row");
+      details.open = true;
+      const mt = parseFloat(frame.contentWindow.getComputedStyle(body).marginTop);
+      assert(Math.abs(mt - 4) < 0.5, `${key} open answer marginTop=${mt}, expected 4`);
+      details.open = false;
+    }
+  });
+
+  test("opening archiveLogNote does not shift #wayback-log-clear down with the second grid row", () => {
+    const { details, host } = parts("archiveLogNote");
+    const heading = host.parentElement;
+    const clearBtn = heading?.querySelector("#wayback-log-clear");
+    assert(heading?.classList.contains("wayback-log-heading") && clearBtn, "wayback-log-heading or #wayback-log-clear missing");
+    const wasHidden = clearBtn.hidden;
+    try {
+      clearBtn.hidden = false;
+      details.open = false;
+      const closedTop = clearBtn.getBoundingClientRect().top;
+      details.open = true;
+      const openTop = clearBtn.getBoundingClientRect().top;
+      assert(Math.abs(openTop - closedTop) <= 0.5, `#wayback-log-clear shifted on open: ${closedTop} -> ${openTop}`);
+    } finally {
+      details.open = false;
+      clearBtn.hidden = wasHidden;
+    }
+  });
+
+  test("opening vocabCompleteExportHint tightens the File export heading host's gap to .vocab-toolbar to 8px", () => {
+    const { details, host } = parts("vocabCompleteExportHint");
+    const toolbar = host.nextElementSibling;
+    assert(toolbar?.classList.contains("vocab-toolbar") && toolbar.closest(".fg") === null,
+      ".vocab-toolbar must remain the direct sibling after vocabFileExportHeading's .fg");
+    details.open = false;
+    const closedMb = parseFloat(frame.contentWindow.getComputedStyle(host).marginBottom);
+    assert(Math.abs(closedMb - 12) < 0.5, `closed host marginBottom=${closedMb}, expected 12`);
+    details.open = true;
+    const openMb = parseFloat(frame.contentWindow.getComputedStyle(host).marginBottom);
+    const boxGap = toolbar.getBoundingClientRect().top - host.getBoundingClientRect().bottom;
+    assert(Math.abs(openMb - 8) < 0.5 && Math.abs(boxGap - 8) < 0.5,
+      `open host marginBottom=${openMb}, boxGap=${boxGap}, expected 8`);
+    details.open = false;
   });
 })().catch((error) => {
   for (let i = results.children.length; i < 16; i++) report("fixture setup", error);
