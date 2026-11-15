@@ -5555,11 +5555,12 @@
   "mdAsrErrTooLarge": {"message":"To nagranie przekracza limit 8 MB usługi DeepSeek ASR."},
   "mdAsrErrFailed": {"message":"Transkrypcja głosu nie powiodła się. Spróbuj ponownie za chwilę."},
   "hintDeepseekKey": {"message":"Obsługuje również DeepSeek Fetch, OCR plików PDF i obrazów, wprowadzanie głosowe w czytniku oraz wymowę słownikową."},
-  "hintDeepseekModel": {"message":"Obsługuje modele deepseek-flash, deepseek-chat i deepseek-reasoner. W modelach DeepSeek V4 kliknięcie obrazu w czytniku otwiera wyjaśnienie wizualne AI."},
+  "hintDeepseekModel": {"message":"Obsługuje modele deepseek-flash, deepseek-chat i deepseek-reasoner. Z modelem deepseek-flash kliknięcie obrazu w czytniku otwiera wyjaśnienie wizualne AI."},
   "deepseekToolsCredentialsSection": {"message":"Dane dostępowe narzędzi DeepSeek"},
   "deepseekToolsKeyReady": {"message":"Klucz API zapisany"},
   "hintDeepseekToolsKey": {"message":"Zapisz klucz API DeepSeek dla DeepSeek Fetch, OCR plików PDF i obrazów, wprowadzania głosowego w czytniku oraz wymowy słownikowej bez zmiany obecnego dostawcy AI."},
   "deepseekToolsConnectionName": {"message":"Narzędzia DeepSeek"},
-  "previewAiModelDeepseekVisionNote": {"message":"Modele DeepSeek V4 obsługują również wyjaśnianie obrazów przez AI po kliknięciu w czytniku."},
-  "mdOcrKeyMissingLead": {"message":"Dodaj klucz API DeepSeek w Ustawieniach, aby korzystać z OCR plików PDF i obrazów."}
+  "previewAiModelDeepseekVisionNote": {"message":"Model deepseek-flash obsługuje również wyjaśnianie obrazów przez AI po kliknięciu w czytniku."},
+  "mdOcrKeyMissingLead": {"message":"Dodaj klucz API DeepSeek w Ustawieniach, aby korzystać z OCR plików PDF i obrazów."},
+  "mdOcrEvictedOnlineLead": {"message":"Ten dokument OCR nie jest już zapisany w pamięci podręcznej na tym urządzeniu. Uruchom OCR ponownie lub wybierz plik lokalny."}
 }

@@ -1553,40 +1553,59 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // guard only covers shared.js failing to load at all. _pbpTypoStored hands
   // the raw tiers to md-reader.js's _pbpTypoInit so it doesn't re-read
   // storage.
-  const deepseekSecretsPromise = typeof pbpReadSettingsWithSecrets === "function"
-    ? pbpReadSettingsWithSecrets({ deepseekApiKey: "" }).catch(() => {
-      // swallow-ok: fallback to empty key if secret read fails
-      return { deepseekApiKey: "" };
-    })
-    : Promise.resolve({ deepseekApiKey: "" });
-  const data = await chrome.storage.local.get([MP_KEY, "pbp_font_tier", "pbp_leading_tier", "pbp_zen_width"]);
-  const deepseekSecrets = await deepseekSecretsPromise;
-  _pbpReaderHasDeepseekKey = typeof pbpHasDeepseekKey === "function"
-    ? pbpHasDeepseekKey(deepseekSecrets)
-    : Boolean(String(deepseekSecrets?.deepseekApiKey || "").trim());
-  if (typeof pbpOcrSetKeyAvailable === "function") pbpOcrSetKeyAvailable(_pbpReaderHasDeepseekKey);
   let _onDeepseekKeyChanged = null;
+  let _deepseekKeyGen = 0;
+  let _deepseekKeySyncPromise = Promise.resolve();
+  function _syncReaderDeepseekKey(isBoot) {
+    const gen = ++_deepseekKeyGen;
+    const p = (typeof pbpOcrRefreshConfig === "function"
+      ? pbpOcrRefreshConfig()
+      : (typeof pbpReadSettingsWithSecrets === "function"
+        ? pbpReadSettingsWithSecrets({ deepseekApiKey: "" }).then((secrets) => (
+          typeof pbpHasDeepseekKey === "function"
+            ? pbpHasDeepseekKey(secrets)
+            : Boolean(String(secrets?.deepseekApiKey || "").trim())
+        ))
+        : Promise.resolve(false))
+    ).then((nextReady) => {
+      if (gen !== _deepseekKeyGen) return _deepseekKeySyncPromise;
+      const ready = Boolean(nextReady);
+      const changed = ready !== _pbpReaderHasDeepseekKey;
+      _pbpReaderHasDeepseekKey = ready;
+      if ((isBoot || changed) && typeof pbpOcrRefreshConfig !== "function" && typeof pbpOcrSetKeyAvailable === "function") {
+        pbpOcrSetKeyAvailable(ready);
+      }
+      if (!isBoot && changed) {
+        if (typeof _onDeepseekKeyChanged === "function") _onDeepseekKeyChanged();
+        const rhBtn = document.getElementById("rail-history-btn");
+        if (_pbpRailHistoryPopEl && rhBtn && _pbpRailHistoryPopEl.matches(":popover-open")) {
+          void _pbpRailHistoryPopulate(_pbpRailHistoryPopEl, rhBtn).then(() => {
+            if (_pbpRailHistoryPopEl.matches(":popover-open")) _pbpRailHistoryPosition(_pbpRailHistoryPopEl, rhBtn);
+          });
+        }
+      }
+      return ready;
+    }).catch(() => {
+      // swallow-ok: transient storage read error keeps prior key state (false on boot)
+      if (isBoot && gen === _deepseekKeyGen) {
+        _pbpReaderHasDeepseekKey = false;
+        if (typeof pbpOcrSetKeyAvailable === "function") pbpOcrSetKeyAvailable(false);
+      }
+      return _pbpReaderHasDeepseekKey;
+    });
+    _deepseekKeySyncPromise = p;
+    return p;
+  }
   if (chrome.storage?.onChanged) {
-    let deepseekKeyGen = 0;
-    chrome.storage.onChanged.addListener(async (changes, area) => {
+    chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync" && area !== "local") return;
       if (!(changes.deepseekApiKey || changes.optSyncEnabled || changes.syncApiKeys)) return;
-      const gen = ++deepseekKeyGen;
-      try {
-        const nextSecrets = typeof pbpReadSettingsWithSecrets === "function"
-          ? await pbpReadSettingsWithSecrets({ deepseekApiKey: "" })
-          : { deepseekApiKey: "" };
-        if (gen !== deepseekKeyGen) return;
-        const nextReady = typeof pbpHasDeepseekKey === "function"
-          ? pbpHasDeepseekKey(nextSecrets)
-          : Boolean(String(nextSecrets?.deepseekApiKey || "").trim());
-        if (nextReady === _pbpReaderHasDeepseekKey) return;
-        _pbpReaderHasDeepseekKey = nextReady;
-        if (typeof pbpOcrSetKeyAvailable === "function") pbpOcrSetKeyAvailable(nextReady);
-        if (typeof _onDeepseekKeyChanged === "function") _onDeepseekKeyChanged();
-      } catch (_) { /* swallow-ok: transient storage read error keeps prior key state */ }
+      void _syncReaderDeepseekKey(false);
     });
   }
+  void _syncReaderDeepseekKey(true);
+  const data = await chrome.storage.local.get([MP_KEY, "pbp_font_tier", "pbp_leading_tier", "pbp_zen_width"]);
+  await _deepseekKeySyncPromise;
   window._pbpTypoStored = { font: data.pbp_font_tier, leading: data.pbp_leading_tier };
   if (typeof pbpTypoApplyVars === "function") pbpTypoApplyVars(data.pbp_font_tier, data.pbp_leading_tier);
   // Reading width (pbp_zen_width) rides this same read and is applied here for
@@ -2386,7 +2405,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // attempt reloads the page instead of falling through.
     setupDrawer();
     const _isLocalOcr = info.localOcrReopen === true || (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url));
-    const _isReopenedOnlineOcr = !_isLocalOcr && (info.ocrCachedReopen === true || info.source === "deepseek-ocr");
+    const _isReopenedOnlineOcr = !_isLocalOcr && (
+      info.ocrCachedReopen === true ||
+      (info.source === "deepseek-ocr" && info.ocrCandidate !== true)
+    );
     const _isOnlineOcrCandidate = !_isLocalOcr && info.ocrCandidate === true;
     if (_isLocalOcr || _isReopenedOnlineOcr || _isOnlineOcrCandidate) {
       const _cachedOcr = typeof pbpOcrDocsGet === "function" ? await pbpOcrDocsGet(url) : null;
@@ -2427,7 +2449,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         if (sourceDetails && (!engineUnavailable("jina") || !engineUnavailable("deepseek"))) sourceDetails.open = true;
         pbpOcrRenderPanel({
           mode: "online",
-          leadText: _isReopenedOnlineOcr ? t("mdOcrEvictedLead") : "",
+          leadText: _isReopenedOnlineOcr ? t("mdOcrEvictedOnlineLead") : "",
           url, title, sourceTabUrl, bookmarkUrl, site,
           sourceIncognito, bookmarkDraft, account: bookmarkAccount, tags, description
         });
@@ -2674,7 +2696,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           ...(source === "deepseek-ocr" ? {
             source: "deepseek-ocr",
             ocrFileName,
-            ...(typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url) ? { localOcrReopen: true } : { ocrCandidate: true })
+            ...(typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url) ? { localOcrReopen: true } : { ocrCachedReopen: true })
           } : {}),
           sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
           nonce: _pageNonce

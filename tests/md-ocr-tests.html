@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="17"><title>DeepSeek OCR Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="18"><title>DeepSeek OCR Tests</title>
 <link rel="stylesheet" href="../md-preview.css">
 <style>
 #results { font-family: monospace; padding: 16px; max-width: 960px; }
@@ -65,6 +65,14 @@ async function test(name, fn) {
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "assertion failed");
+}
+
+async function until(pred, label) {
+  for (let i = 0; i < 200; i++) {
+    if (pred()) return;
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  throw new Error("timed out waiting for " + label);
 }
 
 function buildEchoMessages(enTable) {
@@ -749,6 +757,7 @@ const DEEPSEEK_OCR_LIVE_20261115 = {
   // 17. Missing DeepSeek API key renders setup card, suppresses drag/drop, and live-upgrades once key is saved
   await test("missing DeepSeek API key renders setup CTA, suppresses drop popover, and live-upgrades when key arrives", async () => {
     const mock = freshMock();
+    pbpOcrInstallReaderHooks();
     await chrome.storage.local.set({ deepseekApiKey: "" });
     const ready0 = await pbpOcrRefreshConfig();
     assert(ready0 === false && pbpOcrIsAvailable() === false, "expected OCR unavailable when deepseekApiKey is empty");
@@ -767,14 +776,25 @@ const DEEPSEEK_OCR_LIVE_20261115 = {
     assert(createdTabs.length === 1 && String(createdTabs[0].args[0]?.url || "").endsWith("options.html#deepseek-key"),
       "setup CTA must deep-link to options.html#deepseek-key, got: " + JSON.stringify(createdTabs));
 
+    // Switch to normal article view so document drop targets #ocr-drop-pop rather than empty-shell panel
+    document.body.classList.remove("md-empty", "md-shell");
+    document.getElementById("rendered-view").innerHTML = "<article><p>Article body</p></article>";
     const pngFile = new File([PNG_MAGIC], "dropped.png", { type: "image/png" });
-    const dt = new DataTransfer();
-    dt.items.add(pngFile);
-    const dropEv = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt });
-    window.dispatchEvent(dropEv);
-    const dropPop = document.getElementById("ocr-drop-pop");
-    assert(!dropPop || !dropPop.matches(":popover-open"), "window drop must not open OCR popover when DeepSeek key is missing");
+    const makeFileDropEvent = (file) => {
+      const ev = new Event("drop", { bubbles: true, cancelable: true });
+      Object.defineProperty(ev, "dataTransfer", {
+        value: { types: ["Files"], files: [file], dropEffect: "none" },
+      });
+      return ev;
+    };
+    const dropBlockedEv = makeFileDropEvent(pngFile);
+    document.dispatchEvent(dropBlockedEv);
+    let dropPop = document.getElementById("ocr-drop-pop");
+    assert(!dropBlockedEv.defaultPrevented && (!dropPop || !dropPop.matches(":popover-open")),
+      "document drop must not open OCR popover when DeepSeek key is missing");
 
+    // Re-mount missing-key panel and verify live upgrade + document drop positive control once key arrives
+    pbpOcrRenderPanel({ mode: "local" });
     await chrome.storage.local.set({ deepseekApiKey: obfuscateKey("sk-ocr-added") });
     const ready1 = await pbpOcrRefreshConfig();
     assert(ready1 === true && pbpOcrIsAvailable() === true, "expected OCR available after adding deepseekApiKey");
@@ -783,6 +803,54 @@ const DEEPSEEK_OCR_LIVE_20261115 = {
       !!document.getElementById("ocr-main-rich-layout") &&
       upgradedPanel.querySelector("button.es-primary")?.textContent === "mdOcrChooseFile",
       "mounted missing-key panel must live-upgrade to the file picker once deepseekApiKey is configured");
+
+    document.body.classList.remove("md-empty", "md-shell");
+    document.getElementById("rendered-view").innerHTML = "<article><p>Article body</p></article>";
+    const dropAllowedEv = makeFileDropEvent(pngFile);
+    document.dispatchEvent(dropAllowedEv);
+    dropPop = document.getElementById("ocr-drop-pop");
+    assert(dropAllowedEv.defaultPrevented && dropPop && dropPop.matches(":popover-open"),
+      "document drop must open #ocr-drop-pop once DeepSeek key is configured");
+    try { dropPop.hidePopover(); } catch (_) { /* swallow-ok: cleanup popover */ }
+  });
+
+  // 18. Deleting DeepSeek API key while an OCR run is active re-applies missing-key gating as soon as the run settles
+  await test("deleting deepseekApiKey during an in-flight OCR upload re-syncs panel to missing-key setup card once settled", async () => {
+    const mock = freshMock({ permissions: { origins: ["https://api.deepseek.com/*"] } });
+    await chrome.storage.local.set({ deepseekApiKey: obfuscateKey("sk-ocr-inflight") });
+    await pbpOcrRefreshConfig();
+
+    const pngFile = new File([PNG_MAGIC], "inflight.png", { type: "image/png" });
+    pbpOcrRenderPanel({ mode: "local", initialFile: pngFile });
+    const panel = document.querySelector("#rendered-view > .empty-state.es-ocr");
+    const runBtn = panel.querySelector("button.es-primary");
+    assert(runBtn && runBtn.textContent === "mdOcrRunBtn", "expected staged OCR run button");
+
+    let releaseFetch;
+    const fetchGate = new Promise((r) => { releaseFetch = r; });
+    const origFetch = window.fetch;
+    window.fetch = async () => {
+      await fetchGate;
+      return new Response(JSON.stringify({ error: { message: "invalid api key" } }), { status: 401 });
+    };
+    try {
+      mock.userGesture();
+      runBtn.click();
+      await until(() => runBtn.textContent === "mdOcrRunning", "OCR upload in flight");
+
+      // Delete key while request is active: active panel stays mounted until settled
+      await chrome.storage.local.set({ deepseekApiKey: "" });
+      await pbpOcrRefreshConfig();
+      assert(document.querySelector("#rendered-view > .empty-state.es-ocr")?.dataset.ocrMissingKey !== "1",
+        "in-flight panel should not be torn down before request finishes");
+
+      // Finish failed upload -> finally must re-sync availability and swap to missing-key setup card
+      releaseFetch();
+      await until(() => document.querySelector("#rendered-view > .empty-state.es-ocr")?.dataset.ocrMissingKey === "1",
+        "panel must swap to missing-key setup card once in-flight upload finishes with key deleted");
+    } finally {
+      window.fetch = origFetch;
+    }
   });
 
   document.title = (failed === 0 ? "PASS" : "FAIL") + ` (${passed}/${passed + failed})`;

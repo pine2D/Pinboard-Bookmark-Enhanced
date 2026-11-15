@@ -1311,6 +1311,31 @@ function pbpQueueOptionsSave(state, save) {
   return run;
 }
 
+// Guard for storage.onChanged credential field refills: never overwrite an
+// active input, an edit made while the async secret read was in flight, or a
+// form value that differs from this page's last committed savedState baseline
+// (e.g., user typed B -> save started -> user typed C and blurred before B's
+// storage echo arrived).
+function pbpShouldRefillSecretField({
+  inputs,
+  hasFocus,
+  activeElement,
+  revBefore,
+  revAfter,
+  baselineObfuscated,
+  freshPlain,
+}) {
+  const list = (Array.isArray(inputs) ? inputs : []).filter(Boolean);
+  if (!list.length) return false;
+  if (revBefore !== revAfter) return false;
+  if (hasFocus && list.includes(activeElement)) return false;
+  const curPlain = String((list.find((el) => typeof el.value === "string")?.value) || "").trim();
+  const curObf = obfuscateKey(curPlain);
+  const baseObf = typeof baselineObfuscated === "string" ? baselineObfuscated : "";
+  if (curObf !== baseObf) return false;
+  return curPlain !== String(freshPlain || "");
+}
+
 // Apply one saved-theme mutation to a stored list. The page's savedThemes
 // array is a load-time snapshot while the key has other writers (a backup
 // import, a second options tab), so writing the whole snapshot back silently
@@ -4989,13 +5014,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
   }
+  let _deepseekFieldEditRev = 0;
   deepseekKeyInput?.addEventListener("input", () => {
+    _deepseekFieldEditRev++;
     if (deepseekToolsKeyInput && deepseekToolsKeyInput.value !== deepseekKeyInput.value) {
       deepseekToolsKeyInput.value = deepseekKeyInput.value;
     }
     syncDeepseekToolsSummary();
   });
   deepseekToolsKeyInput?.addEventListener("input", () => {
+    _deepseekFieldEditRev++;
     if (deepseekKeyInput && deepseekKeyInput.value !== deepseekToolsKeyInput.value) {
       deepseekKeyInput.value = deepseekToolsKeyInput.value;
     }
@@ -5151,12 +5179,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     if ((area !== "sync" && area !== "local")
         || !(changes.deepseekApiKey || changes.optSyncEnabled || changes.syncApiKeys)) return;
     _deepseekFieldRefillTail = _deepseekFieldRefillTail.then(async () => {
-      if (!deepseekKeyInput && !deepseekToolsKeyInput) return;
-      if (document.hasFocus() && (document.activeElement === deepseekKeyInput || document.activeElement === deepseekToolsKeyInput)) return;
+      const inputs = [deepseekKeyInput, deepseekToolsKeyInput].filter(Boolean);
+      if (!inputs.length) return;
+      if (document.hasFocus() && inputs.includes(document.activeElement)) return;
+      const curBefore = (inputs[0].value || "").trim();
+      if (obfuscateKey(curBefore) !== (savedState.settings.deepseekApiKey || "")) return;
+      const revBefore = _deepseekFieldEditRev;
       const fresh = await pbpReadSettingsWithSecrets({ deepseekApiKey: SETTINGS_DEFAULTS.deepseekApiKey });
       const plain = deobfuscateKey(typeof fresh.deepseekApiKey === "string" ? fresh.deepseekApiKey : "");
-      const cur = (deepseekKeyInput?.value || deepseekToolsKeyInput?.value || "").trim();
-      if (cur === plain) return;
+      if (!pbpShouldRefillSecretField({
+        inputs,
+        hasFocus: document.hasFocus(),
+        activeElement: document.activeElement,
+        revBefore,
+        revAfter: _deepseekFieldEditRev,
+        baselineObfuscated: savedState.settings.deepseekApiKey || "",
+        freshPlain: plain,
+      })) return;
       if (deepseekKeyInput) deepseekKeyInput.value = plain;
       if (deepseekToolsKeyInput) deepseekToolsKeyInput.value = plain;
       savedState.settings.deepseekApiKey = obfuscateKey(plain);

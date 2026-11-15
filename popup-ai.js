@@ -88,12 +88,19 @@ function clearAiProgress(buttonId) {
 // fell back to local Defuddle must not persist local-content results
 // into the jina namespace. Remembered on pageInfo for the session so a
 // second op reuses the same answer.
+function _pbpEffectiveSource(s) {
+  return typeof pbpEffectiveExtractEngine === "function"
+    ? pbpEffectiveExtractEngine(s)
+    : pbpNormalizeExtractEngine(s && s.aiContentSource);
+}
+
 async function ensurePageText(s, buttonId) {
   s = s || settings;
+  const effectiveEngine = _pbpEffectiveSource(s);
   if (pageInfo.pageText) {
-    return pageInfo._pbpTextSource || pbpNormalizeExtractEngine(s.aiContentSource);
+    return pageInfo._pbpTextSource || effectiveEngine;
   }
-  const ensureKey = `${pageInfo.url || ""}|${pbpNormalizeExtractEngine(s.aiContentSource)}|${s.aiUseTranscript !== false ? 1 : 0}`;
+  const ensureKey = `${pageInfo.url || ""}|${effectiveEngine}|${s.aiUseTranscript !== false ? 1 : 0}`;
   if (pageInfo._pbpEnsurePromise && pageInfo._pbpEnsureKey === ensureKey) {
     return pageInfo._pbpEnsurePromise;
   }
@@ -105,7 +112,7 @@ async function ensurePageText(s, buttonId) {
       const tx = await pbpAiTranscriptText(s, buttonId);
       if (tx) { pageInfo.pageText = tx; pageInfo._pbpTextSource = "transcript"; return "transcript"; }
     }
-    if (s.aiContentSource === "jina") {
+    if (effectiveEngine === "jina") {
       // Throws only on host_permission (surface the grant flow); any other
       // failure leaves pageText empty and falls through to local Defuddle
       // below. The old code returned unconditionally here - its warn log
@@ -113,7 +120,7 @@ async function ensurePageText(s, buttonId) {
       // extractor (audit A9).
       const jinaText = await enrichPageTextIfJina(s);
       if (jinaText) { pageInfo.pageText = jinaText; pageInfo._pbpTextSource = "jina"; return "jina"; }
-    } else if (s.aiContentSource === "deepseek") {
+    } else if (effectiveEngine === "deepseek") {
       const deepseekText = await enrichPageTextIfDeepseek(s);
       if (deepseekText) { pageInfo.pageText = deepseekText; pageInfo._pbpTextSource = "deepseek"; return "deepseek"; }
     }
@@ -179,7 +186,7 @@ async function enrichPageTextIfJina(s) {
 
 async function enrichPageTextIfDeepseek(s) {
   s = s || settings;
-  if (s.aiContentSource !== "deepseek") return "";
+  if (_pbpEffectiveSource(s) !== "deepseek") return "";
   if (!pageInfo?.url) return "";
   try {
     const deepseekKey = s.deepseekApiKey ? deobfuscateKey(s.deepseekApiKey) : "";
@@ -1209,7 +1216,7 @@ async function pbpAiCallViaSW({ s, mode, kind, prompt, url, source, account, inf
 // below sees one consistent provider/model/lang for the op's whole life.
 async function fetchAIArtifacts(kind, forceRefresh, account, s, source, resultMeta) {
   s = s || settings;
-  source = source || pbpNormalizeExtractEngine(s.aiContentSource);
+  source = source || _pbpEffectiveSource(s);
   const url = pageInfo.url;
   const otherKind = kind === "summary" ? "tags" : "summary";
   // Inflight identity carries the same generation fingerprint as the

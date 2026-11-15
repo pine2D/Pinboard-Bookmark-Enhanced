@@ -1529,13 +1529,16 @@ async function htmlToMarkdownAsync(html, opts) {
       setBtnIcon(jinaMdBtn, "doc", t("jinaConverting"));
 
       let result;
-      let actualEngine = pbpNormalizeExtractEngine(settings.aiContentSource);
+      const configuredEngine = typeof pbpEffectiveExtractEngine === "function"
+        ? pbpEffectiveExtractEngine(settings)
+        : pbpNormalizeExtractEngine(settings.aiContentSource);
+      let actualEngine = configuredEngine;
       let deepseekFallbackNotice = "";
-      if (settings.aiContentSource === "jina") {
+      if (configuredEngine === "jina") {
         const jinaKey = settings.jinaApiKey ? deobfuscateKey(settings.jinaApiKey) : "";
         result = await fetchJinaMarkdown(url, { apiKey: jinaKey, cacheDuration: settings.aiCacheDuration });
         if (!result.error) result._hasApiKey = !!jinaKey;
-      } else if (settings.aiContentSource === "deepseek") {
+      } else if (configuredEngine === "deepseek") {
         const deepseekKey = settings.deepseekApiKey ? deobfuscateKey(settings.deepseekApiKey) : "";
         result = await fetchDeepseekMarkdown(url, { apiKey: deepseekKey, cacheDuration: settings.aiCacheDuration });
         if (!result.error && (!result.markdown || !result.markdown.trim())
@@ -1612,7 +1615,7 @@ async function htmlToMarkdownAsync(html, opts) {
           }
         }
         if (result.code === "host_permission") {
-          const reqPattern = pbpRemoteExtractOriginPattern(settings.aiContentSource) || PBP_JINA_ORIGIN_PATTERN;
+          const reqPattern = pbpRemoteExtractOriginPattern(configuredEngine) || PBP_JINA_ORIGIN_PATTERN;
           remoteGrantPattern = reqPattern;
           setBtnIcon(jinaMdBtn, "doc", t("aiGrantRetry"));
           jinaMdBtn.title = t("aiErrorHostPermission", reqPattern.replace(/\/\*$/, ""));
@@ -1638,7 +1641,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 pending: true,
                 ocrCandidate: true,
                 engine: actualEngine,
-                source: "deepseek-ocr",
+                source: actualEngine,
                 tabId: tab.id,
                 url,
                 baseUrl: url,
@@ -1681,9 +1684,9 @@ async function htmlToMarkdownAsync(html, opts) {
         // Persistent, specific status — so the user can tell API-key vs other failures
         if (result.error === "deepseek_key_missing") {
           showStatus("status-msg", t("deepseekFetchKeyMissing"), "error", { remedy: true });
-        } else if (settings.aiContentSource === "deepseek" && result.authFailed) {
+        } else if (configuredEngine === "deepseek" && result.authFailed) {
           showStatus("status-msg", t("deepseekFetchAuthFailed"), "error", { remedy: true });
-        } else if (settings.aiContentSource === "jina" && result.authFailed) {
+        } else if (configuredEngine === "jina" && result.authFailed) {
           showStatus("status-msg", t("jinaAuthFailed"), "error", { remedy: true });
         } else if (result.error === "invalid_url" || result.error === "empty") {
           showStatus("status-msg", extractMessage, "error");

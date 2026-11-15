@@ -5983,12 +5983,26 @@ async function pbpOpenReaderFromHistory(entry, opts = {}) {
   }
 
   const isLocalDoc = pbpIsLocalDocUrl(articleUrl);
-  const engine = pbpNormalizeExtractEngine(norm.engine);
-  // Keep permission requests synchronous with the click gesture (no IDB await
-  // ahead of chrome.permissions.request). Online PDF/image entries recorded
-  // under engine==="local" come from DeepSeek OCR, which either restores from
-  // IndexedDB in md-preview.js or renders the foreground OCR confirmation card.
-  const isOcrHistoryEntry = !isLocalDoc && engine === "local" && pbpIsOcrCandidateUrl(articleUrl);
+  const rawEngine = pbpNormalizeExtractEngine(norm.engine);
+  // Keep permission requests inside the click gesture's transient activation
+  // (no IDB await ahead of chrome.permissions.request). Online PDF/image entries
+  // recorded under engine==="local" come from DeepSeek OCR, which either
+  // restores from IndexedDB in md-preview.js or renders the foreground OCR
+  // confirmation card.
+  const isOcrHistoryEntry = !isLocalDoc && rawEngine === "local" && pbpIsOcrCandidateUrl(articleUrl);
+  let engine = rawEngine;
+  if (engine === "deepseek" && !isLocalDoc && !isOcrHistoryEntry) {
+    let hasDeepseekKey = false;
+    try {
+      const dsSecrets = typeof pbpReadSettingsWithSecrets === "function"
+        ? await pbpReadSettingsWithSecrets({ deepseekApiKey: SETTINGS_DEFAULTS.deepseekApiKey })
+        : null;
+      hasDeepseekKey = Boolean(dsSecrets && pbpHasDeepseekKey(dsSecrets));
+    } catch (e) {
+      console.warn("[reader-history] DeepSeek key check failed:", e?.name, e?.message);
+    }
+    if (!hasDeepseekKey) engine = "local";
+  }
   if (!isLocalDoc && !isOcrHistoryEntry && chrome.permissions?.contains && chrome.permissions?.request) {
     const neededPattern = pbpRemoteExtractOriginPattern(engine)
       || pbpReaderHistoryRequestableOrigin(targetUrl);

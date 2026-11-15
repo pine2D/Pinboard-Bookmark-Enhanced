@@ -5555,11 +5555,12 @@
   "mdAsrErrTooLarge": {"message":"Diese Aufnahme überschreitet das 8-MB-Limit von DeepSeek ASR."},
   "mdAsrErrFailed": {"message":"Die Sprachtranskription ist fehlgeschlagen. Versuche es gleich noch einmal."},
   "hintDeepseekKey": {"message":"Wird auch für DeepSeek Fetch, PDF- und Bild-OCR, Spracheingabe im Reader sowie Wörterbuch-Aussprache genutzt."},
-  "hintDeepseekModel": {"message":"Unterstützt deepseek-flash, deepseek-chat und deepseek-reasoner. Mit DeepSeek V4 öffnet ein Klick auf ein Bild im Reader die KI-Bilderklärung."},
+  "hintDeepseekModel": {"message":"Unterstützt deepseek-flash, deepseek-chat und deepseek-reasoner. Mit deepseek-flash öffnet ein Klick auf ein Bild im Reader die KI-Bilderklärung."},
   "deepseekToolsCredentialsSection": {"message":"DeepSeek-Werkzeug-Zugangsdaten"},
   "deepseekToolsKeyReady": {"message":"API-Schlüssel gespeichert"},
   "hintDeepseekToolsKey": {"message":"Speichere einen DeepSeek-API-Schlüssel für DeepSeek Fetch, PDF- und Bild-OCR, Spracheingabe im Reader und Wörterbuch-Aussprache, ohne deinen aktuellen KI-Anbieter zu wechseln."},
   "deepseekToolsConnectionName": {"message":"DeepSeek-Werkzeuge"},
-  "previewAiModelDeepseekVisionNote": {"message":"DeepSeek-V4-Modelle unterstützen im Reader außerdem die KI-Bilderklärung per Klick auf ein Bild."},
-  "mdOcrKeyMissingLead": {"message":"Hinterlege in den Einstellungen einen DeepSeek-API-Schlüssel, um die PDF- und Bild-OCR zu nutzen."}
+  "previewAiModelDeepseekVisionNote": {"message":"deepseek-flash unterstützt im Reader außerdem die KI-Bilderklärung per Klick auf ein Bild."},
+  "mdOcrKeyMissingLead": {"message":"Hinterlege in den Einstellungen einen DeepSeek-API-Schlüssel, um die PDF- und Bild-OCR zu nutzen."},
+  "mdOcrEvictedOnlineLead": {"message":"Dieses OCR-Dokument ist auf diesem Gerät nicht mehr zwischengespeichert. Führe die OCR erneut aus oder wähle eine lokale Datei."}
 }

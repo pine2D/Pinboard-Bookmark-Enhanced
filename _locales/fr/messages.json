@@ -5555,11 +5555,12 @@
   "mdAsrErrTooLarge": {"message":"Cet enregistrement dépasse la limite de 8 Mo de DeepSeek ASR."},
   "mdAsrErrFailed": {"message":"Échec de la transcription vocale. Réessayez dans un instant."},
   "hintDeepseekKey": {"message":"Sert aussi à DeepSeek Fetch, à l'OCR de PDF et d'images, à la saisie vocale du lecteur et à la prononciation du dictionnaire."},
-  "hintDeepseekModel": {"message":"Prend en charge deepseek-flash, deepseek-chat et deepseek-reasoner. Avec DeepSeek V4, cliquer sur une image dans le lecteur ouvre l'explication visuelle par IA."},
+  "hintDeepseekModel": {"message":"Prend en charge deepseek-flash, deepseek-chat et deepseek-reasoner. Avec deepseek-flash, cliquer sur une image dans le lecteur ouvre l'explication visuelle par IA."},
   "deepseekToolsCredentialsSection": {"message":"Identifiants des outils DeepSeek"},
   "deepseekToolsKeyReady": {"message":"Clé API enregistrée"},
   "hintDeepseekToolsKey": {"message":"Enregistrez une clé API DeepSeek pour DeepSeek Fetch, l'OCR de PDF et d'images, la saisie vocale du lecteur et la prononciation du dictionnaire tout en gardant votre fournisseur d'IA actuel."},
   "deepseekToolsConnectionName": {"message":"Outils DeepSeek"},
-  "previewAiModelDeepseekVisionNote": {"message":"Les modèles DeepSeek V4 permettent aussi d'expliquer les images par IA d'un clic dans le lecteur."},
-  "mdOcrKeyMissingLead": {"message":"Ajoutez une clé API DeepSeek dans les Paramètres pour utiliser l'OCR de PDF et d'images."}
+  "previewAiModelDeepseekVisionNote": {"message":"deepseek-flash permet aussi d'expliquer les images par IA d'un clic dans le lecteur."},
+  "mdOcrKeyMissingLead": {"message":"Ajoutez une clé API DeepSeek dans les Paramètres pour utiliser l'OCR de PDF et d'images."},
+  "mdOcrEvictedOnlineLead": {"message":"Ce document OCR n'est plus en cache sur cet appareil. Relancez l'OCR ou sélectionnez un fichier local."}
 }

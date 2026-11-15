@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="106"><title>Options Usability Tests</title>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="107"><title>Options Usability Tests</title>
 <link rel="stylesheet" href="../options.css">
 <style>body{font-family:monospace;padding:16px}.case{padding:5px}.pass{color:#176}.fail{color:#b00}</style>
 </head><body>
@@ -1887,6 +1887,56 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       host.remove();
       await renderConnectionOverview();
     }
+  });
+
+  await test("pbpShouldRefillSecretField protects unsaved in-flight edits and mid-read edits while allowing genuine external updates", () => {
+    const a = { value: "sk-typed-C" };
+    const b = { value: "sk-typed-C" };
+    // User typed B (baseline just saved B or still at A), then typed C and blurred before B's storage echo arrived
+    assert(pbpShouldRefillSecretField({
+      inputs: [a, b],
+      hasFocus: true,
+      activeElement: document.body,
+      revBefore: 2,
+      revAfter: 2,
+      baselineObfuscated: obfuscateKey("sk-saved-B"),
+      freshPlain: "sk-saved-B",
+    }) === false, "must not overwrite unsaved C with B's storage echo");
+
+    // User started typing during the async pbpReadSettingsWithSecrets read
+    a.value = "sk-saved-B";
+    b.value = "sk-saved-B";
+    assert(pbpShouldRefillSecretField({
+      inputs: [a, b],
+      hasFocus: false,
+      activeElement: document.body,
+      revBefore: 2,
+      revAfter: 3,
+      baselineObfuscated: obfuscateKey("sk-saved-B"),
+      freshPlain: "sk-external-D",
+    }) === false, "must abort refill when edit revision advanced during async read");
+
+    // User has focus in the tools key input
+    assert(pbpShouldRefillSecretField({
+      inputs: [a, b],
+      hasFocus: true,
+      activeElement: b,
+      revBefore: 3,
+      revAfter: 3,
+      baselineObfuscated: obfuscateKey("sk-saved-B"),
+      freshPlain: "sk-external-D",
+    }) === false, "must not refill while either synced key input is focused");
+
+    // Genuine external update while form matches committed baseline and input is idle
+    assert(pbpShouldRefillSecretField({
+      inputs: [a, b],
+      hasFocus: true,
+      activeElement: document.body,
+      revBefore: 3,
+      revAfter: 3,
+      baselineObfuscated: obfuscateKey("sk-saved-B"),
+      freshPlain: "sk-external-D",
+    }) === true, "must refill when another tab/restore updated the stored key and form has no unsaved edits");
   });
 
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";

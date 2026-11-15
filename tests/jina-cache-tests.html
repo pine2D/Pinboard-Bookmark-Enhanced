@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="45"><title>Jina &amp; DeepSeek Fetch Cache Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="46"><title>Jina &amp; DeepSeek Fetch Cache Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -370,6 +370,38 @@ function buildSuggestSweepHarness(source, options) {
       const [fbA, fbB] = await Promise.all([ensurePageText(sFallback, "ai-summary-btn"), ensurePageText(sFallback, "ai-tags-btn")]);
       if (fetches !== 1 || tabCalls !== 1 || fbA !== "local" || fbB !== "local" || window.pageInfo._pbpTextSource !== "local" || window.pageInfo.pageText !== "Local Defuddle text") {
         throw new Error(`fallback case wrong: fetches=${fetches} tabCalls=${tabCalls} fb=${fbA}/${fbB} src=${window.pageInfo._pbpTextSource}`);
+      }
+    });
+
+    await acheck("ensurePageText clamps aiContentSource=deepseek to local when deepseekApiKey is empty even if deepseek_md_ cache is warm", async () => {
+      let fetches = 0;
+      let tabCalls = 0;
+      const warmUrl = "https://example.com/warm-ds-cache";
+      window.pbpAiVideoGrant = async () => null;
+      window.pbpMarkdownToPlainText = (md) => String(md || "").replace(/^#+\s+/gm, "").trim();
+      window.getPageInfoFromTab = async () => { tabCalls++; return { pageText: "Fresh local Defuddle text" }; };
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        storage: {
+          local: {
+            get: async () => ({
+              [`deepseek_md_${warmUrl}`]: {
+                result: { markdown: "# Stale DeepSeek Cache", title: "Stale" },
+                timestamp: Date.now(),
+              },
+            }),
+            set: async () => {},
+          },
+        },
+        permissions: { contains: async () => true },
+        tabs: { query: async () => [{ id: 8, url: warmUrl }] },
+      };
+      window.fetch = async () => { fetches++; throw new Error("must not call DeepSeek Fetch without key"); };
+      window.pageInfo = { url: warmUrl, pageText: "" };
+      const sEmptyKey = { aiContentSource: "deepseek", deepseekApiKey: "", aiCacheDuration: 60, aiUseTranscript: false };
+      const src = await ensurePageText(sEmptyKey, "ai-summary-btn");
+      if (src !== "local" || fetches !== 0 || tabCalls !== 1 || window.pageInfo._pbpTextSource !== "local" || window.pageInfo.pageText !== "Fresh local Defuddle text") {
+        throw new Error(`empty-key clamp failed: src=${src} fetches=${fetches} tabCalls=${tabCalls} text=${window.pageInfo.pageText}`);
       }
     });
 

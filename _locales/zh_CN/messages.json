@@ -5549,11 +5549,12 @@
   "mdAsrErrTooLarge": {"message":"录音大小超过 DeepSeek ASR 的 8 MB 上限。"},
   "mdAsrErrFailed": {"message":"语音转写失败，请稍后再试。"},
   "hintDeepseekKey": {"message":"同时用于 DeepSeek Fetch、PDF 与图片 OCR、阅读页语音输入和单词发音。"},
-  "hintDeepseekModel": {"message":"支持 deepseek-flash、deepseek-chat 和 deepseek-reasoner；使用 DeepSeek V4 模型时，在阅读页点击图片可调用 AI 解释图片。"},
+  "hintDeepseekModel": {"message":"支持 deepseek-flash、deepseek-chat 和 deepseek-reasoner；使用 deepseek-flash 时，在阅读页点击图片可调用 AI 解释图片。"},
   "deepseekToolsCredentialsSection": {"message":"DeepSeek 工具凭据"},
   "deepseekToolsKeyReady": {"message":"已保存 API Key"},
   "hintDeepseekToolsKey": {"message":"保留当前 AI 服务商不变，单独保存用于 DeepSeek Fetch、PDF 与图片 OCR、阅读页语音输入和单词发音的 DeepSeek API Key。"},
   "deepseekToolsConnectionName": {"message":"DeepSeek 工具"},
-  "previewAiModelDeepseekVisionNote": {"message":"DeepSeek V4 模型还支持在阅读页点击图片调用 AI 解释图片。"},
-  "mdOcrKeyMissingLead": {"message":"请先在设置中填写 DeepSeek API Key，再使用 PDF 与图片 OCR。"}
+  "previewAiModelDeepseekVisionNote": {"message":"deepseek-flash 还支持在阅读页点击图片调用 AI 解释图片。"},
+  "mdOcrKeyMissingLead": {"message":"请先在设置中填写 DeepSeek API Key，再使用 PDF 与图片 OCR。"},
+  "mdOcrEvictedOnlineLead": {"message":"这份 OCR 文档在本机的缓存已过期或被清理，可重新识别，或选择本地文件导入。"}
 }

@@ -5577,11 +5577,12 @@
   "mdAsrErrTooLarge": {"message":"This recording exceeds DeepSeek ASR's 8 MB limit."},
   "mdAsrErrFailed": {"message":"Voice transcription failed. Try again in a moment."},
   "hintDeepseekKey": {"message":"Also powers DeepSeek Fetch, PDF and image OCR, Reader voice input, and dictionary pronunciation."},
-  "hintDeepseekModel": {"message":"Supports deepseek-flash, deepseek-chat, and deepseek-reasoner. On DeepSeek V4, clicking an image in Reader opens AI visual explanation."},
+  "hintDeepseekModel": {"message":"Supports deepseek-flash, deepseek-chat, and deepseek-reasoner. With deepseek-flash, clicking an image in Reader opens AI visual explanation."},
   "deepseekToolsCredentialsSection": {"message":"DeepSeek Tool Credentials"},
   "deepseekToolsKeyReady": {"message":"API key saved"},
   "hintDeepseekToolsKey": {"message":"Save a DeepSeek API key for DeepSeek Fetch, PDF and image OCR, Reader voice input, and dictionary pronunciation while keeping your current AI provider."},
   "deepseekToolsConnectionName": {"message":"DeepSeek Tools"},
-  "previewAiModelDeepseekVisionNote": {"message":"DeepSeek V4 models also support clicking images in Reader for AI visual explanation."},
-  "mdOcrKeyMissingLead": {"message":"Add a DeepSeek API key in Settings to use PDF and image OCR."}
+  "previewAiModelDeepseekVisionNote": {"message":"deepseek-flash also supports clicking images in Reader for AI visual explanation."},
+  "mdOcrKeyMissingLead": {"message":"Add a DeepSeek API key in Settings to use PDF and image OCR."},
+  "mdOcrEvictedOnlineLead": {"message":"This OCR document is no longer cached on this device. Run OCR again to convert it, or choose a local file."}
 }

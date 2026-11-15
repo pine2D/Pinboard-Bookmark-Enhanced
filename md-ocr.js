@@ -586,6 +586,7 @@ let _pbpOcrDropActiveAbort = null;
 let _pbpOcrKeyReady = false;
 let _pbpOcrKeyLoaded = false;
 let _pbpOcrConfigGen = 0;
+let _pbpOcrLatestRefreshPromise = Promise.resolve(false);
 let _pbpOcrMountedPanelOpts = null;
 
 function pbpOcrIsAvailable() {
@@ -615,38 +616,46 @@ function _pbpOcrSyncAvailabilityDom() {
 }
 
 function pbpOcrSetKeyAvailable(ready) {
+  ++_pbpOcrConfigGen;
   _pbpOcrKeyLoaded = true;
   _pbpOcrKeyReady = Boolean(ready);
   _pbpOcrSyncAvailabilityDom();
 }
 
-async function pbpOcrRefreshConfig() {
+function pbpOcrRefreshConfig() {
   const gen = ++_pbpOcrConfigGen;
-  let ready = false;
-  try {
-    let settings = null;
-    if (typeof pbpReadSettingsWithSecrets === "function") {
-      settings = await pbpReadSettingsWithSecrets({ deepseekApiKey: "" });
-    } else if (typeof chrome !== "undefined" && chrome.storage?.local?.get) {
-      settings = await chrome.storage.local.get({ deepseekApiKey: "" });
+  const run = (async () => {
+    let ready = false;
+    try {
+      let settings = null;
+      if (typeof pbpReadSettingsWithSecrets === "function") {
+        settings = await pbpReadSettingsWithSecrets({ deepseekApiKey: "" });
+      } else if (typeof chrome !== "undefined" && chrome.storage?.local?.get) {
+        settings = await chrome.storage.local.get({ deepseekApiKey: "" });
+      }
+      if (settings) {
+        ready = typeof pbpHasDeepseekKey === "function"
+          ? pbpHasDeepseekKey(settings)
+          : Boolean(String(
+            typeof deobfuscateKey === "function" && settings.deepseekApiKey
+              ? deobfuscateKey(settings.deepseekApiKey)
+              : (settings.deepseekApiKey || "")
+          ).trim());
+      }
+    } catch (_) {
+      // swallow-ok: transient storage read failure defaults OCR key availability to false
+      ready = false;
     }
-    if (settings) {
-      ready = typeof pbpHasDeepseekKey === "function"
-        ? pbpHasDeepseekKey(settings)
-        : Boolean(String(
-          typeof deobfuscateKey === "function" && settings.deepseekApiKey
-            ? deobfuscateKey(settings.deepseekApiKey)
-            : (settings.deepseekApiKey || "")
-        ).trim());
+    if (gen === _pbpOcrConfigGen) {
+      _pbpOcrKeyLoaded = true;
+      _pbpOcrKeyReady = Boolean(ready);
+      _pbpOcrSyncAvailabilityDom();
+      return _pbpOcrKeyReady;
     }
-  } catch (_) {
-    // swallow-ok: transient storage read failure defaults OCR key availability to false
-    ready = false;
-  }
-  if (gen === _pbpOcrConfigGen) {
-    pbpOcrSetKeyAvailable(ready);
-  }
-  return _pbpOcrKeyReady;
+    return _pbpOcrLatestRefreshPromise;
+  })();
+  _pbpOcrLatestRefreshPromise = run;
+  return run;
 }
 
 function pbpOcrAbortActive(reason = "aborted") {
@@ -1022,6 +1031,7 @@ function pbpOcrRenderPanel(opts = {}) {
       if (_pbpOcrPanelActiveAbort === activeAbort) _pbpOcrPanelActiveAbort = null;
       activeAbort = null;
       syncCard();
+      _pbpOcrSyncAvailabilityDom();
     }
   });
 
@@ -1118,7 +1128,10 @@ function pbpOcrRenderPanel(opts = {}) {
     } finally {
       if (activeAbort === ac) activeAbort = null;
       if (_pbpOcrPanelActiveAbort === ac) _pbpOcrPanelActiveAbort = null;
-      if (wrap.isConnected) syncCard();
+      if (wrap.isConnected) {
+        syncCard();
+        _pbpOcrSyncAvailabilityDom();
+      }
     }
   });
 
@@ -1278,6 +1291,7 @@ function _pbpOcrOpenDropDialogOnArticle(file) {
         runBtn.disabled = false;
         runBtn.textContent = t("mdOcrRunBtn");
         richInput.disabled = false;
+        _pbpOcrSyncAvailabilityDom();
       }
     }
   });

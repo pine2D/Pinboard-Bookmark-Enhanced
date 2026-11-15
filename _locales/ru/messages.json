@@ -5555,11 +5555,12 @@
   "mdAsrErrTooLarge": {"message":"Размер записи превышает лимит DeepSeek ASR в 8 МБ."},
   "mdAsrErrFailed": {"message":"Не удалось распознать речь. Повторите попытку чуть позже."},
   "hintDeepseekKey": {"message":"Также используется для DeepSeek Fetch, OCR PDF и изображений, голосового ввода в режиме чтения и озвучивания словаря."},
-  "hintDeepseekModel": {"message":"Поддерживает deepseek-flash, deepseek-chat и deepseek-reasoner. С моделями DeepSeek V4 нажатие на изображение в режиме чтения открывает объяснение ИИ."},
+  "hintDeepseekModel": {"message":"Поддерживает deepseek-flash, deepseek-chat и deepseek-reasoner. С моделью deepseek-flash нажатие на изображение в режиме чтения открывает объяснение ИИ."},
   "deepseekToolsCredentialsSection": {"message":"Учётные данные инструментов DeepSeek"},
   "deepseekToolsKeyReady": {"message":"API-ключ сохранён"},
   "hintDeepseekToolsKey": {"message":"Сохраните API-ключ DeepSeek для DeepSeek Fetch, OCR PDF и изображений, голосового ввода в режиме чтения и озвучивания словаря, не меняя текущего AI-провайдера."},
   "deepseekToolsConnectionName": {"message":"Инструменты DeepSeek"},
-  "previewAiModelDeepseekVisionNote": {"message":"Модели DeepSeek V4 также поддерживают объяснение изображений ИИ по нажатию в режиме чтения."},
-  "mdOcrKeyMissingLead": {"message":"Добавьте API-ключ DeepSeek в настройках, чтобы использовать OCR для PDF и изображений."}
+  "previewAiModelDeepseekVisionNote": {"message":"Модель deepseek-flash также поддерживает объяснение изображений ИИ по нажатию в режиме чтения."},
+  "mdOcrKeyMissingLead": {"message":"Добавьте API-ключ DeepSeek в настройках, чтобы использовать OCR для PDF и изображений."},
+  "mdOcrEvictedOnlineLead": {"message":"Этот OCR-документ больше не хранится в кэше на этом устройстве. Запустите OCR повторно или выберите локальный файл."}
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="11"><title>Reader History Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="12"><title>Reader History Tests</title>
 <link rel="stylesheet" href="../md-preview.css">
 <style>
 #results { font-family: monospace; padding: 16px; max-width: 960px; }
@@ -272,7 +272,10 @@ function buildEchoMessages(enTable) {
       ["jina", "https://r.jina.ai"],
       ["deepseek", "https://api.deepseek.com"],
     ]) {
-      const mock = freshMock({ permissionRequestAnswer: false });
+      const mock = freshMock({
+        permissionRequestAnswer: false,
+        storage: { local: engine === "deepseek" ? { deepseekApiKey: obfuscateKey("sk-ds-test") } : {} },
+      });
       const res = await pbpOpenReaderFromHistory({
         url: "https://locked.example.org/story",
         title: "Locked Story",
@@ -288,7 +291,9 @@ function buildEchoMessages(enTable) {
 
   // 6b. DeepSeek Fetch history entry preserves engine="deepseek" and requests exact api.deepseek.com origin on reopen
   await test("pbpOpenReaderFromHistory requests https://api.deepseek.com/* and writes engine=deepseek for DeepSeek Fetch entries", async () => {
-    const mock = freshMock();
+    const mock = freshMock({
+      storage: { local: { deepseekApiKey: obfuscateKey("sk-ds-test") } },
+    });
     await pbpReaderHistoryRecord({
       url: "https://article.example.org/deep",
       title: "DeepSeek Read",
@@ -305,6 +310,25 @@ function buildEchoMessages(enTable) {
       "expected exact https://api.deepseek.com/* request, got " + JSON.stringify(reqCalls));
     const slot = mock.storageData("local")["md_preview_data_" + res.key];
     assert(slot && slot.engine === "deepseek" && slot.historyReopen === true, "slot did not carry engine=deepseek: " + JSON.stringify(slot));
+  });
+
+  // 6c. Without a DeepSeek API key, reopening a DeepSeek Fetch history entry clamps to local and requests the page origin
+  await test("pbpOpenReaderFromHistory clamps DeepSeek Fetch history entries to local and requests the page origin when deepseekApiKey is empty", async () => {
+    const mock = freshMock({ storage: { local: { deepseekApiKey: "" } } });
+    const res = await pbpOpenReaderFromHistory({
+      url: "https://article.example.org/deep-no-key",
+      title: "DeepSeek Read Without Key",
+      site: "article.example.org",
+      engine: "deepseek",
+      lastKey: "dead-ds-no-key",
+    });
+    assert(res.ok === true && res.mode === "created", "expected created tab after clamping to local: " + JSON.stringify(res));
+    const reqCalls = mock.callsOf("permissions.request");
+    assert(reqCalls.length === 1 && reqCalls[0].args[0].origins[0] === "https://article.example.org/*",
+      "must request exact page origin instead of api.deepseek.com/* when key is empty: " + JSON.stringify(reqCalls));
+    const slot = mock.storageData("local")["md_preview_data_" + res.key];
+    assert(slot && slot.engine === "local" && slot.source === "local" && slot.historyReopen === true,
+      "slot must carry clamped engine=local: " + JSON.stringify(slot));
   });
 
   // 7. Video URL reopen preserves video=1 on both new-tab creation and in-place replacement
