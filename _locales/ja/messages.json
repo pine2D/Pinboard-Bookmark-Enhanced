@@ -5556,7 +5556,7 @@
   "mdAsrErrFailed": {"message":"音声の文字起こしに失敗しました。しばらくしてからもう一度お試しください。"},
   "hintDeepseekKey": {"message":"通常の AI 機能に加え、DeepSeek Fetch ページ抽出、PDF・画像 OCR、リーダーの音声入力、辞書の発音読み上げ、deepseek-flash 利用時のリーダー内画像クリック解説にも使われます。"},
   "hintDeepseekModel": {"message":"deepseek-flash、deepseek-chat、deepseek-reasoner に対応。deepseek-flash では、リーダー内の画像をクリックして AI 画像解説を利用できます。"},
-  "deepseekToolsCredentialsSection": {"message":"DeepSeek ツール認証情報（OCR・ページ抽出・音声）"},
+  "deepseekToolsCredentialsSection": {"message":"DeepSeek ツール認証情報（OCR・ページ抽出・音声入力・発音）"},
   "deepseekToolsKeyReady": {"message":"API キー保存済み"},
   "hintDeepseekToolsKey": {"message":"現在の AI プロバイダーを変更せずに、DeepSeek Fetch、PDF・画像 OCR、リーダーの音声入力、辞書の発音読み上げ用の DeepSeek API キーを保存します。"},
   "deepseekToolsConnectionName": {"message":"DeepSeek ツール"},

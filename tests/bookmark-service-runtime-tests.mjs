@@ -2545,9 +2545,20 @@ try{
       assert(await guide.isVisible(),'#deepseek-extra-guide must not jump away before debounced save completes');
       await until(async()=>await guide.isHidden(),'#deepseek-extra-guide auto-collapses once deepseekApiKey saves');
 
-      // Clearing the key and saving restores #deepseek-extra-guide; switching to DeepSeek hides both the top guide and bottom tools disclosure while showing #hint-deepseek-key.
+      // Clearing the key and saving restores #deepseek-extra-guide; external storage updates still sync #deepseek-extra-guide even while #opt-deepseek-tools-key holds focus.
       await toolsInput.fill('');
       await until(async()=>await guide.isVisible(),'clearing deepseekApiKey brings #deepseek-extra-guide back');
+      await options.bringToFront();
+      await toolsInput.focus();
+      await worker.evaluate(()=>persistSettings({deepseekApiKey:obfuscateKey('sk-ds-external-while-focused')}));
+      await until(async()=>await guide.isHidden(),'external save collapses #deepseek-extra-guide even while #opt-deepseek-tools-key is focused');
+      assert.equal(await toolsInput.inputValue(),'','focused #opt-deepseek-tools-key is not overwritten by external refill');
+      assert(await guide.evaluate(el=>el.hasAttribute('data-search-skip')),'collapsed guide carries data-search-skip');
+      await worker.evaluate(()=>persistSettings({deepseekApiKey:''}));
+      await until(async()=>await guide.isVisible(),'external clear restores #deepseek-extra-guide even while #opt-deepseek-tools-key is focused');
+      assert.equal(await guide.evaluate(el=>el.hasAttribute('data-search-skip')),false,'restored guide drops data-search-skip');
+
+      // Switching to DeepSeek hides both the top guide and bottom tools disclosure while showing #hint-deepseek-key.
       await options.evaluate(()=>{const sel=document.getElementById('opt-ai-provider');sel.value='deepseek';sel.dispatchEvent(new Event('change',{bubbles:true}));});
       assert(await guide.isHidden(),'#deepseek-extra-guide hides when #fields-deepseek is already shown');
       assert(await toolsDet.isHidden(),'#deepseek-tools-credentials hides when DeepSeek is the active provider');

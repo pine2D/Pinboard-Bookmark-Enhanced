@@ -3541,6 +3541,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const deepseekToolsSummary = $id("deepseek-tools-summary");
   const deepseekExtraGuide = $id("deepseek-extra-guide");
   let _savedDeepseekKeyPresent = !!(s.deepseekApiKey && String(s.deepseekApiKey).trim());
+  let _savedDeepseekKeyWriteSeq = 0;
   function syncDeepseekToolsSummary() {
     if (!deepseekToolsSummary) return;
     const hasKey = !!(deepseekKeyInput?.value.trim() || deepseekToolsKeyInput?.value.trim());
@@ -4815,6 +4816,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             try { localStorage.setItem("md-preview-video-dark", data.mdVideoDarkScheme ? "1" : "0"); } catch (_) {}
           }
           if ("deepseekApiKey" in settingsDelta) {
+            _savedDeepseekKeyWriteSeq++;
             _savedDeepseekKeyPresent = !!data.deepseekApiKey;
             syncDeepseekExtraGuide();
           }
@@ -5202,14 +5204,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         || !(changes.deepseekApiKey || changes.optSyncEnabled || changes.syncApiKeys)) return;
     _deepseekFieldRefillTail = _deepseekFieldRefillTail.then(async () => {
       const inputs = [deepseekKeyInput, deepseekToolsKeyInput].filter(Boolean);
-      if (!inputs.length) return;
-      if (document.hasFocus() && inputs.includes(document.activeElement)) return;
-      const curBefore = (inputs[0].value || "").trim();
-      if (obfuscateKey(curBefore) !== (savedState.settings.deepseekApiKey || "")) return;
       const revBefore = _deepseekFieldEditRev;
+      const writeSeqBefore = _savedDeepseekKeyWriteSeq;
+      const canCheckRefill = inputs.length > 0
+        && !(document.hasFocus() && inputs.includes(document.activeElement))
+        && obfuscateKey((inputs[0].value || "").trim()) === (savedState.settings.deepseekApiKey || "");
       const fresh = await pbpReadSettingsWithSecrets({ deepseekApiKey: SETTINGS_DEFAULTS.deepseekApiKey });
       const plain = deobfuscateKey(typeof fresh.deepseekApiKey === "string" ? fresh.deepseekApiKey : "");
-      if (!pbpShouldRefillSecretField({
+      if (writeSeqBefore === _savedDeepseekKeyWriteSeq) {
+        _savedDeepseekKeyPresent = !!plain;
+        syncDeepseekExtraGuide();
+      }
+      if (!canCheckRefill || !pbpShouldRefillSecretField({
         inputs,
         hasFocus: document.hasFocus(),
         activeElement: document.activeElement,
@@ -5221,9 +5227,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (deepseekKeyInput) deepseekKeyInput.value = plain;
       if (deepseekToolsKeyInput) deepseekToolsKeyInput.value = plain;
       savedState.settings.deepseekApiKey = obfuscateKey(plain);
-      _savedDeepseekKeyPresent = !!plain;
       syncDeepseekToolsSummary();
-      syncDeepseekExtraGuide();
       scheduleConnectionOverview();
     }).catch((e) => {
       console.warn("[options] DeepSeek key refresh failed:", e?.name, e?.message);

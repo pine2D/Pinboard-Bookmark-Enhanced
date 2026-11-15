@@ -1867,6 +1867,23 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       !!toolsDet.querySelector("button#test-deepseek-tools") &&
       !!toolsDet.querySelector("#test-deepseek-tools-status"),
       "#deepseek-tools-credentials must expose an always-visible #hint-deepseek-tools-key and keep summary/key/test controls");
+
+    for (const [locale, voiceRe, ttsRe] of [
+      ["en", /Voice/i, /TTS/],
+      ["zh_CN", /语音/, /发音/],
+      ["zh_TW", /語音/, /發音/],
+      ["zh_HK", /語音/, /發音/],
+      ["ja", /音声入力/, /発音/],
+      ["de", /Sprache/i, /TTS/],
+      ["fr", /voix/i, /TTS/],
+      ["pl", /głos/i, /wymowa/i],
+      ["ru", /голос/i, /озвучка/i],
+    ]) {
+      const dict = await (await fetch(`../_locales/${locale}/messages.json`)).json();
+      const title = dict.deepseekToolsCredentialsSection?.message || "";
+      assert(/OCR/.test(title) && voiceRe.test(title) && ttsRe.test(title),
+        `${locale} deepseekToolsCredentialsSection must name OCR, voice input, and TTS/pronunciation distinctly: ${title}`);
+    }
   });
 
   await test("settings search resolves DeepSeek extra capabilities to the active DeepSeek key input in English and zh_CN", async () => {
