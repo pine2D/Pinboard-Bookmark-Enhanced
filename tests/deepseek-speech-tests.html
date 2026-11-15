@@ -80,9 +80,27 @@ function makeTestWav(frameCount = 320, sampleRate = 16000) {
   return pbpAsrEncodePcm16Wav(samples, sampleRate);
 }
 
-// Hand-written DeepSeek /v1/tools/asr fixture per 2026-11-13 official schema:
-// response JSON { request_id, text, duration_ms } (optionally preceded by \n heartbeats).
-const ASR_FIXTURE_BODY = '\n\n{"request_id":"req_asr_20261113_01","text":"Summarize the key empirical findings.","duration_ms":2450}';
+// Live synthetic DeepSeek /v1/tools/tts 44-byte streaming WAV header captured on 2026-11-15
+// (24000 Hz, 1-ch 16-bit PCM; streaming RIFF size = 0xffffffff and data size = 0xffffffff).
+const DEEPSEEK_TTS_LIVE_WAV_HEADER_20261115 = "52494646ffffffff57415645666d74201000000001000100c05d000080bb00000200100064617461ffffffff";
+
+function makeDeepseekLiveStreamingWav(frameCount = 240) {
+  const out = new Uint8Array(44 + frameCount * 2);
+  for (let i = 0; i < 44; i++) {
+    out[i] = parseInt(DEEPSEEK_TTS_LIVE_WAV_HEADER_20261115.slice(i * 2, i * 2 + 2), 16);
+  }
+  const view = new DataView(out.buffer);
+  for (let i = 0; i < frameCount; i++) {
+    const s = Math.sin((2 * Math.PI * 440 * i) / 24000) * 0.35;
+    view.setInt16(44 + i * 2, Math.round(s * 32767), true);
+  }
+  return out;
+}
+
+// Live synthetic DeepSeek /v1/tools/asr response captured on 2026-11-15 via authorized smoke verification
+// (16 kHz 16-bit mono WAV resampled from synthetic "Hello world." TTS clip).
+const DEEPSEEK_ASR_LIVE_20261115 = '{"request_id":"f57300dd-1966-4ead-be7b-babfb6a3ae0d","text":"Hello world.","duration_ms":1240}';
+const ASR_FIXTURE_BODY = "\n\n" + '{"request_id":"req_asr_20261113_01","text":"Summarize the key empirical findings.","duration_ms":2450}';
 
 (async () => {
   const en = await (await fetch("../_locales/en/messages.json")).json();
@@ -112,10 +130,25 @@ const ASR_FIXTURE_BODY = '\n\n{"request_id":"req_asr_20261113_01","text":"Summar
     assert(pbpDeepseekTtsResolveLang("und", "图书馆") === "zh", "Han -> zh");
   });
 
-  await test("2. pbpValidateWavBytes accepts valid PCM WAV and rejects JSON-200, truncated, or empty-data payloads", () => {
+  await test("2. pbpValidateWavBytes accepts valid and live-captured streaming (0xffffffff) PCM WAV and rejects JSON-200, truncated, unaligned, or empty-data payloads", async () => {
     const validWav = makeTestWav(160, 24000);
     const res = pbpValidateWavBytes(validWav);
     assert(res.ok === true && res.sampleRate === 24000 && res.channels === 1, "valid WAV rejected");
+
+    const liveStreamingWav = makeDeepseekLiveStreamingWav(240);
+    const streamRes = pbpValidateWavBytes(liveStreamingWav);
+    assert(streamRes.ok === true && streamRes.sampleRate === 24000 && streamRes.channels === 1
+      && streamRes.audioFormat === 1 && streamRes.blockAlign === 2 && streamRes.bitsPerSample === 16
+      && streamRes.dataOffset === 44 && streamRes.dataSize === 480, "live 0xffffffff streaming WAV rejected: " + JSON.stringify(streamRes));
+
+    for (const tornBytes of [1, 3, 481]) {
+      const torn = new Uint8Array(44 + tornBytes);
+      torn.set(liveStreamingWav.subarray(0, 44), 0);
+      const tornRes = pbpValidateWavBytes(torn);
+      assert(tornRes.ok === false && tornRes.reason === "unaligned_data", `streaming WAV with ${tornBytes} trailing byte(s) must fail frame alignment`);
+      const cachedTorn = await pbpTtsCachePut({ voice: "stella", lang: "en", text: "torn", wavBytes: torn });
+      assert(cachedTorn === null, `torn ${tornBytes}-byte streaming WAV must never enter pbp-tts-cache`);
+    }
 
     const jsonErr = new TextEncoder().encode('{"error":{"message":"rate limit exceeded"}}');
     assert(pbpValidateWavBytes(jsonErr).ok === false, "JSON body must be rejected");
@@ -207,7 +240,7 @@ const ASR_FIXTURE_BODY = '\n\n{"request_id":"req_asr_20261113_01","text":"Summar
     const origAudio = window.Audio;
     let restoreSynth = () => {};
     const origContains = chrome.permissions.contains;
-    const wavFixture = makeTestWav(240, 24000);
+    const wavFixture = makeDeepseekLiveStreamingWav(240);
     const calls = [];
     const playedSrcs = [];
     let browserSpoken = 0;
@@ -376,7 +409,11 @@ const ASR_FIXTURE_BODY = '\n\n{"request_id":"req_asr_20261113_01","text":"Summar
     if (typeof File === "function") assert(f.name === "clip.wav", "expected file name clip.wav");
   });
 
-  await test("10. pbpAsrParseResponse handles leading keepalive newlines and HTTP 200 error envelopes", () => {
+  await test("10. pbpAsrParseResponse handles live-captured ASR payload, leading keepalive newlines, and HTTP 200 error envelopes", () => {
+    const liveOk = pbpAsrParseResponse(200, DEEPSEEK_ASR_LIVE_20261115);
+    assert(liveOk.ok === true && liveOk.text === "Hello world."
+      && liveOk.requestId === "f57300dd-1966-4ead-be7b-babfb6a3ae0d" && liveOk.durationMs === 1240, "live ASR fixture parse failed");
+
     const ok = pbpAsrParseResponse(200, ASR_FIXTURE_BODY);
     assert(ok.ok === true && ok.text === "Summarize the key empirical findings."
       && ok.requestId === "req_asr_20261113_01" && ok.durationMs === 2450, "valid ASR fixture parse failed");

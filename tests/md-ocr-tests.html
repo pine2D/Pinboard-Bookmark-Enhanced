@@ -91,6 +91,28 @@ const PNG_MAGIC = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
 const JPEG_MAGIC = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
 const WEBP_MAGIC = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]);
 
+// Live synthetic DeepSeek OCR response captured on 2026-11-15 via authorized smoke verification
+// (POST https://api.deepseek.com/v1/tools/ocr, purpose: "text_recognition", synthetic "HELLO 2026" PNG).
+const DEEPSEEK_OCR_LIVE_20261115 = {
+  id: "ocr-25806703-f30b-4c44-acba-517841cecec5",
+  object: "ocr.result",
+  created: 1794708559,
+  purpose: "text_recognition",
+  page_count: 1,
+  pages: [
+    {
+      index: 0,
+      text: "HELLO 2026",
+      finish_reason: "stop"
+    }
+  ],
+  usage: {
+    input_tokens: 120,
+    output_tokens: 7,
+    total_tokens: 127
+  }
+};
+
 (async () => {
   const en = await (await fetch("../_locales/en/messages.json")).json();
   const messages = buildEchoMessages(en);
@@ -192,13 +214,18 @@ const WEBP_MAGIC = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x0
     assert(cleaned.includes("| Col A | Col B |"), "Markdown table pipe syntax corrupted");
   });
 
-  // 5. Hand-written DeepSeek /v1/tools/ocr server schema fixtures
-  await test("pbpOcrParseResponse handles leading keep-alive newlines, page sorting, length truncation notices, and HTTP 200 error payloads", async () => {
+  // 5. Live-verified 2026-11-15 DeepSeek /v1/tools/ocr fixture + multi-page/heartbeat/error boundary checks
+  await test("pbpOcrParseResponse handles live-captured ocr.result payloads, leading keep-alive newlines, page sorting, length truncation notices, and HTTP 200 error payloads", async () => {
     freshMock();
-    // Hand-written per 2026-11-13 DeepSeek /v1/tools/ocr response schema (out-of-order pages + leading keep-alive heartbeats)
+    const liveOk = pbpOcrParseResponse(200, JSON.stringify(DEEPSEEK_OCR_LIVE_20261115), { purpose: "text_recognition" });
+    assert(liveOk.ok === true && liveOk.id === "ocr-25806703-f30b-4c44-acba-517841cecec5", "live OCR fixture rejected");
+    assert(liveOk.pageCount === 1 && liveOk.markdown === "HELLO 2026" && liveOk.truncatedPages.length === 0, "live OCR fixture mismatch");
+
+    // Multi-page boundary envelope aligned with live ocr.result schema (out-of-order pages + leading keep-alive heartbeats + length truncation)
     const serverBody = "\n\n\n" + JSON.stringify({
-      id: "ocr-req-20261113-9f2a",
-      object: "ocr",
+      id: "ocr-9b2f4c1e-2026-4c44-acba-517841cecec5",
+      object: "ocr.result",
+      created: 1794708559,
       purpose: "rich_layout_recognition",
       page_count: 2,
       pages: [
@@ -214,7 +241,9 @@ const WEBP_MAGIC = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x0
         }
       ],
       usage: {
-        processed_pages: 2
+        input_tokens: 1536,
+        output_tokens: 412,
+        total_tokens: 1948
       }
     });
     const ok = pbpOcrParseResponse(200, serverBody, { purpose: "rich_layout_recognition" });
@@ -286,13 +315,7 @@ const WEBP_MAGIC = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x0
     window.fetch = async (url, init) => {
       calls.push({ url, init });
       return new Response(
-        "\n" + JSON.stringify({
-          id: "ocr-live-sim-1",
-          object: "ocr",
-          purpose: "text_recognition",
-          page_count: 1,
-          pages: [{ index: 0, text: "# Scanned Handout\n\nClean text.", finish_reason: "stop" }],
-        }),
+        "\n" + JSON.stringify(DEEPSEEK_OCR_LIVE_20261115),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     };
@@ -304,7 +327,7 @@ const WEBP_MAGIC = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x0
         mimeType: "application/pdf",
         purpose: "text_recognition",
       });
-      assert(first.ok === true && first.cached === false, "first upload should succeed over network");
+      assert(first.ok === true && first.cached === false && first.doc.markdown === "HELLO 2026", "first upload should succeed over network");
       assert(calls.length === 1, "expected 1 fetch call");
       assert(calls[0].url === "https://api.deepseek.com/v1/tools/ocr", "wrong endpoint: " + calls[0].url);
       assert(calls[0].init.headers.Authorization === "Bearer sk-test-ocr-key", "missing Bearer header");
@@ -321,7 +344,7 @@ const WEBP_MAGIC = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x0
       });
       assert(second.ok === true && second.cached === true, "second upload should hit local SHA-256 cache");
       assert(calls.length === 1, "cache hit must not call fetch");
-      assert(second.doc.markdown === "# Scanned Handout\n\nClean text.", "cached markdown mismatch");
+      assert(second.doc.markdown === "HELLO 2026", "cached markdown mismatch");
     } finally {
       window.fetch = origFetch;
       await pbpOcrDocsClear();
@@ -592,13 +615,7 @@ const WEBP_MAGIC = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x0
     const origFetch = window.fetch;
     const origPut = window.pbpOcrDocsPut;
     window.fetch = async () => new Response(
-      JSON.stringify({
-        id: "ocr-no-idb",
-        object: "ocr",
-        purpose: "text_recognition",
-        page_count: 1,
-        pages: [{ index: 0, text: "# Paid Result", finish_reason: "stop" }],
-      }),
+      JSON.stringify(DEEPSEEK_OCR_LIVE_20261115),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
     window.pbpOcrDocsPut = async () => null;
@@ -609,7 +626,8 @@ const WEBP_MAGIC = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x0
         mimeType: "application/pdf",
         purpose: "text_recognition",
       });
-      assert(uncachedRes.ok === true && uncachedRes.cacheSaved === false && uncachedRes.doc.cacheSaved === false, "IDB failure must flag cacheSaved:false");
+      assert(uncachedRes.ok === true && uncachedRes.doc.markdown === "HELLO 2026"
+        && uncachedRes.cacheSaved === false && uncachedRes.doc.cacheSaved === false, "IDB failure must flag cacheSaved:false");
     } finally {
       window.fetch = origFetch;
       window.pbpOcrDocsPut = origPut;

@@ -1,4 +1,4 @@
-<!doctype html><meta charset="utf-8"><meta name="pbp-expected-count" content="125"><title>AI completion and required-thinking tests</title>
+<!doctype html><meta charset="utf-8"><meta name="pbp-expected-count" content="126"><title>AI completion and required-thinking tests</title>
 <div id="results"></div><div id="summary"></div>
 <script src="../i18n.js"></script><script src="../shared.js"></script><script src="../ai.js"></script>
 <script>
@@ -1330,6 +1330,30 @@ await test('vision capability memos isolate under :vision without poisoning text
   assert(await run({images:[img]},ds)==='ready','vision heal');
   assert(stored.pbpThinkReject?.[vKey]?.rejected===true&&!stored.pbpThinkReject?.[tKey],'memo isolation: '+JSON.stringify(stored.pbpThinkReject));
   assert(await run({},ds)==='ready'&&calls[2].thinking?.type==='disabled','text-only call was poisoned by :vision memo');
+});
+// Live synthetic DeepSeek responses captured on 2026-11-15 via authorized smoke verification
+// (POST https://api.deepseek.com/v1/chat/completions, model: deepseek-flash, thinking: { type: "disabled" }).
+const DEEPSEEK_FLASH_LIVE_20261115={
+  text:{
+    id:'7b891430-3b43-4823-a45c-32d1a7114443',object:'chat.completion',created:1794708558,model:'deepseek-flash',
+    choices:[{index:0,message:{role:'assistant',content:'OK'},logprobs:null,finish_reason:'stop'}],
+    usage:{prompt_tokens:11,completion_tokens:1,total_tokens:12,prompt_tokens_details:{cached_tokens:0},prompt_cache_hit_tokens:0,prompt_cache_miss_tokens:11},
+    system_fingerprint:'bc19ba97cbe016479903222bb1578db6'
+  },
+  vision:{
+    id:'3573546d-9e3b-4d56-878c-562cd1b5d6d6',object:'chat.completion',created:1794708558,model:'deepseek-flash',
+    choices:[{index:0,message:{role:'assistant',content:'HELLO 2026'},logprobs:null,finish_reason:'stop'}],
+    usage:{prompt_tokens:201,completion_tokens:6,total_tokens:207,prompt_tokens_details:{cached_tokens:0},prompt_cache_hit_tokens:0,prompt_cache_miss_tokens:201},
+    system_fingerprint:'bc19ba97cbe016479903222bb1578db6'
+  }
+};
+await test('live-captured 2026-11-15 deepseek-flash text and image_url envelopes succeed on first dispatch with thinking disabled',async()=>{
+  const ds={aiProvider:'deepseek',deepseekApiKey:'fixture',deepseekModel:'deepseek-flash'};
+  const img={mimeType:'image/png',dataBase64:'iVBORw0KGgo='};
+  reset([reply(DEEPSEEK_FLASH_LIVE_20261115.text),reply(DEEPSEEK_FLASH_LIVE_20261115.vision)]);
+  assert(await run({maxTokens:16,requireComplete:true},ds)==='OK','deepseek-flash live text envelope');
+  assert(await run({maxTokens:32,images:[img],requireComplete:true},ds)==='HELLO 2026','deepseek-flash live vision envelope');
+  assert(calls.length===2&&calls[0].thinking?.type==='disabled'&&calls[1].thinking?.type==='disabled'&&!stored.pbpThinkReject,'unexpected dialect fallback');
 });
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();

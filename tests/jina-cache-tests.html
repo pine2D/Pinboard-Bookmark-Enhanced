@@ -236,25 +236,37 @@ function buildSuggestSweepHarness(source, options) {
         } },
         permissions: { contains: async (spec) => { checked = spec.origins; return true; } },
       };
-      // Hand-authored from DeepSeek Fetch API docs (2026-11-13): 200 { title, content } (with keep-alive leading whitespace)
+      // Live synthetic DeepSeek Fetch response captured on 2026-11-15 via authorized smoke verification
+      // (POST https://api.deepseek.com/v1/tools/fetch on https://example.com/): flat top-level { content, title }.
+      const DEEPSEEK_FETCH_LIVE_20261115 = {
+        content: "该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。\n\nThis domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+        title: "Example Domain"
+      };
       window.fetch = async (u, init) => {
         reqUrl = u;
         reqInit = init;
-        return new Response("  \n\n" + JSON.stringify({ title: "Official Spec", content: "# Clean Article\n\nBody." }), {
+        return new Response(JSON.stringify(DEEPSEEK_FETCH_LIVE_20261115), {
           status: 200,
           headers: { "Content-Type": "application/json" }
         });
       };
-      const targetUrl = "https://example.com/article?id=1";
+      const targetUrl = "https://example.com/";
       const result = await fetchDeepseekMarkdown(targetUrl, { apiKey: "sk-ds-123", cacheDuration: 60 });
       if (checked?.[0] !== PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN || reqUrl !== PBP_DEEPSEEK_FETCH_URL) throw new Error("wrong endpoint or origin check");
       if (reqInit?.method !== "POST" || reqInit?.headers?.Authorization !== "Bearer sk-ds-123") throw new Error("wrong method or auth header");
       if (JSON.parse(reqInit.body).url !== targetUrl) throw new Error("wrong request JSON payload");
-      if (result.error || result.fromCache || result.title !== "Official Spec" || !result.markdown.includes("# Clean Article")) {
+      if (result.error || result.fromCache || result.title !== "Example Domain" || !result.markdown.includes("This domain is for use in documentation examples")) {
         throw new Error("unexpected result: " + JSON.stringify(result));
       }
       const cached = saved[`deepseek_md_${targetUrl}`];
       if (!cached || cached.result.markdown !== result.markdown) throw new Error("200 non-empty response was not cached");
+      // Also preserve resilience when gateways prepend keep-alive whitespace before JSON
+      window.fetch = async () => new Response("  \n\n" + JSON.stringify(DEEPSEEK_FETCH_LIVE_20261115), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+      const wsResult = await fetchDeepseekMarkdown("https://example.com/?ws=1", { apiKey: "sk-ds-123", cacheDuration: 0 });
+      if (wsResult.error || wsResult.title !== "Example Domain") throw new Error("leading whitespace broke parser");
     });
 
     await acheck("DeepSeek Fetch does not sticky-cache empty 200 content, surfaces 200 error payloads, and flags 401 authFailed", async () => {

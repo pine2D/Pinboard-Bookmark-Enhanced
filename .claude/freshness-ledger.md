@@ -13,7 +13,7 @@
 | 服务商 | 默认模型 | 最近核实 | 备注 |
 |---|---|---|---|
 | openai | gpt-5.4-nano | 未核实 | - |
-| deepseek | deepseek-flash | 未核实 | 2026-11-13 官方文档更新默认模型名 |
+| deepseek | deepseek-flash | 2026-11-15 | 2026-11-15 真实核验纯文本与多模态图片输入（thinking disabled） |
 | qwen | qwen-flash | 未核实 | - |
 | minimax | MiniMax-M2 | 未核实 | - |
 | openrouter | openai/gpt-oss-20b | 未核实 | - |
@@ -60,7 +60,8 @@
 | Google Drive | tests/ask-archive-tests.html | 未核实 | - |
 | Google Drive | tests/drive-scopes-tests.html | 未核实 | - |
 | Google Drive | tests/options-drive-sync-tests.html | 未核实 | - |
-| OpenAI、Anthropic、Gemini、DeepSeek、Ollama | tests/ai-completion-tests.html | 未核实 | 按官方 schema 手写（含多模态图片输入） |
+| OpenAI、Anthropic、Gemini、Ollama | tests/ai-completion-tests.html | 未核实 | 按官方 schema 手写（含多模态图片输入） |
+| DeepSeek | tests/ai-completion-tests.html#DEEPSEEK_FLASH_LIVE_20261115 | 2026-11-15 | 2026-11-15 真实核验 deepseek-flash 纯文本与多模态 image_url 响应夹具 |
 | OpenAI 兼容接口 | tests/popup-ai-sw-tests.html | 未核实 | - |
 | OpenAI 兼容接口 | tests/fixtures/dict-live-responses.mjs | 未核实 | - |
 | OpenAI 兼容接口 | tests/fixtures/dict-chat-stream.mjs | 未核实 | 流式响应 |
@@ -75,10 +76,10 @@
 | DeepSeek | tests/fixtures/dict-deepseek-collocations.json | 2026-10-25 | 原文："Captured successful DeepSeek collocations response from the explicitly authorized 2026-10-25 synthetic provider lookup." |
 | LiteLLM | tests/fixtures/dict-live-malformed-responses.js:1 | 2026-10-26 | 原文：// Reviewed synthetic-term answers captured on 2026-10-26 through LiteLLM. |
 | Jina Reader | tests/jina-cache-tests.html | 未核实 | - |
-| DeepSeek Fetch | tests/jina-cache-tests.html | 未核实 | 按 2026-11-13 官方 schema 手写 |
-| DeepSeek OCR | tests/md-ocr-tests.html | 未核实 | 按 2026-11-13 官方 schema 手写 |
-| DeepSeek TTS | tests/deepseek-speech-tests.html | 未核实 | 按 2026-11-13 官方 schema 手写 |
-| DeepSeek ASR | tests/deepseek-speech-tests.html | 未核实 | 按 2026-11-13 官方 schema 手写 |
+| DeepSeek Fetch | tests/jina-cache-tests.html#DEEPSEEK_FETCH_LIVE_20261115 | 2026-11-15 | 2026-11-15 真实核验 /v1/tools/fetch 顶层 {content, title} 响应夹具 |
+| DeepSeek OCR | tests/md-ocr-tests.html#DEEPSEEK_OCR_LIVE_20261115 | 2026-11-15 | 2026-11-15 真实核验 /v1/tools/ocr (ocr.result) 响应夹具 |
+| DeepSeek TTS | tests/deepseek-speech-tests.html#DEEPSEEK_TTS_LIVE_WAV_HEADER_20261115 | 2026-11-15 | 2026-11-15 真实核验 /v1/tools/tts 24kHz 流式 WAV (0xffffffff) 头部夹具 |
+| DeepSeek ASR | tests/deepseek-speech-tests.html#DEEPSEEK_ASR_LIVE_20261115 | 2026-11-15 | 2026-11-15 真实核验 /v1/tools/asr {request_id, text, duration_ms} 响应夹具 |
 | Wayback Machine | tests/wayback-tests.html | 未核实 | - |
 | Free Dictionary | tests/md-dict-tests.html:216 | 2026-11-13 | 2026-11-13 复核 es/aprovecho、pl/psa、en/found 线上响应；pl/psa 同步新增 IPA |
 | Free Dictionary | tests/library-vocab-tests.html | 未核实 | 照 md-dict-tests.html 的样本手写 |

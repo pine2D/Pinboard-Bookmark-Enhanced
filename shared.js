@@ -6144,6 +6144,7 @@ function pbpValidateWavBytes(input) {
   let audioFormat = 0;
   let sampleRate = 0;
   let channels = 0;
+  let blockAlign = 0;
   let bitsPerSample = 0;
   let dataOffset = 0;
   let dataSize = 0;
@@ -6157,10 +6158,20 @@ function pbpValidateWavBytes(input) {
       audioFormat = view.getUint16(bodyStart, true);
       channels = view.getUint16(bodyStart + 2, true);
       sampleRate = view.getUint32(bodyStart + 4, true);
+      blockAlign = view.getUint16(bodyStart + 12, true);
       bitsPerSample = view.getUint16(bodyStart + 14, true);
+      const validPcmBits = bitsPerSample === 8 || bitsPerSample === 16 || bitsPerSample === 24 || bitsPerSample === 32;
+      const validFloatBits = bitsPerSample === 32 || bitsPerSample === 64;
+      const validExtBits = bitsPerSample >= 8 && bitsPerSample <= 64 && bitsPerSample % 8 === 0;
+      const bitsOk = audioFormat === 1 ? validPcmBits : (audioFormat === 3 ? validFloatBits : (audioFormat === 0xfffe && validExtBits));
+      const expectedAlign = bitsOk ? channels * (bitsPerSample / 8) : 0;
+      const alignOk = expectedAlign > 0 && (audioFormat === 0xfffe
+        ? (blockAlign >= expectedAlign && blockAlign % expectedAlign === 0)
+        : blockAlign === expectedAlign);
       if ((audioFormat !== 1 && audioFormat !== 3 && audioFormat !== 0xfffe)
           || channels < 1 || channels > 8
-          || sampleRate < 4000 || sampleRate > 192000) {
+          || sampleRate < 4000 || sampleRate > 192000
+          || !bitsOk || !alignOk) {
         return { ok: false, reason: "unsupported_fmt" };
       }
       hasFmt = true;
@@ -6184,12 +6195,16 @@ function pbpValidateWavBytes(input) {
     offset = bodyStart + padded;
   }
   if (!hasFmt || !hasData) return { ok: false, reason: "missing_chunks" };
+  if (blockAlign <= 0 || dataSize < blockAlign || dataSize % blockAlign !== 0) {
+    return { ok: false, reason: "unaligned_data" };
+  }
   return {
     ok: true,
     byteLength: bytes.byteLength,
     sampleRate,
     channels,
     audioFormat,
+    blockAlign,
     bitsPerSample,
     dataOffset,
     dataSize,
