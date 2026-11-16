@@ -2012,7 +2012,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const fnEnd = popupAiSource.indexOf("async function enrichPageTextIfJina", fnStart);
       const fn = popupAiSource.slice(fnStart, fnEnd);
       assert(fn.includes('return "transcript"'), "transcript source reported");
-      assert(fn.indexOf("pbpAiTranscriptText(") < fn.indexOf('if (s.aiContentSource === "jina") {'), "transcript tier runs before the jina branch");
+      assert(fn.includes('if (effectiveEngine === "jina") {') && fn.indexOf("pbpAiTranscriptText(") < fn.indexOf('if (effectiveEngine === "jina") {'), "transcript tier runs before the jina branch");
       assert(!popupAiSource.includes("permissions.request"), "popup-ai.js must never request a permission (automatic path)");
       const helper = popupAiSource.slice(popupAiSource.indexOf("async function pbpAiVideoGrant"));
       assert(helper.indexOf("pbpVideoDetect(") < helper.indexOf("permissions.contains"), "URL detect precedes the permission probe: non-video pages never touch permissions");
@@ -3134,7 +3134,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       // way. The worker route has its own cases below.
       const make = sliceFn(
         "pageInfo", "settings", "pbpPopupAiAccountIsCurrent", "getOrCreateInflight",
-        "$id", "callAI", "buildSummaryPrompt", "aiCacheFingerprint", "PBP_AI_VIA_SW",
+        "$id", "callAI", "buildSummaryPrompt", "aiCacheFingerprint", "PBP_AI_VIA_SW", "_pbpEffectiveSource",
         popupAiSource.slice(fetchStart, fetchEnd) + "; return fetchAIArtifacts;"
       );
       const fetchArtifact = make(
@@ -3146,7 +3146,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         async () => "summary",
         () => "prompt",
         (s, type) => s.aiProvider + "#" + type,
-        false
+        false,
+        (s) => s.aiContentSource || "local"
       );
       assert(await fetchArtifact("summary", true, "alice") === "summary", "Alice summary missing");
       currentAccount = "bob";

@@ -17,6 +17,8 @@ paths:
   - "bili-player-bridge.js"
   - "md-bookmark.js"
   - "md-dict.js"
+  - "md-ocr.js"
+  - "md-speech.js"
   - "md-vocab-echo.js"
   - "md-preview-theme-early.js"
 ---

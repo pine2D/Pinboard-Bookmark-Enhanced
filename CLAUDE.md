@@ -1,7 +1,7 @@
 # Bookmark Enhanced 项目配置
 
 作者：pine2D
-更新：2026-11-10
+更新：2026-11-16
 
 > 本文件只保留每个会话都需要的跨领域约定。子系统深水区规则在 `.claude/rules/`（按 paths 匹配自动加载），按任务的流程在 `.claude/skills/`（按描述触发），有到期日的一次性迁移在 `.claude/expiring-items.md`；三者都列在文末索引表。不自动加载 rules 或 skills 的工具（Codex 等）在改对应文件或执行对应任务前，按索引表先读。机器可验证的铁律已由 pre-commit / verify.sh / release 硬门强制——prose 是提醒，lint 是底线。
 
@@ -19,7 +19,7 @@ Chrome Extension (Manifest V3)，将当前页面保存到可选主服务 Pinboar
 | 语言 | Vanilla JavaScript（无框架、无构建步骤、零运行时依赖——保持这一点） |
 | 存储 | Chrome Storage API（sync + local）+ IndexedDB |
 | AI providers | OpenAI / Anthropic / Gemini / DeepSeek / Alibaba Cloud Model Studio (Bailian) / MiniMax / OpenRouter / Groq / Mistral / Cohere / SiliconFlow / Zhipu (BigModel) / Moonshot (Kimi) / Volcengine Ark / BytePlus ModelArk / OpenCode Zen / Command Code / Ollama (local)；另可添加多个 OpenAI / Anthropic 兼容的自定义端点 |
-| 页面正文抽取 | Defuddle（vendor/ 本地化，懒注入）；备用 Jina Reader API |
+| 页面正文抽取 | Defuddle（vendor/ 本地化，懒注入）；备用 Jina Reader API / DeepSeek Fetch API；另有配 DeepSeek Key 可用的 PDF/图片 OCR 导入（`md-ocr.js`）及查词发音/语音输入（`md-speech.js`） |
 | 主题生产 | 自建 theme factory（`docs/theme-surface/`） |
 
 ## 目录结构（速览）
@@ -31,7 +31,7 @@ manifest.json / background.js   # MV3 配置；Service Worker（图标状态、�
 popup.* + popup-{ai,batch,offline,tags,theme-early}.js       # 主弹窗（AI 标签/摘要、批量、离线兜底、标签补全、防 FOUC）
 options.* + options-{connectivity,backup,vocab,theme-early}.js  # 设置页（联通测试、JSON 备份、生词设置侧）
 library.* + library-{vocab,notes,ask}.js   # 资料库页（索引 + 详情平铺双栏，owner 隔离；library-ask.js 按文章与会话浏览、继续提问和删除 Ask 历史）；listbox.js 是 options/library 共用列表框
-md-preview.* + md-*.js           # 阅读器及其子模块；md-preview-theme-early.js 首帧明暗；bili-player-bridge.js 是 B 站播放器桥
+md-preview.* + md-*.js           # 阅读器及其子模块（含 md-ocr.js 本机 SHA-256 缓存 OCR 导入、md-speech.js 查词 TTS 与语音输入）；md-preview-theme-early.js 首帧明暗；bili-player-bridge.js 是 B 站播放器桥
 vocab-store.js / notes-sync.js / dict-archive.js / ask-archive.js  # 四类个人资料的本机写边界；各自的 *-gdrive.js 是 SW-only Drive 同步；restore-points.js 是生词与高亮笔记的本机还原点
 dict-pack.js / dict-entry.js / dict-evidence.js   # 离线词典包 / AI 词条与补充 / 原文用例检索
 ai.js / ai-cache.js              # AI 调用核心（popup/options/library/md-preview 共载）/ 结果 IDB 缓存
@@ -170,7 +170,7 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 | vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js、options-vocab.js、library-vocab.js、library-notes.js、md-highlight.js、anki-connect.js、eudic-sync.js、vocab-send.js | `.claude/rules/vocab-sync.md` |
 | vocab-gdrive.js、notes-gdrive.js、dict-archive-gdrive.js、ask-archive-gdrive.js、options-vocab.js、library.js、background.js、tests/ 下的 vocab-gdrive-tests.html、notes-gdrive-tests.html、options-drive-sync-tests.html、drive-scopes-tests.html、drive-migration-tests.html（连接层 / 身份缓存 / 错误码 / OAuth / 权限） | `.claude/rules/drive-sync.md` |
 | dict-archive.js、dict-archive-gdrive.js、ask-archive.js、ask-archive-gdrive.js、library-ask.js | `.claude/rules/archive-sync.md` |
-| md-preview.*、md-preview-theme-early.js、md-translate.js、md-ask.js、md-reader.js、md-highlight.js、md-ai-core.js、md-bookmark.js、md-skim.js、md-convert.js、md-epub.js、md-mermaid.js、md-export-send.js、md-video.js、md-dict.js、md-vocab-echo.js、bili-player-bridge.js | `.claude/rules/md-preview.md` |
+| md-preview.*、md-preview-theme-early.js、md-translate.js、md-ask.js、md-reader.js、md-highlight.js、md-ai-core.js、md-bookmark.js、md-skim.js、md-convert.js、md-epub.js、md-mermaid.js、md-export-send.js、md-video.js、md-dict.js、md-ocr.js、md-speech.js、md-vocab-echo.js、bili-player-bridge.js | `.claude/rules/md-preview.md` |
 | md-dict.js、md-vocab-echo.js、ai-cache.js、library-vocab.js（查词界面） | `.claude/rules/dict.md` |
 | dict-entry.js、dict-evidence.js、md-dict.js（AI 词条与补充的生成） | `.claude/rules/dict-entry.md` |
 | dict-pack.js、options-vocab.js、md-dict.js、library-vocab.js（离线词典包） | `.claude/rules/dict-pack.md` |

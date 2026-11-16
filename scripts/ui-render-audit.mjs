@@ -7377,6 +7377,12 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       const _ptLanded = await page.evaluate(({ mode, presetKey }) => {
         if (typeof pbpApplyOptionsEarlyTheme !== "function") return null;
         pbpApplyOptionsEarlyTheme(mode, presetKey, true);
+        const autoSaveEl = document.getElementById("auto-save-status");
+        if (autoSaveEl) {
+          clearTimeout(autoSaveEl._timer);
+          autoSaveEl.classList.remove("saved");
+          autoSaveEl.classList.add("hidden");
+        }
         return {
           theme: document.documentElement.dataset.theme || null,
           density: document.documentElement.dataset.density || null,
@@ -7393,6 +7399,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       if (_ptLanded.density !== _ptExpectedDensity) {
         throw new Error(`SETUP ERROR [options|${theme}|preset-preview group]: restore left documentElement.dataset.density=${JSON.stringify(_ptLanded.density)}, expected=${JSON.stringify(_ptExpectedDensity)} -- the theme re-apply did not restore density, so every density-tiered check after this one would measure the wrong tier`);
       }
+      await settleAnimations(page);
     }
     if (keyWrapChecks.length) {
       await page.click("#tab-general");
