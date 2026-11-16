@@ -405,8 +405,8 @@ async function shortcutSlot(tab, urlClean) {
   const chrome = { tabs: { query: async () => [tab], create: async () => ({}) }, storage: { local: { set: async values => { written.push(values); } } } };
   const stored = { aiContentSource: "local", ...(urlClean === undefined ? {} : { urlClean }) };
   const settingsStorage = { get: async defaults => ({ ...defaults, ...stored }) };
-  const open = new Function("chrome", "pbpSweepPreviewOrphans", "getSettingsStorage", "SETTINGS_DEFAULTS", "getCurrentBookmarkAuth", "pbpVideoDetect", "showNotification", "t", "pbpBookmarkLookupUrl",
-    body + "\nreturn openMarkdownPreviewFromShortcut;")(chrome, () => {}, async () => settingsStorage, SETTINGS_DEFAULTS, async () => ({ account: "alice" }), () => null, () => { throw new Error("shortcut failed"); }, key => key, pbpBookmarkLookupUrl);
+  const open = new Function("chrome", "pbpSweepPreviewOrphans", "getSettingsStorage", "pbpReadSettingsWithSecrets", "SETTINGS_DEFAULTS", "getCurrentBookmarkAuth", "pbpVideoDetect", "showNotification", "t", "pbpBookmarkLookupUrl",
+    body + "\nreturn openMarkdownPreviewFromShortcut;")(chrome, () => {}, async () => settingsStorage, async defaults => ({ ...defaults, ...stored }), SETTINGS_DEFAULTS, async () => ({ account: "alice" }), () => null, () => { throw new Error("shortcut failed"); }, key => key, pbpBookmarkLookupUrl);
   await open();
   equal(written.length, 1);
   const [[key, slot]] = Object.entries(written[0]);

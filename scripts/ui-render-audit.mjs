@@ -9158,7 +9158,7 @@ async function openReaderSurface(name) {
       return shown(document.getElementById("ask-img-att"));
     }
     case "ask-voice-input": {
-      await chrome.storage.local.set({ readerVoiceInputEnabled: true });
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true, deepseekApiKey: obfuscateKey("render-fixture-key") });
       if (typeof pbpSpeechRefreshConfig === "function") await pbpSpeechRefreshConfig();
       const btn = document.getElementById("ask-open");
       const panel = document.getElementById("ask-panel");
@@ -9167,7 +9167,7 @@ async function openReaderSurface(name) {
       return shown(document.getElementById("ask-mic"));
     }
     case "hl-card-voice-input": {
-      await chrome.storage.local.set({ readerVoiceInputEnabled: true });
+      await chrome.storage.local.set({ readerVoiceInputEnabled: true, deepseekApiKey: obfuscateKey("render-fixture-key") });
       if (typeof pbpSpeechRefreshConfig === "function") await pbpSpeechRefreshConfig();
       if (typeof _pbpHlOpenCard !== "function") return false;
       _pbpHlOpenCard("h1");
@@ -9177,7 +9177,7 @@ async function openReaderSurface(name) {
   }
   return false;
 }
-function closeReaderSurface(name) {
+async function closeReaderSurface(name) {
   const hide = (el) => { try { if (el && el.matches(":popover-open")) el.hidePopover(); } catch (_) {} };
   switch (name) {
     case "reader-source-details": { document.getElementById(name).open = false; return; }
@@ -9217,14 +9217,16 @@ function closeReaderSurface(name) {
       return;
     }
     case "ask-voice-input": {
-      chrome.storage.local.set({ readerVoiceInputEnabled: false });
+      await chrome.storage.local.set({ readerVoiceInputEnabled: false, deepseekApiKey: "" });
+      if (typeof pbpSpeechRefreshConfig === "function") await pbpSpeechRefreshConfig();
       const btn = document.getElementById("ask-open");
       const panel = document.getElementById("ask-panel");
       if (btn && panel && !panel.hidden) btn.click();
       return;
     }
     case "hl-card-voice-input": {
-      chrome.storage.local.set({ readerVoiceInputEnabled: false });
+      await chrome.storage.local.set({ readerVoiceInputEnabled: false, deepseekApiKey: "" });
+      if (typeof pbpSpeechRefreshConfig === "function") await pbpSpeechRefreshConfig();
       hide(document.getElementById("pb-hl-card"));
       return;
     }
@@ -10429,7 +10431,11 @@ async function runSweep(page, sw, extBase) {
               if (ok === true) await page.waitForTimeout(150);
               return ok;
             });
-            await page.evaluate(closeReaderSurface, name).catch(() => {});
+            if (name === "ask-voice-input" || name === "hl-card-voice-input") {
+              await page.evaluate(closeReaderSurface, name);
+            } else {
+              await page.evaluate(closeReaderSurface, name).catch(() => {});
+            }
           };
           if (name === "reader-bookmark-quote-error") {
             try {
@@ -10489,10 +10495,15 @@ async function runSweep(page, sw, extBase) {
       }
 
       if (wants("md-preview", "ocr-import")) {
-        await page.goto(`${extBase}md-preview.html?import=ocr`, { waitUntil: "load", timeout: TIMEOUT_MS });
-        await page.waitForSelector(".empty-state.es-ocr .rh-match", { timeout: TIMEOUT_MS });
-        await page.waitForTimeout(200);
-        await scan("md-preview", "ocr-import");
+        await sw.evaluate(() => chrome.storage.local.set({ deepseekApiKey: obfuscateKey("render-fixture-key") }));
+        try {
+          await page.goto(`${extBase}md-preview.html?import=ocr`, { waitUntil: "load", timeout: TIMEOUT_MS });
+          await page.waitForSelector('.empty-state.es-ocr:not([data-ocr-missing-key="1"]) #ocr-main-rich-layout', { timeout: TIMEOUT_MS });
+          await page.waitForTimeout(200);
+          await scan("md-preview", "ocr-import");
+        } finally {
+          await sw.evaluate(() => chrome.storage.local.set({ deepseekApiKey: "" }));
+        }
       }
     }
   }

@@ -421,6 +421,7 @@ async function runPopupObsidianTests() {
       window: { open: uri => { state.opened.push(uri); return {}; } },
       sessionStorage: { getItem: () => true }, t: key => key,
       showStatus: (...args) => state.messages.push(args),
+      exportSource: "local", deepseekFallbackNotice: "",
       copyMd: () => {}, openPreview: () => {}, downloadFile: () => {}, pbpScrollIntoView: () => {}
     };
     new Function(...Object.keys(params), popupSource.slice(begin, end))(...Object.values(params));

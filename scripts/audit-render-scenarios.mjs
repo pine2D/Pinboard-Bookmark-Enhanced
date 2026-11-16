@@ -135,7 +135,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
       : name === 'explain-image' ? { target: '#explain-pop[data-mode="image"]:popover-open' }
       : name === 'ask-image-att' ? { target: '#ask-img-att:not([hidden])' }
       : name === 'ask-voice-input' ? { target: '#ask-mic:not([hidden])' }
-      : name === 'hl-card-voice-input' ? { target: '.hl-card-mic:not([hidden])' } : {})), context('video', [], { target: '.pbv-bar' }), context('history-empty', [], { target: '.empty-state.es-history .rh-match' }), context('ocr-import', [], { target: '.empty-state.es-ocr .rh-match' })],
+      : name === 'hl-card-voice-input' ? { target: '.hl-card-mic:not([hidden])' } : {})), context('video', [], { target: '.pbv-bar' }), context('history-empty', [], { target: '.empty-state.es-history .rh-match' }), context('ocr-import', [], { target: '.empty-state.es-ocr:not([data-ocr-missing-key="1"]) #ocr-main-rich-layout' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
     context('form', [], { target: '#url-input' }), context('title-error', ['form'], { target: '#desc-char-count.over-limit' }), context('linkding-sharing', ['form'], { target: '#share-check' }), context('linkding-description', ['form'], { target: '#linkding-description-input' }), context('reader-history', [], { target: '#jina-md-history-pop:popover-open' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),

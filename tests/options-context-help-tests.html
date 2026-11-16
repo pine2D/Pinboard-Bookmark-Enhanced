@@ -1261,11 +1261,20 @@ function test(name, fn) {
       assert(anchor.matches("label.pick") && pickText, key + " lost its label.pick / .pick-text");
       const nextRow = anchor.closest(".pref-row")?.nextElementSibling;
       const nextText = nextRow?.matches(".pref-row") ? nextRow.querySelector("label.pick > .pick-text") : null;
+      const readVar = (name) => parseFloat(frame.contentWindow.getComputedStyle(doc.documentElement).getPropertyValue(name));
       for (const density of [null, "compact"]) {
         if (density) doc.documentElement.dataset.density = density; else delete doc.documentElement.dataset.density;
+        // .pick-text has align-self: baseline (options.css), placing it flush with
+        // label.pick's top padding; any min-height slack stays below .pick-text.
+        const minSlack = Math.max(0, readVar("--opt-row-min-h") - 2 * readVar("--opt-row-pad-y") - readVar("--opt-lh-body"));
+        const structural = minSlack + readVar("--opt-sp-3");
         details.open = true;
+        const boxGap = body.getBoundingClientRect().top - pickText.getBoundingClientRect().bottom;
+        assert(Math.abs(boxGap - structural) < 0.05,
+          `${key} (${density || "comfortable"}) CSS box gap=${boxGap}, expected ${structural}`);
         const ownerGap = textInkRect(body).top - textInkRect(pickText).bottom;
-        assert(ownerGap >= 4 && ownerGap <= 9, `${key} (${density || "comfortable"}) copy-to-answer gap=${ownerGap}`);
+        assert(ownerGap >= structural - 2 && ownerGap <= structural + 4,
+          `${key} (${density || "comfortable"}) copy-to-answer gap=${ownerGap}, expected ${structural - 2}..${structural + 4} (structural ${structural} + font-ink residual)`);
         if (nextText) {
           const nextGap = textInkRect(nextText).top - textInkRect(body).bottom;
           assert(ownerGap < nextGap, `${key} (${density || "comfortable"}) answer closer to next row (${nextGap}) than own copy (${ownerGap})`);
