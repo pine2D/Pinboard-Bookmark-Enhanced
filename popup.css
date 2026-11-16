@@ -1553,6 +1553,12 @@ input[type="text"].search-field:focus-visible:not(:disabled) { box-shadow: var(-
   position: relative;
   z-index: 1;
 }
+#ocr-import-btn {
+  flex: 0 0 26px;
+  min-width: 26px;
+  padding: var(--pp-sp-2) 0;
+}
+#ocr-import-btn[hidden] { display: none; }
 
 /* Recent Reader Previews Popover (#jina-md-history-pop) */
 #jina-md-history-pop {
@@ -1639,7 +1645,18 @@ html[data-theme] #jina-md-history-pop { color: var(--pp-fg); }
   display: flex;
   align-items: center;
   gap: var(--pp-sp-4);
+  padding-inline-end: var(--pp-sp-2);
   min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--pp-radius-md);
+  transition: background var(--pp-motion-state), border-color var(--pp-motion-state);
+}
+.pp-rh-item:hover {
+  background: var(--pp-btn-hover);
+}
+.pp-rh-item:hover .pp-rh-open,
+.pp-rh-item:hover .pp-rh-meta {
+  color: var(--pp-btn-fg);
 }
 .pp-rh-open {
   flex: 1 1 auto;
@@ -1649,7 +1666,7 @@ html[data-theme] #jina-md-history-pop { color: var(--pp-fg); }
   flex-direction: column;
   align-items: flex-start;
   gap: var(--pp-sp-1);
-  padding: var(--pp-sp-2) var(--pp-sp-4);
+  padding: var(--pp-sp-2) 0 var(--pp-sp-2) var(--pp-sp-4);
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--pp-radius-md);
@@ -1657,13 +1674,8 @@ html[data-theme] #jina-md-history-pop { color: var(--pp-fg); }
   font-family: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--pp-motion-state), color var(--pp-motion-state), border-color var(--pp-motion-state), box-shadow var(--pp-motion-state);
+  transition: color var(--pp-motion-state), border-color var(--pp-motion-state), box-shadow var(--pp-motion-state);
 }
-.pp-rh-open:hover {
-  background: var(--pp-btn-hover);
-  color: var(--pp-btn-fg);
-}
-.pp-rh-open:hover .pp-rh-meta { color: var(--pp-btn-fg); }
 .pp-rh-open:focus-visible {
   outline: none;
   border-color: var(--pp-focus-bd);
@@ -1697,14 +1709,17 @@ html[data-theme] #jina-md-history-pop { color: var(--pp-fg); }
   justify-content: center;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--pp-radius-md);
+  border-radius: var(--pp-radius-sm);
   color: var(--pp-fg-muted);
   cursor: pointer;
-  transition: background var(--pp-motion-state), color var(--pp-motion-state), border-color var(--pp-motion-state), box-shadow var(--pp-motion-state);
+  transition: color var(--pp-motion-state), border-color var(--pp-motion-state), box-shadow var(--pp-motion-state);
 }
-.pp-rh-remove:hover {
-  background: var(--pp-btn-hover);
+.pp-rh-item:hover .pp-rh-remove {
   color: var(--pp-btn-fg);
+}
+.pp-rh-remove:hover,
+.pp-rh-item:hover .pp-rh-remove:hover {
+  color: var(--pp-danger-quiet-fg);
 }
 .pp-rh-remove:focus-visible {
   outline: none;
@@ -1712,46 +1727,6 @@ html[data-theme] #jina-md-history-pop { color: var(--pp-fg); }
   box-shadow: var(--pp-focus-ring);
 }
 .pp-rh-remove svg { width: 13px; height: 13px; }
-#jina-md-history-pop > .divider {
-  border: none;
-  border-top: 1px solid var(--pp-divider);
-  margin: 0;
-}
-#pp-rh-import-ocr {
-  width: 100%;
-  height: var(--pp-control-h);
-  display: flex;
-  align-items: center;
-  gap: var(--pp-sp-3);
-  padding: 0 var(--pp-sp-4);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--pp-radius-md);
-  color: var(--pp-fg);
-  font-family: inherit;
-  font-size: var(--pp-text-body);
-  line-height: 16px;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--pp-motion-state), color var(--pp-motion-state), border-color var(--pp-motion-state), box-shadow var(--pp-motion-state);
-}
-#pp-rh-import-ocr .pp-rh-label { line-height: 16px; }
-#pp-rh-import-ocr:hover {
-  background: var(--pp-btn-hover);
-  color: var(--pp-btn-fg);
-}
-#pp-rh-import-ocr:hover svg { color: var(--pp-btn-fg); }
-#pp-rh-import-ocr:focus-visible {
-  outline: none;
-  border-color: var(--pp-focus-bd);
-  box-shadow: var(--pp-focus-ring);
-}
-#pp-rh-import-ocr svg {
-  flex: none;
-  width: 14px;
-  height: 14px;
-  color: var(--pp-fg-muted);
-}
 
 /* Batch progress bar — visible while batch save iterates over tabs */
 /* Positioning context for the cancel button, which must live OUTSIDE the

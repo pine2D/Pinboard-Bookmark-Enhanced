@@ -898,7 +898,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   } else showMain(pbpBookmarkConnection(settings).token);
   $id("login-service-settings")?.addEventListener("click", () => pbpOpenOptionsTab("general"));
   chrome.storage.onChanged.addListener((changes, area) => {
-    if ((area === "local" || area === "sync") && (pbpBookmarkSettingsChanged(changes) || changes.optSyncEnabled || changes.syncApiKeys)) window.location.reload();
+    if ((area === "local" || area === "sync") && (pbpBookmarkSettingsChanged(changes) || changes.optSyncEnabled || changes.syncApiKeys)) {
+      window.location.reload();
+      return;
+    }
+    if ((area === "local" || area === "sync") && changes.deepseekApiKey && typeof pbpReadSettingsWithSecrets === "function") {
+      pbpReadSettingsWithSecrets({ deepseekApiKey: "" }).then((dsCfg) => {
+        if (settings && typeof settings === "object") settings.deepseekApiKey = String(dsCfg?.deepseekApiKey || "");
+        const ocrBtn = $id("ocr-import-btn");
+        if (ocrBtn) {
+          const ready = typeof pbpHasDeepseekKey === "function"
+            ? pbpHasDeepseekKey(dsCfg)
+            : Boolean(String(dsCfg?.deepseekApiKey || "").trim());
+          ocrBtn.hidden = !ready;
+        }
+      }).catch(() => { /* swallow-ok: secret refresh fallback keeps prior UI state */ });
+    }
   });
 
   $id("library-link").addEventListener("click", (e) => {
@@ -1197,6 +1212,7 @@ async function showMain(token) {
   setupTabSet();
   showOfflineQueueStatus();
   setupReaderHistory();
+  setupOcrImportBtn();
 
   const isUnsupportedUrl = !pageInfo.url || (!pageInfo.url.startsWith("http://") && !pageInfo.url.startsWith("https://"));
   if (isUnsupportedUrl) {
@@ -3718,60 +3734,96 @@ function _popupReaderHistoryErrText(res) {
 function _positionPopupReaderHistory(pop, anchorBtn) {
   if (!pop || !anchorBtn || !pop.isConnected || !anchorBtn.isConnected) return;
   const gap = 4;
-  const vv = window.visualViewport || null;
-  const vpLeft = Number.isFinite(vv?.offsetLeft) ? vv.offsetLeft : 0;
-  const vpTop = Number.isFinite(vv?.offsetTop) ? vv.offsetTop : 0;
-  const vpWidth = Number.isFinite(vv?.width) && vv.width > 0 ? vv.width : document.documentElement.clientWidth;
-  const vpHeight = Number.isFinite(vv?.height) && vv.height > 0 ? vv.height : document.documentElement.clientHeight;
-  const bodyRect = document.body.getBoundingClientRect();
-  const hasSurface = bodyRect && bodyRect.width > gap * 2;
-  const leftBound = Math.max(vpLeft + gap, hasSurface ? bodyRect.left + gap : vpLeft + gap);
-  const rightBound = Math.max(leftBound, Math.min(vpLeft + vpWidth - gap, hasSurface ? bodyRect.right - gap : vpLeft + vpWidth - gap));
+  const anchorEl = (typeof anchorBtn.closest === "function" && anchorBtn.closest(".qbtn-split")) || anchorBtn;
+  const rawZoom = Number(pop.currentCSSZoom) || parseFloat(getComputedStyle(document.body).zoom) || 1;
+  const cssZoom = Number.isFinite(rawZoom) && rawZoom > 0 ? rawZoom : 1;
 
-  pop.style.maxWidth = `${Math.max(0, Math.floor(rightBound - leftBound))}px`;
-  const anchorRect = anchorBtn.getBoundingClientRect();
-  const naturalHeight = pop.scrollHeight || pop.offsetHeight || 160;
-  const isActionPopupWindow = vpHeight <= document.body.offsetHeight + 4;
-  const desiredBottom = Math.ceil(anchorRect.bottom + gap + Math.min(naturalHeight, 320) + 8);
-  if (isActionPopupWindow && desiredBottom > document.body.offsetHeight) {
-    document.body.style.minHeight = `${Math.min(440, desiredBottom)}px`;
+  // Only grow body height in collapsed action popups (e.g. unsupported-url mode)
+  // where there is neither enough space above nor below the bottom split button.
+  // Normal web-tab popups already have ample room above #jina-md-split, so
+  // leaving minHeight untouched avoids introducing a vertical scrollbar shift.
+  const initDocH = document.documentElement.clientHeight || window.innerHeight || 0;
+  const initAnchorRect = anchorEl.getBoundingClientRect();
+  const naturalDipH = Math.min((pop.scrollHeight || pop.offsetHeight || 160) * cssZoom, 360 * cssZoom);
+  const initSpaceAbove = initAnchorRect.top - gap * 2;
+  const initSpaceBelow = initDocH - initAnchorRect.bottom - gap * 2;
+  const bodyDipH = document.body.getBoundingClientRect().height || (document.body.offsetHeight * cssZoom);
+  const isActionPopupWindow = initDocH <= bodyDipH + 6;
+  const grewBody = isActionPopupWindow && initSpaceAbove < Math.min(naturalDipH, 200 * cssZoom) && initSpaceBelow < naturalDipH;
+  if (grewBody) {
+    const desiredDipBottom = Math.ceil(initAnchorRect.bottom + gap + naturalDipH + 8);
+    const cappedDipH = Math.min(440 * cssZoom, desiredDipBottom);
+    if (cappedDipH > bodyDipH) {
+      document.body.style.minHeight = `${Math.ceil(cappedDipH / cssZoom)}px`;
+    }
   }
 
   const place = () => {
-    if (!pop.isConnected || !anchorBtn.isConnected) return;
-    const curVpHeight = Number.isFinite(vv?.height) && vv.height > 0 ? vv.height : document.documentElement.clientHeight;
-    pop.style.maxHeight = `${Math.max(80, Math.floor(curVpHeight - gap * 2))}px`;
-    const aRect = anchorBtn.getBoundingClientRect();
+    if (!pop.isConnected || !anchorEl.isConnected) return;
+    const vv = window.visualViewport || null;
+    const vpLeft = Number.isFinite(vv?.offsetLeft) ? vv.offsetLeft : 0;
+    const vpTop = Number.isFinite(vv?.offsetTop) ? vv.offsetTop : 0;
+    const docClientW = document.documentElement.clientWidth;
+    const docClientH = document.documentElement.clientHeight;
+    // Bound width by documentElement.clientWidth (which excludes any classic
+    // vertical scrollbar track on Windows), never letting visualViewport.width
+    // push the right edge under the scrollbar.
+    const vpWidth = docClientW > 0
+      ? (Number.isFinite(vv?.width) && vv.width > 0 ? Math.min(docClientW, vv.width) : docClientW)
+      : (Number.isFinite(vv?.width) && vv.width > 0 ? vv.width : window.innerWidth);
+    const vpHeight = docClientH > 0
+      ? (Number.isFinite(vv?.height) && vv.height > 0 ? Math.min(docClientH, vv.height) : docClientH)
+      : (Number.isFinite(vv?.height) && vv.height > 0 ? vv.height : window.innerHeight);
+    const bodyRect = document.body.getBoundingClientRect();
+    const hasSurface = bodyRect && bodyRect.width > gap * 2;
+    const leftBound = Math.max(vpLeft + gap, hasSurface ? bodyRect.left + gap : vpLeft + gap);
+    const rightBound = Math.max(
+      leftBound,
+      Math.min(vpLeft + vpWidth - gap, hasSurface ? bodyRect.right - gap : vpLeft + vpWidth - gap)
+    );
+    pop.style.maxWidth = `${Math.max(0, Math.floor((rightBound - leftBound) / cssZoom))}px`;
+
+    const topBound = vpTop + gap;
+    const bottomBound = vpTop + vpHeight - gap;
+    const aRect = anchorEl.getBoundingClientRect();
+    const roomBelow = Math.max(0, bottomBound - (aRect.bottom + gap));
+    const roomAbove = Math.max(0, (aRect.top - gap) - topBound);
+    pop.style.maxHeight = `${Math.max(80, Math.floor(Math.min(360 * cssZoom, bottomBound - topBound) / cssZoom))}px`;
+    const naturalRect = pop.getBoundingClientRect();
+    const openBelow = roomBelow >= naturalRect.height || roomBelow >= roomAbove;
+    const sideRoom = openBelow ? roomBelow : roomAbove;
+    if (sideRoom >= 96 * cssZoom) {
+      pop.style.maxHeight = `${Math.floor(Math.min(360 * cssZoom, sideRoom) / cssZoom)}px`;
+    }
+
     const pRect = pop.getBoundingClientRect();
     let left = aRect.right - pRect.width;
     left = Math.max(leftBound, Math.min(left, rightBound - pRect.width));
-    const topBound = vpTop + gap;
-    const bottomBound = vpTop + curVpHeight - gap;
-    const below = aRect.bottom + gap;
-    let top = below + pRect.height <= bottomBound
-      ? below
-      : Math.max(topBound, aRect.top - pRect.height - gap);
+    let top = openBelow
+      ? aRect.bottom + gap
+      : aRect.top - pRect.height - gap;
     top = Math.max(topBound, Math.min(top, bottomBound - pRect.height));
-    pop.style.left = `${Math.round(left)}px`;
-    pop.style.top = `${Math.round(top)}px`;
+    // Popover inherits body CSS zoom (1.12 / 1.22 on Hi-DPI), so convert
+    // viewport DIPs into local zoomed CSS pixels before writing style.left/top.
+    pop.style.left = `${(left / cssZoom).toFixed(2)}px`;
+    pop.style.top = `${(top / cssZoom).toFixed(2)}px`;
+
+    const placed = pop.getBoundingClientRect();
+    let dx = 0;
+    let dy = 0;
+    if (placed.right > rightBound + 0.5) dx = rightBound - placed.right;
+    else if (placed.left < leftBound - 0.5) dx = leftBound - placed.left;
+    if (placed.bottom > bottomBound + 0.5) dy = bottomBound - placed.bottom;
+    else if (placed.top < topBound - 0.5) dy = topBound - placed.top;
+    if (dx !== 0) pop.style.left = `${((left + dx) / cssZoom).toFixed(2)}px`;
+    if (dy !== 0) pop.style.top = `${((top + dy) / cssZoom).toFixed(2)}px`;
   };
   place();
-  if (isActionPopupWindow) requestAnimationFrame(place);
+  if (grewBody) requestAnimationFrame(place);
 }
 
 async function _populatePopupReaderHistory(pop, anchorBtn) {
-  const [items, dsCfg] = await Promise.all([
-    typeof pbpReaderHistoryRead === "function" ? pbpReaderHistoryRead() : [],
-    typeof pbpReadSettingsWithSecrets === "function"
-      ? pbpReadSettingsWithSecrets({ deepseekApiKey: "" }).catch(() => {
-        // swallow-ok: fallback to empty key if secret read fails
-        return { deepseekApiKey: "" };
-      })
-      : { deepseekApiKey: "" },
-  ]);
-  const canImportOcr = typeof pbpHasDeepseekKey === "function"
-    ? pbpHasDeepseekKey(dsCfg)
-    : Boolean(String(dsCfg?.deepseekApiKey || "").trim());
+  const items = typeof pbpReaderHistoryRead === "function" ? await pbpReaderHistoryRead() : [];
 
   const head = document.createElement("div");
   head.className = "pp-rh-head";
@@ -3875,31 +3927,25 @@ async function _populatePopupReaderHistory(pop, anchorBtn) {
     frag.appendChild(listEl);
   }
 
-  if (canImportOcr) {
-    const divEl = document.createElement("div");
-    divEl.className = "divider";
-    frag.appendChild(divEl);
-
-    const importBtn = document.createElement("button");
-    importBtn.type = "button";
-    importBtn.id = "pp-rh-import-ocr";
-    importBtn.innerHTML = PBP_ICONS.doc;
-    const importLabel = document.createElement("span");
-    importLabel.className = "pp-rh-label";
-    importLabel.textContent = t("mdOcrImportBtn");
-    importBtn.appendChild(importLabel);
-    importBtn.addEventListener("click", async () => {
-      try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
-      if (chrome.tabs?.create && chrome.runtime?.getURL) {
-        const incogQ = _activeTabAtOpen?.incognito === true ? "&incognito=1" : "";
-        const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect("")) ? "&video=1" : "";
-        await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html?import=ocr" + incogQ + videoQ) });
-      }
-    });
-    frag.appendChild(importBtn);
-  }
-
   pop.replaceChildren(frag);
+}
+
+function setupOcrImportBtn() {
+  const btn = $id("ocr-import-btn");
+  if (!btn) return;
+  const ready = typeof pbpHasDeepseekKey === "function"
+    ? pbpHasDeepseekKey(settings)
+    : Boolean(String(settings?.deepseekApiKey || "").trim());
+  btn.hidden = !ready;
+  if (btn.dataset.pbpOcrBound === "1") return;
+  btn.dataset.pbpOcrBound = "1";
+  btn.addEventListener("click", async () => {
+    if (chrome.tabs?.create && chrome.runtime?.getURL) {
+      const incogQ = _activeTabAtOpen?.incognito === true ? "&incognito=1" : "";
+      const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect("")) ? "&video=1" : "";
+      await chrome.tabs.create({ url: chrome.runtime.getURL("md-preview.html?import=ocr" + incogQ + videoQ) });
+    }
+  });
 }
 
 function setupReaderHistory() {
@@ -3913,10 +3959,26 @@ function setupReaderHistory() {
       pop.setAttribute("popover", "auto");
       pop.setAttribute("role", "dialog");
       pop.setAttribute("aria-label", t("readerHistoryTitle"));
+      let repositionRaf = 0;
+      const scheduleReposition = () => {
+        if (repositionRaf || !pop.matches(":popover-open")) return;
+        repositionRaf = requestAnimationFrame(() => {
+          repositionRaf = 0;
+          if (pop.matches(":popover-open")) _positionPopupReaderHistory(pop, btn);
+        });
+      };
       pop.addEventListener("toggle", (e) => {
         const open = e.newState === "open";
         btn.setAttribute("aria-expanded", open ? "true" : "false");
-        if (!open) document.body.style.minHeight = "";
+        if (open) {
+          window.addEventListener("scroll", scheduleReposition, { passive: true });
+          window.addEventListener("resize", scheduleReposition, { passive: true });
+        } else {
+          if (repositionRaf) { cancelAnimationFrame(repositionRaf); repositionRaf = 0; }
+          window.removeEventListener("scroll", scheduleReposition);
+          window.removeEventListener("resize", scheduleReposition);
+          document.body.style.minHeight = "";
+        }
       });
       document.body.appendChild(pop);
       _popupReaderHistoryPopEl = pop;

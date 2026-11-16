@@ -13,10 +13,12 @@
   <aside class="rail" id="rail">
     <div class="rail-ident">
       <h1 id="preview-title">Reader</h1>
+      <button type="button" class="action-btn icon-only" id="rail-ocr-btn" hidden></button>
       <button type="button" class="action-btn icon-only" id="rail-history-btn"></button>
       <button type="button" class="action-btn icon-only" id="rail-settings-btn"></button>
       <a id="preview-url" class="preview-url" href="https://example.com/current">example.com/current</a>
     </div>
+    <button type="button" class="action-btn" id="btn-import-ocr" hidden></button>
     <div class="rail-section" id="reader-bookmark-section"></div>
   </aside>
   <main>
@@ -761,6 +763,9 @@ const DEEPSEEK_OCR_LIVE_20261115 = {
     await chrome.storage.local.set({ deepseekApiKey: "" });
     const ready0 = await pbpOcrRefreshConfig();
     assert(ready0 === false && pbpOcrIsAvailable() === false, "expected OCR unavailable when deepseekApiKey is empty");
+    assert(document.getElementById("rail-ocr-btn").hidden === true && document.getElementById("btn-import-ocr").hidden === true &&
+      !document.querySelector(".rail-ident").hasAttribute("data-has-ocr"),
+      "rail OCR buttons and .rail-ident[data-has-ocr] must clear when DeepSeek key is missing");
 
     pbpOcrRenderPanel({ mode: "local" });
     const missingPanel = document.querySelector("#rendered-view > .empty-state.es-ocr");
@@ -798,6 +803,9 @@ const DEEPSEEK_OCR_LIVE_20261115 = {
     await chrome.storage.local.set({ deepseekApiKey: obfuscateKey("sk-ocr-added") });
     const ready1 = await pbpOcrRefreshConfig();
     assert(ready1 === true && pbpOcrIsAvailable() === true, "expected OCR available after adding deepseekApiKey");
+    assert(document.getElementById("rail-ocr-btn").hidden === false && document.getElementById("btn-import-ocr").hidden === false &&
+      document.querySelector(".rail-ident").dataset.hasOcr === "1",
+      "rail OCR buttons and .rail-ident[data-has-ocr=1] must activate once deepseekApiKey is configured");
     const upgradedPanel = document.querySelector("#rendered-view > .empty-state.es-ocr");
     assert(upgradedPanel && upgradedPanel.dataset.ocrMissingKey !== "1" &&
       !!document.getElementById("ocr-main-rich-layout") &&

@@ -1036,6 +1036,7 @@ function _pbpBuildReaderHistoryRow(item, { isCurrent = false, onOpen, onRemove }
   const row = document.createElement("div");
   row.className = "rh-item";
   row.setAttribute("role", "listitem");
+  if (isCurrent) row.dataset.current = "1";
 
   const openBtn = document.createElement("button");
   openBtn.type = "button";
@@ -1263,10 +1264,7 @@ function _pbpRailHistoryPosition(pop, anchorBtn) {
 }
 
 async function _pbpRailHistoryPopulate(pop, anchorBtn) {
-  const [items] = await Promise.all([
-    typeof pbpReaderHistoryRead === "function" ? pbpReaderHistoryRead() : [],
-    typeof pbpOcrRefreshConfig === "function" ? pbpOcrRefreshConfig() : Promise.resolve(),
-  ]);
+  const items = typeof pbpReaderHistoryRead === "function" ? await pbpReaderHistoryRead() : [];
   const curKey = (() => {
     try { return new URLSearchParams(location.search).get("k") || ""; }
     catch (_) { /* swallow-ok: unavailable location search defaults to empty key */ return ""; }
@@ -1346,23 +1344,6 @@ async function _pbpRailHistoryPopulate(pop, anchorBtn) {
       }));
     });
     frag.appendChild(listEl);
-  }
-
-  if (typeof pbpOcrOpenImportEntry === "function" && _pbpReaderCanImportOcr()) {
-    const importBtn = document.createElement("button");
-    importBtn.type = "button";
-    importBtn.id = "rh-import-ocr-btn";
-    importBtn.className = "action-btn";
-    importBtn.innerHTML = (typeof PBP_ICONS !== "undefined" && PBP_ICONS.doc) || "";
-    const lab = document.createElement("span");
-    lab.className = "btn-label";
-    lab.textContent = t("mdOcrImportBtn");
-    importBtn.appendChild(lab);
-    importBtn.addEventListener("click", () => {
-      try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
-      pbpOcrOpenImportEntry();
-    });
-    frag.appendChild(importBtn);
   }
 
   pop.replaceChildren(frag);

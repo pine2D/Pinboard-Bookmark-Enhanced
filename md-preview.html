@@ -22,6 +22,9 @@
   <aside id="rail" class="rail" aria-labelledby="preview-title">
     <div class="rail-ident">
       <h1 id="preview-title"></h1>
+      <button type="button" id="rail-ocr-btn" class="action-btn icon-only" hidden title="Import PDF or image (OCR)" data-i18n-title="mdOcrImportBtn" aria-label="Import PDF or image (OCR)" data-i18n-aria="mdOcrImportBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/></svg>
+      </button>
       <button type="button" id="rail-history-btn" class="action-btn icon-only" title="Recent previews" data-i18n-title="readerHistoryBtn" aria-label="Recent previews" data-i18n-aria="readerHistoryBtn" aria-haspopup="dialog" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
       </button>
@@ -134,7 +137,7 @@
       <button id="btn-rendered" class="toggle-btn active" data-i18n="mdViewRendered" aria-pressed="true">Rendered</button>
     </div>
     <button type="button" id="btn-import-ocr" class="action-btn" hidden>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/></svg>
       <span class="btn-label" data-i18n="mdOcrImportBtn">Import PDF or image (OCR)</span>
     </button>
     </details>

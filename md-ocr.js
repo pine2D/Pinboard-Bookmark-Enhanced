@@ -595,6 +595,15 @@ function pbpOcrIsAvailable() {
 
 function _pbpOcrSyncAvailabilityDom() {
   if (typeof document === "undefined") return;
+  const railImportBtn = document.getElementById("rail-ocr-btn");
+  if (railImportBtn) {
+    railImportBtn.hidden = !_pbpOcrKeyReady;
+    const ident = typeof railImportBtn.closest === "function" ? railImportBtn.closest(".rail-ident") : null;
+    if (ident) {
+      if (_pbpOcrKeyReady) ident.dataset.hasOcr = "1";
+      else delete ident.dataset.hasOcr;
+    }
+  }
   const srcImportBtn = document.getElementById("btn-import-ocr");
   if (srcImportBtn) srcImportBtn.hidden = !_pbpOcrKeyReady;
   if (!_pbpOcrKeyReady && _pbpOcrDropPop && !_pbpOcrDropActiveAbort) {
@@ -1305,11 +1314,14 @@ function pbpOcrInstallReaderHooks() {
   if (typeof document === "undefined" || !document.body || document.body.dataset.ocrHooksBound === "1") return;
   document.body.dataset.ocrHooksBound = "1";
 
-  const srcImportBtn = document.getElementById("btn-import-ocr");
-  if (srcImportBtn) {
-    srcImportBtn.hidden = !_pbpOcrKeyReady;
-    srcImportBtn.addEventListener("click", () => pbpOcrOpenImportEntry());
+  for (const id of ["rail-ocr-btn", "btn-import-ocr"]) {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.hidden = !_pbpOcrKeyReady;
+      btn.addEventListener("click", () => pbpOcrOpenImportEntry());
+    }
   }
+  _pbpOcrSyncAvailabilityDom();
   if (typeof chrome !== "undefined" && chrome.storage) {
     void pbpOcrRefreshConfig();
     chrome.storage.onChanged?.addListener((changes, area) => {

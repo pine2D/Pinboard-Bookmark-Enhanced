@@ -1274,8 +1274,12 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
   transition: transform 200ms var(--ease-drawer), visibility 0s;
 }
 .rail-ident { display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px; column-gap: var(--sp-2); align-items: start; }
+.rail-ident[data-has-ocr="1"] { grid-template-columns: minmax(0, 1fr) 24px 24px 24px; }
+.rail-ident > #rail-ocr-btn { grid-column: 2; grid-row: 1; width: 24px; height: 24px; padding: 0; }
 .rail-ident > #rail-history-btn { grid-column: 2; grid-row: 1; width: 24px; height: 24px; padding: 0; }
 .rail-ident > #rail-settings-btn { grid-column: 3; grid-row: 1; width: 24px; height: 24px; padding: 0; }
+.rail-ident[data-has-ocr="1"] > #rail-history-btn { grid-column: 3; }
+.rail-ident[data-has-ocr="1"] > #rail-settings-btn { grid-column: 4; }
 .rail-ident > a { grid-column: 1 / -1; }
 .rail-ident h1 { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .rail-ident a { display: block; margin-top: var(--sp-1); font-size: 12px; color: var(--fg-muted); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1715,10 +1719,12 @@ body.rail-open .rail-toggle .rail-toggle-close { display: block; }
   }
   .rail-toggle { display: inline-flex; }
   body.rail-open .rail-ident { grid-template-columns: minmax(0, 1fr) 24px 24px 24px; }
+  body.rail-open .rail-ident[data-has-ocr="1"] { grid-template-columns: minmax(0, 1fr) 24px 24px 24px 24px; }
   .rail-ident > .rail-toggle {
     position: static; grid-column: 4; grid-row: 1;
     width: 24px; height: 24px; box-shadow: none;
   }
+  body.rail-open .rail-ident[data-has-ocr="1"] > .rail-toggle { grid-column: 5; }
   .rail-ident > .rail-toggle svg { width: 14px; height: 14px; }
   .rail {
     transform: translateX(-100%);
@@ -3873,7 +3879,22 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+  padding-inline-end: var(--sp-1);
   min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease;
+}
+.rh-item[data-current="1"] {
+  background: var(--code-bg);
+  border-color: var(--border);
+}
+.rh-item:hover {
+  background: var(--btn-hover);
+}
+.rh-item:hover .rh-open,
+.rh-item:hover .rh-meta {
+  color: var(--fg);
 }
 .rh-open {
   flex: 1 1 auto;
@@ -3883,7 +3904,7 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   flex-direction: column;
   align-items: flex-start;
   gap: var(--sp-0);
-  padding: var(--sp-1) var(--sp-2);
+  padding: var(--sp-1) 0 var(--sp-1) var(--sp-2);
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
@@ -3891,18 +3912,9 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background-color var(--motion-state) ease, border-color var(--motion-state) ease, color var(--motion-state) ease;
+  transition: color var(--motion-state) ease;
 }
-.rh-open[aria-current="true"] {
-  background: var(--code-bg);
-  border-color: var(--border);
-}
-.rh-open:hover {
-  background: var(--btn-hover);
-  color: var(--fg);
-}
-.rh-open:hover .rh-meta { color: var(--fg); }
-.rh-open:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.rh-open:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
 .rh-item-title {
   width: 100%;
   font-size: 12.5px;
@@ -3928,9 +3940,12 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   padding: 0;
   background: transparent;
   border-color: transparent;
+  border-radius: var(--radius-sm);
   color: var(--fg-muted);
 }
-.rh-remove:hover { background: var(--btn-hover); border-color: transparent; color: var(--fg); }
+.rh-item:hover .rh-remove { color: var(--fg); }
+.rh-remove:hover,
+.rh-item:hover .rh-remove:hover { background: transparent; border-color: transparent; color: var(--danger); }
 .rh-remove svg { width: 13px; height: 13px; }
 
 .empty-state.es-history,
@@ -3988,10 +4003,6 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 .es-ocr .action-btn[aria-disabled="true"] {
   opacity: 0.6;
   cursor: wait;
-}
-#rail-history-pop > #rh-import-ocr-btn {
-  width: 100%;
-  justify-content: flex-start;
 }
 #ocr-drop-pop {
   position: fixed;
