@@ -208,6 +208,8 @@ const PBP_ICONS = {
   arrowLeft: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>',
   // Lucide v0.525.0 mic: short voice input in Ask and highlight notes (md-speech.js).
   mic: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect width="6" height="13" x="9" y="2" rx="3"/></svg>',
+  // Lucide v0.525.0 scan-text: standalone Import PDF or image (OCR) action in popup and reader rail.
+  scanText: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/></svg>',
 };
 
 // Render "<check|cross icon> text" into a status element. The SVG uses currentColor so
@@ -661,20 +663,20 @@ const SETTINGS_DEFAULTS = {
   // @generated:ai-providers start (settings-defaults)
   geminiApiKey: "", geminiModel: "gemini-3.5-flash-lite",
   openaiApiKey: "", openaiModel: "gpt-5.4-nano", openaiBaseUrl: "https://api.openai.com/v1",
-  claudeApiKey: "", claudeModel: "claude-haiku-4-5",
+  claudeApiKey: "", claudeModel: "claude-haiku-5-5",
   deepseekApiKey: "", deepseekModel: "deepseek-flash",
   qwenApiKey: "", qwenModel: "qwen-flash", qwenRegion: "beijing", qwenWorkspaceId: "",
-  minimaxApiKey: "", minimaxModel: "MiniMax-M2",
+  minimaxApiKey: "", minimaxModel: "MiniMax-M3.1-Flash",
   openrouterApiKey: "", openrouterModel: "openai/gpt-oss-20b",
   groqApiKey: "", groqModel: "openai/gpt-oss-20b",
   mistralApiKey: "", mistralModel: "mistral-small-latest",
   cohereApiKey: "", cohereModel: "command-r7b-12-2024",
   siliconflowApiKey: "", siliconflowModel: "Qwen/Qwen3-8B",
-  zhipuApiKey: "", zhipuModel: "glm-4.7-flash",
-  kimiApiKey: "", kimiModel: "kimi-k2.6",
-  arkApiKey: "", arkModel: "doubao-seed-2-0-mini-260428", arkRegion: "cn",
+  zhipuApiKey: "", zhipuModel: "glm-5.3-flash",
+  kimiApiKey: "", kimiModel: "kimi-k3.1-pro",
+  arkApiKey: "", arkModel: "doubao-seed-2-1-lite-260915", arkRegion: "cn",
   opencodeApiKey: "", opencodeModel: "glm-5.3-flash", opencodeProtocol: "openai",
-  commandcodeApiKey: "", commandcodeModel: "deepseek/deepseek-v4-flash", commandcodeProtocol: "openai",
+  commandcodeApiKey: "", commandcodeModel: "deepseek/deepseek-v4.1-flash", commandcodeProtocol: "openai",
   ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3.2",
   customApiKey: "", customModel: "", customBaseUrl: "",
   // @generated:ai-providers end (settings-defaults)
@@ -4181,6 +4183,85 @@ async function pbpMigrateRetiredDeepseekModels() {
     });
   } catch (e) {
     console.warn("[ai-migration] retired DeepSeek model rewrite failed:", e && e.name, e && e.message);
+  }
+}
+
+// One-shot retirement rewrite for MiniMax M2/M2.5/M2.7 family (EOL 2026-11-18 ->
+// "MiniMax-M3.1-Flash") and Moonshot Kimi's deprecated default ("kimi-k2.6" ->
+// "kimi-k3.1-pro"). Scoped strictly to official `minimax` and `kimi` settings
+// (`minimaxModel` / `kimiModel`, `previewAiModelByProvider.{minimax,kimi}`, and
+// legacy `previewAiModel` when `aiProvider` matches without a map entry).
+// Retire by 2027-01-15 (.claude/expiring-items.md).
+const PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG = "_retiredMinimaxKimiModelsDone";
+const PBP_RETIRED_MINIMAX_MODELS = Object.freeze([
+  "MiniMax-M2",
+  "MiniMax-M2-Stable",
+  "MiniMax-M2.5",
+  "MiniMax-M2.5-highspeed",
+  "MiniMax-M2.7",
+  "MiniMax-M2.7-highspeed",
+]);
+const PBP_RETIRED_KIMI_MODELS = Object.freeze([
+  "kimi-k2.6",
+]);
+
+function pbpBuildRetiredMinimaxKimiModelPatch(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const patch = {};
+  const minimaxNext = SETTINGS_DEFAULTS.minimaxModel;
+  const kimiNext = SETTINGS_DEFAULTS.kimiModel;
+  if (typeof raw.minimaxModel === "string" && PBP_RETIRED_MINIMAX_MODELS.includes(raw.minimaxModel)) {
+    patch.minimaxModel = minimaxNext;
+  }
+  if (typeof raw.kimiModel === "string" && PBP_RETIRED_KIMI_MODELS.includes(raw.kimiModel)) {
+    patch.kimiModel = kimiNext;
+  }
+  const map = raw.previewAiModelByProvider;
+  const hasPlainMap = Boolean(map && typeof map === "object" && !Array.isArray(map));
+  const hasMapMinimax = hasPlainMap && Object.prototype.hasOwnProperty.call(map, "minimax");
+  const hasMapKimi = hasPlainMap && Object.prototype.hasOwnProperty.call(map, "kimi");
+  let nextMap = null;
+  if (hasMapMinimax && typeof map.minimax === "string" && PBP_RETIRED_MINIMAX_MODELS.includes(map.minimax)) {
+    nextMap = Object.assign({}, map, { minimax: minimaxNext });
+  }
+  if (hasMapKimi && typeof map.kimi === "string" && PBP_RETIRED_KIMI_MODELS.includes(map.kimi)) {
+    nextMap = Object.assign(nextMap || Object.assign({}, map), { kimi: kimiNext });
+  }
+  if (nextMap) patch.previewAiModelByProvider = nextMap;
+  if (!hasMapMinimax && raw.aiProvider === "minimax"
+      && typeof raw.previewAiModel === "string" && PBP_RETIRED_MINIMAX_MODELS.includes(raw.previewAiModel)) {
+    patch.previewAiModel = minimaxNext;
+  } else if (!hasMapKimi && raw.aiProvider === "kimi"
+      && typeof raw.previewAiModel === "string" && PBP_RETIRED_KIMI_MODELS.includes(raw.previewAiModel)) {
+    patch.previewAiModel = kimiNext;
+  }
+  return patch;
+}
+
+async function pbpMigrateRetiredMinimaxKimiModels() {
+  try {
+    const doneRead = await chrome.storage.local.get(PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG);
+    if (doneRead && doneRead[PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG] === true) return;
+    await pbpWithSecretStorageLock(async () => {
+      const recheck = await chrome.storage.local.get(PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG);
+      if (recheck && recheck[PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG] === true) return;
+      const keys = ["minimaxModel", "kimiModel", "previewAiModelByProvider", "previewAiModel", "aiProvider"];
+      const localRaw = await chrome.storage.local.get(keys);
+      const localPatch = pbpBuildRetiredMinimaxKimiModelPatch(localRaw);
+      if (Object.keys(localPatch).length > 0) {
+        await chrome.storage.local.set(localPatch);
+      }
+      if (chrome.storage && chrome.storage.sync) {
+        const syncRaw = await chrome.storage.sync.get(keys);
+        const syncPatch = pbpBuildRetiredMinimaxKimiModelPatch(syncRaw);
+        if (Object.keys(syncPatch).length > 0) {
+          await chrome.storage.sync.set(syncPatch);
+        }
+      }
+      await chrome.storage.local.set({ [PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG]: true });
+    });
+  } catch (e) {
+    console.warn("[ai-migration] retired MiniMax/Kimi model rewrite failed:", e && e.name, e && e.message);
   }
 }
 

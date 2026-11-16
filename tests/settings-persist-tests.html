@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="566"><title>Settings Persistence Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="571"><title>Settings Persistence Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -6815,6 +6815,100 @@ async function run() {
         const bgSource = await fetch("../background.js").then((r) => r.text());
         check("retired DeepSeek migration: background.js invokes pbpMigrateRetiredDeepseekModels at top level",
           /^pbpMigrateRetiredDeepseekModels\(\);$/m.test(bgSource));
+      }
+      {
+        const local = {
+          minimaxModel: "MiniMax-M2",
+          kimiModel: "kimi-k2.6",
+          previewAiModelByProvider: { minimax: "MiniMax-M2.7-highspeed", kimi: "kimi-k2.6", openai: "gpt-5.4-nano" },
+        };
+        const sync = {
+          minimaxModel: "MiniMax-M2.5",
+          kimiModel: "kimi-k2.6",
+          aiProvider: "minimax",
+          previewAiModelByProvider: {},
+          previewAiModel: "MiniMax-M2",
+        };
+        install(local, sync);
+        await pbpMigrateRetiredMinimaxKimiModels();
+        check("retired MiniMax/Kimi migration: rewrites retired M2/M2.5/M2.7 and kimi-k2.6 slugs in local and sync while preserving other map entries",
+          local.minimaxModel === "MiniMax-M3.1-Flash"
+          && local.kimiModel === "kimi-k3.1-pro"
+          && local.previewAiModelByProvider.minimax === "MiniMax-M3.1-Flash"
+          && local.previewAiModelByProvider.kimi === "kimi-k3.1-pro"
+          && local.previewAiModelByProvider.openai === "gpt-5.4-nano"
+          && sync.minimaxModel === "MiniMax-M3.1-Flash"
+          && sync.kimiModel === "kimi-k3.1-pro"
+          && sync.previewAiModel === "MiniMax-M3.1-Flash"
+          && local[PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG] === true);
+      }
+      {
+        const local = {
+          minimaxModel: "MiniMax-M3.1-Pro",
+          kimiModel: "kimi-k2.7-code",
+          customModel: "MiniMax-M2",
+          aiProvider: "custom",
+          previewAiModel: "MiniMax-M2",
+          previewAiModelByProvider: { minimax: "MiniMax-M3.1-Pro", kimi: "kimi-k2.5", openrouter: "MiniMax-M2" },
+        };
+        const sync = {
+          minimaxModel: "  MiniMax-M2  ",
+          kimiModel: "  kimi-k2.6  ",
+          aiProvider: "kimi",
+          previewAiModelByProvider: { minimax: "" },
+          previewAiModel: "kimi-k2.6",
+        };
+        install(local, sync);
+        await pbpMigrateRetiredMinimaxKimiModels();
+        check("retired MiniMax/Kimi migration: preserves non-retired models, padded strings, custom/3rd-party gateways, and migrates kimi legacy previewAiModel when only minimax has a map key",
+          local.minimaxModel === "MiniMax-M3.1-Pro"
+          && local.kimiModel === "kimi-k2.7-code"
+          && local.customModel === "MiniMax-M2"
+          && local.previewAiModel === "MiniMax-M2"
+          && local.previewAiModelByProvider.minimax === "MiniMax-M3.1-Pro"
+          && local.previewAiModelByProvider.kimi === "kimi-k2.5"
+          && local.previewAiModelByProvider.openrouter === "MiniMax-M2"
+          && sync.minimaxModel === "  MiniMax-M2  "
+          && sync.kimiModel === "  kimi-k2.6  "
+          && sync.previewAiModel === "kimi-k3.1-pro"
+          && local[PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG] === true);
+      }
+      {
+        const local = { [PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG]: true, minimaxModel: "MiniMax-M2" };
+        const sync = { kimiModel: "kimi-k2.6" };
+        install(local, sync);
+        await pbpMigrateRetiredMinimaxKimiModels();
+        check("retired MiniMax/Kimi migration: one-shot flag prevents overwriting a later user edit",
+          local.minimaxModel === "MiniMax-M2" && sync.kimiModel === "kimi-k2.6");
+      }
+      {
+        const local = { minimaxModel: "MiniMax-M2" };
+        const sync = { kimiModel: "kimi-k2.6" };
+        install(local, sync);
+        const origSyncSet = globalThis.chrome.storage.sync.set;
+        let warned = false;
+        const origWarn = console.warn;
+        console.warn = (...args) => {
+          if (String(args[0] || "").includes("[ai-migration]")) warned = true;
+        };
+        try {
+          globalThis.chrome.storage.sync.set = () => Promise.reject(new Error("QUOTA_BYTES"));
+          await pbpMigrateRetiredMinimaxKimiModels();
+          const unsettledAfterFail = warned && local[PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG] !== true;
+          globalThis.chrome.storage.sync.set = origSyncSet;
+          await pbpMigrateRetiredMinimaxKimiModels();
+          check("retired MiniMax/Kimi migration: storage write failure logs warning and leaves flag unset for retry",
+            unsettledAfterFail
+            && sync.kimiModel === "kimi-k3.1-pro"
+            && local[PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG] === true);
+        } finally {
+          console.warn = origWarn;
+        }
+      }
+      {
+        const bgSource = await fetch("../background.js").then((r) => r.text());
+        check("retired MiniMax/Kimi migration: background.js invokes pbpMigrateRetiredMinimaxKimiModels at top level",
+          /^pbpMigrateRetiredMinimaxKimiModels\(\);$/m.test(bgSource));
       }
     } finally {
       globalThis.chrome = previousChrome;

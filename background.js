@@ -3033,6 +3033,12 @@ pbpScrubLegacySyncWebhookUrls();
 // retire by 2027-01-15 (.claude/expiring-items.md, flag _retiredDeepseekModelsDone).
 pbpMigrateRetiredDeepseekModels();
 
+// One-shot rewrite of retired official MiniMax M2/M2.5/M2.7 family (->
+// "MiniMax-M3.1-Flash") and Kimi "kimi-k2.6" (-> "kimi-k3.1-pro") model slugs.
+// Defined in shared.js; retire by 2027-01-15 (.claude/expiring-items.md, flag
+// _retiredMinimaxKimiModelsDone).
+pbpMigrateRetiredMinimaxKimiModels();
+
 // One-shot claim migration (roadmap #19, approved 2026-08-29): pre-existing
 // highlight items carry no owner field — claim them for the CURRENT Pinboard
 // account so the new per-account visibility rule has a defined baseline

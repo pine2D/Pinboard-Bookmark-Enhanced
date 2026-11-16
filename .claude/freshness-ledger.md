@@ -15,19 +15,19 @@
 | openai | gpt-5.4-nano | 未核实 | - |
 | deepseek | deepseek-flash | 2026-11-15 | 2026-11-15 真实核验纯文本与多模态图片输入（thinking disabled） |
 | qwen | qwen-flash | 未核实 | - |
-| minimax | MiniMax-M2 | 未核实 | - |
+| minimax | MiniMax-M3.1-Flash | 未核实 | - |
 | openrouter | openai/gpt-oss-20b | 未核实 | - |
 | groq | openai/gpt-oss-20b | 未核实 | - |
 | mistral | mistral-small-latest | 未核实 | - |
 | cohere | command-r7b-12-2024 | 未核实 | - |
 | siliconflow | Qwen/Qwen3-8B | 未核实 | - |
-| zhipu | glm-4.7-flash | 未核实 | - |
-| kimi | kimi-k2.6 | 未核实 | - |
-| ark | doubao-seed-2-0-mini-260428 | 未核实 | - |
+| zhipu | glm-5.3-flash | 未核实 | - |
+| kimi | kimi-k3.1-pro | 未核实 | - |
+| ark | doubao-seed-2-1-lite-260915 | 未核实 | - |
 | opencode | glm-5.3-flash | 未核实 | - |
-| commandcode | deepseek/deepseek-v4-flash | 未核实 | - |
+| commandcode | deepseek/deepseek-v4.1-flash | 未核实 | - |
 | gemini | gemini-3.5-flash-lite | 未核实 | - |
-| claude | claude-haiku-4-5 | 未核实 | - |
+| claude | claude-haiku-5-5 | 未核实 | - |
 | ollama | llama3.2 | 未核实 | - |
 
 ## 远端夹具
