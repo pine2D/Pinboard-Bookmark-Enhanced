@@ -559,6 +559,20 @@ async function runUpgradeRound(profileDir, oldStageDir, workExtDir, oldVersion, 
         '_retiredDeepseekModelsDone',
         '_retiredMinimaxKimiModelsDone',
       ]);
+      await chrome.storage.local.set({
+        minimaxModel: 'MiniMax-M2',
+        kimiModel: 'kimi-k2.6',
+        customModel: 'MiniMax-M2',
+        previewAiModelByProvider: {
+          minimax: 'MiniMax-M2.7',
+          kimi: 'kimi-k2.6',
+          openrouter: 'MiniMax-M2',
+        },
+      });
+      await chrome.storage.sync.set({
+        minimaxModel: 'MiniMax-M2.5',
+        kimiModel: 'kimi-k2.6',
+      });
     });
     const newMeta = materializeNewReleaseTree(workExtDir, oldVersion, mutateNewTree);
     const extPage = await launch.context.newPage();
@@ -647,12 +661,16 @@ async function verifyPostUpgrade(launch, snapshot, { label }) {
     });
     const syncCheck = await chrome.storage.sync.get(['optLang', 'optPrivateDefault', 'optReadlaterDefault', 'previewAiEnabled', 'previewSkimEnabled', 'aiProvider', 'tagSyncMode', 'personalLibraryAccount']);
     const localCheck = await chrome.storage.local.get(['pinboardToken', 'openaiApiKey', 'optSyncEnabled', 'syncApiKeys', 'bookmarkServiceActive']);
+    const migratedLocal = await chrome.storage.local.get(['minimaxModel', 'kimiModel', 'customModel', 'previewAiModelByProvider']);
+    const migratedSync = await chrome.storage.sync.get(['minimaxModel', 'kimiModel']);
     const offlineQueue = await readOfflineQueueWithIds();
     const owner = await pbpVocabCurrentOwner();
     const pointPayload = await pbpRestorePointRead(pointId, account);
     return {
       settings,
       syncCheck,
+      migratedLocal,
+      migratedSync,
       localKeysPresent: {
         hasPinboardToken: !!localCheck.pinboardToken,
         hasOpenaiApiKey: !!localCheck.openaiApiKey,
@@ -670,6 +688,14 @@ async function verifyPostUpgrade(launch, snapshot, { label }) {
   assertCategoryEqual(label, 'sync-settings', afterSw.syncCheck, snapshot.syncCheck);
   assertCategoryEqual(label, 'local-settings', afterSw.localKeysPresent, snapshot.localKeysPresent);
   assertCategoryEqual(label, 'offline-queue', afterSw.offlineQueue, snapshot.offlineQueue);
+  assert.equal(afterSw.migratedLocal?.minimaxModel, 'MiniMax-M3.1-Flash', `[${label}] retired local minimaxModel did not migrate`);
+  assert.equal(afterSw.migratedLocal?.kimiModel, 'kimi-k3.1-pro', `[${label}] retired local kimiModel did not migrate`);
+  assert.equal(afterSw.migratedLocal?.customModel, 'MiniMax-M2', `[${label}] customModel should remain untouched by retired-model migration`);
+  assert.equal(afterSw.migratedLocal?.previewAiModelByProvider?.minimax, 'MiniMax-M3.1-Flash', `[${label}] previewAiModelByProvider.minimax did not migrate`);
+  assert.equal(afterSw.migratedLocal?.previewAiModelByProvider?.kimi, 'kimi-k3.1-pro', `[${label}] previewAiModelByProvider.kimi did not migrate`);
+  assert.equal(afterSw.migratedLocal?.previewAiModelByProvider?.openrouter, 'MiniMax-M2', `[${label}] 3rd-party router map entry should remain untouched`);
+  assert.equal(afterSw.migratedSync?.minimaxModel, 'MiniMax-M3.1-Flash', `[${label}] retired sync minimaxModel did not migrate`);
+  assert.equal(afterSw.migratedSync?.kimiModel, 'kimi-k3.1-pro', `[${label}] retired sync kimiModel did not migrate`);
   assert.equal(afterSw.pointPayload?._vocabulary?.records?.length, snapshot.vocab.length, `[${label}] update restore point missing vocabulary`);
   for (const key of snapshot.hlKeys) {
     assert.equal(

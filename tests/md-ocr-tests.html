@@ -806,6 +806,20 @@ const DEEPSEEK_OCR_LIVE_20261115 = {
     assert(document.getElementById("rail-ocr-btn").hidden === false && document.getElementById("btn-import-ocr").hidden === false &&
       document.querySelector(".rail-ident").dataset.hasOcr === "1",
       "rail OCR buttons and .rail-ident[data-has-ocr=1] must activate once deepseekApiKey is configured");
+    // Verify real <=1000px narrow-drawer layout places .rail-toggle into column 5 when data-has-ocr="1"
+    const narrowFrame = document.createElement("iframe");
+    narrowFrame.style.cssText = "width:800px;height:200px;border:0;";
+    document.getElementById("fixture").appendChild(narrowFrame);
+    try {
+      const ndoc = narrowFrame.contentDocument;
+      ndoc.open();
+      ndoc.write('<!doctype html><html><head><link rel="stylesheet" href="../md-preview.css"></head><body class="rail-open"><aside class="rail"><div class="rail-ident" data-has-ocr="1"><h1 id="preview-title">Title</h1><button id="rail-ocr-btn" class="action-btn icon-only"></button><button id="rail-history-btn" class="action-btn icon-only"></button><button id="rail-settings-btn" class="action-btn icon-only"></button><button class="rail-toggle"></button><a id="preview-url" href="#">url</a></div></aside></body></html>');
+      ndoc.close();
+      await until(() => ndoc.defaultView.getComputedStyle(ndoc.querySelector(".rail-toggle")).gridColumnStart === "5",
+        "narrow <=1000px drawer must place .rail-toggle into grid column 5 when data-has-ocr=1");
+    } finally {
+      narrowFrame.remove();
+    }
     const upgradedPanel = document.querySelector("#rendered-view > .empty-state.es-ocr");
     assert(upgradedPanel && upgradedPanel.dataset.ocrMissingKey !== "1" &&
       !!document.getElementById("ocr-main-rich-layout") &&

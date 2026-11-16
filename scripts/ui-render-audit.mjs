@@ -7373,9 +7373,21 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // silently reach the checks below with a comfortable/wrong-theme face
       // (fix round 1: the render-audit run this task's own densityTier check
       // caught had exactly this drift going undetected here).
+      // Wait out options.js's 500ms debounced auto-save armed by clicking the
+      // Flexoki preset above before clearing #auto-save-status and restoring the
+      // theme; otherwise saveTimer fires mid-otherChecks and re-shows "Saved"
+      // (Codex QA P2).
+      await page.waitForFunction(() => {
+        const el = document.getElementById("auto-save-status");
+        const alertEl = document.getElementById("opt-global-alert");
+        return !el || el.classList.contains("saved") || el.classList.contains("hidden") || alertEl?.dataset?.autosaveFailure === "1";
+      }, null, { timeout: TIMEOUT_MS });
       const { themePresetKey: _ptPresetKey, optTheme: _ptMode } = themeToStorage(theme);
-      const _ptLanded = await page.evaluate(({ mode, presetKey }) => {
+      const _ptLanded = await page.evaluate(async ({ mode, presetKey }) => {
         if (typeof pbpApplyOptionsEarlyTheme !== "function") return null;
+        if (typeof chrome !== "undefined" && chrome.storage?.local) {
+          await chrome.storage.local.set({ themePresetKey: presetKey, optTheme: mode });
+        }
         pbpApplyOptionsEarlyTheme(mode, presetKey, true);
         const autoSaveEl = document.getElementById("auto-save-status");
         if (autoSaveEl) {

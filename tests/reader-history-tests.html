@@ -458,7 +458,9 @@ function buildEchoMessages(enTable) {
       if (msg && msg.type === "get_offline_queue") return { ok: true, queue: [], pause: null, account: "alice" };
       return undefined;
     });
-    await pbpReaderHistoryRecord({ url: "https://example.net/saved-read", title: "Saved Read", site: "example.net", openedAt: 3000, lastKey: "k-pop" });
+    for (let i = 0; i < 5; i++) {
+      await pbpReaderHistoryRecord({ url: `https://example.net/saved-read-${i}`, title: `Saved Read ${i}`, site: "example.net", openedAt: 3000 + i * 100, lastKey: `k-pop-${i}` });
+    }
 
     const rawPopupHtml = await (await fetch("../popup.html")).text();
     const injectedHtml = rawPopupHtml.replace(
@@ -484,6 +486,9 @@ function buildEchoMessages(enTable) {
         caretBtn && caretBtn.dataset.pbpHistoryBound === "1";
     }, "popup unsupported-url boot with bound history caret");
 
+    // Match Chrome's real action-popup sizing where viewport height wraps body height
+    frame.style.height = `${Math.ceil(fdoc.body.getBoundingClientRect().height)}px`;
+
     const mainBtn = fdoc.getElementById("jina-md-btn");
     const caretBtn = fdoc.getElementById("jina-md-history-btn");
     const ocrBtn = fdoc.getElementById("ocr-import-btn");
@@ -493,15 +498,17 @@ function buildEchoMessages(enTable) {
     caretBtn.click();
     await until(() => {
       const p = fdoc.getElementById("jina-md-history-pop");
-      return p && p.matches(":popover-open") && p.querySelectorAll(".pp-rh-item").length === 1;
-    }, "#jina-md-history-pop open with 1 row");
+      return p && p.matches(":popover-open") && p.querySelectorAll(".pp-rh-item").length === 5;
+    }, "#jina-md-history-pop open with 5 rows");
 
     const pop = fdoc.getElementById("jina-md-history-pop");
     assert(caretBtn.getAttribute("aria-expanded") === "true", "popup caret aria-expanded not true");
+    assert(parseFloat(fdoc.body.style.minHeight) > 250, "collapsed unsupported-url action popup must grow body.style.minHeight when multi-row history needs room");
     mock.userGesture();
     pop.querySelector(".pp-rh-open").click();
     await until(() => mock.callsOf("tabs.create").length === 1, "popup history click opened reader tab");
     assert(!pop.matches(":popover-open"), "popup history popover did not close after opening reader");
+    assert(fdoc.body.style.minHeight === "", "closing popup history must reset body.style.minHeight");
 
     // Reopen and Clear transitions to empty message
     caretBtn.click();
@@ -564,31 +571,64 @@ function buildEchoMessages(enTable) {
     assert(String(mock.callsOf("tabs.create")[0].args[0]?.url || "").endsWith("md-preview.html?import=ocr&incognito=1"),
       "#ocr-import-btn must preserve incognito=1 query");
 
-    // Simulate 4K Hi-DPI body zoom (1.22) + scrolled form + 18px classic Windows vertical scrollbar
-    fdoc.body.style.zoom = "1.22";
+    // Live storage.onChanged hides and re-shows #ocr-import-btn while popup stays open
+    await chrome.storage.local.set({ deepseekApiKey: "" });
+    await until(() => ocrBtn.hidden === true, "#ocr-import-btn must hide when deepseekApiKey is cleared");
+    await chrome.storage.local.set({ deepseekApiKey: obfuscateKey("sk-deepseek-popup-test-2") });
+    await until(() => ocrBtn.hidden === false, "#ocr-import-btn must re-show when deepseekApiKey is restored");
+
+    // Seed 25 history items to exercise maxHeight capping + internal list scrolling + delete reposition
+    for (let i = 0; i < 25; i++) {
+      await pbpReaderHistoryRecord({
+        url: `https://example.org/entry-${i}`,
+        title: `History Entry ${i} with a reasonably long title for layout`,
+        site: "example.org",
+        openedAt: 6000 + i * 1000,
+        lastKey: `k-many-${i}`,
+      });
+    }
+
     const spacer = fdoc.createElement("div");
     spacer.style.height = "300px";
     fdoc.querySelector(".form-body").appendChild(spacer);
     Object.defineProperty(fdoc.documentElement, "clientWidth", { configurable: true, get: () => 532 });
-    frame.contentWindow.scrollTo(0, 9999);
-
     const caretBtn = fdoc.getElementById("jina-md-history-btn");
     const splitEl = fdoc.getElementById("jina-md-split");
-    caretBtn.click();
-    await until(() => {
-      const p = fdoc.getElementById("jina-md-history-pop");
-      return p && p.matches(":popover-open") && p.querySelectorAll(".pp-rh-item").length === 2;
-    }, "#jina-md-history-pop open with 2 rows under zoom:1.22");
 
+    for (const zoomVal of ["1.12", "1.22"]) {
+      fdoc.body.style.zoom = zoomVal;
+      frame.contentWindow.scrollTo(0, 9999);
+      const existingPop = fdoc.getElementById("jina-md-history-pop");
+      if (existingPop && existingPop.matches(":popover-open")) existingPop.hidePopover();
+      caretBtn.click();
+      await until(() => {
+        const p = fdoc.getElementById("jina-md-history-pop");
+        return p && p.matches(":popover-open") && p.querySelectorAll(".pp-rh-item").length >= 20;
+      }, `#jina-md-history-pop open with capped list under zoom:${zoomVal}`);
+
+      const pop = fdoc.getElementById("jina-md-history-pop");
+      assert(!pop.querySelector("#pp-rh-import-ocr") && !pop.querySelector(".divider"),
+        "#jina-md-history-pop must not render OCR button or divider inside history popover");
+      const listEl = pop.querySelector(".pp-rh-list");
+      assert(listEl && listEl.scrollHeight > listEl.clientHeight,
+        `25-item .pp-rh-list must scroll internally under zoom:${zoomVal}`);
+      const popRect = pop.getBoundingClientRect();
+      const splitRect = splitEl.getBoundingClientRect();
+      assert(popRect.left >= 3.5 && popRect.right <= 532 - 3.5,
+        `popover horizontal bounds [${popRect.left.toFixed(1)}, ${popRect.right.toFixed(1)}] crossed scrollbar clientWidth 532 at zoom:${zoomVal}`);
+      assert(popRect.bottom <= splitRect.top - 3.5,
+        `popover bottom (${popRect.bottom.toFixed(1)}) overlapped #jina-md-split top (${splitRect.top.toFixed(1)}) under zoom:${zoomVal}`);
+    }
+
+    // Delete an item while open at zoom:1.22 and verify bounds still hold after reposition
     const pop = fdoc.getElementById("jina-md-history-pop");
-    assert(!pop.querySelector("#pp-rh-import-ocr") && !pop.querySelector(".divider"),
-      "#jina-md-history-pop must not render OCR button or divider inside history popover");
-    const popRect = pop.getBoundingClientRect();
-    const splitRect = splitEl.getBoundingClientRect();
-    assert(popRect.left >= 3.5 && popRect.right <= 532 - 3.5,
-      `popover horizontal bounds [${popRect.left.toFixed(1)}, ${popRect.right.toFixed(1)}] crossed scrollbar clientWidth 532`);
-    assert(popRect.bottom <= splitRect.top - 3.5,
-      `popover bottom (${popRect.bottom.toFixed(1)}) overlapped #jina-md-split top (${splitRect.top.toFixed(1)}) under zoom:1.22`);
+    const countBefore = pop.querySelectorAll(".pp-rh-item").length;
+    pop.querySelector(".pp-rh-remove").click();
+    await until(() => pop.querySelectorAll(".pp-rh-item").length === countBefore - 1, "row removed via .pp-rh-remove");
+    const afterDelRect = pop.getBoundingClientRect();
+    const afterSplitRect = splitEl.getBoundingClientRect();
+    assert(afterDelRect.right <= 532 - 3.5 && afterDelRect.bottom <= afterSplitRect.top - 3.5,
+      "popover bounds drifted after deleting a row under zoom:1.22");
 
     frame.remove();
     delete window.__pbpPopupFrameChrome;
