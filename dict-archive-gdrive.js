@@ -6,7 +6,7 @@ const PBP_DICT_ARCHIVE_DRIVE_PROTOCOL = Object.freeze({
   validBatchBody: (body, ownerHash) => pbpDictArchiveValidBatchBody(body, ownerHash)
 });
 function pbpCreateDictArchiveDriveSyncRunner(options = {}) {
-  return pbpCreateVocabDriveSyncRunner({ ...options,
-    client: options.client || pbpCreateVocabDriveClient({ protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL }),
+  return pbpCreateDriveSyncRunner({ ...options,
+    client: options.client || pbpCreateDriveClient({ protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL }),
     store: options.store || pbpCreateDictArchiveStore(), protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL });
 }

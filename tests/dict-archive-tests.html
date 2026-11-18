@@ -545,7 +545,7 @@ function driveFixture(options = {}) {
       entries: [REMOTE_V2_ENTRY, REMOTE_V3_SUPPLEMENT, REMOTE_V4_PATTERNS] })
     : JSON.stringify(options.version2 ? batchV2() : batch());
   const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
-  const client = pbpCreateVocabDriveClient({ protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL,
+  const client = pbpCreateDriveClient({ protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL,
     identity: { getAuthToken: async () => ({ token: "token:" + permissionId }), removeCachedAuthToken: async () => {} },
     beforeRequest: async () => enabled,
     fetchImpl: async (input, init) => {

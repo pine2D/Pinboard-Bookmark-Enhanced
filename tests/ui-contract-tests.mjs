@@ -1349,7 +1349,7 @@ check(!backgroundJs.includes('"webdav.js"'), "background.js still imports webdav
 check(backgroundJs.includes('"vocab-store.js"') && backgroundJs.includes('"vocab-gdrive.js"') &&
   backgroundJs.indexOf('"vocab-store.js"') < backgroundJs.indexOf('"vocab-gdrive.js"'),
   "background.js does not load the vocabulary sync dependencies in order");
-check(vocabGdriveJs.includes("function pbpCreateVocabDriveSyncRunner("),
+check(vocabGdriveJs.includes("function pbpCreateDriveSyncRunner("),
   "vocab-gdrive.js is missing the serialized sync runner");
 
 

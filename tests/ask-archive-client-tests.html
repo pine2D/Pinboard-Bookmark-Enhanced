@@ -16,8 +16,8 @@ function fixture() {
 }
 const input = () => ({ owner: OWNER, url: URL_VALUE, title: "Article", sessionId: SESSION, record: record() });
 test("client fixture excludes every Drive transport dependency", () => {
-  assert(typeof pbpVocabOwnerHash === "undefined" && typeof pbpCreateVocabDriveClient === "undefined" &&
-    typeof pbpCreateVocabDriveSyncRunner === "undefined");
+  assert(typeof pbpVocabOwnerHash === "undefined" && typeof pbpCreateDriveClient === "undefined" &&
+    typeof pbpCreateDriveSyncRunner === "undefined");
 });
 test("signed-in empty archive reads successfully without worker scripts", async () => {
   const store = fixture(); assert((await store.read({ owner: OWNER, url: URL_VALUE })).length === 0);

@@ -224,7 +224,7 @@ function driveFixture(options = {}) {
     mimeType: "application/json", appProperties: { pbpKind: "ask-history-batch", schema: "1", owner: HASH, device: "peer-a" } };
   const body = JSON.stringify(batch());
   const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
-  const client = pbpCreateVocabDriveClient({ protocol: PBP_ASK_ARCHIVE_DRIVE_PROTOCOL,
+  const client = pbpCreateDriveClient({ protocol: PBP_ASK_ARCHIVE_DRIVE_PROTOCOL,
     identity: { getAuthToken: async () => ({ token: "token:" + permissionId }), removeCachedAuthToken: async () => {} },
     beforeRequest: async () => enabled,
     fetchImpl: async (input, init) => {

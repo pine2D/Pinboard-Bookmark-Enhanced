@@ -6,7 +6,7 @@ const PBP_ASK_ARCHIVE_DRIVE_PROTOCOL = Object.freeze({
   validBatchBody: (body, ownerHash) => pbpAskArchiveValidBatchBody(body, ownerHash)
 });
 function pbpCreateAskArchiveDriveSyncRunner(options = {}) {
-  return pbpCreateVocabDriveSyncRunner({ ...options,
-    client: options.client || pbpCreateVocabDriveClient({ protocol: PBP_ASK_ARCHIVE_DRIVE_PROTOCOL }),
+  return pbpCreateDriveSyncRunner({ ...options,
+    client: options.client || pbpCreateDriveClient({ protocol: PBP_ASK_ARCHIVE_DRIVE_PROTOCOL }),
     store: options.store || pbpCreateAskArchiveStore(), protocol: PBP_ASK_ARCHIVE_DRIVE_PROTOCOL });
 }

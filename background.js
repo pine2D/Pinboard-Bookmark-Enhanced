@@ -3310,18 +3310,18 @@ async function pbpDriveEnabled() {
 }
 
 const vocabDriveClient = PBP_VOCAB_DRIVE_CAPABLE
-  ? pbpCreateVocabDriveClient({ beforeRequest: pbpDriveEnabled }) : null;
+  ? pbpCreateDriveClient({ beforeRequest: pbpDriveEnabled }) : null;
 const notesDriveClient = PBP_VOCAB_DRIVE_CAPABLE
-  ? pbpCreateVocabDriveClient({ protocol: PBP_NOTES_DRIVE_PROTOCOL,
+  ? pbpCreateDriveClient({ protocol: PBP_NOTES_DRIVE_PROTOCOL,
       beforeRequest: pbpDriveEnabled }) : null;
 const dictArchiveDriveClient = PBP_VOCAB_DRIVE_CAPABLE
-  ? pbpCreateVocabDriveClient({ protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL,
+  ? pbpCreateDriveClient({ protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL,
       beforeRequest: pbpDriveEnabled }) : null;
 const askArchiveDriveClient = PBP_VOCAB_DRIVE_CAPABLE
-  ? pbpCreateVocabDriveClient({ protocol: PBP_ASK_ARCHIVE_DRIVE_PROTOCOL,
+  ? pbpCreateDriveClient({ protocol: PBP_ASK_ARCHIVE_DRIVE_PROTOCOL,
       beforeRequest: pbpDriveEnabled }) : null;
 // Used only by the explicit Connect action, which authorizes before any round.
-const driveConnectClient = PBP_VOCAB_DRIVE_CAPABLE ? pbpCreateVocabDriveClient() : null;
+const driveConnectClient = PBP_VOCAB_DRIVE_CAPABLE ? pbpCreateDriveClient() : null;
 async function pbpNotesDriveCurrentOwner({ requireDriveAccount = true, dataset = "notes" } = {}) {
   if (!await pbpDriveEnabled()) return "";
   const session = driveSession.type === dataset ? driveSession : null;
@@ -3427,7 +3427,7 @@ const askArchiveDriveStore = PBP_VOCAB_DRIVE_CAPABLE
       }
     }) : null;
 const runVocabDriveSync = PBP_VOCAB_DRIVE_CAPABLE
-  ? pbpCreateVocabDriveSyncRunner({
+  ? pbpCreateDriveSyncRunner({
       client: vocabDriveClient,
       getCurrentLibraryAuth,
       libraryAuthIsCurrent: pbpLibraryAuthIsCurrent,

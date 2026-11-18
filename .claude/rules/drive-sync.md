@@ -20,6 +20,8 @@ paths:
 
 ## 共享连接层（原在《高亮与笔记同步不变量》节）
 
+`vocab-gdrive.js` 提供四类资料共用的传输客户端 `pbpCreateDriveClient` 和同步执行器 `pbpCreateDriveSyncRunner`。生词使用默认协议与存储，另外三类的 `*-gdrive.js` 传入各自的协议和存储。设置页的历史消息名 `vocabDriveSyncNow` 仍由 `background.js` 接收，触发整轮资料库同步。
+
 - 四类数据（生词、高亮笔记、AI 词条归档、Ask 归档）共享本机 Drive **连接层**：每个 owner 一份连接状态 `driveConnState:<ownerHash>`（local，`{ lastError, authAttempts, retryAttempt, retryAt, blocked, updatedAt }`）、一条串行队列 `queueDriveSync`（每轮按生词、笔记、AI 词条归档、Ask 归档顺序执行；任一数据集以连接层错误结束时后续数据集本轮不发 Drive 请求）、单一 `driveScopeEpoch`、三个 alarm `drive-sync-dirty` / `drive-sync-periodic` / `drive-sync-retry` 和一条通知（每轮至多一条，手动立即同步与连接不弹）。runner 遇到连接层码只写共享记录，不写自己的 preflight 和账号行；`authAttempts` 只统计 `auth`，任一非 `auth` 结果清零；之前已累计 5 次 auth 退避（1+2+4+8+16 分钟，约 31 分钟）后，第 6 次 auth 失败才转 blocked；连接层退避未到期时四类都不发网络请求。openSession 成功即把共享记录的 `lastError` / `retryAt` 置空、`authAttempts` 清零（保留 `retryAttempt`，让时好时坏的链路继续拉长退避），整轮成功删除记录；读共享记录失败按无记录处理（`console.warn` 留痕，不升级为 `local_store` blocked）。整轮中途发现 `driveScopeEpoch` 变化时先读连接标记：已断开返回 `not_connected`（不渲染），仍连接才是 `account_changed`。编排层写入或清零 `driveConnState` 前原子重读个人资料库身份（`getCurrentLibraryAuth` + `pbpLibraryAuthIsCurrent`），owner 与 `driveScopeEpoch` 都与本轮开始时一致才写，轮外写入一律丢弃；状态组装只从共享记录读连接层结论，preflight 与账号行里遗留的连接层码视为不存在。`force`（立即同步 / 连接）同时清除共享连接状态、四类数据层 blocked 以及四类账号行的 `lastError` / `retryAt`（游标不动）。alarm 由编排层每轮结束后统一调和（`pbpReconcileDriveAlarms`），runner 不直接 create/clear。**数据层**各自独立：四套 wire 协议（`vocab-batch` / `notes-batch` / `dict-entry-batch` / `ask-history-batch`）、游标、store 与数据层告警；一类数据层 blocked 不阻断另一类，也不清除共享 periodic / dirty。启用判定只有 `pbpDriveEnabled()`（已连接且可选权限仍在）：连接即同步生词、高亮笔记、完整 AI 词条和补充及 Ask 对话，断开即停止，没有按类型的开关。
 - Google 账号无法在线核验时保留原网络或认证错误，不能当作账号切换；同一 token 命中身份缓存视为已核验（见下文《Drive 身份缓存》）。退避状态仅需重新核验 个人资料库 owner，成功数据写入仍需核验 Drive 账号。
 

@@ -1,6 +1,7 @@
 const PBP_VOCAB_BATCH_SCHEMA = 2;
 const PBP_VOCAB_BATCH_MAX_BYTES = 4 * 1024 * 1024;
-// The transport is shared; each dataset owns its wire validation and identity.
+// The client and sync runner serve all four library datasets. Vocabulary is
+// their default protocol and store; the other *-gdrive.js files supply their own.
 const PBP_VOCAB_DRIVE_PROTOCOL = Object.freeze({
   kind: "vocab-batch", schema: PBP_VOCAB_BATCH_SCHEMA, readSchemas: [1, 2], filePrefix: "pbp-vocab",
   validateEvent: (event) => pbpVocabValidateEvent(event),
@@ -222,7 +223,7 @@ function _pbpVocabDriveRememberIdentity(token, identity) {
   }
 }
 
-function pbpCreateVocabDriveClient({
+function pbpCreateDriveClient({
   fetchImpl = fetch,
   identity = null,
   protocol = PBP_VOCAB_DRIVE_PROTOCOL,
@@ -791,8 +792,8 @@ function _pbpVocabDriveDefaultStore() {
   };
 }
 
-function pbpCreateVocabDriveSyncRunner({
-  client = pbpCreateVocabDriveClient(),
+function pbpCreateDriveSyncRunner({
+  client = pbpCreateDriveClient(),
   store = _pbpVocabDriveDefaultStore(),
   getCurrentLibraryAuth,
   libraryAuthIsCurrent,

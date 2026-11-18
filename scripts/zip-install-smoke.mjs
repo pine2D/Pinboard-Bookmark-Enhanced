@@ -263,7 +263,7 @@ sw.on('console', msg => {
 await new Promise(r => setTimeout(r, 1500));
 const vocabRuntime = await sw.evaluate(() => ({
   store: typeof pbpVocabGetSyncMeta === 'function',
-  drive: typeof pbpCreateVocabDriveSyncRunner === 'function',
+  drive: typeof pbpCreateDriveSyncRunner === 'function',
 }));
 if (!vocabRuntime.store || !vocabRuntime.drive) {
   console.error(`[zip-smoke] FAIL: vocabulary runtime imports unavailable: ${JSON.stringify(vocabRuntime)}`);

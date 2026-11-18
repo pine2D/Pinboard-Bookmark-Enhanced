@@ -68,7 +68,7 @@ function fixture(ownerHash, options = {}) {
     return { token };
   }, async removeCachedAuthToken(details) { issued.delete(details.token); } };
   const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
-  const client = pbpCreateVocabDriveClient({ identity, protocol: PBP_NOTES_DRIVE_PROTOCOL,
+  const client = pbpCreateDriveClient({ identity, protocol: PBP_NOTES_DRIVE_PROTOCOL,
     beforeRequest: async () => {
       if (switchInUploadGate) { await Promise.resolve(); owner = "acct_bob"; switchInUploadGate = false; }
       return enabled;
@@ -289,7 +289,7 @@ function fixture(ownerHash, options = {}) {
     const run = async (response) => {
       let n = 0;
       const identity = { async getAuthToken() { return { token: "t" }; }, async removeCachedAuthToken() {} };
-      const client = pbpCreateVocabDriveClient({ identity, protocol,
+      const client = pbpCreateDriveClient({ identity, protocol,
         fetchImpl: async () => ++n === 1 ? new Response(null, { status: 409 })
           : new Response(JSON.stringify(response), { status: 200, headers: { "Content-Type": "application/json" } }) });
       return client.upload(expected, body);

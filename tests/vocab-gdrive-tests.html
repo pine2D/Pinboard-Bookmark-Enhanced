@@ -305,7 +305,7 @@ function syncHarness(options = {}) {
       return options.uploadResult === undefined ? { ok: true, fileId: meta.id } : options.uploadResult;
     }
   };
-  const runner = () => pbpCreateVocabDriveSyncRunner({
+  const runner = () => pbpCreateDriveSyncRunner({
     ...(options.protocol ? { protocol: options.protocol } : {}),
     ...(options.isEnabled ? { isEnabled: options.isEnabled } : {}),
     ...(options.getCurrentPermissionId ? { getCurrentPermissionId: options.getCurrentPermissionId } : {}),
@@ -563,7 +563,7 @@ function syncHarness(options = {}) {
 
   await asyncCheck("Drive auth is noninteractive by default", async () => {
     const identity = identityFixture();
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity,
       fetchImpl: async () => jsonResponse({ user: { permissionId: "perm-a" } })
     });
@@ -573,7 +573,7 @@ function syncHarness(options = {}) {
 
   await asyncCheck("interactive auth is confined to explicit connect", async () => {
     const identity = identityFixture(["connect-token", "background-token"]);
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity,
       fetchImpl: async (url) => String(url).includes("generateIds")
         ? jsonResponse({ ids: ["generated-id"] })
@@ -587,7 +587,7 @@ function syncHarness(options = {}) {
 
   await asyncCheck("about.get requests exact minimal fields", async () => {
     const calls = [];
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async (url, init) => {
         calls.push({ url: String(url), init });
@@ -606,7 +606,7 @@ function syncHarness(options = {}) {
   });
 
   await asyncCheck("about.get fails closed without permissionId", async () => {
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => jsonResponse({ user: { emailAddress: "a@example.test" } })
     });
@@ -617,7 +617,7 @@ function syncHarness(options = {}) {
   await asyncCheck("first 401 evicts token and retries exactly once", async () => {
     const identity = identityFixture(["old-token", "new-token"]);
     let fetches = 0;
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity,
       fetchImpl: async () => ++fetches === 1
         ? new Response(null, { status: 401 })
@@ -626,7 +626,7 @@ function syncHarness(options = {}) {
     const result = await client.about();
     const sessionIdentity = identityFixture(["session-a", "session-b"]);
     const sessionFetches = [];
-    const sessionClient = pbpCreateVocabDriveClient({
+    const sessionClient = pbpCreateDriveClient({
       identity: sessionIdentity,
       fetchImpl: async (url, init) => {
         const call = {
@@ -646,7 +646,7 @@ function syncHarness(options = {}) {
     const crossed = session.ok ? await session.generateId() : session;
     const stableIdentity = identityFixture(["stable-a", "stable-a2"]);
     const stableFetches = [];
-    const stableClient = pbpCreateVocabDriveClient({
+    const stableClient = pbpCreateDriveClient({
       identity: stableIdentity,
       fetchImpl: async (url, init) => {
         const call = {
@@ -696,7 +696,7 @@ function syncHarness(options = {}) {
       delete globalThis.chrome;
       let client;
       try {
-        client = pbpCreateVocabDriveClient({
+        client = pbpCreateDriveClient({
           fetchImpl: async () => jsonResponse({ user: { permissionId: "perm-late" } })
         });
       } catch (_) {
@@ -721,7 +721,7 @@ function syncHarness(options = {}) {
       async getAuthToken() { return { token: "" }; },
       async removeCachedAuthToken() {}
     });
-    const open = (identity, interactive) => pbpCreateVocabDriveClient({
+    const open = (identity, interactive) => pbpCreateDriveClient({
       identity, fetchImpl: async () => new Response(null, { status: 500 })
     }).openSession(interactive);
     const silent = await open(rejecting(), false);
@@ -774,7 +774,7 @@ function syncHarness(options = {}) {
     });
     let fetches = 0;
     const make = (identity, fetchImpl = async () => { fetches++; return jsonResponse({}); }) =>
-      pbpCreateVocabDriveClient({ identity, fetchImpl });
+      pbpCreateDriveClient({ identity, fetchImpl });
     const entries = [
       await make(offline()).about(), await make(offline()).connect(),
       await make(offline()).openSession(false), await make(offline()).generateId()
@@ -816,7 +816,7 @@ function syncHarness(options = {}) {
   await asyncCheck("client.about() answers a repeated token from the identity cache", async () => {
     const identity = identityFixture(["token-a", "token-a", "token-b", "token-a"]);
     const fetched = [];
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity,
       fetchImpl: async (url, init) => {
         fetched.push(init.headers.Authorization);
@@ -846,16 +846,16 @@ function syncHarness(options = {}) {
       fetches++;
       return jsonResponse({ user: { permissionId: "perm-a" } });
     };
-    const first = await pbpCreateVocabDriveClient({ identity: identityFixture(), fetchImpl }).about();
-    const second = await pbpCreateVocabDriveClient({ identity: identityFixture(), fetchImpl }).about();
-    // Simplest miss: a cache created inside pbpCreateVocabDriveClient.
+    const first = await pbpCreateDriveClient({ identity: identityFixture(), fetchImpl }).about();
+    const second = await pbpCreateDriveClient({ identity: identityFixture(), fetchImpl }).about();
+    // Simplest miss: a cache created inside pbpCreateDriveClient.
     return first.ok && second.ok && second.permissionId === "perm-a" && fetches === 1;
   });
 
   await asyncCheck("openSession, session.about() and connect() always ask Drive and refresh the cache", async () => {
     const paths = [];
     let answer = "perm-a";
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async (url) => {
         paths.push(new URL(url).pathname);
@@ -887,7 +887,7 @@ function syncHarness(options = {}) {
     const removed = [];
     const fetched = [];
     let rejectA = false;
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: {
         async getAuthToken() { return { token: next }; },
         async removeCachedAuthToken(details) { removed.push(details.token); next = "token-b"; }
@@ -910,7 +910,7 @@ function syncHarness(options = {}) {
     const renewedHit = await client.about();
     const sessionFetched = [];
     let sessionNext = "session-a";
-    const sessionClient = pbpCreateVocabDriveClient({
+    const sessionClient = pbpCreateDriveClient({
       identity: {
         async getAuthToken() { return { token: sessionNext }; },
         async removeCachedAuthToken() { sessionNext = "session-b"; }
@@ -958,7 +958,7 @@ function syncHarness(options = {}) {
   await asyncCheck("pbpVocabDriveForgetIdentity drops one token or all, and the cache keeps two", async () => {
     let next = "token-a";
     const fetched = [];
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: { async getAuthToken() { return { token: next }; }, async removeCachedAuthToken() {} },
       fetchImpl: async (url, init) => {
         const token = init.headers.Authorization.slice("Bearer ".length);
@@ -984,7 +984,7 @@ function syncHarness(options = {}) {
   await asyncCheck("a cached identity honours the scope gate, is a copy and never carries the token", async () => {
     let enabled = true;
     let fetches = 0;
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(["secret-token-a"]),
       beforeRequest: async () => enabled,
       fetchImpl: async (url) => {
@@ -1012,7 +1012,7 @@ function syncHarness(options = {}) {
   await asyncCheck("an interactive request renews a 401 interactively", async () => {
     const identity = identityFixture(["old-token", "new-token"]);
     let fetches = 0;
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity,
       fetchImpl: async () => ++fetches === 1
         ? new Response(null, { status: 401 })
@@ -1020,7 +1020,7 @@ function syncHarness(options = {}) {
     });
     const connected = await client.connect();
     let mints = 0;
-    const declined = pbpCreateVocabDriveClient({
+    const declined = pbpCreateDriveClient({
       identity: {
         async getAuthToken() {
           if (mints++ === 0) return { token: "old-token" };
@@ -1042,7 +1042,7 @@ function syncHarness(options = {}) {
   await asyncCheck("second 401 stops without a third request", async () => {
     const identity = identityFixture(["old-token", "new-token"]);
     let fetches = 0;
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity,
       fetchImpl: async () => {
         fetches++;
@@ -1066,11 +1066,11 @@ function syncHarness(options = {}) {
     let inSession;
     console.warn = (...args) => { warnings.push(args.map((value) => String(value)).join(" ")); };
     try {
-      plain = await pbpCreateVocabDriveClient({
+      plain = await pbpCreateDriveClient({
         identity: failingRenew(),
         fetchImpl: async () => new Response(null, { status: 401 })
       }).about();
-      const sessionClient = pbpCreateVocabDriveClient({
+      const sessionClient = pbpCreateDriveClient({
         identity: failingRenew(),
         fetchImpl: async (url) => new URL(url).pathname === "/drive/v3/about"
           ? jsonResponse({ user: { permissionId: "perm-a" } })
@@ -1091,7 +1091,7 @@ function syncHarness(options = {}) {
   await asyncCheck("403/404 are permanent and oversized headers fail before reading", async () => {
     const permanent = [];
     for (const status of [403, 404]) {
-      const client = pbpCreateVocabDriveClient({
+      const client = pbpCreateDriveClient({
         identity: identityFixture(),
         fetchImpl: async () => new Response("private-response-body", { status })
       });
@@ -1099,7 +1099,7 @@ function syncHarness(options = {}) {
     }
     let read = false;
     let cancelled = false;
-    const oversized = pbpCreateVocabDriveClient({
+    const oversized = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => ({
         ok: true,
@@ -1117,7 +1117,7 @@ function syncHarness(options = {}) {
       "rateLimitExceeded", "userRateLimitExceeded",
       "insufficientPermissions", "accessNotConfigured"
     ]) {
-      const reasonClient = pbpCreateVocabDriveClient({
+      const reasonClient = pbpCreateDriveClient({
         identity: identityFixture(),
         fetchImpl: async () => jsonResponse({
           error: { errors: [{ reason }], message: "private remote detail" }
@@ -1178,13 +1178,13 @@ function syncHarness(options = {}) {
   });
 
   await asyncCheck("429 is retryable and streamed overflow cancels", async () => {
-    const rateLimited = pbpCreateVocabDriveClient({
+    const rateLimited = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => new Response("private-response-body", { status: 429 })
     });
     const rateResult = await rateLimited.about();
     let cancelled = false;
-    const overflow = pbpCreateVocabDriveClient({
+    const overflow = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => readerResponse(
         [new Uint8Array(TEST_MAX_BYTES), new Uint8Array(1)],
@@ -1197,18 +1197,18 @@ function syncHarness(options = {}) {
   });
 
   await asyncCheck("5xx is retryable and absent Content-Length can succeed", async () => {
-    const serverError = pbpCreateVocabDriveClient({
+    const serverError = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => new Response("private-response-body", { status: 503 })
     });
     const errorResult = await serverError.about();
-    const downloadClient = pbpCreateVocabDriveClient({
+    const downloadClient = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => readerResponse([new TextEncoder().encode("é-small")])
     });
     const download = await downloadClient.download(DRIVE_FILE_ID);
     let invalidCancelled = false;
-    const invalidUtf8 = pbpCreateVocabDriveClient({
+    const invalidUtf8 = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => readerResponse(
         [new Uint8Array([0xc3, 0x28])],
@@ -1223,18 +1223,18 @@ function syncHarness(options = {}) {
   });
 
   await asyncCheck("network failure is retryable and exact 4 MiB succeeds", async () => {
-    const network = pbpCreateVocabDriveClient({
+    const network = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => { throw new Error("socket private body"); }
     });
     const errorResult = await network.about();
-    const exact = pbpCreateVocabDriveClient({
+    const exact = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => readerResponse([new Uint8Array(TEST_MAX_BYTES).fill(97)])
     });
     const download = await exact.download(DRIVE_FILE_ID);
     let readerCancelled = false;
-    const readerFailure = pbpCreateVocabDriveClient({
+    const readerFailure = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => ({
         ok: true,
@@ -1259,7 +1259,7 @@ function syncHarness(options = {}) {
 
   await asyncCheck("request timeout aborts a fetch that never returns headers", async () => {
     let signal = null;
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(),
       timeoutMs: 1,
       fetchImpl: (_url, init) => new Promise((_resolve, reject) => {
@@ -1274,7 +1274,7 @@ function syncHarness(options = {}) {
 
   await asyncCheck("request timeout aborts a stalled response body read", async () => {
     let signal = null;
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(),
       timeoutMs: 1,
       fetchImpl: async (_url, init) => {
@@ -1293,7 +1293,7 @@ function syncHarness(options = {}) {
 
   await asyncCheck("invalid timeout input falls back to a safe live signal", async () => {
     let signal = null;
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(),
       timeoutMs: 0.5,
       fetchImpl: async (_url, init) => {
@@ -1319,7 +1319,7 @@ function syncHarness(options = {}) {
       });
       return new Response("body-bytes");
     };
-    const client = () => pbpCreateVocabDriveClient({
+    const client = () => pbpCreateDriveClient({
       identity: identityFixture(), timeoutMs: 60, fetchImpl: slow(200)
     });
     const meta = await client().about();
@@ -1331,7 +1331,7 @@ function syncHarness(options = {}) {
   await asyncCheck("generateIds uses exact one-ID appDataFolder query", async () => {
     const calls = [];
     const opaqueId = "opaque/+? id";
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async (url, init) => {
         calls.push({ url: String(url), init });
@@ -1350,7 +1350,7 @@ function syncHarness(options = {}) {
     const calls = [];
     const meta = metadata();
     const frozen = bodyString([live("Frozen", "en", { note: "exact-frozen-body" })]);
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async (url, init) => {
         calls.push({ url: String(url), init });
@@ -1374,7 +1374,7 @@ function syncHarness(options = {}) {
     const frozen = bodyString([live("Statuses")]);
     const results = [];
     for (const status of [200, 201]) {
-      const client = pbpCreateVocabDriveClient({
+      const client = pbpCreateDriveClient({
         identity: identityFixture(),
         fetchImpl: async () => jsonResponse({ id: DRIVE_FILE_ID }, status)
       });
@@ -1400,7 +1400,7 @@ function syncHarness(options = {}) {
       }
     };
     const calls = [];
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(["upload-token", "metadata-token"]),
       fetchImpl: async (url, init) => {
         calls.push({ url: String(url), init });
@@ -1411,7 +1411,7 @@ function syncHarness(options = {}) {
     });
     const result = await client.upload(meta, bodyString([live("Retry")]));
     let networkFetches = 0;
-    const networkClient = pbpCreateVocabDriveClient({
+    const networkClient = pbpCreateDriveClient({
       identity: identityFixture(["upload-token", "metadata-token"]),
       fetchImpl: async () => {
         if (++networkFetches === 1) return new Response(null, { status: 409 });
@@ -1421,7 +1421,7 @@ function syncHarness(options = {}) {
     const network = await networkClient.upload(meta, bodyString([live("Network Retry")]));
     const sessionIdentity = identityFixture(["session-token"]);
     const sessionCalls = [];
-    const sessionClient = pbpCreateVocabDriveClient({
+    const sessionClient = pbpCreateDriveClient({
       identity: sessionIdentity,
       fetchImpl: async (url, init) => {
         const path = new URL(url).pathname;
@@ -1467,7 +1467,7 @@ function syncHarness(options = {}) {
       }
     };
     let fetches = 0;
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(["upload-token", "metadata-token"]),
       fetchImpl: async () => ++fetches === 1
         ? new Response(null, { status: 409 })
@@ -1475,7 +1475,7 @@ function syncHarness(options = {}) {
     });
     const result = await client.upload(expected, bodyString([live("Collision")]));
     let serverFetches = 0;
-    const serverClient = pbpCreateVocabDriveClient({
+    const serverClient = pbpCreateDriveClient({
       identity: identityFixture(["upload-token", "metadata-token"]),
       fetchImpl: async () => ++serverFetches === 1
         ? new Response(null, { status: 409 })
@@ -1501,7 +1501,7 @@ function syncHarness(options = {}) {
     });
     const upload409 = async (response) => {
       let fetches = 0;
-      const client = pbpCreateVocabDriveClient({
+      const client = pbpCreateDriveClient({
         identity: identityFixture(["upload-token", "metadata-token"]),
         fetchImpl: async () => ++fetches === 1 ? new Response(null, { status: 409 }) : jsonResponse(response)
       });
@@ -1547,7 +1547,7 @@ function syncHarness(options = {}) {
   await asyncCheck("files.list carries filters, minimal fields and page tokens", async () => {
     const calls = [];
     const nextToken = "next/+? &=token";
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(["page-a", "page-b"]),
       fetchImpl: async (url) => {
         calls.push(String(url));
@@ -1558,7 +1558,7 @@ function syncHarness(options = {}) {
     });
     const first = await client.listFiles(OWNER_HASH);
     const second = await client.listFiles(OWNER_HASH, first.nextPageToken);
-    const listResult = async (payload) => pbpCreateVocabDriveClient({
+    const listResult = async (payload) => pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => jsonResponse(payload)
     }).listFiles(OWNER_HASH);
@@ -1592,7 +1592,7 @@ function syncHarness(options = {}) {
     const pageToken = "start/+? &=token";
     const nextPageToken = "next/+? &=token";
     const newStartPageToken = "new/+? &=token";
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(["start-token", "list-token", "end-token"]),
       fetchImpl: async (url) => {
         calls.push(String(url));
@@ -1607,7 +1607,7 @@ function syncHarness(options = {}) {
     const start = await client.getStartPageToken();
     const middle = await client.listChanges(start.pageToken);
     const end = await client.listChanges(middle.nextPageToken);
-    const changesResult = async (payload) => pbpCreateVocabDriveClient({
+    const changesResult = async (payload) => pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async () => jsonResponse(payload)
     }).listChanges(pageToken);
@@ -1643,16 +1643,16 @@ function syncHarness(options = {}) {
       "secret-auth-token", "Défense", "private note", "secret gloss",
       "https://private.example/article", "private-response-body"
     ];
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture([secrets[0]]),
       fetchImpl: async () => new Response(secrets.slice(1).join(" "), { status: 503 })
     });
     const result = await client.download("opaque-secret-file-id");
-    const invalidJson = await pbpCreateVocabDriveClient({
+    const invalidJson = await pbpCreateDriveClient({
       identity: identityFixture([secrets[0]]),
       fetchImpl: async () => new Response(secrets.slice(1).join(" "), { status: 200 })
     }).about();
-    const readerError = await pbpCreateVocabDriveClient({
+    const readerError = await pbpCreateDriveClient({
       identity: identityFixture([secrets[0]]),
       fetchImpl: async () => ({
         ok: true,
@@ -2611,7 +2611,7 @@ function syncHarness(options = {}) {
       }]
     });
     const uploads = [];
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: identityFixture(),
       fetchImpl: async (url, init) => {
         const path = new URL(url).pathname;
@@ -2629,7 +2629,7 @@ function syncHarness(options = {}) {
         throw new Error("unexpected fixture request");
       }
     });
-    const runner = pbpCreateVocabDriveSyncRunner({
+    const runner = pbpCreateDriveSyncRunner({
       client,
       getCurrentLibraryAuth: async () => ({ account: "alias-runner" }),
       libraryAuthIsCurrent: () => true,
@@ -2735,7 +2735,7 @@ function syncHarness(options = {}) {
   });
   await asyncCheck("HTTP session checks the selected scope after awaiting token mint", async () => {
     let enabled = true, fetches = 0;
-    const client = pbpCreateVocabDriveClient({
+    const client = pbpCreateDriveClient({
       identity: { async getAuthToken() { enabled = false; return { token: "token-a" }; } },
       fetchImpl: async () => { fetches++; return jsonResponse({ user: { permissionId: "perm-a" } }); }
     });
@@ -2771,7 +2771,7 @@ function syncHarness(options = {}) {
         generateId:async()=>({ok:true,fileId:"cycle-"+(++nextId)}),
         upload:async(metadata,body)=>{uploads[bound].push(...JSON.parse(body).entries);return {ok:true};}};
     }};
-    const runner = pbpCreateVocabDriveSyncRunner({client,hashOwner:async()=>ownerHash,
+    const runner = pbpCreateDriveSyncRunner({client,hashOwner:async()=>ownerHash,
       getCurrentLibraryAuth:async()=>({account:"drive-cycle"}),libraryAuthIsCurrent:()=>true});
     await pbpVocabSaveWord(owner,{term:"Haus",language:"de",gloss:"house"});
     if (!(await runner()).ok) return false;
@@ -2789,7 +2789,7 @@ function syncHarness(options = {}) {
   });
   await asyncCheck("v2 writes are isolated from v1 while list queries continue reading both", async () => {
     let query = "";
-    const client = pbpCreateVocabDriveClient({identity:identityFixture(),fetchImpl:async url=>{
+    const client = pbpCreateDriveClient({identity:identityFixture(),fetchImpl:async url=>{
       query = new URL(url).searchParams.get("q"); return jsonResponse({files:[]});
     }});
     const listed = await client.listFiles(OWNER_HASH);
@@ -2829,7 +2829,7 @@ function syncHarness(options = {}) {
     // Read-side metadata uses the opaque folder ID, not appDataFolder.
     const oldMeta = {id:"original-v1-id",name:"pbp-vocab-original-v1-id.json",parents:["opaque-old-folder"],
       mimeType:"application/json",appProperties:{pbpKind:"vocab-batch",schema:"1",owner:ownerHash,device:"old-device"}};
-    const client = pbpCreateVocabDriveClient({identity:identityFixture(),fetchImpl:async(url,init)=>{
+    const client = pbpCreateDriveClient({identity:identityFixture(),fetchImpl:async(url,init)=>{
       const path = new URL(url).pathname; requests.push(init.method+" "+path);
       if (path.endsWith("/about")) return jsonResponse({user:{permissionId}});
       if (path.endsWith("/changes/startPageToken")) return jsonResponse({startPageToken:"pending-start"});
@@ -2839,7 +2839,7 @@ function syncHarness(options = {}) {
       if (path.endsWith("/original-v1-id")) return jsonResponse(oldMeta);
       throw new Error("unexpected legacy fixture request");
     }});
-    const runner = pbpCreateVocabDriveSyncRunner({client,getCurrentLibraryAuth:async()=>({account:"v1-pending"}),
+    const runner = pbpCreateDriveSyncRunner({client,getCurrentLibraryAuth:async()=>({account:"v1-pending"}),
       libraryAuthIsCurrent:()=>true,hashOwner:async()=>ownerHash});
     const result = await runner();
     return result.ok && sent.length === 1 && sent[0].includes(oldBody) &&
@@ -2873,7 +2873,7 @@ function syncHarness(options = {}) {
         nextPageToken:null,newStartPageToken:"next"}),download:async id=>({ok:true,body:files.get(id)}),
       generateId:async()=>({ok:true,fileId:"frontier-upload"}),
       upload:async(meta,body)=>{uploads.push(JSON.parse(body));return {ok:true};}})};
-    const runner=pbpCreateVocabDriveSyncRunner({client,getCurrentLibraryAuth:async()=>({account:"frontier-runner"}),
+    const runner=pbpCreateDriveSyncRunner({client,getCurrentLibraryAuth:async()=>({account:"frontier-runner"}),
       libraryAuthIsCurrent:()=>true,hashOwner:async()=>ownerHash});
     const first=await runner(),second=await runner();
     const words=await pbpVocabAll(owner),preflight=await pbpVocabGetPreflightState(ownerHash);

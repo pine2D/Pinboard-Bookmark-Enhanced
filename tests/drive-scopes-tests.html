@@ -43,8 +43,8 @@ function harness(source, seed = {}, results = {}) {
     } },
     PBP_NOTES_DRIVE_PROTOCOL: {}, PBP_DICT_ARCHIVE_DRIVE_PROTOCOL: {}, PBP_ASK_ARCHIVE_DRIVE_PROTOCOL: {},
     pbpVocabDriveOAuthActive: () => true, pbpCreateRecoveringTail: results.createTail || (() => async (fn) => fn()),
-    pbpCreateVocabDriveClient: results.createClient || (() => client),
-    pbpCreateVocabDriveSyncRunner: results.createVocabRunner || stubRunner("vocabulary"),
+    pbpCreateDriveClient: results.createClient || (() => client),
+    pbpCreateDriveSyncRunner: results.createVocabRunner || stubRunner("vocabulary"),
     pbpCreateNotesDriveSyncRunner: stubRunner("notes"),
     pbpCreateDictArchiveDriveSyncRunner: stubRunner("dictionary"),
     pbpCreateAskArchiveDriveSyncRunner: stubRunner("ask"),
@@ -105,7 +105,7 @@ async function connectDuringSync(source, sessionPermissionId, { pinIdentity = fa
     },
     createClient(options = {}) {
       const number = clientNumber++;
-      return pbpCreateVocabDriveClient({ ...options,
+      return pbpCreateDriveClient({ ...options,
         // Chrome mints a different OAuth token for each Google account, and the
         // identity cache is keyed on it: the switch has to surface here.
         identity: {
@@ -150,7 +150,7 @@ async function connectDuringSync(source, sessionPermissionId, { pinIdentity = fa
         async putAccountState(state) { mutations.push({ run: runNumber, kind: "state" }); states.set(state.drivePermissionId, structuredClone(state)); return true; },
         async listPendingBatches() { return []; }, async listOutbox() { return []; }
       };
-      const runner = pbpCreateVocabDriveSyncRunner({ ...options, store, hashOwner: async () => HASH, now: () => 100000 });
+      const runner = pbpCreateDriveSyncRunner({ ...options, store, hashOwner: async () => HASH, now: () => 100000 });
       return (runOptions) => { runNumber++; return runner(runOptions); };
     }
   });
@@ -524,7 +524,7 @@ function refreshHarness(source, opts = {}) {
   // code the runner records must leave drive-sync-retry armed at the record's own retryAt.
   const retryArmed = [];
   for (const code of ["network", "server", "rate_limited"]) {
-    const c = harness(source, {}, { createVocabRunner: (options) => pbpCreateVocabDriveSyncRunner({ ...options,
+    const c = harness(source, {}, { createVocabRunner: (options) => pbpCreateDriveSyncRunner({ ...options,
       client: { async openSession() { return { ok: false, error: code, retryable: true }; } },
       store: { async getPreflightState() { return null; }, async deletePreflightState() { return true; } },
       hashOwner: async () => HASH }) });
