@@ -2122,7 +2122,7 @@ function pbpFragmentProbeWait(probeAtClick, settledAtClick) {
 // prefetch (optional): { prefetchUrl, prefetchPromise } — a get_bookmark_data lookup
 // kicked off in parallel from showMain. Used only when prefetchUrl matches the url we
 // actually need (else a stale prefetch would mislead). Misses fall back to a live fetch.
-async function checkExistingBookmark(token, url, prefetch, forceFresh = false, submittedTags) {
+async function checkExistingBookmark(token, url, prefetch, forceFresh = false, submittedTags, preserveLiveTags = false) {
   const lookupUrl = String(url || "").trim();
   // Clear any optimistic first-paint mirror before the source-of-truth lookup.
   // A found result restores the edit UI; missing/failed results leave it cleared.
@@ -2161,12 +2161,16 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         // Late lookup may follow accepted AI/cache tags or manual edits. Align
         // only the surviving choices, keeping exact old twins and group-based
         // AI provenance; do not reintroduce anything the user removed.
-        currentTags = pbpAlignIncomingTags(currentTags, ownTagNames, null, false);
-        if (Array.isArray(submittedTags)) submittedTags = pbpAlignIncomingTags(submittedTags, ownTagNames, null, false);
-        currentTags = Array.isArray(submittedTags)
-          ? pbpRebasePopupTags(pbpBookmarkServiceId(settings) === "pinboard"
-            ? existingBookmark.tags || "" : existingBookmark.tagNames || [], submittedTags, currentTags)
-          : (pbpPopupDraftRestoredField("tags") || _tagsUserTouched) ? currentTags : Array.isArray(existingBookmark.tagNames) ? [...new Set([...existingBookmark.tagNames, ...currentTags])] : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
+        // Conflict reloads retain the live tag draft until the caller rebases
+        // it on this fresh row, including edits made while the lookup waited.
+        if (!preserveLiveTags) {
+          currentTags = pbpAlignIncomingTags(currentTags, ownTagNames, null, false);
+          if (Array.isArray(submittedTags)) submittedTags = pbpAlignIncomingTags(submittedTags, ownTagNames, null, false);
+          currentTags = Array.isArray(submittedTags)
+            ? pbpRebasePopupTags(pbpBookmarkServiceId(settings) === "pinboard"
+              ? existingBookmark.tags || "" : existingBookmark.tagNames || [], submittedTags, currentTags)
+            : (pbpPopupDraftRestoredField("tags") || _tagsUserTouched) ? currentTags : Array.isArray(existingBookmark.tagNames) ? [...new Set([...existingBookmark.tagNames, ...currentTags])] : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
+        }
         renderTags();
         $id("submit-btn").textContent = t("update");
         $id("delete-btn").classList.remove("hidden");
@@ -2773,10 +2777,9 @@ function setupSubmit(token) {
         // new tags. Their next press saves on top of that version.
         for (const id of Object.keys(fieldDirtyFlags)) fieldDirtyFlags[id] = fieldDirtyFlags[id] || dirtyAtSubmit[id] === true;
         _tagsUserTouched = _tagsUserTouched || tagsTouchedAtSubmit;
-        const mineTags = currentTags.slice();
         const latest = result.latestPost && typeof result.latestPost === "object" ? result.latestPost : null;
         const reloadPromise = checkExistingBookmark(token, url,
-          latest ? { prefetchUrl: url, prefetchPromise: Promise.resolve({ posts: [latest], account: submitAccount }) } : null, !latest);
+          latest ? { prefetchUrl: url, prefetchPromise: Promise.resolve({ posts: [latest], account: submitAccount }) } : null, !latest, undefined, true);
         const reloadGeneration = bookmarkLookup.generation;
         const reloaded = await reloadPromise;
         if (!ownsSubmitUi()) return;
@@ -2785,7 +2788,7 @@ function setupSubmit(token) {
           return;
         }
         if (reloaded.status === "found") {
-          currentTags = pbpRebaseLoadedTags(loadedTagsAtSubmit, mineTags, existingBookmark?.tagNames);
+          currentTags = pbpRebaseLoadedTags(loadedTagsAtSubmit, currentTags, existingBookmark?.tagNames);
           renderTags();
           _popupDraftBase = null;
           pbpRememberPopupDraft();
@@ -2793,7 +2796,7 @@ function setupSubmit(token) {
         // A field the user edited that the server now holds differently (and,
         // when known, differently from what the form loaded) keeps the user's
         // text; the server's value is named so the next press is made knowing it.
-        const theirs = reloaded.status === "found" && existingBookmark ? pbpPopupServerFieldNotes(dirtyAtSubmit, loadedFieldsAtSubmit) : "";
+        const theirs = reloaded.status === "found" && existingBookmark ? pbpPopupServerFieldNotes(fieldDirtyFlags, loadedFieldsAtSubmit) : "";
         showStatus("status-msg", t(result.unverified ? "saveNeedsReview" : "bookmarkChangedElsewhere") + (theirs ? " " + theirs : ""), "info");
         setSubmitState("idle");
         return;
@@ -2826,7 +2829,6 @@ function setupSubmit(token) {
       }
 
       if (result.status === "skipped" || (result.status === "failed" && result.reason === "conflict")) {
-        _popupDraftBase = null;
         // An update's edits are put back before the recheck, as for
         // changed_elsewhere: if the bookmark is gone, the missing lookup may
         // prefill from server metadata, which must not replace what the user
@@ -2843,6 +2845,7 @@ function setupSubmit(token) {
           setSubmitState("idle");
           return;
         }
+        if (conflictLookup.status === "found" || conflictLookup.status === "missing") _popupDraftBase = null;
         if (conflictLookup.status === "found") {
           // Same shape as review_required: the save did not land, press again.
           showStatus("status-msg", t("saveNeedsReview"), "info");

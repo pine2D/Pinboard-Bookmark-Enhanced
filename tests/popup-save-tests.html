@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="316"><title>Popup Save Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="320"><title>Popup Save Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 .case { padding: 4px 8px; margin: 4px 0; }
@@ -257,7 +257,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(elements["private-check"].checked && !elements["share-check"].checked,"new popup defaults to shared");
       }
     });
-    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null, ownershipKnown = true, descriptionKnown = true, descriptionPending = false, loaded = null, recheck } = {}) {
+    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null, ownershipKnown = true, descriptionKnown = true, descriptionPending = false, loaded = null, recheck, realLookup = false, draftBase = null } = {}) {
       const elements = {
         "submit-btn": createElementStub(),
         "delete-btn": createElementStub({ classes: ["hidden"] }),
@@ -305,6 +305,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       let nextTimerId = 1;
       let resolveSave;
       let resolveWayback;
+      let resolveLookup;
+      const lookupResponse = new Promise(resolve => { resolveLookup = resolve; });
       let effectiveToken = settings.pinboardToken;
       const saveResponse = new Promise((resolve) => { resolveSave = resolve; });
       const waybackResponse = new Promise((resolve) => { resolveWayback = resolve; });
@@ -384,8 +386,21 @@ test("posts/add default remains replace=yes for existing callers", () => {
         source.slice(awaitStart, awaitEnd) + "\nreturn pbpFragmentProbeWait;")(bookmarkLookup, setTimeoutStub, clearTimeoutStub, () => {}, null);
       const dependencies = {
         pbpFragmentProbeWait,
+        _popupDraftBase: draftBase,
+        _activeTabAtOpen: null,
+        localStorage: { setItem() {} },
+        shouldUpdateField: id => !fieldDirtyFlags[id],
+        pbpPopupBookmarkApi: async () => ({ ok: true, status: 200, json: () => lookupResponse }),
+        _linkdingPageDescription: null,
+        pbpPopupApplyServerMetadata() {},
+        pbpPopupRenderDescriptionHint() {},
+        recomputeArchiveCheck() {},
+        renderTags() {},
+        autoResizeTextarea() {},
+        pbpRebasePopupTags: rebasePopupTags,
+        pbpRememberPopupDraft() {},
         $id: (id) => (elements[id] ||= createElementStub()),
-        t: (key) => key,
+        t: (key, ...args) => key + (args.length ? ":" + args.join(":") : ""),
         clearTimeout: clearTimeoutStub,
         setTimeout: setTimeoutStub,
         showStatus: (...args) => statuses.push(args),
@@ -432,7 +447,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         pbpAiSaveSummaryOwnership: async (...args) => { receiptWrites.push(args); },
       };
       const names = Object.keys(dependencies);
-      const factory = new Function(...names, `${source.slice(source.indexOf("function pbpPopupDraftSnapshot("), source.indexOf("function pbpRememberPopupDraft("))}\n${resetSource}\n${setupSource}\nreturn {setupSubmit, snapshot:pbpPopupDraftSnapshot, sharing:()=>_linkdingSharedExplicit, changeSharing:()=>{_linkdingSharedExplicit=true;_linkdingSharedRevision++;}};`);
+      const factory = new Function(...names, `${source.slice(source.indexOf("function pbpPopupExpectedVersion("), source.indexOf("function pbpRememberPopupDraft("))}\n${resetSource}\n${realLookup ? lookupSource : ""}\n${setupSource}\nreturn {setupSubmit, tags:()=>currentTags, base:()=>_popupDraftBase, snapshot:pbpPopupDraftSnapshot, sharing:()=>_linkdingSharedExplicit, changeSharing:()=>{_linkdingSharedExplicit=true;_linkdingSharedRevision++;}};`);
       const submitApi = factory(...names.map((name) => dependencies[name]));
       const setupSubmit = submitApi.setupSubmit;
       setupSubmit("alice:token");
@@ -441,7 +456,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         elements, currentTags, fieldDirtyFlags, bookmarkLookup, settings, messages, statuses, timers, bars,
         checkCalls, checkDirty, savedTagCalls, syncRemovals, localTokenWrites, authEvents, reloadTokenValues,
         ownershipReads, receiptWrites,
-        click, resolveSave, resolveWayback,
+        click, resolveSave, resolveWayback, resolveLookup,
+        liveTags: submitApi.tags, draftBase: submitApi.base,
         setCurrentToken: (token) => { effectiveToken = token; },
         currentToken: () => effectiveToken,
         snapshot: submitApi.snapshot, sharing: submitApi.sharing, changeSharing: submitApi.changeSharing,
@@ -1424,6 +1440,68 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!noteShown, "tag text typed after the click produced the unsaved-draft note despite the click-time snapshot");
     });
 
+    await testAsync("changed-elsewhere reload keeps text and tags edited while the lookup waits and names server values", async () => {
+      for (const service of ["karakeep", "linkding"]) {
+        const loaded = { href: URL, description: "Old title", extended: "Old notes", summary: "Old summary", tagNames: ["One", "Two"], version: "old-version", shared: "no", toread: "no" };
+        const h = createSubmitHarness({ service, loaded, realLookup: true });
+        h.fieldDirtyFlags["title-input"] = false;
+        h.fieldDirtyFlags["description-input"] = false;
+        h.fieldDirtyFlags["linkding-description-input"] = false;
+        const pending = h.click();
+        await flushMicrotasks();
+        h.resolveSave({ status: "failed", reason: "changed_elsewhere" });
+        await flushMicrotasks();
+        // The first response started a fresh lookup; edits made now must be
+        // read when it settles, never from the earlier save's snapshot.
+        h.elements["title-input"].value = "Late title";
+        h.elements["description-input"].value = "Late notes";
+        h.elements["linkding-description-input"].value = "Late description";
+        for (const id of ["title-input", "description-input", "linkding-description-input"]) h.fieldDirtyFlags[id] = true;
+        h.currentTags.splice(0, h.currentTags.length, "Two", "Late tag");
+        h.resolveLookup({ posts: [{ ...loaded, description: "Server title", extended: "Server notes", summary: "Server description", tagNames: ["One", "Two", "Server tag"], version: "new-version" }] });
+        await pending;
+        assert(h.elements["title-input"].value === "Late title" && h.elements["description-input"].value === "Late notes", service + ": late text overwritten");
+        assert(JSON.stringify(h.liveTags()) === JSON.stringify(["Two", "Server tag", "Late tag"]), service + ": late tags overwritten: " + JSON.stringify(h.liveTags()));
+        const message = h.statuses.at(-1)?.[1] || "";
+        assert(message.includes("Server title") && message.includes("Server notes"), service + ": newly edited fields lack server conflict values: " + message);
+        if (service === "linkding") assert(message.includes("Server description") && h.elements["linkding-description-input"].value === "Late description", "description conflict lost");
+        assert(h.messages.length === 1, "conflict triggered an automatic save");
+      }
+    });
+
+    await testAsync("newly edited fields are compared with server values after a pending save stops", async () => {
+      const loaded = { href: URL, description: "Original title", extended: "", tagNames: ["One", "Two"], version: "old", shared: "no", toread: "no" };
+      const h = createSubmitHarness({ service: "karakeep", loaded, realLookup: true });
+      h.fieldDirtyFlags["title-input"] = false;
+      const pending = h.click(); await flushMicrotasks();
+      h.elements["title-input"].value = "Edited while saving";
+      h.fieldDirtyFlags["title-input"] = true;
+      h.resolveSave({ status: "failed", reason: "changed_elsewhere" }); await flushMicrotasks();
+      h.resolveLookup({ posts: [{ ...loaded, description: "Changed on server", version: "new" }] });
+      await pending;
+      assert(h.elements["title-input"].value === "Edited while saving", "in-flight edit overwritten");
+      assert(h.statuses.at(-1)?.[1].includes("Changed on server"), "current dirty field omitted from conflict explanation");
+    });
+
+    await testAsync("changed-elsewhere reload rebases untouched tags without restoring a server removal", async () => {
+      const loaded = { href: URL, description: "Old", extended: "", tagNames: ["One", "Two"], version: "old-version", shared: "no", toread: "no" };
+      const h = createSubmitHarness({ service: "karakeep", loaded, realLookup: true });
+      const pending = h.click(); await flushMicrotasks();
+      h.resolveSave({ status: "failed", reason: "changed_elsewhere" }); await flushMicrotasks();
+      h.resolveLookup({ posts: [{ ...loaded, tagNames: ["Two", "Server tag"], version: "new-version" }] });
+      await pending;
+      assert(JSON.stringify(h.liveTags()) === JSON.stringify(["Two", "Server tag"]), "lookup merged an old server tag into the live draft before rebasing: " + JSON.stringify(h.liveTags()));
+    });
+
+    await testAsync("failed conflict lookup retains the restored draft base for the next reviewed update", async () => {
+      const loaded = { href: URL, description: "Old", extended: "", tagNames: ["One", "Two"], version: "current-version", shared: "no", toread: "no" };
+      const base = { url: URL, version: "restored-version", tags: ["One"] };
+      const h = createSubmitHarness({ service: "karakeep", loaded, recheck: "failed", draftBase: base });
+      const pending = h.click(); await flushMicrotasks();
+      h.resolveSave({ status: "failed", reason: "conflict" }); await pending;
+      assert(h.draftBase() === base && h.snapshot().baseVersion === "restored-version", "failed read discarded the draft's conflict base");
+    });
+
     await testAsync("real submit callback preserves edits made while save is pending", async () => {
       const mutations = [
         ["title", (harness) => { harness.elements["title-input"].value = "Edited title"; }],
@@ -2369,7 +2447,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         popupAiSource.slice(renderStart, renderEnd + 2) + "\n" +
         "return { renderAITags, addTag, removeTag, provenance: _aiSessionAddedTags, tags: () => currentTags.slice()," +
         " touched: () => _tagsUserTouched, account: pbpPopupAiAccount, show: pbpShowAITagResult, refresh: pbpRefreshDisplayedAITagsForBookmark," +
-        " setLookup: state => {bookmarkLookup=state;}, acceptLookup: post => { const existingBookmark=post; let submittedTags; const pbpPopupDraftRestoredField=()=>false; " +
+        " setLookup: state => {bookmarkLookup=state;}, acceptLookup: post => { const existingBookmark=post; let submittedTags; const preserveLiveTags=false; const pbpPopupDraftRestoredField=()=>false; " +
         source.slice(source.indexOf("        const ownTagNames ="), source.indexOf('        $id("submit-btn").textContent = t("update");', source.indexOf("        const ownTagNames ="))) + "} };"
       );
 
