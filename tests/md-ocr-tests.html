@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="18"><title>DeepSeek OCR Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="19"><title>DeepSeek OCR Tests</title>
 <link rel="stylesheet" href="../md-preview.css">
 <style>
 #results { font-family: monospace; padding: 16px; max-width: 960px; }
@@ -159,6 +159,29 @@ const DEEPSEEK_OCR_LIVE_20261115 = {
     assert(pbpIsOcrCandidateUrl("http://192.168.1.1/doc.pdf") === false, "LAN HTTP URL must fail");
     assert(pbpIsOcrCandidateUrl(localUrl) === false, "synthetic local doc URL must not be an online OCR candidate");
     assert(pbpIsOcrCandidateUrl("https://example.com/article.html") === false, "HTML URL must not match");
+  });
+
+  await test("PDF page estimates count boundary-spanning names once and preserve the 1000 page limit", async () => {
+    const enc = new TextEncoder();
+    const at = (offset, token, pages = 999) => {
+      const head = "%PDF-1.7\n" + "/Type /Page\n".repeat(pages);
+      return enc.encode(head + " ".repeat(offset - head.length) + token + "\n");
+    };
+    for (let offset = 65500; offset <= 65570; offset++) {
+      const bytes = at(offset, "/Type /Page");
+      assert(pbpOcrEstimatePdfPages(bytes) === 1000, "page duplicated or skipped at byte " + offset);
+      assert(pbpOcrValidateInput({ bytes, fileName: "limit.pdf" }).ok, "valid 1000-page PDF rejected at " + offset);
+      assert(pbpOcrEstimatePdfPages(at(offset, "/Type /Pages")) === 999, "/Pages counted at " + offset);
+    }
+    const longSpace = at(65530, "/Type" + " ".repeat(131072) + "\r\n\t\0\f/Page");
+    assert(pbpOcrEstimatePdfPages(longSpace) === 1000, "long legal whitespace split the name pair");
+    assert(pbpOcrEstimatePdfPages(enc.encode("%PDF-1.7\n/Type/Page/Other /Type /PageExtra /Type /Page_1 /Type /Pages")) === 1, "PDF name delimiters were not respected");
+    const tooMany = at(65560, "/Type /Page\n/Type /Page");
+    assert(pbpOcrValidateInput({ bytes: tooMany, fileName: "over.pdf" }).code === "too_many_pages", "1001 pages accepted");
+    const large = new Uint8Array(8 * 1024 * 1024);
+    large.fill(32); large.set(enc.encode("%PDF-1.7\n"));
+    for (let i = 1; i <= 1000; i++) large.set(enc.encode("/Type /Page\n"), i * 8000);
+    assert(pbpOcrEstimatePdfPages(large) === 1000, "large input page count drifted");
   });
 
   // 2. Magic byte detection, spoofed HTML rejection, size cap, and 1,000-page PDF limit

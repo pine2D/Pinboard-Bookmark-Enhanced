@@ -97,19 +97,21 @@ function pbpOcrEstimatePdfPages(bytes) {
     ? bytes
     : (bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : null);
   if (!u8 || u8.byteLength < 16) return 0;
-  const chunkSize = 65536;
-  const overlap = 32;
+  // Scan bytes directly instead of decoding overlapping windows. A name may
+  // straddle any 64 KiB boundary, and whitespace between names is unbounded.
+  // PDF whitespace and delimiters terminate names; /Pages and /PageExtra do
+  // not identify a page. Each slash is visited once, with no chunk duplicates.
+  const whitespace = b => b === 0 || b === 9 || b === 10 || b === 12 || b === 13 || b === 32;
+  const delimiter = b => b === undefined || whitespace(b) || b === 40 || b === 41 ||
+    b === 60 || b === 62 || b === 91 || b === 93 || b === 123 || b === 125 || b === 47 || b === 37;
   let count = 0;
-  const decoder = typeof TextDecoder !== "undefined" ? new TextDecoder("latin1") : null;
-  if (!decoder) return 0;
-  for (let offset = 0; offset < u8.byteLength; offset += chunkSize) {
-    const end = Math.min(u8.byteLength, offset + chunkSize + overlap);
-    const slice = decoder.decode(u8.subarray(offset, end));
-    const re = /\/Type\s*\/Page\b(?!s)/g;
-    let m;
-    while ((m = re.exec(slice)) !== null) {
-      if (offset === 0 || m.index >= overlap - 12) count += 1;
-    }
+  for (let i = 0; i < u8.length - 9; i++) {
+    if (u8[i] !== 47 || u8[i + 1] !== 84 || u8[i + 2] !== 121 || u8[i + 3] !== 112 || u8[i + 4] !== 101) continue;
+    let j = i + 5;
+    while (whitespace(u8[j])) j++;
+    if (u8[j] === 47 && u8[j + 1] === 80 && u8[j + 2] === 97 && u8[j + 3] === 103 &&
+        u8[j + 4] === 101 && delimiter(u8[j + 5])) count++;
+    i = j - 1;
   }
   return count;
 }
