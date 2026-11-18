@@ -6146,12 +6146,12 @@ async function confirmMergeGroup(group, canonical, anchorEl, expectedAccount) {
   const renames = plan.filter(op => op.op === "rename");
   const summary = renames.map(op => op.old + " -> " + canonical).join(" | ");
   // Renames run as per-bookmark re-saves (tags/rename is broken server-side), so the
-  // duration scales with bookmark count: one posts/all fetch per rename + one posts/add
+  // duration scales with bookmark count: one posts/all fetch per rename + posts/get and posts/add
   // per bookmark, each spaced 3.1s by the rate-limit queue.
   const canonLower = canonical.toLowerCase();
   const bookmarkCount = group.members.reduce((sum, m) =>
     (m && m.tag && m.tag.toLowerCase() !== canonLower) ? sum + (m.count || 0) : sum, 0);
-  const estSec = Math.ceil((renames.length + bookmarkCount) * 3.2);
+  const estSec = Math.ceil((renames.length + bookmarkCount * 2) * 3.2);
   const estStr = formatTagGovEst(estSec);
   const anchor = anchorEl;
   if (!anchor) return;
@@ -6236,94 +6236,50 @@ async function retagBookmarksViaResave(expectedAccount, oldTag, newTag, onProgre
       problems: [{ url: "", title: "", kind: "failed", reason: "posts/all: unexpected response" }], aborted: false };
   }
 
-  const oldLower = oldTag.toLowerCase();
-  let saved = 0, failed = 0, skipped = 0;
-  // Bookmarks actually re-saved with a changed tag set (`saved` also counts posts that
-  // already lacked the old tag). The entity repair needs the difference: a posts/all
-  // filter that matched nothing, or only unrelated posts, must not look like success.
-  let written = 0;
-  const problems = []; // { url, title, kind: "failed" | "skipped" } per bookmark
+  let saved = 0, failed = 0, skipped = 0, written = 0;
+  const problems = [];
   for (let i = 0; i < posts.length; i++) {
     if (_tagGovCancelRequested) {
       return { total: posts.length, saved, failed, skipped, problems, written, cancelled: true };
     }
-    const auth = await requireTagGovAuth(expectedAccount);
+    await requireTagGovAuth(expectedAccount);
     if (onProgress) onProgress(i, posts.length);
     const post = posts[i];
-    if (!post || !post.href) {
+    if (!post || typeof post.href !== "string" || !post.href) {
       failed++;
       problems.push({ url: "", title: (post && post.description) || "", kind: "failed", reason: "missing href" });
       continue;
     }
-    const tags = (post.tags || "").split(/\s+/).filter(Boolean);
-    // Pinboard tags are case-insensitive: match accordingly. Already clean -> count as done without a write.
-    if (!tags.some(tg => tg.toLowerCase() === oldLower)) { saved++; continue; }
-    const seen = new Set();
-    const next = [];
-    for (const tg of tags) {
-      const replaced = tg.toLowerCase() === oldLower ? newTag : tg;
-      const key = replaced.toLowerCase();
-      if (!seen.has(key)) { seen.add(key); next.push(replaced); }
-    }
-    const uri = buildPostsAddUri({
-      token: auth.token,
-      url: post.href,
-      title: post.description || post.href,
-      extended: post.extended || "",
-      tags: next.join(" "),
-      shared: post.shared,
-      toread: post.toread,
-      dt: post.time
-    });
-    // Never truncate a bookmark to fit the URI cap — skip it and surface the count instead.
-    if (uri.length > POSTS_ADD_URI_BUDGET) {
-      skipped++;
-      problems.push({ url: post.href, title: post.description || post.href, kind: "skipped" });
-      continue;
-    }
     try {
-      let r = await pinboardFetch(uri);
-      if (r.status === 429) {
+      // posts/all is only a URL worklist. The SW reads and re-tags the current
+      // row inside the same transaction as popup/reader saves and offline replay.
+      const attempt = async () => {
+        await requireTagGovAuth(expectedAccount);
+        const result = await chrome.runtime.sendMessage({ type: "tag_gov_retag_post",
+          account: expectedAccount, url: post.href, oldTag, newTag });
+        await requireTagGovAuth(expectedAccount);
+        if (result?.error === "account_changed") throw Object.assign(new Error("account_changed"), { code: "account_changed" });
+        if (!result || typeof result.status !== "string") throw new Error("invalid retag response");
+        return result;
+      };
+      let result = await attempt();
+      if (result.status === "rate_limited") {
         setWaitNote();
         await new Promise(rs => setTimeout(rs, TAG_GOV_RETRY_WAIT_MS));
         if (_tagGovCancelRequested) {
           return { total: posts.length, saved, failed, skipped, problems, written, cancelled: true };
         }
-        const retryAuth = await requireTagGovAuth(expectedAccount);
-        const retryUri = buildPostsAddUri({
-          token: retryAuth.token,
-          url: post.href,
-          title: post.description || post.href,
-          extended: post.extended || "",
-          tags: next.join(" "),
-          shared: post.shared,
-          toread: post.toread,
-          dt: post.time
-        });
-        r = await pinboardFetch(retryUri);
-        if (r.status === 429) {
-          // A persistent 429 on one bookmark: server-side throttling can still
-          // hit even now that every context rides the SW's single queue (the
-          // old cross-context slot collision is gone with the proxy rewire) —
-          // record it and move on instead of killing the whole run over one
-          // bookmark.
-          failed++;
-          problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: "HTTP 429" });
-          continue;
-        }
+        // A retry is a new lookup-to-write transaction, never a replayed URI.
+        result = await attempt();
       }
-      if (!r.ok) {
-        failed++;
-        problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: "HTTP " + r.status });
-        continue;
-      }
-      const data = await r.json();
-      if (data.result_code === "done") {
-        saved++;
-        written++;
+      if (result.status === "saved") { saved++; written++; }
+      else if (result.status === "unchanged") { saved++; }
+      else if (result.status === "too_large") {
+        skipped++;
+        problems.push({ url: post.href, title: post.description || post.href, kind: "skipped" });
       } else {
         failed++;
-        problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: String(data.result_code || "unknown") });
+        problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: result.error || "HTTP " + (result.httpStatus || 0) });
       }
     } catch (e) {
       if (e?.code === "account_changed") throw e;
@@ -6643,7 +6599,7 @@ async function _runTagGovBatch(ops, expectedAccount) {
           if (_tagGovUiOwned(expectedAccount) && ptext) {
             // Live ETA from the REAL bookmark total — the confirm-time estimate came
             // from possibly-stale cached counts. Upcoming ops add one posts/all each.
-            const remainSec = (total - done) * 3.2 + (ops.length - i - 1) * 3.2;
+            const remainSec = (total - done) * 6.4 + (ops.length - i - 1) * 3.2;
             const eta = remainSec >= 3 ? " · " + t("tagGovTimeLeft", formatTagGovEst(remainSec)) : "";
             ptext.innerHTML = opLine + " " + t("tagGovRetagProgress", String(done), String(total)) + eta + queueSuffix();
           }
@@ -7161,9 +7117,9 @@ function initTagGovEntityRepair() {
     const items = _tagGovEntityItems.filter((it) => picked.has(it.tag));
     if (!items.length) return;
     const bookmarkCount = items.reduce((sum, it) => sum + it.count, 0);
-    // Same arithmetic as the merge: one posts/all per tag + one posts/add per
+    // Same arithmetic as the merge: one posts/all per tag + posts/get and posts/add per
     // bookmark, each spaced 3.1 s by the rate-limit queue.
-    const estStr = formatTagGovEst(Math.ceil((items.length + bookmarkCount) * 3.2));
+    const estStr = formatTagGovEst(Math.ceil((items.length + bookmarkCount * 2) * 3.2));
     const shown = items.slice(0, 10).map((it) => it.tag + " -> " + it.repaired).join(" | ")
       + (items.length > 10 ? " | " + t("tagGovMoreCount", String(items.length - 10)) : "");
     showConfirmPopover(repairBtn, {

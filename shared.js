@@ -6555,6 +6555,7 @@ async function pbpTtsCacheClear() {
 // Regenerate with: node scripts/sync-runtime-messages.mjs --write
 // @generated:runtime-messages start (catalog)
 const PBP_RUNTIME_MESSAGES = Object.freeze({
+  tag_gov_retag_post: "tag_gov_retag_post",
   mdReaderBookmarkState: "mdReaderBookmarkState",
   mdReaderBookmarkSave: "mdReaderBookmarkSave",
   mdReaderBookmarkDelete: "mdReaderBookmarkDelete",

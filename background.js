@@ -3,7 +3,7 @@
 // ============================================================
 
 importScripts(
-  "i18n.js", "shared.js", "bookmark-services.js", "vocab-store.js", "vocab-gdrive.js", "notes-sync.js", "notes-gdrive.js", "restore-points.js",
+  "i18n.js", "shared.js", "tag-gov-save.js", "bookmark-services.js", "vocab-store.js", "vocab-gdrive.js", "notes-sync.js", "notes-gdrive.js", "restore-points.js",
   "ai-cache.js", "dict-archive.js", "dict-archive-gdrive.js", "ask-archive.js", "ask-archive-gdrive.js", "ai.js", "jina.js", "wayback.js"
 );
 
@@ -5235,6 +5235,15 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     }).catch(() => {
       _batchRunning = false;
       sendResponse({ status: "account_changed" });
+    });
+    return true;
+  }
+
+  if (message.type === "tag_gov_retag_post") {
+    if (new URL(sender.url).pathname !== "/options.html") { sendResponse({ status: "failed", error: "forbidden" }); return true; }
+    pbpRetagPinboardPost(message).then(sendResponse).catch((error) => {
+      console.warn("[tag-gov] retag failed:", error?.name, error?.code || "network_error");
+      sendResponse({ status: "failed", error: error?.code || "network_error" });
     });
     return true;
   }

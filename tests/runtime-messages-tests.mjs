@@ -105,10 +105,10 @@ function makeSyntheticRepo(overrides = {}) {
 test('live catalog invariants and live repository --check pass with zero errors', () => {
   // 最简单漏判反例：目录与真实仓库某条新消息漏对账，或某处 listener 误写成 async 却无人阻断。
   assert.deepEqual(validateRuntimeMessagesCatalog(RUNTIME_MESSAGES, EXTERNAL_RUNTIME_SENDERS), []);
-  assert.equal(RUNTIME_MESSAGES.length, 43);
+  assert.equal(RUNTIME_MESSAGES.length, 44);
   const res = syncRuntimeMessages({ root: ROOT, write: false, espreeModule: espree });
   assert.equal(res.ok, true, res.errors.join('\n'));
-  assert.equal(res.messageCount, 43);
+  assert.equal(res.messageCount, 44);
 });
 
 test('catalog validation rejects duplicate keys, broadcast responders and dual responder+observer', () => {

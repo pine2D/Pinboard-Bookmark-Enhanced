@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="16"><title>Tag Gov Entity Repair Tests</title>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="24"><title>Tag Gov Entity Repair Tests</title>
 <style>body{font-family:monospace;padding:16px}.case{padding:5px;white-space:pre-wrap}.pass{color:#176}.fail{color:#b00}</style>
 </head><body>
 <!-- The repair UI the handlers bind to (ids as in options.html). -->
@@ -41,6 +41,7 @@ function uiLangToBCP47() { return "en"; }
 <script src="../export-targets.js"></script>
 <script src="../tag-gov.js"></script>
 <script src="../options.js"></script>
+<script src="../tag-gov-save.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -60,6 +61,14 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
 // `&amp;quot;` reaches code as the stored `&quot;`.
 let wire;            // { tags, posts: {tagLiteral: [wirePost...]}, addResult(url, n) }
 let calls;           // every request URL, in order
+// Only SW boundaries are simulated; options and the retag transaction run real code.
+const runSaveDeliveryTransaction = pbpCreateRecoveringTail();
+const statusCache = new Map();
+async function getCurrentBookmarkAuth() {
+  const auth = await getTagGovAuth();
+  return { ...auth, service: "pinboard" };
+}
+chrome.runtime.sendMessage = message => pbpRetagPinboardPost(message);
 let onAdd;           // hook run before each posts/add response
 function wirePost(href, tags, over) {
   return Object.assign({ href, description: "t " + href, extended: "note é", meta: "m", hash: "h", time: "2026-11-04T06:00:00Z",
@@ -77,11 +86,16 @@ function reset(tagsGet, posts) {
       const list = wire.posts[u.searchParams.get("tag")] || [];
       return pbpPinboardDecodedPostsResponse(url, new Response(JSON.stringify(list), { status: 200 }));
     }
+    if (u.pathname === "/v1/posts/get") {
+      const url = u.searchParams.get("url");
+      const rows = wire.lookup ? await wire.lookup(url) : Object.values(wire.posts).flat().filter(post => post.href === url).slice(0, 1);
+      return pbpPinboardDecodedPostsResponse(u.href, new Response(JSON.stringify({ posts: rows }), { status: 200 }));
+    }
     if (u.pathname === "/v1/posts/add") {
       wire.adds++;
       if (onAdd) await onAdd(u, wire.adds);
       const r = wire.addResult ? wire.addResult(u, wire.adds) : "done";
-      return new Response(JSON.stringify({ result_code: r }), { status: 200 });
+      return new Response(JSON.stringify({ result_code: r }), { status: wire.addStatus ? wire.addStatus(wire.adds) : 200 });
     }
     return new Response("{}", { status: 404 });
   };
@@ -317,6 +331,114 @@ window.showConfirmPopover = (anchor, opts) => { confirmOpts = opts; return true;
 
   await test("entity table here matches shared.js's decoder table", async () => {
     assert(JSON.stringify(PBP_TAG_GOV_ENTITY_MAP) === JSON.stringify(PBP_PINBOARD_TAG_ENTITIES), "tables diverged");
+  });
+
+  await test("a concurrent edit after posts/all preserves every fresh field and tag", async () => {
+    await begin();
+    reset({}, { old: [wirePost("https://example.com/x", "old stale")] });
+    wire.lookup = () => [wirePost("https://example.com/x", "keep OLD new", {
+      description: "edited", extended: "new notes", shared: "yes", toread: "no", time: "2026-11-17T01:02:03Z" })];
+    const result = await retagBookmarksViaResave(account, "old", "new");
+    const a = adds()[0];
+    assert(result.written === 1 && a.get("description") === "edited" && a.get("extended") === "new notes", "stale text replayed");
+    assert(a.get("shared") === "yes" && a.get("toread") === "no" && a.get("dt") === "2026-11-17T01:02:03Z", "stale metadata replayed");
+    assert(a.get("tags") === "keep new", "fresh tags lost: " + a.get("tags"));
+  });
+
+  await test("deleted rows and rows no longer carrying oldTag are never re-created", async () => {
+    for (const rows of [[], [wirePost("https://example.com/x", "keep")]]) {
+      await begin();
+      reset({}, { old: [wirePost("https://example.com/x", "old")] });
+      wire.lookup = () => rows;
+      const result = await retagBookmarksViaResave(account, "old", "new");
+      assert(result.written === 0 && adds().length === 0 && result.failed === 0, JSON.stringify(result));
+    }
+  });
+
+  await test("429 retry reads again and preserves edits made during backoff", async () => {
+    await begin();
+    reset({}, { old: [wirePost("https://example.com/x", "old")] });
+    let reads = 0;
+    wire.lookup = () => [wirePost("https://example.com/x", ++reads === 1 ? "old before" : "old after", { description: reads === 1 ? "before" : "after" })];
+    wire.addStatus = n => n === 1 ? 429 : 200;
+    const originalTimeout = window.setTimeout;
+    window.setTimeout = (fn, ms, ...args) => originalTimeout(fn, ms === TAG_GOV_RETRY_WAIT_MS ? 0 : ms, ...args);
+    try {
+      const result = await retagBookmarksViaResave(account, "old", "new");
+      assert(result.written === 1 && reads === 2 && adds()[1].get("description") === "after" && adds()[1].get("tags") === "new after", "retry reused a snapshot");
+    } finally { window.setTimeout = originalTimeout; }
+  });
+
+  await test("429 retry skips a row deleted during backoff", async () => {
+    await begin();
+    reset({}, { old: [wirePost("https://example.com/x", "old")] });
+    let reads = 0;
+    wire.lookup = () => ++reads === 1 ? [wirePost("https://example.com/x", "old")] : [];
+    wire.addStatus = () => 429;
+    const originalTimeout = window.setTimeout;
+    window.setTimeout = (fn, ms, ...args) => originalTimeout(fn, ms === TAG_GOV_RETRY_WAIT_MS ? 0 : ms, ...args);
+    try {
+      const result = await retagBookmarksViaResave(account, "old", "new");
+      assert(result.written === 0 && result.failed === 0 && reads === 2 && adds().length === 1, "deleted row retried");
+    } finally { window.setTimeout = originalTimeout; }
+  });
+
+  await test("invalid, partial and mismatched lookup rows fail closed", async () => {
+    for (const rows of [[{}], [wirePost("https://example.com/other", "old")],
+      [wirePost("https://example.com/x", "old", { shared: undefined })],
+      [wirePost("https://example.com/x", "old", { time: "" })]]) {
+      await begin();
+      reset({}, { old: [wirePost("https://example.com/x", "old")] });
+      wire.lookup = () => rows;
+      const result = await retagBookmarksViaResave(account, "old", "new");
+      assert(result.failed === 1 && adds().length === 0, "unsafe lookup written: " + JSON.stringify(rows));
+    }
+  });
+
+  await test("retag waits for the shared save transaction before its fresh lookup", async () => {
+    await begin();
+    reset({}, { old: [wirePost("https://example.com/x", "old")] });
+    let release;
+    const priorSave = runSaveDeliveryTransaction(() => new Promise(resolve => { release = () => { wire.lookup = () => []; resolve(); }; }));
+    await Promise.resolve();
+    const retag = retagBookmarksViaResave(account, "old", "new");
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert(!calls.some(url => new URL(url).pathname === "/v1/posts/get"), "lookup ran outside save transaction");
+    release(); await priorSave;
+    const result = await retag;
+    assert(result.written === 0 && adds().length === 0, "prior deletion was lost");
+  });
+
+  await test("fresh lookup failures and malformed envelopes never reach posts/add", async () => {
+    for (const data of [{ result_code: "error" }, { posts: {} }, null, { posts: [] }]) {
+      await begin();
+      reset({}, { old: [wirePost("https://example.com/x", "old")] });
+      const fetcher = window.pinboardFetch;
+      window.pinboardFetch = async url => new URL(url).pathname === "/v1/posts/get"
+        ? new Response(JSON.stringify(data), { status: data?.posts?.length === 0 ? 503 : 200 }) : fetcher(url);
+      const result = await retagBookmarksViaResave(account, "old", "new");
+      assert(result.failed === 1 && adds().length === 0, "lookup error was treated as a writable bookmark");
+    }
+  });
+
+  await test("retry rechecks URI budget and stop leaves no follow-up write", async () => {
+    for (const stop of [false, true]) {
+      await begin();
+      _tagGovCancelRequested = false;
+      reset({}, { old: [wirePost("https://example.com/x", "old")] });
+      let reads = 0;
+      wire.lookup = () => [wirePost("https://example.com/x", "old", { extended: ++reads === 1 ? "short" : "x".repeat(5000) })];
+      wire.addStatus = () => 429;
+      const originalTimeout = window.setTimeout;
+      window.setTimeout = (fn, ms, ...args) => {
+        if (ms === TAG_GOV_RETRY_WAIT_MS && stop) _tagGovCancelRequested = true;
+        return originalTimeout(fn, ms === TAG_GOV_RETRY_WAIT_MS ? 0 : ms, ...args);
+      };
+      try {
+        const result = await retagBookmarksViaResave(account, "old", "new");
+        assert(adds().length === 1 && (stop ? result.cancelled && reads === 1 : result.skipped === 1 && reads === 2), JSON.stringify(result));
+      } finally { window.setTimeout = originalTimeout; _tagGovCancelRequested = false; }
+    }
   });
 
   document.title = (fail ? "FAIL " : "PASS ") + "Tag Gov Entity Repair Tests";

@@ -24,6 +24,12 @@ function freezeMessage(spec) {
 }
 
 export const RUNTIME_MESSAGES = Object.freeze([
+  freezeMessage({
+    wire: 'tag_gov_retag_post',
+    responseMode: 'async',
+    responder: 'background.js',
+    senders: ['options.js'],
+  }),
   // ---- Reader bookmark bar <-> service worker ----
   freezeMessage({
     wire: 'mdReaderBookmarkState',
