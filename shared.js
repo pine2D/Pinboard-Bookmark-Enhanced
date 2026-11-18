@@ -5941,7 +5941,16 @@ function pbpReaderHistoryMerge(existingList, incoming, limit = PBP_READER_HISTOR
 
 let _pbpReaderHistoryChain = Promise.resolve();
 function _pbpReaderHistoryEnqueue(work) {
-  const run = _pbpReaderHistoryChain.then(work, work);
+  // One origin-scoped lock covers record/remove/clear across reader pages,
+  // popup and the worker. Keep the per-document chain as the no-Web-Locks
+  // fallback; acquire the lock only here, never inside a queued mutation.
+  const lockedWork = () => {
+    const locks = typeof navigator !== "undefined" && navigator.locks;
+    return locks && typeof locks.request === "function"
+      ? locks.request("pbp-reader-history", work)
+      : work();
+  };
+  const run = _pbpReaderHistoryChain.then(lockedWork, lockedWork);
   _pbpReaderHistoryChain = run.catch(() => {
     // swallow-ok: caller handles run's rejection; keep serial queue alive
   });
