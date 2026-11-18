@@ -552,7 +552,10 @@ async function seedAll(context, worker, aiPort) {
   // 1. Settings via SW (same key set persistSettings routes to local storage).
   await worker.evaluate(async ({ token, aiBase, siteTheme }) => {
     if (typeof primeSettings === "function") await primeSettings();
-    await chrome.storage.local.set({
+    // Startup may already have read an empty owner and be about to persist
+    // personal:default. Queue behind that initializer before installing this
+    // scenario's explicit fixture; the secret lock also drains settings writes.
+    await navigator.locks.request("pbp-personal-library", () => pbpWithSecretStorageLock(() => chrome.storage.local.set({
       optSyncEnabled: false,
       syncApiKeys: false,
       // This tour models a migrated installation. Otherwise the phase-2 SW
@@ -576,7 +579,8 @@ async function seedAll(context, worker, aiPort) {
       optShowRecent: true,
       optShowSuggestTags: true,
       translateTargetLang: "zh-CN",
-    });
+    })));
+    if (await pbpPersonalLibraryAccount() !== token.split(":")[0]) throw new Error("QA fixture personal library identity was not established");
   }, { token: FAKE_TOKEN, aiBase: `http://127.0.0.1:${aiPort}/v1`, siteTheme: CONFIG.siteTheme });
 
   // 2. Vocabulary through the real write boundary (vocab-store.js in the SW).
@@ -2137,6 +2141,7 @@ async function diffAgainstPrev(runDir, prevDir) {
 // ============================================================
 async function driveReaderExport(context, worker, extId, rep) {
   const s = rep.surface("reader-export");
+  const fixtureAccount = FAKE_TOKEN.split(":")[0];
   const page = await context.newPage();
   const detach = rep.attach(page, s);
   let peer = null, detachPeer = () => {};
@@ -2153,7 +2158,8 @@ async function driveReaderExport(context, worker, extId, rep) {
     await page.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`, { waitUntil: "load" });
     await page.waitForSelector("#rendered-view p");
     await page.waitForSelector("#exp-include-ask", { state: "attached", timeout: 5000 });
-    await page.evaluate(async ({ url }) => {
+    await page.evaluate(async ({ url, account }) => {
+      if (await pbpPersonalLibraryAccount() !== account) throw new Error("QA reader export fixture owner mismatch");
       const rounds = [
         { q: "What does serendipity mean here?", a: "A portable answer.[P2]\n\nCITES:\nP2: The word serendipity appears here", ts: 1700000000000, model: "qa-export-model" },
         { q: "Keep the code example?", a: "Keep `[P2]` literal. Another answer.[P2]\n\nCITES:\nP2: The word serendipity appears here", ts: 1700000001000, model: "qa-export-model" }
@@ -2165,17 +2171,17 @@ async function driveReaderExport(context, worker, extId, rep) {
       if (typeof pbpAskArchiveAppend === "function") {
         // The export takes the article's newest conversation, so one left by an
         // earlier scenario would stand in for these rounds.
-        const owner = pbpDictOwnerScope("qa");
+        const owner = pbpDictOwnerScope(account);
         for (const session of await pbpAskArchiveRead({ owner, url })) await pbpAskArchiveDelete({ owner, sessionId: session.id });
         for (const round of rounds) {
           await pbpAskArchiveAppend({ owner, url, title: document.title, sessionId: "qa_export_session",
             record: { ...round, blocksHash: "", cites: [], evidence: [] } });
         }
-      } else await pbpAskHistSet(url, rounds, "qa");
+      } else await pbpAskHistSet(url, rounds, account);
       document.dispatchEvent(new CustomEvent("pbp:ask-history-changed"));
       window.pbpReaderOpenExport();
       document.getElementById("export-more").open = true;
-    }, { url: ARTICLE_URL });
+    }, { url: ARTICLE_URL, account: fixtureAccount });
     await page.waitForFunction(() => !document.getElementById("exp-include-ask").hidden);
     requireState(await page.locator("#exp-include-ask").getAttribute("aria-pressed") === "false", "Q&A export must default off");
     const article = await downloadText("#btn-dl-md");
@@ -2215,13 +2221,14 @@ async function driveReaderExport(context, worker, extId, rep) {
     });
     await page.locator("#btn-dl-html").click();
     await page.waitForFunction(() => window._qaExportWaiting);
-    await peer.evaluate(async ({ url }) => {
+    await peer.evaluate(async ({ url, account }) => {
+      if (await pbpPersonalLibraryAccount() !== account) throw new Error("QA peer export fixture owner mismatch");
       // Clearing a conversation deletes its archive session (d433eabb); the
       // legacy cache is cleared as well for builds without the archive.
-      if (typeof pbpAskArchiveDelete === "function") await pbpAskArchiveDelete({ owner: pbpDictOwnerScope("qa"), sessionId: "qa_export_session" });
-      await pbpAskHistSet(url, [], "qa");
-      _pbpAskHistoryChanged({ type: "clear", url, account: "qa" });
-    }, { url: ARTICLE_URL });
+      if (typeof pbpAskArchiveDelete === "function") await pbpAskArchiveDelete({ owner: pbpDictOwnerScope(account), sessionId: "qa_export_session" });
+      await pbpAskHistSet(url, [], account);
+      _pbpAskHistoryChanged({ type: "clear", url, account });
+    }, { url: ARTICLE_URL, account: fixtureAccount });
     await page.waitForFunction(() => document.getElementById("exp-scope-ask").disabled);
     await page.evaluate(() => {
       window._qaResumeExport();
