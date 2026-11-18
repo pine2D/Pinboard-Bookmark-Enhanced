@@ -1558,16 +1558,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   pbpBindLooseLabels(document);
 
-  // W3: Lazy-init scaffolding for the appearance panel.
-  // Hoisted to the top of DOMContentLoaded so the tab-switch handler and the
-  // saved-tab restore (both below) can safely reference _initAppearancePanel.
-  // The actual render depends on currentPresetKey + PINBOARD_THEMES, which
-  // aren't initialized until the settings load completes much further down.
-  // Until that bootstrap finishes, we record a pending request and flush it
-  // when _appearancePanelBootReady flips to true.
-  let _appearanceInited = false;
-  let _appearancePanelBootReady = false;
-  let _appearancePendingInit = false;
+  // Both restored-tab activation and a click can precede settings hydration.
+  // The initialized renderer is supplied below; a request waits for it once.
+  let provideAppearanceRenderer;
+  const appearanceRenderReady = new Promise(resolve => { provideAppearanceRenderer = resolve; });
+  let _appearanceOpening = null;
   let _pinboardThemesPromise = null;
   function _loadPinboardThemes() {
     if (_pinboardThemesPromise) return _pinboardThemesPromise;
@@ -1583,20 +1578,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     return _pinboardThemesPromise;
   }
-  async function _initAppearancePanel() {
-    if (_appearanceInited) return;
-    if (!_appearancePanelBootReady) { _appearancePendingInit = true; return; }
-    _appearanceInited = true;
-    try {
+  function _initAppearancePanel() {
+    if (_appearanceOpening) return _appearanceOpening;
+    _appearanceOpening = appearanceRenderReady.then(async renderPreview => {
       await _loadPinboardThemes();
-    } catch (e) {
-      console.warn("[options] pinboard-themes lazy load failed:", e.message);
-      _appearanceInited = false; // allow retry on next switch
-      return;
-    }
-    renderPresetPreview();
+      renderPreview();
+      return renderPreview;
+    }).catch(error => {
+      _appearanceOpening = null;
+      console.warn("[options] appearance initialization failed:", error?.name, error?.message);
+      return null;
+    });
+    return _appearanceOpening;
   }
-
+  // The fallback can reveal the form before storage answers. Apply preset
+  // clicks in order once the saved settings and form controls are ready.
+  document.querySelectorAll(".theme-preset-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      void appearanceRenderReady.then(() => applyPreset(btn.dataset.theme));
+    });
+  });
   // ---- Tags panel lazy-init ----
   let _tagGovInited = false;
   async function _initTagGovPanel() {
@@ -1806,7 +1807,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     $id(`panel-${btn.dataset.panel}`).classList.add("active");
     _syncResetBtnVisibility(btn.dataset.panel);
     // W3: lazy-init expensive per-panel rendering on first view.
-    if (btn.dataset.panel === "appearance") _initAppearancePanel();
+    if (btn.dataset.panel === "appearance") void _initAppearancePanel();
     if (btn.dataset.panel === "tags") _initTagGovPanel();
     if (btn.dataset.panel === "storage") { renderStoragePanel(); renderDriveSyncPanel(); }
     else if (typeof invalidateDriveSyncPanel === "function") invalidateDriveSyncPanel();
@@ -5259,6 +5260,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       previewEl.textContent = "";
       return;
     }
+    // A preset or theme-mode change may precede the lazy script's load. The
+    // pending panel open renders the latest selection once the themes arrive.
+    if (typeof PINBOARD_THEMES === "undefined") return;
     let themeKey = currentPresetKey;
     const mode = $id("opt-theme").value;
     const prefersDark = mode === "dark" || (mode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -5273,21 +5277,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    if (_appearanceInited && $id("opt-theme").value === "auto") renderPresetPreview();
+    if (_appearanceOpening && $id("opt-theme").value === "auto") {
+      void _appearanceOpening.then(renderPreview => renderPreview?.());
+    }
   });
 
-  // W3: appearance panel's render deps (currentPresetKey, PINBOARD_THEMES,
-  // ADAPTIVE_THEME_MAP, $id targets) are now initialized — flip the boot-ready
-  // flag, flush any queued init from earlier saved-tab clicks, then handle the
-  // boot-active case. Dumping a full PINBOARD_THEMES entry (~50KB CSS) into the
-  // preview textarea costs noticeable boot time, so we only render when the
-  // appearance panel is actually viewed. Settings VALUE population for
-  // appearance fields still happens unconditionally above, so saveAll() sees
-  // correct values regardless of which panel was viewed.
-  _appearancePanelBootReady = true;
-  if (_appearancePendingInit) _initAppearancePanel();
+  // Settings and preview targets are ready. Pending tab requests receive this
+  // renderer now; theme loading and preview rendering remain lazy.
+  provideAppearanceRenderer(renderPresetPreview);
   const _activePanelAtBoot = document.querySelector(".tab-btn.active")?.dataset?.panel;
-  if (_activePanelAtBoot === "appearance") _initAppearancePanel();
+  if (_activePanelAtBoot === "appearance") void _initAppearancePanel();
 
   function applyPreset(key) {
     currentPresetKey = key || "";
@@ -5305,10 +5304,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     // then a harmless no-op, same convention as updateProviderFields().
     window.pbpListboxSync?.($id("opt-theme"));
   }
-
-  document.querySelectorAll(".theme-preset-btn").forEach(btn => {
-    btn.addEventListener("click", () => applyPreset(btn.dataset.theme));
-  });
 
   // Toggle "Save as theme" button disabled state based on whether there's
   // any non-whitespace CSS to save. Called from input handler, preset apply,

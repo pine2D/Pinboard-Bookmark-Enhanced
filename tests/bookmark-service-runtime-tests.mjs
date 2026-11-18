@@ -1764,6 +1764,88 @@ try{
   console.log('settings Tags panel reloads on a bookmark service change: Pinboard tags in, linkding explanation back, in local and in sync');
   });
   await block('settings appearance, shortcuts and reader reset',[],async()=>{
+  // Exercise the page's real tab bindings while settings/theme loading pause.
+  // These fixtures touch only this isolated extension's APIs and script load.
+  await worker.evaluate(()=>chrome.storage.local.set({optSyncEnabled:false,_migrationV2:true,themePresetKey:'nord-night',optTheme:'auto'}));
+  async function appearancePage({hash='',holdSettings=false,holdTheme=false,failFirst=false}={}){
+    const page=await ctx.newPage();
+    await page.addInitScript(({holdSettings,holdTheme,failFirst})=>{
+      let releaseSettings;
+      const settingsReady=new Promise(resolve=>{releaseSettings=resolve;});
+      const state=window.appearanceFixture={loads:0,settingsWaiting:false,releaseSettings,releaseTheme:null};
+      if(holdSettings){
+        for(const area of [chrome.storage.local,chrome.storage.sync]){
+          const get=area.get.bind(area);
+          area.get=(query,...rest)=>{
+            const result=get(query,...rest);
+            if(query&&typeof query==='object'&&Object.hasOwn(query,'optPrivateDefault')){
+              state.settingsWaiting=true;
+              return settingsReady.then(()=>result);
+            }
+            return result;
+          };
+        }
+      }
+      const append=Element.prototype.appendChild;
+      Element.prototype.appendChild=function(node){
+        if(this===document.head&&node.tagName==='SCRIPT'&&node.src.endsWith('/pinboard-themes.js')){
+          state.loads++;
+          if(failFirst&&state.loads===1){
+            setTimeout(()=>node.dispatchEvent(new Event('error')),0);
+            return node;
+          }
+          if(holdTheme){state.releaseTheme=()=>append.call(this,node);return node;}
+        }
+        return append.call(this,node);
+      };
+    },{holdSettings,holdTheme,failFirst});
+    await page.goto(pageUrl+'options.html'+hash);
+    return page;
+  }
+  const lazy=await appearancePage({holdTheme:true});
+  try{
+    await lazy.waitForFunction(()=>document.documentElement.dataset.optionsReady==='1');
+    assert.equal(await lazy.evaluate(()=>appearanceFixture.loads),0,'other settings tabs loaded full themes');
+    await lazy.locator('#tab-appearance').click();
+    await lazy.locator('#tab-general').click();
+    await lazy.locator('#tab-appearance').click();
+    await until(()=>lazy.evaluate(()=>appearanceFixture.loads===1),'first appearance click loads one script');
+    await lazy.locator('.theme-preset-btn[data-theme="paper-ink"]').click();
+    await lazy.evaluate(()=>appearanceFixture.releaseTheme());
+    await lazy.waitForFunction(()=>document.getElementById('preset-preview-content').textContent.length>0);
+    assert(await lazy.evaluate(()=>document.getElementById('preset-preview-content').textContent===PINBOARD_THEMES['paper-ink'].css),'the pending load did not render the current preset');
+    await lazy.locator('#tab-general').click();
+    await lazy.locator('#tab-appearance').click();
+    assert.equal(await lazy.evaluate(()=>appearanceFixture.loads),1,'revisiting appearance loaded another script');
+  }finally{await lazy.close();}
+  const early=await appearancePage({hash:'#appearance',holdSettings:true,holdTheme:true});
+  try{
+    await until(()=>early.evaluate(()=>appearanceFixture.settingsWaiting),'appearance restore waits for settings');
+    await early.locator('#tab-general').click();
+    await early.locator('#tab-appearance').click();
+    assert.equal(await early.evaluate(()=>appearanceFixture.loads),0,'appearance loaded before its settings were ready');
+    // A slow first settings read can outlast the page's fallback reveal.
+    // Choose twice while the old stored preset is still on its way.
+    await early.locator('.theme-preset-btn[data-theme="paper-ink"]').click();
+    await early.locator('.theme-preset-btn[data-theme="dracula"]').click();
+    await early.evaluate(()=>appearanceFixture.releaseSettings());
+    await until(()=>early.evaluate(()=>appearanceFixture.loads===1),'restore and early click share one theme load');
+    await early.emulateMedia({colorScheme:'dark'});
+    await early.evaluate(()=>appearanceFixture.releaseTheme());
+    await early.waitForFunction(()=>document.getElementById('preset-preview-content').textContent.length>0);
+    assert(await early.locator('#tab-appearance').evaluate(button=>button.classList.contains('active')),'restored appearance tab lost its active state');
+    assert.equal(await early.evaluate(()=>appearanceFixture.loads),1,'restored appearance load was duplicated');
+    assert(await early.evaluate(()=>document.getElementById('preset-preview-content').textContent===PINBOARD_THEMES.dracula.css),'stored preset overrode the early selection');
+    await until(async()=>(await worker.evaluate(()=>chrome.storage.local.get('themePresetKey'))).themePresetKey==='dracula','early selection persisted');
+  }finally{await early.close();}
+  const retry=await appearancePage({hash:'#appearance',failFirst:true});
+  try{
+    await retry.waitForFunction(()=>document.documentElement.dataset.optionsReady==='1'&&appearanceFixture.loads===1);
+    await retry.locator('#tab-general').click();
+    await retry.locator('#tab-appearance').click();
+    await retry.waitForFunction(()=>appearanceFixture.loads===2&&document.getElementById('preset-preview-content').textContent.length>0);
+  }finally{await retry.close();}
+  console.log('appearance stays lazy, waits for settings on restored/early visits, deduplicates opens and retries a failed script load');
   // Three states the options page keeps in closures: the preset buttons after
   // a saved theme is picked, the shown shortcuts after the shortcut page is
   // visited, and the per-provider reader model overrides after a tab reset.
