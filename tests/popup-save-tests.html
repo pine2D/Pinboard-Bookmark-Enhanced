@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="323"><title>Popup Save Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="326"><title>Popup Save Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 .case { padding: 4px 8px; margin: 4px 0; }
@@ -1530,7 +1530,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(h.draftBase() === base && h.snapshot().baseVersion === "restored-version", "failed read discarded the draft's conflict base");
     });
 
-    for (const outcome of ["found", "missing"]) await testAsync("conflict " + outcome + " persists its new base before close and restores it on reopen", async () => {
+    for (const reason of ["conflict", "changed_elsewhere"]) for (const outcome of ["found", "missing"]) await testAsync(reason + " " + outcome + " persists its new base before close and restores it on reopen", async () => {
       const loaded = { href: URL, description: "Old", extended: "", tagNames: ["One", "Two"], version: "loaded-version", shared: "no", toread: "no" };
       const base = { url: URL, version: "restored-version", tags: ["Old tag"] };
       const draftStore = { row: null };
@@ -1538,14 +1538,17 @@ test("posts/add default remains replace=yes for existing callers", () => {
       h.remember();
       assert(draftStore.row.baseVersion === "restored-version", "precondition: initial dispatch lacks restored base");
       const pending = h.click(); await flushMicrotasks();
-      h.resolveSave({status: "failed", reason: "conflict"}); await flushMicrotasks();
+      // No latestPost: changed_elsewhere/unverified must do a real lookup.
+      h.resolveSave({status: "failed", reason, ...(reason === "changed_elsewhere" ? {unverified: true} : {})}); await flushMicrotasks();
       const fresh = {...loaded, tagNames: ["Two", "Server tag"], version: "fresh-version"};
       h.resolveLookup({posts: outcome === "found" ? [fresh] : []}); await pending;
       const writes = h.messages.filter(message => message.type === "PBP_POPUP_DRAFT" && message.action === "write");
       const last = writes.at(-1).draft;
       assert(outcome === "found" ? last.baseVersion === "fresh-version" && JSON.stringify(last.baseTags) === JSON.stringify(fresh.tagNames)
         : !Object.hasOwn(last, "baseVersion") && !Object.hasOwn(last, "baseTags"), "last dispatched draft kept old base: " + JSON.stringify(last));
-      assert(JSON.stringify(last) === JSON.stringify(h.snapshot()), "last dispatched draft differs from form snapshot");
+      assert(h.draftBase() === null, "answered lookup kept the old in-memory base");
+      assert(JSON.stringify(last) === JSON.stringify(h.snapshot()), "last dispatched draft differs from final tag-rebased form snapshot");
+      if (outcome === "found" && reason === "changed_elsewhere") assert(JSON.stringify(last.tags) === JSON.stringify(pbpRebaseLoadedTags(base.tags, ["One", "Two"], fresh.tagNames)), "draft was dispatched before tag rebase");
       // A response to an older dispatch arrives after the current one. It
       // must not reset the write key or show a stale failure on this form.
       h.draftReplies.at(-1)({ok: true}); h.draftReplies[0]({ok: false}); await flushMicrotasks();
@@ -1561,7 +1564,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(restored.baseVersion === last.baseVersion && JSON.stringify(restored.baseTags) === JSON.stringify(last.baseTags), "reopen restored an outdated conflict base");
     });
 
-    await testAsync("failed and stale conflict reads preserve the last dispatched draft base across reopen", async () => {
+    for (const reason of ["conflict", "changed_elsewhere"]) await testAsync("failed and stale " + reason + " reads preserve the last dispatched draft base across reopen", async () => {
       for (const outcome of ["failed", "stale"]) {
         const loaded = {href: URL, description: "Old", extended: "", tagNames: ["One"], version: "loaded-version", shared: "no", toread: "no"};
         const base = {url: URL, version: "restored-version", tags: ["Old tag"]};
@@ -1570,11 +1573,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
         h.remember();
         const before = JSON.stringify(draftStore.row);
         const pending = h.click(); await flushMicrotasks();
-        h.resolveSave({status:"failed", reason:"conflict"}); await flushMicrotasks();
+        h.resolveSave({status:"failed", reason, ...(reason === "changed_elsewhere" ? {unverified:true} : {})}); await flushMicrotasks();
         if (outcome === "stale") h.elements["url-input"].value = "https://other.example/";
         h.resolveLookup(outcome === "failed" ? {posts:null, get metadata(){ throw new Error("lookup failed"); }} : {posts:[{...loaded,version:"should-not-apply"}]});
         await pending;
-        assert(JSON.stringify(draftStore.row) === before, outcome + ": uncertain lookup changed the persisted baseline");
+        assert(h.draftBase() === base, outcome + ": uncertain lookup changed the in-memory baseline");
+        assert(JSON.stringify(draftStore.row) === before, outcome + ": uncertain lookup changed the last dispatched baseline");
         const reopened = createSubmitHarness({service:"karakeep", realDraft:true, draftEdits:false, draftStore});
         await reopened.reopen();
         assert(reopened.snapshot().baseVersion === "restored-version" && JSON.stringify(reopened.snapshot().baseTags) === JSON.stringify(base.tags), outcome + ": reopen lost the old draft base: " + JSON.stringify({snapshot:reopened.snapshot(),sent:reopened.messages,statuses:reopened.statuses}));

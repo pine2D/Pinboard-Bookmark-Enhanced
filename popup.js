@@ -2456,6 +2456,13 @@ function setupSubmit(token) {
   const submitAccount = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
   let submitErrorResetTimer = null;
   let submitAttemptSeq = 0;
+  // Both conflict paths adopt only an answered lookup. Call after any tag
+  // rebase, so the last dispatched draft holds the complete reviewed form.
+  const rememberReviewedLookup = (status) => {
+    if (status !== "found" && status !== "missing") return;
+    _popupDraftBase = null;
+    pbpRememberPopupDraft();
+  };
 
   // Pinboard takes one API call per 3s and the bookmark lookup made on open
   // already spent the slot, so a save can sit at "Saving…" for 2-3s with
@@ -2771,8 +2778,8 @@ function setupSubmit(token) {
 
       if (result.status === "failed" && result.reason === "changed_elsewhere") {
         // Nothing was written. The form takes the bookmark as the server holds
-        // it now (the worker's own check found it, so no request is made
-        // here): the fields the user left alone show the new values, the ones
+        // it now (using the worker's row, or a fresh lookup if unavailable):
+        // the fields the user left alone show the new values, the ones
         // they changed keep their text, and their tag changes are made on the
         // new tags. Their next press saves on top of that version.
         for (const id of Object.keys(fieldDirtyFlags)) fieldDirtyFlags[id] = fieldDirtyFlags[id] || dirtyAtSubmit[id] === true;
@@ -2790,9 +2797,8 @@ function setupSubmit(token) {
         if (reloaded.status === "found") {
           currentTags = pbpRebaseLoadedTags(loadedTagsAtSubmit, currentTags, existingBookmark?.tagNames);
           renderTags();
-          _popupDraftBase = null;
-          pbpRememberPopupDraft();
         }
+        rememberReviewedLookup(reloaded.status);
         // A field the user edited that the server now holds differently (and,
         // when known, differently from what the form loaded) keeps the user's
         // text; the server's value is named so the next press is made knowing it.
@@ -2845,12 +2851,7 @@ function setupSubmit(token) {
           setSubmitState("idle");
           return;
         }
-        if (conflictLookup.status === "found" || conflictLookup.status === "missing") {
-          _popupDraftBase = null;
-          // The lookup may already have drafted the form against its restored
-          // base. Persist the newly reviewed base before this popup can close.
-          pbpRememberPopupDraft();
-        }
+        rememberReviewedLookup(conflictLookup.status);
         if (conflictLookup.status === "found") {
           // Same shape as review_required: the save did not land, press again.
           showStatus("status-msg", t("saveNeedsReview"), "info");
