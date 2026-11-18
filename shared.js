@@ -1551,6 +1551,19 @@ function pbpScopeHighlightBackupImport(highlights, ownerScope) {
   return out;
 }
 
+// The short storage key locates a slot. When a record has an article URL,
+// it is the identity. Early highlight records did not carry one.
+function pbpHighlightArticleMatches(record, url) {
+  return !record?.url || record.url === url;
+}
+
+function pbpRestoreHighlightArticle(stored, incoming) {
+  if (!stored?.url || !incoming) return incoming;
+  if (!incoming.url) return { ...incoming, url: stored.url };
+  if (!pbpHighlightArticleMatches(stored, incoming.url)) throw new Error("Highlight article mismatch");
+  return incoming;
+}
+
 // A restore replaces only what the importing account can see. The file carries
 // just that account's items (pbpBuildHighlightBackup scopes the export), while
 // the stored record is shared by every account that highlighted the page, so a
@@ -1559,6 +1572,7 @@ function pbpScopeHighlightBackupImport(highlights, ownerScope) {
 // somebody else are carried across unchanged, and an incoming item wins over a
 // stored one with the same id. Pure.
 function pbpMergeHighlightBackupRecord(stored, incoming, ownerScope) {
+  incoming = pbpRestoreHighlightArticle(stored, incoming);
   if (!stored || typeof stored !== "object" || Array.isArray(stored) || !Array.isArray(stored.items)) return incoming;
   const incomingItems = (incoming && Array.isArray(incoming.items)) ? incoming.items : [];
   const incomingIds = new Set(incomingItems
@@ -1582,6 +1596,7 @@ function pbpMergeHighlightBackupRecord(stored, incoming, ownerScope) {
 // The text identity is the one normalizeLegacy hashes. Returns null when
 // nothing is missing, so the caller writes nothing. Pure.
 function pbpAddMissingHighlightBackupRecord(stored, incoming, ownerScope) {
+  incoming = pbpRestoreHighlightArticle(stored, incoming);
   const incomingItems = (incoming && Array.isArray(incoming.items)) ? incoming.items : [];
   if (!stored || typeof stored !== "object" || Array.isArray(stored) || !Array.isArray(stored.items)) {
     return incomingItems.length ? incoming : null;
@@ -1602,7 +1617,7 @@ function pbpAddMissingHighlightBackupRecord(stored, incoming, ownerScope) {
   const missing = incomingItems.filter((item) => pbpHighlightBackupItemInScope(item, ownerScope) &&
     !(hasId(item) ? present.has("id:" + item.id) || idlessText.has(textIdentity(item)) : present.has(textIdentity(item))));
   if (!missing.length) return null;
-  return Object.assign({}, stored, { items: stored.items.concat(missing) });
+  return Object.assign({}, stored, incoming.url && !stored.url ? { url: incoming.url } : {}, { items: stored.items.concat(missing) });
 }
 
 function pbpIsPlainRecord(value) {

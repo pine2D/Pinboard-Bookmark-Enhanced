@@ -239,12 +239,16 @@ function pbpCreateNotesSyncStore({
       const previous=(await read(key)) || {v:1,url:next?.url || "",title:next?.title || "",items:[]};
       await checkOwner(owner);
       next=next || {...previous,items:[]};
+      if (previous.url && next.url && previous.url !== next.url) throw _pbpNotesSyncError("local_store");
+      if (previous.url && !next.url) next = {...next,url:previous.url};
+      const articleKey = /^pbp_hl_[0-9a-f]{8}$/.test(key);
+      if (articleKey && next.url && pbpNotesArticleKey(next.url) !== key) throw _pbpNotesSyncError("local_store");
       const hidden=rec=>(rec.items || []).filter(item=>item.owner && item.owner !== owner);
       if (!pbpVocabEventContentEqual(hidden(previous),hidden(next))) throw _pbpNotesSyncError("account_changed");
       let updated={...next};
       if (previous.notesSync) updated.notesSync=previous.notesSync;
-      const enrol=/^acct_.+/.test(owner) && /^pbp_hl_[0-9a-f]{8}$/.test(key) &&
-        typeof updated.url === "string" && pbpDictSafeUrl(updated.url) === updated.url && pbpNotesArticleKey(updated.url) === key;
+      const enrol=/^acct_.+/.test(owner) && articleKey &&
+        typeof updated.url === "string" && !!updated.url && pbpDictSafeUrl(updated.url) === updated.url;
       if (enrol) {
         const old=await normalizeLegacy(previous,owner);
         updated=await normalizeLegacy(updated,owner);

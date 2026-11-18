@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="55"><title>Notes Sync Tests</title></head><body>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="58"><title>Notes Sync Tests</title></head><body>
 <h1>Notes Sync Tests</h1><div id="summary"></div><div id="results"></div>
 <script src="../shared.js"></script><script src="../options-backup.js"></script>
 <script src="../vocab-store.js"></script><script src="../notes-sync.js"></script>
@@ -63,6 +63,39 @@ test("three-way note merge is associative",()=>{const a=event("peer-a","first"),
 test("concurrent delete/edit preserves text and a notice",()=>{const a=event("peer-a","edited"),b=event("peer-b");b.deleted=true;delete b.value;const r=pbpNotesMergeEvents(a,b);assert(!r.event.deleted && r.event.value.item.note === "edited" && r.notice);});
 test("later delete dominates earlier note",()=>{const a=event(),b=event("peer-a","",2);b.deleted=true;delete b.value;assert(pbpNotesMergeEvents(a,b).event.deleted);});
 test("write persists content and pending event in one article record",async()=>{const f=fixture();await write(f,record());const out=await f.store().listOutbox(OWNER);assert(f.data[KEY].items[0].note === "original");assert(out.length===1 && out[0].event.value.item.note === "original");});
+test("an occupied article slot cannot publish or replace a different article", async () => {
+  const f = fixture({[KEY]: {...record(), url:"https://different.example/article"}});
+  const original = clone(f.data[KEY]);
+  let error;
+  try { await write(f, record([item("new note")])); } catch (e) { error = e; }
+  assert(error?.code === "local_store");
+  assert(JSON.stringify(f.data[KEY]) === JSON.stringify(original));
+  assert((await f.store().listOutbox(OWNER)).length === 0);
+});
+test("both file import and add-missing restore preserve a different article in the same slot", async () => {
+  for (const addMissing of [false, true]) {
+    const f = fixture({[KEY]: {...record(), url:"https://different.example/article"}});
+    const prior = globalThis.chrome, original = clone(f.data[KEY]);
+    try {
+      globalThis.chrome = {storage:{local:f.storage}};
+      let failed = false;
+      try { await pbpBackupWriteHighlights({[KEY]:record([item("from backup","another-id")])},OWNER,async()=>{}, {addMissing}); }
+      catch (e) { failed = e.message === "highlight records failed: 1"; }
+      assert(failed && JSON.stringify(f.data[KEY]) === JSON.stringify(original));
+    } finally { globalThis.chrome = prior; }
+  }
+});
+test("a URL-less legacy import retains an article URL already known on this device", async () => {
+  const f = fixture({[KEY]:record()}), legacy = record([item("from legacy")]);
+  delete legacy.url;
+  const prior = globalThis.chrome;
+  try {
+    globalThis.chrome = {storage:{local:f.storage}};
+    await pbpBackupWriteHighlights({[KEY]:legacy},OWNER,async()=>{});
+    assert(f.data[KEY].url === URL_ && f.data[KEY].items[0].note === "from legacy");
+    assert((await f.store().listOutbox(OWNER))[0].event.value.url === URL_);
+  } finally { globalThis.chrome = prior; }
+});
 test("note edits advance version without losing other items",async()=>{const f=fixture({[KEY]:record([item("foreign","foreign",OTHER)])});await write(f,record([item(),item("foreign","foreign",OTHER)]));await write(f,record([item("changed"),item("foreign","foreign",OTHER)]));const out=await f.store().listOutbox(OWNER);assert(out.length===1 && out[0].event.dot.counter===2);assert(f.data[KEY].items[1].note === "foreign");});
 test("unchanged content does not queue another version",async()=>{const f=fixture();await write(f,record());await write(f,record());assert((await f.store().listOutbox(OWNER))[0].event.dot.counter===1);});
 test("deleting last item keeps durable tombstone",async()=>{const f=fixture();await write(f,record());await write(f,record([]));assert(f.data[KEY].items.length===0);assert((await f.store().listOutbox(OWNER))[0].event.deleted);});
