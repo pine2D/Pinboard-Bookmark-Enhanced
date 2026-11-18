@@ -59,7 +59,7 @@ export const PANEL_SCHEMA = deepFreeze({
     extraFields: [
       { domId: "translate-target-lang-custom", value: "", order: 5 },
     ],
-    afterHook: `() => {\n        for (const k of Object.keys(_previewModelMap)) { _previewModelMap[k] = ""; _previewModelEdits[k] = ""; }\n        scheduleAutoSave();\n      }`,
+    afterHook: `() => {\n        pbpResetPreviewModels(_previewModelReset, _previewModelMap, _previewModelEdits);\n        _previewModelShown = "";\n        scheduleAutoSave();\n      }`,
     resetAllowlist: {},
   },
   quick: {

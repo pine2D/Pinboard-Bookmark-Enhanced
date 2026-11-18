@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="587"><title>Settings Persistence Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="597"><title>Settings Persistence Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -6965,6 +6965,50 @@ async function run() {
       values.previewAiModelByProvider["custom-ab12cd"] = "removed-model";
       await persistSettings({previewAiModelByProvider:{}}, {previewModelChanges:{"custom-ab12cd":null}});
       check("model merge: custom provider deletion keeps unrelated entries", !("custom-ab12cd" in values.previewAiModelByProvider) && values.previewAiModelByProvider.gemini === "legacy-only");
+      values.previewAiModelByProvider = {gemini:"g",openai:"external-after-load"};
+      await persistSettings({previewAiModelByProvider:{gemini:""}}, {previewModelChanges:{},previewModelReset:true});
+      check("Reader reset: clears unseen latest providers inside lock", values.previewAiModelByProvider.gemini === "" && values.previewAiModelByProvider.openai === "");
+      const unchanged = {previewAiModelByProvider:{gemini:""},previewAiModel:""};
+      values.previewAiModelByProvider.openai = "external-again";
+      await pbpSaveOptionsSnapshot({settings:unchanged,overlay:""}, unchanged, "", {
+        persist:persistSettings, previewModelChanges:{}, previewModelReset:true,
+        saveOverlay:async()=>({}), assertOverlay:()=>{},
+      });
+      check("Reader reset: all-provider intent survives empty form delta", values.previewAiModelByProvider.openai === "");
+      values.previewAiModelByProvider = {}; values.previewAiModel = "legacy-hidden";
+      await persistSettings({}, {previewModelChanges:{gemini:"retyped-old"},previewModelReset:true});
+      check("Reader reset: post-reset input wins over legacy and reset", values.previewAiModelByProvider.gemini === "retyped-old" && values.previewAiModel === "");
+      await Promise.all([
+        persistSettings({previewAiModelByProvider:{deepseek:"imported"}}),
+        persistSettings({}, {previewModelChanges:{},previewModelReset:true}),
+      ]);
+      check("Reader reset: serialized reset sees provider added by ordinary import", values.previewAiModelByProvider.deepseek === "");
+      await Promise.all([
+        persistSettings({}, {previewModelChanges:{},previewModelReset:true}),
+        persistSettings({}, {previewModelChanges:{openai:"later-edit"}}),
+      ]);
+      check("Reader reset: later provider edit survives ordered reset", values.previewAiModelByProvider.deepseek === "" && values.previewAiModelByProvider.openai === "later-edit");
+      const reset = {revision:0,pending:0}, map = {gemini:"old"}, edits = {gemini:"before-reset"};
+      pbpResetPreviewModels(reset,map,edits);
+      check("Reader reset: discards pre-reset edits without inventing provider edits", reset.pending === 1 && map.gemini === "" && Object.keys(edits).length === 0);
+      edits.gemini = "retyped-old";
+      const submitted = {...edits}, submittedRevision = reset.pending;
+      edits.gemini = "newer-draft";
+      pbpCommitPreviewModels(reset,edits,submitted,submittedRevision);
+      check("Reader reset: save completion retains edits made during write", reset.pending === 0 && edits.gemini === "newer-draft");
+      pbpResetPreviewModels(reset,map,edits);
+      const firstResetRevision = reset.pending;
+      pbpResetPreviewModels(reset,map,edits); edits.gemini = "same-as-first-save";
+      pbpCommitPreviewModels(reset,edits,{gemini:"same-as-first-save"},firstResetRevision);
+      check("Reader reset: older completion cannot consume a newer reset and equal edit", reset.pending === 3 && edits.gemini === "same-as-first-save");
+      const originalSet = area.set;
+      area.set = async()=>{throw new Error("deterministic reset write failure");};
+      const failure = await persistSettings({}, {previewModelChanges:{...edits},previewModelReset:true});
+      check("Reader reset: failed persistence leaves reset and edits available for retry", !failure.ok && reset.pending === 3 && edits.gemini === "same-as-first-save");
+      area.set = originalSet;
+      const retry = await persistSettings({}, {previewModelChanges:{...edits},previewModelReset:true});
+      if (retry.ok) pbpCommitPreviewModels(reset,edits,{...edits},3);
+      check("Reader reset: successful retry clears latest providers and consumes only committed intent", retry.ok && reset.pending === 0 && !Object.keys(edits).length && values.previewAiModelByProvider.openai === "" && values.previewAiModelByProvider.gemini === "same-as-first-save");
     } finally {
       globalThis.chrome = priorChrome; _settingsStorageCache = priorCache;
       if (priorStorage === undefined) delete globalThis.__pbpTestStorage; else globalThis.__pbpTestStorage = priorStorage;

@@ -5410,7 +5410,7 @@ const optionsSnapshot = optionsJs.slice(optionsSnapshotStart, optionsSnapshotEnd
 const optionsSaveAllStart = optionsJs.indexOf("async function saveAll()", optionsSnapshotEnd);
 const optionsSaveAllEnd = optionsJs.indexOf("function reportAutoSaveFailure", optionsSaveAllStart);
 const optionsSaveAll = optionsJs.slice(optionsSaveAllStart, optionsSaveAllEnd);
-check(inOrder(optionsSnapshot, "await persist(settingsDelta, { previewModelChanges })", "if (!res.ok)",
+check(inOrder(optionsSnapshot, "await persist(settingsDelta,", "if (!res.ok)",
   "if (onSettingsSaved) onSettingsSaved(settingsDelta);",
   "overlay = await saveOverlay(overlayValue);") &&
   /onSettingsSaved\(settingsDelta\)[\s\S]*pbpStoreOptionsThemeMirror\(data\.optTheme, data\.themePresetKey, data\.optPopupFollowTheme !== false\)/.test(optionsSaveAll),

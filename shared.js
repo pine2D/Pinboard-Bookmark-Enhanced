@@ -3641,7 +3641,7 @@ function pbpParamListClamp(list, maxBytes = PBP_PARAM_LIST_BYTE_BUDGET) {
 // syncSetLarge (chunked, local-fallback on quota) so a single >8KB key can't
 // reject the whole sync batch. The remaining keys go in one guarded set().
 // Returns {ok, fellBackToLocal, error?} — never throws on quota.
-async function persistSettings(data, { previewModelChanges } = {}) {
+async function persistSettings(data, { previewModelChanges, previewModelReset = false } = {}) {
   let batch = { ...data };
   let fellBackToLocal = false;
   // Test seam: allow stubbing storage + syncSetLarge from the harness.
@@ -3679,16 +3679,22 @@ async function persistSettings(data, { previewModelChanges } = {}) {
       // Form writers send only provider entries actually edited. Re-read and
       // merge under the same cross-document lock as the write. Ordinary
       // backup/import callers omit this option and retain replacement semantics.
-      if (previewModelChanges && typeof previewModelChanges === "object") {
+      if (previewModelReset || (previewModelChanges && typeof previewModelChanges === "object")) {
         delete batch.previewAiModelByProvider;
-        if (Object.keys(previewModelChanges).length || batch.previewAiModel === "") {
+        if (previewModelReset || Object.keys(previewModelChanges).length || batch.previewAiModel === "") {
           const latest = await pbpReadSettingsUnlocked({ previewAiModelByProvider: {}, previewAiModel: "", aiProvider: "gemini" });
           const map = latest.previewAiModelByProvider && typeof latest.previewAiModelByProvider === "object"
             && !Array.isArray(latest.previewAiModelByProvider) ? { ...latest.previewAiModelByProvider } : {};
           if (!Object.hasOwn(map, latest.aiProvider) && typeof latest.previewAiModel === "string" && latest.previewAiModel.trim()) {
             map[latest.aiProvider] = latest.previewAiModel.trim();
           }
-          for (const [provider, value] of Object.entries(previewModelChanges)) {
+          // Only an explicit Reader reset clears providers this page has never
+          // seen. Apply edits made after Reset on top of that locked baseline.
+          if (previewModelReset) {
+            for (const provider of Object.keys(map)) map[provider] = "";
+            batch.previewAiModel = "";
+          }
+          for (const [provider, value] of Object.entries(previewModelChanges || {})) {
             if (value === null) delete map[provider]; // Deleted custom provider.
             else map[provider] = value;
           }

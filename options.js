@@ -1277,16 +1277,17 @@ async function pbpSaveOptionsSnapshot(state, data, overlayValue, {
   assertOverlay,
   onSettingsSaved,
   previewModelChanges,
+  previewModelReset = false,
 }) {
   const settingsDelta = pbpSettingsDelta(data, state.settings);
   // Another form may have changed a provider since this form took its baseline.
   // An intentional edit back to that baseline still needs to reach the lock.
-  if (previewModelChanges && Object.keys(previewModelChanges).length) {
+  if (previewModelReset || (previewModelChanges && Object.keys(previewModelChanges).length)) {
     settingsDelta.previewAiModelByProvider = data.previewAiModelByProvider;
   }
   const overlayChanged = overlayValue !== state.overlay;
   const res = Object.keys(settingsDelta).length
-    ? await persist(settingsDelta, { previewModelChanges })
+    ? await persist(settingsDelta, { previewModelChanges, previewModelReset })
     : { ok: true, fellBackToLocal: false };
   if (!res.ok) throw res.error || new Error("settings save failed");
   if (Object.keys(settingsDelta).length) {
@@ -1315,6 +1316,21 @@ function pbpQueueOptionsSave(state, save) {
   // later saves or a bulk-import drain.
   state.chain = run.catch(() => {});
   return run;
+}
+
+// A Reader reset is a separate intent from editing one provider. Its sequence
+// survives failure and prevents an older completion consuming a newer reset.
+function pbpResetPreviewModels(state, map, edits) {
+  state.pending = ++state.revision;
+  for (const key of Object.keys(map)) map[key] = "";
+  for (const key of Object.keys(edits)) delete edits[key];
+}
+function pbpCommitPreviewModels(state, edits, submitted, resetRevision) {
+  if (state.pending !== resetRevision) return;
+  state.pending = 0;
+  for (const [provider, value] of Object.entries(submitted)) {
+    if (edits[provider] === value) delete edits[provider];
+  }
 }
 
 // Guard for storage.onChanged credential field refills: never overwrite an
@@ -2213,7 +2229,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-reader-voice-input": false,
       },
       after: () => {
-        for (const k of Object.keys(_previewModelMap)) { _previewModelMap[k] = ""; _previewModelEdits[k] = ""; }
+        pbpResetPreviewModels(_previewModelReset, _previewModelMap, _previewModelEdits);
+        _previewModelShown = "";
         scheduleAutoSave();
       },
     },
@@ -3063,6 +3080,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       && !Array.isArray(s.previewAiModelByProvider))
     ? { ...s.previewAiModelByProvider } : {};
   const _previewModelEdits = Object.create(null);
+  const _previewModelReset = { revision: 0, pending: 0 };
   let _previewModelProvider = s.aiProvider || "gemini";
   let _previewModelShown = "";
   function capturePreviewModelEdit() {
@@ -4839,16 +4857,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const data = collectSettingsFromForm();
     const overlayValue = $id("opt-custom-css").value;
     const previewModelChanges = { ..._previewModelEdits };
+    const previewModelResetRevision = _previewModelReset.pending;
     try {
       const result = await pbpSaveOptionsSnapshot(savedState, data, overlayValue, {
         persist: persistSettings,
         previewModelChanges,
+        previewModelReset: previewModelResetRevision !== 0,
         saveOverlay: saveOverlayWithFallback,
         assertOverlay: pbpAssertOverlaySize,
         onSettingsSaved(settingsDelta) {
-          for (const [provider, value] of Object.entries(previewModelChanges)) {
-            if (_previewModelEdits[provider] === value) delete _previewModelEdits[provider];
-          }
+          pbpCommitPreviewModels(_previewModelReset, _previewModelEdits, previewModelChanges, previewModelResetRevision);
           if ("optTheme" in settingsDelta || "themePresetKey" in settingsDelta || "optPopupFollowTheme" in settingsDelta) {
             pbpStoreOptionsThemeMirror(data.optTheme, data.themePresetKey, data.optPopupFollowTheme !== false);
           }
