@@ -138,6 +138,59 @@ test("posts/add default remains replace=yes for existing callers", () => {
   assert(uri.includes("&replace=yes") && !uri.includes("&replace=no"));
 });
 
+// A fresh document loads the real scripts and real controls for each case.
+// The fixture only supplies an already-open form and the worker's message end.
+async function loadPopupSubmitFixture() {
+  const frame = document.createElement("iframe");
+  frame.hidden = true;
+  const loaded = new Promise((resolve, reject) => {
+    frame.onload = resolve;
+    frame.onerror = () => reject(new Error("popup submit fixture failed to load"));
+  });
+  frame.src = "fixtures/popup-submit.html";
+  document.body.appendChild(frame);
+  await loaded;
+  const api = await frame.contentWindow.submitReady;
+  return { frame, api, window: frame.contentWindow };
+}
+
+async function waitForSubmitState(ready, message) {
+  const deadline = performance.now() + 3000;
+  while (!ready() && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10));
+  assert(ready(), message);
+}
+
+async function withPopupSubmitFixture(options, check) {
+  const fixture = await loadPopupSubmitFixture();
+  fixture.messages = [];
+  fixture.network = [];
+  fixture.window.submitMock.onSendMessage(message => {
+    fixture.messages.push(message);
+    if (message.type === "save_intent") {
+      return new Promise(resolve => { fixture.replyToSave = resolve; });
+    }
+    return fixture.replyToLookup?.(message);
+  });
+  fixture.window.fetch = (...args) => {
+    fixture.network.push(args);
+    return Promise.reject(new Error("direct network request in submit fixture"));
+  };
+  fixture.window.XMLHttpRequest.prototype.send = function () {
+    fixture.network.push(["XMLHttpRequest"]);
+    throw new Error("direct XHR request in submit fixture");
+  };
+  try {
+    fixture.api.configure({
+      url: URL, title: "Submitted title", notes: "Submitted notes",
+      tags: ["One", "Two", "machine learning"], private: true, toread: true,
+      ...options,
+    });
+    fixture.window.document.getElementById("submit-btn").click();
+    await waitForSubmitState(() => fixture.messages.length > 0, "real submit listener sent no request");
+    await check(fixture, fixture.messages[0]);
+  } finally { fixture.frame.remove(); }
+}
+
 (async () => {
   try {
     const [source, backgroundSource, sharedSource, popupAiSource, popupTagsSource, popupHtml, popupCss, enMessages, popupOfflineSource] = await Promise.all([
@@ -173,19 +226,24 @@ test("posts/add default remains replace=yes for existing callers", () => {
       return (...args) => { args.length = parts.length; return raw(...args, window.URL); };
     };
     const sliceRuntime = (params, body) => sliceFn(...Object.keys(params), body)(...Object.values(params));
-    const start = source.indexOf("function setupSubmit(token)");
-    const handlerEnd = source.indexOf('  document.addEventListener("keydown"', start);
-    assert(start >= 0 && handlerEnd > start, "setupSubmit source not found");
-    const setupEnd = source.indexOf("// ===================== Edit From Recent", start);
-    assert(setupEnd > start, "setupSubmit end marker not found");
-    const submit = source.slice(start, handlerEnd);
+    // Legacy cases below still execute selected function bodies with injected
+    // dependencies. Obtain this body from the genuinely loaded popup function,
+    // so its signature spelling and adjacent section comments are not gates
+    // for every case on the page. New submit cases use that live function.
+    const liveSubmit = await loadPopupSubmitFixture();
+    const loadedSubmitSource = liveSubmit.api.setupSubmit.toString();
+    liveSubmit.frame.remove();
+    const start = source.indexOf(loadedSubmitSource);
+    assert(start >= 0, "loaded popup submit function differs from the inspected file");
+    const setupSource = source.slice(start, start + loadedSubmitSource.length);
+    const handlerEnd = setupSource.indexOf('  document.addEventListener("keydown"');
+    assert(handlerEnd > 0, "legacy submit click-handler boundary not found");
+    const submit = setupSource.slice(0, handlerEnd);
     const policyIndex = submit.indexOf("const savePolicy = pbpPopupSavePolicy");
     const snapshotIndex = submit.indexOf('url: $id("url-input").value.trim()', policyIndex);
     const ownershipIndex = submit.indexOf("saveUrl !== url", snapshotIndex);
     const intentIndex = submit.indexOf("const intent = {", ownershipIndex);
     const sendIndex = submit.indexOf('chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft, summaryRange: summaryOwnership,', intentIndex);
-    const snapshot = submit.slice(snapshotIndex, ownershipIndex);
-    const intentBlock = submit.slice(intentIndex, sendIndex);
     const tagHelperStart = source.indexOf("function pbpRebasePopupTags(");
     const tagHelperEnd = source.indexOf("// Wayback per-save toggle", tagHelperStart);
     assert(tagHelperStart >= 0 && tagHelperEnd > tagHelperStart, "pbpRebasePopupTags source not found");
@@ -202,7 +260,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const lookupEnd = source.indexOf("// ===================== Submit / Delete", lookupStart);
     assert(lookupStart >= 0 && lookupEnd > lookupStart, "checkExistingBookmark source not found");
     const lookupSource = source.slice(lookupStart, lookupEnd);
-    const setupSource = source.slice(start, setupEnd);
     const offlineClearStart = source.indexOf("async function showOfflineQueueStatus() {");
     const offlineClearEnd = source.indexOf("// ===================== Helpers", offlineClearStart);
     assert(offlineClearStart >= 0 && offlineClearEnd > offlineClearStart, "showOfflineQueueStatus source not found");
@@ -1533,23 +1590,43 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(JSON.stringify(resetTokens) === JSON.stringify(["alice:failed-token"]), "proxy reset used a later session token");
     });
 
-    test("submit rereads one owned form snapshot into save_intent", () => {
-      assert(start >= 0 && handlerEnd > start && policyIndex >= 0, "submit policy path not found");
-      assert(snapshotIndex > policyIndex && ownershipIndex > snapshotIndex && intentIndex > ownershipIndex && sendIndex > intentIndex, "snapshot-to-intent ordering changed");
-      for (const field of ["title-input", "description-input", "private-check", "readlater-check", "archive-check"]) {
-        assert(snapshot.includes(`$id("${field}")`), `${field} is not in the final snapshot`);
+    await testAsync("submit rereads one owned form snapshot into save_intent", async () => {
+      for (const service of ["pinboard", "karakeep", "linkding"]) {
+        await withPopupSubmitFixture({ service, archiveTouched: true, archive: true }, async (fixture, message) => {
+          const intent = message.intent;
+          assert(intent.mode === "create" && intent.url === URL, "wrong save policy or URL");
+          assert(intent.title === "Submitted title" && intent.notes === "Submitted notes", "form text was not snapshotted");
+          assert(intent.private === true && intent.toread === true && intent.archive === true, "form flags were not snapshotted");
+          const expectedTags = service === "pinboard" ? "One Two machine learning" : 'One Two "machine learning"';
+          assert(intent.tags === expectedTags, "service tag serialization changed");
+          assert(message.account === fixture.api.account(), "save is not bound to the active bookmark connection");
+          fixture.api.replaceTags(["Later edit"]);
+          assert(message.intent.tags === expectedTags, "submitted tags changed with live form edits");
+        });
       }
-      assert(snapshot.includes("currentTags.slice()"), "tags are not copied into the final snapshot");
-      for (const field of ["mode: savePolicy.mode", "url: saveUrl", "title", "notes: extended", 'tags: pbpSerializeIntentTags(tags, pbpBookmarkServiceId(settings))', "private: isPrivate", "toread: isReadLater"]) {
-        assert(intentBlock.includes(field), `intent is missing ${field}`);
-      }
-      assert(intentBlock.includes("archive: _archiveUserTouched ? archiveRequested : undefined"), "automatic archive choice is still sent as an override");
+      await withPopupSubmitFixture({ archiveTouched: false, archive: true }, async (_fixture, message) => {
+        assert(message.intent.archive === undefined, "automatic archive choice became an explicit override");
+      });
     });
 
-    test("submit no longer builds or sends posts/add directly", () => {
-      assert(!submit.includes("buildPostsAddUri"), "Popup submit still builds a posts/add URI");
-      assert(!submit.includes("/posts/add"), "Popup submit still names posts/add");
-      assert(!submit.includes("pinboardFetch("), "Popup submit still performs direct Pinboard delivery");
+    await testAsync("submit delegates delivery without directly requesting a remote endpoint", async () => {
+      const post = { href: URL, description: "Title from the server", extended: "", tags: "", shared: "no", toread: "yes", time: "2020-01-02T03:04:05Z" };
+      for (const loaded of [null, post]) {
+        await withPopupSubmitFixture({ loaded }, async (fixture, message) => {
+          assert(message.type === "save_intent" && fixture.messages.length === 1, "save was not delegated exactly once");
+          fixture.replyToLookup = () => ({ ok: true, status: 200, text: JSON.stringify({ posts: [post] }) });
+          fixture.replyToSave({ status: "saved", mutation: loaded ? "updated" : "created" });
+          const doc = fixture.window.document;
+          await waitForSubmitState(() => doc.getElementById("submit-btn").classList.contains("saved-success"), "popup did not display a successful save");
+          if (!loaded) {
+            await waitForSubmitState(() => doc.getElementById("title-input").value === post.description, "create did not reread the saved record");
+            const lookup = fixture.messages[1];
+            assert(lookup?.type === "pinboard_api_call" && new window.URL(lookup.url).pathname === "/v1/posts/get", "post-save lookup was not delegated to the worker");
+          }
+          assert(fixture.messages.length === (loaded ? 1 : 2), "submit sent an unexpected runtime request");
+          assert(fixture.network.length === 0, "popup performed a direct network request during delivery");
+        });
+      }
     });
 
     test("submit stays inert until its own handlers are bound", () => {
@@ -1927,12 +2004,14 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(calls.length===1&&calls[0][1]===URL,"enabled valid-target suggestions did not use the target URL");
     });
 
-    test("update forwards only the exact loaded server time", () => {
-      const timeStart = submit.indexOf('if (savePolicy.mode === "update")', intentIndex);
-      const timeBlock = submit.slice(timeStart, submit.indexOf("let attemptsStored", timeStart));
-      assert(timeStart > intentIndex && timeBlock.includes("intent.time = existingBookmark?.time"), "update time is not forwarded from the loaded bookmark");
-      assert(!submit.includes("new Date().toISOString"), "Popup still invents a bookmark time");
-      assert(!submit.includes("existingTimeAtSave"), "legacy synthetic-time fallback remains");
+    await testAsync("update forwards only the exact loaded server time", async () => {
+      for (const time of ["2020-01-02T03:04:05Z", undefined]) {
+        const loaded = { description: "Loaded title", extended: "Loaded notes", tags: "old", shared: "no", toread: "yes", ...(time === undefined ? {} : { time }) };
+        await withPopupSubmitFixture({ loaded }, async (_fixture, message) => {
+          assert(message.intent.mode === "update", "loaded record was not updated");
+          assert(message.intent.time === time, "submit synthesized or replaced the loaded server time");
+        });
+      }
     });
 
     test("queued refreshes the queue bar without saved side effects", () => {

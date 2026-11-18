@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Popup submit fixture</title></head>
+<body>
+<script src="chrome-mock.js"></script>
+<script>
+window.submitMock = pbpChromeMock.install();
+window.submitReady = new Promise((resolve, reject) => {
+  // The submit fixture exercises an already-open form. Loading after
+  // DOMContentLoaded leaves the whole popup's session/tab bootstrap dormant.
+  // Scripts still execute in popup.html's consumer order, in a fresh realm.
+  document.addEventListener("DOMContentLoaded", async () => {
+    try {
+      const response = await fetch("../../popup.html");
+      if (!response.ok) throw new Error("Cannot load popup.html: " + response.status);
+      const popup = new DOMParser().parseFromString(await response.text(), "text/html");
+      const sources = [...popup.querySelectorAll("script[defer][src]")]
+        .map(script => new URL(script.getAttribute("src"), response.url).href);
+      popup.querySelectorAll("script").forEach(script => script.remove());
+      document.body.replaceChildren(...popup.body.childNodes);
+      for (const src of [...sources, "popup-submit.js"]) {
+        await new Promise((loaded, failed) => {
+          const script = document.createElement("script");
+          script.src = src;
+          script.onload = loaded;
+          script.onerror = () => failed(new Error("fixture script failed: " + src));
+          document.head.appendChild(script);
+        });
+      }
+      resolve(window.popupSubmitFixture);
+    } catch (error) { reject(error); }
+  }, { once: true });
+});
+</script>
+</body></html>
