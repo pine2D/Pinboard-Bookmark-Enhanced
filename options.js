@@ -6324,7 +6324,7 @@ async function retagBookmarksViaResave(expectedAccount, oldTag, newTag, onProgre
         problems.push({ url: post.href, title: post.description || post.href, kind: "skipped" });
       } else {
         failed++;
-        problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: result.error || "HTTP " + (result.httpStatus || 0) });
+        problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: result.httpStatus ? "HTTP " + result.httpStatus : result.error || "unknown" });
       }
     } catch (e) {
       if (e?.code === "account_changed") throw e;
