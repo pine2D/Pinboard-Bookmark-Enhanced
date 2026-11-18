@@ -1276,11 +1276,17 @@ async function pbpSaveOptionsSnapshot(state, data, overlayValue, {
   saveOverlay,
   assertOverlay,
   onSettingsSaved,
+  previewModelChanges,
 }) {
   const settingsDelta = pbpSettingsDelta(data, state.settings);
+  // Another form may have changed a provider since this form took its baseline.
+  // An intentional edit back to that baseline still needs to reach the lock.
+  if (previewModelChanges && Object.keys(previewModelChanges).length) {
+    settingsDelta.previewAiModelByProvider = data.previewAiModelByProvider;
+  }
   const overlayChanged = overlayValue !== state.overlay;
   const res = Object.keys(settingsDelta).length
-    ? await persist(settingsDelta)
+    ? await persist(settingsDelta, { previewModelChanges })
     : { ok: true, fellBackToLocal: false };
   if (!res.ok) throw res.error || new Error("settings save failed");
   if (Object.keys(settingsDelta).length) {
@@ -1334,6 +1340,23 @@ function pbpShouldRefillSecretField({
   const baseObf = typeof baselineObfuscated === "string" ? baselineObfuscated : "";
   if (curObf !== baseObf) return false;
   return curPlain !== String(freshPlain || "");
+}
+
+// Read/refill a single credential while retaining drafts even when focus left
+// before the notification, or edits were saved while the read was pending.
+async function pbpRefreshSecretInput({ input, read, revision, baseline, hasFocus, activeElement, commit }) {
+  if (!input) return false;
+  const revBefore = revision();
+  const canRefill = !(hasFocus() && activeElement() === input)
+    && obfuscateKey(input.value.trim()) === baseline();
+  const plain = await read();
+  if (!canRefill || !pbpShouldRefillSecretField({ inputs: [input],
+    hasFocus: hasFocus(), activeElement: activeElement(), revBefore, revAfter: revision(),
+    baselineObfuscated: baseline(), freshPlain: plain,
+  })) return false;
+  input.value = plain;
+  commit(plain);
+  return true;
 }
 
 // Apply one saved-theme mutation to a stored list. The page's savedThemes
@@ -2190,7 +2213,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-reader-voice-input": false,
       },
       after: () => {
-        for (const k of Object.keys(_previewModelMap)) _previewModelMap[k] = "";
+        for (const k of Object.keys(_previewModelMap)) { _previewModelMap[k] = ""; _previewModelEdits[k] = ""; }
         scheduleAutoSave();
       },
     },
@@ -3039,11 +3062,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   const _previewModelMap = (s.previewAiModelByProvider && typeof s.previewAiModelByProvider === "object"
       && !Array.isArray(s.previewAiModelByProvider))
     ? { ...s.previewAiModelByProvider } : {};
+  const _previewModelEdits = Object.create(null);
   let _previewModelProvider = s.aiProvider || "gemini";
+  let _previewModelShown = "";
+  function capturePreviewModelEdit() {
+    const value = $id("opt-preview-ai-model").value.trim();
+    if (value !== _previewModelShown) {
+      _previewModelMap[_previewModelProvider] = value;
+      _previewModelEdits[_previewModelProvider] = value;
+      _previewModelShown = value;
+    }
+  }
   if (!Object.prototype.hasOwnProperty.call(_previewModelMap, _previewModelProvider)
       && typeof s.previewAiModel === "string" && s.previewAiModel.trim()) {
     _previewModelMap[_previewModelProvider] = s.previewAiModel.trim();
   }
+
+  _previewModelShown = _previewModelMap[_previewModelProvider] ?? "";
 
   // Initialize the library before a bookmark-credential change can hide legacy data.
   await pbpPersonalLibraryAccount();
@@ -4201,9 +4236,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   function syncPreviewModelToProvider(selected) {
     const el = $id("opt-preview-ai-model");
     if (el && selected && selected !== _previewModelProvider) {
-      _previewModelMap[_previewModelProvider] = el.value.trim();
+      capturePreviewModelEdit();
       _previewModelProvider = selected;
       el.value = _previewModelMap[selected] ?? "";
+      _previewModelShown = el.value;
     }
     const cap = $id("preview-ai-model-provider");
     const opt = $id("opt-ai-provider").selectedOptions[0];
@@ -4353,13 +4389,14 @@ document.addEventListener("DOMContentLoaded", async () => {
           ollamaGranted = false;
         }
         const select = $id("opt-ai-provider");
-        pbpOptAiCustomDeleteEntry({
+        const nextProvider = pbpOptAiCustomDeleteEntry({
           state: pbpOptAiCustomEditorState, id, current: select.value,
           snapshot: () => pbpLiveAiSettingsSnapshot(select.value),
           order: providers, ollamaGranted, previewModelMap: _previewModelMap,
           applyProvider: switchProvider,
           forgetHealth: pbpForgetConnectionHealth,
         });
+        if (nextProvider !== null) _previewModelEdits[id] = null;
         syncAddCustomButton();
         saveAllSafely();
         $id("opt-ai-provider-btn")?.focus();
@@ -4748,7 +4785,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       obsidianVault: (_ets.obsidian && _ets.obsidian.vault) || "",
       obsidianFolder: (_ets.obsidian && _ets.obsidian.folder) || "",
       previewAiModelByProvider: (() => {
-        _previewModelMap[_previewModelProvider] = $id("opt-preview-ai-model").value.trim();
+        capturePreviewModelEdit();
         return { ..._previewModelMap };
       })(),
       previewAiModel: "",
@@ -4801,12 +4838,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     setAutoSaveProgress("saving");
     const data = collectSettingsFromForm();
     const overlayValue = $id("opt-custom-css").value;
+    const previewModelChanges = { ..._previewModelEdits };
     try {
       const result = await pbpSaveOptionsSnapshot(savedState, data, overlayValue, {
         persist: persistSettings,
+        previewModelChanges,
         saveOverlay: saveOverlayWithFallback,
         assertOverlay: pbpAssertOverlaySize,
         onSettingsSaved(settingsDelta) {
+          for (const [provider, value] of Object.entries(previewModelChanges)) {
+            if (_previewModelEdits[provider] === value) delete _previewModelEdits[provider];
+          }
           if ("optTheme" in settingsDelta || "themePresetKey" in settingsDelta || "optPopupFollowTheme" in settingsDelta) {
             pbpStoreOptionsThemeMirror(data.optTheme, data.themePresetKey, data.optPopupFollowTheme !== false);
           }
@@ -5034,6 +5076,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
   }
+  $id("opt-preview-ai-model").addEventListener("input", capturePreviewModelEdit);
+  let _pinboardFieldEditRev = 0;
+  $id("opt-pinboard-token")?.addEventListener("input", () => { _pinboardFieldEditRev++; });
   let _deepseekFieldEditRev = 0;
   deepseekKeyInput?.addEventListener("input", () => {
     _deepseekFieldEditRev++;
@@ -5181,19 +5226,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     _tokenFieldRefillTail = _tokenFieldRefillTail.then(async () => {
       const el = $id("opt-pinboard-token");
       if (!el) return;
-      // Never fight live typing: auto-save is debounced, so a half-typed token
-      // reaches storage, comes back through this listener and would be pasted
-      // over the keystrokes made since.
-      if (document.hasFocus() && document.activeElement === el) return;
-      const fresh = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
-      const plain = deobfuscateKey(typeof fresh.pinboardToken === "string" ? fresh.pinboardToken : "");
-      if (el.value.trim() === plain) return;
-      el.value = plain;
-      // Move the auto-save baseline with the field (collectSettingsFromForm
-      // obfuscates the trimmed input), so the delta stays empty and a later
-      // save cannot push the value we just replaced back to storage.
-      savedState.settings.pinboardToken = obfuscateKey(el.value.trim());
-      scheduleConnectionOverview();
+      await pbpRefreshSecretInput({
+        input: el, revision: () => _pinboardFieldEditRev,
+        baseline: () => savedState.settings.pinboardToken || "",
+        hasFocus: () => document.hasFocus(), activeElement: () => document.activeElement,
+        read: async () => {
+          const fresh = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
+          return deobfuscateKey(typeof fresh.pinboardToken === "string" ? fresh.pinboardToken : "");
+        },
+        commit: plain => {
+          savedState.settings.pinboardToken = obfuscateKey(plain);
+          scheduleConnectionOverview();
+        },
+      });
     }).catch((e) => {
       console.warn("[options] token field refresh failed:", e?.name, e?.message);
     });

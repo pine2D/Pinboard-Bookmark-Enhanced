@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="571"><title>Settings Persistence Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="587"><title>Settings Persistence Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -6917,6 +6917,75 @@ async function run() {
       _settingsStorageCache = previousCache;
     }
   })();
+
+  // Cross-document model writes merge only the providers edited by this form.
+  {
+    const priorChrome = globalThis.chrome, priorStorage = globalThis.__pbpTestStorage;
+    const priorCache = _settingsStorageCache;
+    let values = {optSyncEnabled:false, syncApiKeys:false, aiProvider:"gemini", previewAiModelByProvider:{gemini:"g0",openai:"o0"}};
+    const area = {
+      async get(query) {
+        if (query == null) return {...values};
+        if (typeof query === "string") return {[query]:values[query]};
+        if (Array.isArray(query)) return Object.fromEntries(query.filter(k => k in values).map(k => [k,values[k]]));
+        return {...query,...Object.fromEntries(Object.keys(query).filter(k => k in values).map(k => [k,values[k]]))};
+      },
+      async set(data) { values = {...values,...data}; }, async remove() {},
+    };
+    globalThis.chrome = {storage:{local:area,sync:area}};
+    globalThis.__pbpTestStorage = area;
+    try {
+      const stale = {...values.previewAiModelByProvider};
+      const one = persistSettings({previewAiModelByProvider:{...stale,gemini:"g1"}}, {previewModelChanges:{gemini:"g1"}});
+      const two = persistSettings({previewAiModelByProvider:{...stale,openai:"o1"}}, {previewModelChanges:{openai:"o1"}});
+      check("model merge: both concurrent writes succeed", (await one).ok && (await two).ok);
+      check("model merge: second stale form preserves first provider", values.previewAiModelByProvider.gemini === "g1" && values.previewAiModelByProvider.openai === "o1");
+      await persistSettings({previewAiModelByProvider:stale}, {previewModelChanges:{gemini:""}});
+      check("model merge: explicit clear retains other provider", values.previewAiModelByProvider.gemini === "" && values.previewAiModelByProvider.openai === "o1");
+      const emptySnapshot = {previewAiModelByProvider: {gemini:""}};
+      values.previewAiModelByProvider = {...values.previewAiModelByProvider,gemini:"from another tab"};
+      await pbpSaveOptionsSnapshot({settings:structuredClone(emptySnapshot),overlay:""}, emptySnapshot, "", {
+        persist:persistSettings, previewModelChanges:{gemini:""},
+      });
+      check("an explicit clear back to a stale form baseline still reaches storage",
+        values.previewAiModelByProvider.gemini === "" && values.previewAiModelByProvider.openai === "o1");
+      await persistSettings({previewAiModelByProvider:stale,optTheme:"nord"}, {previewModelChanges:{}});
+      check("model merge: unedited switching snapshot cannot overwrite map", values.previewAiModelByProvider.openai === "o1" && values.previewAiModelByProvider.gemini === "");
+      await persistSettings({previewAiModelByProvider:{deepseek:"ds"}});
+      check("model merge: ordinary backup import still replaces map", JSON.stringify(values.previewAiModelByProvider) === JSON.stringify({deepseek:"ds"}));
+      values.previewAiModelByProvider = null; values.previewAiModel = "legacy-g";
+      await persistSettings({previewAiModelByProvider:{openai:"new"},previewAiModel:""},{previewModelChanges:{openai:"new"}});
+      check("model merge: legacy model is retained under its actual provider", values.previewAiModelByProvider.gemini === "legacy-g" && values.previewAiModelByProvider.openai === "new");
+      values.previewAiModel = "stale-legacy";
+      await persistSettings({previewAiModelByProvider:{gemini:"stale-legacy"},previewAiModel:""}, {previewModelChanges:{}});
+      check("model merge: retiring stale legacy snapshot keeps newer stored provider", values.previewAiModelByProvider.gemini === "legacy-g" && values.previewAiModelByProvider.openai === "new");
+      values.previewAiModelByProvider = {}; values.previewAiModel = "legacy-only";
+      await persistSettings({previewAiModel:""}, {previewModelChanges:{}});
+      check("model merge: legacy-only retirement persists provider mapping", values.previewAiModelByProvider.gemini === "legacy-only" && values.previewAiModel === "");
+      values.previewAiModelByProvider["custom-ab12cd"] = "removed-model";
+      await persistSettings({previewAiModelByProvider:{}}, {previewModelChanges:{"custom-ab12cd":null}});
+      check("model merge: custom provider deletion keeps unrelated entries", !("custom-ab12cd" in values.previewAiModelByProvider) && values.previewAiModelByProvider.gemini === "legacy-only");
+    } finally {
+      globalThis.chrome = priorChrome; _settingsStorageCache = priorCache;
+      if (priorStorage === undefined) delete globalThis.__pbpTestStorage; else globalThis.__pbpTestStorage = priorStorage;
+    }
+  }
+  {
+    for (const scenario of ["blurred-draft", "edit-during-read", "draft-saved-during-read", "focused", "rotation", "logout"]) {
+      const input = {value:"alice:old"}; let rev = 0, base = obfuscateKey(input.value), committed = false;
+      let release; const wait = new Promise(resolve => {release = resolve;});
+      if (scenario === "blurred-draft" || scenario === "draft-saved-during-read") input.value = "alice:draft";
+      const pending = pbpRefreshSecretInput({input, read:()=>wait, revision:()=>rev,baseline:()=>base,
+        hasFocus:()=>scenario === "focused", activeElement:()=>input,
+        commit:plain=>{base=obfuscateKey(plain);committed=true;}});
+      if (scenario === "edit-during-read") {input.value="alice:draft"; rev++;}
+      if (scenario === "draft-saved-during-read") base = obfuscateKey(input.value);
+      const fresh = scenario === "logout" ? "" : "alice:rotated";
+      release(fresh); await pending;
+      const shouldRefill = scenario === "rotation" || scenario === "logout";
+      check("Pinboard refill: " + scenario, committed === shouldRefill && input.value === (shouldRefill ? fresh : scenario === "focused" ? "alice:old" : "alice:draft"));
+    }
+  }
 
   const summary = document.createElement("h2");
   summary.id = "summary";
