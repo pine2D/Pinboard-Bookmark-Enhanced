@@ -51,7 +51,8 @@ function pbpNotesValidateEvent(event, expectedRecordKey, leaf = false) {
   if (event.versions !== undefined) {
     if (leaf || !_pbpVocabDenseArray(event.versions) || event.versions.length < 2 ||
         !event.versions.every(version=>pbpNotesValidateEvent(version,event.recordKey,true)) ||
-        !_pbpNotesFrontierValid(event.versions,event.vector)) return false;
+        !_pbpNotesFrontierValid(event.versions,event.vector) ||
+        event.versions.some(version => !version.deleted && version.value.url !== event.value?.url)) return false;
     const projected=_pbpNotesProject(event.recordKey,event.vector,event.versions);
     const actual={...event};delete actual.versions;
     if (!pbpVocabEventContentEqual(actual,projected.event)) return false;
@@ -122,6 +123,7 @@ function _pbpNotesProject(recordKey,vector,versions) {
 function pbpNotesMergeEvents(left, right) {
   const invalid = {kind:"invalid",event:null,requeue:false,notice:null};
   if (!pbpNotesValidateEvent(left) || !pbpNotesValidateEvent(right,left.recordKey)) return invalid;
+  if (!left.deleted && !right.deleted && left.value.url !== right.value.url) return invalid;
   const relation = pbpVocabVectorRelation(left.vector,right.vector);
   if (relation === "equal") return {kind:pbpVocabEventContentEqual(left,right) ? "noop" : "corrupt",event:left,requeue:false,notice:null};
   if (relation === "left") return {kind:"noop",event:left,requeue:false,notice:null};
@@ -368,6 +370,8 @@ function pbpCreateNotesSyncStore({
         const state=ownerState(rec,owner);
         const before = applied + merged;
         for (const remote of events) {
+          // Check the incoming article before projecting concurrent notes onto a winning version.
+          if (!remote.deleted && rec.url && rec.url !== remote.value.url) throw _pbpNotesSyncError("invalid_remote_page");
           const ident=_pbpNotesIdentity(remote.recordKey);
           if (!ident) throw _pbpNotesSyncError("invalid_remote_page");
           const id=ident.id;

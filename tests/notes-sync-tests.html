@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="59"><title>Notes Sync Tests</title></head><body>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="60"><title>Notes Sync Tests</title></head><body>
 <h1>Notes Sync Tests</h1><div id="summary"></div><div id="results"></div>
 <script src="../shared.js"></script><script src="../options-backup.js"></script>
 <script src="../vocab-store.js"></script><script src="../notes-sync.js"></script>
@@ -71,6 +71,26 @@ test("an occupied article slot cannot publish or replace a different article", a
   assert(error?.code === "local_store");
   assert(JSON.stringify(f.data[KEY]) === JSON.stringify(original));
   assert((await f.store().listOutbox(OWNER)).length === 0);
+});
+test("colliding article URLs cannot merge note text, including incoming multi-version events", async () => {
+  const local = event("z-local", "local"), incoming = event("a-peer", "other");
+  const other = "https://other.example/read", originalKey = pbpNotesArticleKey;
+  // Simulate only the lookup result. The event codec, causal merge and store are real.
+  pbpNotesArticleKey = url => url === other ? KEY : originalKey(url);
+  try {
+    incoming.value.url = other;
+    assert(pbpNotesValidateEvent(local) && pbpNotesValidateEvent(incoming));
+    const versions = [local, incoming].sort(_pbpNotesLeafCompare);
+    const vector = {...local.vector,...incoming.vector};
+    const mixed = {..._pbpNotesProject(local.recordKey,vector,versions).event,versions};
+    const f = fixture();
+    await f.store().applyRemotePage(OWNER,HASH,[batch([local])],null);
+    const original = JSON.stringify(f.data[KEY]);
+    const partial = await f.store().applyRemotePage(OWNER,HASH,[batch([incoming])],null);
+    assert(!partial.ok && !partial.changed && JSON.stringify(f.data[KEY]) === original);
+    assert(pbpNotesMergeEvents(local,incoming).kind === "invalid");
+    assert(!pbpNotesValidateEvent(mixed));
+  } finally { pbpNotesArticleKey = originalKey; }
 });
 test("both file import and add-missing restore preserve a different article in the same slot", async () => {
   for (const addMissing of [false, true]) {
