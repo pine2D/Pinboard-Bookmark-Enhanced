@@ -2845,7 +2845,12 @@ function setupSubmit(token) {
           setSubmitState("idle");
           return;
         }
-        if (conflictLookup.status === "found" || conflictLookup.status === "missing") _popupDraftBase = null;
+        if (conflictLookup.status === "found" || conflictLookup.status === "missing") {
+          _popupDraftBase = null;
+          // The lookup may already have drafted the form against its restored
+          // base. Persist the newly reviewed base before this popup can close.
+          pbpRememberPopupDraft();
+        }
         if (conflictLookup.status === "found") {
           // Same shape as review_required: the save did not land, press again.
           showStatus("status-msg", t("saveNeedsReview"), "info");

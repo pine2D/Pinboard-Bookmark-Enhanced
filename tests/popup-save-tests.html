@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="320"><title>Popup Save Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="323"><title>Popup Save Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 .case { padding: 4px 8px; margin: 4px 0; }
@@ -231,6 +231,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         style: {},
         getBoundingClientRect() { return { width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 }; },
         appendChild(child) { this.children.push(child); },
+        append(...children) { this.children.push(...children); },
         replaceChildren(...children) { this.children = children; },
         remove() { this.removed = true; },
         _listeners: listeners,
@@ -257,7 +258,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(elements["private-check"].checked && !elements["share-check"].checked,"new popup defaults to shared");
       }
     });
-    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null, ownershipKnown = true, descriptionKnown = true, descriptionPending = false, loaded = null, recheck, realLookup = false, draftBase = null } = {}) {
+    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null, ownershipKnown = true, descriptionKnown = true, descriptionPending = false, loaded = null, recheck, realLookup = false, draftBase = null, realDraft = false, draftStore = { row: null }, holdDraftReplies = false, draftEdits = true } = {}) {
       const elements = {
         "submit-btn": createElementStub(),
         "delete-btn": createElementStub({ classes: ["hidden"] }),
@@ -287,6 +288,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         settings[service+"Token"] = pbpBookmarkCredentialSeal({baseUrl:settings[service+"Url"],token:"fixture-token",connectionId:"fixture-connection",userId:"fixture-user",sharing:true});
       }
       const messages = [];
+      const draftReplies = [];
       const statuses = [];
       const timers = [];
       const bars = [];
@@ -314,6 +316,19 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const chromeStub = {
         runtime: {
           sendMessage(message) {
+            if (message.type === "PBP_POPUP_DRAFT") {
+              messages.push(structuredClone(message));
+              if (message.action === "read") return Promise.resolve({ ok: true, account: message.account, draft: structuredClone(draftStore.row) });
+              if (message.action === "write") {
+                // The fake boundary stores dispatches in arrival order, as the
+                // real worker's pbp-popup-drafts Web Lock does. Responses may
+                // finish out of order without replaying the storage mutation.
+                draftStore.row = structuredClone(message.draft);
+                if (holdDraftReplies) return new Promise(resolve => draftReplies.push(resolve));
+                return Promise.resolve({ ok: true, account: message.account });
+              }
+              throw new Error("unexpected draft action");
+            }
             if (message.type === "PBP_RESET_PINBOARD_AUTH") {
               messages.push(message);
               if (message.expectedToken !== effectiveToken) return Promise.resolve({ ok: false, error: "account_changed" });
@@ -387,6 +402,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const dependencies = {
         pbpFragmentProbeWait,
         _popupDraftBase: draftBase,
+        _popupDraftRevision: 0,
+        _popupDraftWriteRevision: 0,
+        _popupDraftSummaryAi: "",
+        _popupDraftUserUrl: false,
+        // This page's global URL fixture shadows the constructor in shared
+        // connection parsing; inject only the authenticated transport identity.
+        pbpBookmarkConnection: realDraft ? () => ({account: "fixture-owner", sharingEnabled: false}) : pbpBookmarkConnection,
+        pbpReadBookmarkConnection: async () => ({account: realDraft ? "fixture-owner" : pbpBookmarkConnection(settings).account}),
+        pbpPopupFormHoldsPage: () => true,
+        pbpPopupFormIsDirty: () => Object.values(fieldDirtyFlags).some(Boolean),
         _activeTabAtOpen: null,
         localStorage: { setItem() {} },
         shouldUpdateField: id => !fieldDirtyFlags[id],
@@ -416,7 +441,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         _archiveUserTouched: archiveUserTouched,
         _linkdingSharedExplicit: sharedExplicit,
         _linkdingSharedRevision: 0,
-        _popupDraftContext: draftContext ? {pageUrl: URL, incognito: false} : null,
+        _popupDraftContext: draftContext ? {account: realDraft ? "fixture-owner" : pbpBookmarkConnection(settings).account, pageUrl: URL, incognito: false, ready: true} : null,
         _popupDraftUrlSource: null,
         _linkdingDescriptionKnown: descriptionKnown,
         _linkdingDescriptionPending: descriptionPending,
@@ -426,7 +451,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         _popupDraftRestoredFields: new Set(),
         _tagsUserTouched: false,
         _popupDraftLastSnapshot: "",
-        _popupDraftChangedFields: new Set(),
+        _popupDraftChangedFields: new Set(realDraft && draftEdits ? ["title", "notes", "tags"] : []),
         pbpDiscardPopupDraft: async () => {},
         _waybackHostGranted: waybackHostGranted,
         settings,
@@ -447,7 +472,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         pbpAiSaveSummaryOwnership: async (...args) => { receiptWrites.push(args); },
       };
       const names = Object.keys(dependencies);
-      const factory = new Function(...names, `${source.slice(source.indexOf("function pbpPopupExpectedVersion("), source.indexOf("function pbpRememberPopupDraft("))}\n${resetSource}\n${realLookup ? lookupSource : ""}\n${setupSource}\nreturn {setupSubmit, tags:()=>currentTags, base:()=>_popupDraftBase, snapshot:pbpPopupDraftSnapshot, sharing:()=>_linkdingSharedExplicit, changeSharing:()=>{_linkdingSharedExplicit=true;_linkdingSharedRevision++;}};`);
+      const factory = new Function(...names, `${source.slice(source.indexOf("function pbpPopupExpectedVersion("), source.indexOf(realDraft ? "// Popup draft UI end" : "function pbpRememberPopupDraft("))}\n${resetSource}\n${realLookup ? lookupSource : ""}\n${setupSource}\nreturn {setupSubmit, remember:pbpRememberPopupDraft, restore:typeof initPopupDraft === "function" ? initPopupDraft : null, tags:()=>currentTags, base:()=>_popupDraftBase, snapshot:pbpPopupDraftSnapshot, sharing:()=>_linkdingSharedExplicit, changeSharing:()=>{_linkdingSharedExplicit=true;_linkdingSharedRevision++;}};`);
       const submitApi = factory(...names.map((name) => dependencies[name]));
       const setupSubmit = submitApi.setupSubmit;
       setupSubmit("alice:token");
@@ -458,6 +483,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
         ownershipReads, receiptWrites,
         click, resolveSave, resolveWayback, resolveLookup,
         liveTags: submitApi.tags, draftBase: submitApi.base,
+        remember: submitApi.remember,
+        reopen: () => submitApi.restore(realDraft ? "fixture-owner" : pbpBookmarkConnection(settings).account, {url: URL}),
+        draftStore, draftReplies,
         setCurrentToken: (token) => { effectiveToken = token; },
         currentToken: () => effectiveToken,
         snapshot: submitApi.snapshot, sharing: submitApi.sharing, changeSharing: submitApi.changeSharing,
@@ -1500,6 +1528,57 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const pending = h.click(); await flushMicrotasks();
       h.resolveSave({ status: "failed", reason: "conflict" }); await pending;
       assert(h.draftBase() === base && h.snapshot().baseVersion === "restored-version", "failed read discarded the draft's conflict base");
+    });
+
+    for (const outcome of ["found", "missing"]) await testAsync("conflict " + outcome + " persists its new base before close and restores it on reopen", async () => {
+      const loaded = { href: URL, description: "Old", extended: "", tagNames: ["One", "Two"], version: "loaded-version", shared: "no", toread: "no" };
+      const base = { url: URL, version: "restored-version", tags: ["Old tag"] };
+      const draftStore = { row: null };
+      const h = createSubmitHarness({service: "karakeep", loaded, realLookup: true, realDraft: true, draftContext: true, draftBase: base, draftStore, holdDraftReplies: true});
+      h.remember();
+      assert(draftStore.row.baseVersion === "restored-version", "precondition: initial dispatch lacks restored base");
+      const pending = h.click(); await flushMicrotasks();
+      h.resolveSave({status: "failed", reason: "conflict"}); await flushMicrotasks();
+      const fresh = {...loaded, tagNames: ["Two", "Server tag"], version: "fresh-version"};
+      h.resolveLookup({posts: outcome === "found" ? [fresh] : []}); await pending;
+      const writes = h.messages.filter(message => message.type === "PBP_POPUP_DRAFT" && message.action === "write");
+      const last = writes.at(-1).draft;
+      assert(outcome === "found" ? last.baseVersion === "fresh-version" && JSON.stringify(last.baseTags) === JSON.stringify(fresh.tagNames)
+        : !Object.hasOwn(last, "baseVersion") && !Object.hasOwn(last, "baseTags"), "last dispatched draft kept old base: " + JSON.stringify(last));
+      assert(JSON.stringify(last) === JSON.stringify(h.snapshot()), "last dispatched draft differs from form snapshot");
+      // A response to an older dispatch arrives after the current one. It
+      // must not reset the write key or show a stale failure on this form.
+      h.draftReplies.at(-1)({ok: true}); h.draftReplies[0]({ok: false}); await flushMicrotasks();
+      const count = writes.length; h.remember();
+      assert(h.messages.filter(m => m.action === "write").length === count, "old response reset the latest draft key");
+      assert(!h.statuses.some(([,message]) => message === "popupDraftFailed"), "old response reported a stale draft failure");
+      // Close/open boundary: a fresh popup reads the last dispatched draft,
+      // through the production initPopupDraft, rather than inheriting memory.
+      const reopened = createSubmitHarness({service: "karakeep", realDraft: true, draftEdits: false, draftStore});
+      await reopened.reopen();
+      const restored = reopened.snapshot();
+      assert(restored.title === last.title && restored.notes === last.notes && JSON.stringify(restored.tags) === JSON.stringify(last.tags), "reopen lost the user's edits: " + JSON.stringify({restored,last,sent:reopened.messages,statuses:reopened.statuses}));
+      assert(restored.baseVersion === last.baseVersion && JSON.stringify(restored.baseTags) === JSON.stringify(last.baseTags), "reopen restored an outdated conflict base");
+    });
+
+    await testAsync("failed and stale conflict reads preserve the last dispatched draft base across reopen", async () => {
+      for (const outcome of ["failed", "stale"]) {
+        const loaded = {href: URL, description: "Old", extended: "", tagNames: ["One"], version: "loaded-version", shared: "no", toread: "no"};
+        const base = {url: URL, version: "restored-version", tags: ["Old tag"]};
+        const draftStore = {row: null};
+        const h = createSubmitHarness({service: "karakeep", loaded, realLookup: true, realDraft: true, draftContext: true, draftBase: base, draftStore});
+        h.remember();
+        const before = JSON.stringify(draftStore.row);
+        const pending = h.click(); await flushMicrotasks();
+        h.resolveSave({status:"failed", reason:"conflict"}); await flushMicrotasks();
+        if (outcome === "stale") h.elements["url-input"].value = "https://other.example/";
+        h.resolveLookup(outcome === "failed" ? {posts:null, get metadata(){ throw new Error("lookup failed"); }} : {posts:[{...loaded,version:"should-not-apply"}]});
+        await pending;
+        assert(JSON.stringify(draftStore.row) === before, outcome + ": uncertain lookup changed the persisted baseline");
+        const reopened = createSubmitHarness({service:"karakeep", realDraft:true, draftEdits:false, draftStore});
+        await reopened.reopen();
+        assert(reopened.snapshot().baseVersion === "restored-version" && JSON.stringify(reopened.snapshot().baseTags) === JSON.stringify(base.tags), outcome + ": reopen lost the old draft base: " + JSON.stringify({snapshot:reopened.snapshot(),sent:reopened.messages,statuses:reopened.statuses}));
+      }
     });
 
     await testAsync("real submit callback preserves edits made while save is pending", async () => {
