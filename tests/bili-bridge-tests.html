@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="3"><title>Bili Player Bridge Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="4"><title>Bili Player Bridge Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 h2 { margin-top: 24px; font-size: 16px; }
@@ -123,6 +123,36 @@ async function bridgeCase(run) {
       delete window.postMessage;
     }
   });
+  await test("rate queued before media mounts survives replacement and respects player controls", () => bridgeCase(async ({ w, d, calls, media, hello, settle }) => {
+    const rate = value => w.dispatchEvent(new w.MessageEvent("message", {
+      source: window, origin: "chrome-extension://test-ext-id",
+      data: { pbpVideo: 1, func: "setPlaybackRate", args: [value] }
+    }));
+    hello();
+    assert(calls.some(m => m.event === "ready"), "reader never received ready");
+    rate(1.5); rate(1.75); rate(99);
+    const first = media("video", 0);
+    d.body.appendChild(first);
+    await settle();
+    assert(first.playbackRate === 1.75, "latest valid pre-mount rate was lost");
+    assert(calls.some(m => m.event === "time" && m.r === 1.75), "applied rate was not reported");
+    first.playbackRate = 1.25;
+    first.dispatchEvent(new w.Event("ratechange"));
+    const second = media("bwp-video", 10);
+    first.replaceWith(second);
+    await settle();
+    assert(second.playbackRate === 1.25, "replacement lost the player's own changed rate");
+    second.remove();
+    await settle();
+    rate(1);
+    const third = media("video", 20);
+    d.body.appendChild(third);
+    await settle();
+    assert(third.playbackRate === 1, "1x requested during an empty gap was lost");
+    calls.length = 0;
+    first.dispatchEvent(new w.Event("ratechange"));
+    assert(calls.length === 0, "detached media retained rate listeners");
+  }));
   await test("paused media replacement resumes progress without another reader command", () => bridgeCase(async ({ w, d, calls, media, hello, settle }) => {
     const old = media("video", 10);
     d.body.appendChild(old);

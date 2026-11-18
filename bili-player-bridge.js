@@ -33,7 +33,7 @@
     if (seekGuard && performance.now() - lastPlayAt > 1500) seekGuard = null;
   }
   function onPlay() { lastPlayAt = performance.now(); }
-  let armed = false, timer = 0, bound = null;
+  let armed = false, timer = 0, bound = null, requestedRate = null;
   // Seek guard: the embed's own continue-watching logic jumps to ITS
   // remembered position on the document's first play, overriding a seek
   // made just before it (probed live 2026-08-25: seek 77 + play -> 577).
@@ -78,9 +78,18 @@
     selfSeek = true;
     try { m.currentTime = seekGuard.target; } catch (_) { selfSeek = false; }
   }
+  function applyRequestedRate(m) {
+    if (requestedRate === null || m.playbackRate === requestedRate) return;
+    try { m.playbackRate = requestedRate; } catch (error) {
+      console.warn("[bili-player] playback rate unavailable", error?.name);
+    }
+  }
   function onState() {
     const m = bind();
-    if (m) guardSeek(m);
+    if (m) {
+      if (typeof m.playbackRate === "number" && m.playbackRate >= 0.25 && m.playbackRate <= 2) requestedRate = m.playbackRate;
+      guardSeek(m);
+    }
     stopTimer();
     postTime();
     if (m && !m.paused && !m.ended) timer = setInterval(postTime, 250);
@@ -97,9 +106,11 @@
       selfSeek = false;
       lastPlayAt = -1e9;
       if (!m) return null;
-      // onPlay FIRST: listeners run in registration order, and onState's own
-      // play handler (guardSeek) reads lastPlayAt (Codex r9 H1 -- registered
-      // last, the stamp it read was the previous play's).
+      // A rate command can arrive immediately after ready, before the async
+      // player mounts. Retain the latest requested/observed rate across media
+      // replacements, including a gap with no element.
+      applyRequestedRate(m);
+      // onPlay FIRST: onState's play handler reads this timestamp.
       m.addEventListener("play", onPlay);
       for (const ev of EVENTS) m.addEventListener(ev, onState);
       m.addEventListener("seeking", onSeeking);
@@ -121,9 +132,18 @@
     if (!d || typeof d !== "object" || d.pbpVideo !== 1 || typeof d.func !== "string") return;
     if (d.func === "hello") { arm(); post({ pbpVideo: 1, event: "ready" }); return; }
     if (!armed) return;
+    const a = Array.isArray(d.args) ? d.args : [];
+    if (d.func === "setPlaybackRate") {
+      const r = Number(a[0]);
+      if (r >= 0.25 && r <= 2) {
+        requestedRate = r;
+        const m = bind();
+        if (m) { applyRequestedRate(m); postTime(); }
+      }
+      return;
+    }
     const m = bind();
     if (!m) return;
-    const a = Array.isArray(d.args) ? d.args : [];
     switch (d.func) {
       case "seekTo": {
         const s = Number(a[0]);
@@ -143,11 +163,6 @@
         break;
       }
       case "pauseVideo": { try { m.pause(); } catch (_) {} break; }
-      case "setPlaybackRate": {
-        const r = Number(a[0]);
-        if (r >= 0.25 && r <= 2) { try { m.playbackRate = r; } catch (_) {} }
-        break;
-      }
       default: break; // closed verb set: anything else is ignored
     }
   });
