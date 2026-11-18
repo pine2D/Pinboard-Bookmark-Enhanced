@@ -3208,7 +3208,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Between services this device has connected, picking one is the switch.
         if (pbpOptViewedBookmarkService() === service && service !== state.active && state.ready[service]) {
           const saved = await pbpSwitchBookmarkService(service);
-          if (!saved.ok) console.warn("[bookmark-service] switch failed:", saved.error?.name, saved.error?.message);
+          // Another window may switch again before this page receives its own
+          // successful response. The next render compares against our pick.
+          if (saved.ok) _bookmarkServiceShownActive = service;
+          else console.warn("[bookmark-service] switch failed:", saved.error?.name, saved.error?.message);
         }
       } catch (error) {
         console.warn("[bookmark-service] switch failed:", error?.name, error?.message);

@@ -1528,14 +1528,25 @@ try{
     await new Promise(resolve=>setTimeout(resolve,5));
     await options.locator('#connect-karakeep').click();
     await until(async()=>(await mark()).bookmarkConnectMark?.at>first.at,'a repeated Connect with the same values did not refresh the marker');
-    // Between two connected services, picking one is the switch.
+    // Hold the successful local response after the write. A second context
+    // can already switch back while the first page is still awaiting its pick.
+    await options.evaluate(()=>{
+      const original=window.pbpSwitchBookmarkService;
+      window.pbpSwitchBookmarkService=async (...args)=>{
+        window.pbpSwitchBookmarkService=original;
+        const saved=await original(...args);
+        await new Promise(resolve=>{window.__qaReleaseRadioPick=resolve;});
+        return saved;
+      };
+    });
     await options.locator('input[name="bookmark-service"][value="linkding"]').check();
-    await until(async()=>(await stored()).bookmarkServiceActive==='linkding','picking a connected service did not switch to it');
-    // Another tab (or a followed sync choice) switches this device while the
-    // page shows the service in use: the radios follow, no stale note.
+    await options.waitForFunction(()=>typeof window.__qaReleaseRadioPick==='function');
+    assert.equal((await stored()).bookmarkServiceActive,'linkding','picking a connected service did not switch to it');
+    // The radios follow both that overlapping switch and a later one.
     const checkedNow=()=>options.evaluate(()=>document.querySelector('input[name="bookmark-service"]:checked')?.value);
     for(const service of ['karakeep','linkding']){
-      await worker.evaluate(service=>chrome.storage.local.set({bookmarkService:service,bookmarkServiceActive:service}),service);
+      assert.equal((await worker.evaluate(service=>pbpSwitchBookmarkService(service),service)).ok,true);
+      if(service==='karakeep')await options.evaluate(()=>window.__qaReleaseRadioPick());
       await until(async()=>await checkedNow()===service&&await options.locator('#bookmark-'+service+'-fields').isVisible(),'the radios did not follow '+service+' switched elsewhere');
       await note.waitFor({state:'hidden',timeout:5000});
       assert(await options.locator('#bookmark-service-chosen-actions').isHidden(),'an action shows for the service in use');
