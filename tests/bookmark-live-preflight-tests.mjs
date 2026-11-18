@@ -2793,7 +2793,15 @@ try {
     // healthyAt: both health routes answer "starting" until then.
     let healthyAt = 0;
     const linkdingHealth = createServer((req, res) => { res.writeHead(req.url === '/health' ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: Date.now() < healthyAt ? 'starting' : 'healthy' })); });
-    const karakeepHealth = createServer((req, res) => { res.writeHead(req.url === '/api/health' ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: Date.now() < healthyAt ? 'starting' : 'ok', message: 'Web app is working' })); });
+    let karakeepSignupFails = false;
+    const karakeepHealth = createServer((req, res) => {
+      const health = req.url === '/api/health';
+      const signup = req.url === '/api/auth/sign-up/email';
+      const exchange = req.url === '/api/trpc/apiKeys.exchange';
+      res.writeHead(health || exchange || (signup && !karakeepSignupFails) ? 200 : 404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(exchange ? { result: { data: { json: { key: 'temporary-karakeep-test-key' } } } }
+        : { status: Date.now() < healthyAt ? 'starting' : 'ok', message: 'Web app is working' }));
+    });
     servers.push(linkdingHealth, karakeepHealth);
     const ports = { '9101/tcp': await listen(linkdingHealth), '9102/tcp': await listen(karakeepHealth) };
     const fakeDocker = ({ leftovers = [], imageMissing = false, states = {}, token = 'Traceback (most recent call last)' } = {}) => {
@@ -2911,8 +2919,11 @@ try {
     }
     {
       const docker = fakeDocker({ token: 'PBPSNAPSHOTS=False\nPBPTOKEN=' + 'a'.repeat(40) });
-      const { report } = await tempRun('profile-confirmed', docker);
-      // linkding is ready; the fake Karakeep only answers its health route.
+      karakeepSignupFails = true;
+      let report;
+      try { ({ report } = await tempRun('profile-confirmed', docker)); }
+      finally { karakeepSignupFails = false; }
+      // linkding is ready; only Karakeep signup fails in this case.
       assert.equal(report.failure.code, 'temp_signup_failed');
       assert(!JSON.stringify(report).includes('a'.repeat(40)), 'the temp token stays out of the report');
     }
