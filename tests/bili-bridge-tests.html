@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="5"><title>Bili Player Bridge Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="6"><title>Bili Player Bridge Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 h2 { margin-top: 24px; font-size: 16px; }
@@ -152,6 +152,30 @@ async function bridgeCase(run) {
     calls.length = 0;
     first.dispatchEvent(new w.Event("ratechange"));
     assert(calls.length === 0, "detached media retained rate listeners");
+  }));
+  await test("native temporary fast playback coexists with reader rate commands", () => bridgeCase(async ({ w, d, calls, hello, settle }) => {
+    const node = d.createElement("video");
+    d.body.appendChild(node);
+    const command = value => w.dispatchEvent(new w.MessageEvent("message", {
+      source: window, origin: "chrome-extension://test-ext-id",
+      data: { pbpVideo: 1, func: "setPlaybackRate", args: [value] }
+    }));
+    hello();
+    command(1.5);
+    await settle();
+    node.playbackRate = 3;
+    await settle();
+    node.dispatchEvent(new w.Event("waiting"));
+    command(99);
+    assert(node.playbackRate === 3 && node.defaultPlaybackRate === 1.5, "the bridge cancelled or persisted the player's temporary fast rate");
+    assert(calls.some(m => m.event === "time" && m.r === 3), "the native fast rate was not reported");
+    node.playbackRate = node.defaultPlaybackRate;
+    await settle();
+    assert(node.playbackRate === 1.5, "releasing fast playback lost the original rate");
+    node.playbackRate = 3;
+    command(2);
+    await settle();
+    assert(node.playbackRate === 2 && node.defaultPlaybackRate === 2, "an explicit reader choice did not take precedence");
   }));
   await test("native media retains speed through src assignment, load and replacement", () => bridgeCase(async ({ w, d, calls, hello, settle }) => {
     // Real HTMLMediaElement state, not writable property mocks: load() resets

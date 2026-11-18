@@ -93,8 +93,12 @@
   function onState() {
     const m = bind();
     if (m) {
-      if (typeof m.playbackRate === "number" && m.playbackRate >= 0.25 && m.playbackRate <= 2) requestedRate = m.playbackRate;
-      applyRequestedRate(m);
+      // Speeds outside the reader's range can be a temporary player gesture.
+      // Report the current speed and leave its normal default for release.
+      if (typeof m.playbackRate === "number" && m.playbackRate >= 0.25 && m.playbackRate <= 2) {
+        requestedRate = m.playbackRate;
+        applyRequestedRate(m);
+      }
       guardSeek(m);
     }
     stopTimer();
