@@ -2145,11 +2145,8 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // load-order dependency on it, and so retro V5's rule -- _ownerNow is
   // ALREADY scoped, never re-scope it -- has a single place to live).
   const _videoOwnerScope = (account) => (account ? "acct_" + encodeURIComponent(account) : "ownerless");
-  // A reader tab outlives an account switch, so this is a snapshot that has to
-  // be re-pointed rather than a constant. md-preview.js's credential listener
-  // dispatches the same frozen {account} detail the article events carry;
-  // pbpVideoInit reads the live previewAccount, so a switch arriving BEFORE
-  // the panel mounts is simply overwritten with the identical value.
+  // Reader account events carry the personal library owner. pbpVideoInit also
+  // receives the current owner when the video panel mounts after a switch.
   //
   // Nothing else moves with it, on purpose. _savedRec is a session snapshot
   // whose density/rate/track choices are ALREADY applied to the UI -- dropping

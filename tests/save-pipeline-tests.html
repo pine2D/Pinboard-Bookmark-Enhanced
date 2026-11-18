@@ -873,7 +873,8 @@ await suite("unified save pipeline", async () => {
     const popupPayload = popupSource.slice(popupSource.indexOf("const openPreview"), popupSource.indexOf("const downloadMd"));
     assert(popupPayload.includes("account: sessionAccount"), "popup preview payload has no owner");
     assert(popupPayload.includes('description: $id("description-input")?.value || ""'), "popup preview drops notes");
-    assert(previewSource.includes("account: bookmarkAccount, tags, description, ts: Date.now()"), "restore record drops owner metadata");
+    // The real reader's restored account, tags, notes and draft are checked
+    // by readerHandoffAccountChecks in bookmark-service-runtime-tests.mjs.
     // The reader bar owns the lookup (owner-checked there); the preview page sends no lookup of its own.
     const previewCode = previewSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     assert(!/mdPreviewBookmarkInfo/.test(previewCode), "preview page still sends its own bookmark lookup");

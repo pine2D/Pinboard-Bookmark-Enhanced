@@ -1279,6 +1279,27 @@ function pbpAlignIncomingTags(incoming, bookmarkNames, index, respectCase, keepE
   return names;
 }
 
+// Pinboard and the self-hosted adapters supply the same posts/get shape.
+// The lookup supplies the URL; archive is the caller's optional Wayback choice.
+function pbpBookmarkFieldsFromPost(post, url, archive) {
+  if (!post || typeof post !== "object" || typeof post.description !== "string"
+      || typeof post.extended !== "string" || typeof post.tags !== "string"
+      || (post.shared !== "yes" && post.shared !== "no")
+      || (post.toread !== "yes" && post.toread !== "no")
+      || typeof post.time !== "string" || !post.time) return null;
+  return {
+    url,
+    title: post.description,
+    notes: post.extended,
+    summary: post.summary,
+    tags: post.tags,
+    private: post.shared === "no",
+    toread: post.toread === "yes",
+    archive: typeof archive === "boolean" ? archive : undefined,
+    time: post.time,
+  };
+}
+
 function pbpResolveSavePlan(intent, lookup) {
   const incoming = {
     url: intent?.url || "",
@@ -1311,31 +1332,10 @@ function pbpResolveSavePlan(intent, lookup) {
   }
   if (!lookup.exists) return send({ ...incoming, time: undefined }, false, "created");
   if (intent.mode === "skip") return { action: "skip", fields: { url: incoming.url } };
-  if (!lookup.post || typeof lookup.post !== "object") {
+  const existing = pbpBookmarkFieldsFromPost(lookup.post, incoming.url, incoming.archive);
+  if (!existing) {
     return { action: "failed", result: { status: "failed", reason: "lookup" }, retryable: true };
   }
-
-  const post = lookup.post;
-  const canonical = typeof post.description === "string"
-    && typeof post.extended === "string"
-    && typeof post.tags === "string"
-    && (post.shared === "yes" || post.shared === "no")
-    && (post.toread === "yes" || post.toread === "no")
-    && typeof post.time === "string" && post.time.length > 0;
-  if (!canonical) {
-    return { action: "failed", result: { status: "failed", reason: "lookup" }, retryable: true };
-  }
-  const existing = {
-    url: incoming.url,
-    title: post.description,
-    notes: post.extended,
-    summary: post.summary,
-    tags: post.tags,
-    private: post.shared === "no",
-    toread: post.toread === "yes",
-    archive: incoming.archive,
-    time: post.time,
-  };
 
   // overwrite drops the server's tags; merge unions them. Everything else stays
   // as the server has it — including toread and private, which are only ever

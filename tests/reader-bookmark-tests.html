@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="112"><title>Reader Bookmark Tests</title></head><body>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="113"><title>Reader Bookmark Tests</title></head><body>
 <div id="results"></div><script src="../shared.js"></script><script src="../wayback.js"></script><script src="../bookmark-services.js"></script><script src="fixtures/case-filter.js"></script><script>
 function assert(x, msg) { if (!x) throw new Error(msg || "assertion failed"); }
 function equal(a, b) { assert(a === b, JSON.stringify(a) + " !== " + JSON.stringify(b)); }
@@ -32,7 +32,7 @@ async function harness(options = {}) {
     pbpBookmarkAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
     fetchExistingBookmark: async (url, token) => { env.calls.push({ url, token }); if (env.onLookup) env.onLookup(); return env.lookup || { exists: !!env.post, lookupFailed: false, post: env.post }; },
     pbpSaveFailure: reason => ({ status: "failed", reason }),
-    pbpResolveSavePlan, pbpEffectivePrivate, pbpSelfHostedAuth: auth => ["karakeep", "linkding"].includes(auth?.service),
+    pbpBookmarkFieldsFromPost, pbpEffectivePrivate, pbpSelfHostedAuth: auth => ["karakeep", "linkding"].includes(auth?.service),
     pbpReadTagVocab: async account => account === env.account ? pbpTagVocabIndex(env.vocab || {}) : null,
     pbpBookmarkParseTags, pbpCanonicalTagName, pbpSerializeIntentTags,
     loadSettings: async () => ({ bookmarkService: env.service || "pinboard", optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, qsDefaultTags: "quick", rlDefaultTags: "later", ...env.settings }),
@@ -2024,8 +2024,20 @@ async function barFrame(account, handler, detailExtra = {}) {
     node: name => w.document.getElementById("reader-bookmark-" + name) };
 }
 const wait = ms => new Promise(r => setTimeout(r, ms));
+await test("the bookmark bar queries and publishes the connection when the library has another owner", async () => {
+  const connection = "linkding:fixture";
+  const bar = await barFrame("personal:default", msg => ({
+    known: true, bookmarked: true, account: msg.account, bookmark: { tags: "work", notes: "Saved note" },
+  }), { bookmarkAccount: connection });
+  try {
+    equal(bar.requests.length, 1);
+    equal(bar.requests[0].type, "mdReaderBookmarkState");
+    equal(bar.requests[0].account, connection);
+    equal(bar.states.at(-1)?.account, connection);
+  } finally { bar.frame.remove(); }
+});
 await test("no bookmark connection asks the user to connect instead of reporting an account switch, and sends no request", async () => {
-  const none = await barFrame("", () => { throw new Error("no request may be sent"); });
+  const none = await barFrame("personal:default", () => { throw new Error("no request may be sent"); }, { bookmarkAccount: "" });
   try {
     equal(none.status(), "bgSetToken"); equal(none.requests.length, 0);
     for (const name of ["save", "later", "edit"]) assert(none.node(name).disabled, name + " must stay disabled");

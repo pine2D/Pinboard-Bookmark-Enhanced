@@ -4005,15 +4005,8 @@ function _pbpDictShowSaved(pop, cur, record) {
       // This handler is closed over `record.id`, a record resolved under
       // cur.owner, so it needs the SAME two commit gates pbpDictSaveCurrent
       // applies -- re-scoping _pbpDictOwner on pbp:account-changed cannot
-      // reach into this closure. Without them a Pinboard account switch left
-      // the popover on screen fully live: the click would flip a status
-      // inside the PREVIOUS account's partition and queue that change into
-      // that account's Drive outbox. Snapshot check first (a switch this
-      // page already saw), then the live account before the write (a token
-      // swap made in another tab or in Options, which _pbpDictOwner has not
-      // caught up with yet -- both sides of the snapshot comparison come
-      // from the same previewAccount). Fail-closed: a read that throws
-      // counts as a mismatch.
+      // reach into this closure. Check the owner seen by the page, then the
+      // live library owner in case its change event has not arrived.
       if (cur.owner !== _pbpDictOwner) { refuse(); return; }
       if (typeof pbpVocabCurrentOwner === "function") {
         const live = await pbpVocabCurrentOwner().catch(() => null);
@@ -4088,14 +4081,8 @@ async function pbpDictSaveCurrent() {
       }
     } catch (_) {}
   }
-  // Commit-time owner check against the LIVE account, not the snapshot the
-  // page render froze into _pbpDictOwner: both sides of that comparison come
-  // from the same previewAccount, so a token swap in another tab (or in
-  // Options) left this reader happily writing the PREVIOUS account's
-  // partition -- invisible in the library, and uploaded to that account's
-  // Drive by its outbox. Same fail-closed semantics options-vocab.js applies
-  // before it builds an export (its vocabAccountChanged branch): refuse the
-  // write and let the caller report the failure.
+  // The page may still hold the previous library owner while its storage
+  // change event is pending. Re-read before writing to this owner's outbox.
   if (typeof pbpVocabCurrentOwner === "function") {
     const live = await pbpVocabCurrentOwner().catch(() => null);
     if (live !== cur.owner) return false;

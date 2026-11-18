@@ -68,9 +68,7 @@ async function pbpAskInit(detail) {
     s,
     url: String((detail && detail.url) || ""),
     title: String((detail && detail.title) || ""),
-    // Non-secret Pinboard username (md-preview.js previewAccount). Scopes
-    // the persisted thread key — account-isolation invariant, same as the
-    // tr_/gloss_ cache families.
+    // The personal library owner scopes Ask history and the translation caches.
     account: String((detail && detail.account) || ""),
     // Forum/thread pages get the thread-variant prompt (same detection
     // skim uses: md-preview.js resolves pbpForumShouldMark into detail).

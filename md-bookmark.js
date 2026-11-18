@@ -81,7 +81,7 @@
 
   function paint() {
     for (const { btn, action } of buttons) {
-      btn.disabled = !context?.account;
+      btn.disabled = !context?.bookmarkAccount;
       btn.setAttribute("aria-busy", String(inflight));
       if (action === "save") {
         const saved = Boolean(state.known && state.bookmarked);
@@ -100,22 +100,22 @@
         label(el, statusKey); el.hidden = !statusKey;
         if (statusKey === "saveMergedExisting") {
           el.removeAttribute("data-i18n");
-          el.textContent = pbpBookmarkMergedText(pbpBookmarkAccountService(context?.account), text);
+          el.textContent = pbpBookmarkMergedText(pbpBookmarkAccountService(context?.bookmarkAccount), text);
         } else if (statusKey === "titleTooLong") {
           // The worker refuses a Save / Read Later whose title is over the
           // service's limit and sends the limit along; the copy needs it.
           el.removeAttribute("data-i18n");
-          el.textContent = text("titleTooLong", String(argsFor(statusKey)[0] ?? pbpBookmarkLimits(pbpBookmarkAccountService(context?.account)).title));
+          el.textContent = text("titleTooLong", String(argsFor(statusKey)[0] ?? pbpBookmarkLimits(pbpBookmarkAccountService(context?.bookmarkAccount)).title));
         } else if (ARG_KEYS.includes(statusKey)) {
           el.removeAttribute("data-i18n");
           el.textContent = text(statusKey, ...argsFor(statusKey));
         }
       }
     }
-    if (id("apply")) { id("apply").disabled = !context?.account || inflight; id("apply").setAttribute("aria-busy", String(inflight)); }
+    if (id("apply")) { id("apply").disabled = !context?.bookmarkAccount || inflight; id("apply").setAttribute("aria-busy", String(inflight)); }
     if (id("delete")) {
       id("delete").hidden = !(state.known && state.bookmarked);
-      id("delete").disabled = !context?.account || inflight;
+      id("delete").disabled = !context?.bookmarkAccount || inflight;
       id("delete").setAttribute("aria-busy", String(deleting));
     }
     if (id("editor-status")) {
@@ -123,7 +123,7 @@
       id("editor-status").hidden = !editorStatusKey;
       if (editorStatusKey === "titleTooLong") {
         id("editor-status").removeAttribute("data-i18n");
-        id("editor-status").textContent = text("titleTooLong", String(pbpBookmarkLimits(pbpBookmarkAccountService(context?.account)).title));
+        id("editor-status").textContent = text("titleTooLong", String(pbpBookmarkLimits(pbpBookmarkAccountService(context?.bookmarkAccount)).title));
       } else if (ARG_KEYS.includes(editorStatusKey)) {
         id("editor-status").removeAttribute("data-i18n");
         id("editor-status").textContent = text(editorStatusKey, ...argsFor(editorStatusKey));
@@ -188,7 +188,7 @@
   // a save it also hands the bookmark as the server now holds it, which the
   // export metadata takes over (md-preview.js); a delete hands none.
   function changedDetail() {
-    const detail = { url: context.bookmarkUrl || context.url, account: context.account };
+    const detail = { url: context.bookmarkUrl || context.url, account: context.bookmarkAccount };
     const saved = state.known && state.bookmarked ? state.bookmark : null;
     if (saved && typeof saved === "object") {
       detail.bookmark = {
@@ -201,7 +201,7 @@
   }
 
   async function request(message) {
-    try { return await chrome.runtime.sendMessage({ ...message, account: context?.account || "" }); }
+    try { return await chrome.runtime.sendMessage({ ...message, account: context?.bookmarkAccount || "" }); }
     catch (e) {
       console.warn("reader bookmark message failed:", e?.name, e?.message);
       return { status: "failed", reason: "network" };
@@ -212,7 +212,7 @@
   // Also takes the copy's placeholders (a tag, an HTTP status) into failureArgs.
   function failureKey(result) {
     const key = typeof pbpBookmarkFailureKey === "function" && typeof pbpBookmarkAccountService === "function"
-      ? pbpBookmarkFailureKey(result, pbpBookmarkAccountService(context?.account)) : "";
+      ? pbpBookmarkFailureKey(result, pbpBookmarkAccountService(context?.bookmarkAccount)) : "";
     if (key) {
       failureKeys.add(key);
       failureArgs.set(key, typeof pbpBookmarkFailureArgs === "function" ? pbpBookmarkFailureArgs(result) : []);
@@ -225,7 +225,7 @@
   // (linkding fetches the page on every check).
   function publishState() {
     const saved = state.known && state.bookmarked ? state.bookmark : null;
-    const detail = { url: context.bookmarkUrl || context.url, account: context.account, bookmarked: !!saved };
+    const detail = { url: context.bookmarkUrl || context.url, account: context.bookmarkAccount, bookmarked: !!saved };
     if (saved && typeof saved === "object") {
       detail.tagNames = Array.isArray(saved.tagNames) ? saved.tagNames.slice() : String(saved.tags || "").split(/\s+/).filter(Boolean);
       detail.shared = saved.private === true ? "no" : "yes";
@@ -235,7 +235,7 @@
 
   async function refresh(expectedGeneration) {
     const result = await request({ type: "mdReaderBookmarkState" });
-    if (expectedGeneration !== generation || result?.account !== context?.account) {
+    if (expectedGeneration !== generation || result?.account !== context?.bookmarkAccount) {
       if (expectedGeneration === generation && result?.reason === "account_changed") showStatus("readerBookmarkAccountChanged");
       return false;
     }
@@ -398,7 +398,7 @@
     "readerBookmarkDeleted", "readerBookmarkDeletedElsewhere", "bookmarkPartialSave", "bookmarkErrTagTooLong"]);
   function statusFromOldConnection() { return !WRITE_OUTCOME_KEYS.has(statusKey) && !partialKeys.has(statusKey); }
   function recheckIfPending(idleChange = false) {
-    if (!recheckConnection || inflight || !context?.account) return;
+    if (!recheckConnection || inflight || !context?.bookmarkAccount) return;
     recheckConnection = false;
     if (!idleChange && !statusFromOldConnection()) return;
     inflight = true; showStatus("readerBookmarkChecking");
@@ -411,7 +411,7 @@
   }
 
   async function editImpl() {
-    if (inflight || !context?.account) return;
+    if (inflight || !context?.bookmarkAccount) return;
     inflight = true; paint(); const gen = generation;
     const known = await refresh(gen);
     if (gen !== generation) return;
@@ -448,7 +448,7 @@
   }
 
   function confirmDelete() {
-    if (inflight || !context?.account || !state.known || !state.bookmarked || !editor?.matches(":popover-open")) return;
+    if (inflight || !context?.bookmarkAccount || !state.known || !state.bookmarked || !editor?.matches(":popover-open")) return;
     const gen = generation;
     showConfirmPopover(id("delete"), {
       container: editor,
@@ -466,23 +466,23 @@
   }
 
   async function deleteBookmarkImpl() {
-    if (inflight || !context?.account || !state.known || !state.bookmarked) return;
+    if (inflight || !context?.bookmarkAccount || !state.known || !state.bookmarked) return;
     const gen = generation;
     inflight = true; deleting = true; editorStatusKey = "readerBookmarkDeleting";
     showStatus(editorStatusKey);
     const result = await request({ type: "mdReaderBookmarkDelete" });
     if (gen !== generation) return;
     inflight = false; deleting = false;
-    if (result?.status === "deleted" && result.account === context.account) {
+    if (result?.status === "deleted" && result.account === context.bookmarkAccount) {
       // The successful delete is authoritative; a second lookup could fail
       // or return stale data and must not paint the removed bookmark as saved.
-      state = { known: true, bookmarked: false, account: context.account };
+      state = { known: true, bookmarked: false, account: context.bookmarkAccount };
       editorStatusKey = ""; statusKey = "readerBookmarkDeleted"; tagFix = null;
       closeEditor();
       publishState();
       document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: changedDetail() }));
     } else {
-      const foreign = !!(result?.account && result.account !== context.account);
+      const foreign = !!(result?.account && result.account !== context.bookmarkAccount);
       editorStatusKey = foreign ? "readerBookmarkAccountChanged" : failureKey(result)
         || (result?.reason === "account_changed" || result?.reason === "not_logged_in" ? "readerBookmarkAccountChanged" : "readerBookmarkDeleteFailed");
       statusKey = editorStatusKey;
@@ -495,13 +495,13 @@
   }
 
   async function saveImpl(action, draft) {
-    if (inflight || !context?.account) return;
+    if (inflight || !context?.bookmarkAccount) return;
     if (action === "edit" && draft) {
       if (state.quotedTags === true) {
         try { pbpBookmarkParseTags(draft.tags); }
         catch (_) { editorStatusKey = "readerBookmarkTagsQuoteError"; paint(); return; }
       }
-      const service = pbpBookmarkAccountService(context.account);
+      const service = pbpBookmarkAccountService(context.bookmarkAccount);
       const limits = pbpBookmarkLimits(service);
       if (!String(draft.title ?? "").trim()) { editorStatusKey = "readerBookmarkTitleRequired"; paint(); return; }
       const titleOver = pbpBookmarkTitleTooLong(draft.title, service);
@@ -527,7 +527,7 @@
       ...(action === "edit" || action === "later" ? { expectBookmarked: wasBookmarked } : {}),
       ...(action === "edit" && typeof editorBase?.version === "string" ? { expectedVersion: editorBase.version } : {}) });
     if (gen !== generation) return;
-    if (result?.account && result.account !== context.account) {
+    if (result?.account && result.account !== context.bookmarkAccount) {
       inflight = false; showStatus("readerBookmarkAccountChanged"); return;
     }
     if (["saved", "skipped", "queued"].includes(result?.status)) tagFix = null;
@@ -627,8 +627,16 @@
     window.pbpReaderBookmarkAction(message.action); sendResponse({ ok: true });
   });
 
+  function bookmarkContext(detail, bookmarkAccount) {
+    if (!detail) return null;
+    const { url, bookmarkUrl, title, bookmark } = detail;
+    return { url, bookmarkUrl, title, bookmark, bookmarkAccount };
+  }
+
   document.addEventListener("pbp:rendered", event => {
-    const next = {...event.detail, account:event.detail?.bookmarkAccount ?? event.detail?.account};
+    // Current render events carry the library owner in account. Older events
+    // supplied only the bookmark connection there. An empty connection is valid.
+    const next = bookmarkContext(event.detail, event.detail?.bookmarkAccount ?? event.detail?.account);
     if (isLocalDoc(next?.url) || isLocalDoc(next?.bookmarkUrl)) {
       closeEditor();
       generation++; recheckConnection = false; context = null; state = { known: false }; inflight = false; deleting = false; editorStatusKey = ""; tagFix = null;
@@ -637,7 +645,7 @@
       return;
     }
     // A second render of the same article must not unlock an in-flight write.
-    if (context?.url === next?.url && context?.account === next?.account) return;
+    if (context?.url === next?.url && context?.bookmarkAccount === next?.bookmarkAccount) return;
     closeEditor();
     generation++; recheckConnection = false; context = next; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
     mount();
@@ -645,7 +653,7 @@
     if (id("footer")) id("footer").hidden = false;
     // No bookmark connection: nothing to look up. The buttons stay disabled and
     // the bar says where to connect (it is not an account switch).
-    if (!context?.account) { inflight = false; showStatus("bgSetToken"); return; }
+    if (!context?.bookmarkAccount) { inflight = false; showStatus("bgSetToken"); return; }
     showStatus("readerBookmarkChecking"); const gen = generation;
     refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); recheckIfPending(); } });
   });
@@ -655,7 +663,7 @@
   // does not outlive the fix. A request in flight finishes first, then this looks again
   // unless the bar then shows that request's write outcome.
   document.addEventListener("pbp:bookmark-connection-changed", event => {
-    if (!context?.account || event.detail?.account !== context.account) return;
+    if (!context?.bookmarkAccount || event.detail?.account !== context.bookmarkAccount) return;
     recheckConnection = true;
     recheckIfPending(true);
   });
@@ -667,10 +675,10 @@
       if (id("footer")) id("footer").hidden = true;
       return;
     }
-    generation++; recheckConnection = false; context = event.detail || null; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
+    generation++; recheckConnection = false; context = bookmarkContext(event.detail, event.detail?.account); state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
     closeEditor();
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) { input.value = ""; input.checked = false; }
-    if (!context?.account) { inflight = false; showStatus("bgSetToken"); return; }
+    if (!context?.bookmarkAccount) { inflight = false; showStatus("bgSetToken"); return; }
     showStatus("readerBookmarkChecking");
     const gen = generation;
     refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); recheckIfPending(); } });

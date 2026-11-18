@@ -36,7 +36,7 @@ vocab-store.js / notes-sync.js / dict-archive.js / ask-archive.js  # 四类个�
 dict-pack.js / dict-entry.js / dict-evidence.js   # 离线词典包 / AI 词条与补充 / 原文用例检索
 ai.js / ai-cache.js              # AI 调用核心（popup/options/library/md-preview 共载）/ 结果 IDB 缓存
 bookmark-services.js / export-targets.js / anki-connect.js / eudic-sync.js / vocab-send.js  # Karakeep/linkding 适配（统一保存入口在 background.js）/ Send-to 注册表（纯层）/ 生词外发（本机 AnkiConnect / 欧路 OpenAPI；纯层，测试页可载）
-shared.js                        # 跨文件常量 + $id 记忆化 DOM 缓存
+shared.js                        # 共用设置读写（pbpReadSettingsWithSecrets / persistSettings）、书签字段与保存计划（pbpBookmarkFieldsFromPost / pbpResolveSavePlan）、个人资料库身份（pbpPersonalLibraryAccount）、阅读历史（pbpOpenReaderFromHistory）、OCR/语音缓存及 UI 工具（$id 等）
 jina.js / i18n.js / tag-gov.js / wayback.js / site-rules.js  # 兜底抽取 / 多语言 / 标签治理 / 归档队列 / 站点适配器
 pinboard-style.js / pinboard-sort.js / pinboard-themes.js    # pinboard.in 注入：主题 CSS（生成产物，勿手改）+ 标签热度排序
 icons/  _locales/（9 locale）  vendor/（Defuddle 等，由 update-vendor.sh 同步）  README*.md ×9 / privacy-policy.md / LICENSE

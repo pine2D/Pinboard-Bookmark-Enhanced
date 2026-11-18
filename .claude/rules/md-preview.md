@@ -53,6 +53,13 @@ block 切分 → `pbpAiShield` 占位符 `⟦C/L/I/M/T\d+⟧` 屏蔽代码/链�
 - `md-convert.js` 是 marked→DOMPurify 的单点 sanitize 中枢；导出与 frontmatter/byline 都走它。
 - **最近预览历史**（`PBP_READER_HISTORY_KEY` / `pbp_reader_history`）：`chrome.storage.local` 本机环形队列（上限 25 条，归入 `pbpIsNeverClearKey`），跳过无痕标签页与含凭据 URL，只存 URL、标题、站点名、抽取引擎、视频标记、时间与槽位键，不存正文与账号字段。打开菜单只读本机元数据；点击条目走 `pbpOpenReaderFromHistory`，优先聚焦槽位仍在的存活阅读器标签页，失效时仅在该次点击动作里按需申请文章精确 origin（或 `https://r.jina.ai` / `https://api.deepseek.com`）并挂 `historyReopen` 重抽；`md-preview.html` 槽位失效时渲染带匹配卡与最近列表的 `.es-history` 空态。
 
+## 阅读器身份与正文生命周期
+
+预览存储槽的 `account` 属于书签连接，同槽的 `tags`、`description`（备注）和 `bookmarkDraft` 随连接更换一起清理。阅读器内用 `bookmarkAccount` 表示该连接，用 `libraryOwner` 表示高亮、词典和 Ask 的个人资料库归属。首次渲染事件的 `detail.account`、资料库身份变更事件 `pbp:account-changed` 都传资料库归属；书签栏从渲染事件的 `detail.bookmarkAccount` 或 `pbp:bookmark-account-changed` 的 `detail.account` 取得书签连接。导出时核对两者。真实交接用例见 `tests/bookmark-service-runtime-tests.mjs` 的 `readerHandoffAccountChecks`。
+
+- **首次打开**。等待阅读器的 defer 脚本装配完成，`md-preview.js` 发一次 `pbp:rendered`。`md-ai-core.js` 为正文段落建索引，各功能绑定本页监听器，书签栏检查当前连接下的书签。
+- **原位替换正文**。字幕换轨、字幕标点修正或首次加载字幕替换旧正文时，`_applyArticleCommit` 先递增 `revision`，同步发 `pbp:article-will-replace`。`md-highlight.js` 趁旧编辑框还在，读出笔记并送入写入队列。随后替换正文，重建目录和段落索引，在 `finally` 发同一版本的 `pbp:article-replaced`。高亮重新定位，Ask 保留问答并把旧段落引用标为失效。整个替换沿用已绑定的监听器。换轨回归用 `tests/md-ai-tests.html` 中的 `T4 ask: citations after a replacement` 与 `T5 highlight: article replacement`，笔记写入见 `tests/md-highlight-commit-tests.html`。
+
 ## 视频面板（md-video.js）
 
 - 纯层/运行时分界见文件头注释；纯层含注入 YouTube 标签页的页函数 `pbpYtDomTranscriptInPage`——`executeScript` 按源码序列化，它必须**闭包零引用**（只用页面全局与自身参数），并留在顶层供 `tests/md-video-tests.html` 在真实 DOM 上直接跑。
@@ -63,5 +70,3 @@ block 切分 → `pbpAiShield` 占位符 `⟦C/L/I/M/T\d+⟧` 屏蔽代码/链�
 ## Ask 持久历史
 
 完成回答自动写 Ask 归档，保存失败只重试写入，不能再付费重跑；临时会话跳过持久化。新对话保留旧会话，删除单独确认并写同步墓碑。指定 askSession 已删除或不可用时，必须先开始新对话，不向旧 sessionId 发送新问题。模型上下文窗口与历史保留分离。
-
-- 阅读器双身份：`pbp:rendered.account` / `pbp:account-changed` 属固定个人资料库（Ask/高亮/词典）；`bookmarkAccount` / `pbp:bookmark-account-changed` 属当前书签连接。持久 handoff 的 `account` 与 tags/description/draft 同属书签连接，打开前及运行中切换服务均须清理旧私有元数据；导出同时校验两种身份。

@@ -1843,9 +1843,9 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth,
     }
     return { intent: { ...intent, mode: "create", ...(action === "edit" ? draft : {}), toread: action === "later" || (action === "edit" ? draft.toread : intent.toread) } };
   }
-  const plan = pbpResolveSavePlan({ ...intent, mode: "overwrite", tags: lookup.post?.tags, private: false, toread: false }, lookup);
-  if (plan.action !== "send") return { result: plan.result || pbpSaveFailure("lookup") };
-  if (action !== "edit" && plan.fields.toread === (action === "later")) {
+  const stored = pbpBookmarkFieldsFromPost(lookup.post, intent.url, intent.archive);
+  if (!stored) return { result: pbpSaveFailure("lookup") };
+  if (action !== "edit" && stored.toread === (action === "later")) {
     // kept: the bookmark was just found in the requested state, so there is
     // nothing to deliver. submitSaveIntent finishes on this lookup as a
     // delivered skip would, without a second lookup or a queue record: a
@@ -1857,8 +1857,8 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth,
   // An update leaves it alone without it, and a queued replay of this intent
   // would otherwise write that snapshot, as one line, over a Description
   // changed elsewhere since. Only the reader's own edit (draft) carries one.
-  const { summary: _readSummary, ...kept } = plan.fields;
-  return { intent: { ...kept, mode: "update", ...(action === "edit" ? draft : { toread: action === "later" }), time: plan.fields.time } };
+  const { summary: _readSummary, ...kept } = stored;
+  return { intent: { ...kept, mode: "update", ...(action === "edit" ? draft : { toread: action === "later" }), time: stored.time } };
 }
 
 function pbpReaderInitialIntent(context, settings, action) {
@@ -2045,11 +2045,10 @@ async function pbpBookmarkApiRequest(message) {
 // reader's export metadata takes over after a save (self-hosted names may
 // hold spaces). version: what the editor loaded, sent back with its edit.
 function pbpReaderStateBookmark(context, post) {
-  const plan = pbpResolveSavePlan({ mode: "overwrite", url: context.bookmarkUrl, tags: post?.tags }, { exists: true, post });
-  if (plan.action !== "send") return null;
-  const tagNames = Array.isArray(post?.tagNames) ? post.tagNames.slice()
-    : String(post?.tags || "").split(/\s+/).filter(Boolean);
-  return { ...plan.fields, tagNames, ...(typeof post?.version === "string" ? { version: post.version } : {}) };
+  const fields = pbpBookmarkFieldsFromPost(post, context.bookmarkUrl);
+  if (!fields) return null;
+  const tagNames = Array.isArray(post.tagNames) ? post.tagNames.slice() : fields.tags.split(/\s+/).filter(Boolean);
+  return { ...fields, tagNames, ...(typeof post.version === "string" ? { version: post.version } : {}) };
 }
 
 async function pbpReaderBookmarkRequest(message, sender) {

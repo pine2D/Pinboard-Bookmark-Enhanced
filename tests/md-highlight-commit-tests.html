@@ -1568,7 +1568,7 @@ function selectionRange(n, start, end) {
   const exportHelpers = previewSource.slice(previewSource.indexOf("  function captureExportJob()"),
     previewSource.indexOf("  function exportErrorText("));
   const readerExports = new Function("buildExportOpts", "pbpHlExportItems", `
-    const exportScope = "article", previewAccount = "", bookmarkAccount = "", _articleRevision = 1, exportAskRevision = 1;
+    const exportScope = "article", libraryOwner = "", bookmarkAccount = "", _articleRevision = 1, exportAskRevision = 1;
     const expIncludeAsk = false, expIncludeHl = true, exportSettings = {};
     const pbpExpTglOn = value => value;
     const getViewMarkdown = () => "Article", buildMeta = () => ({ title: "Fixture" });

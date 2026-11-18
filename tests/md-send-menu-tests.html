@@ -30,7 +30,7 @@ async function fixture({ realRuntime = false } = {}) {
   };
   const params = {
     exportSettings: {},
-    previewAccount: "qa", bookmarkAccount: "qa", _articleRevision: 0, exportAskRevision: 0,
+    libraryOwner: "qa", bookmarkAccount: "qa", _articleRevision: 0, exportAskRevision: 0,
     exportScope: "article", expIncludeAsk: {}, expIncludeHl: null, pbpExpTglOn: () => state.includeAsk,
     url: "https://fixture.test/article", title: "Fixture",
     pbpAskExportSnapshot: async () => state.askReads.length ? state.askReads.shift().promise : structuredClone(state.askSnapshot),
