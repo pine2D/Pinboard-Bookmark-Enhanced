@@ -2712,8 +2712,12 @@ function setupSubmit(token) {
         ? { "title-input": existingBookmark.description, "description-input": existingBookmark.extended,
           "linkding-description-input": typeof existingBookmark.summary === "string" ? pbpBookmarkDescriptionText(existingBookmark.summary) : undefined }
         : null;
-      Object.keys(fieldDirtyFlags).forEach((id) => { fieldDirtyFlags[id] = false; });
-      _tagsUserTouched = false;
+      // Pending delivery does not commit the form. Preserve its dirty flags
+      // through failures, queued writes and abandoned account/URL contexts.
+      const fieldsAtSubmit = Object.fromEntries(Object.keys(fieldDirtyFlags).map(id => {
+        const el = $id(id);
+        return [id, { value: el.value, checked: el.checked }];
+      }));
 
       // Host permission first: without it the background's archive call returns
       // at wayback.js's own permissions gate, so the indicator would claim an
@@ -2867,6 +2871,14 @@ function setupSubmit(token) {
       }
 
       if (result.status === "saved") {
+        // Commit only fields still equal to the delivered snapshot; later
+        // edits must survive the fresh lookup after a create/merge.
+        for (const [id, submitted] of Object.entries(fieldsAtSubmit)) {
+          const el = $id(id);
+          if (el.value === submitted.value && el.checked === submitted.checked) fieldDirtyFlags[id] = false;
+        }
+        if (currentTags.length === tags.length && currentTags.every((tag, i) => tag === tags[i])
+            && $id("tags-input").value.trim() === "") _tagsUserTouched = false;
         // A successful delivery consumes only this click's sharing choice.
         // Controls remain editable during I/O: a newer toggle, even back to
         // the same value, belongs to the next save and keeps its provenance.

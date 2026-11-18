@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="314"><title>Popup Save Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="316"><title>Popup Save Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 .case { padding: 4px 8px; margin: 4px 0; }
@@ -450,6 +450,26 @@ test("posts/add default remains replace=yes for existing callers", () => {
         reloadCalls: () => reloadCalls,
       };
     }
+
+    await testAsync("failed and queued deliveries retain draft flags for conflict retries", async () => {
+      for (const result of [{status:"failed",reason:"network"}, {status:"queued"}, null]) {
+        const h = createSubmitHarness();
+        const pending = h.click();
+        await flushMicrotasks();
+        assert(h.fieldDirtyFlags["title-input"] && h.fieldDirtyFlags["description-input"], "pending save cleared draft");
+        h.resolveSave(result);
+        await pending;
+        assert(h.fieldDirtyFlags["title-input"] && h.fieldDirtyFlags["description-input"], "failed/queued response cleared draft");
+      }
+    });
+    await testAsync("successful delivery clears submitted flags while preserving newer edits", async () => {
+      const h = createSubmitHarness();
+      const pending = h.click(); await flushMicrotasks();
+      h.elements["title-input"].value = "Newer draft";
+      h.resolveSave({status:"saved",mutation:"created"}); await pending;
+      assert(h.fieldDirtyFlags["title-input"] === true, "newer edit lost its flag");
+      assert(h.fieldDirtyFlags["description-input"] === false, "delivered field stayed dirty");
+    });
 
     // The popup's own listeners, registered by the real setup functions on the
     // harness elements: the counter runs only because an input event reached
@@ -1946,17 +1966,17 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
-    test("submitted fields reset before delivery without erasing in-flight edits later", () => {
+    test("submitted fields commit after delivery without erasing in-flight edits later", () => {
       const savedStart = submit.indexOf('if (result.status === "saved")');
       const savedEnd = submit.indexOf('if (result.status === "failed" && result.reason === "too_long")', savedStart);
       const saved = submit.slice(savedStart, savedEnd);
       const elseStart = saved.indexOf("} else {");
       const freshIndex = saved.indexOf("checkExistingBookmark(token, url, null, true, tags)", elseStart);
       const autoCloseGeneration = saved.indexOf("const autoCloseGeneration = bookmarkLookup.generation", freshIndex);
-      const dirtyResetIndex = submit.indexOf("Object.keys(fieldDirtyFlags).forEach", intentIndex);
+      const dirtyResetIndex = submit.indexOf("fieldDirtyFlags[id] = false", intentIndex);
       assert(saved.includes('if (savePolicy.mode === "update")'), "update/create result split missing");
-      assert(dirtyResetIndex > intentIndex && dirtyResetIndex < sendIndex, "submitted dirty baseline is not reset before delivery");
-      assert(!submit.slice(sendIndex, savedEnd).includes("fieldDirtyFlags[id] = false"), "a result path can erase edits made while delivery is pending");
+      assert(dirtyResetIndex > savedStart, "dirty baseline reset before successful delivery");
+      assert(saved.includes("el.value === submitted.value && el.checked === submitted.checked"), "successful result must preserve newer field values");
       assert(freshIndex > elseStart, "create/merge does not force a fresh lookup");
       assert(saved.includes("checkExistingBookmark(token, url, null, true, tags)"), "force-fresh does not carry the submitted tag baseline");
       assert(autoCloseGeneration > freshIndex, "auto-close captures the stale pre-refresh generation");
