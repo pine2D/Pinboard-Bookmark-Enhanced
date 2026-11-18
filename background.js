@@ -3628,6 +3628,7 @@ async function pbpReconcileDriveAlarms() {
 }
 
 async function pbpRunDriveDataset(type, auth, ownerScope, runOptions) {
+  const scopeEpoch = driveScopeEpoch;
   driveSession.type = type;
   driveSession.permissionId = "";
   driveSession.identityVersion = driveIdentityVersion;
@@ -3641,7 +3642,8 @@ async function pbpRunDriveDataset(type, auth, ownerScope, runOptions) {
       result = null;
     }
     if (!result || typeof result !== "object") result = { ok: false, error: "unexpected", retryable: true };
-    if (result.ok && result.changed && auth && pbpLibraryAuthIsCurrent(auth)) {
+    if (result.changed && result.error !== "account_changed" && auth &&
+        driveScopeEpoch === scopeEpoch && pbpLibraryAuthIsCurrent(auth)) {
       pbpBroadcastVocabSynced(ownerScope, type);
     }
     if (result.ok && !result.status?.waitingForRetry) {

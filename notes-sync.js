@@ -358,6 +358,7 @@ function pbpCreateNotesSyncStore({
       grouped.get(key).push(event);
     }
     let applied=0,merged=0,ignored=0;
+    let changed = false;
     try {
       await checkHash(owner,ownerHash);
       for (const [key,events] of grouped) await withLock(PBP_NOTES_SYNC_RECORD_LOCK_PREFIX+key,async()=>{
@@ -365,6 +366,7 @@ function pbpCreateNotesSyncStore({
         let rec=(await read(key)) || {v:1,url:"",title:"",items:[]};
         await checkOwner(owner);
         const state=ownerState(rec,owner);
+        const before = applied + merged;
         for (const remote of events) {
           const ident=_pbpNotesIdentity(remote.recordKey);
           if (!ident) throw _pbpNotesSyncError("invalid_remote_page");
@@ -391,13 +393,15 @@ function pbpCreateNotesSyncStore({
         rec=saveOwnerState(rec,owner,state);
         await checkOwner(owner);
         await store().set({[key]:rec});
+        if (applied + merged > before) changed = true;
       });
       if (cursorCommit && !await putAccountState(cursorCommit)) throw _pbpNotesSyncError("local_store");
       return {ok:true,applied,merged,ignored};
     } catch (error) {
       const code=typeof error.code === "string" ? error.code : "local_store";
       console.warn("[notes-sync] page apply failed:",error.name,code);
-      return {ok:false,error:code,retryable:error.retryable === true};
+      // Each article was committed separately. A later article or the cursor can fail.
+      return {ok:false,error:code,retryable:error.retryable === true,changed};
     }
   }
   async function checkpointOwner(owner) {

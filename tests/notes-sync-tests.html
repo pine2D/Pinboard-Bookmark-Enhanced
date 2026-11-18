@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="58"><title>Notes Sync Tests</title></head><body>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="59"><title>Notes Sync Tests</title></head><body>
 <h1>Notes Sync Tests</h1><div id="summary"></div><div id="results"></div>
 <script src="../shared.js"></script><script src="../options-backup.js"></script>
 <script src="../vocab-store.js"></script><script src="../notes-sync.js"></script>
@@ -95,6 +95,16 @@ test("a URL-less legacy import retains an article URL already known on this devi
     assert(f.data[KEY].url === URL_ && f.data[KEY].items[0].note === "from legacy");
     assert((await f.store().listOutbox(OWNER))[0].event.value.url === URL_);
   } finally { globalThis.chrome = prior; }
+});
+test("a cursor failure after the note was committed reports the durable change", async () => {
+  const f = fixture(), set = f.storage.set;
+  f.storage.set = async values => {
+    if (!Object.hasOwn(values, KEY)) throw new Error("cursor store full");
+    await set(values);
+  };
+  const cursor = {key:"account:google:"+HASH,ownerHash:HASH,drivePermissionId:"google",pageToken:"next"};
+  const result = await f.store().applyRemotePage(OWNER,HASH,[batch([event()])],cursor);
+  assert(!result.ok && result.changed === true && f.data[KEY].items[0].note === "original");
 });
 test("note edits advance version without losing other items",async()=>{const f=fixture({[KEY]:record([item("foreign","foreign",OTHER)])});await write(f,record([item(),item("foreign","foreign",OTHER)]));await write(f,record([item("changed"),item("foreign","foreign",OTHER)]));const out=await f.store().listOutbox(OWNER);assert(out.length===1 && out[0].event.dot.counter===2);assert(f.data[KEY].items[1].note === "foreign");});
 test("unchanged content does not queue another version",async()=>{const f=fixture();await write(f,record());await write(f,record());assert((await f.store().listOutbox(OWNER))[0].event.dot.counter===1);});
