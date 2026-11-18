@@ -1781,7 +1781,8 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     // Headers received: start a fresh idle window for time-to-first-byte.
     resetIdle();
     if (!res.ok) {
-      clearTimeout(idleTimer);
+      // Keep the idle guard armed while reading the error body too: response
+      // headers alone do not guarantee the server will finish its JSON body.
       // always throws (same semantics as the non-streaming callers)
       await wait(handleAIError(res, providerName));
     }
