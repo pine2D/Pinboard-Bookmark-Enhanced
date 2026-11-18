@@ -79,8 +79,14 @@
     try { m.currentTime = seekGuard.target; } catch (_) { selfSeek = false; }
   }
   function applyRequestedRate(m) {
-    if (requestedRate === null || m.playbackRate === requestedRate) return;
-    try { m.playbackRate = requestedRate; } catch (error) {
+    if (requestedRate === null) return;
+    try {
+      if (m.playbackRate !== requestedRate) m.playbackRate = requestedRate;
+      // Native load()/src changes restore playbackRate from this default,
+      // even when the same media node stays mounted. Keep both in sync so
+      // that reset cannot erase either a reader request or a player choice.
+      if ("defaultPlaybackRate" in m && m.defaultPlaybackRate !== requestedRate) m.defaultPlaybackRate = requestedRate;
+    } catch (error) {
       console.warn("[bili-player] playback rate unavailable", error?.name);
     }
   }
@@ -88,6 +94,7 @@
     const m = bind();
     if (m) {
       if (typeof m.playbackRate === "number" && m.playbackRate >= 0.25 && m.playbackRate <= 2) requestedRate = m.playbackRate;
+      applyRequestedRate(m);
       guardSeek(m);
     }
     stopTimer();
