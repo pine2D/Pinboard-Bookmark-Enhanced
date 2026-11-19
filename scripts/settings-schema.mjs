@@ -981,21 +981,6 @@ export const SETTINGS_SCHEMA = deepFreeze([
     },
   },
   {
-    key: "optExtensionStyle",
-    section: "tail",
-    defaultValue: "standard",
-    backupEnum: ["standard", "platinum"],
-    backupEnumOrder: 16,
-    options: {
-      panel: "appearance",
-      domId: "opt-extension-style",
-      reset: { mode: "field", order: 1.5 },
-      load: { map: "fieldMap", section: "tail", order: 8.5, form: "bare" },
-      collect: { section: "tail", order: 25.5, kind: "value" },
-      htmlDefault: { check: "value" },
-    },
-  },
-  {
     key: "optPopupFollowTheme",
     section: "tail",
     defaultValue: true,

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 export const SITE_THEMES = vm.runInNewContext(readFileSync(new URL('../pinboard-themes.js', import.meta.url), 'utf8') + '; PINBOARD_THEMES');
-const darkNames = new Set(['nord-night', 'terminal', 'dracula', 'flexoki:dark', 'solarized-dark', 'catppuccin-mocha', 'gruvbox-dark', 'rose-pine']);
+const darkNames = new Set(['nord-night', 'terminal', 'dracula', 'flexoki:dark', 'solarized-dark', 'catppuccin-mocha', 'gruvbox-dark', 'rose-pine', 'platinum-dark']);
 export const SITE_VARIANTS = [
   ...Object.entries(SITE_THEMES).map(([key, { css }]) => ({ key, css, dark: false, scheme: darkNames.has(key) ? 'dark' : 'light' })),
   { key: 'flexoki:dark', css: SITE_THEMES.flexoki.css, dark: true, scheme: 'dark' },

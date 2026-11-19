@@ -1896,15 +1896,6 @@
   "secExtensionAppearance": {
     "message": "Wygląd rozszerzenia"
   },
-  "extensionStyleLabel": {
-    "message": "Styl interfejsu"
-  },
-  "extensionStyleStandard": {
-    "message": "Standardowy"
-  },
-  "extensionStylePlatinum": {
-    "message": "Platynowy (jasny)"
-  },
   "themeAuto": {
     "message": "Auto (według systemu)"
   },
@@ -1918,7 +1909,7 @@
     "message": "Strony rozszerzenia zgodne z motywem Pinboard"
   },
   "popupFollowHint": {
-    "message": "Okienko, ustawienia i biblioteka używają kolorów motywu Pinboard. Czytnik zachowuje własne kolory."
+    "message": "Okienko, ustawienia i biblioteka używają kolorów motywu Pinboard. Czytnik zachowuje własne kolory, chyba że wybierzesz Platinum."
   },
   "optFollowNeedsPreset": {
     "message": "Najpierw wybierz poniżej motyw Pinboard. Przy „Bez motywu” nie ma palety do zastosowania."

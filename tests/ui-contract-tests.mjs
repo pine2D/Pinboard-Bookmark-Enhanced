@@ -4938,7 +4938,7 @@ check(/@media[^{]*\(max-height:[^)]*\)\s*\{[\s\S]*?\.options-nav\s*\{[^}]*positi
 check(/\.pick\s*>\s*input:disabled\s*~\s*\.pick-text[^{}]*\{[^}]*color\s*:/.test(optionsCss),
   "options.css: .pick disabled checkbox rows (backup-section-picker, storage-cats) keep full-contrast text -- the user cannot tick them and the page never says why");
 
-function runOptionsEarly({ mode = "auto", preset = "", dark = false, style = "standard", syncMirror, chrome } = {}) {
+function runOptionsEarly({ mode = "auto", preset = "", dark = false, follow = true, syncMirror, chrome } = {}) {
   // dataset is a Proxy that counts real mutations (K33): the write-only-on-
   // change guard is the actual product of the options-theme-early.js fix,
   // so tests need to see how many times dataset.theme was actually touched,
@@ -4955,7 +4955,7 @@ function runOptionsEarly({ mode = "auto", preset = "", dark = false, style = "st
     },
   });
   const root = { dataset };
-  const values = new Map([["pp-theme", mode], ["pp-theme-preset", preset], ["pp-extension-style", style]]);
+  const values = new Map([["pp-theme", mode], ["pp-theme-preset", preset], ["pp-theme-follow", follow === false ? "0" : "1"]]);
   // task-7/K5: "pp-sync-enabled" is only seeded when a test explicitly asks
   // for it, so the pre-existing tests above (which pass no syncMirror) keep
   // exercising the two-hop fallback path unchanged.
@@ -4979,9 +4979,19 @@ function runOptionsEarly({ mode = "auto", preset = "", dark = false, style = "st
   };
 }
 
-for (const [preset, expected] of [["flexoki", "flexoki-dark"], ["solarized", "solarized-dark"], ["catppuccin", "catppuccin-mocha"]]) {
+for (const [preset, expected] of [
+  ["flexoki", "flexoki-dark"],
+  ["solarized", "solarized-dark"],
+  ["catppuccin", "catppuccin-mocha"],
+  ["platinum", "platinum-dark"],
+]) {
   const run = runOptionsEarly({ mode: "auto", preset, dark: true });
   check(run.root.dataset.theme === expected, `options-theme-early.js: ${preset} did not follow dark matchMedia without chrome`);
+}
+{
+  const ptLight = runOptionsEarly({ mode: "light", preset: "platinum", dark: false });
+  check(ptLight.root.dataset.theme === "platinum-light" && ptLight.root.dataset.density === "compact",
+    "options-theme-early.js: platinum light did not resolve to platinum-light + compact density");
 }
 for (const preset of ["__proto__", "constructor"]) {
   const run = runOptionsEarly({ mode: "dark", preset });
@@ -5097,8 +5107,8 @@ check(corrected.values.get("pp-theme") === "light" && corrected.values.get("pp-t
 // stated rules, not against the twin's own source (a self-referential
 // "diff the two copies" check would pass even if both sides drifted the
 // same way).
-function runReaderEarly({ optTheme = "auto", override = "auto", videoDark = false, search = "", syncMirror, chrome } = {}) {
-  const root = { style: {} };
+function runReaderEarly({ optTheme = "auto", override = "auto", videoDark = false, search = "", preset = "", follow = true, syncMirror, chrome } = {}) {
+  const root = { style: {}, dataset: {} };
   const links = {
     "hljs-light-link": { media: "(prefers-color-scheme: light)" },
     "hljs-dark-link": { media: "(prefers-color-scheme: dark)" },
@@ -5111,6 +5121,8 @@ function runReaderEarly({ optTheme = "auto", override = "auto", videoDark = fals
     ["pp-theme", optTheme],
     ["md-preview-scheme", override],
     ["md-preview-video-dark", videoDark ? "1" : "0"],
+    ["pp-theme-preset", preset],
+    ["pp-theme-follow", follow === false ? "0" : "1"],
   ]);
   // task-7/K5: only seeded when a test asks for it, so every pre-existing
   // caller above (no syncMirror) keeps exercising the two-hop fallback.
@@ -5253,7 +5265,7 @@ function countingLocalDual(syncEnabledResponse, themeResponse) {
 // file) relevant to the mirror merge; applyTabMirror's DOMContentLoaded path
 // is inert here (no "pp-last-tab" seeded, same abstinence runOptionsEarly
 // shows toward fields it does not need).
-function runPopupEarly({ syncMirror, chrome, style = "standard" } = {}) {
+function runPopupEarly({ mode = "auto", preset = "", follow = true, dark = false, syncMirror, chrome } = {}) {
   const datasetStore = {};
   const dataset = new Proxy(datasetStore, {
     set(target, prop, value) { target[prop] = value; return true; },
@@ -5261,11 +5273,11 @@ function runPopupEarly({ syncMirror, chrome, style = "standard" } = {}) {
   });
   const styleProps = {};
   const root = { dataset, style: { setProperty(k, v) { styleProps[k] = v; } } };
-  const values = new Map([["pp-extension-style", style]]);
+  const values = new Map([["pp-theme", mode], ["pp-theme-preset", preset], ["pp-theme-follow", follow === false ? "0" : "1"]]);
   if (syncMirror !== undefined) values.set("pp-sync-enabled", syncMirror);
   const context = {
     document: { documentElement: root, addEventListener() {}, getElementById() { return null; } },
-    window: { matchMedia: () => ({ matches: false }) },
+    window: { matchMedia: () => ({ matches: dark }) },
     localStorage: {
       getItem: key => values.get(key) ?? null,
       setItem: (key, value) => values.set(key, String(value)),
@@ -5276,21 +5288,43 @@ function runPopupEarly({ syncMirror, chrome, style = "standard" } = {}) {
   return { root, values, styleProps };
 }
 
-// A cached style must paint synchronously. An authoritative switch back to
-// Standard restores the original Pinboard preset, including in dark mode.
+// Adaptive Platinum resolves synchronously from mirrors and updates cleanly
+// when authoritative storage switches preset or disables follow-theme.
 for (const boot of [runPopupEarly, runOptionsEarly]) {
-  for (const [style, stored, expected] of [
-    ["platinum", "standard", "dracula"], ["standard", "platinum", "platinum"],
-  ]) {
-    const sync = countingArea({ optTheme: "dark", themePresetKey: "dracula",
-      optPopupFollowTheme: true, optExtensionStyle: stored });
-    const run = boot({ style, syncMirror: "1", chrome: { storage: { sync, local: countingArea({}) } } });
-    if (style === "platinum") check(run.root.dataset.theme === "platinum",
-      boot.name + ": cached Platinum must be present before storage resolves");
-    await new Promise(resolve => setImmediate(resolve));
-    check(run.root.dataset.theme === expected && run.values.get("pp-extension-style") === stored,
-      boot.name + ": authoritative interface style wins and refreshes the mirror");
-  }
+  const sync = countingArea({ optTheme: "dark", themePresetKey: "dracula", optPopupFollowTheme: true });
+  const run = boot({ mode: "light", preset: "platinum", follow: true, syncMirror: "1", chrome: { storage: { sync, local: countingArea({}) } } });
+  check(run.root.dataset.theme === "platinum-light",
+    boot.name + ": cached Platinum light must paint synchronously before storage resolves");
+  await new Promise(resolve => setImmediate(resolve));
+  check(run.root.dataset.theme === "dracula" && run.values.get("pp-theme-preset") === "dracula",
+    boot.name + ": authoritative preset replaces cached Platinum and refreshes the mirror");
+
+  const ptDarkSync = countingArea({ optTheme: "dark", themePresetKey: "platinum", optPopupFollowTheme: true });
+  const ptDarkRun = boot({ mode: "light", preset: "", follow: true, syncMirror: "1", chrome: { storage: { sync: ptDarkSync, local: countingArea({}) } } });
+  await new Promise(resolve => setImmediate(resolve));
+  check(ptDarkRun.root.dataset.theme === "platinum-dark",
+    boot.name + ": authoritative Platinum in dark mode must resolve to platinum-dark");
+}
+
+// Reader Platinum mode: active iff preset === "platinum" and follow !== false.
+{
+  const rOn = runReaderEarly({ optTheme: "auto", preset: "platinum", follow: true });
+  check(rOn.root.dataset.readerTheme === "platinum",
+    'md-preview-theme-early.js: preset="platinum" with follow=true did not set data-reader-theme="platinum"');
+  const rOff = runReaderEarly({ optTheme: "auto", preset: "platinum", follow: false });
+  check(!("readerTheme" in rOff.root.dataset),
+    'md-preview-theme-early.js: preset="platinum" with follow=false still set data-reader-theme');
+  const rOther = runReaderEarly({ optTheme: "auto", preset: "dracula", follow: true });
+  check(!("readerTheme" in rOther.root.dataset),
+    'md-preview-theme-early.js: non-platinum preset set data-reader-theme');
+}
+
+// Platinum listbox open-hover contrast guard (prevents 1175d89d's 1.23:1 white-on-#e8e8e8 bug).
+{
+  const ptControlsCss = readFileSync(resolve(root, "platinum-controls.css"), "utf8");
+  check(/\.listbox-btn[\s\S]{0,120}:hover:enabled:not\(\[aria-expanded="true"\]/.test(ptControlsCss) &&
+    /\[aria-expanded="true"\],\s*\[aria-expanded="true"\]:hover/.test(ptControlsCss),
+    "platinum-controls.css: .listbox-btn hover must exclude [aria-expanded=\"true\"] and lock expanded+hover to paired dark sunken fill + white text");
 }
 
 // --- popup-theme-early.js: mirror "1" picks sync directly, zero local.get calls ---
@@ -5412,13 +5446,13 @@ function inOrder(source, ...parts) {
 const optionsThemeApplyStart = optionsJs.indexOf("function applyOptionsPageTheme");
 const optionsThemeApplyEnd = optionsJs.indexOf("// Track active preset key", optionsThemeApplyStart);
 const optionsThemeApply = optionsJs.slice(optionsThemeApplyStart, optionsThemeApplyEnd);
-check(optionsThemeApply.includes('pbpApplyOptionsEarlyTheme(themeMode, presetKey, $id("opt-popup-follow-theme").checked, $id("opt-extension-style").value)') &&
+check(optionsThemeApply.includes('pbpApplyOptionsEarlyTheme(themeMode, presetKey, $id("opt-popup-follow-theme").checked)') &&
   !optionsThemeApply.includes("pbpStoreOptionsThemeMirror"),
   "options.js: visual theme apply also mutates the persisted mirror");
 check(inOrder(optionsJs,
   "Object.entries(fieldMap)", "el.value = val", "Object.entries(checkMap)", "el.checked = val",
   "syncKeysToggle.checked = syncApiKeys", "applyOptionsPageTheme(currentPresetKey, s.optTheme);",
-  "pbpStoreOptionsThemeMirror(s.optTheme, currentPresetKey, s.optPopupFollowTheme !== false, s.optExtensionStyle);",
+  "pbpStoreOptionsThemeMirror(s.optTheme, currentPresetKey, s.optPopupFollowTheme !== false);",
   'document.documentElement.dataset.optionsReady = "1";', "// Language change"),
   "options.js: General values, authoritative theme/mirror, and ready gate are out of order");
 const optionsSnapshotStart = optionsJs.indexOf("async function pbpSaveOptionsSnapshot");
@@ -5430,7 +5464,7 @@ const optionsSaveAll = optionsJs.slice(optionsSaveAllStart, optionsSaveAllEnd);
 check(inOrder(optionsSnapshot, "await persist(settingsDelta)", "if (!res.ok)",
   "if (onSettingsSaved) onSettingsSaved(settingsDelta);",
   "overlay = await saveOverlay(overlayValue);") &&
-  /onSettingsSaved\(settingsDelta\)[\s\S]*pbpStoreOptionsThemeMirror\(data\.optTheme, data\.themePresetKey, data\.optPopupFollowTheme !== false, data\.optExtensionStyle\)/.test(optionsSaveAll),
+  /onSettingsSaved\(settingsDelta\)[\s\S]*pbpStoreOptionsThemeMirror\(data\.optTheme, data\.themePresetKey, data\.optPopupFollowTheme !== false\)/.test(optionsSaveAll),
   "options.js: theme mirror is updated before settings persistence succeeds or after overlay work");
 
 check(/const el = document\.createElement\("button"\);[\s\S]{0,240}el\.className = "stag";/.test(popupTagsJs), "popup-tags.js: suggested tag is not a button");

@@ -47,7 +47,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isolatedFontconfigEnv, parityProbeEnv } from "./ci-fonts-env.mjs";
 import { auditSelection } from "./audit-scope.mjs";
-import { QA_SCENARIOS, QA_OPTIONS_PANELS, QA_INTERFACE_THEMES, runQaScenarios, qaThemeCases, qaReaderControlCases, qaExpectedCases, assertQaCases } from "./audit-qa-scenarios.mjs";
+import { QA_SCENARIOS, QA_OPTIONS_PANELS, QA_THEME_PRESETS, runQaScenarios, qaThemeCases, qaReaderControlCases, qaExpectedCases, assertQaCases } from "./audit-qa-scenarios.mjs";
 import { openVocabPackPreview, installVocabPackFixture } from "./audit-vocab-pack-fixture.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -1574,7 +1574,7 @@ async function drivePinboard(context, rep) {
 // Adaptive umbrellas resolve their variant from optTheme at render time.
 
 function uiPresetKeys() {
-  return axisValues("theme", QA_INTERFACE_THEMES).map(preset => preset === "default" ? "" : preset);
+  return axisValues("theme", QA_THEME_PRESETS).map(preset => preset === "default" ? "" : preset);
 }
 
 function adaptivePresetKeys() {
@@ -1589,19 +1589,16 @@ async function driveThemes(context, worker, extId, rep) {
   const adaptive = new Set(adaptivePresetKeys());
   const themeCases = activeScenario?.axes.theme ? qaThemeCases(activeScenario, AUDIT.filters.axes) : [];
   const modesFor = (preset, legacy = ["light", "dark"]) => activeScenario
-    ? themeCases.filter(item => item.theme === (preset || "default")).map(item => item.scheme)
-    : preset === "platinum" ? ["light"] : legacy;
-  const verifyScheme = async (page, mode, site = false, theme = "") => {
+    ? themeCases.filter(item => item.theme === (preset || "default")).map(item => item.scheme) : legacy;
+  const verifyScheme = async (page, mode, site = false) => {
     if (!activeScenario) return;
-    await page.waitForFunction(({ mode, site, theme }) => {
-      if (theme === "platinum" && document.documentElement.dataset.theme !== theme) return false;
+    await page.waitForFunction(({ mode, site }) => {
       const scheme = getComputedStyle(site ? document.body : document.documentElement).colorScheme;
       return (scheme === "normal" ? "light" : scheme) === mode;
-    }, { mode, site, theme }, { timeout: TIMEOUT_MS });
+    }, { mode, site }, { timeout: TIMEOUT_MS });
   };
   const setTheme = (preset, mode) => worker.evaluate(async ({ p, m }) => {
-    await chrome.storage.local.set({ themePresetKey: p === "platinum" ? "" : p, optTheme: m,
-      optExtensionStyle: p === "platinum" ? p : "standard" });
+    await chrome.storage.local.set({ themePresetKey: p, optTheme: m });
   }, { p: preset, m: mode });
 
   // Options UI: preset × light/dark (double reload settles the theme-early
@@ -1616,7 +1613,7 @@ async function driveThemes(context, worker, extId, rep) {
           await page.goto(`chrome-extension://${extId}/options.html#appearance`, { waitUntil: "load", timeout: TIMEOUT_MS });
           await page.reload({ waitUntil: "load", timeout: TIMEOUT_MS });
           await page.waitForTimeout(350);
-          await verifyScheme(page, mode, false, preset);
+          await verifyScheme(page, mode);
           await rep.shot(page, s, `options-${preset || "default"}-${mode}`);
           recordCase({ theme: preset || "default", scheme: mode });
         } catch (e) {
@@ -1644,7 +1641,7 @@ async function driveThemes(context, worker, extId, rep) {
           // uncommented): options' single #appearance panel fits the viewport,
           // but the vocab list's height varies with word count and routinely
           // exceeds it -- a non-fullPage shot would crop it.
-          await verifyScheme(page, mode, false, preset);
+          await verifyScheme(page, mode);
           await rep.shot(page, s, `library-${preset || "default"}-${mode}`, { fullPage: true });
           recordCase({ theme: preset || "default", scheme: mode });
         } catch (e) {
@@ -1669,7 +1666,7 @@ async function driveThemes(context, worker, extId, rep) {
     }
     // pinboard.in site fixture: adaptive umbrellas render a different variant
     // per light/dark, so they get two shots; fixed presets get one.
-    for (const preset of includesStep("site") ? presets.filter(preset => preset && preset !== "platinum") : []) {
+    for (const preset of includesStep("site") ? presets.filter(Boolean) : []) {
       for (const mode of modesFor(preset, adaptive.has(preset) ? ["light", "dark"] : ["light"])) {
         try {
           await setTheme(preset, mode);
@@ -1698,7 +1695,7 @@ async function driveThemes(context, worker, extId, rep) {
     // (popup-theme-early.js:33-35, no adaptive-map fallback) — a state no
     // preset combination reaches, and popup was never in this matrix before
     // this task, so it needs both light and dark captured here.
-    const clearTheme = () => worker.evaluate(() => chrome.storage.local.remove(["themePresetKey", "optTheme", "optExtensionStyle"]));
+    const clearTheme = () => worker.evaluate(() => chrome.storage.local.remove(["themePresetKey", "optTheme"]));
     for (const [label, url] of [
       ["options", `chrome-extension://${extId}/options.html#appearance`],
       ["library", `chrome-extension://${extId}/library.html?_qa=unset#vocab`],
@@ -1730,7 +1727,7 @@ async function driveThemes(context, worker, extId, rep) {
             const url = `chrome-extension://${extId}/popup.html?_qa=${encodeURIComponent(preset)}-${mode}`;
             await page.goto(url, { waitUntil: "load", timeout: TIMEOUT_MS });
             await page.waitForTimeout(350);
-            await verifyScheme(page, mode, false, preset);
+            await verifyScheme(page, mode);
             await rep.shot(page, s, `popup-${preset || "default"}-${mode}`);
             recordCase({ theme: preset || "default", scheme: mode });
           } catch (e) {

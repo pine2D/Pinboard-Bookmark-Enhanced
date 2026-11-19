@@ -1896,15 +1896,6 @@
   "secExtensionAppearance": {
     "message": "Оформление расширения"
   },
-  "extensionStyleLabel": {
-    "message": "Стиль интерфейса"
-  },
-  "extensionStyleStandard": {
-    "message": "Стандартный"
-  },
-  "extensionStylePlatinum": {
-    "message": "Платина (светлый)"
-  },
   "themeAuto": {
     "message": "Авто (по настройкам системы)"
   },
@@ -1918,7 +1909,7 @@
     "message": "Страницы расширения следуют теме Pinboard"
   },
   "popupFollowHint": {
-    "message": "Всплывающее окно, настройки и библиотека используют цвета пресета Pinboard. Страница «Чтение» сохраняет свои цвета."
+    "message": "Всплывающее окно, настройки и библиотека используют цвета пресета Pinboard. Страница «Чтение» сохраняет свои цвета, кроме пресета Platinum."
   },
   "optFollowNeedsPreset": {
     "message": "Сначала выберите ниже пресет Pinboard. При «Без пресета» нет палитры для применения."

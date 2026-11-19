@@ -1905,15 +1905,6 @@
   "secExtensionAppearance": {
     "message": "Extension Appearance"
   },
-  "extensionStyleLabel": {
-    "message": "Interface style"
-  },
-  "extensionStyleStandard": {
-    "message": "Standard"
-  },
-  "extensionStylePlatinum": {
-    "message": "Platinum (light)"
-  },
   "themeAuto": {
     "message": "Auto (follow system)"
   },
@@ -1927,7 +1918,7 @@
     "message": "Extension pages follow the Pinboard theme preset"
   },
   "popupFollowHint": {
-    "message": "The popup, Settings and the library use your Pinboard preset's colors. The reader keeps its own colors."
+    "message": "The popup, Settings and the library use your Pinboard preset's colors. The reader keeps its own colors unless you pick Platinum."
   },
   "optFollowNeedsPreset": {
     "message": "Pick a Pinboard preset below first. With No preset there is no palette to follow."

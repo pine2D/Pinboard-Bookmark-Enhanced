@@ -1605,19 +1605,12 @@
           </select>
           <p class="hint" id="opt-theme-overridden" hidden></p>
         </div>
-        <div class="fg entry-block">
-          <label class="bl" id="opt-extension-style-label" for="opt-extension-style" data-i18n="extensionStyleLabel">Interface style</label>
-          <select id="opt-extension-style" aria-labelledby="opt-extension-style-label" data-listbox>
-            <option value="standard" data-i18n="extensionStyleStandard">Standard</option>
-            <option value="platinum" data-i18n="extensionStylePlatinum">Platinum (light)</option>
-          </select>
-        </div>
-        <div class="pref-group" id="opt-follow-theme-group">
+        <div class="pref-group">
           <div class="pref-row context-help-host" data-help-role="choice">
             <label class="switch"><input type="checkbox" role="switch" id="opt-popup-follow-theme" aria-labelledby="opt-popup-follow-theme-label" aria-describedby="opt-popup-follow-theme-needs-preset" checked /> <span class="switch-text" id="opt-popup-follow-theme-label" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span>
             <details class="context-help">
               <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">The popup, Settings and the library use your Pinboard preset's colors. The reader keeps its own colors.</p>
+              <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">The popup, Settings and the library use your Pinboard preset's colors. The reader keeps its own colors unless you pick Platinum.</p>
             </details><span class="switch-track" aria-hidden="true"></span></label>
           </div>
           <p class="hint" id="opt-popup-follow-theme-needs-preset" data-i18n="optFollowNeedsPreset" hidden>Pick a Pinboard preset below first. With No preset there is no palette to follow.</p>
@@ -1645,6 +1638,7 @@
                 <button class="btn btn-sm theme-preset-btn" data-theme="flexoki" aria-pressed="false">Flexoki</button>
                 <button class="btn btn-sm theme-preset-btn" data-theme="solarized" aria-pressed="false">Solarized</button>
                 <button class="btn btn-sm theme-preset-btn" data-theme="catppuccin" aria-pressed="false">Catppuccin</button>
+                <button class="btn btn-sm theme-preset-btn" data-theme="platinum" aria-pressed="false">Platinum</button>
               </div>
             </div>
             <div class="theme-presets-group" role="group" aria-labelledby="theme-group-light">

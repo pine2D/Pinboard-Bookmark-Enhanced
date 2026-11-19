@@ -21,6 +21,8 @@
   // has been opened since (settings batch D2); this script's own key is the
   // fallback for a profile where neither page has run yet.
   var SHARED_THEME_KEY = "pp-theme";
+  var SHARED_PRESET_KEY = "pp-theme-preset";
+  var SHARED_FOLLOW_KEY = "pp-theme-follow";
   var MIRROR_KEY = "md-preview-theme";
   // Per-device reader override ("Aa" panel), written by md-preview.js.
   var SCHEME_KEY = "md-preview-scheme";
@@ -46,10 +48,25 @@
     return optTheme === "light" || optTheme === "dark" ? optTheme : "auto";
   }
 
-  function apply(mode) {
+  // Twin of pbpResolveReaderChrome (md-preview.js): Platinum is the only preset
+  // that styles the reader as a windowed Mac OS 9 document reader while
+  // "Extension pages follow the Pinboard theme preset" is enabled.
+  function resolveChrome(presetKey, follow) {
+    return follow !== false && presetKey === "platinum" ? "platinum" : "";
+  }
+
+  function apply(mode, chromeTheme) {
     try {
       var r = resolve(mode);
-      document.documentElement.style.colorScheme = r.colorScheme;
+      var root = document.documentElement;
+      root.style.colorScheme = r.colorScheme;
+      if (root.dataset) {
+        if (chromeTheme) {
+          if (root.dataset.readerTheme !== chromeTheme) root.dataset.readerTheme = chromeTheme;
+        } else if ("readerTheme" in root.dataset) {
+          delete root.dataset.readerTheme;
+        }
+      }
       var lightLink = document.getElementById(LIGHT_LINK_ID);
       var darkLink = document.getElementById(DARK_LINK_ID);
       if (lightLink) lightLink.media = r.lightMedia;
@@ -59,11 +76,17 @@
 
   // 1) Synchronous localStorage mirrors -- instant, before first paint.
   try {
-    apply(resolveReader(
-      localStorage.getItem(SHARED_THEME_KEY) || localStorage.getItem(MIRROR_KEY) || "auto",
-      localStorage.getItem(SCHEME_KEY) || "auto",
-      localStorage.getItem(VIDEO_KEY) === "1"
-    ));
+    apply(
+      resolveReader(
+        localStorage.getItem(SHARED_THEME_KEY) || localStorage.getItem(MIRROR_KEY) || "auto",
+        localStorage.getItem(SCHEME_KEY) || "auto",
+        localStorage.getItem(VIDEO_KEY) === "1"
+      ),
+      resolveChrome(
+        localStorage.getItem(SHARED_PRESET_KEY) || "",
+        localStorage.getItem(SHARED_FOLLOW_KEY) !== "0"
+      )
+    );
   } catch (_) { /* localStorage unavailable (rare); CSS default (auto) already applies */ }
 
   // 2) Async source-of-truth read -- corrects the mirrors if stale, seeds them
@@ -87,10 +110,11 @@
   var _optSyncMirror = null;
   try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
 
+  var _settingsDefaults = { optTheme: "auto", mdVideoDarkScheme: false, themePresetKey: "", optPopupFollowTheme: true };
   var _firstHop;
   if (_optSyncMirror === "0") {
     _firstHop = chrome.storage.local
-      .get({ pbp_color_scheme: "auto", optTheme: "auto", mdVideoDarkScheme: false })
+      .get({ pbp_color_scheme: "auto", optTheme: "auto", mdVideoDarkScheme: false, themePresetKey: "", optPopupFollowTheme: true })
       .then(function (l) {
         override = l.pbp_color_scheme || "auto";
         return l;
@@ -98,7 +122,7 @@
   } else if (_optSyncMirror === "1") {
     _firstHop = Promise.all([
       chrome.storage.local.get({ pbp_color_scheme: "auto" }),
-      chrome.storage.sync.get({ optTheme: "auto", mdVideoDarkScheme: false })
+      chrome.storage.sync.get(_settingsDefaults)
     ]).then(function (pair) {
       override = pair[0].pbp_color_scheme || "auto";
       return pair[1];
@@ -106,18 +130,22 @@
   } else {
     _firstHop = chrome.storage.local.get({ optSyncEnabled: false, pbp_color_scheme: "auto" }).then(function (l) {
       override = l.pbp_color_scheme || "auto";
-      return (l.optSyncEnabled ? chrome.storage.sync : chrome.storage.local).get({ optTheme: "auto", mdVideoDarkScheme: false });
+      return (l.optSyncEnabled ? chrome.storage.sync : chrome.storage.local).get(_settingsDefaults);
     });
   }
 
   _firstHop.then(function (s) {
     var mode = s.optTheme || "auto";
     var videoDark = s.mdVideoDarkScheme === true;
+    var presetKey = s.themePresetKey || "";
+    var follow = s.optPopupFollowTheme !== false;
     try {
       localStorage.setItem(MIRROR_KEY, mode);
       localStorage.setItem(SCHEME_KEY, override);
       localStorage.setItem(VIDEO_KEY, videoDark ? "1" : "0");
+      localStorage.setItem(SHARED_PRESET_KEY, presetKey);
+      localStorage.setItem(SHARED_FOLLOW_KEY, follow ? "1" : "0");
     } catch (_) {}
-    apply(resolveReader(mode, override, videoDark));
+    apply(resolveReader(mode, override, videoDark), resolveChrome(presetKey, follow));
   }).catch(function () { /* storage unavailable: localStorage mirrors already applied */ });
 })();

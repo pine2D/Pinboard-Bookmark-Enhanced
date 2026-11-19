@@ -1599,18 +1599,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       void appearanceRenderReady.then(() => applyPreset(btn.dataset.theme));
     });
   });
-  const extensionStyle = $id("opt-extension-style");
-  extensionStyle.addEventListener("change", () => {
-    // A late storage read may replace the select's value before the form
-    // is ready. Replay the choice that was actually made.
-    const choice = extensionStyle.value;
-    void appearanceRenderReady.then(() => {
-      extensionStyle.value = choice;
-      window.pbpListboxSync?.(extensionStyle);
-      applyOptionsPageTheme(currentPresetKey, $id("opt-theme").value);
-      scheduleAutoSave();
-    });
-  });
   // ---- Tags panel lazy-init ----
   let _tagGovInited = false;
   async function _initTagGovPanel() {
@@ -2254,7 +2242,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     appearance: {
       fields: {
         "opt-theme": "auto",
-        "opt-extension-style": "standard",
         "opt-popup-follow-theme": true,
         "opt-custom-font": "",
         "opt-custom-css": "",
@@ -3527,7 +3514,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-batch-tag": s.optBatchTag,
     "opt-lang": s.optLang,
     "opt-theme": s.optTheme,
-    "opt-extension-style": s.optExtensionStyle,
     "qs-default-tags": s.qsDefaultTags,
     "rl-default-tags": s.rlDefaultTags,
     "opt-custom-font": s.customFont,
@@ -4121,10 +4107,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- Apply options page theme based on Pinboard theme preset ----
-  // A dedicated interface style takes priority on extension pages. Keep the
-  // saved Pinboard follow preference for when the user returns to Standard.
+  // The preset applies only while "Extension pages follow the Pinboard theme
+  // preset" is on -- the same gate the popup has always had (theme model
+  // 2026-08-25, settings batch D4); the checkbox is the live source so every
+  // call site stays a two-argument call.
   function applyOptionsPageTheme(presetKey, themeMode) {
-    pbpApplyOptionsEarlyTheme(themeMode, presetKey, $id("opt-popup-follow-theme").checked, $id("opt-extension-style").value);
+    pbpApplyOptionsEarlyTheme(themeMode, presetKey, $id("opt-popup-follow-theme").checked);
     syncFollowThemeState(presetKey);
   }
   // "Follow the preset" does nothing while no preset is picked (None, or a
@@ -4134,17 +4122,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // extension pages, and the Theme field says so instead of silently losing.
   function syncFollowThemeState(presetKey) {
     const follow = $id("opt-popup-follow-theme");
-    const platinum = $id("opt-extension-style").value === "platinum";
-    $id("opt-follow-theme-group").hidden = platinum;
     const none = !presetKey;
-    follow.disabled = platinum || none;
+    follow.disabled = none;
     $id("opt-popup-follow-theme-needs-preset").hidden = !none;
     const note = $id("opt-theme-overridden");
     const fixed = !none && follow.checked && !Object.prototype.hasOwnProperty.call(PBP_OPTIONS_ADAPTIVE_MAP, presetKey);
-    note.hidden = !platinum && !fixed;
-    if (platinum) {
-      note.textContent = t("optThemeOverridden", t("extensionStylePlatinum"));
-    } else if (fixed) {
+    note.hidden = !fixed;
+    if (fixed) {
       const name = document.querySelector(`.theme-preset-btn[data-theme="${CSS.escape(presetKey)}"]`)?.textContent.trim() || presetKey;
       note.textContent = t("optThemeOverridden", name);
     }
@@ -4152,7 +4136,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Track active preset key — schema v2: themePresetKey is authoritative
   let currentPresetKey = s.themePresetKey || "";
   applyOptionsPageTheme(currentPresetKey, s.optTheme);
-  pbpStoreOptionsThemeMirror(s.optTheme, currentPresetKey, s.optPopupFollowTheme !== false, s.optExtensionStyle);
+  pbpStoreOptionsThemeMirror(s.optTheme, currentPresetKey, s.optPopupFollowTheme !== false);
   document.documentElement.dataset.optionsReady = "1";
   _focusLearnerProfile();
   $id("opt-popup-follow-theme").addEventListener("change", () => {
@@ -4722,7 +4706,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       selectionTrigger: $id("opt-selection-trigger").value,
       optLang: $id("opt-lang").value,
       optTheme: $id("opt-theme").value,
-      optExtensionStyle: $id("opt-extension-style").value,
       optShowSearch: $id("opt-show-search").checked,
       optShowRecent: $id("opt-show-recent").checked,
       optShowBadge: $id("opt-show-badge").checked,
@@ -4826,8 +4809,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         saveOverlay: saveOverlayWithFallback,
         assertOverlay: pbpAssertOverlaySize,
         onSettingsSaved(settingsDelta) {
-          if ("optTheme" in settingsDelta || "themePresetKey" in settingsDelta || "optPopupFollowTheme" in settingsDelta || "optExtensionStyle" in settingsDelta) {
-            pbpStoreOptionsThemeMirror(data.optTheme, data.themePresetKey, data.optPopupFollowTheme !== false, data.optExtensionStyle);
+          if ("optTheme" in settingsDelta || "themePresetKey" in settingsDelta || "optPopupFollowTheme" in settingsDelta) {
+            pbpStoreOptionsThemeMirror(data.optTheme, data.themePresetKey, data.optPopupFollowTheme !== false);
           }
           // Reader pre-paint mirror for "open video pages in dark" (read by
           // md-preview-theme-early.js; same origin, so this page can seed it).
@@ -5356,7 +5339,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     // clicks reach here too and never touch #opt-theme's value; the sync is
     // then a harmless no-op, same convention as updateProviderFields().
     window.pbpListboxSync?.($id("opt-theme"));
-    window.pbpListboxSync?.($id("opt-extension-style"));
   }
 
   // Toggle "Save as theme" button disabled state based on whether there's

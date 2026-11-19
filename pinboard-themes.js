@@ -13652,6 +13652,1918 @@ a.url_link { border-radius: 12px !important; }
 #right_bar input[type="submit"] { border-radius: 4px !important; }
 #tweet_searchbox #search_query_field { color: #24292f !important; border-radius: 4px !important; }
 #tweet_searchbox input[type="submit"] { border-radius: 4px !important; }`
+  },
+
+  // ---- 14. Platinum Light (Adaptive: Platinum) ----
+  "platinum-light": {
+    name: "Platinum Light",
+    desc: "Mac OS 9 Platinum desktop window chrome (Light)",
+    css: `:root {
+  --pinboard-bg: #dddddd;
+  --pinboard-bg-surface: #ffffff;
+  --pinboard-fg: #262626;
+  --pinboard-fg-strong: #111111;
+  --pinboard-muted: #4d4d4d;
+  --pinboard-muted-soft: #545454;
+  --pinboard-metadata-fg: #545454;
+  --pinboard-border: #767676;
+  --pinboard-border-strong: #262626;
+  --pinboard-border-soft: #b8b8b8;
+  --pinboard-accent: #333399;
+  --pinboard-accent-hover: #141452;
+  --pinboard-accent-soft: #e6e6fa;
+  --pinboard-accent-alpha: rgba(51,51,153,0.28);
+  --pinboard-input-bg: #cccccc;
+  --pinboard-private-bg: #f2f2fc;
+  --pinboard-private-accent: #333399;
+  --pinboard-selection-bg: #333399;
+  --pinboard-selection-fg: #ffffff;
+  --pinboard-tag-bg: #ebebff;
+  --pinboard-tag-fg: #20206b;
+  --pinboard-row-hover: #e4e4f8;
+  --pinboard-bundle-row-hover: #33339914;
+  --pinboard-destroy: #a02525;
+  --pinboard-btn-bg: #333399;
+  --pinboard-btn-bg-hover: #24247a;
+  --pinboard-btn-fg: #ffffff;
+  --pinboard-success: #1f6b35;
+  --pinboard-success-hover: #144d25;
+  --pinboard-url-link-bg: #eeeeee;
+  --pinboard-url-link-fg: #444444;
+  --pinboard-link-hover: #141452;
+  --pinboard-link-visited: #583d78;
+  --pinboard-focus-ring: #333399;
+  --pinboard-unread: #a02525;
+  --pinboard-sidebar-btn-bg: #333399;
+  --pinboard-sidebar-btn-fg: #ffffff;
+  --pinboard-sidebar-btn-bg-hover: #24247a;
+  --pinboard-on-accent: #ffffff;
+  --pinboard-on-link-hover: #ffffff;
+  --pinboard-scrollbar-thumb: #4d4d4d;
+  --pinboard-sidebar-link-fg: #333399;
+  --pinboard-sidebar-link-hover: #141452;
+  --pinboard-sidebar-tag-fg: #20206b;
+  --pinboard-sidebar-tag-hover: #333399;
+  --pinboard-sidebar-tag-hover-bg: rgba(51,51,153,0.28);
+  --pinboard-anchor-fg: #333399;
+  --pinboard-star-fg: #767676;
+  --pinboard-bundle-edit-hover: #333399;
+  --pinboard-table-destroy-hover: #a02525;
+  --pinboard-help-fg: #545454;
+  --pinboard-bundle-chip-bg: #adadca;
+  --pinboard-font-family: "Lucida Grande", "Geneva", Verdana, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  --pinboard-font-size-base: 13px;
+  --pinboard-font-size-sm: 12px;
+  --pinboard-font-size-lg: 14px;
+  --pinboard-font-size-xs: 11px;
+  --pinboard-line-height: 1.5;
+  --pinboard-weight-body: 400;
+  --pinboard-weight-heading: 700;
+  --pinboard-space-unit: 4px;
+  --pinboard-space-bookmark-gap: 0px;
+  --pinboard-space-main-padding: 0px;
+  --pinboard-space-sub-banner-y: 6px;
+  --pinboard-space-right-bar-gap: 12px;
+  --pinboard-space-form-gap: 8px;
+  --pinboard-radius-sm: 2px;
+  --pinboard-radius-md: 3px;
+  --pinboard-radius-lg: 3px;
+  --pinboard-border-width: 1px;
+  --pinboard-border-style: solid;
+  --pinboard-border-hairline: 1px solid #d4d4d4;
+}
+
+/* === inline_base_rules (manifest.json §inline_base_rules) === */
+
+/* override.tr-onmouseover-yellow — defeat inline style.background on row hover */
+#right_bar table tr[onmouseover],
+#main_column table tr[onmouseover] {
+  background: transparent !important;
+}
+#right_bar table tr[onmouseover]:hover,
+#main_column table tr[onmouseover]:hover {
+  background: var(--pinboard-row-hover) !important;
+}
+
+/* override.bookmark-separator — tokenize "border-top:1px dotted #aaa" */
+#main_column .bookmark[style*="border-top"] {
+  border-top: var(--pinboard-border-hairline) !important;
+}
+
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
+.bookmark.private[style*="background"],
+.bookmark[style*="#fff1f1"],
+.bookmark[style*="#fff4f4"] {
+  background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
+}
+
+/* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
+#sub_banner [style*="#aa5511"],
+.bookmark_count[style*="color"] {
+  color: var(--pinboard-accent) !important;
+}
+
+/* override.muted-aaa — tokenize widespread inline #aaa */
+[style*="color:#aaa"],
+[style*="color: #aaa"] {
+  color: var(--pinboard-muted) !important;
+}
+
+/* override.bundle-table-width — neutralize 830px hard width */
+#main_column table[style*="width:830"] {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* override.bundle-slot-input — tokenize inline dotted 20px inputs */
+input[type="text"][name^="id_"][style*="border"] {
+  border: var(--pinboard-border-width) solid var(--pinboard-border) !important;
+  background: var(--pinboard-input-bg) !important;
+  color: var(--pinboard-fg) !important;
+  width: 32px !important;
+}
+
+/* override.per-page-active — tokenize active ffa pill */
+table.per_page_widget [style*="background:#ffa"] {
+  background: var(--pinboard-accent-alpha) !important;
+  color: var(--pinboard-fg) !important;
+}
+
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
+/* override.generic-bgcolor — defensive against legacy HTML attr */
+[bgcolor] { background-color: transparent !important; }
+
+/* override.generic-html-color — defensive against legacy <font> */
+font[color], font[size] { color: inherit !important; font-size: inherit !important; }
+
+/* override.generic-fixed-width — defensive against layout tables */
+table[width]:not([width="100%"]) { width: auto !important; max-width: 100% !important; }
+
+/* === selection (applied globally; composers may override scoped) === */
+::selection          { background: var(--pinboard-selection-bg); color: var(--pinboard-selection-fg); }
+::-moz-selection     { background: var(--pinboard-selection-bg); color: var(--pinboard-selection-fg); }
+
+/* === composer: classic-list-v2 — canonical surface inventory === */
+
+/* ---- App shell typography (body#pinboard) ---- */
+body#pinboard {
+  background: var(--pinboard-bg) !important;
+  color: var(--pinboard-fg) !important;
+  font-family: var(--pinboard-font-family) !important;
+  font-size: 13px !important;
+  line-height: var(--pinboard-line-height) !important;
+}
+body#pinboard table, body#pinboard td, body#pinboard th,
+body#pinboard p, body#pinboard b, body#pinboard strong,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
+body#pinboard dd, body#pinboard dt { color: inherit !important; }
+
+/* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
+body:not(#pinboard) {
+  background: var(--pinboard-bg) !important;
+  color: var(--pinboard-fg) !important;
+  font-family: var(--pinboard-font-family) !important;
+}
+body:not(#pinboard) table, body:not(#pinboard) td,
+body:not(#pinboard) p, body:not(#pinboard) label,
+body:not(#pinboard) span { color: inherit !important; }
+body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
+
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: light !important; }
+
+/* ---- Global anchor rest-colour fallback: emitted FIRST, not last ----
+   a:link is (0,1,1) — exactly the specificity of every a.CLASS / .CLASS a intent
+   rule further down — so while this lived at the tail it won the source-order tie
+   against ALL of them and repainted a.tag, a.url_link, a.delete, a.destroy,
+   a.unread, a.help, .edit_links a, .rss_linkbox a, .colophon a and .settings_tab a
+   with accent. (.bookmark a.when / .bookmark a.cached at (0,2,1) were written to
+   escape exactly this.) Emitting it first lets every later intent rule win its own
+   tie, with no specificity change — so the pilot overrides appended last still beat
+   the composer, which is what keeps a.url_display on each pilot own shipped colour.
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
+
+/* ---- Banner & navigation ---- */
+#banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
+#banner a, #top_menu a, .banner_username { color: var(--pinboard-accent) !important; }
+#banner a:hover, #top_menu a:hover { color: var(--pinboard-link-hover) !important; }
+#pinboard_name a { color: var(--pinboard-accent) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
+#sub_banner a { color: var(--pinboard-muted) !important; }
+#sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+
+/* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
+   Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
+   that lets inline content wrap around them. Switching #bmarks_page_nav to display:flex would create a
+   BFC and clear those floats, dropping the filter row to a 2nd line. Solution: turn the OUTER .user_navbar
+   into a flex container so all three siblings stay on one row, then nest a flex inside #bmarks_page_nav
+   to pin the RSS chip right via margin-left:auto. ---- */
+/* padding-left: 8px aligns .small_username with a.next_prev (Pinboard's pagination row underneath uses
+   8px gutter from #main_column's left edge); padding-right: 0 keeps RSS chip flush with #main_column's
+   right edge via the inner flex margin-left:auto. */
+.user_navbar { display: flex !important; flex-wrap: nowrap !important; align-items: baseline !important; padding: 0 0 0 8px !important; box-sizing: border-box !important; }
+.user_navbar > .small_username, .user_navbar > .bookmark_count_box { float: none !important; flex-shrink: 0 !important; }
+
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Inner flex container: filters flow inline, .rss_linkbox pinned right via margin-left:auto.
+   Only the selected filter gets a pill with negative margin to neutralize its padding (zero inline drift).
+   flex:1 + min-width:0 lets nav shrink to fit available space after the leftward siblings. */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; flex: 1 !important; min-width: 0 !important; display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 0 0.3em !important; box-sizing: border-box !important; }
+#bmarks_page_nav .rss_linkbox { margin: 0 0 0 auto !important; padding-left: 12px !important; float: none !important; position: static !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+/* In flex layout, no need for negative margin compensation — pills lay out as discrete flex items
+   without affecting siblings. Negative margin would pull the adjacent " ‧ " text node under the pill bg. */
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-on-accent) !important; padding: 1px 5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-on-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-on-accent) !important; background: var(--pinboard-accent) !important; }
+
+/* ---- Search (banner + main) ---- */
+#searchbox { margin-bottom: 12px !important; }
+a.bundle { color: var(--pinboard-accent) !important; }
+a.bundle:hover { color: var(--pinboard-link-hover) !important; }
+#search_query_field { width: 100% !important; }
+#search_query_field, #banner_searchbox input[type="text"] {
+  background: var(--pinboard-input-bg) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  box-sizing: border-box !important;
+}
+#search_query_field:focus, #banner_searchbox input[type="text"]:focus { border-color: var(--pinboard-accent) !important; outline: none !important; }
+.search_button input[type="submit"] {
+  background: var(--pinboard-btn-bg) !important;
+  color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  cursor: pointer !important;
+}
+.search_button input[type="submit"]:hover { background: var(--pinboard-btn-bg-hover) !important; }
+
+/* ---- Bookmark list ---- */
+.bookmark {
+  background: transparent !important;
+  display: flex !important;
+  align-items: flex-start !important;
+}
+.bookmark { transition: box-shadow 0.2s ease !important; }
+.bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
+.selected_star { color: var(--pinboard-private-accent) !important; }
+
+a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 14px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
+a.bookmark_title:hover { color: var(--pinboard-link-hover) !important; text-decoration: underline !important; }
+a.url_display, a.when, a.cached { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; }
+/* Metadata strip (timestamp / cached): the muted intent above was eaten from
+   day one by the trailing "Global anchor fallbacks" (same (0,1,1) specificity,
+   later in source). These (0,2,1) rules win over every bare-anchor rule
+   including :hover/:visited. Hover keeps the AA metadata color (link-hover
+   fails 4.5:1 on six theme surfaces) and signals with an underline instead.
+   url_display is NOT migrated: its per-pilot override colors are shipped
+   visual identity. */
+.bookmark a.when,
+.bookmark a.cached { color: var(--pinboard-metadata-fg) !important; font-size: 11px !important; }
+.bookmark a.when:hover,
+.bookmark a.cached:hover { text-decoration: underline !important; }
+a.url_link {
+  color: var(--pinboard-url-link-fg) !important;
+  background: var(--pinboard-url-link-bg) !important;
+  padding: 1px 6px !important;
+  border-radius: var(--pinboard-radius-lg) !important;
+  font-size: 11px !important;
+}
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
+.description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
+
+a.tag {
+  color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
+  padding: 0 4px !important;
+  border-radius: 3px !important;
+  text-decoration: none !important;
+}
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
+/* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
+a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
+
+/* Unread titles differ by weight only; no colour here on purpose (a:link tie, see git log). */
+a.unread { font-weight: bold !important; }
+.edit_links a, a.copy_link { color: var(--pinboard-muted-soft) !important; }
+.edit_links a:hover { color: var(--pinboard-fg) !important; }
+a.copy_link { color: var(--pinboard-accent) !important; }
+a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
+
+/* ---- Private bookmarks ---- */
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
+
+/* ---- Right bar ---- */
+#right_bar {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  padding: var(--pinboard-space-right-bar-gap) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  word-wrap: break-word !important;
+}
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
+}
+#right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
+#right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
+#right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key {
+  background: var(--pinboard-input-bg) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 8px !important;
+  box-sizing: border-box !important;
+  font-size: 12px !important;
+}
+#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input[type="submit"] {
+  background: var(--pinboard-sidebar-btn-bg) !important;
+  color: var(--pinboard-sidebar-btn-fg) !important;
+  border: none !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 10px !important;
+  margin-left: 6px !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  transition: background 0.15s ease !important;
+}
+#right_bar input[type="submit"]:hover { background: var(--pinboard-sidebar-btn-bg-hover) !important; }
+
+/* ---- Tag cloud ---- */
+#tag_cloud { max-width: 100% !important; overflow-wrap: break-word !important; }
+/* Native list mode has two floated .tag_table wrappers. Sidebar padding must
+   not push the second table below hundreds of tags in the first. Constrain
+   those tables only; cloud mode keeps its inline, frequency-sized links. */
+#tag_cloud .tag_table { width: 50% !important; margin-right: 0 !important; padding-right: 10px !important; box-sizing: border-box !important; }
+#tag_cloud .tag_table table { width: 100% !important; table-layout: fixed !important; }
+#tag_cloud .tag_table td { width: auto !important; overflow-wrap: anywhere !important; }
+#tag_cloud a:not(.tag) { color: var(--pinboard-accent) !important; }
+#tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
+#tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
+#tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+
+/* ---- Tweets page searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: var(--pinboard-space-form-gap) !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field {
+  width: 100% !important; box-sizing: border-box !important;
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 6px 10px !important; font-size: 13px !important;
+}
+#tweet_searchbox #search_query_field:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] {
+  background: var(--pinboard-sidebar-btn-bg) !important; color: var(--pinboard-sidebar-btn-fg) !important;
+  border: none !important; border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 14px !important; cursor: pointer !important;
+  font-size: 12px !important; align-self: flex-start !important;
+  transition: background 0.15s ease !important;
+}
+#tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-sidebar-btn-bg-hover) !important; }
+
+/* ---- Forms (global) ----
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
+input[type="text"], input:not([type]), input[type="password"], textarea, select {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  box-sizing: border-box !important; max-width: 100% !important;
+  padding: 5px 12px !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  line-height: 1.4 !important;
+}
+/* Focus: accent border + 2px accent-alpha halo — the same house language as the sort-form
+   inputs below and the P1 focus-ring searchboxes. The halo is what replaces the UA focus ring
+   this rule suppresses; a 1px border-colour change alone leaves the add/edit-bookmark form
+   (url / title / description / tags) with no visible keyboard focus. Themes overriding the
+   ring keep winning from tokens.overrides.css on source order. */
+input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+input[type="submit"], input[type="button"] {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; }
+input[type="reset"], input[type="reset"].reset, button[type="reset"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
+.suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
+
+/* ---- Settings page ---- */
+#settings_panel { background: var(--pinboard-bg-surface) !important; }
+.settings_tabs { border-color: var(--pinboard-border) !important; }
+.settings_tab { color: var(--pinboard-muted) !important; padding: 6px 12px !important; border-bottom-color: var(--pinboard-border) !important; }
+.settings_tab a { color: inherit !important; text-decoration: none !important; }
+.settings_tab:hover { color: var(--pinboard-accent) !important; }
+.settings_tab_selected {
+  color: var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-top: 2px solid var(--pinboard-accent) !important;
+  border-bottom-color: var(--pinboard-bg-surface) !important;
+  background: var(--pinboard-bg-surface) !important;
+  font-weight: bold !important;
+  margin-bottom: -1px !important;
+}
+.settings_tab_selected a { color: var(--pinboard-accent) !important; }
+[class*="settings_tab_spacer"] { border-bottom-color: var(--pinboard-border) !important; }
+.settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
+a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
+.email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
+#settings_tab_panes { border: none !important; }
+#settings_tab_panes table td { color: var(--pinboard-fg) !important; }
+
+/* Import form + history need 700 + 10 + 320px. Wrap according to the available
+   column width, not an early viewport breakpoint that hides history below a
+   long form even when both columns still fit. */
+#main_column:has(> #import_history_table) {
+  display: flex !important; flex-wrap: wrap !important; align-items: flex-start !important;
+  column-gap: 10px !important; width: 1030px !important; max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+#main_column:has(> #import_history_table) > #settings_panel { flex: 1 1 700px !important; min-width: 0 !important; box-sizing: border-box !important; }
+#main_column > #import_history_table {
+  position: static !important; float: none !important;
+  flex: 1 1 320px !important; width: 320px !important; max-width: 100% !important;
+  margin: 13px 0 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* Keep a long TOC beside the article as the content column shrinks. Native
+   phone CSS hides the TOC at 640px; do not turn it into a full-width preamble.
+   Pages without a TOC retain their native content column. */
+#main_column:has(#left_toc) { display: flex !important; align-items: flex-start !important; width: 1030px !important; max-width: 100% !important; }
+#main_column:has(#left_toc) > #left_toc { flex: 0 1 auto !important; min-width: 0 !important; overflow-wrap: anywhere !important; }
+#main_column:has(#left_toc) > #content_column { flex: 1 1 780px !important; width: auto !important; min-width: 0 !important; max-width: 780px !important; box-sizing: border-box !important; }
+#main_column:has(#left_toc) > #content_column img { max-width: 100% !important; height: auto !important; box-sizing: border-box !important; }
+/* The native Tour screenshot's 34px indent sits outside its border box.
+   Include it in the width budget, including just above the phone breakpoint
+   when the TOC reappears, while preserving the original image alignment. */
+#main_column:has(#left_toc) > #content_column img[style*="margin-left:34px"],
+#main_column:has(#left_toc) > #content_column img[style*="margin-left: 34px"] { max-width: calc(100% - 34px) !important; }
+
+/* Let these page containers shrink without forcing their children to stack. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+}
+
+/* ---- Profile page ---- */
+.service_box, .help_box {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  margin-bottom: 12px !important;
+}
+.service_box .service_box { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; width: auto !important; box-sizing: border-box !important; }
+#profile_left_column { margin-right: 20px !important; }
+#profile_right_column { width: 430px !important; }
+/* Cap the shrink-to-fit parent as well as its fixed-width details column.
+   Retain the native left column and the existing desktop column balance. */
+@media (max-width: 640px) {
+  #profile_main_column, #profile_right_column { max-width: 100% !important; box-sizing: border-box !important; }
+}
+#profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: var(--pinboard-muted) !important; }
+#profile_main_column table td, #profile_right_column table td { color: var(--pinboard-fg) !important; }
+
+/* ---- Notes ---- */
+.note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
+.note a { color: var(--pinboard-accent) !important; }
+.note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
+#note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Bulk edit ---- */
+#bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
+
+/* ---- Save bookmark popup ---- */
+#popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
+.formtable td { color: var(--pinboard-fg) !important; }
+.bookmark_count, .bookmark_count_box { color: var(--pinboard-muted) !important; }
+.user_navbar a { color: var(--pinboard-accent) !important; }
+.rss_link, .rss_linkbox a { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
+/* Native table is 830px inside a 690px wrapper. Give it that room instead of
+   squeezing every bundle's tags into extra rows, and retain table density. */
+#main_column:has(> form[name="sort"]) { width: 830px !important; max-width: 100% !important; }
+#main_column form[name="sort"] > table { width: 100% !important; max-width: 830px !important; border-collapse: separate !important; border-spacing: 0 2px !important; margin-top: 8px !important; }
+#main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
+#main_column form[name="sort"] table td { padding: 1px 4px !important; line-height: normal !important; vertical-align: middle !important; border: none !important; }
+/* Reserve room for names as well as tags: intrinsic sizing alone can squeeze
+   long names into several lines, especially in monospace themes. */
+#main_column form[name="sort"] table td[style*="text-align:right"] { width: 20% !important; white-space: normal !important; overflow-wrap: anywhere !important; }
+#main_column form[name="sort"] table input[name^="id_"] {
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  background: var(--pinboard-input-bg) !important;
+  color: var(--pinboard-fg) !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  padding: 2px !important;
+  margin-right: 10px !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+  font-weight: 600 !important;
+  box-sizing: border-box !important;
+  vertical-align: middle !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  text-align: center !important;
+}
+#main_column form[name="sort"] table input[name^="id_"]:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#main_column form[name="sort"] table a.bundle { font-weight: var(--pinboard-weight-heading) !important; font-style: normal !important; letter-spacing: 0.01em !important; padding: 2px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#main_column form[name="sort"] table a[style*="color:#aaa"],
+#main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
+#main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
+/* ---- Pagination ---- */
+.next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
+.next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
+#nextprev a.edit { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Logged-out landing page (https://pinboard.in/) ---- */
+#main_welcome, .homepage_quad { color: var(--pinboard-fg) !important; }
+.homepage_heading { color: var(--pinboard-fg-strong) !important; font-weight: var(--pinboard-weight-heading) !important; }
+.homepage_subheading { color: var(--pinboard-muted) !important; }
+.signup_button,
+.signup_button[style*="background"] {
+  background: var(--pinboard-btn-bg) !important;
+  color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 10px 16px !important;
+  text-align: center !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
+  /* defeat Pinboard landing.css legacy chrome: drop-shadow that reads as "sunken" on dark themes,
+   * fixed 230×20 box that prevents vertical centering, asymmetric 5px/2px padding */
+  box-shadow: none !important;
+  width: auto !important;
+  height: auto !important;
+  -webkit-box-shadow: none !important;
+  -moz-box-shadow: none !important;
+}
+.signup_button:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; }
+#blurb_div { color: var(--pinboard-fg) !important; }
+.blurb_column { color: var(--pinboard-fg) !important; }
+#blurb_div a { text-decoration: none !important; color: var(--pinboard-fg) !important; display: block !important; }
+.blurb_box {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  margin-bottom: 10px !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
+  /* defeat Pinboard landing.css fixed height:180px so taller quotes don't clip */
+  height: auto !important;
+  min-height: 180px !important;
+}
+.blurb_box:hover, #blurb_div a:hover .blurb_box { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent-alpha) !important; }
+.magazine_title { color: var(--pinboard-accent) !important; font-weight: var(--pinboard-weight-heading) !important; }
+.blurb { color: var(--pinboard-fg) !important; opacity: 0.85 !important; }
+#language_box { color: var(--pinboard-muted) !important; }
+#language_box p { margin: 2px 0 !important; }
+#language_box a { color: var(--pinboard-muted) !important; padding: 1px 6px !important; border-radius: var(--pinboard-radius-sm) !important; text-decoration: none !important; }
+#language_box a:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-alpha) !important; }
+#language_box a[style*="background:#ffa"],
+#language_box a[style*="background: #ffa"] { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-accent) !important; }
+.nli { color: var(--pinboard-muted) !important; }
+.nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
+.nav_nli:hover { color: var(--pinboard-link-hover) !important; }
+
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ---- Footer / colophon ---- */
+#footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Scrollbars (Webkit + Firefox standard) ----
+ * thumb uses its OWN role (scrollbar-thumb, _util.mjs#deriveTextTiers) rather
+ * than reading muted straight. Both used to be the same token, which is how
+ * "raising muted would hurt the scrollbar" ended up parked in contrast-audit's
+ * allowlist as an argument against fixing sub-AA prose. They are opposite
+ * constraints — the thumb is a non-text UI part needing WCAG 1.4.11's 3:1
+ * against its track (bg-surface), the prose needs 4.5:1 — so each derives to
+ * its own floor and neither pins the other. scrollbar-thumb defaults to muted,
+ * so themes whose muted already clears 3:1 render exactly as before. */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-scrollbar-thumb) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-scrollbar-thumb) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
+
+/* ---- Global anchor STATE fallbacks ----
+   The rest-colour fallback is no longer here — it is emitted at the top of this
+   composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
+   :focus-visible stay at the tail, where they still beat the element+class rules
+   above, so hover and visited behaviour is unchanged. */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
+a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
+h2 { color: var(--pinboard-muted) !important; }
+hr { border-color: var(--pinboard-border) !important; }
+
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
+
+/* ---- ::selection (also in _base but themes may want explicit) ---- */
+::selection { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
+::-moz-selection { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
+
+/* === patterns layer (tokens.patterns) === */
+.settings_heading { text-transform: uppercase !important; font-size: 12px !important; letter-spacing: 0.08em !important; }
+.description blockquote { border-left: 3px solid var(--pinboard-accent) !important; padding-left: 12px !important; margin: 6px 0 !important; }
+body#pinboard { background: #cccccc !important; }
+body:not(#pinboard) { background: #dddddd !important; }
+#banner { background: #dddddd !important; border: 1px solid #262626 !important; border-radius: 0 !important; padding: 6px 12px !important; margin-bottom: 12px !important; box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #999999, 2px 2px 0 #262626 !important; }
+#banner a, #top_menu a, .banner_username { text-decoration: none !important; font-weight: 600 !important; }
+#banner a:hover, #top_menu a:hover { text-decoration: underline !important; }
+#pinboard_name a { color: var(--pinboard-fg-strong) !important; font-weight: 700 !important; }
+#sub_banner { background: #dddddd !important; border: 1px solid #262626 !important; border-radius: 0 !important; padding: 5px 10px !important; margin-bottom: 10px !important; box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #999999 !important; }
+#sub_banner a { font-weight: 600 !important; text-decoration: none !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: #333399 !important; color: #ffffff !important; padding: 1px 6px !important; border-radius: 2px !important; font-weight: 700 !important; }
+#main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc)) { background: #ffffff !important; border: 1px solid #262626 !important; border-radius: 0 !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 #262626 !important; }
+#main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc))::before { content: "" !important; display: block !important; height: 18px !important; box-sizing: border-box !important; padding: 3px 6px !important; background-color: #dddddd !important; background-image: linear-gradient(#ffffff 50%, #777777 50%) !important; background-size: 100% 2px !important; background-origin: content-box !important; background-clip: content-box !important; border-bottom: 1px solid #262626 !important; box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #999999 !important; }
+#main_column:has(> form[name="sort"]), #main_column:has(#left_toc), #note_column { background: #ffffff !important; border: 1px solid #262626 !important; border-radius: 0 !important; box-shadow: 2px 2px 0 #262626 !important; }
+#note_column { padding: 12px 14px !important; }
+#main_column:has(> #import_history_table) > #settings_panel, #main_column > #import_history_table, .service_box, .help_box, #right_column { background: #ffffff !important; border: 1px solid #262626 !important; border-radius: 0 !important; box-shadow: 2px 2px 0 #262626 !important; }
+.service_box .service_box { border: none !important; box-shadow: none !important; background: transparent !important; }
+#settings_panel { background: #ffffff !important; padding: 10px 12px !important; box-sizing: border-box !important; }
+.settings_tab_selected { background: #ffffff !important; border-color: #262626 !important; border-top: 2px solid var(--pinboard-accent) !important; border-bottom-color: #ffffff !important; }
+.user_navbar { background: #dddddd !important; border-bottom: 1px solid #262626 !important; padding: 5px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #999999 !important; }
+#bmarks_page_nav a.filter.selected { background: #333399 !important; color: #ffffff !important; border-radius: 2px !important; }
+#bmarks_page_nav a.filter.selected:hover { background: #24247a !important; color: #ffffff !important; }
+#bookmarks { background: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+#nextprev { background: #dddddd !important; border-top: 1px solid #262626 !important; border-bottom: 1px solid #262626 !important; padding: 4px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #999999 !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: #666666 !important; color: #ffffff !important; border-color: #262626 !important; }
+.bookmark { background: #ffffff !important; padding: 9px 12px !important; margin: 0 !important; border-top: none !important; border-right: none !important; border-left: none !important; border-bottom: 1px solid #d4d4d4 !important; border-radius: 0 !important; box-shadow: none !important; }
+.bookmark.private, .bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+a.bookmark_title { font-weight: 600 !important; }
+a.tag { background: #ebebff !important; color: var(--pinboard-tag-fg) !important; box-shadow: inset 0 0 0 1px #9999ff !important; border-radius: 2px !important; padding: 0 4px !important; text-decoration: none !important; }
+a.tag:hover { background: #dcdcff !important; color: #11114d !important; box-shadow: inset 0 0 0 1px #6666cc !important; text-decoration: none !important; }
+a.tag.selected { background: #333399 !important; color: #ffffff !important; box-shadow: inset 0 0 0 1px #262626 !important; font-weight: 700 !important; }
+a.tag.selected:hover { background: #24247a !important; color: #ffffff !important; box-shadow: inset 0 0 0 1px #262626 !important; }
+#right_bar:not(:has(#tag_cloud:empty)) { background: #ffffff !important; border: 1px solid #262626 !important; border-radius: 0 !important; padding: 0 12px 12px !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 #262626 !important; }
+@media (min-width: 761px) { #main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc)):has(~ #right_bar) { float: left !important; width: min(690px, calc(100% - 340px)) !important; } #main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc)) ~ #right_bar:not(:has(#tag_cloud:empty)) { float: left !important; width: 320px !important; margin-left: 16px !important; } #footer { clear: both !important; } }
+#right_bar:not(:has(#tag_cloud:empty))::before { content: "" !important; display: block !important; height: 18px !important; margin: 0 -12px 10px -12px !important; box-sizing: border-box !important; padding: 3px 6px !important; background-color: #dddddd !important; background-image: linear-gradient(#ffffff 50%, #777777 50%) !important; background-size: 100% 2px !important; background-origin: content-box !important; background-clip: content-box !important; border-bottom: 1px solid #262626 !important; box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #999999 !important; }
+#right_bar table tr[onmouseover]:hover { background: #f5f5fa !important; }
+#search_query_field, #banner_searchbox input[type="text"], #right_bar input#key, #tweet_searchbox #search_query_field, input[type="text"], input:not([type]), input[type="password"], textarea, select { background: #ffffff !important; color: var(--pinboard-fg) !important; border: 1px solid #262626 !important; border-radius: 0 !important; box-shadow: inset 1px 1px 0 #999999, 1px 1px 0 #ffffff !important; }
+#search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus, input[type="text"]:focus, input:not([type]):focus, input[type="password"]:focus, textarea:focus, select:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+input[type="submit"], input[type="button"], input[type="reset"], input[type="reset"].reset, button[type="reset"], input[type="file"]::file-selector-button, .search_button input[type="submit"], #right_bar input[type="submit"], #tweet_searchbox input[type="submit"], #tagPickerNav input[type="button"], #save_changes_marker, .signup_button, .signup_button[style*="background"] { background: #dddddd !important; color: #262626 !important; border: 1px solid #262626 !important; border-radius: 3px !important; box-shadow: inset 1px 1px 0 #dddddd, inset -1px -1px 0 #777777, inset 2px 2px 0 #ffffff, inset -2px -2px 0 #aaaaaa !important; font-weight: 600 !important; }
+input[type="submit"]:hover, input[type="button"]:hover, input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover, input[type="file"]::file-selector-button:hover, .search_button input[type="submit"]:hover, #right_bar input[type="submit"]:hover, #tweet_searchbox input[type="submit"]:hover, #tagPickerNav input[type="button"]:hover, #save_changes_marker:hover, .signup_button:hover { background: #e8e8e8 !important; color: #262626 !important; border-color: #262626 !important; box-shadow: inset 1px 1px 0 #e8e8e8, inset -1px -1px 0 #6e6e6e, inset 2px 2px 0 #ffffff, inset -2px -2px 0 #9e9e9e !important; }
+input[type="submit"]:active, input[type="button"]:active, input[type="reset"]:active, .search_button input[type="submit"]:active, #right_bar input[type="submit"]:active, #tweet_searchbox input[type="submit"]:active, #tagPickerNav input[type="button"]:active, #save_changes_marker:active, .signup_button:active { background: #666666 !important; color: #ffffff !important; border-color: #262626 !important; box-shadow: inset 1px 1px 0 #444444, inset -1px -1px 0 #888888, inset 2px 2px 0 #555555, inset -2px -2px 0 #777777 !important; }
+#edit_bookmark_form, #bulk_top_bar, #bulk_edit_box { background: #dddddd !important; border: 1px solid #262626 !important; border-radius: 0 !important; padding: 10px 12px !important; box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #999999 !important; }
+.pin-ac .bd { background: #ffffff !important; border: 1px solid #262626 !important; border-radius: 0 !important; box-shadow: 2px 2px 0 #262626 !important; }
+@media (max-width: 1060px) { #main_column > #right_bar { position: static !important; left: auto !important; width: 100% !important; margin-top: 12px !important; } }
+@media (max-width: 760px) { #main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc)) { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; } #right_bar, #main_column > #right_bar { width: 100% !important; margin-left: 0 !important; margin-top: 12px !important; float: none !important; } }
+@media (max-width: 640px) { #right_bar, #main_column > #right_bar { display: none !important; } }
+`
+  },
+
+  // ---- 15. Platinum Dark (Adaptive: Platinum) ----
+  "platinum-dark": {
+    name: "Platinum Dark",
+    desc: "Mac OS 9 Platinum desktop window chrome (Dark)",
+    css: `:root {
+  --pinboard-bg: #222222;
+  --pinboard-bg-surface: #2e2e2e;
+  --pinboard-fg: #e2e2e2;
+  --pinboard-fg-strong: #f4f4f4;
+  --pinboard-muted: #bdbdbd;
+  --pinboard-muted-soft: #ababab;
+  --pinboard-metadata-fg: #ababab;
+  --pinboard-border: #888888;
+  --pinboard-border-strong: #b0b0b0;
+  --pinboard-border-soft: #444444;
+  --pinboard-accent: #9494ff;
+  --pinboard-accent-hover: #c4c4ff;
+  --pinboard-accent-soft: #2d2d52;
+  --pinboard-accent-alpha: rgba(148,148,255,0.32);
+  --pinboard-input-bg: #3b3b3b;
+  --pinboard-private-bg: #26263d;
+  --pinboard-private-accent: #9494ff;
+  --pinboard-selection-bg: #3d3dad;
+  --pinboard-selection-fg: #ffffff;
+  --pinboard-tag-bg: #2a2a48;
+  --pinboard-tag-fg: #e0e0ff;
+  --pinboard-row-hover: #34345c;
+  --pinboard-bundle-row-hover: #9494ff1a;
+  --pinboard-destroy: #ff8a80;
+  --pinboard-btn-bg: #3d3dad;
+  --pinboard-btn-bg-hover: #4e4ec7;
+  --pinboard-btn-fg: #ffffff;
+  --pinboard-success: #65d48a;
+  --pinboard-success-hover: #8ae3a8;
+  --pinboard-url-link-bg: #2a2a2a;
+  --pinboard-url-link-fg: #d0d0d0;
+  --pinboard-link-hover: #c4c4ff;
+  --pinboard-link-visited: #c6a6ff;
+  --pinboard-focus-ring: #9494ff;
+  --pinboard-unread: #ff8a80;
+  --pinboard-sidebar-btn-bg: #3d3dad;
+  --pinboard-sidebar-btn-fg: #ffffff;
+  --pinboard-sidebar-btn-bg-hover: #4e4ec7;
+  --pinboard-on-accent: #333333;
+  --pinboard-on-link-hover: #525252;
+  --pinboard-scrollbar-thumb: #bdbdbd;
+  --pinboard-sidebar-link-fg: #9494ff;
+  --pinboard-sidebar-link-hover: #c4c4ff;
+  --pinboard-sidebar-tag-fg: #e0e0ff;
+  --pinboard-sidebar-tag-hover: #9494ff;
+  --pinboard-sidebar-tag-hover-bg: rgba(148,148,255,0.32);
+  --pinboard-anchor-fg: #9494ff;
+  --pinboard-star-fg: #888888;
+  --pinboard-bundle-edit-hover: #9e9eff;
+  --pinboard-table-destroy-hover: #ff8a80;
+  --pinboard-help-fg: #ababab;
+  --pinboard-bundle-chip-bg: #464669;
+  --pinboard-font-family: "Lucida Grande", "Geneva", Verdana, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  --pinboard-font-size-base: 13px;
+  --pinboard-font-size-sm: 12px;
+  --pinboard-font-size-lg: 14px;
+  --pinboard-font-size-xs: 11px;
+  --pinboard-line-height: 1.5;
+  --pinboard-weight-body: 400;
+  --pinboard-weight-heading: 700;
+  --pinboard-space-unit: 4px;
+  --pinboard-space-bookmark-gap: 0px;
+  --pinboard-space-main-padding: 0px;
+  --pinboard-space-sub-banner-y: 6px;
+  --pinboard-space-right-bar-gap: 12px;
+  --pinboard-space-form-gap: 8px;
+  --pinboard-radius-sm: 2px;
+  --pinboard-radius-md: 3px;
+  --pinboard-radius-lg: 3px;
+  --pinboard-border-width: 1px;
+  --pinboard-border-style: solid;
+  --pinboard-border-hairline: 1px solid #333333;
+}
+
+/* === inline_base_rules (manifest.json §inline_base_rules) === */
+
+/* override.tr-onmouseover-yellow — defeat inline style.background on row hover */
+#right_bar table tr[onmouseover],
+#main_column table tr[onmouseover] {
+  background: transparent !important;
+}
+#right_bar table tr[onmouseover]:hover,
+#main_column table tr[onmouseover]:hover {
+  background: var(--pinboard-row-hover) !important;
+}
+
+/* override.bookmark-separator — tokenize "border-top:1px dotted #aaa" */
+#main_column .bookmark[style*="border-top"] {
+  border-top: var(--pinboard-border-hairline) !important;
+}
+
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
+.bookmark.private[style*="background"],
+.bookmark[style*="#fff1f1"],
+.bookmark[style*="#fff4f4"] {
+  background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
+}
+
+/* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
+#sub_banner [style*="#aa5511"],
+.bookmark_count[style*="color"] {
+  color: var(--pinboard-accent) !important;
+}
+
+/* override.muted-aaa — tokenize widespread inline #aaa */
+[style*="color:#aaa"],
+[style*="color: #aaa"] {
+  color: var(--pinboard-muted) !important;
+}
+
+/* override.bundle-table-width — neutralize 830px hard width */
+#main_column table[style*="width:830"] {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* override.bundle-slot-input — tokenize inline dotted 20px inputs */
+input[type="text"][name^="id_"][style*="border"] {
+  border: var(--pinboard-border-width) solid var(--pinboard-border) !important;
+  background: var(--pinboard-input-bg) !important;
+  color: var(--pinboard-fg) !important;
+  width: 32px !important;
+}
+
+/* override.per-page-active — tokenize active ffa pill */
+table.per_page_widget [style*="background:#ffa"] {
+  background: var(--pinboard-accent-alpha) !important;
+  color: var(--pinboard-fg) !important;
+}
+
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
+/* override.generic-bgcolor — defensive against legacy HTML attr */
+[bgcolor] { background-color: transparent !important; }
+
+/* override.generic-html-color — defensive against legacy <font> */
+font[color], font[size] { color: inherit !important; font-size: inherit !important; }
+
+/* override.generic-fixed-width — defensive against layout tables */
+table[width]:not([width="100%"]) { width: auto !important; max-width: 100% !important; }
+
+/* === selection (applied globally; composers may override scoped) === */
+::selection          { background: var(--pinboard-selection-bg); color: var(--pinboard-selection-fg); }
+::-moz-selection     { background: var(--pinboard-selection-bg); color: var(--pinboard-selection-fg); }
+
+/* === composer: classic-list-v2 — canonical surface inventory === */
+
+/* ---- App shell typography (body#pinboard) ---- */
+body#pinboard {
+  background: var(--pinboard-bg) !important;
+  color: var(--pinboard-fg) !important;
+  font-family: var(--pinboard-font-family) !important;
+  font-size: 13px !important;
+  line-height: var(--pinboard-line-height) !important;
+}
+body#pinboard table, body#pinboard td, body#pinboard th,
+body#pinboard p, body#pinboard b, body#pinboard strong,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
+body#pinboard dd, body#pinboard dt { color: inherit !important; }
+
+/* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
+body:not(#pinboard) {
+  background: var(--pinboard-bg) !important;
+  color: var(--pinboard-fg) !important;
+  font-family: var(--pinboard-font-family) !important;
+}
+body:not(#pinboard) table, body:not(#pinboard) td,
+body:not(#pinboard) p, body:not(#pinboard) label,
+body:not(#pinboard) span { color: inherit !important; }
+body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
+
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: dark !important; }
+
+/* ---- Global anchor rest-colour fallback: emitted FIRST, not last ----
+   a:link is (0,1,1) — exactly the specificity of every a.CLASS / .CLASS a intent
+   rule further down — so while this lived at the tail it won the source-order tie
+   against ALL of them and repainted a.tag, a.url_link, a.delete, a.destroy,
+   a.unread, a.help, .edit_links a, .rss_linkbox a, .colophon a and .settings_tab a
+   with accent. (.bookmark a.when / .bookmark a.cached at (0,2,1) were written to
+   escape exactly this.) Emitting it first lets every later intent rule win its own
+   tie, with no specificity change — so the pilot overrides appended last still beat
+   the composer, which is what keeps a.url_display on each pilot own shipped colour.
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
+
+/* ---- Banner & navigation ---- */
+#banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
+#banner a, #top_menu a, .banner_username { color: var(--pinboard-accent) !important; }
+#banner a:hover, #top_menu a:hover { color: var(--pinboard-link-hover) !important; }
+#pinboard_name a { color: var(--pinboard-accent) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
+#sub_banner a { color: var(--pinboard-muted) !important; }
+#sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+
+/* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
+   Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
+   that lets inline content wrap around them. Switching #bmarks_page_nav to display:flex would create a
+   BFC and clear those floats, dropping the filter row to a 2nd line. Solution: turn the OUTER .user_navbar
+   into a flex container so all three siblings stay on one row, then nest a flex inside #bmarks_page_nav
+   to pin the RSS chip right via margin-left:auto. ---- */
+/* padding-left: 8px aligns .small_username with a.next_prev (Pinboard's pagination row underneath uses
+   8px gutter from #main_column's left edge); padding-right: 0 keeps RSS chip flush with #main_column's
+   right edge via the inner flex margin-left:auto. */
+.user_navbar { display: flex !important; flex-wrap: nowrap !important; align-items: baseline !important; padding: 0 0 0 8px !important; box-sizing: border-box !important; }
+.user_navbar > .small_username, .user_navbar > .bookmark_count_box { float: none !important; flex-shrink: 0 !important; }
+
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Inner flex container: filters flow inline, .rss_linkbox pinned right via margin-left:auto.
+   Only the selected filter gets a pill with negative margin to neutralize its padding (zero inline drift).
+   flex:1 + min-width:0 lets nav shrink to fit available space after the leftward siblings. */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; flex: 1 !important; min-width: 0 !important; display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 0 0.3em !important; box-sizing: border-box !important; }
+#bmarks_page_nav .rss_linkbox { margin: 0 0 0 auto !important; padding-left: 12px !important; float: none !important; position: static !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+/* In flex layout, no need for negative margin compensation — pills lay out as discrete flex items
+   without affecting siblings. Negative margin would pull the adjacent " ‧ " text node under the pill bg. */
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-on-accent) !important; padding: 1px 5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-on-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-on-accent) !important; background: var(--pinboard-accent) !important; }
+
+/* ---- Search (banner + main) ---- */
+#searchbox { margin-bottom: 12px !important; }
+a.bundle { color: var(--pinboard-accent) !important; }
+a.bundle:hover { color: var(--pinboard-link-hover) !important; }
+#search_query_field { width: 100% !important; }
+#search_query_field, #banner_searchbox input[type="text"] {
+  background: var(--pinboard-input-bg) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  box-sizing: border-box !important;
+}
+#search_query_field:focus, #banner_searchbox input[type="text"]:focus { border-color: var(--pinboard-accent) !important; outline: none !important; }
+.search_button input[type="submit"] {
+  background: var(--pinboard-btn-bg) !important;
+  color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  cursor: pointer !important;
+}
+.search_button input[type="submit"]:hover { background: var(--pinboard-btn-bg-hover) !important; }
+
+/* ---- Bookmark list ---- */
+.bookmark {
+  background: transparent !important;
+  display: flex !important;
+  align-items: flex-start !important;
+}
+.bookmark { transition: box-shadow 0.2s ease !important; }
+.bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
+.selected_star { color: var(--pinboard-private-accent) !important; }
+
+a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 14px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
+a.bookmark_title:hover { color: var(--pinboard-link-hover) !important; text-decoration: underline !important; }
+a.url_display, a.when, a.cached { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; }
+/* Metadata strip (timestamp / cached): the muted intent above was eaten from
+   day one by the trailing "Global anchor fallbacks" (same (0,1,1) specificity,
+   later in source). These (0,2,1) rules win over every bare-anchor rule
+   including :hover/:visited. Hover keeps the AA metadata color (link-hover
+   fails 4.5:1 on six theme surfaces) and signals with an underline instead.
+   url_display is NOT migrated: its per-pilot override colors are shipped
+   visual identity. */
+.bookmark a.when,
+.bookmark a.cached { color: var(--pinboard-metadata-fg) !important; font-size: 11px !important; }
+.bookmark a.when:hover,
+.bookmark a.cached:hover { text-decoration: underline !important; }
+a.url_link {
+  color: var(--pinboard-url-link-fg) !important;
+  background: var(--pinboard-url-link-bg) !important;
+  padding: 1px 6px !important;
+  border-radius: var(--pinboard-radius-lg) !important;
+  font-size: 11px !important;
+}
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
+.description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
+
+a.tag {
+  color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
+  padding: 0 4px !important;
+  border-radius: 3px !important;
+  text-decoration: none !important;
+}
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
+/* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
+a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
+
+/* Unread titles differ by weight only; no colour here on purpose (a:link tie, see git log). */
+a.unread { font-weight: bold !important; }
+.edit_links a, a.copy_link { color: var(--pinboard-muted-soft) !important; }
+.edit_links a:hover { color: var(--pinboard-fg) !important; }
+a.copy_link { color: var(--pinboard-accent) !important; }
+a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
+
+/* ---- Private bookmarks ---- */
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
+
+/* ---- Right bar ---- */
+#right_bar {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  padding: var(--pinboard-space-right-bar-gap) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  word-wrap: break-word !important;
+}
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
+}
+#right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
+#right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
+#right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key {
+  background: var(--pinboard-input-bg) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 8px !important;
+  box-sizing: border-box !important;
+  font-size: 12px !important;
+}
+#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input[type="submit"] {
+  background: var(--pinboard-sidebar-btn-bg) !important;
+  color: var(--pinboard-sidebar-btn-fg) !important;
+  border: none !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 10px !important;
+  margin-left: 6px !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  transition: background 0.15s ease !important;
+}
+#right_bar input[type="submit"]:hover { background: var(--pinboard-sidebar-btn-bg-hover) !important; }
+
+/* ---- Tag cloud ---- */
+#tag_cloud { max-width: 100% !important; overflow-wrap: break-word !important; }
+/* Native list mode has two floated .tag_table wrappers. Sidebar padding must
+   not push the second table below hundreds of tags in the first. Constrain
+   those tables only; cloud mode keeps its inline, frequency-sized links. */
+#tag_cloud .tag_table { width: 50% !important; margin-right: 0 !important; padding-right: 10px !important; box-sizing: border-box !important; }
+#tag_cloud .tag_table table { width: 100% !important; table-layout: fixed !important; }
+#tag_cloud .tag_table td { width: auto !important; overflow-wrap: anywhere !important; }
+#tag_cloud a:not(.tag) { color: var(--pinboard-accent) !important; }
+#tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
+#tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
+#tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+
+/* ---- Tweets page searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: var(--pinboard-space-form-gap) !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field {
+  width: 100% !important; box-sizing: border-box !important;
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 6px 10px !important; font-size: 13px !important;
+}
+#tweet_searchbox #search_query_field:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] {
+  background: var(--pinboard-sidebar-btn-bg) !important; color: var(--pinboard-sidebar-btn-fg) !important;
+  border: none !important; border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 14px !important; cursor: pointer !important;
+  font-size: 12px !important; align-self: flex-start !important;
+  transition: background 0.15s ease !important;
+}
+#tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-sidebar-btn-bg-hover) !important; }
+
+/* ---- Forms (global) ----
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
+input[type="text"], input:not([type]), input[type="password"], textarea, select {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  box-sizing: border-box !important; max-width: 100% !important;
+  padding: 5px 12px !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  line-height: 1.4 !important;
+}
+/* Focus: accent border + 2px accent-alpha halo — the same house language as the sort-form
+   inputs below and the P1 focus-ring searchboxes. The halo is what replaces the UA focus ring
+   this rule suppresses; a 1px border-colour change alone leaves the add/edit-bookmark form
+   (url / title / description / tags) with no visible keyboard focus. Themes overriding the
+   ring keep winning from tokens.overrides.css on source order. */
+input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+input[type="submit"], input[type="button"] {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; }
+input[type="reset"], input[type="reset"].reset, button[type="reset"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
+.suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
+#edit_bookmark_form { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+#edit_bookmark_form p { color: var(--pinboard-muted) !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
+
+/* ---- Settings page ---- */
+#settings_panel { background: var(--pinboard-bg-surface) !important; }
+.settings_tabs { border-color: var(--pinboard-border) !important; }
+.settings_tab { color: var(--pinboard-muted) !important; padding: 6px 12px !important; border-bottom-color: var(--pinboard-border) !important; }
+.settings_tab a { color: inherit !important; text-decoration: none !important; }
+.settings_tab:hover { color: var(--pinboard-accent) !important; }
+.settings_tab_selected {
+  color: var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-top: 2px solid var(--pinboard-accent) !important;
+  border-bottom-color: var(--pinboard-bg-surface) !important;
+  background: var(--pinboard-bg-surface) !important;
+  font-weight: bold !important;
+  margin-bottom: -1px !important;
+}
+.settings_tab_selected a { color: var(--pinboard-accent) !important; }
+[class*="settings_tab_spacer"] { border-bottom-color: var(--pinboard-border) !important; }
+.settings_heading { color: var(--pinboard-muted) !important; background: transparent !important; border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; padding-bottom: 6px !important; }
+a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-accent-soft) !important; }
+.email_secret { color: var(--pinboard-accent) !important; }
+body .api_token { color: var(--pinboard-fg) !important; }
+#settings_tab_panes { border: none !important; }
+#settings_tab_panes table td { color: var(--pinboard-fg) !important; }
+
+/* Import form + history need 700 + 10 + 320px. Wrap according to the available
+   column width, not an early viewport breakpoint that hides history below a
+   long form even when both columns still fit. */
+#main_column:has(> #import_history_table) {
+  display: flex !important; flex-wrap: wrap !important; align-items: flex-start !important;
+  column-gap: 10px !important; width: 1030px !important; max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+#main_column:has(> #import_history_table) > #settings_panel { flex: 1 1 700px !important; min-width: 0 !important; box-sizing: border-box !important; }
+#main_column > #import_history_table {
+  position: static !important; float: none !important;
+  flex: 1 1 320px !important; width: 320px !important; max-width: 100% !important;
+  margin: 13px 0 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* Keep a long TOC beside the article as the content column shrinks. Native
+   phone CSS hides the TOC at 640px; do not turn it into a full-width preamble.
+   Pages without a TOC retain their native content column. */
+#main_column:has(#left_toc) { display: flex !important; align-items: flex-start !important; width: 1030px !important; max-width: 100% !important; }
+#main_column:has(#left_toc) > #left_toc { flex: 0 1 auto !important; min-width: 0 !important; overflow-wrap: anywhere !important; }
+#main_column:has(#left_toc) > #content_column { flex: 1 1 780px !important; width: auto !important; min-width: 0 !important; max-width: 780px !important; box-sizing: border-box !important; }
+#main_column:has(#left_toc) > #content_column img { max-width: 100% !important; height: auto !important; box-sizing: border-box !important; }
+/* The native Tour screenshot's 34px indent sits outside its border box.
+   Include it in the width budget, including just above the phone breakpoint
+   when the TOC reappears, while preserving the original image alignment. */
+#main_column:has(#left_toc) > #content_column img[style*="margin-left:34px"],
+#main_column:has(#left_toc) > #content_column img[style*="margin-left: 34px"] { max-width: calc(100% - 34px) !important; }
+
+/* Let these page containers shrink without forcing their children to stack. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+}
+
+/* ---- Profile page ---- */
+.service_box, .help_box {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  margin-bottom: 12px !important;
+}
+.service_box .service_box { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; width: auto !important; box-sizing: border-box !important; }
+#profile_left_column { margin-right: 20px !important; }
+#profile_right_column { width: 430px !important; }
+/* Cap the shrink-to-fit parent as well as its fixed-width details column.
+   Retain the native left column and the existing desktop column balance. */
+@media (max-width: 640px) {
+  #profile_main_column, #profile_right_column { max-width: 100% !important; box-sizing: border-box !important; }
+}
+#profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: var(--pinboard-muted) !important; }
+#profile_main_column table td, #profile_right_column table td { color: var(--pinboard-fg) !important; }
+
+/* ---- Notes ---- */
+.note { border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+blockquote.note { color: var(--pinboard-fg) !important; }
+.note a { color: var(--pinboard-accent) !important; }
+.note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
+#note_right_column { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; padding: 16px !important; border-left: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Bulk edit ---- */
+#bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
+/* Native toggle writes #aaa when active and #fff when closed. Clear the light
+   fallback in both states, then preserve the active cue with the button pair. */
+#bulk_edit { background: transparent !important; border-color: transparent !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; border-color: var(--pinboard-btn-bg) !important; }
+
+/* ---- Save bookmark popup ---- */
+#popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
+.formtable td { color: var(--pinboard-fg) !important; }
+.bookmark_count, .bookmark_count_box { color: var(--pinboard-muted) !important; }
+.user_navbar a { color: var(--pinboard-accent) !important; }
+.rss_link, .rss_linkbox a { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
+/* Native table is 830px inside a 690px wrapper. Give it that room instead of
+   squeezing every bundle's tags into extra rows, and retain table density. */
+#main_column:has(> form[name="sort"]) { width: 830px !important; max-width: 100% !important; }
+#main_column form[name="sort"] > table { width: 100% !important; max-width: 830px !important; border-collapse: separate !important; border-spacing: 0 2px !important; margin-top: 8px !important; }
+#main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
+#main_column form[name="sort"] table td { padding: 1px 4px !important; line-height: normal !important; vertical-align: middle !important; border: none !important; }
+/* Reserve room for names as well as tags: intrinsic sizing alone can squeeze
+   long names into several lines, especially in monospace themes. */
+#main_column form[name="sort"] table td[style*="text-align:right"] { width: 20% !important; white-space: normal !important; overflow-wrap: anywhere !important; }
+#main_column form[name="sort"] table input[name^="id_"] {
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  background: var(--pinboard-input-bg) !important;
+  color: var(--pinboard-fg) !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  padding: 2px !important;
+  margin-right: 10px !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+  font-weight: 600 !important;
+  box-sizing: border-box !important;
+  vertical-align: middle !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  text-align: center !important;
+}
+#main_column form[name="sort"] table input[name^="id_"]:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#main_column form[name="sort"] table a.bundle { font-weight: var(--pinboard-weight-heading) !important; font-style: normal !important; letter-spacing: 0.01em !important; padding: 2px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#main_column form[name="sort"] table a[style*="color:#aaa"],
+#main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
+#main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode, #help_content .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#status_display { color: var(--pinboard-muted) !important; }
+#help_banner .logo { color: var(--pinboard-accent) !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
+/* ---- Pagination ---- */
+.next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
+.next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
+#nextprev a.edit { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Logged-out landing page (https://pinboard.in/) ---- */
+#main_welcome, .homepage_quad { color: var(--pinboard-fg) !important; }
+.homepage_heading { color: var(--pinboard-fg-strong) !important; font-weight: var(--pinboard-weight-heading) !important; }
+.homepage_subheading { color: var(--pinboard-muted) !important; }
+.signup_button,
+.signup_button[style*="background"] {
+  background: var(--pinboard-btn-bg) !important;
+  color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 10px 16px !important;
+  text-align: center !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
+  /* defeat Pinboard landing.css legacy chrome: drop-shadow that reads as "sunken" on dark themes,
+   * fixed 230×20 box that prevents vertical centering, asymmetric 5px/2px padding */
+  box-shadow: none !important;
+  width: auto !important;
+  height: auto !important;
+  -webkit-box-shadow: none !important;
+  -moz-box-shadow: none !important;
+}
+.signup_button:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; }
+#blurb_div { color: var(--pinboard-fg) !important; }
+.blurb_column { color: var(--pinboard-fg) !important; }
+#blurb_div a { text-decoration: none !important; color: var(--pinboard-fg) !important; display: block !important; }
+.blurb_box {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  margin-bottom: 10px !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
+  /* defeat Pinboard landing.css fixed height:180px so taller quotes don't clip */
+  height: auto !important;
+  min-height: 180px !important;
+}
+.blurb_box:hover, #blurb_div a:hover .blurb_box { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent-alpha) !important; }
+.magazine_title { color: var(--pinboard-accent) !important; font-weight: var(--pinboard-weight-heading) !important; }
+.blurb { color: var(--pinboard-fg) !important; opacity: 0.85 !important; }
+#language_box { color: var(--pinboard-muted) !important; }
+#language_box p { margin: 2px 0 !important; }
+#language_box a { color: var(--pinboard-muted) !important; padding: 1px 6px !important; border-radius: var(--pinboard-radius-sm) !important; text-decoration: none !important; }
+#language_box a:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-alpha) !important; }
+#language_box a[style*="background:#ffa"],
+#language_box a[style*="background: #ffa"] { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-accent) !important; }
+.nli { color: var(--pinboard-muted) !important; }
+.nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
+.nav_nli:hover { color: var(--pinboard-link-hover) !important; }
+
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ---- Footer / colophon ---- */
+#footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Scrollbars (Webkit + Firefox standard) ----
+ * thumb uses its OWN role (scrollbar-thumb, _util.mjs#deriveTextTiers) rather
+ * than reading muted straight. Both used to be the same token, which is how
+ * "raising muted would hurt the scrollbar" ended up parked in contrast-audit's
+ * allowlist as an argument against fixing sub-AA prose. They are opposite
+ * constraints — the thumb is a non-text UI part needing WCAG 1.4.11's 3:1
+ * against its track (bg-surface), the prose needs 4.5:1 — so each derives to
+ * its own floor and neither pins the other. scrollbar-thumb defaults to muted,
+ * so themes whose muted already clears 3:1 render exactly as before. */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-scrollbar-thumb) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-scrollbar-thumb) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
+
+/* ---- Global anchor STATE fallbacks ----
+   The rest-colour fallback is no longer here — it is emitted at the top of this
+   composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
+   :focus-visible stay at the tail, where they still beat the element+class rules
+   above, so hover and visited behaviour is unchanged. */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
+a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
+h2 { color: var(--pinboard-muted) !important; }
+hr { border-color: var(--pinboard-border) !important; }
+
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Inline doc samples and bookmarklets use different native light fills from
+   pre. Keep their compact geometry and use the same readable site roles. */
+code, tt { color: var(--pinboard-fg) !important; background: var(--pinboard-bg-surface) !important; }
+a.bookmarklet { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-accent) !important; border-color: var(--pinboard-border) !important; }
+#content_column span.private, #content_column a.bundle.private { background: var(--pinboard-private-bg) !important; border-color: var(--pinboard-border) !important; }
+#content_column a.bundle.private { color: var(--pinboard-accent) !important; }
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
+
+/* ---- ::selection (also in _base but themes may want explicit) ---- */
+::selection { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
+::-moz-selection { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
+
+/* === patterns layer (tokens.patterns) === */
+.settings_heading { text-transform: uppercase !important; font-size: 12px !important; letter-spacing: 0.08em !important; }
+.description blockquote { border-left: 3px solid var(--pinboard-accent) !important; padding-left: 12px !important; margin: 6px 0 !important; }
+body#pinboard { background: #2a2a2a !important; }
+body:not(#pinboard) { background: #3b3b3b !important; }
+#banner { background: #3b3b3b !important; border: 1px solid #000000 !important; border-radius: 0 !important; padding: 6px 12px !important; margin-bottom: 12px !important; box-shadow: inset 1px 1px 0 #636363, inset -1px -1px 0 #191919, 2px 2px 0 #000000 !important; }
+#banner a, #top_menu a, .banner_username { text-decoration: none !important; font-weight: 600 !important; }
+#banner a:hover, #top_menu a:hover { text-decoration: underline !important; }
+#pinboard_name a { color: var(--pinboard-fg-strong) !important; font-weight: 700 !important; }
+#sub_banner { background: #3b3b3b !important; border: 1px solid #000000 !important; border-radius: 0 !important; padding: 5px 10px !important; margin-bottom: 10px !important; box-shadow: inset 1px 1px 0 #636363, inset -1px -1px 0 #191919 !important; }
+#sub_banner a { font-weight: 600 !important; text-decoration: none !important; }
+#sub_banner a.selected, #sub_banner a.selected:hover { background: #3d3dad !important; color: #ffffff !important; padding: 1px 6px !important; border-radius: 2px !important; font-weight: 700 !important; }
+#main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc)) { background: #1c1c1c !important; border: 1px solid #000000 !important; border-radius: 0 !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 #000000 !important; }
+#main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc))::before { content: "" !important; display: block !important; height: 18px !important; box-sizing: border-box !important; padding: 3px 6px !important; background-color: #3b3b3b !important; background-image: linear-gradient(#636363 50%, #191919 50%) !important; background-size: 100% 2px !important; background-origin: content-box !important; background-clip: content-box !important; border-bottom: 1px solid #000000 !important; box-shadow: inset 1px 1px 0 #636363, inset -1px -1px 0 #191919 !important; }
+#main_column:has(> form[name="sort"]), #main_column:has(#left_toc), #note_column { background: #1c1c1c !important; border: 1px solid #000000 !important; border-radius: 0 !important; box-shadow: 2px 2px 0 #000000 !important; }
+#note_column { padding: 12px 14px !important; }
+#main_column:has(> #import_history_table) > #settings_panel, #main_column > #import_history_table, .service_box, .help_box, #right_column { background: #1c1c1c !important; border: 1px solid #000000 !important; border-radius: 0 !important; box-shadow: 2px 2px 0 #000000 !important; }
+.service_box .service_box { border: none !important; box-shadow: none !important; background: transparent !important; }
+#settings_panel { background: #1c1c1c !important; padding: 10px 12px !important; box-sizing: border-box !important; }
+.settings_tab_selected { background: #1c1c1c !important; border-color: #000000 !important; border-top: 2px solid var(--pinboard-accent) !important; border-bottom-color: #1c1c1c !important; }
+.user_navbar { background: #3b3b3b !important; border-bottom: 1px solid #000000 !important; padding: 5px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 #636363, inset -1px -1px 0 #191919 !important; }
+#bmarks_page_nav a.filter.selected { background: #3d3dad !important; color: #ffffff !important; border-radius: 2px !important; }
+#bmarks_page_nav a.filter.selected:hover { background: #4e4ec7 !important; color: #ffffff !important; }
+#bookmarks { background: #1c1c1c !important; margin: 0 !important; padding: 0 !important; }
+#nextprev { background: #3b3b3b !important; border-top: 1px solid #000000 !important; border-bottom: 1px solid #000000 !important; padding: 4px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 #636363, inset -1px -1px 0 #191919 !important; }
+#nextprev #bulk_edit[style*="170, 170, 170"] { background: #202020 !important; color: #ffffff !important; border-color: #000000 !important; }
+.bookmark { background: #1c1c1c !important; padding: 9px 12px !important; margin: 0 !important; border-top: none !important; border-right: none !important; border-left: none !important; border-bottom: 1px solid #333333 !important; border-radius: 0 !important; box-shadow: none !important; }
+.bookmark.private, .bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+a.bookmark_title { font-weight: 600 !important; }
+a.tag { background: #2a2a48 !important; color: var(--pinboard-tag-fg) !important; box-shadow: inset 0 0 0 1px #5a5aa8 !important; border-radius: 2px !important; padding: 0 4px !important; text-decoration: none !important; }
+a.tag:hover { background: #323257 !important; color: #f4f4ff !important; box-shadow: inset 0 0 0 1px #8080e0 !important; text-decoration: none !important; }
+a.tag.selected { background: #3d3dad !important; color: #ffffff !important; box-shadow: inset 0 0 0 1px #000000 !important; font-weight: 700 !important; }
+a.tag.selected:hover { background: #4e4ec7 !important; color: #ffffff !important; box-shadow: inset 0 0 0 1px #000000 !important; }
+#right_bar:not(:has(#tag_cloud:empty)) { background: #1c1c1c !important; border: 1px solid #000000 !important; border-radius: 0 !important; padding: 0 12px 12px !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 #000000 !important; }
+@media (min-width: 761px) { #main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc)):has(~ #right_bar) { float: left !important; width: min(690px, calc(100% - 340px)) !important; } #main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc)) ~ #right_bar:not(:has(#tag_cloud:empty)) { float: left !important; width: 320px !important; margin-left: 16px !important; } #footer { clear: both !important; } }
+#right_bar:not(:has(#tag_cloud:empty))::before { content: "" !important; display: block !important; height: 18px !important; margin: 0 -12px 10px -12px !important; box-sizing: border-box !important; padding: 3px 6px !important; background-color: #3b3b3b !important; background-image: linear-gradient(#636363 50%, #191919 50%) !important; background-size: 100% 2px !important; background-origin: content-box !important; background-clip: content-box !important; border-bottom: 1px solid #000000 !important; box-shadow: inset 1px 1px 0 #636363, inset -1px -1px 0 #191919 !important; }
+#right_bar table tr[onmouseover]:hover { background: #252525 !important; }
+#search_query_field, #banner_searchbox input[type="text"], #right_bar input#key, #tweet_searchbox #search_query_field, input[type="text"], input:not([type]), input[type="password"], textarea, select { background: #1c1c1c !important; color: var(--pinboard-fg) !important; border: 1px solid #707070 !important; border-radius: 0 !important; box-shadow: inset 1px 1px 0 #0c0c0c, 1px 1px 0 #4c4c4c !important; }
+#search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus, input[type="text"]:focus, input:not([type]):focus, input[type="password"]:focus, textarea:focus, select:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+input[type="submit"], input[type="button"], input[type="reset"], input[type="reset"].reset, button[type="reset"], input[type="file"]::file-selector-button, .search_button input[type="submit"], #right_bar input[type="submit"], #tweet_searchbox input[type="submit"], #tagPickerNav input[type="button"], #save_changes_marker, .signup_button, .signup_button[style*="background"] { background: #4a4a4a !important; color: #ffffff !important; border: 1px solid #000000 !important; border-radius: 3px !important; box-shadow: inset 1px 1px 0 #4a4a4a, inset -1px -1px 0 #191919, inset 2px 2px 0 #6c6c6c, inset -2px -2px 0 #2c2c2c !important; font-weight: 600 !important; }
+input[type="submit"]:hover, input[type="button"]:hover, input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover, input[type="file"]::file-selector-button:hover, .search_button input[type="submit"]:hover, #right_bar input[type="submit"]:hover, #tweet_searchbox input[type="submit"]:hover, #tagPickerNav input[type="button"]:hover, #save_changes_marker:hover, .signup_button:hover { background: #575757 !important; color: #ffffff !important; border-color: #000000 !important; box-shadow: inset 1px 1px 0 #575757, inset -1px -1px 0 #191919, inset 2px 2px 0 #7a7a7a, inset -2px -2px 0 #363636 !important; }
+input[type="submit"]:active, input[type="button"]:active, input[type="reset"]:active, .search_button input[type="submit"]:active, #right_bar input[type="submit"]:active, #tweet_searchbox input[type="submit"]:active, #tagPickerNav input[type="button"]:active, #save_changes_marker:active, .signup_button:active { background: #202020 !important; color: #ffffff !important; border-color: #000000 !important; box-shadow: inset 1px 1px 0 #0c0c0c, inset -1px -1px 0 #3c3c3c, inset 2px 2px 0 #161616, inset -2px -2px 0 #2e2e2e !important; }
+#edit_bookmark_form, #bulk_top_bar, #bulk_edit_box { background: #3b3b3b !important; border: 1px solid #000000 !important; border-radius: 0 !important; padding: 10px 12px !important; box-shadow: inset 1px 1px 0 #636363, inset -1px -1px 0 #191919 !important; }
+.pin-ac .bd { background: #1c1c1c !important; border: 1px solid #000000 !important; border-radius: 0 !important; box-shadow: 2px 2px 0 #000000 !important; }
+@media (max-width: 1060px) { #main_column > #right_bar { position: static !important; left: auto !important; width: 100% !important; margin-top: 12px !important; } }
+@media (max-width: 760px) { #main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc)) { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; } #right_bar, #main_column > #right_bar { width: 100% !important; margin-left: 0 !important; margin-top: 12px !important; float: none !important; } }
+@media (max-width: 640px) { #right_bar, #main_column > #right_bar { display: none !important; } }
+`
   }
 
 };

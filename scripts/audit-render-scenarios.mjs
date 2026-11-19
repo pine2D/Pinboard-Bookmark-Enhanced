@@ -4,6 +4,7 @@ import { CHECKS, THEMES, MEDIA_CHECKS, MEDIA_SCENARIOS, MEDIA_THEMES } from '../
 export const RENDER_DARK_THEMES = new Set([
   'nord-night', 'terminal', 'dracula', 'flexoki-dark',
   'solarized-dark', 'catppuccin-mocha', 'gruvbox-dark', 'rose-pine',
+  'platinum-dark',
 ]);
 export const renderScheme = (theme) => RENDER_DARK_THEMES.has(theme) ? 'dark' : 'light';
 export const checkScenarioId = (check) => `render.${check.surface}.${check.state || 'default'}`;

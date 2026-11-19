@@ -952,8 +952,25 @@ function pbpResolveReaderScheme(input) {
   return s.optTheme === "light" || s.optTheme === "dark" ? s.optTheme : "auto";
 }
 
+function pbpResolveReaderChrome(presetKey, follow) {
+  return follow !== false && presetKey === "platinum" ? "platinum" : "";
+}
+
+function pbpApplyReaderChrome(chromeTheme) {
+  if (typeof document === "undefined") return;
+  const ds = document.documentElement?.dataset;
+  if (!ds) return;
+  if (chromeTheme) {
+    if (ds.readerTheme !== chromeTheme) ds.readerTheme = chromeTheme;
+  } else if ("readerTheme" in ds) {
+    delete ds.readerTheme;
+  }
+}
+
 const _pbpScheme = {
-  optTheme: "auto", override: "auto", videoDark: false, applied: null,
+  optTheme: "auto", override: "auto", videoDark: false,
+  presetKey: "", follow: true,
+  applied: null, appliedChrome: null,
   // The opener's video=1 mark, standing in for body.video-mode until the
   // payload has been judged (pbpReaderSchemeVideoSettled clears it).
   videoHint: /(?:^|[?&])video=1(?:&|$)/.test(location.search)
@@ -966,6 +983,11 @@ function pbpReaderSchemeApply() {
     optTheme: _pbpScheme.optTheme, override: _pbpScheme.override,
     videoMode: document.body.classList.contains("video-mode") || _pbpScheme.videoHint, videoDark: _pbpScheme.videoDark
   });
+  const chromeTheme = pbpResolveReaderChrome(_pbpScheme.presetKey, _pbpScheme.follow);
+  if (chromeTheme !== _pbpScheme.appliedChrome) {
+    _pbpScheme.appliedChrome = chromeTheme;
+    pbpApplyReaderChrome(chromeTheme);
+  }
   if (mode === _pbpScheme.applied) return; // body-class observer fires on every class flip
   _pbpScheme.applied = mode;
   pbpApplyColorScheme(mode);
@@ -1455,15 +1477,21 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   try {
     const settingsArea = await getSettingsStorage();
     const [s, loc] = await Promise.all([
-      settingsArea.get({ optTheme: "auto", mdVideoDarkScheme: false }),
+      settingsArea.get({ optTheme: "auto", mdVideoDarkScheme: false, themePresetKey: "", optPopupFollowTheme: true }),
       chrome.storage.local.get({ pbp_color_scheme: "auto" })
     ]);
     _pbpScheme.optTheme = s.optTheme;
     _pbpScheme.videoDark = s.mdVideoDarkScheme === true;
+    _pbpScheme.presetKey = s.themePresetKey || "";
+    _pbpScheme.follow = s.optPopupFollowTheme !== false;
     _pbpScheme.override = pbpReaderSchemeNorm(loc.pbp_color_scheme);
     // Pre-paint mirror for the next video page (md-preview-theme-early.js
     // reads it together with the opener's video=1 URL mark).
-    try { localStorage.setItem("md-preview-video-dark", _pbpScheme.videoDark ? "1" : "0"); } catch (_) {}
+    try {
+      localStorage.setItem("md-preview-video-dark", _pbpScheme.videoDark ? "1" : "0");
+      localStorage.setItem("pp-theme-preset", _pbpScheme.presetKey);
+      localStorage.setItem("pp-theme-follow", _pbpScheme.follow ? "1" : "0");
+    } catch (_) {}
     pbpReaderSchemeApply();
   } catch (_) { /* degrade: leave whatever md-preview-theme-early.js (or the CSS default) set */ }
   if (chrome.storage.onChanged) {
@@ -1477,7 +1505,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // generation is taken. pbp_color_scheme and optSyncEnabled are local-
       // only keys and always count.
       const localOnly = area === "local" && !!(changes.pbp_color_scheme || changes.optSyncEnabled);
-      const themed = !!(changes.optTheme || changes.mdVideoDarkScheme);
+      const themed = !!(changes.optTheme || changes.mdVideoDarkScheme || changes.themePresetKey || changes.optPopupFollowTheme);
       if (!localOnly && !themed) return;
       if (!localOnly && area !== await pbpSettingsAreaName()) return;
       const gen = ++schemeGen;
@@ -1492,18 +1520,26 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         // (shared.js's own listener has already dropped the routing cache).
         // A newer consumed event that landed while this read was in flight wins.
         try {
-          const s = await (await getSettingsStorage()).get({ optTheme: "auto", mdVideoDarkScheme: false });
+          const s = await (await getSettingsStorage()).get({ optTheme: "auto", mdVideoDarkScheme: false, themePresetKey: "", optPopupFollowTheme: true });
           if (gen !== schemeGen) return;
           _pbpScheme.optTheme = s.optTheme;
           _pbpScheme.videoDark = s.mdVideoDarkScheme === true;
+          _pbpScheme.presetKey = s.themePresetKey || "";
+          _pbpScheme.follow = s.optPopupFollowTheme !== false;
           touched = true;
         } catch (_) {}
       } else if (themed) {
         if (changes.optTheme) { _pbpScheme.optTheme = changes.optTheme.newValue; touched = true; }
         if (changes.mdVideoDarkScheme) { _pbpScheme.videoDark = changes.mdVideoDarkScheme.newValue === true; touched = true; }
+        if (changes.themePresetKey) { _pbpScheme.presetKey = changes.themePresetKey.newValue || ""; touched = true; }
+        if (changes.optPopupFollowTheme) { _pbpScheme.follow = changes.optPopupFollowTheme.newValue !== false; touched = true; }
       }
       if (!touched) return;
-      try { localStorage.setItem("md-preview-video-dark", _pbpScheme.videoDark ? "1" : "0"); } catch (_) {}
+      try {
+        localStorage.setItem("md-preview-video-dark", _pbpScheme.videoDark ? "1" : "0");
+        localStorage.setItem("pp-theme-preset", _pbpScheme.presetKey);
+        localStorage.setItem("pp-theme-follow", _pbpScheme.follow ? "1" : "0");
+      } catch (_) {}
       pbpReaderSchemeApply();
     });
   }

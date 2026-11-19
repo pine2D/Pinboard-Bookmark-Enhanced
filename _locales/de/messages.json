@@ -1896,15 +1896,6 @@
   "secExtensionAppearance": {
     "message": "Darstellung der Erweiterung"
   },
-  "extensionStyleLabel": {
-    "message": "Oberflächenstil"
-  },
-  "extensionStyleStandard": {
-    "message": "Standard"
-  },
-  "extensionStylePlatinum": {
-    "message": "Platin (hell)"
-  },
   "themeAuto": {
     "message": "Automatisch (Systemeinstellung)"
   },
@@ -1918,7 +1909,7 @@
     "message": "Erweiterungsseiten folgen dem Pinboard-Preset"
   },
   "popupFollowHint": {
-    "message": "Popup, Einstellungen und Bibliothek übernehmen die Farben deines Pinboard-Presets. Die Leseansicht behält ihre eigenen Farben."
+    "message": "Popup, Einstellungen und Bibliothek übernehmen die Farben deines Pinboard-Presets. Die Leseansicht behält ihre eigenen Farben, außer bei Platinum."
   },
   "optFollowNeedsPreset": {
     "message": "Wähle zuerst unten ein Pinboard-Preset. Bei „Kein Preset“ gibt es keine Palette zum Übernehmen."

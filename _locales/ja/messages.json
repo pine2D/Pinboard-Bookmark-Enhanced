@@ -1896,15 +1896,6 @@
   "secExtensionAppearance": {
     "message": "拡張機能の外観"
   },
-  "extensionStyleLabel": {
-    "message": "インターフェイスのスタイル"
-  },
-  "extensionStyleStandard": {
-    "message": "標準"
-  },
-  "extensionStylePlatinum": {
-    "message": "プラチナ（ライト）"
-  },
   "themeAuto": {
     "message": "自動（システムに合わせる）"
   },
@@ -1918,7 +1909,7 @@
     "message": "拡張機能のページを Pinboard テーマプリセットに合わせる"
   },
   "popupFollowHint": {
-    "message": "ポップアップ、設定ページ、ライブラリで、選択した Pinboard プリセットの配色を使います。リーダーは独自の配色のままです。"
+    "message": "ポップアップ、設定ページ、ライブラリで、選択した Pinboard プリセットの配色を使います。Platinum を選んだ場合を除き、リーダーは独自の配色のままです。"
   },
   "optFollowNeedsPreset": {
     "message": "まず下で Pinboard プリセットを選んでください。「プリセットなし」では合わせる配色がありません。"

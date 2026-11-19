@@ -1896,15 +1896,6 @@
   "secExtensionAppearance": {
     "message": "擴充功能外觀"
   },
-  "extensionStyleLabel": {
-    "message": "介面風格"
-  },
-  "extensionStyleStandard": {
-    "message": "標準"
-  },
-  "extensionStylePlatinum": {
-    "message": "白金立體（淺色）"
-  },
   "themeAuto": {
     "message": "自動（跟隨系統）"
   },
@@ -1918,7 +1909,7 @@
     "message": "擴充功能頁面跟隨 Pinboard 主題預設"
   },
   "popupFollowHint": {
-    "message": "彈出式視窗、設定頁和資料庫使用所選 Pinboard 預設的配色，閱讀器保持自己的配色。"
+    "message": "彈出式視窗、設定頁和資料庫使用所選 Pinboard 預設的配色；除 Platinum 外，閱讀器保持自己的配色。"
   },
   "optFollowNeedsPreset": {
     "message": "先在下方選一個 Pinboard 預設。選「不使用預設」時沒有可跟隨的配色。"

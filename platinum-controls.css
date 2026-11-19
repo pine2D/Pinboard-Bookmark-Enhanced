@@ -1,165 +1,1528 @@
-/* Platinum draws only the chrome. Controls keep their native hit areas, roles,
-   disabled states and keyboard handling. Forced colors uses the surface CSS. */
-html[data-theme="platinum"] {
+/* ==========================================================================
+   Mac OS 9 Platinum Windowed Desktop & Controls (v2core light & dark)
+   Loaded behind media="(forced-colors: none)" on popup, options, library,
+   and md-preview. Forced-colors falls back to the surface stylesheets.
+   ========================================================================== */
+
+html[data-theme="platinum-light"] {
+  color-scheme: light;
+  --pp-bg: #dddddd;
+  --opt-bg: #cccccc;
+  --lib-bg: #cccccc;
+  --pt-desk: #cccccc;
+  --pt-win: #cccccc;
+  --pt-dialog: #dddddd;
+  --pt-face: #dddddd;
+  --pt-face-hover: #e8e8e8;
+  --pt-pressed-bg: #666666;
+  --pt-pressed-fg: #ffffff;
+  --pt-pressed-s1: #444444;
+  --pt-pressed-s2: #888888;
+  --pt-pressed-s3: #555555;
+  --pt-pressed-s4: #777777;
+  --pt-paper: #ffffff;
+  --pt-paper-alt: #f4f4f4;
   --pt-ink: #262626;
-  --pt-edge: #575757;
-  --pt-face: #ddd;
-  --pt-light: #fff;
-  --pt-shadow: #929292;
-  --pt-selection: #333399;
-  --pt-bevel: inset 1px 1px var(--pt-light), inset -1px -1px var(--pt-shadow);
-  --pt-well: inset 1px 1px #a3a3a3, inset -1px -1px #eee;
+  --pt-ink-muted: #525252;
+  --pt-ink-hint: #595959;
+  --pt-frame: #262626;
+  --pt-edge: #262626;
+  --pt-field-edge: #262626;
+  --pt-divider: #aaaaaa;
+  --pt-shadow-drop: #262626;
+  --pt-glint: #ffffff;
+  --pt-glint-soft: rgba(255, 255, 255, 0.65);
+  --pt-bevel-d1: #777777;
+  --pt-bevel-d2: #aaaaaa;
+  --pt-bevel-mid: #999999;
+  --pt-stripe-hi: #ffffff;
+  --pt-stripe-lo: #777777;
+  --pt-sel-bg: #333399;
+  --pt-sel-hover: #28287c;
+  --pt-sel-fg: #ffffff;
+  --pt-sel-muted: #ebecff;
+  --pt-band-bg: #d6d6ec;
+  --pt-band-hover: #c8c8e4;
+  --pt-row-hover: #ededf7;
+  --pt-link: #333399;
+  --pt-link-hover: #1f1f7a;
+  --pt-focus: #333399;
+  --pt-lav-bg: #ebebff;
+  --pt-lav-hover: #dadaff;
+  --pt-lav-bd: #8585eb;
+  --pt-lav-fg: #20206b;
+  --pt-danger-bg: #a02525;
+  --pt-danger-fg: #7a1010;
+  --pt-danger-bd: #7a1010;
+  --pt-notice-bg: #ffffcc;
+  --pt-tbox-g1: #9a9a9a;
+  --pt-tbox-g2: #f1f1f1;
+  --pt-tbox-mid: #808080;
+  --pt-tbox-press1: rgba(53, 53, 53, 0.8);
+  --pt-tbox-press2: rgba(156, 156, 156, 0.8);
 }
 
-/* Keep the popup header in its normal account-and-actions layout. */
-html[data-theme="platinum"] .header-bar {
-  border-bottom: 1px solid var(--pt-shadow);
+html[data-theme="platinum-dark"] {
+  color-scheme: dark;
+  --pp-bg: #3b3b3b;
+  --opt-bg: #2a2a2a;
+  --lib-bg: #2a2a2a;
+  --pt-desk: #2a2a2a;
+  --pt-win: #3b3b3b;
+  --pt-dialog: #3b3b3b;
+  --pt-face: #4a4a4a;
+  --pt-face-hover: #545454;
+  --pt-pressed-bg: #202020;
+  --pt-pressed-fg: #ffffff;
+  --pt-pressed-s1: #0c0c0c;
+  --pt-pressed-s2: #3c3c3c;
+  --pt-pressed-s3: #161616;
+  --pt-pressed-s4: #2e2e2e;
+  --pt-paper: #1c1c1c;
+  --pt-paper-alt: #252525;
+  --pt-ink: #e2e2e2;
+  --pt-ink-muted: #b8b8b8;
+  --pt-ink-hint: #adadad;
+  --pt-frame: #000000;
+  --pt-edge: #000000;
+  --pt-field-edge: #707070;
+  --pt-divider: #262626;
+  --pt-shadow-drop: #000000;
+  --pt-glint: #6c6c6c;
+  --pt-glint-soft: rgba(255, 255, 255, 0.14);
+  --pt-bevel-d1: #191919;
+  --pt-bevel-d2: #2c2c2c;
+  --pt-bevel-mid: #191919;
+  --pt-stripe-hi: #636363;
+  --pt-stripe-lo: #131313;
+  --pt-sel-bg: #3d3dad;
+  --pt-sel-hover: #4a4ac0;
+  --pt-sel-fg: #ffffff;
+  --pt-sel-muted: #e4e4ff;
+  --pt-band-bg: #2a2a4d;
+  --pt-band-hover: #33335e;
+  --pt-row-hover: #262638;
+  --pt-link: #a9a9ff;
+  --pt-link-hover: #c4c4ff;
+  --pt-focus: #9999ff;
+  --pt-lav-bg: #2a2a48;
+  --pt-lav-hover: #34345c;
+  --pt-lav-bd: #6a6ad8;
+  --pt-lav-fg: #e2e2ff;
+  --pt-danger-bg: #8a1f1f;
+  --pt-danger-fg: #ff9c94;
+  --pt-danger-bd: #c4524a;
+  --pt-notice-bg: #3b381c;
+  --pt-tbox-g1: #262626;
+  --pt-tbox-g2: #6e6e6e;
+  --pt-tbox-mid: #191919;
+  --pt-tbox-press1: rgba(0, 0, 0, 0.65);
+  --pt-tbox-press2: rgba(58, 58, 58, 0.65);
 }
 
-html[data-theme="platinum"] :is(.btn:not(.ghost, .danger, .primary, .theme-preset-btn, .saved-theme-btn),
-    .qbtn, .listbox-btn) {
-  background: var(--pt-face);
-  color: var(--pt-ink);
+html[data-reader-theme="platinum"] {
+  --pt-desk: light-dark(#cccccc, #2a2a2a);
+  --pt-win: light-dark(#cccccc, #3b3b3b);
+  --pt-dialog: light-dark(#dddddd, #3b3b3b);
+  --pt-face: light-dark(#dddddd, #4a4a4a);
+  --pt-face-hover: light-dark(#e8e8e8, #545454);
+  --pt-pressed-bg: light-dark(#666666, #202020);
+  --pt-pressed-fg: #ffffff;
+  --pt-pressed-s1: light-dark(#444444, #0c0c0c);
+  --pt-pressed-s2: light-dark(#888888, #3c3c3c);
+  --pt-pressed-s3: light-dark(#555555, #161616);
+  --pt-pressed-s4: light-dark(#777777, #2e2e2e);
+  --pt-paper: light-dark(#ffffff, #1c1c1c);
+  --pt-paper-alt: light-dark(#f4f4f4, #252525);
+  --pt-ink: light-dark(#262626, #e2e2e2);
+  --pt-ink-muted: light-dark(#525252, #b8b8b8);
+  --pt-ink-hint: light-dark(#595959, #adadad);
+  --pt-frame: light-dark(#262626, #000000);
+  --pt-edge: light-dark(#262626, #000000);
+  --pt-field-edge: light-dark(#262626, #707070);
+  --pt-divider: light-dark(#aaaaaa, #262626);
+  --pt-shadow-drop: light-dark(#262626, #000000);
+  --pt-glint: light-dark(#ffffff, #6c6c6c);
+  --pt-glint-soft: light-dark(rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.14));
+  --pt-bevel-d1: light-dark(#777777, #191919);
+  --pt-bevel-d2: light-dark(#aaaaaa, #2c2c2c);
+  --pt-bevel-mid: light-dark(#999999, #191919);
+  --pt-stripe-hi: light-dark(#ffffff, #636363);
+  --pt-stripe-lo: light-dark(#777777, #131313);
+  --pt-sel-bg: light-dark(#333399, #3d3dad);
+  --pt-sel-hover: light-dark(#28287c, #4a4ac0);
+  --pt-sel-fg: #ffffff;
+  --pt-sel-muted: light-dark(#ebecff, #e4e4ff);
+  --pt-band-bg: light-dark(#d6d6ec, #2a2a4d);
+  --pt-band-hover: light-dark(#c8c8e4, #33335e);
+  --pt-row-hover: light-dark(#ededf7, #262638);
+  --pt-link: light-dark(#333399, #a9a9ff);
+  --pt-link-hover: light-dark(#1f1f7a, #c4c4ff);
+  --pt-focus: light-dark(#333399, #9999ff);
+  --pt-lav-bg: light-dark(#ebebff, #2a2a48);
+  --pt-lav-hover: light-dark(#dadaff, #34345c);
+  --pt-lav-bd: light-dark(#8585eb, #6a6ad8);
+  --pt-lav-fg: light-dark(#20206b, #e2e2ff);
+  --pt-danger-bg: light-dark(#a02525, #8a1f1f);
+  --pt-danger-fg: light-dark(#7a1010, #ff9c94);
+  --pt-danger-bd: light-dark(#7a1010, #c4524a);
+  --pt-notice-bg: light-dark(#ffffcc, #3b381c);
+  --pt-tbox-g1: light-dark(#9a9a9a, #262626);
+  --pt-tbox-g2: light-dark(#f1f1f1, #6e6e6e);
+  --pt-tbox-mid: light-dark(#808080, #191919);
+  --pt-tbox-press1: light-dark(rgba(53, 53, 53, 0.8), rgba(0, 0, 0, 0.65));
+  --pt-tbox-press2: light-dark(rgba(156, 156, 156, 0.8), rgba(58, 58, 58, 0.65));
+
+  /* Reader semantic variable bridge (preserves --hl-1..5 user highlight colors) */
+  --bg: light-dark(#cccccc, #2a2a2a);
+  --fg: light-dark(#262626, #e2e2e2);
+  --fg-secondary: light-dark(#444444, #c2c2c2);
+  --fg-muted: light-dark(#555555, #b0b0b0);
+  --border: light-dark(#777777, #555555);
+  --border-light: light-dark(#b5b5b5, #3a3a3a);
+  --code-bg: light-dark(#f2f2f7, #262630);
+  --code-fg: light-dark(#262626, #e2e2e2);
+  --link: light-dark(#333399, #8f8fff);
+  --link-hover: light-dark(#1f1f7a, #b2b2ff);
+  --link-on-raised: light-dark(#20206b, #c2c2ff);
+  --badge-bg: light-dark(#ebebff, #2a2a48);
+  --badge-fg: light-dark(#20206b, #e2e2ff);
+  --btn-bg: light-dark(#dddddd, #4a4a4a);
+  --btn-border: light-dark(#262626, #000000);
+  --btn-hover: light-dark(#e8e8e8, #545454);
+  --btn-fg: light-dark(#262626, #e2e2e2);
+  --bq-border: light-dark(#333399, #8f8fff);
+  --bq-bg: light-dark(#f4f4fa, #24242e);
+  --bq-fg: light-dark(#333333, #d4d4d4);
+  --table-stripe: light-dark(#f4f4f8, #232329);
+  --selection: light-dark(#ccccff, #3d3dad);
+  --surface: light-dark(#dddddd, #3b3b3b);
+  --pre-bg: light-dark(#f6f6f8, #16161a);
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 3px;
+}
+
+/* Shared composite bevel shadows & font stack */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) {
+  --pt-font-ui: "Lucida Grande", "Geneva", Verdana, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  --pt-btn-shadow: inset 1px 1px 0 var(--pt-face), inset -1px -1px 0 var(--pt-bevel-d1), inset 2px 2px 0 var(--pt-glint), inset -2px -2px 0 var(--pt-bevel-d2);
+  --pt-btn-pressed-shadow: inset 1px 1px 0 var(--pt-pressed-s1), inset -1px -1px 0 var(--pt-pressed-s2), inset 2px 2px 0 var(--pt-pressed-s3), inset -2px -2px 0 var(--pt-pressed-s4);
+  --pt-well-shadow: inset 1px 1px 0 var(--pt-bevel-mid), 1px 1px 0 var(--pt-glint);
+  --pt-window-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-mid), 2px 2px 0 var(--pt-shadow-drop);
+  --pt-pinstripe-bg: linear-gradient(var(--pt-stripe-hi) 50%, var(--pt-stripe-lo) 50%);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) body {
+  font-family: var(--pt-font-ui);
+}
+
+/* ==========================================================================
+   1. Shared Platinum Scrollbars (Grooved Track + Beveled Thumb)
+   ========================================================================== */
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) ::-webkit-scrollbar-track {
+  background: var(--pt-win);
+  border-left: 1px solid var(--pt-divider);
+  box-shadow: inset 1px 1px 0 var(--pt-bevel-mid);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) ::-webkit-scrollbar-corner {
+  background: var(--pt-win);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) ::-webkit-scrollbar-thumb {
+  background-color: var(--pt-face);
   border: 1px solid var(--pt-edge);
-  box-shadow: var(--pt-bevel);
+  border-radius: 0;
+  background-clip: border-box;
+  box-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-d1);
 }
 
-html[data-theme="platinum"] :is(.btn:not(.ghost, .danger, .primary, .theme-preset-btn, .saved-theme-btn),
-    .qbtn, .listbox-btn):hover:enabled {
-  background: #e8e8e8;
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--pt-face-hover);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) ::-webkit-scrollbar-thumb:active {
+  background-color: var(--pt-pressed-bg);
+}
+
+/* ==========================================================================
+   2. Shared 4-Layer Stepped Bevel Buttons, Toggles & Default Ring
+   ========================================================================== */
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.btn:not(.ghost, .danger, .theme-preset-btn, .saved-theme-btn),
+      .qbtn:not(.saving, .saved),
+      .fc-btn,
+      .action-btn:not(.copied),
+      .toggle-btn,
+      .lib-toggle,
+      .zen-btn,
+      .xp-act) {
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  font-weight: 600;
+  border: 1px solid var(--pt-edge);
+  border-radius: 3px;
+  box-shadow: var(--pt-btn-shadow);
+  transition: none;
+  transform: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.btn:not(.ghost, .danger, .theme-preset-btn, .saved-theme-btn),
+      .qbtn:not(.saving, .saved),
+      .fc-btn,
+      .action-btn:not(.copied),
+      .toggle-btn,
+      .lib-toggle,
+      .zen-btn,
+      .xp-act):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"], [aria-expanded="true"], .active) {
+  background: var(--pt-face-hover);
+  color: var(--pt-ink);
   border-color: var(--pt-edge);
 }
 
-html[data-theme="platinum"] :is(.btn:not(.ghost, .danger), .qbtn, .listbox-btn):active:enabled,
-html[data-theme="platinum"] .listbox-btn[aria-expanded="true"] {
-  background: #666;
-  color: white;
-  box-shadow: inset 1px 1px #434343, inset -1px -1px #bbb;
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.btn:not(.ghost, .danger, .theme-preset-btn, .saved-theme-btn),
+      .qbtn:not(.saving, .saved),
+      .fc-btn,
+      .action-btn:not(.copied),
+      .toggle-btn,
+      .lib-toggle,
+      .zen-btn,
+      .xp-act):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], .active) {
+  background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-btn-pressed-shadow);
+  transform: none;
 }
 
-html[data-theme="platinum"] :is(#submit-btn, #login-btn):enabled:not(.saved-success, .save-error, .loading) {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-toggle .lib-toggle-count {
+  color: inherit;
+}
+
+/* Segmented controls (.source-badge / .view-toggle) in Reader */
+html[data-reader-theme="platinum"] :is(.source-badge, .view-toggle) {
+  border: 1px solid var(--pt-edge);
+  border-radius: 3px;
+  background: var(--pt-face);
+  box-shadow: var(--pt-btn-shadow);
+}
+
+html[data-reader-theme="platinum"] .src-seg {
+  color: var(--pt-ink);
+  font-weight: 600;
+}
+
+html[data-reader-theme="platinum"] .src-seg:hover:not([aria-pressed="true"], :disabled) {
+  background: var(--pt-face-hover);
+  color: var(--pt-ink);
+}
+
+html[data-reader-theme="platinum"] .src-seg[aria-pressed="true"] {
+  background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
+  box-shadow: var(--pt-btn-pressed-shadow);
+}
+
+/* Ghost buttons: quiet at rest, crisp Platinum bevel on hover/press (excluding ? help toggle) */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .btn.ghost:not(.context-help-toggle, .danger, .listbox-trigger) {
+  border-radius: 3px;
+  transition: none;
+  transform: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .btn.ghost:not(.context-help-toggle, .danger, .listbox-trigger):hover:not(:disabled, [aria-expanded="true"]) {
   background: var(--pt-face);
   color: var(--pt-ink);
   border-color: var(--pt-edge);
-  box-shadow: var(--pt-bevel), 0 0 0 1px var(--pt-light), 0 0 0 3px var(--pt-ink);
+  box-shadow: var(--pt-btn-shadow);
 }
 
-html[data-theme="platinum"] :is(#submit-btn, #login-btn):enabled:active:not(.saved-success, .save-error, .loading) {
-  background: #666;
-  color: white;
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .btn.ghost:not(.context-help-toggle, .danger, .listbox-trigger):is(:active:not(:disabled), [aria-expanded="true"]) {
+  background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-btn-pressed-shadow);
+  transform: none;
 }
 
-html[data-theme="platinum"] .listbox-btn {
-  padding-inline-end: 2px;
+/* Theme preset & saved-theme buttons: beveled Platinum pills -> rectangular 3px switches */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.theme-preset-btn, .saved-theme-btn) {
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  font-weight: 600;
+  border: 1px solid var(--pt-edge);
+  border-radius: 3px;
+  box-shadow: var(--pt-btn-shadow);
   transition: none;
 }
 
-html[data-theme="platinum"] .listbox-btn > .btn-ic {
-  position: relative;
-  width: 19px;
-  height: 16px;
-  border-inline-start: 1px solid var(--pt-shadow);
-  color: inherit;
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.theme-preset-btn, .saved-theme-btn):hover:not(:disabled, .active) {
+  background: var(--pt-face-hover);
+  color: var(--pt-ink);
 }
 
-html[data-theme="platinum"] .listbox-btn > .btn-ic svg { display: none; }
-
-html[data-theme="platinum"] .listbox-btn > .btn-ic::before,
-html[data-theme="platinum"] .listbox-btn > .btn-ic::after {
-  content: "";
-  position: absolute;
-  left: 6px;
-  border-inline: 4px solid transparent;
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.theme-preset-btn.active, .saved-theme-btn.active, .theme-preset-btn.active:hover:not(:disabled), .saved-theme-btn.active:hover:not(:disabled)) {
+  background: var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
+  border-color: var(--pt-edge);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.45), inset -1px -1px 0 rgba(255, 255, 255, 0.28);
 }
 
-html[data-theme="platinum"] .listbox-btn > .btn-ic::before {
-  top: 2px;
-  border-bottom: 5px solid currentColor;
-}
-
-html[data-theme="platinum"] .listbox-btn > .btn-ic::after {
-  bottom: 2px;
-  border-top: 5px solid currentColor;
-}
-
-html[data-theme="platinum"] .listbox-pop {
+/* Mac OS 9 Default Action Button Ring (#submit-btn, #login-btn, .tnp-save, .confirm-popover.is-action .confirm-yes) */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(#submit-btn, #login-btn, .tnp-save, .confirm-popover.is-action .confirm-yes):enabled:not(.saved-success, .save-error, .loading) {
   background: var(--pt-face);
   color: var(--pt-ink);
+  font-weight: 700;
   border: 1px solid var(--pt-edge);
-  border-radius: 1px;
-  box-shadow: var(--pt-bevel), 2px 2px var(--pt-ink);
+  border-radius: 3px;
+  box-shadow: var(--pt-btn-shadow), 0 0 0 1px var(--pt-dialog), 0 0 0 3px var(--pt-frame);
 }
 
-html[data-theme="platinum"] .listbox-list { padding: 2px; }
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(#submit-btn, #login-btn, .tnp-save, .confirm-popover.is-action .confirm-yes):enabled:hover:not(:active, .saved-success, .save-error, .loading) {
+  background: var(--pt-face-hover);
+  color: var(--pt-ink);
+}
 
-html[data-theme="platinum"] .listbox-opt {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(#submit-btn, #login-btn, .tnp-save, .confirm-popover.is-action .confirm-yes):enabled:active:not(.saved-success, .save-error, .loading) {
+  background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
+  box-shadow: var(--pt-btn-pressed-shadow), 0 0 0 1px var(--pt-dialog), 0 0 0 3px var(--pt-frame);
+}
+
+/* Danger buttons & Solid Confirm Yes */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .btn.danger:not(.ghost) {
+  background: var(--pt-face);
+  color: var(--pt-danger-fg);
+  font-weight: 600;
+  border: 1px solid var(--pt-danger-bd);
+  border-radius: 3px;
+  box-shadow: var(--pt-btn-shadow);
+  transform: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .btn.danger:not(.ghost):hover:not(:disabled, :active) {
+  background: var(--pt-face-hover);
+  color: var(--pt-danger-fg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .btn.danger:not(.ghost):active:not(:disabled) {
+  background: var(--pt-danger-bg);
+  color: #ffffff;
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-btn-pressed-shadow);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  .confirm-popover:not(.is-action) .confirm-yes {
+  background: var(--pt-danger-bg);
+  color: #ffffff;
+  font-weight: 700;
+  border: 1px solid var(--pt-edge);
+  border-radius: 3px;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.35), inset -1px -1px 0 rgba(0, 0, 0, 0.45);
+}
+
+/* ==========================================================================
+   3. Listbox HIG Fig. 2-7 Right Arrow Well & Expanded-Hover Contrast Lock
+   ========================================================================== */
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn {
+  padding-inline-end: 0;
+  column-gap: 0;
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  font-weight: 600;
+  border: 1px solid var(--pt-edge);
+  border-radius: 3px;
+  box-shadow: var(--pt-btn-shadow);
+  transition: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-value {
+  padding-inline-end: 6px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn > .btn-ic {
   position: relative;
-  padding-inline-start: 1.65em;
-  border-radius: 0;
-}
-
-html[data-theme="platinum"] .listbox-opt[aria-selected="true"] {
-  background: transparent;
+  width: 21px;
+  height: 100%;
+  align-self: stretch;
+  display: inline-grid;
+  place-items: center;
+  margin: 0;
+  border-inline-start: 1px solid var(--pt-bevel-d2);
+  box-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-d1);
   color: inherit;
 }
 
-/* CSS checkmark is decorative. aria-selected identifies the committed value,
-   while data-active follows the pointer or the arrow keys until confirmation. */
-html[data-theme="platinum"] .listbox-opt[aria-selected="true"]::before {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn > .btn-ic svg {
+  display: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn > .btn-ic::before {
+  content: "";
+  width: 7px;
+  height: 10px;
+  background-color: currentColor;
+  -webkit-mask: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="black" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>') center / 7px 10px no-repeat;
+  mask: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="black" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>') center / 7px 10px no-repeat;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-trigger {
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  font-weight: 600;
+  border: 1px solid var(--pt-edge);
+  border-radius: 3px;
+  box-shadow: var(--pt-btn-shadow);
+  transition: none;
+}
+
+/* Closed hover only: never overrides open [aria-expanded="true"] */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.listbox-btn, .listbox-trigger):hover:enabled:not([aria-expanded="true"], :active) {
+  background: var(--pt-face-hover);
+  color: var(--pt-ink);
+  border-color: var(--pt-edge);
+}
+
+/* Open & active lock: paired dark sunken background + #ffffff ink even under :hover */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.listbox-btn, .listbox-trigger):is([aria-expanded="true"], [aria-expanded="true"]:hover, :active:enabled) {
+  background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-btn-pressed-shadow);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .listbox-trigger:is([aria-expanded="true"], [aria-expanded="true"]:hover, :active:enabled) > .btn-ic {
+  color: var(--pt-pressed-fg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .listbox-btn:is([aria-expanded="true"], [aria-expanded="true"]:hover, :active:enabled) > .btn-ic {
+  border-inline-start-color: var(--pt-pressed-s1);
+  box-shadow: inset 1px 1px 0 var(--pt-pressed-s1), inset -1px -1px 0 var(--pt-pressed-s2);
+  color: var(--pt-pressed-fg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-pop {
+  background: var(--pt-dialog);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-frame);
+  border-radius: 0;
+  box-shadow: var(--pt-window-shadow);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-list {
+  padding: 2px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-opt {
+  position: relative;
+  padding-inline-start: 1.7em;
+  border-radius: 0;
+  color: var(--pt-ink);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-opt[aria-selected="true"] {
+  background: transparent;
+  color: var(--pt-ink);
+  font-weight: 700;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-opt[aria-selected="true"]::before {
   content: "";
   position: absolute;
-  inset-inline-start: .56em;
+  inset-inline-start: 0.58em;
   top: 50%;
-  width: .29em;
-  height: .58em;
+  width: 0.3em;
+  height: 0.58em;
   border: solid currentColor;
   border-width: 0 2px 2px 0;
   transform: translateY(-60%) rotate(45deg);
 }
 
-html[data-theme="platinum"] .listbox-opt[data-active]:not([aria-disabled="true"]),
-html[data-theme="platinum"] .tab-btn.active {
-  color: white;
-  background: var(--pt-selection);
-  border-color: transparent;
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .listbox-opt[data-active]:not([aria-disabled="true"]) {
+  background: var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
 }
 
-html[data-theme="platinum"] :is(.field > input[type="text"], .field > textarea,
-    .tags-input-wrap, .search-field, .fg > textarea, .fg > input:is([type="text"], [type="password"], [type="number"]),
-    .notes-toolbar input[type="search"]):not(:disabled) {
-  background: white;
+/* Native <select> fallback (mobile tab picker, reader export image policy) */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  select:not([hidden]) {
+  background-color: var(--pt-face);
   color: var(--pt-ink);
+  font-weight: 600;
+  border: 1px solid var(--pt-edge);
+  border-radius: 3px;
+  box-shadow: var(--pt-btn-shadow);
+}
+
+/* ==========================================================================
+   4. Sunken Text Fields, Rectangular Switches, Checkboxes & Lavender Chips
+   ========================================================================== */
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.field > input[type="text"],
+      .field > textarea,
+      .tags-input-wrap,
+      .search-field,
+      .login-body .secret-field > input,
+      .options-search input[type="search"],
+      .fg > textarea,
+      .fg > input:is([type="text"], [type="password"], [type="number"], [type="search"], [type="url"]),
+      .key-wrap > input,
+      .notes-toolbar input[type="search"],
+      .vocab-lookup-bar input[type="search"],
+      .vocab-group-unit,
+      .vocab-note-input,
+      #reader-dict-query,
+      #ask-input,
+      #search-input-box):not(:disabled) {
+  background-color: var(--pt-paper);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-field-edge);
+  border-radius: 0;
+  box-shadow: var(--pt-well-shadow);
+  transition: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .vocab-group-unit > input {
+  background: transparent;
+  color: var(--pt-ink);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(button, input, select, textarea, summary, [tabindex]):focus-visible,
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.tags-input-wrap, .key-wrap, .secret-field, .vocab-group-unit):focus-within {
+  outline: 2px solid var(--pt-focus);
+  outline-offset: 1px;
+}
+
+/* Rectangular 28x16 Sunken Trough + Raised Beveled Square Thumb Switch */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch-track {
+  border-radius: 2px;
+  border: 1px solid var(--pt-edge);
+  background: var(--pt-paper-alt);
+  box-shadow: inset 1px 1px 0 var(--pt-bevel-mid);
+  transition: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch-track::before {
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--pt-face);
+  border: 1px solid var(--pt-edge);
+  box-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-d1);
+  transition: transform 90ms ease-out;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked ~ .switch-track {
+  background: var(--pt-sel-bg);
   border-color: var(--pt-edge);
-  box-shadow: var(--pt-well);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.45);
 }
 
-html[data-theme="platinum"] :is(button, input, select, textarea):focus-visible,
-html[data-theme="platinum"] .tags-input-wrap:focus-within {
-  outline: 2px solid var(--pt-selection);
-  outline-offset: 2px;
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked ~ .switch-track::before {
+  transform: translateX(12px);
 }
 
-/* Set row roles locally so the read pane and annotation colors keep their
-   own inks. Multi-selected rows have a lighter band; the open row is indigo. */
-html[data-theme="platinum"] :is(.notes-hit, .vocab-card, .ask-library-hit)[aria-current] {
-  --lib-row-current-bg: var(--pt-selection);
-  --lib-row-current-bg-hover: #28287c;
-  --lib-row-band-current-bg: #292976;
-  --lib-row-band-current-bg-hover: #222266;
-  --lib-row-selected-fg: white;
-  --lib-row-current-fg-muted: #f1f1ff;
+/* Platinum Checkboxes & Radios (.pick-mark + popup .bottom-bar checkboxes) */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .pick-mark {
+  background: var(--pt-face);
+  border: 1px solid var(--pt-edge);
+  box-shadow: var(--pt-btn-shadow);
+  color: var(--pt-ink);
+  transition: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .pick-box > .pick-mark {
+  border-radius: 2px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .pick > input:checked ~ .pick-mark,
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .pick > input[type="checkbox"]:indeterminate ~ .pick-mark {
+  background: var(--pt-sel-bg);
+  border-color: var(--pt-edge);
+  color: #ffffff;
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.45), inset -1px -1px 0 rgba(255, 255, 255, 0.25);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border: 1px solid var(--pt-edge);
+  border-radius: 2px;
+  background: var(--pt-face);
+  box-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-d1);
+  cursor: pointer;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar input[type="checkbox"]:checked {
+  background: var(--pt-sel-bg);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.45);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 3px;
+  height: 7px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* v2core Lavender 2px Rectangular Tag Chips */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.stag:not(.used), .tag-item, .vocab-group-chip, .tag-gov-chip-face, .preset-btn:not(.used)) {
+  background: var(--pt-lav-bg);
+  color: var(--pt-lav-fg);
+  border: 1px solid var(--pt-lav-bd);
+  border-radius: 2px;
+  box-shadow: inset 1px 1px 0 var(--pt-glint-soft);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.stag:not(.used):hover, .tag-item:hover, .preset-btn:not(.used):hover) {
+  background: var(--pt-lav-hover);
+  color: var(--pt-lav-fg);
+  border-color: var(--pt-sel-bg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.tag-item .tag-remove, .vocab-group-chip .vocab-group-chip-del) {
+  color: var(--pt-lav-fg);
+}
+
+/* ==========================================================================
+   5. Real Interactive .tbox Close/Collapse Buttons (v2core 13x13 Bevel)
+   ========================================================================== */
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(#explain-close, #ask-close, .fc-dismiss, #rail-toggle) {
+  position: relative;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(#explain-close, #ask-close, #rail-toggle) svg {
+  display: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .fc-dismiss {
+  font-size: 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(#explain-close, #ask-close, .fc-dismiss, #rail-toggle)::after {
+  content: "";
+  display: block;
+  width: 13px;
+  height: 13px;
+  background: linear-gradient(135deg, var(--pt-tbox-g1) 0%, var(--pt-tbox-g2) 100%) 50% / 9px 9px no-repeat;
+  box-shadow:
+    inset 1px 1px 0 var(--pt-tbox-mid),
+    inset -1px -1px 0 var(--pt-glint),
+    inset 0 0 0 2px var(--pt-frame),
+    inset 3px 3px 0 var(--pt-glint),
+    inset -3px -3px 0 var(--pt-tbox-mid);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(#explain-close, #ask-close, .fc-dismiss, #rail-toggle):active::after {
+  background: linear-gradient(135deg, var(--pt-tbox-press1) 0%, var(--pt-tbox-press2) 100%);
+}
+
+/* ==========================================================================
+   6. Surface 1 — Popup: Flush-Fitted Mac OS 9 Dialog Window
+   ========================================================================== */
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) body > main:not(.container, .lib-main) {
+  background: var(--pt-dialog);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-frame);
+  box-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-mid);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) 84px;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  background-color: var(--pt-win);
+  background-image: var(--pt-pinstripe-bg);
+  background-size: 100% 2px;
+  border-bottom: 1px solid var(--pt-frame);
+  box-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-mid);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #login-section .header-bar {
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar > h1 {
+  grid-column: 2;
+  justify-self: center;
+  max-width: 100%;
+  padding: 1px 8px;
+  background: var(--pt-win);
+  color: var(--pt-ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar > .header-icons {
+  grid-column: 3;
+  justify-self: end;
+  padding-left: 4px;
+  background: var(--pt-win);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar .header-ic {
+  width: 24px;
+  height: 20px;
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-edge);
+  border-radius: 2px;
+  box-shadow: var(--pt-btn-shadow);
+  transition: none;
+  transform: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar .header-ic:hover {
+  background: var(--pt-face-hover);
+  color: var(--pt-ink);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar .header-ic:active:not(:disabled) {
+  background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
+  box-shadow: var(--pt-btn-pressed-shadow);
+  transform: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .label {
+  color: var(--pt-ink);
+}
+
+/* Bottom .quick-actions styled as classic Mac OS 9 .statusbar utility strip */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .quick-actions {
+  background: var(--pt-win);
+  border-top: 1px solid var(--pt-frame);
+  box-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-d2);
+  padding-top: 8px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .quick-actions .divider {
+  display: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .qbtn-split > .qbtn-primary {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .qbtn-split > .qbtn-caret {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.autocomplete-dropdown, #jina-md-history-pop, .confirm-popover, .theme-name-popover, .options-search-results) {
+  background: var(--pt-dialog);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-frame);
+  border-radius: 0;
+  box-shadow: var(--pt-window-shadow);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #jina-md-history-pop .pp-rh-list {
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-field-edge);
+  box-shadow: var(--pt-well-shadow);
+  padding: 2px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #jina-md-history-pop .pp-rh-item:hover {
+  background: var(--pt-row-hover);
+}
+
+/* ==========================================================================
+   7. Surface 2 — Options: Full-Bleed Menu Bar + Left & Right Mac Windows
+   ========================================================================== */
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) {
+  scrollbar-gutter: stable;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) main.container {
+  max-width: none;
+  margin: 0;
+  padding: 0 0 32px;
+  grid-template-columns: minmax(16px, 1fr) minmax(204px, 228px) 18px minmax(0, 740px) minmax(16px, 1fr);
+  column-gap: 0;
+  row-gap: 18px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) main.container > header {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 4px 16px;
+  background: var(--pt-dialog);
+  border-bottom: 1px solid var(--pt-frame);
+  box-shadow: inset 0 1px 0 var(--pt-glint), 0 1px 0 var(--pt-bevel-mid);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) main.container > header h1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 20px;
+  color: var(--pt-ink);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) main.container > header .auto-save-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--pt-ink-muted);
+}
+
+/* Left Navigation Mac Window */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) nav.options-nav {
+  grid-column: 2;
+  grid-row: 2;
+  background: var(--pt-win);
+  border: 1px solid var(--pt-frame);
+  border-radius: 0;
+  padding: 0;
+  box-shadow: var(--pt-window-shadow);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) nav.options-nav::before {
+  content: "";
+  display: block;
+  height: 16px;
+  margin: 2px 4px;
+  background-color: var(--pt-win);
+  background-image: var(--pt-pinstripe-bg);
+  background-size: 100% 2px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .options-search {
+  margin: 0;
+  padding: 4px 4px 6px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .tabs {
+  margin: 0 4px 4px;
+  padding: 3px 0;
+  gap: 0;
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-frame);
+  box-shadow: -1px -1px 0 var(--pt-bevel-mid), 1px 1px 0 var(--pt-glint);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .tab-group-label {
+  margin: 4px 0 0;
+  padding: 4px 10px 2px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--pt-ink-muted);
+  border-top: 1px solid var(--pt-divider);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .tab-group-label:first-child {
+  margin-top: 0;
+  border-top: 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .tab-btn {
+  min-height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pt-ink);
+  transition: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .tab-btn:hover:not(.active) {
+  background: var(--pt-row-hover);
+  color: var(--pt-ink);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .tab-btn.active {
+  background: var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
+  font-weight: 700;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .reset-tab-btn {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 4px 8px;
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  font-size: 11px;
+  font-weight: 600;
+  border-top: 1px solid var(--pt-frame);
+  box-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-d2);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .reset-tab-btn:hover {
+  background: var(--pt-face-hover);
+  color: var(--pt-danger-fg);
+}
+
+/* Right Settings Mac Window */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .panel.active {
+  grid-column: 4;
+  grid-row: 2;
+  padding: 18px 20px 20px;
+  background: var(--pt-paper);
+  color: var(--pt-ink);
+  border: 4px solid var(--pt-win);
+  border-radius: 0;
+  outline: 1px solid var(--pt-frame);
+  box-shadow: inset 0 0 0 1px var(--pt-frame), 3px 3px 0 var(--pt-shadow-drop);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .panel.active::before {
+  content: "";
+  display: block;
+  height: 16px;
+  margin: -18px -20px 16px;
+  background-color: var(--pt-win);
+  background-image: var(--pt-pinstripe-bg);
+  background-size: 100% 2px;
+  border-bottom: 1px solid var(--pt-frame);
+  box-shadow: 0 3px 0 var(--pt-win), 0 4px 0 var(--pt-frame);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .panel .pf {
+  background: var(--pt-paper-alt);
+  border: 1px solid var(--pt-field-edge);
+  border-radius: 0;
+  box-shadow: var(--pt-well-shadow);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .disclosure {
+  border-top: 1px solid var(--pt-divider);
+}
+
+@media (max-width: 720px) {
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) main.container {
+    grid-template-columns: 12px minmax(0, 1fr) 12px;
+    row-gap: 14px;
+  }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) nav.options-nav,
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .panel.active {
+    grid-column: 2;
+    grid-row: auto;
+  }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) nav.options-nav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) nav.options-nav::before {
+    grid-column: 1 / -1;
+  }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .mobile-tab-picker {
+    padding: 0 6px 6px;
+  }
+}
+
+/* ==========================================================================
+   8. Surface 3 — Library: Top Menu Bar + Left Index & Right Detail Windows
+   ========================================================================== */
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) header.lib-header {
+  padding: 4px 16px;
+  gap: 6px 18px;
+  background: var(--pt-dialog);
+  border-bottom: 1px solid var(--pt-frame);
+  box-shadow: inset 0 1px 0 var(--pt-glint), 0 1px 0 var(--pt-bevel-mid);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-header h1 {
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--pt-ink);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-tabs {
+  gap: 2px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-tab {
+  height: 22px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  color: var(--pt-ink);
+  transition: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-tab:hover:not([aria-selected="true"]) {
+  background: var(--pt-face-hover);
+  border-color: var(--pt-edge);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-tab:is(.active, [aria-selected="true"]) {
+  background: var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
+  border-color: var(--pt-frame);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.vocab-workbench, .notes-workbench, .ask-library-workbench) {
+  padding: 12px 16px 16px;
+  column-gap: 16px;
+}
+
+/* Left Index Mac Window (Vocab / Notes / Questions) */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.vocab-list-pane, .notes-list-pane, .ask-library-index) {
+  background: var(--pt-win);
+  border: 1px solid var(--pt-frame);
+  box-shadow: var(--pt-window-shadow);
+  padding: 0 6px 6px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.vocab-list-pane, .notes-list-pane, .ask-library-index)::before {
+  content: "";
+  flex: none;
+  display: block;
+  height: 16px;
+  margin: 2px -2px 6px;
+  background-color: var(--pt-win);
+  background-image: var(--pt-pinstripe-bg);
+  background-size: 100% 2px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.vocab-list-region, .notes-list-region, .ask-library-scroll) {
+  margin: 0;
+  padding: 2px 0;
+  scrollbar-gutter: auto;
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-frame);
+  box-shadow: -1px -1px 0 var(--pt-bevel-mid), 1px 1px 0 var(--pt-glint);
+}
+
+/* Full-bleed Platinum list rows inside the sunken white/dark well */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.notes-card, .notes-hit, .vocab-card, .ask-library-hit) {
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .notes-card-top {
+  --row-bg: transparent;
+  border-bottom: 1px solid var(--pt-paper-alt);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-card:not([aria-current], .selected) .notes-card-top:hover,
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .notes-hit:not([aria-current], .selected) .notes-hit-btn:hover,
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .ask-library-hit:not([aria-current]):hover {
+  --row-bg: var(--pt-row-hover);
+  background: var(--pt-row-hover);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.notes-hit, .vocab-card, .ask-library-hit)[aria-current] {
+  --lib-row-current-bg: var(--pt-sel-bg);
+  --lib-row-current-bg-hover: var(--pt-sel-hover);
+  --lib-row-band-current-bg: var(--pt-sel-bg);
+  --lib-row-band-current-bg-hover: var(--pt-sel-hover);
+  --lib-row-selected-fg: var(--pt-sel-fg);
+  --lib-row-current-fg-muted: var(--pt-sel-muted);
   border-radius: 0;
 }
 
-html[data-theme="platinum"] :is(.notes-hit, .vocab-card).selected:not([aria-current]) {
-  --lib-row-band-bg: #c1c1d3;
-  --lib-row-band-bg-hover: #b6b6cb;
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-card[aria-current] .notes-card-top {
+  --row-bg: var(--pt-sel-bg);
+  background: var(--pt-sel-bg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-card[aria-current] .notes-card-top:hover {
+  --row-bg: var(--pt-sel-hover);
+  background: var(--pt-sel-hover);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-card[aria-current] :is(.notes-card-head, .vocab-status-chip) {
+  color: var(--pt-sel-fg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-card[aria-current]:not(.selected) :is(.vocab-row-gloss, .vocab-row-groups, .notes-row-meta) {
+  color: var(--pt-sel-muted);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .notes-hit[aria-current] .notes-hit-btn {
+  --row-bg: var(--pt-sel-bg);
+  background: var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .notes-hit[aria-current] .notes-hit-btn:hover {
+  --row-bg: var(--pt-sel-hover);
+  background: var(--pt-sel-hover);
+  color: var(--pt-sel-fg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .notes-hit[aria-current] .notes-hit-btn :is(.notes-row-title, .notes-row-meta, .notes-hit-quote, .notes-hit-note) {
+  color: inherit;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .ask-library-hit[aria-current] {
+  background: var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .ask-library-hit[aria-current]:hover {
+  background: var(--pt-sel-hover);
+  color: var(--pt-sel-fg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.notes-hit, .vocab-card).selected:not([aria-current]) {
+  --lib-row-band-bg: var(--pt-band-bg);
+  --lib-row-band-bg-hover: var(--pt-band-hover);
   border-radius: 0;
 }
 
-html[data-theme="platinum"] .tab-btn.active:focus-visible,
-html[data-theme="platinum"] :is(.notes-hit, .vocab-card)[aria-current] :is(.notes-hit-btn, .notes-card-top):focus-visible,
-html[data-theme="platinum"] .ask-library-hit[aria-current]:focus-visible {
-  outline: 2px solid white;
-  outline-offset: -3px;
+/* Right Detail Mac Window (Vocab / Notes / Questions) */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.vocab-detail-pane, .notes-detail-pane, .ask-library-pane) {
+  margin: 0;
+  padding: 0 20px 48px;
+  scrollbar-gutter: auto;
+  background: var(--pt-paper);
+  color: var(--pt-ink);
+  border: 4px solid var(--pt-win);
+  outline: 1px solid var(--pt-frame);
+  box-shadow: inset 0 0 0 1px var(--pt-frame), 3px 3px 0 var(--pt-shadow-drop);
+}
+
+@media (min-width: 861px) {
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+    :is(.vocab-detail-pane, .notes-detail-pane, .ask-library-pane)::before {
+    content: attr(aria-label);
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 18px;
+    margin: 0 -20px 18px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 14px;
+    color: var(--pt-ink);
+    background-color: var(--pt-win);
+    background-image:
+      linear-gradient(90deg, transparent 0, transparent calc(50% - 76px), var(--pt-win) calc(50% - 76px), var(--pt-win) calc(50% + 76px), transparent calc(50% + 76px)),
+      var(--pt-pinstripe-bg);
+    background-size: 100% 100%, 100% 2px;
+    border-bottom: 1px solid var(--pt-frame);
+  }
+}
+
+@media (max-width: 860px) {
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+    :is(.vocab-workbench, .notes-workbench, .ask-library-workbench) {
+    padding: 10px 12px 14px;
+  }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+    :is(.vocab-list-pane, .notes-list-pane, .ask-library-index) {
+    margin-inline-end: 0;
+  }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+    :is(.vocab-detail-pane, .notes-detail-pane, .ask-library-pane) {
+    padding-top: 8px;
+  }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+    body.lib-narrow-detail .vocab-detail-pane::before,
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+    body.lib-narrow-notes .notes-detail-pane::before {
+    background-color: var(--pt-win);
+    background-image: var(--pt-pinstripe-bg);
+    background-size: 100% 2px;
+    border-bottom: 1px solid var(--pt-frame);
+    margin-inline: -20px;
+  }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+    :is(#vocab-detail-back, .notes-detail-back, .ask-library-back) {
+    background: var(--pt-face);
+    color: var(--pt-ink);
+    font-weight: 700;
+    border: 1px solid var(--pt-edge);
+    border-radius: 3px;
+    box-shadow: var(--pt-btn-shadow);
+  }
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.vocab-filter-set:popover-open, .lib-keys:popover-open) {
+  background: var(--pt-dialog);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-frame);
+  border-radius: 0;
+  box-shadow: var(--pt-window-shadow);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-keys kbd {
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-edge);
+  border-radius: 2px;
+  box-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-d1);
+}
+
+/* ==========================================================================
+   9. Surface 4 — Reader (md-preview): Mac Document Reader Mode
+   ========================================================================== */
+
+html[data-reader-theme="platinum"] .rail {
+  background: var(--pt-dialog);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-frame);
+  box-shadow: var(--pt-window-shadow);
+}
+
+@media (min-width: 1001px) {
+  html[data-reader-theme="platinum"] .rail {
+    top: 12px;
+    left: 12px;
+    bottom: 12px;
+    width: 244px;
+    padding-top: 0;
+  }
+  html[data-reader-theme="platinum"] body.zen #rail {
+    transform: translateX(calc(-100% - 20px));
+  }
+}
+
+html[data-reader-theme="platinum"] .rail::before {
+  content: "";
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  flex: none;
+  display: block;
+  height: 16px;
+  margin: 0 -6px 12px -16px;
+  background-color: var(--pt-win);
+  background-image: var(--pt-pinstripe-bg);
+  background-size: 100% 2px;
+  border-bottom: 1px solid var(--pt-frame);
+}
+
+html[data-reader-theme="platinum"] .rail-ident :is(#rail-ocr-btn, #rail-history-btn, #rail-settings-btn) {
+  border-radius: 2px;
+}
+
+html[data-reader-theme="platinum"] .toc-list {
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-field-edge);
+  border-radius: 0;
+  box-shadow: var(--pt-well-shadow);
+  padding: 4px;
+}
+
+html[data-reader-theme="platinum"] .toc-list a.active {
+  background: var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
+  border-radius: 0;
+}
+
+html[data-reader-theme="platinum"] main {
+  padding: 20px 24px 56px;
+}
+
+html[data-reader-theme="platinum"] .doc-body {
+  max-width: calc(var(--pbp-width, 720px) + 64px);
+  padding: 24px 32px 44px;
+  background: var(--pt-paper);
+  color: var(--pt-ink);
+  border: 4px solid var(--pt-win);
+  outline: 1px solid var(--pt-frame);
+  box-shadow: inset 0 0 0 1px var(--pt-frame), 3px 3px 0 var(--pt-shadow-drop);
+}
+
+html[data-reader-theme="platinum"] .doc-body::before {
+  content: "";
+  display: block;
+  height: 18px;
+  margin: -24px -32px 24px;
+  background-color: var(--pt-win);
+  background-image: var(--pt-pinstripe-bg);
+  background-size: 100% 2px;
+  border-bottom: 1px solid var(--pt-frame);
+  box-shadow: 0 3px 0 var(--pt-win), 0 4px 0 var(--pt-frame);
+}
+
+@media (max-width: 640px) {
+  html[data-reader-theme="platinum"] main {
+    padding: 52px 10px 40px;
+  }
+  html[data-reader-theme="platinum"] .doc-body {
+    padding: 18px 16px 28px;
+  }
+  html[data-reader-theme="platinum"] .doc-body::before {
+    margin: -18px -16px 18px;
+  }
+}
+
+/* Reader Floating Windows (#explain-pop, #ask-panel, #typo-pop, #rail-history-pop, #send-menu, #zen-bar) */
+html[data-reader-theme="platinum"]
+  :is(#explain-pop, #typo-pop, #rail-history-pop, .send-menu, #zen-bar, #search-pop, #kbd-help-pop, #fn-pop, #pb-hl-card, #ocr-drop-pop) {
+  background: var(--pt-dialog);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-frame);
+  border-radius: 0;
+  box-shadow: var(--pt-window-shadow);
+}
+
+html[data-reader-theme="platinum"] #explain-pop > .xp-head {
+  background-color: var(--pt-win);
+  background-image: var(--pt-pinstripe-bg);
+  background-size: 100% 2px;
+  border-bottom: 1px solid var(--pt-frame);
+  padding: 6px 8px;
+}
+
+html[data-reader-theme="platinum"] #explain-pop .xp-term {
+  background: var(--pt-win);
+  padding: 1px 6px;
+  font-weight: 700;
+}
+
+html[data-reader-theme="platinum"] #explain-pop .xp-window-actions {
+  background: var(--pt-win);
+  padding-left: 4px;
+}
+
+html[data-reader-theme="platinum"] #explain-pop > :is(.xp-body, .reader-dict-session) {
+  background: var(--pt-paper);
+  margin: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--pt-field-edge);
+  box-shadow: var(--pt-well-shadow);
+}
+
+html[data-reader-theme="platinum"] #ask-panel {
+  background: var(--pt-dialog);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-frame);
+  box-shadow: var(--pt-window-shadow);
+}
+
+html[data-reader-theme="platinum"] #ask-panel > .panel-head {
+  margin: -16px -16px 8px;
+  padding: 6px 10px;
+  background-color: var(--pt-win);
+  background-image: var(--pt-pinstripe-bg);
+  background-size: 100% 2px;
+  border-bottom: 1px solid var(--pt-frame);
+}
+
+html[data-reader-theme="platinum"] #ask-panel .reader-panel-tabs,
+html[data-reader-theme="platinum"] #ask-panel .panel-head > h2 {
+  background: var(--pt-win);
+  padding: 1px 4px;
+}
+
+html[data-reader-theme="platinum"] #ask-panel :is(#ask-log, #reader-dict-view .xp-body) {
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-field-edge);
+  box-shadow: var(--pt-well-shadow);
+  padding: 10px 12px;
+}
+
+@media print {
+  html[data-reader-theme="platinum"] .doc-body {
+    max-width: 880px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    box-shadow: none;
+  }
+  html[data-reader-theme="platinum"] .doc-body::before {
+    display: none;
+  }
 }

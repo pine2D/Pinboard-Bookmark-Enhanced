@@ -336,6 +336,11 @@
           "type": "string",
           "enum": ["default", "accent", "accent-soft", "bold-accent"],
           "description": "Color treatment of a.tag.selected (active filter chip). accent=color shifts to accent (keeps composer's bold). accent-soft=accent + normal weight. bold-accent=accent + explicit 600 weight (crisp for serif/mono themes). default=composer baseline (destroy color + bold)."
+        },
+        "window-chrome": {
+          "type": "string",
+          "enum": ["default", "platinum"],
+          "description": "Desktop windowing treatment for Pinboard shell surfaces (#banner menu bar, #main_column and #right_bar Mac OS 9 Platinum windows with pinstripe titlebars, sunken frames, Lavender rectangular tag chips, and 4-layer beveled controls). default=composer baseline."
         }
       }
     },

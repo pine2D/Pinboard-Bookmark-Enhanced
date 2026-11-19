@@ -205,6 +205,7 @@ const SWATCH_SOURCE_BY_BUTTON_KEY = {
   flexoki: "flexoki-light",
   solarized: "solarized-light",
   catppuccin: "catppuccin-latte",
+  platinum: "platinum-light",
   "modern-card": "modern-card",
   "paper-ink": "paper-ink",
   "github-light": "github-light",

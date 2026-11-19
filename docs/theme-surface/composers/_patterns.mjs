@@ -517,6 +517,103 @@ export function patternsLayer(tokens) {
   }
   // "default" or missing → composer baseline
 
+  // ---- P8: window-chrome ----
+  // Mac OS 9 Platinum desktop windowing ("platinum"): #ccc / #2a2a2a desktop,
+  // straight-edge Menu Bar #banner, independent Mac windows for #main_column
+  // and #right_bar with 2px horizontal pinstripe titlebars, sunken #fff /
+  // #1c1c1c document wells, Lavender rectangular tag chips, and 4-layer
+  // stepped crisp beveled buttons.
+  const windowChrome = pat["window-chrome"];
+  if (windowChrome === "platinum") {
+    const isDark = tokens.meta?.mode === "dark";
+    const deskBg = isDark ? "#2a2a2a" : "#cccccc";
+    const chromeBg = isDark ? "#3b3b3b" : "#dddddd";
+    const paperBg = isDark ? "#1c1c1c" : "#ffffff";
+    const inkBorder = isDark ? "#000000" : "#262626";
+    const hardShadow = isDark ? "#000000" : "#262626";
+    const glint = isDark ? "#636363" : "#ffffff";
+    const stripeDark = isDark ? "#191919" : "#777777";
+    const bevelMid = isDark ? "#191919" : "#999999";
+    const rowRule = isDark ? "#333333" : "#d4d4d4";
+    const rowHoverBg = isDark ? "#252525" : "#f5f5fa";
+    const btnFace = isDark ? "#4a4a4a" : "#dddddd";
+    const btnHover = isDark ? "#575757" : "#e8e8e8";
+    const btnFg = isDark ? "#ffffff" : "#262626";
+    const btnBevel = isDark
+      ? "inset 1px 1px 0 #4a4a4a, inset -1px -1px 0 #191919, inset 2px 2px 0 #6c6c6c, inset -2px -2px 0 #2c2c2c"
+      : "inset 1px 1px 0 #dddddd, inset -1px -1px 0 #777777, inset 2px 2px 0 #ffffff, inset -2px -2px 0 #aaaaaa";
+    const btnHoverBevel = isDark
+      ? "inset 1px 1px 0 #575757, inset -1px -1px 0 #191919, inset 2px 2px 0 #7a7a7a, inset -2px -2px 0 #363636"
+      : "inset 1px 1px 0 #e8e8e8, inset -1px -1px 0 #6e6e6e, inset 2px 2px 0 #ffffff, inset -2px -2px 0 #9e9e9e";
+    const btnActiveBg = isDark ? "#202020" : "#666666";
+    const btnActiveFg = "#ffffff";
+    const btnActiveBevel = isDark
+      ? "inset 1px 1px 0 #0c0c0c, inset -1px -1px 0 #3c3c3c, inset 2px 2px 0 #161616, inset -2px -2px 0 #2e2e2e"
+      : "inset 1px 1px 0 #444444, inset -1px -1px 0 #888888, inset 2px 2px 0 #555555, inset -2px -2px 0 #777777";
+    const fieldBorder = isDark ? "#707070" : "#262626";
+    const fieldShadow = isDark
+      ? "inset 1px 1px 0 #0c0c0c, 1px 1px 0 #4c4c4c"
+      : "inset 1px 1px 0 #999999, 1px 1px 0 #ffffff";
+    const lavBg = isDark ? "#2a2a48" : "#ebebff";
+    const lavBorder = isDark ? "#5a5aa8" : "#9999ff";
+    const lavHoverBg = isDark ? "#323257" : "#dcdcff";
+    const lavHoverFg = isDark ? "#f4f4ff" : "#11114d";
+    const lavHoverBorder = isDark ? "#8080e0" : "#6666cc";
+    const selBg = isDark ? "#3d3dad" : "#333399";
+    const selHoverBg = isDark ? "#4e4ec7" : "#24247a";
+    const selFg = "#ffffff";
+    const mainWindowSel = `#main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc))`;
+
+    out.push(
+      `body#pinboard { background: ${deskBg} !important; }`,
+      `body:not(#pinboard) { background: ${chromeBg} !important; }`,
+      `#banner { background: ${chromeBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 6px 12px !important; margin-bottom: 12px !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid}, 2px 2px 0 ${hardShadow} !important; }`,
+      `#banner a, #top_menu a, .banner_username { text-decoration: none !important; font-weight: 600 !important; }`,
+      `#banner a:hover, #top_menu a:hover { text-decoration: underline !important; }`,
+      `#pinboard_name a { color: ${v("fg-strong")} !important; font-weight: 700 !important; }`,
+      `#sub_banner { background: ${chromeBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 5px 10px !important; margin-bottom: 10px !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#sub_banner a { font-weight: 600 !important; text-decoration: none !important; }`,
+      `#sub_banner a.selected, #sub_banner a.selected:hover { background: ${selBg} !important; color: ${selFg} !important; padding: 1px 6px !important; border-radius: 2px !important; font-weight: 700 !important; }`,
+      `${mainWindowSel} { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      `${mainWindowSel}::before { content: "" !important; display: block !important; height: 18px !important; box-sizing: border-box !important; padding: 3px 6px !important; background-color: ${chromeBg} !important; background-image: linear-gradient(${glint} 50%, ${stripeDark} 50%) !important; background-size: 100% 2px !important; background-origin: content-box !important; background-clip: content-box !important; border-bottom: 1px solid ${inkBorder} !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#main_column:has(> form[name="sort"]), #main_column:has(#left_toc), #note_column { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      `#note_column { padding: 12px 14px !important; }`,
+      `#main_column:has(> #import_history_table) > #settings_panel, #main_column > #import_history_table, .service_box, .help_box, #right_column { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      `.service_box .service_box { border: none !important; box-shadow: none !important; background: transparent !important; }`,
+      `#settings_panel { background: ${paperBg} !important; padding: 10px 12px !important; box-sizing: border-box !important; }`,
+      `.settings_tab_selected { background: ${paperBg} !important; border-color: ${inkBorder} !important; border-top: 2px solid ${v("accent")} !important; border-bottom-color: ${paperBg} !important; }`,
+      `.user_navbar { background: ${chromeBg} !important; border-bottom: 1px solid ${inkBorder} !important; padding: 5px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#bmarks_page_nav a.filter.selected { background: ${selBg} !important; color: ${selFg} !important; border-radius: 2px !important; }`,
+      `#bmarks_page_nav a.filter.selected:hover { background: ${selHoverBg} !important; color: ${selFg} !important; }`,
+      `#bookmarks { background: ${paperBg} !important; margin: 0 !important; padding: 0 !important; }`,
+      `#nextprev { background: ${chromeBg} !important; border-top: 1px solid ${inkBorder} !important; border-bottom: 1px solid ${inkBorder} !important; padding: 4px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#nextprev #bulk_edit[style*="170, 170, 170"] { background: ${btnActiveBg} !important; color: ${btnActiveFg} !important; border-color: ${inkBorder} !important; }`,
+      `.bookmark { background: ${paperBg} !important; padding: 9px 12px !important; margin: 0 !important; border-top: none !important; border-right: none !important; border-left: none !important; border-bottom: 1px solid ${rowRule} !important; border-radius: 0 !important; box-shadow: none !important; }`,
+      `.bookmark.private, .bookmark.private[style*="background"] { background: ${v("private-bg")} !important; box-shadow: inset 3px 0 0 ${v("private-accent")} !important; }`,
+      `a.bookmark_title { font-weight: 600 !important; }`,
+      `a.tag { background: ${lavBg} !important; color: ${v("tag-fg")} !important; box-shadow: inset 0 0 0 1px ${lavBorder} !important; border-radius: 2px !important; padding: 0 4px !important; text-decoration: none !important; }`,
+      `a.tag:hover { background: ${lavHoverBg} !important; color: ${lavHoverFg} !important; box-shadow: inset 0 0 0 1px ${lavHoverBorder} !important; text-decoration: none !important; }`,
+      `a.tag.selected { background: ${selBg} !important; color: ${selFg} !important; box-shadow: inset 0 0 0 1px ${inkBorder} !important; font-weight: 700 !important; }`,
+      `a.tag.selected:hover { background: ${selHoverBg} !important; color: ${selFg} !important; box-shadow: inset 0 0 0 1px ${inkBorder} !important; }`,
+      `#right_bar:not(:has(#tag_cloud:empty)) { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 0 12px 12px !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      `@media (min-width: 761px) { ${mainWindowSel}:has(~ #right_bar) { float: left !important; width: min(690px, calc(100% - 340px)) !important; } ${mainWindowSel} ~ #right_bar:not(:has(#tag_cloud:empty)) { float: left !important; width: 320px !important; margin-left: 16px !important; } #footer { clear: both !important; } }`,
+      `#right_bar:not(:has(#tag_cloud:empty))::before { content: "" !important; display: block !important; height: 18px !important; margin: 0 -12px 10px -12px !important; box-sizing: border-box !important; padding: 3px 6px !important; background-color: ${chromeBg} !important; background-image: linear-gradient(${glint} 50%, ${stripeDark} 50%) !important; background-size: 100% 2px !important; background-origin: content-box !important; background-clip: content-box !important; border-bottom: 1px solid ${inkBorder} !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#right_bar table tr[onmouseover]:hover { background: ${rowHoverBg} !important; }`,
+      `#search_query_field, #banner_searchbox input[type="text"], #right_bar input#key, #tweet_searchbox #search_query_field, input[type="text"], input:not([type]), input[type="password"], textarea, select { background: ${paperBg} !important; color: ${v("fg")} !important; border: 1px solid ${fieldBorder} !important; border-radius: 0 !important; box-shadow: ${fieldShadow} !important; }`,
+      `#search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus, input[type="text"]:focus, input:not([type]):focus, input[type="password"]:focus, textarea:focus, select:focus { border-color: ${v("accent")} !important; box-shadow: 0 0 0 2px ${v("accent-alpha")} !important; outline: none !important; }`,
+      `input[type="submit"], input[type="button"], input[type="reset"], input[type="reset"].reset, button[type="reset"], input[type="file"]::file-selector-button, .search_button input[type="submit"], #right_bar input[type="submit"], #tweet_searchbox input[type="submit"], #tagPickerNav input[type="button"], #save_changes_marker, .signup_button, .signup_button[style*="background"] { background: ${btnFace} !important; color: ${btnFg} !important; border: 1px solid ${inkBorder} !important; border-radius: 3px !important; box-shadow: ${btnBevel} !important; font-weight: 600 !important; }`,
+      `input[type="submit"]:hover, input[type="button"]:hover, input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover, input[type="file"]::file-selector-button:hover, .search_button input[type="submit"]:hover, #right_bar input[type="submit"]:hover, #tweet_searchbox input[type="submit"]:hover, #tagPickerNav input[type="button"]:hover, #save_changes_marker:hover, .signup_button:hover { background: ${btnHover} !important; color: ${btnFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnHoverBevel} !important; }`,
+      `input[type="submit"]:active, input[type="button"]:active, input[type="reset"]:active, .search_button input[type="submit"]:active, #right_bar input[type="submit"]:active, #tweet_searchbox input[type="submit"]:active, #tagPickerNav input[type="button"]:active, #save_changes_marker:active, .signup_button:active { background: ${btnActiveBg} !important; color: ${btnActiveFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnActiveBevel} !important; }`,
+      `#edit_bookmark_form, #bulk_top_bar, #bulk_edit_box { background: ${chromeBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 10px 12px !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `.pin-ac .bd { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      `@media (max-width: 1060px) { #main_column > #right_bar { position: static !important; left: auto !important; width: 100% !important; margin-top: 12px !important; } }`,
+      `@media (max-width: 760px) { ${mainWindowSel} { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; } #right_bar, #main_column > #right_bar { width: 100% !important; margin-left: 0 !important; margin-top: 12px !important; float: none !important; } }`,
+      `@media (max-width: 640px) { #right_bar, #main_column > #right_bar { display: none !important; } }`
+    );
+  } else if (windowChrome != null && windowChrome !== "default") {
+    throw new Error(`window-chrome: unknown value "${windowChrome}" (expected "default" or "platinum")`);
+  }
+
   if (!out.length) return "";
   return `\n/* === patterns layer (tokens.patterns) === */\n` + out.join("\n") + "\n";
 }

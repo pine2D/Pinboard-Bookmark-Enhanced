@@ -1828,11 +1828,6 @@ try{
     // Choose twice while the old stored preset is still on its way.
     await early.locator('.theme-preset-btn[data-theme="paper-ink"]').click();
     await early.locator('.theme-preset-btn[data-theme="dracula"]').click();
-    const style = early.locator('#opt-extension-style-btn');
-    for (const index of [1, 0, 1]) {
-      await style.click();
-      await early.locator('#opt-extension-style-opt-' + index).click();
-    }
     await early.evaluate(()=>appearanceFixture.releaseSettings());
     await until(()=>early.evaluate(()=>appearanceFixture.loads===1),'restore and early click share one theme load');
     await early.emulateMedia({colorScheme:'dark'});
@@ -1842,15 +1837,6 @@ try{
     assert.equal(await early.evaluate(()=>appearanceFixture.loads),1,'restored appearance load was duplicated');
     assert(await early.evaluate(()=>document.getElementById('preset-preview-content').textContent===PINBOARD_THEMES.dracula.css),'stored preset overrode the early selection');
     await until(async()=>(await worker.evaluate(()=>chrome.storage.local.get('themePresetKey'))).themePresetKey==='dracula','early selection persisted');
-    await until(async () => (await worker.evaluate(() => chrome.storage.local.get('optExtensionStyle'))).optExtensionStyle === 'platinum', 'early interface style persisted');
-    assert.deepEqual(await early.evaluate(() => [
-      document.getElementById('opt-extension-style').value, document.documentElement.dataset.theme,
-      localStorage.getItem('pp-extension-style'),
-    ]), ['platinum', 'platinum', 'platinum']);
-    await style.click();
-    await early.locator('#opt-extension-style-opt-0').click();
-    await until(async () => (await worker.evaluate(() => chrome.storage.local.get('optExtensionStyle'))).optExtensionStyle === 'standard', 'returning to Standard restores the site palette');
-    assert.equal(await early.evaluate(() => document.documentElement.dataset.theme), 'dracula');
   }finally{await early.close();}
   const retry=await appearancePage({hash:'#appearance',failFirst:true});
   try{

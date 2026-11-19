@@ -41,7 +41,8 @@ function pbpAiParseCites(fullText) {
 const ADAPTIVE_THEME_MAP = {
   flexoki: ["flexoki-light", "flexoki-dark"],
   solarized: ["solarized-light", "solarized-dark"],
-  catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
+  catppuccin: ["catppuccin-latte", "catppuccin-mocha"],
+  platinum: ["platinum-light", "platinum-dark"]
 };
 
 const TEXTAREA_MIN_HEIGHT = 54;
@@ -747,7 +748,6 @@ const SETTINGS_DEFAULTS = {
   tagPresets: "",
   optAutoCloseAfterSave: true,
   themePresetKey: "",
-  optExtensionStyle: "standard",
   optPopupFollowTheme: true,
   popupWidth: 550,
   mdExportFrontmatter: true,

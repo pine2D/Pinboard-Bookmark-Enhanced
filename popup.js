@@ -867,7 +867,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function applyTheme() {
     const prefersDark = settings.optTheme === "dark" ||
       (settings.optTheme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    const key = pbpPopupThemeKey(settings.optExtensionStyle, settings.optPopupFollowTheme, settings.themePresetKey);
+    const key = settings.optPopupFollowTheme !== false ? (settings.themePresetKey || "") : "";
     let target = "";
     if (ADAPTIVE_THEME_MAP[key]) {
       const [light, dark] = ADAPTIVE_THEME_MAP[key];

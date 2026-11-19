@@ -330,6 +330,7 @@ const ADAPTIVE_VARIANTS = {
   flexoki: ["flexoki-light", "flexoki-dark"],
   solarized: ["solarized-light", "solarized-dark"],
   catppuccin: ["catppuccin-latte", "catppuccin-mocha"],
+  platinum: ["platinum-light", "platinum-dark"],
 };
 // Dark-preset ids among THEMES (colorSchemeMatchesTheme, Task 6). Hand-copied
 // from composers/popup-chrome.mjs's POPUP_THEME_MAP { mode: "dark" } entries

@@ -1896,15 +1896,6 @@
   "secExtensionAppearance": {
     "message": "扩展外观"
   },
-  "extensionStyleLabel": {
-    "message": "界面风格"
-  },
-  "extensionStyleStandard": {
-    "message": "标准"
-  },
-  "extensionStylePlatinum": {
-    "message": "铂金立体（浅色）"
-  },
   "themeAuto": {
     "message": "自动（跟随系统）"
   },
@@ -1918,7 +1909,7 @@
     "message": "扩展页面跟随 Pinboard 主题预设"
   },
   "popupFollowHint": {
-    "message": "弹窗、设置页和资料库使用所选 Pinboard 预设的配色，阅读器保持自己的配色。"
+    "message": "弹窗、设置页和资料库使用所选 Pinboard 预设的配色；除 Platinum 外，阅读器保持自己的配色。"
   },
   "optFollowNeedsPreset": {
     "message": "先在下面选一个 Pinboard 预设。选「不使用预设」时没有可跟随的配色。"

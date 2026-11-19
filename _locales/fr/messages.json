@@ -1896,15 +1896,6 @@
   "secExtensionAppearance": {
     "message": "Apparence de l'extension"
   },
-  "extensionStyleLabel": {
-    "message": "Style de l’interface"
-  },
-  "extensionStyleStandard": {
-    "message": "Standard"
-  },
-  "extensionStylePlatinum": {
-    "message": "Platine (clair)"
-  },
   "themeAuto": {
     "message": "Auto (suivre le système)"
   },
@@ -1918,7 +1909,7 @@
     "message": "Les pages de l'extension suivent le thème Pinboard sélectionné"
   },
   "popupFollowHint": {
-    "message": "Le popup, les réglages et la bibliothèque reprennent les couleurs de votre préréglage Pinboard. La page Lecture garde ses propres couleurs."
+    "message": "Le popup, les réglages et la bibliothèque reprennent les couleurs de votre préréglage Pinboard. La page Lecture garde ses propres couleurs, sauf avec Platinum."
   },
   "optFollowNeedsPreset": {
     "message": "Choisissez d’abord un préréglage Pinboard ci-dessous. Avec « Sans préréglage », il n’y a aucune palette à suivre."

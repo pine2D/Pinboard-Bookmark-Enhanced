@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "id": "platinum-dark",
+    "name": "Platinum Dark",
+    "mode": "dark",
+    "family": "platinum",
+    "description": "Mac OS 9 Platinum dark desktop window chrome (hub.v2core.com dark scheme)."
+  },
+  "layout": {
+    "mode": "classic-list",
+    "max-width": "1030px",
+    "bookmark-style": "flat",
+    "right-bar": "visible"
+  },
+  "palette": {
+    "bg": "#222222",
+    "bg-surface": "#2e2e2e",
+    "fg": "#e2e2e2",
+    "fg-strong": "#f4f4f4",
+    "muted": "#bdbdbd",
+    "muted-soft": "#ababab",
+    "metadata-fg": "#ababab",
+    "border": "#888888",
+    "border-strong": "#b0b0b0",
+    "border-soft": "#444444",
+    "accent": "#9494ff",
+    "accent-hover": "#c4c4ff",
+    "accent-soft": "#2d2d52",
+    "accent-alpha": "rgba(148,148,255,0.32)",
+    "input-bg": "#3b3b3b",
+    "private-bg": "#26263d",
+    "private-accent": "#9494ff",
+    "selection-bg": "#3d3dad",
+    "selection-fg": "#ffffff",
+    "tag-bg": "#2a2a48",
+    "tag-fg": "#e0e0ff",
+    "row-hover": "#34345c",
+    "bundle-row-hover": "#9494ff1a",
+    "destroy": "#ff8a80",
+    "btn-bg": "#3d3dad",
+    "btn-bg-hover": "#4e4ec7",
+    "btn-fg": "#ffffff",
+    "success": "#65d48a",
+    "success-hover": "#8ae3a8",
+    "url-link-bg": "#2a2a2a",
+    "url-link-fg": "#d0d0d0",
+    "link-hover": "#c4c4ff",
+    "link-visited": "#c6a6ff",
+    "focus-ring": "#9494ff",
+    "unread": "#ff8a80",
+    "sidebar-btn-bg": "#3d3dad",
+    "sidebar-btn-fg": "#ffffff",
+    "sidebar-btn-bg-hover": "#4e4ec7"
+  },
+  "typo": {
+    "family": "\"Lucida Grande\", \"Geneva\", Verdana, \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei\", \"微软雅黑\", \"Noto Sans SC\", \"Noto Sans CJK SC\", \"Source Han Sans SC\", \"WenQuanYi Micro Hei\", sans-serif",
+    "family-mono": "\"SFMono-Regular\", Menlo, Monaco, Consolas, \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei\", \"微软雅黑\", \"Noto Sans SC\", \"Noto Sans CJK SC\", \"Source Han Sans SC\", \"WenQuanYi Micro Hei\", monospace",
+    "size-base": "13px",
+    "size-lg": "14px",
+    "size-sm": "12px",
+    "size-xs": "11px",
+    "line-height": 1.5,
+    "weight-body": 400,
+    "weight-heading": 700
+  },
+  "space": {
+    "unit": "4px",
+    "bookmark-gap": "0px",
+    "main-padding": "0px",
+    "sub-banner-y": "6px",
+    "right-bar-gap": "12px",
+    "form-gap": "8px"
+  },
+  "radius": {
+    "sm": "2px",
+    "md": "3px",
+    "lg": "3px"
+  },
+  "border": {
+    "width": "1px",
+    "style": "solid",
+    "hairline": "1px solid #333333"
+  },
+  "patterns": {
+    "window-chrome": "platinum",
+    "blockquote-style": "left-accent",
+    "heading-accent": "caps"
+  },
+  "ui": {
+    "density": "compact",
+    "popup": {
+      "dark": {
+        "on-accent": "#0e0e26",
+        "radius-sm": "2px",
+        "radius-md": "3px",
+        "radius-lg": "3px",
+        "radius-tag": "2px"
+      }
+    },
+    "options": {
+      "dark": {
+        "warn": "#e5b045",
+        "danger": "#e05550",
+        "radius-sm": "2px",
+        "radius-md": "3px",
+        "radius-lg": "3px"
+      }
+    },
+    "library": {
+      "dark": {
+        "radius-sm": "2px",
+        "radius-md": "3px",
+        "radius-lg": "3px"
+      }
+    }
+  }
+}

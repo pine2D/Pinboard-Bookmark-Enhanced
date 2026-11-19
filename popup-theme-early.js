@@ -5,16 +5,12 @@
 const PBP_POPUP_ADAPTIVE_MAP = {
   flexoki: ["flexoki-light", "flexoki-dark"],
   solarized: ["solarized-light", "solarized-dark"],
-  catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
+  catppuccin: ["catppuccin-latte", "catppuccin-mocha"],
+  platinum: ["platinum-light", "platinum-dark"]
 };
 
 // Mirrors shared.js pbpBookmarkServiceId(): this file runs before shared.js.
 const PBP_POPUP_BOOKMARK_SERVICES = ["pinboard", "karakeep", "linkding"];
-
-// The interface style is an extension preference, independent of the Pinboard CSS preset.
-function pbpPopupThemeKey(style, follow, preset) {
-  return style === "platinum" ? "platinum" : follow === false ? "" : (preset || "");
-}
 
 (function applyFromLocalStorageMirror() {
   const root = document.documentElement;
@@ -38,7 +34,7 @@ function pbpPopupThemeKey(style, follow, preset) {
   const followTheme = localStorage.getItem("pp-theme-follow") !== "0"; // default true
   const prefersDark = mode === "dark" ||
     (mode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const key = pbpPopupThemeKey(localStorage.getItem("pp-extension-style"), followTheme, preset);
+  const key = followTheme ? preset : "";
 
   if (PBP_POPUP_ADAPTIVE_MAP[key]) {
     root.dataset.theme = prefersDark ? PBP_POPUP_ADAPTIVE_MAP[key][1] : PBP_POPUP_ADAPTIVE_MAP[key][0];
@@ -112,7 +108,7 @@ try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
   : chrome.storage.local.get({ optSyncEnabled: false, bookmarkServiceActive: "" })
 ).then(({ optSyncEnabled, bookmarkServiceActive }) => {
   return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
-    .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, optExtensionStyle: "standard", popupWidth: 550,
+    .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, popupWidth: 550,
       ...(optSyncEnabled ? {} : { bookmarkService: "pinboard", bookmarkServiceActive: "" }) })
     .then(s => {
       const active = bookmarkServiceActive || s.bookmarkServiceActive;
@@ -124,7 +120,6 @@ try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
 }).then(s => {
   // Update localStorage mirror for next popup boot
   try {
-    localStorage.setItem("pp-extension-style", s.optExtensionStyle === "platinum" ? "platinum" : "standard");
     localStorage.setItem("pp-theme", s.optTheme || "auto");
     localStorage.setItem("pp-theme-preset", s.themePresetKey || "");
     localStorage.setItem("pp-theme-follow", s.optPopupFollowTheme === false ? "0" : "1");
@@ -140,7 +135,7 @@ try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
   const root = document.documentElement;
   const prefersDark = s.optTheme === "dark" ||
     (s.optTheme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const key = pbpPopupThemeKey(s.optExtensionStyle, s.optPopupFollowTheme, s.themePresetKey);
+  const key = s.optPopupFollowTheme !== false ? (s.themePresetKey || "") : "";
 
   let target = "";
   if (PBP_POPUP_ADAPTIVE_MAP[key]) {

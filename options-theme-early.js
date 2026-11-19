@@ -3,17 +3,23 @@
 const PBP_OPTIONS_ADAPTIVE_MAP = {
   flexoki: ["flexoki-light", "flexoki-dark"],
   solarized: ["solarized-light", "solarized-dark"],
-  catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
+  catppuccin: ["catppuccin-latte", "catppuccin-mocha"],
+  platinum: ["platinum-light", "platinum-dark"]
 };
 
 const _optionsRoot = document.documentElement;
 
-// Stage-0 density tiers (spec §2, ruling R3): terminal-flavoured presets are
-// compact, everything else (incl. the default surface) is comfortable and
-// carries no attribute. Mirrors the pilots' ui.density (COMPONENTS.md §11);
-// keys are data-theme TARGETS (umbrella pilots expand through
-// PBP_OPTIONS_ADAPTIVE_MAP above); pinned by tests/ui-contract-tests.mjs.
-const PBP_OPTIONS_DENSITY_MAP = Object.freeze({ "terminal": "compact", "gruvbox-dark": "compact" });
+// Stage-0 density tiers (spec §2, ruling R3): terminal-flavoured and Platinum
+// presets are compact, everything else (incl. the default surface) is
+// comfortable and carries no attribute. Mirrors the pilots' ui.density
+// (COMPONENTS.md §11); keys are data-theme TARGETS (umbrella pilots expand
+// through PBP_OPTIONS_ADAPTIVE_MAP above); pinned by tests/ui-contract-tests.mjs.
+const PBP_OPTIONS_DENSITY_MAP = Object.freeze({
+  "terminal": "compact",
+  "gruvbox-dark": "compact",
+  "platinum-light": "compact",
+  "platinum-dark": "compact"
+});
 setTimeout(() => {
   if (!_optionsRoot.dataset.optionsReady) _optionsRoot.dataset.optionsReady = "fallback";
 }, 3000);
@@ -37,13 +43,12 @@ function pbpReleaseLibraryGate() {
 // Last applied inputs, re-run by the system light/dark listener below
 // (settings batch D1: an open Options/Library page follows the OS switch
 // like the popup and the reader do).
-const _optionsLastTheme = { mode: "auto", presetKey: "", follow: true, style: "standard" };
+const _optionsLastTheme = { mode: "auto", presetKey: "", follow: true };
 // follow === false drops the preset: "Extension pages follow the Pinboard
 // theme preset" gates Options and Library exactly like the popup (theme
 // model 2026-08-25, settings batch D4). Omitted = legacy caller = follow.
-function pbpApplyOptionsEarlyTheme(mode, presetKey, follow, style) {
-  const key = style === "platinum" ? "platinum" : follow === false ? "" : (presetKey || "");
-  _optionsLastTheme.style = style;
+function pbpApplyOptionsEarlyTheme(mode, presetKey, follow) {
+  const key = follow === false ? "" : (presetKey || "");
   _optionsLastTheme.mode = mode || "auto";
   _optionsLastTheme.presetKey = presetKey || "";
   _optionsLastTheme.follow = follow !== false;
@@ -87,7 +92,7 @@ if (typeof window.matchMedia === "function") {
   try {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
       if (_optionsLastTheme.mode === "auto") {
-        pbpApplyOptionsEarlyTheme(_optionsLastTheme.mode, _optionsLastTheme.presetKey, _optionsLastTheme.follow, _optionsLastTheme.style);
+        pbpApplyOptionsEarlyTheme(_optionsLastTheme.mode, _optionsLastTheme.presetKey, _optionsLastTheme.follow);
       }
     });
   } catch (_) {}
@@ -95,9 +100,8 @@ if (typeof window.matchMedia === "function") {
 
 // follow undefined = legacy caller: leave the popup-owned "pp-theme-follow"
 // mirror untouched rather than overwrite it with a guess.
-function pbpStoreOptionsThemeMirror(mode, presetKey, follow, style) {
+function pbpStoreOptionsThemeMirror(mode, presetKey, follow) {
   try {
-    localStorage.setItem("pp-extension-style", style === "platinum" ? style : "standard");
     localStorage.setItem("pp-theme", mode || "auto");
     localStorage.setItem("pp-theme-preset", presetKey || "");
     if (typeof follow === "boolean") localStorage.setItem("pp-theme-follow", follow ? "1" : "0");
@@ -107,14 +111,12 @@ function pbpStoreOptionsThemeMirror(mode, presetKey, follow, style) {
 let _optionsMirrorMode = "auto";
 let _optionsMirrorPreset = "";
 let _optionsMirrorFollow = true;
-let _optionsMirrorStyle = "standard";
 try {
-  _optionsMirrorStyle = localStorage.getItem("pp-extension-style") || "standard";
   _optionsMirrorMode = localStorage.getItem("pp-theme") || "auto";
   _optionsMirrorPreset = localStorage.getItem("pp-theme-preset") || "";
   _optionsMirrorFollow = localStorage.getItem("pp-theme-follow") !== "0"; // popup-owned mirror, default true
 } catch (_) {}
-pbpApplyOptionsEarlyTheme(_optionsMirrorMode, _optionsMirrorPreset, _optionsMirrorFollow, _optionsMirrorStyle);
+pbpApplyOptionsEarlyTheme(_optionsMirrorMode, _optionsMirrorPreset, _optionsMirrorFollow);
 
 // ---- Mirror prefill: high-frequency UI fields ----
 // Synchronously apply cached field values from localStorage so the form
@@ -170,16 +172,14 @@ if (typeof chrome !== "undefined" && chrome.storage?.local) {
     : chrome.storage.local.get({ optSyncEnabled: false })
   ).then(({ optSyncEnabled }) => {
     return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
-      .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, optExtensionStyle: "standard" });
+      .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true });
   }).then(s => {
     if (_optionsBootGen !== _optionsThemeGen) return;
-    // An already hydrated Options form owns its live preview and mirror.
-    if (pbpIsOptionsPage() && _optionsRoot.dataset.optionsReady === "1") return;
     const mode = s.optTheme || "auto";
     const presetKey = s.themePresetKey || "";
     const follow = s.optPopupFollowTheme !== false;
-    pbpStoreOptionsThemeMirror(mode, presetKey, follow, s.optExtensionStyle);
-    pbpApplyOptionsEarlyTheme(mode, presetKey, follow, s.optExtensionStyle);
+    pbpStoreOptionsThemeMirror(mode, presetKey, follow);
+    pbpApplyOptionsEarlyTheme(mode, presetKey, follow);
     pbpReleaseLibraryGate();
   }).catch(() => {
     // storage unavailable: the localStorage mirror already applied; a KNOWN
@@ -202,18 +202,18 @@ if (typeof chrome !== "undefined" && chrome.storage?.local) {
   // controls still show the previous state. Library has no such owner.
   if (chrome.storage.onChanged && !pbpIsOptionsPage()) {
     chrome.storage.onChanged.addListener((changes, area) => {
-      const themed = changes.optTheme || changes.themePresetKey || changes.optPopupFollowTheme || changes.optExtensionStyle;
+      const themed = changes.optTheme || changes.themePresetKey || changes.optPopupFollowTheme;
       const rerouted = area === "local" && changes.optSyncEnabled;
       if ((area !== "sync" && area !== "local") || !(themed || rerouted)) return;
       const gen = ++_optionsThemeGen;
       chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) => {
         return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
-          .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, optExtensionStyle: "standard" });
+          .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true });
       }).then(s => {
         if (gen !== _optionsThemeGen) return;
         const follow = s.optPopupFollowTheme !== false;
-        pbpStoreOptionsThemeMirror(s.optTheme || "auto", s.themePresetKey || "", follow, s.optExtensionStyle);
-        pbpApplyOptionsEarlyTheme(s.optTheme || "auto", s.themePresetKey || "", follow, s.optExtensionStyle);
+        pbpStoreOptionsThemeMirror(s.optTheme || "auto", s.themePresetKey || "", follow);
+        pbpApplyOptionsEarlyTheme(s.optTheme || "auto", s.themePresetKey || "", follow);
         pbpReleaseLibraryGate(); // a runtime read that superseded the boot read is the authoritative theme too
       }).catch(() => {});
     });

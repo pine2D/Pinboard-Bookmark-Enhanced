@@ -12,7 +12,8 @@
 const PBP_ADAPTIVE_THEME_MAP = {
   flexoki: ["flexoki-light", "flexoki-dark"],
   solarized: ["solarized-light", "solarized-dark"],
-  catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
+  catppuccin: ["catppuccin-latte", "catppuccin-mocha"],
+  platinum: ["platinum-light", "platinum-dark"]
 };
 
 // Only cloak when prior evidence (origin-scoped, synchronous) says a theme is

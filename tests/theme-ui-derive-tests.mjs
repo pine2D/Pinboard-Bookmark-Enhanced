@@ -1442,7 +1442,10 @@ function f8Failures(id, out, hosts) {
     walked++;
     fieldCategory(entry.id, map, tk.ui?.options?.[entry.mode]?.["input-border"] != null);
   }
-  check(walked === POPUP_THEME_MAP.length && POPUP_THEME_MAP.some(e => e.id === "platinum"), `field-family pipeline walk visited ${walked} themes, expected every interface theme including Platinum`);
+  check(walked === POPUP_THEME_MAP.length &&
+    POPUP_THEME_MAP.some(e => e.id === "platinum-light") &&
+    POPUP_THEME_MAP.some(e => e.id === "platinum-dark"),
+    `field-family pipeline walk visited ${walked} themes, expected every interface theme including Platinum light/dark`);
   // The 15th block: the default :root (never framed), folded from the shipped
   // CSS the same way the re-derivation block below reads it.
   const rootCss = readFileSync(new URL("../options.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
