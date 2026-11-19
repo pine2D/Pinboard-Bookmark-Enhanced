@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="590"><title>library-vocab Tests</title>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="593"><title>library-vocab Tests</title>
 <link rel="stylesheet" href="../library.css">
 <style>
 body{font-family:monospace;padding:16px}.case{padding:5px;border-bottom:1px solid #ddd}.pass{color:#176}.fail{color:#b00}
@@ -3694,6 +3694,36 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       ].map((status) => pbpLibDriveLine(status, me));
       check("drive line: any connection or dataset error is a problem line, even with an earlier success",
         problems.every((line) => line?.kind === "problem" && line.text === t("libraryDriveProblem")), JSON.stringify(problems));
+
+      const markup = new DOMParser().parseFromString(await (await fetch("../library.html")).text(), "text/html");
+      const link = markup.getElementById("lib-drive"), live = markup.getElementById("lib-drive-status");
+      const manifest = await (await fetch("../manifest.json")).json();
+      const originalChrome = window.chrome, originalOwner = pbpVocabCurrentOwner, originalConnected = _libDriveConnected;
+      let status = { ...base, connection: { lastError:"network" } };
+      try {
+        document.body.append(link, live);
+        pbpVocabCurrentOwner = async () => me;
+        window.chrome = { runtime: { getManifest: () => manifest, sendMessage: async () => ({ ok:true, status }) } };
+        await pbpLibRefreshDriveLine();
+        check("drive line: a fault has a native settings link and a separate status announcement",
+          !link.hidden && link.matches('a[href="options.html#storage"]:not([role]):not([aria-live])') &&
+          live.getAttribute("role") === "status" && live.textContent === t("libraryDriveProblem"));
+        const linkFault = link.firstChild, announcedFault = live.firstChild;
+        await pbpLibRefreshDriveLine();
+        check("drive line: repeating a fault keeps both text nodes", link.firstChild === linkFault && live.firstChild === announcedFault);
+        status = { ...base };
+        await pbpLibRefreshDriveLine();
+        const announcedRecovery = live.firstChild;
+        status.lastSuccessAt = Date.UTC(2026, 9, 16);
+        await pbpLibRefreshDriveLine();
+        check("drive line: recovery is announced once while the link keeps its current sync time",
+          live.textContent === t("vocabDriveConnected") && live.firstChild === announcedRecovery &&
+          link.textContent === pbpLibDriveLine(status, me).text);
+      } finally {
+        link.remove(); live.remove();
+        pbpVocabCurrentOwner = originalOwner; _libDriveConnected = originalConnected;
+        if (originalChrome) window.chrome = originalChrome; else delete window.chrome;
+      }
     }
     // First frame (review round 1, re-cut in critique round 5): the form is
     // decided at wiring, before anything paints, and the row's need (group

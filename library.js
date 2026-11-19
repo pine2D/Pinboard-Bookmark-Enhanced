@@ -802,9 +802,17 @@ async function pbpLibRefreshDriveLine() {
   }
   if (gen !== _libDriveGen) return;
   _libDriveConnected = !!line;
+  const previousKind = el.hidden ? null : el.classList.contains("bad") ? "problem" : "ok";
+  const kind = line?.kind || null;
+  const text = line?.text || "";
   el.hidden = !line;
-  el.classList.toggle("bad", !!line && line.kind === "problem");
-  el.textContent = line ? line.text : "";
+  el.classList.toggle("bad", kind === "problem");
+  if (el.textContent !== text) el.textContent = text;
+  // Keep timestamps on the link. The live message stays accurate between
+  // announcements, even if the device next syncs under another account.
+  if (kind !== previousKind) {
+    $id("lib-drive-status").textContent = kind === "ok" ? t("vocabDriveConnected") : text;
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
