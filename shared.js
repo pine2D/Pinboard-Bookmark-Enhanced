@@ -5819,6 +5819,41 @@ async function pbpOcrDocsClear() {
 // chrome-extension:// tabs while keeping storage.local intact) without storing
 // full-text article bodies or private bookmark/account data. Incognito source
 // tabs are never recorded.
+// Both history popovers outlive their rows. Escape belongs to the open layer,
+// including when a pointer opened it and focus is still on the trigger.
+function pbpBindReaderHistoryDismiss(pop, opener) {
+  pop.tabIndex = -1;
+  const onKey = (event) => {
+    if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || event.keyCode === 229
+        || _activeConfirmPopover || !pop.matches(":popover-open")) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    pop.hidePopover();
+    opener.focus({ preventScroll: true });
+  };
+  pop.addEventListener("beforetoggle", (event) => {
+    if (event.newState === "open") document.addEventListener("keydown", onKey, true);
+    else document.removeEventListener("keydown", onKey, true);
+  });
+}
+
+function pbpReplaceReaderHistoryRows(pop, fragment, opener) {
+  // Sample focus after the storage read: keyboard navigation or light dismiss
+  // may have moved it elsewhere while the mutation was pending.
+  const active = document.activeElement;
+  const restore = pop.contains(active) && pop.matches(":popover-open");
+  const row = restore && active.closest('[role="listitem"]');
+  const index = row ? Array.from(row.parentElement.children).indexOf(row) : 0;
+  pop.replaceChildren(fragment);
+  if (!restore) return;
+  const rows = Array.from(pop.querySelectorAll('[role="listitem"]'));
+  const same = row && rows.find(item => item.firstElementChild.title === row.firstElementChild.title);
+  const next = same ? (active === row.lastElementChild ? same.lastElementChild : same.firstElementChild)
+    : rows[Math.min(index, rows.length - 1)]?.firstElementChild;
+  if (next) next.focus();
+  else opener.focus({ preventScroll: true });
+}
+
 function pbpReaderHistorySafeUrl(rawUrl) {
   if (typeof rawUrl !== "string" || !rawUrl.trim()) return "";
   const text = rawUrl.trim();

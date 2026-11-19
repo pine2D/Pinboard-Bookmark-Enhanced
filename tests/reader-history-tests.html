@@ -406,11 +406,14 @@ function buildEchoMessages(enTable) {
   // 9. In-reader #rail-history-btn popover marks current article and opens other entries
   await test("pbpRailHistoryBtnInit toggles #rail-history-pop, marks current article, and opens other entries", async () => {
     const mock = freshMock();
+    // The preceding expired-preview fixture hid the rail. This case opens it from an article.
+    document.body.classList.remove("md-empty");
     _pbpCurrentReaderUrl = "https://example.com/current?utm_source=feed";
     await pbpReaderHistoryRecord({ url: "https://example.org/other", title: "Other Article", openedAt: 1000, lastKey: "k-other" });
     await pbpReaderHistoryRecord({ url: "https://example.com/current", title: "Current Reader Article", openedAt: 2000, lastKey: "k-cur" });
 
     const btn = document.getElementById("rail-history-btn");
+    btn.focus();
     btn.click();
     await until(() => {
       const p = document.getElementById("rail-history-pop");
@@ -426,9 +429,15 @@ function buildEchoMessages(enTable) {
     const openBtns = [...pop.querySelectorAll(".rh-open")];
     assert(openBtns[0].getAttribute("aria-current") === "true", "current article row missing aria-current=true");
     assert(!openBtns[1].hasAttribute("aria-current"), "non-current row falsely marked current");
+    assert(document.activeElement === openBtns[1], "keyboard open must focus the first article that can be reopened");
+    const escape = new KeyboardEvent("keydown", { key:"Escape", bubbles:true, cancelable:true });
+    openBtns[1].dispatchEvent(escape);
+    assert(escape.defaultPrevented && !pop.matches(":popover-open") && document.activeElement === btn, "Escape should close only the history layer and restore the trigger");
+    btn.click();
+    await until(() => pop.matches(":popover-open"), "history reopened after Escape");
 
     // Clicking the current article simply closes the popover without creating a tab
-    openBtns[0].click();
+    pop.querySelector(".rh-open").click();
     await until(() => !pop.matches(":popover-open"), "popover closed on current click");
     assert(mock.callsOf("tabs.create").length === 0, "clicking current article must not open a new tab");
 
@@ -495,6 +504,7 @@ function buildEchoMessages(enTable) {
     assert(mainBtn.disabled === true && caretBtn.disabled === false, "caret must stay enabled when main Reader button is disabled");
     assert(ocrBtn && ocrBtn.hidden === true, "standalone #ocr-import-btn must hide when DeepSeek key is absent");
 
+    caretBtn.focus();
     caretBtn.click();
     await until(() => {
       const p = fdoc.getElementById("jina-md-history-pop");
@@ -502,6 +512,7 @@ function buildEchoMessages(enTable) {
     }, "#jina-md-history-pop open with 5 rows");
 
     const pop = fdoc.getElementById("jina-md-history-pop");
+    assert(fdoc.activeElement === pop.querySelector(".pp-rh-open"), "keyboard open should land on an article");
     assert(caretBtn.getAttribute("aria-expanded") === "true", "popup caret aria-expanded not true");
     assert(parseFloat(fdoc.body.style.minHeight) > 250, "collapsed unsupported-url action popup must grow body.style.minHeight when multi-row history needs room");
     mock.userGesture();
@@ -513,8 +524,15 @@ function buildEchoMessages(enTable) {
     // Reopen and Clear transitions to empty message
     caretBtn.click();
     await until(() => pop.matches(":popover-open"), "popup history reopened");
-    pop.querySelector(".pp-rh-clear").click();
+    const remove = pop.querySelector(".pp-rh-remove");
+    const neighbor = pop.querySelectorAll(".pp-rh-open")[1].title;
+    remove.focus(); remove.click();
+    await until(() => pop.querySelectorAll(".pp-rh-open").length === 4, "popup history removed one row");
+    assert(fdoc.activeElement === pop.querySelector(".pp-rh-open") && fdoc.activeElement.title === neighbor, "focus did not follow the removed row");
+    const clear = pop.querySelector(".pp-rh-clear");
+    clear.focus(); clear.click();
     await until(() => !!pop.querySelector(".pp-rh-empty"), "popup history empty placeholder");
+    assert(fdoc.activeElement === caretBtn, "clearing the list must return focus to its trigger");
     assert((await pbpReaderHistoryRead()).length === 0, "popup Clear did not wipe pbp_reader_history");
     frame.remove();
     delete window.__pbpPopupFrameChrome;

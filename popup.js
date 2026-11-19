@@ -3926,7 +3926,7 @@ async function _populatePopupReaderHistory(pop, anchorBtn) {
     frag.appendChild(listEl);
   }
 
-  pop.replaceChildren(frag);
+  pbpReplaceReaderHistoryRows(pop, frag, anchorBtn);
 }
 
 function setupOcrImportBtn() {
@@ -3951,13 +3951,14 @@ function setupReaderHistory() {
   const btn = $id("jina-md-history-btn");
   if (!btn || btn.dataset.pbpHistoryBound === "1") return;
   btn.dataset.pbpHistoryBound = "1";
-  btn.addEventListener("click", async () => {
+  btn.addEventListener("click", async (event) => {
     if (!_popupReaderHistoryPopEl) {
       const pop = document.createElement("div");
       pop.id = "jina-md-history-pop";
       pop.setAttribute("popover", "auto");
       pop.setAttribute("role", "dialog");
       pop.setAttribute("aria-label", t("readerHistoryTitle"));
+      pbpBindReaderHistoryDismiss(pop, btn);
       let repositionRaf = 0;
       const scheduleReposition = () => {
         if (repositionRaf || !pop.matches(":popover-open")) return;
@@ -3988,8 +3989,9 @@ function setupReaderHistory() {
       return;
     }
     await _populatePopupReaderHistory(pop, btn);
-    try { pop.showPopover(); } catch (_) { /* swallow-ok: detached or unsupported popover state */ return; }
+    try { pop.showPopover({ source: btn }); } catch (_) { /* swallow-ok: detached or unsupported popover state */ return; }
     _positionPopupReaderHistory(pop, btn);
+    if (event.detail === 0 && document.activeElement === btn) (pop.querySelector(".pp-rh-open") || pop).focus({ preventScroll: true });
   });
 }
 const PBP_ALT_CHECKBOX_CODES = { KeyP: "private-check", KeyR: "readlater-check", KeyA: "archive-check" };

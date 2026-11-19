@@ -1245,6 +1245,7 @@ function _pbpRailHistoryEnsurePop(anchorBtn) {
   pop.setAttribute("popover", "auto");
   pop.setAttribute("role", "dialog");
   pop.setAttribute("aria-label", t("readerHistoryTitle"));
+  pbpBindReaderHistoryDismiss(pop, anchorBtn);
   pop.addEventListener("toggle", (e) => {
     if (anchorBtn) anchorBtn.setAttribute("aria-expanded", e.newState === "open" ? "true" : "false");
   });
@@ -1346,7 +1347,7 @@ async function _pbpRailHistoryPopulate(pop, anchorBtn) {
     frag.appendChild(listEl);
   }
 
-  pop.replaceChildren(frag);
+  pbpReplaceReaderHistoryRows(pop, frag, anchorBtn);
 }
 
 function pbpRailHistoryBtnInit() {
@@ -1354,7 +1355,7 @@ function pbpRailHistoryBtnInit() {
   _pbpRailHistoryInited = true;
   const btn = document.getElementById("rail-history-btn");
   if (!btn) return;
-  btn.addEventListener("click", async () => {
+  btn.addEventListener("click", async (event) => {
     const pop = _pbpRailHistoryEnsurePop(btn);
     if (pop.matches(":popover-open")) {
       try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover may already be closed */ }
@@ -1362,8 +1363,11 @@ function pbpRailHistoryBtnInit() {
     }
     if (typeof _pbpReaderHideOtherPopovers === "function") _pbpReaderHideOtherPopovers(pop);
     await _pbpRailHistoryPopulate(pop, btn);
-    try { pop.showPopover(); } catch (_) { /* swallow-ok: detached or unsupported popover state */ return; }
+    try { pop.showPopover({ source: btn }); } catch (_) { /* swallow-ok: detached or unsupported popover state */ return; }
     _pbpRailHistoryPosition(pop, btn);
+    if (event.detail === 0 && document.activeElement === btn) {
+      (pop.querySelector(".rh-open:not([aria-current])") || pop.querySelector(".rh-open") || pop).focus({ preventScroll: true });
+    }
   });
 }
 
@@ -5093,7 +5097,7 @@ function setupDrawer() {
   toggle.addEventListener("click", () => setOpen(!isOpen()));
   scrim.addEventListener("click", () => setOpen(false));
   document.addEventListener("keydown", (e) => {
-    if (!isOpen()) return;
+    if (!isOpen() || e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
     if (e.key === "Escape") { setOpen(false); return; }
     if (e.key === "Tab") {
       const f = focusables();
