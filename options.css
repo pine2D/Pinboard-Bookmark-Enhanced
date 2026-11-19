@@ -3349,7 +3349,7 @@ html[data-theme="platinum-light"] {
   --opt-input-bg: #cccccc;
   --opt-input-border: #cccccc;
   --opt-btn-bg: #f3f3f3;
-  --opt-btn-hover: #e6e6fa;
+  --opt-btn-hover: #e6e6e6;
   --opt-pf-bg: #ffffff;
   --opt-code-bg: #ffffff;
   --opt-radius-sm: 2px;
@@ -3363,8 +3363,8 @@ html[data-theme="platinum-light"] {
   --opt-btn-fg-muted: #4d4d4d;
   --opt-danger-quiet-fg: #a02525;
   --opt-on-danger: #ffffff;
-  --opt-chip-bg: #ebebff;
-  --opt-chip-fg: #20206b;
+  --opt-chip-bg: #d9d9e0;
+  --opt-chip-fg: #222222;
   --opt-on-accent: #ffffff;
   --opt-field-bg: #cccccc;
   --opt-field-border: #cccccc;
@@ -3393,7 +3393,7 @@ html[data-theme="platinum-dark"] {
   --opt-input-bg: #3b3b3b;
   --opt-input-border: #3b3b3b;
   --opt-btn-bg: #353535;
-  --opt-btn-hover: #38385b;
+  --opt-btn-hover: #3c3c3c;
   --opt-pf-bg: #2e2e2e;
   --opt-code-bg: #2e2e2e;
   --opt-radius-sm: 2px;
@@ -3407,8 +3407,8 @@ html[data-theme="platinum-dark"] {
   --opt-btn-fg-muted: #bdbdbd;
   --opt-danger-quiet-fg: #eb908d;
   --opt-on-danger: #191919;
-  --opt-chip-bg: #32324f;
-  --opt-chip-fg: #e0e0ff;
+  --opt-chip-bg: #3f3f48;
+  --opt-chip-fg: #e8e8e8;
   --opt-on-accent: #333333;
   --opt-field-bg: #3b3b3b;
   --opt-field-border: #3b3b3b;

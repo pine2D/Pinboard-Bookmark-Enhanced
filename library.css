@@ -4356,7 +4356,7 @@ html[data-theme="platinum-light"] {
   --lib-input-bg: #cccccc;
   --lib-input-border: #cccccc;
   --lib-btn-bg: #f3f3f3;
-  --lib-btn-hover: #e6e6fa;
+  --lib-btn-hover: #e6e6e6;
   --lib-code-bg: #ffffff;
   --lib-radius-sm: 2px;
   --lib-radius-md: 3px;
@@ -4367,8 +4367,8 @@ html[data-theme="platinum-light"] {
   --lib-btn-fg-muted: #4d4d4d;
   --lib-danger-quiet-fg: #a02525;
   --lib-on-danger: #ffffff;
-  --lib-chip-bg: #ebebff;
-  --lib-chip-fg: #20206b;
+  --lib-chip-bg: #d9d9e0;
+  --lib-chip-fg: #222222;
   --lib-on-accent: #ffffff;
   --lib-field-bg: #cccccc;
   --lib-field-border: #cccccc;
@@ -4409,7 +4409,7 @@ html[data-theme="platinum-dark"] {
   --lib-input-bg: #3b3b3b;
   --lib-input-border: #3b3b3b;
   --lib-btn-bg: #353535;
-  --lib-btn-hover: #38385b;
+  --lib-btn-hover: #3c3c3c;
   --lib-code-bg: #2e2e2e;
   --lib-radius-sm: 2px;
   --lib-radius-md: 3px;
@@ -4420,8 +4420,8 @@ html[data-theme="platinum-dark"] {
   --lib-btn-fg-muted: #bdbdbd;
   --lib-danger-quiet-fg: #ff8a80;
   --lib-on-danger: #3d3d3d;
-  --lib-chip-bg: #32324f;
-  --lib-chip-fg: #e0e0ff;
+  --lib-chip-bg: #3f3f48;
+  --lib-chip-fg: #e8e8e8;
   --lib-on-accent: #333333;
   --lib-field-bg: #3b3b3b;
   --lib-field-border: #3b3b3b;

@@ -19,7 +19,7 @@ paths:
 
 # Theme Factory 深水区（站点主题 + 三表面 UI 主题）
 
-`docs/theme-surface/` 是 token-driven 主题生成系统：13 套 preset 从 `pilots/*.tokens.json` 经 composer 渲染，写入四个文件——`pinboard-themes.js`（站点，全文件生成）+ `popup.css` / `options.css` / `library.css`（扩展 UI，各含**两个独立生成区**）。
+`docs/theme-surface/` 是 token-driven 主题生成系统：15 套 preset 从 `pilots/*.tokens.json` 经 composer 渲染，写入四个文件——`pinboard-themes.js`（站点，全文件生成）+ `popup.css` / `options.css` / `library.css`（扩展 UI，各含**两个独立生成区**）。
 
 ## 两个生成区
 
@@ -38,7 +38,7 @@ paths:
 
 Pre-commit 有两组触发。主题组使用**同一组触发条件**（theme-surface 源、pinboard-themes.js 或三份 CSS 任一改动）：先跑复杂 CSS 语法回归，再跑完整 `sync-all --check` 只读管线，随后补跑 source/cascade/hand-edit/UI contract 门；任一红即 block，禁止 `--no-verify`。`scripts/setup-hooks.sh` 安装的是委托器而非脚本快照，受版本控制的 hook 脚本更新后无需重装；`sh scripts/setup-hooks.sh --check`（verify.sh 的 `[hooks]` 段）检测本机是否残留旧版脚本快照。
 
-`sync-all --check` 覆盖：`validate-contracts`、`render-all --check`、UI 六个生成区逐字节检查、13 个站点主题逐字节检查、`diff-all --strict --check`、`contrast-audit`、`css-region-audit`、`ui-token-coverage`、`layout-lint`、`url-lint`、`recipe-lint`、`override-debt`。其中 `override-debt` 从 CSS 解析器真实消费的 `(at-rule 上下文, selector, property, !important, theme)` 身份做 ratchet：删债直接通过，新增结构债必须阻断；禁止只看总数。补充门为 `token-coverage`、`cascade-lint`、`override-drift`、`handedit-audit` 与 `tests/ui-contract-tests.mjs`；CSS 解析器自身由 `tests/theme-css-syntax-tests.mjs` 固定复杂语法边界与特异性计分，同一文件拦截私有特异性引擎回流。
+`sync-all --check` 覆盖：`validate-contracts`、`render-all --check`、UI 六个生成区逐字节检查、15 个站点主题逐字节检查、`diff-all --strict --check`、`contrast-audit`、`css-region-audit`、`ui-token-coverage`、`layout-lint`、`url-lint`、`recipe-lint`、`override-debt`。其中 `override-debt` 从 CSS 解析器真实消费的 `(at-rule 上下文, selector, property, !important, theme)` 身份做 ratchet：删债直接通过，新增结构债必须阻断；禁止只看总数。补充门为 `token-coverage`、`cascade-lint`、`override-drift`、`handedit-audit` 与 `tests/ui-contract-tests.mjs`；CSS 解析器自身由 `tests/theme-css-syntax-tests.mjs` 固定复杂语法边界与特异性计分，同一文件拦截私有特异性引擎回流。
 
 **verify.sh [theme] 段**还执行 `tests/theme-contract-tests.mjs`、`tests/theme-tooling-tests.mjs`、`tests/theme-css-syntax-tests.mjs`、`tests/theme-ui-derive-tests.mjs`、`tests/theme-override-debt-tests.mjs` 与 `tests/theme-sync-check-tests.mjs`；最后一项同时快照内容与 mtime，证明 `--check` 全程零写入。
 
@@ -50,7 +50,7 @@ Pre-commit 有两组触发。主题组使用**同一组触发条件**（theme-su
 
 ## 迁移与删改陷阱（真实事故沉淀）
 
-- **同特异性删除必须双向查；「外观相同」不能当「语义相同」删。** 生成区插入点移动会反转同特异性选择器的源序胜负；主题覆盖块里「看似冗余」的声明可能正在压制另一条特异性更高、源序更晚的规则（popup 密钥显隐 `background: transparent` 案，13 套预设立刻冒出不透明方块——COMPONENTS.md §8.6 + 附录 C32）。内部件覆盖一律写 `.<unit> > .<child>` 显式限定，不赌源序；删「冗余」声明前先量特异性、真机核对渲染。
+- **同特异性删除必须双向查；「外观相同」不能当「语义相同」删。** 生成区插入点移动会反转同特异性选择器的源序胜负；主题覆盖块里「看似冗余」的声明可能正在压制另一条特异性更高、源序更晚的规则（popup 密钥显隐 `background: transparent` 案，15 套预设立刻冒出不透明方块——COMPONENTS.md §8.6 + 附录 C32）。内部件覆盖一律写 `.<unit> > .<child>` 显式限定，不赌源序；删「冗余」声明前先量特异性、真机核对渲染。
 - **断言问得太窄等于没门。** 只测命中过的选择器 = 枚举实例，同类新缺陷绕门无察觉；检查「存在」不代表覆盖「量级」（insetBand 被压到 ~2px 仍判过的教训——加严为量级 + 圆角阶梯比对才补上）。通用原则见根文件《测试与夹具》。
 - **文本 grep 覆盖判定必被注释/字符串击穿。**「这个东西有没有被处理」的判定，要从程序真实消费的数据结构（注册表、Set、导出清单）拿答案，不要退回源码文本扫描（contrast-audit orphan 守卫被一条说明性注释击穿的案例）。
 

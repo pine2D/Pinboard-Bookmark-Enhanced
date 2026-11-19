@@ -521,7 +521,7 @@ export function patternsLayer(tokens) {
   // Mac OS 9 Platinum desktop windowing ("platinum"): #ccc / #2a2a2a desktop,
   // straight-edge Menu Bar #banner, independent Mac windows for #main_column
   // and #right_bar with 2px horizontal pinstripe titlebars, sunken #fff /
-  // #1c1c1c document wells, Lavender rectangular tag chips, and 4-layer
+  // #1c1c1c document wells, neutral Platinum rectangular tag chips, and 4-layer
   // stepped crisp beveled buttons.
   const windowChrome = pat["window-chrome"];
   if (windowChrome === "platinum") {
@@ -535,7 +535,7 @@ export function patternsLayer(tokens) {
     const stripeDark = isDark ? "#191919" : "#777777";
     const bevelMid = isDark ? "#191919" : "#999999";
     const rowRule = isDark ? "#333333" : "#d4d4d4";
-    const rowHoverBg = isDark ? "#252525" : "#f5f5fa";
+    const rowHoverBg = isDark ? "#262626" : "#f2f2f2";
     const btnFace = isDark ? "#4a4a4a" : "#dddddd";
     const btnHover = isDark ? "#575757" : "#e8e8e8";
     const btnFg = isDark ? "#ffffff" : "#262626";
@@ -554,11 +554,12 @@ export function patternsLayer(tokens) {
     const fieldShadow = isDark
       ? "inset 1px 1px 0 #0c0c0c, 1px 1px 0 #4c4c4c"
       : "inset 1px 1px 0 #999999, 1px 1px 0 #ffffff";
-    const lavBg = isDark ? "#2a2a48" : "#ebebff";
-    const lavBorder = isDark ? "#5a5aa8" : "#9999ff";
-    const lavHoverBg = isDark ? "#323257" : "#dcdcff";
-    const lavHoverFg = isDark ? "#f4f4ff" : "#11114d";
-    const lavHoverBorder = isDark ? "#8080e0" : "#6666cc";
+    const chipBg = isDark ? "#383838" : "#e4e4e4";
+    const chipBorder = isDark ? "#666666" : "#808080";
+    const chipGlint = isDark ? "#525252" : "#ffffff";
+    const chipHoverBg = isDark ? "#484848" : "#d6d6d6";
+    const chipHoverFg = isDark ? "#ffffff" : "#111111";
+    const chipHoverBorder = isDark ? "#999999" : "#262626";
     const selBg = isDark ? "#3d3dad" : "#333399";
     const selHoverBg = isDark ? "#4e4ec7" : "#24247a";
     const selFg = "#ffffff";
@@ -591,8 +592,8 @@ export function patternsLayer(tokens) {
       `.bookmark { background: ${paperBg} !important; padding: 9px 12px !important; margin: 0 !important; border-top: none !important; border-right: none !important; border-left: none !important; border-bottom: 1px solid ${rowRule} !important; border-radius: 0 !important; box-shadow: none !important; }`,
       `.bookmark.private, .bookmark.private[style*="background"] { background: ${v("private-bg")} !important; box-shadow: inset 3px 0 0 ${v("private-accent")} !important; }`,
       `a.bookmark_title { font-weight: 600 !important; }`,
-      `a.tag { background: ${lavBg} !important; color: ${v("tag-fg")} !important; box-shadow: inset 0 0 0 1px ${lavBorder} !important; border-radius: 2px !important; padding: 0 4px !important; text-decoration: none !important; }`,
-      `a.tag:hover { background: ${lavHoverBg} !important; color: ${lavHoverFg} !important; box-shadow: inset 0 0 0 1px ${lavHoverBorder} !important; text-decoration: none !important; }`,
+      `a.tag { background: ${chipBg} !important; color: ${v("tag-fg")} !important; box-shadow: inset 1px 1px 0 ${chipGlint}, inset 0 0 0 1px ${chipBorder} !important; border-radius: 2px !important; padding: 0 5px !important; text-decoration: none !important; }`,
+      `a.tag:hover { background: ${chipHoverBg} !important; color: ${chipHoverFg} !important; box-shadow: inset 0 0 0 1px ${chipHoverBorder} !important; text-decoration: none !important; }`,
       `a.tag.selected { background: ${selBg} !important; color: ${selFg} !important; box-shadow: inset 0 0 0 1px ${inkBorder} !important; font-weight: 700 !important; }`,
       `a.tag.selected:hover { background: ${selHoverBg} !important; color: ${selFg} !important; box-shadow: inset 0 0 0 1px ${inkBorder} !important; }`,
       `#right_bar:not(:has(#tag_cloud:empty)) { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 0 12px 12px !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,

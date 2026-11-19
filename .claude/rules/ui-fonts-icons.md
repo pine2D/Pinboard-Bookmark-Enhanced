@@ -24,7 +24,7 @@ paths:
 > 自根 CLAUDE.md 迁来（2026-11-05）。字体回退性能铁律的作用域以下文第一段为准（popup / options / library）。图标契约直接点名阅读器查词按钮（`wandSparkles` / `quote`），阅读器代码也按本规则用 SVG 代替字面符号（md-ask.js、md-reader.js、md-video.js、md-preview.css 的注释都引用它），所以 paths 同时覆盖 md-preview.* 与 md-*.js；这不扩大性能铁律的作用域。
 
 <!-- 机制依据：Blink fonts README、crbug 1266022/491556、developer.chrome.com（SW lifecycle / storage / CSP / alarms）、web.dev（content-visibility / style 计算） -->
-popup / options / library 三个扩展表面是短命单次渲染、无暖 shape cache——任何「UI 文本回退到大/慢字体」都会在高 DPI Windows 上造成 1-3s 首屏冻结。**作用域仅此三表面，不含 pinboard.in 站点主题**（`pinboard-themes.js` / `pilots/*.tokens.json`）：站点主题注入的是长命普通网页，性能模型不同；13/13 pilot 的 `typography.family` 均不列 CJK 字体，sans 栈与 mono 栈一视同仁，也无任何门禁检查它——据此报 Terminal / Solarized 违反下表形态 4 属误报。四种已踩形态：
+popup / options / library 三个扩展表面是短命单次渲染、无暖 shape cache——任何「UI 文本回退到大/慢字体」都会在高 DPI Windows 上造成 1-3s 首屏冻结。**作用域仅此三表面，不含 pinboard.in 站点主题**（`pinboard-themes.js` / `pilots/*.tokens.json`）：站点主题注入的是长命普通网页，性能模型不同；15/15 pilot 的 `typography.family` 均不列 CJK 字体，sans 栈与 mono 栈一视同仁，也无任何门禁检查它——据此报 Terminal / Solarized 违反下表形态 4 属误报。四种已踩形态：
 
 | 形态 | 铁律 |
 |------|------|
