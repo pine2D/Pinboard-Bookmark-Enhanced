@@ -3241,19 +3241,21 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
       && !document.getElementById("auto-save-retry").disabled
       && document.getElementById("auto-save-retry").getAttribute("aria-disabled") !== "true", failureAttempt);
     await fail(); await waitFailure();
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await rep.shot(page, s, "failure-at-title");
     const measure = () => page.evaluate(() => {
       const rect = (e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }; };
       return { alert: rect(document.getElementById("opt-global-alert")), retry: rect(document.getElementById("auto-save-retry")), header: rect(document.querySelector(".container > header")), viewport: {width:innerWidth, height:innerHeight} };
     });
-    const assertVisible = (g) => {
-      for (const name of ["alert", "retry", "header"]) {
+    const assertVisible = (g, names = ["alert", "retry"]) => {
+      for (const name of names) {
         const r = g[name];
         if (r.height <= 0 || r.width <= 0 || r.top < 0 || r.bottom > g.viewport.height + 1 || r.left < 0 || r.right > g.viewport.width + 1) throw new Error(`${name} feedback is outside viewport: ${JSON.stringify(g)}`);
       }
     };
     assertVisible(await measure());
+    await rep.shot(page, s, "failure-while-scrolled");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    assertVisible(await measure(), ["alert", "retry", "header"]);
+    await rep.shot(page, s, "failure-at-title");
     await page.waitForTimeout(4500);
     if (!await page.locator("#auto-save-retry").isVisible()) throw new Error("Failure cleared without a successful save");
     await page.evaluate(() => {
@@ -3319,8 +3321,9 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
           document.documentElement.dataset.density = density;
         }, {mode,density});
         await fail(); await waitFailure();
+        assertVisible(await measure());
         await page.evaluate(() => window.scrollTo(0, 0));
-        const g = await measure(); assertVisible(g);
+        const g = await measure(); assertVisible(g, ["alert", "retry", "header"]);
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
         const clearance = await page.evaluate(() => document.querySelector(".panel.active").getBoundingClientRect().bottom <= innerHeight + 1);
         if (!clearance) throw new Error(`${locale}/${mode}/${density}/${width}: final settings cannot scroll into view`);
@@ -3343,7 +3346,26 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
         recordCase({ locale, scheme: mode, density, viewport: width });
       }
     }
-    s.notes.push("PASS: persistent failure, same-error live-region dedupe, keyboard retry, queued edit status, selected locale/theme/density/width title-error geometries, original brief success feedback.");
+    // Bring the edited field right up to the viewport edge before the write
+    // fails. A sticky status can pass every bounds check yet cover its caret.
+    await page.goto(`chrome-extension://${extId}/options.html#quick`);
+    await page.waitForFunction(() => document.documentElement.hasAttribute("data-options-ready"));
+    const field = page.locator("#qs-default-tags");
+    await field.focus();
+    await field.evaluate(el => {
+      window.scrollBy(0, el.getBoundingClientRect().top - 8);
+      persistSettings = async () => { throw new Error("QA_EXPECTED_SAVE_FAILURE"); };
+    });
+    await page.keyboard.insertText("edge-test");
+    await page.waitForFunction(() => document.getElementById("opt-global-alert").dataset.autosaveFailure === "1");
+    assertVisible(await measure());
+    const editable = await field.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return document.activeElement === el && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === el;
+    });
+    if (!editable) throw new Error("Save failure covered or blurred the field being edited");
+    await rep.shot(page, s, "failure-beside-focused-field");
+    s.notes.push("PASS: persistent visible failure, focus clearance, same-error live-region dedupe, keyboard retry, queued edit status, selected locale/theme/density/width geometries, original brief success feedback.");
   } catch (e) { s.failures.push(e.stack); }
   finally {
     detach();

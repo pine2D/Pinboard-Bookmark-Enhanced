@@ -4840,6 +4840,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // The title and recovery action can wrap onto separate rows after zoom or a
+  // language change. Pin only the part from the error down, at its actual size.
+  const saveError = $id("opt-global-error");
+  const saveHeader = saveError.closest("header");
+  let saveClearance = 0;
+  function avoidCoveringFocus() {
+    const active = document.activeElement;
+    if (saveHeader.contains(active)) return;
+    const rect = active && active !== document.body && active.getBoundingClientRect();
+    document.documentElement.classList.toggle("save-error-below", !!rect && rect.bottom > 0 && rect.top < saveClearance);
+  }
+  function measureSaveFailure() {
+    if (!saveHeader.classList.contains("save-failed")) return;
+    const header = saveHeader.getBoundingClientRect();
+    const top = saveError.getBoundingClientRect().top;
+    saveHeader.style.setProperty("--opt-save-inset", (header.top - top) + "px");
+    saveClearance = Math.ceil(header.bottom - top);
+    document.documentElement.style.setProperty("--opt-save-clearance", saveClearance + "px");
+    avoidCoveringFocus();
+  }
+  const failureSize = new ResizeObserver(measureSaveFailure);
+
   // The failure stays visible across panels until an actual save succeeds.
   // Repeated identical errors leave the live region untouched.
   function setAutoSaveFailureAlert(text) {
@@ -4855,7 +4877,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     errEl.textContent = text;
     errEl.dataset.autosaveFailure = "1";
     errEl.classList.remove("hidden");
-    $id("opt-global-error")?.classList.remove("hidden");
+    saveError.classList.remove("hidden");
+    saveHeader.classList.add("save-failed");
+    measureSaveFailure();
+    failureSize.observe(saveHeader);
+    failureSize.observe(saveError);
+    document.addEventListener("focusin", avoidCoveringFocus);
+    window.addEventListener("scroll", avoidCoveringFocus, { passive: true });
   }
 
   function clearAutoSaveFailureAlert() {
@@ -4867,7 +4895,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     delete errEl.dataset.failureKind;
     errEl.textContent = "";
     errEl.classList.add("hidden");
-    $id("opt-global-error")?.classList.add("hidden");
+    failureSize.disconnect();
+    document.removeEventListener("focusin", avoidCoveringFocus);
+    window.removeEventListener("scroll", avoidCoveringFocus);
+    document.documentElement.classList.remove("save-error-below");
+    saveHeader.classList.remove("save-failed");
+    saveHeader.style.removeProperty("--opt-save-inset");
+    document.documentElement.style.removeProperty("--opt-save-clearance");
+    saveError.classList.add("hidden");
     const retry = $id("auto-save-retry");
     if (retry) retry.hidden = true;
   }
