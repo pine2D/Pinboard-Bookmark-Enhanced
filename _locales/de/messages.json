@@ -1896,6 +1896,15 @@
   "secExtensionAppearance": {
     "message": "Darstellung der Erweiterung"
   },
+  "extensionStyleLabel": {
+    "message": "Oberflächenstil"
+  },
+  "extensionStyleStandard": {
+    "message": "Standard"
+  },
+  "extensionStylePlatinum": {
+    "message": "Platin (hell)"
+  },
   "themeAuto": {
     "message": "Automatisch (Systemeinstellung)"
   },

@@ -747,6 +747,7 @@ const SETTINGS_DEFAULTS = {
   tagPresets: "",
   optAutoCloseAfterSave: true,
   themePresetKey: "",
+  optExtensionStyle: "standard",
   optPopupFollowTheme: true,
   popupWidth: 550,
   mdExportFrontmatter: true,

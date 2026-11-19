@@ -1442,7 +1442,7 @@ function f8Failures(id, out, hosts) {
     walked++;
     fieldCategory(entry.id, map, tk.ui?.options?.[entry.mode]?.["input-border"] != null);
   }
-  check(walked === POPUP_THEME_MAP.length && walked === 14, `field-family pipeline walk visited ${walked} themes, expected 14`);
+  check(walked === POPUP_THEME_MAP.length && POPUP_THEME_MAP.some(e => e.id === "platinum"), `field-family pipeline walk visited ${walked} themes, expected every interface theme including Platinum`);
   // The 15th block: the default :root (never framed), folded from the shipped
   // CSS the same way the re-derivation block below reads it.
   const rootCss = readFileSync(new URL("../options.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
@@ -1659,7 +1659,7 @@ function f8Failures(id, out, hosts) {
       }
     }
   }
-  check(walked === 42, `stage-4 field walk visited ${walked} blocks, expected 42 (3 surfaces x 14 themes)`);
+  check(walked === POPUP_THEME_MAP.length * 3, `stage-4 field walk visited ${walked} blocks, expected three per registered theme`);
   check(sets.r13Pushed.some((id) => id.startsWith("pp:")) && sets.r13Pushed.some((id) => id.startsWith("lib:")),
     `R13 minimality: no shipped popup or library block pushes field-fg (pushed: ${JSON.stringify(sets.r13Pushed)}) -- the pipeline half is vacuous there`);
   const eq = (got, want) => JSON.stringify([...got].sort()) === JSON.stringify([...want].sort());
@@ -1712,7 +1712,7 @@ function f8Failures(id, out, hosts) {
     const region = css.slice(css.indexOf("*/", start) + 2, css.indexOf("/* @generated:ui-themes end */"));
     const blocks = parseStyleRules(region).filter((r) => r.context.length === 0 &&
       r.selectors.length === 1 && /^(?:html\[data-theme="[a-z-]+"\]|:root)$/.test(r.selectors[0]));
-    check(blocks.length === 15, `${file}: expected 15 generated theme blocks (14 presets + :root), found ${blocks.length}`);
+    check(blocks.length === POPUP_THEME_MAP.length + 1, `${file}: expected one generated block per registered theme and :root, found ${blocks.length}`);
     for (const block of blocks) {
       const declared = new Set(parseDeclarations(block.body).map((d) => d.property));
       const absent = REQUIRED[ns].filter((r) => !declared.has(`--${ns}-${r}`));
@@ -1975,7 +1975,7 @@ function f8Failures(id, out, hosts) {
     check(isHex(placeholder) && decl("field-chevron") === fieldChevronUri(placeholder),
       `${m[1]} --opt-field-chevron ${decl("field-chevron")} is not fieldChevronUri(its --opt-field-placeholder ${placeholder})`);
   }
-  check(chevrons === 15, `field-chevron check visited ${chevrons} options blocks, expected 15 (14 themes + :root)`);
+  check(chevrons === POPUP_THEME_MAP.length + 1, `field-chevron check visited ${chevrons} options blocks, expected one per interface theme and :root`);
 }
 
 // --- Highlighter marks (spec docs/superpowers/specs/2026-10-03-library-

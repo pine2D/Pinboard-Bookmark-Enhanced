@@ -1896,6 +1896,15 @@
   "secExtensionAppearance": {
     "message": "扩展外观"
   },
+  "extensionStyleLabel": {
+    "message": "界面风格"
+  },
+  "extensionStyleStandard": {
+    "message": "标准"
+  },
+  "extensionStylePlatinum": {
+    "message": "铂金立体（浅色）"
+  },
   "themeAuto": {
     "message": "自动（跟随系统）"
   },

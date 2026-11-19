@@ -6,6 +6,7 @@
   <title>Bookmark Enhanced - Settings</title>
   <script src="options-theme-early.js"></script>
   <link rel="stylesheet" href="options.css">
+  <link rel="stylesheet" href="platinum-controls.css" media="(forced-colors: none)">
 </head>
 <body>
   <main class="container">
@@ -1604,7 +1605,14 @@
           </select>
           <p class="hint" id="opt-theme-overridden" hidden></p>
         </div>
-        <div class="pref-group">
+        <div class="fg entry-block">
+          <label class="bl" id="opt-extension-style-label" for="opt-extension-style" data-i18n="extensionStyleLabel">Interface style</label>
+          <select id="opt-extension-style" aria-labelledby="opt-extension-style-label" data-listbox>
+            <option value="standard" data-i18n="extensionStyleStandard">Standard</option>
+            <option value="platinum" data-i18n="extensionStylePlatinum">Platinum (light)</option>
+          </select>
+        </div>
+        <div class="pref-group" id="opt-follow-theme-group">
           <div class="pref-row context-help-host" data-help-role="choice">
             <label class="switch"><input type="checkbox" role="switch" id="opt-popup-follow-theme" aria-labelledby="opt-popup-follow-theme-label" aria-describedby="opt-popup-follow-theme-needs-preset" checked /> <span class="switch-text" id="opt-popup-follow-theme-label" data-i18n="optPopupFollowTheme">Extension pages follow the Pinboard theme preset</span>
             <details class="context-help">

@@ -1896,6 +1896,15 @@
   "secExtensionAppearance": {
     "message": "Apparence de l'extension"
   },
+  "extensionStyleLabel": {
+    "message": "Style de l’interface"
+  },
+  "extensionStyleStandard": {
+    "message": "Standard"
+  },
+  "extensionStylePlatinum": {
+    "message": "Platine (clair)"
+  },
   "themeAuto": {
     "message": "Auto (suivre le système)"
   },

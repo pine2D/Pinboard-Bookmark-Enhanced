@@ -3689,7 +3689,7 @@ function chipOverFillAcrossBlocks(css, ns, states, { file, what }) {
     parsed.push(st);
   }
   const blocks = fieldThemeBlocks(css, ns);
-  if (blocks.length !== 15) failures.push(`${file}: the ${what} gate found ${blocks.length} theme blocks, expected 15 (14 themes + :root)`);
+  if (blocks.length !== POPUP_THEME_MAP.length + 1) failures.push(`${file}: the ${what} gate found ${blocks.length} theme blocks, expected all registered interface themes and :root`);
   const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
   let measured = 0;
   const lowest = { r: Infinity, where: "" };
@@ -4938,7 +4938,7 @@ check(/@media[^{]*\(max-height:[^)]*\)\s*\{[\s\S]*?\.options-nav\s*\{[^}]*positi
 check(/\.pick\s*>\s*input:disabled\s*~\s*\.pick-text[^{}]*\{[^}]*color\s*:/.test(optionsCss),
   "options.css: .pick disabled checkbox rows (backup-section-picker, storage-cats) keep full-contrast text -- the user cannot tick them and the page never says why");
 
-function runOptionsEarly({ mode = "auto", preset = "", dark = false, syncMirror, chrome } = {}) {
+function runOptionsEarly({ mode = "auto", preset = "", dark = false, style = "standard", syncMirror, chrome } = {}) {
   // dataset is a Proxy that counts real mutations (K33): the write-only-on-
   // change guard is the actual product of the options-theme-early.js fix,
   // so tests need to see how many times dataset.theme was actually touched,
@@ -4955,7 +4955,7 @@ function runOptionsEarly({ mode = "auto", preset = "", dark = false, syncMirror,
     },
   });
   const root = { dataset };
-  const values = new Map([["pp-theme", mode], ["pp-theme-preset", preset]]);
+  const values = new Map([["pp-theme", mode], ["pp-theme-preset", preset], ["pp-extension-style", style]]);
   // task-7/K5: "pp-sync-enabled" is only seeded when a test explicitly asks
   // for it, so the pre-existing tests above (which pass no syncMirror) keep
   // exercising the two-hop fallback path unchanged.
@@ -5253,7 +5253,7 @@ function countingLocalDual(syncEnabledResponse, themeResponse) {
 // file) relevant to the mirror merge; applyTabMirror's DOMContentLoaded path
 // is inert here (no "pp-last-tab" seeded, same abstinence runOptionsEarly
 // shows toward fields it does not need).
-function runPopupEarly({ syncMirror, chrome } = {}) {
+function runPopupEarly({ syncMirror, chrome, style = "standard" } = {}) {
   const datasetStore = {};
   const dataset = new Proxy(datasetStore, {
     set(target, prop, value) { target[prop] = value; return true; },
@@ -5261,7 +5261,7 @@ function runPopupEarly({ syncMirror, chrome } = {}) {
   });
   const styleProps = {};
   const root = { dataset, style: { setProperty(k, v) { styleProps[k] = v; } } };
-  const values = new Map();
+  const values = new Map([["pp-extension-style", style]]);
   if (syncMirror !== undefined) values.set("pp-sync-enabled", syncMirror);
   const context = {
     document: { documentElement: root, addEventListener() {}, getElementById() { return null; } },
@@ -5274,6 +5274,23 @@ function runPopupEarly({ syncMirror, chrome } = {}) {
   };
   runInNewContext(popupThemeEarlyJs, context);
   return { root, values, styleProps };
+}
+
+// A cached style must paint synchronously. An authoritative switch back to
+// Standard restores the original Pinboard preset, including in dark mode.
+for (const boot of [runPopupEarly, runOptionsEarly]) {
+  for (const [style, stored, expected] of [
+    ["platinum", "standard", "dracula"], ["standard", "platinum", "platinum"],
+  ]) {
+    const sync = countingArea({ optTheme: "dark", themePresetKey: "dracula",
+      optPopupFollowTheme: true, optExtensionStyle: stored });
+    const run = boot({ style, syncMirror: "1", chrome: { storage: { sync, local: countingArea({}) } } });
+    if (style === "platinum") check(run.root.dataset.theme === "platinum",
+      boot.name + ": cached Platinum must be present before storage resolves");
+    await new Promise(resolve => setImmediate(resolve));
+    check(run.root.dataset.theme === expected && run.values.get("pp-extension-style") === stored,
+      boot.name + ": authoritative interface style wins and refreshes the mirror");
+  }
 }
 
 // --- popup-theme-early.js: mirror "1" picks sync directly, zero local.get calls ---
@@ -5395,13 +5412,13 @@ function inOrder(source, ...parts) {
 const optionsThemeApplyStart = optionsJs.indexOf("function applyOptionsPageTheme");
 const optionsThemeApplyEnd = optionsJs.indexOf("// Track active preset key", optionsThemeApplyStart);
 const optionsThemeApply = optionsJs.slice(optionsThemeApplyStart, optionsThemeApplyEnd);
-check(optionsThemeApply.includes('pbpApplyOptionsEarlyTheme(themeMode, presetKey, $id("opt-popup-follow-theme").checked)') &&
+check(optionsThemeApply.includes('pbpApplyOptionsEarlyTheme(themeMode, presetKey, $id("opt-popup-follow-theme").checked, $id("opt-extension-style").value)') &&
   !optionsThemeApply.includes("pbpStoreOptionsThemeMirror"),
   "options.js: visual theme apply also mutates the persisted mirror");
 check(inOrder(optionsJs,
   "Object.entries(fieldMap)", "el.value = val", "Object.entries(checkMap)", "el.checked = val",
   "syncKeysToggle.checked = syncApiKeys", "applyOptionsPageTheme(currentPresetKey, s.optTheme);",
-  "pbpStoreOptionsThemeMirror(s.optTheme, currentPresetKey, s.optPopupFollowTheme !== false);",
+  "pbpStoreOptionsThemeMirror(s.optTheme, currentPresetKey, s.optPopupFollowTheme !== false, s.optExtensionStyle);",
   'document.documentElement.dataset.optionsReady = "1";', "// Language change"),
   "options.js: General values, authoritative theme/mirror, and ready gate are out of order");
 const optionsSnapshotStart = optionsJs.indexOf("async function pbpSaveOptionsSnapshot");
@@ -5413,7 +5430,7 @@ const optionsSaveAll = optionsJs.slice(optionsSaveAllStart, optionsSaveAllEnd);
 check(inOrder(optionsSnapshot, "await persist(settingsDelta)", "if (!res.ok)",
   "if (onSettingsSaved) onSettingsSaved(settingsDelta);",
   "overlay = await saveOverlay(overlayValue);") &&
-  /onSettingsSaved\(settingsDelta\)[\s\S]*pbpStoreOptionsThemeMirror\(data\.optTheme, data\.themePresetKey, data\.optPopupFollowTheme !== false\)/.test(optionsSaveAll),
+  /onSettingsSaved\(settingsDelta\)[\s\S]*pbpStoreOptionsThemeMirror\(data\.optTheme, data\.themePresetKey, data\.optPopupFollowTheme !== false, data\.optExtensionStyle\)/.test(optionsSaveAll),
   "options.js: theme mirror is updated before settings persistence succeeds or after overlay work");
 
 check(/const el = document\.createElement\("button"\);[\s\S]{0,240}el\.className = "stag";/.test(popupTagsJs), "popup-tags.js: suggested tag is not a button");
@@ -8281,7 +8298,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
     { name: "unit focused", chip: bgOf(CHIP_FOCUS) || bgOf(CHIP_HOVER), fill: bgOf(FW), pct: 0.08 },
   ], { file: "options.css", what: "the eye's hover chip" });
   for (const failure of eyeChip.failures) check(false, failure);
-  check(eyeChip.measured === 30, `ui-contract-tests.mjs: the eye chip gate measured ${eyeChip.measured} (block, state) pairs, expected 30`);
+  check(eyeChip.measured === (POPUP_THEME_MAP.length + 1) * 2, `ui-contract-tests.mjs: the eye chip gate measured ${eyeChip.measured} (block, state) pairs, expected two per interface palette`);
   if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] eye chip: lowest ${eyeChip.lowest.r.toFixed(3)}:1 (${eyeChip.lowest.where}) over ${eyeChip.measured} (block, state) pairs; floor ${KEY_CHIP_MIN}`);
   gateDump(`[gate] chip options measured=${eyeChip.measured} lowest=${eyeChip.lowest.r.toFixed(3)} (${eyeChip.lowest.where}) ratios=${ratioHash(eyeChip.ratios)}`);
 }
@@ -8336,7 +8353,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
       check(stale.length === 0, `${surface} composer map for ${entry.id} carries retired role(s) ${stale.join(", ")}`);
     }
   }
-  check(composed === 42, `ui-contract-tests.mjs: the retired-role composer walk visited ${composed} (surface, theme) maps, expected 42 (3 x 14)`);
+  check(composed === POPUP_THEME_MAP.length * 3, `ui-contract-tests.mjs: the retired-role composer walk visited ${composed} (surface, theme) maps, expected three per registered theme`);
   const pilotDir = resolve(root, "docs/theme-surface/pilots");
   const pilotFiles = readdirSync(pilotDir).filter((f) => f.endsWith(".tokens.json"));
   check(pilotFiles.length >= 13, `ui-contract-tests.mjs: found only ${pilotFiles.length} pilot files under docs/theme-surface/pilots`);
@@ -8661,7 +8678,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
     { name: "shell focused", chip: bgOf(CHIP_FOCUS), fill: fillVarOf(secret[0].focus), pct: 0.08 },
   ], { file: "popup.css", what: "the eye's hover chip" });
   for (const failure of ppChip.failures) check(false, failure);
-  check(ppChip.measured === 30, `ui-contract-tests.mjs: the popup eye chip gate measured ${ppChip.measured} (block, state) pairs, expected 30`);
+  check(ppChip.measured === (POPUP_THEME_MAP.length + 1) * 2, `ui-contract-tests.mjs: the popup eye chip gate measured ${ppChip.measured} (block, state) pairs, expected two per interface palette`);
   if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] popup eye chip: lowest ${ppChip.lowest.r.toFixed(3)}:1 (${ppChip.lowest.where}) over ${ppChip.measured} (block, state) pairs; floor ${FILL_SEPARATE_MIN}`);
   gateDump(`[gate] chip popup measured=${ppChip.measured} lowest=${ppChip.lowest.r.toFixed(3)} (${ppChip.lowest.where}) ratios=${ratioHash(ppChip.ratios)}`);
 }
@@ -9149,7 +9166,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
   const stepChip = chipOverFillAcrossBlocks(libraryCss, "lib", CHIPS.map((c) => ({ name: c.name, chip: chipOf(c.sel), fill: fillOf(c.fillRule), pct: c.pct })),
     { file: "library.css", what: "the stepper chip" });
   for (const failure of stepChip.failures) check(false, failure);
-  check(stepChip.measured === 60, `ui-contract-tests.mjs: the stepper chip gate measured ${stepChip.measured} (block, state) pairs, expected 60`);
+  check(stepChip.measured === (POPUP_THEME_MAP.length + 1) * 4, `ui-contract-tests.mjs: the stepper chip gate measured ${stepChip.measured} (block, state) pairs, expected four per interface palette`);
   if (process.env.PBP_KEY_CHIP_MIN === "1") console.log(`[ui-contract] stepper chip: lowest ${stepChip.lowest.r.toFixed(3)}:1 (${stepChip.lowest.where}) over ${stepChip.measured} (block, state) pairs; floor ${STEP_CHIP_MIN}`);
   gateDump(`[gate] chip library measured=${stepChip.measured} lowest=${stepChip.lowest.r.toFixed(3)} (${stepChip.lowest.where}) ratios=${ratioHash(stepChip.ratios)}`);
 }

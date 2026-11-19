@@ -1,0 +1,165 @@
+/* Platinum draws only the chrome. Controls keep their native hit areas, roles,
+   disabled states and keyboard handling. Forced colors uses the surface CSS. */
+html[data-theme="platinum"] {
+  --pt-ink: #262626;
+  --pt-edge: #575757;
+  --pt-face: #ddd;
+  --pt-light: #fff;
+  --pt-shadow: #929292;
+  --pt-selection: #333399;
+  --pt-bevel: inset 1px 1px var(--pt-light), inset -1px -1px var(--pt-shadow);
+  --pt-well: inset 1px 1px #a3a3a3, inset -1px -1px #eee;
+}
+
+/* Keep the popup header in its normal account-and-actions layout. */
+html[data-theme="platinum"] .header-bar {
+  border-bottom: 1px solid var(--pt-shadow);
+}
+
+html[data-theme="platinum"] :is(.btn:not(.ghost, .danger, .primary, .theme-preset-btn, .saved-theme-btn),
+    .qbtn, .listbox-btn) {
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-edge);
+  box-shadow: var(--pt-bevel);
+}
+
+html[data-theme="platinum"] :is(.btn:not(.ghost, .danger, .primary, .theme-preset-btn, .saved-theme-btn),
+    .qbtn, .listbox-btn):hover:enabled {
+  background: #e8e8e8;
+  border-color: var(--pt-edge);
+}
+
+html[data-theme="platinum"] :is(.btn:not(.ghost, .danger), .qbtn, .listbox-btn):active:enabled,
+html[data-theme="platinum"] .listbox-btn[aria-expanded="true"] {
+  background: #666;
+  color: white;
+  box-shadow: inset 1px 1px #434343, inset -1px -1px #bbb;
+}
+
+html[data-theme="platinum"] :is(#submit-btn, #login-btn):enabled:not(.saved-success, .save-error, .loading) {
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-bevel), 0 0 0 1px var(--pt-light), 0 0 0 3px var(--pt-ink);
+}
+
+html[data-theme="platinum"] :is(#submit-btn, #login-btn):enabled:active:not(.saved-success, .save-error, .loading) {
+  background: #666;
+  color: white;
+}
+
+html[data-theme="platinum"] .listbox-btn {
+  padding-inline-end: 2px;
+  transition: none;
+}
+
+html[data-theme="platinum"] .listbox-btn > .btn-ic {
+  position: relative;
+  width: 19px;
+  height: 16px;
+  border-inline-start: 1px solid var(--pt-shadow);
+  color: inherit;
+}
+
+html[data-theme="platinum"] .listbox-btn > .btn-ic svg { display: none; }
+
+html[data-theme="platinum"] .listbox-btn > .btn-ic::before,
+html[data-theme="platinum"] .listbox-btn > .btn-ic::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  border-inline: 4px solid transparent;
+}
+
+html[data-theme="platinum"] .listbox-btn > .btn-ic::before {
+  top: 2px;
+  border-bottom: 5px solid currentColor;
+}
+
+html[data-theme="platinum"] .listbox-btn > .btn-ic::after {
+  bottom: 2px;
+  border-top: 5px solid currentColor;
+}
+
+html[data-theme="platinum"] .listbox-pop {
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-edge);
+  border-radius: 1px;
+  box-shadow: var(--pt-bevel), 2px 2px var(--pt-ink);
+}
+
+html[data-theme="platinum"] .listbox-list { padding: 2px; }
+
+html[data-theme="platinum"] .listbox-opt {
+  position: relative;
+  padding-inline-start: 1.65em;
+  border-radius: 0;
+}
+
+html[data-theme="platinum"] .listbox-opt[aria-selected="true"] {
+  background: transparent;
+  color: inherit;
+}
+
+/* CSS checkmark is decorative. aria-selected identifies the committed value,
+   while data-active follows the pointer or the arrow keys until confirmation. */
+html[data-theme="platinum"] .listbox-opt[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: .56em;
+  top: 50%;
+  width: .29em;
+  height: .58em;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-60%) rotate(45deg);
+}
+
+html[data-theme="platinum"] .listbox-opt[data-active]:not([aria-disabled="true"]),
+html[data-theme="platinum"] .tab-btn.active {
+  color: white;
+  background: var(--pt-selection);
+  border-color: transparent;
+}
+
+html[data-theme="platinum"] :is(.field > input[type="text"], .field > textarea,
+    .tags-input-wrap, .search-field, .fg > textarea, .fg > input:is([type="text"], [type="password"], [type="number"]),
+    .notes-toolbar input[type="search"]):not(:disabled) {
+  background: white;
+  color: var(--pt-ink);
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-well);
+}
+
+html[data-theme="platinum"] :is(button, input, select, textarea):focus-visible,
+html[data-theme="platinum"] .tags-input-wrap:focus-within {
+  outline: 2px solid var(--pt-selection);
+  outline-offset: 2px;
+}
+
+/* Set row roles locally so the read pane and annotation colors keep their
+   own inks. Multi-selected rows have a lighter band; the open row is indigo. */
+html[data-theme="platinum"] :is(.notes-hit, .vocab-card, .ask-library-hit)[aria-current] {
+  --lib-row-current-bg: var(--pt-selection);
+  --lib-row-current-bg-hover: #28287c;
+  --lib-row-band-current-bg: #292976;
+  --lib-row-band-current-bg-hover: #222266;
+  --lib-row-selected-fg: white;
+  --lib-row-current-fg-muted: #f1f1ff;
+  border-radius: 0;
+}
+
+html[data-theme="platinum"] :is(.notes-hit, .vocab-card).selected:not([aria-current]) {
+  --lib-row-band-bg: #c1c1d3;
+  --lib-row-band-bg-hover: #b6b6cb;
+  border-radius: 0;
+}
+
+html[data-theme="platinum"] .tab-btn.active:focus-visible,
+html[data-theme="platinum"] :is(.notes-hit, .vocab-card)[aria-current] :is(.notes-hit-btn, .notes-card-top):focus-visible,
+html[data-theme="platinum"] .ask-library-hit[aria-current]:focus-visible {
+  outline: 2px solid white;
+  outline-offset: -3px;
+}

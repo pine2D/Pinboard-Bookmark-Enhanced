@@ -51,6 +51,9 @@ test('fixed themes only schedule their real scheme and reject incompatible reque
   const scenario = catalog.QA_SCENARIOS.find(row => row.id === 'qa.themes.options');
   assert.throws(() => catalog.qaThemeCases(scenario, { theme: ['dracula'], scheme: ['light'] }), /Invalid theme\/scheme combination/);
   assert.deepEqual(catalog.qaThemeCases(scenario, { theme: ['dracula', 'modern-card'], scheme: ['light'] }), [{ theme: 'modern-card', scheme: 'light' }]);
+  assert.deepEqual(catalog.qaThemeCases(scenario, { theme: ['platinum'] }), [{ theme: 'platinum', scheme: 'light' }]);
+  const site = catalog.QA_SCENARIOS.find(row => row.id === 'qa.themes.site');
+  assert.throws(() => catalog.qaThemeCases(site, { theme: ['platinum'] }), /Invalid theme\/scheme combination/);
   assert.deepEqual(catalog.qaThemeCases(scenario, { theme: ['flexoki'], scheme: ['light', 'dark'] }), [{ theme: 'flexoki', scheme: 'light' }, { theme: 'flexoki', scheme: 'dark' }]);
 });
 

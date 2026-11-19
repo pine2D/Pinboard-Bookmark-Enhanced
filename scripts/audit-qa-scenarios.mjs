@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const optionsHtml = readFileSync(new URL('../options.html', import.meta.url), 'utf8');
 export const QA_OPTIONS_PANELS = [...optionsHtml.matchAll(/id="tab-([a-z-]+)"/g)].map(m => m[1]);
 export const QA_THEME_PRESETS = [...new Set([...optionsHtml.matchAll(/theme-preset-btn" data-theme="([a-z0-9-]*)"/g)].map(m => m[1] || 'default'))];
+export const QA_INTERFACE_THEMES = [...QA_THEME_PRESETS, "platinum"];
 export const QA_LOCALES = ['zh_CN', 'en', 'de', 'fr', 'ja', 'pl', 'ru', 'zh_TW', 'zh_HK'];
 const adaptiveBlock = readFileSync(new URL('../shared.js', import.meta.url), 'utf8').match(/const ADAPTIVE_THEME_MAP = \{([\s\S]*?)\n\};/);
 if (!adaptiveBlock) throw new Error('QA theme metadata: ADAPTIVE_THEME_MAP missing');
@@ -14,12 +15,13 @@ const themeModes = new Map(QA_THEME_PRESETS.map(theme => {
   if (!['light', 'dark'].includes(mode)) throw new Error(`QA theme metadata: unsupported mode ${theme}/${mode}`);
   return [theme, [mode]];
 }));
+themeModes.set("platinum", ["light"]);
 const runtimeAxes = { dpr: ['1'], font: ['native', 'ci'] };
 const narrowAxes = { locale: QA_LOCALES, viewport: ['320', '420'], scheme: ['light', 'dark'], density: ['comfortable', 'compact'] };
 const files = {
-  options: ['options.html', 'options.js', 'options.css', 'options-connectivity.js', 'options-backup.js', 'options-vocab.js'],
-  popup: ['popup.html', 'popup.js', 'popup.css', 'popup-ai.js', 'popup-tags.js', 'popup-offline.js'],
-  library: ['library.html', 'library.js', 'library.css', 'library-notes.js', 'library-vocab.js'],
+  options: ['options.html', 'options.js', 'options.css', 'platinum-controls.css', 'options-connectivity.js', 'options-backup.js', 'options-vocab.js'],
+  popup: ['popup.html', 'popup.js', 'popup.css', 'platinum-controls.css', 'popup-ai.js', 'popup-tags.js', 'popup-offline.js'],
+  library: ['library.html', 'library.js', 'library.css', 'platinum-controls.css', 'library-notes.js', 'library-vocab.js'],
   reader: ['md-preview.html', 'md-preview.js', 'md-preview.css', 'md-reader.js', 'md-ask.js', 'md-translate.js', 'md-highlight.js'],
   site: ['pinboard-style.js', 'pinboard-sort.js', 'pinboard-themes.js'],
 };
@@ -55,7 +57,7 @@ export const QA_SCENARIOS = [
   row('discovery.reader-setup', 'discovery', 'reader-setup', ['reader', 'options'], ['ai', 'settings', 'account'], ['interaction', 'journey'], {}, { needsNetwork: true }),
   row('discovery.popup-setup', 'discovery', 'popup-setup', ['popup', 'options'], ['ai', 'settings'], ['interaction', 'journey']),
   ...['options', 'library', 'popup', 'site', 'reader'].map(surface => row(`themes.${surface}`, 'themes', surface, [surface], ['theme'], ['visual'], {
-    scheme: ['light', 'dark'], ...(surface !== 'reader' ? { theme: surface === 'site' ? QA_THEME_PRESETS.filter(p => p !== 'default') : QA_THEME_PRESETS } : {}),
+    scheme: ['light', 'dark'], ...(surface !== 'reader' ? { theme: surface === 'site' ? QA_THEME_PRESETS.filter(p => p !== 'default') : QA_INTERFACE_THEMES } : {}),
   })),
   ...['options', 'library', 'popup'].map(surface => row(`themes.${surface}-unset`, 'themes', `${surface}-unset`, [surface], ['theme'], ['visual'], { scheme: surface === 'popup' ? ['light', 'dark'] : ['light'] })),
   ...['ai-429', 'ai-500', 'ai-malformed', 'ai-truncated', 'pb-401', 'pb-500'].map(fault => row(`fault.${fault}`, 'faults', fault, [fault.startsWith('ai-') ? 'reader' : 'popup'], [fault.startsWith('ai-') ? 'translation' : 'bookmark'], ['error'], { fault: [fault] }, { fault, needsNetwork: fault.startsWith('ai-') })),
@@ -77,7 +79,7 @@ const selected = (axes, axis, defaults) => axis in axes ? [...axes[axis]] : [...
 export function qaThemeCases(scenario, axes = {}) {
   if (scenario.driver !== 'themes' || !scenario.axes.theme) return [];
   const schemes = selected(axes, 'scheme', scenario.axes.scheme);
-  const cases = selected(axes, 'theme', scenario.axes.theme).flatMap(theme =>
+  const cases = selected(axes, 'theme', scenario.axes.theme).filter(theme => scenario.axes.theme.includes(theme)).flatMap(theme =>
     (themeModes.get(theme) || []).filter(scheme => schemes.includes(scheme)).map(scheme => ({ theme, scheme })));
   if (!cases.length) throw new Error(`Invalid theme/scheme combination for ${scenario.id}`);
   return cases;

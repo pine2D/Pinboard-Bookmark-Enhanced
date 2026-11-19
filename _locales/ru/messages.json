@@ -1896,6 +1896,15 @@
   "secExtensionAppearance": {
     "message": "Оформление расширения"
   },
+  "extensionStyleLabel": {
+    "message": "Стиль интерфейса"
+  },
+  "extensionStyleStandard": {
+    "message": "Стандартный"
+  },
+  "extensionStylePlatinum": {
+    "message": "Платина (светлый)"
+  },
   "themeAuto": {
     "message": "Авто (по настройкам системы)"
   },

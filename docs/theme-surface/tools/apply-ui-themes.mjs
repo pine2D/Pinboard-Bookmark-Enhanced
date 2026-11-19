@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { composePopupThemes } from "../composers/popup-chrome.mjs";
+import { composePopupThemes, POPUP_THEME_MAP } from "../composers/popup-chrome.mjs";
 import { composeOptionsThemes } from "../composers/options-chrome.mjs";
 import { composeLibraryThemes } from "../composers/library-chrome.mjs";
 import { renderComponents } from "../composers/ui-components.mjs";
@@ -33,8 +33,9 @@ const ACTIVE_COMPONENT_FAMILIES = { pp: ["btn", "btnIc", "danger", "chip", "form
 
 function loadPilots() {
   const by = {};
-  for (const f of readdirSync(PILOTS).filter(f => f.endsWith(".tokens.json")))
-    by[f.replace(/\.tokens\.json$/, "")] = JSON.parse(readFileSync(resolve(PILOTS, f), "utf8"));
+  for (const { pilot } of POPUP_THEME_MAP) {
+    by[pilot] ??= JSON.parse(readFileSync(resolve(PILOTS, pilot + ".tokens.json"), "utf8"));
+  }
   return by;
 }
 

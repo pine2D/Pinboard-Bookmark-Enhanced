@@ -1905,6 +1905,15 @@
   "secExtensionAppearance": {
     "message": "Extension Appearance"
   },
+  "extensionStyleLabel": {
+    "message": "Interface style"
+  },
+  "extensionStyleStandard": {
+    "message": "Standard"
+  },
+  "extensionStylePlatinum": {
+    "message": "Platinum (light)"
+  },
   "themeAuto": {
     "message": "Auto (follow system)"
   },

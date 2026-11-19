@@ -19,6 +19,8 @@ export const POPUP_THEME_MAP = [
   { id: "gruvbox-dark", pilot: "gruvbox-dark", mode: "dark" },
   { id: "rose-pine", pilot: "rose-pine", mode: "dark" },
   { id: "github-light", pilot: "github-light", mode: "light" },
+  // UI-only pilots live below this directory so site preset discovery stays independent.
+  { id: "platinum", pilot: "ui-only/platinum", mode: "light" },
 ];
 
 // Default-surface (no preset selected) component-layer baseline — Task 5,

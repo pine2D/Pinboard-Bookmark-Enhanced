@@ -3333,6 +3333,50 @@ html[data-theme="github-light"] {
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%235a626b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --opt-link: #0969da;
 }
+html[data-theme="platinum"] {
+  color-scheme: light;
+  --opt-bg: #eeeeee;
+  --opt-panel: #ffffff;
+  --opt-tab: #cccccc;
+  --opt-tab-active: #dedede;
+  --opt-fg: #262626;
+  --opt-fg-muted: #454545;
+  --opt-fg-hint: #505050;
+  --opt-accent: #333399;
+  --opt-save: #365d35;
+  --opt-border: #717171;
+  --opt-border-section: #aaaaaa;
+  --opt-input-bg: #e3e3e3;
+  --opt-input-border: #e3e3e3;
+  --opt-btn-bg: #cccccc;
+  --opt-btn-hover: #e6e6ef;
+  --opt-pf-bg: #ededed;
+  --opt-code-bg: #cccccc;
+  --opt-radius-sm: 2px;
+  --opt-radius-md: 3px;
+  --opt-radius-lg: 3px;
+  --opt-danger: #9d2828;
+  --opt-warn: #774c16;
+  --opt-btn-border: #cccccc;
+  --opt-focus-bd: #6a6ab0;
+  --opt-btn-fg: #262626;
+  --opt-btn-fg-muted: #454545;
+  --opt-danger-quiet-fg: #952626;
+  --opt-on-danger: #ffffff;
+  --opt-chip-bg: #e8e8eb;
+  --opt-chip-fg: #333366;
+  --opt-on-accent: #ffffff;
+  --opt-field-bg: #e2e2e2;
+  --opt-field-border: #e2e2e2;
+  --opt-field-bg-hover: #d8d8d8;
+  --opt-field-border-hover: #d8d8d8;
+  --opt-field-bg-focus: #e2e2e2;
+  --opt-field-border-focus: #6a6ab0;
+  --opt-field-placeholder: #505050;
+  --opt-field-fg: #262626;
+  --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23505050' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --opt-link: #333399;
+}
 :root {
   color-scheme: light;
   --opt-btn-fg: #000000;
