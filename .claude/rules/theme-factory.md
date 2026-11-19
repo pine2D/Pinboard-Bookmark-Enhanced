@@ -4,6 +4,7 @@ paths:
   - "popup.css"
   - "options.css"
   - "library.css"
+  - "platinum-controls.css"
   - "pinboard-themes.js"
   - "tests/render-audit-checklist.mjs"
   - "tests/render-audit-known-failures.json"

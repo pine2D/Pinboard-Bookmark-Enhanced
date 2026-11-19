@@ -5319,12 +5319,212 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     'md-preview-theme-early.js: non-platinum preset set data-reader-theme');
 }
 
-// Platinum listbox open-hover contrast guard (prevents 1175d89d's 1.23:1 white-on-#e8e8e8 bug).
+// Platinum listbox open-hover contrast guard & systemic CSS first-principles invariants
+// across all five surface stylesheets (popup.css, options.css, library.css, md-preview.css, platinum-controls.css).
 {
   const ptControlsCss = readFileSync(resolve(root, "platinum-controls.css"), "utf8");
   check(/\.listbox-btn[\s\S]{0,120}:hover:enabled:not\(\[aria-expanded="true"\]/.test(ptControlsCss) &&
     /\[aria-expanded="true"\],\s*\[aria-expanded="true"\]:hover/.test(ptControlsCss),
     "platinum-controls.css: .listbox-btn hover must exclude [aria-expanded=\"true\"] and lock expanded+hover to paired dark sunken fill + white text");
+
+  // 0) Governance wiring: platinum-controls.css must never bypass layout-lint, edit-time hook, or pre-commit UI consumer arm.
+  const layoutLintSrc = read("docs/theme-surface/tools/layout-lint.mjs");
+  const consumerLintSrc = read("scripts/ui-consumer-lint.mjs");
+  const preCommitSrc = read("scripts/pre-commit-hook.sh");
+  check(layoutLintSrc.includes('"platinum-controls.css"'),
+    "layout-lint.mjs TARGETS must include platinum-controls.css");
+  check(/const GOVERNED = \/.*platinum-controls\\\.css.*\//.test(consumerLintSrc),
+    "scripts/ui-consumer-lint.mjs GOVERNED must include platinum-controls.css");
+  check(/UI_HTML_RE='[^']*platinum-controls\\\.css[^']*'/.test(preCommitSrc),
+    "scripts/pre-commit-hook.sh UI_HTML_RE must include platinum-controls.css");
+
+  // Helper: split top-level comma-separated CSS values (respecting parentheses and quotes).
+  const splitTopLevelComma = (value) => {
+    const parts = [];
+    let depth = 0;
+    let quote = "";
+    let start = 0;
+    for (let i = 0; i < value.length; i++) {
+      const ch = value[i];
+      if (quote) {
+        if (ch === "\\") { i++; continue; }
+        if (ch === quote) quote = "";
+        continue;
+      }
+      if (ch === '"' || ch === "'") { quote = ch; continue; }
+      if (ch === "(") depth++;
+      else if (ch === ")" && depth > 0) depth--;
+      else if (ch === "," && depth === 0) {
+        parts.push(value.slice(start, i).trim());
+        start = i + 1;
+      }
+    }
+    const tail = value.slice(start).trim();
+    if (tail) parts.push(tail);
+    return parts;
+  };
+
+  // 1) box-shadow Z-order bevel occlusion gate:
+  //    In CSS, earlier shadows in a comma list paint ON TOP of later shadows.
+  //    An `inset 0 0 0 <S>px` ring placed before `inset <dx> <dy> 0 [spread2]`
+  //    with max(|dx|, |dy|) + max(0, spread2) <= S completely covers and erases
+  //    the inner highlight/bevel (turning a 3D chip/button into a flat box).
+  const parseInsetLayer = (layer) => {
+    const stripped = layer.replace(/\b(?:rgba?|hsla?|color-mix|light-dark)\([^()]*\)/gi, " ").trim();
+    const tokens = stripped.split(/\s+/).filter(Boolean);
+    if (!tokens.includes("inset")) return null;
+    const nums = [];
+    for (const tok of tokens) {
+      if (tok === "0") nums.push(0);
+      else if (/^-?\d+(?:\.\d+)?px$/i.test(tok)) nums.push(parseFloat(tok));
+    }
+    if (nums.length < 2) return null;
+    const [dx, dy, blur = 0, spread = 0] = nums;
+    return { dx, dy, blur, spread };
+  };
+  const scanShadowOcclusions = (sheets) => {
+    const hits = [];
+    for (const [file, css] of sheets) {
+      const rules = parseStyleRules(css);
+      const customProps = new Map();
+      for (const r of rules) {
+        for (const d of parseDeclarations(r.body)) {
+          if (d.property.startsWith("--")) customProps.set(d.property, d.value);
+        }
+      }
+      const expandVars = (val, depth = 0) => {
+        if (depth > 2 || !val.includes("var(")) return val;
+        return val.replace(/var\(\s*(--[A-Za-z0-9_-]+)\s*\)/g, (full, name) =>
+          customProps.has(name) ? expandVars(customProps.get(name), depth + 1) : full);
+      };
+      for (const r of rules) {
+        for (const d of parseDeclarations(r.body)) {
+          if (d.property !== "box-shadow") continue;
+          const expanded = expandVars(d.value);
+          if (expanded === "none") continue;
+          const layers = splitTopLevelComma(expanded).map(parseInsetLayer);
+          for (let i = 0; i < layers.length; i++) {
+            const top = layers[i];
+            if (!top || top.dx !== 0 || top.dy !== 0 || top.blur !== 0 || top.spread <= 0) continue;
+            for (let j = i + 1; j < layers.length; j++) {
+              const under = layers[j];
+              if (!under || under.blur !== 0) continue;
+              const reach = Math.max(Math.abs(under.dx), Math.abs(under.dy)) + Math.max(0, under.spread);
+              if (reach > 0 && reach <= top.spread) {
+                hits.push(`${file} (${r.selectors[0]}): layer ${i + 1} (inset 0 0 0 ${top.spread}px) occludes layer ${j + 1}`);
+              }
+            }
+          }
+        }
+      }
+    }
+    return hits;
+  };
+  check(scanShadowOcclusions([["bad.css", ".chip { box-shadow: inset 0 0 0 1px #000, inset 1px 1px 0 #fff; }"]]).length === 1 &&
+    scanShadowOcclusions([["bad-var.css", ":root { --b: inset 1px 1px 0 #fff; } .btn { box-shadow: inset 0 0 0 1px #000, var(--b); }"]]).length === 1 &&
+    scanShadowOcclusions([["ok-tbox.css", ".tbox::after { box-shadow: inset 1px 1px 0 #000, inset 0 0 0 2px #000, inset 3px 3px 0 #fff; }"]]).length === 0,
+    "ui-contract: scanShadowOcclusions self-test regressed");
+
+  const fiveSheets = [
+    ["popup.css", read("popup.css")],
+    ["options.css", read("options.css")],
+    ["library.css", read("library.css")],
+    ["md-preview.css", read("md-preview.css")],
+    ["platinum-controls.css", ptControlsCss],
+  ];
+  const shadowOcclusions = scanShadowOcclusions(fiveSheets);
+  check(shadowOcclusions.length === 0,
+    `box-shadow bevel occlusion detected (earlier inset spread ring covers later bevel): [${shadowOcclusions.join("; ")}]`);
+
+  // 2) Bordered sized ::before / ::after box-sizing gate:
+  //    `* { box-sizing: border-box }` in popup.css / options.css does NOT match ::before or ::after.
+  //    Any ::before / ::after rule in a sheet without a universal pseudo border-box reset that sets
+  //    both positive width/height and a 4-sided border must declare box-sizing explicitly.
+  const scanPseudoBoxSizing = (sheets) => {
+    const hits = [];
+    for (const [file, css] of sheets) {
+      const rules = parseStyleRules(css);
+      const hasPseudoReset = rules.some((r) =>
+        r.context.length === 0 &&
+        r.selectors.some((s) => s === "*::before" || s === "*:before") &&
+        r.selectors.some((s) => s === "*::after" || s === "*:after") &&
+        parseDeclarations(r.body).some((d) => d.property === "box-sizing" && d.value === "border-box"));
+      if (hasPseudoReset) continue;
+      for (const r of rules) {
+        if (!r.selectors.some((s) => /::?(?:before|after)$/.test(s))) continue;
+        const declMap = new Map(parseDeclarations(r.body).map((d) => [d.property, d.value.trim()]));
+        const hasPositiveSize = ["width", "height"].some((p) => {
+          const v = declMap.get(p);
+          return v && v !== "0" && v !== "0px" && v !== "auto" && v !== "100%";
+        });
+        const borderVal = declMap.get("border");
+        const hasFourSidedBorder = Boolean(borderVal && !/^(?:0|none)\b/.test(borderVal) &&
+          !(declMap.has("border-width") && /\b0(?:px)?\b/.test(declMap.get("border-width"))));
+        if (hasPositiveSize && hasFourSidedBorder && !declMap.has("box-sizing")) {
+          hits.push(`${file} (${r.selectors[0]})`);
+        }
+      }
+    }
+    return hits;
+  };
+  check(scanPseudoBoxSizing([["bad.css", ".switch-track::before { width: 12px; height: 12px; border: 1px solid #000; }"]]).length === 1 &&
+    scanPseudoBoxSizing([["ok.css", ".switch-track::before { box-sizing: border-box; width: 12px; height: 12px; border: 1px solid #000; }"]]).length === 0 &&
+    scanPseudoBoxSizing([["tick.css", ".chk::after { width: 3px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; }"]]).length === 0,
+    "ui-contract: scanPseudoBoxSizing self-test regressed");
+  const pseudoBoxHits = scanPseudoBoxSizing(fiveSheets);
+  check(pseudoBoxHits.length === 0,
+    `bordered ::before/::after without explicit box-sizing (defaults to content-box and overflows by 2px): [${pseudoBoxHits.join("; ")}]`);
+
+  // 3) Icon-only button symmetric padding & non-polluted border gate:
+  //    Icon-only toolbar/popover buttons must not use asymmetric horizontal padding or
+  //    single-side border-left/border-right group dividers on the button element itself.
+  const ICON_BTN_SEL_RE = /(?:\.pb-hl-(?:note|explain|dict|seek)-btn|\.header-ic|\.ask-ic|\.skim-ic|\.action-btn\.icon-only|\.xp-(?:resize-grip|dock|pin|close))(?![A-Za-z0-9_-])/;
+  const scanIconButtonTraps = (sheets) => {
+    const hits = [];
+    for (const [file, css] of sheets) {
+      for (const r of parseStyleRules(css)) {
+        const iconSels = r.selectors.filter((s) => ICON_BTN_SEL_RE.test(s) && !/::?(?:before|after)$/.test(s));
+        if (!iconSels.length) continue;
+        const declMap = new Map(parseDeclarations(r.body).map((d) => [d.property, d.value.trim()]));
+        const pad = declMap.get("padding");
+        if (pad) {
+          const parts = pad.split(/\s+/);
+          if (parts.length === 4 && parts[1] !== parts[3]) {
+            hits.push(`${file} (${iconSels[0]}): asymmetric horizontal padding "${pad}"`);
+          }
+        }
+        const pl = declMap.get("padding-left") ?? declMap.get("padding-inline-start");
+        const pr = declMap.get("padding-right") ?? declMap.get("padding-inline-end");
+        if ((pl !== undefined || pr !== undefined) && pl !== pr) {
+          hits.push(`${file} (${iconSels[0]}): unmatched directional inline padding (${pl ?? "unset"} vs ${pr ?? "unset"})`);
+        }
+        for (const side of ["border-left", "border-right", "border-inline-start", "border-inline-end"]) {
+          const bv = declMap.get(side);
+          if (bv && !/^(?:0|none)\b/.test(bv) && !declMap.has("border")) {
+            hits.push(`${file} (${iconSels[0]}): single-side separator "${side}: ${bv}" on button box`);
+          }
+        }
+      }
+    }
+    return hits;
+  };
+  check(scanIconButtonTraps([["bad1.css", ".pb-hl-dict-btn { padding: 0 4px 0 8px; }"]]).length === 1 &&
+    scanIconButtonTraps([["bad2.css", ".pb-hl-note-btn + .pb-hl-explain-btn { border-left: 1px solid var(--border); }"]]).length === 1 &&
+    scanIconButtonTraps([["ok.css", ".pb-hl-dict-btn { width: 22px; height: 22px; padding: 0; }"]]).length === 0,
+    "ui-contract: scanIconButtonTraps self-test regressed");
+  const iconTrapHits = scanIconButtonTraps(fiveSheets);
+  check(iconTrapHits.length === 0,
+    `icon-only button geometry/separator violation: [${iconTrapHits.join("; ")}]`);
+
+  // 4) Platinum full-height listbox cap & switch copy-only anchor contracts:
+  const ptListboxBtn = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn');
+  const ptListboxIc = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn > .btn-ic');
+  check(ptListboxBtn.get("grid-template-rows") === "minmax(0, 1fr)" &&
+    ptListboxBtn.get("align-content") === "stretch" &&
+    ptListboxIc.get("box-shadow") === "none",
+    "platinum-controls.css: .listbox-btn must stretch its single grid row track (grid-template-rows: minmax(0, 1fr); align-content: stretch) and keep .btn-ic free of competing box-shadow");
+  check(!optionsCss.includes("--pbp-switch-answer") && optionsCss.includes("--pbp-switch-copy-bottom"),
+    "options.css: .switch-track must anchor to static copy line-box edges (--pbp-switch-copy-bottom), never to nodes inside details::details-content");
 }
 
 // --- popup-theme-early.js: mirror "1" picks sync directly, zero local.get calls ---

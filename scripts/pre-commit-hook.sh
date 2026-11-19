@@ -30,7 +30,7 @@ STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
 # removing a rule file or a register breaks the index without changing a kept file.
 STAGED_WITH_DELETES=$(git diff --cached --name-only --no-renames)
 THEME_RE='^(docs/theme-surface/(pilots/[^/]+\.tokens\.json|composers/[^/]+\.mjs|tools/[^/]+\.mjs|tools/override-debt-baseline\.json|manifest\.json|tokens\.schema\.json)|pinboard-themes\.js|popup\.css|options\.css|library\.css)$'
-UI_HTML_RE='^((popup|options|library|md-preview)\.html|md-preview\.css|(popup|options|library)(-[a-z-]+)?\.js|listbox\.js|md-dict\.js|dict-[a-z-]+\.js)$'
+UI_HTML_RE='^((popup|options|library|md-preview)\.html|md-preview\.css|platinum-controls\.css|(popup|options|library)(-[a-z-]+)?\.js|listbox\.js|md-dict\.js|dict-[a-z-]+\.js)$'
 UI_VOCAB_RE='^((popup|options|library|md-preview)\.html|(popup|options|library)(-[a-z-]+)?\.js|listbox\.js|md-[a-z-]+\.js|shared\.js|docs/theme-surface/ui-vocabulary\.json|scripts/ui-vocabulary-baseline\.json|scripts/ui-vocabulary-lint\.mjs)$'
 CHANGED=$(printf '%s
 ' "$STAGED" | grep -E "$THEME_RE")

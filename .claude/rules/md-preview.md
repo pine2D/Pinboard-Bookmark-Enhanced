@@ -2,6 +2,7 @@
 paths:
   - "md-preview.html"
   - "md-preview.css"
+  - "platinum-controls.css"
   - "md-preview.js"
   - "md-ai-core.js"
   - "md-translate.js"

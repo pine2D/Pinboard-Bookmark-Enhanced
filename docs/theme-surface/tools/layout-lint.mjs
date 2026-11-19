@@ -22,6 +22,7 @@ const TARGETS = [
   resolve(ROOT, "popup.css"),
   resolve(ROOT, "options.css"),
   resolve(ROOT, "library.css"),
+  resolve(ROOT, "platinum-controls.css"),
 ];
 
 let blockers = 0;

@@ -734,14 +734,21 @@ html.save-error-below { scroll-padding-block: 0 var(--opt-save-clearance); }
   float: left;
   anchor-name: --pbp-switch-copy-top;
 }
-.pref-row.context-help-host[data-help-role="choice"] > label.switch > .context-help > .context-help-body { anchor-name: --pbp-switch-answer; }
+.pref-row.context-help-host[data-help-role="choice"] > label.switch > .switch-text::after {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  vertical-align: bottom;
+  anchor-name: --pbp-switch-copy-bottom;
+}
 .pref-row.context-help-host[data-help-role="choice"] > label.switch > .switch-track {
   position: absolute;
   right: 0;
   top: var(--opt-row-pad-y);
   top: anchor(--pbp-switch-copy-top top, var(--opt-row-pad-y));
   bottom: var(--opt-row-pad-y);
-  bottom: calc(anchor(--pbp-switch-answer top, calc(var(--opt-row-pad-y) - var(--opt-sp-3))) + var(--opt-sp-3));
+  bottom: anchor(--pbp-switch-copy-bottom bottom, var(--opt-row-pad-y));
   margin-block: auto;
 }
 /* The native input covers the first line only (the 20px row plus the
@@ -1096,10 +1103,10 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
    empty status line is not a paragraph, so it never pulls the next one up. */
 .hint:not(.context-help-body, [hidden], .hidden, :empty) + .hint:not(.context-help-body, :empty) { margin-top: calc(var(--opt-sp-2) - var(--opt-rhythm)); }
 .fg > .hint:not(.context-help-body, [hidden], .hidden, :empty) + .hint:not(.context-help-body, :empty) { margin-top: var(--opt-sp-2); }
-/* Shortcut rows ("[label] <keys> [Open Chrome Shortcut Settings]") are a plain
-   .fg-actions: its gap spaces the parts and a wrapped button starts flush at
-   the row's edge (the old `.shortcut-current + .btn` margin-left kept its
-   indent after wrapping). A status hint inside a row drops its block rhythm. */
+/* Shortcut rows ("[label] [Open Chrome Shortcut Settings] <keys>") are a plain
+   .fg-actions: the primary action button anchors flush at the column edge like
+   every other action row, and the current binding readout sits to its right.
+   A status hint inside a row drops its block rhythm. */
 .fg-actions > .hint { margin: 0; }
 .fg.entry-block > .fg-actions:first-child { margin-top: 0; }
 /* :not(.btn): a button-styled link inside a hint (the Chrome shortcut

@@ -8,6 +8,7 @@ paths:
   - "options.css"
   - "library.css"
   - "md-preview.css"
+  - "platinum-controls.css"
   - "popup.js"
   - "popup-*.js"
   - "options.js"

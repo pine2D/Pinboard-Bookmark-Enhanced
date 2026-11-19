@@ -8,6 +8,7 @@ paths:
   - "options.css"
   - "library.css"
   - "md-preview.css"
+  - "platinum-controls.css"
   - "shared.js"
   - "listbox.js"
   - "library.js"
@@ -57,3 +58,8 @@ popup / library 的值盒子（文本、搜索、密钥输入框，textarea，`l
 - `.save-status` 基线 margin-left 对所有 flex 行都错，攒出 5 条逐行 reset。
 - 两套折叠机制（JS accordion + native details）并存，三种标题面。
 - 同特异性规则靠源序压住修复：`.fg-stack > label.bl` 与 `.fg label.bl` 平局，前者从未生效。
+- `box-shadow` 叠层遮挡斜面：先写 `inset 0 0 0 1px` 再写 `inset 1px 1px 0` 高光/暗边，第一层会完全盖死后续斜面层而退化为扁平框（已由 `tests/ui-contract-tests.mjs` 拦截）。
+- 伪元素 `content-box` 溢出：`popup.css` / `options.css` 的 `*` 重置不含 `::before` / `::after`，带四边 `border` 与尺寸的伪元素滑块/方块必须显式声明 `box-sizing: border-box`（已由 `tests/ui-contract-tests.mjs` 拦截）。
+- 图标按钮混入分组分隔边与不对称内距：在圆角 `<button>` 上写 `border-left` + `padding: 0 4px 0 8px` 会使悬停框偏心、分隔线两端弯曲；分组线应由盒外独立伪元素绘制，图标按钮保持对称正方形盒（已由 `tests/ui-contract-tests.mjs` 拦截）。
+- 静态行内控件锚定到折叠子容器：`.switch-track` 若锚定到 `details::details-content` 内部节点，紧凑档 `min-height` 余量与 `content-visibility: allow-discrete` 会造成首尾帧 1px 跳变；静止控件只锚定静止文本行本身。
+- 固定高度 `inline-grid` 按钮设 `align-content: center` 且未设 `grid-template-rows: minmax(0, 1fr)` 时，隐式行轨缩成行高，`height: 100%` 右侧箭头舱会悬空断边（已由 `tests/ui-contract-tests.mjs` 拦截）。

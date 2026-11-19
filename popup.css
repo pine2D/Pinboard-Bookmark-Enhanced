@@ -1007,6 +1007,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .action-link.loading, .action-link.disabled-link { color: var(--pp-disabled-fg); pointer-events: none; }
 .action-link.loading::before, .submit-bar button.loading::before {
   content: "";
+  box-sizing: content-box;
   display: inline-block;
   width: 10px; height: 10px;
   border: 2px solid var(--pp-spinner-bg);

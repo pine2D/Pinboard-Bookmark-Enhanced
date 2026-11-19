@@ -3125,18 +3125,17 @@ html.motion-ready #pb-hl-bar:popover-open {
   width: 22px;
   height: 22px;
   padding: 0;
-  border: none;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--fg-muted);
   cursor: pointer;
   border-radius: var(--radius-sm);
   position: relative;
 }
-/* 22px box -> 24px hit area. -1px (not the swatches' -4px) because this
-   button has no border and no padding, so its padding box -- what the inset
-   resolves against -- is the full 22px. 1px per side fits inside the bar's
-   6px gap, so the neighbouring swatch's own pad is still not touched. */
-.pb-hl-note-btn::before { content: ""; position: absolute; inset: -1px; }
+/* 22px border-box (20px padding-box) -> 24px hit area via -2px inset against
+   the padding-box. 1px per side outside the border box fits inside the bar's
+   8px gap without touching neighbouring swatch hit zones. */
+.pb-hl-note-btn::before { content: ""; position: absolute; inset: -2px; }
 .pb-hl-note-btn:hover { color: var(--fg); background: var(--btn-hover); }
 /* Focus ring split out of :hover. Fused with outline:none the whole bar
    spoke two focus languages -- the colour swatches above ring, these
@@ -3146,33 +3145,41 @@ html.motion-ready #pb-hl-bar:popover-open {
    6px and its edge is a pill, so an outward ring rides over that border. */
 .pb-hl-note-btn:focus-visible { color: var(--fg); background: var(--btn-hover); outline: 2px solid var(--link); outline-offset: -1px; }
 .pb-hl-note-btn svg { width: 13px; height: 13px; }
-/* Explain entry fused into this bar (formerly a standalone floating pill in
-   md-ask.js). Same box as .pb-hl-note-btn, plus a divider on the left to set
-   it apart from the color dots/note button. .pb-hl-dict-btn (real-device
-   feedback: dedicated dictionary entry) joins this same family verbatim. */
+/* Explain / dictionary / timeline-seek icon buttons share the exact symmetric
+   22x22 square box of .pb-hl-note-btn so hover/focus fills stay dead-centred
+   around the 13px glyph. Group separation is drawn by a standalone 1x14px
+   ::after rule outside the button box (never border-left + asymmetric padding
+   on a rounded button, which shifts the glyph off-centre and curves the line). */
 .pb-hl-explain-btn, .pb-hl-dict-btn, .pb-hl-seek-btn {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 22px;
   height: 22px;
-  padding: 0 4px 0 8px;
-  border: none;
+  padding: 0;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--fg-muted);
   cursor: pointer;
   border-radius: var(--radius-sm);
   position: relative;
 }
-/* 22px tall -> 24px hit area (width already clears it: 8+13+4). Same 1px
-   pad as .pb-hl-note-btn above, absorbed by the bar's 6px gap. */
 .pb-hl-explain-btn::before, .pb-hl-dict-btn::before, .pb-hl-seek-btn::before {
-  content: ""; position: absolute; inset: -1px;
+  content: ""; position: absolute; inset: -2px;
 }
-/* Only the first of the pair carries the group divider -- they act as one
-   action group off the color dots/note button. "First" is whichever leads in
-   the DOM: md-highlight.js moves the dictionary ahead of explain for a lone
-   foreign word (_pbpHlOrderLookup), and the divider follows it. */
-.pb-hl-note-btn + :is(.pb-hl-explain-btn, .pb-hl-dict-btn) { margin-left: var(--sp-0); border-left: 1px solid var(--border); }
+/* Only the first visible lookup button in normal reading mode carries the
+   external vertical separator; timeline mode hides .pb-hl-note-btn. */
+#pb-hl-bar:not(.pb-hl-bar--timeline) .pb-hl-note-btn + :is(.pb-hl-explain-btn, .pb-hl-dict-btn) { margin-left: var(--sp-1); }
+#pb-hl-bar:not(.pb-hl-bar--timeline) .pb-hl-note-btn + :is(.pb-hl-explain-btn, .pb-hl-dict-btn)::after {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 3px;
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  pointer-events: none;
+}
 .pb-hl-explain-btn:hover,
 .pb-hl-dict-btn:hover,
 .pb-hl-seek-btn:hover { color: var(--fg); background: var(--btn-hover); }

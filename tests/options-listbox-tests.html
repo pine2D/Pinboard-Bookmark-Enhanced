@@ -1682,6 +1682,9 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       const row = label.nextElementSibling;
       assert(row && row.classList.contains("fg-actions") && row.querySelector(".shortcut-current"),
         "shortcut label is not directly above its action row: " + (label && label.id));
+      assert(row.children[0]?.getAttribute("href") === "chrome://extensions/shortcuts" &&
+        row.children[1]?.classList.contains("shortcut-current"),
+        "shortcut action row must place the Chrome shortcuts button before .shortcut-current: " + (label && label.id));
       assert(!row.querySelector(".hint"), "the action row still carries an inline label: " + label.id);
     }
   });

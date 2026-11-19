@@ -163,14 +163,14 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 |------|------|
 | scripts/settings-schema.mjs、shared.js、background.js、options.html、options.js、options-backup.js、bookmark-services.js、popup.js、popup-offline.js、popup-batch.js、md-bookmark.js、vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js（设置项契约 / 存储路由 / 同步 / 书签连接 / 离线队列） | `.claude/rules/storage-sync.md` |
 | background.js、manifest.json、SW 用 importScripts 载入的数据模块（bookmark-services / vocab-store / notes-sync / dict-archive / ask-archive 及其 *-gdrive.js、restore-points.js、wayback.js）、pinboard-style.js、pinboard-sort.js、bili-player-bridge.js | `.claude/rules/mv3.md` |
-| 四个表面 HTML/CSS、popup.js、popup-*.js、options.js、options-*.js、library.js、library-*.js、listbox.js、shared.js、md-*.js（UI 文本、字体栈、图标） | `.claude/rules/ui-fonts-icons.md` |
-| 四个表面 HTML/CSS、shared.js、listbox.js、ui-vocabulary.json 与基线（新增任何 UI 元素；library 运行时创建值盒子的 library.js / library-vocab.js / library-notes.js 也要先读） | `.claude/rules/ui-primitives.md` |
-| docs/theme-surface/**、popup.css、options.css、library.css、pinboard-themes.js、render-audit 家族（ui-render-audit / audit-render-scenarios / render-audit-ledger / checklist / known-failures）、ui-contract-tests、theme-*-tests | `.claude/rules/theme-factory.md` |
+| 四个表面 HTML/CSS、platinum-controls.css、popup.js、popup-*.js、options.js、options-*.js、library.js、library-*.js、listbox.js、shared.js、md-*.js（UI 文本、字体栈、图标） | `.claude/rules/ui-fonts-icons.md` |
+| 四个表面 HTML/CSS、platinum-controls.css、shared.js、listbox.js、ui-vocabulary.json 与基线（新增任何 UI 元素；library 运行时创建值盒子的 library.js / library-vocab.js / library-notes.js 也要先读） | `.claude/rules/ui-primitives.md` |
+| docs/theme-surface/**、popup.css、options.css、library.css、platinum-controls.css、pinboard-themes.js、render-audit 家族（ui-render-audit / audit-render-scenarios / render-audit-ledger / checklist / known-failures）、ui-contract-tests、theme-*-tests | `.claude/rules/theme-factory.md` |
 | scripts/audit*.mjs、tests/audit*-tests.mjs、qa-drive、ci-fonts、verify.sh、.qa-scan/run-test.mjs、slice-anchor-lint、coverage-report、tests/fixtures/chrome-mock.js（选审计场景、`--font=ci`、新测试怎么写） | `.claude/rules/audit.md` |
 | vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js、options-vocab.js、library-vocab.js、library-notes.js、md-highlight.js、anki-connect.js、eudic-sync.js、vocab-send.js | `.claude/rules/vocab-sync.md` |
 | vocab-gdrive.js、notes-gdrive.js、dict-archive-gdrive.js、ask-archive-gdrive.js、options-vocab.js、library.js、background.js、tests/ 下的 vocab-gdrive-tests.html、notes-gdrive-tests.html、options-drive-sync-tests.html、drive-scopes-tests.html、drive-migration-tests.html（连接层 / 身份缓存 / 错误码 / OAuth / 权限） | `.claude/rules/drive-sync.md` |
 | dict-archive.js、dict-archive-gdrive.js、ask-archive.js、ask-archive-gdrive.js、library-ask.js | `.claude/rules/archive-sync.md` |
-| md-preview.*、md-preview-theme-early.js、md-translate.js、md-ask.js、md-reader.js、md-highlight.js、md-ai-core.js、md-bookmark.js、md-skim.js、md-convert.js、md-epub.js、md-mermaid.js、md-export-send.js、md-video.js、md-dict.js、md-ocr.js、md-speech.js、md-vocab-echo.js、bili-player-bridge.js | `.claude/rules/md-preview.md` |
+| md-preview.*、platinum-controls.css、md-preview-theme-early.js、md-translate.js、md-ask.js、md-reader.js、md-highlight.js、md-ai-core.js、md-bookmark.js、md-skim.js、md-convert.js、md-epub.js、md-mermaid.js、md-export-send.js、md-video.js、md-dict.js、md-ocr.js、md-speech.js、md-vocab-echo.js、bili-player-bridge.js | `.claude/rules/md-preview.md` |
 | md-dict.js、md-vocab-echo.js、ai-cache.js、library-vocab.js（查词界面） | `.claude/rules/dict.md` |
 | dict-entry.js、dict-evidence.js、md-dict.js（AI 词条与补充的生成） | `.claude/rules/dict-entry.md` |
 | dict-pack.js、options-vocab.js、md-dict.js、library-vocab.js（离线词典包） | `.claude/rules/dict-pack.md` |

@@ -220,7 +220,7 @@ html[data-reader-theme="platinum"] {
   --radius-lg: 3px;
 }
 
-/* Shared composite bevel shadows & font stack */
+/* Shared composite bevel shadows, zero-tween Mac OS 9 motion tokens & font stack */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) {
   --pt-font-ui: "Lucida Grande", "Geneva", Verdana, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
   --pt-btn-shadow: inset 1px 1px 0 var(--pt-face), inset -1px -1px 0 var(--pt-bevel-d1), inset 2px 2px 0 var(--pt-glint), inset -2px -2px 0 var(--pt-bevel-d2);
@@ -231,13 +231,40 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
   --pt-well-shadow: inset 1px 1px 0 var(--pt-bevel-mid), 1px 1px 0 var(--pt-glint);
   --pt-window-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-mid), 2px 2px 0 var(--pt-shadow-drop);
   --pt-pinstripe-bg: linear-gradient(var(--pt-stripe-hi) 50%, var(--pt-stripe-lo) 50%);
+  --pt-arrows-dark-ink: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="%23262626" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>');
+  --pt-arrows-light-ink: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="%23eaeaea" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>');
+  --pt-arrows-pressed-ink: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="%23ffffff" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>');
+  --pt-select-arrows: var(--pt-arrows-dark-ink);
+  /* Classic Mac OS 9 Appearance Manager snaps controls, disclosures, and menus
+     instantaneously without web fade/slide/height tweens. 0.01ms stays truthy
+     for parseFloat(...) || fallback while firing transitionend immediately. */
+  --motion-state: 0.01ms;
+  --motion-pop: 0.01ms;
+  --motion-pop-out: 0.01ms;
+  --motion-collapse: 0.01ms;
+  --motion-collapse-out: 0.01ms;
+  --pp-motion-duration: 0.01ms;
+  --pp-motion-state: 0.01ms;
+  --pp-motion-pop: 0.01ms;
+  --pp-motion-pop-out: 0.01ms;
+}
+
+html[data-theme="platinum-dark"],
+html[data-reader-theme="platinum"][style*="dark"] {
+  --pt-select-arrows: var(--pt-arrows-light-ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-reader-theme="platinum"]:not([style*="light"]) {
+    --pt-select-arrows: var(--pt-arrows-light-ink);
+  }
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) body {
   font-family: var(--pt-font-ui);
 }
 
-/* Classic Mac OS 9 crisp presentation: eliminate @starting-style slide jumps */
+/* Eliminate @starting-style slide jumps, Popup fadeSlideDown keyframes, and literal chevron tweens */
 html.motion-ready:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   :is(.pf:not([hidden]), .backup-import-preview, .backup-import-result, #tag-gov-progress:not([hidden])) {
   transition: none;
@@ -246,8 +273,22 @@ html.motion-ready:is([data-theme="platinum-light"], [data-theme="platinum-dark"]
 }
 
 html.motion-ready:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  :is(.confirm-popover, .theme-name-popover, #explain-pop, #typo-pop, #pb-hl-bar, #search-pop, #kbd-help-pop, #pb-hl-card, #fn-pop, .send-menu) {
+  :is(.confirm-popover, .theme-name-popover, #explain-pop, #typo-pop, #pb-hl-bar, #search-pop, #kbd-help-pop, #pb-hl-card, #fn-pop, .send-menu, #rail-history-pop, #dict-resize-pop) {
   translate: 0 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(details.motion-toggle > summary::after,
+      #skim-collapse.motion-toggle svg,
+      .xp-dict-ai-details.dict-motion > summary::after,
+      #vocab-ref-result .xp-dict-ai-details.dict-motion > summary::after,
+      .feedback-card,
+      .autocomplete-dropdown,
+      #jina-md-history-pop,
+      .offline-bar,
+      .login-error) {
+  transition: none;
+  animation: none;
 }
 
 /* ==========================================================================
@@ -294,7 +335,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .qbtn:not(.saving, .saved),
       .fc-btn,
       .action-btn:not(.copied, .es-quiet),
-      .toggle-btn:not(.view-toggle > .toggle-btn),
+      .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
       .xp-act,
@@ -320,7 +361,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .qbtn:not(.saving, .saved),
       .fc-btn,
       .action-btn:not(.copied, .es-quiet),
-      .toggle-btn:not(.view-toggle > .toggle-btn),
+      .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
       .xp-act,
@@ -341,7 +382,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .qbtn:not(.saving, .saved),
       .fc-btn,
       .action-btn:not(.copied, .es-quiet),
-      .toggle-btn:not(.view-toggle > .toggle-btn),
+      .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
       .xp-act,
@@ -351,7 +392,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .xp-vocab:not([data-face="update"]),
       .xp-open-vocab,
       .xp-dict-connect,
-      .xp-dict-speak):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], .active) {
+      .xp-dict-speak):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], .active) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
@@ -596,6 +637,8 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
    ========================================================================== */
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn {
+  grid-template-rows: minmax(0, 1fr);
+  align-content: stretch;
   padding-inline-end: 0;
   column-gap: 0;
   background: var(--pt-face);
@@ -611,21 +654,38 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-va
   padding-inline-end: 6px;
 }
 
+/* Full-height right arrow cap inside .listbox-btn's unbroken outer 4-layer bevel:
+   no competing inner rectangle box-shadow on .btn-ic (which previously floated at
+   line-height and sliced across the outer right bevel); ::after draws the authentic
+   Mac OS 9 2-tone vertical etched groove cleanly between top glint and bottom shade. */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn > .btn-ic {
   position: relative;
-  width: 21px;
+  width: 22px;
   height: 100%;
   align-self: stretch;
   display: inline-grid;
   place-items: center;
   margin: 0;
-  border-inline-start: 1px solid var(--pt-bevel-d2);
-  box-shadow: var(--pt-mini-bevel);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   color: inherit;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn > .btn-ic svg {
   display: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn > .btn-ic::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  background: var(--pt-bevel-d1);
+  box-shadow: 1px 0 0 var(--pt-glint);
+  pointer-events: none;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn > .btn-ic::before {
@@ -671,9 +731,13 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   .listbox-btn:is([aria-expanded="true"], [aria-expanded="true"]:hover, :active:enabled) > .btn-ic {
-  border-inline-start-color: var(--pt-pressed-s1);
-  box-shadow: var(--pt-mini-pressed);
   color: var(--pt-pressed-fg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .listbox-btn:is([aria-expanded="true"], [aria-expanded="true"]:hover, :active:enabled) > .btn-ic::after {
+  background: var(--pt-pressed-s1);
+  box-shadow: 1px 0 0 var(--pt-pressed-s2);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-pop {
@@ -703,6 +767,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-op
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-opt[aria-selected="true"]::before {
   content: "";
+  box-sizing: content-box;
   position: absolute;
   inset-inline-start: 0.58em;
   top: 50%;
@@ -719,15 +784,110 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   color: var(--pt-sel-fg);
 }
 
-/* Native <select> fallback (mobile tab picker, reader export/dictionary language selects) */
+/* Native & Customizable <select> (mobile tab picker, Reader export/dictionary/video selects) */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  select:not([hidden]) {
+  select:not([hidden]),
+html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-inline-end: 26px;
   background-color: var(--pt-face);
+  background-image:
+    var(--pt-select-arrows),
+    linear-gradient(90deg, var(--pt-bevel-d1) 0 1px, var(--pt-glint) 1px 2px);
+  background-position: right 7px center, right 21px center;
+  background-size: 7px 10px, 2px calc(100% - 4px);
+  background-repeat: no-repeat;
   color: var(--pt-ink);
   font-weight: 600;
   border: 1px solid var(--pt-edge);
   border-radius: 3px;
   box-shadow: var(--pt-btn-shadow);
+  transition: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  select:not([hidden]):hover:not(:disabled, :active),
+html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):hover:not(:disabled, :active) {
+  background-color: var(--pt-face-hover);
+  color: var(--pt-ink);
+  border-color: var(--pt-edge);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  select:not([hidden]):active:not(:disabled),
+html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):active:not(:disabled) {
+  background-color: var(--pt-pressed-bg);
+  background-image:
+    var(--pt-arrows-pressed-ink),
+    linear-gradient(90deg, var(--pt-pressed-s1) 0 1px, var(--pt-pressed-s2) 1px 2px);
+  color: var(--pt-pressed-fg);
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-btn-pressed-shadow);
+}
+
+/* Chromium customizable <select> (::picker(select)) in Reader: match .listbox-pop Mac OS 9 menu */
+@supports selector(::picker(select)) {
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) {
+    appearance: base-select;
+  }
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate)::picker-icon {
+    display: none;
+  }
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):open {
+    background-color: var(--pt-pressed-bg);
+    background-image:
+      var(--pt-arrows-pressed-ink),
+      linear-gradient(90deg, var(--pt-pressed-s1) 0 1px, var(--pt-pressed-s2) 1px 2px);
+    color: var(--pt-pressed-fg);
+    border-color: var(--pt-edge);
+    box-shadow: var(--pt-btn-pressed-shadow);
+  }
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate)::picker(select) {
+    appearance: base-select;
+    margin-top: 2px;
+    padding: 2px;
+    background: var(--pt-dialog);
+    color: var(--pt-ink);
+    border: 1px solid var(--pt-frame);
+    border-radius: 0;
+    box-shadow: var(--pt-window-shadow);
+  }
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option {
+    position: relative;
+    padding: 3px 10px 3px 22px;
+    border-radius: 0;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 18px;
+    color: var(--pt-ink);
+    background: transparent;
+  }
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option::checkmark {
+    display: none;
+  }
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option:checked {
+    background: transparent;
+    color: var(--pt-ink);
+    font-weight: 700;
+  }
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option:checked::before {
+    content: "";
+    box-sizing: content-box;
+    position: absolute;
+    inset-inline-start: 7px;
+    top: 50%;
+    width: 3.5px;
+    height: 7px;
+    border: solid currentColor;
+    border-width: 0 2px 2px 0;
+    transform: translateY(-60%) rotate(45deg);
+  }
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option:is(:hover, :focus-visible, :checked:hover, :checked:focus-visible) {
+    background: var(--pt-sel-bg);
+    color: var(--pt-sel-fg);
+    outline: none;
+  }
 }
 
 /* ==========================================================================
@@ -772,16 +932,20 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   outline-offset: 1px;
 }
 
-/* Rectangular 28x16 Sunken Trough + Raised Beveled Square Thumb Switch */
+/* Rectangular 28x16 Sunken Trough + Raised Beveled Square Thumb Switch:
+   explicit box-sizing: border-box on ::before prevents options.css's `*` reset
+   (which omits ::before/::after) from expanding 12px + 2px border to 14px and
+   knocking the thumb 1px down onto the bottom border. */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch-track {
   border-radius: 2px;
   border: 1px solid var(--pt-edge);
   background: var(--pt-paper-alt);
-  box-shadow: inset 1px 1px 0 var(--pt-bevel-mid);
+  box-shadow: inset 1px 1px 0 var(--pt-bevel-d2);
   transition: none;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch-track::before {
+  box-sizing: border-box;
   top: 1px;
   left: 1px;
   width: 12px;
@@ -790,13 +954,13 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch-tra
   background: var(--pt-face);
   border: 1px solid var(--pt-edge);
   box-shadow: var(--pt-mini-bevel);
-  transition: transform 90ms ease-out;
+  transition: none;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked ~ .switch-track {
   background: var(--pt-sel-bg);
   border-color: var(--pt-edge);
-  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.45);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.22);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked ~ .switch-track::before {
@@ -845,6 +1009,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar input[type="checkbox"]:checked::after {
   content: "";
+  box-sizing: content-box;
   position: absolute;
   left: 4px;
   top: 1px;
@@ -906,13 +1071,17 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   font-weight: 700;
 }
 
-/* Popup suggested tags (.stag) & quick tag presets (.preset-btn) */
+/* Popup suggested tags (.stag) & quick tag presets (.preset-btn):
+   real 1px outer border + --pt-mini-bevel matching Options .tag-gov-chip-face
+   (never `inset 0 0 0 1px` before `inset 1px 1px 0`, which occludes the bevel). */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .stag:not(.used) {
+  padding: 1px 9px;
   background: var(--pt-face);
   color: var(--pt-ink);
-  border: 0;
+  font-weight: 500;
+  border: 1px solid var(--pt-edge);
   border-radius: 2px;
-  box-shadow: inset 0 0 0 1px var(--pt-edge), inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-d1);
+  box-shadow: var(--pt-mini-bevel);
   transition: none;
 }
 
@@ -924,22 +1093,27 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .stag:not(.used):hover {
   background: var(--pt-face-hover);
   color: var(--pt-ink);
+  border-color: var(--pt-edge);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .stag:not(.used):active {
-  background: var(--pt-pressed-bg);
-  color: var(--pt-pressed-fg);
-  box-shadow: inset 0 0 0 1px var(--pt-edge), inset 1px 1px 0 var(--pt-pressed-s1), inset -1px -1px 0 var(--pt-pressed-s2);
+  background: var(--pt-chip-checked-bg);
+  color: var(--pt-chip-checked-fg);
+  border-color: var(--pt-edge);
+  box-shadow: inset 1px 1px 0 var(--pt-chip-checked-s1), inset -1px -1px 0 var(--pt-chip-checked-s2);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   .stag:not(.used):active :is(.ac-count, .stag-num) {
-  color: var(--pt-pressed-fg);
+  color: var(--pt-chip-checked-fg);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .stag.used {
+  padding: 1px 9px;
   background: transparent;
   color: var(--pt-ink-hint);
+  border: 1px dashed var(--pt-divider);
+  border-radius: 2px;
   box-shadow: none;
   text-decoration: line-through;
 }
@@ -1155,12 +1329,12 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .quick-acti
   display: none;
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .qbtn-split > .qbtn-primary {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .qbtn-split > .qbtn.qbtn-primary {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .qbtn-split > .qbtn-caret {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .qbtn-split > .qbtn.qbtn-caret {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
@@ -1174,6 +1348,44 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   box-shadow: var(--pt-window-shadow);
 }
 
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .autocomplete-dropdown {
+  padding: 2px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .ac-item {
+  border-radius: 0;
+  font-weight: 600;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .ac-item:is(:hover, .selected) {
+  background: var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .ac-item:is(:hover, .selected) .ac-count {
+  color: var(--pt-sel-muted);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .options-search-results {
+  padding: 2px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .options-search-result {
+  border-radius: 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .options-search-result:is(:hover, :focus-visible) {
+  background: var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .options-search-result:is(:hover, :focus-visible) :is(.options-search-result-panel, .options-search-result-snippet) {
+  color: var(--pt-sel-muted);
+}
+
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #jina-md-history-pop .pp-rh-list {
   background: var(--pt-paper);
   border: 1px solid var(--pt-field-edge);
@@ -1183,6 +1395,28 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #jina-md-hi
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #jina-md-history-pop .pp-rh-item:hover {
   background: var(--pt-row-hover);
+}
+
+/* Unified Mac OS 9 Platinum Beveled Keycaps (<kbd>) & Unset Shortcut Status */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.shortcut-current kbd, .ac-hint-footer kbd, .lib-keys kbd, #kbd-help-pop kbd) {
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  font-weight: 600;
+  border: 1px solid var(--pt-edge);
+  border-radius: 2px;
+  box-shadow: var(--pt-mini-bevel);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .shortcut-current kbd:last-child {
+  margin-right: 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .shortcut-current .shortcut-unset {
+  background: transparent;
+  color: var(--pt-ink-muted);
+  border: 1px dashed var(--pt-divider);
+  border-radius: 2px;
 }
 
 /* ==========================================================================
@@ -1701,7 +1935,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .ask-librar
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(.vocab-filter-set:popover-open, .lib-keys:popover-open) {
+  :is(.vocab-filter-set:popover-open, .lib-keys:popover-open, .notes-color-menu:popover-open, .vocab-export-menu:popover-open) {
   background: var(--pt-dialog);
   color: var(--pt-ink);
   border: 1px solid var(--pt-frame);
@@ -1709,12 +1943,26 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   box-shadow: var(--pt-window-shadow);
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-keys kbd {
-  background: var(--pt-face);
-  color: var(--pt-ink);
-  border: 1px solid var(--pt-edge);
-  border-radius: 2px;
-  box-shadow: var(--pt-mini-bevel);
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.notes-color-menu, .vocab-export-menu)[popover] {
+  padding: 2px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.notes-color-choice, .vocab-export-choice) {
+  border-radius: 0;
+  font-weight: 600;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.notes-color-choice:hover, .vocab-export-choice:hover, .notes-color-choice[aria-checked="true"]) {
+  background: var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-export-choice:hover > .btn-ic {
+  color: inherit;
 }
 
 /* ==========================================================================
@@ -1758,6 +2006,19 @@ html[data-reader-theme="platinum"] .rail::before {
 
 html[data-reader-theme="platinum"] .rail-ident :is(#rail-ocr-btn, #rail-history-btn, #rail-settings-btn) {
   border-radius: 2px;
+}
+
+/* Reader Split Buttons (#send-split & .pbv-copy-group): fused Mac OS 9 beveled pair */
+html[data-reader-theme="platinum"] .send-split:not(.send-empty) > .action-btn.send-primary,
+html[data-reader-theme="platinum"] .pbv-copy-group > button.pbv-copy {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+html[data-reader-theme="platinum"] .send-split > .action-btn.send-caret,
+html[data-reader-theme="platinum"] .pbv-copy-group > button.pbv-copy-caret {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 html[data-reader-theme="platinum"] .toc-list {
@@ -1840,6 +2101,51 @@ html[data-reader-theme="platinum"]
   box-shadow: var(--pt-window-shadow);
 }
 
+html[data-reader-theme="platinum"] .send-menu {
+  padding: 2px;
+  top: calc(100% + 2px);
+}
+
+html[data-reader-theme="platinum"] .send-mi {
+  padding: 4px 10px;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--pt-ink);
+  transition: none;
+}
+
+html[data-reader-theme="platinum"] .send-mi:is(:hover, :focus-visible) {
+  background: var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
+  outline: none;
+  box-shadow: none;
+}
+
+html[data-reader-theme="platinum"] .send-mi:is(:hover, :focus-visible) .send-mi-tag {
+  color: var(--pt-sel-muted);
+}
+
+html[data-reader-theme="platinum"] .send-mi-foot {
+  margin-top: 2px;
+  padding-top: 5px;
+  border-top: 1px solid var(--pt-bevel-mid);
+  box-shadow: inset 0 1px 0 var(--pt-glint);
+  opacity: 1;
+}
+
+html[data-reader-theme="platinum"] #rail-history-pop .rh-list {
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-field-edge);
+  box-shadow: var(--pt-well-shadow);
+  padding: 2px;
+}
+
+html[data-reader-theme="platinum"] #rail-history-pop .rh-item:hover {
+  background: var(--pt-row-hover);
+}
+
 html[data-reader-theme="platinum"] #pb-hl-bar .pb-hl-dot {
   border-radius: 2px;
   border: 1px solid var(--pt-edge);
@@ -1854,7 +2160,16 @@ html[data-reader-theme="platinum"]
 html[data-reader-theme="platinum"]
   #pb-hl-bar :is(.pb-hl-note-btn, .pb-hl-explain-btn, .pb-hl-dict-btn, .pb-hl-seek-btn):hover {
   background: var(--pt-face-hover);
-  box-shadow: inset 0 0 0 1px var(--pt-edge), var(--pt-mini-bevel);
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-mini-bevel);
+}
+
+html[data-reader-theme="platinum"]
+  #pb-hl-bar :is(.pb-hl-note-btn, .pb-hl-explain-btn, .pb-hl-dict-btn, .pb-hl-seek-btn):active {
+  background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-mini-pressed);
 }
 
 /* #explain-pop Lookup / Explain / Translate Floating Window:
