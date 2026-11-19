@@ -885,6 +885,7 @@ function _pbpSearchEnsurePop() {
   input.setAttribute("aria-label", t("srchInputAria"));
   input.addEventListener("input", _pbpSearchOnInput);
   input.addEventListener("keydown", (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key !== "Enter") return;
     e.preventDefault();
     // Flush a pending 150ms debounce: comparing the live input value

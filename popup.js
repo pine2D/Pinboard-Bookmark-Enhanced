@@ -1128,6 +1128,7 @@ async function showMain(token) {
   const searchInput = $id("search-input");
   if (searchInput) {
     searchInput.addEventListener("keydown", (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === "Enter" && searchInput.value.trim()) {
         chrome.tabs.create({ url: `https://pinboard.in/search/u:${username}?query=${enc(searchInput.value.trim())}` });
       }
@@ -3044,7 +3045,9 @@ function setupSubmit(token) {
     }, 3000);
   });
 
-  document.addEventListener("keydown", (e) => {
+  document.addEventListener("keydown", function onPopupShortcut(e) {
+    // Candidate selection can bubble here even after the field's own IME guard.
+    if (e.isComposing || e.keyCode === 229) return;
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       const mainSection = $id("main-section");
       if (!mainSection.classList.contains("hidden")) {
@@ -3082,11 +3085,7 @@ function setupSubmit(token) {
           }
         }, () => {});
       }
-    } else if (e.key === "Escape" && !e.isComposing && e.keyCode !== 229) {
-      // An IME uses Escape to drop its candidate list; that keystroke is the
-      // input method's, not a request to close the popup (critique
-      // 2026-10-21). keyCode 229 covers engines that report the composing
-      // Escape without isComposing.
+    } else if (e.key === "Escape") {
       // No .del-confirm-popover branch here any more: the delete confirm is
       // a shared showConfirmPopover() now, and that helper installs its own
       // capture-phase Escape handler with stopImmediatePropagation -- it

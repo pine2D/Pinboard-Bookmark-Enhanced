@@ -480,6 +480,14 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     const input = document.getElementById("options-search-input");
     input.value = "model name";
     input.dispatchEvent(new Event("input"));
+    input.focus();
+    for (const flags of [{ isComposing:true }, { keyCode:229 }]) {
+      for (const key of ["Enter", "Escape", "ArrowDown"]) {
+        const event = new KeyboardEvent("keydown", { key, bubbles:true, cancelable:true, ...flags });
+        input.dispatchEvent(event);
+        assert(!event.defaultPrevented && !opened && input.value === "model name" && document.activeElement === input, "candidate key was consumed: " + key);
+      }
+    }
     input.dispatchEvent(new KeyboardEvent("keydown", { key:"Enter", bubbles:true }));
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     assert(opened === "ai" && document.activeElement === document.getElementById("model-name"), "result did not open/focus");

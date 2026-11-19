@@ -3847,7 +3847,7 @@ async function withPopupSubmitFixture(options, check) {
       }
     });
     function pressCombinedAi(h) {
-      const startAt = source.indexOf('  document.addEventListener("keydown", (e) => {\n    if ((e.ctrlKey || e.metaKey) && e.key === "Enter")');
+      const startAt = source.indexOf('  document.addEventListener("keydown", function onPopupShortcut(e) {');
       const endAt = source.indexOf("\n  });\n", startAt);
       assert(startAt >= 0 && endAt > startAt, "Shift+Enter listener missing");
       let handler;
@@ -6650,14 +6650,27 @@ async function withPopupSubmitFixture(options, check) {
       } finally { long.remove(); short.remove(); }
     });
 
-    // Critique 2026-10-21: an IME's Escape (dropping the candidate list) must
-    // not reach the branch that closes the popup.
-    test("Escape closes the popup only outside IME composition", () => {
-      const closeAt = source.indexOf("window.close();", source.indexOf('e.key === "Escape"'));
-      const branchAt = source.lastIndexOf("e.key === \"Escape\"", closeAt);
-      assert(closeAt > 0 && branchAt > 0, "Escape close branch not found");
-      const guard = source.slice(branchAt, source.indexOf("{", branchAt));
-      assert(guard.includes("!e.isComposing") && guard.includes("229"), "the closing Escape branch ignores IME state: " + guard);
+    await testAsync("popup save, AI and Escape shortcuts yield to IME composition", async () => {
+      const { frame, api, window: win } = await loadPopupSubmitFixture();
+      try {
+        api.configure({ url: URL, title: "Title", notes: "", tags: [] });
+        const doc = win.document, actions = [];
+        doc.getElementById("main-section").classList.remove("hidden");
+        doc.getElementById("submit-btn").click = () => actions.push("save");
+        win.doAISummary = async () => { actions.push("summary"); };
+        win.doAITags = async () => { actions.push("tags"); };
+        win.close = () => actions.push("close");
+        const field = doc.getElementById("title-input");
+        const shortcuts = [{key:"Enter", ctrlKey:true}, {key:"Enter", metaKey:true}, {key:"Enter", shiftKey:true}, {key:"Escape"}];
+        for (const flags of [{isComposing:true}, {keyCode:229}, {}]) {
+          for (const key of shortcuts) {
+            const event = new win.KeyboardEvent("keydown", { bubbles:true, cancelable:true, ...key, ...flags });
+            field.dispatchEvent(event);
+            if (flags.isComposing || flags.keyCode) assert(!event.defaultPrevented && !actions.length, "popup handled a candidate key");
+          }
+        }
+        assert(actions.join(",") === "save,save,summary,tags,close", "ordinary shortcuts: " + actions);
+      } finally { frame.remove(); }
     });
 
     // Critique 2026-10-21: the lookup on open spends Pinboard's 3s slot, so a
@@ -6804,7 +6817,7 @@ async function withPopupSubmitFixture(options, check) {
     // call, writing a summary into the words being typed. Runs the SHIPPED
     // listener, sliced out of popup.js.
     test("Shift+Enter breaks a line in the notes and runs AI everywhere else", () => {
-      const startAt = source.indexOf('  document.addEventListener("keydown", (e) => {\n    if ((e.ctrlKey || e.metaKey) && e.key === "Enter")');
+      const startAt = source.indexOf('  document.addEventListener("keydown", function onPopupShortcut(e) {');
       const endAt = source.indexOf("\n  });\n", startAt);
       assert(startAt >= 0 && endAt > startAt, "popup.js: the Ctrl/Shift+Enter keydown listener was not found");
       let handler = null;

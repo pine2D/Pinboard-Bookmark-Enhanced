@@ -7382,7 +7382,14 @@ suiteIf("_pbpSearchOpen (query memory)", "_pbpSearchOpen", () => {
       _pbpSearchRun("alpha");
       assertEq(_pbpSearchState.matches.length, 3, "fixture did not produce three hits");
       assertEq(scrolls, 1, "a fresh run should jump to hit 1");
-      _pbpSearchStep(1); // the reader walked on to hit 2, then closed the bar
+      const input = document.getElementById("search-input");
+      for (const flags of [{ isComposing:true }, { keyCode:229 }]) {
+        const enter = new KeyboardEvent("keydown", { key:"Enter", bubbles:true, cancelable:true, ...flags });
+        input.dispatchEvent(enter);
+        assertEq(enter.defaultPrevented, false, "candidate selection must keep its native action");
+        assertEq(_pbpSearchState.idx, 0, "composition stepped past the first match");
+      }
+      input.dispatchEvent(new KeyboardEvent("keydown", { key:"Enter", bubbles:true, cancelable:true }));
       assertEq(scrolls, 2, "stepping should jump");
       _pbpSearchOpen();
       assertEq(document.getElementById("search-input").value, "alpha", "reopen cleared the query");

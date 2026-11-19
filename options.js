@@ -777,6 +777,7 @@ function setupOptionsSearch() {
   input.addEventListener("input", render);
   input.addEventListener("focus", () => { if (input.value.trim()) render(); });
   input.addEventListener("keydown", (event) => {
+    if (event.isComposing || event.keyCode === 229) return;
     if (event.key === "Escape") {
       event.preventDefault();
       clear();
