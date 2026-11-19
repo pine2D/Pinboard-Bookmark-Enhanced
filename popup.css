@@ -388,6 +388,9 @@ button.action-link {
   margin-right: 0;
   vertical-align: 0;
 }
+.btn > span:empty:not(.btn-ic) {
+  display: none;
+}
 
 .btn.danger {
   color: var(--pp-danger-quiet-fg);

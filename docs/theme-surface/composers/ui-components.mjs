@@ -296,6 +296,11 @@ function btnRules(ns) {
 // this campaign. Popup retains the inline variant for prose, while flex
 // button hosts own the icon gap and must not inherit the inline margin.
 function btnIcRules(ns) {
+  // setBtnIcon(btn, icon, "") always emits a trailing empty `<span></span>`
+  // after `.btn-ic`. Hiding that empty label span keeps flex `gap` from
+  // shifting icon-only `.btn` glyphs 2px off-center while keeping
+  // `lastElementChild` alive in the DOM for callers that write text later.
+  const emptyLabel = rule(".btn > span:empty:not(.btn-ic)", [["display", "none"]]);
   if (ns === "pp") {
     return [
       rule(".btn-ic", [
@@ -306,11 +311,13 @@ function btnIcRules(ns) {
       rule(".btn > .btn-ic, .qbtn > .btn-ic, button.action-link > .btn-ic", [
         ["margin-right", "0"], ["vertical-align", "0"],
       ]),
+      emptyLabel,
     ];
   }
   return [
     rule(".btn-ic", [["display", "inline-flex"], ["align-items", "center"]]),
     rule(".btn-ic svg", [["display", "block"]]),
+    emptyLabel,
   ];
 }
 

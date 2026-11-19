@@ -404,6 +404,9 @@ html[data-theme] { --lib-scrollbar-thumb: var(--lib-fg-muted); }
 .btn-ic svg {
   display: block;
 }
+.btn > span:empty:not(.btn-ic) {
+  display: none;
+}
 
 .btn.danger {
   color: var(--lib-danger-quiet-fg);

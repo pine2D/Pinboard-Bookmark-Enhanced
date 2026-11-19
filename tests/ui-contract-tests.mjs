@@ -5525,6 +5525,124 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     "platinum-controls.css: .listbox-btn must stretch its single grid row track (grid-template-rows: minmax(0, 1fr); align-content: stretch) and keep .btn-ic free of competing box-shadow");
   check(!optionsCss.includes("--pbp-switch-answer") && optionsCss.includes("--pbp-switch-copy-bottom"),
     "options.css: .switch-track must anchor to static copy line-box edges (--pbp-switch-copy-bottom), never to nodes inside details::details-content");
+
+  // 5) Unified <details> > <summary> disclosure contract across all surfaces:
+  //    (a) no legacy 0x0 border-wedge triangles on summary::before/::after;
+  //    (b) every interactive non-help `> summary` rule setting cursor:pointer must suppress
+  //        the UA marker via list-style:none + ::-webkit-details-marker { display: none }.
+  const scanDisclosureSummaries = (sheets) => {
+    const hits = [];
+    for (const [file, css] of sheets) {
+      const rules = parseStyleRules(css);
+      const listNonePrefixes = new Set();
+      const webkitMarkerPrefixes = new Set();
+      const normSummarySel = (s) => s.trim().replace(/^details(?=[.#\[])/, "");
+      for (const r of rules) {
+        const decls = new Map(parseDeclarations(r.body).map((d) => [d.property, d.value.trim()]));
+        for (const sel of r.selectors) {
+          if (/summary::?(?:before|after)$/.test(sel)) {
+            if (decls.get("width") === "0" && decls.get("height") === "0" &&
+                [...decls.entries()].some(([k, v]) => k.startsWith("border-") && /\bsolid\b/.test(v))) {
+              hits.push(`${file} (${sel}): legacy 0x0 border-wedge triangle (use rotating chevron family)`);
+            }
+          }
+          if (/> *\bsummary::-webkit-details-marker$/.test(sel) && decls.get("display") === "none") {
+            webkitMarkerPrefixes.add(normSummarySel(sel.replace(/::-webkit-details-marker$/, "")));
+          }
+          if (/> *\bsummary$/.test(sel) && decls.get("list-style") === "none") {
+            listNonePrefixes.add(normSummarySel(sel));
+          }
+        }
+      }
+      for (const r of rules) {
+        const decls = new Map(parseDeclarations(r.body).map((d) => [d.property, d.value.trim()]));
+        if (decls.get("cursor") !== "pointer") continue;
+        for (const sel of r.selectors) {
+          if (!/> *\bsummary$/.test(sel) || /\.context-help\b/.test(sel)) continue;
+          const key = normSummarySel(sel);
+          if (!listNonePrefixes.has(key) || !webkitMarkerPrefixes.has(key)) {
+            hits.push(`${file} (${key}): interactive > summary missing list-style:none or ::-webkit-details-marker { display: none }`);
+          }
+        }
+      }
+    }
+    return hits;
+  };
+  check(
+    scanDisclosureSummaries([["bad-tri.css", ".more > summary { cursor: pointer; list-style: none; } .more > summary::-webkit-details-marker { display: none; } .more > summary::before { width: 0; height: 0; border-left: 5px solid currentColor; }"]]).length === 1 &&
+    scanDisclosureSummaries([["bad-ua.css", "#desc > summary { cursor: pointer; color: inherit; }"]]).length === 1 &&
+    scanDisclosureSummaries([["ok.css", ".disc > summary { cursor: pointer; list-style: none; } .disc > summary::-webkit-details-marker { display: none; } .disc > summary::after { width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; }"]]).length === 0,
+    "ui-contract: scanDisclosureSummaries self-test regressed");
+  const summaryHits = scanDisclosureSummaries(fiveSheets.slice(0, 4));
+  check(summaryHits.length === 0,
+    `disclosure <summary> contract violation: [${summaryHits.join("; ")}]`);
+
+  // 6) setBtnIcon(btn, icon, "") empty-span flex-gap immunity across all 4 surfaces:
+  for (const [file, css] of [["popup.css", popupCss], ["options.css", optionsCss], ["library.css", libraryCss]]) {
+    check(declarationValueMap(css, ".btn > span:empty:not(.btn-ic)").get("display") === "none",
+      `${file}: missing .btn > span:empty:not(.btn-ic) { display: none } (setBtnIcon empty label shifts icon-only buttons off-center via flex gap)`);
+  }
+  check(declarationValueMap(fiveSheets[3][1], ".action-btn > span:empty:not(.btn-ic)").get("display") === "none",
+    "md-preview.css: missing .action-btn > span:empty:not(.btn-ic) { display: none }");
+
+  // 7) Theme preset row layout & no unselected swatch dots:
+  check(!optionsCss.includes("--variant-swatch") &&
+    declarationValueMap(optionsCss, ".theme-preset-btn::before").size === 0 &&
+    declarationValueMap(optionsCss, ".theme-preset-btn.active::before").has("content") &&
+    declarationValueMap(optionsCss, ".theme-preset-groups > .theme-presets-group > .fg-actions:only-child").get("grid-column") === "1 / -1",
+    "options.css: theme preset pills must not draw unselected swatch dots, must keep .active::before check, and must span 'No preset' across 1 / -1");
+
+  // 8) Platinum systemic architecture & live-#id verification gate:
+  const ptRules = parseStyleRules(ptControlsCss);
+  // 8a) Every #id selector in platinum-controls.css must exist in shipped HTML/JS (catches #search-input-box typos).
+  const shippedDomSources = readdirSync(root)
+    .filter((f) => f.endsWith(".html") || f.endsWith(".js"))
+    .map((f) => read(f));
+  const hasShippedId = (id) => {
+    const base = id.replace(/-(?:btn|pop)$/, "");
+    return shippedDomSources.some((src) =>
+      src.includes(`id="${id}"`) || src.includes(`id='${id}'`) ||
+      src.includes(`.id = "${id}"`) || src.includes(`.id = '${id}'`) ||
+      src.includes(`"#${id}"`) || src.includes(`'#${id}'`) ||
+      src.includes(`id="${base}"`) || src.includes(`.id = "${base}"`));
+  };
+  check(!hasShippedId("search-input-box") && hasShippedId("search-input"),
+    "ui-contract: hasShippedId self-test regressed");
+  const ptIds = new Set();
+  for (const r of ptRules) {
+    for (const sel of r.selectors) {
+      for (const m of sel.matchAll(/#([A-Za-z_-][A-Za-z0-9_-]*)/g)) ptIds.add(m[1]);
+    }
+  }
+  const deadPtIds = [...ptIds].filter((id) => !hasShippedId(id)).map((id) => `#${id}`);
+  check(deadPtIds.length === 0,
+    `platinum-controls.css references non-existent DOM #id(s) (typo/stale selector): [${deadPtIds.join("; ")}]`);
+
+  // 8b) Window-local --opt-bg / --lib-bg rebinding & sticky .vocab-ref-foot bottom sync:
+  const ptPanelActive = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .panel.active');
+  const ptListPane = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) :is(.vocab-list-pane, .notes-list-pane, .ask-library-index)');
+  const ptDetailPane = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) :is(.vocab-detail-pane, .notes-detail-pane, .ask-library-pane)');
+  const ptRefFoot = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .vocab-ref-foot');
+  const padParts = (ptDetailPane.get("padding") || "").trim().split(/\s+/);
+  const detailPadBottom = ptDetailPane.get("padding-bottom") || (padParts.length === 3 ? padParts[2] : padParts.length === 4 ? padParts[2] : "");
+  check(ptPanelActive.get("--opt-bg") === "var(--pt-paper)" &&
+    ptListPane.get("--lib-bg") === "var(--pt-win)" &&
+    ptDetailPane.get("--lib-bg") === "var(--pt-paper)" &&
+    detailPadBottom && ptRefFoot.get("bottom") === `-${detailPadBottom}`,
+    `platinum-controls.css: window panes must locally rebind --opt-bg/--lib-bg and sync .vocab-ref-foot bottom (${ptRefFoot.get("bottom")}) to -padding-bottom (-${detailPadBottom})`);
+
+  // 8c) Boolean .btn partition completeness, .vocab-group-step passenger exclusion, optical-hang reset & Reader --danger bridge:
+  const ptReaderRoot = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"]');
+  const ptHangStart = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) :is(.lib-hang-start, .vocab-manage-row > .vocab-manage-groups:not([hidden]) + .vocab-edit-groups, #vocab-ref-result .xp-dict-more)');
+  const ptHangEnd = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-hang-end');
+  const hasDangerGhostExclusionHole = ptRules.some((r) => r.selectors.some((s) => /\.btn\.danger:not\([^)]*\.ghost/.test(s)));
+  const excludesGroupStepPassenger = ptRules.some((r) => r.selectors.some((s) => /\.btn:not\([^)]*\.vocab-group-step/.test(s)));
+  check(ptReaderRoot.has("--danger") &&
+    ptHangStart.get("margin-inline-start") === "0" &&
+    ptHangEnd.get("margin-inline-end") === "0" &&
+    !hasDangerGhostExclusionHole &&
+    excludesGroupStepPassenger,
+    "platinum-controls.css: must bridge Reader --danger, zero .lib-hang-start/.lib-hang-end margins, cover .btn.danger.ghost without exclusion holes, and exclude .vocab-group-step from standalone .btn bevels");
 }
 
 // --- popup-theme-early.js: mirror "1" picks sync directly, zero local.get calls ---

@@ -511,7 +511,7 @@ function _pbpAskBuildPanel() {
   const content = panel.querySelector("#reader-ask-view");
   content.innerHTML = [
     '<header class="panel-head">',
-    '  <h2 id="ask-title" data-i18n="askTitle" data-i18n-title="askTitle">Ask the page</h2>',
+    '  <h2 id="ask-title" tabindex="-1" data-i18n="askTitle" data-i18n-title="askTitle">Ask the page</h2>',
     '  <button type="button" id="ask-new" class="ask-ic" data-i18n-title="askNewConversation" data-i18n-aria="askNewConversation">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.plus : "") + '</button>',
     '  <button type="button" id="ask-history" class="ask-ic" data-i18n-title="askHistory" data-i18n-aria="askHistory">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.clock : "") + '</button>',
     // askCopyThread, not mdCopyMarkdown: this button copies the Q&A thread
@@ -727,10 +727,12 @@ function _pbpAskSetOpen(open, view = "ask") {
     if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("ask");
     if (typeof pbpDictStopSpeak === "function") pbpDictStopSpeak();
   }
+  let openerKeyboard = false;
   if (open) {
     _pbpReaderSelectView(view);
     const drawerWasOpen = document.body.classList.contains("rail-open");
     const ae = document.activeElement;
+    openerKeyboard = !ae || ae === document.body || (typeof ae.matches === "function" && ae.matches(":focus-visible"));
     if (drawerWasOpen) pbpRailDrawerClose();
     if (_pbpAskRailHandle) _pbpAskRailHandle.expand(true); // ask entry activation -> auto-expand (temp; no-op visually, see design note)
     // Remember who opened us so we can hand focus back on close (non-modal,
@@ -757,7 +759,12 @@ function _pbpAskSetOpen(open, view = "ask") {
     // Transparency-line seam: implemented by the send-flow task.
     if (_pbpReaderPanelView === "ask" && typeof _pbpAskUpdateMeta === "function") _pbpAskUpdateMeta();
     const ta = document.getElementById(_pbpReaderPanelView === "dict" ? "reader-dict-query" : "ask-input");
-    (ta && !ta.disabled ? ta : document.getElementById("ask-history"))?.focus({ preventScroll: true });
+    const loadingArchive = _pbpReaderPanelView === "ask" && Boolean(_pbpAskState?.archiveLoading);
+    if (loadingArchive && openerKeyboard && _pbpAskState) _pbpAskState._pendingKeyboardFallback = true;
+    const fallbackFocus = !loadingArchive && openerKeyboard
+      ? document.getElementById("ask-history")
+      : document.getElementById("ask-title");
+    (ta && !ta.disabled ? ta : fallbackFocus)?.focus({ preventScroll: true });
   } else {
     const op = _pbpReaderPanelOpener;
     const isVisible = (el) => {
@@ -847,7 +854,16 @@ async function _pbpAskLoadArchive(st) {
     console.warn("[pbp-ask] archive restore failed:", error?.name, error?.code || error?.message);
     throw error;
   }).finally(() => {
-    if (current()) { st.archiveLoading = false; _pbpAskArchiveStatus(); }
+    if (current()) {
+      st.archiveLoading = false;
+      _pbpAskArchiveStatus();
+      if (_pbpAskIsOpen() && _pbpReaderPanelView === "ask" && document.activeElement === document.getElementById("ask-title")) {
+        const readyTa = document.getElementById("ask-input");
+        if (readyTa && !readyTa.disabled) readyTa.focus({ preventScroll: true });
+        else if (st._pendingKeyboardFallback) document.getElementById("ask-history")?.focus({ preventScroll: true });
+      }
+      st._pendingKeyboardFallback = false;
+    }
   });
   return st.archiveReady;
 }

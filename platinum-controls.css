@@ -35,6 +35,7 @@ html[data-theme="platinum-light"] {
   --pt-shadow-drop: #262626;
   --pt-glint: #ffffff;
   --pt-glint-soft: rgba(255, 255, 255, 0.65);
+  --pt-trough-off: #bcbcbc;
   --pt-bevel-d1: #777777;
   --pt-bevel-d2: #aaaaaa;
   --pt-bevel-mid: #999999;
@@ -100,6 +101,7 @@ html[data-theme="platinum-dark"] {
   --pt-shadow-drop: #000000;
   --pt-glint: #6c6c6c;
   --pt-glint-soft: rgba(255, 255, 255, 0.14);
+  --pt-trough-off: #1e1e1e;
   --pt-bevel-d1: #191919;
   --pt-bevel-d2: #2c2c2c;
   --pt-bevel-mid: #191919;
@@ -114,7 +116,7 @@ html[data-theme="platinum-dark"] {
   --pt-row-hover: #282828;
   --pt-link: #a9a9ff;
   --pt-link-hover: #c4c4ff;
-  --pt-focus: #9999ff;
+  --pt-focus: #6e7fe8;
   --pt-chip-bg: #444444;
   --pt-chip-hover: #505050;
   --pt-chip-bd: #141414;
@@ -161,6 +163,7 @@ html[data-reader-theme="platinum"] {
   --pt-shadow-drop: light-dark(#262626, #000000);
   --pt-glint: light-dark(#ffffff, #6c6c6c);
   --pt-glint-soft: light-dark(rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.14));
+  --pt-trough-off: light-dark(#bcbcbc, #1e1e1e);
   --pt-bevel-d1: light-dark(#777777, #191919);
   --pt-bevel-d2: light-dark(#aaaaaa, #2c2c2c);
   --pt-bevel-mid: light-dark(#999999, #191919);
@@ -175,7 +178,7 @@ html[data-reader-theme="platinum"] {
   --pt-row-hover: light-dark(#efefef, #282828);
   --pt-link: light-dark(#333399, #a9a9ff);
   --pt-link-hover: light-dark(#1f1f7a, #c4c4ff);
-  --pt-focus: light-dark(#333399, #9999ff);
+  --pt-focus: light-dark(#333399, #6e7fe8);
   --pt-chip-bg: light-dark(#e4e4e4, #444444);
   --pt-chip-hover: light-dark(#efefef, #505050);
   --pt-chip-bd: light-dark(#6e6e6e, #141414);
@@ -215,6 +218,8 @@ html[data-reader-theme="platinum"] {
   --selection: light-dark(#ccccff, #3d3dad);
   --surface: light-dark(#dddddd, #3b3b3b);
   --pre-bg: light-dark(#f6f6f6, #161618);
+  --danger: light-dark(#a02525, #ff8f87);
+  --on-danger: #ffffff;
   --radius-sm: 2px;
   --radius-md: 3px;
   --radius-lg: 3px;
@@ -273,22 +278,37 @@ html.motion-ready:is([data-theme="platinum-light"], [data-theme="platinum-dark"]
 }
 
 html.motion-ready:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  :is(.confirm-popover, .theme-name-popover, #explain-pop, #typo-pop, #pb-hl-bar, #search-pop, #kbd-help-pop, #pb-hl-card, #fn-pop, .send-menu, #rail-history-pop, #dict-resize-pop) {
+  :is(.confirm-popover, .theme-name-popover, #explain-pop, #typo-pop, #pb-hl-bar, #search-pop, #kbd-help-pop, #pb-hl-card, #fn-pop, .send-menu, #rail-history-pop, #dict-resize-pop, #reader-bookmark-editor) {
   translate: 0 0;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
   :is(details.motion-toggle > summary::after,
+      .wayback-log-more > summary::after,
+      #video-description > summary::after,
       #skim-collapse.motion-toggle svg,
       .xp-dict-ai-details.dict-motion > summary::after,
       #vocab-ref-result .xp-dict-ai-details.dict-motion > summary::after,
       .feedback-card,
+      .batch-progress,
+      .batch-permission,
       .autocomplete-dropdown,
       #jina-md-history-pop,
       .offline-bar,
       .login-error) {
   transition: none;
   animation: none;
+}
+
+/* Static Mac OS 9 etched placeholder bars instead of dark flashing shimmer blocks */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(#vocab-ref-result .xp-skel, .tag-skel),
+html[data-reader-theme="platinum"] .xp-skel {
+  animation: none;
+  background: var(--pt-paper-alt);
+  border: 1px solid var(--pt-divider);
+  border-radius: 0;
+  box-shadow: inset 1px 1px 0 var(--pt-glint);
 }
 
 /* ==========================================================================
@@ -331,10 +351,14 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
    ========================================================================== */
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  :is(.btn:not(.ghost, .danger, .theme-preset-btn, .saved-theme-btn),
-      .qbtn:not(.saving, .saved),
+  :is(.btn:not(.context-help-toggle, .vocab-group-step, .danger, .theme-preset-btn, .saved-theme-btn, .listbox-trigger),
+      button.action-link,
+      .md-strip-btn,
+      .qbtn,
       .fc-btn,
-      .action-btn:not(.copied, .es-quiet),
+      .confirm-popover :is(.confirm-no, .confirm-alt),
+      .theme-name-popover .tnp-cancel,
+      .action-btn:not(.es-quiet, #reader-bookmark-delete),
       .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
@@ -345,7 +369,21 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .xp-vocab:not([data-face="update"]),
       .xp-open-vocab,
       .xp-dict-connect,
-      .xp-dict-speak) {
+      .xp-dict-speak,
+      .xp-dict-more,
+      .xp-dict-usage-stop,
+      .xp-dict-save-change,
+      .reader-dict-return,
+      .hl-card-ai-explain,
+      .hl-card-ai-translate,
+      .hl-card-ai-ask,
+      .hl-card-save,
+      .hl-card-mic,
+      .pbv-bar button),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(#vocab-ref-result :is(.xp-dict-connect, .xp-dict-more, .xp-dict-usage-stop),
+      #vocab-lookup-bar .xp-dict-connect,
+      .lib-cluster > .btn:not(.danger)) {
   background: var(--pt-face);
   color: var(--pt-ink);
   font-weight: 600;
@@ -357,10 +395,14 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  :is(.btn:not(.ghost, .danger, .theme-preset-btn, .saved-theme-btn),
-      .qbtn:not(.saving, .saved),
+  :is(.btn:not(.context-help-toggle, .vocab-group-step, .danger, .theme-preset-btn, .saved-theme-btn, .listbox-trigger),
+      button.action-link,
+      .md-strip-btn,
+      .qbtn,
       .fc-btn,
-      .action-btn:not(.copied, .es-quiet),
+      .confirm-popover :is(.confirm-no, .confirm-alt),
+      .theme-name-popover .tnp-cancel,
+      .action-btn:not(.es-quiet, #reader-bookmark-delete),
       .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
@@ -371,17 +413,36 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .xp-vocab:not([data-face="update"]),
       .xp-open-vocab,
       .xp-dict-connect,
-      .xp-dict-speak):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"], [aria-expanded="true"], .active) {
+      .xp-dict-speak,
+      .xp-dict-more,
+      .xp-dict-usage-stop,
+      .xp-dict-save-change,
+      .reader-dict-return,
+      .hl-card-ai-explain,
+      .hl-card-ai-translate,
+      .hl-card-ai-ask,
+      .hl-card-save,
+      .hl-card-mic,
+      .pbv-bar button):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(#vocab-ref-result :is(.xp-dict-connect, .xp-dict-more, .xp-dict-usage-stop),
+      #vocab-lookup-bar .xp-dict-connect,
+      .lib-cluster > .btn.ghost:not(.danger)):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"], [aria-expanded="true"], .active) {
   background: var(--pt-face-hover);
   color: var(--pt-ink);
   border-color: var(--pt-edge);
+  box-shadow: var(--pt-btn-shadow);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  :is(.btn:not(.ghost, .danger, .theme-preset-btn, .saved-theme-btn),
-      .qbtn:not(.saving, .saved),
+  :is(.btn:not(.context-help-toggle, .vocab-group-step, .danger, .theme-preset-btn, .saved-theme-btn, .listbox-trigger),
+      button.action-link,
+      .md-strip-btn,
+      .qbtn,
       .fc-btn,
-      .action-btn:not(.copied, .es-quiet),
+      .confirm-popover :is(.confirm-no, .confirm-alt),
+      .theme-name-popover .tnp-cancel,
+      .action-btn:not(.es-quiet, #reader-bookmark-delete),
       .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
@@ -392,12 +453,45 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .xp-vocab:not([data-face="update"]),
       .xp-open-vocab,
       .xp-dict-connect,
-      .xp-dict-speak):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], .active) {
+      .xp-dict-speak,
+      .xp-dict-more,
+      .xp-dict-usage-stop,
+      .xp-dict-save-change,
+      .reader-dict-return,
+      .hl-card-ai-explain,
+      .hl-card-ai-translate,
+      .hl-card-ai-ask,
+      .hl-card-save,
+      .hl-card-mic,
+      .pbv-bar button):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(#vocab-ref-result :is(.xp-dict-connect, .xp-dict-more, .xp-dict-usage-stop),
+      #vocab-lookup-bar .xp-dict-connect,
+      .lib-cluster > .btn:not(.danger)):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], .active) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
   box-shadow: var(--pt-btn-pressed-shadow);
   transform: none;
+}
+
+/* Zero optical-hang negative margins designed for borderless flat-canvas .ghost buttons */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.lib-hang-start,
+      .vocab-manage-row > .vocab-manage-groups:not([hidden]) + .vocab-edit-groups,
+      #vocab-ref-result .xp-dict-more) {
+  margin-inline-start: 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-hang-end {
+  margin-inline-end: 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.vocab-entry-row > .fg-actions > .btn-sm.ghost:last-child,
+      .tag-gov-head > .fg-actions > .btn-sm.ghost:last-child,
+      .wayback-log-heading > .btn-sm.ghost:last-child) {
+  margin-right: 0;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-toggle .lib-toggle-count {
@@ -429,16 +523,29 @@ html[data-reader-theme="platinum"]
   transform: none;
 }
 
-/* Reader compact icon & stepper buttons (.ask-ic, .skim-ic, .typo-step, .typo-seg-btn, .srch-*, etc.) */
-html[data-reader-theme="platinum"]
-  :is(.ask-ic:not(#ask-close),
+/* Compact icon, inline utility & stepper buttons across Popup, Options & Reader */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.offline-queue-item > .actions button:not(.offline-queue-remove),
+      .recent-bm-edit,
+      .edit-cancel,
+      .pp-rh-clear,
+      .pp-rh-open,
+      .batch-cancel-btn,
+      .wayback-perm-help,
+      .wayback-log-retry,
+      .vocab-drive-notice-dismiss,
+      .ask-ic:not(#ask-close),
       .skim-ic,
       .srch-nav,
       .srch-regex,
       .typo-step,
       .typo-seg-btn,
       .fn-pop-jump,
-      .rail-kbd-help-btn) {
+      .rail-kbd-help-btn,
+      .pb-copy-code,
+      .pbp-img-fix-btn,
+      .rh-clear-btn,
+      .rh-open) {
   background: var(--pt-face);
   color: var(--pt-ink);
   font-weight: 600;
@@ -449,29 +556,55 @@ html[data-reader-theme="platinum"]
   transform: none;
 }
 
-html[data-reader-theme="platinum"]
-  :is(.ask-ic:not(#ask-close),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.offline-queue-item > .actions button:not(.offline-queue-remove),
+      .recent-bm-edit,
+      .edit-cancel,
+      .pp-rh-clear,
+      .pp-rh-open,
+      .batch-cancel-btn,
+      .wayback-perm-help,
+      .wayback-log-retry,
+      .vocab-drive-notice-dismiss,
+      .ask-ic:not(#ask-close),
       .skim-ic,
       .srch-nav,
       .srch-regex,
       .typo-step,
       .typo-seg-btn,
       .fn-pop-jump,
-      .rail-kbd-help-btn):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"], .active) {
+      .rail-kbd-help-btn,
+      .pb-copy-code,
+      .pbp-img-fix-btn,
+      .rh-clear-btn,
+      .rh-open):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"], .active) {
   background: var(--pt-face-hover);
   color: var(--pt-ink);
   border-color: var(--pt-edge);
 }
 
-html[data-reader-theme="platinum"]
-  :is(.ask-ic:not(#ask-close),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.offline-queue-item > .actions button:not(.offline-queue-remove),
+      .recent-bm-edit,
+      .edit-cancel,
+      .pp-rh-clear,
+      .pp-rh-open,
+      .batch-cancel-btn,
+      .wayback-perm-help,
+      .wayback-log-retry,
+      .vocab-drive-notice-dismiss,
+      .ask-ic:not(#ask-close),
       .skim-ic,
       .srch-nav,
       .srch-regex,
       .typo-step,
       .typo-seg-btn,
       .fn-pop-jump,
-      .rail-kbd-help-btn):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], .active) {
+      .rail-kbd-help-btn,
+      .pb-copy-code,
+      .pbp-img-fix-btn,
+      .rh-clear-btn,
+      .rh-open):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], .active) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
@@ -524,31 +657,6 @@ html[data-reader-theme="platinum"]
   box-shadow: var(--pt-mini-pressed);
 }
 
-/* Ghost buttons: quiet at rest, crisp Platinum bevel on hover/press (excluding ? help toggle) */
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .btn.ghost:not(.context-help-toggle, .danger, .listbox-trigger) {
-  border-radius: 3px;
-  transition: none;
-  transform: none;
-}
-
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .btn.ghost:not(.context-help-toggle, .danger, .listbox-trigger):hover:not(:disabled, [aria-expanded="true"]) {
-  background: var(--pt-face);
-  color: var(--pt-ink);
-  border-color: var(--pt-edge);
-  box-shadow: var(--pt-btn-shadow);
-}
-
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .btn.ghost:not(.context-help-toggle, .danger, .listbox-trigger):is(:active:not(:disabled), [aria-expanded="true"]) {
-  background: var(--pt-pressed-bg);
-  color: var(--pt-pressed-fg);
-  border-color: var(--pt-edge);
-  box-shadow: var(--pt-btn-pressed-shadow);
-  transform: none;
-}
-
 /* Theme preset & saved-theme buttons: beveled Platinum rectangular switches */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   :is(.theme-preset-btn, .saved-theme-btn) {
@@ -575,9 +683,17 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.45), inset -1px -1px 0 rgba(255, 255, 255, 0.28);
 }
 
-/* Mac OS 9 Default Action Button Ring (#submit-btn, #login-btn, .tnp-save, .confirm-popover.is-action .confirm-yes) */
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(#submit-btn, #login-btn, .tnp-save, .confirm-popover.is-action .confirm-yes):enabled:not(.saved-success, .save-error, .loading) {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .saved-theme-del {
+  border-radius: 2px;
+  background: var(--pt-danger-bg);
+  color: #ffffff;
+  border: 1px solid var(--pt-edge);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.35), inset -1px -1px 0 rgba(0, 0, 0, 0.45);
+}
+
+/* Mac OS 9 Default Action Button Ring (#submit-btn, #login-btn, .tnp-save, .confirm-popover.is-action .confirm-yes, #reader-bookmark-apply) */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(#submit-btn, #login-btn, .theme-name-popover .tnp-save, .confirm-popover.is-action .confirm-yes, #reader-bookmark-apply):enabled:not(.saved-success, .save-error, .loading) {
   background: var(--pt-face);
   color: var(--pt-ink);
   font-weight: 700;
@@ -586,50 +702,112 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   box-shadow: var(--pt-btn-shadow), 0 0 0 1px var(--pt-dialog), 0 0 0 3px var(--pt-frame);
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(#submit-btn, #login-btn, .tnp-save, .confirm-popover.is-action .confirm-yes):enabled:hover:not(:active, .saved-success, .save-error, .loading) {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(#submit-btn, #login-btn, .theme-name-popover .tnp-save, .confirm-popover.is-action .confirm-yes, #reader-bookmark-apply):enabled:hover:not(:active, .saved-success, .save-error, .loading) {
   background: var(--pt-face-hover);
   color: var(--pt-ink);
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-btn-shadow), 0 0 0 1px var(--pt-dialog), 0 0 0 3px var(--pt-frame);
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(#submit-btn, #login-btn, .tnp-save, .confirm-popover.is-action .confirm-yes):enabled:active:not(.saved-success, .save-error, .loading) {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(#submit-btn, #login-btn, .theme-name-popover .tnp-save, .confirm-popover.is-action .confirm-yes, #reader-bookmark-apply):enabled:active:not(.saved-success, .save-error, .loading) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
+  border-color: var(--pt-edge);
   box-shadow: var(--pt-btn-pressed-shadow), 0 0 0 1px var(--pt-dialog), 0 0 0 3px var(--pt-frame);
 }
 
-/* Danger buttons & Solid Confirm Yes */
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .btn.danger:not(.ghost) {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  #submit-btn:is(.saved-success, .save-error, .loading) {
+  border-color: var(--pt-edge);
+  border-radius: 3px;
+  box-shadow: var(--pt-mini-bevel);
+}
+
+/* Unified Danger Push Buttons (both .btn.danger and .btn.danger.ghost, plus Reader & Popup destructive actions) */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.btn.danger,
+      #reader-bookmark-delete,
+      .ask-clear-btn,
+      .hl-card-delete,
+      .pb-tr-err-retry,
+      #tr-retry-all) {
   background: var(--pt-face);
   color: var(--pt-danger-fg);
   font-weight: 600;
   border: 1px solid var(--pt-danger-bd);
   border-radius: 3px;
   box-shadow: var(--pt-btn-shadow);
+  transition: none;
   transform: none;
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .btn.danger:not(.ghost):hover:not(:disabled, :active) {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.btn.danger,
+      .btn.danger.ghost,
+      #reader-bookmark-delete,
+      .ask-clear-btn,
+      .hl-card-delete,
+      .pb-tr-err-retry,
+      #tr-retry-all):hover:not(:disabled, :active) {
   background: var(--pt-face-hover);
   color: var(--pt-danger-fg);
+  border-color: var(--pt-danger-bd);
+  box-shadow: var(--pt-btn-shadow);
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .btn.danger:not(.ghost):active:not(:disabled) {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.btn.danger,
+      .btn.danger.ghost,
+      #reader-bookmark-delete,
+      .ask-clear-btn,
+      .hl-card-delete,
+      .pb-tr-err-retry,
+      #tr-retry-all):active:not(:disabled) {
   background: var(--pt-danger-bg);
   color: #ffffff;
   border-color: var(--pt-edge);
   box-shadow: var(--pt-btn-pressed-shadow);
+  transform: none;
+}
+
+/* Compact row-level remove buttons */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.offline-queue-remove, .recent-bm-del, .pp-rh-remove, .hl-item-del, .rh-remove) {
+  background: var(--pt-face);
+  color: var(--pt-danger-fg);
+  border: 1px solid var(--pt-danger-bd);
+  border-radius: 2px;
+  box-shadow: var(--pt-mini-bevel);
+  transition: none;
+  transform: none;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  .confirm-popover:not(.is-action) .confirm-yes {
+  :is(.offline-queue-remove, .recent-bm-del, .pp-rh-remove, .hl-item-del, .rh-remove):hover:not(:disabled, :active) {
+  background: var(--pt-face-hover);
+  color: var(--pt-danger-fg);
+  border-color: var(--pt-danger-bd);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.offline-queue-remove, .recent-bm-del, .pp-rh-remove, .hl-item-del, .rh-remove):active:not(:disabled) {
+  background: var(--pt-danger-bg);
+  color: #ffffff;
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-mini-pressed);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.confirm-popover:not(.is-action) .confirm-yes, .ask-clear-yes) {
   background: var(--pt-danger-bg);
   color: #ffffff;
   font-weight: 700;
   border: 1px solid var(--pt-edge);
   border-radius: 3px;
   box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.35), inset -1px -1px 0 rgba(0, 0, 0, 0.45);
+  transition: none;
 }
 
 /* ==========================================================================
@@ -901,8 +1079,8 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .search-field,
       .login-body .secret-field > input,
       .options-search input[type="search"],
-      .fg > textarea,
-      .fg > input:is([type="text"], [type="password"], [type="number"], [type="search"], [type="url"]),
+      .fg textarea,
+      .fg input:is([type="text"], [type="password"], [type="number"], [type="search"], [type="url"]),
       .key-wrap > input,
       .notes-toolbar input[type="search"],
       .vocab-lookup-bar input[type="search"],
@@ -910,7 +1088,17 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .vocab-note-input,
       #reader-dict-query,
       #pb-hl-card textarea,
-      #search-input-box):not(:disabled) {
+      #search-input,
+      #tr-ask input,
+      #reader-bookmark-editor input[type="text"],
+      #reader-bookmark-editor textarea):not(:disabled),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.fg .key-wrap:hover:not(:focus-within) :is(input[type="text"], input[type="password"]):not(:disabled),
+      .fg .key-wrap:focus-within :is(input[type="text"], input[type="password"]):not(:disabled),
+      .login-body .secret-field:hover:where(:not(:focus-within)):not(:has(> input:disabled)) > input,
+      .login-body .secret-field:focus-within:not(:has(> input:disabled)) > input,
+      .vocab-group-unit:hover:where(:not(:has(> input[type="text"]:focus), :has(> input:disabled))),
+      .vocab-group-unit:has(> input[type="text"]:focus):not(:disabled)) {
   background-color: var(--pt-paper);
   color: var(--pt-ink);
   border: 1px solid var(--pt-field-edge);
@@ -919,52 +1107,223 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
   transition: none;
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .vocab-group-unit > input {
-  background: transparent;
-  color: var(--pt-ink);
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.field > input[type="text"],
+      .field > textarea,
+      .search-field,
+      .login-body .secret-field > input,
+      .options-search input[type="search"],
+      .fg textarea,
+      .fg input:is([type="text"], [type="password"], [type="number"], [type="search"], [type="url"]),
+      .key-wrap > input,
+      .notes-toolbar input[type="search"],
+      .vocab-lookup-bar input[type="search"],
+      .vocab-note-input,
+      #reader-dict-query,
+      #pb-hl-card textarea,
+      #search-input,
+      #tr-ask input,
+      #reader-bookmark-editor input[type="text"],
+      #reader-bookmark-editor textarea):disabled {
+  background-color: var(--pt-paper-alt);
+  color: var(--pt-ink-hint);
+  border: 1px solid var(--pt-divider);
+  border-radius: 0;
+  box-shadow: none;
+  opacity: 0.75;
 }
 
+/* Fused .vocab-group-unit ([ 分组名称 ▼ ][ + ][ − ]): white sunken well + flush beveled caps */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .vocab-group-unit {
+  overflow-clip-margin: 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .vocab-group-unit > input[type="text"] {
+  background: transparent;
+  color: var(--pt-ink);
+  border-radius: 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-group-unit > .vocab-group-step,
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-group-unit > .vocab-group-step:last-child {
+  border: 0;
+  border-left: 1px solid var(--pt-edge);
+  border-radius: 0;
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  box-shadow: var(--pt-mini-bevel);
+  transition: none;
+  transform: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-group-unit > .vocab-group-step:hover:not(:disabled, :active),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-group-unit:has(> input[type="text"]:focus):not(:disabled) > .vocab-group-step:hover:not(:disabled, :active) {
+  background: var(--pt-face-hover);
+  color: var(--pt-ink);
+  border-left-color: var(--pt-edge);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-group-unit > .vocab-group-step:active:not(:disabled),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-group-unit:has(> input[type="text"]:focus):not(:disabled) > .vocab-group-step:active:not(:disabled) {
+  background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
+  border-left-color: var(--pt-edge);
+  box-shadow: var(--pt-mini-pressed);
+  transform: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-group-unit > .vocab-group-step:disabled {
+  opacity: 0.45;
+  background: var(--pt-face);
+  box-shadow: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-group-unit > .vocab-group-step:focus-visible {
+  outline: 2px solid var(--pt-focus);
+  outline-offset: -2px;
+  box-shadow: var(--pt-mini-bevel);
+}
+
+/* Focus rings: crisp 2px Mac OS 9 focus outline, zero double-ring on fused passengers,
+   zero leaked modern box-shadow glows, and parity over #id:focus-visible selectors */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
   :is(button, input, select, textarea, summary, [tabindex]):focus-visible,
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(.tags-input-wrap, .key-wrap, .secret-field, .vocab-group-unit):focus-within {
+  :is(.tags-input-wrap, .key-wrap, .secret-field):focus-within,
+html[data-reader-theme="platinum"]
+  :is(#reader-dict-query, #search-input, #tr-ask input, #reader-bookmark-editor input, #reader-bookmark-editor textarea):focus-visible {
   outline: 2px solid var(--pt-focus);
   outline-offset: 1px;
 }
 
-/* Rectangular 28x16 Sunken Trough + Raised Beveled Square Thumb Switch:
-   explicit box-sizing: border-box on ::before prevents options.css's `*` reset
-   (which omits ::before/::after) from expanding 12px + 2px border to 14px and
-   knocking the thumb 1px down onto the bottom border. */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(#submit-btn, #login-btn, .theme-name-popover .tnp-save, .confirm-popover.is-action .confirm-yes, #reader-bookmark-apply, #ask-send):focus-visible {
+  outline: 2px solid var(--pt-focus);
+  outline-offset: 3px;
+}
+
+/* Passenger inputs inside single-field fused shells let their outer shell draw the single focus ring;
+   in .vocab-group-unit ([ text ][ + ][ - ]), the text input draws its own inset focus ring so the ring
+   never wraps the adjacent raised +/- push buttons. */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.tags-input-wrap > input,
+      .key-wrap > input,
+      .login-body .secret-field > input):focus-visible {
+  outline: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-group-unit > input[type="text"]:focus-visible {
+  outline: 2px solid var(--pt-focus);
+  outline-offset: -2px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.key-toggle, .vocab-group-chip .chip-remove):focus-visible {
+  outline: 2px solid var(--pt-focus);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+/* Suppress modern focus-ring box-shadow halos on borderless summaries, tabs, and links,
+   while preserving Platinum 4-layer bevel shadows on focused 3D buttons */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(summary,
+      .tab-btn,
+      .lib-tab,
+      .toc-list a,
+      .rail-sec-head,
+      .hl-item-main,
+      #vocab-ref-result :is(.xp-dict-lemma-link, .xp-dict-ai-title, .xp-dict-learning-title, .xp-dict-learning-label)):focus-visible {
+  box-shadow: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.btn:not(.context-help-toggle, .vocab-group-step, .theme-preset-btn, .saved-theme-btn, .listbox-trigger),
+      .confirm-popover :is(.confirm-no, .confirm-alt),
+      .theme-name-popover .tnp-cancel,
+      .md-strip-btn,
+      .connection-health-row,
+      .vocab-ref .xp-dict-connect):focus-visible {
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-btn-shadow);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.btn.danger, .btn.danger.ghost):focus-visible {
+  border-color: var(--pt-danger-bd);
+  box-shadow: var(--pt-btn-shadow);
+}
+
+/* Rectangular 28x16 Sunken Trough + Flush 14x14 Mechanical Slider Switch:
+   1px outer frame + 14px flush slider (1 + 14 + 1 = 16px) eliminates double-border
+   moiré and 1px top/bottom slit asymmetry, while --pt-trough-off keeps the off
+   trough darker/recessed behind the raised Platinum slider thumb. */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch-track {
   border-radius: 2px;
   border: 1px solid var(--pt-edge);
-  background: var(--pt-paper-alt);
-  box-shadow: inset 1px 1px 0 var(--pt-bevel-d2);
+  background: var(--pt-trough-off);
+  box-shadow: inset 1px 1px 0 var(--pt-bevel-d1), inset -1px -1px 0 var(--pt-glint-soft);
   transition: none;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch-track::before {
   box-sizing: border-box;
-  top: 1px;
-  left: 1px;
-  width: 12px;
-  height: 12px;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
   border-radius: 1px;
   background: var(--pt-face);
-  border: 1px solid var(--pt-edge);
+  border: 0;
+  border-right: 1px solid var(--pt-edge);
   box-shadow: var(--pt-mini-bevel);
   transition: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .switch:hover > input:enabled ~ .switch-track::before {
+  background: var(--pt-face-hover);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked ~ .switch-track {
   background: var(--pt-sel-bg);
   border-color: var(--pt-edge);
-  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.22);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.35);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked ~ .switch-track::before {
+  border-right: 0;
+  border-left: 1px solid var(--pt-edge);
   transform: translateX(12px);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .switch > input:focus-visible ~ .switch-track {
+  outline: 2px solid var(--pt-focus);
+  outline-offset: 1px;
+  box-shadow: inset 1px 1px 0 var(--pt-bevel-d1), inset -1px -1px 0 var(--pt-glint-soft);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .switch > input:checked:focus-visible ~ .switch-track {
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .switch > input:disabled ~ .switch-track {
+  opacity: 0.55;
+  background: var(--pt-trough-off);
+  border-color: var(--pt-edge);
+  box-shadow: none;
 }
 
 /* Platinum Checkboxes & Radios (.pick-mark, popup .bottom-bar, reader .reader-check) */
@@ -986,6 +1345,27 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .pick > inp
   border-color: var(--pt-edge);
   color: #ffffff;
   box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.45), inset -1px -1px 0 rgba(255, 255, 255, 0.25);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .pick > input:focus-visible ~ .pick-mark {
+  outline: 2px solid var(--pt-focus);
+  outline-offset: 1px;
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-btn-shadow);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .pick > input:is(:checked, :indeterminate):focus-visible ~ .pick-mark {
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.45), inset -1px -1px 0 rgba(255, 255, 255, 0.25);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .pick > input:disabled ~ .pick-mark {
+  opacity: 0.55;
+  background: var(--pt-face);
+  border-color: var(--pt-edge);
+  box-shadow: none;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar input[type="checkbox"] {
@@ -1147,25 +1527,34 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .preset-btn
   box-shadow: none;
 }
 
-/* Removable tag tokens inside white wells (.tag-item in Popup, .vocab-group-chip in Library) */
+/* Removable tag tokens (.tag-item in Popup, .vocab-group-chip in Library):
+   unified 1px outer border + --pt-mini-bevel matching .tag-gov-chip-face & .stag */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   :is(.tag-item, .vocab-group-chip) {
-  background: var(--pt-chip-bg);
-  color: var(--pt-chip-fg);
-  border: 1px solid var(--pt-chip-bd);
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-edge);
   border-radius: 2px;
-  box-shadow: inset 1px 1px 0 var(--pt-glint-soft);
+  box-shadow: var(--pt-mini-bevel);
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .tag-item:hover {
-  background: var(--pt-chip-hover);
-  color: var(--pt-chip-fg);
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.tag-item:hover, .vocab-group-chip:hover) {
+  background: var(--pt-face-hover);
+  color: var(--pt-ink);
   border-color: var(--pt-edge);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   :is(.tag-item .tag-remove, .vocab-group-chip .vocab-group-chip-del, .vocab-group-chip .chip-remove) {
-  color: var(--pt-chip-fg);
+  color: var(--pt-ink);
+  border-radius: 1px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-group-chip .chip-remove:hover {
+  background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
 }
 
 /* Reader Ask starter prompt chips (#ask-chips .ask-chip) */
@@ -1311,10 +1700,29 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .label {
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(.feedback-card, .offline-bar) {
+  :is(.feedback-card, .offline-bar, .batch-progress, .batch-permission) {
   border: 1px solid var(--pt-edge);
   border-radius: 0;
   box-shadow: inset 1px 1px 0 var(--pt-glint-soft);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .batch-progress {
+  background: var(--pt-group-bg);
+  color: var(--pt-ink);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .batch-progress-bar {
+  height: 8px;
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-edge);
+  border-radius: 0;
+  box-shadow: inset 1px 1px 0 var(--pt-bevel-mid);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .batch-progress-fill {
+  background: var(--pt-sel-bg);
+  border-radius: 0;
+  transition: none;
 }
 
 /* Bottom .quick-actions styled as classic Mac OS 9 .statusbar utility strip */
@@ -1547,8 +1955,10 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .reset-tab-
   color: var(--pt-danger-fg);
 }
 
-/* Right Settings Mac Window */
+/* Right Settings Mac Window: locally rebind --opt-bg to --pt-paper so sticky/mixed
+   in-window surfaces never inherit the outer #cccccc Mac desktop canvas */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .panel.active {
+  --opt-bg: var(--pt-paper);
   grid-column: 4;
   grid-row: 2;
   padding: 18px 20px 20px;
@@ -1732,6 +2142,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 /* Left Index Mac Window (Vocab / Notes / Questions) */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   :is(.vocab-list-pane, .notes-list-pane, .ask-library-index) {
+  --lib-bg: var(--pt-win);
   background: var(--pt-win);
   border: 1px solid var(--pt-frame);
   box-shadow: var(--pt-window-shadow);
@@ -1766,6 +2177,11 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   margin: 0;
   border-radius: 0;
   background: transparent;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.notes-card-top, .notes-hit-btn) {
+  border-radius: 0;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .notes-card-top {
@@ -1854,9 +2270,23 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   border-radius: 0;
 }
 
-/* Right Detail Mac Window (Vocab / Notes / Questions) */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.vocab-card.selected:not([aria-current]) .notes-card-top,
+      .notes-hit.selected:not([aria-current]) .notes-hit-btn) {
+  box-shadow: inset 0 0 0 1px var(--pt-divider);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.vocab-card.selected[aria-current] .notes-card-top,
+      .notes-hit.selected[aria-current] .notes-hit-btn) {
+  box-shadow: none;
+}
+
+/* Right Detail Mac Window (Vocab / Notes / Questions): locally rebind --lib-bg to --pt-paper
+   and align .vocab-ref-foot sticky bottom (-48px) with the pane's 48px padding-bottom */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   :is(.vocab-detail-pane, .notes-detail-pane, .ask-library-pane) {
+  --lib-bg: var(--pt-paper);
   margin: 0;
   padding: 0 20px 48px;
   scrollbar-gutter: auto;
@@ -1865,6 +2295,12 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   border: 4px solid var(--pt-win);
   outline: 1px solid var(--pt-frame);
   box-shadow: inset 0 0 0 1px var(--pt-frame), 3px 3px 0 var(--pt-shadow-drop);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .vocab-ref-foot {
+  bottom: -48px;
+  background: var(--pt-paper);
+  border-top: 1px solid var(--pt-divider);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .ask-library-answer pre {
@@ -2068,6 +2504,21 @@ html[data-reader-theme="platinum"] #skim-section {
   box-shadow: var(--pt-group-shadow);
 }
 
+html[data-reader-theme="platinum"] .msg-bar {
+  background: var(--pt-group-bg);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-group-bd);
+  border-radius: 0;
+  box-shadow: var(--pt-group-shadow);
+  transition: none;
+  animation: none;
+}
+
+html[data-reader-theme="platinum"] .msg-bar:is(.error, [data-state="error"]) {
+  color: var(--pt-danger-fg);
+  border-color: var(--pt-danger-bd);
+}
+
 @media (max-width: 640px) {
   html[data-reader-theme="platinum"] main {
     padding: 52px 10px 40px;
@@ -2080,7 +2531,7 @@ html[data-reader-theme="platinum"] #skim-section {
   }
 }
 
-/* Reader Floating Windows (#explain-pop, #typo-pop, #rail-history-pop, #pb-hl-bar, #pb-hl-card, etc.) */
+/* Reader Floating Windows (#explain-pop, #typo-pop, #rail-history-pop, #pb-hl-bar, #pb-hl-card, #reader-bookmark-editor, etc.) */
 html[data-reader-theme="platinum"]
   :is(#explain-pop,
       #dict-resize-pop,
@@ -2093,7 +2544,9 @@ html[data-reader-theme="platinum"]
       #fn-pop,
       #pb-hl-bar,
       #pb-hl-card,
-      #ocr-drop-pop) {
+      #ocr-drop-pop,
+      #reader-bookmark-editor,
+      .ask-clear-confirm) {
   background: var(--pt-dialog);
   color: var(--pt-ink);
   border: 1px solid var(--pt-frame);
@@ -2135,14 +2588,15 @@ html[data-reader-theme="platinum"] .send-mi-foot {
   opacity: 1;
 }
 
-html[data-reader-theme="platinum"] #rail-history-pop .rh-list {
+html[data-reader-theme="platinum"] :is(#rail-history-pop, .empty-state.es-history) .rh-list {
   background: var(--pt-paper);
   border: 1px solid var(--pt-field-edge);
+  border-radius: 0;
   box-shadow: var(--pt-well-shadow);
   padding: 2px;
 }
 
-html[data-reader-theme="platinum"] #rail-history-pop .rh-item:hover {
+html[data-reader-theme="platinum"] :is(#rail-history-pop, .empty-state.es-history) .rh-item:hover {
   background: var(--pt-row-hover);
 }
 

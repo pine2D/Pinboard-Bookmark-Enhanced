@@ -321,6 +321,7 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 .action-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+.action-btn > span:empty:not(.btn-ic) { display: none; }
 
 /* Pressed-state vocabulary (D3, taste-uplift batch3 T1; text-color fix round,
    Ruling 21): btn-hover fill + link-colored edge + link-colored text -- the
@@ -1579,6 +1580,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
 .rail-sec-head:focus-visible,
 .send-mi:focus-visible,
 .rail-disclosure > summary:focus-visible,
+#video-description > summary:focus-visible,
 .hl-item-main:focus-visible {
   outline: 1px solid var(--link);
   outline-offset: 2px;
@@ -1614,7 +1616,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
 }
 .rail-sec-head[aria-expanded="true"] .rail-sec-tri { transform: translateY(1px) rotate(225deg); }
 @media (prefers-reduced-motion: reduce) {
-  .rail-sec-tri, .rail-disclosure > summary::after { transition: none; }
+  .rail-sec-tri, .rail-disclosure > summary::after, #video-description > summary::after { transition: none; }
 }
 .rail-sec-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-sec-count { flex: none; color: var(--fg-muted); }
@@ -3515,6 +3517,7 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 #ask-panel .ask-copy-btn, #ask-panel .ask-regenerate,
 #ask-panel .ask-retry, #ask-panel .ask-clear-btn { font-size: 12px; } /* secondary md face, in px: control faces do not follow the panel's prose scale */
 #ask-panel .panel-head > h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#ask-title:focus { outline: none; }
 .ask-ic {
   flex: none;
   display: inline-flex; align-items: center; justify-content: center;
@@ -5146,8 +5149,23 @@ body.video-mode .pbv-col-study #rendered-view { max-width: var(--pbp-width, 720p
   padding: var(--sp-2) var(--sp-3);
   margin-top: var(--sp-4);
 }
-#video-description > summary { cursor: pointer; color: var(--fg-muted); }
-#video-description[open] > summary { margin-bottom: var(--sp-2); }
+#video-description > summary {
+  cursor: pointer; display: flex; align-items: center; gap: var(--sp-2);
+  list-style: none; color: var(--fg-muted);
+  transition: color var(--motion-state) ease;
+}
+#video-description > summary:hover { color: var(--fg); }
+#video-description > summary::-webkit-details-marker { display: none; }
+#video-description > summary::after {
+  content: ""; width: 5px; height: 5px; flex: none; margin-left: auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--fg-muted);
+  transform: translateY(-1px) rotate(45deg);
+  transition: transform 120ms var(--ease-in-out);
+}
+#video-description[open] > summary { margin-bottom: var(--sp-2); color: var(--fg); }
+#video-description[open] > summary::after { transform: translateY(1px) rotate(225deg); }
 /* Minimal reading rhythm for the rendered description markdown (fix round 1
    -- UA defaults alone read too cramped). Tokens only, scoped to this block;
    #rendered-view's own prose rules don't reach here (different ancestor). */

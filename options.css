@@ -1296,6 +1296,9 @@ html[data-theme] .opt-error {
 .btn-ic svg {
   display: block;
 }
+.btn > span:empty:not(.btn-ic) {
+  display: none;
+}
 
 .btn.danger {
   color: var(--opt-danger-quiet-fg);
@@ -2385,7 +2388,8 @@ html.motion-ready .context-help-host > .context-help.motion-toggle[open] + selec
    surface in Options shares this. Drawn with borders, never a glyph
    (font-fallback stall rule). */
 details.disclosure > summary,
-#preset-preview-section > summary {
+#preset-preview-section > summary,
+.wayback-log-more > summary {
   display: flex; align-items: center; gap: var(--opt-sp-3);
   list-style: none; cursor: pointer; user-select: none;
 }
@@ -2403,9 +2407,11 @@ details.disclosure > summary,
    cause -- fixed by just not fighting the class rule's already-correct
    padding here. */
 details.disclosure > summary::-webkit-details-marker,
-#preset-preview-section > summary::-webkit-details-marker { display: none; }
+#preset-preview-section > summary::-webkit-details-marker,
+.wayback-log-more > summary::-webkit-details-marker { display: none; }
 details.disclosure > summary::after,
-#preset-preview-section > summary::after {
+#preset-preview-section > summary::after,
+.wayback-log-more > summary::after {
   content: ""; width: 7px; height: 7px; flex: none;
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
@@ -2413,12 +2419,15 @@ details.disclosure > summary::after,
   color: var(--opt-fg-muted);
 }
 details.disclosure[open] > summary::after,
-#preset-preview-section[open] > summary::after { transform: translateY(1px) rotate(225deg); }
+#preset-preview-section[open] > summary::after,
+.wayback-log-more[open] > summary::after { transform: translateY(1px) rotate(225deg); }
 /* Section-style headers park the chevron on the right edge. */
 details.disclosure > summary::after,
-#preset-preview-section > summary::after { margin-left: auto; }
+#preset-preview-section > summary::after,
+.wayback-log-more > summary::after { margin-left: auto; }
 html.motion-ready details.disclosure > summary::after,
-html.motion-ready #preset-preview-section > summary::after {
+html.motion-ready #preset-preview-section > summary::after,
+html.motion-ready .wayback-log-more > summary::after {
   transition: transform var(--motion-collapse) var(--ease-in-out);
 }
 
@@ -2464,72 +2473,29 @@ html.motion-ready #preset-preview-section > summary::after {
   color: var(--opt-fg-muted);
 }
 .theme-preset-groups .fg-actions { min-width: 0; }
-/* A row with no label ("No preset", critique 6 SP-16) puts its chips in the
-   chip track, not under the labels, so the whole choice set has one left edge. */
-.theme-preset-groups > .theme-presets-group > .fg-actions:only-child { grid-column: 2; }
+/* Flush-left "No preset" row (2026-11-19 user ruling): spans the full track
+   directly under the heading instead of leaving an empty column-1 gap under
+   "Theme preset (?)" where the button corner formed a diagonal tangent. */
+.theme-preset-groups > .theme-presets-group > .fg-actions:only-child { grid-column: 1 / -1; }
+#theme-presets-help:not([open]) + .theme-preset-groups { margin-top: var(--opt-sp-4); }
 .theme-preset-groups + .hint { margin-top: var(--opt-sp-4); }
 @media (max-width: 600px) {
   .theme-preset-groups { grid-template-columns: minmax(0, 1fr); gap: var(--opt-sp-6); }
   .theme-preset-groups > .theme-presets-group { row-gap: var(--opt-sp-2); }
   .theme-group-label { min-height: 0; }
-  .theme-preset-groups > .theme-presets-group > .fg-actions:only-child { grid-column: 1; }
 }
-/* Borderless swatch pill (design-uplift, user-selected Variant A,
-   2026-08-04) -- shared base for .theme-preset-btn and .saved-theme-btn; see
-   COMPONENTS.md Appendix C's preset-row-redesign entry for the full
-   before/after and rationale. Border, the fixed accent-fill/panel-text
-   invert, and the border-drawn check tick are gone; selection is now a 2px
-   accent ring outside the border box (outline-offset) so it never touches
-   the label -- and because the fill/text below are var()-driven against
-   --opt-accent/--opt-panel (both already theme-reactive), this single rule
-   set is correct under every preset with no per-theme override needed --
-   removing the html[data-theme] override block the old opt-panel/opt-bg
-   swap scheme required (Task 12 review round 2's rationale for that swap no
-   longer applies once the fill itself is accent-relative, not a fixed
-   literal-adjacent role). */
+/* Borderless preset pill (2026-11-19 user ruling retired the per-preset
+   swatch dot on unselected buttons; only the active pill draws a 12px check). */
 .theme-preset-btn,
 .saved-theme-btn {
-  --variant-swatch: var(--opt-accent);
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   border: none;
   border-radius: var(--opt-radius-full);
-  /* Chip language (DESIGN.md Chips; 2026-10-15 options critique): unselected
-     wears the button fill, selected the chip wash. The old 10% / 16% accent
-     tints were too close to tell apart without the ring. */
   background: var(--opt-btn-bg);
   color: var(--opt-fg);
-}
-/* Swatch dot: --variant-swatch defaults to the current theme's plain
-   --opt-accent (used as-is by .saved-theme-btn -- custom saved themes are
-   arbitrary user CSS with no color identity of their own -- and by the
-   "None" preset button, which has no pilot). Every OTHER .theme-preset-btn
-   gets its OWN preset's accent instead, overridden per data-theme value by
-   composers/options-chrome.mjs's generated .theme-preset-btn[data-theme="X"]
-   rules below (@generated:ui-themes region) -- (0,2,0) beats this rule's
-   (0,1,0), no source-order dependency. This makes the row an actual color
-   picker (design-uplift, Variant A follow-up, 2026-08-04 USER RULING:
-   a single shared dot for every button lost the whole point of "每预设独立
-   强调色圆点"). The per-preset hex values live in the generated region, not
-   here -- hand-written popup.css/options.css are at the hex/rgba
-   zero-tolerance gate (tests/ui-contract-tests.mjs), which only scans the
-   hand-maintained text (countBareHex strips every @generated region before
-   counting), so literals belong in composer output, never here. */
-.theme-preset-btn::before,
-.saved-theme-btn::before {
-  content: "";
-  width: 7px; height: 7px;
-  /* 7px dot + 2.5px each side = the 12px check that replaces it on the
-     selected pill, so selecting never shifts the row. */
-  margin: 0 2.5px;
-  border-radius: 50%;
-  background: var(--variant-swatch);
-  /* A hairline in the chip's own ink: a dark preset accent (Paper & Ink's
-     navy) vanished on a dark page's chip without it. */
-  outline: 1px solid color-mix(in srgb, var(--opt-fg) 30%, transparent);
-  flex-shrink: 0;
 }
 /* Not on the selected pill: this rule is (0,3,0) and the .active fill below
    is (0,2,0), so hovering the selected preset used to swap its chip wash for
@@ -2540,20 +2506,10 @@ html.motion-ready #preset-preview-section > summary::after {
   background: var(--opt-btn-hover);
 }
 /* .saved-theme-btn shares every other rule in this shared-base block (fill,
-   hover, .active ring) but had never gained its own focus core -- its sibling
-   passenger `.saved-theme-del` has one (below), and `.theme-preset-btn` has
-   one, but the pill itself did not (debt-sweep 2026-08-07). §7.3 `borderless`
-   recipe, same call as `.theme-preset-btn` -- both rest on `border: none`. */
+   hover, .active) -- §7.3 `borderless` recipe, same call as `.theme-preset-btn`. */
 .theme-preset-btn:focus-visible,
 .saved-theme-btn:focus-visible { outline: 1px solid var(--opt-accent); outline-offset: 2px; box-shadow: var(--opt-focus-ring); }
-/* Selected = chip wash + 600 + a Lucide check (v0.525.0 `check`) in place of
-   the swatch dot (2026-10-20, options critique 4, user ruling). The 2px
-   accent ring this replaced was nearly the same shape as :focus-visible's
-   1px ring + glow, so tabbing across the 14 presets showed two near-twin
-   rings and "where am I" read as "what is on". Rings now mean focus only.
-   Text in --opt-fg, not --opt-chip-fg (2026-10-15): chip-fg is a tag-chip
-   ink and on Flexoki dark (the default dark mode) it is amber. fg on chip-bg
-   clears 4.6:1 or more on every preset, and the check is drawn in that ink. */
+/* Selected = chip wash + 600 + a 12px Lucide check (`check`). */
 .theme-preset-btn.active,
 .saved-theme-btn.active,
 /* (0,4,0): outranks the generated `.btn:hover:not(:disabled)` (0,3,0), which
@@ -2566,10 +2522,12 @@ html.motion-ready #preset-preview-section > summary::after {
 }
 .theme-preset-btn.active::before,
 .saved-theme-btn.active::before {
+  content: "";
   width: 12px; height: 12px;
   margin: 0;
   border-radius: 0;
   outline: none;
+  flex-shrink: 0;
   background: currentColor;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
@@ -3458,42 +3416,6 @@ html[data-theme="platinum-dark"] {
   --opt-field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23616161' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --opt-link: #3f6dac;
 }
-.theme-preset-btn[data-theme="flexoki"] {
-  --variant-swatch: #205EA6;
-}
-.theme-preset-btn[data-theme="solarized"] {
-  --variant-swatch: #1e6ca4;
-}
-.theme-preset-btn[data-theme="catppuccin"] {
-  --variant-swatch: #1a5ad8;
-}
-.theme-preset-btn[data-theme="platinum"] {
-  --variant-swatch: #333399;
-}
-.theme-preset-btn[data-theme="modern-card"] {
-  --variant-swatch: #1a73e8;
-}
-.theme-preset-btn[data-theme="paper-ink"] {
-  --variant-swatch: #1a3a5c;
-}
-.theme-preset-btn[data-theme="github-light"] {
-  --variant-swatch: #0969da;
-}
-.theme-preset-btn[data-theme="nord-night"] {
-  --variant-swatch: #88c0d0;
-}
-.theme-preset-btn[data-theme="terminal"] {
-  --variant-swatch: #33ff33;
-}
-.theme-preset-btn[data-theme="dracula"] {
-  --variant-swatch: #8be9fd;
-}
-.theme-preset-btn[data-theme="gruvbox-dark"] {
-  --variant-swatch: #83a598;
-}
-.theme-preset-btn[data-theme="rose-pine"] {
-  --variant-swatch: #c4a7e7;
-}
 /* @generated:ui-themes end */
 
 /* ---- Shared themed rules ----
@@ -4039,34 +3961,28 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
   margin: var(--opt-sp-1) 0 var(--opt-rhythm);
 }
 .wayback-log-more > summary {
-  cursor: pointer;
-  padding: var(--opt-sp-2) var(--opt-sp-4);
-  font-size: 11px;
+  padding: var(--opt-sp-2);
+  border-radius: var(--opt-radius-sm);
+  font-size: var(--opt-text-helper);
+  line-height: var(--opt-lh-helper);
+  font-weight: 500;
   color: var(--opt-fg-muted);
-  list-style: none;
+  transition: color var(--motion-state) ease, background var(--motion-state) ease;
 }
-.wayback-log-more > summary::-webkit-details-marker { display: none; }
-.wayback-log-more > summary::before {
-  content: "";
-  display: inline-block;
-  width: 0;
-  height: 0;
-  border: 4px solid transparent;
-  border-left: 5px solid currentColor;
-  margin-right: var(--opt-sp-2);
-  vertical-align: middle;
+.wayback-log-more > summary:hover {
+  color: var(--opt-fg);
+  background: var(--opt-panel);
 }
-.wayback-log-more[open] > summary::before {
-  content: "";
-  display: inline-block;
-  width: 0;
-  height: 0;
-  border: 4px solid transparent;
-  border-top: 5px solid currentColor;
-  border-bottom: none;
-  border-left: 4px solid transparent;
-  margin-right: var(--opt-sp-2);
-  vertical-align: middle;
+.wayback-log-more > summary:focus-visible {
+  outline: 2px solid var(--opt-focus-bd);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+.wayback-log-more[open] > summary {
+  color: var(--opt-fg);
+  border-bottom: 1px solid var(--opt-border-section);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 /* Section title on the left, its tools on the right. The title's own block

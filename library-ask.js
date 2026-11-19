@@ -168,7 +168,7 @@ function _pbpLibAskRenderDetail() {
     versions.append(summary, ...earlier.map(makeRound)); host.append(versions);
   }
   const remove = _pbpLibAskButton("cross", "askDeleteConversation", event => _pbpLibAskDelete(session, event.currentTarget), true);
-  remove.classList.add("danger-quiet", "ask-library-delete"); host.append(remove);
+  remove.classList.add("danger", "ask-library-delete"); host.append(remove);
   [...host.querySelectorAll("details")].forEach((detail, index) => { detail.open = !!opened[index]; });
   pane.scrollTop = top;
   if (focused >= 0) host.querySelectorAll("button, summary")[focused]?.focus({ preventScroll: true });

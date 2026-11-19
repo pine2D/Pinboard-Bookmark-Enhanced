@@ -63,3 +63,8 @@ popup / library 的值盒子（文本、搜索、密钥输入框，textarea，`l
 - 图标按钮混入分组分隔边与不对称内距：在圆角 `<button>` 上写 `border-left` + `padding: 0 4px 0 8px` 会使悬停框偏心、分隔线两端弯曲；分组线应由盒外独立伪元素绘制，图标按钮保持对称正方形盒（已由 `tests/ui-contract-tests.mjs` 拦截）。
 - 静态行内控件锚定到折叠子容器：`.switch-track` 若锚定到 `details::details-content` 内部节点，紧凑档 `min-height` 余量与 `content-visibility: allow-discrete` 会造成首尾帧 1px 跳变；静止控件只锚定静止文本行本身。
 - 固定高度 `inline-grid` 按钮设 `align-content: center` 且未设 `grid-template-rows: minmax(0, 1fr)` 时，隐式行轨缩成行高，`height: 100%` 右侧箭头舱会悬空断边（已由 `tests/ui-contract-tests.mjs` 拦截）。
+- `setBtnIcon(btn, icon, "")` 空文本节点吃进 flex `gap`：辅助函数固定创建 `<span class="btn-ic">svg</span><span></span>` 两个子节点，图标按钮若继承 `gap: 4px` 且不隐藏 `span:empty:not(.btn-ic)`，图标会整体左偏 2px（已由 `ui-components.mjs` 与 `tests/ui-contract-tests.mjs` 拦截）。
+- 窗口化主题（Platinum）漏重绑窗口内 `--*-bg` 与负向悬挂边距：根级 `--opt-bg` / `--lib-bg` 是外层桌面灰，进入白纸详情窗/灰底列表窗必须就地重绑 `--opt-bg` / `--lib-bg`，且 `sticky` 底栏 `bottom` 必须与面板 `padding-bottom` 互为相反数；同时平铺画布为无框 `.ghost` 按钮设置的 `.lib-hang-start` / `.lib-hang-end` 等负边距在带框立体按钮下必须归零，否则边框会撞上窗口框线（已由 `tests/ui-contract-tests.mjs` 拦截）。
+- 修饰类布尔分区漏洞与融合子格误命中：对 `.btn` 做 `:not(.danger)` 同时对 `.btn.danger` 做 `:not(.ghost)` 会把 `.btn.danger.ghost` 漏成三不管；而未从独立 `.btn` 规则排除 `.vocab-group-step` 会把融合输入框内的 `+`/`-` 子格画成带圆角的独立立体按钮（已由 `tests/ui-contract-tests.mjs` 拦截）。
+- 表面 `#id` 选择器倒挂压过主题类覆盖与死 `#id` 拼写：表面 CSS 里的 `#vocab-ref-result .xp-dict-connect`、`#reader-bookmark-apply` 等 `(1,x,x)` 规则会压过主题表里的 `(0,3,1)` 类选择器，主题表还曾把 `#search-input` 误写成不存在的 `#search-input-box`（已由 `tests/ui-contract-tests.mjs` 拦截）。
+- 面板打开同步聚焦撞上异步初始化暂时 `disabled`：抽屉打开同一同步帧启动 IndexedDB 读取并暂时禁用输入框时，若立即执行 `(ta && !ta.disabled ? ta : toolbarBtn).focus()`，焦点会误落到工具栏按钮并亮起 `:focus-visible` 外框，异步就绪后也不会回到输入框；应在加载期暂落 `tabindex="-1"` 标题并在 `.finally()` 把焦点交还就绪输入框。
