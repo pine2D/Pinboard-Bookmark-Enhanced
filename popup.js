@@ -895,6 +895,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!pbpBookmarkConnection(settings).account) {
     showLogin();
     $id("login-form").hidden = pbpBookmarkServiceId(settings) !== "pinboard";
+    if ($id("login-form").hidden) {
+      const chooser = $id("login-service-settings");
+      chooser.dataset.i18n = "bookmarkServiceSettings";
+      chooser.textContent = t("bookmarkServiceSettings");
+    }
   } else showMain(pbpBookmarkConnection(settings).token);
   $id("login-service-settings")?.addEventListener("click", () => pbpOpenOptionsTab("general"));
   chrome.storage.onChanged.addListener((changes, area) => {

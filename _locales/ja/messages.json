@@ -27,7 +27,10 @@
     "message": "設定"
   },
   "login": {
-    "message": "ログイン"
+    "message": "Pinboard にログイン"
+  },
+  "loginOtherServices": {
+    "message": "Karakeep または linkding を使う"
   },
   "logout": {
     "message": "ログアウト"

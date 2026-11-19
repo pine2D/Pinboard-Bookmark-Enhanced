@@ -27,7 +27,10 @@
     "message": "設定"
   },
   "login": {
-    "message": "登入"
+    "message": "登入 Pinboard"
+  },
+  "loginOtherServices": {
+    "message": "使用 Karakeep 或 linkding"
   },
   "logout": {
     "message": "登出"

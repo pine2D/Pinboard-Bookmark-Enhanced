@@ -27,7 +27,10 @@
     "message": "Ustawienia"
   },
   "login": {
-    "message": "Zaloguj się"
+    "message": "Zaloguj się do Pinboard"
+  },
+  "loginOtherServices": {
+    "message": "Użyj Karakeep lub linkding"
   },
   "logout": {
     "message": "Wyloguj się"

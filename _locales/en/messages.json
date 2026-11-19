@@ -27,7 +27,10 @@
     "message": "Settings"
   },
   "login": {
-    "message": "Log in"
+    "message": "Log in to Pinboard"
+  },
+  "loginOtherServices": {
+    "message": "Use Karakeep or linkding"
   },
   "logout": {
     "message": "Log out"
