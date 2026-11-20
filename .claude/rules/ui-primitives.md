@@ -61,7 +61,7 @@ popup / library 的值盒子（文本、搜索、密钥输入框，textarea，`l
 - `box-shadow` 叠层遮挡斜面：先写 `inset 0 0 0 1px` 再写 `inset 1px 1px 0` 高光/暗边，第一层会完全盖死后续斜面层而退化为扁平框（已由 `tests/ui-contract-tests.mjs` 拦截）。
 - 伪元素 `content-box` 溢出：`popup.css` / `options.css` 的 `*` 重置不含 `::before` / `::after`，带四边 `border` 与尺寸的伪元素滑块/方块必须显式声明 `box-sizing: border-box`（已由 `tests/ui-contract-tests.mjs` 拦截）。
 - 图标按钮混入分组分隔边与不对称内距：在圆角 `<button>` 上写 `border-left` + `padding: 0 4px 0 8px` 会使悬停框偏心、分隔线两端弯曲；分组线应由盒外独立伪元素绘制，图标按钮保持对称正方形盒（已由 `tests/ui-contract-tests.mjs` 拦截）。
-- 静态行内控件锚定到折叠子容器：`.switch-track` 若锚定到 `details::details-content` 内部节点，紧凑档 `min-height` 余量与 `content-visibility: allow-discrete` 会造成首尾帧 1px 跳变；静止控件只锚定静止文本行本身。
+- 静态行内控件锚定到折叠子容器与行尾伪元素换行陷阱：`.switch-track` 若锚定到 `details::details-content` 内部节点，紧凑档 `min-height` 余量与 `content-visibility: allow-discrete` 会造成首尾帧 1px 跳变；但把零宽 `display: inline-block` 锚点写在 `.switch-text::after` 又会在末词与 `margin-right: 24px` 预留位之间制造原子行内换行点，窄屏下把 `?` 单独挤到下一行。正确锚点应放在 `details.context-help::before`（紧跟 `.switch-text` 预留边距之后、净进宽为 `0px`）。
 - 固定高度 `inline-grid` 按钮设 `align-content: center` 且未设 `grid-template-rows: minmax(0, 1fr)` 时，隐式行轨缩成行高，`height: 100%` 右侧箭头舱会悬空断边（已由 `tests/ui-contract-tests.mjs` 拦截）。
 - `setBtnIcon(btn, icon, "")` 空文本节点吃进 flex `gap`：辅助函数固定创建 `<span class="btn-ic">svg</span><span></span>` 两个子节点，图标按钮若继承 `gap: 4px` 且不隐藏 `span:empty:not(.btn-ic)`，图标会整体左偏 2px（已由 `ui-components.mjs` 与 `tests/ui-contract-tests.mjs` 拦截）。
 - 窗口化主题（Platinum）漏重绑窗口内 `--*-bg` 与负向悬挂边距：根级 `--opt-bg` / `--lib-bg` 是外层桌面灰，进入白纸详情窗/灰底列表窗必须就地重绑 `--opt-bg` / `--lib-bg`，且 `sticky` 底栏 `bottom` 必须与面板 `padding-bottom` 互为相反数；同时平铺画布为无框 `.ghost` 按钮设置的 `.lib-hang-start` / `.lib-hang-end` 等负边距在带框立体按钮下必须归零，否则边框会撞上窗口框线（已由 `tests/ui-contract-tests.mjs` 拦截）。

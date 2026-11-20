@@ -734,7 +734,7 @@ html.save-error-below { scroll-padding-block: 0 var(--opt-save-clearance); }
   float: left;
   anchor-name: --pbp-switch-copy-top;
 }
-.pref-row.context-help-host[data-help-role="choice"] > label.switch > .switch-text::after {
+.pref-row.context-help-host[data-help-role="choice"] > label.switch > .context-help::before {
   content: "";
   display: inline-block;
   width: 0;

@@ -3332,7 +3332,7 @@ body { display: flex; flex-direction: column; }
    page a stopped sync can show. A plain link: underline on hover only. */
 /* The header's right end (Drive line + keyboard shortcuts button): one
    group pushed to the end, its two items a button-row gap apart. */
-.lib-corner { display: flex; align-items: center; gap: var(--lib-sp-3); min-width: 0; margin-inline-start: auto; }
+.lib-corner { display: flex; align-items: center; gap: var(--lib-sp-2); min-width: 0; margin-inline-start: auto; }
 .lib-drive {
   min-width: 0;
   color: var(--lib-fg-muted);
