@@ -39,7 +39,7 @@ const ID_RE = /^A-\d{3}$/;
 const STORE_SUBMIT_HEADER = ["版本", "提交日", "结果", "结果日", "备注"];
 const STORE_DATA_HEADER = ["日期", "周用户", "安装", "卸载", "评分", "评价数"];
 const STORE_RESULTS = ["审核中", "通过", "被拒", "撤回"];
-const VERSION_RE = /^\d+\.\d+\.\d+$/;
+const VERSION_RE = /^\d+\.\d+(?:\.\d+)?$/;
 // Release policy (user ruling 2026-11-10): a candidate is used for three days
 // before it goes to the store, and the store gets a version every 2-4 weeks.
 export const STORE_SOAK_DAYS = 3;

@@ -183,7 +183,9 @@ test('store: both tables are required and the headers are fixed', () => {
 test('store: submission rows reject bad versions, results and dates', () => {
   const e = (row) => lintStoreLedger(store([row]), T).errors;
   assert.ok(has(e(sb('v3.0.3', '2026-11-01', '通过')), /版本/));
-  assert.ok(has(e(sb('3.0', '2026-11-01', '通过')), /版本/));
+  assert.ok(has(e(sb('3', '2026-11-01', '通过')), /版本/));
+  assert.ok(has(e(sb('3.0.3.1', '2026-11-01', '通过')), /版本/));
+  assert.deepEqual(e(sb('3.3', '2026-11-01', '通过')), []);
   assert.ok(has(e(sb('3.0.3', '2026-11-01', '过了')), /结果/));
   assert.ok(has(e(sb('3.0.3', '2026-02-30', '通过')), /提交日/));
   assert.ok(has(e(sb('3.0.3', '2026-11-11', '审核中')), /晚于今天/));
@@ -407,7 +409,8 @@ const check = (dir, version, releasedOn, todayStr = today) =>
 test('cli: --store-check exits 0 after three days, 1 before, 2 when it cannot tell', () => withDir(set(), (d) => {
   const ok = check(d, 'v3.0.4', '2026-11-07'); assert.equal(ok.status, 0, ok.stdout + ok.stderr); assert.match(ok.stdout, /满 3 天/);
   const early = check(d, '3.0.4', '2026-11-09'); assert.equal(early.status, 1); assert.match(early.stdout, /最早 2026-11-12/);
-  assert.equal(check(d, '3.0', '2026-11-07').status, 2);
+  const minorOk = check(d, '3.3', '2026-11-07'); assert.equal(minorOk.status, 0, minorOk.stdout + minorOk.stderr);
+  assert.equal(check(d, '3', '2026-11-07').status, 2);
   assert.equal(check(d, '3.0.4', 'someday').status, 2);
   assert.equal(check(d, '3.0.4', '2026-11-12').status, 2);
 }));
@@ -571,6 +574,7 @@ test('latestApprovedStoreVersion: picks highest approved version, ignores pendin
     sb('3.0.6', '2026-11-09', '被拒', '2026-11-10', 'missing icon'),
     sb('3.0.7', '2026-11-10', '撤回', '-'),
   ])), '3.0.4');
+  assert.equal(latestApprovedStoreVersion(store([sb('3.0.4', '2026-11-05', '通过', '2026-11-06'), sb('3.3', '2026-11-10', '通过', '2026-11-10')])), '3.3');
   assert.equal(latestApprovedStoreVersion(store([sb('3.0.4', '2026-11-08', '审核中', '-')])), null);
 });
 
