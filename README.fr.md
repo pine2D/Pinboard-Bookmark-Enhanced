@@ -68,4 +68,4 @@ L’extension ne vous piste pas et ne collecte aucune donnée d’utilisation. L
 
 ## Licence
 
-MIT. Voir [LICENSE](LICENSE).
+MIT. Voir [LICENSE](LICENSE). Le thème Platinum s’inspire de Mac OS 9 Platinum et du design web de [v2core.com](https://www.v2ex.com/t/1246152) par Livid.

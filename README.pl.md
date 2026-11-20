@@ -68,4 +68,4 @@ Rozszerzenie nie śledzi Cię i nie zbiera danych o użytkowaniu. Ustawienia i k
 
 ## Licencja
 
-MIT — patrz [LICENSE](LICENSE).
+MIT — patrz [LICENSE](LICENSE). Motyw Platinum czerpie inspirację z interfejsu Mac OS 9 Platinum oraz projektu [v2core.com](https://www.v2ex.com/t/1246152) autorstwa Livida.

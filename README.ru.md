@@ -68,4 +68,4 @@
 
 ## Лицензия
 
-MIT — см. [LICENSE](LICENSE).
+MIT — см. [LICENSE](LICENSE). Тема Platinum вдохновлена интерфейсом Mac OS 9 Platinum и веб-дизайном [v2core.com](https://www.v2ex.com/t/1246152) от Livid.

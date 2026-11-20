@@ -7334,6 +7334,9 @@ async function withPopupSubmitFixture(options, check) {
         fx.renderAITags(["alpha", "beta", "gamma"], true);
         assert(fx.links().length === 1,
           "setup: the cached path did not render its one re-roll button (fixture out of sync with renderAITags)");
+        const wrap = fx.container.querySelector(".cache-hint-wrap");
+        assert(wrap && wrap.children[0]?.classList.contains("regen-link") && wrap.children[1]?.classList.contains("cache-hint"),
+          "cached AI tags must place .regen-link ('New set') before .cache-hint ('Cached') so [Add all] and [New set] stay grouped");
         assert(fx.container.getAttribute("role") === "toolbar" && fx.container.getAttribute("tabindex") === "0",
           "the cached render left #ai-suggest-tags without its container-level tab stop");
         const strays = [...fx.container.querySelectorAll("*")]

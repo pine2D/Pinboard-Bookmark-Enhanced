@@ -68,4 +68,4 @@ Die Erweiterung verfolgt dich nicht und sammelt keine Nutzungsdaten. Einstellung
 
 ## Lizenz
 
-MIT. Siehe [LICENSE](LICENSE).
+MIT. Siehe [LICENSE](LICENSE). Das Theme Platinum ist von Mac OS 9 Platinum und Livids Webdesign für [v2core.com](https://www.v2ex.com/t/1246152) inspiriert.

@@ -68,4 +68,4 @@ The extension does not track you or collect usage data. Settings and keys stay o
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The Platinum theme draws on Mac OS 9 Platinum and Livid's [v2core.com](https://www.v2ex.com/t/1246152) web design.

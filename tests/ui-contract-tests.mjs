@@ -5593,20 +5593,23 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
   check(summaryHits.length === 0,
     `disclosure <summary> contract violation: [${summaryHits.join("; ")}]`);
 
-  // 6) setBtnIcon(btn, icon, "") empty-span flex-gap immunity across all 4 surfaces:
+  // 6) setBtnIcon(btn, icon, "") empty-span flex-gap immunity across all 4 surfaces
+  // (while preserving CSS-border triangles .send-tri and .rail-sec-tri inside Reader buttons):
   for (const [file, css] of [["popup.css", popupCss], ["options.css", optionsCss], ["library.css", libraryCss]]) {
     check(declarationValueMap(css, ".btn > span:empty:not(.btn-ic)").get("display") === "none",
       `${file}: missing .btn > span:empty:not(.btn-ic) { display: none } (setBtnIcon empty label shifts icon-only buttons off-center via flex gap)`);
   }
-  check(declarationValueMap(fiveSheets[3][1], ".action-btn > span:empty:not(.btn-ic)").get("display") === "none",
-    "md-preview.css: missing .action-btn > span:empty:not(.btn-ic) { display: none }");
+  check(declarationValueMap(fiveSheets[3][1], ".action-btn > span:empty:not(.btn-ic, .send-tri, .rail-sec-tri)").get("display") === "none",
+    "md-preview.css: missing .action-btn > span:empty:not(.btn-ic, .send-tri, .rail-sec-tri) { display: none } (must suppress empty labels without hiding .send-tri dropdown carets)");
 
-  // 7) Theme preset row layout & no unselected swatch dots:
+  // 7) Theme preset row layout, Platinum first in Adaptive with Apple icon, & no unselected swatch dots:
   check(!optionsCss.includes("--variant-swatch") &&
     declarationValueMap(optionsCss, ".theme-preset-btn::before").size === 0 &&
     declarationValueMap(optionsCss, ".theme-preset-btn.active::before").has("content") &&
-    declarationValueMap(optionsCss, ".theme-preset-groups > .theme-presets-group > .fg-actions:only-child").get("grid-column") === "1 / -1",
-    "options.css: theme preset pills must not draw unselected swatch dots, must keep .active::before check, and must span 'No preset' across 1 / -1");
+    declarationValueMap(optionsCss, ".theme-preset-groups > .theme-presets-group > .fg-actions:only-child").get("grid-column") === "1 / -1" &&
+    /<span id="theme-group-adaptive"[\s\S]{0,240}<div class="fg-actions">\s*<button class="btn btn-sm theme-preset-btn" data-theme="platinum" aria-pressed="false"><span class="btn-ic" data-ic="apple"><\/span><span>Platinum<\/span><\/button>/.test(optionsHtml) &&
+    sharedJs.includes("apple: '<svg viewBox=\"0 0 24 24\""),
+    "options.css/options.html: theme preset pills must not draw unselected swatch dots, must keep .active::before check, span 'No preset' across 1 / -1, and place Platinum first in Adaptive with PBP_ICONS.apple");
 
   // 8) Platinum systemic architecture & live-#id verification gate:
   const ptRules = parseStyleRules(ptControlsCss);
@@ -5660,13 +5663,18 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     excludesGroupStepPassenger,
     "platinum-controls.css: must bridge Reader --danger, zero .lib-hang-start/.lib-hang-end margins, cover .btn.danger.ghost without exclusion holes, and exclude .vocab-group-step from standalone .btn bevels");
 
-  // 8d) Promoted link-button bevel clearance & sunken list-row exclusion gate:
+  // 8d) Promoted link-button bevel clearance, #export-summary group-shadow exclusion, & sunken list-row exclusion gate:
   // Any text button whose flat-surface base rule resets `padding: 0` must restore >=6px horizontal
-  // padding + `text-decoration: none` when promoted to a 3D Platinum button, and sunken history
-  // list-row triggers (.pp-rh-open, .rh-open) must never be lumped into raised bevel buttons.
+  // padding + `text-decoration: none` when promoted to a 3D Platinum button, #export-summary must
+  // never inherit .msg-bar's white group box-shadow ring, and sunken history list-row triggers
+  // (.pp-rh-open, .rh-open) must never be lumped into raised bevel buttons.
   const ptActionLink = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) button.action-link');
   const ptReaderMore = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .xp-dict-more');
-  const ptPopupUtil = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) :is(button.regen-link, button.clear-all-link, button.offline-clear)');
+  const ptPopupUtil = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) :is(button.add-all-link, button.regen-link, button.clear-all-link, button.offline-clear)');
+  const ptMsgBarPlain = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .msg-bar');
+  const ptMsgBarScoped = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .msg-bar:not(#export-summary)');
+  const readerExportSummary = declarationValueMap(fiveSheets[3][1], "#export-summary");
+  const readerExpScope = declarationValueMap(fiveSheets[3][1], ".exp-scope");
   const minHorizPadPx = (map) => {
     const raw = (map.get("padding-inline") || map.get("padding") || "").trim().split(/\s+/);
     const h = raw.length >= 2 ? raw[1] : raw[0] || "";
@@ -5677,19 +5685,31 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
   check(minHorizPadPx(ptActionLink) >= 8 && ptActionLink.get("text-decoration") === "none" &&
     minHorizPadPx(ptReaderMore) >= 8 && ptReaderMore.get("text-decoration") === "none" &&
     minHorizPadPx(ptPopupUtil) >= 6 && ptPopupUtil.get("text-decoration") === "none" &&
+    ptMsgBarPlain.size === 0 && ptMsgBarScoped.has("box-shadow") &&
+    readerExportSummary.get("box-shadow") === "none" &&
+    readerExpScope.get("margin-bottom") === "var(--sp-2)" &&
     !bevelLeaksListRowOpen,
-    "platinum-controls.css: promoted link buttons (button.action-link, .xp-dict-more, .regen-link/.clear-all-link/.offline-clear) must restore >=6..8px horizontal padding + text-decoration:none, and .pp-rh-open/.rh-open must stay list rows");
+    "platinum-controls.css / md-preview.css: promoted link buttons (.action-link, .xp-dict-more, .add-all-link/.regen-link/.clear-all-link/.offline-clear) must restore >=6..8px padding + text-decoration:none, #export-summary must exclude .msg-bar group-shadow, .exp-scope must keep margin-bottom, and .pp-rh-open/.rh-open must stay list rows");
 
-  // 8e) Pinboard.in Platinum composer (_patterns.mjs) control & chrome invariants:
+  // 8e) Pinboard.in shared (classic-list-v2.mjs) & Platinum (_patterns.mjs) composer invariants:
+  const classicComposerSrc = readFileSync(resolve(root, "docs/theme-surface/composers/classic-list-v2.mjs"), "utf8");
   const patternsComposerSrc = readFileSync(resolve(root, "docs/theme-surface/composers/_patterns.mjs"), "utf8");
   check(
+    classicComposerSrc.includes("#top_next_prev, #bottom_next_prev") &&
+    classicComposerSrc.includes("display: flow-root !important") &&
+    classicComposerSrc.includes("#right_bar, #search_right_bar") &&
+    classicComposerSrc.includes(".bookmark > #edit_bookmark_form { flex: 1 1 0% !important;") &&
+    classicComposerSrc.includes("#profile_left_column > div:first-child:not(.service_box)") &&
     patternsComposerSrc.includes('select:not([multiple]):not([size]), select[size="1"]') &&
     patternsComposerSrc.includes("@supports selector(::picker(select))") &&
     patternsComposerSrc.includes(":is(:open, :open:hover):not(:disabled)") &&
     patternsComposerSrc.includes('input[type="checkbox"], input[type="radio"]') &&
     patternsComposerSrc.includes("background-clip: content-box, border-box") &&
-    patternsComposerSrc.includes("inset 0 0 0 1px ${chipBorder}, inset 2px 2px 0 ${chipGlint}"),
-    "composers/_patterns.mjs (platinum): must style popup <select> + ::picker(select) (:open:hover locked), beveled checkbox/radio, 2-layer content-box/border-box pinstripe bars, and outer-ring-first tag chips");
+    patternsComposerSrc.includes("inset 0 0 0 1px ${chipBorder}, inset 2px 2px 0 ${chipGlint}") &&
+    patternsComposerSrc.includes("#search_right_bar::before") &&
+    patternsComposerSrc.includes("#profile_left_column > div:first-child:not(.service_box)::before") &&
+    patternsComposerSrc.includes(".bookmark > #edit_bookmark_form { flex: 1 1 0% !important;"),
+    "composers (classic-list-v2.mjs / _patterns.mjs): must clear #top_next_prev float gap, style #search_right_bar & #profile_left_column card, flex-fit .bookmark > #edit_bookmark_form, and keep Platinum controls intact");
 
   // 8f) Platinum Reader .doc-body must preserve video-mode dual-column workspace width:
   const ptVideoDocBody = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] body.video-mode:not(.raw-active) .doc-body');

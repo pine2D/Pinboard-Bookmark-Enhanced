@@ -68,4 +68,4 @@
 
 ## ライセンス
 
-MIT。[LICENSE](LICENSE) を参照。
+MIT。[LICENSE](LICENSE) を参照。Platinum テーマは Mac OS 9 Platinum と Livid による [v2core.com](https://www.v2ex.com/t/1246152) の Web デザインに着想を得ています。

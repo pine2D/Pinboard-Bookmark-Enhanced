@@ -2497,6 +2497,7 @@ html.motion-ready .wayback-log-more > summary::after {
   background: var(--opt-btn-bg);
   color: var(--opt-fg);
 }
+.theme-preset-btn .btn-ic svg { width: 13px; height: 13px; }
 /* Not on the selected pill: this rule is (0,3,0) and the .active fill below
    is (0,2,0), so hovering the selected preset used to swap its chip wash for
    the hover grey -- invisible while a ring carried selection, the whole

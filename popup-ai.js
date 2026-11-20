@@ -1747,13 +1747,6 @@ function renderAITags(tags, fromCache) {
   const hintWrap = document.createElement("span");
   hintWrap.className = "cache-hint-wrap";
 
-  if (fromCache) {
-    const cachedSpan = document.createElement("span");
-    cachedSpan.className = "cache-hint";
-    cachedSpan.textContent = t("aiCached");
-    hintWrap.appendChild(cachedSpan);
-  }
-
   const link = document.createElement("button"); // a real button, same as the summary pair
   link.type = "button";
   link.className = "regen-link";
@@ -1828,6 +1821,16 @@ function renderAITags(tags, fromCache) {
     }
   });
   hintWrap.appendChild(link);
+
+  // Keep the two interactive actions ([Add all] [New set]) grouped together
+  // immediately after the chips, and place the passive "cached" provenance
+  // note at the trailing end rather than wedged between the two buttons.
+  if (fromCache) {
+    const cachedSpan = document.createElement("span");
+    cachedSpan.className = "cache-hint";
+    cachedSpan.textContent = t("aiCached");
+    hintWrap.appendChild(cachedSpan);
+  }
 
   container.appendChild(hintWrap);
 

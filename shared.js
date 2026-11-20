@@ -39,10 +39,10 @@ function pbpAiParseCites(fullText) {
 }
 
 const ADAPTIVE_THEME_MAP = {
+  platinum: ["platinum-light", "platinum-dark"],
   flexoki: ["flexoki-light", "flexoki-dark"],
   solarized: ["solarized-light", "solarized-dark"],
-  catppuccin: ["catppuccin-latte", "catppuccin-mocha"],
-  platinum: ["platinum-light", "platinum-dark"]
+  catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
 };
 
 const TEXTAREA_MIN_HEIGHT = 54;
@@ -211,6 +211,8 @@ const PBP_ICONS = {
   mic: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect width="6" height="13" x="9" y="2" rx="3"/></svg>',
   // Lucide v0.525.0 scan-text: standalone Import PDF or image (OCR) action in popup and reader rail.
   scanText: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/></svg>',
+  // Lucide v0.525.0 apple: marks the full-extension Mac OS 9 Platinum adaptive preset in Settings.
+  apple: '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/><path d="M10 2c1 .5 2 2 2 5"/></svg>',
 };
 
 // Render "<check|cross icon> text" into a status element. The SVG uses currentColor so

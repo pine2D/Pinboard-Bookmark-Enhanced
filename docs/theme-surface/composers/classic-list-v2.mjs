@@ -50,11 +50,11 @@ function emit(tokens) {
   const anchor = 'a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a))';
   // Optional sidebar roles follow the tag-navigation rules below so both
   // ordinary links and navigation text use the same state colors. Keep them
-  // scoped to #right_bar; .tag retains its frequency/color treatment. The
+  // scoped to #right_bar / #search_right_bar; .tag retains its frequency/color treatment. The
   // explicit header path also beats legacy header overrides inside the sidebar.
   const sidebarLinks = [
-    tokens.palette?.["sidebar-link-fg"] && `\n#right_bar a:not(.tag), #right_bar #tag_cloud_header a:not(.tag) { color: ${v("sidebar-link-fg")} !important; }`,
-    tokens.palette?.["sidebar-link-hover"] && `\n#right_bar a:not(.tag):hover, #right_bar #tag_cloud_header a:not(.tag):hover { color: ${v("sidebar-link-hover")} !important; }`,
+    tokens.palette?.["sidebar-link-fg"] && `\n#right_bar a:not(.tag), #right_bar #tag_cloud_header a:not(.tag), #search_right_bar a:not(.tag) { color: ${v("sidebar-link-fg")} !important; }`,
+    tokens.palette?.["sidebar-link-hover"] && `\n#right_bar a:not(.tag):hover, #right_bar #tag_cloud_header a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: ${v("sidebar-link-hover")} !important; }`,
   ].filter(Boolean).join("");
 
   return `
@@ -224,8 +224,8 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
 .bookmark.private,
 .bookmark.private[style*="background"] { background: ${v("private-bg")} !important; box-shadow: inset 3px 0 0 ${v("private-accent")} !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
-/* ---- Right bar ---- */
-#right_bar {
+/* ---- Right bar (#right_bar & /search/ #search_right_bar) ---- */
+#right_bar, #search_right_bar {
   background: ${v("bg-surface")} !important;
   color: ${v("fg")} !important;
   padding: ${v("space-right-bar-gap")} !important;
@@ -247,9 +247,10 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
-#right_bar h3, #right_bar h4, #right_bar b { color: ${v("muted")} !important; }
-#right_bar a:not(.tag) { color: ${v("accent")} !important; }
-#right_bar a:not(.tag):hover { color: ${v("link-hover")} !important; }
+#right_bar h3, #right_bar h4, #right_bar b,
+#search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: ${v("muted")} !important; }
+#right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: ${v("accent")} !important; }
+#right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: ${v("link-hover")} !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: ${v("row-hover")} !important; }
 #right_bar table td a.delete { color: ${v("muted-soft")} !important; font-size: ${sizeXs} !important; opacity: 1 !important; transition: color 0.15s ease !important; }
@@ -264,7 +265,7 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
   font-size: ${sizeSm} !important;
 }
 #right_bar input#key:focus { border-color: ${v("accent")} !important; box-shadow: 0 0 0 2px ${v("accent-alpha")} !important; outline: none !important; }
-#right_bar input[type="submit"] {
+#right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: ${v("sidebar-btn-bg")} !important;
   color: ${v("sidebar-btn-fg")} !important;
   border: none !important;
@@ -275,7 +276,8 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
   font-size: ${sizeSm} !important;
   transition: background 0.15s ease !important;
 }
-#right_bar input[type="submit"]:hover { background: ${v("sidebar-btn-bg-hover")} !important; }
+#right_bar input[type="submit"]:hover, #search_right_bar input[type="submit"]:hover { background: ${v("sidebar-btn-bg-hover")} !important; }
+#search_right_bar .search_button input[type="submit"] { margin-left: 0 !important; }
 
 /* ---- Tag cloud ---- */
 #tag_cloud { max-width: 100% !important; overflow-wrap: break-word !important; }
@@ -357,6 +359,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: ${v("row-hover")} !important; border-color: ${v("accent")} !important; color: ${v("accent")} !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: ${v("accent")} !important; vertical-align: middle !important; }
+select option { background: ${v("input-bg")} !important; color: ${v("fg")} !important; }
 
 /* ---- File picker button (e.g. Choose File on /settings/import) ----
    Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
@@ -380,6 +383,9 @@ input[type="file"]::file-selector-button:hover {
 }
 .suggested_tag { color: ${v("success")} !important; cursor: pointer !important; }
 #edit_bookmark_form { background: ${v("bg-surface")} !important; color: ${v("fg")} !important; border: ${v("border-width")} ${v("border-style")} ${v("border")} !important; width: 100% !important; box-sizing: border-box !important; }
+/* When EditForm mounts #edit_bookmark_form inside a flex .bookmark row next to .star (~20px),
+   flex:1 1 0% + min-width:0 fits the remaining row width instead of overflowing #main_column by 20px. */
+.bookmark > #edit_bookmark_form { flex: 1 1 0% !important; width: auto !important; min-width: 0 !important; max-width: 100% !important; }
 #edit_bookmark_form p { color: ${v("muted")} !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
    the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
@@ -474,7 +480,7 @@ body .api_token { color: ${v("fg")} !important; }
 }
 
 /* ---- Profile page ---- */
-.service_box, .help_box {
+.service_box, .help_box, #profile_left_column > div:first-child:not(.service_box) {
   background: ${v("bg-surface")} !important;
   border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
   border-radius: ${v("radius-md")} !important;
@@ -483,6 +489,7 @@ body .api_token { color: ${v("fg")} !important; }
   margin-bottom: 12px !important;
 }
 .service_box .service_box { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; width: auto !important; box-sizing: border-box !important; }
+#profile_main_column .service_box:not(:has(*)) { display: none !important; }
 #profile_left_column { margin-right: 20px !important; }
 #profile_right_column { width: 430px !important; }
 /* Cap the shrink-to-fit parent as well as its fixed-width details column.
@@ -498,6 +505,10 @@ body .api_token { color: ${v("fg")} !important; }
 blockquote.note { color: ${v("fg")} !important; }
 .note a { color: ${v("accent")} !important; }
 .note .note { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
+/* Pinboard's /notes/ index renders 20 unclosed <div class="note"> tags nested inside each other;
+   move the row divider to each item's direct <span> wrapper so all 20 rows get clean rules. */
+#notes > .note { border-bottom: none !important; padding: 0 !important; }
+#notes .note > span:first-child { display: block !important; padding: 8px 0 !important; border-bottom: ${v("border-width")} ${v("border-style")} ${v("border")} !important; }
 #note_right_column { background: ${v("bg-surface")} !important; color: ${v("fg")} !important; padding: 16px !important; border-left: ${v("border-width")} ${v("border-style")} ${v("border")} !important; }
 
 /* ---- Bulk edit ---- */
@@ -622,10 +633,22 @@ blockquote.note { color: ${v("fg")} !important; }
 }
 #save_changes_marker:hover { background: ${v("btn-bg-hover")} !important; border-color: ${v("btn-bg-hover")} !important; color: ${v("btn-fg")} !important; }
 
-/* ---- Pagination ---- */
+/* ---- Pagination & Cross-Page Float Containment ---- */
+/* Pinboard's new_main.css floats table.next_prev_widget (width="200") left without a clearing element
+   after #top_next_prev on /network/ and /search/, causing the first flex .bookmark (BFC) to shrink by
+   200px on the left across all 15 themes (even when the 1-page search table is visually empty). */
+#top_next_prev, #bottom_next_prev { float: none !important; clear: both !important; display: flow-root !important; width: 100% !important; box-sizing: border-box !important; }
+#top_next_prev:not(:has(a)), #bottom_next_prev:not(:has(a)):not(:has(.per_page_widget)) { display: none !important; }
+div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { clear: both !important; }
 .next_prev, .next_prev_widget a { color: ${v("accent")} !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: ${v("link-hover")} !important; }
 #nextprev a.edit { color: ${v("muted-soft")} !important; }
+
+/* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
+tr.tab_header, tr.tab_header td { background: ${v("bg-surface")} !important; color: ${v("fg-strong")} !important; }
+#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#main_column:has(.howto_box) { display: flow-root !important; }
+.flash:not(:has(p:not(:empty))) { display: none !important; }
 
 /* ---- Logged-out landing page (https://pinboard.in/) ---- */
 #main_welcome, .homepage_quad { color: ${v("fg")} !important; }

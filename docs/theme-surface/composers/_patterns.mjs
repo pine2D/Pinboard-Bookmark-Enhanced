@@ -635,14 +635,13 @@ export function patternsLayer(tokens) {
       `#notes .note { border-bottom: none !important; padding: 0 !important; margin: 0 !important; }`,
       `#notes .note > span:first-child { display: block !important; padding: 7px 0 !important; border-bottom: 1px solid ${rowRule} !important; color: ${v("muted")} !important; }`,
       `#notes .note > span:first-child p.when { margin: 2px 0 0 !important; font-size: 11px !important; color: ${v("metadata-fg")} !important; }`,
-      `#main_column:has(> #import_history_table) > #settings_panel, #main_column > #import_history_table, .service_box, .help_box, #right_column { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      `#main_column:has(> #import_history_table) > #settings_panel, #main_column > #import_history_table, .service_box, .help_box, #profile_left_column > div:first-child:not(.service_box), #right_column { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
       `#main_column:has(> #import_history_table) > #settings_panel { margin-top: 0 !important; padding: 0 14px 14px !important; }`,
       `#main_column:has(> #import_history_table) > #settings_panel::before { ${pinstripeDecls} margin: 0 -14px 12px -14px !important; }`,
       `#main_column > #import_history_table { margin-top: 0 !important; }`,
       `.service_box:not(:has(*)), #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }`,
-      `.service_box:not(.service_box .service_box)::before, .help_box::before { ${pinstripeDecls} margin: -16px -16px 12px -16px !important; }`,
+      `.service_box:not(.service_box .service_box)::before, .help_box::before, #profile_left_column > div:first-child:not(.service_box)::before { ${pinstripeDecls} margin: -16px -16px 12px -16px !important; }`,
       `.service_box .service_box { border: none !important; box-shadow: none !important; background: transparent !important; }`,
-      `#profile_left_column > div:first-child:not(.service_box) { background: ${groupBg} !important; border: 1px solid ${groupBorder} !important; border-radius: 2px !important; padding: 10px 12px !important; margin-bottom: 12px !important; box-sizing: border-box !important; box-shadow: inset 1px 1px 0 ${glint} !important; }`,
 
       // Settings Tab Control, Etched Section Grooves & Mini-Bevel Help Badges
       `#settings_panel { background: ${paperBg} !important; margin-top: 0 !important; padding: 12px 16px 16px !important; box-sizing: border-box !important; }`,
@@ -664,8 +663,10 @@ export function patternsLayer(tokens) {
       `#bmarks_page_nav a.rss_link { background: ${btnFace} !important; color: ${btnFg} !important; border: 1px solid ${inkBorder} !important; border-radius: 2px !important; padding: 0 6px !important; box-shadow: ${miniBevel} !important; text-decoration: none !important; }`,
       `#bmarks_page_nav a.rss_link:hover { background: ${btnHover} !important; color: ${btnFg} !important; text-decoration: none !important; }`,
       `#bookmarks { background: ${paperBg} !important; margin: 0 !important; padding: 0 !important; }`,
-      `#nextprev { background: ${chromeBg} !important; border-top: 1px solid ${inkBorder} !important; border-bottom: 1px solid ${inkBorder} !important; padding: 4px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#nextprev, #top_next_prev:has(a) { background: ${chromeBg} !important; border-top: 1px solid ${inkBorder} !important; border-bottom: 1px solid ${inkBorder} !important; padding: 4px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#top_next_prev:has(a) { margin: 0 -14px 8px -14px !important; width: auto !important; }`,
       `#bottom_next_prev { float: none !important; display: flow-root !important; width: 100% !important; box-sizing: border-box !important; background: ${chromeBg} !important; border-top: 1px solid ${inkBorder} !important; padding: 5px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `${paddedMainSel} > #bottom_next_prev { margin: 8px -14px -14px -14px !important; width: auto !important; }`,
       `#nextprev #bulk_edit[style*="170, 170, 170"] { background: ${btnActiveBg} !important; color: ${btnActiveFg} !important; border-color: ${inkBorder} !important; padding: 0 6px !important; border-radius: 2px !important; }`,
       `#main_column div:has(> .edit_checkbox[style*="block"]), #main_column div:has(> .edit_checkbox[style*="inline"]) { display: flex !important; flex-wrap: wrap !important; align-items: flex-start !important; background: ${paperBg} !important; border-bottom: 1px solid ${rowRule} !important; }`,
       `#main_column div:has(> .edit_checkbox[style*="block"]) > .edit_checkbox, #main_column div:has(> .edit_checkbox[style*="inline"]) > .edit_checkbox { float: none !important; margin: 11px 0 0 12px !important; width: auto !important; flex-shrink: 0 !important; }`,
@@ -695,14 +696,14 @@ export function patternsLayer(tokens) {
       `#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: ${selBg} !important; color: ${selFg} !important; box-shadow: inset 0 0 0 1px ${inkBorder} !important; }`,
       `#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: ${selHoverBg} !important; color: ${selFg} !important; box-shadow: inset 0 0 0 1px ${inkBorder} !important; }`,
 
-      // Right Sidebar Window (#right_bar) & Nested /popular/ Sidebar Alignment
-      `#right_bar:not(:has(#tag_cloud:empty)) { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 0 12px 12px !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      // Right Sidebar Window (#right_bar & /search/ #search_right_bar) & Nested /popular/ Sidebar Alignment
+      `#right_bar:not(:has(#tag_cloud:empty)), #search_right_bar { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 0 12px 12px !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
       `@media (min-width: 1061px) { #main_column > #right_bar { top: -1px !important; left: 706px !important; } }`,
-      `@media (min-width: 761px) { ${mainWindowSel}:has(~ #right_bar) { float: left !important; width: min(690px, calc(100% - 340px)) !important; } ${mainWindowSel} ~ #right_bar:not(:has(#tag_cloud:empty)) { float: left !important; width: 320px !important; margin-left: 16px !important; } #footer { clear: both !important; } }`,
-      `#right_bar:not(:has(#tag_cloud:empty))::before { ${pinstripeDecls} margin: 0 -12px 10px -12px !important; }`,
-      `#right_bar table { width: 100% !important; border-collapse: collapse !important; }`,
-      `#right_bar table td { padding: 3px 4px !important; }`,
-      `#right_bar table tr[onmouseover]:hover { background: ${rowHoverBg} !important; }`,
+      `@media (min-width: 761px) { ${mainWindowSel}:has(~ #right_bar), ${mainWindowSel}:has(~ #search_right_bar) { float: left !important; width: min(690px, calc(100% - 340px)) !important; } ${mainWindowSel} ~ #right_bar:not(:has(#tag_cloud:empty)), ${mainWindowSel} ~ #search_right_bar { float: left !important; width: 320px !important; margin-left: 16px !important; } #footer { clear: both !important; } }`,
+      `#right_bar:not(:has(#tag_cloud:empty))::before, #search_right_bar::before { ${pinstripeDecls} margin: 0 -12px 10px -12px !important; }`,
+      `#right_bar table, #search_right_bar table { width: 100% !important; border-collapse: collapse !important; }`,
+      `#right_bar table td, #search_right_bar table td { padding: 3px 4px !important; }`,
+      `#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: ${rowHoverBg} !important; }`,
 
       // Sunken Text Wells (Text Inputs, Textareas, Multi-row Selects)
       `#search_query_field, #banner_searchbox input[type="text"], #right_bar input#key, #tweet_searchbox #search_query_field, input[type="text"], input:not([type]), input[type="password"], textarea, select[multiple], select[size]:not([size="1"]) { background: ${paperBg} !important; color: ${v("fg")} !important; border: 1px solid ${fieldBorder} !important; border-radius: 0 !important; box-shadow: ${fieldShadow} !important; }`,
@@ -717,6 +718,7 @@ export function patternsLayer(tokens) {
 
       // Platinum Beveled Checkboxes & Radios
       `input[type="checkbox"], input[type="radio"] { -webkit-appearance: none !important; appearance: none !important; position: relative !important; display: inline-block !important; width: 14px !important; height: 14px !important; margin: 0 4px 0 0 !important; padding: 0 !important; vertical-align: -2px !important; background: ${btnFace} !important; border: 1px solid ${inkBorder} !important; box-shadow: ${miniBevel} !important; cursor: pointer !important; }`,
+      `#edit_bookmark_form label + input[type="checkbox"], body:not(#pinboard) label + input[type="checkbox"] { margin-left: 10px !important; }`,
       `input[type="checkbox"] { border-radius: 2px !important; }`,
       `input[type="radio"] { border-radius: 50% !important; }`,
       `input[type="checkbox"]:hover:not(:disabled):not(:checked), input[type="radio"]:hover:not(:disabled):not(:checked) { background: ${btnHover} !important; }`,
@@ -728,12 +730,13 @@ export function patternsLayer(tokens) {
       `input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.5 !important; cursor: default !important; }`,
 
       // 4-Layer Stepped Bevel Push Buttons
-      `input[type="submit"], input[type="button"], input[type="reset"], input[type="reset"].reset, button[type="reset"], input[type="file"]::file-selector-button, .search_button input[type="submit"], #right_bar input[type="submit"], #tweet_searchbox input[type="submit"], #tagPickerNav input[type="button"], #save_changes_marker, #edit_bookmark_form input.submit, #edit_bookmark_form input.reset, .signup_button, .signup_button[style*="background"] { background: ${btnFace} !important; color: ${btnFg} !important; border: 1px solid ${inkBorder} !important; border-radius: 3px !important; box-shadow: ${btnBevel} !important; font-weight: 600 !important; }`,
-      `input[type="submit"]:hover, input[type="button"]:hover, input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover, input[type="file"]::file-selector-button:hover, .search_button input[type="submit"]:hover, #right_bar input[type="submit"]:hover, #tweet_searchbox input[type="submit"]:hover, #tagPickerNav input[type="button"]:hover, #save_changes_marker:hover, #edit_bookmark_form input.submit:hover, #edit_bookmark_form input.reset:hover, .signup_button:hover { background: ${btnHover} !important; color: ${btnFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnHoverBevel} !important; }`,
-      `input[type="submit"]:active, input[type="button"]:active, input[type="reset"]:active, .search_button input[type="submit"]:active, #right_bar input[type="submit"]:active, #tweet_searchbox input[type="submit"]:active, #tagPickerNav input[type="button"]:active, #save_changes_marker:active, #edit_bookmark_form input.submit:active, #edit_bookmark_form input.reset:active, .signup_button:active { background: ${btnActiveBg} !important; color: ${btnActiveFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnActiveBevel} !important; }`,
+      `input[type="submit"], input[type="button"], input[type="reset"], input[type="reset"].reset, button[type="reset"], input[type="file"]::file-selector-button, .search_button input[type="submit"], #right_bar input[type="submit"], #search_right_bar input[type="submit"], #tweet_searchbox input[type="submit"], #tagPickerNav input[type="button"], #save_changes_marker, #edit_bookmark_form input.submit, #edit_bookmark_form input.reset, .signup_button, .signup_button[style*="background"] { background: ${btnFace} !important; color: ${btnFg} !important; border: 1px solid ${inkBorder} !important; border-radius: 3px !important; box-shadow: ${btnBevel} !important; font-weight: 600 !important; }`,
+      `input[type="submit"]:hover, input[type="button"]:hover, input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover, input[type="file"]::file-selector-button:hover, .search_button input[type="submit"]:hover, #right_bar input[type="submit"]:hover, #search_right_bar input[type="submit"]:hover, #tweet_searchbox input[type="submit"]:hover, #tagPickerNav input[type="button"]:hover, #save_changes_marker:hover, #edit_bookmark_form input.submit:hover, #edit_bookmark_form input.reset:hover, .signup_button:hover { background: ${btnHover} !important; color: ${btnFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnHoverBevel} !important; }`,
+      `input[type="submit"]:active, input[type="button"]:active, input[type="reset"]:active, .search_button input[type="submit"]:active, #right_bar input[type="submit"]:active, #search_right_bar input[type="submit"]:active, #tweet_searchbox input[type="submit"]:active, #tagPickerNav input[type="button"]:active, #save_changes_marker:active, #edit_bookmark_form input.submit:active, #edit_bookmark_form input.reset:active, .signup_button:active { background: ${btnActiveBg} !important; color: ${btnActiveFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnActiveBevel} !important; }`,
 
       // Inline Edit Form, Bulk Edit Dialog Box, Autocomplete Menu & Responsive Breakpoints
-      `#edit_bookmark_form { float: none !important; flex: 0 0 100% !important; width: 100% !important; box-sizing: border-box !important; background: ${chromeBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 12px 14px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#edit_bookmark_form { float: none !important; width: 100% !important; box-sizing: border-box !important; background: ${chromeBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 12px 14px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `.bookmark > #edit_bookmark_form { flex: 1 1 0% !important; width: auto !important; min-width: 0 !important; max-width: 100% !important; }`,
       `#bulk_edit_options { margin: 0 !important; padding: 8px 10px !important; box-sizing: border-box !important; background: ${paperBg} !important; border-bottom: 1px solid ${inkBorder} !important; }`,
       `#bulk_edit_box { background: ${groupBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint} !important; }`,
       `#bulk_top_bar { background: ${chromeBg} !important; border: none !important; border-bottom: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 5px 10px !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
@@ -750,8 +753,8 @@ export function patternsLayer(tokens) {
       `.pin-ac li { font-weight: 600 !important; }`,
       `.pin-ac li:hover, .pin-ac .active { background: ${selBg} !important; color: ${selFg} !important; }`,
       `@media (max-width: 1060px) { #main_column > #right_bar { position: static !important; left: auto !important; top: auto !important; width: 100% !important; margin-top: 12px !important; } }`,
-      `@media (max-width: 760px) { ${mainWindowSel} { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; } #right_bar, #main_column > #right_bar, #note_right_column { width: 100% !important; margin-left: 0 !important; margin-top: 12px !important; float: none !important; } }`,
-      `@media (max-width: 640px) { #right_bar, #main_column > #right_bar { display: none !important; } }`
+      `@media (max-width: 760px) { ${mainWindowSel} { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; } #right_bar, #search_right_bar, #main_column > #right_bar, #note_right_column { width: 100% !important; margin-left: 0 !important; margin-top: 12px !important; float: none !important; } }`,
+      `@media (max-width: 640px) { #right_bar, #search_right_bar, #main_column > #right_bar { display: none !important; } }`
     );
   } else if (windowChrome != null && windowChrome !== "default") {
     throw new Error(`window-chrome: unknown value "${windowChrome}" (expected "default" or "platinum")`);

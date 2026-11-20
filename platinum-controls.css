@@ -562,6 +562,7 @@ html[data-reader-theme="platinum"]
 /* Compact icon, inline utility & stepper buttons across Popup, Options & Reader */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
   :is(.offline-queue-item > .actions button:not(.offline-queue-remove),
+      button.add-all-link,
       button.regen-link,
       button.clear-all-link,
       button.offline-clear,
@@ -594,11 +595,16 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(button.regen-link, button.clear-all-link, button.offline-clear) {
+  :is(button.add-all-link, button.regen-link, button.clear-all-link, button.offline-clear) {
   padding: 1px 6px;
   min-height: 18px;
   line-height: 14px;
   text-decoration: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .add-all-link + .cache-hint-wrap > button.regen-link {
+  margin-left: 0;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
@@ -607,7 +613,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(button.regen-link, button.clear-all-link, button.offline-clear, #tags-copy-all):is(:hover, :focus-visible) {
+  :is(button.add-all-link, button.regen-link, button.clear-all-link, button.offline-clear, #tags-copy-all):is(:hover, :focus-visible) {
   text-decoration: none;
 }
 
@@ -632,6 +638,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
   :is(.offline-queue-item > .actions button:not(.offline-queue-remove),
+      button.add-all-link,
       button.regen-link,
       button.clear-all-link,
       button.offline-clear,
@@ -660,6 +667,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
   :is(.offline-queue-item > .actions button:not(.offline-queue-remove),
+      button.add-all-link,
       button.regen-link,
       button.clear-all-link,
       button.offline-clear,
@@ -1356,7 +1364,8 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(button.regen-link,
+  :is(button.add-all-link,
+      button.regen-link,
       button.clear-all-link,
       button.offline-clear,
       .recent-bm-edit,
@@ -2637,7 +2646,7 @@ html[data-reader-theme="platinum"] #skim-section {
   box-shadow: var(--pt-group-shadow);
 }
 
-html[data-reader-theme="platinum"] .msg-bar {
+html[data-reader-theme="platinum"] .msg-bar:not(#export-summary) {
   background: var(--pt-group-bg);
   color: var(--pt-ink);
   border: 1px solid var(--pt-group-bd);
@@ -2647,7 +2656,7 @@ html[data-reader-theme="platinum"] .msg-bar {
   animation: none;
 }
 
-html[data-reader-theme="platinum"] .msg-bar:is(.error, [data-state="error"]) {
+html[data-reader-theme="platinum"] .msg-bar:not(#export-summary):is(.error, [data-state="error"]) {
   color: var(--pt-danger-fg);
   border-color: var(--pt-danger-bd);
 }

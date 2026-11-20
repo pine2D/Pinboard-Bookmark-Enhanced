@@ -68,4 +68,4 @@
 
 ## 许可证
 
-MIT，见 [LICENSE](LICENSE)。
+MIT，见 [LICENSE](LICENSE)。Platinum 主题的设计灵感来自 Mac OS 9 Platinum 与 Livid 的 [v2core.com](https://www.v2ex.com/t/1246152) 网页设计。
