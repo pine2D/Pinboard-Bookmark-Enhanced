@@ -374,7 +374,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .fc-btn,
       .confirm-popover :is(.confirm-no, .confirm-alt),
       .theme-name-popover .tnp-cancel,
-      .action-btn:not(.es-quiet, #reader-bookmark-delete),
+      .action-btn:not(.es-quiet, #reader-bookmark-delete, .reader-bookmark-ic, #rail-ocr-btn, #rail-history-btn, #rail-settings-btn),
       .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
@@ -389,10 +389,6 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .xp-dict-more,
       .xp-dict-usage-stop,
       .xp-dict-save-change,
-      .reader-dict-return,
-      .hl-card-ai-explain,
-      .hl-card-ai-translate,
-      .hl-card-ai-ask,
       .hl-card-save,
       .hl-card-mic,
       .pbv-bar button),
@@ -418,7 +414,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .fc-btn,
       .confirm-popover :is(.confirm-no, .confirm-alt),
       .theme-name-popover .tnp-cancel,
-      .action-btn:not(.es-quiet, #reader-bookmark-delete),
+      .action-btn:not(.es-quiet, #reader-bookmark-delete, .reader-bookmark-ic, #rail-ocr-btn, #rail-history-btn, #rail-settings-btn),
       .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
@@ -433,10 +429,6 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .xp-dict-more,
       .xp-dict-usage-stop,
       .xp-dict-save-change,
-      .reader-dict-return,
-      .hl-card-ai-explain,
-      .hl-card-ai-translate,
-      .hl-card-ai-ask,
       .hl-card-save,
       .hl-card-mic,
       .pbv-bar button):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active),
@@ -458,7 +450,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .fc-btn,
       .confirm-popover :is(.confirm-no, .confirm-alt),
       .theme-name-popover .tnp-cancel,
-      .action-btn:not(.es-quiet, #reader-bookmark-delete),
+      .action-btn:not(.es-quiet, #reader-bookmark-delete, .reader-bookmark-ic, #rail-ocr-btn, #rail-history-btn, #rail-settings-btn),
       .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
@@ -473,10 +465,6 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .xp-dict-more,
       .xp-dict-usage-stop,
       .xp-dict-save-change,
-      .reader-dict-return,
-      .hl-card-ai-explain,
-      .hl-card-ai-translate,
-      .hl-card-ai-ask,
       .hl-card-save,
       .hl-card-mic,
       .pbv-bar button):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active),
@@ -597,6 +585,13 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .typo-seg-btn,
       .fn-pop-jump,
       .rail-sec-open,
+      .reader-bookmark-ic,
+      #rail-ocr-btn,
+      #rail-history-btn,
+      #rail-settings-btn,
+      .hl-card-ai-explain,
+      .hl-card-ai-translate,
+      .hl-card-ai-ask,
       .rail-kbd-help-btn,
       .pb-copy-code,
       .pbp-img-fix-btn,
@@ -674,10 +669,17 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .typo-seg-btn,
       .fn-pop-jump,
       .rail-sec-open,
+      .reader-bookmark-ic,
+      #rail-ocr-btn,
+      #rail-history-btn,
+      #rail-settings-btn,
+      .hl-card-ai-explain,
+      .hl-card-ai-translate,
+      .hl-card-ai-ask,
       .rail-kbd-help-btn,
       .pb-copy-code,
       .pbp-img-fix-btn,
-      .rh-clear-btn):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"], .active) {
+      .rh-clear-btn):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active) {
   background: var(--pt-face-hover);
   color: var(--pt-ink);
   border-color: var(--pt-edge);
@@ -704,10 +706,17 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .typo-seg-btn,
       .fn-pop-jump,
       .rail-sec-open,
+      .reader-bookmark-ic,
+      #rail-ocr-btn,
+      #rail-history-btn,
+      #rail-settings-btn,
+      .hl-card-ai-explain,
+      .hl-card-ai-translate,
+      .hl-card-ai-ask,
       .rail-kbd-help-btn,
       .pb-copy-code,
       .pbp-img-fix-btn,
-      .rh-clear-btn):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], .active) {
+      .rh-clear-btn):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
@@ -1363,6 +1372,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .toc-list a,
       .rail-sec-head,
       .hl-item-main,
+      #reader-bookmark-section > .bookmark-badge,
       #vocab-ref-result :is(.xp-dict-lemma-link, .xp-dict-ai-title, .xp-dict-learning-title, .xp-dict-learning-label)):focus-visible {
   box-shadow: none;
 }
@@ -1778,7 +1788,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) body > main
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar {
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr) 84px;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
   align-items: center;
   gap: 6px;
   padding: 3px 6px;
@@ -1790,7 +1800,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #login-section .header-bar {
-  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar > h1 {
@@ -1816,13 +1826,13 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar .header-ic {
-  width: 24px;
+  width: 20px;
   height: 20px;
   background: var(--pt-face);
   color: var(--pt-ink);
   border: 1px solid var(--pt-edge);
   border-radius: 2px;
-  box-shadow: var(--pt-btn-shadow);
+  box-shadow: var(--pt-mini-bevel);
   transition: none;
   transform: none;
 }
@@ -1832,10 +1842,18 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar
   color: var(--pt-ink);
 }
 
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar .header-ic:focus-visible {
+  outline: 2px solid var(--pt-focus);
+  outline-offset: 1px;
+  border-color: var(--pt-edge);
+  border-radius: 2px;
+  box-shadow: var(--pt-mini-bevel);
+}
+
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar .header-ic:active:not(:disabled) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
-  box-shadow: var(--pt-btn-pressed-shadow);
+  box-shadow: var(--pt-mini-pressed);
   transform: none;
 }
 
@@ -2602,32 +2620,22 @@ html[data-reader-theme="platinum"] .rail::before {
   border-bottom: 1px solid var(--pt-frame);
 }
 
-html[data-reader-theme="platinum"] .rail-ident :is(#rail-ocr-btn, #rail-history-btn, #rail-settings-btn) {
+html[data-reader-theme="platinum"] #reader-bookmark-section > .bookmark-badge {
+  background: transparent;
+  color: var(--pt-ink-muted);
+  border: 0;
   border-radius: 2px;
+  box-shadow: none;
 }
 
-html[data-reader-theme="platinum"] .rail-ident a.bookmark-badge {
-  padding: var(--sp-0) var(--sp-2);
-  background: var(--pt-face);
-  color: var(--pt-ink);
-  font-weight: 600;
-  border: 1px solid var(--pt-edge);
-  border-radius: 2px;
-  box-shadow: var(--pt-mini-bevel);
-  text-decoration: none;
-}
-
-html[data-reader-theme="platinum"] .rail-ident a.bookmark-badge:hover {
-  background: var(--pt-face-hover);
+html[data-reader-theme="platinum"] #reader-bookmark-section > .bookmark-badge:hover {
+  background: transparent;
   color: var(--pt-link);
-  border-color: var(--pt-edge);
 }
 
-html[data-reader-theme="platinum"] .rail-ident a.bookmark-badge:active {
-  background: var(--pt-pressed-bg);
-  color: var(--pt-pressed-fg);
-  border-color: var(--pt-edge);
-  box-shadow: var(--pt-mini-pressed);
+html[data-reader-theme="platinum"] #reader-bookmark-section > .bookmark-badge:active {
+  background: transparent;
+  color: var(--pt-ink);
 }
 
 html[data-reader-theme="platinum"] :is(.token-badge, .pbv-ai-note, .hl-item-lang) {
@@ -2942,13 +2950,13 @@ html[data-reader-theme="platinum"] #pb-hl-card .hl-card-quote {
 }
 
 html[data-reader-theme="platinum"]
-  #pb-hl-card :is(.hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask, .hl-card-delete, .hl-card-mic) {
+  #pb-hl-card :is(.hl-card-delete, .hl-card-mic) {
   border-radius: 2px;
   box-shadow: var(--pt-mini-bevel);
 }
 
 html[data-reader-theme="platinum"]
-  #pb-hl-card :is(.hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask, .hl-card-mic):active {
+  #pb-hl-card .hl-card-mic:active {
   box-shadow: var(--pt-mini-pressed);
 }
 
@@ -3127,7 +3135,7 @@ html[data-reader-theme="platinum"] #ask-panel > .panel-head > h2 {
 }
 
 html[data-reader-theme="platinum"] #ask-panel > .panel-head > #ask-close {
-  width: 22px;
+  width: 20px;
   height: 20px;
   background: var(--pt-win);
 }

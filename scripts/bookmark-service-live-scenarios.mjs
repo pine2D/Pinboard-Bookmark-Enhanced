@@ -3008,36 +3008,47 @@ export const H3C_MODULES = [
     // extension's own UI, which a temporary instance shows the same.
     tempReason: '阅读器书签条的文案与状态由扩展决定，临时实例上结果相同；user 目标 3 轮装不下全部模块，按价值留给临时目标（H3d 裁决 13）',
     needs: needs({ target: 'temp', shots: true }),
-    budget: { bookmarks: 3, urls: 3, node: 20, browser: { linkding: 90, karakeep: 160 }, ai: 0, tags: 0, lists: { karakeep: 1 }, seconds: 100, tagReads: 2 },
+    budget: { bookmarks: 3, urls: 3, node: 20, browser: { linkding: 90, karakeep: 160 }, ai: 0, tags: 1, lists: { karakeep: 1 }, seconds: 100, tagReads: 2 },
     files: [],
     settings: { offlineQueueEnabled: true },
     async steps(t) {
       const { prefix } = t;
+      const badgeTag = prefix + '-badge';
       const [a, b, c] = [t.claimUrl(), t.claimUrl(), t.claimUrl()];
       await t.phase('reader_bar_seed');
-      await t.seed({ url: a, title: prefix + ' reader bar', notes: 'seed' });
+      await t.seed({ url: a, title: prefix + ' reader bar', tags: [badgeTag], notes: 'seed' });
       const origin = new URL(t.base).origin;
       // Waits for a condition; when it never comes, the expectation after it
       // fails with its own code (the copy it found) instead of a timeout.
       const settle = (read, label, timeout = 8000) => t.until(read, label, timeout).then(() => true, error => { if (!/^timeout_/.test(error?.code || '')) throw error; return false; });
 
-      // G20: the badge points at the connected service, shows no padlock
-      // (self-hosted privacy is not Pinboard's shared flag), and one reader
-      // open looks the page up once.
+      // G20: the Save section's bookmark metadata line shows saved tags in-page
+      // (never linking out to Pinboard), shows no padlock (self-hosted privacy
+      // is not Pinboard's shared flag), and one reader open looks the page up once.
       await t.part('badge', async () => {
         await t.phase('reader_badge');
         const since = t.now();
         const reader = await t.openReader(a, { ready: '#reader-bookmark-edit' });
-        await t.until(async () => (await reader.locator('.bookmark-badge').count()) > 0, 'reader_badge_shown', 8000);
-        const badge = await reader.evaluate(() => { const el = document.querySelector('.bookmark-badge'); return { href: el.getAttribute('href') || '', lock: !!el.querySelector('.bb-lock') }; });
-        let hrefOrigin = '';
-        try { hrefOrigin = new URL(badge.href).origin; } catch { hrefOrigin = 'invalid'; }
+        await t.until(async () => (await reader.locator('#reader-bookmark-section > .bookmark-badge:not([hidden])').count()) > 0, 'reader_badge_shown', 8000);
+        const badge = await reader.evaluate(() => {
+          const el = document.querySelector('#reader-bookmark-section > .bookmark-badge');
+          return {
+            railCount: document.querySelectorAll('.rail-ident .bookmark-badge').length,
+            href: el.getAttribute('href') || '',
+            lock: !!el.querySelector('.bb-lock'),
+            tags: el.querySelector('.bb-tags')?.textContent || '',
+          };
+        });
         const lookups = t.requests({ path: CHECK_PATH[t.service], since }).length;
-        t.note('badge', { pinboard: /pinboard\.in/i.test(badge.href), sameOrigin: hrefOrigin === origin, lock: badge.lock, lookups });
-        await t.shot(reader, 'badge', { surface: 'reader', keys: ['.bookmark-badge', '#reader-bookmark-save'] });
+        t.note('badge', { pinboard: /pinboard\.in/i.test(badge.href), railCount: badge.railCount, tags: badge.tags, lock: badge.lock, lookups, origin });
+        await t.shot(reader, 'badge', { surface: 'reader', keys: ['#reader-bookmark-meta', '#reader-bookmark-save'] });
+        await reader.locator('#reader-bookmark-meta').click();
+        await reader.locator('#reader-bookmark-editor:popover-open').waitFor({ timeout: 8000 });
+        const focusedTags = await reader.evaluate(() => document.activeElement?.id === 'reader-bookmark-tags');
         await reader.close();
         t.expect(!/pinboard\.in/i.test(badge.href), 'reader_badge_pinboard_link');
-        t.expectEq(hrefOrigin, origin, 'reader_badge_service_link');
+        t.expectEq(badge.railCount, 0, 'reader_badge_rail_duplicate');
+        t.expect(badge.tags.includes(badgeTag) && focusedTags, 'reader_badge_service_link');
         t.expect(!badge.lock, 'reader_badge_lock');
         t.expectEq(lookups, 1, 'reader_badge_second_lookup');
       });

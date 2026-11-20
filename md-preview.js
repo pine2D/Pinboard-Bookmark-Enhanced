@@ -505,100 +505,6 @@ function ensureKatex() {
   return _katexPromise;
 }
 
-// X2: bookmarked badge padlock icon (no PBP_ICONS entry for this yet — kept
-// local to md-preview.js rather than growing shared.js's icon bank for one
-// consumer). Same style budget as PBP_ICONS entries in shared.js: viewBox
-// 0 0 16 16, stroke currentColor, aria-hidden (a11y label lives on the
-// wrapping span in renderBookmarkBadge, not the SVG itself).
-const PBP_BOOKMARK_LOCK_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.lock : "";
-
-// Pure: turns the reader bar's pbp:bookmark-state detail into the
-// badge's render model. No DOM/chrome access — kept side-effect-free even
-// though md-preview.js has no test harness to exercise it directly (the
-// file's top-level IIFE below depends on chrome.storage/real DOM ids, so
-// it isn't loaded by tests/md-ai-tests.html; see the task note).
-function pbpBuildBookmarkBadgeModel(resp, service) {
-  if (!resp || resp.bookmarked !== true) return { show: false, tagsShown: [], tagsFull: "", isPrivate: false };
-  const names = Array.isArray(resp.tagNames) ? resp.tagNames
-    : typeof resp.tags === "string" ? resp.tags.trim().split(/\s+/).filter(Boolean) : [];
-  const tagsFull = names.join(" ");
-  const tagsShown = names.slice(0, 3);
-  // Karakeep bookmarks are always private and a linkding one is private unless
-  // shared, so the padlock says something only for Pinboard.
-  return { show: true, tagsShown, tagsFull, isPrivate: service === "pinboard" && resp.shared === "no" };
-}
-
-// Takes the badge off screen. It is account-derived data (a private bookmark's
-// tags and its padlock), so an account switch has to remove it even when the
-// new account's lookup never answers -- offline, no token, or a rejected
-// message all leave the previous account's tags sitting in the rail otherwise.
-function pbpClearBookmarkBadge() {
-  document.querySelectorAll(".bookmark-badge").forEach((el) => el.remove());
-}
-
-// Builds the bookmarked-badge DOM from that bookmark-state detail and
-// inserts it right after #preview-url. Clears any badge already there when
-// the model says not to show (unbookmarked / offline / no token / any
-// exception — all collapse to {bookmarked:false} in background.js).
-// Tags are remote data (Pinboard-stored, not this extension's own strings)
-// so they're only ever set via textContent/title, never innerHTML.
-// `home` is the connected self-hosted service's address (the badge opens it);
-// Pinboard keeps its add page for the address.
-function renderBookmarkBadge(resp, url, service, home) {
-  const model = pbpBuildBookmarkBadgeModel(resp, service);
-  // Idempotent: a re-render after an account switch REPLACES the previous
-  // account's badge instead of stacking a second one after #preview-url, and a
-  // {bookmarked:false} answer clears rather than silently keeping the old one.
-  pbpClearBookmarkBadge();
-  if (!model.show) return;
-  const urlEl = document.getElementById("preview-url");
-  if (!urlEl || !urlEl.parentNode) return;
-
-  const a = document.createElement("a");
-  a.className = "bookmark-badge";
-  if (service === "pinboard") a.href = "https://pinboard.in/add?url=" + encodeURIComponent(url);
-  else if (home) a.href = home;
-  else return; // no known destination: no badge rather than one that points elsewhere
-  a.target = "_blank";
-  a.rel = "noopener noreferrer";
-  // Spec X2 i18n key group: an explicit aria-label on the anchor becomes the
-  // ENTIRE accessible name (descendants are not traversed), so the private
-  // state must be folded in here — the lock span's own aria-label below is
-  // never announced through the anchor (it keeps its title tooltip only).
-  a.setAttribute("aria-label",
-    t("mdBookmarkedBadge") + (model.isPrivate ? ", " + t("mdBookmarkedPrivate") : ""));
-
-  const icon = document.createElement("span");
-  icon.className = "bb-icon";
-  icon.setAttribute("aria-hidden", "true");
-  icon.innerHTML = PBP_ICONS.pin; // shared.js icon bank — fixed literal, no interpolation
-  a.appendChild(icon);
-
-  const label = document.createElement("span");
-  label.textContent = t("mdBookmarkedBadge");
-  a.appendChild(label);
-
-  if (model.tagsShown.length) {
-    const tagsEl = document.createElement("span");
-    tagsEl.className = "bb-tags";
-    tagsEl.textContent = model.tagsShown.join(" "); // remote data -> textContent only
-    tagsEl.title = model.tagsFull;                  // full tag string, remote data -> title attr only
-    a.appendChild(tagsEl);
-  }
-
-  if (model.isPrivate) {
-    const lock = document.createElement("span");
-    lock.className = "bb-lock";
-    lock.setAttribute("role", "img");
-    lock.setAttribute("aria-label", t("mdBookmarkedPrivate"));
-    lock.title = t("mdBookmarkedPrivate");
-    lock.innerHTML = PBP_BOOKMARK_LOCK_SVG; // fixed literal, no interpolation
-    a.appendChild(lock);
-  }
-
-  urlEl.insertAdjacentElement("afterend", a);
-}
-
 // Fills #preview-url with "host + rest", the rail's one-line link back to the
 // source page. Top-level (not inline in the render path) because BOTH shells
 // need it: the fully-rendered article and the pending/error shell, which
@@ -718,11 +624,10 @@ function pbpFoldHeightAnimate(el, next, setFolded, prev, animate) {
 // ============================================================
 // Rail accordion (spec: docs/superpowers/specs/2026-07-04-md-preview-hl-
 // notebook-rail-design.md). pbpRailCollapseState is PURE (no DOM/chrome).
-// pbpRailCollapsible touches DOM + chrome.storage.local, but (like
-// renderBookmarkBadge above) only inside functions invoked at call time --
-// defining it here has no side effect. tests/md-ai-tests.html loads this
-// whole file on file:// (the boot IIFE above early-returns without chrome),
-// so both are directly unit-testable.
+// pbpRailCollapsible touches DOM + chrome.storage.local, but only inside
+// functions invoked at call time -- defining it here has no side effect.
+// tests/md-ai-tests.html loads this whole file on file:// (the boot IIFE
+// above early-returns without chrome), so both are directly unit-testable.
 // ============================================================
 const PBP_RAIL_STORAGE_KEY = "pbp_rail_collapse";
 
@@ -1762,28 +1667,6 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   const image = info.image || "";
   const ocrFileName = typeof info.ocrFileName === "string" ? info.ocrFileName : "";
 
-  // X2 bookmarked badge. It asks nobody: the reader's bookmark bar (md-bookmark.js)
-  // looks the address up once per open and publishes pbp:bookmark-state, which is
-  // drawn here (linkding fetches the page on every check, so a second query of
-  // the same address would fetch it twice). An account switch clears the badge
-  // at once -- the fail-closed half: the previous account's tags and padlock
-  // never wait on the new account's lookup -- and the bar's next answer redraws.
-  let _badgeSeq = 0;
-  document.addEventListener("pbp:bookmark-state", (e) => {
-    const d = e.detail;
-    const seq = ++_badgeSeq;
-    // Compared against the LIVE account and address: a switch while the answer
-    // was in flight must not paint it.
-    if (!d || d.account !== bookmarkAccount || d.url !== bookmarkUrl) return;
-    if (d.bookmarked !== true) { pbpClearBookmarkBadge(); return; }
-    const service = pbpBookmarkAccountService(d.account);
-    if (service === "pinboard") { renderBookmarkBadge(d, bookmarkUrl, service, ""); return; }
-    pbpReadBookmarkConnection().then((connection) => {
-      if (seq !== _badgeSeq || connection.account !== d.account || d.account !== bookmarkAccount) return;
-      renderBookmarkBadge(d, bookmarkUrl, service, connection.baseUrl);
-    }).catch(() => {});
-  });
-
   // Reading data and bookmark metadata have independent live identities.
   if (chrome.storage.onChanged) {
     let accountGen = 0;
@@ -1805,7 +1688,6 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           const stored = (await chrome.storage.local.get(key))[key];
           if (gen !== accountGen) return;
           if (stored) await chrome.storage.local.set({[key]:{...stored,account:bookmarkAccount,tags:[],description:"",bookmarkDraft:null}});
-          pbpClearBookmarkBadge(); ++_badgeSeq;
           document.dispatchEvent(new CustomEvent("pbp:bookmark-account-changed", {detail:{url,bookmarkUrl,title,account:bookmarkAccount}}));
         } else if (bookmarkAccount && pbpBookmarkSettingsChanged(changes)) {
           // Same account, other connection settings (gateway, rotated token):

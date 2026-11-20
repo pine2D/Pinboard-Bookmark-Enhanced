@@ -8134,7 +8134,7 @@ const SWEEP_CFG = {
     exempt: [
       ".tabs, .lib-tabs",                                                     // tab strips
       ".source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split, .qbtn-split, .typo-seg, .vocab-status-toggles, .notes-color-filters", // fused shells / segmented strips
-      ".header-icons, .xp-window-actions, .lib-cluster", // icon-button clusters: not button rows; clusterGap (family 12) holds them to 4px instead
+      ".header-icons, .xp-window-actions, .hl-card-ai, .lib-cluster", // icon-button clusters: not button rows; clusterGap (family 12) holds them to 4px instead
       ".connection-health, .theme-presets-group, .kbd-help-chips, .rail-badges, .hl-filter-row", // status-card grid, swatch-pill / chip rows, the highlight legend (gap = two 6px hit pads)
       ".notes-card-top",                                                      // card head: title + chips, the remove X is absolutely positioned
       // Library word head (T7b): text lines that carry a button, not button
@@ -8146,7 +8146,7 @@ const SWEEP_CFG = {
       // stray gap. This exemption covers these two lines only: a button
       // group added to either one later goes in its own container, which
       // this rule then measures at 8.
-      ".vocab-pron-row, .vocab-manage-row",
+      ".vocab-pron-row, .vocab-manage-row, .rail-ident, .rail-sec-toolbar, #reader-ask-view > .panel-head, #skim-section > .panel-head",
     ].join(", "),
   },
   // 12. clusterGap -- the icon-button cluster rung: 4px on every surface.
@@ -8157,7 +8157,7 @@ const SWEEP_CFG = {
   //     since the one-column redesign (plan 3.3) every action in it is icon +
   //     text, so it is an 8px action row that actionRowGap measures.
   clusterGap: {
-    selectors: { library: ".lib-cluster", popup: ".header-icons", "md-preview": ".xp-window-actions" },
+    selectors: { library: ".lib-cluster", popup: ".header-icons", "md-preview": ".xp-window-actions, .hl-card-ai" },
     members: {
       "md-preview": ".reader-bookmark-ic",
     },

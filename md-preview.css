@@ -1279,11 +1279,14 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
   z-index: 20;
   transition: transform 200ms var(--ease-drawer), visibility 0s;
 }
-.rail-ident { display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px; column-gap: var(--sp-2); align-items: start; }
-.rail-ident[data-has-ocr="1"] { grid-template-columns: minmax(0, 1fr) 24px 24px 24px; }
-.rail-ident > #rail-ocr-btn { grid-column: 2; grid-row: 1; width: 24px; height: 24px; padding: 0; }
-.rail-ident > #rail-history-btn { grid-column: 2; grid-row: 1; width: 24px; height: 24px; padding: 0; }
-.rail-ident > #rail-settings-btn { grid-column: 3; grid-row: 1; width: 24px; height: 24px; padding: 0; }
+.rail-ident { display: grid; grid-template-columns: minmax(0, 1fr) 20px 20px; column-gap: var(--sp-1); align-items: start; }
+.rail-ident[data-has-ocr="1"] { grid-template-columns: minmax(0, 1fr) 20px 20px 20px; }
+.rail-ident > :is(#rail-ocr-btn, #rail-history-btn, #rail-settings-btn) { position: relative; width: 20px; height: 20px; padding: 0; border-radius: var(--radius-sm); }
+.rail-ident > :is(#rail-ocr-btn, #rail-history-btn, #rail-settings-btn)::before { content: ""; position: absolute; inset: -3px; }
+.rail-ident > :is(#rail-ocr-btn, #rail-history-btn, #rail-settings-btn) svg { width: 13px; height: 13px; }
+.rail-ident > #rail-ocr-btn { grid-column: 2; grid-row: 1; }
+.rail-ident > #rail-history-btn { grid-column: 2; grid-row: 1; }
+.rail-ident > #rail-settings-btn { grid-column: 3; grid-row: 1; }
 .rail-ident[data-has-ocr="1"] > #rail-history-btn { grid-column: 3; }
 .rail-ident[data-has-ocr="1"] > #rail-settings-btn { grid-column: 4; }
 .rail-ident > a { grid-column: 1 / -1; }
@@ -1292,34 +1295,6 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
 .rail-ident a:hover { color: var(--link); }
 .rail-ident a:not([href]):hover { color: var(--fg-muted); cursor: default; }
 .rail-ident a .url-host { font-weight: 600; }
-/* X2: bookmarked badge — higher specificity than ".rail-ident a" above so it
-   doesn't inherit that rule's display:block (wrong for a pill-shaped badge);
-   text-overflow:ellipsis IS inherited from the base rule (harmless — this
-   badge already clips with overflow:hidden below, ellipsis just improves
-   the clip). Reuses existing header tokens only. */
-.rail-ident a.bookmark-badge {
-  display: inline-flex;
-  justify-self: start;
-  align-items: center;
-  gap: var(--sp-1);
-  margin-top: var(--sp-2);
-  padding: 3px var(--sp-2);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--fg-muted);
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  max-width: 100%;
-  overflow: hidden;
-}
-.rail-ident a.bookmark-badge:hover { color: var(--link); border-color: var(--link); }
-.bookmark-badge .bb-icon { display: inline-flex; flex: none; }
-.bookmark-badge .bb-icon svg { width: 12px; height: 12px; display: block; }
-.bookmark-badge .bb-tags { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
-.bookmark-badge .bb-lock { display: inline-flex; flex: none; margin-left: 1px; }
-.bookmark-badge .bb-lock svg { width: 11px; height: 11px; display: block; }
 .rail-badges { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin: var(--sp-2) 0 var(--sp-3); }
 .rail .view-toggle { width: 100%; }
 /* Segments must FIT the fixed 264px rail in verbose locales: flex:1 alone
@@ -1632,31 +1607,33 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
    without absolute offsets tied to font metrics. The toggle spans the row;
    sibling actions occupy its reserved cells, with the chevron at the edge. */
 .rail-sec-toolbar {
-  display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px 10px;
-  align-items: center; column-gap: var(--sp-2);
+  display: grid; grid-template-columns: minmax(0, 1fr) 20px 20px 12px;
+  align-items: center; column-gap: var(--sp-1);
   margin: var(--sp-3) 0 var(--sp-2); padding-top: var(--sp-3);
   border-top: 1px solid var(--border);
 }
 .rail-sec-toolbar > .rail-sec-head {
   grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: subgrid;
-  margin: 0; padding: 0; border: 0; min-height: 24px;
+  margin: 0; padding: 0; border: 0; min-height: 20px;
 }
 .rail-sec-caption { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: var(--sp-1); min-width: 0; }
 .rail-sec-caption > .rail-sec-label { flex: 0 1 auto; }
-.rail-sec-toolbar .rail-sec-tri { grid-column: 4; grid-row: 1; justify-self: center; }
+.rail-sec-toolbar .rail-sec-tri { grid-column: 4; grid-row: 1; justify-self: end; }
 .rail-sec-toolbar > .rail-sec-open { grid-column: 3; grid-row: 1; z-index: 1; }
 .rail-sec-toolbar > #hl-rail-copy { grid-column: 2; }
 .rail-sec-toolbar .rail-sec-progress { display: none; }
 .rail-sec-open {
-  width: 24px; height: 24px;
+  position: relative;
+  width: 20px; height: 20px;
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0;
-  border: none; border-radius: var(--radius-sm);
+  border: 1px solid transparent; border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg-muted);
   cursor: pointer;
 }
-.rail-sec-open svg { width: 15px; height: 15px; }
+.rail-sec-open::before { content: ""; position: absolute; inset: -3px; }
+.rail-sec-open svg { width: 13px; height: 13px; }
 .rail-sec-open:hover { color: var(--fg); background: var(--btn-hover); }
 /* Focus ring split out of :hover. Fused with outline:none the only keyboard
    cue was the --btn-hover wash (~1.1:1 against --surface, far under WCAG
@@ -3524,16 +3501,20 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 #ask-panel .ask-retry, #ask-panel .ask-clear-btn { font-size: 12px; } /* secondary md face, in px: control faces do not follow the panel's prose scale */
 #ask-panel .panel-head > h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #ask-title:focus { outline: none; }
+#reader-ask-view > .panel-head,
+#skim-section > .panel-head { gap: var(--sp-1); }
 .ask-ic {
+  position: relative;
   flex: none;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; padding: 0; /* md rung (was 28): the reader's icon buttons share .action-btn's height */
-  border: 1px solid transparent; border-radius: var(--radius-md);
+  width: 20px; height: 20px; padding: 0; /* sm rung: compact secondary toolbar icon buttons */
+  border: 1px solid transparent; border-radius: var(--radius-sm);
   background: none; color: var(--fg-muted); cursor: pointer;
 }
+.ask-ic::before { content: ""; position: absolute; inset: -3px; }
 .ask-ic:hover { background: var(--btn-hover); color: var(--fg); }
 .ask-ic:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
-.ask-ic svg { width: 15px; height: 15px; }
+.ask-ic svg { width: 13px; height: 13px; }
 #ask-storage {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
   font-size: 11px; line-height: 16px; color: var(--fg-muted);
@@ -4078,25 +4059,27 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   .hl-card-dot.active, .hl-card-dot:focus-visible { border-color: Highlight; box-shadow: none; }
   .hl-card-dot:focus-visible { outline-color: Highlight; }
 }
-.hl-card-ai { display: flex; gap: var(--sp-2); margin-left: auto; }
+.hl-card-ai { display: flex; gap: var(--sp-1); margin-left: auto; }
 .hl-card-ai[hidden] { display: none; }
 .hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask {
-  /* Compact square 26x26 icon cells on the same toolbar row as the 5 colour
-     swatches, mirroring #pb-hl-bar's [swatches | actions] grammar. */
+  /* Compact square 20x20 sm icon cells beside the 5 18x18 colour swatches;
+     ::before (-3px against 18px padding box) restores a 24x24 hit target. */
+  position: relative;
   flex: none;
-  width: 26px;
-  height: 26px; /* md rung */
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
   border: 1px solid var(--btn-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--btn-bg);
   color: var(--btn-fg);
   cursor: pointer;
 }
-.hl-card-ai svg { width: 15px; height: 15px; }
+:is(.hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask)::before { content: ""; position: absolute; inset: -3px; }
+.hl-card-ai svg { width: 13px; height: 13px; }
 .hl-card-ai-explain:hover, .hl-card-ai-translate:hover, .hl-card-ai-ask:hover { background: var(--btn-hover); }
 /* .action-btn's 150ms fade for all card buttons (they share its look). */
 .hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask,
@@ -4707,14 +4690,16 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
    their own feature-scoped class, e.g. .fn-pop-jump/
    .srch-regex, rather than sharing one class across files). */
 .skim-ic {
+  position: relative;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; padding: 0; /* md rung (was 28): the reader's icon buttons share .action-btn's height */
-  border: 1px solid transparent; border-radius: var(--radius-md);
+  width: 20px; height: 20px; padding: 0; /* sm rung: compact secondary toolbar icon buttons */
+  border: 1px solid transparent; border-radius: var(--radius-sm);
   background: none; color: var(--fg-muted); cursor: pointer;
 }
+.skim-ic::before { content: ""; position: absolute; inset: -3px; }
 .skim-ic:hover { background: var(--btn-hover); color: var(--fg); }
 .skim-ic:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
-.skim-ic svg { width: 15px; height: 15px; }
+.skim-ic svg { width: 13px; height: 13px; }
 /* Chevron rotation is on-screen morphing, same job as the options accordion
    arrow, so it takes the same curve — and the same user-toggle gate: the
    storage restore on load flips aria-expanded programmatically, and without
@@ -5288,16 +5273,48 @@ details#video-description .desc-body a { color: var(--link); }
    unit when the title needs more room. The section owns its full-width rule. */
 #reader-bookmark-section {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: var(--sp-2) var(--sp-3);
+  gap: var(--sp-1) var(--sp-3);
   margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border);
 }
 #reader-bookmark-section > .rail-label { flex: none; max-width: 100%; overflow-wrap: anywhere; margin: 0; padding: 0; border: 0; }
 #reader-bookmark-section > .row { flex: none; flex-wrap: nowrap; }
+#reader-bookmark-section > .bookmark-badge {
+  flex-basis: 100%;
+  min-width: 0;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: var(--sp-0) 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+}
+#reader-bookmark-section > .bookmark-badge[hidden] { display: none; }
+#reader-bookmark-section > .bookmark-badge:hover { color: var(--link); }
+#reader-bookmark-section > .bookmark-badge:hover .bb-tags { text-decoration: underline; text-underline-offset: 2px; }
+#reader-bookmark-section > .bookmark-badge:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+#reader-bookmark-section > .bookmark-badge:disabled { cursor: default; opacity: 0.6; }
+#reader-bookmark-section > .bookmark-badge .bb-lock { display: inline-flex; flex: none; }
+#reader-bookmark-section > .bookmark-badge .bb-lock svg { width: 11px; height: 11px; display: block; }
+#reader-bookmark-section > .bookmark-badge .bb-tags { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
 #reader-bookmark-section > .msg-bar { flex-basis: 100%; min-width: 0; margin: 0; overflow-wrap: anywhere; }
 #reader-bookmark-section > .row,
 #reader-bookmark-footer > .row { gap: var(--sp-1); }
-.reader-bookmark-ic.action-btn { flex: none; width: 26px; height: 26px; padding: 0; justify-content: center; }
-.reader-bookmark-ic svg { width: 15px; height: 15px; }
+.reader-bookmark-ic.action-btn { position: relative; flex: none; width: 20px; height: 20px; padding: 0; justify-content: center; border-radius: var(--radius-sm); }
+.reader-bookmark-ic::before { content: ""; position: absolute; inset: -3px; }
+.reader-bookmark-ic svg { width: 13px; height: 13px; }
 .reader-bookmark-ic[data-saved="true"],
 .reader-bookmark-ic[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised); }
 #reader-bookmark-section > .msg-bar,

@@ -1880,14 +1880,6 @@ await test("reader validates self-hosted quotes locally and shows the edit hint"
     }finally{frame.remove();}
   }
 });
-await test("bookmark badge uses supplied tag names as whole labels", async () => {
-  const source=await (await fetch("../md-preview.js")).text();
-  const start=source.indexOf("function pbpBuildBookmarkBadgeModel(");
-  const end=source.indexOf("// Takes the badge off screen",start);
-  assert(start>=0&&end>start);
-  const model=new Function(source.slice(start,end)+"return pbpBuildBookmarkBadgeModel({bookmarked:true,tags:'\"machine learning\" second',tagNames:['machine learning','second'],shared:'no'});")();
-  equal(model.tagsShown[0],"machine learning");equal(model.tagsFull,"machine learning second");
-});
 await test("reader editor rejects over-limit titles locally, keeps the full input, and allows correction", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();
   for (const [service, limit] of [["linkding",512],["karakeep",1000]]) {
@@ -2024,6 +2016,23 @@ async function barFrame(account, handler, detailExtra = {}) {
     node: name => w.document.getElementById("reader-bookmark-" + name) };
 }
 const wait = ms => new Promise(r => setTimeout(r, ms));
+await test("bookmark meta line in Save section uses supplied tag names as whole labels and opens editor focused on tags", async () => {
+  const r = await barFrame("alice", () => ({
+    known: true, bookmarked: true, account: "alice",
+    bookmark: { title: "Saved", tags: '"machine learning" second third fourth', tagNames: ["machine learning", "second", "third", "fourth"], notes: "", private: false, toread: false },
+  }));
+  try {
+    const meta = r.node("meta");
+    assert(meta && meta.parentElement?.id === "reader-bookmark-section", "bookmark meta must live inside #reader-bookmark-section");
+    equal(meta.hidden, false);
+    equal(meta.querySelector(".bb-tags")?.textContent, "machine learning · second · third +1");
+    equal(meta.title, "machine learning second third fourth");
+    meta.click();
+    await wait(30);
+    assert(r.node("editor")?.matches(":popover-open"), "clicking bookmark meta must open in-page editor");
+    equal(r.w.document.activeElement, r.node("tags"), "clicking bookmark meta must focus tags input");
+  } finally { r.frame.remove(); }
+});
 await test("the bookmark bar queries and publishes the connection when the library has another owner", async () => {
   const connection = "linkding:fixture";
   const bar = await barFrame("personal:default", msg => ({
@@ -2174,35 +2183,36 @@ await test("the bar publishes its lookup once for the badge, and nothing else qu
   const bookmarkUrl = await barFrame("alice", () => ({ known: true, bookmarked: false, account: "alice", bookmark: {} }), { bookmarkUrl: "https://example.com/canonical" });
   try { equal(bookmarkUrl.states[0].url, "https://example.com/canonical"); } finally { bookmarkUrl.frame.remove(); }
 });
-await test("bookmark badge links to the connected service and shows the lock only for Pinboard", async () => {
-  const source = await (await fetch("../md-preview.js")).text();
-  const start = source.indexOf("const PBP_BOOKMARK_LOCK_SVG"), end = source.indexOf("// Fills #preview-url", start);
-  assert(start >= 0 && end > start);
-  const render = async (resp, service, home) => {
-    const frame = document.createElement("iframe"); document.body.append(frame);
+await test("Save section bookmark meta shows the padlock only for Pinboard private bookmarks and hides when public without tags", async () => {
+  const inspect = async (account, bookmark) => {
+    const r = await barFrame(account, () => ({
+      known: true, bookmarked: Boolean(bookmark), account, bookmark: bookmark || {},
+    }));
     try {
-      const w = frame.contentWindow;
-      w.document.body.innerHTML = '<a id="preview-url"></a>';
-      w.eval(await (await fetch("../shared.js")).text()); w.t = k => k;
-      w.PBP_ICONS = { pin: "<svg></svg>", lock: "<svg></svg>" };
-      w.eval(source.slice(start, end) + "\nwindow.renderBookmarkBadge = renderBookmarkBadge;");
-      w.renderBookmarkBadge(resp, URL_ARTICLE, service, home);
-      const a = w.document.querySelector(".bookmark-badge");
-      return a ? { href: a.getAttribute("href"), lock: !!a.querySelector(".bb-lock"), tag: a.tagName, label: a.getAttribute("aria-label") } : null;
-    } finally { frame.remove(); }
+      const meta = r.node("meta");
+      return {
+        hidden: meta.hidden,
+        tag: meta.tagName,
+        href: meta.getAttribute("href"),
+        lock: Boolean(meta.querySelector(".bb-lock")),
+        text: meta.querySelector(".bb-tags")?.textContent || "",
+        label: meta.getAttribute("aria-label") || "",
+      };
+    } finally { r.frame.remove(); }
   };
-  const mine = (shared) => ({ bookmarked: true, tagNames: ["x"], shared });
-  const ld = await render(mine("no"), "linkding", "https://ld.example/");
-  equal(ld.tag, "A"); equal(ld.href, "https://ld.example/"); equal(ld.lock, false); assert(!/Private/i.test(ld.label));
-  const kk = await render(mine("no"), "karakeep", "https://kk.example/");
-  equal(kk.href, "https://kk.example/"); equal(kk.lock, false);
-  const pb = await render(mine("no"), "pinboard", "");
-  assert(pb.href.startsWith("https://pinboard.in/"), pb.href); equal(pb.lock, true);
-  equal((await render(mine("yes"), "pinboard", "")).lock, false);
-  for (const service of ["linkding", "karakeep"]) {
-    const bad = await render(mine("yes"), service, "");
-    assert(bad === null || !bad.href.includes("pinboard.in"), service + " badge pointed at Pinboard");
-  }
+  const ld = await inspect("linkding:https://ld.example:c1", { title: "T", tagNames: ["x"], private: true });
+  equal(ld.tag, "BUTTON"); equal(ld.href, null); equal(ld.hidden, false); equal(ld.lock, false); equal(ld.text, "x");
+  assert(!/Private/i.test(ld.label), ld.label);
+  const kk = await inspect("karakeep:https://kk.example:c1", { title: "T", tagNames: ["x"], private: true });
+  equal(kk.hidden, false); equal(kk.lock, false);
+  const pbPrivTags = await inspect("alice", { title: "T", tagNames: ["x"], private: true });
+  equal(pbPrivTags.hidden, false); equal(pbPrivTags.lock, true); equal(pbPrivTags.text, "x");
+  const pbPrivNoTags = await inspect("alice", { title: "T", tagNames: [], private: true });
+  equal(pbPrivNoTags.hidden, false); equal(pbPrivNoTags.lock, true); equal(pbPrivNoTags.text, "mdBookmarkedPrivate");
+  const pbPubNoTags = await inspect("alice", { title: "T", tagNames: [], private: false });
+  equal(pbPubNoTags.hidden, true);
+  const unbookmarked = await inspect("alice", null);
+  equal(unbookmarked.hidden, true);
 });
 await test("a Connect that changes no setting still reaches open readers through the local connect mark", async () => {
   // The reader's storage.onChanged gate is pbpBookmarkSettingsChanged; the mark is its only trigger here.

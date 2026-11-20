@@ -496,7 +496,8 @@ function buildEchoMessages(enTable) {
     }, "popup unsupported-url boot with bound history caret");
 
     // Match Chrome's real action-popup sizing where viewport height wraps body height
-    frame.style.height = `${Math.ceil(fdoc.body.getBoundingClientRect().height)}px`;
+    const collapsedH = Math.ceil(fdoc.body.getBoundingClientRect().height);
+    frame.style.height = `${collapsedH}px`;
 
     const mainBtn = fdoc.getElementById("jina-md-btn");
     const caretBtn = fdoc.getElementById("jina-md-history-btn");
@@ -514,7 +515,7 @@ function buildEchoMessages(enTable) {
     const pop = fdoc.getElementById("jina-md-history-pop");
     assert(fdoc.activeElement === pop.querySelector(".pp-rh-open"), "keyboard open should land on an article");
     assert(caretBtn.getAttribute("aria-expanded") === "true", "popup caret aria-expanded not true");
-    assert(parseFloat(fdoc.body.style.minHeight) > 250, "collapsed unsupported-url action popup must grow body.style.minHeight when multi-row history needs room");
+    assert(parseFloat(fdoc.body.style.minHeight) > collapsedH + 100, "collapsed unsupported-url action popup must grow body.style.minHeight when multi-row history needs room");
     mock.userGesture();
     pop.querySelector(".pp-rh-open").click();
     await until(() => mock.callsOf("tabs.create").length === 1, "popup history click opened reader tab");

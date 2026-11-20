@@ -5716,12 +5716,24 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
   check(ptVideoDocBody.get("max-width") === "min(2160px, 100%)",
     'platinum-controls.css: html[data-reader-theme="platinum"] body.video-mode:not(.raw-active) .doc-body must keep max-width: min(2160px, 100%)');
 
-  // 8g) Platinum 5-surface ::selection parity, squared highlight swatches/badges, quiet .hl-item-del, & #kbd-help-pop uncapped viewport height:
+  // 8g) Platinum 5-surface ::selection parity, 20x20 compact icon-button tier + ::before (-3px) hit box,
+  //     lightweight #reader-bookmark-section > .bookmark-badge (no .rail-ident a.bookmark-badge),
+  //     squared highlight swatches, quiet .hl-item-del, & #kbd-help-pop uncapped viewport height:
   const ptSelLight = declarationValueMap(ptControlsCss, 'html[data-theme="platinum-light"] ::selection');
   const ptSelDark = declarationValueMap(ptControlsCss, 'html[data-theme="platinum-dark"] ::selection');
   const ptSelReader = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] ::selection');
-  const ptBookmarkBadge = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .rail-ident a.bookmark-badge');
-  const readerBookmarkBadge = declarationValueMap(fiveSheets[3][1], ".rail-ident a.bookmark-badge");
+  const ptBookmarkBadge = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] #reader-bookmark-section > .bookmark-badge');
+  const readerBookmarkBadge = declarationValueMap(fiveSheets[3][1], "#reader-bookmark-section > .bookmark-badge");
+  const readerBookmarkIc = declarationValueMap(fiveSheets[3][1], ".reader-bookmark-ic.action-btn");
+  const readerBookmarkIcBefore = declarationValueMap(fiveSheets[3][1], ".reader-bookmark-ic::before");
+  const railSecOpen = declarationValueMap(fiveSheets[3][1], ".rail-sec-open");
+  const railSecOpenBefore = declarationValueMap(fiveSheets[3][1], ".rail-sec-open::before");
+  const hlCardAiBtn = declarationValueMap(fiveSheets[3][1], ".hl-card-ai-explain");
+  const askIc = declarationValueMap(fiveSheets[3][1], ".ask-ic");
+  const skimIc = declarationValueMap(fiveSheets[3][1], ".skim-ic");
+  const popupHeaderIc = declarationValueMap(fiveSheets[0][1], ".header-bar .header-ic");
+  const popupHeaderIcBefore = declarationValueMap(fiveSheets[0][1], ".header-bar .header-ic::before");
+  const ptPopupHeaderIc = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar .header-ic');
   const ptHlDots = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] :is(#pb-hl-bar .pb-hl-dot, #pb-hl-card .hl-card-dot)');
   const ptHlList = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .hl-list:not(:empty)');
   const ptHlItemDelRest = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .hl-item-del');
@@ -5732,14 +5744,22 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     ptSelDark.get("background") === "#3d3dad" && ptSelDark.get("color") === "#ffffff" &&
     ptReaderRoot.get("--selection") === "light-dark(#ccccff, #3d3dad)" &&
     ptSelReader.get("background") === "var(--selection)" &&
-    ptBookmarkBadge.get("border-radius") === "2px" &&
-    readerBookmarkBadge.get("justify-self") === "start" &&
+    !fiveSheets[3][1].includes(".rail-ident a.bookmark-badge") &&
+    !ptControlsCss.includes(".rail-ident a.bookmark-badge") &&
+    ptBookmarkBadge.get("box-shadow") === "none" &&
+    readerBookmarkBadge.get("height") === "20px" &&
+    readerBookmarkIc.get("width") === "20px" && readerBookmarkIcBefore.get("inset") === "-3px" &&
+    railSecOpen.get("width") === "20px" && railSecOpenBefore.get("inset") === "-3px" &&
+    hlCardAiBtn.get("width") === "20px" && askIc.get("width") === "20px" && skimIc.get("width") === "20px" &&
+    popupHeaderIc.get("width") === "var(--pp-control-h-sm)" && popupHeaderIc.get("height") === "var(--pp-control-h-sm)" &&
+    popupHeaderIcBefore.get("inset") === "-3px" &&
+    ptPopupHeaderIc.get("box-shadow") === "var(--pt-mini-bevel)" &&
     ptHlDots.get("border-radius") === "2px" &&
     ptHlList.get("background") === "var(--pt-paper)" &&
     ptHlItemDelRest.get("box-shadow") === "none" &&
     hlCardNote.get("field-sizing") === "content" && hlCardNote.has("max-height") &&
     kbdHelpPop.get("max-height") === "calc(100dvh - 2 * var(--sp-4))",
-    "platinum-controls.css / md-preview.css: Platinum must unify ::selection (#ccccff/#3d3dad), square .bookmark-badge & highlight dots (2px), put .hl-list:not(:empty) in a sunken --pt-paper well with quiet resting .hl-item-del, auto-size .hl-card-note with max-height, and keep #kbd-help-pop free of a 480px cap");
+    "platinum-controls.css / md-preview.css / popup.css: compact secondary icon buttons must unify on 20x20 (+ ::before -3px & Platinum --pt-mini-bevel), .bookmark-badge must live inside #reader-bookmark-section without .rail-ident duplication, and Platinum ::selection / highlight / #kbd-help-pop invariants must hold");
 }
 
 // --- popup-theme-early.js: mirror "1" picks sync directly, zero local.get calls ---

@@ -1059,7 +1059,7 @@ async function driveJourney(context, worker, extId, rep) {
           return {label:box('.rail-sec-label'),count:box('.rail-sec-count'),copy:box('#hl-rail-copy'),book:box('.rail-sec-open:not(#hl-rail-copy)'),list:box('.hl-list'),total:el.querySelector('.rail-sec-count').textContent};
         });
         requireState(geometry.count.left-geometry.label.right<=6 && geometry.count.left>=geometry.label.right-1, 'highlight count separated from label');
-        requireState(geometry.copy.width>=24 && geometry.book.width>=24 && Math.abs(geometry.copy.top-geometry.book.top)<1 && geometry.copy.right<=geometry.book.left, 'collapsed header actions hidden, overlapping or misordered');
+        requireState(geometry.copy.width>=20 && geometry.book.width>=20 && Math.abs(geometry.copy.top-geometry.book.top)<1 && geometry.copy.right<=geometry.book.left, 'collapsed header actions hidden, overlapping or misordered');
         requireState(geometry.total==='(2)' && geometry.list.height===0, `fold hid total or left list visible: ${locale}/${mode}/${width} total=${geometry.total} height=${geometry.list.height}`);
         requireState(await reader.locator('#rail-settings-btn').evaluate(el=>{
           const svg = el.querySelector('svg');
@@ -2452,7 +2452,7 @@ async function driveReaderControls(context, worker, extId, rep) {
           fail(icons.length === 7, "rail/footer icon control missing");
           for (const btn of icons) {
             const r = btn.getBoundingClientRect(), key = btn.getAttribute("data-i18n-aria");
-            fail(Math.abs(r.width - 26) < 1 && Math.abs(r.height - 26) < 1, btn.id + " is not 26px");
+            fail(Math.abs(r.width - 20) < 1 && Math.abs(r.height - 20) < 1, btn.id + " is not 20px");
             fail(!!btn.querySelector("svg") && !btn.textContent.trim(), btn.id + " lost icon-only presentation");
             fail(!!key && btn.title === t(key) && btn.getAttribute("aria-label") === t(key), btn.id + " lacks complete localized title/name");
           }

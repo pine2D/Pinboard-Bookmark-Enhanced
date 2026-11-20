@@ -94,6 +94,47 @@
         btn.setAttribute("aria-keyshortcuts", "l");
       } else if (action === "edit") btn.setAttribute("aria-keyshortcuts", "Shift+S");
     }
+    const meta = id("meta");
+    if (meta) {
+      const saved = Boolean(state.known && state.bookmarked && state.bookmark);
+      const service = typeof pbpBookmarkAccountService === "function" ? pbpBookmarkAccountService(context?.bookmarkAccount) : "pinboard";
+      // Karakeep bookmarks are always private and linkding ones are private
+      // unless shared, so the padlock carries meaning only on Pinboard.
+      const isPrivate = saved && service === "pinboard" && state.bookmark?.private === true;
+      const names = saved
+        ? (Array.isArray(state.bookmark?.tagNames) ? state.bookmark.tagNames.filter(Boolean) : String(state.bookmark?.tags || "").trim().split(/\s+/).filter(Boolean))
+        : [];
+      if (!saved || (!isPrivate && !names.length)) {
+        meta.hidden = true;
+        meta.replaceChildren();
+        meta.removeAttribute("title");
+        meta.removeAttribute("aria-label");
+      } else {
+        meta.hidden = false;
+        meta.disabled = !context?.bookmarkAccount;
+        meta.setAttribute("aria-busy", String(inflight));
+        meta.replaceChildren();
+        if (isPrivate) {
+          const lock = document.createElement("span");
+          lock.className = "bb-lock";
+          lock.setAttribute("aria-hidden", "true");
+          lock.innerHTML = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.lock || "" : "";
+          meta.appendChild(lock);
+        }
+        const tagsEl = document.createElement("span");
+        tagsEl.className = "bb-tags";
+        tagsEl.textContent = names.length
+          ? names.slice(0, 3).join(" · ") + (names.length > 3 ? " +" + (names.length - 3) : "")
+          : text("mdBookmarkedPrivate");
+        meta.appendChild(tagsEl);
+        const fullSummary = [
+          ...(isPrivate ? [text("mdBookmarkedPrivate")] : []),
+          ...(names.length ? [names.join(" ")] : []),
+        ].join(" · ");
+        meta.title = fullSummary;
+        meta.setAttribute("aria-label", text("readerBookmarkEdit") + " — " + fullSummary);
+      }
+    }
     for (const name of ["status", "footer-status"]) {
       const el = id(name);
       if (el) {
@@ -155,6 +196,13 @@
     button(row, "later", "readerBookmarkLater", "later");
     button(row, "edit", "readerBookmarkEdit", "edit");
     section.appendChild(row);
+    const meta = document.createElement("button");
+    meta.type = "button";
+    meta.id = "reader-bookmark-meta";
+    meta.className = "bookmark-badge";
+    meta.hidden = true;
+    meta.addEventListener("click", () => window.pbpReaderBookmarkAction("edit", "tags"));
+    section.appendChild(meta);
     const status = document.createElement("div");
     status.id = "reader-bookmark-status";
     status.className = "msg-bar";
@@ -406,11 +454,11 @@
     refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); recheckIfPending(); } });
   }
 
-  async function edit() {
-    try { return await editImpl(); } finally { recheckIfPending(); }
+  async function edit(focusTarget) {
+    try { return await editImpl(focusTarget); } finally { recheckIfPending(); }
   }
 
-  async function editImpl() {
+  async function editImpl(focusTarget) {
     if (inflight || !context?.bookmarkAccount) return;
     inflight = true; paint(); const gen = generation;
     const known = await refresh(gen);
@@ -444,7 +492,7 @@
     sharingChoice = id("private").checked;
     editorSource = document.activeElement;
     if (!editor.matches(":popover-open")) editor.showPopover();
-    id(tagFix ? "tags" : "title").focus();
+    id(tagFix || focusTarget === "tags" ? "tags" : "title").focus();
   }
 
   function confirmDelete() {
@@ -595,9 +643,9 @@
 
   const isLocalDoc = (u) => typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(u);
 
-  window.pbpReaderBookmarkAction = function (action) {
+  window.pbpReaderBookmarkAction = function (action, focusTarget) {
     if (!context || isLocalDoc(context.url) || isLocalDoc(context.bookmarkUrl)) return;
-    if (action === "edit") return edit();
+    if (action === "edit") return edit(focusTarget);
     if (action !== "save" && action !== "later") return;
     if (tagFix) {
       // An editor already open on those tags may hold the user's shortened
