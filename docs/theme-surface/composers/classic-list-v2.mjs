@@ -247,15 +247,22 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: ${v("muted")} !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: ${v("accent")} !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: ${v("link-hover")} !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: ${v("row-hover")} !important; }
-#right_bar table td a.delete { color: ${v("muted-soft")} !important; font-size: ${sizeXs} !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: ${v("table-destroy-hover")} !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: ${v("row-hover")} !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: ${v("muted-soft")} !important; font-size: ${sizeXs} !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: ${v("table-destroy-hover")} !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: ${v("input-bg")} !important;
   color: ${v("fg")} !important;
   border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
@@ -264,7 +271,7 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
   box-sizing: border-box !important;
   font-size: ${sizeSm} !important;
 }
-#right_bar input#key:focus { border-color: ${v("accent")} !important; box-shadow: 0 0 0 2px ${v("accent-alpha")} !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: ${v("accent")} !important; box-shadow: 0 0 0 2px ${v("accent-alpha")} !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: ${v("sidebar-btn-bg")} !important;
   color: ${v("sidebar-btn-fg")} !important;
@@ -646,7 +653,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: ${v("bg-surface")} !important; color: ${v("fg-strong")} !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 

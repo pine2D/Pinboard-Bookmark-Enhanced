@@ -90,6 +90,7 @@
     "density": "compact",
     "popup": {
       "dark": {
+        "link": "#a9a9ff",
         "on-accent": "#0e0e26",
         "radius-sm": "2px",
         "radius-md": "3px",

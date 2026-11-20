@@ -7,6 +7,7 @@
 html[data-theme="platinum-light"] {
   color-scheme: light;
   --pp-bg: #dddddd;
+  --pp-link: #333399;
   --opt-bg: #cccccc;
   --lib-bg: #cccccc;
   --pt-desk: #cccccc;
@@ -27,7 +28,7 @@ html[data-theme="platinum-light"] {
   --pt-group-glint: #ffffff;
   --pt-ink: #262626;
   --pt-ink-muted: #505050;
-  --pt-ink-hint: #595959;
+  --pt-ink-hint: #505050;
   --pt-frame: #262626;
   --pt-edge: #262626;
   --pt-field-edge: #262626;
@@ -73,6 +74,7 @@ html[data-theme="platinum-light"] {
 html[data-theme="platinum-dark"] {
   color-scheme: dark;
   --pp-bg: #3b3b3b;
+  --pp-link: #a9a9ff;
   --opt-bg: #2a2a2a;
   --lib-bg: #2a2a2a;
   --pt-desk: #2a2a2a;
@@ -92,8 +94,8 @@ html[data-theme="platinum-dark"] {
   --pt-group-bd: #0d0d0d;
   --pt-group-glint: #3d3d3d;
   --pt-ink: #e2e2e2;
-  --pt-ink-muted: #b8b8b8;
-  --pt-ink-hint: #adadad;
+  --pt-ink-muted: #c2c2c2;
+  --pt-ink-hint: #c2c2c2;
   --pt-frame: #000000;
   --pt-edge: #000000;
   --pt-field-edge: #707070;
@@ -126,7 +128,7 @@ html[data-theme="platinum-dark"] {
   --pt-chip-checked-s1: #ffffff;
   --pt-chip-checked-s2: #9e9e9e;
   --pt-danger-bg: #8a1f1f;
-  --pt-danger-fg: #ff9c94;
+  --pt-danger-fg: #ffbab4;
   --pt-danger-bd: #c4524a;
   --pt-notice-bg: #3b381c;
   --pt-tbox-g1: #262626;
@@ -154,8 +156,8 @@ html[data-reader-theme="platinum"] {
   --pt-group-bd: light-dark(#8c8c8c, #0d0d0d);
   --pt-group-glint: light-dark(#ffffff, #3d3d3d);
   --pt-ink: light-dark(#262626, #e2e2e2);
-  --pt-ink-muted: light-dark(#505050, #b8b8b8);
-  --pt-ink-hint: light-dark(#595959, #adadad);
+  --pt-ink-muted: light-dark(#505050, #c2c2c2);
+  --pt-ink-hint: light-dark(#505050, #c2c2c2);
   --pt-frame: light-dark(#262626, #000000);
   --pt-edge: light-dark(#262626, #000000);
   --pt-field-edge: light-dark(#262626, #707070);
@@ -183,8 +185,12 @@ html[data-reader-theme="platinum"] {
   --pt-chip-hover: light-dark(#efefef, #505050);
   --pt-chip-bd: light-dark(#6e6e6e, #141414);
   --pt-chip-fg: light-dark(#222222, #eaeaea);
+  --pt-chip-checked-bg: light-dark(#595959, #dcdcdc);
+  --pt-chip-checked-fg: light-dark(#ffffff, #141414);
+  --pt-chip-checked-s1: light-dark(#3b3b3b, #ffffff);
+  --pt-chip-checked-s2: light-dark(#7a7a7a, #9e9e9e);
   --pt-danger-bg: light-dark(#a02525, #8a1f1f);
-  --pt-danger-fg: light-dark(#7a1010, #ff9c94);
+  --pt-danger-fg: light-dark(#7a1010, #ffbab4);
   --pt-danger-bd: light-dark(#7a1010, #c4524a);
   --pt-notice-bg: light-dark(#ffffcc, #3b381c);
   --pt-tbox-g1: light-dark(#9a9a9a, #262626);
@@ -197,20 +203,22 @@ html[data-reader-theme="platinum"] {
   --bg: light-dark(#cccccc, #2a2a2a);
   --fg: light-dark(#262626, #e2e2e2);
   --fg-secondary: light-dark(#444444, #c2c2c2);
-  --fg-muted: light-dark(#555555, #b0b0b0);
+  --fg-muted: light-dark(#505050, #c2c2c2);
   --border: light-dark(#777777, #555555);
   --border-light: light-dark(#b5b5b5, #3a3a3a);
   --code-bg: light-dark(#f2f2f2, #252525);
   --code-fg: light-dark(#262626, #e2e2e2);
-  --link: light-dark(#333399, #8f8fff);
-  --link-hover: light-dark(#1f1f7a, #b2b2ff);
-  --link-on-raised: light-dark(#20206b, #c2c2ff);
+  --link: light-dark(#333399, #a9a9ff);
+  --link-hover: light-dark(#1f1f7a, #c4c4ff);
+  --link-on-raised: light-dark(#20206b, #d2d2ff);
   --badge-bg: light-dark(#e4e4e4, #383838);
   --badge-fg: light-dark(#222222, #eaeaea);
   --btn-bg: light-dark(#dddddd, #4a4a4a);
   --btn-border: light-dark(#262626, #000000);
   --btn-hover: light-dark(#e8e8e8, #545454);
   --btn-fg: light-dark(#262626, #e2e2e2);
+  --success: light-dark(#425805, #98bf6c);
+  --on-success: light-dark(#ffffff, #1c1c1c);
   --bq-border: light-dark(#666666, #888888);
   --bq-bg: light-dark(#f5f5f5, #242424);
   --bq-fg: light-dark(#333333, #d4d4d4);
@@ -218,8 +226,8 @@ html[data-reader-theme="platinum"] {
   --selection: light-dark(#ccccff, #3d3dad);
   --surface: light-dark(#dddddd, #3b3b3b);
   --pre-bg: light-dark(#f6f6f6, #161618);
-  --danger: light-dark(#a02525, #ff8f87);
-  --on-danger: #ffffff;
+  --danger: light-dark(#7a1010, #ffbab4);
+  --on-danger: light-dark(#ffffff, #1c1c1c);
   --radius-sm: 2px;
   --radius-md: 3px;
   --radius-lg: 3px;
@@ -367,14 +375,14 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
    ========================================================================== */
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  :is(.btn:not(.context-help-toggle, .vocab-group-step, .danger, .theme-preset-btn, .saved-theme-btn, .listbox-trigger),
+  :is(.btn:not(.context-help-toggle, .vocab-group-step, .danger, .theme-preset-btn, .saved-theme-btn, .listbox-trigger, .saved-success, .save-error),
       button.action-link,
       .md-strip-btn,
       .qbtn,
       .fc-btn,
       .confirm-popover :is(.confirm-no, .confirm-alt),
       .theme-name-popover .tnp-cancel,
-      .action-btn:not(.es-quiet, #reader-bookmark-delete, .reader-bookmark-ic, #rail-ocr-btn, #rail-history-btn, #rail-settings-btn),
+      .action-btn:not(.es-quiet, .reader-bookmark-ic, :where(#reader-bookmark-delete, #rail-ocr-btn, #rail-history-btn, #rail-settings-btn)),
       .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
@@ -407,14 +415,14 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  :is(.btn:not(.context-help-toggle, .vocab-group-step, .danger, .theme-preset-btn, .saved-theme-btn, .listbox-trigger),
+  :is(.btn:not(.context-help-toggle, .vocab-group-step, .danger, .theme-preset-btn, .saved-theme-btn, .listbox-trigger, .saved-success, .save-error),
       button.action-link,
       .md-strip-btn,
       .qbtn,
       .fc-btn,
       .confirm-popover :is(.confirm-no, .confirm-alt),
       .theme-name-popover .tnp-cancel,
-      .action-btn:not(.es-quiet, #reader-bookmark-delete, .reader-bookmark-ic, #rail-ocr-btn, #rail-history-btn, #rail-settings-btn),
+      .action-btn:not(.es-quiet, .reader-bookmark-ic, :where(#reader-bookmark-delete, #rail-ocr-btn, #rail-history-btn, #rail-settings-btn)),
       .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
@@ -443,14 +451,14 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  :is(.btn:not(.context-help-toggle, .vocab-group-step, .danger, .theme-preset-btn, .saved-theme-btn, .listbox-trigger),
+  :is(.btn:not(.context-help-toggle, .vocab-group-step, .danger, .theme-preset-btn, .saved-theme-btn, .listbox-trigger, .saved-success, .save-error),
       button.action-link,
       .md-strip-btn,
       .qbtn,
       .fc-btn,
       .confirm-popover :is(.confirm-no, .confirm-alt),
       .theme-name-popover .tnp-cancel,
-      .action-btn:not(.es-quiet, #reader-bookmark-delete, .reader-bookmark-ic, #rail-ocr-btn, #rail-history-btn, #rail-settings-btn),
+      .action-btn:not(.es-quiet, .reader-bookmark-ic, :where(#reader-bookmark-delete, #rail-ocr-btn, #rail-history-btn, #rail-settings-btn)),
       .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
       .lib-toggle,
       .zen-btn,
@@ -2486,6 +2494,11 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .ask-librar
 }
 
 @media (min-width: 861px) {
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+    :is(.vocab-detail-pane, .notes-detail-pane, .ask-library-pane, .vocab-list-pane, .notes-list-pane, .ask-library-index) {
+    scroll-padding-top: 28px;
+  }
+
   html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
     :is(.vocab-detail-pane, .notes-detail-pane, .ask-library-pane)::before {
     content: attr(aria-label);

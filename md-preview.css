@@ -212,19 +212,12 @@ html { scrollbar-gutter: stable; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 100%; } /* rem-based reading size honors the browser's default font */
 
-::selection { background: var(--selection); }
-/* M3-a: a selected link inside the rendered doc kept its own --link color
-   over --selection's dark bg (#6095C5 on #324B61 = 2.85:1, fails AA). Pull
-   selected text to --fg in dark only -- selection is a transient interaction
-   state, so losing the link-blue tint while highlighted is an acceptable
-   trade for 5.68:1. `currentColor` is the light branch: ::selection is a
-   CSS Pseudo highlight-styling pseudo-element (same family as ::highlight()
-   below), where an unset/currentColor `color` falls back to the *selected
-   element's own* computed color per spec -- byte-identical to this rule
-   simply not existing, so light mode is untouched. light-dark() (not
-   `@media (prefers-color-scheme: dark)`) so it still tracks optTheme's
-   forced mode via the inline color-scheme style, not just the OS setting. */
-#rendered-view ::selection { color: light-dark(currentColor, var(--fg)); }
+/* M3-a (widened to document-wide ::selection, 2026-11-20): links, muted
+   chrome, and status text outside #rendered-view (#ask-panel, #explain-pop,
+   #skim-section, .rail, .doc-header) sat at 2.84:1-3.85:1 over --selection
+   (#324B61) in dark mode and 4.34:1 (--fg-muted on #C6DDE8) in light mode.
+   Pulling selected text to --fg everywhere yields 10.56:1 light / 5.68:1 dark. */
+::selection { background: var(--selection); color: var(--fg); }
 
 /* ---- Scrollbars (document-wide: body's rightmost bar, rail, hl-list, pre) ----
    Transparent track so bars melt into --bg/--surface; the thumb is a neutral

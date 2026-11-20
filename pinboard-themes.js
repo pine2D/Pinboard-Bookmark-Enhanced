@@ -364,15 +364,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -381,7 +388,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -763,7 +770,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -1394,15 +1401,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -1411,7 +1425,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -1795,7 +1809,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -2381,15 +2395,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -2398,7 +2419,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -2780,7 +2801,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -3407,15 +3428,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -3424,7 +3452,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -3806,7 +3834,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -4431,15 +4459,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -4448,7 +4483,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -4830,7 +4865,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -5104,7 +5139,7 @@ input[type="radio"] { accent-color: #bd93f9 !important; }
   --pinboard-input-bg: #FFFCF0;
   --pinboard-private-bg: #f5ebd0;
   --pinboard-private-accent: #D0A215;
-  --pinboard-selection-bg: #F2F0E5;
+  --pinboard-selection-bg: #C6DDE8;
   --pinboard-selection-fg: #100f0f;
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #846401;
@@ -5442,15 +5477,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -5459,7 +5501,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -5841,7 +5883,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -6381,15 +6423,22 @@ html.pbp-dark #main_column > #right_bar {
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  html.pbp-dark #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 html.pbp-dark #right_bar h3, html.pbp-dark #right_bar h4, html.pbp-dark #right_bar b,
 html.pbp-dark #search_right_bar h3, html.pbp-dark #search_right_bar h4, html.pbp-dark #search_right_bar b { color: var(--pinboard-muted) !important; }
 html.pbp-dark #right_bar a:not(.tag), html.pbp-dark #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 html.pbp-dark #right_bar a:not(.tag):hover, html.pbp-dark #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-html.pbp-dark #right_bar table tr[onmouseover] { background: transparent !important; }
-html.pbp-dark #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-html.pbp-dark #right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-html.pbp-dark #right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-html.pbp-dark #right_bar input#key {
+html.pbp-dark #right_bar table tr[onmouseover], html.pbp-dark #search_right_bar table tr[onmouseover] { background: transparent !important; }
+html.pbp-dark #right_bar table tr[onmouseover]:hover, html.pbp-dark #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+html.pbp-dark #right_bar table td a.delete, html.pbp-dark #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+html.pbp-dark #right_bar table tr:hover td a.delete, html.pbp-dark #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+html.pbp-dark #right_bar input#key, html.pbp-dark #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -6398,7 +6447,7 @@ html.pbp-dark #right_bar input#key {
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-html.pbp-dark #right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+html.pbp-dark #right_bar input#key:focus, html.pbp-dark #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 html.pbp-dark #right_bar input[type="submit"], html.pbp-dark #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -6782,7 +6831,7 @@ html.pbp-dark #nextprev a.edit { color: var(--pinboard-muted-soft) !important; }
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 html.pbp-dark tr.tab_header, html.pbp-dark tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-html.pbp-dark #content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+html.pbp-dark #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 html.pbp-dark #main_column:has(.howto_box) { display: flow-root !important; }
 html.pbp-dark .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -7451,15 +7500,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -7468,7 +7524,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -7850,7 +7906,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -8423,15 +8479,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -8440,7 +8503,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -8822,7 +8885,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -9400,15 +9463,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -9417,7 +9487,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -9799,7 +9869,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -10386,15 +10456,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -10403,7 +10480,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -10785,7 +10862,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -11385,15 +11462,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -11402,7 +11486,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -11784,7 +11868,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -12376,15 +12460,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -12393,7 +12484,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -12775,7 +12866,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -13374,15 +13465,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -13391,7 +13489,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -13773,7 +13871,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -14336,15 +14434,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -14353,7 +14458,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -14735,7 +14840,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
@@ -15418,15 +15523,22 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   margin-left: 0 !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 1060px) {
+  #main_column > #right_bar {
+    position: static !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+  }
+}
 #right_bar h3, #right_bar h4, #right_bar b,
 #search_right_bar h3, #search_right_bar h4, #search_right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag), #search_right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover, #search_right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
-#right_bar table tr[onmouseover] { background: transparent !important; }
-#right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
-#right_bar input#key {
+#right_bar table tr[onmouseover], #search_right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover, #search_right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
+#right_bar table td a.delete, #search_right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete, #search_right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
+#right_bar input#key, #search_right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
@@ -15435,7 +15547,7 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   font-size: 12px !important;
 }
-#right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
+#right_bar input#key:focus, #search_right_bar input#key:focus { border-color: var(--pinboard-accent) !important; box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important; outline: none !important; }
 #right_bar input[type="submit"], #search_right_bar input[type="submit"] {
   background: var(--pinboard-sidebar-btn-bg) !important;
   color: var(--pinboard-sidebar-btn-fg) !important;
@@ -15817,7 +15929,7 @@ div:has(> .edit_checkbox), #bookmarks > .bookmark, #main_column > .bookmark { cl
 
 /* ---- Saved tabs (/u:<user>/tabs/), /howto/ float containment, & empty .flash suppression ---- */
 tr.tab_header, tr.tab_header td { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg-strong) !important; }
-#content:has(.tabs) #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
+#right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }
 #main_column:has(.howto_box) { display: flow-root !important; }
 .flash:not(:has(p:not(:empty))) { display: none !important; }
 
