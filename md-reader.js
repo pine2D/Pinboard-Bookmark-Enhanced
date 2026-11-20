@@ -1419,7 +1419,13 @@ function _pbpZenLoadWidth() {
 // the scroll anchor once (max-width does not transition).
 function _pbpZenApplyWidth() {
   const anchor = _pbpZenCaptureAnchor();
+  if (_pbpZenWidth === 880 || _pbpZenWidth === 1080) {
+    document.documentElement.style.setProperty("--pbp-width", _pbpZenWidth + "px");
+  } else {
+    document.documentElement.style.removeProperty("--pbp-width");
+  }
   document.body.style.setProperty("--pbp-width", _pbpZenWidth + "px");
+  try { localStorage.setItem("md-preview-width", String(_pbpZenWidth)); } catch (_) { /* swallow-ok: pre-paint width mirror is best-effort */ }
   _pbpZenUpdateWidthBtn();
   _pbpZenSettleAnchor(anchor);
 }

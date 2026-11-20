@@ -244,7 +244,7 @@ function renderErrorState(message, retryFn, permissionRequired, alt, openUrl, pr
     if (row.firstChild) wrap.appendChild(row);
     view.replaceChildren(wrap);
   }
-  document.body.classList.remove("md-empty"); // undo renderLoadingState's rail-hide so the engine-switch badge stays reachable
+  document.body.classList.remove("md-empty"); // keep the rail + reading column locked so the engine-switch badge stays reachable
 }
 
 // ---- F5-hydration gate, extracted for testability (audit E2/E3): the
@@ -343,7 +343,11 @@ function renderLoadingState(message, note) {
     view.replaceChildren(wrap);
     view.setAttribute("aria-busy", "true");
   }
-  document.body.classList.add("md-empty");
+  // Keep body free of .md-empty while extraction is in flight (body.md-shell):
+  // hiding .rail and resetting main's margin-left to 0 shifted .doc-body 132px
+  // left during "Extracting with Defuddle…" and snapped it 132px back right on
+  // reload/error.
+  document.body.classList.remove("md-empty");
   // Message + note, so a reader without sight of the spinner learns both which
   // engine is running and (for Jina) that it may take a while.
   pbpAnnounce(note ? message + " " + note : message);
@@ -1642,9 +1646,18 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // re-applies.
   window._pbpZenWidthStored = { width: data.pbp_zen_width };
   if (data.pbp_zen_width === 880 || data.pbp_zen_width === 1080) {
+    document.documentElement.style.setProperty("--pbp-width", data.pbp_zen_width + "px");
     document.body.style.setProperty("--pbp-width", data.pbp_zen_width + "px");
+    try { localStorage.setItem("md-preview-width", String(data.pbp_zen_width)); } catch (_) { /* swallow-ok: pre-paint width mirror is best-effort */ }
+  } else {
+    document.documentElement.style.removeProperty("--pbp-width");
+    document.body.style.removeProperty("--pbp-width");
+    try { localStorage.setItem("md-preview-width", "720"); } catch (_) { /* swallow-ok: pre-paint width mirror is best-effort */ }
   }
   const info = data[MP_KEY];
+  if (info && (info.pending || info.restore)) {
+    document.body.classList.add("md-shell");
+  }
   if (!info) {
     pbpReaderSchemeVideoSettled();
     let wantOcrImport = false;
@@ -2201,6 +2214,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       inFlight = true;
       attemptedEngine = engine;
       applyAvailability(engine);
+      if (sourceEl) {
+        sourceEl.setAttribute("aria-busy", "true");
+        sourceEl.querySelectorAll(".src-seg").forEach((s) => {
+          s.classList.toggle("loading", s.getAttribute("data-engine") === engine);
+        });
+      }
       renderLoadingState(
         t("mdEngineExtracting", engineLabel(engine)),
         engine === "jina" ? t("mdEngineExtractingNoteJina") : (engine === "deepseek" ? t("mdEngineExtractingNoteDeepseek") : "")
@@ -2226,6 +2245,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // writers for MP_KEY. Non-video pages release right after detection;
       // video pages hold it until this attempt's terminal decision.
       if (pr && pr.ok) { location.reload(); return; }
+      if (sourceEl) {
+        sourceEl.removeAttribute("aria-busy");
+        sourceEl.querySelectorAll(".src-seg").forEach((s) => s.classList.remove("loading"));
+      }
       if ((engine === "jina" || engine === "deepseek") && pr && pr.error === "host_permission") shellPermissionMissing.add(engine);
       else shellPermissionMissing.delete(engine);
       // An empty top document with one dominant cross-origin https frame:

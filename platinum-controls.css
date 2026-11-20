@@ -475,7 +475,43 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   transform: none;
 }
 
-/* Zero optical-hang negative margins designed for borderless flat-canvas .ghost buttons */
+/* Zero optical-hang negative margins & restore push-button padding on promoted link buttons
+   whose flat-surface base rules reset `padding: 0` / `text-decoration: underline` */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) button.action-link {
+  min-height: 22px;
+  padding: 3px 9px;
+  text-decoration: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  button.action-link:is(:hover, :focus-visible) {
+  text-decoration: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  button.action-link:is(.loading, .disabled-link) {
+  color: var(--pt-ink-muted);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  button.action-link.loading::before {
+  border-color: var(--pt-divider);
+  border-top-color: var(--pt-ink);
+}
+
+html[data-reader-theme="platinum"] .xp-dict-more {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 24px;
+  padding: 2px 10px;
+  text-decoration: none;
+}
+
+html[data-reader-theme="platinum"] .xp-dict-more:is(:hover, :focus-visible) {
+  text-decoration: none;
+}
+
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   :is(.lib-hang-start,
       .vocab-manage-row > .vocab-manage-groups:not([hidden]) + .vocab-edit-groups,
@@ -526,10 +562,12 @@ html[data-reader-theme="platinum"]
 /* Compact icon, inline utility & stepper buttons across Popup, Options & Reader */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
   :is(.offline-queue-item > .actions button:not(.offline-queue-remove),
+      button.regen-link,
+      button.clear-all-link,
+      button.offline-clear,
       .recent-bm-edit,
       .edit-cancel,
       .pp-rh-clear,
-      .pp-rh-open,
       .batch-cancel-btn,
       .wayback-perm-help,
       .wayback-log-retry,
@@ -544,8 +582,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .rail-kbd-help-btn,
       .pb-copy-code,
       .pbp-img-fix-btn,
-      .rh-clear-btn,
-      .rh-open) {
+      .rh-clear-btn) {
   background: var(--pt-face);
   color: var(--pt-ink);
   font-weight: 600;
@@ -556,12 +593,51 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
   transform: none;
 }
 
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(button.regen-link, button.clear-all-link, button.offline-clear) {
+  padding: 1px 6px;
+  min-height: 18px;
+  line-height: 14px;
+  text-decoration: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .tags-input-wrap ~ .actions {
+  min-height: 18px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(button.regen-link, button.clear-all-link, button.offline-clear, #tags-copy-all):is(:hover, :focus-visible) {
+  text-decoration: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  button.regen-link.loading {
+  color: var(--pt-ink-muted);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .batch-cancel-btn > .btn-ic {
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .batch-cancel-btn:hover > .btn-ic {
+  background: transparent;
+}
+
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
   :is(.offline-queue-item > .actions button:not(.offline-queue-remove),
+      button.regen-link,
+      button.clear-all-link,
+      button.offline-clear,
       .recent-bm-edit,
       .edit-cancel,
       .pp-rh-clear,
-      .pp-rh-open,
       .batch-cancel-btn,
       .wayback-perm-help,
       .wayback-log-retry,
@@ -576,8 +652,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .rail-kbd-help-btn,
       .pb-copy-code,
       .pbp-img-fix-btn,
-      .rh-clear-btn,
-      .rh-open):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"], .active) {
+      .rh-clear-btn):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"], .active) {
   background: var(--pt-face-hover);
   color: var(--pt-ink);
   border-color: var(--pt-edge);
@@ -585,10 +660,12 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
   :is(.offline-queue-item > .actions button:not(.offline-queue-remove),
+      button.regen-link,
+      button.clear-all-link,
+      button.offline-clear,
       .recent-bm-edit,
       .edit-cancel,
       .pp-rh-clear,
-      .pp-rh-open,
       .batch-cancel-btn,
       .wayback-perm-help,
       .wayback-log-retry,
@@ -603,8 +680,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .rail-kbd-help-btn,
       .pb-copy-code,
       .pbp-img-fix-btn,
-      .rh-clear-btn,
-      .rh-open):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], .active) {
+      .rh-clear-btn):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], .active) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
@@ -1004,15 +1080,21 @@ html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-
   box-shadow: var(--pt-btn-pressed-shadow);
 }
 
-/* Chromium customizable <select> (::picker(select)) in Reader: match .listbox-pop Mac OS 9 menu */
+/* Chromium customizable <select> (::picker(select)) across Options & Reader: match .listbox-pop Mac OS 9 menu */
 @supports selector(::picker(select)) {
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+    select:not([hidden]),
   html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) {
     appearance: base-select;
   }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+    select:not([hidden])::picker-icon,
   html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate)::picker-icon {
     display: none;
   }
-  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):open {
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+    select:not([hidden]):is(:open, :open:hover):not(:disabled),
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):is(:open, :open:hover):not(:disabled) {
     background-color: var(--pt-pressed-bg);
     background-image:
       var(--pt-arrows-pressed-ink),
@@ -1021,6 +1103,8 @@ html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-
     border-color: var(--pt-edge);
     box-shadow: var(--pt-btn-pressed-shadow);
   }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+    select:not([hidden])::picker(select),
   html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate)::picker(select) {
     appearance: base-select;
     margin-top: 2px;
@@ -1031,6 +1115,8 @@ html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-
     border-radius: 0;
     box-shadow: var(--pt-window-shadow);
   }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+    select:not([hidden]) option,
   html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option {
     position: relative;
     padding: 3px 10px 3px 22px;
@@ -1041,14 +1127,20 @@ html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-
     color: var(--pt-ink);
     background: transparent;
   }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+    select:not([hidden]) option::checkmark,
   html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option::checkmark {
     display: none;
   }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+    select:not([hidden]) option:checked,
   html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option:checked {
     background: transparent;
     color: var(--pt-ink);
     font-weight: 700;
   }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+    select:not([hidden]) option:checked::before,
   html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option:checked::before {
     content: "";
     box-sizing: content-box;
@@ -1061,6 +1153,8 @@ html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-
     border-width: 0 2px 2px 0;
     transform: translateY(-60%) rotate(45deg);
   }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+    select:not([hidden]) option:is(:hover, :focus-visible, :checked:hover, :checked:focus-visible),
   html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option:is(:hover, :focus-visible, :checked:hover, :checked:focus-visible) {
     background: var(--pt-sel-bg);
     color: var(--pt-sel-fg);
@@ -1248,13 +1342,35 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   :is(.btn:not(.context-help-toggle, .vocab-group-step, .theme-preset-btn, .saved-theme-btn, .listbox-trigger),
+      button.action-link,
+      .qbtn,
+      .fc-btn,
       .confirm-popover :is(.confirm-no, .confirm-alt),
       .theme-name-popover .tnp-cancel,
       .md-strip-btn,
       .connection-health-row,
-      .vocab-ref .xp-dict-connect):focus-visible {
+      .vocab-ref .xp-dict-connect,
+      #vocab-ref-result .xp-dict-more):focus-visible {
   border-color: var(--pt-edge);
   box-shadow: var(--pt-btn-shadow);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(button.regen-link,
+      button.clear-all-link,
+      button.offline-clear,
+      .recent-bm-edit,
+      .edit-cancel,
+      .pp-rh-clear,
+      .wayback-perm-help):focus-visible {
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-mini-bevel);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.recent-bm-del, .pp-rh-remove, .offline-queue-remove):focus-visible {
+  border-color: var(--pt-danger-bd);
+  box-shadow: var(--pt-mini-bevel);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
@@ -1797,8 +1913,21 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #jina-md-history-pop .pp-rh-list {
   background: var(--pt-paper);
   border: 1px solid var(--pt-field-edge);
+  border-radius: 0;
   box-shadow: var(--pt-well-shadow);
   padding: 2px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #jina-md-history-pop .pp-rh-item {
+  border-radius: 0;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #jina-md-history-pop .pp-rh-open {
+  padding-inline-end: 6px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #jina-md-history-pop .pp-rh-item:hover {
@@ -2485,6 +2614,10 @@ html[data-reader-theme="platinum"] .doc-body {
   box-shadow: inset 0 0 0 1px var(--pt-frame), 3px 3px 0 var(--pt-shadow-drop);
 }
 
+html[data-reader-theme="platinum"] body.video-mode:not(.raw-active) .doc-body {
+  max-width: min(2160px, 100%);
+}
+
 html[data-reader-theme="platinum"] .doc-body::before {
   content: "";
   display: block;
@@ -2517,6 +2650,12 @@ html[data-reader-theme="platinum"] .msg-bar {
 html[data-reader-theme="platinum"] .msg-bar:is(.error, [data-state="error"]) {
   color: var(--pt-danger-fg);
   border-color: var(--pt-danger-bd);
+}
+
+@media screen and (min-width: 641px) and (max-width: 1000px) {
+  html[data-reader-theme="platinum"] body:not(.zen):not(.md-empty) main {
+    padding-left: calc(var(--rail-toggle-inset) + var(--rail-toggle-size) + var(--sp-3));
+  }
 }
 
 @media (max-width: 640px) {
@@ -2594,6 +2733,18 @@ html[data-reader-theme="platinum"] :is(#rail-history-pop, .empty-state.es-histor
   border-radius: 0;
   box-shadow: var(--pt-well-shadow);
   padding: 2px;
+}
+
+html[data-reader-theme="platinum"] :is(#rail-history-pop, .empty-state.es-history) .rh-item {
+  border-radius: 0;
+}
+
+html[data-reader-theme="platinum"] :is(#rail-history-pop, .empty-state.es-history) .rh-open {
+  padding-inline-end: 6px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 html[data-reader-theme="platinum"] :is(#rail-history-pop, .empty-state.es-history) .rh-item:hover {
@@ -2865,6 +3016,7 @@ html[data-reader-theme="platinum"] :is(#ask-send, #ask-stop, #ask-mic):is(:activ
 }
 
 @media print {
+  html[data-reader-theme="platinum"] body.video-mode .doc-body,
   html[data-reader-theme="platinum"] .doc-body {
     max-width: 880px;
     padding: 0;

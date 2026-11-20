@@ -5107,8 +5107,16 @@ check(corrected.values.get("pp-theme") === "light" && corrected.values.get("pp-t
 // stated rules, not against the twin's own source (a self-referential
 // "diff the two copies" check would pass even if both sides drifted the
 // same way).
-function runReaderEarly({ optTheme = "auto", override = "auto", videoDark = false, search = "", preset = "", follow = true, syncMirror, chrome } = {}) {
-  const root = { style: {}, dataset: {} };
+function runReaderEarly({ optTheme = "auto", override = "auto", videoDark = false, search = "", preset = "", follow = true, width, syncMirror, chrome } = {}) {
+  const styleProps = new Map();
+  const root = {
+    style: {
+      setProperty: (k, v) => styleProps.set(k, String(v)),
+      removeProperty: (k) => styleProps.delete(k),
+      getPropertyValue: (k) => styleProps.get(k) || "",
+    },
+    dataset: {},
+  };
   const links = {
     "hljs-light-link": { media: "(prefers-color-scheme: light)" },
     "hljs-dark-link": { media: "(prefers-color-scheme: dark)" },
@@ -5124,6 +5132,7 @@ function runReaderEarly({ optTheme = "auto", override = "auto", videoDark = fals
     ["pp-theme-preset", preset],
     ["pp-theme-follow", follow === false ? "0" : "1"],
   ]);
+  if (width !== undefined) values.set("md-preview-width", String(width));
   // task-7/K5: only seeded when a test asks for it, so every pre-existing
   // caller above (no syncMirror) keeps exercising the two-hop fallback.
   if (syncMirror !== undefined) values.set("pp-sync-enabled", syncMirror);
@@ -5317,6 +5326,13 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
   const rOther = runReaderEarly({ optTheme: "auto", preset: "dracula", follow: true });
   check(!("readerTheme" in rOther.root.dataset),
     'md-preview-theme-early.js: non-platinum preset set data-reader-theme');
+  const rW880 = runReaderEarly({ width: "880" });
+  const rW1080 = runReaderEarly({ width: "1080" });
+  const rW720 = runReaderEarly({ width: "720" });
+  check(rW880.root.style.getPropertyValue("--pbp-width") === "880px" &&
+    rW1080.root.style.getPropertyValue("--pbp-width") === "1080px" &&
+    rW720.root.style.getPropertyValue("--pbp-width") === "",
+    "md-preview-theme-early.js: pre-paint md-preview-width mirror must apply 880px/1080px on :root and leave 720px on CSS fallback");
 }
 
 // Platinum listbox open-hover contrast guard & systemic CSS first-principles invariants
@@ -5643,6 +5659,42 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     !hasDangerGhostExclusionHole &&
     excludesGroupStepPassenger,
     "platinum-controls.css: must bridge Reader --danger, zero .lib-hang-start/.lib-hang-end margins, cover .btn.danger.ghost without exclusion holes, and exclude .vocab-group-step from standalone .btn bevels");
+
+  // 8d) Promoted link-button bevel clearance & sunken list-row exclusion gate:
+  // Any text button whose flat-surface base rule resets `padding: 0` must restore >=6px horizontal
+  // padding + `text-decoration: none` when promoted to a 3D Platinum button, and sunken history
+  // list-row triggers (.pp-rh-open, .rh-open) must never be lumped into raised bevel buttons.
+  const ptActionLink = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) button.action-link');
+  const ptReaderMore = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .xp-dict-more');
+  const ptPopupUtil = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) :is(button.regen-link, button.clear-all-link, button.offline-clear)');
+  const minHorizPadPx = (map) => {
+    const raw = (map.get("padding-inline") || map.get("padding") || "").trim().split(/\s+/);
+    const h = raw.length >= 2 ? raw[1] : raw[0] || "";
+    return h.endsWith("px") ? parseFloat(h) : 0;
+  };
+  const bevelLeaksListRowOpen = ptRules.some((r) =>
+    r.body.includes("--pt-mini-bevel") && r.selectors.some((s) => s.includes(".pp-rh-open") || s.includes(".rh-open")));
+  check(minHorizPadPx(ptActionLink) >= 8 && ptActionLink.get("text-decoration") === "none" &&
+    minHorizPadPx(ptReaderMore) >= 8 && ptReaderMore.get("text-decoration") === "none" &&
+    minHorizPadPx(ptPopupUtil) >= 6 && ptPopupUtil.get("text-decoration") === "none" &&
+    !bevelLeaksListRowOpen,
+    "platinum-controls.css: promoted link buttons (button.action-link, .xp-dict-more, .regen-link/.clear-all-link/.offline-clear) must restore >=6..8px horizontal padding + text-decoration:none, and .pp-rh-open/.rh-open must stay list rows");
+
+  // 8e) Pinboard.in Platinum composer (_patterns.mjs) control & chrome invariants:
+  const patternsComposerSrc = readFileSync(resolve(root, "docs/theme-surface/composers/_patterns.mjs"), "utf8");
+  check(
+    patternsComposerSrc.includes('select:not([multiple]):not([size]), select[size="1"]') &&
+    patternsComposerSrc.includes("@supports selector(::picker(select))") &&
+    patternsComposerSrc.includes(":is(:open, :open:hover):not(:disabled)") &&
+    patternsComposerSrc.includes('input[type="checkbox"], input[type="radio"]') &&
+    patternsComposerSrc.includes("background-clip: content-box, border-box") &&
+    patternsComposerSrc.includes("inset 0 0 0 1px ${chipBorder}, inset 2px 2px 0 ${chipGlint}"),
+    "composers/_patterns.mjs (platinum): must style popup <select> + ::picker(select) (:open:hover locked), beveled checkbox/radio, 2-layer content-box/border-box pinstripe bars, and outer-ring-first tag chips");
+
+  // 8f) Platinum Reader .doc-body must preserve video-mode dual-column workspace width:
+  const ptVideoDocBody = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] body.video-mode:not(.raw-active) .doc-body');
+  check(ptVideoDocBody.get("max-width") === "min(2160px, 100%)",
+    'platinum-controls.css: html[data-reader-theme="platinum"] body.video-mode:not(.raw-active) .doc-body must keep max-width: min(2160px, 100%)');
 }
 
 // --- popup-theme-early.js: mirror "1" picks sync directly, zero local.get calls ---

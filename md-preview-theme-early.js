@@ -29,6 +29,10 @@
   // "Open video pages in dark" (mdVideoDarkScheme) mirror, written by
   // md-preview.js on its authoritative read and by Options on save.
   var VIDEO_KEY = "md-preview-video-dark";
+  // Per-device reading column width (pbp_zen_width: 720 / 880 / 1080) mirror,
+  // applied on :root before first paint so .doc-body never paints at 720px and
+  // jumps wider once deferred md-preview.js finishes its async storage reads.
+  var WIDTH_KEY = "md-preview-width";
   // The opener marks video pages in the URL (popup.js / background.js
   // append video=1) so the video default can be honoured before the payload
   // is read; md-preview.js still decides video-mode from the payload itself.
@@ -53,6 +57,19 @@
   // "Extension pages follow the Pinboard theme preset" is enabled.
   function resolveChrome(presetKey, follow) {
     return follow !== false && presetKey === "platinum" ? "platinum" : "";
+  }
+
+  function applyWidth(rawWidth) {
+    try {
+      var root = document.documentElement;
+      if (!root || !root.style || typeof root.style.setProperty !== "function") return;
+      var w = Number(rawWidth);
+      if (w === 880 || w === 1080) {
+        root.style.setProperty("--pbp-width", w + "px");
+      } else if (typeof root.style.removeProperty === "function") {
+        root.style.removeProperty("--pbp-width");
+      }
+    } catch (_) { /* swallow-ok: pre-paint width mirror is best-effort */ }
   }
 
   function apply(mode, chromeTheme) {
@@ -87,6 +104,7 @@
         localStorage.getItem(SHARED_FOLLOW_KEY) !== "0"
       )
     );
+    applyWidth(localStorage.getItem(WIDTH_KEY));
   } catch (_) { /* localStorage unavailable (rare); CSS default (auto) already applies */ }
 
   // 2) Async source-of-truth read -- corrects the mirrors if stale, seeds them
@@ -107,6 +125,7 @@
   //    original two-hop chain unchanged.
   if (typeof chrome === "undefined" || !chrome.storage) return;
   var override = "auto";
+  var zenWidth = 720;
   var _optSyncMirror = null;
   try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
 
@@ -114,22 +133,25 @@
   var _firstHop;
   if (_optSyncMirror === "0") {
     _firstHop = chrome.storage.local
-      .get({ pbp_color_scheme: "auto", optTheme: "auto", mdVideoDarkScheme: false, themePresetKey: "", optPopupFollowTheme: true })
+      .get({ pbp_color_scheme: "auto", pbp_zen_width: 720, optTheme: "auto", mdVideoDarkScheme: false, themePresetKey: "", optPopupFollowTheme: true })
       .then(function (l) {
         override = l.pbp_color_scheme || "auto";
+        zenWidth = (l.pbp_zen_width === 880 || l.pbp_zen_width === 1080) ? l.pbp_zen_width : 720;
         return l;
       });
   } else if (_optSyncMirror === "1") {
     _firstHop = Promise.all([
-      chrome.storage.local.get({ pbp_color_scheme: "auto" }),
+      chrome.storage.local.get({ pbp_color_scheme: "auto", pbp_zen_width: 720 }),
       chrome.storage.sync.get(_settingsDefaults)
     ]).then(function (pair) {
       override = pair[0].pbp_color_scheme || "auto";
+      zenWidth = (pair[0].pbp_zen_width === 880 || pair[0].pbp_zen_width === 1080) ? pair[0].pbp_zen_width : 720;
       return pair[1];
     });
   } else {
-    _firstHop = chrome.storage.local.get({ optSyncEnabled: false, pbp_color_scheme: "auto" }).then(function (l) {
+    _firstHop = chrome.storage.local.get({ optSyncEnabled: false, pbp_color_scheme: "auto", pbp_zen_width: 720 }).then(function (l) {
       override = l.pbp_color_scheme || "auto";
+      zenWidth = (l.pbp_zen_width === 880 || l.pbp_zen_width === 1080) ? l.pbp_zen_width : 720;
       return (l.optSyncEnabled ? chrome.storage.sync : chrome.storage.local).get(_settingsDefaults);
     });
   }
@@ -145,7 +167,9 @@
       localStorage.setItem(VIDEO_KEY, videoDark ? "1" : "0");
       localStorage.setItem(SHARED_PRESET_KEY, presetKey);
       localStorage.setItem(SHARED_FOLLOW_KEY, follow ? "1" : "0");
+      localStorage.setItem(WIDTH_KEY, String(zenWidth));
     } catch (_) {}
     apply(resolveReader(mode, override, videoDark), resolveChrome(presetKey, follow));
+    applyWidth(zenWidth);
   }).catch(function () { /* storage unavailable: localStorage mirrors already applied */ });
 })();

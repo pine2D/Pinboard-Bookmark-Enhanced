@@ -529,10 +529,13 @@ export function patternsLayer(tokens) {
     const deskBg = isDark ? "#2a2a2a" : "#cccccc";
     const chromeBg = isDark ? "#3b3b3b" : "#dddddd";
     const paperBg = isDark ? "#1c1c1c" : "#ffffff";
+    const groupBg = isDark ? "#252525" : "#f4f4f4";
+    const groupBorder = isDark ? "#555555" : "#8c8c8c";
     const inkBorder = isDark ? "#000000" : "#262626";
     const hardShadow = isDark ? "#000000" : "#262626";
     const glint = isDark ? "#636363" : "#ffffff";
     const stripeDark = isDark ? "#191919" : "#777777";
+    const bevelD1 = isDark ? "#191919" : "#777777";
     const bevelMid = isDark ? "#191919" : "#999999";
     const rowRule = isDark ? "#333333" : "#d4d4d4";
     const rowHoverBg = isDark ? "#262626" : "#f2f2f2";
@@ -550,24 +553,50 @@ export function patternsLayer(tokens) {
     const btnActiveBevel = isDark
       ? "inset 1px 1px 0 #0c0c0c, inset -1px -1px 0 #3c3c3c, inset 2px 2px 0 #161616, inset -2px -2px 0 #2e2e2e"
       : "inset 1px 1px 0 #444444, inset -1px -1px 0 #888888, inset 2px 2px 0 #555555, inset -2px -2px 0 #777777";
+    const miniBevel = `inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelD1}`;
+    const miniPressed = isDark
+      ? "inset 1px 1px 0 #0c0c0c, inset -1px -1px 0 #3c3c3c"
+      : "inset 1px 1px 0 #444444, inset -1px -1px 0 #888888";
     const fieldBorder = isDark ? "#707070" : "#262626";
     const fieldShadow = isDark
       ? "inset 1px 1px 0 #0c0c0c, 1px 1px 0 #4c4c4c"
       : "inset 1px 1px 0 #999999, 1px 1px 0 #ffffff";
-    const chipBg = isDark ? "#383838" : "#e4e4e4";
-    const chipBorder = isDark ? "#666666" : "#808080";
-    const chipGlint = isDark ? "#525252" : "#ffffff";
-    const chipHoverBg = isDark ? "#484848" : "#d6d6d6";
+    // Neutral Mac OS 9 Platinum raised tag chips: 1px outer ring painted FIRST
+    // so the 2px inner glint/shade never erases the top-left border on white paper,
+    // while keeping 0px border-width delta so #tag_cloud frequency geometry is untouched.
+    const chipBg = isDark ? "#444444" : "#dddddd";
+    const chipBorder = isDark ? "#141414" : "#595959";
+    const chipGlint = isDark ? "#666666" : "#ffffff";
+    const chipShade = isDark ? "#262626" : "#b5b5b5";
+    const chipHoverBg = isDark ? "#525252" : "#e8e8e8";
     const chipHoverFg = isDark ? "#ffffff" : "#111111";
-    const chipHoverBorder = isDark ? "#999999" : "#262626";
+    const chipHoverBorder = isDark ? "#000000" : "#262626";
+    const chipRestShadow = `inset 0 0 0 1px ${chipBorder}, inset 2px 2px 0 ${chipGlint}, inset -2px -2px 0 ${chipShade}`;
+    const chipHoverShadow = `inset 0 0 0 1px ${chipHoverBorder}, inset 2px 2px 0 ${chipGlint}, inset -2px -2px 0 ${chipShade}`;
     const selBg = isDark ? "#3d3dad" : "#333399";
     const selHoverBg = isDark ? "#4e4ec7" : "#24247a";
     const selFg = "#ffffff";
+    const arrowHex = isDark ? "%23eaeaea" : "%23262626";
+    const selectArrows = `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="${arrowHex}" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>')`;
+    const selectArrowsActive = `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="%23ffffff" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>')`;
+    const pinstripeDecls = `content: "" !important; display: block !important; height: 18px !important; box-sizing: border-box !important; padding: 3px 6px !important; background-image: linear-gradient(${glint} 50%, ${stripeDark} 50%), linear-gradient(${chromeBg}, ${chromeBg}) !important; background-size: 100% 2px, 100% 100% !important; background-origin: content-box, border-box !important; background-clip: content-box, border-box !important; border-bottom: 1px solid ${inkBorder} !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important;`;
     const mainWindowSel = `#main_column:not(:has(> form[name="sort"])):not(:has(> #import_history_table)):not(:has(#left_toc))`;
+    const paddedMainSel = `${mainWindowSel}:not(:has(> .user_navbar)):not(:has(> #settings_panel))`;
+    const popupSelectSel = `select:not([multiple]):not([size]), select[size="1"]`;
 
     out.push(
+      // Desktop & popup body surfaces + classic 12px Mac OS 9 grooved scrollbars
       `body#pinboard { background: ${deskBg} !important; }`,
-      `body:not(#pinboard) { background: ${chromeBg} !important; }`,
+      `body:not(#pinboard) { margin: 0 !important; background: ${chromeBg} !important; }`,
+      `html, body, textarea, .description, .pin-ac .bd { scrollbar-width: auto !important; scrollbar-color: ${btnFace} ${deskBg} !important; }`,
+      `::-webkit-scrollbar { width: 12px !important; height: 12px !important; }`,
+      `::-webkit-scrollbar-track { background: ${deskBg} !important; border-left: 1px solid ${inkBorder} !important; box-shadow: inset 1px 1px 0 ${bevelMid} !important; }`,
+      `::-webkit-scrollbar-thumb { background: ${btnFace} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-shadow: ${miniBevel} !important; }`,
+      `::-webkit-scrollbar-thumb:hover { background: ${btnHover} !important; }`,
+      `::-webkit-scrollbar-thumb:active { background: ${btnActiveBg} !important; }`,
+      `::-webkit-scrollbar-corner { background: ${chromeBg} !important; }`,
+
+      // Top Menu Bar (#banner, #sub_banner) & /add Bookmarklet Popup Header (#popup_header)
       `#banner { background: ${chromeBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 6px 12px !important; margin-bottom: 12px !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid}, 2px 2px 0 ${hardShadow} !important; }`,
       `#banner a, #top_menu a, .banner_username { text-decoration: none !important; font-weight: 600 !important; }`,
       `#banner a:hover, #top_menu a:hover { text-decoration: underline !important; }`,
@@ -575,40 +604,153 @@ export function patternsLayer(tokens) {
       `#sub_banner { background: ${chromeBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 5px 10px !important; margin-bottom: 10px !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
       `#sub_banner a { font-weight: 600 !important; text-decoration: none !important; }`,
       `#sub_banner a.selected, #sub_banner a.selected:hover { background: ${selBg} !important; color: ${selFg} !important; padding: 1px 6px !important; border-radius: 2px !important; font-weight: 700 !important; }`,
-      `${mainWindowSel} { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
-      `${mainWindowSel}::before { content: "" !important; display: block !important; height: 18px !important; box-sizing: border-box !important; padding: 3px 6px !important; background-color: ${chromeBg} !important; background-image: linear-gradient(${glint} 50%, ${stripeDark} 50%) !important; background-size: 100% 2px !important; background-origin: content-box !important; background-clip: content-box !important; border-bottom: 1px solid ${inkBorder} !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `body:not(#pinboard) #popup_header { height: auto !important; box-sizing: border-box !important; display: flex !important; align-items: center !important; justify-content: space-between !important; padding: 4px 10px !important; margin-bottom: 10px !important; background-image: linear-gradient(${glint} 50%, ${stripeDark} 50%), linear-gradient(${chromeBg}, ${chromeBg}) !important; background-size: 100% 2px, 100% 100% !important; background-origin: content-box, border-box !important; background-clip: content-box, border-box !important; border-bottom: 1px solid ${inkBorder} !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `body:not(#pinboard) #popup_header #title, body:not(#pinboard) #popup_header #logout { float: none !important; padding: 1px 6px !important; background: ${chromeBg} !important; font-weight: 700 !important; }`,
+      `body:not(#pinboard) #popup_header #title { order: 1 !important; }`,
+      `body:not(#pinboard) #popup_header #logout { order: 2 !important; }`,
+      `body:not(#pinboard) #main_body { padding: 4px 14px 14px !important; box-sizing: border-box !important; }`,
+
+      // Independent Mac OS 9 Windows Across All Page Layouts
+      `${mainWindowSel} { display: flow-root !important; background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      `${mainWindowSel}::before { ${pinstripeDecls} }`,
+      `${paddedMainSel} { padding: 0 14px 14px !important; }`,
+      `${paddedMainSel}::before { margin: 0 -14px 12px -14px !important; }`,
+      `${paddedMainSel} > #bookmarks { margin: 8px -14px -14px -14px !important; padding: 0 14px !important; border-top: 1px solid ${inkBorder} !important; }`,
+      `${paddedMainSel} > #bookmarks:first-child { margin-top: -4px !important; border-top: none !important; }`,
+      `${paddedMainSel} > #bookmarks .bookmark { margin: 0 -14px !important; }`,
+      `${paddedMainSel} > #bookmarks > :not(.bookmark):not(#nextprev) + .bookmark { margin-top: 8px !important; border-top: 1px solid ${rowRule} !important; }`,
       `#main_column:has(> form[name="sort"]), #main_column:has(#left_toc), #note_column { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
-      `#note_column { padding: 12px 14px !important; }`,
+      `#main_column:has(> form[name="sort"]) { box-sizing: content-box !important; padding: 0 12px 12px !important; }`,
+      `#main_column:has(> form[name="sort"])::before { ${pinstripeDecls} margin: 0 -12px 10px -12px !important; }`,
+      `#main_column:has(#left_toc) { position: relative !important; padding-top: 18px !important; align-items: stretch !important; box-sizing: border-box !important; }`,
+      `#main_column:has(#left_toc)::before { ${pinstripeDecls} position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; }`,
+      `#main_column:has(#left_toc) > #left_toc { align-self: stretch !important; background: ${chromeBg} !important; border-right: 1px solid ${inkBorder} !important; padding: 12px 14px !important; margin-right: 0 !important; box-shadow: inset 1px 1px 0 ${glint} !important; }`,
+      `#main_column:has(#left_toc) > #content_column { padding: 12px 18px !important; }`,
+      `#note_column { padding: 0 16px 16px !important; box-sizing: border-box !important; }`,
+      `#note_column::before { ${pinstripeDecls} margin: 0 -16px 14px -16px !important; }`,
+      `#note_right_column { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 0 12px 12px !important; margin-left: 16px !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      `#note_right_column::before { ${pinstripeDecls} margin: 0 -12px 10px -12px !important; }`,
+      `#note_tagbox { background: ${groupBg} !important; color: ${v("fg")} !important; border: 1px solid ${groupBorder} !important; border-radius: 0 !important; padding: 6px 10px !important; box-shadow: inset 1px 1px 0 ${glint} !important; }`,
+      `.flash:not(:has(p:not(:empty))) { display: none !important; }`,
+      `#notes .note { border-bottom: none !important; padding: 0 !important; margin: 0 !important; }`,
+      `#notes .note > span:first-child { display: block !important; padding: 7px 0 !important; border-bottom: 1px solid ${rowRule} !important; color: ${v("muted")} !important; }`,
+      `#notes .note > span:first-child p.when { margin: 2px 0 0 !important; font-size: 11px !important; color: ${v("metadata-fg")} !important; }`,
       `#main_column:has(> #import_history_table) > #settings_panel, #main_column > #import_history_table, .service_box, .help_box, #right_column { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      `#main_column:has(> #import_history_table) > #settings_panel { margin-top: 0 !important; padding: 0 14px 14px !important; }`,
+      `#main_column:has(> #import_history_table) > #settings_panel::before { ${pinstripeDecls} margin: 0 -14px 12px -14px !important; }`,
+      `#main_column > #import_history_table { margin-top: 0 !important; }`,
+      `.service_box:not(:has(*)), #right_column:not(:has(a, p, div, ul, ol, table)) { display: none !important; }`,
+      `.service_box:not(.service_box .service_box)::before, .help_box::before { ${pinstripeDecls} margin: -16px -16px 12px -16px !important; }`,
       `.service_box .service_box { border: none !important; box-shadow: none !important; background: transparent !important; }`,
-      `#settings_panel { background: ${paperBg} !important; padding: 10px 12px !important; box-sizing: border-box !important; }`,
-      `.settings_tab_selected { background: ${paperBg} !important; border-color: ${inkBorder} !important; border-top: 2px solid ${v("accent")} !important; border-bottom-color: ${paperBg} !important; }`,
+      `#profile_left_column > div:first-child:not(.service_box) { background: ${groupBg} !important; border: 1px solid ${groupBorder} !important; border-radius: 2px !important; padding: 10px 12px !important; margin-bottom: 12px !important; box-sizing: border-box !important; box-shadow: inset 1px 1px 0 ${glint} !important; }`,
+
+      // Settings Tab Control, Etched Section Grooves & Mini-Bevel Help Badges
+      `#settings_panel { background: ${paperBg} !important; margin-top: 0 !important; padding: 12px 16px 16px !important; box-sizing: border-box !important; }`,
+      `.settings_tabs { align-items: flex-end !important; gap: 3px !important; border-bottom: none !important; padding: 0 !important; margin-bottom: 0 !important; }`,
+      `.settings_tab { height: auto !important; padding: 5px 14px !important; background: ${btnFace} !important; color: ${v("fg")} !important; border: 1px solid ${inkBorder} !important; border-radius: 3px 3px 0 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px 0 0 ${bevelD1} !important; font-weight: 600 !important; }`,
+      `.settings_tab:hover:not(.settings_tab_selected) { background: ${btnHover} !important; color: ${v("fg-strong")} !important; }`,
+      `.settings_tab_selected, .settings_tab.settings_tab_selected { background: ${paperBg} !important; color: ${v("fg-strong")} !important; border: 1px solid ${inkBorder} !important; border-bottom-color: ${paperBg} !important; padding: 6px 14px !important; margin-bottom: -1px !important; position: relative !important; z-index: 1 !important; box-shadow: inset 1px 1px 0 ${glint} !important; font-weight: 700 !important; }`,
+      `.settings_tab_selected a { color: ${v("fg-strong")} !important; }`,
+      `[class*="settings_tab_spacer"] { display: none !important; }`,
+      `#settings_tab_panes { border: 1px solid ${inkBorder} !important; background: ${paperBg} !important; padding: 16px 18px !important; box-sizing: border-box !important; box-shadow: inset 1px 0 0 ${glint} !important; }`,
+      `.settings_heading { font-size: 12px !important; font-weight: 700 !important; letter-spacing: 0.04em !important; color: ${v("fg-strong")} !important; border-bottom: 1px solid ${bevelMid} !important; box-shadow: 0 1px 0 ${glint} !important; padding-bottom: 4px !important; margin: 16px 0 10px !important; }`,
+      `a.help { display: inline-flex !important; align-items: center !important; justify-content: center !important; min-width: 15px !important; height: 15px !important; padding: 0 3px !important; margin-left: 4px !important; vertical-align: middle !important; background: ${btnFace} !important; color: ${btnFg} !important; border: 1px solid ${inkBorder} !important; border-radius: 2px !important; box-shadow: ${miniBevel} !important; font-size: 10px !important; font-weight: 700 !important; line-height: 1 !important; text-decoration: none !important; }`,
+      `a.help:hover { background: ${btnHover} !important; color: ${btnFg} !important; text-decoration: none !important; }`,
+
+      // Bookmark Toolbars, Rows, Saved Tab Tables, Tweet Rows & Tag Chips
       `.user_navbar { background: ${chromeBg} !important; border-bottom: 1px solid ${inkBorder} !important; padding: 5px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
-      `#bmarks_page_nav a.filter.selected { background: ${selBg} !important; color: ${selFg} !important; border-radius: 2px !important; }`,
+      `#bmarks_page_nav a.filter.selected, a.sort_order_selected, #pbp-pop-sort.pbp-pop-active, .per_page_widget span[style*="background"] { background: ${selBg} !important; color: ${selFg} !important; border-radius: 2px !important; padding: 1px 5px !important; font-weight: 700 !important; text-decoration: none !important; }`,
       `#bmarks_page_nav a.filter.selected:hover { background: ${selHoverBg} !important; color: ${selFg} !important; }`,
+      `#bmarks_page_nav a.rss_link { background: ${btnFace} !important; color: ${btnFg} !important; border: 1px solid ${inkBorder} !important; border-radius: 2px !important; padding: 0 6px !important; box-shadow: ${miniBevel} !important; text-decoration: none !important; }`,
+      `#bmarks_page_nav a.rss_link:hover { background: ${btnHover} !important; color: ${btnFg} !important; text-decoration: none !important; }`,
       `#bookmarks { background: ${paperBg} !important; margin: 0 !important; padding: 0 !important; }`,
       `#nextprev { background: ${chromeBg} !important; border-top: 1px solid ${inkBorder} !important; border-bottom: 1px solid ${inkBorder} !important; padding: 4px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
-      `#nextprev #bulk_edit[style*="170, 170, 170"] { background: ${btnActiveBg} !important; color: ${btnActiveFg} !important; border-color: ${inkBorder} !important; }`,
-      `.bookmark { background: ${paperBg} !important; padding: 9px 12px !important; margin: 0 !important; border-top: none !important; border-right: none !important; border-left: none !important; border-bottom: 1px solid ${rowRule} !important; border-radius: 0 !important; box-shadow: none !important; }`,
+      `#bottom_next_prev { float: none !important; display: flow-root !important; width: 100% !important; box-sizing: border-box !important; background: ${chromeBg} !important; border-top: 1px solid ${inkBorder} !important; padding: 5px 10px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#nextprev #bulk_edit[style*="170, 170, 170"] { background: ${btnActiveBg} !important; color: ${btnActiveFg} !important; border-color: ${inkBorder} !important; padding: 0 6px !important; border-radius: 2px !important; }`,
+      `#main_column div:has(> .edit_checkbox[style*="block"]), #main_column div:has(> .edit_checkbox[style*="inline"]) { display: flex !important; flex-wrap: wrap !important; align-items: flex-start !important; background: ${paperBg} !important; border-bottom: 1px solid ${rowRule} !important; }`,
+      `#main_column div:has(> .edit_checkbox[style*="block"]) > .edit_checkbox, #main_column div:has(> .edit_checkbox[style*="inline"]) > .edit_checkbox { float: none !important; margin: 11px 0 0 12px !important; width: auto !important; flex-shrink: 0 !important; }`,
+      `#main_column div:has(> .edit_checkbox[style*="block"]) > .bookmark, #main_column div:has(> .edit_checkbox[style*="inline"]) > .bookmark { box-sizing: border-box !important; flex: 1 1 calc(100% - 40px) !important; min-width: 0 !important; border-bottom: none !important; padding-left: 8px !important; margin: 0 !important; }`,
+      `.bookmark { float: none !important; width: auto !important; background: ${paperBg} !important; padding: 9px 12px !important; margin: 0 !important; border-top: none !important; border-right: none !important; border-left: none !important; border-bottom: 1px solid ${rowRule} !important; border-radius: 0 !important; box-shadow: none !important; }`,
       `.bookmark.private, .bookmark.private[style*="background"] { background: ${v("private-bg")} !important; box-shadow: inset 3px 0 0 ${v("private-accent")} !important; }`,
       `a.bookmark_title { font-weight: 600 !important; }`,
-      `a.tag { background: ${chipBg} !important; color: ${v("tag-fg")} !important; box-shadow: inset 1px 1px 0 ${chipGlint}, inset 0 0 0 1px ${chipBorder} !important; border-radius: 2px !important; padding: 0 5px !important; text-decoration: none !important; }`,
-      `a.tag:hover { background: ${chipHoverBg} !important; color: ${chipHoverFg} !important; box-shadow: inset 0 0 0 1px ${chipHoverBorder} !important; text-decoration: none !important; }`,
+      `a.url_link, a.url_link[style*="background"] { background: ${groupBg} !important; color: ${v("muted")} !important; border: 1px solid ${rowRule} !important; border-radius: 2px !important; padding: 0 5px !important; text-decoration: none !important; }`,
+      `a.url_link:hover { background: ${btnHover} !important; color: ${v("fg-strong")} !important; border-color: ${inkBorder} !important; text-decoration: none !important; }`,
+      `#main_column > table[cellspacing] { width: 100% !important; border-collapse: collapse !important; margin-top: 8px !important; }`,
+      `#main_column > table[cellspacing] th { background: ${chromeBg} !important; color: ${v("fg-strong")} !important; font-weight: 700 !important; padding: 5px 8px !important; border-top: 1px solid ${inkBorder} !important; border-bottom: 1px solid ${inkBorder} !important; box-shadow: inset 0 1px 0 ${glint} !important; }`,
+      `#main_column > table[cellspacing] td { padding: 6px 8px !important; border-bottom: 1px solid ${rowRule} !important; vertical-align: top !important; }`,
+      `#main_column > table[cellspacing] tr:hover td { background: ${rowHoverBg} !important; }`,
+      `a.tag { background: ${chipBg} !important; color: ${v("tag-fg")} !important; box-shadow: ${chipRestShadow} !important; border-radius: 2px !important; padding: 0 5px !important; text-decoration: none !important; }`,
+      `a.tag:hover { background: ${chipHoverBg} !important; color: ${chipHoverFg} !important; box-shadow: ${chipHoverShadow} !important; text-decoration: none !important; }`,
       `a.tag.selected { background: ${selBg} !important; color: ${selFg} !important; box-shadow: inset 0 0 0 1px ${inkBorder} !important; font-weight: 700 !important; }`,
       `a.tag.selected:hover { background: ${selHoverBg} !important; color: ${selFg} !important; box-shadow: inset 0 0 0 1px ${inkBorder} !important; }`,
+      `.suggested_tag { display: inline-block !important; background: ${chipBg} !important; color: ${v("tag-fg")} !important; box-shadow: ${chipRestShadow} !important; border-radius: 2px !important; padding: 1px 7px !important; margin: 2px 3px 2px 0 !important; font-weight: 600 !important; text-decoration: none !important; }`,
+      `.suggested_tag:hover { background: ${chipHoverBg} !important; color: ${chipHoverFg} !important; box-shadow: ${chipHoverShadow} !important; text-decoration: none !important; }`,
+
+      // Bundle Editor (#tagpicker, #bundle, .tagNode) — preserves exact 0px hover/select geometry
+      `#tagpicker, #bundle { background: ${paperBg} !important; color: ${v("fg")} !important; border: 1px solid ${fieldBorder} !important; border-radius: 0 !important; box-shadow: ${fieldShadow} !important; padding: 8px !important; box-sizing: border-box !important; }`,
+      `#tagpicker { width: 100% !important; margin-top: 12px !important; }`,
+      `#tagpicker .tagNode:not(.unbundled), #bundle .tagNode, #help_content .tagNode { background: ${chipBg} !important; color: ${v("tag-fg")} !important; border-radius: 2px !important; box-shadow: ${chipRestShadow} !important; }`,
+      `#tagpicker .tagNode:hover, #bundle .tagNode:hover, #help_content .tagNode:hover { background: ${chipHoverBg} !important; color: ${chipHoverFg} !important; box-shadow: ${chipHoverShadow} !important; }`,
+      `#tagpicker .tagNode.unbundled:hover { background: ${rowHoverBg} !important; color: ${v("fg-strong")} !important; box-shadow: inset 0 0 0 1px ${inkBorder} !important; }`,
+      `#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected, #help_content .tagNode.tagSelected { background: ${selBg} !important; color: ${selFg} !important; box-shadow: inset 0 0 0 1px ${inkBorder} !important; }`,
+      `#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover, #help_content .tagNode.tagSelected:hover { background: ${selHoverBg} !important; color: ${selFg} !important; box-shadow: inset 0 0 0 1px ${inkBorder} !important; }`,
+
+      // Right Sidebar Window (#right_bar) & Nested /popular/ Sidebar Alignment
       `#right_bar:not(:has(#tag_cloud:empty)) { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 0 12px 12px !important; box-sizing: border-box !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      `@media (min-width: 1061px) { #main_column > #right_bar { top: -1px !important; left: 706px !important; } }`,
       `@media (min-width: 761px) { ${mainWindowSel}:has(~ #right_bar) { float: left !important; width: min(690px, calc(100% - 340px)) !important; } ${mainWindowSel} ~ #right_bar:not(:has(#tag_cloud:empty)) { float: left !important; width: 320px !important; margin-left: 16px !important; } #footer { clear: both !important; } }`,
-      `#right_bar:not(:has(#tag_cloud:empty))::before { content: "" !important; display: block !important; height: 18px !important; margin: 0 -12px 10px -12px !important; box-sizing: border-box !important; padding: 3px 6px !important; background-color: ${chromeBg} !important; background-image: linear-gradient(${glint} 50%, ${stripeDark} 50%) !important; background-size: 100% 2px !important; background-origin: content-box !important; background-clip: content-box !important; border-bottom: 1px solid ${inkBorder} !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#right_bar:not(:has(#tag_cloud:empty))::before { ${pinstripeDecls} margin: 0 -12px 10px -12px !important; }`,
+      `#right_bar table { width: 100% !important; border-collapse: collapse !important; }`,
+      `#right_bar table td { padding: 3px 4px !important; }`,
       `#right_bar table tr[onmouseover]:hover { background: ${rowHoverBg} !important; }`,
-      `#search_query_field, #banner_searchbox input[type="text"], #right_bar input#key, #tweet_searchbox #search_query_field, input[type="text"], input:not([type]), input[type="password"], textarea, select { background: ${paperBg} !important; color: ${v("fg")} !important; border: 1px solid ${fieldBorder} !important; border-radius: 0 !important; box-shadow: ${fieldShadow} !important; }`,
-      `#search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus, input[type="text"]:focus, input:not([type]):focus, input[type="password"]:focus, textarea:focus, select:focus { border-color: ${v("accent")} !important; box-shadow: 0 0 0 2px ${v("accent-alpha")} !important; outline: none !important; }`,
-      `input[type="submit"], input[type="button"], input[type="reset"], input[type="reset"].reset, button[type="reset"], input[type="file"]::file-selector-button, .search_button input[type="submit"], #right_bar input[type="submit"], #tweet_searchbox input[type="submit"], #tagPickerNav input[type="button"], #save_changes_marker, .signup_button, .signup_button[style*="background"] { background: ${btnFace} !important; color: ${btnFg} !important; border: 1px solid ${inkBorder} !important; border-radius: 3px !important; box-shadow: ${btnBevel} !important; font-weight: 600 !important; }`,
-      `input[type="submit"]:hover, input[type="button"]:hover, input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover, input[type="file"]::file-selector-button:hover, .search_button input[type="submit"]:hover, #right_bar input[type="submit"]:hover, #tweet_searchbox input[type="submit"]:hover, #tagPickerNav input[type="button"]:hover, #save_changes_marker:hover, .signup_button:hover { background: ${btnHover} !important; color: ${btnFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnHoverBevel} !important; }`,
-      `input[type="submit"]:active, input[type="button"]:active, input[type="reset"]:active, .search_button input[type="submit"]:active, #right_bar input[type="submit"]:active, #tweet_searchbox input[type="submit"]:active, #tagPickerNav input[type="button"]:active, #save_changes_marker:active, .signup_button:active { background: ${btnActiveBg} !important; color: ${btnActiveFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnActiveBevel} !important; }`,
-      `#edit_bookmark_form, #bulk_top_bar, #bulk_edit_box { background: ${chromeBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 10px 12px !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
-      `.pin-ac .bd { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
-      `@media (max-width: 1060px) { #main_column > #right_bar { position: static !important; left: auto !important; width: 100% !important; margin-top: 12px !important; } }`,
-      `@media (max-width: 760px) { ${mainWindowSel} { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; } #right_bar, #main_column > #right_bar { width: 100% !important; margin-left: 0 !important; margin-top: 12px !important; float: none !important; } }`,
+
+      // Sunken Text Wells (Text Inputs, Textareas, Multi-row Selects)
+      `#search_query_field, #banner_searchbox input[type="text"], #right_bar input#key, #tweet_searchbox #search_query_field, input[type="text"], input:not([type]), input[type="password"], textarea, select[multiple], select[size]:not([size="1"]) { background: ${paperBg} !important; color: ${v("fg")} !important; border: 1px solid ${fieldBorder} !important; border-radius: 0 !important; box-shadow: ${fieldShadow} !important; }`,
+      `#search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus, input[type="text"]:focus, input:not([type]):focus, input[type="password"]:focus, textarea:focus, select[multiple]:focus, select[size]:not([size="1"]):focus { border-color: ${v("accent")} !important; box-shadow: 0 0 0 2px ${v("accent-alpha")} !important; outline: none !important; }`,
+
+      // Authentic Mac OS 9 Platinum Popup Menu <select> + ::picker(select)
+      `${popupSelectSel} { -webkit-appearance: none !important; appearance: none !important; background-color: ${btnFace} !important; background-image: ${selectArrows}, linear-gradient(90deg, ${bevelD1} 0 1px, ${glint} 1px 2px) !important; background-position: right 7px center, right 21px center !important; background-size: 7px 10px, 2px calc(100% - 4px) !important; background-repeat: no-repeat !important; color: ${btnFg} !important; font-weight: 600 !important; border: 1px solid ${inkBorder} !important; border-radius: 3px !important; padding: 4px 28px 4px 10px !important; line-height: 1.4 !important; box-shadow: ${btnBevel} !important; cursor: pointer !important; }`,
+      `select:is(:not([multiple]):not([size]), [size="1"]):hover:not(:disabled):not(:active) { background-color: ${btnHover} !important; color: ${btnFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnHoverBevel} !important; }`,
+      `select:is(:not([multiple]):not([size]), [size="1"]):active:not(:disabled) { background-color: ${btnActiveBg} !important; background-image: ${selectArrowsActive}, linear-gradient(90deg, #191919 0 1px, #777777 1px 2px) !important; color: ${btnActiveFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnActiveBevel} !important; }`,
+      `select:is(:not([multiple]):not([size]), [size="1"]):focus, select:is(:not([multiple]):not([size]), [size="1"]):focus-visible { border-color: ${inkBorder} !important; box-shadow: ${btnBevel} !important; outline: 2px solid ${v("focus-ring")} !important; outline-offset: 1px !important; }`,
+      `@supports selector(::picker(select)) { select:is(:not([multiple]):not([size]), [size="1"]) { appearance: base-select !important; } select:is(:not([multiple]):not([size]), [size="1"])::picker-icon { display: none !important; } select:is(:not([multiple]):not([size]), [size="1"]):is(:open, :open:hover):not(:disabled) { background-color: ${btnActiveBg} !important; background-image: ${selectArrowsActive}, linear-gradient(90deg, #191919 0 1px, #777777 1px 2px) !important; color: ${btnActiveFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnActiveBevel} !important; } select:is(:not([multiple]):not([size]), [size="1"])::picker(select) { appearance: base-select !important; margin-top: 2px !important; padding: 2px !important; background: ${chromeBg} !important; color: ${v("fg")} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid}, 2px 2px 0 ${hardShadow} !important; } select:is(:not([multiple]):not([size]), [size="1"]) option { position: relative !important; padding: 3px 12px 3px 22px !important; border-radius: 0 !important; font-size: 12px !important; font-weight: 600 !important; line-height: 18px !important; color: ${v("fg")} !important; background: transparent !important; } select:is(:not([multiple]):not([size]), [size="1"]) option::checkmark { display: none !important; } select:is(:not([multiple]):not([size]), [size="1"]) option:checked { background: transparent !important; color: ${v("fg-strong")} !important; font-weight: 700 !important; } select:is(:not([multiple]):not([size]), [size="1"]) option:checked::before { content: "" !important; box-sizing: content-box !important; position: absolute !important; left: 7px !important; top: 50% !important; width: 3.5px !important; height: 7px !important; border: solid currentColor !important; border-width: 0 2px 2px 0 !important; transform: translateY(-60%) rotate(45deg) !important; } select:is(:not([multiple]):not([size]), [size="1"]) option:is(:hover, :focus-visible, :checked:hover, :checked:focus-visible) { background: ${selBg} !important; color: ${selFg} !important; outline: none !important; } }`,
+
+      // Platinum Beveled Checkboxes & Radios
+      `input[type="checkbox"], input[type="radio"] { -webkit-appearance: none !important; appearance: none !important; position: relative !important; display: inline-block !important; width: 14px !important; height: 14px !important; margin: 0 4px 0 0 !important; padding: 0 !important; vertical-align: -2px !important; background: ${btnFace} !important; border: 1px solid ${inkBorder} !important; box-shadow: ${miniBevel} !important; cursor: pointer !important; }`,
+      `input[type="checkbox"] { border-radius: 2px !important; }`,
+      `input[type="radio"] { border-radius: 50% !important; }`,
+      `input[type="checkbox"]:hover:not(:disabled):not(:checked), input[type="radio"]:hover:not(:disabled):not(:checked) { background: ${btnHover} !important; }`,
+      `input[type="checkbox"]:active:not(:disabled):not(:checked), input[type="radio"]:active:not(:disabled):not(:checked) { background: ${btnActiveBg} !important; box-shadow: ${miniPressed} !important; }`,
+      `input[type="checkbox"]:checked, input[type="radio"]:checked { background: ${selBg} !important; border-color: ${inkBorder} !important; box-shadow: inset 1px 1px 0 rgba(0,0,0,0.45) !important; }`,
+      `input[type="checkbox"]:checked::after { content: "" !important; box-sizing: content-box !important; position: absolute !important; left: 4px !important; top: 1px !important; width: 3px !important; height: 7px !important; border: solid #ffffff !important; border-width: 0 2px 2px 0 !important; transform: rotate(45deg) !important; }`,
+      `input[type="radio"]:checked::after { content: "" !important; position: absolute !important; left: 4px !important; top: 4px !important; width: 4px !important; height: 4px !important; border-radius: 50% !important; background: #ffffff !important; }`,
+      `input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outline: 2px solid ${v("focus-ring")} !important; outline-offset: 1px !important; }`,
+      `input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.5 !important; cursor: default !important; }`,
+
+      // 4-Layer Stepped Bevel Push Buttons
+      `input[type="submit"], input[type="button"], input[type="reset"], input[type="reset"].reset, button[type="reset"], input[type="file"]::file-selector-button, .search_button input[type="submit"], #right_bar input[type="submit"], #tweet_searchbox input[type="submit"], #tagPickerNav input[type="button"], #save_changes_marker, #edit_bookmark_form input.submit, #edit_bookmark_form input.reset, .signup_button, .signup_button[style*="background"] { background: ${btnFace} !important; color: ${btnFg} !important; border: 1px solid ${inkBorder} !important; border-radius: 3px !important; box-shadow: ${btnBevel} !important; font-weight: 600 !important; }`,
+      `input[type="submit"]:hover, input[type="button"]:hover, input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover, input[type="file"]::file-selector-button:hover, .search_button input[type="submit"]:hover, #right_bar input[type="submit"]:hover, #tweet_searchbox input[type="submit"]:hover, #tagPickerNav input[type="button"]:hover, #save_changes_marker:hover, #edit_bookmark_form input.submit:hover, #edit_bookmark_form input.reset:hover, .signup_button:hover { background: ${btnHover} !important; color: ${btnFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnHoverBevel} !important; }`,
+      `input[type="submit"]:active, input[type="button"]:active, input[type="reset"]:active, .search_button input[type="submit"]:active, #right_bar input[type="submit"]:active, #tweet_searchbox input[type="submit"]:active, #tagPickerNav input[type="button"]:active, #save_changes_marker:active, #edit_bookmark_form input.submit:active, #edit_bookmark_form input.reset:active, .signup_button:active { background: ${btnActiveBg} !important; color: ${btnActiveFg} !important; border-color: ${inkBorder} !important; box-shadow: ${btnActiveBevel} !important; }`,
+
+      // Inline Edit Form, Bulk Edit Dialog Box, Autocomplete Menu & Responsive Breakpoints
+      `#edit_bookmark_form { float: none !important; flex: 0 0 100% !important; width: 100% !important; box-sizing: border-box !important; background: ${chromeBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 12px 14px !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#bulk_edit_options { margin: 0 !important; padding: 8px 10px !important; box-sizing: border-box !important; background: ${paperBg} !important; border-bottom: 1px solid ${inkBorder} !important; }`,
+      `#bulk_edit_box { background: ${groupBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; box-shadow: inset 1px 1px 0 ${glint} !important; }`,
+      `#bulk_top_bar { background: ${chromeBg} !important; border: none !important; border-bottom: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 5px 10px !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid} !important; }`,
+      `#bulk_edit_box a[style*="color"], #bulk_edit_box span[style*="color"] { color: ${v("accent")} !important; }`,
+      `#bulk_edit_box a[style*="color"]:hover { color: ${v("link-hover")} !important; text-decoration: underline !important; }`,
+      `#bulk_edit_box #confirm { background: ${chromeBg} !important; border-top: 1px solid ${inkBorder} !important; padding: 6px 10px !important; }`,
+      `#bulk_edit_box #confirm #confirm_message { color: ${v("fg-strong")} !important; font-weight: 700 !important; }`,
+      `.blurb_box { background: ${paperBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; box-shadow: 2px 2px 0 ${hardShadow} !important; }`,
+      `pre { background: ${groupBg} !important; border: 1px solid ${fieldBorder} !important; border-radius: 0 !important; box-shadow: ${fieldShadow} !important; }`,
+      `code, tt { background: ${groupBg} !important; border: 1px solid ${rowRule} !important; border-radius: 2px !important; padding: 0 4px !important; }`,
+      `a.bookmarklet { background: ${btnFace} !important; color: ${btnFg} !important; border: 1px solid ${inkBorder} !important; border-radius: 2px !important; padding: 1px 7px !important; box-shadow: ${miniBevel} !important; font-weight: 600 !important; text-decoration: none !important; }`,
+      `a.bookmarklet:hover { background: ${btnHover} !important; color: ${btnFg} !important; text-decoration: none !important; }`,
+      `.pin-ac .bd { background: ${chromeBg} !important; border: 1px solid ${inkBorder} !important; border-radius: 0 !important; padding: 2px !important; box-shadow: inset 1px 1px 0 ${glint}, inset -1px -1px 0 ${bevelMid}, 2px 2px 0 ${hardShadow} !important; }`,
+      `.pin-ac li { font-weight: 600 !important; }`,
+      `.pin-ac li:hover, .pin-ac .active { background: ${selBg} !important; color: ${selFg} !important; }`,
+      `@media (max-width: 1060px) { #main_column > #right_bar { position: static !important; left: auto !important; top: auto !important; width: 100% !important; margin-top: 12px !important; } }`,
+      `@media (max-width: 760px) { ${mainWindowSel} { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; } #right_bar, #main_column > #right_bar, #note_right_column { width: 100% !important; margin-left: 0 !important; margin-top: 12px !important; float: none !important; } }`,
       `@media (max-width: 640px) { #right_bar, #main_column > #right_bar { display: none !important; } }`
     );
   } else if (windowChrome != null && windowChrome !== "default") {

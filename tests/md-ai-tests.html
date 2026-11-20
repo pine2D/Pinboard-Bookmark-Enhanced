@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="1179"><title>md-preview AI Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="1180"><title>md-preview AI Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1200px; }
 h2 { margin-top: 24px; font-size: 16px; }
@@ -10282,6 +10282,26 @@ suiteIf("translation failure pill text (item 6)", "pbpTrErrLines", () => {
     assertEq(card.querySelectorAll(".pb-tr-err-raw").length, 0);
     assertEq(card.querySelector(".pb-tr-err-reason").textContent, "key problem");
     assertEq(act.getAttribute("aria-describedby"), card.querySelector(".pb-tr-err-reason").id);
+  });
+});
+
+suiteIf("extraction loading shell: rail & column stability", "renderLoadingState", () => {
+  test("renderLoadingState keeps body free of .md-empty so .rail and .doc-body never jump horizontally", () => {
+    const host = document.createElement("div");
+    host.id = "rendered-view";
+    document.body.appendChild(host);
+    document.body.classList.add("md-empty");
+    try {
+      renderLoadingState("正在用 Defuddle 提取…", "可能需要几秒钟");
+      assertEq(document.body.classList.contains("md-empty"), false, "renderLoadingState must not hide .rail or zero main's margin-left");
+      assertEq(host.getAttribute("aria-busy"), "true", "rendered-view marked aria-busy while extracting");
+      const wrap = host.querySelector(".preview-loading");
+      assert(wrap, "mounts .preview-loading inside #rendered-view");
+      assertEq(wrap.querySelectorAll("p").length, 2, "renders message + note paragraphs");
+    } finally {
+      host.remove();
+      document.body.classList.remove("md-empty");
+    }
   });
 });
 
