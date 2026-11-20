@@ -5715,6 +5715,31 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
   const ptVideoDocBody = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] body.video-mode:not(.raw-active) .doc-body');
   check(ptVideoDocBody.get("max-width") === "min(2160px, 100%)",
     'platinum-controls.css: html[data-reader-theme="platinum"] body.video-mode:not(.raw-active) .doc-body must keep max-width: min(2160px, 100%)');
+
+  // 8g) Platinum 5-surface ::selection parity, squared highlight swatches/badges, quiet .hl-item-del, & #kbd-help-pop uncapped viewport height:
+  const ptSelLight = declarationValueMap(ptControlsCss, 'html[data-theme="platinum-light"] ::selection');
+  const ptSelDark = declarationValueMap(ptControlsCss, 'html[data-theme="platinum-dark"] ::selection');
+  const ptSelReader = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] ::selection');
+  const ptBookmarkBadge = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .rail-ident a.bookmark-badge');
+  const readerBookmarkBadge = declarationValueMap(fiveSheets[3][1], ".rail-ident a.bookmark-badge");
+  const ptHlDots = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] :is(#pb-hl-bar .pb-hl-dot, #pb-hl-card .hl-card-dot)');
+  const ptHlList = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .hl-list:not(:empty)');
+  const ptHlItemDelRest = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .hl-item-del');
+  const hlCardNote = declarationValueMap(fiveSheets[3][1], ".hl-card-note");
+  const kbdHelpPop = declarationValueMap(fiveSheets[3][1], "#kbd-help-pop");
+  check(
+    ptSelLight.get("background") === "#ccccff" && ptSelLight.get("color") === "#000000" &&
+    ptSelDark.get("background") === "#3d3dad" && ptSelDark.get("color") === "#ffffff" &&
+    ptReaderRoot.get("--selection") === "light-dark(#ccccff, #3d3dad)" &&
+    ptSelReader.get("background") === "var(--selection)" &&
+    ptBookmarkBadge.get("border-radius") === "2px" &&
+    readerBookmarkBadge.get("justify-self") === "start" &&
+    ptHlDots.get("border-radius") === "2px" &&
+    ptHlList.get("background") === "var(--pt-paper)" &&
+    ptHlItemDelRest.get("box-shadow") === "none" &&
+    hlCardNote.get("field-sizing") === "content" && hlCardNote.has("max-height") &&
+    kbdHelpPop.get("max-height") === "calc(100dvh - 2 * var(--sp-4))",
+    "platinum-controls.css / md-preview.css: Platinum must unify ::selection (#ccccff/#3d3dad), square .bookmark-badge & highlight dots (2px), put .hl-list:not(:empty) in a sunken --pt-paper well with quiet resting .hl-item-del, auto-size .hl-card-note with max-height, and keep #kbd-help-pop free of a 480px cap");
 }
 
 // --- popup-theme-early.js: mirror "1" picks sync directly, zero local.get calls ---

@@ -77,6 +77,7 @@ async function pbpAskInit(detail) {
     ctx: null,        // lazy context cache (filled by the send-flow task)
     records: [],
     sessionId: String(detail.askSession || new URL(location.href).searchParams.get("askSession") || ""),
+    autoSessionId: "",
     archiveRev: 0,
     temporary: false,
     attachedImage: null,
@@ -834,24 +835,49 @@ async function _pbpAskLoadArchive(st) {
     await pbpAskArchiveMigrate({ owner, url: st.url, title: st.title, records: legacy, isCurrent: current });
     let sessions = await pbpAskArchiveRead({ owner, url: st.url });
     if (!current()) return null;
-    if ((!sessions.length || (st.sessionId && !sessions.some(session => session.id === st.sessionId))) && owner !== "ownerless" && globalThis.chrome?.runtime?.sendMessage) {
-      const result = await chrome.runtime.sendMessage({ type: "PBP_ASK_ARCHIVE_RESTORE", owner });
+    const explicitSession = !!st.sessionId && (st.sessionId !== st.autoSessionId || !!st.records?.length ||
+      _pbpAskUnpersisted.some(item => item.account === account && item.sessionId === st.sessionId));
+    if ((!sessions.length || (explicitSession && !sessions.some(session => session.id === st.sessionId))) && owner !== "ownerless" && globalThis.chrome?.runtime?.sendMessage) {
+      let result = null;
+      try {
+        result = await chrome.runtime.sendMessage({ type: "PBP_ASK_ARCHIVE_RESTORE", owner });
+      } catch (error) {
+        console.warn("[pbp-ask] cloud restore skipped:", error?.name, error?.message);
+      }
       if (!current()) return null;
-      if (result && result.ok === false && result.code !== "not_connected") throw new Error(result.code || "sync_failed");
-      sessions = await pbpAskArchiveRead({ owner, url: st.url });
+      if (result?.code === "account_changed") throw Object.assign(new Error("account_changed"), { code: "account_changed" });
+      // Connection/backoff outcomes (e.g. waiting_for_retry, network, auth)
+      // belong to the shared Drive sync status and retry alarm; a healthy
+      // local archive stays readable and writable while the queue retries
+      // (matching library-ask.js _pbpLibAskRestore).
+      if (result?.ok && result.connected) {
+        sessions = await pbpAskArchiveRead({ owner, url: st.url });
+        if (!current()) return null;
+      }
     }
-    if (!current()) return null;
-    const selected = st.sessionId ? sessions.find(session => session.id === st.sessionId) : sessions[0];
-    st.archiveMissing = !!st.sessionId && !selected;
-    st.sessionId = selected ? selected.id : st.sessionId || crypto.randomUUID();
+    const selected = explicitSession ? sessions.find(session => session.id === st.sessionId) : sessions[0];
+    st.archiveMissing = explicitSession && !selected;
+    if (selected) {
+      st.sessionId = selected.id;
+      st.autoSessionId = "";
+    } else if (explicitSession) {
+      st.autoSessionId = "";
+    } else {
+      const nextId = st.sessionId || crypto.randomUUID();
+      st.sessionId = nextId;
+      st.autoSessionId = nextId;
+    }
     st.archiveSession = selected || null;
     st.archiveAllRecords = selected ? selected.records : [];
     st.archiveError = false;
     return selected;
   };
   st.archiveReady = load().catch(error => {
-    if (current()) { st.archiveError = true; st.archiveReady = null; }
-    console.warn("[pbp-ask] archive restore failed:", error?.name, error?.code || error?.message);
+    if (current()) {
+      st.archiveError = true;
+      st.archiveReady = null;
+      console.warn("[pbp-ask] archive restore failed:", error?.name, error?.code || error?.message);
+    }
     throw error;
   }).finally(() => {
     if (current()) {
@@ -954,7 +980,7 @@ function _pbpAskNewConversation() {
   if (!st || st.running || _pbpAskUnpersisted.some(item => item.account === st.account && item.sessionId === st.sessionId)) return;
   if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("ask");
   st.archiveRev = (st.archiveRev || 0) + 1;
-  st.sessionId = crypto.randomUUID(); st.archiveSession = null; st.archiveAllRecords = [];
+  st.sessionId = crypto.randomUUID(); st.autoSessionId = ""; st.archiveSession = null; st.archiveAllRecords = [];
   st.archiveReady = Promise.resolve(null); st.archiveStale = false; st.archiveLoading = false; st.archiveError = false; st.archiveMissing = false; st.temporary = false;
   st.rounds = []; st.records = []; st.ctrl = null;
   if (st.attachedImage) _pbpAskSetAttachedImage(null);
@@ -5605,7 +5631,7 @@ function _pbpAskOnAccountChanged(account) {
   if (st) {
     st.account = acct;
     st.archiveRev = (st.archiveRev || 0) + 1;
-    st.sessionId = ""; st.archiveReady = null; st.archiveSession = null; st.archiveAllRecords = [];
+    st.sessionId = ""; st.autoSessionId = ""; st.archiveReady = null; st.archiveSession = null; st.archiveAllRecords = [];
     st.archiveError = false; st.archiveMissing = false; st.temporary = false;
     // Same order Clear uses: memory first, then the DOM. An in-flight answer
     // takes the AbortError branch, which never pushes to rounds/records and
@@ -5649,15 +5675,21 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
     if (!st || !st.sessionId || st.temporary || !_pbpAskArchiveEnabled() ||
         (message.owner && message.owner !== _pbpAskArchiveOwnerOf(st.account))) return;
     const account = st.account, revision = st.archiveRev || 0, sessionId = st.sessionId;
-    pbpAskArchiveRead({ owner: _pbpAskArchiveOwnerOf(account), sessionId }).then(sessions => {
+    const autoBlank = sessionId === st.autoSessionId && !st.records?.length &&
+      !_pbpAskUnpersisted.some(item => item.account === account && item.sessionId === sessionId);
+    const query = autoBlank
+      ? { owner: _pbpAskArchiveOwnerOf(account), url: st.url }
+      : { owner: _pbpAskArchiveOwnerOf(account), sessionId };
+    pbpAskArchiveRead(query).then(sessions => {
       if (!_pbpAskArchiveStateCurrent(st, account, revision) || st.sessionId !== sessionId) return;
       if (!sessions.length && st.records?.length && !_pbpAskUnpersisted.some(item => item.sessionId === sessionId)) {
         if (st.ctrl) st.ctrl.abort();
         st.running = false;
         _pbpAskNewConversation();
       } else {
-        const changed = sessions[0] && JSON.stringify(sessions[0].records.map(record => record.id).sort()) !==
-          JSON.stringify((st.archiveAllRecords || []).map(record => record.id).sort());
+        const changed = sessions[0] && (st.archiveMissing || autoBlank ||
+          JSON.stringify(sessions[0].records.map(record => record.id).sort()) !==
+          JSON.stringify((st.archiveAllRecords || []).map(record => record.id).sort()));
         const pending = _pbpAskUnpersisted.some(item => item.sessionId === sessionId);
         if (changed && !pending) {
           st.archiveStale = true;

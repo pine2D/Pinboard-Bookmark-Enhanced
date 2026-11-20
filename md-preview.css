@@ -169,6 +169,11 @@ html { scrollbar-gutter: stable; }
   --hl-ink-3: light-dark(#3B82F6, #5689B6);
   --hl-ink-4: light-dark(#EF4444, #B86F8C);
   --hl-ink-5: light-dark(#A855F7, #8B72AF);
+  --hl-swatch-1: light-dark(#facc15, #D9A441);
+  --hl-swatch-2: light-dark(#4ade80, #5E9C69);
+  --hl-swatch-3: light-dark(#60a5fa, #5689B6);
+  --hl-swatch-4: light-dark(#f87171, #B86F8C);
+  --hl-swatch-5: light-dark(#c084fc, #8B72AF);
   /* R4 in-document search (md-reader.js): a low-saturation NEUTRAL tint
      distinct from every saturated user-highlight hue above (yellow/
      green/blue/pink/purple) and from --hl-flash's yellow, so all three
@@ -1294,6 +1299,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
    the clip). Reuses existing header tokens only. */
 .rail-ident a.bookmark-badge {
   display: inline-flex;
+  justify-self: start;
   align-items: center;
   gap: var(--sp-1);
   margin-top: var(--sp-2);
@@ -1626,7 +1632,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child
    without absolute offsets tied to font metrics. The toggle spans the row;
    sibling actions occupy its reserved cells, with the chevron at the edge. */
 .rail-sec-toolbar {
-  display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px 6px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px 10px;
   align-items: center; column-gap: var(--sp-2);
   margin: var(--sp-3) 0 var(--sp-2); padding-top: var(--sp-3);
   border-top: 1px solid var(--border);
@@ -3108,11 +3114,11 @@ html.motion-ready #pb-hl-bar:popover-open {
    case -- these are non-text UI (WCAG 1.4.11 non-text contrast, >=3:1
    against the panel bg they sit on), not body copy, so the 4.5:1 text
    floor doesn't apply; verified >=3.64:1 against --surface/--bg. */
-.pb-hl-dot-1 { background: light-dark(#facc15, #D9A441); }
-.pb-hl-dot-2 { background: light-dark(#4ade80, #5E9C69); }
-.pb-hl-dot-3 { background: light-dark(#60a5fa, #5689B6); }
-.pb-hl-dot-4 { background: light-dark(#f87171, #B86F8C); }
-.pb-hl-dot-5 { background: light-dark(#c084fc, #8B72AF); }
+.pb-hl-dot-1 { background: var(--hl-swatch-1); }
+.pb-hl-dot-2 { background: var(--hl-swatch-2); }
+.pb-hl-dot-3 { background: var(--hl-swatch-3); }
+.pb-hl-dot-4 { background: var(--hl-swatch-4); }
+.pb-hl-dot-5 { background: var(--hl-swatch-5); }
 .pb-hl-dot:focus-visible { transform: scale(1.15); outline: 2px solid var(--link); outline-offset: 2px; }
 /* :hover is gated to real pointers — on touch it latches after a tap and leaves
    the swatch stuck 15% larger with a focus ring it never earned. :focus-visible
@@ -3815,18 +3821,26 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
   inset: auto;
   margin: 0;
   width: min(320px, calc(100vw - 32px));
-  max-height: min(360px, calc(100vh - 32px));
+  max-height: min(420px, calc(100dvh - 32px));
   display: none;
   flex-direction: column;
   gap: var(--sp-2);
 }
 #pb-hl-card:popover-open { display: flex; }
+#pb-hl-card[data-color="1"] { --hl-card-accent: var(--hl-ink-1); }
+#pb-hl-card[data-color="2"] { --hl-card-accent: var(--hl-ink-2); }
+#pb-hl-card[data-color="3"] { --hl-card-accent: var(--hl-ink-3); }
+#pb-hl-card[data-color="4"] { --hl-card-accent: var(--hl-ink-4); }
+#pb-hl-card[data-color="5"] { --hl-card-accent: var(--hl-ink-5); }
+#pb-hl-card > .row { justify-content: space-between; }
 #pb-hl-card button, #pb-hl-card textarea { font-family: inherit; }
 .hl-card-quote {
   margin: 0;
-  padding: var(--sp-2) var(--sp-3);
-  border-left: 3px solid var(--fg-muted);
-  color: var(--fg-secondary);
+  padding: var(--sp-1) var(--sp-2);
+  border-left: 3px solid var(--hl-card-accent, var(--fg-muted));
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--bq-bg);
+  color: var(--bq-fg);
   font-size: 12.5px;
   line-height: 1.5;
   max-height: 4.5em;
@@ -4028,29 +4042,31 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 #ocr-drop-pop:popover-open { display: flex; }
 #ocr-drop-pop button { font-family: inherit; }
 .hl-card-dot {
-  width: 22px; height: 22px; padding: 0;
+  width: 18px; height: 18px; padding: 0;
   border-radius: 50%;
-  border: 2px solid transparent;
+  border: 1px solid rgba(128, 128, 128, 0.45);
   cursor: pointer;
   position: relative;
-  transition: border-color var(--motion-state) ease;
+  transition: border-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
 }
-/* 22px swatch -> 24px hit area, same idiom as .pb-hl-dot above. -3px, not
-   -1px: the inset resolves against the padding box, and the 2px transparent
-   border (the selected-state ring) leaves only 18px there. The zone ends up
-   1px outside the border box on each side, well inside the colour row's (.row) 8px
-   gap. */
-.hl-card-dot::before { content: ""; position: absolute; inset: -3px; }
-/* L5 (edit-card dots, same swatch-legend rationale as .pb-hl-dot above). */
-.hl-card-dot-1 { background: light-dark(#f5c518, #D9A441); }
-.hl-card-dot-2 { background: light-dark(#4caf50, #5E9C69); }
-.hl-card-dot-3 { background: light-dark(#3b82f6, #5689B6); }
-.hl-card-dot-4 { background: light-dark(#ef4444, #B86F8C); }
-.hl-card-dot-5 { background: light-dark(#a855f7, #8B72AF); }
-.hl-card-dot.active, .hl-card-dot:focus-visible { border-color: var(--fg); }
-/* The border alone marks the selected colour too, so focus also takes the
-   reader's 2px link ring (same as .hl-filter-dot) to stay distinct from it. */
-.hl-card-dot:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+/* 18px swatch -> 24px hit area, matching .pb-hl-dot above. -4px resolves
+   against the 16px padding box (18px minus 1px border on each side) = 24x24,
+   leaving 2px clear between adjacent hit zones across .row's 8px gap. */
+.hl-card-dot::before { content: ""; position: absolute; inset: -4px; }
+/* L5 (edit-card dots, unified onto --hl-swatch-1..5 with .pb-hl-dot). */
+.hl-card-dot-1 { background: var(--hl-swatch-1); }
+.hl-card-dot-2 { background: var(--hl-swatch-2); }
+.hl-card-dot-3 { background: var(--hl-swatch-3); }
+.hl-card-dot-4 { background: var(--hl-swatch-4); }
+.hl-card-dot-5 { background: var(--hl-swatch-5); }
+.hl-card-dot.active {
+  border-color: var(--fg);
+  box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 3px var(--fg);
+}
+.hl-card-dot:focus-visible { border-color: var(--fg); }
+/* The border/ring marks the selected colour, so focus takes the reader's 2px
+   link ring (same as .hl-filter-dot) to stay distinct from it. */
+.hl-card-dot:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
 /* The card dots are opted out of forced-colors mapping above (K115 block) so
    their hue survives as the only classifier -- but that opt-out covers every
    colour on the element, border included, and this border is the ONLY signal
@@ -4059,16 +4075,17 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
    else; :780 calls them "EMPTY buttons"). Map it back onto a system colour,
    the same idiom .msg-bar.error / .pbv-row--current use. */
 @media (forced-colors: active) {
-  .hl-card-dot.active, .hl-card-dot:focus-visible { border-color: Highlight; }
+  .hl-card-dot.active, .hl-card-dot:focus-visible { border-color: Highlight; box-shadow: none; }
   .hl-card-dot:focus-visible { outline-color: Highlight; }
 }
-.hl-card-ai { display: flex; gap: var(--sp-2); }
+.hl-card-ai { display: flex; gap: var(--sp-2); margin-left: auto; }
 .hl-card-ai[hidden] { display: none; }
 .hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask {
-  /* Icon-only cells sharing the explain-pop trio; equal thirds of the 292px
-     row, height fixed so no locale can reflow the card. */
-  flex: 1 1 0;
-  height: 26px; /* md rung (was 28) */
+  /* Compact square 26x26 icon cells on the same toolbar row as the 5 colour
+     swatches, mirroring #pb-hl-bar's [swatches | actions] grammar. */
+  flex: none;
+  width: 26px;
+  height: 26px; /* md rung */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4088,15 +4105,20 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 }
 .hl-card-note {
   width: 100%;
-  min-height: 56px;
+  field-sizing: content;
+  min-height: 72px;
+  max-height: 180px;
   padding: var(--sp-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--fg);
+  font-size: 13px;
+  line-height: 1.45;
   resize: vertical;
   box-sizing: border-box;
 }
+.hl-card-note:placeholder-shown { field-sizing: fixed; }
 .hl-card-voice-status {
   font-size: 11px;
   line-height: 16px;
@@ -4170,11 +4192,11 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
    dot A silently toggle dot B (Codex catch). */
 .hl-filter-dot::before { content: ""; position: absolute; inset: -7px; }
 /* L5 (filter-legend dots, same rationale as .pb-hl-dot above). */
-.hl-filter-dot-1 { background: light-dark(#facc15, #D9A441); }
-.hl-filter-dot-2 { background: light-dark(#4ade80, #5E9C69); }
-.hl-filter-dot-3 { background: light-dark(#60a5fa, #5689B6); }
-.hl-filter-dot-4 { background: light-dark(#f87171, #B86F8C); }
-.hl-filter-dot-5 { background: light-dark(#c084fc, #8B72AF); }
+.hl-filter-dot-1 { background: var(--hl-swatch-1); }
+.hl-filter-dot-2 { background: var(--hl-swatch-2); }
+.hl-filter-dot-3 { background: var(--hl-swatch-3); }
+.hl-filter-dot-4 { background: var(--hl-swatch-4); }
+.hl-filter-dot-5 { background: var(--hl-swatch-5); }
 .hl-filter-dot.off { opacity: 0.25; }
 .hl-filter-dot:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 /* Same reason as the card dots' border above: the K115 forced-color-adjust
@@ -4205,7 +4227,8 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 .hl-item-orphan .hl-item-main { opacity: 0.55; }
 .hl-list { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow-y: auto; }
 .hl-item {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  display: flex; flex-wrap: wrap; align-items: center;
+  column-gap: var(--sp-2); row-gap: var(--sp-0);
   padding: var(--sp-1) 0;
   border-bottom: 1px solid var(--border-light);
 }
@@ -4228,13 +4251,17 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 .hl-item-main:hover, .hl-item-main:focus-visible { background: var(--border-light); }
 .hl-item-main:disabled { cursor: default; opacity: 0.5; }
 .hl-item-main:disabled:hover { background: none; }
-.hl-item-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-/* L5 (Notebook-panel list dots, same rationale as .pb-hl-dot above). */
-.hl-item-dot-1 { background: light-dark(#facc15, #D9A441); }
-.hl-item-dot-2 { background: light-dark(#4ade80, #5E9C69); }
-.hl-item-dot-3 { background: light-dark(#60a5fa, #5689B6); }
-.hl-item-dot-4 { background: light-dark(#f87171, #B86F8C); }
-.hl-item-dot-5 { background: light-dark(#c084fc, #8B72AF); }
+.hl-item-dot {
+  width: 8px; height: 8px; box-sizing: border-box;
+  border-radius: 50%; border: 1px solid rgba(128, 128, 128, 0.4);
+  flex-shrink: 0;
+}
+/* L5 (Notebook-panel list dots, unified onto --hl-swatch-1..5). */
+.hl-item-dot-1 { background: var(--hl-swatch-1); }
+.hl-item-dot-2 { background: var(--hl-swatch-2); }
+.hl-item-dot-3 { background: var(--hl-swatch-3); }
+.hl-item-dot-4 { background: var(--hl-swatch-4); }
+.hl-item-dot-5 { background: var(--hl-swatch-5); }
 .hl-item-quote {
   flex: 1 1 auto; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -4259,7 +4286,9 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 .hl-item-note {
   flex-basis: 100%;
   padding-left: calc(var(--sp-1) + 8px + 6px); /* .hl-item-main inset + dot + its icon gap: the note starts under the quote text */
+  padding-right: var(--sp-1);
   font-size: 11px;
+  line-height: 1.4;
   color: var(--fg-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -4426,7 +4455,7 @@ html.motion-ready #fn-pop:popover-open {
   margin: auto;
   width: min(420px, calc(100vw - 32px));
   max-width: 420px;
-  max-height: min(480px, calc(100vh - 32px));
+  max-height: calc(100dvh - 2 * var(--sp-4));
   height: fit-content;
   display: none;
   flex-direction: column;

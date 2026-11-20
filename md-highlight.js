@@ -2241,6 +2241,9 @@ function _pbpHlEnsureCard() {
   degraded.hidden = true;
   card.appendChild(degraded);
 
+  const toolbar = document.createElement("div");
+  toolbar.className = "row";
+
   const dots = document.createElement("div");
   dots.className = "row";
   dots.setAttribute("role", "group");
@@ -2252,14 +2255,15 @@ function _pbpHlEnsureCard() {
     dot.addEventListener("click", () => _pbpHlSwitchColor(color));
     dots.appendChild(dot);
   }
-  card.appendChild(dots);
+  toolbar.appendChild(dots);
 
-  // ---- H4: AI action row (explain / translate / ask), above the note
-  // textarea. Hidden until the async availability check resolves; stays hidden
-  // forever when AI is unavailable (spec 2.3: "AI unavailable -> card stays
-  // pixel-identical to today" -- `hidden` gives zero layout footprint, same
-  // technique .hl-card-degraded above already uses). pbpAiGetSettings() is
-  // memoized page-wide, so this settles once no matter how many cards open.
+  // ---- H4: AI action group (explain / translate / ask), flush-right on the
+  // same toolbar row as the five colour swatches (mirroring #pb-hl-bar's
+  // compact [swatches | actions] grammar instead of stretching three icon-only
+  // cells across a separate 320px row). Hidden until the async availability
+  // check resolves; stays hidden forever when AI is unavailable. Sharing the
+  // 26px toolbar row also eliminates the 34px first-open vertical jump when
+  // pbpAiGetSettings() resolves.
   const aiRow = document.createElement("div");
   aiRow.className = "hl-card-ai";
   aiRow.setAttribute("role", "group");
@@ -2279,19 +2283,18 @@ function _pbpHlEnsureCard() {
   askBtn.className = "hl-card-ai-ask";
   askBtn.addEventListener("click", _pbpHlCardAskCurrent);
   aiRow.appendChild(askBtn);
-  card.appendChild(aiRow);
+  toolbar.appendChild(aiRow);
+  card.appendChild(toolbar);
   pbpAiGetSettings().then((s) => {
     if (!pbpAiAvailable(s)) return;
     aiRow.hidden = false;
-    // On the very first open this settles AFTER the card was placed, and the
-    // row's 34px would push a card placed above down over its own highlight.
     if (card.matches(":popover-open")) _pbpHlPlaceCard(card);
   }).catch(() => {});
 
   const note = document.createElement("textarea");
   note.className = "hl-card-note";
   note.dir = "auto";
-  note.rows = 3;
+  note.rows = 4;
   note.addEventListener("blur", _pbpHlCommitNote);
   card.appendChild(note);
 
@@ -2469,6 +2472,7 @@ function _pbpHlOpenCard(id) {
   _pbpHlApplyCardI18n(card);
   _pbpHlCardItemId = id;
   card.querySelector(".hl-card-quote").textContent = item.quote || ""; // textContent only (spec sec.6)
+  card.dataset.color = String(item.color);
   card.querySelectorAll(".hl-card-dot").forEach((dot) => {
     const active = Number(dot.dataset.color) === Number(item.color);
     dot.classList.toggle("active", active);
@@ -2490,6 +2494,7 @@ function _pbpHlOpenCard(id) {
   _pbpHlPlaceCard(card);
   noteEl.focus();
   noteEl.setSelectionRange(noteEl.value.length, noteEl.value.length); // caret at end, no accidental select-all
+  if (noteEl.scrollHeight <= noteEl.clientHeight + 4) noteEl.scrollTop = 0;
 }
 
 // The anchor rect of the open card, kept so a late height change (the AI row

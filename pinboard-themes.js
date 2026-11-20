@@ -13998,8 +13998,8 @@ a.url_link { border-radius: 12px !important; }
   --pinboard-input-bg: #cccccc;
   --pinboard-private-bg: #f4f4f4;
   --pinboard-private-accent: #333399;
-  --pinboard-selection-bg: #333399;
-  --pinboard-selection-fg: #ffffff;
+  --pinboard-selection-bg: #ccccff;
+  --pinboard-selection-fg: #000000;
   --pinboard-tag-bg: #e4e4e4;
   --pinboard-tag-fg: #222222;
   --pinboard-row-hover: #efefef;

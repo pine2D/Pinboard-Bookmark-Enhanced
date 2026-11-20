@@ -23,5 +23,5 @@ paths:
 
 - `ask-archive.js` 在独立 IndexedDB 保存完成的回答、引用证据、模型与时间。`ask-archive-gdrive.js` 以独立 `ask-history-batch` schema 1 复用共享 Drive 连接与队列；未登录记录仅本地保留，不认领给后来登录的账号。
 - 每次回答为不可变记录；重生成通过 `replacesId` 关联旧版本，归档保留全部版本，发送给模型的上下文数量另有限制。新对话使用新 sessionId；明确删除使用永久会话墓碑，迟到/离线追加不得复活。
-- 临时对话仅存当前页面内存，不写归档、不同步。旧 Ask 缓存按 owner、URL 幂等迁入现存数据；无法恢复已经被旧 LRU 淘汰的内容。读取失败不得当作没有历史。
+- 临时对话仅存当前页面内存，不写归档、不同步。旧 Ask 缓存按 owner、URL 幂等迁入现存数据；无法恢复已经被旧 LRU 淘汰的内容。本机 IndexedDB 读取失败不得当作没有历史；已连接设备的云端预取（`PBP_ASK_ARCHIVE_RESTORE`）遇 `waiting_for_retry`、网络或授权等同步层非就绪结果时，错误与重试由共享 Drive 队列统一承担，不得锁死本机可读写的 Ask 面板或阻塞新对话提问（显式请求的 `askSession` 本地与云端均未命中时仍走 `archiveMissing` 要求先开新对话）。
 - 每次持久写、远端提交、UI读取及继续提问均重验 owner。历史页继续提问只在用户点击时申请文章精确 origin，通过现有 pending reader 重新抽取；完整原文不进入归档。

@@ -226,6 +226,22 @@ html[data-reader-theme="platinum"] {
 }
 
 /* Shared composite bevel shadows, zero-tween Mac OS 9 motion tokens & font stack */
+html[data-theme="platinum-light"] ::selection {
+  background: #ccccff;
+  color: #000000;
+}
+
+html[data-theme="platinum-dark"] ::selection {
+  background: #3d3dad;
+  color: #ffffff;
+}
+
+html[data-reader-theme="platinum"] ::selection,
+html[data-reader-theme="platinum"] #rendered-view ::selection {
+  background: var(--selection);
+  color: light-dark(#000000, #ffffff);
+}
+
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) {
   --pt-font-ui: "Lucida Grande", "Geneva", Verdana, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
   --pt-btn-shadow: inset 1px 1px 0 var(--pt-face), inset -1px -1px 0 var(--pt-bevel-d1), inset 2px 2px 0 var(--pt-glint), inset -2px -2px 0 var(--pt-bevel-d2);
@@ -580,6 +596,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .typo-step,
       .typo-seg-btn,
       .fn-pop-jump,
+      .rail-sec-open,
       .rail-kbd-help-btn,
       .pb-copy-code,
       .pbp-img-fix-btn,
@@ -656,6 +673,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .typo-step,
       .typo-seg-btn,
       .fn-pop-jump,
+      .rail-sec-open,
       .rail-kbd-help-btn,
       .pb-copy-code,
       .pbp-img-fix-btn,
@@ -685,6 +703,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .typo-step,
       .typo-seg-btn,
       .fn-pop-jump,
+      .rail-sec-open,
       .rail-kbd-help-btn,
       .pb-copy-code,
       .pbp-img-fix-btn,
@@ -858,7 +877,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
 
 /* Compact row-level remove buttons */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  :is(.offline-queue-remove, .recent-bm-del, .pp-rh-remove, .hl-item-del, .rh-remove) {
+  :is(.offline-queue-remove, .recent-bm-del, .pp-rh-remove, .rh-remove) {
   background: var(--pt-face);
   color: var(--pt-danger-fg);
   border: 1px solid var(--pt-danger-bd);
@@ -869,14 +888,14 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  :is(.offline-queue-remove, .recent-bm-del, .pp-rh-remove, .hl-item-del, .rh-remove):hover:not(:disabled, :active) {
+  :is(.offline-queue-remove, .recent-bm-del, .pp-rh-remove, .rh-remove):hover:not(:disabled, :active) {
   background: var(--pt-face-hover);
   color: var(--pt-danger-fg);
   border-color: var(--pt-danger-bd);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  :is(.offline-queue-remove, .recent-bm-del, .pp-rh-remove, .hl-item-del, .rh-remove):active:not(:disabled) {
+  :is(.offline-queue-remove, .recent-bm-del, .pp-rh-remove, .rh-remove):active:not(:disabled) {
   background: var(--pt-danger-bg);
   color: #ffffff;
   border-color: var(--pt-edge);
@@ -2539,6 +2558,11 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   color: inherit;
 }
 
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .notes-hit-dot {
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
 /* ==========================================================================
    9. Surface 4 — Reader (md-preview): Mac Document Reader Mode
    ========================================================================== */
@@ -2582,6 +2606,60 @@ html[data-reader-theme="platinum"] .rail-ident :is(#rail-ocr-btn, #rail-history-
   border-radius: 2px;
 }
 
+html[data-reader-theme="platinum"] .rail-ident a.bookmark-badge {
+  padding: var(--sp-0) var(--sp-2);
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  font-weight: 600;
+  border: 1px solid var(--pt-edge);
+  border-radius: 2px;
+  box-shadow: var(--pt-mini-bevel);
+  text-decoration: none;
+}
+
+html[data-reader-theme="platinum"] .rail-ident a.bookmark-badge:hover {
+  background: var(--pt-face-hover);
+  color: var(--pt-link);
+  border-color: var(--pt-edge);
+}
+
+html[data-reader-theme="platinum"] .rail-ident a.bookmark-badge:active {
+  background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-mini-pressed);
+}
+
+html[data-reader-theme="platinum"] :is(.token-badge, .pbv-ai-note, .hl-item-lang) {
+  border-radius: 2px;
+  background: var(--pt-group-bg);
+  color: var(--pt-ink-muted);
+  border: 1px solid var(--pt-group-bd);
+  box-shadow: var(--pt-group-shadow);
+}
+
+html[data-reader-theme="platinum"] .pbv-back-current {
+  border-radius: 3px;
+  background: var(--pt-face);
+  color: var(--pt-ink);
+  font-weight: 600;
+  border: 1px solid var(--pt-edge);
+  box-shadow: var(--pt-btn-shadow), 2px 2px 0 var(--pt-shadow-drop);
+}
+
+html[data-reader-theme="platinum"] .pbv-back-current:hover {
+  background: var(--pt-face-hover);
+  color: var(--pt-ink);
+  border-color: var(--pt-edge);
+}
+
+html[data-reader-theme="platinum"] .pbv-back-current:active {
+  background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-btn-pressed-shadow), 2px 2px 0 var(--pt-shadow-drop);
+}
+
 /* Reader Split Buttons (#send-split & .pbv-copy-group): fused Mac OS 9 beveled pair */
 html[data-reader-theme="platinum"] .send-split:not(.send-empty) > .action-btn.send-primary,
 html[data-reader-theme="platinum"] .pbv-copy-group > button.pbv-copy {
@@ -2607,6 +2685,64 @@ html[data-reader-theme="platinum"] .toc-list a.active {
   background: var(--pt-sel-bg);
   color: var(--pt-sel-fg);
   border-radius: 0;
+}
+
+/* Reader Highlight Notebook (#hl-rail-section): Mac OS 9 sunken list well + quiet row delete */
+html[data-reader-theme="platinum"] #rail .hl-filter-dot {
+  border-radius: 2px;
+  border: 1px solid var(--pt-edge);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.45);
+  transition: none;
+}
+
+html[data-reader-theme="platinum"] .hl-list:not(:empty) {
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-field-edge);
+  border-radius: 0;
+  box-shadow: var(--pt-well-shadow);
+  padding: var(--sp-0) var(--sp-1);
+}
+
+html[data-reader-theme="platinum"] .hl-item {
+  border-bottom-color: var(--pt-divider);
+}
+
+html[data-reader-theme="platinum"] .hl-item-main {
+  border-radius: 0;
+  transition: none;
+}
+
+html[data-reader-theme="platinum"] .hl-item-main:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--pt-row-hover);
+  color: var(--pt-ink);
+}
+
+html[data-reader-theme="platinum"] #rail .hl-item-dot {
+  border-radius: 1px;
+  border: 1px solid var(--pt-edge);
+}
+
+html[data-reader-theme="platinum"] .hl-item-del {
+  background: transparent;
+  color: var(--pt-ink-muted);
+  border: 1px solid transparent;
+  border-radius: 2px;
+  box-shadow: none;
+  transition: none;
+}
+
+html[data-reader-theme="platinum"] .hl-item-del:is(:hover, :focus-visible):not(:active) {
+  background: var(--pt-face-hover);
+  color: var(--pt-danger-fg);
+  border-color: var(--pt-danger-bd);
+  box-shadow: var(--pt-mini-bevel);
+}
+
+html[data-reader-theme="platinum"] .hl-item-del:active {
+  background: var(--pt-danger-bg);
+  color: #ffffff;
+  border-color: var(--pt-edge);
+  box-shadow: var(--pt-mini-pressed);
 }
 
 html[data-reader-theme="platinum"] main {
@@ -2760,9 +2896,60 @@ html[data-reader-theme="platinum"] :is(#rail-history-pop, .empty-state.es-histor
   background: var(--pt-row-hover);
 }
 
-html[data-reader-theme="platinum"] #pb-hl-bar .pb-hl-dot {
+html[data-reader-theme="platinum"] :is(#pb-hl-bar .pb-hl-dot, #pb-hl-card .hl-card-dot) {
   border-radius: 2px;
   border: 1px solid var(--pt-edge);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.45);
+  transition: none;
+}
+
+html[data-reader-theme="platinum"] #pb-hl-card .hl-card-dot.active {
+  border-color: var(--pt-frame);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.45), 0 0 0 1px var(--pt-dialog), 0 0 0 3px var(--pt-frame);
+}
+
+html[data-reader-theme="platinum"] #pb-hl-card .hl-card-dot:focus-visible {
+  outline-offset: 3px;
+}
+
+html[data-reader-theme="platinum"] #pb-hl-card::before,
+html[data-reader-theme="platinum"] #kbd-help-pop::before {
+  content: "";
+  display: block;
+  flex: none;
+  height: 16px;
+  background-color: var(--pt-win);
+  background-image: var(--pt-pinstripe-bg);
+  background-size: 100% 2px;
+  border-bottom: 1px solid var(--pt-frame);
+}
+
+html[data-reader-theme="platinum"] #pb-hl-card::before {
+  margin: -12px -12px 4px;
+}
+
+html[data-reader-theme="platinum"] #kbd-help-pop::before {
+  margin: -16px -16px 0;
+}
+
+html[data-reader-theme="platinum"] #pb-hl-card .hl-card-quote {
+  background: var(--pt-group-bg);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-group-bd);
+  border-left: 3px solid var(--hl-card-accent, var(--pt-frame));
+  border-radius: 0;
+  box-shadow: var(--pt-group-shadow);
+}
+
+html[data-reader-theme="platinum"]
+  #pb-hl-card :is(.hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask, .hl-card-delete, .hl-card-mic) {
+  border-radius: 2px;
+  box-shadow: var(--pt-mini-bevel);
+}
+
+html[data-reader-theme="platinum"]
+  #pb-hl-card :is(.hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask, .hl-card-mic):active {
+  box-shadow: var(--pt-mini-pressed);
 }
 
 html[data-reader-theme="platinum"]
