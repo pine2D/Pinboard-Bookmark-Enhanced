@@ -22,6 +22,7 @@ paths:
   - "md-speech.js"
   - "md-vocab-echo.js"
   - "md-preview-theme-early.js"
+  - "tests/md-preview-contrast-tests.mjs"
 ---
 
 # md-preview 阅读器深水区
@@ -50,7 +51,7 @@ block 切分 → `pbpAiShield` 占位符 `⟦C/L/I/M/T\d+⟧` 屏蔽代码/链�
 - md-highlight.js：五色划词高亮 + 笔记 + Notebook 面板；高亮必须在重渲染/翻译切换后按锚定恢复。
 - md-epub.js 顶段是纯层（zip/OPF/nav/XML 转义，无 DOM/chrome，测试页可载）；运行时 XHTML 序列化与 DOM 派生目录在 `pbpBuildEpub`。
 - 阅读视图**不提案 hover 触发的浮层交互**（用户真机反馈否决，历史上 tr 悬停气泡被点名全删）。
-- **明暗解析模型**（2026-08-25）：`pbpResolveReaderScheme` = 页内覆盖（`pbp_color_scheme`，local、按设备，「Aa」面板第三行）＞ 视频默认深色（`mdVideoDarkScheme`，仅 video-mode）＞ 全局 `optTheme`；阅读器永不套 Pinboard 预设。`md-preview-theme-early.js` 是它的 verbatim twin，靠 `pp-theme` / `md-preview-scheme` / `md-preview-video-dark` 三个 localStorage 镜像 + opener 附加的 `video=1` URL 参数在首帧前解析——改任何一侧必须同步另一侧。settings 类 `storage.onChanged` 一律经 `pbpSettingsAreaName()` 过滤非本机路由的 area，并在 `optSyncEnabled` 切换时整组重读。
+- **明暗与主题外壳解析模型**（2026-08-25 建立，2026-11-20 增补 Platinum 外壳）：`pbpResolveReaderScheme` = 页内覆盖（`pbp_color_scheme`，local、按设备，「Aa」面板第三行）＞ 视频默认深色（`mdVideoDarkScheme`，仅 video-mode）＞ 全局 `optTheme`；`pbpResolveReaderChrome` 仅在开启跟随（`optPopupFollowTheme !== false`）且 `themePresetKey === "platinum"` 时挂载 `html[data-reader-theme="platinum"]`，阅读器不套其余站点预设。`md-preview-theme-early.js` 是两者的 verbatim twin，靠 `pp-theme` / `md-preview-scheme` / `md-preview-video-dark` / `pp-theme-preset` / `pp-theme-follow` / `md-preview-width` 六个 localStorage 镜像 + opener 附加的 `video=1` URL 参数在首帧前解析——改任何一侧必须同步另一侧。`md-preview.css` 的 `::selection` 必须作用于全页（含侧栏、Ask、查词弹层与要点区，不得窄化到 `#rendered-view`），阅读器及 `platinum-controls.css` 主题覆盖统一由 `tests/md-preview-contrast-tests.mjs` 在编辑期与提交期强制校验 AA 对比度。settings 类 `storage.onChanged` 一律经 `pbpSettingsAreaName()` 过滤非本机路由的 area，并在 `optSyncEnabled` 切换时整组重读。
 - `md-convert.js` 是 marked→DOMPurify 的单点 sanitize 中枢；导出与 frontmatter/byline 都走它。
 - **最近预览历史**（`PBP_READER_HISTORY_KEY` / `pbp_reader_history`）：`chrome.storage.local` 本机环形队列（上限 25 条，归入 `pbpIsNeverClearKey`），跳过无痕标签页与含凭据 URL，只存 URL、标题、站点名、抽取引擎、视频标记、时间与槽位键，不存正文与账号字段。打开菜单只读本机元数据；点击条目走 `pbpOpenReaderFromHistory`，优先聚焦槽位仍在的存活阅读器标签页，失效时仅在该次点击动作里按需申请文章精确 origin（或 `https://r.jina.ai` / `https://api.deepseek.com`）并挂 `historyReopen` 重抽；`md-preview.html` 槽位失效时渲染带匹配卡与最近列表的 `.es-history` 空态。
 

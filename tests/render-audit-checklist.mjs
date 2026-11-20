@@ -2915,6 +2915,12 @@ export const CHECKS = [
 // (popup-theme-early.js / options-theme-early.js, theme model 2026-08-25,
 // batch 2 D6), which the "flexoki-dark" entry below already covers; the
 // popup's former hand-maintained `html.dark` block was retired with it.
+// Flat Soft-Fill theme list (COMPONENTS.md §2.1 / §9). Platinum (`platinum-light`
+// / `platinum-dark`) is the sole user-sanctioned Mac OS 9 3D windowed/beveled
+// exception (.claude/decisions.md 2026-11-19) and intentionally violates flat
+// value-box/tab/canvas identity rules; its WCAG AA token/raised-fill contrast
+// and 3D structural contracts are enforced by tests/md-preview-contrast-tests.mjs
+// and tests/ui-contract-tests.mjs (checked for completeness against POPUP_THEME_MAP).
 export const THEMES = [
   "",                  // default light -- no data-theme attribute
   "catppuccin-latte", "catppuccin-mocha",

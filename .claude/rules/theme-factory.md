@@ -15,6 +15,7 @@ paths:
   - "tests/audit-render-*-tests.mjs"
   - "scripts/options-help-render-audit.mjs"
   - "tests/pinboard-theme-render-tests.mjs"
+  - "tests/md-preview-contrast-tests.mjs"
   - "tests/theme-*-tests.mjs"
 ---
 
@@ -48,6 +49,15 @@ Pre-commit 有两组触发。主题组使用**同一组触发条件**（theme-su
 ### 开发时按场景选择审计
 
 已拆到 `audit.md`（2026-11-05；paths 覆盖 audit 入口、场景注册表、qa-drive 与 verify.sh）。
+
+## 窗口化立体主题双轨边界（Platinum 特例，2026-11-20 沉淀）
+
+全部主题统一挂在单一 `themePresetKey` 轴上（明暗双态伞形主题登记进 `ADAPTIVE_THEME_MAP` / `PBP_OPTIONS_ADAPTIVE_MAP`），禁止另起独立的外观风格设置项。Platinum 作为唯一获批的 Mac OS 9 立体窗口化特例采用双轨结构：站点侧走 `pilots/platinum-{light,dark}.tokens.json` + `_patterns.mjs` 的 `window-chrome`，扩展四表面（popup / options / library + 阅读器 `html[data-reader-theme="platinum"]`）走手维护的 `platinum-controls.css`。由于 `platinum-controls.css` 位于六个 `@generated:*` 区块之外，必须由以下四道专属门闭环兜底，禁止脱管：
+
+1. **生成表与渲染审计清单对齐**：`tests/ui-contract-tests.mjs` 强制核对 `POPUP_THEME_MAP` 与 `tests/render-audit-checklist.mjs` 的 `THEMES` 双向一致（仅豁免与扁平无框断言冲突的 `platinum-light` / `platinum-dark`），并校验各 pilot 的 `selection-bg` 在明暗模式下均与 `bg` 及 `bg-surface` 保持可辨识度（`> 1.02:1`）。
+2. **阅读器与 `--pt-*` 跨表面对比度门**：`tests/md-preview-contrast-tests.mjs` 同时校验 `html[data-reader-theme="platinum"]` 全部语义对、`platinum-light` / `platinum-dark` 与阅读器块之间的 `--pt-*` 逐项相等（零漂移），以及 `--pt-*` 在四表面按钮面、凹陷输入面、纸面、桌面与芯片上的 AA 对比度；`scripts/ui-consumer-lint.mjs` 与 `scripts/pre-commit-hook.sh` 在编辑或暂存 `md-preview.css` / `platinum-controls.css` 时自动运行该门。
+3. **变更审计路由**：`scripts/audit-plan.mjs`、`scripts/audit-catalog.mjs` 与 `scripts/audit-render-scenarios.mjs` 将 `platinum-controls.css` 映射至 `popup` / `options` / `library` / `md-preview` 全部四个扩展表面，确保 `node scripts/audit.mjs --changed --plan` 不漏报。
+4. **跨主题与立体/平铺兼容检查流程**：涉及新增预设、跨表面样式精修或 `pinboard.in` 多页面模板适配时，按 `.claude/skills/theme-surface/SKILL.md` 清单逐项核查。
 
 ## 迁移与删改陷阱（真实事故沉淀）
 

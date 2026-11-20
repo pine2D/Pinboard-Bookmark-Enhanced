@@ -10,6 +10,7 @@ import * as uiDerive from "../docs/theme-surface/composers/_ui-derive.mjs";
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
 import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
 import { composeLibraryThemeMap } from "../docs/theme-surface/composers/library-chrome.mjs";
+import { THEMES as RENDER_AUDIT_THEMES } from "./render-audit-checklist.mjs";
 import { checkAiProviderSync } from "../scripts/sync-ai-providers.mjs";
 import { checkSettingsSchemaSync } from "../scripts/sync-settings-schema.mjs";
 
@@ -5589,7 +5590,7 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     scanDisclosureSummaries([["bad-ua.css", "#desc > summary { cursor: pointer; color: inherit; }"]]).length === 1 &&
     scanDisclosureSummaries([["ok.css", ".disc > summary { cursor: pointer; list-style: none; } .disc > summary::-webkit-details-marker { display: none; } .disc > summary::after { width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; }"]]).length === 0,
     "ui-contract: scanDisclosureSummaries self-test regressed");
-  const summaryHits = scanDisclosureSummaries(fiveSheets.slice(0, 4));
+  const summaryHits = scanDisclosureSummaries(fiveSheets);
   check(summaryHits.length === 0,
     `disclosure <summary> contract violation: [${summaryHits.join("; ")}]`);
 
@@ -5760,6 +5761,69 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     hlCardNote.get("field-sizing") === "content" && hlCardNote.has("max-height") &&
     kbdHelpPop.get("max-height") === "calc(100dvh - 2 * var(--sp-4))",
     "platinum-controls.css / md-preview.css / popup.css: compact secondary icon buttons must unify on 20x20 (+ ::before -3px & Platinum --pt-mini-bevel), .bookmark-badge must live inside #reader-bookmark-section without .rail-ident duplication, and Platinum ::selection / highlight / #kbd-help-pop invariants must hold");
+
+  // 8h) Systemic retrospective guardrails:
+  //   (i)   POPUP_THEME_MAP <-> render-audit-checklist.mjs THEMES completeness (only platinum-light/dark may opt out as windowed 3D exception);
+  //   (ii)  All site pilots' selection-bg must be perceptually distinct (> 1.02:1) from BOTH bg and bg-surface in every mode;
+  //   (iii) Platinum's .btn push-button :is(...) selector must carry 0 ID specificity (no un-:where()'d #id inflating .btn above #submit-btn.saved-success/.save-error) and must exclude .saved-success & .save-error;
+  //   (iv)  Platinum Library scrollable panes with sticky ::before titlebars must set scroll-padding-top so Tab/scrollIntoView never hides controls under the bar.
+  const WINDOWED_THEME_EXCEPTIONS = new Set(["platinum-light", "platinum-dark"]);
+  const renderAuditSet = new Set(RENDER_AUDIT_THEMES.filter(Boolean));
+  const popupThemeKeys = POPUP_THEME_MAP.map((entry) => entry.id);
+  const popupThemeSet = new Set(popupThemeKeys);
+  const missingInRenderAudit = popupThemeKeys.filter((k) => !renderAuditSet.has(k) && !WINDOWED_THEME_EXCEPTIONS.has(k));
+  const unknownInRenderAudit = [...renderAuditSet].filter((k) => !popupThemeSet.has(k));
+  check(missingInRenderAudit.length === 0 && unknownInRenderAudit.length === 0,
+    `render-audit-checklist.mjs THEMES drifted from POPUP_THEME_MAP: missing=[${missingInRenderAudit.join(", ")}], unknown=[${unknownInRenderAudit.join(", ")}]`);
+
+  const resolveSelOnHost = (raw, hostRgb) => {
+    if (/^#[0-9a-fA-F]{6}$/.test(raw)) return hexToRgb(raw);
+    if (/^#[0-9a-fA-F]{8}$/.test(raw)) {
+      const fgRgb = hexToRgb(raw.slice(0, 7));
+      const alpha = parseInt(raw.slice(7, 9), 16) / 255;
+      return fgRgb.map((c, i) => Math.round(c * alpha + hostRgb[i] * (1 - alpha)));
+    }
+    return null;
+  };
+  const pilotDir = resolve(root, "docs/theme-surface/pilots");
+  const selectionViolations = [];
+  for (const name of readdirSync(pilotDir).filter((f) => f.endsWith(".tokens.json")).sort()) {
+    const pilot = JSON.parse(readFileSync(resolve(pilotDir, name), "utf8"));
+    const modesToCheck = [["base", pilot.palette]];
+    if (pilot.modes?.dark?.palette) modesToCheck.push(["dark", { ...pilot.palette, ...pilot.modes.dark.palette }]);
+    for (const [label, pal] of modesToCheck) {
+      if (!pal?.["selection-bg"] || !pal["selection-bg"].startsWith("#")) continue;
+      const bgRgb = hexToRgb(pal.bg);
+      const surfRgb = hexToRgb(pal["bg-surface"]);
+      const selOnBg = resolveSelOnHost(pal["selection-bg"], bgRgb);
+      const selOnSurf = resolveSelOnHost(pal["selection-bg"], surfRgb);
+      if (selOnBg && contrast(selOnBg, bgRgb) <= 1.02) {
+        selectionViolations.push(`${name} (${label}): selection-bg ${pal["selection-bg"]} is indistinguishable from bg ${pal.bg}`);
+      }
+      if (selOnSurf && contrast(selOnSurf, surfRgb) <= 1.02) {
+        selectionViolations.push(`${name} (${label}): selection-bg ${pal["selection-bg"]} is indistinguishable from bg-surface ${pal["bg-surface"]}`);
+      }
+    }
+  }
+  check(selectionViolations.length === 0, `site pilot ::selection visibility failure: [${selectionViolations.join("; ")}]`);
+
+  const ptBtnRules = parseStyleRules(ptControlsCss).filter((r) =>
+    r.context.length === 0 && r.selectors.some((s) => s.includes(".btn:not(") && s.includes(".action-btn:not(")));
+  check(ptBtnRules.length === 3, `platinum-controls.css: expected 3 .btn/.action-btn push-button rules (rest/hover/active), found ${ptBtnRules.length}`);
+  for (const r of ptBtnRules) {
+    const btnBranch = r.selectors.find((s) => s.includes(".btn:not("));
+    const spec = selectorSpecificity(btnBranch);
+    check(spec[0] === 0 && btnBranch.includes(".saved-success") && btnBranch.includes(".save-error"),
+      `platinum-controls.css:${r.lineNum}: .btn push-button selector must have 0 ID specificity (got (${spec.join(",")})) and exclude .saved-success/.save-error so #submit-btn state feedback is never overwritten`);
+  }
+
+  const ptLibScrollPad = declarationValueMap(
+    ptControlsCss,
+    'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) :is(.vocab-detail-pane, .notes-detail-pane, .ask-library-pane, .vocab-list-pane, .notes-list-pane, .ask-library-index)',
+    { context: ["@media (min-width: 861px)"] },
+  );
+  check(parseInt(ptLibScrollPad.get("scroll-padding-top") || "0", 10) >= 24,
+    "platinum-controls.css: Library panes with sticky ::before titlebars must set scroll-padding-top >= 24px at min-width: 861px");
 }
 
 // --- popup-theme-early.js: mirror "1" picks sync directly, zero local.get calls ---
@@ -7874,7 +7938,7 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   const isItalicDecl = (d) =>
     (d.property === "font-style" && /^(italic|oblique)/i.test(d.value)) ||
     (d.property === "font" && /\b(italic|oblique)\b/i.test(d.value));
-  const italicFiles = [["popup.css", popupCss], ["options.css", optionsCss], ["library.css", libraryCss], ["md-preview.css", mdCss]];
+  const italicFiles = [["popup.css", popupCss], ["options.css", optionsCss], ["library.css", libraryCss], ["md-preview.css", mdCss], ["platinum-controls.css", read("platinum-controls.css")]];
   for (const [fileName, css] of italicFiles) {
     const allowed = ITALIC_ALLOWLIST[fileName] || {};
     for (const rule of parseStyleRules(css)) {

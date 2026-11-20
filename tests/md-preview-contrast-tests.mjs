@@ -339,6 +339,11 @@ const PAIRS = [
     text: "bq-fg", fill: "bq-bg", min: 4.5,
     note: "blockquotes -- #rendered-view blockquote ~:744.",
   },
+  {
+    id: "fg/selection",
+    text: "fg", fill: "selection", min: 4.5,
+    note: "document-wide ::selection { background: var(--selection); color: var(--fg); } across prose, rail, Ask, and Explain.",
+  },
 ];
 
 // No stop-line exemption: every pair in PAIRS, including the pressed-state
@@ -440,6 +445,134 @@ const stripState = (s) => s.replace(STATE_RE, "").replace(/\s+/g, " ").trim();
   check(checked >= 120, `rule scan checked only ${checked} pairs (134 when written) -- the CSS walker likely broke`);
   for (const must of [".toc-list a.active", ".rail-kbd-help-btn:hover", ".rail-kbd-help-btn:focus-visible", ".toggle-btn.active", ".typo-seg-btn[aria-pressed=\"true\"]", ".pbv-back-current:hover"]) {
     check(seen.has(must), `rule scan: expected consumer ${must} was not checked -- renamed, or its fill/colour no longer resolves`);
+  }
+  const selRule = live.find((r) => r.sels.includes("::selection"));
+  const selDecls = selRule ? declsOf(selRule.body) : {};
+  check(selDecls.background === "var(--selection)" && selDecls.color === "var(--fg)",
+    `md-preview.css: document-wide ::selection must declare background: var(--selection) and color: var(--fg) so rail/Ask/Explain selections clear AA in both modes (got background=${selDecls.background}, color=${selDecls.color})`);
+}
+
+// ---- Platinum 4-surface (--pt-*) + Reader bridge WCAG AA & parity gate ------
+// platinum-controls.css sits outside docs/theme-surface/tools/contrast-audit.mjs;
+// verify here that:
+//   (a) html[data-reader-theme="platinum"] overlaid on md-preview.css :root
+//       clears all PAIRS above in both light and dark modes;
+//   (b) html[data-theme="platinum-light"] and html[data-theme="platinum-dark"]
+//       agree 1:1 with html[data-reader-theme="platinum"] on every shared --pt-*
+//       custom property (zero light/dark palette drift across surfaces);
+//   (c) all Platinum --pt-* text/link/chip/danger/selection pairs clear 4.5:1.
+{
+  const ptPath = resolve(root, "platinum-controls.css");
+  const ptCss = readFileSync(ptPath, "utf8");
+  const ptRules = parseStyleRules(ptCss);
+  const tokenMapFor = (selector) => {
+    const map = new Map();
+    for (const r of ptRules) {
+      if (r.context.length === 0 && r.selectors.length === 1 && r.selectors[0] === selector) {
+        for (const d of parseDeclarations(r.body)) {
+          if (d.property.startsWith("--")) map.set(d.property.slice(2), d.value.trim());
+        }
+      }
+    }
+    return map;
+  };
+  const ptLight = tokenMapFor('html[data-theme="platinum-light"]');
+  const ptDark = tokenMapFor('html[data-theme="platinum-dark"]');
+  const ptReader = tokenMapFor('html[data-reader-theme="platinum"]');
+  check(ptLight.size >= 45 && ptDark.size >= 45 && ptReader.size >= 60,
+    `platinum-controls.css: unexpected token block sizes (light=${ptLight.size}, dark=${ptDark.size}, reader=${ptReader.size})`);
+
+  const resolveFromMap = (map, raw, mode, seen = new Set()) => {
+    const s = raw.trim();
+    const ld = s.match(/^light-dark\((.+)\)$/s);
+    if (ld) {
+      const [lightV, darkV] = splitTopLevel(ld[1]);
+      return resolveFromMap(map, mode === "light" ? lightV : darkV, mode, seen);
+    }
+    const v = s.match(/^var\((.+)\)$/s);
+    if (v) {
+      const [nameRaw, ...fb] = splitTopLevel(v[1]);
+      const name = nameRaw.trim().replace(/^--/, "");
+      if (map.has(name)) {
+        if (seen.has(name)) throw new Error(`circular var(--${name})`);
+        return resolveFromMap(map, map.get(name), mode, new Set(seen).add(name));
+      }
+      if (fb.length) return resolveFromMap(map, fb.join(","), mode, seen);
+      throw new Error(`UNRESOLVABLE var(--${name})`);
+    }
+    const hex = hexRgb(s);
+    if (hex) return hex;
+    const rgba = rgbaColor(s);
+    if (rgba) return rgba.alpha >= 1 ? rgba.rgb : mix([255, 255, 255], rgba.rgb, rgba.alpha);
+    throw new Error(`UNRESOLVABLE "${s}"`);
+  };
+
+  // (a) Platinum Reader overlaid onto md-preview.css :root
+  const mergedReader = new Map([...TOKENS, ...ptReader]);
+  console.log("\nplatinum-controls.css [data-reader-theme=\"platinum\"] contrast pairs (WCAG AA 4.5:1)\n");
+  for (const pair of PAIRS) {
+    for (const mode of MODES) {
+      const textExpr = typeof pair.text === "string" ? mergedReader.get(pair.text) : pair.text.expr;
+      const fillExpr = mergedReader.get(pair.fill);
+      const ratio = contrastRatio(resolveFromMap(mergedReader, textExpr, mode), resolveFromMap(mergedReader, fillExpr, mode));
+      const ok = ratio >= pair.min;
+      console.log(`${ok ? "OK  " : "FAIL"} pt-reader:${pair.id.padEnd(20)} ${mode.padEnd(5)} ${ratio.toFixed(2)}:1  (>= ${pair.min}:1)`);
+      check(ok, `platinum-controls.css [data-reader-theme="platinum"] ${pair.id} fails in ${mode} mode: ${ratio.toFixed(2)}:1 < ${pair.min}:1`);
+    }
+  }
+
+  // (b) 1:1 parity on shared --pt-* tokens across extension surfaces vs Reader
+  for (const [k, readerVal] of ptReader.entries()) {
+    if (!k.startsWith("pt-")) continue;
+    check(ptLight.has(k) && ptDark.has(k), `platinum-controls.css: --${k} is in [data-reader-theme="platinum"] but missing in platinum-light or platinum-dark`);
+    if (!ptLight.has(k) || !ptDark.has(k)) continue;
+    const rLight = JSON.stringify(resolveFromMap(ptReader, readerVal, "light"));
+    const rDark = JSON.stringify(resolveFromMap(ptReader, readerVal, "dark"));
+    const sLight = JSON.stringify(resolveFromMap(ptLight, ptLight.get(k), "light"));
+    const sDark = JSON.stringify(resolveFromMap(ptDark, ptDark.get(k), "dark"));
+    check(rLight === sLight && rDark === sDark,
+      `platinum-controls.css: --${k} drifted between surface blocks (${ptLight.get(k)} / ${ptDark.get(k)}) and reader block (${readerVal})`);
+  }
+
+  // (c) Platinum 4-surface --pt-* WCAG AA contrast pairs
+  const PT_PAIRS = [
+    ["pt-ink", "pt-win", 4.5],
+    ["pt-ink", "pt-dialog", 4.5],
+    ["pt-ink", "pt-paper", 4.5],
+    ["pt-ink", "pt-group-bg", 4.5],
+    ["pt-ink", "pt-face", 4.5],
+    ["pt-ink", "pt-face-hover", 4.5],
+    ["pt-ink-muted", "pt-win", 4.5],
+    ["pt-ink-muted", "pt-dialog", 4.5],
+    ["pt-ink-muted", "pt-paper", 4.5],
+    ["pt-ink-muted", "pt-group-bg", 4.5],
+    ["pt-ink-muted", "pt-face", 4.5],
+    ["pt-ink-hint", "pt-win", 4.5],
+    ["pt-ink-hint", "pt-dialog", 4.5],
+    ["pt-ink-hint", "pt-paper", 4.5],
+    ["pt-ink-hint", "pt-group-bg", 4.5],
+    ["pt-link", "pt-win", 4.5],
+    ["pt-link", "pt-dialog", 4.5],
+    ["pt-link", "pt-paper", 4.5],
+    ["pt-link", "pt-group-bg", 4.5],
+    ["pp-link", "pp-bg", 4.5],
+    ["pt-chip-fg", "pt-chip-bg", 4.5],
+    ["pt-chip-fg", "pt-chip-hover", 4.5],
+    ["pt-chip-checked-fg", "pt-chip-checked-bg", 4.5],
+    ["pt-pressed-fg", "pt-pressed-bg", 4.5],
+    ["pt-sel-fg", "pt-sel-bg", 4.5],
+    ["pt-sel-fg", "pt-sel-hover", 4.5],
+    ["pt-danger-fg", "pt-face", 4.5],
+    ["pt-danger-fg", "pt-face-hover", 4.5],
+    ["pt-danger-fg", "pt-paper", 4.5],
+  ];
+  for (const [mode, map] of [["light", ptLight], ["dark", ptDark]]) {
+    for (const [fgKey, bgKey, min] of PT_PAIRS) {
+      const ratio = contrastRatio(resolveFromMap(map, map.get(fgKey), mode), resolveFromMap(map, map.get(bgKey), mode));
+      check(ratio >= min, `platinum-${mode}: --${fgKey} (${map.get(fgKey)}) on --${bgKey} (${map.get(bgKey)}) = ${ratio.toFixed(2)}:1 < ${min}:1`);
+    }
+    const solidDangerRatio = contrastRatio([255, 255, 255], resolveFromMap(map, map.get("pt-danger-bg"), mode));
+    check(solidDangerRatio >= 4.5, `platinum-${mode}: #ffffff on --pt-danger-bg (${map.get("pt-danger-bg")}) = ${solidDangerRatio.toFixed(2)}:1 < 4.5:1`);
   }
 }
 

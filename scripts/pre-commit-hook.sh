@@ -38,6 +38,7 @@ UI_HTML_CHANGED=$(printf '%s
 ' "$STAGED" | grep -E "$UI_HTML_RE")
 UI_VOCAB_CHANGED=$(printf '%s
 ' "$STAGED" | grep -E "$UI_VOCAB_RE")
+READER_CONTRAST_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(md-preview\.css|platinum-controls\.css|tests/md-preview-contrast-tests\.mjs)$')
 AUDIT_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(audit[^/]*|ui-render-audit|qa-drive|options-help-render-audit)\.mjs|tests/(audit[^/]*-tests|pinboard-theme-render-tests|render-audit-checklist)\.mjs|scripts/(verify|pre-commit-hook)\.sh)$')
 # Registers group: the five registers, the lint and its tests, plus the files
 # freshness-ledger.md is checked against (ai.js holds the provider registry,
@@ -65,7 +66,7 @@ SETTINGS_SCHEMA_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(settings
 TYPECHECK_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^((vocab-store|bookmark-services|export-targets|dict-archive|ask-archive|notes-sync)\.js|scripts/(typecheck-data-layer\.mjs|jsconfig\.data-layer\.json|types/data-layer-globals\.d\.ts)|tests/typecheck-data-layer-tests\.mjs|\.qa-scan/package(-lock)?\.json)$')
 RUNTIME_MESSAGES_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^([^/]+\.js|scripts/(runtime-messages-source|sync-runtime-messages)\.mjs|tests/runtime-messages-tests\.mjs)$')
 HARD_RULES_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '[^[:space:]]' | grep -vE '^vendor/')
-if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ] && [ -z "$SENTINEL_CHANGED" ] && [ -z "$AI_PROVIDERS_CHANGED" ] && [ -z "$SETTINGS_SCHEMA_CHANGED" ] && [ -z "$TYPECHECK_CHANGED" ] && [ -z "$RUNTIME_MESSAGES_CHANGED" ] && [ -z "$HARD_RULES_CHANGED" ]; then
+if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$READER_CONTRAST_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ] && [ -z "$SENTINEL_CHANGED" ] && [ -z "$AI_PROVIDERS_CHANGED" ] && [ -z "$SETTINGS_SCHEMA_CHANGED" ] && [ -z "$TYPECHECK_CHANGED" ] && [ -z "$RUNTIME_MESSAGES_CHANGED" ] && [ -z "$HARD_RULES_CHANGED" ]; then
   exit 0
 fi
 
@@ -445,6 +446,14 @@ if [ -n "$UI_VOCAB_CHANGED" ]; then
   if ! node "$REPO_ROOT/scripts/ui-vocabulary-lint.mjs"; then
     echo ""
     echo "[ui-vocabulary] COMMIT BLOCKED — a new structural class token; reuse a registered primitive or register it (docs/theme-surface/ui-vocabulary.json + COMPONENTS.md §10)" >&2
+    exit 1
+  fi
+fi
+if [ -n "$READER_CONTRAST_CHANGED" ]; then
+  echo "[md-preview-contrast] checking WCAG AA contrast across md-preview.css and platinum-controls.css"
+  if ! node "$REPO_ROOT/tests/md-preview-contrast-tests.mjs"; then
+    echo ""
+    echo "[md-preview-contrast] COMMIT BLOCKED — a reader or Platinum token/raised-fill contrast pair fell below AA" >&2
     exit 1
   fi
 fi

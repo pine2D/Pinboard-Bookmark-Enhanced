@@ -44,8 +44,8 @@ function features(name) {
   return [...new Set(out)];
 }
 const sourcePatterns = {
-  popup: ['popup*.js', 'popup.html', 'popup.css'], options: ['options*.js', 'options.html', 'options.css'],
-  library: ['library*.js', 'library.html', 'library.css'], 'md-preview': ['md-*.js', 'md-preview.html', 'md-preview.css'],
+  popup: ['popup*.js', 'popup.html', 'popup.css', 'platinum-controls.css'], options: ['options*.js', 'options.html', 'options.css', 'platinum-controls.css'],
+  library: ['library*.js', 'library.html', 'library.css', 'platinum-controls.css'], 'md-preview': ['md-*.js', 'md-preview.html', 'md-preview.css', 'platinum-controls.css'],
   pinboard: ['pinboard-*.js'], background: ['background.js', 'shared.js', 'manifest.json'],
   tooling: ['scripts/audit*.mjs', 'tests/audit*-tests.mjs'],
 };

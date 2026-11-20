@@ -165,7 +165,7 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 | background.js、manifest.json、SW 用 importScripts 载入的数据模块（bookmark-services / vocab-store / notes-sync / dict-archive / ask-archive 及其 *-gdrive.js、restore-points.js、wayback.js）、pinboard-style.js、pinboard-sort.js、bili-player-bridge.js | `.claude/rules/mv3.md` |
 | 四个表面 HTML/CSS、platinum-controls.css、popup.js、popup-*.js、options.js、options-*.js、library.js、library-*.js、listbox.js、shared.js、md-*.js（UI 文本、字体栈、图标） | `.claude/rules/ui-fonts-icons.md` |
 | 四个表面 HTML/CSS、platinum-controls.css、shared.js、listbox.js、ui-vocabulary.json 与基线（新增任何 UI 元素；library 运行时创建值盒子的 library.js / library-vocab.js / library-notes.js 也要先读） | `.claude/rules/ui-primitives.md` |
-| docs/theme-surface/**、popup.css、options.css、library.css、platinum-controls.css、pinboard-themes.js、render-audit 家族（ui-render-audit / audit-render-scenarios / render-audit-ledger / checklist / known-failures）、ui-contract-tests、theme-*-tests | `.claude/rules/theme-factory.md` |
+| docs/theme-surface/**、popup.css、options.css、library.css、platinum-controls.css、pinboard-themes.js、render-audit 家族（ui-render-audit / audit-render-scenarios / render-audit-ledger / checklist / known-failures）、ui-contract-tests、md-preview-contrast-tests、theme-*-tests | `.claude/rules/theme-factory.md` |
 | scripts/audit*.mjs、tests/audit*-tests.mjs、qa-drive、ci-fonts、verify.sh、.qa-scan/run-test.mjs、slice-anchor-lint、coverage-report、tests/fixtures/chrome-mock.js（选审计场景、`--font=ci`、新测试怎么写） | `.claude/rules/audit.md` |
 | vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js、options-vocab.js、library-vocab.js、library-notes.js、md-highlight.js、anki-connect.js、eudic-sync.js、vocab-send.js | `.claude/rules/vocab-sync.md` |
 | vocab-gdrive.js、notes-gdrive.js、dict-archive-gdrive.js、ask-archive-gdrive.js、options-vocab.js、library.js、background.js、tests/ 下的 vocab-gdrive-tests.html、notes-gdrive-tests.html、options-drive-sync-tests.html、drive-scopes-tests.html、drive-migration-tests.html（连接层 / 身份缓存 / 错误码 / OAuth / 权限） | `.claude/rules/drive-sync.md` |
@@ -181,6 +181,7 @@ popup / options / library 的 UI 文本不能回退到慢字体：字面 emoji/d
 | README*.md、_locales/**、docs/privacy.md、docs/index.md | `.claude/rules/l10n.md` |
 | scripts/cws-shots.mjs、scripts/readme-shots*.mjs、docs/cws-assets/**、docs/screenshots/readme/**、.qa-scan/promo-video/**（商店图、README 图、宣传片） | `.claude/rules/promo-assets.md` |
 | 发版、bump 版本、打 tag、release.sh、ZIP / CWS、弄清 pre-commit 分路 | `.claude/skills/release/SKILL.md` |
+| 新增或升级主题预设、跨表面样式精修、排查 pinboard.in 页面或立体与平铺主题兼容 | `.claude/skills/theme-surface/SKILL.md` |
 | 任何真实 AI API 调用或测试 | `.claude/skills/live-ai-test/SKILL.md` |
 | 新增、改期或退役一次性迁移 | `.claude/expiring-items.md` |
 | 提新功能、做界面评审或审计、给评审类子代理写提示词 | `.claude/decisions.md` |

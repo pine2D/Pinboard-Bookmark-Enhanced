@@ -73,6 +73,9 @@ export function inferAuditImpact(catalog, changes, { consumers = [] } = {}) {
       isolated = !!mapped;
       reason = mapped ? 'additive icons (' + icons.join(', ') + ') traced to AST consumers' : 'shared dependency could not be safely narrowed; include all consumers';
       if (traced?.uncertain) warnings.push(...traced.reasons.map(r => `${path}: ${r.path}: ${r.reason}`));
+    } else if (path === 'platinum-controls.css') {
+      surfaces = ['popup', 'options', 'library', 'md-preview'];
+      reason = 'shared Platinum chrome stylesheet: popup, options, library, and reader consumers';
     } else if (/^docs\/theme-surface\/(composers|pilots)\//.test(path) || /^(popup|options|library)\.css$/.test(path) && /@generated:/.test(change.patch || '')) {
       surfaces = /ui-components|ui-themes/.test(path) ? ['popup', 'options', 'library'] : ['popup', 'options', 'library', 'pinboard'];
       reason = 'theme generation dependency';

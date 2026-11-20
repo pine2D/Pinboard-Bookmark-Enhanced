@@ -174,5 +174,12 @@ test('every html test suite and coverage fixture declares a valid positive-integ
 test('a change to the mutation check tool recommends only its own self-test', () => {
   const impact = inferAuditImpact(catalog, [{ path: 'scripts/mutate-check.mjs' }]);
   assert.deepEqual(impact.ids, ['test.mutate-check']);
-  assert.deepEqual(impact.warnings, []);
+  assert.equal(impact.warnings.length, 0);
+});
+test('platinum-controls.css routes to all four UI surfaces, render scenarios, and contrast/contract gates without unmapped warnings', () => {
+  const impact = inferAuditImpact(catalog, [{ path: 'platinum-controls.css' }]);
+  assert.equal(impact.warnings.length, 0);
+  for (const id of ['test.ui-contract', 'test.md-preview-contrast', 'render.popup.default', 'render.options.default', 'render.library.default', 'render.md-preview.sweep.reader']) {
+    assert.ok(impact.ids.includes(id), `platinum-controls.css must schedule ${id}`);
+  }
 });

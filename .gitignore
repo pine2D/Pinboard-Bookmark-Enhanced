@@ -14,6 +14,7 @@ release/
 .claude/skills/*
 !.claude/skills/release/
 !.claude/skills/live-ai-test/
+!.claude/skills/theme-surface/
 .claude/scheduled_tasks.lock
 
 # CodeGraph local index (regenerable; machine-local socket/pid/db)

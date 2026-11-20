@@ -78,6 +78,9 @@ if (governed) {
   addGate("layout-lint", "docs/theme-surface/tools/layout-lint.mjs");
   addGate("ui-vocabulary", "scripts/ui-vocabulary-lint.mjs");
 }
+if (/^(?:md-preview|platinum-controls)\.css$/.test(rel)) {
+  addGate("md-preview-contrast", "tests/md-preview-contrast-tests.mjs");
+}
 if (themeCssGoverned) {
   addGate("layout-lint", "docs/theme-surface/tools/layout-lint.mjs");
   addGate("css-region-audit", "docs/theme-surface/tools/css-region-audit.mjs");

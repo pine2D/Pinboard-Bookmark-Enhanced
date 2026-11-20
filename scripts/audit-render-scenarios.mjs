@@ -144,7 +144,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
 });
 
 function files(surface) {
-  return [`${surface}.html`, `${surface}.css`, `${surface}.js`, ...(surface === 'md-preview' ? ['md-*.js'] : surface === 'library' ? ['library-*.js', 'scripts/audit-ask-history-fixture.mjs'] : [])];
+  return [`${surface}.html`, `${surface}.css`, 'platinum-controls.css', `${surface}.js`, ...(surface === 'md-preview' ? ['md-*.js'] : surface === 'library' ? ['library-*.js', 'scripts/audit-ask-history-fixture.mjs'] : [])];
 }
 function row(id, surface, themes, extra) {
   return { id, runner: 'render', surfaces: [surface], files: files(surface), dependencies: [],

@@ -591,6 +591,22 @@ bypass any of this with `--no-verify` — if a check fires it's a real bug.
    browsers silently fall back to CSS initial — invisible to drift-guard.
    `token-coverage` catches this.
 
+6. **Invisible `::selection` on secondary surfaces.** Ensure `selection-bg` is
+   perceptually distinct (`> 1.02:1` luminance contrast) from **both** `bg` and
+   `bg-surface` in every mode (`flexoki` once set light `selection-bg` equal to
+   `bg-surface` `#F2F0E5`, turning selected text invisible inside `#right_bar`,
+   forms, `pre`, and `code`). `tests/ui-contract-tests.mjs` now gates all pilots.
+
+7. **Extension registration wiring (`POPUP_THEME_MAP` & `THEMES`).** Adding a
+   pilot file alone does **not** wire extension surfaces: register the runtime
+   `data-theme` ID(s) in `composers/popup-chrome.mjs` (`POPUP_THEME_MAP`),
+   `composers/options-chrome.mjs`, `composers/library-chrome.mjs`, and
+   `tests/render-audit-checklist.mjs` (`THEMES` — enforced 1:1 against
+   `POPUP_THEME_MAP` by `tests/ui-contract-tests.mjs`). If the preset is an
+   adaptive light+dark umbrella, also wire `ADAPTIVE_THEME_MAP` in `shared.js`
+   plus its early-boot twins (`popup-theme-early.js`, `options-theme-early.js`),
+   and never introduce an orthogonal UI-style setting outside `themePresetKey`.
+
 ---
 
 ## 9 · Visual smoke test
@@ -599,13 +615,18 @@ bypass any of this with `--no-verify` — if a check fires it's a real bug.
    refresh icon on the unpacked extension card).
 2. Open Pinboard and switch your theme in the extension options.
 3. Compare against `docs/theme-surface/snapshots/` and `.qa-scan/` for the
-   reference state of the 14 pages × hover/focus/selection.
+   reference state across Pinboard's full page matrix × hover/focus/selection.
 
-The four pages most worth checking by eye:
-- `home` — bookmark list, tag cloud, pagination
-- `add` (popup) — form inputs, submit buttons
-- `settings` — heavyweight forms, `.settings_heading`
-- `tweets` — right_bar-heavy layout, sort tables
+Check beyond the primary list view — Pinboard serves 18 distinct page templates
+with quirks that broke early theme passes:
+- `home` (`/u:<user>/`) — bookmark list, `#tag_cloud`, `#top_next_prev`, inline `.bookmark > #edit_bookmark_form` (must stay `flex: 0 0 100%; max-width: 100%; box-sizing: border-box` inside flex `.bookmark` rows)
+- `search` (`/search/`) — uses `#search_right_bar` (not `#right_bar`!) and floats `#top_next_prev` right (`#bookmarks` / `> p` / `.bookmark` must `clear: both` so the first `.display` never indents rightward)
+- `network` (`/network/`) — floated `#top_next_prev` + `.user_navbar`
+- `popular` (`/popular/`) — nests `#right_bar` *inside* `#main_column` (`position: absolute; left: 710px; width: 320px`; needs static flow fallback below `1060px`)
+- `profile` (`/u:<user>/profile/`) — `#profile_left_column > div:not(.service_box):first-child` summary box + `.service_box` cards
+- `notes` (`/u:<user>/from:notes/` & `/note/<id>/`) — Pinboard emits unclosed `<div class="note">` wrappers that nest subsequent rows inside one another (`#bookmarks .note .note` must neutralize double borders/backgrounds) + `#note_body_box`
+- `tabs` (`/tabs/`), `bundles` (`/bundles/`), `tweets` (`/tweets/`) — `#right_bar` table `tr[onmouseover]`, empty `#right_column` suppression, `.tab_set`
+- `settings` (`/settings/*`), `howto` (`/howto/`), `resources`, `add` (`/add` popup form) — heavyweight forms, `.settings_heading`, standalone submit rows
 
 ### Automated cross-theme screenshot (`screenshot-themes.mjs`)
 
@@ -633,7 +654,7 @@ google-chrome --remote-debugging-port=9222 \
 **Run** (every time you want a sweep):
 
 ```bash
-# Default: all 13 themes, viewport-only, screenshots to .qa-scan/visual-qa-YYYY-MM-DD/
+# Default: all shipped themes, viewport-only, screenshots to .qa-scan/visual-qa-YYYY-MM-DD/
 node docs/theme-surface/tools/screenshot-themes.mjs
 
 # Subset of themes
@@ -713,7 +734,7 @@ kinds generically and blocks the commit on any drift.
 
 If you need a rule that doesn't fit the composer:
 
-- **Pinboard site theme, all 13 themes** → add it to `composers/classic-list-v2.mjs`
+- **Pinboard site theme, all shipped themes** → add it to `composers/classic-list-v2.mjs`
   (or `_patterns.mjs` if it should be opt-in per theme).
 - **Pinboard site theme, one theme only** → add it to that theme's
   `pilots/<slug>.tokens.json` `overrides.css` string.
