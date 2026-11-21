@@ -26,6 +26,7 @@ function ownership(name) {
   if (/^library-/.test(name)) return ['library'];
   if (/^md-|^reader-|^bili-|^frame-|^dict-/.test(name)) return ['md-preview'];
   if (/^pinboard-/.test(name)) return ['pinboard'];
+  if (name === 'theme-platinum-render') return ui;
   if (/^theme-/.test(name)) return ['popup', 'options', 'library', 'pinboard'];
   if (/^ui-|^i18n-|^a11y|^contrast|^confirm-layout|^escape-html/.test(name)) return ui;
   if (/^vocab-|^notes-|^drive-|^anki-|^eudic-/.test(name)) return ['background', 'library', 'options', 'md-preview'];
@@ -56,8 +57,8 @@ export const TEST_SCENARIOS = testFiles.filter(name => name !== 'pinboard-theme-
   const file = 'tests/' + name;
   return {
     id: 'test.' + base, runner: name.endsWith('.html') ? 'html' : 'node', file,
-    surfaces, features: features(base), kinds: ['popup-label-fit', 'confirm-layout'].includes(base) ? ['layout', 'i18n'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history', 'bookmark-service-runtime', 'upgrade-path'].includes(base) ? 'logic' : 'contract'],
-    browser: ['popup-label-fit', 'confirm-layout', 'ask-history', 'library-ask-history', 'bookmark-service-runtime', 'bookmark-live-preflight', 'upgrade-path'].includes(base),
+    surfaces, features: features(base), kinds: ['popup-label-fit', 'confirm-layout'].includes(base) ? ['layout', 'i18n'] : base === 'theme-platinum-render' ? ['layout', 'contract'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history', 'bookmark-service-runtime', 'upgrade-path'].includes(base) ? 'logic' : 'contract'],
+    browser: ['popup-label-fit', 'confirm-layout', 'theme-platinum-render', 'ask-history', 'library-ask-history', 'bookmark-service-runtime', 'bookmark-live-preflight', 'upgrade-path'].includes(base),
     files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base === 'ai-providers-source' ? ['scripts/ai-providers-source.mjs', 'scripts/sync-ai-providers.mjs'] : []), ...(base === 'settings-schema' ? ['scripts/settings-schema.mjs', 'scripts/sync-settings-schema.mjs'] : []), ...(base === 'typecheck-data-layer' ? ['scripts/typecheck-data-layer.mjs', 'scripts/jsconfig.data-layer.json', 'scripts/types/data-layer-globals.d.ts', 'vocab-store.js', 'bookmark-services.js', 'export-targets.js', 'dict-archive.js', 'ask-archive.js', 'notes-sync.js'] : []), ...(base === 'runtime-messages' ? ['scripts/runtime-messages-source.mjs', 'scripts/sync-runtime-messages.mjs'] : []), ...(base === 'hard-rules-lint' ? ['scripts/hard-rules-lint.mjs', 'scripts/commit-msg-lint.mjs', 'scripts/commit-msg-hook.sh'] : []), ...(base === 'bookmark-live-preflight' ? ['scripts/bookmark-service-live.mjs'] : []), ...(base === 'mutate-check' ? ['scripts/mutate-check.mjs'] : []), ...(base === 'upgrade-path' ? ['restore-points.js', 'vocab-store.js', 'notes-sync.js', 'dict-archive.js', 'ask-archive.js', '.claude/store-ledger.md'] : []), ...(/^dict-(?:entry|usage|evidence|archive)$/.test(base) ? ['dict-entry.js', 'dict-evidence.js', 'dict-archive.js'] : []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
     dependencies: [], axes: {},
   };

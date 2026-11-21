@@ -562,6 +562,8 @@ const stripState = (s) => s.replace(STATE_RE, "").replace(/\s+/g, " ").trim();
     ["pt-pressed-fg", "pt-pressed-bg", 4.5],
     ["pt-sel-fg", "pt-sel-bg", 4.5],
     ["pt-sel-fg", "pt-sel-hover", 4.5],
+    ["pt-sel-muted", "pt-sel-bg", 4.5],
+    ["pt-sel-muted", "pt-sel-hover", 4.5],
     ["pt-danger-fg", "pt-face", 4.5],
     ["pt-danger-fg", "pt-face-hover", 4.5],
     ["pt-danger-fg", "pt-paper", 4.5],
@@ -573,6 +575,30 @@ const stripState = (s) => s.replace(STATE_RE, "").replace(/\s+/g, " ").trim();
     }
     const solidDangerRatio = contrastRatio([255, 255, 255], resolveFromMap(map, map.get("pt-danger-bg"), mode));
     check(solidDangerRatio >= 4.5, `platinum-${mode}: #ffffff on --pt-danger-bg (${map.get("pt-danger-bg")}) = ${solidDangerRatio.toFixed(2)}:1 < 4.5:1`);
+  }
+
+  // (d) Neutral R=G=B chassis & Gray monochrome selection lock across all 3 token blocks
+  // Every non-semantic Platinum token (chassis, surfaces, wells, scrollbars, chips, pressed,
+  // active menu/row highlights, and ::selection) must resolve to exact R=G=B with zero hue cast.
+  const SEMANTIC_COLOR_KEYS = new Set([
+    "pp-link", "pt-link", "pt-link-hover", "pt-focus",
+    "pt-danger-bg", "pt-danger-fg", "pt-danger-bd", "pt-notice-bg",
+    "link", "link-hover", "link-on-raised", "success", "on-success", "danger",
+  ]);
+  const NON_COLOR_KEYS = new Set(["radius-sm", "radius-md", "radius-lg"]);
+  for (const [blockLabel, map, modes] of [
+    ["platinum-light", ptLight, ["light"]],
+    ["platinum-dark", ptDark, ["dark"]],
+    ["platinum-reader", ptReader, ["light", "dark"]],
+  ]) {
+    for (const [k, raw] of map.entries()) {
+      if (SEMANTIC_COLOR_KEYS.has(k) || NON_COLOR_KEYS.has(k)) continue;
+      for (const mode of modes) {
+        const [r, g, b] = resolveFromMap(map, raw, mode);
+        check(r === g && g === b,
+          `platinum-controls.css (${blockLabel}/${mode}): neutral Gray token --${k} (${raw}) resolved to non-R=G=B rgb(${r}, ${g}, ${b})`);
+      }
+    }
   }
 }
 

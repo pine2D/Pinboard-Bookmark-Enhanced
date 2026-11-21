@@ -10,6 +10,7 @@ import * as uiDerive from "../docs/theme-surface/composers/_ui-derive.mjs";
 import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-chrome.mjs";
 import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
 import { composeLibraryThemeMap } from "../docs/theme-surface/composers/library-chrome.mjs";
+import { patternsLayer } from "../docs/theme-surface/composers/_patterns.mjs";
 import { THEMES as RENDER_AUDIT_THEMES } from "./render-audit-checklist.mjs";
 import { checkAiProviderSync } from "../scripts/sync-ai-providers.mjs";
 import { checkSettingsSchemaSync } from "../scripts/sync-settings-schema.mjs";
@@ -5653,16 +5654,18 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
 
   // 8c) Boolean .btn partition completeness, .vocab-group-step passenger exclusion, optical-hang reset & Reader --danger bridge:
   const ptReaderRoot = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"]');
-  const ptHangStart = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) :is(.lib-hang-start, .vocab-manage-row > .vocab-manage-groups:not([hidden]) + .vocab-edit-groups, #vocab-ref-result .xp-dict-more)');
+  const ptHangStart = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) :is(.lib-hang-start, .vocab-manage-row > .vocab-manage-groups:not([hidden]) + .vocab-edit-groups)');
+  const ptHangDictMore = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) #vocab-ref-result .xp-dict-more');
   const ptHangEnd = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .lib-hang-end');
   const hasDangerGhostExclusionHole = ptRules.some((r) => r.selectors.some((s) => /\.btn\.danger:not\([^)]*\.ghost/.test(s)));
   const excludesGroupStepPassenger = ptRules.some((r) => r.selectors.some((s) => /\.btn:not\([^)]*\.vocab-group-step/.test(s)));
   check(ptReaderRoot.has("--danger") &&
     ptHangStart.get("margin-inline-start") === "0" &&
+    ptHangDictMore.get("margin-inline-start") === "0" &&
     ptHangEnd.get("margin-inline-end") === "0" &&
     !hasDangerGhostExclusionHole &&
     excludesGroupStepPassenger,
-    "platinum-controls.css: must bridge Reader --danger, zero .lib-hang-start/.lib-hang-end margins, cover .btn.danger.ghost without exclusion holes, and exclude .vocab-group-step from standalone .btn bevels");
+    "platinum-controls.css: must bridge Reader --danger, zero .lib-hang-start/.lib-hang-end/#vocab-ref-result .xp-dict-more margins, cover .btn.danger.ghost without exclusion holes, and exclude .vocab-group-step from standalone .btn bevels");
 
   // 8d) Promoted link-button bevel clearance, #export-summary group-shadow exclusion, & sunken list-row exclusion gate:
   // Any text button whose flat-surface base rule resets `padding: 0` must restore >=6px horizontal
@@ -5673,7 +5676,7 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
   const ptReaderMore = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .xp-dict-more');
   const ptPopupUtil = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) :is(button.add-all-link, button.regen-link, button.clear-all-link, button.offline-clear)');
   const ptMsgBarPlain = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .msg-bar');
-  const ptMsgBarScoped = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .msg-bar:not(#export-summary)');
+  const ptMsgBarScoped = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .msg-bar:not(:where(#export-summary))');
   const readerExportSummary = declarationValueMap(fiveSheets[3][1], "#export-summary");
   const readerExpScope = declarationValueMap(fiveSheets[3][1], ".exp-scope");
   const minHorizPadPx = (map) => {
@@ -5705,19 +5708,21 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     patternsComposerSrc.includes("@supports selector(::picker(select))") &&
     patternsComposerSrc.includes(":is(:open, :open:hover):not(:disabled)") &&
     patternsComposerSrc.includes('input[type="checkbox"], input[type="radio"]') &&
-    patternsComposerSrc.includes("background-clip: content-box, border-box") &&
+    patternsComposerSrc.includes('input[type="checkbox"]:indeterminate::after') &&
+    patternsComposerSrc.includes("scrollbar-color: auto !important") &&
+    patternsComposerSrc.includes("background-clip: content-box, content-box, border-box") &&
     patternsComposerSrc.includes("inset 0 0 0 1px ${chipBorder}, inset 2px 2px 0 ${chipGlint}") &&
     patternsComposerSrc.includes("#search_right_bar::before") &&
     patternsComposerSrc.includes("#profile_left_column > div:first-child:not(.service_box)::before") &&
     patternsComposerSrc.includes(".bookmark > #edit_bookmark_form { flex: 1 1 0% !important;"),
-    "composers (classic-list-v2.mjs / _patterns.mjs): must clear #top_next_prev float gap, style #search_right_bar & #profile_left_column card, flex-fit .bookmark > #edit_bookmark_form, and keep Platinum controls intact");
+    "composers (classic-list-v2.mjs / _patterns.mjs): must clear #top_next_prev float gap, style #search_right_bar & #profile_left_column card, flex-fit .bookmark > #edit_bookmark_form, reset scrollbar-color:auto, and keep Platinum controls intact");
 
   // 8f) Platinum Reader .doc-body must preserve video-mode dual-column workspace width:
   const ptVideoDocBody = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] body.video-mode:not(.raw-active) .doc-body');
   check(ptVideoDocBody.get("max-width") === "min(2160px, 100%)",
     'platinum-controls.css: html[data-reader-theme="platinum"] body.video-mode:not(.raw-active) .doc-body must keep max-width: min(2160px, 100%)');
 
-  // 8g) Platinum 5-surface ::selection parity, 20x20 compact icon-button tier + ::before (-3px) hit box,
+  // 8g) Platinum 5-surface Gray ::selection parity, 20x20 compact icon-button tier + ::before (-3px) hit box,
   //     lightweight #reader-bookmark-section > .bookmark-badge (no .rail-ident a.bookmark-badge),
   //     squared highlight swatches, quiet .hl-item-del, & #kbd-help-pop uncapped viewport height:
   const ptSelLight = declarationValueMap(ptControlsCss, 'html[data-theme="platinum-light"] ::selection');
@@ -5735,15 +5740,16 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
   const popupHeaderIc = declarationValueMap(fiveSheets[0][1], ".header-bar .header-ic");
   const popupHeaderIcBefore = declarationValueMap(fiveSheets[0][1], ".header-bar .header-ic::before");
   const ptPopupHeaderIc = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .header-bar .header-ic');
-  const ptHlDots = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] :is(#pb-hl-bar .pb-hl-dot, #pb-hl-card .hl-card-dot)');
+  const ptHlBarDot = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] #pb-hl-bar .pb-hl-dot');
+  const ptHlCardDot = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] #pb-hl-card .hl-card-dot');
   const ptHlList = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .hl-list:not(:empty)');
   const ptHlItemDelRest = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .hl-item-del');
   const hlCardNote = declarationValueMap(fiveSheets[3][1], ".hl-card-note");
   const kbdHelpPop = declarationValueMap(fiveSheets[3][1], "#kbd-help-pop");
   check(
-    ptSelLight.get("background") === "#ccccff" && ptSelLight.get("color") === "#000000" &&
-    ptSelDark.get("background") === "#3d3dad" && ptSelDark.get("color") === "#ffffff" &&
-    ptReaderRoot.get("--selection") === "light-dark(#ccccff, #3d3dad)" &&
+    ptSelLight.get("background") === "#b8b8b8" && ptSelLight.get("color") === "#111111" &&
+    ptSelDark.get("background") === "#383838" && ptSelDark.get("color") === "#ffffff" &&
+    ptReaderRoot.get("--selection") === "light-dark(#b8b8b8, #383838)" &&
     ptSelReader.get("background") === "var(--selection)" &&
     !fiveSheets[3][1].includes(".rail-ident a.bookmark-badge") &&
     !ptControlsCss.includes(".rail-ident a.bookmark-badge") &&
@@ -5755,12 +5761,12 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     popupHeaderIc.get("width") === "var(--pp-control-h-sm)" && popupHeaderIc.get("height") === "var(--pp-control-h-sm)" &&
     popupHeaderIcBefore.get("inset") === "-3px" &&
     ptPopupHeaderIc.get("box-shadow") === "var(--pt-mini-bevel)" &&
-    ptHlDots.get("border-radius") === "2px" &&
+    ptHlBarDot.get("border-radius") === "2px" && ptHlCardDot.get("border-radius") === "2px" &&
     ptHlList.get("background") === "var(--pt-paper)" &&
     ptHlItemDelRest.get("box-shadow") === "none" &&
     hlCardNote.get("field-sizing") === "content" && hlCardNote.has("max-height") &&
     kbdHelpPop.get("max-height") === "calc(100dvh - 2 * var(--sp-4))",
-    "platinum-controls.css / md-preview.css / popup.css: compact secondary icon buttons must unify on 20x20 (+ ::before -3px & Platinum --pt-mini-bevel), .bookmark-badge must live inside #reader-bookmark-section without .rail-ident duplication, and Platinum ::selection / highlight / #kbd-help-pop invariants must hold");
+    "platinum-controls.css / md-preview.css / popup.css: compact secondary icon buttons must unify on 20x20 (+ ::before -3px & Platinum --pt-mini-bevel), .bookmark-badge must live inside #reader-bookmark-section without .rail-ident duplication, and Platinum Gray ::selection / highlight / #kbd-help-pop invariants must hold");
 
   // 8h) Systemic retrospective guardrails:
   //   (i)   POPUP_THEME_MAP <-> render-audit-checklist.mjs THEMES completeness (only platinum-light/dark may opt out as windowed 3D exception);
@@ -5824,6 +5830,150 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
   );
   check(parseInt(ptLibScrollPad.get("scroll-padding-top") || "0", 10) >= 24,
     "platinum-controls.css: Library panes with sticky ::before titlebars must set scroll-padding-top >= 24px at min-width: 861px");
+
+  // 8i) Self-contained platinum-ui static anti-trap & Gray zero-purple gates:
+  //   (1) Zero purple/lavender across platinum-controls.css, platinum-{light,dark}.tokens.json,
+  //       composePatterns() output, and shipped PINBOARD_THEMES["platinum-*"].css;
+  //   (2) R=G=B neutral lock on Platinum pilot neutral palette & ui.popup keys;
+  //   (3) Recursive :is()/:not() un-:where()'d #id specificity guard across all rules in platinum-controls.css;
+  //   (4) ::before/::after box-sizing: border-box guard when setting width/height/inset;
+  //   (5) box-shadow bevel occlusion guard (no solid inset 0 0 0 <N>px before inset ±1/2px bevel);
+  //   (6) Reader & Library prose/video polish (.pbv-play 3px bevel, framed 1px tables + 6px/10px padding, sunken pre + opaque .pb-copy-code).
+  const FORBIDDEN_PURPLE_RE = /#(?:9999ff|ccccff|dcdcff|333399|3d3dad|4b4bb8|5c5c9e|9e9eff|9494ff|a9a9ff|b3b3ff|32325c|2b2b4e|6666aa|8585cc|b4b4ff|282831|353540|2b2b34|1f1f26|2a2a33)\b/i;
+  const ptLightPilotRaw = read("docs/theme-surface/pilots/platinum-light.tokens.json");
+  const ptDarkPilotRaw = read("docs/theme-surface/pilots/platinum-dark.tokens.json");
+  const ptLightPilot = JSON.parse(ptLightPilotRaw);
+  const ptDarkPilot = JSON.parse(ptDarkPilotRaw);
+  const shippedSiteThemes = runInNewContext(`${read("pinboard-themes.js")}; PINBOARD_THEMES`);
+  const purpleSources = [
+    ["platinum-controls.css", ptControlsCss.replace(/\/\*[\s\S]*?\*\//g, "")],
+    ["platinum-light.tokens.json", ptLightPilotRaw],
+    ["platinum-dark.tokens.json", ptDarkPilotRaw],
+    ["patternsLayer(platinum-light)", patternsLayer(ptLightPilot).replace(/\/\*[\s\S]*?\*\//g, "")],
+    ["patternsLayer(platinum-dark)", patternsLayer(ptDarkPilot).replace(/\/\*[\s\S]*?\*\//g, "")],
+    ["pinboard-themes.js#platinum-light", shippedSiteThemes["platinum-light"].css.replace(/\/\*[\s\S]*?\*\//g, "")],
+    ["pinboard-themes.js#platinum-dark", shippedSiteThemes["platinum-dark"].css.replace(/\/\*[\s\S]*?\*\//g, "")],
+  ];
+  const purpleHits = [];
+  for (const [label, src] of purpleSources) {
+    if (FORBIDDEN_PURPLE_RE.test(src)) purpleHits.push(label);
+  }
+  check(FORBIDDEN_PURPLE_RE.test("#ccccff") && FORBIDDEN_PURPLE_RE.test("#333399") && !FORBIDDEN_PURPLE_RE.test("#1d4496") && purpleHits.length === 0,
+    `Platinum Gray zero-purple ban violated in: [${purpleHits.join("; ")}]`);
+
+  const NEUTRAL_PILOT_KEYS = [
+    "bg", "bg-surface", "fg", "fg-strong", "muted", "muted-soft", "metadata-fg",
+    "border", "border-subtle", "btn-bg", "btn-bg-hover", "btn-fg",
+    "sidebar-btn-bg", "sidebar-btn-hover", "sidebar-tag-fg", "sidebar-tag-hover",
+    "tag-fg", "selection-bg", "selection-fg", "scrollbar-track", "scrollbar-thumb", "scrollbar-thumb-hover",
+  ];
+  const nonNeutralPilotHits = [];
+  for (const [label, pilot] of [["platinum-light", ptLightPilot], ["platinum-dark", ptDarkPilot]]) {
+    for (const k of NEUTRAL_PILOT_KEYS) {
+      const hex = pilot.palette?.[k];
+      if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) continue;
+      const [r, g, b] = hexToRgb(hex);
+      if (r !== g || g !== b) nonNeutralPilotHits.push(`${label}.palette.${k}=${hex}`);
+    }
+    for (const [mode, overrides] of Object.entries(pilot.ui?.popup || {})) {
+      for (const [k, hex] of Object.entries(overrides || {})) {
+        if (k === "accent" || k === "on-accent" || k === "link" || !/^#[0-9a-fA-F]{6}$/.test(hex)) continue;
+        const [r, g, b] = hexToRgb(hex);
+        if (r !== g || g !== b) nonNeutralPilotHits.push(`${label}.ui.popup.${mode}.${k}=${hex}`);
+      }
+    }
+  }
+  check(nonNeutralPilotHits.length === 0,
+    `Platinum pilot R=G=B neutral chassis lock violated: [${nonNeutralPilotHits.join("; ")}]`);
+
+  const stripWhereBlocks = (sel) => {
+    let out = "";
+    for (let i = 0; i < sel.length;) {
+      if (sel.slice(i, i + 7).toLowerCase() === ":where(") {
+        i = closeOfBracket(sel, i + 6) + 1;
+      } else {
+        out += sel[i++];
+      }
+    }
+    return out;
+  };
+  const hasUnwrappedIdInIsOrNot = (sel) => {
+    const clean = stripWhereBlocks(sel);
+    for (let i = 0; i < clean.length; i++) {
+      if (clean[i] !== ":") continue;
+      const m = /^:(?:is|not)\(/i.exec(clean.slice(i));
+      if (!m) continue;
+      const open = i + m[0].length - 1;
+      const close = closeOfBracket(clean, open);
+      const inner = clean.slice(open + 1, close);
+      // Skip attribute selectors [href="#fn:"] before checking #id tokens
+      let scrubbed = "";
+      for (let j = 0; j < inner.length;) {
+        if (inner[j] === "[") j = closeOfBracket(inner, j) + 1;
+        else scrubbed += inner[j++];
+      }
+      if (/#[A-Za-z_-]/.test(scrubbed)) return true;
+    }
+    return false;
+  };
+  const scanPtStaticAntiTraps = (cssText) => {
+    const issues = [];
+    for (const r of parseStyleRules(cssText)) {
+      const decls = new Map(parseDeclarations(r.body).map((d) => [d.property, d.value.trim()]));
+      const boxShadow = decls.get("box-shadow");
+      if (boxShadow && boxShadow.includes("inset")) {
+        const layers = splitSelectorList(boxShadow);
+        const rings = layers.map((l, idx) => {
+          const m = /^inset\s+0(?:px)?\s+0(?:px)?\s+0(?:px)?\s+([1-9]\d*(?:\.\d+)?)px\b/.exec(l);
+          return m ? { idx, w: parseFloat(m[1]) } : null;
+        }).filter(Boolean);
+        const bevels = layers.map((l, idx) => {
+          const m = /^inset\s+-?([12])px\s+-?[12]px\b/.exec(l);
+          return m ? { idx, w: parseFloat(m[1]) } : null;
+        }).filter(Boolean);
+        if (rings.some((rg) => bevels.some((bv) => bv.idx > rg.idx && bv.w <= rg.w))) {
+          issues.push(`line ${r.lineNum}: box-shadow places solid inset ring before inner bevel (${boxShadow})`);
+        }
+      }
+      const sizesPseudo = decls.has("width") || decls.has("height") || decls.has("inset");
+      for (const sel of r.selectors) {
+        if (hasUnwrappedIdInIsOrNot(sel)) {
+          issues.push(`line ${r.lineNum} (${sel}): un-:where()'d #id inside :is()/:not() inflates specificity`);
+        }
+        if (/::(?:before|after)\b/.test(sel) && sizesPseudo && decls.get("box-sizing") !== "border-box") {
+          issues.push(`line ${r.lineNum} (${sel}): sized ::before/::after missing box-sizing: border-box`);
+        }
+      }
+    }
+    return issues;
+  };
+  check(
+    scanPtStaticAntiTraps(".x:is(.a, #b) { color: #222; }").length === 1 &&
+    scanPtStaticAntiTraps(".x:is(.a, .b:not(#c)) { color: #222; }").length === 1 &&
+    scanPtStaticAntiTraps(".x::before { width: 12px; height: 12px; }").length === 1 &&
+    scanPtStaticAntiTraps(".bad { box-shadow: inset 0 0 0 1px #000, inset 1px 1px 0 #fff; }").length === 1 &&
+    scanPtStaticAntiTraps(".ok-chip { box-shadow: inset 0 0 0 1px #000, inset 2px 2px 0 #fff; }").length === 0 &&
+    scanPtStaticAntiTraps("#c :is(.a, :where(#d), a[href^=\"#fn:\"])::before { width: 12px; box-sizing: border-box; }").length === 0,
+    "ui-contract: scanPtStaticAntiTraps self-test regressed");
+  const ptAntiTrapHits = scanPtStaticAntiTraps(ptControlsCss);
+  check(ptAntiTrapHits.length === 0,
+    `platinum-controls.css static anti-trap violations: [${ptAntiTrapHits.join("; ")}]`);
+
+  const ptPbvPlay = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .pbv-play');
+  const ptReaderPre = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] #rendered-view pre');
+  const ptCopyCode = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .pb-copy-code');
+  const ptReaderTbl = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] #rendered-view table');
+  const ptAskTbl = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] #ask-thread table');
+  const ptLibAskTbl = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .ask-library-answer table');
+  const ptReaderCells = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] #rendered-view :is(th, td, :is(th, td):is(:first-child, :last-child))');
+  const ptLibAskCells = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .ask-library-answer :is(th, td, :is(th, td):is(:first-child, :last-child))');
+  check(
+    ptPbvPlay.get("border-radius") === "3px" && (ptPbvPlay.get("box-shadow") || "").includes("var(--pt-btn-shadow)") &&
+    ptReaderPre.get("border-radius") === "0" && ptReaderPre.get("box-shadow") === "var(--pt-well-shadow)" &&
+    ptCopyCode.get("opacity") === "1" &&
+    ptReaderTbl.get("border-radius") === "0" && ptAskTbl.get("border-radius") === "0" && ptLibAskTbl.get("border-radius") === "0" &&
+    ptReaderCells.get("padding") === "6px 10px" && ptLibAskCells.get("padding") === "6px 10px",
+    "platinum-controls.css: .pbv-play must be a 3px beveled button, #rendered-view pre must be a 0px sunken well with opaque .pb-copy-code, and Reader/Library tables must be 0px framed grids with 6px 10px cell padding");
 }
 
 // --- popup-theme-early.js: mirror "1" picks sync directly, zero local.get calls ---

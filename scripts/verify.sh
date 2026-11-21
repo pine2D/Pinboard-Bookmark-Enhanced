@@ -432,6 +432,7 @@ gate static node "tests/theme-ui-derive-tests.mjs"
 gate static node "tests/theme-media-audit-tests.mjs"
 # Renders every site theme in Chromium, so it is a render gate.
 gate render node "tests/pinboard-theme-render-tests.mjs"
+gate render node "tests/theme-platinum-render-tests.mjs"
 gate static node "tests/theme-override-debt-tests.mjs"
 gate static node "tests/theme-sync-check-tests.mjs"
 gate static node "docs/theme-surface/tools/diff-all.mjs" --strict

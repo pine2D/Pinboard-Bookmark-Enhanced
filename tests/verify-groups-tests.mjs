@@ -247,6 +247,10 @@ test('the hard-rules gate runs in the static group', () => {
   for (const c of HARD_RULES_COMMANDS) assert.ok(full.commands.some((x) => x.command === c && x.group === 'static'), `${c} must be a static gate`);
 });
 
+test('the theme-platinum-render gate runs in the render group', () => {
+  assert.ok(full.commands.some((x) => x.command === 'node tests/theme-platinum-render-tests.mjs' && x.group === 'render'), 'node tests/theme-platinum-render-tests.mjs must be a render gate');
+});
+
 test('the glob gates follow the directory', () => {
   const tests = readdirSync(join(ROOT, 'tests'));
   const scopes = tests.filter((n) => /^audit.*-tests\.mjs$/.test(n)).map((n) => `node tests/${n}`);

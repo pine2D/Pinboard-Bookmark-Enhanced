@@ -152,6 +152,29 @@ try {
         await page.locator('a.selected').hover();
         await readable(key + ':hover', 'a.selected');
       }
+      if (name === 'editor' && key.startsWith('platinum-')) {
+        const ptFormProbe = await page.evaluate(() => {
+          const cb = document.querySelector('#edit_bookmark_form input[type="checkbox"]');
+          const restCs = getComputedStyle(cb);
+          const restRadius = parseFloat(restCs.borderTopLeftRadius);
+          cb.checked = true;
+          const checkedBg = getComputedStyle(cb).backgroundColor;
+          cb.checked = false;
+          cb.indeterminate = true;
+          const indetBg = getComputedStyle(cb).backgroundColor;
+          const indetDash = parseFloat(getComputedStyle(cb, '::after').borderTopWidth);
+          cb.indeterminate = false;
+          const scrollbarColor = getComputedStyle(document.documentElement).scrollbarColor;
+          return { restRadius, checkedBg, indetBg, indetDash, scrollbarColor };
+        });
+        checks++;
+        const wantPressedBg = key === 'platinum-dark' ? 'rgb(22, 22, 22)' : 'rgb(102, 102, 102)';
+        if (ptFormProbe.scrollbarColor !== 'auto' || ptFormProbe.restRadius !== 0 ||
+            ptFormProbe.checkedBg !== wantPressedBg || ptFormProbe.indetBg !== wantPressedBg ||
+            ptFormProbe.indetDash !== 2) {
+          failures.push(`${key} Platinum scrollbar/checkbox invariant failed: ${JSON.stringify(ptFormProbe)}`);
+        }
+      }
       });
     }
     await run('bulk', async () => {
@@ -182,6 +205,30 @@ try {
     await readable(key, '.star span', 3);
     await page.locator('.private .star').hover();
     await readable(key + ':hover', '.private .star span', 3);
+    if (key.startsWith('platinum-')) {
+      const ptSiteProbe = await page.evaluate(() => {
+        const main = document.getElementById('main_column');
+        const tbl = document.createElement('table');
+        tbl.setAttribute('cellspacing', '0');
+        tbl.innerHTML = '<thead><tr><th>Tab</th><th>URL</th></tr></thead><tbody><tr><td>Saved</td><td>https://example.com</td></tr></tbody>';
+        main.append(tbl);
+        const parsePx = v => parseFloat(v) || 0;
+        const cells = [...tbl.querySelectorAll('th, td')].map(c => {
+          const cs = getComputedStyle(c);
+          return { pl: parsePx(cs.paddingLeft), pr: parsePx(cs.paddingRight), bt: parsePx(cs.borderTopWidth), bb: parsePx(cs.borderBottomWidth) };
+        });
+        const pillLeaks = [...document.querySelectorAll('input:not([type="radio"]), button, select, a.tag, a.url_link')].filter(el => {
+          const cs = getComputedStyle(el);
+          return Math.max(parsePx(cs.borderTopLeftRadius), parsePx(cs.borderTopRightRadius), parsePx(cs.borderBottomRightRadius), parsePx(cs.borderBottomLeftRadius)) >= 8;
+        }).length;
+        tbl.remove();
+        return { cells, pillLeaks };
+      });
+      checks++;
+      if (ptSiteProbe.pillLeaks > 0 || ptSiteProbe.cells.some(c => c.pl < 6 || c.pr < 6 || c.bb < 1) || ptSiteProbe.cells[0].bt < 1) {
+        failures.push(`${key} Platinum residual pill or table[cellspacing] padding/border failed: ${JSON.stringify(ptSiteProbe)}`);
+      }
+    }
     });
     for (const [name, selector] of [['subscriptions', 'a.delete'], ['bundles', 'a.edit, a.destroy']]) {
       await run(name, async () => {
