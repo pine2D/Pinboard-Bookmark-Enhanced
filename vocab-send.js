@@ -133,7 +133,7 @@ async function pbpVocabSendCompleteRows(words, owner, zhMap, tag) {
       definition: w.gloss ?? "",
       note: w.note ?? "",
       contexts: (Array.isArray(w.contexts) ? w.contexts : []).map((context) => {
-        const copy = {};
+        const copy = /** @type {Record<string, any>} */ ({});
         for (const key of ["quote", "articleUrl", "articleTitle", "highlightId", "createdAt"]) {
           if (!context || !Object.hasOwn(context, key)) continue;
           if (key === "articleUrl" && typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(context[key])) continue;
@@ -214,7 +214,14 @@ async function pbpVocabEudicReady() {
 // TSV download. The owner is captured before reading the rows and re-checked
 // after every await and before the Blob is built: never download the previous
 // account's words under the new account's export click.
-async function pbpVocabExportTsv({ flash, flush, format = "legacy" } = {}) {
+/**
+ * @param {{
+ *   flash?: (ok: boolean, text: string) => void,
+ *   flush?: () => Promise<{ ok?: boolean } | null | undefined> | { ok?: boolean } | null | undefined,
+ *   format?: string
+ * }} [opts]
+ */
+async function pbpVocabExportTsv({ flash = () => {}, flush, format = "legacy" } = {}) {
   try {
     if (!(await _pbpVocabSendFlushed(flush, flash))) return;
     const owner = await pbpVocabCurrentOwner();
@@ -230,13 +237,16 @@ async function pbpVocabExportTsv({ flash, flush, format = "legacy" } = {}) {
     const zhTag = await pbpVocabSendEcdictTag();
     if ((await pbpVocabCurrentOwner()) !== owner) { flash(false, t("vocabAccountChanged")); return; }
     const complete = format === "complete";
-    const canonical = complete
-      ? await pbpVocabSendCompleteRows(rows, owner, zhMap, zhTag)
-      : rows.map((w) => pbpVocabSendCanonicalRow(w, zhMap, zhTag));
-    // Hashing adds an asynchronous boundary. A switch during local crypto
-    // must abort before any previous account's content reaches a download.
-    if (complete && (await pbpVocabCurrentOwner()) !== owner) { flash(false, t("vocabAccountChanged")); return; }
-    const tsv = complete ? pbpVocabCompleteTsv(canonical) : pbpDictTsv(canonical);
+    let tsv;
+    if (complete) {
+      const completeRows = await pbpVocabSendCompleteRows(rows, owner, zhMap, zhTag);
+      // Hashing adds an asynchronous boundary. A switch during local crypto
+      // must abort before any previous account's content reaches a download.
+      if ((await pbpVocabCurrentOwner()) !== owner) { flash(false, t("vocabAccountChanged")); return; }
+      tsv = pbpVocabCompleteTsv(completeRows);
+    } else {
+      tsv = pbpDictTsv(rows.map((w) => pbpVocabSendCanonicalRow(w, zhMap, zhTag)));
+    }
     const blob = new Blob([tsv], { type: "text/tab-separated-values" });
     const a = document.createElement("a");
     const d = new Date();
@@ -262,7 +272,14 @@ async function pbpVocabExportTsv({ flash, flush, format = "legacy" } = {}) {
 // dispatch -- the permission dialogs can sit open long enough for an account
 // switch (fail-closed invariant). The caller must reach this with no await of
 // its own in between, or the click's transient activation can lapse.
-async function pbpVocabSendToAnki({ flash, flush, port: clickedPort } = {}) {
+/**
+ * @param {{
+ *   flash?: (ok: boolean, text: string) => void,
+ *   flush?: () => Promise<{ ok?: boolean } | null | undefined> | { ok?: boolean } | null | undefined,
+ *   port?: string | number
+ * }} [opts]
+ */
+async function pbpVocabSendToAnki({ flash = () => {}, flush, port: clickedPort } = {}) {
   try {
     // Options supplies the live field synchronously: reading storage before
     // its auto-save flush could send to an old, still-running Anki instance.
@@ -273,8 +290,9 @@ async function pbpVocabSendToAnki({ flash, flush, port: clickedPort } = {}) {
       ? (await pbpReadSettingsWithSecrets({ dictAnkiPort: SETTINGS_DEFAULTS.dictAnkiPort })).dictAnkiPort
       : clickedPort;
     const pattern = pbpEndpointOriginPattern(pbpAnkiEndpointFor(port));
+    if (!pattern) { flash(false, t("dictAnkiHostPermissionDenied")); return; }
     let granted = false;
-    try { granted = await chrome.permissions.request({ origins: [pattern] }); }
+    try { granted = (await chrome.permissions.request({ origins: [pattern] })) === true; }
     catch (e) {
       console.warn("[vocab] Anki host permission request failed:", e?.name, e?.message);
       flash(false, t("dictAnkiHostPermissionDenied"));
@@ -351,11 +369,18 @@ async function pbpVocabSendToAnki({ flash, flush, port: clickedPort } = {}) {
 // Send-to-Eudic chain: the exact Eudic origin is requested first (user
 // gesture), then the owner's full vocabulary goes out, unsupported languages
 // skipped by pbpEudicSendRows.
-async function pbpVocabSendToEudic({ flash, flush } = {}) {
+/**
+ * @param {{
+ *   flash?: (ok: boolean, text: string) => void,
+ *   flush?: () => Promise<{ ok?: boolean } | null | undefined> | { ok?: boolean } | null | undefined
+ * }} [opts]
+ */
+async function pbpVocabSendToEudic({ flash = () => {}, flush } = {}) {
   try {
     const pattern = pbpEndpointOriginPattern(PBP_EUDIC_ENDPOINT);
+    if (!pattern) { flash(false, t("dictEudicHostPermissionDenied")); return; }
     let granted = false;
-    try { granted = await chrome.permissions.request({ origins: [pattern] }); } catch (e) { console.warn("[vocab] Eudic host permission request failed:", e?.name, e?.message); }
+    try { granted = (await chrome.permissions.request({ origins: [pattern] })) === true; } catch (e) { console.warn("[vocab] Eudic host permission request failed:", e?.name, e?.message); }
     if (!granted) { flash(false, t("dictEudicHostPermissionDenied")); return; }
     if (!(await _pbpVocabSendFlushed(flush, flash))) return;
     const raw = await pbpReadSettingsWithSecrets({ dictEudicToken: SETTINGS_DEFAULTS.dictEudicToken });

@@ -237,6 +237,7 @@ async function pbpAnkiSendRows(rows, opts) {
   const modelName = format === "multilingual" ? PBP_ANKI_MULTILINGUAL_MODEL : PBP_ANKI_MODEL;
   // failedTerms names every counted failure so the UI can say WHICH words
   // need attention -- a bare count sent users re-sending the whole library.
+  /** @type {{ stage: string, added: number, skipped: number, failed: number, failedTerms: string[], error: string | null }} */
   const out = { stage: "", added: 0, skipped: 0, failed: 0, failedTerms: [], error: null };
   let notes;
   try { notes = rows.map((r) => pbpAnkiNoteFromRow(r, deck, format)); }
@@ -282,7 +283,9 @@ async function pbpAnkiSendRows(rows, opts) {
     out.error = pbpAnkiAnsweredError(can);
     return out;
   }
+  /** @type {any[]} */
   const addable = [];
+  /** @type {string[]} */
   const addableTerms = [];
   const seenFirst = new Set();
   for (let i = 0; i < can.result.length; i++) {

@@ -1,7 +1,24 @@
 const PBP_VOCAB_BATCH_SCHEMA = 2;
 const PBP_VOCAB_BATCH_MAX_BYTES = 4 * 1024 * 1024;
+/**
+ * @typedef {{
+ *   kind: string,
+ *   schema: number,
+ *   readSchemas?: readonly number[],
+ *   filePrefix: string,
+ *   validateEvent: (event: any) => boolean,
+ *   validBatchBody: (body: any, ownerHash: string) => boolean
+ * }} PbpDriveProtocol
+ */
+/**
+ * @typedef {{
+ *   beforeRequest?: (() => Promise<boolean> | boolean) | null,
+ *   isCurrent?: (() => boolean) | null
+ * }} PbpDriveRequestGuards
+ */
 // The client and sync runner serve all four library datasets. Vocabulary is
 // their default protocol and store; the other *-gdrive.js files supply their own.
+/** @type {PbpDriveProtocol} */
 const PBP_VOCAB_DRIVE_PROTOCOL = Object.freeze({
   kind: "vocab-batch", schema: PBP_VOCAB_BATCH_SCHEMA, readSchemas: [1, 2], filePrefix: "pbp-vocab",
   validateEvent: (event) => pbpVocabValidateEvent(event),
@@ -90,6 +107,12 @@ function pbpVocabValidateDriveBatch(metadata, body, expectedOwnerHash, protocol 
   return true;
 }
 
+/**
+ * @param {any[]} entries
+ * @param {{ ownerHash: string, deviceId: string, createdAt: number, schema?: number }} envelope
+ * @param {PbpDriveProtocol} [protocol]
+ * @returns {{ ok: true, batches: Array<{ body: string, bytes: number }> } | { ok: false, error: string, recordKey?: string, bytes?: number }}
+ */
 function pbpVocabSplitDriveEntries(entries, envelope, protocol = PBP_VOCAB_DRIVE_PROTOCOL) {
   if (!Array.isArray(entries) ||
       !_pbpVocabOnlyKeys(envelope, ["ownerHash", "deviceId", "createdAt"]) ||
@@ -223,6 +246,17 @@ function _pbpVocabDriveRememberIdentity(token, identity) {
   }
 }
 
+/**
+ * @param {{
+ *   fetchImpl?: typeof fetch,
+ *   identity?: { getAuthToken: (details: { interactive?: boolean }) => Promise<any>, removeCachedAuthToken: (details: { token: string }) => Promise<any> } | null,
+ *   protocol?: PbpDriveProtocol,
+ *   beforeRequest?: (() => Promise<boolean> | boolean) | null,
+ *   now?: () => number,
+ *   random?: () => number,
+ *   timeoutMs?: number
+ * }} [options]
+ */
 function pbpCreateDriveClient({
   fetchImpl = fetch,
   identity = null,
@@ -264,6 +298,14 @@ function pbpCreateDriveClient({
   };
   const tokenValue = (value) => typeof value === "string" ? value : value && value.token;
 
+  /**
+   * @param {string} token
+   * @param {string | URL} url
+   * @param {RequestInit} [init]
+   * @param {string} [fileId]
+   * @param {number} [deadlineMs]
+   * @param {PbpDriveRequestGuards | null} [guards]
+   */
   async function requestWithToken(token, url, init = {}, fileId, deadlineMs = requestTimeoutMs, guards = null) {
     let response;
     if (beforeRequest && !await beforeRequest()) return failure("account_changed", false, undefined, fileId);
@@ -301,7 +343,9 @@ function pbpCreateDriveClient({
   async function mint(interactive, fileId) {
     let token;
     try {
-      token = tokenValue(await identityApi().getAuthToken({ interactive }));
+      const api = identityApi();
+      if (!api) throw new Error("chrome.identity unavailable");
+      token = tokenValue(await api.getAuthToken({ interactive }));
     } catch (error) {
       console.warn("[vocab-drive] token mint failed:", error?.name, error?.message);
       return mintFailure(error, interactive, fileId);
@@ -329,10 +373,12 @@ function pbpCreateDriveClient({
       pbpVocabDriveForgetIdentity(token);
       if (attempt === 1) return failure("auth", false, 401, fileId);
       try {
-        await identityApi().removeCachedAuthToken({ token });
+        const api = identityApi();
+        if (!api) throw new Error("chrome.identity unavailable");
+        await api.removeCachedAuthToken({ token });
         // An explicit Connect renews interactively too: a silent renewal
         // cannot show the consent a lapsed grant needs (A15).
-        token = tokenValue(await identityApi().getAuthToken({ interactive }));
+        token = tokenValue(await api.getAuthToken({ interactive }));
       } catch (error) {
         console.warn("[vocab-drive] token renew failed:", error?.name, error?.message);
         return mintFailure(error, interactive, fileId);
@@ -637,6 +683,10 @@ function pbpCreateDriveClient({
     };
   }
 
+  /**
+   * @param {boolean} [interactive]
+   * @param {PbpDriveRequestGuards} [guardsOpt]
+   */
   async function openSession(interactive = false, {
     beforeRequest: sessionGuard = null, isCurrent: sessionIsCurrent = null
   } = {}) {
@@ -653,8 +703,10 @@ function pbpCreateDriveClient({
       pbpVocabDriveForgetIdentity(token);
       let renewed;
       try {
-        await identityApi().removeCachedAuthToken({ token });
-        renewed = tokenValue(await identityApi().getAuthToken({ interactive: false }));
+        const api = identityApi();
+        if (!api) throw new Error("chrome.identity unavailable");
+        await api.removeCachedAuthToken({ token });
+        renewed = tokenValue(await api.getAuthToken({ interactive: false }));
       } catch (error) {
         console.warn("[vocab-drive] token renew failed:", error?.name, error?.message);
         return mintFailure(error, false, fileId);
@@ -792,11 +844,28 @@ function _pbpVocabDriveDefaultStore() {
   };
 }
 
+/**
+ * @param {{
+ *   client?: ReturnType<typeof pbpCreateDriveClient>,
+ *   store?: Record<string, any>,
+ *   getCurrentLibraryAuth?: () => Promise<any>,
+ *   libraryAuthIsCurrent?: (auth: any) => boolean,
+ *   hashOwner?: (owner: string) => Promise<string>,
+ *   now?: () => number,
+ *   random?: () => number,
+ *   protocol?: PbpDriveProtocol,
+ *   isEnabled?: () => Promise<boolean> | boolean,
+ *   getCurrentPermissionId?: (() => Promise<any>) | null,
+ *   onSession?: ((permissionId: string) => void) | null,
+ *   getScopeEpoch?: (() => any) | null,
+ *   connection?: { get: (ownerHash: string) => Promise<any>, put: (ownerHash: string, state: any) => Promise<boolean> } | null
+ * }} [options]
+ */
 function pbpCreateDriveSyncRunner({
   client = pbpCreateDriveClient(),
   store = _pbpVocabDriveDefaultStore(),
-  getCurrentLibraryAuth,
-  libraryAuthIsCurrent,
+  getCurrentLibraryAuth = async () => null,
+  libraryAuthIsCurrent = () => false,
   hashOwner = pbpVocabOwnerHash,
   now = Date.now,
   random = Math.random,
@@ -888,7 +957,7 @@ function pbpCreateDriveSyncRunner({
       } catch (error) {
         if (typeof error?.code === "string") throw error;
         console.warn("[vocab-drive] store read failed:", error?.name, error?.message);
-        const failure = new Error("Sync store read failed");
+        const failure = /** @type {Error & { code?: string }} */ (new Error("Sync store read failed"));
         failure.code = "local_store";
         throw failure;
       }
@@ -912,7 +981,7 @@ function pbpCreateDriveSyncRunner({
       if (checkDrive && session?.permissionId && getCurrentPermissionId) {
         const verified = await getCurrentPermissionId();
         if (verified && typeof verified === "object" && verified.ok !== true) {
-          const error = new Error("Drive identity verification unavailable");
+          const error = /** @type {Error & { code?: string, retryable?: boolean }} */ (new Error("Drive identity verification unavailable"));
           error.code = verified.error || "remote";
           error.retryable = verified.retryable === true;
           throw error;
@@ -1049,6 +1118,7 @@ function pbpCreateDriveSyncRunner({
       if (!applied?.ok) return normalizedFailure(applied);
       return { ok: true };
     };
+    /** @returns {{ ok: true, metadata: any[], removed: boolean } | { ok: false }} */
     const changesMetadata = (changes, skipSelf, deviceId) => {
       const metadata = [];
       let removed = false;

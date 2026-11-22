@@ -55,7 +55,7 @@ const PBP_RESTORE_POINT_WAIT_MS = 4000;
 function _pbpRestorePointUpgrade(request, oldVersion) {
   const db = request.result;
   const tx = request.transaction;
-  const points = db.objectStoreNames.contains(PBP_RESTORE_POINT_STORE)
+  const points = db.objectStoreNames.contains(PBP_RESTORE_POINT_STORE) && tx
     ? tx.objectStore(PBP_RESTORE_POINT_STORE)
     : db.createObjectStore(PBP_RESTORE_POINT_STORE, { keyPath: "id" });
   if (db.objectStoreNames.contains(PBP_RESTORE_POINT_META_STORE)) return;
@@ -69,7 +69,7 @@ function _pbpRestorePointUpgrade(request, oldVersion) {
   // usable owner or time could never be listed, so it is deleted.
   if (points.indexNames.contains("ownerCreated")) points.deleteIndex("ownerCreated");
   points.openCursor().onsuccess = (event) => {
-    const cursor = event.target.result;
+    const cursor = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (event.target).result;
     if (!cursor) return;
     const record = cursor.value;
     if (record && typeof record.owner === "string" && record.owner &&
@@ -155,7 +155,7 @@ function _pbpRestorePointCanonicalJson(value) {
 async function _pbpRestorePointDigest(payload) {
   const text = _pbpRestorePointCanonicalJson({ h: payload._highlights || null, v: payload._vocabulary || null });
   const bytes = new TextEncoder().encode(text);
-  if (globalThis.crypto?.subtle?.digest) {
+  if (typeof globalThis.crypto?.subtle?.digest === "function") {
     const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
     return "sha256:" + Array.from(hash, (byte) => byte.toString(16).padStart(2, "0")).join("");
   }
@@ -197,7 +197,7 @@ async function _pbpRestorePointReadPayload(owner) {
 }
 
 function _pbpRestorePointId(createdAt) {
-  const random = globalThis.crypto?.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+  const random = typeof globalThis.crypto?.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).slice(2);
   return "rp-" + createdAt + "-" + random;
 }
 
@@ -367,8 +367,9 @@ async function pbpRestorePointMissingCounts(payload, owner) {
   const keys = Object.keys(incoming).filter((key) => key !== "pbp_hl_last_color");
   const stored = keys.length ? await chrome.storage.local.get(keys) : {};
   for (const key of keys) {
-    const merged = pbpAddMissingHighlightBackupRecord(stored[key], incoming[key], scope);
-    if (merged) highlights += merged.items.length - (Array.isArray(stored[key]?.items) ? stored[key].items.length : 0);
+    const existing = /** @type {{ items?: any[] } | undefined} */ (stored[key]);
+    const merged = pbpAddMissingHighlightBackupRecord(existing, incoming[key], scope);
+    if (merged) highlights += merged.items.length - (Array.isArray(existing?.items) ? existing.items.length : 0);
   }
   let vocabulary = 0;
   const records = payload?._vocabulary?.records || [];

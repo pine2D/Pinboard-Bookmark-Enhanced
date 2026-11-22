@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Dev-only JSDoc + strictNullChecks gate over the 6 pure data-layer files
-// (vocab-store.js, bookmark-services.js, export-targets.js, dict-archive.js,
-// ask-archive.js, notes-sync.js). Runs TypeScript's checkJs analyser in-memory
-// with noEmit: true — zero build step, zero emitted files, zero runtime deps.
+// Dev-only JSDoc + strictNullChecks gate over the 19 pure data-layer, sync,
+// backup, vocabulary-send, archive and cache files listed in DATA_LAYER_FILES.
+// Runs TypeScript's checkJs analyser in-memory with noEmit: true — zero build
+// step, zero emitted files, zero runtime deps.
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -19,6 +19,19 @@ export const DATA_LAYER_FILES = Object.freeze([
   'dict-archive.js',
   'ask-archive.js',
   'notes-sync.js',
+  'vocab-gdrive.js',
+  'notes-gdrive.js',
+  'dict-archive-gdrive.js',
+  'ask-archive-gdrive.js',
+  'restore-points.js',
+  'options-backup.js',
+  'anki-connect.js',
+  'eudic-sync.js',
+  'vocab-send.js',
+  'wayback.js',
+  'jina.js',
+  'tag-gov.js',
+  'ai-cache.js',
 ]);
 
 function loadTypeScript(qaRoot) {

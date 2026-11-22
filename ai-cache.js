@@ -397,12 +397,12 @@ async function pbpAiCacheAppend(key, transform, ts) {
 async function pbpAiCacheDelete(key) {
   try {
     const db = await _pbpAiOpenDB();
-    await new Promise((resolve) => {
+    await /** @type {Promise<void>} */ (new Promise((resolve) => {
       const tx = db.transaction(_PBP_AI_STORE, "readwrite");
       const req = tx.objectStore(_PBP_AI_STORE).delete(key);
       req.onsuccess = () => resolve();
       req.onerror = () => { _pbpAiWarn("delete", key, req.error); resolve(); };
-    });
+    }));
   } catch (e) {
     _pbpAiWarn("delete", key, e);
   }

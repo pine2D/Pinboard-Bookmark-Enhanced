@@ -1,5 +1,5 @@
 // Self-tests for scripts/typecheck-data-layer.mjs (dev-only JSDoc + strictNullChecks
-// gate over the 6 pure data-layer files). Node only, 0 slice anchors.
+// gate over the 19 pure data-layer, sync, backup, send, and cache files). Node only, 0 slice anchors.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appendFileSync, copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -42,10 +42,10 @@ function listAllFiles(dir) {
 
 test('live repository pure data-layer passes checkJs + strictNullChecks with zero errors', () => {
   // 最简单漏判反例：jsconfig 漏收某个纯数据层文件，或默认 strictNullChecks 未生效导致真实代码带空指针隐患却静默绿灯。
-  assert.equal(DATA_LAYER_FILES.length, 6);
+  assert.equal(DATA_LAYER_FILES.length, 19);
   const res = runDataLayerTypecheck({ root: ROOT });
   assert.equal(res.ok, true, res.errors.join('\n'));
-  assert.equal(res.checkedFiles, 6);
+  assert.equal(res.checkedFiles, 19);
   assert.deepEqual(res.errors, []);
 });
 
@@ -75,14 +75,16 @@ test('config invariants fail closed if strictNullChecks, noEmit or a required fi
     assert.match(emitEnabled.errors.join('\n'), /noEmit/);
     assert.deepEqual(listAllFiles(dir), beforeFiles, 'typecheck gate must never emit build artifacts');
 
-    // 3. Dropping any of the 6 pure data-layer files from files[] must fail closed.
-    writeFileSync(cfgPath, JSON.stringify({
-      ...baseCfg,
-      files: baseCfg.files.filter((f) => !f.endsWith('notes-sync.js')),
-    }, null, 2));
-    const missingFile = runDataLayerTypecheck({ root: dir, qaRoot: QA_ROOT });
-    assert.equal(missingFile.ok, false);
-    assert.match(missingFile.errors.join('\n'), /notes-sync\.js/);
+    // 3. Dropping any of the 19 checked files from files[] must fail closed.
+    for (const target of ['notes-sync.js', 'vocab-gdrive.js', 'options-backup.js']) {
+      writeFileSync(cfgPath, JSON.stringify({
+        ...baseCfg,
+        files: baseCfg.files.filter((f) => !f.endsWith(target)),
+      }, null, 2));
+      const missingFile = runDataLayerTypecheck({ root: dir, qaRoot: QA_ROOT });
+      assert.equal(missingFile.ok, false);
+      assert.match(missingFile.errors.join('\n'), new RegExp(target.replace('.', '\\.')));
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -104,6 +106,18 @@ test('strictNullChecks and cross-file ambient signatures catch null dereferences
         '  const badProp = stripped.nonExistentField;',
         '  const badArity = pbpBookmarkEndpoint();',
         '  return [badLen, badProp, badArity];',
+        '}',
+      ].join('\n'),
+    );
+    appendFileSync(
+      join(dir, 'options-backup.js'),
+      [
+        '',
+        'function __pbpTypecheckDomProbe() {',
+        '  const unguarded = $id("missing-el").textContent;',
+        '  const providers = pbpSanitizeAiCustomProviders(null);',
+        '  const badCount = providers.length;',
+        '  return [unguarded, badCount];',
         '}',
       ].join('\n'),
     );

@@ -139,17 +139,17 @@ const PBP_BACKUP_OBJECT_SANITIZERS = Object.freeze({
 // be widened by accident. Returns null when the backup carries none, so the
 // import UI can tell "no credential section" from "an empty one".
 function pbpSanitizeBackupSecrets(data) {
-  const keys = {};
+  const keys = /** @type {Record<string, string>} */ ({});
   for (const key of API_KEY_FIELDS) {
     if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
     if (typeof data[key] !== "string") throw pbpBackupValueError(key);
     if (data[key] !== "") keys[key] = data[key];
   }
-  const targets = {};
+  const targets = /** @type {Record<string, Record<string, string>>} */ ({});
   if (Object.prototype.hasOwnProperty.call(data, "exportTargets") && pbpIsPlainRecord(data.exportTargets)) {
     for (const [targetId, cfg] of Object.entries(data.exportTargets)) {
       if (!pbpIsPlainRecord(cfg)) continue;
-      const cleaned = {};
+      const cleaned = /** @type {Record<string, string>} */ ({});
       for (const key of pbpExportTargetSecretKeys(targetId)) {
         if (!Object.prototype.hasOwnProperty.call(cfg, key)) continue;
         if (typeof cfg[key] !== "string") throw pbpBackupValueError(`exportTargets.${targetId}.${key}`);
@@ -165,7 +165,7 @@ function pbpSanitizeBackupSecrets(data) {
 // dropped (optional) collects the keys skipped as invalid without rejecting
 // the file, so the import preview can name them.
 function pbpSanitizeBackupSettings(data, exportableKeys, dropped) {
-  const safe = {};
+  const safe = /** @type {Record<string, any>} */ ({});
   const drop = (key) => { if (Array.isArray(dropped)) dropped.push(key); };
   for (const key of exportableKeys) {
     if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
@@ -426,15 +426,17 @@ async function pbpBackupWriteHighlights(cleaned, ownerScope, verifyOwner, { addM
 // connection prevents adoption; restored data must never hide a populated library.
 async function pbpBackupPersonalLibraryEmpty() {
   const local = await chrome.storage.local.get(null);
-  if (local.vocabDriveConnected || Object.entries(local).some(([key,row]) =>
-      key.startsWith("pbp_hl_") && Array.isArray(row?.items) && row.items.length)) return false;
+  if (local.vocabDriveConnected || Object.entries(local).some(([key, row]) => {
+    const record = /** @type {{ items?: any[] } | null | undefined} */ (row);
+    return key.startsWith("pbp_hl_") && Array.isArray(record?.items) && record.items.length > 0;
+  })) return false;
   if (typeof indexedDB.databases !== "function") return false;
   const databases = await indexedDB.databases();
   for (const [name, store] of [["pbp-vocab","words"],["pbp-dict-archive","records"],["pbp-ask-archive","records"]]) {
     if (!databases.some(db=>db.name===name)) continue;
     const empty = await new Promise((resolve,reject) => {
       const request = indexedDB.open(name);
-      request.onupgradeneeded = () => request.transaction.abort();
+      request.onupgradeneeded = () => request.transaction?.abort();
       request.onerror = () => reject(new Error("library_probe"));
       request.onblocked = () => reject(new Error("library_probe_blocked"));
       request.onsuccess = () => {
@@ -472,7 +474,9 @@ async function pbpBackupLibraryIdentity(prepared, selected, {
     if (apply && !(await persist({personalLibraryAccount:target}))?.ok) throw new Error("personal_library_storage");
     return target;
   };
-  return globalThis.navigator?.locks?.request ? navigator.locks.request("pbp-personal-library",run) : run();
+  return typeof globalThis.navigator?.locks?.request === "function"
+    ? navigator.locks.request("pbp-personal-library", run)
+    : run();
 }
 
 // A list entry's key slot is never replaced by a key that cannot work. The
@@ -514,6 +518,20 @@ async function pbpBackupDropUnboundCustomKeys(batch, listDropped) {
 // Applies the selected sections of one already-preflighted backup. Each
 // section reports its own outcome so a later failure cannot hide earlier
 // committed writes.
+/**
+ * @param {unknown} data
+ * @param {{
+ *   exportableKeys: readonly string[],
+ *   saveOverlayWithFallback?: (css: string) => Promise<{ fellBackToLocal?: boolean } | void>,
+ *   loadThemes?: () => Promise<any>,
+ *   sections?: Record<string, boolean>,
+ *   readCurrentOwner?: () => Promise<string>,
+ *   importVocabulary?: (scope: string, batch: any[], limit: number, opts?: { onlyMissing?: boolean }) => Promise<{ ok?: boolean, processed?: number, written?: number }>,
+ *   onVocabularyProgress?: (done: number, total: number) => void,
+ *   takeRestorePoint?: (reason: string) => Promise<{ id?: string } | null>,
+ *   restorePoint?: boolean
+ * }} options
+ */
 async function pbpApplyBackupPayload(data, {
   exportableKeys,
   saveOverlayWithFallback,
@@ -543,6 +561,7 @@ async function pbpApplyBackupPayload(data, {
   // labels itself "restore-point" is an ordinary import.
   const fromRestorePoint = restorePoint === true;
   if (fromRestorePoint) Object.assign(selected, { settings: false, themes: false, secrets: false });
+  /** @type {{ settings: string, themes: string, highlights: string, vocabulary: string, secrets: string, secretsSkipped: number, vocabularyApplied: number, vocabularyProcessed: number, fromRestorePoint: boolean, restorePointId?: string, bookmarkServiceKept?: { wanted: string, active: string }, libraryAdopted?: boolean, highlightsSkipped?: boolean, statusKey?: string }} */
   const result = {
     settings: "skipped",
     themes: "skipped",
@@ -596,7 +615,7 @@ async function pbpApplyBackupPayload(data, {
       let localOnly = !!importRes.fellBackToLocal;
       if (schemaVersion >= 2) {
         if (customOverlayCSS !== undefined) {
-          const overlayRes = await saveOverlayWithFallback(customOverlayCSS);
+          const overlayRes = saveOverlayWithFallback ? await saveOverlayWithFallback(customOverlayCSS) : null;
           localOnly = localOnly || !!(overlayRes && overlayRes.fellBackToLocal);
         }
       } else {
@@ -622,7 +641,7 @@ async function pbpApplyBackupPayload(data, {
           newOverlay = allowed.some((css) => css && css.trim() === customCSS.trim()) ? "" : customCSS;
         }
         await (await getSettingsStorage()).set({ themePresetKey: resolvedKey || "" });
-        const overlayRes = await saveOverlayWithFallback(newOverlay);
+        const overlayRes = saveOverlayWithFallback ? await saveOverlayWithFallback(newOverlay) : null;
         localOnly = localOnly || !!(overlayRes && overlayRes.fellBackToLocal);
       }
       result.settings = localOnly ? "local-only" : "applied";
@@ -638,7 +657,7 @@ async function pbpApplyBackupPayload(data, {
   // its own, so this needs no area handling of its own.
   if (selected.secrets && prepared.secretData) {
     try {
-      const batch = Object.assign({}, prepared.secretData.keys);
+      const batch = /** @type {Record<string, any>} */ (Object.assign({}, prepared.secretData.keys));
       const keptLocal = await pbpBackupDropUnboundCustomKeys(batch,
         selected.settings === true && (prepared.droppedKeys || []).includes("aiCustomProviders"));
       result.secretsSkipped = keptLocal.length;
@@ -908,11 +927,12 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
   };
   // A restore point holds highlights and vocabulary only, so its preview and
   // result leave the other sections out instead of listing them as empty.
+  /** @param {boolean} libraryOnly @param {Record<string, { enabled?: boolean }>} [sections] */
   const showLibrarySectionsOnly = (libraryOnly, sections) => {
     ["settings", "themes", "secrets"].forEach((key) => {
       const count = $id(`backup-preview-${key}`)?.parentElement;
       if (count) count.hidden = libraryOnly;
-      const pick = $id(`backup-section-${key}`)?.closest(".pref-row");
+      const pick = /** @type {HTMLElement | null | undefined} */ ($id(`backup-section-${key}`)?.closest(".pref-row"));
       if (pick) pick.hidden = libraryOnly;
       const outcome = $id(`backup-result-${key}`)?.parentElement;
       if (outcome) outcome.hidden = libraryOnly;
@@ -920,7 +940,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     // A section the restore point holds nothing of gets no checkbox.
     if (sections) {
       ["highlights", "vocabulary"].forEach((key) => {
-        const pick = $id(`backup-section-${key}`)?.closest(".pref-row");
+        const pick = /** @type {HTMLElement | null | undefined} */ ($id(`backup-section-${key}`)?.closest(".pref-row"));
         if (pick) pick.hidden = libraryOnly && !sections[key]?.enabled;
       });
     }
@@ -1062,7 +1082,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     if (restored) renderResult(restored);
   }
 
-  $id("import-settings").addEventListener("click", () => $id("import-settings-file").click());
+  $id("import-settings")?.addEventListener("click", () => $id("import-settings-file")?.click());
 
   // Last export time and this library's restore points (restore-points.js).
   // Both are local to this device. Rendered at load, after an export, after
@@ -1079,7 +1099,8 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     let lastExport = "";
     try {
       const stored = await chrome.storage.local.get(PBP_BACKUP_LAST_EXPORT_KEY);
-      if (typeof stored?.[PBP_BACKUP_LAST_EXPORT_KEY] === "string") lastExport = stored[PBP_BACKUP_LAST_EXPORT_KEY];
+      const rawLastExport = stored?.[PBP_BACKUP_LAST_EXPORT_KEY];
+      if (typeof rawLastExport === "string") lastExport = rawLastExport;
     } catch (error) {
       console.warn("[backup] last-export read failed:", error?.name, error?.message);
     }
@@ -1318,7 +1339,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
   // A credential-bearing export is the one action here that writes usable
   // secrets to disk, so it gets a stop-and-read step naming what lands in the
   // file. An ordinary export needs no confirmation and gets none.
-  $id("export-settings").addEventListener("click", () => {
+  $id("export-settings")?.addEventListener("click", () => {
     if ($id("opt-backup-include-secrets")?.checked !== true) { runExport(); return; }
     showConfirmPopover($id("export-settings"), {
       msg: t("backupSecretsExportTitle"),
@@ -1351,7 +1372,8 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       const prepared = pbpPreflightBackupPayload(data, exportableKeys);
       const [currentOwner, local] = await Promise.all([
         readOwner().catch(() => ""),
-        chrome.storage.local.get(["optSyncEnabled", ...PBP_LARGE_FALLBACK_KEYS]).catch(() => ({})),
+        chrome.storage.local.get(["optSyncEnabled", ...PBP_LARGE_FALLBACK_KEYS])
+          .catch(() => /** @type {Record<string, unknown>} */ ({})),
       ]);
       if (token !== selectionToken) return;
       selectionText = text;
@@ -1399,8 +1421,9 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     }
   };
 
-  $id("import-settings-file").addEventListener("change", async (e) => {
-    const file = e.target.files[0];
+  $id("import-settings-file")?.addEventListener("change", async (e) => {
+    const input = /** @type {HTMLInputElement | null} */ (e.target);
+    const file = input?.files?.[0];
     if (!file) return;
     const token = beginSelection();
     try {
@@ -1410,7 +1433,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       console.error("[import] failed", err);
       if (token === selectionToken) setStatusIcon($id("import-status"), false, t("importInvalid"));
     }
-    e.target.value = "";
+    if (input) input.value = "";
   });
 
   // Restore goes through the same preview as a file: pick, check, apply.
@@ -1462,10 +1485,10 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       if (token !== selectionToken) return;
       if (beforeApply) { await beforeApply(); applyPaused = true; }
       if (token !== selectionToken) return;
-      const selected = {};
+      const selected = /** @type {Record<string, boolean>} */ ({});
       ["settings", "themes", "highlights", "vocabulary", "secrets"].forEach((key) => {
         const checkbox = $id(`backup-section-${key}`);
-        selected[key] = !!checkbox && checkbox.checked && !checkbox.disabled;
+        selected[key] = checkbox?.checked === true && checkbox.disabled !== true;
       });
       const applied = await pbpApplyBackupPayload(data, {
         exportableKeys,

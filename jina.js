@@ -11,7 +11,7 @@ async function _ensureJinaHostPermission() {
     }
   } catch (_) {}
   if (!has) {
-    const err = new Error("Jina host permission required");
+    const err = /** @type {Error & { code?: string }} */ (new Error("Jina host permission required"));
     err.code = "host_permission";
     throw err;
   }
@@ -26,11 +26,11 @@ async function fetchJinaMarkdown(url, options = {}) {
   if (!forceRefresh) {
     try {
       const data = await chrome.storage.local.get(cacheKey);
-      if (data[cacheKey]) {
-        const { result, timestamp } = data[cacheKey];
+      const cached = /** @type {{ result?: Record<string, any>, timestamp?: number } | undefined} */ (data[cacheKey]);
+      if (cached && cached.result && typeof cached.timestamp === "number") {
         const dur = resolveCacheMs(cacheDuration);
-        if (dur > 0 && Date.now() - timestamp <= dur) {
-          return { ...result, fromCache: true };
+        if (dur > 0 && Date.now() - cached.timestamp <= dur) {
+          return { ...cached.result, fromCache: true };
         }
       }
     } catch (_) {}
@@ -104,7 +104,7 @@ async function _ensureDeepseekFetchHostPermission() {
     console.warn("[deepseek-fetch] permission check failed:", e && e.name);
   }
   if (!has) {
-    const err = new Error("DeepSeek Fetch host permission required");
+    const err = /** @type {Error & { code?: string }} */ (new Error("DeepSeek Fetch host permission required"));
     err.code = "host_permission";
     throw err;
   }
@@ -136,11 +136,11 @@ async function fetchDeepseekMarkdown(url, options = {}) {
   if (!forceRefresh) {
     try {
       const data = await chrome.storage.local.get(cacheKey);
-      if (data[cacheKey]) {
-        const { result, timestamp } = data[cacheKey];
+      const cached = /** @type {{ result?: Record<string, any>, timestamp?: number } | undefined} */ (data[cacheKey]);
+      if (cached && cached.result && typeof cached.timestamp === "number") {
         const dur = resolveCacheMs(cacheDuration);
-        if (dur > 0 && Date.now() - timestamp <= dur) {
-          return { ...result, fromCache: true };
+        if (dur > 0 && Date.now() - cached.timestamp <= dur) {
+          return { ...cached.result, fromCache: true };
         }
       }
     } catch (e) {

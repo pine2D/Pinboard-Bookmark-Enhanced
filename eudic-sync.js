@@ -135,6 +135,7 @@ async function pbpEudicSendRows(rows, opts) {
   const token = (opts && opts.token) || "";
   const ownerCheck = (opts && opts.ownerCheck) || (async () => true);
   const { byLang, unsupported, unsupportedTerms } = pbpEudicPartition(rows);
+  /** @type {{ added: number, skipped: number, unsupported: number, unsupportedTerms: string[], failed: number, failedTerms: string[], forbidden: boolean, generic: boolean, stage: string, error: string | null }} */
   const out = { added: 0, skipped: 0, unsupported, unsupportedTerms, failed: 0, failedTerms: [],
     forbidden: false, generic: false, stage: "done", error: null };
   const batches = [...byLang];

@@ -20,6 +20,19 @@
     "../export-targets.js",
     "../dict-archive.js",
     "../ask-archive.js",
-    "../notes-sync.js"
+    "../notes-sync.js",
+    "../vocab-gdrive.js",
+    "../notes-gdrive.js",
+    "../dict-archive-gdrive.js",
+    "../ask-archive-gdrive.js",
+    "../restore-points.js",
+    "../options-backup.js",
+    "../anki-connect.js",
+    "../eudic-sync.js",
+    "../vocab-send.js",
+    "../wayback.js",
+    "../jina.js",
+    "../tag-gov.js",
+    "../ai-cache.js"
   ]
 }

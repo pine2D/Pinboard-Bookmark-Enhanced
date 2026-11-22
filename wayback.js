@@ -63,7 +63,7 @@ function pbpWaybackBuildRequest(url, s3Key, s3Secret) {
     return {
       url: "https://web.archive.org/save/" + encodeURI(url),
       method: "GET",
-      headers: {},
+      headers: /** @type {Record<string, string>} */ ({}),
       body: null,
       timeoutMs: WAYBACK_ANON_TIMEOUT_MS
     };
@@ -91,7 +91,10 @@ function pbpWaybackBuildRequest(url, s3Key, s3Secret) {
 async function _pbpWaybackRollbackAttempt(key) {
   try {
     const stored = await chrome.storage.local.get({ _waybackAttempts: {} });
-    const attempts = stored._waybackAttempts || {};
+    const rawAttempts = stored._waybackAttempts;
+    const attempts = rawAttempts && typeof rawAttempts === "object"
+      ? /** @type {Record<string, number>} */ (rawAttempts)
+      : {};
     if (key in attempts) {
       delete attempts[key];
       await chrome.storage.local.set({ _waybackAttempts: attempts });

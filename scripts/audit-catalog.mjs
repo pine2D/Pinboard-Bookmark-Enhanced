@@ -5,6 +5,7 @@ import { RENDER_SCENARIOS } from './audit-render-scenarios.mjs';
 import { QA_SCENARIOS } from './audit-qa-scenarios.mjs';
 import { SITE_SCENARIOS } from './audit-site-scenarios.mjs';
 import { HELP_SCENARIOS } from './audit-help-scenarios.mjs';
+import { DATA_LAYER_FILES } from './typecheck-data-layer.mjs';
 
 export const AUDIT_SURFACES = Object.freeze(['popup', 'options', 'library', 'md-preview', 'pinboard', 'background', 'tooling']);
 const ui = ['popup', 'options', 'library', 'md-preview'];
@@ -59,7 +60,7 @@ export const TEST_SCENARIOS = testFiles.filter(name => name !== 'pinboard-theme-
     id: 'test.' + base, runner: name.endsWith('.html') ? 'html' : 'node', file,
     surfaces, features: features(base), kinds: ['popup-label-fit', 'confirm-layout'].includes(base) ? ['layout', 'i18n'] : base === 'theme-platinum-render' ? ['layout', 'contract'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history', 'bookmark-service-runtime', 'upgrade-path'].includes(base) ? 'logic' : 'contract'],
     browser: ['popup-label-fit', 'confirm-layout', 'theme-platinum-render', 'ask-history', 'library-ask-history', 'bookmark-service-runtime', 'bookmark-live-preflight', 'upgrade-path'].includes(base),
-    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base === 'ai-providers-source' ? ['scripts/ai-providers-source.mjs', 'scripts/sync-ai-providers.mjs'] : []), ...(base === 'settings-schema' ? ['scripts/settings-schema.mjs', 'scripts/sync-settings-schema.mjs'] : []), ...(base === 'typecheck-data-layer' ? ['scripts/typecheck-data-layer.mjs', 'scripts/jsconfig.data-layer.json', 'scripts/types/data-layer-globals.d.ts', 'vocab-store.js', 'bookmark-services.js', 'export-targets.js', 'dict-archive.js', 'ask-archive.js', 'notes-sync.js'] : []), ...(base === 'runtime-messages' ? ['scripts/runtime-messages-source.mjs', 'scripts/sync-runtime-messages.mjs'] : []), ...(base === 'hard-rules-lint' ? ['scripts/hard-rules-lint.mjs', 'scripts/commit-msg-lint.mjs', 'scripts/commit-msg-hook.sh'] : []), ...(base === 'bookmark-live-preflight' ? ['scripts/bookmark-service-live.mjs'] : []), ...(base === 'mutate-check' ? ['scripts/mutate-check.mjs'] : []), ...(base === 'upgrade-path' ? ['restore-points.js', 'vocab-store.js', 'notes-sync.js', 'dict-archive.js', 'ask-archive.js', '.claude/store-ledger.md'] : []), ...(/^dict-(?:entry|usage|evidence|archive)$/.test(base) ? ['dict-entry.js', 'dict-evidence.js', 'dict-archive.js'] : []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
+    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base === 'ai-providers-source' ? ['scripts/ai-providers-source.mjs', 'scripts/sync-ai-providers.mjs'] : []), ...(base === 'settings-schema' ? ['scripts/settings-schema.mjs', 'scripts/sync-settings-schema.mjs'] : []), ...(base === 'typecheck-data-layer' ? ['scripts/typecheck-data-layer.mjs', 'scripts/jsconfig.data-layer.json', 'scripts/types/data-layer-globals.d.ts', ...DATA_LAYER_FILES] : []), ...(base === 'runtime-messages' ? ['scripts/runtime-messages-source.mjs', 'scripts/sync-runtime-messages.mjs'] : []), ...(base === 'hard-rules-lint' ? ['scripts/hard-rules-lint.mjs', 'scripts/commit-msg-lint.mjs', 'scripts/commit-msg-hook.sh'] : []), ...(base === 'bookmark-live-preflight' ? ['scripts/bookmark-service-live.mjs'] : []), ...(base === 'mutate-check' ? ['scripts/mutate-check.mjs'] : []), ...(base === 'upgrade-path' ? ['restore-points.js', 'vocab-store.js', 'notes-sync.js', 'dict-archive.js', 'ask-archive.js', '.claude/store-ledger.md'] : []), ...(/^dict-(?:entry|usage|evidence|archive)$/.test(base) ? ['dict-entry.js', 'dict-evidence.js', 'dict-archive.js'] : []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
     dependencies: [], axes: {},
   };
 });
@@ -68,7 +69,7 @@ const staticRow = (id, file, surfaces, inputs, kinds = ['contract'], args = []) 
 });
 export const STATIC_SCENARIOS = [
   staticRow('script-graph', 'scripts/script-graph-lint.mjs', ['background', ...ui], ['*.js'], ['syntax', 'security']),
-  staticRow('typecheck-data-layer', 'scripts/typecheck-data-layer.mjs', ['background', ...ui], ['scripts/jsconfig.data-layer.json', 'scripts/types/data-layer-globals.d.ts', 'vocab-store.js', 'bookmark-services.js', 'export-targets.js', 'dict-archive.js', 'ask-archive.js', 'notes-sync.js'], ['syntax', 'contract']),
+  staticRow('typecheck-data-layer', 'scripts/typecheck-data-layer.mjs', ['background', ...ui], ['scripts/jsconfig.data-layer.json', 'scripts/types/data-layer-globals.d.ts', ...DATA_LAYER_FILES], ['syntax', 'contract']),
   staticRow('ui-vocabulary', 'scripts/ui-vocabulary-lint.mjs', ui, ['*.html', '*.js', 'docs/theme-surface/ui-vocabulary.json']),
   staticRow('layout', 'docs/theme-surface/tools/layout-lint.mjs', ui, ['*.html', '*.css'], ['layout', 'contract']),
   staticRow('network-exits', 'scripts/network-exits-check.mjs', ['background'], ['manifest.json', 'docs/network-exits.json', 'docs/privacy.md', '*.js'], ['security']),
