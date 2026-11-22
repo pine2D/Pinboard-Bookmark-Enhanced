@@ -69,10 +69,12 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const abs = resolve(file);
 const rel = relative(ROOT, abs).split("\\").join("/");
 // These larger suites include real asynchronous DOM/IDB work. Library's
-// 561-row suite measured 38.89s wall time under load; a 45s outer deadline
-// leaves less than 39s for rows after launch/navigation and the 6s diagnostic
-// reserve below. Give only this suite 60s; conversion retains its 45s budget.
-const TEST_TIMEOUT_MS = rel === "tests/library-vocab-tests.html" ? 60000
+// 561-row suite measured 38.89s wall time under load, and ai-cache's 32-case
+// suite drives >32k IDB operations / >1,350 readwrite transactions (~9s idle,
+// ~25-28s under 8-way parallel suite load, exceeding the 30s default's ~20s
+// row-wait budget around case 20-21). Give those two heavy IDB suites 60s;
+// conversion retains its 45s budget.
+const TEST_TIMEOUT_MS = rel === "tests/library-vocab-tests.html" || rel === "tests/ai-cache-tests.html" ? 60000
   : rel === "tests/md-convert-tests.html" ? 45000 : 30000;
 const CLEANUP_TIMEOUT_MS = 5000;
 // Cushion between "the wait-for-rows deadline + the diagnostic sample's own

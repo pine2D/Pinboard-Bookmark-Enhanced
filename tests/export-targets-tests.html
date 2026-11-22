@@ -384,8 +384,8 @@ async function runOptionsTestButtonDeadlineTests() {
     "sanity: >=2 registry rows still define precheckRequest, or this pin would be vacuous");
 
   const handlerStart = optionsSource.indexOf('testBtn.addEventListener("click", async () => {');
-  const handlerEnd = optionsSource.indexOf('testWrap.appendChild(testBtn); testWrap.appendChild(testStatus);', handlerStart);
-  assert(handlerStart >= 0 && handlerEnd > handlerStart,
+  const handlerEnd = optionsSource.indexOf('testWrap.appendChild(testBtn); testWrap.appendChild(testStatus);', handlerStart === -1 ? 0 : handlerStart);
+  assert(handlerStart !== -1 && handlerEnd !== -1 && handlerEnd > handlerStart,
     "K49 anchor: the Test button click handler is still found by this literal shape -- every registry row with precheckRequest (notion, github) is rendered through this single shared handler, so pinning it once covers all of them");
   const handler = optionsSource.slice(handlerStart, handlerEnd);
 
@@ -403,8 +403,8 @@ async function runPopupObsidianTests() {
   section("popup Obsidian click closure");
   const popupSource = await (await fetch("../popup.js")).text();
   const begin = popupSource.indexOf("      const downloadMd = () => {");
-  const end = popupSource.indexOf('\n      // No "Copied" state', begin);
-  if (begin < 0 || end <= begin) throw new Error("popup export closures missing");
+  const end = popupSource.indexOf('\n      // No "Copied" state', begin === -1 ? 0 : begin);
+  if (begin === -1 || end === -1 || end <= begin) throw new Error("popup export closures missing");
   const make = settings => {
     const host = document.createElement("div");
     host.innerHTML = '<div id="md-actions-strip"><button id="md-strip-copy"></button><button id="md-strip-preview"></button><button id="md-strip-dl"></button><button id="md-strip-obsidian"></button></div>';
@@ -453,8 +453,8 @@ async function runPopupObsidianTests() {
 
   section("popup Markdown dependency readiness");
   const loaderBegin = popupSource.indexOf("let _mdConvertLoadPromise = null;");
-  const loaderEnd = popupSource.indexOf("\nlet _turndownLoadPromise", loaderBegin);
-  if (loaderBegin < 0 || loaderEnd <= loaderBegin) throw new Error("popup Markdown loader missing");
+  const loaderEnd = popupSource.indexOf("\nlet _turndownLoadPromise", loaderBegin === -1 ? 0 : loaderBegin);
+  if (loaderBegin === -1 || loaderEnd === -1 || loaderEnd <= loaderBegin) throw new Error("popup Markdown loader missing");
   for (const alreadyConverted of [false, true]) {
     const state = { appended: [], pending: [] };
     const globals = { htmlToMarkdown: alreadyConverted ? () => "" : undefined, marked: undefined, DOMPurify: undefined };
@@ -483,10 +483,22 @@ async function runPopupObsidianTests() {
 }
 
 (async function () {
-  await runSendNetworkPolicyTests();
-  await runOptionsTestButtonDeadlineTests();
-  await runPopupObsidianTests();
-  document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+  try {
+    for (const [label, fn] of [
+      ["runSendNetworkPolicyTests", runSendNetworkPolicyTests],
+      ["runOptionsTestButtonDeadlineTests", runOptionsTestButtonDeadlineTests],
+      ["runPopupObsidianTests", runPopupObsidianTests],
+    ]) {
+      try {
+        await fn();
+      } catch (err) {
+        check(`${label} uncaught error: ${err && err.message ? err.message : String(err)}`, false);
+      }
+    }
+  } finally {
+    document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+    document.title = (fail ? "FAIL " : "PASS ") + "export-targets Tests";
+  }
 })();
 </script>
 </body></html>

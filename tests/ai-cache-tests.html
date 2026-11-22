@@ -17,27 +17,41 @@ async function test(name, fn) {
 async function db() { return _pbpAiOpenDB(); }
 async function clearEntries() {
   const opened = await db();
-  await new Promise((resolve) => {
+  await new Promise((resolve, reject) => {
     const tx = opened.transaction(_PBP_AI_STORE, "readwrite");
     tx.objectStore(_PBP_AI_STORE).clear();
-    tx.oncomplete = resolve; tx.onabort = resolve; tx.onerror = () => {};
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(tx.error || new Error("clearEntries transaction aborted"));
+    tx.onerror = () => {};
   });
 }
 async function seed(entries) {
   const opened = await db();
-  await new Promise((resolve) => {
+  await new Promise((resolve, reject) => {
     const tx = opened.transaction(_PBP_AI_STORE, "readwrite");
     const store = tx.objectStore(_PBP_AI_STORE);
     entries.forEach((entry) => store.put(entry));
-    tx.oncomplete = resolve; tx.onabort = resolve; tx.onerror = () => {};
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(tx.error || new Error("seed transaction aborted"));
+    tx.onerror = () => {};
   });
 }
 async function allEntries() {
   const opened = await db();
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const tx = opened.transaction(_PBP_AI_STORE, "readonly");
     const req = tx.objectStore(_PBP_AI_STORE).getAll();
-    req.onsuccess = () => resolve(req.result || []); req.onerror = () => resolve([]);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error || new Error("allEntries getAll failed"));
+  });
+}
+async function allKeys() {
+  const opened = await db();
+  return new Promise((resolve, reject) => {
+    const tx = opened.transaction(_PBP_AI_STORE, "readonly");
+    const req = tx.objectStore(_PBP_AI_STORE).getAllKeys();
+    req.onsuccess = () => resolve((req.result || []).map(String));
+    req.onerror = () => reject(req.error || new Error("allKeys getAllKeys failed"));
   });
 }
 async function rawEntry(key) {
@@ -57,7 +71,8 @@ const POOL_PREFIXES = [["dict2", "dict2_"], ["dictctx", "dictctx2_"], ["summaryO
 function counts(entries) {
   const result = { dict2: 0, dictctx: 0, summaryOwner: 0, summaryHold: 0, tr: 0, other: 0 };
   for (const entry of entries) {
-    const pool = POOL_PREFIXES.find(([, prefix]) => entry.key.startsWith(prefix));
+    const key = typeof entry === "string" ? entry : entry.key;
+    const pool = POOL_PREFIXES.find(([, prefix]) => key.startsWith(prefix));
     result[pool ? pool[0] : "other"]++;
   }
   return result;
@@ -72,6 +87,7 @@ async function cursorSteps(run) {
 }
 
 (async () => {
+  try {
   await test("schema remains DB version 1 with the existing entries store", async () => {
     const opened = await db();
     assert(opened.version === 1, "version=" + opened.version);
@@ -82,7 +98,7 @@ async function cursorSteps(run) {
     await clearEntries();
     await seed(rows("dict2_en|word", 499, 1));
     await pbpAiCacheSet("dict2_en|word499", "new", 500);
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.dict2 === 500 && count.other === 0, JSON.stringify(count));
   });
 
@@ -90,7 +106,7 @@ async function cursorSteps(run) {
     await clearEntries();
     await seed(rows("dict2_fr|word", 500, 1));
     await pbpAiCacheSet("dict2_fr|newest", "new", 501);
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.dict2 === 500, "dict2=" + count.dict2);
     assert(!await rawEntry("dict2_fr|word0"), "oldest dict2 survived");
     assert(await rawEntry("dict2_fr|newest"), "newest dict2 was evicted");
@@ -100,7 +116,7 @@ async function cursorSteps(run) {
     await clearEntries();
     await seed(rows("dict2_it|word", 500, 100));
     await pbpAiCacheSet("dict2_it|stale-write", "stale", 1);
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.dict2 === 500, "dict2=" + count.dict2);
     assert(!await rawEntry("dict2_it|stale-write"), "oldest new dict2 write survived");
     assert(await rawEntry("dict2_it|word0"), "existing dict2 LRU head was incorrectly evicted");
@@ -110,10 +126,10 @@ async function cursorSteps(run) {
     await clearEntries();
     await seed(rows("skim_test_", 199, 1));
     await pbpAiCacheSet("ask_boundary", "two-hundred", 200);
-    let count = counts(await allEntries());
+    let count = counts(await allKeys());
     assert(count.other === 200, "boundary=" + JSON.stringify(count));
     await pbpAiCacheSet("skim_overflow", "two-hundred-one", 201);
-    count = counts(await allEntries());
+    count = counts(await allKeys());
     assert(count.other === 200 && count.dict2 === 0, "overflow=" + JSON.stringify(count));
     assert(!await rawEntry("skim_test_0"), "oldest other record survived");
   });
@@ -128,11 +144,11 @@ async function cursorSteps(run) {
     await seed(rows("summary_owner_alice|url", cap - 1, 1).concat(rows("summary_hold_q", 3, cap + 1),
       rows("dict2_en|word", 500, cap + 10), rows("skim_owner_mix_", 200, cap + 1000)));
     await pbpAiCacheSet("summary_owner_alice|boundary", "new", cap + 2000);
-    let count = counts(await allEntries());
+    let count = counts(await allKeys());
     assert(count.summaryOwner === cap && count.summaryHold === 3 && count.dict2 === 500 && count.other === 200,
       "boundary " + JSON.stringify(count));
     await pbpAiCacheSet("summary_owner_alice|newest", "new", cap + 2001);
-    count = counts(await allEntries());
+    count = counts(await allKeys());
     assert(count.summaryOwner === cap && count.summaryHold === 3 && count.dict2 === 500 && count.other === 200,
       "overflow " + JSON.stringify(count));
     assert(!await rawEntry("summary_owner_alice|url0"), "oldest receipt survived");
@@ -154,7 +170,7 @@ async function cursorSteps(run) {
     const dictSteps = await cursorSteps(() => pbpAiCacheSet("dict2_en|walk-newest", "new", 3000));
     await seed(rows("skim_walk_", 200, 500));
     const ordinarySteps = await cursorSteps(() => pbpAiCacheSet("ask_walk_newest", "new", 3001));
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.summaryOwner === 300 && count.dict2 === 500 && count.other === 200, JSON.stringify(count));
     assert(!await rawEntry("dict2_en|walk0") && !await rawEntry("skim_walk_0"), "the oldest entries were not evicted");
     assert(dictSteps < 50 && ordinarySteps < 50,
@@ -195,7 +211,7 @@ async function cursorSteps(run) {
     await seed(rows("dictctx2_owner_", 500, 1)
       .concat(rows("skim_ctx_mix_", 200, 1001), rows("dict2_en|ctx", 500, 2001)));
     await pbpAiCacheSet("dictctx2_owner_newest", "new", 3001);
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.dictctx === 500 && count.other === 200 && count.dict2 === 500,
       JSON.stringify(count));
     assert(!await rawEntry("dictctx2_owner_0"), "oldest gloss survived");
@@ -207,7 +223,7 @@ async function cursorSteps(run) {
     await clearEntries();
     await seed(rows("tr_article_", 200, 1));
     await pbpAiCacheSet("dictctx2_owner_word", "gloss", 1001);
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     // ZH-6: translations now sit in their own tr pool (300), doubly out of a
     // gloss write's reach -- same intent, stronger isolation.
     assert(count.tr === 200 && count.dictctx === 1 && count.other === 0, JSON.stringify(count));
@@ -219,7 +235,7 @@ async function cursorSteps(run) {
     await seed(rows("summary_owner_bob|url", 500, 1)
       .concat(rows("ask_owner_mix_", 200, 1001)));
     await pbpAiCacheSet("skim_owner_newest", "new", 2001);
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.summaryOwner === 500 && count.other === 200,
       JSON.stringify(count));
     assert(await rawEntry("summary_owner_bob|url0"), "ordinary overflow evicted receipt");
@@ -230,7 +246,7 @@ async function cursorSteps(run) {
     await clearEntries();
     await seed(rows("ask_existing_", 200, 100));
     await pbpAiCacheSet("skim_stale_write", "stale", 1);
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.other === 200 && count.dict2 === 0, JSON.stringify(count));
     assert(!await rawEntry("skim_stale_write"), "oldest new other-cache write survived");
     assert(await rawEntry("ask_existing_0"), "existing other-pool LRU head was incorrectly evicted");
@@ -240,11 +256,11 @@ async function cursorSteps(run) {
     await clearEntries();
     await seed(rows("dict2_de|word", 500, 1).concat(rows("skim_mixed_", 200, 1001)));
     await pbpAiCacheSet("dict2_de|newest", "dict", 2001);
-    let count = counts(await allEntries());
+    let count = counts(await allKeys());
     assert(count.dict2 === 500 && count.other === 200, "dict overflow=" + JSON.stringify(count));
     assert(await rawEntry("skim_mixed_0"), "dict overflow evicted other cache");
     await pbpAiCacheSet("ask_mixed_newest", "other", 2002);
-    count = counts(await allEntries());
+    count = counts(await allKeys());
     assert(count.dict2 === 500 && count.other === 200, "other overflow=" + JSON.stringify(count));
     assert(await rawEntry("dict2_de|newest"), "other overflow evicted dict2 cache");
   });
@@ -254,11 +270,11 @@ async function cursorSteps(run) {
     await seed(rows("dict2_es|word", 500, 100).concat(
       [{ key: "dictctx2_oldest", result: "context", ts: 1 }], rows("gloss_ctx_", 199, 2)));
     await pbpAiCacheSet("ask_ctx_boundary", "other-200", 300);
-    let count = counts(await allEntries());
+    let count = counts(await allKeys());
     assert(count.dict2 === 500 && count.dictctx === 1 && count.other === 200,
       "boundary=" + JSON.stringify(count));
     await pbpAiCacheSet("skim_ctx_overflow", "other-201", 301);
-    count = counts(await allEntries());
+    count = counts(await allKeys());
     assert(count.dict2 === 500 && count.dictctx === 1 && count.other === 200,
       "overflow=" + JSON.stringify(count));
     assert(await rawEntry("dictctx2_oldest"), "other-pool overflow evicted a contextual gloss");
@@ -270,7 +286,7 @@ async function cursorSteps(run) {
     await seed(rows("dict2_fr|seed", 499, 1));
     await pbpAiCacheSet("dict2_fr|Défense", { same: true }, 500);
     await pbpAiCacheSet("dict2_fr|défense", { same: true }, 501);
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.dict2 === 500, "dict2=" + count.dict2);
     assert(await rawEntry("dict2_fr|Défense") && await rawEntry("dict2_fr|défense"), "alias missing");
     assert(!await rawEntry("dict2_fr|seed0"), "aliases did not consume separate slots");
@@ -303,7 +319,7 @@ async function cursorSteps(run) {
     assert(!_pbpAiIsDict2Key("dict_legacy"), "legacy prefix misclassified as dict2");
     await pbpAiCacheSet("ask_legacy_boundary", "other-200", 200);
     await pbpAiCacheSet("skim_legacy_overflow", "other-201", 201);
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.dict2 === 500 && count.other === 200, JSON.stringify(count));
     assert(!await rawEntry("dict_legacy"), "legacy dict_ escaped the other-pool cap");
   });
@@ -314,7 +330,7 @@ async function cursorSteps(run) {
       await seed(rows("dict2_concurrent|old", 500, 1));
       const keys = Array.from({ length: concurrency }, (_, i) => "dict2_concurrent|new" + i);
       await Promise.all(keys.map((key, i) => pbpAiCacheSet(key, "new", 10000 + i)));
-      const count = counts(await allEntries());
+      const count = counts(await allKeys());
       assert(count.dict2 === 500, "concurrency " + concurrency + ": " + JSON.stringify(count));
       for (const key of keys) assert(await rawEntry(key), "concurrency " + concurrency + " lost " + key);
     }
@@ -326,7 +342,7 @@ async function cursorSteps(run) {
       await seed(rows("skim_concurrent_old_", 200, 1));
       const keys = Array.from({ length: concurrency }, (_, i) => "ask_concurrent_new_" + i);
       await Promise.all(keys.map((key, i) => pbpAiCacheSet(key, "new", 10000 + i)));
-      const count = counts(await allEntries());
+      const count = counts(await allKeys());
       assert(count.other === 200, "concurrency " + concurrency + ": " + JSON.stringify(count));
       for (const key of keys) assert(await rawEntry(key), "concurrency " + concurrency + " lost " + key);
     }
@@ -339,7 +355,7 @@ async function cursorSteps(run) {
     const otherKeys = Array.from({ length: 10 }, (_, i) => "ask_mixed_concurrent_" + i);
     await Promise.all(dictKeys.map((key, i) => pbpAiCacheSet(key, "dict", 10000 + i))
       .concat(otherKeys.map((key, i) => pbpAiCacheSet(key, "other", 11000 + i))));
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.dict2 === 500 && count.other === 200, JSON.stringify(count));
     for (const key of dictKeys.concat(otherKeys)) assert(await rawEntry(key), "lost new mixed key " + key);
   });
@@ -351,7 +367,7 @@ async function cursorSteps(run) {
     const otherWrites = Array.from({ length: 201 }, (_, i) =>
       pbpAiCacheSet("skim_empty_" + i, i, i + 1));
     await Promise.all(dictWrites.concat(otherWrites));
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.dict2 === 500 && count.other === 200, JSON.stringify(count));
     assert(await rawEntry("dict2_empty|500") && await rawEntry("skim_empty_200"), "newest empty-pool writes missing");
   });
@@ -361,7 +377,7 @@ async function cursorSteps(run) {
     const trWrites = Array.from({ length: 301 }, (_, i) =>
       pbpAiCacheSet("tr_cap_" + i, i, i + 1));
     await Promise.all(trWrites.concat([pbpAiCacheSet("ask_cap_witness", "w", 5000)]));
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.tr === 300 && count.other === 1, JSON.stringify(count));
     assert(await rawEntry("tr_cap_300"), "newest tr write missing");
     assert(!await rawEntry("tr_cap_0"), "oldest tr entry survived past the cap");
@@ -373,7 +389,7 @@ async function cursorSteps(run) {
     const key = "ask_append_concurrent";
     await Promise.all(Array.from({ length: 10 }, (_, i) =>
       pbpAiCacheAppend(key, (previous) => (Array.isArray(previous) ? previous : []).concat([i]), 10000 + i)));
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     const entry = await rawEntry(key);
     assert(count.other === 200 && count.dict2 === 0, JSON.stringify(count));
     assert(entry && entry.result.length === 10, "append updates lost: " + JSON.stringify(entry && entry.result));
@@ -386,7 +402,7 @@ async function cursorSteps(run) {
       { key: "ask_append_rollback", result: ["kept"], ts: 200 }
     ]));
     await pbpAiCacheAppend("ask_append_rollback", () => { throw new Error("stop"); }, 10000);
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     const entry = await rawEntry("ask_append_rollback");
     assert(count.other === 200 && count.dict2 === 0, JSON.stringify(count));
     assert(entry && entry.ts === 200 && entry.result.join(",") === "kept", "append rollback changed record");
@@ -497,7 +513,7 @@ async function cursorSteps(run) {
     await pbpAiHoldSummaryOwnership("q-5", "alice", OWNED_URL, OWNED_NOTES, OWNED_RANGE);
     assert(await pbpAiLoadSummaryOwnership("alice", OWNED_URL, OWNED_NOTES) === null, "a hold read as a receipt");
     await pbpAiSaveSummaryOwnership("alice", OWNED_URL, OWNED_NOTES, OWNED_RANGE);
-    const count = counts(await allEntries());
+    const count = counts(await allKeys());
     assert(count.summaryHold === 1 && count.summaryOwner === 1 && count.other === 0, JSON.stringify(count));
     const stats = await pbpAiCacheStats();
     assert(stats.pools["summary-hold"] === 1 && stats.pools["summary-owner"] === 1 && stats.pools.other === 0,
@@ -514,13 +530,13 @@ async function cursorSteps(run) {
     await seed(rows("summary_owner_alice|url", 10, 1)
       .concat(rows("summary_hold_q", cap, 100), rows("ask_hold_mix_", 200, cap + 1000)));
     await pbpAiCacheSet("summary_hold_newest", "hold", cap + 5000);
-    let count = counts(await allEntries());
+    let count = counts(await allKeys());
     assert(count.summaryHold === cap && count.summaryOwner === 10 && count.other === 200,
       "hold overflow " + JSON.stringify(count));
     assert(!await rawEntry("summary_hold_q0") && await rawEntry("summary_hold_q1"), "hold overflow evicted the wrong holds");
     assert(await rawEntry("summary_owner_alice|url0"), "a hold evicted a receipt");
     await pbpAiCacheSet("skim_hold_newest", "other", cap + 6000);
-    count = counts(await allEntries());
+    count = counts(await allKeys());
     assert(count.summaryHold === cap && count.summaryOwner === 10 && count.other === 200,
       "ordinary overflow " + JSON.stringify(count));
     assert(!await rawEntry("ask_hold_mix_0") && await rawEntry("ask_hold_mix_1"),
@@ -577,5 +593,14 @@ async function cursorSteps(run) {
 
   await clearEntries();
   document.title = fail ? "FAIL ai-cache Tests" : "PASS ai-cache Tests";
+  } catch (error) {
+    fail++;
+    const row = document.createElement("div");
+    row.className = "case fail";
+    row.textContent = "FAIL harness\n  " + (error && error.message ? error.message : String(error));
+    results.appendChild(row);
+  } finally {
+    document.title = (fail ? "FAIL " : "PASS ") + "ai-cache Tests";
+  }
 })();
 </script></body></html>
