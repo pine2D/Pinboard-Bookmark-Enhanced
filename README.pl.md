@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [日本語](README.ja.md) | **Polski** | [Русский](README.ru.md)
 
-Rozszerzenie Chrome dla [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) i [linkding](https://linkding.link): tagi i streszczenia AI, czytnik z tłumaczeniem i wyróżnieniami oraz 13 motywów dla pinboard.in.
+Rozszerzenie Chrome dla [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) i [linkding](https://linkding.link): tagi i streszczenia AI, czytnik z tłumaczeniem i wyróżnieniami oraz 15 motywów dla pinboard.in.
 
 > **Uwaga:** Wybierz usługę zakładek w ustawieniach. Karakeep i linkding działają bez konta Pinboard. Pinboard to niezależna, **płatna** usługa, która wymaga własnego konta i tokenu API. To rozszerzenie jest klientem zewnętrznym, niepowiązanym z Pinboard, niesponsorowanym ani nieautoryzowanym przez ten serwis.
 
@@ -10,7 +10,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in), [Karakeep](https://kara
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Zapis z tagami i streszczeniem od AI, w motywie ciemnym i jasnym](docs/screenshots/readme/hero.webp)
+![Zapis z tagami i streszczeniem od AI, w motywie ciemnym i jasnym Platinum](docs/screenshots/readme/hero.webp)
 
 [![Minutowy film: zapisz, przeczytaj, zachowaj](docs/screenshots/readme/promo-video.webp)](https://youtu.be/YWvA_Vux0CI)
 
@@ -45,11 +45,11 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in), [Karakeep](https://kara
 ![Zapisane słówko z kontekstem i kolumną słownika](docs/screenshots/readme/vocab.webp)
 
 ### Pinboard po Twojemu
-- **13 motywów dla pinboard.in** — jasny i ciemny wygląd witryny, a do tego własny CSS.
+- **15 motywów dla pinboard.in** — jasny i ciemny wygląd witryny oraz własny CSS, a klasyczny motyw Platinum zmienia też wygląd rozszerzenia.
 - **Porządki w tagach** — scalaj niemal identyczne tagi i usuwaj te, których rzadko używasz.
 - **Automatyczna archiwizacja w [Wayback Machine](https://web.archive.org)** — zapisane strony da się przeczytać nawet wtedy, gdy oryginalny link przestanie działać.
 
-![13 motywów dla pinboard.in](docs/screenshots/readme/themes.webp)
+![15 motywów dla pinboard.in](docs/screenshots/readme/themes.webp)
 
 ## Instalacja
 

@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | **日本語** | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-[Pinboard](https://pinboard.in)、[Karakeep](https://karakeep.app)、[linkding](https://linkding.link) に対応した Chrome 拡張機能。AI タグと要約、翻訳・ハイライト付きリーダー、pinboard.in 用テーマ 13 種を備えています。
+[Pinboard](https://pinboard.in)、[Karakeep](https://karakeep.app)、[linkding](https://linkding.link) に対応した Chrome 拡張機能。AI タグと要約、翻訳・ハイライト付きリーダー、pinboard.in 用テーマ 15 種を備えています。
 
 > **注意:** 設定でブックマークサービスを選択します。Karakeep と linkding は Pinboard アカウントなしで使えます。Pinboard は独立した**有料**サービスで、自分のアカウントと API トークンが必要です。本拡張機能は第三者製で、Pinboard との提携・出資・公式の承認はありません。
 
@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![AI タグと要約を付けて保存（ダーク／ライトテーマ）](docs/screenshots/readme/hero.webp)
+![AI タグと要約を付けて保存（ダーク／Platinum ライトテーマ）](docs/screenshots/readme/hero.webp)
 
 [![1 分の紹介動画：保存して、読んで、残す](docs/screenshots/readme/promo-video.webp)](https://youtu.be/YWvA_Vux0CI)
 
@@ -45,11 +45,11 @@
 ![保存した単語：文脈と辞書欄](docs/screenshots/readme/vocab.webp)
 
 ### カスタマイズ
-- **pinboard.in 用テーマ 13 種**：サイトの見た目をライトやダークに変えられ、自分の CSS も使えます。
+- **pinboard.in 用テーマ 15 種**：ライト／ダークの配色と独自 CSS に対応し、クラシックな Platinum は拡張機能にも適用できます。
 - **タグ整理**：似たタグを統合し、ほとんど使わないタグを片付けます。
 - **[Wayback Machine](https://web.archive.org) へ自動アーカイブ**：保存したページは、元のリンクが切れても読めます。
 
-![pinboard.in 用テーマ 13 種](docs/screenshots/readme/themes.webp)
+![pinboard.in 用テーマ 15 種](docs/screenshots/readme/themes.webp)
 
 ## インストール
 

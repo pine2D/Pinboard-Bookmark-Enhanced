@@ -46,7 +46,7 @@ const DSF = Number(flag("--dsf", "2"));
 const ASK_FLASH_MS = 1000; // the flash lasts 1.6 s; this leaves time for the scroll
 const START_T = Number(flag("--video-t", "95"));
 const ALL = ["popup", "popup-tags", "popup-linkding", "popup-save", "account", "reader", "ask", "lookup", "notes", "vocab", "questions", "themes", "video"];
-const OUT_ROOT = join(process.env.PBP_QA_REPORT_DIR || join(homedir(), ".local/share/pbp-qa-report"), "readme-shots"); // outside the repo, see CLAUDE.md "测试与夹具"
+const OUT_ROOT = join(flag("--out-dir", process.env.PBP_QA_REPORT_DIR || join(homedir(), ".local/share/pbp-qa-report")), "readme-shots"); // outside the repo, see CLAUDE.md "测试与夹具"
 const RAW = (scheme) => join(OUT_ROOT, "raw", scheme);
 const COMPOSED = join(OUT_ROOT, "out");
 const WEBP_DIR = join(REPO, "docs/screenshots/readme");
@@ -341,7 +341,7 @@ async function popupOnce(S, attempt, name, select = "", summary = true) {
     await active.bringToFront();
     await (await ctx.newCDPSession(active)).send("Page.bringToFront").catch(() => {});
     await sleep(500);
-    if (name === "popup-ai-tagged") await shot(S, active, "article-page");
+    if (name === "popup-ai-tagged" || (name === "popup-linkding" && !existsSync(join(S.out, "article-page.png")))) await shot(S, active, "article-page");
     cdp = await ctx.browser().newBrowserCDPSession();
     await cdp.send("Target.setDiscoverTargets", { discover: true });
     const popupUrl = `chrome-extension://${extId}/popup.html`;
@@ -432,8 +432,21 @@ async function clearPopupState(S) {
     });
   });
 }
+async function withPreset(S, preset, fn) {
+  const apply = async (p) => {
+    await S.sw.evaluate(async (v) => chrome.storage.local.set({ themePresetKey: v }), p);
+    const pg = await S.ctx.newPage();
+    try {
+      await pg.goto(`chrome-extension://${S.extId}/options.html#general`, { waitUntil: "commit" });
+      await pg.evaluate((v) => localStorage.setItem("pp-theme-preset", v), p);
+    } finally { await pg.close().catch(() => {}); }
+    await sleep(300);
+  };
+  await apply(preset);
+  try { return await fn(); } finally { await apply(""); }
+}
 async function popupTags(S) { await clearPopupState(S); await popup(S, "popup-tags", "", false); }
-async function popupLinkding(S) { await withLinkding(S, () => popup(S, "popup-linkding", F.POPUP_QUOTE)); }
+async function popupLinkding(S) { await withLinkding(S, () => withPreset(S, "platinum", () => popup(S, "popup-linkding", F.POPUP_QUOTE))); }
 async function popupSave(S) { await withLinkding(S, async () => { await clearPopupState(S); await popup(S, "popup-save", "", false); }); }
 
 async function account(S) {
@@ -601,7 +614,7 @@ async function vocab(S) {
   await page.close();
 }
 
-const THEME_SHOTS = [["", "light"], ["solarized", "light"], ["dracula", "dark"], ["terminal", "dark"]];
+const THEME_SHOTS = [["solarized", "light"], ["dracula", "dark"], ["terminal", "dark"], ["platinum", "light"]];
 async function themes(S) {
   await ensurePbCss();
   const page = await S.ctx.newPage();
@@ -689,13 +702,13 @@ function windowHtml({ x, y, w, img, aspect, theme, url = "", pin = false, pinAct
 
 // name -> { w, h, needs: [raw files], html(), webp: README asset name }
 const PAGES = {};
-// hero: dark scene behind up-left (Pinboard), light scene in front down-right
-// (a self-hosted linkding server: the AI summary lands in Description)
+// hero: dark scene behind up-left (Pinboard), Platinum light scene in front
+// down-right (a self-hosted linkding server: the AI summary lands in Description)
 PAGES["hero-stacked"] = { webp: "hero", w: 1200, h: 820, needs: ["light/article-page", "light/popup-linkding", "dark/article-page", "dark/popup-ai-tagged"], html: () => {
   const W = 860, s = W / 1280, pw = Math.round(683 * s);
-  const scene = (theme, popupShot, x, y, z) => windowHtml({ x, y, w: W, img: raw(`${theme}/article-page.png`), aspect: "1280/800", theme, url: "example.com/essays/the-case-for-slow-reading", pin: true, pinActive: true, z })
-    + `<div class="pop" style="left:${x + W - pw - 14}px;top:${y + 42}px;width:${pw}px;box-shadow:${T_[theme].shadow};z-index:${z}"><img class="shot" src="${raw(`${theme}/${popupShot}.png`)}"></div>`;
-  return `<div class="stage" style="background:linear-gradient(135deg,#1b1f27 0%,#1b1f27 50%,#e9edf3 50%,#e9edf3 100%)">${scene("dark", "popup-ai-tagged", 50, 40, 1)}${scene("light", "popup-linkding", 290, 218, 5)}</div>`;
+  const scene = (theme, popupShot, x, y, z, popStyle = "") => windowHtml({ x, y, w: W, img: raw(`${theme}/article-page.png`), aspect: "1280/800", theme, url: "example.com/essays/the-case-for-slow-reading", pin: true, pinActive: true, z })
+    + `<div class="pop" style="left:${x + W - pw - 14}px;top:${y + 42}px;width:${pw}px;box-shadow:${T_[theme].shadow};z-index:${z};${popStyle}"><img class="shot" src="${raw(`${theme}/${popupShot}.png`)}"></div>`;
+  return `<div class="stage" style="background:linear-gradient(135deg,#1b1f27 0%,#1b1f27 50%,#e9edf3 50%,#e9edf3 100%)">${scene("dark", "popup-ai-tagged", 50, 40, 1)}${scene("light", "popup-linkding", 290, 218, 5, "border-radius:3px;border:1px solid #262626")}</div>`;
 } };
 // plain framed single screenshots
 const single = (name, webp, file, rw, rh, url, W = 1120) => {
@@ -707,10 +720,10 @@ single("ask", "ask", "light/ask-answer", 1440, 900, "Reader · Ask the page");
 single("notes-flow", "notes", "light/notes-flow", 1280, 800, "Library · Notes");
 single("vocab-detail-crop", "vocab", "light/vocab-detail-crop", 1690, 664, "Library · Vocabulary");
 single("video", "video", "light/video-workspace", 1280, 540, "Reader · YouTube");
-// themes: four themed pinboard.in pages fanned diagonally
-PAGES["themes"] = { webp: "themes", w: 1200, h: 800, needs: ["light/site-none-light", "light/site-solarized-light", "light/site-dracula-dark", "light/site-terminal-dark"], html: () => {
+// themes: four themed pinboard.in pages fanned diagonally (Platinum in front)
+PAGES["themes"] = { webp: "themes", w: 1200, h: 800, needs: ["light/site-solarized-light", "light/site-dracula-dark", "light/site-terminal-dark", "light/site-platinum-light"], html: () => {
   // Every window is the same site: the address bar says so, the page shows the theme.
-  const list = [["light/site-none-light.png", "light"], ["light/site-solarized-light.png", "light"], ["light/site-dracula-dark.png", "dark"], ["light/site-terminal-dark.png", "dark"]];
+  const list = [["light/site-solarized-light.png", "light"], ["light/site-dracula-dark.png", "dark"], ["light/site-terminal-dark.png", "dark"], ["light/site-platinum-light.png", "light"]];
   return `<div class="stage" style="background:${T_.light.stage}">` + list.map(([f, th], i) =>
     windowHtml({ x: 40 + i * 130, y: 34 + i * 92, w: 700, img: raw(f), aspect: "1280/800", theme: th, url: "pinboard.in", z: i + 1 })).join("") + "</div>";
 } };
@@ -736,10 +749,14 @@ async function toWebp(browser, pngPath, outPath) {
 async function compose() {
   mkdirSync(COMPOSED, { recursive: true });
   mkdirSync(WEBP_DIR, { recursive: true });
+  const onlyPages = flag("--pages", "").split(",").filter(Boolean);
+  const badPages = onlyPages.filter((n) => !PAGES[n]);
+  if (badPages.length) throw new Error("unknown page: " + badPages.join(","));
   const browser = await chromium.launch({ executablePath: chromium.executablePath() });
   let missing = 0;
   try {
     for (const [name, p] of Object.entries(PAGES)) {
+      if (onlyPages.length && !onlyPages.includes(name)) continue;
       const lack = p.needs.filter((n) => !existsSync(join(OUT_ROOT, "raw", n + ".png")));
       if (lack.length) { console.warn(`[compose] skip ${name}: missing raw ${lack.join(", ")}`); missing++; continue; }
       const page = await browser.newPage({ viewport: { width: p.w, height: p.h }, deviceScaleFactor: 2 });

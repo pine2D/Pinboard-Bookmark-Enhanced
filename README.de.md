@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | **Deutsch** | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) und [linkding](https://linkding.link): KI-Tags und Zusammenfassungen, ein Reader mit Übersetzung und Markierungen sowie 13 Themes für pinboard.in.
+Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) und [linkding](https://linkding.link): KI-Tags und Zusammenfassungen, ein Reader mit Übersetzung und Markierungen sowie 15 Themes für pinboard.in.
 
 > **Hinweis:** Wähle deinen Lesezeichendienst in den Einstellungen. Karakeep und linkding funktionieren ohne Pinboard-Konto. Pinboard ist ein unabhängiger, **kostenpflichtiger** Dienst und erfordert ein eigenes Konto mit API-Token. Diese Erweiterung stammt von einem Drittanbieter, steht in keiner Verbindung zu Pinboard und wird von Pinboard weder gesponsert noch befürwortet.
 
@@ -10,7 +10,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in), [Karakeep](https:/
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Speichern mit KI-Tags und Zusammenfassung, in dunklem und hellem Theme](docs/screenshots/readme/hero.webp)
+![Speichern mit KI-Tags und Zusammenfassung, im dunklen und hellen Platinum-Theme](docs/screenshots/readme/hero.webp)
 
 [![1-Minuten-Video: speichern, lesen, behalten](docs/screenshots/readme/promo-video.webp)](https://youtu.be/YWvA_Vux0CI)
 
@@ -45,11 +45,11 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in), [Karakeep](https:/
 ![Gespeichertes Wort mit Kontext und Wörterbuchspalte](docs/screenshots/readme/vocab.webp)
 
 ### Pinboard nach deinem Geschmack
-- **13 Themes für pinboard.in**: helle und dunkle Designs für die Website, dazu dein eigenes CSS.
+- **15 Themes für pinboard.in**: helle und dunkle Designs sowie eigenes CSS; das klassische Platinum-Theme gestaltet auf Wunsch auch die Erweiterung.
 - **Tags aufräumen**: ähnliche Tags zusammenführen und selten genutzte ausmisten.
 - **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren**: Gespeicherte Seiten bleiben lesbar, auch wenn der Originallink nicht mehr funktioniert.
 
-![13 Themes für pinboard.in](docs/screenshots/readme/themes.webp)
+![15 Themes für pinboard.in](docs/screenshots/readme/themes.webp)
 
 ## Installation
 

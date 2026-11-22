@@ -3,7 +3,7 @@
 // The judgment work lives in the content-l10n / humanizer skills at writing
 // time; this lint freezes their OUTPUT CONTRACTS so later edits can't drift:
 //   1. README x9 structural mirror (feature bullets, subsections, links,
-//      code spans, bold pairing, the "13" claims in tagline).
+//      code spans, bold pairing, the "15" claims in tagline).
 //   2. Feature-bullet delimiter policy: colon-family for en/CJK/de/fr;
 //      pl/ru keep the spaced dash ON PURPOSE (myslnik / tire are native
 //      punctuation there, not an AI artifact -- do not "unify" them).
@@ -161,7 +161,7 @@ for (const f of READMES) {
   }
   if ((block.split("**").length - 1) % 2 !== 0) errors.push(`${f}: unbalanced ** in features block`);
   checkCoreOnly(f, block.split("\n").filter(l => l.startsWith("- **")));
-  if (!(lines[4] || "").includes("13")) errors.push(`${f}: tagline (line 5) lost the "13 themes" claim`);
+  if (!(lines[4] || "").includes("15")) errors.push(`${f}: tagline (line 5) lost the "15 themes" claim`);
   const dashDelims = (block.match(/\*\* [—–] /g) || []).length;
   if (DASH_DELIM_ALLOWED.has(f)) {
     if (dashDelims === 0) errors.push(`${f}: pl/ru keep the native spaced-dash delimiter; found none (policy drift?)`);

@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | **Français** | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-Une extension Chrome pour [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) et [linkding](https://linkding.link) : étiquettes et résumés par IA, lecteur avec traduction et surlignage, et 13 thèmes pour pinboard.in.
+Une extension Chrome pour [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) et [linkding](https://linkding.link) : étiquettes et résumés par IA, lecteur avec traduction et surlignage, et 15 thèmes pour pinboard.in.
 
 > **Remarque :** Choisissez votre service de signets dans les paramètres. Karakeep et linkding fonctionnent sans compte Pinboard. Pinboard est un service indépendant **payant**, qui nécessite votre propre compte et votre jeton API. Cette extension tierce n’est ni affiliée à Pinboard, ni sponsorisée ou approuvée par Pinboard.
 
@@ -10,7 +10,7 @@ Une extension Chrome pour [Pinboard](https://pinboard.in), [Karakeep](https://ka
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Enregistrement avec étiquettes et résumé par IA, en thème sombre et clair](docs/screenshots/readme/hero.webp)
+![Enregistrement avec étiquettes et résumé par IA, en thème sombre et Platinum clair](docs/screenshots/readme/hero.webp)
 
 [![Vidéo d’une minute : enregistrer, lire, garder](docs/screenshots/readme/promo-video.webp)](https://youtu.be/YWvA_Vux0CI)
 
@@ -45,11 +45,11 @@ Une extension Chrome pour [Pinboard](https://pinboard.in), [Karakeep](https://ka
 ![Mot enregistré avec son contexte et une colonne de dictionnaire](docs/screenshots/readme/vocab.webp)
 
 ### Un Pinboard à votre image
-- **13 thèmes pour pinboard.in** : des apparences claires et sombres pour le site, plus votre propre CSS.
+- **15 thèmes pour pinboard.in** : apparences claires et sombres avec votre propre CSS ; le thème classique Platinum habille aussi l’extension.
 - **Nettoyage des étiquettes** : fusionnez les étiquettes quasi identiques et élaguez celles qui servent peu.
 - **Archivage automatique dans la [Wayback Machine](https://web.archive.org)** : les pages enregistrées restent lisibles même quand le lien d’origine disparaît.
 
-![13 thèmes pour pinboard.in](docs/screenshots/readme/themes.webp)
+![15 thèmes pour pinboard.in](docs/screenshots/readme/themes.webp)
 
 ## Installation
 

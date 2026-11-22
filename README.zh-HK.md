@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | **繁體中文（香港）** | [Deutsch](README.de.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-支援 [Pinboard](https://pinboard.in)、[Karakeep](https://karakeep.app) 和 [linkding](https://linkding.link) 的 Chrome 擴充功能：AI 標籤與摘要、支援翻譯與高亮的閱讀器，以及 13 套 pinboard.in 網站主題。
+支援 [Pinboard](https://pinboard.in)、[Karakeep](https://karakeep.app) 和 [linkding](https://linkding.link) 的 Chrome 擴充功能：AI 標籤與摘要、支援翻譯與高亮的閱讀器，以及 15 套 pinboard.in 網站主題。
 
 > **說明：** 在設定選擇一種書籤服務。使用 Karakeep 或 linkding 無需 Pinboard 帳號。Pinboard 是獨立的**付費**服務，使用時需自備帳號及 API Token。本擴充功能是第三方客戶端，與 Pinboard 沒有隸屬、贊助或認可關係。
 
@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![AI 生成標籤與摘要後儲存，深色與淺色主題](docs/screenshots/readme/hero.webp)
+![AI 生成標籤與摘要後儲存，深色與 Platinum 淺色主題](docs/screenshots/readme/hero.webp)
 
 [![1 分鐘影片介紹：儲存、閱讀、留存](docs/screenshots/readme/promo-video.webp)](https://youtu.be/YWvA_Vux0CI)
 
@@ -45,11 +45,11 @@
 ![生詞詳情：原文語境與詞典參考欄](docs/screenshots/readme/vocab.webp)
 
 ### 個人化
-- **13 套 pinboard.in 佈景主題**：為網站換上淺色或深色外觀，亦可加上自訂 CSS。
+- **15 套 pinboard.in 佈景主題**：提供淺色與深色外觀及自訂 CSS；經典 Platinum 亦可應用於擴充功能介面。
 - **標籤治理**：合併相近標籤，清理少用的標籤。
 - **自動存檔至 [Wayback Machine](https://web.archive.org)**：儲存過的網頁，即使原連結失效仍可閱讀。
 
-![13 套 pinboard.in 佈景主題](docs/screenshots/readme/themes.webp)
+![15 套 pinboard.in 佈景主題](docs/screenshots/readme/themes.webp)
 
 ## 安裝
 

@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | **Русский**
 
-Расширение Chrome для [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) и [linkding](https://linkding.link): AI-теги и краткое содержание, режим чтения с переводом и выделениями, а также 13 тем для pinboard.in.
+Расширение Chrome для [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) и [linkding](https://linkding.link): AI-теги и краткое содержание, режим чтения с переводом и выделениями, а также 15 тем для pinboard.in.
 
 > **Примечание:** Выберите сервис закладок в настройках. Karakeep и linkding работают без аккаунта Pinboard. Pinboard — независимый **платный** сервис, для которого нужны собственный аккаунт и API-токен. Это стороннее расширение не связано с Pinboard, не спонсируется и не одобряется им.
 
@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Сохранение с AI-тегами и резюме, тёмная и светлая темы](docs/screenshots/readme/hero.webp)
+![Сохранение с AI-тегами и резюме, тёмная и светлая тема Platinum](docs/screenshots/readme/hero.webp)
 
 [![Минутное видео: сохранить, прочитать, оставить себе](docs/screenshots/readme/promo-video.webp)](https://youtu.be/YWvA_Vux0CI)
 
@@ -45,11 +45,11 @@
 ![Сохранённое слово с контекстом и колонкой словаря](docs/screenshots/readme/vocab.webp)
 
 ### Pinboard под себя
-- **13 тем для pinboard.in** — светлое и тёмное оформление сайта, плюс собственный CSS.
+- **15 тем для pinboard.in** — светлое и тёмное оформление сайта со своим CSS, а классическая тема Platinum оформляет и само расширение.
 - **Порядок в тегах** — объединяйте почти одинаковые теги и убирайте те, что почти не используете.
 - **Автоархив в [Wayback Machine](https://web.archive.org)** — сохранённые страницы можно будет прочитать, даже когда исходная ссылка перестанет работать.
 
-![13 тем для pinboard.in](docs/screenshots/readme/themes.webp)
+![15 тем для pinboard.in](docs/screenshots/readme/themes.webp)
 
 ## Установка
 

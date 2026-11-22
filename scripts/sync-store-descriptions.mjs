@@ -101,39 +101,39 @@ function buildFeatures(readmePath) {
 const STORE_REWRITES = {
   "README.md": {
     "Send or download": "Send or download: send articles to your notes app or your own webhook, or save them as e-books for your e-reader.",
-    "13 themes for pinboard.in": "13 themes for pinboard.in: light and dark looks for the site itself, plus room for your own custom CSS.",
+    "15 themes for pinboard.in": "15 themes for pinboard.in: light and dark looks for the site plus room for your own custom CSS, and classic Platinum can style the extension too.",
   },
   "README.zh-CN.md": {
     "发送或下载": "发送或下载：把文章发到常用的笔记应用或你自己的 webhook，或者存成电子书放进阅读器。",
-    "13 套 pinboard.in 主题": "13 套 pinboard.in 主题：给网站本身换上浅色或深色外观，还能叠加自定义 CSS。",
+    "15 套 pinboard.in 主题": "15 套 pinboard.in 主题：给网站本身换上浅色或深色外观并支持自定义 CSS，经典 Platinum 也能套用到扩展界面。",
   },
   "README.zh-TW.md": {
     "傳送或下載": "傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器。",
-    "13 套 pinboard.in 佈景主題": "13 套 pinboard.in 佈景主題：替網站本身換上淺色或深色外觀，還可疊加自訂 CSS。",
+    "15 套 pinboard.in 佈景主題": "15 套 pinboard.in 佈景主題：替網站本身換上淺色或深色外觀並支援自訂 CSS，經典 Platinum 也能套用到擴充功能介面。",
   },
   "README.zh-HK.md": {
     "傳送或下載": "傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器。",
-    "13 套 pinboard.in 佈景主題": "13 套 pinboard.in 佈景主題：為網站本身換上淺色或深色外觀，更可疊加自訂 CSS。",
+    "15 套 pinboard.in 佈景主題": "15 套 pinboard.in 佈景主題：為網站本身換上淺色或深色外觀並支援自訂 CSS，經典 Platinum 亦可應用於擴充功能介面。",
   },
   "README.de.md": {
     "Senden oder herunterladen": "Senden oder herunterladen: Artikel an deine Notiz-App oder deinen eigenen Webhook senden oder als E-Book für den E-Reader speichern.",
-    "13 Themes für pinboard.in": "13 Themes für pinboard.in: helle und dunkle Looks für die Seite selbst, dazu dein eigenes CSS.",
+    "15 Themes für pinboard.in": "15 Themes für pinboard.in: helle und dunkle Looks für die Seite selbst sowie eigenes CSS; das klassische Platinum-Theme gestaltet auf Wunsch auch die Erweiterung.",
   },
   "README.fr.md": {
     "Envoyer ou télécharger": "Envoyer ou télécharger : envoyez vos articles vers votre application de notes ou votre propre webhook, ou enregistrez-les en livre numérique pour votre liseuse.",
-    "13 thèmes pour pinboard.in": "13 thèmes pour pinboard.in : des apparences claires et sombres pour le site lui-même, plus votre CSS personnalisé.",
+    "15 thèmes pour pinboard.in": "15 thèmes pour pinboard.in : des apparences claires et sombres pour le site lui-même avec votre CSS personnalisé, et le thème classique Platinum habille aussi l’extension.",
   },
   "README.ja.md": {
     "送信もダウンロードも": "送信もダウンロードも：記事を普段使いのノートアプリや自分の webhook に送ったり、電子書籍として保存してリーダーで読んだりできます。",
-    "pinboard.in 用テーマ 13 種": "pinboard.in 用テーマ 13 種：サイト自体をライトにもダークにも着せ替えられ、自分のカスタム CSS も重ねられます。",
+    "pinboard.in 用テーマ 15 種": "pinboard.in 用テーマ 15 種：サイト自体をライトやダークに着せ替えられ独自 CSS も重ねられるほか、クラシックな Platinum は拡張機能にも適用できます。",
   },
   "README.pl.md": {
     "Wyślij albo pobierz": "Wyślij albo pobierz — wyślij artykuł do swojej aplikacji z notatkami lub własnego webhooka albo zapisz go jako e-book na czytnik.",
-    "13 motywów dla pinboard.in": "13 motywów dla pinboard.in — jasne i ciemne wersje samej witryny oraz miejsce na własny CSS.",
+    "15 motywów dla pinboard.in": "15 motywów dla pinboard.in — jasne i ciemne wersje samej witryny oraz własny CSS, a klasyczny motyw Platinum zmienia też wygląd rozszerzenia.",
   },
   "README.ru.md": {
     "Отправить или скачать": "Отправить или скачать — отправляйте статьи в своё приложение для заметок или на собственный вебхук либо сохраняйте их как электронные книги для читалки.",
-    "13 тем для pinboard.in": "13 тем для pinboard.in — светлое и тёмное оформление самого сайта плюс место для своего CSS.",
+    "15 тем для pinboard.in": "15 тем для pinboard.in — светлое и тёмное оформление самого сайта и место для своего CSS, а классическая тема Platinum оформляет и само расширение.",
   },
 };
 // What the CWS reviewer reads as keyword stuffing; none may reach store text.

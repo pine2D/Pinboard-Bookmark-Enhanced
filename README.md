@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-A Chrome extension for [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) and [linkding](https://linkding.link): AI tags and summaries, a reader with translation and highlights, and 13 themes for pinboard.in.
+A Chrome extension for [Pinboard](https://pinboard.in), [Karakeep](https://karakeep.app) and [linkding](https://linkding.link): AI tags and summaries, a reader with translation and highlights, and 15 themes for pinboard.in.
 
 > **Note:** Choose one bookmark service in Settings. Karakeep and linkding work without a Pinboard account. Pinboard is an independent **paid** service and requires your own account and API token. This third-party extension is not affiliated with, sponsored by, or endorsed by Pinboard.
 
@@ -10,7 +10,7 @@ A Chrome extension for [Pinboard](https://pinboard.in), [Karakeep](https://karak
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Saving a page with AI tags and summary, in dark and light themes](docs/screenshots/readme/hero.webp)
+![Saving a page with AI tags and summary, in dark and Platinum light themes](docs/screenshots/readme/hero.webp)
 
 [![1-minute video tour: save it, read it, keep it](docs/screenshots/readme/promo-video.webp)](https://youtu.be/YWvA_Vux0CI)
 
@@ -45,11 +45,11 @@ A Chrome extension for [Pinboard](https://pinboard.in), [Karakeep](https://karak
 ![A saved word with its context and a dictionary column](docs/screenshots/readme/vocab.webp)
 
 ### Make Pinboard yours
-- **13 themes for pinboard.in**: light and dark looks for the site, plus your own CSS.
+- **15 themes for pinboard.in**: light and dark looks plus custom CSS, and classic Platinum can style the extension too.
 - **Tidy your tags**: merge near-duplicates and prune the ones you rarely use.
 - **Auto-archive to the [Wayback Machine](https://web.archive.org)**: pages you save stay readable after the original link dies.
 
-![13 themes for pinboard.in](docs/screenshots/readme/themes.webp)
+![15 themes for pinboard.in](docs/screenshots/readme/themes.webp)
 
 ## Install
 
