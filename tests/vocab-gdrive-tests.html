@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="115"><title>Vocabulary Google Drive Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="116"><title>Vocabulary Google Drive Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -2263,6 +2263,17 @@ function syncHarness(options = {}) {
     const quietResult = await quiet.runner()();
     return appliedResult.ok && appliedResult.changed === true &&
       quietResult.ok && quietResult.changed === false;
+  });
+
+  await asyncCheck("a failed later page reports the change committed by the first page only", async () => {
+    const file = driveFile("kept-word");
+    const error = { ok:false, error:"network", retryable:true };
+    const h = syncHarness({ files:[file], filePages:[{ files:[file.meta], nextPageToken:null }], changePages:[error] });
+    const partial = await h.runner()();
+    const empty = await syncHarness({ filePages:[error] }).runner()();
+    return !partial.ok && partial.error === "network" && partial.changed === true &&
+      h.calls.includes("download:kept-word") && h.calls.includes("apply:1:") &&
+      !empty.ok && !empty.changed;
   });
 
   await asyncCheck("a missing Pinboard account is not a Google authorization failure", async () => {

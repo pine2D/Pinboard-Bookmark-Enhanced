@@ -51,7 +51,8 @@ function pbpNotesValidateEvent(event, expectedRecordKey, leaf = false) {
   if (event.versions !== undefined) {
     if (leaf || !_pbpVocabDenseArray(event.versions) || event.versions.length < 2 ||
         !event.versions.every(version=>pbpNotesValidateEvent(version,event.recordKey,true)) ||
-        !_pbpNotesFrontierValid(event.versions,event.vector)) return false;
+        !_pbpNotesFrontierValid(event.versions,event.vector) ||
+        event.versions.some(version => !version.deleted && version.value.url !== event.value?.url)) return false;
     const projected=_pbpNotesProject(event.recordKey,event.vector,event.versions);
     const actual={...event};delete actual.versions;
     if (!pbpVocabEventContentEqual(actual,projected.event)) return false;
@@ -122,6 +123,7 @@ function _pbpNotesProject(recordKey,vector,versions) {
 function pbpNotesMergeEvents(left, right) {
   const invalid = {kind:"invalid",event:null,requeue:false,notice:null};
   if (!pbpNotesValidateEvent(left) || !pbpNotesValidateEvent(right,left.recordKey)) return invalid;
+  if (!left.deleted && !right.deleted && left.value.url !== right.value.url) return invalid;
   const relation = pbpVocabVectorRelation(left.vector,right.vector);
   if (relation === "equal") return {kind:pbpVocabEventContentEqual(left,right) ? "noop" : "corrupt",event:left,requeue:false,notice:null};
   if (relation === "left") return {kind:"noop",event:left,requeue:false,notice:null};
@@ -239,12 +241,16 @@ function pbpCreateNotesSyncStore({
       const previous=(await read(key)) || {v:1,url:next?.url || "",title:next?.title || "",items:[]};
       await checkOwner(owner);
       next=next || {...previous,items:[]};
+      if (previous.url && next.url && previous.url !== next.url) throw _pbpNotesSyncError("local_store");
+      if (previous.url && !next.url) next = {...next,url:previous.url};
+      const articleKey = /^pbp_hl_[0-9a-f]{8}$/.test(key);
+      if (articleKey && next.url && pbpNotesArticleKey(next.url) !== key) throw _pbpNotesSyncError("local_store");
       const hidden=rec=>(rec.items || []).filter(item=>item.owner && item.owner !== owner);
       if (!pbpVocabEventContentEqual(hidden(previous),hidden(next))) throw _pbpNotesSyncError("account_changed");
       let updated={...next};
       if (previous.notesSync) updated.notesSync=previous.notesSync;
-      const enrol=/^acct_.+/.test(owner) && /^pbp_hl_[0-9a-f]{8}$/.test(key) &&
-        typeof updated.url === "string" && pbpDictSafeUrl(updated.url) === updated.url && pbpNotesArticleKey(updated.url) === key;
+      const enrol=/^acct_.+/.test(owner) && articleKey &&
+        typeof updated.url === "string" && !!updated.url && pbpDictSafeUrl(updated.url) === updated.url;
       if (enrol) {
         const old=await normalizeLegacy(previous,owner);
         updated=await normalizeLegacy(updated,owner);
@@ -354,6 +360,7 @@ function pbpCreateNotesSyncStore({
       grouped.get(key).push(event);
     }
     let applied=0,merged=0,ignored=0;
+    let changed = false;
     try {
       await checkHash(owner,ownerHash);
       for (const [key,events] of grouped) await withLock(PBP_NOTES_SYNC_RECORD_LOCK_PREFIX+key,async()=>{
@@ -361,7 +368,10 @@ function pbpCreateNotesSyncStore({
         let rec=(await read(key)) || {v:1,url:"",title:"",items:[]};
         await checkOwner(owner);
         const state=ownerState(rec,owner);
+        const before = applied + merged;
         for (const remote of events) {
+          // Check the incoming article before projecting concurrent notes onto a winning version.
+          if (!remote.deleted && rec.url && rec.url !== remote.value.url) throw _pbpNotesSyncError("invalid_remote_page");
           const ident=_pbpNotesIdentity(remote.recordKey);
           if (!ident) throw _pbpNotesSyncError("invalid_remote_page");
           const id=ident.id;
@@ -387,13 +397,15 @@ function pbpCreateNotesSyncStore({
         rec=saveOwnerState(rec,owner,state);
         await checkOwner(owner);
         await store().set({[key]:rec});
+        if (applied + merged > before) changed = true;
       });
       if (cursorCommit && !await putAccountState(cursorCommit)) throw _pbpNotesSyncError("local_store");
       return {ok:true,applied,merged,ignored};
     } catch (error) {
       const code=typeof error.code === "string" ? error.code : "local_store";
       console.warn("[notes-sync] page apply failed:",error.name,code);
-      return {ok:false,error:code,retryable:error.retryable === true};
+      // Each article was committed separately. A later article or the cursor can fail.
+      return {ok:false,error:code,retryable:error.retryable === true,changed};
     }
   }
   async function checkpointOwner(owner) {

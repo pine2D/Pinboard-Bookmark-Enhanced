@@ -1812,6 +1812,11 @@ function _pbpNotesWriteNote(hit, note, ownerAtOpen) {
   if (typeof note !== "string") return Promise.resolve("gone");
   return _pbpNotesWriteItem(hit, {note}, ownerAtOpen);
 }
+// A confirmation belongs to the row the user saw. Even a legacy record
+// gaining or losing its URL requires a fresh selection before editing it.
+function _pbpNotesSameArticle(row, record) {
+  return row.url === (typeof record.url === "string" ? record.url : "");
+}
 async function _pbpNotesWriteOwnerMatches(ownerAtOpen, revision) {
   if (ownerAtOpen === null || revision !== _notesAuthRevision) return false;
   const raw = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
@@ -1839,6 +1844,7 @@ async function _pbpNotesWriteItem(hit, patch, ownerAtOpen) {
     const fresh = (await chrome.storage.local.get(hit.row.key))[hit.row.key];
     if (!await _pbpNotesWriteOwnerMatches(ownerAtOpen, revision)) return "changed";
     if (!fresh || !Array.isArray(fresh.items)) return "gone";
+    if (!_pbpNotesSameArticle(hit.row, fresh)) return "changed";
     const hasId = hit.item.id != null;
     // Legacy idless items are safe only when exactly one complete snapshot
     // still matches. Array indices can shift after a concurrent insertion.
@@ -2024,6 +2030,7 @@ function _pbpNotesDelete(row, anchor) {
           // Gone already (deleted elsewhere while the confirm was open):
           // nothing to remove, and re-creating it would be worse.
           if (!fresh) return;
+          if (!_pbpNotesSameArticle(row, fresh)) return "changed";
           const items = Array.isArray(fresh.items) ? fresh.items : [];
           const keep = items.filter((it) => !_pbpNotesItemVisible(it, ownerAtOpen));
           if (keep.length === items.length) return;
@@ -2101,6 +2108,7 @@ function _pbpNotesDeleteOne(hit, anchor) {
           const fresh = (await chrome.storage.local.get(hit.row.key))[hit.row.key];
           if (!await _pbpNotesWriteOwnerMatches(ownerAtOpen, revision)) return "changed";
           if (!fresh) return;
+          if (!_pbpNotesSameArticle(hit.row, fresh)) return "changed";
           const items = Array.isArray(fresh.items) ? fresh.items : [];
           const keep = items.filter((it, idx) => !_pbpNotesItemVisible(it, ownerAtOpen) || _pbpNotesHitKey(hit.row.key, it, idx) !== hit.key);
           if (keep.length === items.length) return;
@@ -2150,6 +2158,7 @@ function _pbpNotesBatchDelete() {
   const button = $id("notes-batch-delete");
   if (!button || button.disabled || _notesBatchBusy || !_notesSelected.size) return;
   const snapshot = [..._notesSelected];
+  const rowsAtOpen = _notesAllRows;
   const ownerAtOpen = _notesOwnerCache, revision = _notesAuthRevision;
   showConfirmPopover(button, {
     msg: t(pbpLibCountKey(snapshot.length, "notesBatchDeleteConfirmOne", "notesBatchDeleteConfirm"), String(snapshot.length)),
@@ -2183,7 +2192,7 @@ function _pbpNotesBatchDelete() {
       try {
         // A restore point before the first write; see pbpLibRestorePointBeforeDelete.
         await pbpLibRestorePointBeforeDelete();
-        for (const { row } of _notesAllRows) {
+        for (const { row } of rowsAtOpen) {
           // Pages this batch does not touch cost nothing: hit keys are
           // `${row.key}#${id}`, so the selection already says which records
           // will change. Reading (and locking) every other record just to
@@ -2207,6 +2216,7 @@ function _pbpNotesBatchDelete() {
               // Gone already (deleted elsewhere while the confirm was open):
               // nothing to remove, and re-creating it would be worse.
               if (!fresh) return;
+              if (!_pbpNotesSameArticle(row, fresh)) return "changed";
               const items = Array.isArray(fresh.items) ? fresh.items : [];
               // ponytail: _pbpNotesHitKey falls back to the array index for
               // legacy items with no `id`, so on such a record a concurrent

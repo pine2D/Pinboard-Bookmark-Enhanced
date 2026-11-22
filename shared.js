@@ -1554,6 +1554,19 @@ function pbpScopeHighlightBackupImport(highlights, ownerScope) {
   return out;
 }
 
+// The short storage key locates a slot. When a record has an article URL,
+// it is the identity. Early highlight records did not carry one.
+function pbpHighlightArticleMatches(record, url) {
+  return !record?.url || record.url === url;
+}
+
+function pbpRestoreHighlightArticle(stored, incoming) {
+  if (!stored?.url || !incoming) return incoming;
+  if (!incoming.url) return { ...incoming, url: stored.url };
+  if (!pbpHighlightArticleMatches(stored, incoming.url)) throw new Error("Highlight article mismatch");
+  return incoming;
+}
+
 // A restore replaces only what the importing account can see. The file carries
 // just that account's items (pbpBuildHighlightBackup scopes the export), while
 // the stored record is shared by every account that highlighted the page, so a
@@ -1562,6 +1575,7 @@ function pbpScopeHighlightBackupImport(highlights, ownerScope) {
 // somebody else are carried across unchanged, and an incoming item wins over a
 // stored one with the same id. Pure.
 function pbpMergeHighlightBackupRecord(stored, incoming, ownerScope) {
+  incoming = pbpRestoreHighlightArticle(stored, incoming);
   if (!stored || typeof stored !== "object" || Array.isArray(stored) || !Array.isArray(stored.items)) return incoming;
   const incomingItems = (incoming && Array.isArray(incoming.items)) ? incoming.items : [];
   const incomingIds = new Set(incomingItems
@@ -1585,6 +1599,7 @@ function pbpMergeHighlightBackupRecord(stored, incoming, ownerScope) {
 // The text identity is the one normalizeLegacy hashes. Returns null when
 // nothing is missing, so the caller writes nothing. Pure.
 function pbpAddMissingHighlightBackupRecord(stored, incoming, ownerScope) {
+  incoming = pbpRestoreHighlightArticle(stored, incoming);
   const incomingItems = (incoming && Array.isArray(incoming.items)) ? incoming.items : [];
   if (!stored || typeof stored !== "object" || Array.isArray(stored) || !Array.isArray(stored.items)) {
     return incomingItems.length ? incoming : null;
@@ -1605,7 +1620,7 @@ function pbpAddMissingHighlightBackupRecord(stored, incoming, ownerScope) {
   const missing = incomingItems.filter((item) => pbpHighlightBackupItemInScope(item, ownerScope) &&
     !(hasId(item) ? present.has("id:" + item.id) || idlessText.has(textIdentity(item)) : present.has(textIdentity(item))));
   if (!missing.length) return null;
-  return Object.assign({}, stored, { items: stored.items.concat(missing) });
+  return Object.assign({}, stored, incoming.url && !stored.url ? { url: incoming.url } : {}, { items: stored.items.concat(missing) });
 }
 
 function pbpIsPlainRecord(value) {
@@ -3629,7 +3644,7 @@ function pbpParamListClamp(list, maxBytes = PBP_PARAM_LIST_BYTE_BUDGET) {
 // syncSetLarge (chunked, local-fallback on quota) so a single >8KB key can't
 // reject the whole sync batch. The remaining keys go in one guarded set().
 // Returns {ok, fellBackToLocal, error?} — never throws on quota.
-async function persistSettings(data) {
+async function persistSettings(data, { previewModelChanges, previewModelReset = false } = {}) {
   let batch = { ...data };
   let fellBackToLocal = false;
   // Test seam: allow stubbing storage + syncSetLarge from the harness.
@@ -3664,6 +3679,31 @@ async function persistSettings(data) {
         : await getSettingsStorage());
       if (!testStorage && flags) _settingsStorageCache = storage;
       const routingActive = !!flags && pbpSecretRoutingActive(flags.optSyncEnabled, flags.syncApiKeys);
+      // Form writers send only provider entries actually edited. Re-read and
+      // merge under the same cross-document lock as the write. Ordinary
+      // backup/import callers omit this option and retain replacement semantics.
+      if (previewModelReset || (previewModelChanges && typeof previewModelChanges === "object")) {
+        delete batch.previewAiModelByProvider;
+        if (previewModelReset || Object.keys(previewModelChanges).length || batch.previewAiModel === "") {
+          const latest = await pbpReadSettingsUnlocked({ previewAiModelByProvider: {}, previewAiModel: "", aiProvider: "gemini" });
+          const map = latest.previewAiModelByProvider && typeof latest.previewAiModelByProvider === "object"
+            && !Array.isArray(latest.previewAiModelByProvider) ? { ...latest.previewAiModelByProvider } : {};
+          if (!Object.hasOwn(map, latest.aiProvider) && typeof latest.previewAiModel === "string" && latest.previewAiModel.trim()) {
+            map[latest.aiProvider] = latest.previewAiModel.trim();
+          }
+          // Only an explicit Reader reset clears providers this page has never
+          // seen. Apply edits made after Reset on top of that locked baseline.
+          if (previewModelReset) {
+            for (const provider of Object.keys(map)) map[provider] = "";
+            batch.previewAiModel = "";
+          }
+          for (const [provider, value] of Object.entries(previewModelChanges || {})) {
+            if (value === null) delete map[provider]; // Deleted custom provider.
+            else map[provider] = value;
+          }
+          batch.previewAiModelByProvider = map;
+        }
+      }
       // Preserve the upgrade user's existing library BEFORE any token write,
       // including logout and backup credential restore. This shares the secret
       // lock with readers, so an empty library setting cannot race the change.
@@ -5979,7 +6019,16 @@ function pbpReaderHistoryMerge(existingList, incoming, limit = PBP_READER_HISTOR
 
 let _pbpReaderHistoryChain = Promise.resolve();
 function _pbpReaderHistoryEnqueue(work) {
-  const run = _pbpReaderHistoryChain.then(work, work);
+  // One origin-scoped lock covers record/remove/clear across reader pages,
+  // popup and the worker. Keep the per-document chain as the no-Web-Locks
+  // fallback; acquire the lock only here, never inside a queued mutation.
+  const lockedWork = () => {
+    const locks = typeof navigator !== "undefined" && navigator.locks;
+    return locks && typeof locks.request === "function"
+      ? locks.request("pbp-reader-history", work)
+      : work();
+  };
+  const run = _pbpReaderHistoryChain.then(lockedWork, lockedWork);
   _pbpReaderHistoryChain = run.catch(() => {
     // swallow-ok: caller handles run's rejection; keep serial queue alive
   });
@@ -6593,6 +6642,7 @@ async function pbpTtsCacheClear() {
 // Regenerate with: node scripts/sync-runtime-messages.mjs --write
 // @generated:runtime-messages start (catalog)
 const PBP_RUNTIME_MESSAGES = Object.freeze({
+  tag_gov_retag_post: "tag_gov_retag_post",
   mdReaderBookmarkState: "mdReaderBookmarkState",
   mdReaderBookmarkSave: "mdReaderBookmarkSave",
   mdReaderBookmarkDelete: "mdReaderBookmarkDelete",

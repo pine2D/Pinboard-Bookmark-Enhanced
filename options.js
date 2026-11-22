@@ -1277,11 +1277,18 @@ async function pbpSaveOptionsSnapshot(state, data, overlayValue, {
   saveOverlay,
   assertOverlay,
   onSettingsSaved,
+  previewModelChanges,
+  previewModelReset = false,
 }) {
   const settingsDelta = pbpSettingsDelta(data, state.settings);
+  // Another form may have changed a provider since this form took its baseline.
+  // An intentional edit back to that baseline still needs to reach the lock.
+  if (previewModelReset || (previewModelChanges && Object.keys(previewModelChanges).length)) {
+    settingsDelta.previewAiModelByProvider = data.previewAiModelByProvider;
+  }
   const overlayChanged = overlayValue !== state.overlay;
   const res = Object.keys(settingsDelta).length
-    ? await persist(settingsDelta)
+    ? await persist(settingsDelta, { previewModelChanges, previewModelReset })
     : { ok: true, fellBackToLocal: false };
   if (!res.ok) throw res.error || new Error("settings save failed");
   if (Object.keys(settingsDelta).length) {
@@ -1312,6 +1319,21 @@ function pbpQueueOptionsSave(state, save) {
   return run;
 }
 
+// A Reader reset is a separate intent from editing one provider. Its sequence
+// survives failure and prevents an older completion consuming a newer reset.
+function pbpResetPreviewModels(state, map, edits) {
+  state.pending = ++state.revision;
+  for (const key of Object.keys(map)) map[key] = "";
+  for (const key of Object.keys(edits)) delete edits[key];
+}
+function pbpCommitPreviewModels(state, edits, submitted, resetRevision) {
+  if (state.pending !== resetRevision) return;
+  state.pending = 0;
+  for (const [provider, value] of Object.entries(submitted)) {
+    if (edits[provider] === value) delete edits[provider];
+  }
+}
+
 // Guard for storage.onChanged credential field refills: never overwrite an
 // active input, an edit made while the async secret read was in flight, or a
 // form value that differs from this page's last committed savedState baseline
@@ -1335,6 +1357,23 @@ function pbpShouldRefillSecretField({
   const baseObf = typeof baselineObfuscated === "string" ? baselineObfuscated : "";
   if (curObf !== baseObf) return false;
   return curPlain !== String(freshPlain || "");
+}
+
+// Read/refill a single credential while retaining drafts even when focus left
+// before the notification, or edits were saved while the read was pending.
+async function pbpRefreshSecretInput({ input, read, revision, baseline, hasFocus, activeElement, commit }) {
+  if (!input) return false;
+  const revBefore = revision();
+  const canRefill = !(hasFocus() && activeElement() === input)
+    && obfuscateKey(input.value.trim()) === baseline();
+  const plain = await read();
+  if (!canRefill || !pbpShouldRefillSecretField({ inputs: [input],
+    hasFocus: hasFocus(), activeElement: activeElement(), revBefore, revAfter: revision(),
+    baselineObfuscated: baseline(), freshPlain: plain,
+  })) return false;
+  input.value = plain;
+  commit(plain);
+  return true;
 }
 
 // Apply one saved-theme mutation to a stored list. The page's savedThemes
@@ -2192,7 +2231,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-reader-voice-input": false,
       },
       after: () => {
-        for (const k of Object.keys(_previewModelMap)) _previewModelMap[k] = "";
+        pbpResetPreviewModels(_previewModelReset, _previewModelMap, _previewModelEdits);
+        _previewModelShown = "";
         scheduleAutoSave();
       },
     },
@@ -3041,11 +3081,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   const _previewModelMap = (s.previewAiModelByProvider && typeof s.previewAiModelByProvider === "object"
       && !Array.isArray(s.previewAiModelByProvider))
     ? { ...s.previewAiModelByProvider } : {};
+  const _previewModelEdits = Object.create(null);
+  const _previewModelReset = { revision: 0, pending: 0 };
   let _previewModelProvider = s.aiProvider || "gemini";
+  let _previewModelShown = "";
+  function capturePreviewModelEdit() {
+    const value = $id("opt-preview-ai-model").value.trim();
+    if (value !== _previewModelShown) {
+      _previewModelMap[_previewModelProvider] = value;
+      _previewModelEdits[_previewModelProvider] = value;
+      _previewModelShown = value;
+    }
+  }
   if (!Object.prototype.hasOwnProperty.call(_previewModelMap, _previewModelProvider)
       && typeof s.previewAiModel === "string" && s.previewAiModel.trim()) {
     _previewModelMap[_previewModelProvider] = s.previewAiModel.trim();
   }
+
+  _previewModelShown = _previewModelMap[_previewModelProvider] ?? "";
 
   // Initialize the library before a bookmark-credential change can hide legacy data.
   await pbpPersonalLibraryAccount();
@@ -3157,7 +3210,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Between services this device has connected, picking one is the switch.
         if (pbpOptViewedBookmarkService() === service && service !== state.active && state.ready[service]) {
           const saved = await pbpSwitchBookmarkService(service);
-          if (!saved.ok) console.warn("[bookmark-service] switch failed:", saved.error?.name, saved.error?.message);
+          // Another window may switch again before this page receives its own
+          // successful response. The next render compares against our pick.
+          if (saved.ok) _bookmarkServiceShownActive = service;
+          else console.warn("[bookmark-service] switch failed:", saved.error?.name, saved.error?.message);
         }
       } catch (error) {
         console.warn("[bookmark-service] switch failed:", error?.name, error?.message);
@@ -4203,9 +4259,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   function syncPreviewModelToProvider(selected) {
     const el = $id("opt-preview-ai-model");
     if (el && selected && selected !== _previewModelProvider) {
-      _previewModelMap[_previewModelProvider] = el.value.trim();
+      capturePreviewModelEdit();
       _previewModelProvider = selected;
       el.value = _previewModelMap[selected] ?? "";
+      _previewModelShown = el.value;
     }
     const cap = $id("preview-ai-model-provider");
     const opt = $id("opt-ai-provider").selectedOptions[0];
@@ -4355,13 +4412,14 @@ document.addEventListener("DOMContentLoaded", async () => {
           ollamaGranted = false;
         }
         const select = $id("opt-ai-provider");
-        pbpOptAiCustomDeleteEntry({
+        const nextProvider = pbpOptAiCustomDeleteEntry({
           state: pbpOptAiCustomEditorState, id, current: select.value,
           snapshot: () => pbpLiveAiSettingsSnapshot(select.value),
           order: providers, ollamaGranted, previewModelMap: _previewModelMap,
           applyProvider: switchProvider,
           forgetHealth: pbpForgetConnectionHealth,
         });
+        if (nextProvider !== null) _previewModelEdits[id] = null;
         syncAddCustomButton();
         saveAllSafely();
         $id("opt-ai-provider-btn")?.focus();
@@ -4750,7 +4808,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       obsidianVault: (_ets.obsidian && _ets.obsidian.vault) || "",
       obsidianFolder: (_ets.obsidian && _ets.obsidian.folder) || "",
       previewAiModelByProvider: (() => {
-        _previewModelMap[_previewModelProvider] = $id("opt-preview-ai-model").value.trim();
+        capturePreviewModelEdit();
         return { ..._previewModelMap };
       })(),
       previewAiModel: "",
@@ -4803,12 +4861,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     setAutoSaveProgress("saving");
     const data = collectSettingsFromForm();
     const overlayValue = $id("opt-custom-css").value;
+    const previewModelChanges = { ..._previewModelEdits };
+    const previewModelResetRevision = _previewModelReset.pending;
     try {
       const result = await pbpSaveOptionsSnapshot(savedState, data, overlayValue, {
         persist: persistSettings,
+        previewModelChanges,
+        previewModelReset: previewModelResetRevision !== 0,
         saveOverlay: saveOverlayWithFallback,
         assertOverlay: pbpAssertOverlaySize,
         onSettingsSaved(settingsDelta) {
+          pbpCommitPreviewModels(_previewModelReset, _previewModelEdits, previewModelChanges, previewModelResetRevision);
           if ("optTheme" in settingsDelta || "themePresetKey" in settingsDelta || "optPopupFollowTheme" in settingsDelta) {
             pbpStoreOptionsThemeMirror(data.optTheme, data.themePresetKey, data.optPopupFollowTheme !== false);
           }
@@ -5071,6 +5134,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
   }
+  $id("opt-preview-ai-model").addEventListener("input", capturePreviewModelEdit);
+  let _pinboardFieldEditRev = 0;
+  $id("opt-pinboard-token")?.addEventListener("input", () => { _pinboardFieldEditRev++; });
   let _deepseekFieldEditRev = 0;
   deepseekKeyInput?.addEventListener("input", () => {
     _deepseekFieldEditRev++;
@@ -5218,19 +5284,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     _tokenFieldRefillTail = _tokenFieldRefillTail.then(async () => {
       const el = $id("opt-pinboard-token");
       if (!el) return;
-      // Never fight live typing: auto-save is debounced, so a half-typed token
-      // reaches storage, comes back through this listener and would be pasted
-      // over the keystrokes made since.
-      if (document.hasFocus() && document.activeElement === el) return;
-      const fresh = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
-      const plain = deobfuscateKey(typeof fresh.pinboardToken === "string" ? fresh.pinboardToken : "");
-      if (el.value.trim() === plain) return;
-      el.value = plain;
-      // Move the auto-save baseline with the field (collectSettingsFromForm
-      // obfuscates the trimmed input), so the delta stays empty and a later
-      // save cannot push the value we just replaced back to storage.
-      savedState.settings.pinboardToken = obfuscateKey(el.value.trim());
-      scheduleConnectionOverview();
+      await pbpRefreshSecretInput({
+        input: el, revision: () => _pinboardFieldEditRev,
+        baseline: () => savedState.settings.pinboardToken || "",
+        hasFocus: () => document.hasFocus(), activeElement: () => document.activeElement,
+        read: async () => {
+          const fresh = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
+          return deobfuscateKey(typeof fresh.pinboardToken === "string" ? fresh.pinboardToken : "");
+        },
+        commit: plain => {
+          savedState.settings.pinboardToken = obfuscateKey(plain);
+          scheduleConnectionOverview();
+        },
+      });
     }).catch((e) => {
       console.warn("[options] token field refresh failed:", e?.name, e?.message);
     });
@@ -6177,12 +6243,12 @@ async function confirmMergeGroup(group, canonical, anchorEl, expectedAccount) {
   const renames = plan.filter(op => op.op === "rename");
   const summary = renames.map(op => op.old + " -> " + canonical).join(" | ");
   // Renames run as per-bookmark re-saves (tags/rename is broken server-side), so the
-  // duration scales with bookmark count: one posts/all fetch per rename + one posts/add
+  // duration scales with bookmark count: one posts/all fetch per rename + posts/get and posts/add
   // per bookmark, each spaced 3.1s by the rate-limit queue.
   const canonLower = canonical.toLowerCase();
   const bookmarkCount = group.members.reduce((sum, m) =>
     (m && m.tag && m.tag.toLowerCase() !== canonLower) ? sum + (m.count || 0) : sum, 0);
-  const estSec = Math.ceil((renames.length + bookmarkCount) * 3.2);
+  const estSec = Math.ceil((renames.length + bookmarkCount * 2) * 3.2);
   const estStr = formatTagGovEst(estSec);
   const anchor = anchorEl;
   if (!anchor) return;
@@ -6267,94 +6333,50 @@ async function retagBookmarksViaResave(expectedAccount, oldTag, newTag, onProgre
       problems: [{ url: "", title: "", kind: "failed", reason: "posts/all: unexpected response" }], aborted: false };
   }
 
-  const oldLower = oldTag.toLowerCase();
-  let saved = 0, failed = 0, skipped = 0;
-  // Bookmarks actually re-saved with a changed tag set (`saved` also counts posts that
-  // already lacked the old tag). The entity repair needs the difference: a posts/all
-  // filter that matched nothing, or only unrelated posts, must not look like success.
-  let written = 0;
-  const problems = []; // { url, title, kind: "failed" | "skipped" } per bookmark
+  let saved = 0, failed = 0, skipped = 0, written = 0;
+  const problems = [];
   for (let i = 0; i < posts.length; i++) {
     if (_tagGovCancelRequested) {
       return { total: posts.length, saved, failed, skipped, problems, written, cancelled: true };
     }
-    const auth = await requireTagGovAuth(expectedAccount);
+    await requireTagGovAuth(expectedAccount);
     if (onProgress) onProgress(i, posts.length);
     const post = posts[i];
-    if (!post || !post.href) {
+    if (!post || typeof post.href !== "string" || !post.href) {
       failed++;
       problems.push({ url: "", title: (post && post.description) || "", kind: "failed", reason: "missing href" });
       continue;
     }
-    const tags = (post.tags || "").split(/\s+/).filter(Boolean);
-    // Pinboard tags are case-insensitive: match accordingly. Already clean -> count as done without a write.
-    if (!tags.some(tg => tg.toLowerCase() === oldLower)) { saved++; continue; }
-    const seen = new Set();
-    const next = [];
-    for (const tg of tags) {
-      const replaced = tg.toLowerCase() === oldLower ? newTag : tg;
-      const key = replaced.toLowerCase();
-      if (!seen.has(key)) { seen.add(key); next.push(replaced); }
-    }
-    const uri = buildPostsAddUri({
-      token: auth.token,
-      url: post.href,
-      title: post.description || post.href,
-      extended: post.extended || "",
-      tags: next.join(" "),
-      shared: post.shared,
-      toread: post.toread,
-      dt: post.time
-    });
-    // Never truncate a bookmark to fit the URI cap — skip it and surface the count instead.
-    if (uri.length > POSTS_ADD_URI_BUDGET) {
-      skipped++;
-      problems.push({ url: post.href, title: post.description || post.href, kind: "skipped" });
-      continue;
-    }
     try {
-      let r = await pinboardFetch(uri);
-      if (r.status === 429) {
+      // posts/all is only a URL worklist. The SW reads and re-tags the current
+      // row inside the same transaction as popup/reader saves and offline replay.
+      const attempt = async () => {
+        await requireTagGovAuth(expectedAccount);
+        const result = await chrome.runtime.sendMessage({ type: "tag_gov_retag_post",
+          account: expectedAccount, url: post.href, oldTag, newTag });
+        await requireTagGovAuth(expectedAccount);
+        if (result?.error === "account_changed") throw Object.assign(new Error("account_changed"), { code: "account_changed" });
+        if (!result || typeof result.status !== "string") throw new Error("invalid retag response");
+        return result;
+      };
+      let result = await attempt();
+      if (result.status === "rate_limited") {
         setWaitNote();
         await new Promise(rs => setTimeout(rs, TAG_GOV_RETRY_WAIT_MS));
         if (_tagGovCancelRequested) {
           return { total: posts.length, saved, failed, skipped, problems, written, cancelled: true };
         }
-        const retryAuth = await requireTagGovAuth(expectedAccount);
-        const retryUri = buildPostsAddUri({
-          token: retryAuth.token,
-          url: post.href,
-          title: post.description || post.href,
-          extended: post.extended || "",
-          tags: next.join(" "),
-          shared: post.shared,
-          toread: post.toread,
-          dt: post.time
-        });
-        r = await pinboardFetch(retryUri);
-        if (r.status === 429) {
-          // A persistent 429 on one bookmark: server-side throttling can still
-          // hit even now that every context rides the SW's single queue (the
-          // old cross-context slot collision is gone with the proxy rewire) —
-          // record it and move on instead of killing the whole run over one
-          // bookmark.
-          failed++;
-          problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: "HTTP 429" });
-          continue;
-        }
+        // A retry is a new lookup-to-write transaction, never a replayed URI.
+        result = await attempt();
       }
-      if (!r.ok) {
-        failed++;
-        problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: "HTTP " + r.status });
-        continue;
-      }
-      const data = await r.json();
-      if (data.result_code === "done") {
-        saved++;
-        written++;
+      if (result.status === "saved") { saved++; written++; }
+      else if (result.status === "unchanged") { saved++; }
+      else if (result.status === "too_large") {
+        skipped++;
+        problems.push({ url: post.href, title: post.description || post.href, kind: "skipped" });
       } else {
         failed++;
-        problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: String(data.result_code || "unknown") });
+        problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: result.httpStatus ? "HTTP " + result.httpStatus : result.error || "unknown" });
       }
     } catch (e) {
       if (e?.code === "account_changed") throw e;
@@ -6674,7 +6696,7 @@ async function _runTagGovBatch(ops, expectedAccount) {
           if (_tagGovUiOwned(expectedAccount) && ptext) {
             // Live ETA from the REAL bookmark total — the confirm-time estimate came
             // from possibly-stale cached counts. Upcoming ops add one posts/all each.
-            const remainSec = (total - done) * 3.2 + (ops.length - i - 1) * 3.2;
+            const remainSec = (total - done) * 6.4 + (ops.length - i - 1) * 3.2;
             const eta = remainSec >= 3 ? " · " + t("tagGovTimeLeft", formatTagGovEst(remainSec)) : "";
             ptext.innerHTML = opLine + " " + t("tagGovRetagProgress", String(done), String(total)) + eta + queueSuffix();
           }
@@ -7192,9 +7214,9 @@ function initTagGovEntityRepair() {
     const items = _tagGovEntityItems.filter((it) => picked.has(it.tag));
     if (!items.length) return;
     const bookmarkCount = items.reduce((sum, it) => sum + it.count, 0);
-    // Same arithmetic as the merge: one posts/all per tag + one posts/add per
+    // Same arithmetic as the merge: one posts/all per tag + posts/get and posts/add per
     // bookmark, each spaced 3.1 s by the rate-limit queue.
-    const estStr = formatTagGovEst(Math.ceil((items.length + bookmarkCount) * 3.2));
+    const estStr = formatTagGovEst(Math.ceil((items.length + bookmarkCount * 2) * 3.2));
     const shown = items.slice(0, 10).map((it) => it.tag + " -> " + it.repaired).join(" | ")
       + (items.length > 10 ? " | " + t("tagGovMoreCount", String(items.length - 10)) : "");
     showConfirmPopover(repairBtn, {

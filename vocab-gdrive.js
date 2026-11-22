@@ -812,7 +812,7 @@ function pbpCreateDriveSyncRunner({
   const accountKey = (permissionId, ownerHash) =>
     `account:${permissionId}:${ownerHash}`;
   const preflightKey = (ownerHash) => `preflight:${ownerHash}`;
-  const normalizedFailure = (source) => {
+  const classifyFailure = (source) => {
     if (source?.error === "account_changed") {
       return { ok: false, error: "account_changed", retryable: false };
     }
@@ -863,6 +863,10 @@ function pbpCreateDriveSyncRunner({
     let session = null;
     let connState = null;
     let changedLocal = false;
+    const normalizedFailure = source => {
+      const failure = classifyFailure(source);
+      return changedLocal ? { ...failure, changed: true } : failure;
+    };
     const count = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : 0);
     const putConnection = async (next) => {
       if (!connection || !/^[0-9a-f]{64}$/.test(ownerHash)) return false;
@@ -1040,10 +1044,9 @@ function pbpCreateDriveSyncRunner({
       const applied = await store.applyRemotePage(
         owner, ownerHash, batches, cursorCommit
       );
+      // Notes commit per article; other stores commit the whole page at once.
+      if (applied?.changed || (applied?.ok && (applied.applied || applied.merged))) changedLocal = true;
       if (!applied?.ok) return normalizedFailure(applied);
-      // Report whether local records actually moved, so the caller only wakes
-      // open pages when their snapshot is genuinely stale.
-      if ((applied.applied || 0) + (applied.merged || 0) > 0) changedLocal = true;
       return { ok: true };
     };
     const changesMetadata = (changes, skipSelf, deviceId) => {

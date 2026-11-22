@@ -1,4 +1,4 @@
-<!doctype html><meta charset="utf-8"><meta name="pbp-expected-count" content="126"><title>AI completion and required-thinking tests</title>
+<!doctype html><meta charset="utf-8"><meta name="pbp-expected-count" content="127"><title>AI completion and required-thinking tests</title>
 <div id="results"></div><div id="summary"></div>
 <script src="../i18n.js"></script><script src="../shared.js"></script><script src="../ai.js"></script>
 <script>
@@ -1138,6 +1138,25 @@ await test('the deadline ends the call during a capability write and during an e
     assert(st2.error?.name==='TimeoutError','A pending error body outlived the deadline');
     releaseJson();await clock.flush();
     assert(calls.length===1,'A late error body triggered a retry');
+  });
+});
+await test('non-2xx stalled error bodies retain idle timeout and caller abort priority',async()=>{
+  await withClock(async clock=>{
+    const errorBody=(init,live)=>{const b=liveBody(init.signal);live.bodies.push(b);return new Response(b.body,{status:503});};
+    reset([]);calls=[];const live=liveFetch([errorBody]);
+    const st=track(callAIStream(COMPAT.settings,'x',SNAP_ASK,()=>{}));
+    await clock.flush();
+    assert(calls.length===1&&!st.settled,'Error-body fixture did not stall');
+    await clock.advance(30000);
+    assert(st.settled&&st.error?.message==='AI stream timeout','Stalled HTTP error body outlived idle timeout');
+    assert(live.signals[0].aborted&&clock.timers.size===0,'Timed-out HTTP error request was not cleaned up');
+    assert(calls.length===1,'HTTP timeout retried');
+    reset([]);calls=[];liveFetch([errorBody]);
+    const caller=new AbortController();
+    const st2=track(callAIStream(COMPAT.settings,'x',{...SNAP_ASK,signal:caller.signal},()=>{}));
+    await clock.flush();clock.fireAll();caller.abort();await clock.flush();
+    assert(st2.settled&&st2.error?.name==='AbortError','Caller abort lost to HTTP error-body timeout');
+    assert(clock.timers.size===0&&calls.length===1,'Abort leaked timer or retried');
   });
 });
 await test('without a deadline the 30 s idle timeout is unchanged',async()=>{

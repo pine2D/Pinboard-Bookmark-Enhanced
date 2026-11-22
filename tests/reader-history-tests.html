@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="13"><title>Reader History Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="14"><title>Reader History Tests</title>
 <link rel="stylesheet" href="../md-preview.css">
 <style>
 #results { font-family: monospace; padding: 16px; max-width: 960px; }
@@ -91,6 +91,72 @@ function buildEchoMessages(enTable) {
     initI18n();
     return m;
   }
+
+  await test("history mutations share a cross-document lock and failed work releases it", async () => {
+    freshMock();
+    const frames = [];
+    const originalGet = chrome.storage.local.get;
+    try {
+      for (let i = 0; i < 2; i++) {
+        const frame = document.createElement("iframe");
+        frame.hidden = true;
+        frame.srcdoc = '<script>window.chrome=parent.chrome;<\/script><script src="../shared.js"><\/script>';
+        const loaded = new Promise(resolve => frame.onload = resolve);
+        document.body.appendChild(frame); frames.push(frame); await loaded;
+      }
+      const [a, b] = frames.map(frame => frame.contentWindow);
+      assert(typeof a.pbpReaderHistoryRecord === "function", "real shared.js did not load in second document");
+      chrome.storage.local.get = async (...args) => {
+        const result = await originalGet(...args);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return result;
+      };
+      await Promise.all([
+        a.pbpReaderHistoryRecord({ url: "https://example.com/a" }),
+        b.pbpReaderHistoryRecord({ url: "https://example.com/b" }),
+      ]);
+      assert((await pbpReaderHistoryRead()).length === 2, "simultaneous documents lost a record");
+      await Promise.all([
+        a.pbpReaderHistoryRecord({ url: "https://example.com/c" }),
+        b.pbpReaderHistoryRemove("https://example.com/a"),
+      ]);
+      const afterRemove = await pbpReaderHistoryRead();
+      assert(afterRemove.length === 2 && !afterRemove.some(row => row.url.endsWith("/a")), "remove interleaved with another document's record");
+      let entered = false, release;
+      const gate = new Promise(resolve => release = resolve);
+      chrome.storage.local.get = async (...args) => {
+        const result = await originalGet(...args); entered = true; await gate; return result;
+      };
+      const pending = a.pbpReaderHistoryRecord({ url: "https://example.com/d" });
+      await until(() => entered, "record read");
+      let cleared = false;
+      const clearing = b.pbpReaderHistoryClear().then(() => cleared = true);
+      await new Promise(resolve => setTimeout(resolve, 20));
+      const clearedEarly = cleared;
+      release(); await Promise.all([pending, clearing]);
+      assert(!clearedEarly, "clear bypassed an in-flight record's lock");
+      assert((await pbpReaderHistoryRead()).length === 0, "record resurrected history after clear");
+      chrome.storage.local.get = async () => { throw new Error("fixture read failed"); };
+      assert(await a.pbpReaderHistoryRecord({ url: "https://example.com/fail" }) === false, "failed write did not report false");
+      chrome.storage.local.get = originalGet;
+      assert(await b.pbpReaderHistoryRecord({ url: "https://example.com/recovered" }), "failed mutation held the shared lock");
+      // Legacy/direct-open environments without Web Locks retain the existing
+      // document-local queue, including after a rejected mutation.
+      Object.defineProperty(a.navigator, "locks", { value: undefined, configurable: true });
+      chrome.storage.local.get = async () => { throw new Error("fixture fallback read failed"); };
+      assert(await a.pbpReaderHistoryRecord({ url: "https://example.com/fallback-fail" }) === false, "fallback failure was not reported");
+      chrome.storage.local.get = async (...args) => {
+        const result = await originalGet(...args);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return result;
+      };
+      await Promise.all([1, 2].map(n => a.pbpReaderHistoryRecord({ url: "https://example.com/fallback-" + n })));
+      assert((await pbpReaderHistoryRead()).length === 3, "no-Web-Locks fallback lost same-document updates");
+    } finally {
+      chrome.storage.local.get = originalGet;
+      frames.forEach(frame => frame.remove());
+    }
+  });
 
   // 1. Storage boundary, reclaim exclusion, and settings-cache isolation
   await test("pbp_reader_history is protected from storage reclaim and excluded from synced settings", async () => {

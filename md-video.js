@@ -3617,8 +3617,9 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // AND from the record read, and applies each record once (Codex r2 H1).
   // Every legal rate replays, 1x included: a saved 1x must beat the rate
   // YouTube itself remembers for the account. The YouTube relay queues a
-  // rate that arrives before its player is built; the bilibili bridge sets
-  // it directly. The report that follows mirrors it back into the picker.
+  // rate that arrives before its player is built; the bilibili bridge also
+  // retains it until media mounts and across media replacement. The report
+  // that follows mirrors it back into the picker.
   let _rateAppliedFor = null;
   function applySavedRate() {
     if (!_relayAlive || !_savedRec || _rateAppliedFor === _savedRec) return;

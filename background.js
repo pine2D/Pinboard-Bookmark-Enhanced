@@ -3,7 +3,7 @@
 // ============================================================
 
 importScripts(
-  "i18n.js", "shared.js", "bookmark-services.js", "vocab-store.js", "vocab-gdrive.js", "notes-sync.js", "notes-gdrive.js", "restore-points.js",
+  "i18n.js", "shared.js", "tag-gov-save.js", "bookmark-services.js", "vocab-store.js", "vocab-gdrive.js", "notes-sync.js", "notes-gdrive.js", "restore-points.js",
   "ai-cache.js", "dict-archive.js", "dict-archive-gdrive.js", "ask-archive.js", "ask-archive-gdrive.js", "ai.js", "jina.js", "wayback.js"
 );
 
@@ -3627,6 +3627,7 @@ async function pbpReconcileDriveAlarms() {
 }
 
 async function pbpRunDriveDataset(type, auth, ownerScope, runOptions) {
+  const scopeEpoch = driveScopeEpoch;
   driveSession.type = type;
   driveSession.permissionId = "";
   driveSession.identityVersion = driveIdentityVersion;
@@ -3640,7 +3641,8 @@ async function pbpRunDriveDataset(type, auth, ownerScope, runOptions) {
       result = null;
     }
     if (!result || typeof result !== "object") result = { ok: false, error: "unexpected", retryable: true };
-    if (result.ok && result.changed && auth && pbpLibraryAuthIsCurrent(auth)) {
+    if (result.changed && result.error !== "account_changed" && auth &&
+        driveScopeEpoch === scopeEpoch && pbpLibraryAuthIsCurrent(auth)) {
       pbpBroadcastVocabSynced(ownerScope, type);
     }
     if (result.ok && !result.status?.waitingForRetry) {
@@ -5234,6 +5236,15 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     }).catch(() => {
       _batchRunning = false;
       sendResponse({ status: "account_changed" });
+    });
+    return true;
+  }
+
+  if (message.type === "tag_gov_retag_post") {
+    if (new URL(sender.url).pathname !== "/options.html") { sendResponse({ status: "failed", error: "forbidden" }); return true; }
+    pbpRetagPinboardPost(message).then(sendResponse).catch((error) => {
+      console.warn("[tag-gov] retag failed:", error?.name, error?.code || "network_error");
+      sendResponse({ status: "failed", error: error?.code || "network_error" });
     });
     return true;
   }

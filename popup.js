@@ -2128,7 +2128,7 @@ function pbpFragmentProbeWait(probeAtClick, settledAtClick) {
 // prefetch (optional): { prefetchUrl, prefetchPromise } — a get_bookmark_data lookup
 // kicked off in parallel from showMain. Used only when prefetchUrl matches the url we
 // actually need (else a stale prefetch would mislead). Misses fall back to a live fetch.
-async function checkExistingBookmark(token, url, prefetch, forceFresh = false, submittedTags) {
+async function checkExistingBookmark(token, url, prefetch, forceFresh = false, submittedTags, preserveLiveTags = false) {
   const lookupUrl = String(url || "").trim();
   // Clear any optimistic first-paint mirror before the source-of-truth lookup.
   // A found result restores the edit UI; missing/failed results leave it cleared.
@@ -2167,12 +2167,16 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         // Late lookup may follow accepted AI/cache tags or manual edits. Align
         // only the surviving choices, keeping exact old twins and group-based
         // AI provenance; do not reintroduce anything the user removed.
-        currentTags = pbpAlignIncomingTags(currentTags, ownTagNames, null, false);
-        if (Array.isArray(submittedTags)) submittedTags = pbpAlignIncomingTags(submittedTags, ownTagNames, null, false);
-        currentTags = Array.isArray(submittedTags)
-          ? pbpRebasePopupTags(pbpBookmarkServiceId(settings) === "pinboard"
-            ? existingBookmark.tags || "" : existingBookmark.tagNames || [], submittedTags, currentTags)
-          : (pbpPopupDraftRestoredField("tags") || _tagsUserTouched) ? currentTags : Array.isArray(existingBookmark.tagNames) ? [...new Set([...existingBookmark.tagNames, ...currentTags])] : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
+        // Conflict reloads retain the live tag draft until the caller rebases
+        // it on this fresh row, including edits made while the lookup waited.
+        if (!preserveLiveTags) {
+          currentTags = pbpAlignIncomingTags(currentTags, ownTagNames, null, false);
+          if (Array.isArray(submittedTags)) submittedTags = pbpAlignIncomingTags(submittedTags, ownTagNames, null, false);
+          currentTags = Array.isArray(submittedTags)
+            ? pbpRebasePopupTags(pbpBookmarkServiceId(settings) === "pinboard"
+              ? existingBookmark.tags || "" : existingBookmark.tagNames || [], submittedTags, currentTags)
+            : (pbpPopupDraftRestoredField("tags") || _tagsUserTouched) ? currentTags : Array.isArray(existingBookmark.tagNames) ? [...new Set([...existingBookmark.tagNames, ...currentTags])] : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
+        }
         renderTags();
         $id("submit-btn").textContent = t("update");
         $id("delete-btn").classList.remove("hidden");
@@ -2458,6 +2462,13 @@ function setupSubmit(token) {
   const submitAccount = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
   let submitErrorResetTimer = null;
   let submitAttemptSeq = 0;
+  // Both conflict paths adopt only an answered lookup. Call after any tag
+  // rebase, so the last dispatched draft holds the complete reviewed form.
+  const rememberReviewedLookup = (status) => {
+    if (status !== "found" && status !== "missing") return;
+    _popupDraftBase = null;
+    pbpRememberPopupDraft();
+  };
 
   // Pinboard takes one API call per 3s and the bookmark lookup made on open
   // already spent the slot, so a save can sit at "Saving…" for 2-3s with
@@ -2718,8 +2729,12 @@ function setupSubmit(token) {
         ? { "title-input": existingBookmark.description, "description-input": existingBookmark.extended,
           "linkding-description-input": typeof existingBookmark.summary === "string" ? pbpBookmarkDescriptionText(existingBookmark.summary) : undefined }
         : null;
-      Object.keys(fieldDirtyFlags).forEach((id) => { fieldDirtyFlags[id] = false; });
-      _tagsUserTouched = false;
+      // Pending delivery does not commit the form. Preserve its dirty flags
+      // through failures, queued writes and abandoned account/URL contexts.
+      const fieldsAtSubmit = Object.fromEntries(Object.keys(fieldDirtyFlags).map(id => {
+        const el = $id(id);
+        return [id, { value: el.value, checked: el.checked }];
+      }));
 
       // Host permission first: without it the background's archive call returns
       // at wayback.js's own permissions gate, so the indicator would claim an
@@ -2769,16 +2784,15 @@ function setupSubmit(token) {
 
       if (result.status === "failed" && result.reason === "changed_elsewhere") {
         // Nothing was written. The form takes the bookmark as the server holds
-        // it now (the worker's own check found it, so no request is made
-        // here): the fields the user left alone show the new values, the ones
+        // it now (using the worker's row, or a fresh lookup if unavailable):
+        // the fields the user left alone show the new values, the ones
         // they changed keep their text, and their tag changes are made on the
         // new tags. Their next press saves on top of that version.
         for (const id of Object.keys(fieldDirtyFlags)) fieldDirtyFlags[id] = fieldDirtyFlags[id] || dirtyAtSubmit[id] === true;
         _tagsUserTouched = _tagsUserTouched || tagsTouchedAtSubmit;
-        const mineTags = currentTags.slice();
         const latest = result.latestPost && typeof result.latestPost === "object" ? result.latestPost : null;
         const reloadPromise = checkExistingBookmark(token, url,
-          latest ? { prefetchUrl: url, prefetchPromise: Promise.resolve({ posts: [latest], account: submitAccount }) } : null, !latest);
+          latest ? { prefetchUrl: url, prefetchPromise: Promise.resolve({ posts: [latest], account: submitAccount }) } : null, !latest, undefined, true);
         const reloadGeneration = bookmarkLookup.generation;
         const reloaded = await reloadPromise;
         if (!ownsSubmitUi()) return;
@@ -2787,15 +2801,14 @@ function setupSubmit(token) {
           return;
         }
         if (reloaded.status === "found") {
-          currentTags = pbpRebaseLoadedTags(loadedTagsAtSubmit, mineTags, existingBookmark?.tagNames);
+          currentTags = pbpRebaseLoadedTags(loadedTagsAtSubmit, currentTags, existingBookmark?.tagNames);
           renderTags();
-          _popupDraftBase = null;
-          pbpRememberPopupDraft();
         }
+        rememberReviewedLookup(reloaded.status);
         // A field the user edited that the server now holds differently (and,
         // when known, differently from what the form loaded) keeps the user's
         // text; the server's value is named so the next press is made knowing it.
-        const theirs = reloaded.status === "found" && existingBookmark ? pbpPopupServerFieldNotes(dirtyAtSubmit, loadedFieldsAtSubmit) : "";
+        const theirs = reloaded.status === "found" && existingBookmark ? pbpPopupServerFieldNotes(fieldDirtyFlags, loadedFieldsAtSubmit) : "";
         showStatus("status-msg", t(result.unverified ? "saveNeedsReview" : "bookmarkChangedElsewhere") + (theirs ? " " + theirs : ""), "info");
         setSubmitState("idle");
         return;
@@ -2828,7 +2841,6 @@ function setupSubmit(token) {
       }
 
       if (result.status === "skipped" || (result.status === "failed" && result.reason === "conflict")) {
-        _popupDraftBase = null;
         // An update's edits are put back before the recheck, as for
         // changed_elsewhere: if the bookmark is gone, the missing lookup may
         // prefill from server metadata, which must not replace what the user
@@ -2845,6 +2857,7 @@ function setupSubmit(token) {
           setSubmitState("idle");
           return;
         }
+        rememberReviewedLookup(conflictLookup.status);
         if (conflictLookup.status === "found") {
           // Same shape as review_required: the save did not land, press again.
           showStatus("status-msg", t("saveNeedsReview"), "info");
@@ -2873,6 +2886,14 @@ function setupSubmit(token) {
       }
 
       if (result.status === "saved") {
+        // Commit only fields still equal to the delivered snapshot; later
+        // edits must survive the fresh lookup after a create/merge.
+        for (const [id, submitted] of Object.entries(fieldsAtSubmit)) {
+          const el = $id(id);
+          if (el.value === submitted.value && el.checked === submitted.checked) fieldDirtyFlags[id] = false;
+        }
+        if (currentTags.length === tags.length && currentTags.every((tag, i) => tag === tags[i])
+            && $id("tags-input").value.trim() === "") _tagsUserTouched = false;
         // A successful delivery consumes only this click's sharing choice.
         // Controls remain editable during I/O: a newer toggle, even back to
         // the same value, belongs to the next save and keeps its provenance.

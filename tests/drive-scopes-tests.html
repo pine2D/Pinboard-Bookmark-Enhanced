@@ -1,4 +1,4 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="105"><title>Drive Round Orchestration Tests</title>
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="108"><title>Drive Round Orchestration Tests</title>
 <style>body{font-family:monospace;padding:16px}.case{padding:6px}.pass{color:green}.fail{color:red}</style>
 </head><body><h1>Drive Round Orchestration Tests</h1><div id="summary"></div><div id="results"></div>
 <script src="../shared.js"></script>
@@ -16,6 +16,7 @@ const backoffRow = (code, retryAt) => ({ key: "preflight:" + HASH, ownerHash: HA
 const connRow = (patch) => ({ lastError: "network", authAttempts: 0, retryAttempt: 1, retryAt: null, blocked: false, updatedAt: 1, ...patch });
 function harness(source, seed = {}, results = {}) {
   const local = { vocabDriveConnected: true, ...seed }, calls = [], runs = [], alarms = [], deletes = [], notifications = [], forgets = [], removed = [], accountPuts = [];
+  const messages = [];
   const alarmMap = new Map(Object.entries(structuredClone(results.alarmSeed || {})));
   const empty = { states: [], outbox: [], batches: [], notices: [] };
   const client = { async connect() { calls.push("authorize"); return { ok: true, permissionId: "google-a", emailAddress: "current@example.test", displayName: "Current" }; }, async about() { return results.googleIdentity || { ok: true, permissionId: "google-a" }; } };
@@ -27,7 +28,7 @@ function harness(source, seed = {}, results = {}) {
     return result;
   };
   const deps = {
-    chrome: { runtime: { getManifest: () => ({}), sendMessage: async () => {} }, storage: { local: {
+    chrome: { runtime: { getManifest: () => ({}), sendMessage: async message => { messages.push(structuredClone(message)); } }, storage: { local: {
       async get(query) {
         // connReadError: chrome.storage.local failing for the shared connection record only.
         if (results.connReadError && (typeof query === "string" ? [query] : Object.keys(query)).some((key) => key.startsWith("driveConnState:"))) throw new Error("connection storage unavailable");
@@ -83,7 +84,7 @@ function harness(source, seed = {}, results = {}) {
   const factory = new Function(...Object.keys(deps), source.slice(start, end) + `
     return { queue: pbpQueueDriveRound, connect: pbpConnectDrive, status: pbpGetVocabDriveStatus,
       reconcile: pbpReconcileDriveAlarms, connection: driveConnectionStore, epoch: () => driveScopeEpoch };`);
-  return { ...factory(...Object.values(deps)), calls, runs, local, alarms, alarmMap, deletes, notifications, forgets, removed, accountPuts };
+  return { ...factory(...Object.values(deps)), messages, calls, runs, local, alarms, alarmMap, deletes, notifications, forgets, removed, accountPuts };
 }
 // pinIdentity: run 1's own client keeps minting the token of the account it
 // bound, so its identity re-checks still match and only the epoch Connect
@@ -352,6 +353,18 @@ function refreshHarness(source, opts = {}) {
   const round = await h.queue({});
   // Simplest miss: running vocabulary alone (the old default) or notes first.
   check("a connected device runs vocabulary then notes in one round", round.ok && h.calls.join() === "vocabulary,notes,dictionary,ask");
+  const partialData = { ok:false, error:"network", retryable:true, changed:true };
+  const partialRun = harness(source, {}, { vocabulary:partialData });
+  const failedRun = await partialRun.queue({});
+  const vocabMessages = h => h.messages.filter(m => m.type === "PBP_VOCAB_SYNCED");
+  check("a failed round wakes open vocabulary pages once for already committed words",
+    !failedRun.ok && vocabMessages(partialRun).length === 1 && vocabMessages(partialRun)[0].owner === "acct_alice");
+  const quietRun = harness(source, {}, { vocabulary:{ ...partialData, changed:false } });
+  await quietRun.queue({});
+  check("an error before a local commit sends no vocabulary refresh", vocabMessages(quietRun).length === 0);
+  const switchedRun = harness(source, {}, { vocabulary:{ ...partialData, error:"account_changed" } });
+  await switchedRun.queue({});
+  check("an obsolete owner never announces partial results", vocabMessages(switchedRun).length === 0);
   h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false });
   const staleKeys = await h.queue({});
   // Simplest miss: still honouring a scope key left on disk before the migration.

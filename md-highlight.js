@@ -637,6 +637,10 @@ async function _pbpHlLoadStrict(url) {
         Array.isArray(rec) ? "array" : typeof rec);
       return null;
     }
+    if (!pbpHighlightArticleMatches(rec, url)) {
+      console.warn("[hl] highlight slot belongs to another article; refusing to overwrite it");
+      return null;
+    }
     return rec.items;
   } catch (e) {
     console.warn("[hl] highlight read failed", e && e.name, e && e.message);
@@ -3076,12 +3080,13 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
     if (area !== "local" || !_pbpHlState) return;
     const c = changes[_pbpHlKey(_pbpHlState.url)];
     if (!c) return;
-    const next = (c.newValue && Array.isArray(c.newValue.items)) ? c.newValue.items : [];
+    const sameArticle = pbpHighlightArticleMatches(c.newValue, _pbpHlState.url);
+    const next = sameArticle && Array.isArray(c.newValue?.items) ? c.newValue.items : [];
     // Self-write echo carries identical content; skip to avoid re-anchoring on
     // every save. Compared RAW vs RAW (_pbpHlRawItems mirrors the last known
     // full stored array): the display set is owner-filtered and would differ
     // from every echo once another account's items share the record.
-    if (!pbpHlItemsSame(next, _pbpHlRawItems) && !pbpHlItemsSame(next, _pbpHlEchoItems)) {
+    if (!pbpHlItemsSame(next, _pbpHlRawItems) && (!sameArticle || !pbpHlItemsSame(next, _pbpHlEchoItems))) {
       _pbpHlRawItems = next;
       _pbpHlState.items = _pbpHlOwnerPending ? [] : pbpHlVisibleItems(next, _pbpHlOwner);
       // Retire the echo: it has been overtaken, and keeping it would mask a
