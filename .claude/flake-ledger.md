@@ -17,12 +17,12 @@
 | 2026-10-06 | render-audit 分片 0：行悬停填充色 | 在颜色过渡中途读取，两次尝试的失败状态不同 | 已根治 d71f6c17 | - |
 | 2026-10-22 | tests/md-ai-tests.html：scroll-spy | 同一提交前两次尝试失败，第三次通过 | 已根治 788c60cf | - |
 | 2026-10-23 | tests/md-ai-tests.html：scroll-spy | 侧栏位置 560 对 622，夹具几何没有隔离 | 已根治 788c60cf | - |
-| 2026-11-05 | tests/export-targets-tests.html：渲染未跑完 | 停在 144/153 行，连续两次运行，其中一次是只改 README 的提交 | 未处理 | - |
+| 2026-11-05 | tests/export-targets-tests.html：渲染未跑完 | 停在 144/153 行，连续两次运行，其中一次是只改 README 的提交 | 已根治 96102ee4 | - |
 | 2026-11-05 | bookmark-service-runtime：linkding 弹窗的未改动状态 | 等待超时 | 已根治 b968f907 | - |
 | 2026-11-05 | render-audit 分片 0：未选中列表头的面色 | 测量受鼠标悬停影响 | 已根治 fe264f5e | - |
-| 2026-11-06 | bookmark-service-runtime：linkding 连接状态行 | 等了 10 秒仍是隐藏，重跑后通过 | 未处理 | - |
-| 2026-11-07 | render-audit 分片 0：前提检查 | 夹具前提失败 1 次，重跑后通过 | 未处理 | - |
+| 2026-11-06 | bookmark-service-runtime：linkding 连接状态行 | 等了 10 秒仍是隐藏，重跑后通过 | 已根治 ccf2083e | - |
+| 2026-11-07 | render-audit 分片 0：前提检查 | 夹具前提失败 1 次，重跑后通过 | 已根治 ccf2083e | - |
 | 2026-11-18 | tests/bookmark-live-preflight-tests.mjs：docker fake executor | linkding 凭据或档案验证与 Karakeep 注册同时失败，首次报告的错误随时序变化 | 已根治 b25de629 | - |
 | 2026-11-18 | bookmark-service-runtime：跨窗口切换后的服务单选框 | 本页已写入 linkding，另一窗口切回 Karakeep 后单选框仍停在 linkding；固定两个写入的响应顺序可以复现 | 已根治 3d977db1 | - |
 | 2026-11-18 | reader-save-export：Ask 导出夹具的个人库身份 | 启动时尚未完成的初始化覆盖了夹具的 qa 身份，读取 Ask 档案报 account_changed；串行建立夹具后双窗口导出通过 | 已根治 535ad4ae | - |
-| 2026-11-18 | tests/ai-cache-tests.html：空池并发写入精确容量 | 页面一次停在 20/32，下一项并发写入两个缓存池；独立运行时全部 32 项通过，首次停顿原因未确定 | 未处理 | - |
+| 2026-11-18 | tests/ai-cache-tests.html：空池并发写入精确容量 | 页面一次停在 20/32，下一项并发写入两个缓存池；独立运行时全部 32 项通过，首次停顿原因未确定 | 已根治 96102ee4 | - |
