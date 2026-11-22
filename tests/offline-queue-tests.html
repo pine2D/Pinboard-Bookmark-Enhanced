@@ -36,8 +36,8 @@ async function queueIntentHarness() {
   const source = await (await fetch("../background.js")).text();
   const block = (startText, endText) => {
     const start = source.indexOf(startText);
-    const end = source.indexOf(endText, start);
-    assert(start >= 0 && end > start, "queue intent source block not found");
+    const end = source.indexOf(endText, start === -1 ? 0 : start);
+    assert(start !== -1 && end !== -1 && end > start, "queue intent source block not found");
     return source.slice(start, end);
   };
   return new Function("pbpPinboardAccountFromToken", `

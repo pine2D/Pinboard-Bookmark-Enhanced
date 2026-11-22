@@ -79,8 +79,8 @@ function buildSweepHarness(source, opts) {
 
 function buildStorageAccessHarness(source, opts) {
   const start = source.indexOf("const PBP_STORAGE_ACCESS_RETRY_ALARM");
-  const end = source.indexOf("// Re-assert trusted-only storage", start);
-  if (start < 0 || end <= start) return null;
+  const end = source.indexOf("// Re-assert trusted-only storage", start === -1 ? 0 : start);
+  if (start === -1 || end === -1 || end <= start) return null;
   const calls = { local: [], sync: [], create: [], clear: [], warn: [] };
   const o = opts || {};
   const area = (name) => ({
@@ -128,8 +128,8 @@ function buildStorageAccessHarness(source, opts) {
 // alarms are the real schedule and must stay immediate.
 function buildBootDriveSyncHarness(source, opts) {
   const start = source.indexOf("const PBP_VOCAB_BOOT_SYNC_KEY");
-  const end = source.indexOf("async function pbpDisconnectVocabDrive", start);
-  if (start < 0 || end <= start) return null;
+  const end = source.indexOf("async function pbpDisconnectVocabDrive", start === -1 ? 0 : start);
+  if (start === -1 || end === -1 || end <= start) return null;
   const o = opts || {};
   const local = o.local || {};
   const syncs = [];
@@ -165,8 +165,8 @@ function buildBootDriveSyncHarness(source, opts) {
 // Drive branch matters here; the other branches get inert stand-ins.
 function buildDriveAlarmRouterHarness(source) {
   const start = source.indexOf("chrome.alarms.onAlarm.addListener");
-  const end = source.indexOf("// React to settings change", start);
-  if (start < 0 || end <= start) return null;
+  const end = source.indexOf("// React to settings change", start === -1 ? 0 : start);
+  if (start === -1 || end === -1 || end <= start) return null;
   const boots = [], listeners = [];
   const inert = () => Promise.resolve();
   const deps = {
@@ -190,8 +190,8 @@ function buildDriveAlarmRouterHarness(source) {
 // ---- Undo notification harness ----
 function buildUndoHarness(source, opts) {
   const start = source.indexOf("// F7: Track recent saves");
-  const end = source.indexOf("// ---- Show Chrome notification", start);
-  if (start < 0 || end <= start) throw new Error("undo source not found");
+  const end = source.indexOf("// ---- Show Chrome notification", start === -1 ? 0 : start);
+  if (start === -1 || end === -1 || end <= start) throw new Error("undo source not found");
   const o = opts || {};
   const cleared = [];
   const alarms = [];
@@ -886,8 +886,8 @@ function buildUndoHarness(source, opts) {
   // (plus its module-scope state and helpers) straight out of background.js.
   function buildImgFixSweepHarness(opts) {
     const start = source.indexOf("const PBP_IMGFIX_RULE_MIN");
-    const end = source.indexOf("// A preview tab navigating AWAY is the leak", start);
-    if (start < 0 || end <= start) throw new Error("imgfix sweep source not found");
+    const end = source.indexOf("// A preview tab navigating AWAY is the leak", start === -1 ? 0 : start);
+    if (start === -1 || end === -1 || end <= start) throw new Error("imgfix sweep source not found");
     const o = opts || {};
     const calls = [];
     const spy = (name, ret) => (...args) => { calls.push([name, args]); return typeof ret === "function" ? ret(...args) : ret; };
@@ -942,10 +942,10 @@ function buildUndoHarness(source, opts) {
   const bookmarkServiceOf = (settings) => settings?.bookmarkService === "karakeep" || settings?.bookmarkService === "linkding" ? settings.bookmarkService : "pinboard";
   {
     const aStart = source.indexOf("async function _syncBadgeAlarm");
-    const aEnd = source.indexOf("_syncKeepaliveAlarm();\n_syncBadgeAlarm();", aStart);
+    const aEnd = source.indexOf("_syncKeepaliveAlarm();\n_syncBadgeAlarm();", aStart === -1 ? 0 : aStart);
     const lStart = source.indexOf("chrome.storage.onChanged.addListener((changes) => {\n  if (changes.optShowBadge");
-    const lEnd = source.indexOf("// ---- Markdown preview via keyboard shortcut", lStart);
-    check("badge alarm / storage listener source markers exist", aStart > 0 && aEnd > aStart && lStart > 0 && lEnd > lStart);
+    const lEnd = source.indexOf("// ---- Markdown preview via keyboard shortcut", lStart === -1 ? 0 : lStart);
+    check("badge alarm / storage listener source markers exist", aStart !== -1 && aEnd !== -1 && aEnd > aStart && lStart !== -1 && lEnd !== -1 && lEnd > lStart);
     const build = (settings) => {
       const alarms = new Set(), badgeUpdates = [], listeners = [];
       const chrome = {
@@ -997,7 +997,8 @@ function buildUndoHarness(source, opts) {
   }
   {
     const start = source.indexOf("async function handleSaveTabSet");
-    const end = source.indexOf("// ---- Storage change listener ----", start);
+    const end = source.indexOf("// ---- Storage change listener ----", start === -1 ? 0 : start);
+    if (start === -1 || end === -1 || end <= start) throw new Error("handleSaveTabSet source not found");
     const build = (service) => {
       const notes = [], fetches = [], created = [];
       const deps = {

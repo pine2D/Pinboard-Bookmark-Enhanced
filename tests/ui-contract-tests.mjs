@@ -59,6 +59,20 @@ const root = resolve(import.meta.dirname, "..");
 const read = (file) => readFileSync(resolve(root, file), "utf8");
 const fail = [];
 const check = (ok, msg) => { if (!ok) fail.push(msg); };
+function sliceBetween(src, startNeedle, endNeedle, label) {
+  const start = src.indexOf(startNeedle);
+  const end = src.indexOf(endNeedle, start === -1 ? 0 : start + startNeedle.length);
+  check(start !== -1 && end !== -1 && end > start,
+    `ui-contract: slice anchor missing (${label || startNeedle})`);
+  return start !== -1 && end !== -1 && end > start ? src.slice(start, end) : "";
+}
+function fnBodyChecked(src, sig) {
+  const start = src.indexOf(sig);
+  const end = src.indexOf("\n}\n", start === -1 ? 0 : start + sig.length);
+  check(start !== -1 && end !== -1 && end > start,
+    `ui-contract: function body anchor missing (${sig.trim()})`);
+  return start !== -1 && end !== -1 && end > start ? src.slice(start + sig.length, end) : "";
+}
 
 // Cached syntax data is shared only within this audit invocation. These
 // fixtures guard both the context/source-order contract and accidental
@@ -1501,10 +1515,7 @@ check(libraryVocabJs.includes('card.setAttribute("aria-selected", isSelected ? "
 // handler and select after all -- and neither keydown path selects.
 {
   const libraryNotesSrc = read("library-notes.js");
-  const spaceHandler = (src, anchor) => {
-    const at = src.indexOf(anchor);
-    return at < 0 ? "" : src.slice(at, src.indexOf("});", at));
-  };
+  const spaceHandler = (src, anchor) => sliceBetween(src, anchor, "});", `library spaceHandler ${anchor}`);
   const vocabSpace = spaceHandler(libraryVocabJs, 'head.addEventListener("keydown"');
   const notesSpace = spaceHandler(libraryNotesSrc, 'btn.addEventListener("keydown"');
   check([vocabSpace, notesSpace].every((h) => /e\.key !== " "/.test(h) && /e\.preventDefault\(\)/.test(h) && !/RowSelect/.test(h)) &&
@@ -1518,7 +1529,7 @@ check(libraryVocabJs.includes('card.setAttribute("aria-selected", isSelected ? "
   // shift, which German / French layouts need for "/" and every layout for
   // "?". The list handlers must not grow their own "/" branch back.
   const libJsSrc = read("library.js");
-  const pageKey = libJsSrc.slice(libJsSrc.indexOf("function pbpLibOnPageKey("), libJsSrc.indexOf('document.addEventListener("keydown", pbpLibOnPageKey);'));
+  const pageKey = sliceBetween(libJsSrc, "function pbpLibOnPageKey(", 'document.addEventListener("keydown", pbpLibOnPageKey);', "library.js pbpLibOnPageKey");
   check(/document\.addEventListener\("keydown", pbpLibOnPageKey\);/.test(libJsSrc) &&
     /e\.ctrlKey \|\| e\.metaKey \|\| e\.altKey/.test(pageKey) && !/shiftKey/.test(pageKey) &&
     /pbpLibIsTypingTarget\(document\.activeElement\)/.test(pageKey) &&
@@ -1626,7 +1637,7 @@ check(!read("anki-connect.js").includes("PBP_ANKI_ENDPOINT"),
   // Narrow mode: only a genuine view switch hands the list back. The
   // visibilitychange re-fire dispatches pbp-lib-view WITHOUT going through
   // _pbpLibApplyView, which is exactly what keeps an open detail alive.
-  const applyViewBody = libraryJs.slice(libraryJs.indexOf("function _pbpLibApplyView("), libraryJs.indexOf("function _pbpLibInitialView("));
+  const applyViewBody = sliceBetween(libraryJs, "function _pbpLibApplyView(", "function _pbpLibInitialView(", "library.js _pbpLibApplyView");
   check(/classList\.remove\("lib-narrow-detail"\)/.test(applyViewBody) &&
     // The re-fire dispatches pbp-lib-view straight, never through
     // _pbpLibApplyView -- that split is the whole mechanism. The window is
@@ -1647,7 +1658,7 @@ check(!read("anki-connect.js").includes("PBP_ANKI_ENDPOINT"),
   // Sliced to the function's own body (up to its column-0 closing brace)
   // rather than matched through a character window: this one carries enough
   // comment to make any distance bound a tripwire for editing the comment.
-  const notesRefresh = (libraryNotesJs.split("async function _pbpNotesRefreshPreservingState")[1] || "").split("\n}\n")[0];
+  const notesRefresh = fnBodyChecked(libraryNotesJs, "async function _pbpNotesRefreshPreservingState");
   check(libraryNotesJs.includes("rowEl.dataset.notesKey = hit.key") &&
     ["_pbpNotesMarkCurrentRow()", "_pbpNotesFocus("].every((s) => notesRefresh.includes(s)) &&
     // The list region is the scroll container now (library redesign §2.5
@@ -1728,8 +1739,8 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
       countsEnd > previewAt && semanticsAt > countsEnd && semanticsAt < warningAt,
       "options.html: the import preview no longer states which sections a restore replaces, as a plain hint between the counts and the warning slot");
   }
-  const readerPanel = optionsHtml.slice(
-    optionsHtml.indexOf('id="panel-reader"'), optionsHtml.indexOf('id="panel-vocab"'));
+  const readerPanel = sliceBetween(
+    optionsHtml, 'id="panel-reader"', 'id="panel-vocab"', "options.html #panel-reader");
   check(readerPanel.includes('id="open-shortcuts-link-md"') &&
     !readerPanel.includes('class="kbd-help-list"') && !readerPanel.includes('data-i18n="kbdHelpIntro"'),
     "options.html: Reader still duplicates its in-page shortcut help or lost the Chrome shortcut entry point");
@@ -1794,13 +1805,10 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   // back on the last; a fold body jumped 2px). The .switch answer keeps its
   // 6px / -2px geometry from margins that do not change with the fold.
   {
-    const ruleBody = (sel) => {
-      const at = optionsCss.indexOf(sel + " {");
-      return at < 0 ? "" : optionsCss.slice(at, optionsCss.indexOf("\n}", at));
-    };
+    const ruleBody = (sel) => sliceBetween(optionsCss, sel + " {", "\n}", `options.css ${sel}`);
     const base = ruleBody("html.motion-ready details.motion-toggle::details-content");
     const open = ruleBody("html.motion-ready details.motion-toggle[open]::details-content");
-    const rootBlock = optionsCss.slice(optionsCss.indexOf(":root {"), optionsCss.indexOf("\n}", optionsCss.indexOf(":root {")));
+    const rootBlock = sliceBetween(optionsCss, ":root {", "\n}", "options.css :root");
     check(/--motion-collapse-out:\s*160ms/.test(rootBlock) && /--motion-collapse:\s*200ms/.test(rootBlock) &&
       /height var\(--motion-collapse-out\) var\(--ease-out\)/.test(base) &&
       /opacity var\(--motion-pop-out\) var\(--ease-out\)/.test(base) &&
@@ -1821,7 +1829,9 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
       /\.context-help > summary\.context-help-toggle \{[^}]*transition:\s*color var\(--motion-state\) ease, opacity var\(--motion-state\) ease;/.test(optionsCss),
       "options.css: the native-details fold lost its recipe (collapse 160ms + faster fade-out / expand 200ms + fade-in, ease-out, entry from height 0 + opacity 0, a flow-root box, the .switch answer's fold-independent margins, the answer -> control gap riding the same curve), contextual help grew its own fold transition, or the ? toggle lost its colour/opacity hover fade");
     // `*` never matches ::details-content, so reduced motion must name it.
-    const reduced = optionsCss.slice(optionsCss.indexOf("@media (prefers-reduced-motion: reduce) {\n  *, *::before, *::after"));
+    const reducedAt = optionsCss.indexOf("@media (prefers-reduced-motion: reduce) {\n  *, *::before, *::after");
+    check(reducedAt !== -1, "options.css: missing prefers-reduced-motion media block");
+    const reduced = reducedAt !== -1 ? optionsCss.slice(reducedAt) : "";
     check(/^[\s\S]{0,600}details::details-content \{ transition-duration: 0\.01ms !important; \}/.test(reduced),
       "options.css: prefers-reduced-motion no longer stops the native-details fold (the universal selector does not reach ::details-content)");
   }
@@ -1847,8 +1857,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   // (detail > 0, motion-ready, no reduced motion) marks the clicked <details>;
   // keyboard and reduced motion strip the marker so the flip is instant.
   {
-    const at = optionsJs.indexOf('const det = summary && summary.closest("details");');
-    const handler = at < 0 ? "" : optionsJs.slice(at, optionsJs.indexOf("}, true);", at));
+    const handler = sliceBetween(optionsJs, 'const det = summary && summary.closest("details");', "}, true);", "options.js details click gate");
     check(handler !== "" &&
       /const animate = e\.detail > 0 && !pbpPrefersReducedMotion\(\)\s*&& document\.documentElement\.classList\.contains\("motion-ready"\);/.test(handler) &&
       /if \(animate\) pbpMotionMark\(det\);\s*else pbpMotionUnmark\(det\);/.test(handler) &&
@@ -2127,10 +2136,10 @@ check(mdTranslateJs.includes("pbpTrSingleKeyAllowed(") && mdAskJs.includes("pbpT
   mdHighlightJs.includes("pbpTrSingleKeyAllowed("),
   "md-preview single-key shortcuts do not share the modifier/typing/raw-view gate");
 {
-  const explainShortcut = mdAskJs.slice(mdAskJs.indexOf("function _pbpExplainOnShortcut"),
-    mdAskJs.indexOf("function pbpExplainInit"));
-  const explainInit = mdAskJs.slice(mdAskJs.indexOf("function pbpExplainInit"),
-    mdAskJs.indexOf('document.addEventListener("pbp:rendered"', mdAskJs.indexOf("function pbpExplainInit")));
+  const explainShortcut = sliceBetween(mdAskJs, "function _pbpExplainOnShortcut",
+    "function pbpExplainInit", "md-ask.js _pbpExplainOnShortcut");
+  const explainInit = sliceBetween(mdAskJs, "function pbpExplainInit",
+    'document.addEventListener("pbp:rendered"', "md-ask.js pbpExplainInit");
   check(mdTranslateJs.includes("_pbpTrTrigger(st)") &&
     // ZH-1b: a completed CURRENT translation stays inert (no re-entry, no
     // tokens), while a stale/mixed one may re-arm as an explicit retranslate
@@ -2185,16 +2194,16 @@ check(mdTranslateJs.includes('scrollIntoView({ block: "start", behavior: "instan
   mdCss.includes("140ms"),
   "translation view switching lacks instant anchor restore or reduced-motion-safe article transition");
 {
-  const settle = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrSettleViewAnchor"),
-    mdTranslateJs.indexOf("function _pbpTrApplyMode"));
+  const settle = sliceBetween(mdTranslateJs, "function _pbpTrSettleViewAnchor",
+    "function _pbpTrApplyMode", "md-translate.js _pbpTrSettleViewAnchor");
   check(settle.includes('behavior: "instant"') && !settle.includes(".focus("),
     "translation view anchor restore animates scroll or steals keyboard focus");
 }
 {
-  const focus = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrCaptureFocusHandoff"),
-    mdTranslateJs.indexOf("function _pbpTrCaptureViewAnchor"));
-  const applyMode = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrApplyMode"),
-    mdTranslateJs.indexOf("function _pbpTrSetMode"));
+  const focus = sliceBetween(mdTranslateJs, "function _pbpTrCaptureFocusHandoff",
+    "function _pbpTrCaptureViewAnchor", "md-translate.js _pbpTrCaptureFocusHandoff");
+  const applyMode = sliceBetween(mdTranslateJs, "function _pbpTrApplyMode",
+    "function _pbpTrSetMode", "md-translate.js _pbpTrApplyMode");
   check(focus.includes('mode !== "original" && mode !== "translated"') &&
     focus.includes("document.activeElement !== handoff.active") &&
     focus.includes("target.focus({ preventScroll: true })") &&
@@ -2213,8 +2222,8 @@ check(/orig\.dataset\.pbTrDone = "1";[\s\S]{0,380}_pbpTrSyncToc\(st, "translated
   //   md-translate.js:2316  lang = st.target.code                   (default keeps 3-arg callers honest)
   //   md-translate.js:2358  pbpTrLengthRatioOk(sendText, got, lang) (the gate itself)
   // Anything that drops the code from the retry path breaks one of these.
-  const retryBlock = mdTranslateJs.slice(mdTranslateJs.indexOf("async function _pbpTrRetryBlock"),
-    mdTranslateJs.indexOf("function _pbpTrSyncRetryAll"));
+  const retryBlock = sliceBetween(mdTranslateJs, "async function _pbpTrRetryBlock",
+    "function _pbpTrSyncRetryAll", "md-translate.js _pbpTrRetryBlock");
   check(mdTranslateJs.includes('const targetCode = plan.targetCode || ""') &&
     mdTranslateJs.includes("pbpTrLengthRatioOk(seg.text, item.text, targetCode)") &&
     mdTranslateJs.includes("pbpTrLengthRatioOk(seg.text, text, targetCode)") &&
@@ -2226,10 +2235,10 @@ check(/orig\.dataset\.pbTrDone = "1";[\s\S]{0,380}_pbpTrSyncToc\(st, "translated
     "md-translate.js: target language code does not reach batch, downgrade and manual retry quality gates");
 }
 {
-  const waybackLog = optionsJs.slice(optionsJs.indexOf("function renderWaybackLog"),
-    optionsJs.indexOf("function loadWaybackLog"));
-  const permissionBranch = waybackLog.slice(waybackLog.indexOf('outcome === "permDenied"'),
-    waybackLog.indexOf('outcome === "rate-limited"'));
+  const waybackLog = sliceBetween(optionsJs, "async function renderWaybackLog()",
+    "function _waybackRelTime(ts)", "options.js renderWaybackLog");
+  const permissionBranch = sliceBetween(waybackLog, 'outcome === "permDenied"',
+    'outcome === "rate-limited"', "options.js renderWaybackLog permDenied");
   check(waybackLog.includes("wayback-perm-help") &&
     waybackLog.includes("PBP_ICONS.warning") &&
     waybackLog.includes('pbpScrollIntoView(target, { block: "center", behavior: "smooth" })') &&
@@ -3032,7 +3041,11 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
 {
   const en = JSON.parse(read("_locales/en/messages.json"));
   const msg = (key) => (en[key] || {}).message;
-  const keysOf = (re) => [...new Set([...optionsHtml.matchAll(re)].map((m) => m[1]))];
+  const keysOf = (re) => {
+    const matches = [...optionsHtml.matchAll(re)];
+    check(matches.length > 0, `options.html: capitalisation pattern ${re} matched zero elements`);
+    return [...new Set(matches.map((m) => m[1]))];
+  };
   const titleKeys = [
     ...keysOf(/<h2\b[^>]*class="[^"]*\bsection-title\b[^"]*"[^>]*data-i18n="([^"]+)"/g),
     ...keysOf(/<summary\b(?![^>]*context-help-toggle)[^>]*data-i18n="([^"]+)"/g),
@@ -4217,17 +4230,17 @@ check(popupCss.includes("html[data-theme] .confirm-popover .confirm-no:hover { b
   optionsCss.includes("html[data-theme] .theme-name-popover .tnp-save:hover { background: var(--opt-fg)"),
   "custom themed popovers can fall back to hardcoded hover backgrounds with unreadable foregrounds");
 {
-  const failed = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrMarkFailed"),
-    mdTranslateJs.indexOf("function _pbpTrMarkPartial"));
-  const partial = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrMarkPartial"),
-    mdTranslateJs.indexOf("function _pbpTrClearPendingFailures"));
+  const failed = sliceBetween(mdTranslateJs, "function _pbpTrMarkFailed",
+    "function _pbpTrMarkPartial", "md-translate.js _pbpTrMarkFailed");
+  const partial = sliceBetween(mdTranslateJs, "function _pbpTrMarkPartial",
+    "function _pbpTrClearPendingFailures", "md-translate.js _pbpTrMarkPartial");
   // Both pills write their reason + accessible name through one helper (which
   // also keeps the visible label at the front of the name, WCAG 2.5.3). The
   // reason is printed in the pill (.pb-tr-err-reason); the old hover/focus
   // ::after bubble is gone for good -- the reading view opens no overlay on
   // hover (user ruling), and touch never reached it.
-  const setTip = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrSetErrTip"),
-    mdTranslateJs.indexOf("function _pbpTrBuildErrCard"));
+  const setTip = sliceBetween(mdTranslateJs, "function _pbpTrSetErrTip",
+    "function _pbpTrBuildErrCard", "md-translate.js _pbpTrSetErrTip");
   check(setTip.includes("card.dataset.tip") && setTip.includes('"aria-describedby"') && !setTip.includes('"aria-label"') &&
     failed.includes("_pbpTrSetErrTip(card,") && partial.includes("_pbpTrSetErrTip(card,") &&
     !failed.includes("btn.title") && !partial.includes("btn.title") &&
@@ -4236,14 +4249,14 @@ check(popupCss.includes("html[data-theme] .confirm-popover .confirm-no:hover { b
     "translation failure reasons are not printed in the pill, depend on native title tooltips, or came back as a hover bubble");
 }
 {
-  const upsert = popupAiJs.slice(popupAiJs.indexOf("function upsertSummary"),
-    popupAiJs.indexOf("// ---- Remove AI summary"));
-  const setupAi = popupAiJs.slice(popupAiJs.indexOf("function setupAIFeatures"),
-    popupAiJs.indexOf("function _aiSummaryBlockMatches"));
+  const upsert = sliceBetween(popupAiJs, "function upsertSummary",
+    "// ---- Remove AI summary", "popup-ai.js upsertSummary");
+  const setupAi = sliceBetween(popupAiJs, "function setupAIFeatures",
+    "function _aiSummaryBlockMatches", "popup-ai.js setupAIFeatures");
   // The box's input listener hands every edit to _aiTrackSummaryEdit (G24
   // named it so the linkding Description and Notes share one tracker).
-  const trackEdit = popupAiJs.slice(popupAiJs.indexOf("function _aiTrackSummaryEdit"),
-    popupAiJs.indexOf("// ---- Remove AI summary"));
+  const trackEdit = sliceBetween(popupAiJs, "function _aiTrackSummaryEdit",
+    "// ---- Remove AI summary", "popup-ai.js _aiTrackSummaryEdit");
   check(!popupAiJs.includes('const AI_SUMMARY_TAG = "[AI Summary]"') &&
     !upsert.includes("AI_SUMMARY_TAG") &&
     popupAiJs.includes("function pbpAiTrackSummaryRange") &&
@@ -6185,28 +6198,28 @@ check(focusTarget.includes("pbpRailDrawerClose()") && focusTarget.includes("targ
   (mdHighlightJs.match(/pbpFocusArticleTarget\(/g) || []).length >= 2,
 "md-preview: TOC, Ask citations, and Notebook do not share visible-target focus recovery");
 
-const askOpen = mdAskJs.slice(mdAskJs.indexOf("function _pbpAskSetOpen"), mdAskJs.indexOf("// Clear:", mdAskJs.indexOf("function _pbpAskSetOpen")));
+const askOpen = sliceBetween(mdAskJs, "function _pbpAskSetOpen", "function _pbpAskResetThreadView", "md-ask.js _pbpAskSetOpen");
 check(askOpen.includes("drawerWasOpen") && askOpen.includes("pbpRailDrawerClose()") &&
   askOpen.includes('document.getElementById("rail-toggle")') && askOpen.includes("getBoundingClientRect()") &&
   askOpen.includes('document.getElementById("ask-open")') && askOpen.includes(".find(isVisible)"),
 "md-ask.js: opening Ask from the drawer leaves a hidden opener/focus target");
-const askError = mdAskJs.slice(mdAskJs.indexOf("function _pbpAskErrorUi"), mdAskJs.indexOf("// Core runner", mdAskJs.indexOf("function _pbpAskErrorUi")));
+const askError = sliceBetween(mdAskJs, "function _pbpAskErrorUi", "// Core runner", "md-ask.js _pbpAskErrorUi");
 check(askError.indexOf("aEl.focus()") >= 0 && askError.indexOf("aEl.focus()") < askError.indexOf("aEl.replaceChildren()"),
   "md-ask.js: Ask retry removes its focused button before focus handoff");
-const askClear = mdAskJs.slice(mdAskJs.indexOf("function _pbpAskShowClearConfirm"), mdAskJs.indexOf("// ---- Restore persisted", mdAskJs.indexOf("function _pbpAskShowClearConfirm")));
-check(askClear.indexOf("input.focus()") < askClear.indexOf("strip.remove()") &&
-  askClear.indexOf("clearBtn.focus()") < askClear.lastIndexOf("strip.remove()"),
+const askClear = sliceBetween(mdAskJs, "function _pbpAskShowClearConfirm", "// ---- Restore persisted", "md-ask.js _pbpAskShowClearConfirm");
+check(askClear.indexOf("input.focus()") >= 0 && askClear.indexOf("input.focus()") < askClear.indexOf("strip.remove()") &&
+  askClear.indexOf("clearBtn.focus()") >= 0 && askClear.indexOf("clearBtn.focus()") < askClear.lastIndexOf("strip.remove()"),
 "md-ask.js: clear confirmation removes the focused action before focus handoff");
-const askRegenerate = mdAskJs.slice(mdAskJs.indexOf("function _pbpAskRegenerate"), mdAskJs.indexOf("// ---- Clear:", mdAskJs.indexOf("function _pbpAskRegenerate")));
+const askRegenerate = sliceBetween(mdAskJs, "function _pbpAskRegenerate", "// ---- Clear:", "md-ask.js _pbpAskRegenerate");
 check(askRegenerate.indexOf("el.focus()") >= 0 && askRegenerate.indexOf("el.focus()") < askRegenerate.indexOf("el.replaceChildren()"),
   "md-ask.js: regenerate removes its focused button before focus handoff");
-const skimRegenFocus = mdSkimJs.slice(mdSkimJs.indexOf("async function _pbpSkimRegen"), mdSkimJs.indexOf("// Init hookup", mdSkimJs.indexOf("async function _pbpSkimRegen")));
+const skimRegenFocus = sliceBetween(mdSkimJs, "async function _pbpSkimRegen", "// Init hookup", "md-skim.js _pbpSkimRegen");
 check(skimRegenFocus.indexOf("body.focus()") >= 0 && skimRegenFocus.indexOf("body.focus()") < skimRegenFocus.indexOf("body.replaceChildren()"),
   "md-skim.js: retry removes its focused button before focus handoff");
-const explainRun = mdAskJs.slice(mdAskJs.indexOf("async function _pbpExplainRun"), mdAskJs.indexOf("// ---- Explain: open", mdAskJs.indexOf("async function _pbpExplainRun")));
+const explainRun = sliceBetween(mdAskJs, "async function _pbpExplainRun", "// ---- Explain: open", "md-ask.js _pbpExplainRun");
 check(explainRun.indexOf("body.focus()") >= 0 && explainRun.indexOf("body.focus()") < explainRun.indexOf("body.replaceChildren()"),
   "md-ask.js: Explain retry removes its focused button before focus handoff");
-const explainShell = mdAskJs.slice(mdAskJs.indexOf("// ---- Explain: popover shell"), mdAskJs.indexOf("// ---- Explain: context pack"));
+const explainShell = sliceBetween(mdAskJs, "// ---- Explain: popover shell", "// ---- Explain: context pack", "md-ask.js explain popover shell");
 check(explainShell.includes('pop.setAttribute("popover", "manual")') &&
   explainShell.includes("PBP_EXPLAIN_PIN_SVG") && explainShell.includes("PBP_EXPLAIN_CLOSE_SVG") &&
   explainShell.includes('pin.className = "xp-pin"') && explainShell.includes('close.className = "xp-close"') &&
@@ -6645,8 +6658,8 @@ check(mdCss.includes("text-autospace: normal") && /#rendered-view :is\(pre, code
 // ---- Connectivity tests: one run per target, and no cross-run status wipe ----
 {
   {
-    const fn = optionsConnectivityJs.slice(optionsConnectivityJs.indexOf("async function testAIProvider"),
-      optionsConnectivityJs.indexOf('["gemini","openai"'));
+    const fn = sliceBetween(optionsConnectivityJs, "async function testAIProvider",
+      "PBP_AI_PROVIDER_IDS.forEach(", "options-connectivity.js testAIProvider");
     const disableAt = fn.indexOf("btn.disabled = true");
     const tryAt = fn.indexOf("try {");
     const finallyAt = fn.lastIndexOf("} finally {");
@@ -7071,10 +7084,10 @@ function stripJsComments(input) {
 
   const slice = (startNeedle, endNeedle, label) => {
     const a = src.indexOf(startNeedle);
-    const b = a >= 0 ? src.indexOf(endNeedle, a + startNeedle.length) : -1;
-    check(a >= 0 && b > a,
+    const b = src.indexOf(endNeedle, a === -1 ? 0 : a + startNeedle.length);
+    check(a !== -1 && b !== -1 && b > a,
       `ui-contract: cannot slice ${label} out of md-preview.js (anchor moved) -- every invariant in this block is UNVERIFIED until the anchor is fixed`);
-    return a >= 0 && b > a ? src.slice(a, b) : "";
+    return a !== -1 && b !== -1 && b > a ? src.slice(a, b) : "";
   };
   const render = slice("function renderArticleContent(markdown) {", "\n  renderArticleContent(canonicalMarkdown);", "renderArticleContent");
   const toc = slice("function rebuildToc() {", "\n  rebuildToc();", "rebuildToc");
@@ -9941,7 +9954,11 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
     "library.js: both list panes must be wired to the one header-fit measurement (ResizeObserver on the pane, <=860px always narrow for the vocabulary row)");
   check(declarationValueMap(hand, '.notes-list-pane[data-header-fit="narrow"] .notes-color-filters .lib-toggle-count').get("display") === "none",
     "library.css: a notes colour row too narrow for its numbers must show dots only (user ruling 10-04)");
-  const at = (src) => libraryHtml.indexOf(`<script defer src="${src}"></script>`);
+  const at = (src) => {
+    const idx = libraryHtml.indexOf(`<script defer src="${src}"></script>`);
+    check(idx !== -1, `library.html: missing deferred script ${src}`);
+    return idx;
+  };
   check(at("shared.js") > 0 && at("shared.js") < at("listbox.js") && at("listbox.js") < at("library-notes.js"),
     "library.html: listbox.js must load after shared.js and before library-notes.js (spec §8.1)");
   check(/function pbpLibWireFilterPopover\(set, button, indexEl\)/.test(libJs) &&
@@ -10088,9 +10105,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
 // are one list box (the relookup select is gone); the tail with the
 // destructive action follows it. DOM order is the Tab order.
 {
-  const fnBody = (src, sig) => (src.split(sig)[1] || "").split("\n}\n")[0];
-  const paneStart = libraryHtml.indexOf('id="vocab-detail-pane"');
-  const pane = paneStart < 0 ? "" : libraryHtml.slice(paneStart, libraryHtml.indexOf("</aside>", paneStart));
+  const pane = sliceBetween(libraryHtml, 'id="vocab-detail-pane"', "</aside>", "library.html #vocab-detail-pane");
   const order = ['class="vocab-sheet"', 'id="vocab-detail-empty"', 'id="vocab-detail"', 'id="vocab-ref"', 'id="vocab-ref-label"',
     'id="vocab-lookup-bar"', 'id="vocab-ref-result"', 'id="vocab-detail-tail"'].map((needle) => pane.indexOf(needle));
   check(order.every((at, i) => at > 0 && (i === 0 || at > order[i - 1])),
@@ -10107,7 +10122,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
   check(/detail\.replaceChildren\(frag\);\s*\n\s*\$id\("vocab-detail-tail"\)\.replaceChildren\(footer\);/.test(libraryVocabJs) &&
     /footer\.className = "vocab-detail-footer";/.test(libraryVocabJs),
     "library-vocab.js: the closing row is no longer the tail's own footer.vocab-detail-footer, rebuilt right after #vocab-detail (spec §4.1)");
-  const host = fnBody(libraryVocabJs, "function _pbpVocabStatusHost(detailReady) {");
+  const host = fnBodyChecked(libraryVocabJs, "function _pbpVocabStatusHost(detailReady) {");
   check(host.includes('document.querySelector("#vocab-detail-tail .vocab-detail-footer")') &&
     !host.includes("#vocab-detail .vocab-detail-footer") && !host.includes("_pbpVocabNarrowMode()") &&
     /insertBefore\(el, save\)/.test(host),
@@ -10115,12 +10130,14 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
   check(/const listGone = [^;]*getClientRects\(\)\.length === 0/.test(host) && /!listGone && batch/.test(host) &&
     /if \(detailReady !== undefined\) _vocabStatusDetailReady = !!detailReady;/.test(host),
     "library-vocab.js: _pbpVocabStatusHost must take the batch row's slot only while the list pane is rendered -- narrow detail takes it off the page (spec §4.7 \"batch row visible\") -- and an undefined detailReady must keep the last readiness (T4b re-home)");
-  const idle = fnBody(libraryVocabJs, "function _pbpVocabRenderRefIdle(mode) {");
-  const click = idle.slice(idle.indexOf('addEventListener("click", async'));
+  const idle = fnBodyChecked(libraryVocabJs, "function _pbpVocabRenderRefIdle(mode) {");
+  const clickAt = idle.indexOf('addEventListener("click", async');
+  check(clickAt !== -1, "library-vocab.js: missing _pbpVocabRenderRefIdle click handler");
+  const click = clickAt !== -1 ? idle.slice(clickAt) : "";
   const firstAwait = (/await\s+([^;]+);/.exec(click) || [])[1] || "";
   check(/^chrome\.permissions\.request\(\{ origins: \[PBP_DICT_ORIGIN \+ "\/\*"\] \}\)$/.test(firstAwait.trim()),
     `library-vocab.js: the lookup button's first await must be chrome.permissions.request (the user gesture is spent by any earlier await) -- got ${JSON.stringify(firstAwait)}`);
-  check(!fnBody(libraryVocabJs, "function _pbpVocabReconcileDetail() {").includes("vocab-detail-dict"),
+  check(!fnBodyChecked(libraryVocabJs, "function _pbpVocabReconcileDetail() {").includes("vocab-detail-dict"),
     "library-vocab.js: _pbpVocabReconcileDetail still carries dictionary nodes -- #vocab-ref-result is static and a same-word refresh never rebuilds it");
   check(/function _pbpVocabRenderDetail\(w, enterNarrow, reconcileOnly = false\) \{[\s\S]{0,2400}?const changed = nextId !== _pbpVocabDetailWordId;[\s\S]{0,200}?if \(changed\) _pbpVocabResetRef\(w \|\| null, reconcileOnly\);/.test(libraryVocabJs),
     "library-vocab.js: only a CHANGE of the open entry may reset the dictionary column (a refresh or a second activation of the same word keeps the result and its run)");
@@ -10154,7 +10171,6 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
 // ---- Library redesign T7b (spec §4.2-§4.7, §4.11, §6.5): the word's main
 // column, the cover and the sheet's container tiers.
 {
-  const fnBody = (src, sig) => (src.split(sig)[1] || "").split("\n}\n")[0];
   const hand = stripGeneratedRegions(libraryCss).replace(/\/\*[\s\S]*?\*\//g, "");
   // css-syntax's declarationValueMap matches one selector of a rule's list, in
   // one at-rule context: the tier rules live inside @container blocks.
@@ -10204,7 +10220,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
     declarationValueMap(hand, ".vocab-note-input:focus").get("min-height") === "96px" &&
     declarationValueMap(hand, ".vocab-note-input").get("min-height") === "64px",
     "library.css: the note box lost one of its three heights (one line empty and unfocused, 96 focused, content-sized from 64; spec §4.6)");
-  const note = fnBody(libraryVocabJs, "function _pbpVocabBuildNoteEditor(w) {");
+  const note = fnBodyChecked(libraryVocabJs, "function _pbpVocabBuildNoteEditor(w) {");
   check(note.includes('noteInput.placeholder = t("libraryNotePlaceholderShort");') &&
     note.includes('noteInput.title = t("libraryNotePlaceholder");') &&
     /noteInput\.addEventListener\("blur", \(\) => \{[\s\S]{0,200}noteSave\.click\(\)/.test(note),
@@ -10212,10 +10228,10 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
   check(!/id="vocab-detail-empty"[^>]*data-i18n=/.test(libraryHtml) &&
     /<div id="vocab-detail-empty" class="lib-cover">\s*<h2 class="lib-cover-title lib-first-line"><\/h2>\s*<p class="lib-cover-lead"><\/p>\s*<p class="lib-cover-hint" data-i18n="libraryVocabCoverHint">/.test(libraryHtml),
     "library.html: the vocabulary cover must be title + stats + hint with data-i18n on the hint only (applyI18n would overwrite a container whole; spec §4.11)");
-  const cover = fnBody(libraryVocabJs, "function _pbpVocabRenderCover() {");
+  const cover = fnBodyChecked(libraryVocabJs, "function _pbpVocabRenderCover() {");
   check(cover.includes("pbpLibSplitCount(") && cover.includes("pbpLibFillCount(") && !/innerHTML/.test(cover),
     "library-vocab.js: the cover's numbers must be bolded by the sentinel split, never by string building or innerHTML (spec §3.5)");
-  check(fnBody(libraryVocabJs, "function _pbpVocabDetailFocusTargets(el) {").includes('".vocab-detail-status"') &&
+  check(fnBodyChecked(libraryVocabJs, "function _pbpVocabDetailFocusTargets(el) {").includes('".vocab-detail-status"') &&
     !libraryVocabJs.includes("vocab-detail-actions"),
     "library-vocab.js: the status button lost its vocab-detail-status focus target, or the retired .vocab-detail-actions row is back");
 }
@@ -10225,9 +10241,8 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
 // already exists, after a 250ms dwell; nothing late is ever written; and the
 // privacy page says so in the same commit.
 {
-  const fnBody = (src, sig) => (src.split(sig)[1] || "").split("\n}\n")[0];
-  const auto = fnBody(libraryVocabJs, "async function _pbpVocabAutoLookup(w) {");
-  const probe = fnBody(libraryVocabJs, "async function _pbpVocabLocalProbe(term, lang, signal) {");
+  const auto = fnBodyChecked(libraryVocabJs, "async function _pbpVocabAutoLookup(w) {");
+  const probe = fnBodyChecked(libraryVocabJs, "async function _pbpVocabLocalProbe(term, lang, signal) {");
   check(auto.length > 0 && probe.length > 0 && auto.includes(".contains({ origins: [PBP_DICT_ORIGIN + \"/*\"] })") &&
     !/permissions\.request\(|\.request\(\{/.test(auto + probe) && !/\bfetch\(/.test(probe) && !/_pbpVocabDictRun\(/.test(probe),
     "library-vocab.js: open-to-look-up may only ask permissions.contains (never request), and its local probe neither fetches nor runs the chain (spec §4.8 rules 1-3)");
@@ -10236,7 +10251,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
   const staleChecks = (auto.match(/if \(stale\(\)\) return "stale";/g) || []).length;
   check(/const stale = \(\) => signal\.aborted \|\| _pbpVocabDetailWordId !== wordId \|\|/.test(auto) && staleChecks >= 3,
     `library-vocab.js: open-to-look-up must re-check the run, the open word and the owner after every await before it writes (found ${staleChecks} re-checks)`);
-  check(!/_pbpVocabRelookedWordId = /.test(auto) && /if \(w\) _pbpVocabAutoLookup\(w\)\.catch\(/.test(fnBody(libraryVocabJs, "function _pbpVocabResetRef(w, reconcileOnly = false) {")),
+  check(!/_pbpVocabRelookedWordId = /.test(auto) && /if \(w\) _pbpVocabAutoLookup\(w\)\.catch\(/.test(fnBodyChecked(libraryVocabJs, "function _pbpVocabResetRef(w, reconcileOnly = false) {")),
     "library-vocab.js: a word switch must start open-to-look-up, and that path must never mark the word as looked up by hand");
   const privacy = read("docs/privacy.md");
   check(privacy.includes("opening a saved word on that page also looks it up automatically when no installed offline dictionary has an entry for it") &&
@@ -10270,8 +10285,8 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
   // and the restore keys excerpt controls on data-notes-key. Read off the two
   // function bodies, not the file, so a comment cannot satisfy it.
   const noComments = (src) => src.replace(/^\s*\/\/.*$/gm, "");
-  const fnBody = (name) => noComments((notesJs.split("\nfunction " + name + "(")[1] || "").split("\n}\n")[0]);
-  const refreshBody = noComments((notesJs.split("\nasync function _pbpNotesRefreshPreservingState(")[1] || "").split("\n}\n")[0]);
+  const fnBody = (name) => noComments(fnBodyChecked(notesJs, "\nfunction " + name + "("));
+  const refreshBody = noComments(fnBodyChecked(notesJs, "\nasync function _pbpNotesRefreshPreservingState("));
   check((notesJs.match(/className = "btn btn-sm danger ghost lib-hang-start notes-detail-delete"/g) || []).length === 1 &&
     /_pbpNotesDetailFocusSnapshot\(\)/.test(refreshBody) &&
     /_pbpNotesRestoreDetailFocus\(/.test(refreshBody) &&
@@ -10309,7 +10324,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
   ];
   const sources = { "library.js": read("library.js"), "library-vocab.js": libraryVocabJs, "library-notes.js": read("library-notes.js") };
   const stripLineComments = (src) => src.replace(/^\s*\/\/.*$/gm, "");
-  const fnOf = (src, name) => stripLineComments((src.split("\nfunction " + name + "(")[1] || "").split("\n}\n")[0]);
+  const fnOf = (src, name) => stripLineComments(fnBodyChecked(src, "\nfunction " + name + "("));
   // Contexts (at-rule chains) in which `premise.css` holds, then every rule
   // naming one of the classes, or consuming one of the vars, outside them.
   const measuredOffenders = (css, entry) => {

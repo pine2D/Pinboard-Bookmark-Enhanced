@@ -22,8 +22,8 @@ let background, runtime;
 async function harness(options = {}) {
   background ||= await (await fetch("../background.js")).text();
   const start = background.indexOf("// ---- Reader bookmark workflow ----");
-  const end = background.indexOf("// ---- End reader bookmark workflow ----", start);
-  assert(start >= 0 && end > start, "reader bookmark workflow is not implemented");
+  const end = background.indexOf("// ---- End reader bookmark workflow ----", start === -1 ? 0 : start);
+  assert(start !== -1 && end !== -1 && end > start, "reader bookmark workflow is not implemented");
   const env = { token: "alice:new-token", account: "alice", epoch: 1, calls: [], requests: [], post: { ...POST }, ...options };
   const deps = {
     chrome: { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p }, storage: { local: { get: async key => ({ [key]: options.slot === null ? null : { ...SLOT, ...(options.slot || {}) } }) } }, tabs: { get: async () => { if (env.closedReader) throw new Error("reader closed after sending"); return { id: 9, url: READER }; }, sendMessage: async (id, msg) => { env.requests.push({ id, msg }); return { ok: true }; } } },
@@ -45,7 +45,8 @@ function base() { return { mode: "skip", url: URL_ARTICLE, title: "Reader title"
 async function pipelineHarness(options = {}) {
   background ||= await (await fetch("../background.js")).text();
   const start = background.indexOf("const PBP_SAVE_MODES");
-  const end = background.indexOf("// ---- P1: Shared save function ----", start);
+  const end = background.indexOf("// ---- P1: Shared save function ----", start === -1 ? 0 : start);
+  assert(start !== -1 && end !== -1 && end > start, "save pipeline source not found");
   const env = { account: "alice", token: "alice:rotated-token", epoch: 1, post: { ...POST }, calls: [], queue: [], ...options };
   // A linkding connection whose instance allows sharing (shared.js pbpBookmarkConnection).
   const sharing = () => env.sharingEnabled === undefined ? {} : { sharingEnabled: env.sharingEnabled };

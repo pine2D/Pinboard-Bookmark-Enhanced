@@ -80,7 +80,8 @@ function harness(source, seed = {}, results = {}) {
     showNotification: async (...args) => { notifications.push(args); }, t: (key) => key, console
   };
   const start = source.indexOf("const PBP_VOCAB_DRIVE_CONNECTED_KEY");
-  const end = source.indexOf("// Floor between two cold-start syncs.", start);
+  const end = source.indexOf("// Floor between two cold-start syncs.", start === -1 ? 0 : start);
+  if (start === -1 || end === -1 || end <= start) throw new Error("Drive scopes harness source not found");
   const factory = new Function(...Object.keys(deps), source.slice(start, end) + `
     return { queue: pbpQueueDriveRound, connect: pbpConnectDrive, status: pbpGetVocabDriveStatus,
       reconcile: pbpReconcileDriveAlarms, connection: driveConnectionStore, epoch: () => driveScopeEpoch };`);

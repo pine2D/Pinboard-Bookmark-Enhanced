@@ -8,43 +8,45 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
 (async () => {
   const source = await fetch("../background.js").then((response) => response.text());
   const importsStart = source.indexOf("importScripts(");
-  const importsEnd = source.indexOf(");", importsStart);
-  if (importsStart < 0 || importsEnd <= importsStart) throw new Error("anchor not found: importScripts source");
+  const importsEnd = source.indexOf(");", importsStart === -1 ? 0 : importsStart);
+  if (importsStart === -1 || importsEnd === -1 || importsEnd <= importsStart) throw new Error("anchor not found: importScripts source");
   const imports = source.slice(importsStart, importsEnd + 2);
   const alarmsStart = source.indexOf("chrome.alarms.onAlarm.addListener");
-  const alarmsEnd = source.indexOf("// React to settings change");
-  if (alarmsStart < 0 || alarmsEnd <= alarmsStart) throw new Error("anchor not found: alarm listener source");
+  const alarmsEnd = source.indexOf("// React to settings change", alarmsStart === -1 ? 0 : alarmsStart);
+  if (alarmsStart === -1 || alarmsEnd === -1 || alarmsEnd <= alarmsStart) throw new Error("anchor not found: alarm listener source");
   const alarms = source.slice(alarmsStart, alarmsEnd);
   // Roadmap #35 named the router, so the body now STARTS at the function
   // declaration and the addListener line trails it.
   const messagesStart = source.indexOf("function handleRuntimeMessage");
-  if (messagesStart < 0) throw new Error("anchor not found: handleRuntimeMessage source");
+  if (messagesStart === -1) throw new Error("anchor not found: handleRuntimeMessage source");
   const messages = source.slice(messagesStart);
   const bootAt = source.indexOf("function pbpBootDriveSync");
-  const bootEnd = source.indexOf("\nasync function pbpDisconnectVocabDrive", bootAt);
-  if (bootAt < 0 || bootEnd <= bootAt) throw new Error("anchor not found: pbpBootDriveSync source");
+  const bootEnd = source.indexOf("\nasync function pbpDisconnectVocabDrive", bootAt === -1 ? 0 : bootAt);
+  if (bootAt === -1 || bootEnd === -1 || bootEnd <= bootAt) throw new Error("anchor not found: pbpBootDriveSync source");
   const boot = source.slice(bootAt, bootEnd);
   const startupAt = source.indexOf("chrome.runtime.onStartup.addListener");
-  const startupEnd = source.indexOf("chrome.runtime.onInstalled.addListener", startupAt);
-  if (startupAt < 0 || startupEnd <= startupAt) throw new Error("anchor not found: onStartup listener source");
+  const startupEnd = source.indexOf("chrome.runtime.onInstalled.addListener", startupAt === -1 ? 0 : startupAt);
+  if (startupAt === -1 || startupEnd === -1 || startupEnd <= startupAt) throw new Error("anchor not found: onStartup listener source");
   const startup = source.slice(startupAt, startupEnd);
   const syncNowAt = messages.indexOf('message.type === "vocabDriveSyncNow"');
-  const syncNowEnd = messages.indexOf('message.type === "vocabDriveDisconnect"', syncNowAt);
-  if (syncNowAt < 0 || syncNowEnd <= syncNowAt) throw new Error("anchor not found: vocabDriveSyncNow handler");
+  const syncNowEnd = messages.indexOf('message.type === "vocabDriveDisconnect"', syncNowAt === -1 ? 0 : syncNowAt);
+  if (syncNowAt === -1 || syncNowEnd === -1 || syncNowEnd <= syncNowAt) throw new Error("anchor not found: vocabDriveSyncNow handler");
   const syncNow = messages.slice(syncNowAt, syncNowEnd);
   const connectAt = messages.indexOf('message.type === "vocabDriveConnect"');
-  const connectEnd = messages.indexOf('message.type === "vocabDriveStatus"', connectAt);
-  if (connectAt < 0 || connectEnd <= connectAt) throw new Error("anchor not found: vocabDriveConnect handler");
+  const connectEnd = messages.indexOf('message.type === "vocabDriveStatus"', connectAt === -1 ? 0 : connectAt);
+  if (connectAt === -1 || connectEnd === -1 || connectEnd <= connectAt) throw new Error("anchor not found: vocabDriveConnect handler");
   const connect = messages.slice(connectAt, connectEnd);
   const responseAt = source.indexOf("async function pbpVocabDriveResponse");
-  const responseEnd = source.indexOf("\n\nasync function pbpBootDriveSync", responseAt);
-  if (responseAt < 0 || responseEnd <= responseAt) throw new Error("anchor not found: pbpVocabDriveResponse source");
+  const responseEnd = source.indexOf("\n\nasync function pbpBootDriveSync", responseAt === -1 ? 0 : responseAt);
+  if (responseAt === -1 || responseEnd === -1 || responseEnd <= responseAt) throw new Error("anchor not found: pbpVocabDriveResponse source");
   let responseFactory = null;
   try {
     responseFactory = new Function("pbpGetVocabDriveStatus",
       `${source.slice(responseAt, responseEnd)}; return typeof pbpVocabDriveResponse === "function" ? pbpVocabDriveResponse : null;`);
   } catch (_) {}
-  check("store and Drive scripts are imported in dependency order", imports.indexOf('"vocab-store.js"') >= 0 && imports.indexOf('"vocab-gdrive.js"') > imports.indexOf('"vocab-store.js"'));
+  const storeImportAt = imports.indexOf('"vocab-store.js"');
+  const gdriveImportAt = imports.indexOf('"vocab-gdrive.js"');
+  check("store and Drive scripts are imported in dependency order", storeImportAt !== -1 && gdriveImportAt !== -1 && gdriveImportAt > storeImportAt);
   // Simplest miss: routing only the new names, so a pre-migration vocab-sync-* alarm is dropped.
   check("all three drive-sync alarm names and the legacy names are routed", ["PBP_DRIVE_DIRTY_ALARM", "PBP_DRIVE_PERIODIC_ALARM", "PBP_DRIVE_RETRY_ALARM"].every((name) => alarms.includes(`alarm.name === ${name}`)) && alarms.includes("PBP_DRIVE_LEGACY_ALARMS.includes(alarm.name)") && !/"(vocab|notes)-sync-/.test(alarms));
   check("alarm listener is registered synchronously at top level", /chrome\.alarms\.onAlarm\.addListener\(\(alarm\) =>/.test(alarms) && !/addListener\(async/.test(alarms));
@@ -52,9 +54,10 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
     !/async function handleRuntimeMessage/.test(messages) && !/onMessage\.addListener\(async/.test(messages) &&
     messages.includes("chrome.runtime.onMessage.addListener(handleRuntimeMessage);"));
   const dirtyAt = messages.indexOf('message.type === "PBP_VOCAB_DIRTY" || message.type === "PBP_NOTES_DIRTY"');
-  const dirty = messages.slice(dirtyAt, messages.indexOf('message.type === "vocabDriveConnect"', dirtyAt));
+  const dirtyEnd = messages.indexOf('message.type === "vocabDriveConnect"', dirtyAt === -1 ? 0 : dirtyAt);
+  const dirty = dirtyAt !== -1 && dirtyEnd !== -1 && dirtyEnd > dirtyAt ? messages.slice(dirtyAt, dirtyEnd) : "";
   // Simplest miss: the handler still gating on a per-dataset switch, or one dataset still calling a per-dataset scheduler.
-  check("both dirty messages schedule the one shared drive-sync alarm", dirtyAt >= 0 && dirty.includes("pbpDriveEnabled()") && !/pbpDrive(Type)Enabled/.test(dirty) && (dirty.match(/pbpDriveScheduleDirty\(chrome\.alarms\)/g) || []).length === 1 && !/pbp(Vocab|Notes)ScheduleDirty/.test(source));
+  check("both dirty messages schedule the one shared drive-sync alarm", dirtyAt !== -1 && dirtyEnd !== -1 && dirtyEnd > dirtyAt && dirty.includes("pbpDriveEnabled()") && !/pbpDrive(Type)Enabled/.test(dirty) && (dirty.match(/pbpDriveScheduleDirty\(chrome\.alarms\)/g) || []).length === 1 && !/pbp(Vocab|Notes)ScheduleDirty/.test(source));
   check("connect message is handled", messages.includes('message.type === "vocabDriveConnect"'));
   check("status message is handled", messages.includes('message.type === "vocabDriveStatus"'));
   const failedHandler = responseFactory?.(async () => ({
@@ -94,13 +97,13 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
   // return early, so the retry alarm the round just reconciled does nothing.
   // Only pbpConnectDrive may clear it, and only on connect()'s own refusal (A4).
   const connectFnAt = source.indexOf("async function pbpConnectDrive");
-  const connectFnEnd = connectFnAt >= 0 ? source.indexOf("\n}\n", connectFnAt) : -1;
-  const connectFn = connectFnEnd > connectFnAt ? source.slice(connectFnAt, connectFnEnd) : "";
+  const connectFnEnd = source.indexOf("\n}\n", connectFnAt === -1 ? 0 : connectFnAt);
+  const connectFn = connectFnAt !== -1 && connectFnEnd !== -1 && connectFnEnd > connectFnAt ? source.slice(connectFnAt, connectFnEnd) : "";
   const retryableGuardAt = connectFn.indexOf("account.retryable !== true");
   // The first clear is the permission precheck (spec §10.8); the refusal clear is the last one.
   const refusalClearAt = connectFn.lastIndexOf("PBP_VOCAB_DRIVE_CONNECTED_KEY]: false");
   check("connect keeps the device connected when auth is only retryable",
-    retryableGuardAt >= 0 && retryableGuardAt < refusalClearAt &&
+    retryableGuardAt !== -1 && refusalClearAt !== -1 && retryableGuardAt < refusalClearAt &&
     !connect.includes("PBP_VOCAB_DRIVE_CONNECTED_KEY]: false"));
   // Simplest miss: leave the old clearing branch in the vocabDriveConnect handler, where it also fires on round results (A4).
   check("disconnect message is handled", messages.includes('message.type === "vocabDriveDisconnect"'));
@@ -122,8 +125,9 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
     ["PBP_VOCAB_DIRTY", "vocabDriveConnect", "vocabDriveStatus",
       "vocabDriveSyncNow", "vocabDriveDisconnect"].every((type) => {
         const at = messages.indexOf(`message.type === "${type}"`);
+        if (at === -1) return false;
         const next = messages.indexOf("\n  if (message.type ===", at + 1);
-        const handler = messages.slice(at, next > at ? next : messages.length);
+        const handler = messages.slice(at, next !== -1 && next > at ? next : messages.length);
         return handler.includes("PBP_VOCAB_DRIVE_CAPABLE");
       }));
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;

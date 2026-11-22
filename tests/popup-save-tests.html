@@ -577,7 +577,7 @@ async function withPopupSubmitFixture(options, check) {
     // the field, as in the popup. type() sets the value the way a user edit
     // would leave it and fires that event (a real one on a real element).
     function limitCounter(h) {
-      const slice = (from, to) => { const a = source.indexOf(from), b = source.indexOf(to, a); assert(a >= 0 && b > a, from + " source not found"); return source.slice(a, b); };
+      const slice = (from, to) => { const a = source.indexOf(from), b = source.indexOf(to, a === -1 ? 0 : a); assert(a !== -1 && b !== -1 && b > a, from + " source not found"); return source.slice(a, b); };
       const deps = { $id: id => h.elements[id] ||= createElementStub(), settings: h.settings,
         existingBookmark: null, currentTags: h.currentTags, _pageInfoReady: true,
         t: (key, value) => key + (value === undefined ? "" : ":" + value),
@@ -2173,8 +2173,10 @@ async function withPopupSubmitFixture(options, check) {
     await testAsync("K70: fetchPinboardSuggestTags stays gated behind optShowSuggestTags at its original call site", async () => {
       const line = source.split("\n").find(s => s.includes("fetchPinboardSuggestTags(token, targetUrl);"));
       assert(line, "suggestion enqueue call is missing");
-      const start=source.indexOf("function pbpPopupHasWebUrl(");
-      const guard=new Function("URL",source.slice(start,source.indexOf("\n}",start)+2)+";return pbpPopupHasWebUrl;")(window.URL);
+      const start = source.indexOf("function pbpPopupHasWebUrl(");
+      const end = source.indexOf("\n}", start === -1 ? 0 : start);
+      assert(start !== -1 && end !== -1 && end > start, "pbpPopupHasWebUrl source not found");
+      const guard=new Function("URL",source.slice(start,end+2)+";return pbpPopupHasWebUrl;")(window.URL);
       const calls=[];
       const enqueue=new Function("settings","pbpPopupHasWebUrl","fetchPinboardSuggestTags","token","targetUrl",line);
       const send=(...args)=>calls.push(args);
@@ -2197,7 +2199,8 @@ async function withPopupSubmitFixture(options, check) {
 
     test("queued refreshes the queue bar without saved side effects", () => {
       const queuedStart = submit.indexOf('if (result.status === "queued")');
-      const queuedEnd = submit.indexOf('if (result.status === "failed" && (result.reason === "partial"', queuedStart);
+      const queuedEnd = submit.indexOf('if (result.status === "failed" && (result.reason === "partial"', queuedStart === -1 ? 0 : queuedStart);
+      assert(queuedStart !== -1 && queuedEnd !== -1 && queuedEnd > queuedStart, "queued branch slice not found");
       const queued = submit.slice(queuedStart, queuedEnd);
       assert(queued.includes("showSaveQueued(result)") && queued.includes("window.PPOffline.refresh()"), "queued UI or queue refresh missing");
       assert(queued.includes('setSubmitState("idle")'), "queued submit does not leave loading state");
@@ -2208,12 +2211,14 @@ async function withPopupSubmitFixture(options, check) {
 
     test("submitted fields commit after delivery without erasing in-flight edits later", () => {
       const savedStart = submit.indexOf('if (result.status === "saved")');
-      const savedEnd = submit.indexOf('if (result.status === "failed" && result.reason === "too_long")', savedStart);
+      const savedEnd = submit.indexOf('if (result?.status === "failed" && result.reason === "duplicate_unknown")', savedStart === -1 ? 0 : savedStart);
+      assert(savedStart !== -1 && savedEnd !== -1 && savedEnd > savedStart, "saved branch slice not found");
       const saved = submit.slice(savedStart, savedEnd);
       const elseStart = saved.indexOf("} else {");
-      const freshIndex = saved.indexOf("checkExistingBookmark(token, url, null, true, tags)", elseStart);
-      const autoCloseGeneration = saved.indexOf("const autoCloseGeneration = bookmarkLookup.generation", freshIndex);
+      const freshIndex = saved.indexOf("checkExistingBookmark(token, url, null, true, tags)", elseStart === -1 ? 0 : elseStart);
+      const autoCloseGeneration = saved.indexOf("const autoCloseGeneration = bookmarkLookup.generation", freshIndex === -1 ? 0 : freshIndex);
       const dirtyResetIndex = submit.indexOf("fieldDirtyFlags[id] = false", intentIndex);
+      assert(elseStart !== -1 && freshIndex !== -1 && autoCloseGeneration !== -1 && dirtyResetIndex !== -1, "saved branch landmarks missing");
       assert(saved.includes('if (savePolicy.mode === "update")'), "update/create result split missing");
       assert(dirtyResetIndex > savedStart, "dirty baseline reset before successful delivery");
       assert(saved.includes("el.value === submitted.value && el.checked === submitted.checked"), "successful result must preserve newer field values");
@@ -2225,10 +2230,12 @@ async function withPopupSubmitFixture(options, check) {
 
     test("conflict refreshes the form and auth failure restores login", () => {
       const conflictStart = submit.indexOf('if (result.status === "skipped"');
-      const conflictEnd = submit.indexOf('if (result.status === "saved")', conflictStart);
+      const conflictEnd = submit.indexOf('if (result.status === "saved")', conflictStart === -1 ? 0 : conflictStart);
+      assert(conflictStart !== -1 && conflictEnd !== -1 && conflictEnd > conflictStart, "conflict branch slice not found");
       const conflict = submit.slice(conflictStart, conflictEnd);
       const authStart = submit.indexOf('result.reason === "not_logged_in"');
-      const ownershipAfterSend = submit.indexOf("bookmarkLookup.generation !== lookupGenerationAtSave", authStart);
+      const ownershipAfterSend = submit.indexOf("bookmarkLookup.generation !== lookupGenerationAtSave", authStart === -1 ? 0 : authStart);
+      assert(authStart !== -1 && ownershipAfterSend !== -1 && ownershipAfterSend > authStart, "auth failure branch slice not found");
       const authEnd = ownershipAfterSend;
       const auth = submit.slice(authStart, authEnd);
       assert(conflict.includes('result.reason === "conflict"') && conflict.includes("checkExistingBookmark(token, url, null, true, tags)"), "skipped/conflict refresh path missing");
@@ -2241,7 +2248,8 @@ async function withPopupSubmitFixture(options, check) {
     test("Wayback attempt state is captured before delivery and rendered only after saved", () => {
       const attemptsIndex = submit.indexOf("let attemptsStored", intentIndex);
       const savedStart = submit.indexOf('if (result.status === "saved")', sendIndex);
-      const savedEnd = submit.indexOf('if (result.status === "failed"', savedStart);
+      const savedEnd = submit.indexOf('if (result?.status === "failed" && result.reason === "duplicate_unknown")', savedStart === -1 ? 0 : savedStart);
+      assert(attemptsIndex !== -1 && savedStart !== -1 && savedEnd !== -1 && savedEnd > savedStart, "Wayback saved branch slice not found");
       assert(attemptsIndex < sendIndex, "Wayback attempt snapshot starts after delivery");
       assert(submit.slice(attemptsIndex, sendIndex).includes("await chrome.storage.local.get"), "Wayback attempt snapshot is not complete before delivery");
       assert(submit.slice(attemptsIndex, sendIndex).includes("bookmarkLookup.generation !== lookupGenerationAtSave"), "snapshot await is not followed by an ownership check");
@@ -2284,7 +2292,12 @@ async function withPopupSubmitFixture(options, check) {
     await testAsync("pbpAiFastCached reads ONE namespace: transcript with a standing caption grant, the configured source otherwise (Codex r9 H2)", async () => {
       // Behavioural, not source-grep (review C18): the two helpers run
       // against stubs, and the assertions are on what they read.
-      const fnSrc = (name) => { const i = popupAiSource.indexOf("async function " + name); return popupAiSource.slice(i, popupAiSource.indexOf("\n}\n", i) + 3); };
+      const fnSrc = (name) => {
+        const i = popupAiSource.indexOf("async function " + name);
+        const end = popupAiSource.indexOf("\n}\n", i === -1 ? 0 : i);
+        assert(i !== -1 && end !== -1 && end > i, name + " source not found");
+        return popupAiSource.slice(i, end + 3);
+      };
       const calls = [];
       let probed = 0;
       const run = (granted, url) => sliceRuntime({

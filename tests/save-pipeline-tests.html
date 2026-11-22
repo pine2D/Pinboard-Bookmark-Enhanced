@@ -85,8 +85,8 @@ async function getBackgroundSaveSource() {
   if (backgroundSaveSource) return backgroundSaveSource;
   const source = await getBackgroundSource();
   const start = source.indexOf("async function saveFromBackground");
-  const end = source.indexOf("// Helper: resolve prefix-specific settings", start);
-  assert(start >= 0 && end > start, "background save preparation source not found");
+  const end = source.indexOf("// Helper: resolve prefix-specific settings", start === -1 ? 0 : start);
+  assert(start !== -1 && end !== -1 && end > start, "background save preparation source not found");
   backgroundSaveSource = source.slice(start, end);
   return backgroundSaveSource;
 }
@@ -95,8 +95,8 @@ async function getBatchSaveSource() {
   if (batchSaveSource) return batchSaveSource;
   const source = await getBackgroundSource();
   const start = source.indexOf("function handleBatchSave");
-  const end = source.indexOf("// ===================== Tab Set", start);
-  assert(start >= 0 && end > start, "batch save source not found");
+  const end = source.indexOf("// ===================== Tab Set", start === -1 ? 0 : start);
+  assert(start !== -1 && end !== -1 && end > start, "batch save source not found");
   batchSaveSource = source.slice(start, end);
   return batchSaveSource;
 }
@@ -105,13 +105,13 @@ async function getUndoSource() {
   if (undoSource) return undoSource;
   const source = await getBackgroundSource();
   const start = source.indexOf("const _recentSaves");
-  const end = source.indexOf("// ---- 设置图标", start);
-  assert(start >= 0 && end > start, "Undo notification source not found");
+  const end = source.indexOf("// ---- 设置图标", start === -1 ? 0 : start);
+  assert(start !== -1 && end !== -1 && end > start, "Undo notification source not found");
   // Undo deletes through the reader's ordered delete; the Pinboard request
   // and failure shapes are the worker's own.
   const piece = (from, to) => {
-    const a = source.indexOf(from), b = source.indexOf(to, a);
-    assert(a >= 0 && b > a, "Undo dependency source not found: " + from);
+    const a = source.indexOf(from), b = source.indexOf(to, a === -1 ? 0 : a);
+    assert(a !== -1 && b !== -1 && b > a, "Undo dependency source not found: " + from);
     return source.slice(a, b);
   };
   undoSource = source.slice(start, end)
@@ -125,14 +125,15 @@ async function getUndoSource() {
 async function createStatusCacheHarness(initialToken, initialFetch) {
   const source = await getBackgroundSource();
   const cacheStart = source.indexOf("// URL 状态缓存");
-  const cacheEnd = source.indexOf("// ---- P2: Cached token", cacheStart);
+  const cacheEnd = source.indexOf("// ---- P2: Cached token", cacheStart === -1 ? 0 : cacheStart);
   const checkStart = source.indexOf("async function checkBookmarked");
-  const checkEnd = source.indexOf("// ---- Badge:", checkStart);
+  const checkEnd = source.indexOf("// ---- Badge:", checkStart === -1 ? 0 : checkStart);
   const branchStart = source.indexOf('if (message.type === "get_bookmark_data"');
-  const branchEnd = source.indexOf('if (message.type === "get_offline_queue"', branchStart);
-  assert(cacheStart >= 0 && cacheEnd > cacheStart && checkStart >= 0 && checkEnd > checkStart,
+  const branchEnd = source.indexOf('if (message.type === "get_offline_queue"', branchStart === -1 ? 0 : branchStart);
+  assert(cacheStart !== -1 && cacheEnd !== -1 && cacheEnd > cacheStart &&
+    checkStart !== -1 && checkEnd !== -1 && checkEnd > checkStart,
     "account-scoped status cache source not found");
-  assert(branchStart >= 0 && branchEnd > branchStart, "bookmark-data branch not found");
+  assert(branchStart !== -1 && branchEnd !== -1 && branchEnd > branchStart, "bookmark-data branch not found");
 
   const factory = new Function("initialToken", "initialFetch", "pbpPinboardAccountFromToken", "console", `
     ${source.slice(cacheStart, cacheEnd)}

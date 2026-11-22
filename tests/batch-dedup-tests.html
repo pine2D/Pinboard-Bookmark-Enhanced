@@ -42,8 +42,8 @@ async function createSaveTagsHarness(service, names, opts = {}) {
   const source = await (await fetch("../background.js")).text();
   function block(startMarker, endMarker) {
     const start = source.indexOf(startMarker);
-    const end = source.indexOf(endMarker, start);
-    assert(start >= 0 && end > start, "SW source block not found: " + startMarker);
+    const end = source.indexOf(endMarker, start === -1 ? 0 : start);
+    assert(start !== -1 && end !== -1 && end > start, "SW source block not found: " + startMarker);
     return source.slice(start, end);
   }
   const settings = {bookmarkService:service, pinboardToken:"fixture-token", _aiTags:true, batchAiTags:true, ...(opts.settings || {})};
@@ -138,8 +138,8 @@ async function getPopupBatchProgressSource() {
   if (popupBatchSource) return popupBatchSource;
   const source = await getPopupBatchSource();
   const start = source.indexOf("function renderBatchProgress");
-  const end = source.indexOf("// ---- Tag Presets ----", start);
-  assert(start >= 0 && end > start, "batch progress source block not found");
+  const end = source.indexOf("// ---- Tag Presets ----", start === -1 ? 0 : start);
+  assert(start !== -1 && end !== -1 && end > start, "batch progress source block not found");
   popupBatchSource = source.slice(start, end);
   return popupBatchSource;
 }
@@ -148,8 +148,8 @@ async function getPopupBatchPermissionSource() {
   if (popupBatchPermissionSource) return popupBatchPermissionSource;
   const source = await getPopupBatchSource();
   const start = source.indexOf("function batchAiPermissionOrigins");
-  const end = source.indexOf("function showBatchAiPermission", start);
-  assert(start >= 0 && end > start, "batch permission source block not found");
+  const end = source.indexOf("function showBatchAiPermission", start === -1 ? 0 : start);
+  assert(start !== -1 && end !== -1 && end > start, "batch permission source block not found");
   popupBatchPermissionSource = source.slice(start, end);
   return popupBatchPermissionSource;
 }
@@ -158,8 +158,8 @@ async function getPopupBatchSetupSource() {
   if (popupBatchSetupSource) return popupBatchSetupSource;
   const source = await getPopupBatchSource();
   const start = source.indexOf("let batchAiPermissionPending");
-  const end = source.indexOf("// ---- Background batch progress", start);
-  assert(start >= 0 && end > start, "batch setup source block not found");
+  const end = source.indexOf("// ---- Background batch progress", start === -1 ? 0 : start);
+  assert(start !== -1 && end !== -1 && end > start, "batch setup source block not found");
   popupBatchSetupSource = source.slice(start, end);
   return popupBatchSetupSource;
 }

@@ -33,8 +33,8 @@ async function test(name, fn) {
 
 function buildHarness(source, queryTabs, bookmarkResult = true) {
   const start = source.indexOf("async function _getFocusedActiveTab");
-  const end = source.indexOf("// ---- \u6807\u7b7e\u9875\u6fc0\u6d3b/\u66f4\u65b0\u65f6\u5237\u65b0\u56fe\u6807", start);
-  assert(start >= 0 && end > start, "active-tab refresh helpers not found");
+  const end = source.indexOf("// ---- \u6807\u7b7e\u9875\u6fc0\u6d3b/\u66f4\u65b0\u65f6\u5237\u65b0\u56fe\u6807", start === -1 ? 0 : start);
+  assert(start !== -1 && end !== -1 && end > start, "active-tab refresh helpers not found");
 
   const calls = { queries: [], schedule: [], activity: 0, checks: [], icons: [], mirrors: [], cacheReads: [] };
   let scheduledWork = Promise.resolve();
@@ -282,8 +282,8 @@ const G14_URL = "https://example.com/article";
 function buildStatusFailureHarness(source, { service = "linkding", failure = null, bookmark = null, pinboardStatus = 200, checkStatus = true, linkdingPreload = true, session = {} } = {}) {
   const slice = (from, to) => {
     const start = source.indexOf(from);
-    const end = source.indexOf(to, start);
-    assert(start >= 0 && end > start, "source slice not found: " + from);
+    const end = source.indexOf(to, start === -1 ? 0 : start);
+    assert(start !== -1 && end !== -1 && end > start, "source slice not found: " + from);
     return source.slice(start, end);
   };
   const lookups = [];
