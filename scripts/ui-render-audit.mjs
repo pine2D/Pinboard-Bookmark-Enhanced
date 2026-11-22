@@ -4930,10 +4930,12 @@ async function runOneCheckInPanel(page, theme, check, results, extBase) {
   if (check.state === "classState") {
     // Same discipline as the hover-pointer reset below: leaving the class on
     // would leak into the next check that reads this same element in its
-    // "default" state.
+    // "default" state, and controls like `.stag` transition background/color
+    // on removal too -- settle before any follow-up rest scan reads it.
     await page.evaluate(({ selector, cls }) => {
       document.querySelector(selector)?.classList.remove(...cls);
     }, { selector: check.selector, cls: check.addClass });
+    await settleAnimations(page);
   }
   if (check.state === "open") {
     // Close it again (real Escape, the same key listbox.js's
@@ -7085,6 +7087,12 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // REST-state chip -- marking that one `.used` instead would make every
     // one of those rows measure the used state.
     await page.evaluate(() => {
+      // Unhide #suggest-row BEFORE marking the last chip `.used` so any CSS
+      // transition starts and finishes while the row is actually laid out, rather
+      // than starting late when display:none is lifted right before CHECKS/family-13.
+      document.getElementById("suggest-row")?.classList.remove("hidden");
+      const submit = document.getElementById("submit-btn");
+      if (submit) submit.disabled = false;
       // querySelectorAll + array index, not a :last-of-type/:last-child
       // pseudo-class: .add-all-link is ALSO a <button> and IS each
       // suggest-group's actual last button child, so either pseudo-class
@@ -7096,40 +7104,10 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     });
     // .stag's `transition: background ..., color ...` (--pp-motion-state,
     // 150ms) means an immediate read right after the class add can still
-    // catch the interpolated frame (verified live, scratch diagnostic: the
-    // "used" chip's background read as chip-bg, not transparent, without
-    // this wait) -- same settle discipline runOneCheck's own hover/focus
-    // states already use elsewhere in this file.
+    // catch the interpolated frame -- wait + settleAnimations keeps the rest
+    // scan deterministic across slower runners.
     await page.waitForTimeout(200);
-    // #suggest-row ships `class="row hidden"` (popup.html) until popup.js's
-    // own showMain() unhides it -- unreachable here for the same early-
-    // return reason as above, so it needs the same manual unhide the other
-    // POPUP_HIDDEN_LEG_IDS legs get, but early: this file's own .stag
-    // checklist rows run in the shared CHECKS loop right below, well before
-    // that later pass.
-    //
-    // Defensively re-disabling #submit-btn=false here too: an EARLIER
-    // version of this block called the real click handler (addTag() ->
-    // renderTags() -> updateCharCount(), popup-tags.js/popup.js), which
-    // unconditionally recomputes `sub.disabled = urlBad || over ||
-    // !_pageInfoReady` -- and `_pageInfoReady` is a script-scope `let`,
-    // forever false on this fixture (the isUnsupportedUrl early return this
-    // whole block exists to route around sits BEFORE the only line that
-    // ever sets it true), so that recompute always re-disabled the button
-    // regardless of the URL (confirmed live, scratch diagnostic, not
-    // committed -- setting #url-input's value did NOT help either;
-    // `!_pageInfoReady` alone was enough). The .used marking above no
-    // longer calls addTag() (see its own comment), so nothing in this
-    // block's current form is known to trip updateCharCount() any more --
-    // this stays as cheap, idempotent insurance rather than a proven-needed
-    // fix, since the "shown" block already proved #submit-btn is otherwise
-    // a legitimate, visible, enabled target for the existing focusWithin
-    // checks on it.
-    await page.evaluate(() => {
-      document.getElementById("suggest-row")?.classList.remove("hidden");
-      const submit = document.getElementById("submit-btn");
-      if (submit) submit.disabled = false;
-    });
+    await settleAnimations(page);
   }
   // popup's confirm popover only exists after a destructive action is
   // clicked. #logout-link is the cheapest opener that reaches the SHARED
