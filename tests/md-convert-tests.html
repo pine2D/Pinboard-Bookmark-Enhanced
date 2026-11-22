@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="942"><title>md-convert Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="948"><title>md-convert Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -4528,6 +4528,74 @@ window._pbpSiteEntryDone = (async () => {
     }
   }
 })();
+</script>
+
+<script>
+section("Marked 18.2 CommonMark parity: nested image marks, tab-stop containers, Setext TOC");
+{
+  const parse = html => new DOMParser().parseFromString(html, "text/html");
+  const baseUrl = "https://export.example/articles/guide";
+
+  // 1) Nested image inside image alt with ==highlight== (TextRenderer.image recurses)
+  const nestedMarkMd = "![outer ![==inner==](i.png)](o.png)";
+  const nestedDoc = parse(renderMarkdown(nestedMarkMd));
+  check("renderMarkdown flattens ==mark== inside nested image alt without leaking <mark>",
+    nestedDoc.images.length === 1 && nestedDoc.images[0].alt === "outer ==inner==" && !nestedDoc.body.innerHTML.includes("&lt;mark&gt;"),
+    nestedDoc.body.innerHTML);
+
+  // 2) applyImagePolicy after _configureMarked() handles nested image ==mark== without TextRenderer throw
+  const nestedAlt = applyImagePolicy(nestedMarkMd, { policy: "alt", baseUrl });
+  const nestedStrip = applyImagePolicy("Before " + nestedMarkMd + " after", { policy: "strip", baseUrl });
+  check("applyImagePolicy alt and strip handle nested image ==mark== after Marked configuration",
+    nestedAlt === "outer ==inner==" && nestedStrip === "Before  after",
+    JSON.stringify({ nestedAlt, nestedStrip }));
+
+  // 3) Tab-indented blockquote (`>\t`) and single-tab list bullet (`-\t`) map images, while `-\t\t` (6 spaces after `- `) stays CommonMark indented code
+  const tabContainers = [">\t![Fig](pics/chart.png)", "-\t![Fig](pics/chart.png)"];
+  const tabCodeList = "-\t\t![Fig](pics/chart.png)";
+  check("tab-expanded blockquote and list prefixes map prose images while preserving double-tab list code blocks",
+    tabContainers.every(sample => {
+      const kept = parse(composeStyledHtml(sample, { url: baseUrl }, { imagePolicy: "keep" }));
+      const stripped = parse(composeStyledHtml(sample, { url: baseUrl }, { imagePolicy: "strip" }));
+      const scanned = pbpEmbedScan(sample, baseUrl);
+      return kept.querySelector("img")?.getAttribute("src") === "https://export.example/articles/pics/chart.png"
+        && !stripped.querySelector("img")
+        && scanned.candidates.length === 1
+        && scanned.candidates[0] === "https://export.example/articles/pics/chart.png";
+    }) && applyImagePolicy(tabCodeList, { policy: "strip", baseUrl }) === tabCodeList
+       && pbpEmbedScan(tabCodeList, baseUrl).candidates.length === 0,
+    JSON.stringify(tabContainers.map(s => ({ keep: applyImagePolicy(s, { policy: "keep", baseUrl }), strip: applyImagePolicy(s, { policy: "strip", baseUrl }), scan: pbpEmbedScan(s, baseUrl).candidates }))));
+
+  // 4) Blockquote with a lazy Setext underline (`---` -> `    ---`) still maps images in the blockquote
+  const lazySetextQuote = "> ![Fig](pics/chart.png)\n>\n> Heading\n---";
+  check("blockquote containing a lazy Setext underline still strips and scans sibling images",
+    !parse(composeStyledHtml(lazySetextQuote, { url: baseUrl }, { imagePolicy: "strip" })).querySelector("img")
+      && pbpEmbedScan(lazySetextQuote, baseUrl).candidates.length === 1,
+    applyImagePolicy(lazySetextQuote, { policy: "strip", baseUrl }));
+
+  // 5) Setext autolink heading (`<foo@example.org>\n---`) + duplicate ATX heading keep TOC slugs and single <a> links aligned
+  const setextAutolinkMd = "<foo@example.org>\n---\n\nBody.\n\n## fooexampleorg\n\nMore.";
+  const setextToc = buildToc(setextAutolinkMd, { minLevel: 2, maxLevel: 4 });
+  const setextStyled = parse(composeStyledHtml(setextAutolinkMd, { url: baseUrl }, { includeToc: true }));
+  const setextH2 = [...setextStyled.querySelectorAll("h2")];
+  const setextLinks = [...setextStyled.querySelectorAll('ul a[href^="#"]')];
+  check("Setext autolink heading and duplicate ATX heading share exact slugs and non-nested TOC links",
+    JSON.stringify(setextToc.headings.map(h => h.slug)) === JSON.stringify(["fooexampleorg", "fooexampleorg-1"])
+      && setextLinks.length === 2
+      && setextLinks.every((a, i) => setextStyled.getElementById(a.getAttribute("href").slice(1)) === setextH2[i + 1]),
+    setextStyled.body.innerHTML);
+
+  // 6) Out-of-range Setext h1 (`Title\n===`) and blockquote-nested headings burn slug slots without polluting top-level TOC
+  const mixedSetextMd = "Title\n===\n\n> ## Quoted\n\n## Title\n\n## Quoted";
+  const mixedToc = buildToc(mixedSetextMd, { minLevel: 2, maxLevel: 4 });
+  const mixedRendered = parse(renderMarkdown(mixedSetextMd));
+  const topLevelH2 = [...mixedRendered.body.children].filter(el => el.tagName === "H2");
+  check("Setext h1 and quoted h2 burn dedup slots so top-level TOC anchors hit top-level rendered headings",
+    JSON.stringify(mixedToc.headings.map(h => h.slug)) === JSON.stringify(["title-1", "quoted-1"])
+      && topLevelH2.length === 2
+      && mixedToc.headings.every((h, i) => topLevelH2[i].id === h.slug),
+    JSON.stringify({ toc: mixedToc.headings, topIds: topLevelH2.map(h => h.id) }));
+}
 </script>
 
 <script>

@@ -791,7 +791,7 @@ function _pbpFlattenMarks(tokens) {
   const out = [];
   for (const t of tokens || []) {
     if (t && t.type === "pbpMark") out.push({ type: "text", raw: "==", text: "==" }, ..._pbpFlattenMarks(t.tokens), { type: "text", raw: "==", text: "==" });
-    else if (t && t.tokens && ["strong", "em", "del", "link"].includes(t.type)) out.push({ ...t, tokens: _pbpFlattenMarks(t.tokens) });
+    else if (t && t.tokens && ["strong", "em", "del", "link", "image"].includes(t.type)) out.push({ ...t, tokens: _pbpFlattenMarks(t.tokens) });
     else out.push(t);
   }
   return out;
@@ -1363,20 +1363,33 @@ function pbpMapExportImages(md, transform) {
     for (let i = 0; i < lines.length; i++) {
       let line = rawLines[i], lineMap = map.slice(offset, offset + line.length);
       let start = line.lastIndexOf(lines[i]);
-      // marked expands leading tabs in list continuations before stripping
-      // the list indent. Map each expanded space back to its original tab;
-      // image spans themselves still point at the original source bytes.
-      if (start < 0 && /^[ \t]*\t/.test(line)) {
-        const prefix = line.match(/^[ \t]*/)[0];
+      // marked expands tabs in blockquote/list prefixes (and leading list
+      // continuation whitespace) by CommonMark 4-column tab stops before
+      // stripping container markers. Map each expanded space back to its tab.
+      if (start < 0 && /^(?: {0,3}(?:[*+-]|\d{1,9}[.)])(?:[ \t]+\[[ xX]\])?| {0,3}>)?[ \t]*\t/.test(line)) {
+        const prefix = line.match(/^(?: {0,3}(?:[*+-]|\d{1,9}[.)])(?:[ \t]+\[[ xX]\])?| {0,3}>)?[ \t]*/)[0];
         let expanded = ""; const expandedMap = [];
         for (let j = 0; j < prefix.length; j++) {
           const count = prefix[j] === "\t" ? 4 - expanded.length % 4 : 1;
-          expanded += " ".repeat(count);
+          expanded += prefix[j] === "\t" ? " ".repeat(count) : prefix[j];
           for (let k = 0; k < count; k++) expandedMap.push(lineMap.at(j));
         }
         line = expanded + line.slice(prefix.length);
         lineMap = concat([expandedMap, lineMap.slice(prefix.length)]);
         start = line.lastIndexOf(lines[i]);
+      }
+      // marked turns a lazy Setext underline inside a blockquote (`---`) into
+      // `    ---` so it cannot re-lex as a Setext heading; keep its byte map
+      // valid so images elsewhere in the same blockquote still resolve.
+      if (start < 0 && lines[i].startsWith("    ") && /^ {0,3}(?:=+|-+)[ \t]*$/.test(line)) {
+        const tail = lines[i].slice(4), tailStart = line.lastIndexOf(tail);
+        if (tailStart >= 0) {
+          const anchor = lineMap.at(tailStart);
+          child.push(concat([[anchor, anchor, anchor, anchor], lineMap.slice(tailStart, tailStart + tail.length)]));
+          if (i < lines.length - 1) child.push(map.slice(offset + rawLines[i].length, offset + rawLines[i].length + 1));
+          offset += rawLines[i].length + 1;
+          continue;
+        }
       }
       if (start < 0) return null;
       child.push(lineMap.slice(start, start + lines[i].length));
@@ -1484,37 +1497,64 @@ function _pbpFenceTracker() {
 }
 
 // ── Export transform ③: table of contents ──
-// Scans ATX headings in [minLevel,maxLevel], skipping fenced code blocks.
+// Walks Marked's heading tokens (both ATX and Setext, skipping code blocks),
+// falling back to ATX line scanning only when Marked is absent.
 // Slugs reuse P1 slugify() (GitHub-style, CJK preserved). De-dupes slugs with -1, -2…
 // Returns { tocMarkdown, headings:[{level,text,slug}] }.
 function buildToc(md, opts) {
   opts = opts || {};
   const minLevel = opts.minLevel || 2;
   const maxLevel = opts.maxLevel || 4;
-  const lines = (md || "").split("\n");
   const headings = [];
   const seen = Object.create(null);
   if (opts.reserveTocHeading) seen.contents = 0;
-  const inFence = _pbpFenceTracker();
-  for (const line of lines) {
-    if (inFence(line)) continue;
-    const m = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
-    if (!m) continue;
-    const level = m[1].length;
-    const text = m[2].trim();
-    // Count EVERY heading level into the dedup map (matching renderer.heading's
-    // all-level _headingSeen), even ones outside [minLevel,maxLevel] -- an
-    // out-of-range heading still occupies a slug slot at render time, so it must
-    // burn one here too or a later in-range TOC entry would point at a slug the
-    // renderer already reassigned to a different (out-of-range) heading.
-    const slug = _pbpUniqueHeadingSlug(slugify(text), seen);
-    if (level < minLevel || level > maxLevel) continue;
-    headings.push({ level, text, slug });
+  if (typeof marked !== "undefined" && typeof marked.lexer === "function") {
+    _configureMarked();
+    const walkHeadings = (tokens, topLevel) => {
+      for (const token of tokens || []) {
+        if (!token) continue;
+        if (token.type === "heading") {
+          // Count EVERY rendered heading into `seen` in pre-order (including
+          // out-of-range levels, Setext headings, and blockquote/list headings)
+          // so top-level TOC anchors always match renderer.heading's `_headingSeen`.
+          const slug = _pbpUniqueHeadingSlug(slugify(token.text), seen);
+          if (topLevel && token.depth >= minLevel && token.depth <= maxLevel) {
+            const text = String(token.text || "").replace(/\s*\n\s*/g, " ").trim();
+            const plain = token.tokens
+              ? marked.Parser.parseInline(_pbpFlattenMarks(token.tokens), { renderer: new marked.TextRenderer() }).replace(/\s*\n\s*/g, " ").trim()
+              : text;
+            const hasNestedLinkOrTag = Array.isArray(token.tokens) && token.tokens.some(t => t && (t.type === "link" || t.type === "html"));
+            const label = (hasNestedLinkOrTag ? (plain || text) : text).replace(/([[\]<>])/g, "\\$1");
+            headings.push({ level: token.depth, text, slug, _label: label });
+          }
+        } else if (token.type === "blockquote" && token.tokens) {
+          walkHeadings(token.tokens, false);
+        } else if (token.type === "list" && token.items) {
+          for (const item of token.items) if (item && item.tokens) walkHeadings(item.tokens, false);
+        }
+      }
+    };
+    walkHeadings(marked.lexer(md || ""), true);
+  } else {
+    const lines = (md || "").split("\n");
+    const inFence = _pbpFenceTracker();
+    for (const line of lines) {
+      if (inFence(line)) continue;
+      const m = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+      if (!m) continue;
+      const level = m[1].length;
+      const text = m[2].trim();
+      const slug = _pbpUniqueHeadingSlug(slugify(text), seen);
+      if (level < minLevel || level > maxLevel) continue;
+      headings.push({ level, text, slug, _label: text.replace(/([[\]<>])/g, "\\$1") });
+    }
   }
   if (!headings.length) return { tocMarkdown: "", headings };
   const body = headings.map(h => {
     const indent = "  ".repeat(h.level - minLevel);
-    return indent + "- [" + h.text + "](#" + h.slug + ")";
+    const label = h._label || h.text;
+    delete h._label;
+    return indent + "- [" + label + "](#" + h.slug + ")";
   }).join("\n");
   return { tocMarkdown: "## Contents\n" + body, headings };
 }

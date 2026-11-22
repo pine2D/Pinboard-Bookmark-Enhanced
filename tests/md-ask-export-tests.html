@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="42"><title>Ask export tests</title></head><body>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="43"><title>Ask export tests</title></head><body>
 <div id="results"></div><div id="summary"></div>
 <script src="../shared.js"></script>
 <script src="../vendor/marked.min.js"></script><script src="../vendor/purify.min.js"></script>
@@ -129,6 +129,10 @@ await test('runner freezes sent window, original excerpts and video times before
 await test('nested blockquote and list code citations stay literal',()=>{
   const samples=['> ```js\n> [P2]\n> ```\n> Claim [P1]','- Item\n\n  ```js\n  [P2]\n  ```\n\n  Claim [P1]','> ``start\n> [P2] end`` and [P1]','> - Item\n>\n>   ~~~js\n>   [P2]\n>   ~~~\n>\n>   Claim [P1]'];
   for(const body of samples){const r={...round,a:body,cites:[{p:1,quote:'real source'},{p:2,quote:'code only'}],evidence:[]};const m=pbpAskExportMarkdown({...snapshot,rounds:[r]});assert(m.includes('[P2]'),'code token changed: '+body);assert(!m.includes('code only'),'code citation became a source');assert((m.match(/^\[\^.*\]:/gm)||[]).length===1,'prose citation lost: '+body);const copied=_pbpAskBuildCopyText(body,r.cites);assert(copied.includes('[P2]'),'copy changed nested code: '+body);}
+});
+await test('tab-indented blockquote and list citations map prose and preserve code literals',()=>{
+  const samples=['>\tClaim [P1] and `code [P2]`\n>\t<script>x</scr'+'ipt>','-\tClaim [P1] and `code [P2]`','-\t\t[P2]\n\n\tClaim [P1] and `code [P2]`','> Claim [P1] and `code [P2]`\n>\n> Heading\n---'];
+  for(const body of samples){const r={...round,a:body,cites:[{p:1,quote:'real source'},{p:2,quote:'code only'}],evidence:[]};const m=pbpAskExportMarkdown({...snapshot,rounds:[r]});assert(m.includes('[P2]'),'code token changed: '+body);assert(!m.includes('code only'),'code citation became a source: '+body);assert(!m.includes('<script>'),'raw HTML inside tab blockquote was not escaped: '+body);assert((m.match(/^\[\^.*\]:/gm)||[]).length===1,'prose citation lost: '+body);}
 });
 await test('silent real IndexedDB clear failure is suppressed, visible and retryable',async()=>{
   await withAskRunnerFixture(async({answer,state})=>{

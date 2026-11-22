@@ -2611,9 +2611,32 @@ function _pbpAskExportMapProse(md, transform, escapeHtml) {
     if (lines.length > rawLines.length) return null;
     let at = 0;
     for (let i = 0; i < lines.length; i++) {
-      const offset = rawLines[i].lastIndexOf(lines[i]);
+      let line = rawLines[i], lineMap = map.slice(at, at + line.length);
+      let offset = line.lastIndexOf(lines[i]);
+      if (offset < 0 && /^(?: {0,3}(?:[*+-]|\d{1,9}[.)])(?:[ \t]+\[[ xX]\])?| {0,3}>)?[ \t]*\t/.test(line)) {
+        const prefix = line.match(/^(?: {0,3}(?:[*+-]|\d{1,9}[.)])(?:[ \t]+\[[ xX]\])?| {0,3}>)?[ \t]*/)[0];
+        let expanded = ""; const expandedMap = [];
+        for (let j = 0; j < prefix.length; j++) {
+          const count = prefix[j] === "\t" ? 4 - expanded.length % 4 : 1;
+          expanded += prefix[j] === "\t" ? " ".repeat(count) : prefix[j];
+          for (let k = 0; k < count; k++) expandedMap.push(lineMap[j]);
+        }
+        line = expanded + line.slice(prefix.length);
+        lineMap = expandedMap.concat(lineMap.slice(prefix.length));
+        offset = line.lastIndexOf(lines[i]);
+      }
+      if (offset < 0 && lines[i].startsWith("    ") && /^ {0,3}(?:=+|-+)[ \t]*$/.test(line)) {
+        const tail = lines[i].slice(4), tailStart = line.lastIndexOf(tail);
+        if (tailStart >= 0) {
+          for (let k = 0; k < 4; k++) positions.push(lineMap[tailStart]);
+          for (let j = 0; j < tail.length; j++) positions.push(lineMap[tailStart + j]);
+          if (i < lines.length - 1) positions.push(map[at + rawLines[i].length]);
+          at += rawLines[i].length + 1;
+          continue;
+        }
+      }
       if (offset < 0) return null;
-      for (let j = 0; j < lines[i].length; j++) positions.push(map[at + offset + j]);
+      for (let j = 0; j < lines[i].length; j++) positions.push(lineMap[offset + j]);
       if (i < lines.length - 1) positions.push(map[at + rawLines[i].length]);
       at += rawLines[i].length + 1;
     }
