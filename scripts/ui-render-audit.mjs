@@ -10181,7 +10181,8 @@ async function runSweep(page, sw, extBase) {
     }
     await page.goto(`${extBase}library.html?_ra=sweep#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
     await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS }).catch(() => {});
-    await page.waitForTimeout(300);
+    await page.waitForSelector("#vocab-export-open:not([disabled])", { timeout: TIMEOUT_MS }).catch(() => {});
+    await page.waitForTimeout(150);
     await scan("library", "vocab-list");
     // Library redesign T4b: the "Filter" popover is interaction-only UI
     // (ui-primitives.md: register how it opens or it is outside every family).
@@ -10226,7 +10227,9 @@ async function runSweep(page, sw, extBase) {
     const vocabHead = page.locator("#vocab-list .vocab-card .notes-card-head").first();
     if (wants("library", "vocab-detail")) {
       if (!(await vocabHead.count())) throw new Error("SETUP: vocabulary detail opener is missing");
-      await vocabHead.click(); await page.waitForTimeout(250);
+      await vocabHead.click();
+      await page.waitForSelector("#vocab-detail:not([hidden])", { timeout: TIMEOUT_MS });
+      await page.waitForTimeout(150);
       await scan("library", "vocab-detail");
     }
     if (wants("library", "dict-entry-idle")) {
@@ -10292,7 +10295,9 @@ async function runSweep(page, sw, extBase) {
     // removed 2026-08-06 and selection is now a modified click on the row itself.
     if (wants("library", "vocab-batch-bar")) {
       if (!(await vocabHead.count())) throw new Error("SETUP: vocabulary batch opener is missing");
-      await vocabHead.click({ modifiers: ["Control"] }); await page.waitForTimeout(350);
+      await vocabHead.click({ modifiers: ["Control"] });
+      await page.waitForSelector(".vocab-batch-bar.selecting", { timeout: TIMEOUT_MS });
+      await page.waitForTimeout(150);
       await scan("library", "vocab-batch-bar");
     }
     if ([...contexts.library].some(name => name.startsWith("ask-history-"))) {
@@ -10310,7 +10315,9 @@ async function runSweep(page, sw, extBase) {
       const notesHit = page.locator("#notes-list .notes-hit-btn").first();
       if (wants("library", "notes-detail")) {
         if (!(await notesHit.count())) throw new Error("SETUP: notes detail opener is missing");
-        await notesHit.click(); await page.waitForTimeout(250);
+        await notesHit.click();
+        await page.waitForSelector("#notes-detail:not([hidden])", { timeout: TIMEOUT_MS });
+        await page.waitForTimeout(150);
         await scan("library", "notes-detail");
         if (wants("library", "notes-color-menu")) {
           await page.locator(".notes-excerpt-color").first().click();
@@ -10327,7 +10334,9 @@ async function runSweep(page, sw, extBase) {
       // Same modifier-click contract as the vocab list above.
       if (wants("library", "notes-batch-bar")) {
         if (!(await notesHit.count())) throw new Error("SETUP: notes batch opener is missing");
-        await notesHit.click({ modifiers: ["Control"] }); await page.waitForTimeout(350);
+        await notesHit.click({ modifiers: ["Control"] });
+        await page.waitForSelector(".notes-batch-bar.selecting", { timeout: TIMEOUT_MS });
+        await page.waitForTimeout(150);
         await scan("library", "notes-batch-bar");
       }
     }
@@ -10441,7 +10450,7 @@ async function runSweep(page, sw, extBase) {
         const videoUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
         await sw.evaluate((o) => chrome.storage.local.set(o), readerPayload("render-audit-video", videoUrl));
         await page.goto(`${extBase}md-preview.html?k=render-audit-video`, { waitUntil: "load", timeout: TIMEOUT_MS });
-        await page.waitForTimeout(900);
+        await page.waitForSelector(".pbv-poster", { timeout: TIMEOUT_MS });
         const videoOk = await page.evaluate(async (url) => {
           window.pbpVideoFixture = {
             tracks: [{ baseUrl: "https://x/en.xml", lang: "en", label: "English", asr: false }, { baseUrl: "https://x/zh.xml", lang: "zh-Hans", label: "Chinese (Simplified)", asr: false }],
@@ -10452,13 +10461,19 @@ async function runSweep(page, sw, extBase) {
           const poster = document.querySelector(".pbv-poster");
           if (!poster) return "no .pbv-poster";
           poster.click();
-          await new Promise((r) => setTimeout(r, 1500));
+          const deadline = performance.now() + 10000;
+          while (performance.now() < deadline) {
+            const bar = document.querySelector(".pbv-bar"), rows = document.querySelectorAll(".pbv-row");
+            if (bar && bar.checkVisibility() && rows.length > 0) return true;
+            await new Promise((r) => setTimeout(r, 50));
+          }
           const bar = document.querySelector(".pbv-bar"), rows = document.querySelectorAll(".pbv-row");
           if (!bar || !bar.checkVisibility()) return "no visible .pbv-bar after the poster click";
           if (!rows.length) return ".pbv-bar rendered but no .pbv-row cues";
           return true;
         }, videoUrl).catch((e) => `threw: ${e.message}`);
         if (videoOk !== true) throw new Error(`SETUP: selected reader video workbench did not open (${videoOk})`);
+        await page.waitForTimeout(150);
         await scan("md-preview", "video");
       }
 
@@ -10494,8 +10509,9 @@ async function runSweep(page, sw, extBase) {
   await setTheme(sw, "", "light");
   if (wants("popup", "light") || wants("popup", "states")) {
     await page.goto(`${extBase}popup.html?_ra=sweeplight`, { waitUntil: "load", timeout: TIMEOUT_MS });
-    await page.waitForTimeout(500);
-    await page.evaluate(async () => { if (window.PPOffline) await window.PPOffline.refresh(); }).catch(() => {});
+    await page.waitForSelector("#main-section:not(.hidden)", { timeout: TIMEOUT_MS });
+    await page.waitForFunction(() => typeof window.PPOffline?.refresh === "function", null, { timeout: TIMEOUT_MS });
+    await page.evaluate(async () => { await window.PPOffline.refresh(); }).catch(() => {});
     await page.waitForSelector("#offline-queue-bar:not(.hidden)", { timeout: TIMEOUT_MS }).catch(() => {});
     await scan("popup", "light");
     // Hidden-by-default states -- feedback card (with its fallback action),
@@ -10521,7 +10537,19 @@ async function runSweep(page, sw, extBase) {
       // (they shipped 17px tall against the 24px floor, 2026-09-18 audit M4). Driving
       // the toggle is the only way to render them, so this one block is driven, not
       // unhidden.
-      await page.evaluate(() => document.getElementById("offline-queue-toggle")?.click());
+      await page.evaluate(async () => {
+        const toggle = document.getElementById("offline-queue-toggle");
+        toggle?.click();
+        const deadline = performance.now() + 5000;
+        while (performance.now() < deadline) {
+          if (document.querySelector(".offline-queue-item, .offline-queue-empty")) return;
+          await new Promise((r) => setTimeout(r, 50));
+          if (!document.querySelector(".offline-queue-item, .offline-queue-empty") &&
+              toggle?.getAttribute("aria-expanded") !== "true") {
+            toggle?.click();
+          }
+        }
+      });
       // Wait for either outcome of renderList(): rows, or the empty placeholder.
       // A bare .offline-queue-item wait would burn the full timeout and then
       // measure an empty list in silence if the seeded queue record ever went
@@ -10552,7 +10580,7 @@ async function runSweep(page, sw, extBase) {
   // sweep of the form reports nothing else (2026-10-02).
   if (wants("popup", "form")) {
     await page.goto(`${extBase}popup.html?_ra=sweepform`, { waitUntil: "load", timeout: TIMEOUT_MS });
-    await page.waitForTimeout(500);
+    await page.waitForSelector("#main-section:not(.hidden)", { timeout: TIMEOUT_MS });
     const formShown = await page.evaluate(() => {
       const main = document.getElementById("main-section");
       const search = document.querySelector(".search-row");
@@ -10619,7 +10647,7 @@ async function runSweep(page, sw, extBase) {
       { url: "https://example.org/second-fixture", sourceTabUrl: "https://example.org/second-fixture", title: "Second Reader Entry", site: "example.org", engine: "jina", isVideo: false, openedAt: now - 3600000, lastKey: "popup-hist-2" },
     ]);
     await page.goto(`${extBase}popup.html?_ra=sweephist`, { waitUntil: "load", timeout: TIMEOUT_MS });
-    await page.waitForTimeout(500);
+    await page.waitForSelector("#main-section:not(.hidden)", { timeout: TIMEOUT_MS });
     await page.click("#jina-md-history-btn");
     await page.waitForSelector("#jina-md-history-pop:popover-open .pp-rh-item", { timeout: TIMEOUT_MS });
     await page.waitForTimeout(150);
@@ -10678,8 +10706,9 @@ async function runSweep(page, sw, extBase) {
   if (wants("popup", "dark")) {
     await setTheme(sw, "", "dark");
     await page.goto(`${extBase}popup.html?_ra=sweepdark`, { waitUntil: "load", timeout: TIMEOUT_MS });
-    await page.waitForTimeout(500);
-    await page.evaluate(async () => { if (window.PPOffline) await window.PPOffline.refresh(); }).catch(() => {});
+    await page.waitForSelector("#main-section:not(.hidden)", { timeout: TIMEOUT_MS });
+    await page.waitForFunction(() => typeof window.PPOffline?.refresh === "function", null, { timeout: TIMEOUT_MS });
+    await page.evaluate(async () => { await window.PPOffline.refresh(); }).catch(() => {});
     await page.waitForSelector("#offline-queue-bar:not(.hidden)", { timeout: TIMEOUT_MS }).catch(() => {});
     await scan("popup", "dark");
   }

@@ -319,11 +319,20 @@ try{
     postgres.linkding=false;down.linkding=false;checkDown.linkding=false;tagsDown.karakeep=false;gate.linkding=false;holdLinkdingPatch=null;holdLinkdingCheck=null;holdLinkdingCreate=null;
     await article.goto(origin+'/article');
   };
+  // Open options.html only after options.js DOMContentLoaded and the initial
+  // connection overview have settled, so radio/credential init and click
+  // listener bindings cannot race early .check() / .fill() / .click() steps.
+  const gotoOptions=async(page,hash='')=>{
+    await page.goto(pageUrl+'options.html'+hash);
+    await page.waitForFunction(()=>document.documentElement.dataset.optionsReady==='1'&&!!document.querySelector('#connection-health .connection-health-row'));
+    return page;
+  };
+  const openOptions=async(hash='')=>gotoOptions(await ctx.newPage(),hash);
   // The connection a block needs, made through the settings page like a user.
   const ensureConnected=async service=>{
     const current=await worker.evaluate(()=>pbpReadBookmarkConnection());
     if(current.service===service&&current.account)return;
-    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    const options=await openOptions();
     await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
     await options.locator('#opt-'+service+'-url').fill(origin+'/'+service+'/');
     await options.locator('#opt-'+service+'-token').fill('fixture-key');
@@ -340,7 +349,7 @@ try{
     await run();
   }
   await block('archive explanation and JSON restore',[],async()=>{
-  const backupPage=await ctx.newPage();await backupPage.goto(pageUrl+'options.html');
+  const backupPage=await openOptions();
   // The archive explanation follows the selected service immediately, before
   // any Connect or Save, and switching back must hide it again.
   const archiveHint=backupPage.locator('#wayback-selfhosted-private-hint');
@@ -372,7 +381,7 @@ try{
   let personalOwner;
   await block('services: connect, save, reader',[],async()=>{
   for(const service of ['linkding','karakeep']){
-    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    const options=await openOptions();
     await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
     const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
     // The gateway ? stays reachable with the gateway on None and answers "when do I need one": only that paragraph is visible.
@@ -553,7 +562,7 @@ try{
     // Access gateway form: validation before any request, Cloudflare headers
     // sealed on Connect, linkding keeps its connection ID for the same URL and token.
     const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
-    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    const options=await openOptions();
     const status=options.locator('#connect-linkding-status');
     const waitStatus=text=>status.filter({hasText:text}).waitFor({timeout:10000}).catch(async error=>{console.error({status:await status.textContent(),errors});throw error;});
     const linkdingAccount=()=>options.evaluate(async()=>pbpBookmarkConnection({...await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),bookmarkService:'linkding'}).account);
@@ -1339,7 +1348,7 @@ try{
   await worker.evaluate(()=>{self.__pbpRealTimeout=AbortSignal.timeout;AbortSignal.timeout=ms=>self.__pbpRealTimeout.call(AbortSignal,Math.min(ms,800));});
   try{
     for(const service of ['linkding','karakeep']){
-      const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+      const options=await openOptions();
       await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
       await options.locator('#opt-'+service+'-token').fill('fixture-key');
       const shown=new Set();
@@ -1368,7 +1377,7 @@ try{
   const saved=await worker.evaluate(()=>chrome.storage.local.get(['bookmarkService','bookmarkServiceActive','karakeepToken','linkdingToken','offlineQueue']));
   try{
     for(const service of ['linkding','karakeep']){
-      const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+      const options=await openOptions();
       await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
       const button=options.locator('#disconnect-'+service),status=options.locator('#connect-'+service+'-status');
       await button.waitFor({state:'visible',timeout:10000});
@@ -1410,7 +1419,7 @@ try{
       await worker.evaluate(saved=>chrome.storage.local.set({[saved.key]:saved.value}),{key:service+'Token',value:saved[service+'Token']});
       await options.close();
     }
-    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    const options=await openOptions();
     await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
     assert.equal(await options.locator('#disconnect-pinboard').count(),0);
     assert(await options.locator('#disconnect-linkding').isHidden()&&await options.locator('#disconnect-karakeep').isHidden(),'Pinboard shows a Disconnect button');
@@ -1493,7 +1502,7 @@ try{
   };
   const stored=()=>worker.evaluate(()=>chrome.storage.local.get(['bookmarkService','bookmarkServiceActive']));
   const mark=()=>worker.evaluate(()=>chrome.storage.local.get('bookmarkConnectMark'));
-  const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+  const options=await openOptions();
   const note=options.locator('#bookmark-service-note');
   try{
     await options.locator('input[name="bookmark-service"][value="linkding"]:checked').waitFor();
@@ -1620,7 +1629,7 @@ try{
     // Chosen and used differ now: every consumer still uses this device's service.
     assert.deepEqual(await readers(),['linkding','linkding','linkding','linkding','linkding'],'a reader followed the chosen service instead of this device\'s');
     assert.deepEqual(await replays(),{ok:true,sent:['linkding']},'offline replay did not deliver to this device\'s service');
-    const again=await ctx.newPage();await again.goto(pageUrl+'options.html');
+    const again=await openOptions();
     const note2=again.locator('#bookmark-service-note');
     await note2.filter({hasText:fill('bookmarkServiceChosenNotConnected',{SERVICE:'Karakeep',ACTIVE:'linkding'})}).waitFor({timeout:5000});
     const go=again.locator('#bookmark-service-connect-chosen');
@@ -1661,7 +1670,7 @@ try{
     cached_user_tags:{account:'tagfixture',counts:{reading:3,qa:2},timestamp:Date.now()}});});
   const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
   const overview=en.tagGovOverview.message.replace('$TAGS$','2').replace('$USES$','5');
-  const options=await ctx.newPage();await options.goto(pageUrl+'options.html#tags');
+  const options=await openOptions('#tags');
   const stats=options.locator('#tag-gov-stats');
   const state=()=>options.evaluate(()=>document.getElementById('panel-tags').dataset.tagGovState||'');
   try{
@@ -1682,7 +1691,7 @@ try{
       assert(await options.locator('#panel-archive').evaluate(el=>el.classList.contains('active')),'the Archive panel is active');
       await options.keyboard.press('ArrowUp');
       assert.equal(await options.evaluate(()=>document.activeElement?.id),'tab-markdown','ArrowUp steps back over the hidden Tags tab');
-      await options.goto(pageUrl+'options.html#tags');
+      await gotoOptions(options,'#tags');
       await until(async()=>(await state())==='pinboard-only','deep link reopened');
     }
     await options.locator('#tab-general').click();
@@ -1742,7 +1751,7 @@ try{
     await chrome.storage.local.set({optSyncEnabled:true,bookmarkService:'pinboard',bookmarkServiceActive:'pinboard',pinboardToken:obfuscateKey('tagfixture:0123456789ABCDEF0123'),
       ...await pbpPinboardVerifiedPatch('tagfixture:0123456789ABCDEF0123'),cached_user_tags:{account:'tagfixture',counts:{reading:3,qa:2},timestamp:Date.now()}});
   });
-  const synced=await ctx.newPage();await synced.goto(pageUrl+'options.html#tags');
+  const synced=await openOptions('#tags');
   const syncedNow=()=>synced.evaluate(()=>({state:document.getElementById('panel-tags').dataset.tagGovState||'',stats:document.getElementById('tag-gov-stats').textContent.trim()}));
   const syncedUntil=(want,label)=>until(async()=>{const r=await syncedNow();return r.state===want.state&&r.stats===want.stats;},label).catch(async e=>{throw new Error(e.message+' '+JSON.stringify(await syncedNow()));});
   const pinboardOnly={state:'pinboard-only',stats:en.tagGovPinboardOnly.message};
@@ -1865,9 +1874,10 @@ try{
   await worker.evaluate(async()=>{
     await chrome.storage.local.set({aiProvider:'gemini',previewAiModelByProvider:{gemini:'g-x',openai:'o-y'}});
   });
-  const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+  const options=await openOptions();
   await options.evaluate(()=>syncSetLarge('savedThemes',[{name:'Mine',css:'a{color:red}'}]));
-  await options.goto(pageUrl+'options.html#appearance');
+  await options.goto('about:blank');
+  await gotoOptions(options,'#appearance');
   try{
     await options.locator('.theme-preset-btn[data-theme="nord-night"]').click();
     await until(async()=>(await stored(['themePresetKey'])).themePresetKey==='nord-night','preset stored');
@@ -1909,7 +1919,7 @@ try{
     await chrome.storage.local.set({pinboardToken:obfuscateKey('logfixture:0123456789ABCDEF0123'),
       _waybackLog:[{url:pinboardUrl,ts,outcome:'requested',account:'logfixture'},{url:linkdingUrl,ts,outcome:'requested',account:linkdingAccount}]});
   },{linkdingAccount,pinboardUrl,linkdingUrl});
-  const options=await ctx.newPage();await options.goto(pageUrl+'options.html#archive');
+  const options=await openOptions('#archive');
   const shown=()=>options.locator('#wayback-log .wayback-log-url-text').allTextContents();
   const showing=(want,label)=>until(async()=>JSON.stringify(await shown())===JSON.stringify(want),label).catch(async e=>{throw new Error(e.message+' shown: '+JSON.stringify(await shown()));});
   try{
@@ -2083,7 +2093,7 @@ try{
     // 1. The settings page: the switch sits with linkding's connection only,
     // starts off, and is stored as switched; there the general status row
     // gives way to a note pointing at it.
-    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    const options=await openOptions();
     for(const service of ['pinboard','karakeep','linkding']){
       await options.locator('#tab-general').click();
       await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
@@ -2169,7 +2179,7 @@ try{
   await block('linkding page information from the browser or the server',['linkding'],async()=>{
     const spa=origin+'/article-spa';
     const checksSince=since=>requests.slice(since).filter(r=>r.service==='linkding'&&r.path.startsWith('bookmarks/check'));
-    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    const options=await openOptions();
     await options.locator('#tab-general').click();
     assert.equal(await options.locator('#opt-linkding-browser-metadata').isChecked(),true,'the browser page information switch does not start on');
     const stored=()=>worker.evaluate(()=>chrome.storage.local.get('linkdingBrowserMetadata').then(row=>row.linkdingBrowserMetadata));
@@ -2214,7 +2224,7 @@ try{
     console.log('linkding page information: the browser\'s by default, linkding\'s from the same check (sent with disable_scraping) when switched off');
   });
   await block('linkding SingleFile after a new bookmark',['linkding'],async()=>{
-    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    const options=await openOptions();
     await options.locator('#tab-general').click();
     assert.equal(await options.locator('#opt-linkding-singlefile').isChecked(),false,'the SingleFile switch does not start off');
     await options.locator('#opt-linkding-singlefile').check();
@@ -2518,7 +2528,7 @@ try{
     // the page still handles the first switch. The last pick wins, on the page
     // and on this device, and the page does not take its own switch for a
     // change made elsewhere.
-    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    const options=await openOptions();
     await options.waitForFunction(()=>document.getElementById('opt-linkding-url').value!==''&&document.querySelector('#connection-health .connection-health-row'));
     const pick=service=>options.evaluate(service=>{const radio=document.querySelector('input[name="bookmark-service"][value="'+service+'"]');radio.checked=true;radio.dispatchEvent(new Event('change',{bubbles:true}));},service);
     const stored=()=>options.evaluate(()=>chrome.storage.local.get(['bookmarkService','bookmarkServiceActive']));
@@ -2553,7 +2563,7 @@ try{
     const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
     const zh=JSON.parse(readFileSync(new URL('../_locales/zh_CN/messages.json',import.meta.url),'utf8'));
     const host=new URL(origin).host;
-    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    const options=await openOptions();
     // The page's init ends by scheduling the first overview render; pick the radio only after it, or the change handler runs before the page is wired.
     const initialised=()=>options.waitForFunction(()=>document.getElementById('opt-linkding-url').value!==''&&document.querySelector('#connection-health .connection-health-row'));
     await initialised();
@@ -2620,7 +2630,7 @@ try{
     });
     const options=await ctx.newPage();
     try{
-      await options.goto(pageUrl+'options.html#ai');
+      await gotoOptions(options,'#ai');
       await options.waitForFunction(()=>document.getElementById('panel-ai')?.classList.contains('active')&&document.getElementById('opt-ai-provider')?.value==='gemini'&&document.querySelector('#connection-health .connection-health-row'));
       const guide=options.locator('#deepseek-extra-guide');
       const toolsDet=options.locator('#deepseek-tools-credentials');

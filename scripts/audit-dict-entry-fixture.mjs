@@ -688,7 +688,11 @@ export async function openDictEntryState(page, state) {
       await page.locator('#explain-pop .xp-dict-save-change').click();
       const menu = page.locator('.xp-dict-save-menu:popover-open');
       await menu.waitFor();
-      const focused = await page.evaluate(() => document.activeElement?.matches('.xp-dict-save-menu [role="option"][aria-selected="true"]'));
+      const focused = await page.waitForFunction(
+        () => document.activeElement?.matches('.xp-dict-save-menu [role="option"][aria-selected="true"]'),
+        null,
+        { timeout: 5000 }
+      ).then(() => true, () => false);
       if (!focused) throw new Error('SETUP: opening the choice list did not focus the selected definition');
       return menu.isVisible();
     }
@@ -719,8 +723,12 @@ export async function forgetDictSavedWord(page) {
 // keyboard user does; focus must come back to the control that opened it.
 export async function closeDictSaveMenu(page) {
   await page.keyboard.press('Escape');
-  const back = await page.evaluate(() => !document.querySelector('.xp-dict-save-menu:popover-open') &&
-    !!document.activeElement?.matches('.xp-dict-save-change, .vocab-save-controls .listbox-btn'));
+  const back = await page.waitForFunction(
+    () => !document.querySelector('.xp-dict-save-menu:popover-open') &&
+      !!document.activeElement?.matches('.xp-dict-save-change, .vocab-save-controls .listbox-btn'),
+    null,
+    { timeout: 5000 }
+  ).then(() => true, () => false);
   if (!back) throw new Error('SETUP: Escape did not close the save choice list and return focus to its control');
   await page.evaluate(() => {
     const origin = window._auditDictSaveMenuOrigin, pop = document.getElementById('explain-pop');
