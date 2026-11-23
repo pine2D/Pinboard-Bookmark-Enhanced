@@ -86,13 +86,15 @@ const pageMetadata=pathname=>pathname==='/article-meta'
   :pathname==='/article-spa'?{title:'Served title',description:'Served description'}
   :pathname==='/article-recent'?{title:'Recent article',description:'Recent page description'}
   :{title:'Runtime article',description:null};
-// linkding v1.47 serializer timestamps carry microseconds.
+// Wire shapes verified 2026-11-23 against live --target temp containers
+// (linkding v1.47.0 SQLite + postgres:18, Karakeep v0.34.1).
+// linkding v1.47.0 serializer timestamps carry microseconds.
 const serverNow=()=>new Date().toISOString().replace(/Z$/,'000Z');
 // Karakeep 0.34.1 keeps modifiedAt in whole seconds (db/schema.ts
 // modifiedAtField: integer mode "timestamp"), stamped by every bookmark
 // update and by updateTags (trpc/routers/bookmarks.ts).
 const karakeepNow=()=>new Date(Math.floor(Date.now()/1000)*1000).toISOString();
-const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'bookmark',type:'manual',public:false,hasCollaborators:false,userRole:'owner'};
+const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'\u{1F516}',parentId:null,type:'manual',query:null,public:false,hasCollaborators:false,userRole:'owner'};
 let listCreated=false;
 let holdLinkdingPatch = null;
 // holdLinkdingCheck: {url, promise}: a linkding /check/ for that address waits on the promise.
@@ -135,7 +137,7 @@ const server=createServer(async(req,res)=>{
     // No answer within the client's deadline; closed later so shutdown is not held.
     if(kind==='hang'){setTimeout(()=>req.socket.destroy(),3000);return;}
     if(kind==='headers'){
-      if(req.headers['x-probe-gateway']==='probe-value'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({theme:'auto',version:'1.44.0'}));}
+      if(req.headers['x-probe-gateway']==='probe-value'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({theme:'auto',enable_sharing:false,permanent_notes:false,version:'1.47.0'}));}
       else{res.writeHead(400).end();}
       return;
     }
@@ -170,20 +172,20 @@ const server=createServer(async(req,res)=>{
   // serializers.py BookmarkSerializer: every field, the archive link falling
   // back to a capture at date_added, website_* always null.
   const serialize=row=>{const added=Date.parse(row.date_added);return {id:row.id,url:row.url,title:row.title,description:row.description,notes:row.notes,
-    web_archive_snapshot_url:row.web_archive_snapshot_url||(Number.isFinite(added)?'https://web.archive.org/web/'+new Date(added).toISOString().replace(/[-:T]/g,'').slice(0,14)+'/'+row.url:null),
+    web_archive_snapshot_url:row.web_archive_snapshot_url!==undefined&&row.web_archive_snapshot_url!==null?row.web_archive_snapshot_url:(Number.isFinite(added)?'https://web.archive.org/web/'+new Date(added).toISOString().replace(/[-:T]/g,'').slice(0,14)+'/'+row.url:null),
     favicon_url:null,preview_image_url:null,is_archived:row.is_archived,unread:row.unread,shared:row.shared,tag_names:row.tag_names,date_added:row.date_added,date_modified:row.date_modified,website_title:null,website_description:null};};
-  if(path==='user/profile/')return reply(200,{theme:'auto',enable_sharing:true,permanent_notes:false});
-  if(path==='users/me')return reply(200,{id:'u1',name:'Fixture',email:null,localUser:true});
+  if(path==='user/profile/')return reply(200,{theme:'auto',bookmark_date_display:'relative',bookmark_link_target:'_blank',web_archive_integration:'disabled',tag_search:'strict',enable_sharing:true,enable_public_sharing:false,enable_favicons:false,display_url:false,permanent_notes:false,search_preferences:{},version:'1.47.0'});
+  if(path==='users/me')return reply(200,{id:'u1',name:'Fixture',email:null,image:null,localUser:true});
   if(path.startsWith('bookmarks/check')){
     if(service==='linkding'&&checkDown.linkding)return serverError();
     if(service==='linkding'&&holdLinkdingCheck&&holdLinkdingCheck.url===url.searchParams.get('url'))await holdLinkdingCheck.promise;
-    const row=[...store.values()].find(b=>(b.url||b.content?.url)===url.searchParams.get('url'));
-    if(service!=='linkding')return reply(200,{bookmarkId:row?.id||null});
+    const row=[...store.values()].find(b=>(service==='linkding'?b.url:b.content?.url)===url.searchParams.get('url'));
+    if(service!=='linkding')return reply(200,{bookmarkId:row===undefined?null:row.id});
     // routes.py check(): the page's metadata is loaded whether or not it is saved.
     const meta=scrapeMetadata(url.searchParams.get('url'));
     return reply(200,{bookmark:row?serialize(row):null,metadata:{url:url.searchParams.get('url'),title:meta.title,description:meta.description,preview_image:null},auto_tags:[]});
   }
-  if(path==='tags/'||path==='tags')return reply(200,service==='linkding'?{count:0,next:null,results:[]}:{tags:[]});
+  if(path==='tags/'||path==='tags')return reply(200,service==='linkding'?{count:0,next:null,previous:null,results:[]}:{tags:[],nextCursor:null});
   if(path==='lists'&&req.method==='GET')return reply(200,{lists:listCreated?[list]:[]});
   if(path==='lists'&&req.method==='POST'){listCreated=true;return reply(201,list);}
   if(path==='lists/later1')return reply(200,list);
@@ -197,7 +199,7 @@ const server=createServer(async(req,res)=>{
     if(race){store.set(String(race.record.id),structuredClone(race.record));return reply(race.status,race.record);}
     if(service==='linkding'&&holdLinkdingCreate)await holdLinkdingCreate;
     if(service==='linkding'){
-      // linkding v1.47 POST (serializers.py create, services/bookmarks.py):
+      // linkding v1.47.0 POST (serializers.py create, services/bookmarks.py):
       // an existing URL is merged into (201, same id, date_added kept, tags
       // replaced); omitted fields take the model defaults. Unless the query
       // has disable_scraping, the server then fills an empty title and an
@@ -213,20 +215,26 @@ const server=createServer(async(req,res)=>{
         unread:data.unread===undefined?false:data.unread,shared:data.shared===undefined?false:data.shared,tag_names:tagError||data.tag_names===undefined?[]:data.tag_names,date_modified:now});
       if(!url.searchParams.has('disable_scraping')){
         const meta=scrapeMetadata(row.url);
-        if(!row.title)row.title=meta.title||'';
-        if(!row.description)row.description=meta.description||'';
+        if(!row.title)row.title=meta.title===null?'':meta.title;
+        if(!row.description)row.description=meta.description===null?'':meta.description;
       }
       store.set(String(row.id),row);
       if(tagError)return serverError();
       return reply(201,serialize(row));
     }
     const id='b'+(store.size+1);
-    // Hand-authored API record schema, independently filled from HTTP input.
-    const row={id,title:data.title,note:data.note,summary:null,archived:false,favourited:false,createdAt:'2026-10-01T00:00:00Z',modifiedAt:karakeepNow(),userId:'u1',tags:[],content:{type:'link',url:data.url,title:'Site title'},assets:[]};
-    store.set(String(id),row);return reply(201,row);
+    const createdAt='2026-10-01T00:00:00.000Z';
+    // Hand-authored Karakeep 0.34.1 API record schema (verified 2026-11-23), independently filled from HTTP input.
+    const row={id,firstCreatedAt:createdAt,createdAt,modifiedAt:karakeepNow(),title:data.title===undefined?null:data.title,archived:false,favourited:false,taggingStatus:'pending',summarizationStatus:'pending',embeddingStatus:'pending',note:data.note===undefined?null:data.note,summary:null,source:data.source===undefined?'api':data.source,userId:'u1',tags:[],content:{type:'link',url:data.url,title:'Site title',description:null,imageUrl:null,favicon:null,htmlContent:null,readerViewStatus:null,readerViewScore:null,preferredPreview:'reader_view',crawledAt:null,crawlStatus:'pending',author:null,publisher:null,datePublished:null,dateModified:null},assets:[]};
+    store.set(String(id),row);return reply(201,{...row,alreadyExists:false});
   }
   const id=path.split('/')[1],row=store.get(id);
-  if(!row)return reply(404,{});
+  if(!row){
+    if(service==='linkding')return reply(404,{detail:'No Bookmark matches the given query.'});
+    res.writeHead(404,{'Content-Type':'text/plain;charset=UTF-8'});
+    res.end(path.startsWith('lists/')?'List not found':'Bookmark not found');
+    return;
+  }
   if(path.endsWith('/lists'))return reply(200,{lists:membership.has(id)?[list]:[]});
   if(path.endsWith('/tags')){
     if(tagsDown.karakeep&&req.method==='POST'){res.writeHead(500,{'Content-Type':'text/plain;charset=UTF-8'});res.end('Internal Server Error');return;}
@@ -646,9 +654,9 @@ try{
   });
   await block('Karakeep create race',[],async()=>{
   // A second client saves after check-url. The server response is authored
-  // independently of the submitted fields (Karakeep 0.34.1 B2 shape).
+  // independently of the submitted fields (Karakeep 0.34.1 B2 shape, verified 2026-11-23).
   const raceUrl=origin+'/article-race';
-  raceCreates.set('karakeep:'+raceUrl,{status:200,record:{id:'race1',createdAt:'2026-10-30T03:05:10.000Z',modifiedAt:'2026-10-30T03:05:10.000Z',title:null,archived:false,favourited:true,note:'Server note',summary:null,source:'api',taggingStatus:null,summarizationStatus:null,tags:[{id:'race-tag1',name:'existing',attachedBy:'human'}],content:{type:'link',url:raceUrl,title:'Crawled title',description:null},assets:[],alreadyExists:true}});
+  raceCreates.set('karakeep:'+raceUrl,{status:200,record:{id:'race1',firstCreatedAt:'2026-10-30T03:05:10.000Z',createdAt:'2026-10-30T03:05:10.654Z',modifiedAt:'2026-10-30T03:05:10.654Z',title:null,archived:false,favourited:true,note:'Server note',summary:null,source:'api',userId:'u1',taggingStatus:'pending',summarizationStatus:'pending',embeddingStatus:'pending',tags:[{id:'race-tag1',name:'existing',attachedBy:'human'}],content:{type:'link',url:raceUrl,title:'Crawled title',description:null,preferredPreview:'reader_view',crawlStatus:'pending'},assets:[],alreadyExists:true}});
   const raceStart=requests.length;
   const raceResult=await worker.evaluate(async({origin,url})=>{
     const client=pbpCreateBookmarkServiceClient({service:'karakeep',baseUrl:origin+'/karakeep/',beforeRequest:async()=>({token:'fixture-key'}),readLaterListId:'later1'});

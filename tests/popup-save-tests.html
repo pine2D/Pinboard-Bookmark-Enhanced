@@ -5230,15 +5230,22 @@ async function withPopupSubmitFixture(options, check) {
         cleanup: () => host.remove(),
       };
     }
+    // Worker lookup_bookmark projection shapes (pbpBookmarkPostsResponse over
+    // pbpBookmarkAsPost, verified 2026-11-23 against live --target temp
+    // linkding 1.47.0 and Karakeep 0.34.1 containers).
     const fragmentPost = (service) => service === "pinboard"
       ? { href: URL, description: "Saved original", extended: "Original notes", tags: "kept", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }
-      : { href: URL, description: "Saved original", extended: "Original notes", summary: "Original description", tagNames: ["kept"], tags: "kept", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" };
-    // The worker's answer per address: saved = posts at that address.
+      : service === "linkding"
+      ? { href: URL, description: "Saved original", extended: "Original notes", summary: "Original description", tagNames: ["kept"], tags: "kept", shared: "no", toread: "no", time: "2026-11-23T03:43:37.285281Z", bookmarkId: "1", version: '2["2026-11-23T03:43:37.285302Z",1,"941a64628d00918b",false,"581b3950cb0051ab"]' }
+      : { href: URL, description: "Saved original", extended: "Original notes", summary: "", tagNames: ["kept"], tags: "kept", shared: "no", toread: "no", time: "2026-11-23T03:43:37.000Z", bookmarkId: "wopgl9xqyr7yaalbjw16ape9", version: '2[null,1,"941a64628d00918b",false,"581b3950cb0051ab"]' };
+    // The worker's answer per address: saved = posts at that address, plus
+    // linkding's server-scraped metadata or Karakeep's null metadata.
     const fragmentWorker = (saved, fail = null) => (message, account) => {
       if (message.type === "get_bookmark_data") return { posts: null, account };
       if (message.type !== "lookup_bookmark") return undefined;
       if (fail && message.url === fail.url) return { ok: false, status: fail.status, error: fail.error, posts: null, account: "" };
-      return { ok: true, status: 200, posts: saved[message.url] ? [saved[message.url]] : [], account };
+      const metadata = String(account || "").startsWith("linkding:") ? { title: null, description: null } : String(account || "").startsWith("karakeep:") ? null : undefined;
+      return { ok: true, status: 200, posts: saved[message.url] ? [saved[message.url]] : [], ...(metadata === undefined ? {} : { metadata }), account };
     };
     async function settleProbe(h) { await flushMicrotasks(); await flushMicrotasks(); }
 
@@ -5446,7 +5453,8 @@ async function withPopupSubmitFixture(options, check) {
     // The box keeps the stored line breaks: an AI summary follows them as its
     // own paragraph, and an untouched value is never flattened.
     await testAsync("existing linkding summary refills Description but a later user edit wins",async()=>{
-      const response={ok:true,status:200,data:{posts:[{href:URL,description:"Saved title",extended:"Saved notes",summary:"Saved\ndescription",tags:"",shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}};
+      // Worker pbpBookmarkPostsResponse for linkding 1.47.0 (verified 2026-11-23).
+      const response={ok:true,status:200,data:{posts:[{href:URL,description:"Saved title",extended:"Saved notes",summary:"Saved\ndescription",tags:"",tagNames:[],shared:"no",toread:"no",time:"2026-11-23T03:33:41.307546Z",bookmarkId:"2",version:'2["2026-11-23T03:33:41.307552Z",0,"f912d602bb9758d1",false,"a1b2c3d4e5f60718"]'}],metadata:{title:"Page title",description:"Meta description"}}};
       for(const dirtyDescription of [false,true]){const h=createLookupHarness(response,{service:"linkding",dirtyDescription,realDescription:true});assert((await h.run()).status==="found",JSON.stringify({statuses:h.statuses,warns:h.warns}));assert(h.elements["linkding-description-input"].value===(dirtyDescription?"Manual":"Saved\ndescription"),"wrong Description "+h.elements["linkding-description-input"].value);assert(h.elements["description-input"].value==="Saved notes");
         // The stored Description is a value the popup can vouch for, and not one
         // waiting to be saved (so no draft keeps it); a box the user owns keeps
@@ -5530,13 +5538,14 @@ async function withPopupSubmitFixture(options, check) {
 
     // A save that landed re-reads the bookmark with the tags the user submitted
     // as the baseline: a tag the server gained meanwhile is merged in, which the
-    // plain lookup (the user already edited the tags) would not do. Linkding
-    // names arrive as an array and as a quoted string; the array is the truth.
+    // plain lookup (the user already edited the tags) would not do. Linkding and
+    // Karakeep names arrive as an array and as a quoted string (verified
+    // 2026-11-23 against live --target temp linkding 1.47.0 and Karakeep 0.34.1).
     await testAsync("a fresh lookup after a save rebases on the submitted tags, in each service's own shape", async () => {
       const cases = [
         ["pinboard", { ok: true, status: 200, text: JSON.stringify({ posts: [{ description: "Saved title", extended: "", tags: "alpha gamma", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] }) }, ["alpha", "gamma"]],
-        ["linkding", { ok: true, status: 200, data: { posts: [{ href: URL, description: "Saved title", extended: "", tags: 'alpha "big idea"', tagNames: ["alpha", "big idea"], shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] } }, ["alpha", "big idea"]],
-        ["karakeep", { ok: true, status: 200, data: { posts: [{ href: URL, description: "Saved title", extended: "", tags: 'alpha "big idea"', tagNames: ["alpha", "big idea"], shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] } }, ["alpha", "big idea"]],
+        ["linkding", { ok: true, status: 200, data: { posts: [{ href: URL, description: "Saved title", extended: "", summary: "", tags: 'alpha "big idea"', tagNames: ["alpha", "big idea"], shared: "no", toread: "no", time: "2026-11-23T03:33:43.413644Z", bookmarkId: "3", version: '2["2026-11-23T03:33:43.467998Z",2,"0123456789abcdef",false,"fedcba9876543210"]' }], metadata: { title: null, description: null } } }, ["alpha", "big idea"]],
+        ["karakeep", { ok: true, status: 200, data: { posts: [{ href: URL, description: "Saved title", extended: "", summary: "", tags: 'alpha "big idea"', tagNames: ["alpha", "big idea"], shared: "no", toread: "no", time: "2026-11-23T03:34:04.000Z", bookmarkId: "zltty3inerl8khm6xcpaihk4", version: '2[null,2,"0123456789abcdef",false,"fedcba9876543210"]' }], metadata: null } }, ["alpha", "big idea"]],
       ];
       for (const [service, reply, serverTags] of cases) {
         const withBaseline = createLookupHarness(reply, { service });

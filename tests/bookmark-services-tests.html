@@ -10,19 +10,22 @@ function equal(actual, expected) { if (JSON.stringify(actual) !== JSON.stringify
 function ok(value) { if (!value) throw new Error("assertion failed"); }
 async function rejects(run, code) { try { await run(); } catch (error) { equal(error.code, code); return; } throw new Error("expected rejection: " + code); }
 const pageUrl = "https://example.com/article";
-// Hand-written server records, not derived from the adapter's serializers.
-const ld = {id:7, url:pageUrl, title:"Saved title", description:"Website summary", notes:"My note", tag_names:["work"], unread:true, shared:false, is_archived:false, date_added:"2026-10-01T10:00:00Z", date_modified:"2026-10-01T10:00:00Z"};
-// linkding 1.47 POST serializer (T7): an existing URL keeps date_added.
+// Hand-written server records captured 2026-11-23 against live --target temp
+// containers (linkding 1.47.0 SQLite + postgres:18, Karakeep 0.34.1), never
+// derived from the adapter's write-side serializers.
+const ld = {id:7, url:pageUrl, title:"Saved title", description:"Website summary", notes:"My note", web_archive_snapshot_url:null, favicon_url:null, preview_image_url:null, is_archived:false, unread:true, shared:false, tag_names:["work"], date_added:"2026-10-01T10:00:00Z", date_modified:"2026-10-01T10:00:00Z", website_title:null, website_description:null};
+// linkding 1.47.0 POST serializer (T7, verified 2026-11-23): an existing URL keeps date_added.
 const ldMergedPost = {id:11,url:pageUrl,title:"T",description:"",notes:"",web_archive_snapshot_url:"https://web.archive.org/web/20261030030122/https://example.com/article",favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:["pbp-research","second"],date_added:"2026-10-30T03:01:22.656384Z",date_modified:"2026-10-30T04:01:22.656384Z",website_title:null,website_description:null};
-const kk = {id:"bk1", createdAt:"2026-10-01T10:00:00Z", modifiedAt:"2026-10-01T10:00:00.000Z", title:"Saved title", archived:true, favourited:false, note:"My note", summary:null, userId:"user1", tags:[{id:"tag1",name:"work",attachedBy:"human"}], content:{type:"link",url:pageUrl,title:"Crawled title",description:"Website summary"}, assets:[]};
+const kk = {id:"bk1", firstCreatedAt:"2026-10-01T10:00:00.000Z", createdAt:"2026-10-01T10:00:00Z", modifiedAt:"2026-10-01T10:00:00.000Z", title:"Saved title", archived:true, favourited:false, taggingStatus:"pending", summarizationStatus:"pending", embeddingStatus:"pending", note:"My note", summary:null, source:"extension", userId:"user1", tags:[{id:"tag1",name:"work",attachedBy:"human"}], content:{type:"link",url:pageUrl,title:"Crawled title",description:"Website summary",imageUrl:null,favicon:null,htmlContent:null,readerViewStatus:null,readerViewScore:null,preferredPreview:"reader_view",crawledAt:null,crawlStatus:"pending",author:null,publisher:null,datePublished:null,dateModified:null}, assets:[]};
 // What a popup that loaded ld / kk has as their loaded state: the read-side
 // projection of those server answers, as a lookup gives it to the form.
 const LD_LOADED = pbpBookmarkAsPost(pbpBookmarkNormalize("linkding", ld)).version;
 const KK_LOADED = pbpBookmarkAsPost(pbpBookmarkNormalize("karakeep", kk)).version;
 // Django 6.0 with DEBUG off answers an unhandled database error with its stock
-// page (django/views/defaults.py server_error; linkding v1.47 ships no
-// 500.html). linkding on PostgreSQL meets a tag longer than Tag.name's
-// max_length=64 this way; on SQLite the same save succeeds.
+// page (django/views/defaults.py server_error; linkding v1.47.0 ships no
+// 500.html, verified 2026-11-23 on linkding-pg + postgres:18). linkding on
+// PostgreSQL meets a tag longer than Tag.name's max_length=64 this way; on
+// SQLite the same save succeeds.
 const djangoServerError = () => new Response("\n<!doctype html>\n<html lang=\"en\">\n<head>\n  <title>Server Error (500)</title>\n</head>\n<body>\n  <h1>Server Error (500)</h1><p></p>\n</body>\n</html>\n",
   {status:500, headers:{"Content-Type":"text/html; charset=utf-8"}});
 // 65 code points in three scripts (the emoji one is 130 UTF-16 units), and
@@ -216,7 +219,7 @@ test("linkding recent stops at its limit without validating a next it will not r
     equal(h.calls.length,1);
   }
 });
-const kkRecent=(id,type="link",extra={})=>({id,createdAt:"2026-11-01T09:00:00Z",modifiedAt:null,title:null,archived:false,favourited:false,note:null,summary:null,userId:"user1",tags:[],content:type==="link"?{type,url:"https://e.example/"+id,title:"T"+id}:{type,text:"body"},assets:[],...extra});
+const kkRecent=(id,type="link",extra={})=>({id,firstCreatedAt:"2026-11-01T09:00:00.000Z",createdAt:"2026-11-01T09:00:00Z",modifiedAt:null,title:null,archived:false,favourited:false,taggingStatus:"pending",summarizationStatus:"pending",embeddingStatus:"pending",note:null,summary:null,source:"extension",userId:"user1",tags:[],content:type==="link"?{type,url:"https://e.example/"+id,title:"T"+id,description:null}:{type,text:"body"},assets:[],...extra});
 test("karakeep recent asks for unarchived bookmarks and tops up past non-link rows",async()=>{
   const page1=[kkRecent("a"),kkRecent("b","text"),kkRecent("c"),kkRecent("d","text"),kkRecent("e")];
   const h=harness("karakeep",[[200,{bookmarks:page1,nextCursor:"c1"}],[200,{bookmarks:[kkRecent("f"),kkRecent("g")],nextCursor:null}]]);
@@ -289,16 +292,16 @@ test("Karakeep crawled fallback titles are not written back by a merge",async()=
   equal(h.calls[0].body,{note:"My note"});
 });
 test("Karakeep failed tag update reports a saved bookmark and remaining step",async()=>{const {client,calls}=harness("karakeep",[[201,{...kk,tags:[]}],[503,{message:"unavailable"}]]);const result=await client.save({url:pageUrl,title:"Title",notes:"",tags:["new"]},null);equal([result.status,result.bookmark.id,result.failedStep],["partial","bk1","tags"]);equal(calls.length,2);});
-test("Karakeep mark-read removes only the private read-later list membership",async()=>{const list={id:"later",name:"Read later",type:"manual",public:false,hasCollaborators:false,userRole:"owner"};const {client,calls}=harness("karakeep",[[200,list],[204,null]],{readLaterListId:"later"});await client.setReadLater({id:"bk1"},false);equal(calls[1].method,"DELETE");equal(calls[1].url,"https://bookmarks.example/base/api/v1/lists/later/bookmarks/bk1");ok(!calls.some(c=>c.body?.archived!==undefined));});
-test("Karakeep refuses public, shared, smart or foreign lists",async()=>{for(const patch of [{public:true},{hasCollaborators:true},{type:"smart"},{userRole:"editor"}]){const {client,calls}=harness("karakeep",[[200,{id:"later",name:"Read later",type:"manual",public:false,hasCollaborators:false,userRole:"owner",...patch}]],{readLaterListId:"later"});await rejects(()=>client.setReadLater({id:"bk1"},true),"read_later_list");equal(calls.length,1);}});
-test("Karakeep creates a private read-later list only for an explicit read-later action",async()=>{let stored="";const list={id:"later",name:"Read later",type:"manual",public:false,hasCollaborators:false,userRole:"owner"};const {client,calls}=harness("karakeep",[[200,{lists:[]}],[201,list],[204,null]],{saveReadLaterList:async id=>{stored=id;}});await client.setReadLater({id:"bk1"},true);equal(stored,"later");equal(calls.map(c=>c.method),["GET","POST","PUT"]);equal(calls[2].url,"https://bookmarks.example/base/api/v1/lists/later/bookmarks/bk1");});
+test("Karakeep mark-read removes only the private read-later list membership",async()=>{const list={id:"later",name:"Read later",description:"Pinboard Bookmark Enhanced: Read Later",icon:"\u{1F516}",parentId:null,type:"manual",query:null,public:false,hasCollaborators:false,userRole:"owner"};const {client,calls}=harness("karakeep",[[200,list],[204,null]],{readLaterListId:"later"});await client.setReadLater({id:"bk1"},false);equal(calls[1].method,"DELETE");equal(calls[1].url,"https://bookmarks.example/base/api/v1/lists/later/bookmarks/bk1");ok(!calls.some(c=>c.body?.archived!==undefined));});
+test("Karakeep refuses public, shared, smart or foreign lists",async()=>{for(const patch of [{public:true},{hasCollaborators:true},{type:"smart"},{userRole:"editor"}]){const {client,calls}=harness("karakeep",[[200,{id:"later",name:"Read later",description:"Pinboard Bookmark Enhanced: Read Later",icon:"\u{1F516}",parentId:null,type:"manual",query:null,public:false,hasCollaborators:false,userRole:"owner",...patch}]],{readLaterListId:"later"});await rejects(()=>client.setReadLater({id:"bk1"},true),"read_later_list");equal(calls.length,1);}});
+test("Karakeep creates a private read-later list only for an explicit read-later action",async()=>{let stored="";const list={id:"later",name:"Read later",description:"Pinboard Bookmark Enhanced: Read Later",icon:"\u{1F516}",parentId:null,type:"manual",query:null,public:false,hasCollaborators:false,userRole:"owner"};const {client,calls}=harness("karakeep",[[200,{lists:[]}],[201,list],[204,null]],{saveReadLaterList:async id=>{stored=id;}});await client.setReadLater({id:"bk1"},true);equal(stored,"later");equal(calls.map(c=>c.method),["GET","POST","PUT"]);equal(calls[2].url,"https://bookmarks.example/base/api/v1/lists/later/bookmarks/bk1");});
 test("credential rotation uses the dispatch-time token",async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:null}]],{beforeRequest:async()=>({token:"rotated"})});await client.lookup(pageUrl);equal(calls[0].headers.get("Authorization"),"Token rotated");});
 test("account change before dispatch sends no request",async()=>{const {client,calls}=harness("linkding",[],{beforeRequest:async()=>{throw Object.assign(new Error("changed"),{code:"account_changed"});}});await rejects(()=>client.lookup(pageUrl),"account_changed");equal(calls.length,0);});
 test("late responses are rejected when the connection changes",async()=>{let checks=0;const {client}=harness("linkding",[[200,{bookmark:ld}]],{beforeRequest:async()=>{if(++checks>1)throw Object.assign(new Error("changed"),{code:"account_changed"});return {token:"fixture-token"};}});await rejects(()=>client.lookup(pageUrl),"account_changed");});
 test("HTTP errors have bounded codes and never include server messages or credentials",async()=>{for(const [status,code] of [[401,"auth"],[403,"auth"],[429,"rate_limited"],[500,"server"]]){const {client}=harness("linkding",[[status,{message:"SECRET"}]]);try{await client.lookup(pageUrl);throw new Error("expected error");}catch(e){equal(e.code,code);ok(!e.message.includes("SECRET"));}}});
 test("deletion accepts an empty 204 body",async()=>{const {client}=harness("linkding",[[204,null]]);equal(await client.remove({id:"7"}),true);});
 test("unsafe record IDs cannot escape the API route",async()=>{const {client,calls}=harness("karakeep",[]);await rejects(()=>client.remove({id:"../users/me"}),"invalid_request");equal(calls.length,0);});
-test("service verification does not write remote data",async()=>{const a=harness("linkding",[[200,{theme:"auto",version:"1.44.0"}]]);const b=harness("karakeep",[[200,{id:"u1",name:"User",email:null,localUser:true}]]);equal((await a.client.verify()).id,"");equal((await b.client.verify()).id,"u1");equal(a.calls[0].method,"GET");equal(b.calls[0].method,"GET");});
+test("service verification does not write remote data",async()=>{const a=harness("linkding",[[200,{theme:"auto",bookmark_date_display:"relative",bookmark_link_target:"_blank",web_archive_integration:"disabled",tag_search:"strict",enable_sharing:false,enable_public_sharing:false,enable_favicons:false,display_url:false,permanent_notes:false,search_preferences:{},version:"1.47.0"}]]);const b=harness("karakeep",[[200,{id:"u1",name:"User",email:null,image:null,localUser:true}]]);equal((await a.client.verify()).id,"");equal((await b.client.verify()).id,"u1");equal(a.calls[0].method,"GET");equal(b.calls[0].method,"GET");});
 test("gateway names follow the RFC 9110 token grammar and 1-64 length", () => {
   const one = name => pbpBookmarkGatewayNormalize({type:"custom", headers:[[name, "v"]]});
   for (const name of ["X-Pomerium-Authorization", "x_a", "A".repeat(64), "!#$%&'*+.^_`|~"]) equal(one(name).ok, true);
@@ -484,11 +487,11 @@ async function producers(h, {autoNotes, summary, settings: overrides = {}, realV
   };
 }
 // Karakeep notes are plain text, so its summary block is a paragraph of its
-// own. Hand-written bookmark records (Karakeep 0.34 API shape) holding the
-// notes the worker is expected to have written, typed out literally per case.
+// own. Hand-written bookmark records (Karakeep 0.34.1 API shape, verified
+// 2026-11-23) holding the notes the worker is expected to have written.
 const KK_SUMMARY = "A plain summary paragraph.";
 const kkRecord = (id, note) => ({id, createdAt:"2026-11-01T09:00:00Z", modifiedAt:"2026-11-01T09:00:00Z", title:"Title", archived:false, favourited:false,
-  note, summary:null, source:"extension", userId:"user1", tags:[], content:{type:"link",url:pageUrl,title:"Example Domain",description:null}, assets:[]});
+  taggingStatus:"pending", summarizationStatus:"pending", embeddingStatus:"pending", note, summary:null, source:"extension", userId:"user1", tags:[], content:{type:"link",url:pageUrl,title:"Example Domain",description:null}, assets:[], alreadyExists:false});
 const kkPopup = async (h, notes) => pbpFixturePopupSummary({service:"karakeep", account:(await h.auth()).account, url:pageUrl, notes,
   existingBookmark:pbpBookmarkAsPost(pbpBookmarkNormalize("karakeep", kkRecord("bk-new", notes)))});
 test("Karakeep quick-save and Batch summaries are replaced and removed in place once the AI cache is gone", async()=>{
@@ -1059,7 +1062,7 @@ test("update and overwrite can explicitly remove one same-group twin",async()=>{
   }
 });
 test("Karakeep create-200 race aligns against returned names before tag attachment",async()=>{
-  const raced={id:"zcnye4616rolgje1u3a2mz3k",createdAt:"2026-10-30T03:05:10.000Z",modifiedAt:"2026-10-30T03:05:10.000Z",title:null,archived:false,favourited:true,note:"n",summary:null,source:"api",taggingStatus:null,summarizationStatus:null,tags:[{id:"bgbvx6nze9nrl768iy3joejr",name:"machine learning",attachedBy:"human"}],content:{type:"link",url:pageUrl,title:"Example Domain",description:null},assets:[],alreadyExists:true};
+  const raced={id:"zcnye4616rolgje1u3a2mz3k",firstCreatedAt:"2026-10-30T03:05:10.000Z",createdAt:"2026-10-30T03:05:10.654Z",modifiedAt:"2026-10-30T03:05:10.654Z",title:null,archived:false,favourited:true,note:"n",summary:null,source:"api",userId:"user1",taggingStatus:"pending",summarizationStatus:"pending",embeddingStatus:"pending",tags:[{id:"bgbvx6nze9nrl768iy3joejr",name:"machine learning",attachedBy:"human"}],content:{type:"link",url:pageUrl,title:"Example Domain",description:null,preferredPreview:"reader_view",crawlStatus:"pending"},assets:[],alreadyExists:true};
   const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[200,raced]]);
   equal((await h.submitSaveIntent({...saveIntent,tags:"machine_learning"})).status,"saved");
   equal(h.state.calls.map(c=>c.method),["GET","POST"]);
@@ -1353,7 +1356,7 @@ test("fetch failures log name and message without header values", async () => {
   ok(warns.length >= 1); ok(!JSON.stringify(warns).includes("SECRET-GW-VALUE")); ok(!JSON.stringify(warns).includes("fixture-token"));
 });
 test("connection verification validates the gateway before any request and sends it on success", async () => {
-  const h = await workerHarness("linkding", [[200,{theme:"auto",version:"1.44.0"}]]);
+  const h = await workerHarness("linkding", [[200,{theme:"auto",enable_sharing:false,permanent_notes:false,version:"1.47.0"}]]);
   const bad = await h.verifyConnection({service:"linkding", baseUrl:"https://bookmarks.example/base/", token:"tok", gateway:{type:"custom", headers:[["Cookie","x"]]}});
   equal([bad.ok, bad.error, h.state.calls.length], [false, "invalid_request", 0]);
   // The settings page always sends the field (null for none); a message without it is malformed.
@@ -1466,11 +1469,11 @@ test("popup tag selection preserves native spaces for both self-hosted services"
 });
 test("deleted Karakeep read-later list does not block ordinary bookmark lookup",async()=>{
   let reset;
-  const h=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[404,{}]],{readLaterListId:"gone",saveReadLaterList:async id=>reset=id});
+  const h=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],kkPlain(404,"List not found")],{readLaterListId:"gone",saveReadLaterList:async id=>reset=id});
   equal((await h.client.lookup(pageUrl)).id,"bk1");equal(reset,"");equal(h.calls.length,3);
 });
-// Lists as GET /api/v1/lists answers (karakeep v0.34.1 shape).
-const kkList=(id,patch={})=>({id,name:"Read later",icon:"\u{1F516}",description:"Pinboard Bookmark Enhanced: Read Later",type:"manual",public:false,hasCollaborators:false,userRole:"owner",...patch});
+// Lists as GET /api/v1/lists answers (Karakeep v0.34.1 shape, verified 2026-11-23).
+const kkList=(id,patch={})=>({id,name:"Read later",icon:"\u{1F516}",description:"Pinboard Bookmark Enhanced: Read Later",parentId:null,type:"manual",query:null,public:false,hasCollaborators:false,userRole:"owner",...patch});
 test("two private lists carrying our marker leave Read Later unsaved and name the cause",async()=>{
   const h=harness("karakeep",[[201,{...kk,tags:[]}],[200,{lists:[kkList("a"),kkList("b")]}]],{saveReadLaterList:async()=>{throw new Error("must not bind");}});
   const result=await h.client.save({url:pageUrl,title:"Title",notes:"",tags:[],toread:true},null);
@@ -1500,7 +1503,7 @@ test("finding the Read Later list is read-only and binds only a single private m
 });
 test("Connect reports the existing Read Later list so lookup can read membership, never creating one",async()=>{
   const connect={service:"karakeep",baseUrl:"https://keep.example/base/",token:"tok",gateway:null};
-  const me={id:"user1",name:"Ada",email:"ada@example.com",localUser:true,role:"user"};
+  const me={id:"user1",name:"Ada",email:"ada@example.com",image:null,localUser:true};
   const found=await workerHarness("karakeep",[[200,me],[200,{lists:[kkList("later")]}]]);
   const good=await found.verifyConnection(connect);
   equal([good.ok,good.identity.id,good.readLaterListId],[true,"user1","later"]);
@@ -1993,8 +1996,9 @@ test("a quick save whose title is exactly at the limit is sent whole",async()=>{
 });
 test("Batch counts an over-long title as too long before AI and a partial save as partial, not failed",async()=>{
   const tabs=[{id:31,url:pageUrl+"?b=0",title:"x".repeat(1001),incognito:false},{id:32,url:pageUrl+"?b=1",title:"T1",incognito:false}];
+  const kkBadRequest={success:false,error:{name:"ZodError",message:"Invalid input"}};
   // Karakeep 0.34.1: the bookmark is created, then its tag request fails.
-  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[200,{bookmarkId:null}],[201,kkRecord("bk-new","")],[400,{code:"invalid_request"}]]);
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[200,{bookmarkId:null}],[201,kkRecord("bk-new","")],[400,kkBadRequest]]);
   await (await producers(h,{autoNotes:"",summary:"A summary.",settings:{optBatchTagEnabled:true,optBatchTag:"work"}})).batchSave(tabs);
   const last=h.state.progress.at(-1);
   equal([last.done,last.error,last.saved,last.failed,last.tooLong,last.partial,last.queued],[true,null,0,0,1,1,0]);
@@ -2008,7 +2012,8 @@ test("Batch counts an over-long title as too long before AI and a partial save a
 });
 test("a Batch that only partly saved its pages is not titled a failure",async()=>{
   const tabs=[0,1].map(i=>({id:50+i,url:pageUrl+"?p="+i,title:"T"+i,incognito:false}));
-  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[201,kkRecord("bk-a","")],[400,{code:"invalid_request"}],[200,{bookmarkId:null}],[201,kkRecord("bk-b","")],[400,{code:"invalid_request"}]]);
+  const kkBadRequest={success:false,error:{name:"ZodError",message:"Invalid input"}};
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[201,kkRecord("bk-a","")],[400,kkBadRequest],[200,{bookmarkId:null}],[201,kkRecord("bk-b","")],[400,kkBadRequest]]);
   await (await producers(h,{autoNotes:"",summary:"",settings:{batchAiSummary:false,optBatchTagEnabled:true,optBatchTag:"work"}})).batchSave(tabs);
   const last=h.state.progress.at(-1);
   equal([last.saved,last.failed,last.partial,last.queued],[0,0,2,0]);
@@ -2087,8 +2092,8 @@ test("a linkding 400 on a create names the address only when the server cannot t
   ])await rejects(()=>harness("linkding",[reply]).client.save({url,title:"T",notes:"",tags:[]},null),code);
   // A PATCH never sends the address, so its 400 stays a plain rejection.
   await rejects(()=>harness("linkding",[ldUrlNotValid]).client.save({url:"http://intranet/page",title:"T",notes:"",tags:[]},{id:"7",url:"http://intranet/page",private:true,summary:""}),"remote");
-  // Karakeep keeps its own codes.
-  await rejects(()=>harness("karakeep",[[400,{code:"invalid_request"}]]).client.save({url:"http://intranet/page",title:"T",notes:"",tags:[]},null),"remote");
+  // Karakeep 0.34.1 Zod validation 400 (verified 2026-11-23) keeps its own codes.
+  await rejects(()=>harness("karakeep",[[400,{success:false,error:{name:"ZodError",message:"Invalid URL"}}]]).client.save({url:"http://intranet/page",title:"T",notes:"",tags:[]},null),"remote");
 });
 test("a linkding address the server refuses is not queued and names the address; another 400 stays remote",async()=>{
   for(const [url,reply,reason,key] of [[longPageUrl(2049),ldUrlTooLong,"url_invalid","bookmarkErrUrlInvalid"],[pageUrl,[400,{title:["Ensure this field has no more than 512 characters."]}],"remote","bookmarkErrRemote"]]){

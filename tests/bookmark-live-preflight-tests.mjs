@@ -193,10 +193,10 @@ let browser;
 const ids = live.listIds();
 const pick = (spec, opts) => live.selectModules(spec, opts).selected.map(m => m.id);
 // Karakeep /signin: Next.js flight chunks, JSON-string encoded, carrying the
-// root layout's clientConfig (shape captured from Karakeep 0.34.1).
+// root layout's clientConfig (captured 2026-11-23 from Karakeep 0.34.1 --target temp).
 const flight = inference => `<!DOCTYPE html><html><head><title>Karakeep</title></head><body><script>self.__next_f.push([0])</script>`
   + `<script>self.__next_f.push([1,${JSON.stringify('1:"$Sreact.fragment"\n')}])</script>`
-  + `<script>self.__next_f.push([1,${JSON.stringify('7:["$","$L12",null,{"clientConfig":{"publicUrl":"http://127.0.0.1:3000","publicApiUrl":"http://127.0.0.1:3000/api","demoMode":false,"auth":{"disableSignups":false,"disablePasswordAuth":false},"inference":' + JSON.stringify(inference) + ',"serverVersion":"0.34.1","disableNewReleaseCheck":true},"children":["$","$L13",null,{}]}]\n')}])</script></body></html>`;
+  + `<script>self.__next_f.push([1,${JSON.stringify('2:["$","html",null,{"lang":"en","dir":"ltr","children":["$","body",null,{"children":["$","$L25",null,{"session":null,"clientConfig":{"publicUrl":"http://127.0.0.1:3000","publicApiUrl":"http://127.0.0.1:3000/api","demoMode":"$undefined","auth":{"disableSignups":false,"disablePasswordAuth":false,"oauthAutoRedirect":false},"turnstile":null,"inference":' + JSON.stringify(inference) + ',"chat":{"enabled":false},"search":{"semanticSearchEnabled":false},"stripe":{"isConfigured":false},"crawler":{"videoDownloadOnDemand":false},"legal":{"termsOfServiceUrl":"$undefined","privacyPolicyUrl":"$undefined"},"serverVersion":"0.34.1","disableNewReleaseCheck":false},"children":[]}]}]}]\n')}])</script></body></html>`;
 const off = { isConfigured: false, inferredTagLang: 'english', enableAutoTagging: false, enableAutoSummarization: false };
 const { chromium } = createRequire(join(root, '.qa-scan/package.json'))('playwright');
 // The guard configuration the guard and Node API sections read.
@@ -2257,7 +2257,10 @@ try {
           if (req.method === 'DELETE') { rows.delete(record[1]); res.writeHead(204); return res.end(); }
           return json(200, row);
         }
-        if (url.pathname === '/api/bookmarks/check/') return json(200, { bookmark: [...rows.values()].find(r => r.url === url.searchParams.get('url')) || null, metadata: { title: null, description: null }, auto_tags: [] });
+        if (url.pathname === '/api/bookmarks/check/') {
+          const checkedUrl = url.searchParams.get('url');
+          return json(200, { bookmark: [...rows.values()].find(r => r.url === checkedUrl) || null, metadata: { url: checkedUrl, title: null, description: null, preview_image: null }, auto_tags: [] });
+        }
         if (url.pathname === '/api/tags/') return json(200, { count: 0, next: null, previous: null, results: [] });
         json(404, { detail: 'Not found.' });
       });
@@ -2366,15 +2369,16 @@ try {
         const url = new URL(req.url, 'http://x');
         requests.push(req.method + ' ' + url.pathname);
         const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(body === undefined ? '' : JSON.stringify(body)); };
+        const plain = (status, text) => { res.writeHead(status, { 'Content-Type': 'text/plain;charset=UTF-8' }); res.end(text); };
         const tag = url.pathname.match(/^\/api\/v1\/tags\/([^/]+)$/);
         if (tag) {
           const at = tags.findIndex(t => t.id === tag[1]);
-          if (at < 0) return json(404, { code: 'NOT_FOUND', message: 'Tag not found' });
+          if (at < 0) return plain(404, 'Tag not found');
           if (req.method === 'DELETE') { tags.splice(at, 1); res.writeHead(204); return res.end(); }
           return json(200, tags[at]);
         }
         if (url.pathname === '/api/v1/tags') return json(200, { tags, nextCursor: null });
-        return json(404, { code: 'NOT_FOUND', message: 'Unknown fixture route' });
+        return plain(404, 'Not found');
       });
       const port = await listen(server);
       const base = `http://127.0.0.1:${port}/`;
@@ -3478,12 +3482,13 @@ try {
       const karakeep = createServer((req, res) => {
         requests.push({ method: req.method, path: req.url.split('?')[0], authenticated: req.headers.authorization === 'Bearer ' + syntheticKarakeepKey });
         const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
+        const plain = (status, text) => { res.writeHead(status, { 'Content-Type': 'text/plain;charset=UTF-8' }); res.end(text); };
         if (req.url === '/api/health') return json(200, { status: 'ok', message: 'Web app is working' });
         if (req.url === '/signin') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(signin); }
-        if (req.headers.authorization !== 'Bearer ' + syntheticKarakeepKey) return json(401, { code: 'UNAUTHORIZED', message: 'Unauthorized' });
+        if (req.headers.authorization !== 'Bearer ' + syntheticKarakeepKey) return plain(401, 'Unauthorized');
         if (req.url === '/api/v1/users/me') return json(200, { id: 'u1', name: 'Synthetic', email: 'synthetic@example.invalid', image: null, localUser: true });
         if (req.url.startsWith('/api/v1/bookmarks/check-url?')) return json(200, { bookmarkId: null });
-        return json(404, { code: 'NOT_FOUND', message: 'Not found' });
+        return plain(404, 'Not found');
       });
       servers.push(karakeep);
       const port = await listen(karakeep);
@@ -3512,12 +3517,14 @@ try {
       const query = new URL(req.url, 'http://x').searchParams;
       requests.push({ url: req.url, path, method: req.method, authenticated: req.headers.authorization === 'Token ' + syntheticKey });
       const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(body === undefined ? '' : JSON.stringify(body)); };
-      if (path === '/health') { if (hang) return; return json(200, { status: 'healthy' }); }
+      // linkding 1.47.0 shapes captured 2026-11-23 from live --target temp container.
+      if (path === '/health') { if (hang) return; return json(200, { version: '1.47.0', status: 'healthy' }); }
       if (!allowAuthentication || req.headers.authorization !== 'Token ' + syntheticKey) return json(403, { detail: syntheticKey });
-      if (path === '/api/user/profile/') return json(200, { theme: 'auto', enable_sharing: false, permanent_notes: false, version: '1.47.0' });
+      if (path === '/api/user/profile/') return json(200, { theme: 'auto', bookmark_date_display: 'relative', bookmark_link_target: '_blank', web_archive_integration: 'disabled', tag_search: 'strict', enable_sharing: false, enable_public_sharing: false, enable_favicons: false, display_url: false, permanent_notes: false, search_preferences: {}, version: '1.47.0' });
       if (path === '/api/bookmarks/check/') {
-        const hit = [...store.bookmarks.values()].find(b => b.url === query.get('url'));
-        return json(200, { bookmark: hit || null, metadata: { title: null, description: null }, auto_tags: [] });
+        const checkedUrl = query.get('url');
+        const hit = [...store.bookmarks.values()].find(b => b.url === checkedUrl);
+        return json(200, { bookmark: hit || null, metadata: { url: checkedUrl, title: null, description: null, preview_image: null }, auto_tags: [] });
       }
       const record = path.match(/^\/api\/bookmarks\/(\d+)\/$/);
       if (record) {
@@ -3749,22 +3756,23 @@ try {
     // process the ledger list is deleted after its checks, as before.
     {
       const kRequests = [];
-      const lists = new Map([['L1', { id: 'L1', name: 'Read later', icon: 'bookmark', description: LIST_MARKER, type: 'manual', public: false, hasCollaborators: false, userRole: 'owner', parentId: null }]]);
+      const lists = new Map([['L1', { id: 'L1', name: 'Read later', icon: '\u{1F516}', description: LIST_MARKER, parentId: null, type: 'manual', query: null, public: false, hasCollaborators: false, userRole: 'owner' }]]);
       const kServer = createServer((req, res) => {
         const url = new URL(req.url, 'http://x');
         kRequests.push(req.method + ' ' + url.pathname);
         const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(body === undefined ? '' : JSON.stringify(body)); };
-        if (req.headers.authorization !== 'Bearer ' + syntheticKarakeepKey) return json(401, { code: 'UNAUTHORIZED', message: 'Unauthorized' });
+        const plain = (status, text) => { res.writeHead(status, { 'Content-Type': 'text/plain;charset=UTF-8' }); res.end(text); };
+        if (req.headers.authorization !== 'Bearer ' + syntheticKarakeepKey) return plain(401, 'Unauthorized');
         const list = url.pathname.match(/^\/api\/v1\/lists\/([^/]+)(\/bookmarks)?$/);
         if (list) {
-          if (!lists.has(list[1])) return json(404, { code: 'NOT_FOUND', message: 'List not found' });
+          if (!lists.has(list[1])) return plain(404, 'List not found');
           if (list[2]) return json(200, { bookmarks: [], nextCursor: null });
           if (req.method === 'DELETE') { lists.delete(list[1]); res.writeHead(204); return res.end(); }
           return json(200, lists.get(list[1]));
         }
         if (url.pathname === '/api/v1/bookmarks/check-url') return json(200, { bookmarkId: null });
         if (url.pathname === '/api/v1/tags') return json(200, { tags: [], nextCursor: null });
-        return json(404, { code: 'NOT_FOUND', message: 'Unknown fixture route' });
+        return plain(404, 'Not found');
       });
       const kPort = await listen(kServer);
       const kBase = 'http://127.0.0.1:' + kPort;

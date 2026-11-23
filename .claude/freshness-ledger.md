@@ -44,16 +44,16 @@
 | Pinboard | tests/settings-persist-tests.html | 未核实 | - |
 | Pinboard | tests/tag-gov-tests.html | 未核实 | - |
 | Pinboard | tests/tag-gov-entity-tests.html | 未核实 | 注释写明 tags/get、posts/all、posts/add 的响应形状 |
-| Karakeep | tests/bookmark-services-tests.html | 未核实 | - |
-| linkding | tests/bookmark-services-tests.html | 未核实 | - |
-| Karakeep | tests/bookmark-live-preflight-tests.mjs | 未核实 | 注释说形状取自 Karakeep 0.34.1，没写日期 |
-| Karakeep | tests/bookmark-service-runtime-tests.mjs | 未核实 | - |
-| Karakeep | tests/popup-save-tests.html | 未核实 | - |
-| Karakeep | tests/reader-bookmark-tests.html | 未核实 | - |
-| linkding | tests/bookmark-live-preflight-tests.mjs | 未核实 | 注释说形状取自 linkding 1.47，没写日期 |
-| linkding | tests/bookmark-service-runtime-tests.mjs | 未核实 | - |
-| linkding | tests/popup-save-tests.html | 未核实 | - |
-| linkding | tests/reader-bookmark-tests.html | 未核实 | - |
+| Karakeep | tests/bookmark-services-tests.html | 2026-11-23 | 2026-11-23 对照 --target temp Karakeep 0.34.1 真实容器核实（含 firstCreatedAt、embeddingStatus、lists、Zod 400 与 Hono 401/404） |
+| linkding | tests/bookmark-services-tests.html | 2026-11-23 | 2026-11-23 对照 --target temp linkding 1.47.0（SQLite + postgres:18）真实容器核实（含 BookmarkSerializer、user/profile/ 与超长标签 500） |
+| Karakeep | tests/bookmark-live-preflight-tests.mjs | 2026-11-23 | 2026-11-23 对照 --target temp Karakeep 0.34.1 核实 /signin clientConfig flight、users/me、lists 与 Hono 纯文本 401/404 |
+| Karakeep | tests/bookmark-service-runtime-tests.mjs | 2026-11-23 | 2026-11-23 对照 --target temp Karakeep 0.34.1 核实 POST 201/200、PATCH 全记录、lists、tags 与 401/404 形状 |
+| Karakeep | tests/popup-save-tests.html | 2026-11-23 | 2026-11-23 对照 --target temp Karakeep 0.34.1 核实 lookup_bookmark 投影（bookmarkId、version、metadata: null） |
+| Karakeep | tests/reader-bookmark-tests.html | 2026-11-23 | 2026-11-23 对照 --target temp Karakeep 0.34.1 核实 selfHostedServer（POST 201、PATCH 全记录、🔖 列表与纯文本 404） |
+| linkding | tests/bookmark-live-preflight-tests.mjs | 2026-11-23 | 2026-11-23 对照 --target temp linkding 1.47.0 核实 /health、/api/user/profile/、/api/bookmarks/check/ 与 /api/tags/ |
+| linkding | tests/bookmark-service-runtime-tests.mjs | 2026-11-23 | 2026-11-23 对照 --target temp linkding 1.47.0（SQLite + postgres:18）核实 check/、POST/PATCH、tags 分页与 404/500 |
+| linkding | tests/popup-save-tests.html | 2026-11-23 | 2026-11-23 对照 --target temp linkding 1.47.0 核实 lookup_bookmark 投影（微秒时间戳、summary、version 与 metadata） |
+| linkding | tests/reader-bookmark-tests.html | 2026-11-23 | 2026-11-23 对照 --target temp linkding 1.47.0（SQLite + postgres:18）核实 selfHostedServer（check/、POST/PATCH、404 与 500） |
 | Google Drive | tests/vocab-gdrive-tests.html | 未核实 | - |
 | Google Drive | tests/notes-gdrive-tests.html | 未核实 | - |
 | Google Drive | tests/dict-archive-tests.html | 未核实 | - |

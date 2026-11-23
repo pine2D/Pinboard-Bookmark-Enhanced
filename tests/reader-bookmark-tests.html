@@ -140,9 +140,9 @@ async function pipelineHarness(options = {}) {
     env,
   };
 }
-// The two self-hosted APIs as the adapter meets them, hand-written from
-// linkding v1.47 (routes.py check(), serializers.py create() and update())
-// and Karakeep 0.34.1's /api/v1 OpenAPI. A check answers the stored record;
+// The two self-hosted APIs as the adapter meets them, hand-written and verified
+// 2026-11-23 against live --target temp linkding v1.47.0 (SQLite + postgres:18)
+// and Karakeep 0.34.1 containers. A check answers the stored record;
 // a linkding POST for a URL it does not hold (row null) stores a new record
 // with the serializer's defaults and answers it with 201; PATCH changes only
 // the fields it is sent and answers the stored record. Each failures[] row
@@ -159,12 +159,13 @@ async function pipelineHarness(options = {}) {
 // as the extension stores it; `members` holds the bookmark ids on it.
 function selfHostedServer(service, row, { postgres = false, readLater = null } = {}) {
   const requests = [], failures = [];
-  const laterList = { id: "kklaterlist01", name: "Read Later", description: "Pinboard Bookmark Enhanced: Read Later", icon: "bookmark",
+  const laterList = { id: "kklaterlist01", name: "Read Later", description: "Pinboard Bookmark Enhanced: Read Later", icon: "\u{1F516}",
     parentId: null, type: "manual", query: null, public: false, hasCollaborators: false, userRole: "owner" };
   const overlong = names => postgres && (names || []).some(name => String(name).split(",").some(part => Array.from(part.trim()).length > 64));
   const serverError = () => new Response("\n<!doctype html>\n<html lang=\"en\">\n<head>\n  <title>Server Error (500)</title>\n</head>\n<body>\n  <h1>Server Error (500)</h1><p></p>\n</body>\n</html>\n",
     { status: 500, headers: { "Content-Type": "text/html; charset=utf-8" } });
   const json = (status, value) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
+  const plain = (status, text) => new Response(text, { status, headers: { "Content-Type": "text/plain;charset=UTF-8" } });
   const linkdingRecord = () => ({ id: row.id, url: row.url, title: row.title, description: row.description, notes: row.notes,
     web_archive_snapshot_url: null, favicon_url: null, preview_image_url: null, is_archived: row.is_archived, unread: row.unread,
     shared: row.shared, tag_names: [...row.tag_names], date_added: row.date_added, date_modified: row.date_modified,
@@ -187,34 +188,36 @@ function selfHostedServer(service, row, { postgres = false, readLater = null } =
         return json(200, { bookmark: row && page === row.url ? linkdingRecord() : null, metadata: { url: page, title: null, description: null, preview_image: null }, auto_tags: [] });
       }
       if (method === "POST" && url.pathname === "/api/bookmarks/" && !row) {
-        const now = new Date().toISOString();
-        row = { id: 21, url: body.url, title: body.title ?? "", description: body.description ?? "", notes: body.notes ?? "",
-          is_archived: body.is_archived ?? false, unread: body.unread ?? false, shared: body.shared ?? false,
-          tag_names: overlong(body.tag_names) ? [] : [...(body.tag_names ?? [])], date_added: now, date_modified: now };
+        const now = new Date().toISOString().replace(/Z$/, "000Z");
+        row = { id: 21, url: body.url, title: body.title === undefined ? "" : body.title, description: body.description === undefined ? "" : body.description, notes: body.notes === undefined ? "" : body.notes,
+          is_archived: body.is_archived === undefined ? false : body.is_archived, unread: body.unread === undefined ? false : body.unread, shared: body.shared === undefined ? false : body.shared,
+          tag_names: overlong(body.tag_names) ? [] : [...(body.tag_names === undefined ? [] : body.tag_names)], date_added: now, date_modified: now };
         if (overlong(body.tag_names)) return serverError();
         return json(201, linkdingRecord());
       }
       if (method === "PATCH" && row && url.pathname === "/api/bookmarks/" + row.id + "/") {
         if (overlong(body.tag_names)) return serverError();
         for (const key of ["url", "title", "description", "notes", "is_archived", "unread", "shared", "tag_names"]) if (body[key] !== undefined) row[key] = body[key];
-        row.date_modified = new Date().toISOString();
+        row.date_modified = new Date().toISOString().replace(/Z$/, "000Z");
         return json(200, linkdingRecord());
       }
+      if (/^\/api\/bookmarks\/\d+\/$/.test(url.pathname)) return json(404, { detail: "No Bookmark matches the given query." });
       return json(404, { detail: "Not found." });
     }
     if (method === "GET" && url.pathname === "/api/v1/bookmarks/check-url") return json(200, { bookmarkId: row && page === row.content.url ? row.id : null });
-    // Karakeep 0.34.1 POST /api/v1/bookmarks: 201 and the full bookmark plus
-    // alreadyExists for a URL it does not hold (routes/bookmarks.ts).
+    // Karakeep 0.34.1 POST /api/v1/bookmarks (verified 2026-11-23): 201 and the
+    // full bookmark plus alreadyExists: false for a URL it does not hold.
     if (method === "POST" && url.pathname === "/api/v1/bookmarks" && !row) {
-      const now = new Date().toISOString();
-      row = { id: "kk2created", createdAt: now, modifiedAt: now, title: body.title ?? null, archived: body.archived ?? false,
-        favourited: body.favourited ?? false, note: body.note ?? null, summary: body.summary ?? null, source: body.source ?? "api",
-        taggingStatus: "pending", summarizationStatus: "pending", tags: [],
-        content: { type: "link", url: body.url, title: null, description: null }, assets: [] };
-      return json(201, { ...structuredClone(row), alreadyExists: false });
+      const now = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      const created = { id: "kk2created", createdAt: now, modifiedAt: now, title: body.title === undefined ? null : body.title, archived: body.archived === undefined ? false : body.archived,
+        favourited: body.favourited === undefined ? false : body.favourited, taggingStatus: "pending", summarizationStatus: "pending", embeddingStatus: "pending",
+        note: body.note === undefined ? null : body.note, summary: body.summary === undefined ? null : body.summary, source: body.source === undefined ? "api" : body.source, userId: "user-1", tags: [],
+        content: { type: "link", url: body.url, title: null, description: null, imageUrl: null, favicon: null, htmlContent: null, contentAssetId: null, readerViewStatus: null, readerViewScore: null, crawledAt: null, crawlStatus: "pending", author: null, publisher: null, datePublished: null, dateModified: null }, assets: [] };
+      row = { id: created.id, firstCreatedAt: now, ...created };
+      return json(201, { ...structuredClone(created), alreadyExists: false });
     }
     if (readLater && method === "GET" && url.pathname === "/api/v1/lists/" + laterList.id) return json(200, structuredClone(laterList));
-    if (!row) return json(404, { code: "NOT_FOUND", message: "Bookmark not found" });
+    if (!row) return plain(404, "Bookmark not found");
     if (readLater && method === "GET" && url.pathname === "/api/v1/bookmarks/" + row.id + "/lists")
       return json(200, { lists: readLater.members.has(row.id) ? [structuredClone(laterList)] : [] });
     if (readLater && (method === "PUT" || method === "DELETE") && url.pathname === "/api/v1/lists/" + laterList.id + "/bookmarks/" + row.id) {
@@ -232,13 +235,14 @@ function selfHostedServer(service, row, { postgres = false, readLater = null } =
       return json(200, { attached });
     }
     if (method === "GET" && url.pathname === "/api/v1/bookmarks/" + row.id) return json(200, structuredClone(row));
+    // Karakeep 0.34.1 PATCH /api/v1/bookmarks/:id (verified 2026-11-23) answers
+    // the full zBookmarkSchema record with firstCreatedAt, tags, content, assets.
     if (method === "PATCH" && url.pathname === "/api/v1/bookmarks/" + row.id) {
       for (const key of ["title", "note", "summary", "archived", "favourited"]) if (body[key] !== undefined) row[key] = body[key];
-      row.modifiedAt = new Date().toISOString();
-      const { tags, content, assets, ...bare } = row;
-      return json(200, structuredClone(bare));
+      row.modifiedAt = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      return json(200, structuredClone({ firstCreatedAt: row.createdAt, ...row }));
     }
-    return json(404, { code: "NOT_FOUND", message: "Bookmark not found" });
+    return plain(404, "Bookmark not found");
   };
   const connection = { service, baseUrl: service === "linkding" ? "https://links.example/" : "https://keep.example/",
     beforeRequest: async () => ({ token: service + "-token" }), fetchImpl,
@@ -1326,10 +1330,10 @@ await test("a reader action that finds the bookmark already in its state finishe
     const readLater = service === "karakeep" ? { members: new Set() } : null;
     const server = service === "linkding" ? selfHostedServer("linkding", { id: 7, url: URL_ARTICLE, title: "Server title", description: "", notes: "Server notes",
         is_archived: false, unread: true, shared: false, tag_names: ["server"], date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z" })
-      : service === "karakeep" ? selfHostedServer("karakeep", { id: "kk1bookmark", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
-        title: "Server title", archived: false, favourited: false, note: "Server notes", summary: null, source: "web",
-        taggingStatus: "success", summarizationStatus: "success", tags: [{ id: "tagserver01", name: "server", attachedBy: "human" }],
-        content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null }, assets: [] }, { readLater })
+      : service === "karakeep" ? selfHostedServer("karakeep", { id: "kk1bookmark", firstCreatedAt: "2026-10-30T03:05:10.000Z", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
+        title: "Server title", archived: false, favourited: false, note: "Server notes", summary: null, source: "web", userId: "user-1",
+        taggingStatus: "success", summarizationStatus: "success", embeddingStatus: "success", tags: [{ id: "tagserver01", name: "server", attachedBy: "human" }],
+        content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null, preferredPreview: "reader_view", crawlStatus: "success" }, assets: [] }, { readLater })
       : null;
     if (readLater) readLater.members.add("kk1bookmark");
     let lookups = 0, failAfter = Infinity;
@@ -1371,10 +1375,10 @@ await test("a reader action that finds the bookmark already in its state finishe
 await test("a Karakeep reader edit whose delivery check fails queues nothing and leaves the server's summary alone", async () => {
   const account = "karakeep:https://keep.example/:user-1";
   const summary = "Karakeep's AI summary of the article.";
-  const server = selfHostedServer("karakeep", { id: "kk1bookmark", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
-    title: "Server title", archived: false, favourited: false, note: "Server notes", summary, source: "web",
-    taggingStatus: "success", summarizationStatus: "success", tags: [{ id: "tagserver01", name: "server", attachedBy: "human" }],
-    content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null }, assets: [] });
+  const server = selfHostedServer("karakeep", { id: "kk1bookmark", firstCreatedAt: "2026-10-30T03:05:10.000Z", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
+    title: "Server title", archived: false, favourited: false, note: "Server notes", summary, source: "web", userId: "user-1",
+    taggingStatus: "success", summarizationStatus: "success", embeddingStatus: "success", tags: [{ id: "tagserver01", name: "server", attachedBy: "human" }],
+    content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null, preferredPreview: "reader_view", crawlStatus: "success" }, assets: [] });
   const h = await pipelineHarness({ account, token: "karakeep-token", service: "karakeep", slot: { account }, client: server.client,
     settings: { bookmarkService: "karakeep" } });
   // The reader's read of the bookmark gets through; the delivery's fresh one meets the outage.
@@ -1581,10 +1585,10 @@ await test("reader save results say saved, updated, merged or partial as the wor
 // written blind. It ends on duplicate_unknown, whose copy asks for another press.
 await test("an interactive self-hosted save whose duplicate check fails writes and queues nothing", async () => {
   const LINKDING_ROW = { id: 7, url: URL_ARTICLE, title: "Server title", description: "", notes: "Server notes",
-    is_archived: false, unread: false, shared: false, tag_names: ["server"], date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z" };
-  const KARAKEEP_ROW = { id: "kk1bookmark", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
-    title: "Server title", archived: false, favourited: false, note: "Server notes", summary: null, source: "web",
-    taggingStatus: "success", summarizationStatus: "success", tags: [], content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null }, assets: [] };
+    web_archive_snapshot_url: null, favicon_url: null, preview_image_url: null, is_archived: false, unread: false, shared: false, tag_names: ["server"], date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z", website_title: null, website_description: null };
+  const KARAKEEP_ROW = { id: "kk1bookmark", firstCreatedAt: "2026-10-30T03:05:10.000Z", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
+    title: "Server title", archived: false, favourited: false, note: "Server notes", summary: null, source: "web", userId: "user-1",
+    taggingStatus: "success", summarizationStatus: "success", embeddingStatus: "success", tags: [], content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null, preferredPreview: "reader_view", crawlStatus: "success" }, assets: [] };
   for (const service of ["linkding", "karakeep"]) for (const failure of [{ timeout: true }, {}]) for (const exists of [false, true]) {
     const where = service + (failure.timeout ? " timeout" : " 503") + (exists ? " existing" : " new");
     const account = service === "linkding" ? "linkding:https://links.example/:conn-1" : "karakeep:https://keep.example/:user-1";
@@ -1624,10 +1628,10 @@ await test("an interactive self-hosted save whose duplicate check fails writes a
 // user's next save, made after reading that, may bookmark the page again.
 await test("a reader edit or Read Later on a bookmark deleted elsewhere does not bring it back", async () => {
   const LINKDING_ROW = { id: 7, url: URL_ARTICLE, title: "Server title", description: "", notes: "Server notes",
-    is_archived: false, unread: false, shared: false, tag_names: ["server"], date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z" };
-  const KARAKEEP_ROW = { id: "kk1bookmark", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
-    title: "Server title", archived: false, favourited: false, note: "Server notes", summary: null, source: "web",
-    taggingStatus: "success", summarizationStatus: "success", tags: [], content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null }, assets: [] };
+    web_archive_snapshot_url: null, favicon_url: null, preview_image_url: null, is_archived: false, unread: false, shared: false, tag_names: ["server"], date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z", website_title: null, website_description: null };
+  const KARAKEEP_ROW = { id: "kk1bookmark", firstCreatedAt: "2026-10-30T03:05:10.000Z", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
+    title: "Server title", archived: false, favourited: false, note: "Server notes", summary: null, source: "web", userId: "user-1",
+    taggingStatus: "success", summarizationStatus: "success", embeddingStatus: "success", tags: [], content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null, preferredPreview: "reader_view", crawlStatus: "success" }, assets: [] };
   for (const service of ["linkding", "karakeep"]) for (const action of ["edit", "later"]) {
     const where = service + " " + action;
     const account = service === "linkding" ? "linkding:https://links.example/:conn-1" : "karakeep:https://keep.example/:user-1";
