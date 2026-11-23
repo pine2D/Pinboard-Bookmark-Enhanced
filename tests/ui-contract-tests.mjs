@@ -4482,18 +4482,6 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
   // tests/frame-candidate-tests.html, which evaluates these very function
   // bodies against iframe fixtures.
   const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-  const guards = ['f.hasAttribute("srcdoc")', 'allow-same-origin', 'cs.display === "none"', 'cs.visibility === "hidden"', 'Number(cs.opacity) === 0', 'n = n.parentElement', 'bestArea >= 0.4 * vw * vh', '/^https:\\/\\//.test(origin)', 'origin === location.origin', 'Math.min(r.right, vw)', 'Math.min(r.bottom, vh)'];
-  for (const [name, src] of [["background.js", backgroundJs], ["popup.js", popupJs]]) {
-    const start = src.indexOf("function dominantFrameOrigin()");
-    const body = start >= 0 ? stripComments(src.slice(start, src.indexOf('} catch (_) { return ""; }', start))) : "";
-    check(start >= 0 && guards.every((g) => body.includes(g)),
-      `${name}: the embedded-frame detector lost one of its guards (${guards.filter((g) => !body.includes(g)).join(", ") || "none"})`);
-  }
-  // The "nothing here" gate must judge TEXT, not the HTML string (device
-  // 2026-08-26: Defuddle returned the <main> shell holding only the artifact
-  // <iframe> on claude.ai, a truthy string, so the frame offer never showed).
-  // Both injected copies carry the same predicate and both gates call it.
-  const predGuards = ['/<(img|picture|video|audio|svg|canvas|object|embed|math)\\b/i', 'replace(/<[^>]*>/g, " ")', '&(nbsp|#160|#xa0);'];
   const sliceFn = (src, name) => {
     const start = src.indexOf("function " + name + "(");
     if (start < 0) return "";
@@ -4501,6 +4489,17 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
     for (; i < src.length; i++) { if (src[i] === "{") depth++; else if (src[i] === "}" && --depth === 0) break; }
     return src.slice(start, i + 1);
   };
+  const guards = ['f.hasAttribute("srcdoc")', 'allow-same-origin', 'cs.display === "none"', 'cs.visibility === "hidden"', 'Number(cs.opacity) === 0', 'n = n.parentElement', 'bestArea >= 0.4 * vw * vh', '/^https:\\/\\//.test(origin)', 'origin === location.origin', 'Math.min(r.right, vw)', 'Math.min(r.bottom, vh)'];
+  for (const [name, src] of [["background.js", backgroundJs], ["popup.js", popupJs]]) {
+    const body = stripComments(sliceFn(src, "dominantFrameOrigin"));
+    check(body && guards.every((g) => body.includes(g)),
+      `${name}: the embedded-frame detector lost one of its guards (${guards.filter((g) => !body.includes(g)).join(", ") || "none"})`);
+  }
+  // The "nothing here" gate must judge TEXT, not the HTML string (device
+  // 2026-08-26: Defuddle returned the <main> shell holding only the artifact
+  // <iframe> on claude.ai, a truthy string, so the frame offer never showed).
+  // Both injected copies carry the same predicate and both gates call it.
+  const predGuards = ['/<(img|picture|video|audio|svg|canvas|object|embed|math)\\b/i', 'replace(/<[^>]*>/g, " ")', '&(nbsp|#160|#xa0);'];
   const predBodies = {};
   for (const [name, src] of [["background.js", backgroundJs], ["popup.js", popupJs]]) {
     const body = stripComments(sliceFn(src, "extractionLooksEmpty"));

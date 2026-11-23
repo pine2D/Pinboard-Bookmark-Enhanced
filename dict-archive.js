@@ -19,7 +19,7 @@ function _pbpDictArchiveText(value, max, empty = false) {
 }
 function _pbpDictArchiveLang(value) {
   try { return typeof value === "string" && value.length <= 80 && Intl.getCanonicalLocales(value)[0] === value; }
-  catch (_) { return false; }
+  catch (_) { /* swallow-ok: Intl.getCanonicalLocales throws RangeError on invalid language tags */ return false; }
 }
 function _pbpDictArchiveOwner(owner) { return owner === "ownerless" ? "" : owner; }
 function _pbpDictArchiveScope(owner) {
@@ -60,7 +60,7 @@ function _pbpDictArchiveSource(source) {
       !_pbpDictArchiveLang(source.language) || !_pbpDictArchiveText(source.genre, 200) ||
       !_pbpDictArchiveText(source.revision, 80) || !Number.isSafeInteger(source.retrievedAt) || source.retrievedAt <= 0)) return false;
   try { const url = new URL(source.url); return url.protocol === "https:" && !url.username && !url.password; }
-  catch (_) { return false; }
+  catch (_) { /* swallow-ok: URL parser rejects malformed untrusted source URL */ return false; }
 }
 function _pbpDictArchiveEntryLearning(learning, entry) {
   const keys = ["version", "formation", "history", "related", "sources"];
@@ -169,8 +169,10 @@ function _pbpDictArchiveDone(transaction) {
 }
 function _pbpDictArchiveDirty(owner) {
   if (!owner) return;
-  try { globalThis.chrome?.runtime?.sendMessage?.({ type: "PBP_DICT_ARCHIVE_DIRTY", owner })?.catch?.(() => {}); }
-  catch (_) {}
+  try {
+    globalThis.chrome?.runtime?.sendMessage?.({ type: "PBP_DICT_ARCHIVE_DIRTY", owner })
+      ?.catch?.(() => { /* swallow-ok: advisory dirty ping when no runtime listener is active */ });
+  } catch (_) { /* swallow-ok: advisory dirty ping outside extension runtime */ }
 }
 
 function pbpCreateDictArchiveStore({
@@ -210,7 +212,7 @@ function pbpCreateDictArchiveStore({
       request.onerror = () => reject(request.error);
       request.onblocked = () => console.warn("[dict-archive] database open blocked");
     });
-    opened.catch(() => { opened = null; });
+    opened.catch(() => { /* swallow-ok: clear cached open promise; callers await and handle rejection */ opened = null; });
     return opened;
   };
   const checkOwner = async (owner, options) => {
@@ -246,8 +248,8 @@ function pbpCreateDictArchiveStore({
       return result;
     }
     catch (error) {
-      try { tx.abort(); } catch (_) {}
-      await done.catch(() => {});
+      try { tx.abort(); } catch (_) { /* swallow-ok: transaction may already be finished or aborted */ }
+      await done.catch(() => { /* swallow-ok: wait for aborted transaction settle; original error is handled below */ });
       if (typeof error?.code === "string") throw error;
       console.warn("[dict-archive] transaction failed:", error?.name);
       throw _pbpDictArchiveError("local_store");
@@ -379,8 +381,8 @@ function pbpCreateDictArchiveStore({
       if (!_pbpVocabDeviceId(meta.deviceId)) throw _pbpDictArchiveError("local_store");
       return meta;
     } catch (error) {
-      try { tx.abort(); } catch (_) {}
-      await done.catch(() => {});
+      try { tx.abort(); } catch (_) { /* swallow-ok: transaction may already be finished or aborted */ }
+      await done.catch(() => { /* swallow-ok: wait for aborted transaction settle; original error is logged below */ });
       console.warn("[dict-archive] device metadata unavailable:", error?.name);
       throw _pbpDictArchiveError("local_store");
     }
@@ -446,7 +448,9 @@ function pbpCreateDictArchiveStore({
   const listOutbox = owner => stateRows("outbox:" + owner + ":");
   const listPendingBatches = (permissionId, ownerHash) => stateRows(batchKey(permissionId, ownerHash, ""));
   async function freezeOutbox(owner, permissionId, ownerHash, fileId, batch) {
-    let body; try { body = JSON.parse(batch.body); } catch (_) { return false; }
+    let body;
+    try { body = JSON.parse(batch.body); }
+    catch (error) { console.warn("[dict-archive] freeze batch parse failed:", error?.name); return false; }
     if (!permissionId || !fileId || !pbpDictArchiveValidBatchBody(body, ownerHash) || !body.entries.length) return false;
     if (await checkHash(ownerHash) !== owner) return false;
     return transaction(owner, async (records, sync) => {

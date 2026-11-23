@@ -14,16 +14,6 @@
       "count": 2
     }
   },
-  "ask-archive.js": {
-    "pbp/no-silent-catch": {
-      "count": 9
-    }
-  },
-  "background.js": {
-    "pbp/no-silent-catch": {
-      "count": 97
-    }
-  },
   "bili-player-bridge.js": {
     "pbp/no-silent-catch": {
       "count": 6
@@ -32,11 +22,6 @@
   "bookmark-services.js": {
     "pbp/no-silent-catch": {
       "count": 1
-    }
-  },
-  "dict-archive.js": {
-    "pbp/no-silent-catch": {
-      "count": 10
     }
   },
   "dict-entry.js": {
@@ -179,16 +164,6 @@
       "count": 9
     }
   },
-  "notes-sync.js": {
-    "pbp/no-silent-catch": {
-      "count": 6
-    }
-  },
-  "options-backup.js": {
-    "pbp/no-silent-catch": {
-      "count": 6
-    }
-  },
   "options-theme-early.js": {
     "pbp/no-silent-catch": {
       "count": 7
@@ -244,29 +219,14 @@
       "count": 36
     }
   },
-  "shared.js": {
-    "pbp/no-silent-catch": {
-      "count": 56
-    }
-  },
   "site-rules.js": {
     "pbp/no-silent-catch": {
       "count": 10
     }
   },
-  "vocab-gdrive.js": {
-    "pbp/no-silent-catch": {
-      "count": 12
-    }
-  },
   "vocab-send.js": {
     "pbp/no-silent-catch": {
       "count": 3
-    }
-  },
-  "vocab-store.js": {
-    "pbp/no-silent-catch": {
-      "count": 16
     }
   },
   "wayback.js": {

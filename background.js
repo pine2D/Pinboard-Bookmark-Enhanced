@@ -59,7 +59,7 @@ function _ensureIconDecode() {
       _iconImageData.default = def;
       _iconImageData.saved = bm;
       _iconImageData.toread = tr;
-    } catch (_) { /* decode failed — setIcon keeps using the path: fallback */ }
+    } catch (e) { console.warn("[icon] decode failed, keeping path fallback:", e?.name, e?.message); }
   })();
 }
 
@@ -223,10 +223,12 @@ const _pendingChecks = new Map(); // auth epoch + URL -> Promise
 function invalidateBookmarkAuthState() {
   _pinboardAuthEpoch++;
   _cachedToken = null;
-  try { Promise.resolve(chrome.storage.session.remove("_currentTab")).catch(() => {}); } catch (_) {}
+  try {
+    Promise.resolve(chrome.storage.session.remove("_currentTab")).catch((e) => console.warn("[tab-mirror] auth-reset clear failed:", e?.name, e?.message));
+  } catch (_) { /* swallow-ok: session storage unavailable in stubbed context */ }
   pbpResetBookmarkStatusView();
   chrome.action.setBadgeText({ text: "" });
-  updateBadge().catch(() => {});
+  updateBadge().catch((e) => console.warn("[badge] auth-reset refresh failed:", e?.name));
 }
 
 // Everything the toolbar shows about bookmark status, and the lookups behind
@@ -247,7 +249,7 @@ function pbpResetBookmarkStatusView() {
       if (typeof tab?.id === "number") setIcon(tab.id, "default");
       if (tab?.active && tab.url?.startsWith("http")) _scheduleCurrentTabRefresh(tab.id, tab.url);
     }
-  }).catch(() => {});
+  }).catch((e) => console.warn("[bookmark-status] tab reset query failed:", e?.name, e?.message));
 }
 
 let _authChangeTail = Promise.resolve();
@@ -393,7 +395,7 @@ const PBP_UNDO_ALARM = "undo-expire";
 const PBP_UNDO_ALARM_DELAY_MIN = (PBP_UNDO_TTL + 5000) / 60000;
 
 function pbpUndoSessionStore() {
-  try { return chrome.storage?.session || null; } catch (_) { return null; }
+  try { return chrome.storage?.session || null; } catch (_) { /* swallow-ok: session storage getter may throw in stubbed test contexts */ return null; }
 }
 
 async function pbpRememberUndo(notifId, record) {
@@ -518,8 +520,9 @@ async function showNotification(id, title, message, category, undoInfo) {
     if (category === "tabSet" && !cats.notifyTabSet) return;
     if (category === "batchSave" && !cats.notifyBatchSave) return;
     if (category === "error" && !cats.notifyErrors) return;
-  } catch (_) {
+  } catch (e) {
     // Storage failure: default to showing the notification (least surprising)
+    console.warn("[notify] category preference read failed:", e?.name, e?.message);
   }
   const notifId = id + "-" + Date.now();
   const opts = { type: "basic", iconUrl: "icons/app-48.png", title, message };
@@ -575,7 +578,7 @@ function setIcon(tabId, state, pageUrl) {
       ? { tabId, imageData: cached }                              // in-memory, zero network
       : { tabId, path: ICON_PATHS[state] || ICONS_DEFAULT };       // fallback until decoded
     chrome.action.setIcon(details, () => { void chrome.runtime.lastError; /* consume to mark handled */ });
-  } catch (_) { /* synchronous throw on invalid args — ignore */ }
+  } catch (_) { /* swallow-ok: synchronous throw on closed tab or stubbed action API */ }
 }
 
 // ---- 检查 URL 是否已收藏 (uses cached token, direct fetch for latency) ----
@@ -635,8 +638,9 @@ async function updateBadge() {
     const count = Array.isArray(data) ? data.length : 0;
     chrome.action.setBadgeText({ text: count > 0 ? String(count > 99 ? "99+" : count) : "" });
     chrome.action.setBadgeBackgroundColor({ color: "#4477bb" });
-  } catch (_) {
-    // chrome.action API failure is non-fatal — badge is informational only
+  } catch (e) {
+    // Non-fatal informational badge; log error.name only so URL/token mocks never leak.
+    if (e?.code !== "account_changed") console.warn("[badge] unread count update failed:", e?.name);
   }
 }
 
@@ -895,6 +899,7 @@ function validateSaveIntent(intent) {
     const parsed = new URL(intent.url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return pbpSaveFailure("invalid");
   } catch (_) {
+    /* swallow-ok: URL parser rejects malformed save intent URL */
     return pbpSaveFailure("invalid");
   }
   if (intent.sharedExplicit !== undefined && typeof intent.sharedExplicit !== "boolean") return pbpSaveFailure("invalid");
@@ -1012,7 +1017,7 @@ async function pbpSendResolvedPlan(plan, settings) {
   }
 
   let data = null;
-  try { data = await resp.json(); } catch (_) { /* classified below */ }
+  try { data = await resp.json(); } catch (_) { /* swallow-ok: non-JSON 200 body is classified and logged below */ }
   const code = typeof data?.result_code === "string" ? data.result_code : "";
   if (code === "done") {
     return {
@@ -1029,7 +1034,7 @@ async function pbpSendResolvedPlan(plan, settings) {
   // let every outlet use its generic copy. Log only the status and type.
   if (!code) {
     let contentType = "";
-    try { contentType = String(resp.headers?.get?.("content-type") || "").slice(0, 80); } catch (_) { /* header unreadable */ }
+    try { contentType = String(resp.headers?.get?.("content-type") || "").slice(0, 80); } catch (_) { /* swallow-ok: diagnostic content-type header read only */ }
     console.warn("[save] Pinboard answered without a result_code:", httpStatus, contentType);
   }
   return {
@@ -1215,18 +1220,20 @@ async function applySaveResultSideEffects(envelope, settings, {
         setIcon(tab.id, iconStateFor(pbpStatusCacheGet(persisted.url, auth)), tab.url);
       }
     }
-  } catch (_) { /* status/icon are best-effort */ }
+  } catch (e) { console.warn("[save] post-save icon update failed:", e?.name, e?.message); }
 
   if (result.status !== "saved") return;
   if (!deferBadge) {
-    try { Promise.resolve(updateBadge()).catch(() => {}); } catch (_) {}
+    try {
+      Promise.resolve(updateBadge()).catch((e) => console.warn("[save] post-save badge refresh failed:", e?.name));
+    } catch (e) { console.warn("[save] post-save badge dispatch failed:", e?.name); }
   }
   try {
     Promise.resolve(pbpWaybackArchive(persisted.url, settings, {
       isPrivate: persisted.private === true,
       override: persisted.archive,
-    })).catch(() => {});
-  } catch (_) { /* accepted save is never requeued for a side-effect failure */ }
+    })).catch((e) => console.warn("[save] wayback archive failed:", e?.name, e?.message));
+  } catch (e) { console.warn("[save] wayback dispatch failed:", e?.name, e?.message); }
 }
 
 function queueRecordFromSaveIntent(intent, token, service) {
@@ -1499,7 +1506,8 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
       // or the request never got an HTTP answer ("network").
       const cause = Number.isInteger(envelope.result?.httpStatus) ? "server" : "network";
       return { status: "queued", queueId, cause };
-    } catch (_) {
+    } catch (e) {
+      console.warn("[save] offline queue enqueue failed:", e?.name, e?.message);
       return pbpSaveFailure("storage");
     }
   }).then(async (result) => (singleFileRun ? { ...result, singleFile: await pbpRunSingleFile(singleFileTab) } : result));
@@ -1555,7 +1563,7 @@ async function pbpClearReplayedPopupDraft(item) {
     try {
       return (pbpBookmarkAccountService(account) === "pinboard"
         ? String(text || "").split(/\s+/).filter(Boolean) : pbpBookmarkParseTags(text)).map((n) => n.toLowerCase()).sort();
-    } catch (_) { return null; }
+    } catch (_) { /* swallow-ok: unparseable tag string fails draft equality check safely */ return null; }
   };
   const holdsQueued = (draft) => {
     if (!draft || draft.url !== url || typeof draft.tagInput !== "string" || draft.tagInput.trim()) return false;
@@ -1726,7 +1734,8 @@ function retryOfflineItem(queueId) {
       // longer queued: the automatic replay delivered it, or it was removed.
       // Not an error, and not proof of a save either; the popup refreshes.
       return { ok: false, result: { status: "gone", reason: "gone" } };
-    } catch (_) {
+    } catch (e) {
+      console.warn("[offline-queue] manual retry failed:", e?.name, e?.message);
       return { ok: false, result: pbpSaveFailure("storage") };
     }
   });
@@ -1768,7 +1777,7 @@ function pbpReaderDocumentUrl(raw) {
     const u = new URL(raw);
     return u.protocol === "chrome-extension:" && u.host === chrome.runtime.id
       && u.pathname === "/md-preview.html" ? u : null;
-  } catch (_) { return null; }
+  } catch (_) { /* swallow-ok: non-URL sender rejected */ return null; }
 }
 
 async function pbpReaderBookmarkContext(sender, account) {
@@ -1792,7 +1801,7 @@ async function pbpReaderBookmarkContext(sender, account) {
   try {
     if (!/^https?:$/.test(new URL(stored.url).protocol)) return null;
     if (typeof bookmarkUrl !== "string" || !/^https?:$/.test(new URL(bookmarkUrl).protocol)) return null;
-  } catch (_) { return null; }
+  } catch (_) { /* swallow-ok: malformed stored URL fails context check closed */ return null; }
   return { ...stored, bookmarkUrl, account };
 }
 
@@ -1818,7 +1827,7 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth,
     let names;
     if (selfHosted) {
       try { names = pbpBookmarkParseTags(draft.tags); }
-      catch (_) { return { result: pbpSaveFailure("invalid") }; }
+      catch (_) { /* swallow-ok: unmatched quote syntax in user tag input returns invalid */ return { result: pbpSaveFailure("invalid") }; }
     } else {
       names = String(draft.tags || "").split(/\s+/).filter(Boolean);
     }
@@ -1925,7 +1934,7 @@ function pbpDeleteBookmarkInOrder(account, url) {
       // The answer arrived, so an unreadable body is an API failure, not a
       // network one (same reading as the save path).
       let data = null;
-      try { data = await resp.json(); } catch (_) { /* classified below */ }
+      try { data = await resp.json(); } catch (_) { /* swallow-ok: non-JSON 200 body is classified and logged below */ }
       auth = await pbpReadFreshBookmarkAuthForAccount(account);
       if (!auth) return pbpSaveFailure("account_changed");
       const code = typeof data?.result_code === "string" ? data.result_code : "";
@@ -1933,7 +1942,7 @@ function pbpDeleteBookmarkInOrder(account, url) {
       if (code !== "done" && !/item\s+not\s+found/i.test(code)) {
         if (!code) {
           let contentType = "";
-          try { contentType = String(resp.headers?.get?.("content-type") || "").slice(0, 80); } catch (_) { /* header unreadable */ }
+          try { contentType = String(resp.headers?.get?.("content-type") || "").slice(0, 80); } catch (_) { /* swallow-ok: diagnostic content-type header read only */ }
           console.warn("[delete] Pinboard answered without a result_code:", resp.status, contentType);
         }
         return pbpSaveFailure("api", { detail: code || undefined });
@@ -2012,7 +2021,10 @@ async function pbpRunNotificationUndo(notifId) {
     // record belongs to an account this session may not act for. A cleared
     // token is a real failure the click deserves to hear about; 401 is the
     // shape classifyPinboardError maps to the auth copy.
-    const current = await getCurrentBookmarkAuth().catch(() => null);
+    const current = await getCurrentBookmarkAuth().catch((e) => {
+      console.warn("[undo] auth re-read failed:", e?.name, e?.message);
+      return null;
+    });
     if (!current?.token) pbpNotifyUndoFailed(401);
     return;
   }
@@ -2169,7 +2181,9 @@ async function saveFromBackground({ url, pageUrl, title, tab, settingsOverrides,
       pageInfo = (s._aiTags || s._aiSummary) && hasAIKey(s)
         ? await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: pageUrl || url })
         : await getPageInfoFromTab(tab.id, { expectedUrl: pageUrl || url });
-    } catch (_) { /* content script may not be injected yet — proceed with empty pageInfo */ }
+    } catch (e) {
+      console.warn("[quick-save] tab page extraction unavailable:", e?.name, e?.message);
+    }
   }
 
   // Build notes from page info
@@ -2361,7 +2375,7 @@ async function saveFromBackground({ url, pageUrl, title, tab, settingsOverrides,
       notifyCategory,
       undoInfo
     );
-    processOfflineQueue().catch(() => {});
+    processOfflineQueue().catch((e) => console.warn("[offline-queue] post-save drain failed:", e?.name, e?.message));
     return result;
   }
   if (result.status === "queued") {
@@ -2456,7 +2470,7 @@ function resolvePrefixSettings(s, prefix) {
 // consumed it, and every tab event was paying an extra cache read for it.
 async function _writeCurrentTabMirror(tabId, url, title) {
   if (!url || !url.startsWith("http")) {
-    try { await chrome.storage.session.remove("_currentTab"); } catch (_) {}
+    try { await chrome.storage.session.remove("_currentTab"); } catch (e) { console.warn("[tab-mirror] clear failed:", e?.name, e?.message); }
     return;
   }
   const auth = await getCurrentBookmarkAuth();
@@ -2465,7 +2479,9 @@ async function _writeCurrentTabMirror(tabId, url, title) {
       _currentTab: { tabId, url, title: title || "", account: auth.account, ts: Date.now() }
     });
     if (!pbpBookmarkAuthIsCurrent(auth)) await chrome.storage.session.remove("_currentTab");
-  } catch (_) {}
+  } catch (e) {
+    console.warn("[tab-mirror] write failed:", e?.name, e?.message);
+  }
 }
 
 async function _getFocusedActiveTab(expectedTabId, expectedUrl) {
@@ -2503,7 +2519,7 @@ async function _resetIconForAnotherPage(tabId) {
     if (await _getFocusedActiveTab(tabId, tab.url)) return;
     setIcon(tabId, "default", tab.url);
   } catch (_) {
-    // Tab closed between event and lookup: nothing left to reset.
+    /* swallow-ok: tab closed between navigation event and lookup */
   }
 }
 
@@ -2541,7 +2557,7 @@ function _scheduleCurrentTabRefresh(tabId, expectedUrl) {
       }
       await _writeCurrentTabMirror(currentTab.id, currentTab.url, currentTab.title);
     } catch (_) {
-      // Tab closed/replaced between event and query — expected race, skip
+      /* swallow-ok: tab closed or replaced between event and debounced refresh */
     }
   }, 150);
 }
@@ -2596,7 +2612,7 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
   if (windowId === chrome.windows.WINDOW_ID_NONE) return;
   chrome.tabs.query({ active: true, windowId }).then(([tab]) => {
     if (tab?.id) _scheduleCurrentTabRefresh(tab.id, tab.url);
-  }).catch(() => {});
+  }).catch(() => { /* swallow-ok: window may close before focus-change tab query resolves */ });
 });
 
 // P2.7: Clean up per-tab timer when tab closes to prevent Map leak on long sessions.
@@ -2793,7 +2809,7 @@ function pbpImgFixSweepRules(tabId) {
       ids.forEach((id) => _imgFixRuleOwner.delete(id));
     }
     if (tabId === undefined) _imgFixStartupSweepOk = true;
-  }).catch(() => { /* best-effort: a sweep failure must never break tab handling */ });
+  }).catch((e) => { console.warn("[imgfix] session rule sweep failed:", e?.name, e?.message); });
 }
 
 // A preview tab navigating AWAY is the leak: the tab id stays the same, so a
@@ -2836,7 +2852,9 @@ pbpImgFixSweepRules(); // SW start: drop rules whose tab is gone or no longer a 
 chrome.permissions.onRemoved.addListener((perms) => {
   const origins = (perms && perms.origins) || [];
   if (origins.some((o) => typeof o === "string" && o.includes("player.bilibili.com"))) {
-    chrome.scripting.unregisterContentScripts({ ids: [PBP_BILI_BRIDGE_ID] }).catch(() => {});
+    chrome.scripting.unregisterContentScripts({ ids: [PBP_BILI_BRIDGE_ID] }).catch(() => {
+      /* swallow-ok: Bili bridge script may not be registered when permission is removed */
+    });
   }
 });
 
@@ -2867,7 +2885,7 @@ function ensureKeepAlive() {
       return;
     }
     // The API call (not setInterval itself) resets the SW idle timer; empty cb is fine in MV3.
-    try { chrome.runtime.getPlatformInfo(() => {}); } catch (_) {}
+    try { chrome.runtime.getPlatformInfo(() => {}); } catch (_) { /* swallow-ok: idle-timer reset ping only */ }
   }, KEEPALIVE_PING_MS);
 }
 
@@ -2877,7 +2895,9 @@ function noteActivity() {
   // resume keepalive even if the restarting event isn't itself a tab event.
   if (_lastActivityTs - _lastActivitySessionWrite > 30000) {
     _lastActivitySessionWrite = _lastActivityTs;
-    try { chrome.storage.session.set({ _lastActivityTs }); } catch (_) {}
+    try {
+      Promise.resolve(chrome.storage.session?.set?.({ _lastActivityTs })).catch((e) => console.warn("[keepalive] activity session write failed:", e?.name, e?.message));
+    } catch (_) { /* swallow-ok: session storage unavailable in stubbed context */ }
   }
   ensureKeepAlive();
   // Activity (re)opens the window — make sure the conditional keepalive alarm
@@ -2894,7 +2914,7 @@ function noteActivity() {
 chrome.storage.session.get({ _lastActivityTs: 0 }).then(({ _lastActivityTs: ts }) => {
   _lastActivityTs = Math.max(_lastActivityTs, ts || 0);
   ensureKeepAlive();
-}).catch(() => {});
+}).catch((e) => console.warn("[keepalive] startup activity restore failed:", e?.name, e?.message));
 // ---------------------------------------------------------------------------
 
 // Keep service worker alive + periodic tasks. Same-name alarms.create() CANCELS
@@ -2905,7 +2925,7 @@ chrome.storage.session.get({ _lastActivityTs: 0 }).then(({ _lastActivityTs: ts }
 function ensurePeriodicAlarm(name, periodInMinutes) {
   chrome.alarms.get(name).then((existing) => {
     if (!existing) chrome.alarms.create(name, { periodInMinutes });
-  }).catch(() => {});
+  }).catch((e) => console.warn("[alarms] periodic alarm ensure failed:", name, e?.name, e?.message));
 }
 
 // The keepalive alarm is CONDITIONAL, not 24/7. It exists while any of these
@@ -2931,13 +2951,19 @@ function _ensureKeepaliveAlarmOnce() {
 async function _keepaliveAlarmStillNeeded() {
   const [stored, sess] = await Promise.all([
     chrome.storage.local.get(["offlineQueue", "batch_progress", PBP_OFFLINE_QUEUE_PAUSE_KEY]),
-    chrome.storage.session.get({ _lastActivityTs: 0 }).catch(() => ({ _lastActivityTs: 0 })),
+    chrome.storage.session.get({ _lastActivityTs: 0 }).catch((e) => {
+      console.warn("[keepalive] session activity read failed:", e?.name, e?.message);
+      return { _lastActivityTs: 0 };
+    }),
   ]);
   const { offlineQueue = [], batch_progress } = stored;
   const lastTs = Math.max(_lastActivityTs, Number(sess._lastActivityTs) || 0);
   if ((Date.now() - lastTs) < KEEPALIVE_WINDOW_MS || !!(batch_progress && batch_progress.running)) return true;
   if (!Array.isArray(offlineQueue) || !offlineQueue.length) return false;
-  const auth = await getCurrentBookmarkAuth().catch(() => null);
+  const auth = await getCurrentBookmarkAuth().catch((e) => {
+    console.warn("[keepalive] bookmark auth check failed:", e?.name, e?.message);
+    return null;
+  });
   const pause = pbpOfflineQueuePauseShape(stored[PBP_OFFLINE_QUEUE_PAUSE_KEY]);
   return pbpOfflineQueueAutoRetries(offlineQueue, {
     account: auth && typeof auth.account === "string" ? auth.account : null,
@@ -2948,7 +2974,9 @@ async function _keepaliveAlarmStillNeeded() {
 async function _syncKeepaliveAlarm() {
   try {
     if (await _keepaliveAlarmStillNeeded()) _ensureKeepaliveAlarmOnce();
-  } catch (_) {}
+  } catch (e) {
+    console.warn("[alarms] keepalive sync failed:", e?.name, e?.message);
+  }
 }
 async function _maybeReleaseKeepaliveAlarm() {
   try {
@@ -2963,7 +2991,9 @@ async function _maybeReleaseKeepaliveAlarm() {
     _keepaliveAlarmEnsured = false;
     await chrome.alarms.clear("keepalive");
     if (await _keepaliveAlarmStillNeeded()) _ensureKeepaliveAlarmOnce();
-  } catch (_) {}
+  } catch (e) {
+    console.warn("[alarms] keepalive release failed:", e?.name, e?.message);
+  }
 }
 // Badge refresh is its own longer-period alarm: it is a NETWORK poll
 // (posts/all?toread=yes) and was riding the 4-min keepalive — 360 requests a
@@ -2980,7 +3010,9 @@ async function _syncBadgeAlarm() {
     } else {
       await chrome.alarms.clear("badge-refresh");
     }
-  } catch (_) {}
+  } catch (e) {
+    console.warn("[alarms] badge alarm sync failed:", e?.name, e?.message);
+  }
 }
 _syncKeepaliveAlarm();
 _syncBadgeAlarm();
@@ -2988,7 +3020,7 @@ _syncBadgeAlarm();
 // uses (Chrome evicts storage backend after inactivity, causing slow first-open).
 ensurePeriodicAlarm("storage-warm", 5);
 
-sweepSuggestCache().catch(() => {});
+sweepSuggestCache().catch((e) => console.warn("[cache-sweep] startup sweep failed:", e?.name, e?.message));
 
 // One-shot legacy scrub (roadmap #24; retires shared.js's "two-release
 // cleanup" TODO): keys-off migration used to strip only the token field,
@@ -3117,7 +3149,7 @@ const PBP_SITE_THEME_SCRIPT_ID = "pbp-site-theme-css";
 let _siteThemeSyncTail = Promise.resolve();
 function pbpSyncSiteThemeScript() {
   const run = _siteThemeSyncTail.then(() => _pbpSyncSiteThemeScriptOnce());
-  _siteThemeSyncTail = run.catch(() => {});
+  _siteThemeSyncTail = run.catch(() => { /* swallow-ok: serial tail reset; _pbpSyncSiteThemeScriptOnce logs its own errors */ });
   return run;
 }
 async function _pbpSyncSiteThemeScriptOnce() {
@@ -3125,7 +3157,10 @@ async function _pbpSyncSiteThemeScriptOnce() {
     if (!chrome.scripting || !chrome.scripting.registerContentScripts) return;
     const s = await loadSettings();
     const wantTheme = !!(s && s.themePresetKey);
-    const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [PBP_SITE_THEME_SCRIPT_ID] }).catch(() => []);
+    const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [PBP_SITE_THEME_SCRIPT_ID] }).catch((e) => {
+      console.warn("[site-theme] getRegisteredContentScripts failed:", e?.name, e?.message);
+      return [];
+    });
     const has = !!(existing && existing.length);
     if (wantTheme && !has) {
       await chrome.scripting.registerContentScripts([{
@@ -3246,13 +3281,13 @@ async function pbpMigrateLegacyWildcardPermission() {
     await chrome.storage.local.set({ [PBP_LEGACY_WILDCARD_CLEANUP_KEY]: true });
   }
 }
-pbpMigrateLegacyWildcardPermission().catch(() => {});
+pbpMigrateLegacyWildcardPermission().catch((e) => console.warn("[permissions] legacy wildcard cleanup failed:", e?.name, e?.message));
 
 // Credential-routing maintenance (batch (4)): idempotent, best-effort,
 // fire-and-forget at boot. It mirrors the last keys-on cloud snapshot locally
 // and, while keys are off, migrates/scrubs any stale cloud secret. The existing
 // storage-warm alarm retries either direction within 5 minutes.
-pbpMigrateSecretsToLocal().catch(() => {});
+pbpMigrateSecretsToLocal().catch((e) => console.warn("[secrets-sync] boot secret mirror failed:", e?.name));
 
 const PBP_VOCAB_DRIVE_CONNECTED_KEY = "vocabDriveConnected";
 const PBP_DRIVE_CONNECTION_ACCOUNT_KEY = "driveConnectionAccount";
@@ -3487,8 +3522,8 @@ function pbpBroadcastVocabSynced(owner, type = "vocabulary") {
     const pending = chrome.runtime.sendMessage({
       type: type === "ask" ? "PBP_ASK_ARCHIVE_SYNCED" : type === "notes" ? "PBP_NOTES_SYNCED" : type === "dictionary" ? "PBP_DICT_ARCHIVE_SYNCED" : "PBP_VOCAB_SYNCED", owner
     });
-    if (pending && typeof pending.catch === "function") pending.catch(() => {});
-  } catch (_) {}
+    if (pending && typeof pending.catch === "function") pending.catch(() => { /* swallow-ok: no open UI page listening for sync broadcast */ });
+  } catch (_) { /* swallow-ok: synchronous throw in stubbed runtime context */ }
 }
 
 async function pbpRefreshDriveConnectionAccount(type, auth, confirmedState) {
@@ -3876,7 +3911,7 @@ async function pbpConnectDrive() {
     const pending = chrome.runtime.sendMessage({
       type: "PBP_DRIVE_CONNECT_AUTHORIZED", owner: pbpDictOwnerScope(auth.account)
     });
-    if (pending && typeof pending.catch === "function") pending.catch(() => {});
+    if (pending && typeof pending.catch === "function") pending.catch(() => { /* swallow-ok: requesting page may close during OAuth prompt */ });
   } catch (error) {
     console.warn("[vocab-drive] connect: broadcast failed:", error?.name, error?.message);
   }
@@ -4223,7 +4258,7 @@ async function pbpScrubDriveConnectionRows() {
     if (!key.startsWith(accountPrefix)) continue;
     let id;
     // A key that does not decode was never written by stateKey(); not a row to scrub.
-    try { id = decodeURIComponent(key.slice(accountPrefix.length)); } catch (_) { continue; }
+    try { id = decodeURIComponent(key.slice(accountPrefix.length)); } catch (_) { /* swallow-ok: non-URI-encoded key was not written by stateKey */ continue; }
     if (!id.endsWith(":" + ownerHash)) continue;
     const row = await notesStore.getAccountState(id.slice(0, -(ownerHash.length + 1)), ownerHash);
     if (!pbpDriveHasConnectionError(row) || !canonicalAccountRow(row)) continue;
@@ -4275,7 +4310,7 @@ function syncPrewarmTagsAlarm() {
     const shouldRun = s.tagSyncMode === "prewarmed" && !!pbpBookmarkConnection(s).account;
     if (shouldRun && !existing) {
       chrome.alarms.create("prewarm-tags", { periodInMinutes: 15, delayInMinutes: 0.5 });
-      prewarmTagsNow().catch(() => {}); // populate now; don't wait ~30s for the first alarm
+      prewarmTagsNow().catch((e) => console.warn("[tag-cache] initial prewarm failed:", e?.name)); // populate now; don't wait ~30s for the first alarm
     } else if (!shouldRun && existing) {
       chrome.alarms.clear("prewarm-tags");
     }
@@ -4315,7 +4350,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     });
   }
   if (alarm.name === "keepalive") {
-    processOfflineQueue().catch(() => {});
+    processOfflineQueue().catch((e) => console.warn("[offline-queue] alarm drain failed:", e?.name, e?.message));
     pbpSweepInterruptedBatch().catch((e) => {
       console.warn("[batch] interrupted sweep failed:", e?.name, e?.message);
     });
@@ -4326,17 +4361,17 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     _maybeReleaseKeepaliveAlarm();
   }
   if (alarm.name === "badge-refresh") {
-    updateBadge().catch(() => {});
+    updateBadge().catch((e) => console.warn("[badge] alarm refresh failed:", e?.name));
   }
   if (alarm.name === PBP_UNDO_ALARM) {
     pbpSweepExpiredUndo().catch((e) => console.warn("[undo] expiry sweep failed:", e?.name, e?.message));
   }
   if (alarm.name === "prewarm-tags") {
-    prewarmTagsNow().catch(() => {});
+    prewarmTagsNow().catch((e) => console.warn("[tag-cache] alarm prewarm failed:", e?.name));
   }
   if (alarm.name === "storage-warm") {
-    primeSettings().catch(() => {});
-    pbpMigrateSecretsToLocal().catch(() => {});
+    primeSettings().catch((e) => console.warn("[storage-warm] primeSettings failed:", e?.name, e?.message));
+    pbpMigrateSecretsToLocal().catch((e) => console.warn("[storage-warm] secret mirror failed:", e?.name));
   }
 });
 
@@ -4364,7 +4399,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       API_KEY_FIELDS.some((key) => !!changes[key]))) {
     // Mirror keys-on snapshots promptly on every participating online device;
     // the periodic storage-warm run remains the MV3 restart/offline fallback.
-    pbpMigrateSecretsToLocal().catch(() => {});
+    pbpMigrateSecretsToLocal().catch((e) => console.warn("[secrets-sync] onChanged mirror failed:", e?.name));
   }
   if (area === "local" && changes.vocabDriveConnected &&
       changes.vocabDriveConnected.newValue !== true) {
@@ -4375,7 +4410,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   const routingChanged = !!(changes.optSyncEnabled || changes.syncApiKeys);
   if ((area === "sync" || area === "local") && (routingChanged || changes.tagSyncMode || pbpBookmarkSettingsChanged(changes))) {
-    syncPrewarmTagsAlarm().catch(() => {});
+    syncPrewarmTagsAlarm().catch((e) => console.warn("[tag-cache] alarm sync failed:", e?.name, e?.message));
   }
   // Conditional site-theme payload (roadmap #37): register/unregister the
   // 704KB themes constant as the preset comes and goes (routing changes can
@@ -4385,7 +4420,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 // Initial check
-syncPrewarmTagsAlarm().catch(() => {});
+syncPrewarmTagsAlarm().catch((e) => console.warn("[tag-cache] startup alarm sync failed:", e?.name, e?.message));
 
 
 // Recurring sweep of the per-URL suggest-tag cache (cached_suggest_*). The popup
@@ -4503,20 +4538,20 @@ pbpSweepPreviewOrphans();
 
 // Startup: process offline queue + update badge + prime settings (cheap no-op when already primed)
 chrome.runtime.onStartup.addListener(() => {
-  primeSettings().catch(() => {});
+  primeSettings().catch((e) => console.warn("[startup] primeSettings failed:", e?.name, e?.message));
   pbpReconcileBookmarkService().catch(error => console.warn("[bookmark-service] startup reconcile failed:", error?.name, error?.message));
-  processOfflineQueue().catch(() => {});
-  updateBadge().catch(() => {});
+  processOfflineQueue().catch((e) => console.warn("[startup] offline queue drain failed:", e?.name, e?.message));
+  updateBadge().catch((e) => console.warn("[startup] badge refresh failed:", e?.name));
 });
 
 // Install/update: prime SETTINGS_DEFAULTS so the first popup open is fast for users whose
 // storage doesn't have every key yet (storage.get(missing-key) is measurably slower).
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   if (reason === "install" || reason === "update") {
-    primeSettings().catch(() => {});
+    primeSettings().catch((e) => console.warn("[install] primeSettings failed:", e?.name, e?.message));
     // Records the service this device used before the device key existed.
     pbpReconcileBookmarkService().catch(error => console.warn("[bookmark-service] install reconcile failed:", error?.name, error?.message));
-    readOfflineQueueWithIds().catch(() => {});
+    readOfflineQueueWithIds().catch((e) => console.warn("[install] offline queue migration failed:", e?.name, e?.message));
   }
   // The first start of a new version keeps a restore point of the personal
   // library (restore-points.js). Awaited, so the listener stays pending while
@@ -4674,7 +4709,7 @@ async function pbpRunPopupDraft(message) {
   const ttl = 24 * 60 * 60 * 1000;
   const safeUrl = (s) => {
     try { const u = new URL(s); return typeof s === "string" && s.length <= 16384 && /^https?:$/.test(u.protocol) && !u.username && !u.password; }
-    catch (_) { return false; }
+    catch (_) { /* swallow-ok: non-URL pageUrl is rejected */ return false; }
   };
   // The draft fields some popup open actually changed. Only those are restored;
   // a row without the list predates it and restores the whole form.
@@ -4834,7 +4869,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
               try {
                 const st = await getSettingsStorage();
                 return (await st.get("customOverlayCSS")).customOverlayCSS;
-              } catch (_) { return ""; }
+              } catch (e) {
+                console.warn("[site-prefs] legacy overlay CSS read failed:", e?.name, e?.message);
+                return "";
+              }
             }, "")),
         ]);
         sendResponse({
@@ -4869,7 +4907,9 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   }
 
   if (message.type === "PBP_RESET_PINBOARD_AUTH") {
-    pbpResetPinboardAuth(message.expectedToken).then((result) => { try { sendResponse(result); } catch (_) {} });
+    pbpResetPinboardAuth(message.expectedToken).then((result) => {
+      try { sendResponse(result); } catch (_) { /* swallow-ok: caller port closed before auth reset finished */ }
+    });
     return true;
   }
 
@@ -5037,7 +5077,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         metadata: fresh ? cached.metadata ?? null : null,
         account: auth.account,
       });
-    }).catch(() => sendResponse({ posts: null, account: "" }));
+    }).catch((e) => {
+      console.warn("[bookmark-data] read failed:", e?.name, e?.message);
+      sendResponse({ posts: null, account: "" });
+    });
     return true;
   }
 
@@ -5115,7 +5158,9 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   }
 
   if (message.type === "PBP_POPUP_DRAFT") {
-    pbpRunPopupDraft(message).then((result) => { try { sendResponse(result); } catch (_) {} });
+    pbpRunPopupDraft(message).then((result) => {
+      try { sendResponse(result); } catch (_) { /* swallow-ok: popup closed after dispatching draft op */ }
+    });
     return true;
   }
 
@@ -5123,10 +5168,20 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     // pbpReadOfflineQueuePause never rejects; a failed read reports no pause.
     // account: the current connection's non-secret owner ("" when there is
     // none), so the popup can tell its items from other connections'.
-    Promise.all([readOfflineQueueWithIds(), pbpReadOfflineQueuePause(), getCurrentBookmarkAuth().catch(() => null)])
+    Promise.all([
+      readOfflineQueueWithIds(),
+      pbpReadOfflineQueuePause(),
+      getCurrentBookmarkAuth().catch((e) => {
+        console.warn("[offline-queue] auth read failed:", e?.name, e?.message);
+        return null;
+      }),
+    ])
       .then(([queue, pause, auth]) => sendResponse({ ok: true, queue, pause: pause ? { account: pause.account, reason: pause.reason } : null,
         ...(auth ? { account: typeof auth.account === "string" ? auth.account : "" } : {}) }))
-      .catch(() => sendResponse({ ok: false, queue: [] }));
+      .catch((e) => {
+        console.warn("[offline-queue] queue read failed:", e?.name, e?.message);
+        sendResponse({ ok: false, queue: [] });
+      });
     return true;
   }
 
@@ -5139,10 +5194,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   // dead-port case this whole feature exists for (the cache write already ran).
   if (message.type === "PBP_AI_CALL") {
     pbpRunPopupAiCall(message).then(
-      (envelope) => { try { sendResponse(envelope); } catch (_) { /* popup gone: result is cached, nothing to deliver it to */ } },
+      (envelope) => { try { sendResponse(envelope); } catch (_) { /* swallow-ok: popup closed; result is already cached */ } },
       (e) => {
         console.warn("[pbp-ai] popup AI call crashed:", e && e.name, e && e.message);
-        try { sendResponse({ ok: false, error: pbpAiErrorEnvelope(e) }); } catch (_) {}
+        try { sendResponse({ ok: false, error: pbpAiErrorEnvelope(e) }); } catch (_) { /* swallow-ok: popup closed before error delivery */ }
       }
     );
     return true;
@@ -5167,7 +5222,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         }
         sendResponse(result);
         if (result.status !== "failed") return;
-        const ctx = await chrome.runtime.getContexts({ contextTypes: ["POPUP"] }).catch(() => []);
+        const ctx = await chrome.runtime.getContexts({ contextTypes: ["POPUP"] }).catch((e) => {
+          console.warn("[save] popup context check failed:", e?.name, e?.message);
+          return [];
+        });
         if (!ctx.length) notifySaveFailure("popup-save", result, pbpBookmarkAccountService(message.account));
       })
       // Programming-error path only: submitPopupSaveIntent itself never rejects
@@ -5212,7 +5270,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         }
       }
       sendResponse({ ok: updated });
-    }).catch(() => sendResponse({ ok: false }));
+    }).catch((e) => {
+      console.warn("[bookmark-deleted] status update failed:", e?.name, e?.message);
+      sendResponse({ ok: false });
+    });
     return true;
   }
 
@@ -5231,9 +5292,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         sendResponse({ status: "account_changed" });
         return;
       }
-      handleBatchSave(message.tabs, message.account, true).catch(() => {}); // fire-and-forget; keeps SW alive via in-flight fetches
+      handleBatchSave(message.tabs, message.account, true).catch((e) => console.warn("[batch] run failed:", e?.name, e?.message)); // fire-and-forget; keeps SW alive via in-flight fetches
       sendResponse({ status: "started", account: message.account });
-    }).catch(() => {
+    }).catch((e) => {
+      console.warn("[batch] start auth check failed:", e?.name, e?.message);
       _batchRunning = false;
       sendResponse({ status: "account_changed" });
     });
@@ -5339,7 +5401,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     try {
       const p = new URL(message.origin);
       if (p.protocol === "https:" || p.protocol === "http:") origin = p.origin;
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: invalid URL origin rejected as bad_request */ }
     if (typeof tabId !== "number" || !fromPreview || !domains.length || !origin) {
       sendResponse({ ok: false, error: "bad_request" });
       return true;
@@ -5357,7 +5419,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     if (typeof tabId !== "number" || !fromPreview || !ids.length) { sendResponse({ ok: false }); return true; }
     pbpImgFixRemoveRules(ids, tabId, sender.url)
       .then(() => sendResponse({ ok: true }))
-      .catch(() => sendResponse({ ok: false }));
+      .catch((e) => {
+        console.warn("[imgfix] rule removal failed:", e?.name, e?.message);
+        sendResponse({ ok: false });
+      });
     return true;
   }
 
@@ -5384,7 +5449,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     const frameOrigin = (() => {
       if (!frame || typeof message.frameOrigin !== "string") return "";
       try { const u = new URL(message.frameOrigin); return (u.protocol === "https:" && u.origin === message.frameOrigin) ? u.origin : ""; }
-      catch (_) { return ""; }
+      catch (_) {
+        // swallow-ok: malformed frameOrigin rejected
+        return "";
+      }
     })();
     if (!url || (engine !== "local" && engine !== "jina" && engine !== "deepseek")) {
       sendResponse({ ok: false, error: "bad_request" }); return true;
@@ -5422,7 +5490,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       if (frame) {
         let held = false;
         if (frameOrigin) {
-          try { held = await chrome.permissions.contains({ origins: [frameOrigin + "/*"] }); } catch (_) { held = false; }
+          try { held = await chrome.permissions.contains({ origins: [frameOrigin + "/*"] }); } catch (e) {
+            console.warn("[reextract] frame permission check failed:", e?.name, e?.message);
+            held = false;
+          }
         }
         if (!held) { sendResponse({ ok: false, error: "host_permission" }); return; }
       }
@@ -5441,10 +5512,15 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         // origin -- which the reader requested from the click. contains only:
         // the SW never prompts.
         let pageOrigin = "";
-        try { const u = new URL(tabUrl); if (u.protocol === "https:") pageOrigin = u.origin; } catch (_) {}
+        try { const u = new URL(tabUrl); if (u.protocol === "https:") pageOrigin = u.origin; } catch (_) {
+          // swallow-ok: non-URL tabUrl leaves pageOrigin empty
+        }
         let held = false;
         if (pageOrigin) {
-          try { held = await chrome.permissions.contains({ origins: [pageOrigin + "/*"] }); } catch (_) { held = false; }
+          try { held = await chrome.permissions.contains({ origins: [pageOrigin + "/*"] }); } catch (e) {
+            console.warn("[reextract] page permission check failed:", e?.name, e?.message);
+            held = false;
+          }
         }
         if (!held) { sendResponse({ ok: false, error: "host_permission" }); return; }
         if (!await pbpReloadTabAndSettle(tabId)) { sendResponse({ ok: false, error: "tab_unavailable" }); return; }
@@ -5976,7 +6052,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       }
     }
 
-    if (saved > 0 || partial > 0) await updateBadge().catch(() => {});
+    if (saved > 0 || partial > 0) await updateBadge().catch((e) => console.warn("[batch] post-batch badge refresh failed:", e?.name));
 
     await clearJob();
     await clearCancel();
@@ -6066,7 +6142,7 @@ chrome.storage.onChanged.addListener((changes) => {
     // The event can come from an inactive storage area. Resolve the effective
     // setting instead of trusting this area's candidate value. A service
     // change matters too: the poll exists only for Pinboard.
-    updateBadge().catch(() => {});
+    updateBadge().catch((e) => console.warn("[badge] setting-change refresh failed:", e?.name));
     _syncBadgeAlarm(); // create/clear the 15-min network poll to match
   }
 });
@@ -6095,7 +6171,7 @@ function extractPageForMarkdown() {
       for (const f of document.querySelectorAll("iframe")) {
         if (f.hasAttribute("srcdoc")) continue;
         let origin;
-        try { origin = new URL(f.src, location.href).origin; } catch (_) { continue; }
+        try { origin = new URL(f.src, location.href).origin; } catch (_) { /* swallow-ok: malformed iframe src skipped */ continue; }
         if (!/^https:\/\//.test(origin) || origin === location.origin) continue;
         const sb = f.getAttribute("sandbox");
         if (sb !== null && !/\ballow-same-origin\b/.test(sb)) continue;
@@ -6115,7 +6191,7 @@ function extractPageForMarkdown() {
         if (area > bestArea) { bestArea = area; best = origin; }
       }
       return best && bestArea >= 0.4 * vw * vh ? best : "";
-    } catch (_) { return ""; }
+    } catch (_) { /* swallow-ok: cross-origin or detached DOM inspection fallback */ return ""; }
   }
   // "Nothing here" is judged on TEXT, not on the HTML string: Defuddle hands
   // back the main container even when all it holds is an <iframe> (claude.ai
@@ -6147,18 +6223,18 @@ function extractPageForMarkdown() {
         return { contentHtml: div.innerHTML, title: hit.title || document.title, url: location.href, math: !!hit.math, forum: !!hit.forum };
       }
     }
-  } catch (_) { /* fall through to Defuddle */ }
+  } catch (_) { /* swallow-ok: broken site rule falls through to Defuddle */ }
   if (typeof Defuddle === "undefined") return { error: "Defuddle not available" };
   const OriginalURL = window.URL;
   if (!window.__pp_urlShimInstalled) {
     const SafeURL = function (u, b) {
       try { return b !== undefined ? new OriginalURL(u, b) : new OriginalURL(u); }
-      catch (_) { return new OriginalURL("about:blank"); }
+      catch (_) { /* swallow-ok: malformed relative URL shimmed to about:blank for Defuddle */ return new OriginalURL("about:blank"); }
     };
     SafeURL.prototype = OriginalURL.prototype;
-    try { SafeURL.createObjectURL = OriginalURL.createObjectURL.bind(OriginalURL); } catch (_) {}
-    try { SafeURL.revokeObjectURL = OriginalURL.revokeObjectURL.bind(OriginalURL); } catch (_) {}
-    try { SafeURL.canParse = OriginalURL.canParse && OriginalURL.canParse.bind(OriginalURL); } catch (_) {}
+    try { SafeURL.createObjectURL = OriginalURL.createObjectURL.bind(OriginalURL); } catch (_) { /* swallow-ok: optional static URL method bind */ }
+    try { SafeURL.revokeObjectURL = OriginalURL.revokeObjectURL.bind(OriginalURL); } catch (_) { /* swallow-ok: optional static URL method bind */ }
+    try { SafeURL.canParse = OriginalURL.canParse && OriginalURL.canParse.bind(OriginalURL); } catch (_) { /* swallow-ok: optional static URL method bind */ }
     window.URL = SafeURL;
     window.__pp_urlShimInstalled = true;
   }
@@ -6341,7 +6417,7 @@ async function extractForPreview({ tabId, url, engine, sourceTabUrl, frame, fram
   let out = top;
   let frameBase = "";
   if (frame === true && Array.isArray(results)) {
-    const sameOrigin = (u) => { try { return new URL(u).origin === frameOrigin; } catch (_) { return false; } };
+    const sameOrigin = (u) => { try { return new URL(u).origin === frameOrigin; } catch (_) { /* swallow-ok: malformed frame URL rejected */ return false; } };
     const pick = results.find((r) => r && r.result && r.result.contentHtml && sameOrigin(r.result.url));
     out = pick ? pick.result : null;
     if (pick) frameBase = pick.result.url; // relative links resolve against the FRAME, not the top page
@@ -6392,7 +6468,10 @@ async function openMarkdownPreviewFromShortcut() {
       urlClean: SETTINGS_DEFAULTS.urlClean,
       deepseekApiKey: SETTINGS_DEFAULTS.deepseekApiKey,
     }),
-    getCurrentBookmarkAuth().catch(() => ({ account: "" })),
+    getCurrentBookmarkAuth().catch((e) => {
+      console.warn("[mdpv] auth read failed:", e?.name, e?.message);
+      return { account: "" };
+    }),
   ]);
   const engine = pbpEffectiveExtractEngine(raw);
   // Per-open token key so two shortcut opens (or a shortcut + a popup Preview)

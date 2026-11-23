@@ -22,7 +22,7 @@ function _pbpNotesIdentity(recordKey) {
     const id = decodeURIComponent(recordKey.slice(at + 1));
     return id && id.length <= 512 && id === id.normalize("NFC") &&
       recordKey === key + "|" + encodeURIComponent(id) ? {key,id} : null;
-  } catch (_) { return null; }
+  } catch (_) { /* swallow-ok: decodeURIComponent rejects malformed percent-encoding in untrusted recordKey */ return null; }
 }
 
 function _pbpNotesItemValue(item) {
@@ -47,7 +47,7 @@ function pbpNotesValidateEvent(event, expectedRecordKey, leaf = false) {
   try {
     if (pbpVocabDotCompare(event.dot,event.dot) !== 0 ||
         _pbpVocabOwnValue(event.vector,event.dot.deviceId) < event.dot.counter) return false;
-  } catch (_) { return false; }
+  } catch (_) { /* swallow-ok: pbpVocabDotCompare throws TypeError on invalid untrusted dot */ return false; }
   if (event.versions !== undefined) {
     if (leaf || !_pbpVocabDenseArray(event.versions) || event.versions.length < 2 ||
         !event.versions.every(version=>pbpNotesValidateEvent(version,event.recordKey,true)) ||
@@ -479,7 +479,8 @@ function pbpCreateNotesSyncStore({
   }
   async function freezeOutbox(owner,permissionId,ownerHash,fileId,batch) {
     let body;
-    try { body=JSON.parse(batch.body); } catch (_) { return false; }
+    try { body=JSON.parse(batch.body); }
+    catch (error) { console.warn("[notes-sync] freeze batch parse failed:",error?.name); return false; }
     if (!pbpNotesValidBatchBody(body,ownerHash) || !fileId || !permissionId || !body.entries.length) return false;
     return withLock("pbp-notes-batches",async()=>{
       await checkHash(owner,ownerHash);
@@ -532,7 +533,10 @@ function pbpCreateNotesSyncStore({
         const decoded=decodeURIComponent(key.slice((PBP_NOTES_SYNC_PREFIX+"batch_").length));
         const parts=decoded.split(":");
         return parts[1]===ownerHash ? [{key,drivePermissionId:parts[0],ownerHash,driveFileId:parts.slice(2).join(":")}] : [];
-      } catch (_) { return []; }
+      } catch (error) {
+        console.warn("[notes-sync] corrupt batch key skipped:",error?.name,error?.message);
+        return [];
+      }
     });
     return {states,outbox,batches,notices};
   }
@@ -563,9 +567,9 @@ async function pbpNotesWriteRecord(key,record,owner,options={}) {
   try {
     if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
       const pending=chrome.runtime.sendMessage({type:"PBP_NOTES_DIRTY"});
-      if (pending?.catch) pending.catch(()=>{});
+      if (pending?.catch) pending.catch(()=>{ /* swallow-ok: advisory dirty ping when no runtime listener is active */ });
     }
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: advisory dirty ping outside extension runtime */ }
   return result;
 }
 function pbpNotesSyncSnapshot(owner,ownerHash) { return pbpCreateNotesSyncStore().snapshot(owner,ownerHash); }

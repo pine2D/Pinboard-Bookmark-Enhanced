@@ -99,7 +99,7 @@ function pbpVocabValidateDriveBatch(metadata, body, expectedOwnerHash, protocol 
       metadata.appProperties.owner !== expectedOwnerHash || typeof body !== "string" ||
       _pbpVocabDriveBytes(body) > PBP_VOCAB_BATCH_MAX_BYTES) return false;
   let parsed;
-  try { parsed = JSON.parse(body); } catch (_) { return false; }
+  try { parsed = JSON.parse(body); } catch (_) { /* swallow-ok: batch validator returns false on non-JSON input */ return false; }
   if (!protocol.validBatchBody(parsed, expectedOwnerHash) ||
       metadata.appProperties.schema !== String(parsed.schema) ||
       metadata.appProperties.device !== parsed.deviceId ||
@@ -323,7 +323,8 @@ function pbpCreateDriveClient({
         signal,
         headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` }
       });
-    } catch (_) {
+    } catch (error) {
+      console.warn("[vocab-drive] fetch failed:", error?.name, error?.message);
       return failure("network", true, undefined, fileId);
     }
     if (response && typeof response === "object") responseSignals.set(response, signal);
@@ -403,7 +404,9 @@ function pbpCreateDriveClient({
             value === "insufficientPermissions" || value === "accessNotConfigured"
           ) || "";
         }
-      } catch (_) {}
+      } catch (error) {
+        console.warn("[vocab-drive] 403 error body unreadable:", error?.name);
+      }
       if (responseSignals.get(response)?.aborted) {
         return failure("network", true, undefined, fileId);
       }
@@ -422,7 +425,8 @@ function pbpCreateDriveClient({
   async function json(response, fileId) {
     try {
       return { ok: true, value: await response.json() };
-    } catch (_) {
+    } catch (error) {
+      console.warn("[vocab-drive] response JSON parse failed:", error?.name);
       if (responseSignals.get(response)?.aborted) {
         return failure("network", true, undefined, fileId);
       }
@@ -511,7 +515,8 @@ function pbpCreateDriveClient({
     let multipart;
     try {
       multipart = pbpVocabBuildMultipart(metadata, body, protocol);
-    } catch (_) {
+    } catch (error) {
+      console.warn("[vocab-drive] multipart build rejected:", error?.name, error?.message);
       return failure("invalid_input", false);
     }
     const url = new URL(uploadBase);
@@ -548,12 +553,12 @@ function pbpCreateDriveClient({
     const contentLength = response.headers && response.headers.get("Content-Length");
     if (typeof contentLength === "string" && /^\d+$/.test(contentLength) &&
         Number(contentLength) > PBP_VOCAB_BATCH_MAX_BYTES) {
-      try { await response.body?.cancel?.(); } catch (_) {}
+      try { await response.body?.cancel?.(); } catch (_) { /* swallow-ok: best-effort stream release on oversize response */ }
       return failure("remote_batch_too_large", false, response.status, fileId);
     }
     const reader = response.body && response.body.getReader && response.body.getReader();
     if (!reader) return failure("invalid_response", false, response.status, fileId);
-    const cancel = async () => { try { await reader.cancel(); } catch (_) {} };
+    const cancel = async () => { try { await reader.cancel(); } catch (_) { /* swallow-ok: best-effort stream reader release during error cleanup */ } };
 
     const decoder = new TextDecoder("utf-8", { fatal: true });
     const parts = [];
@@ -562,7 +567,8 @@ function pbpCreateDriveClient({
       let chunk;
       try {
         chunk = await reader.read();
-      } catch (_) {
+      } catch (error) {
+        console.warn("[vocab-drive] download stream read failed:", error?.name, error?.message);
         await cancel();
         return failure("network", true, undefined, fileId);
       }
@@ -578,7 +584,8 @@ function pbpCreateDriveClient({
       }
       try {
         parts.push(decoder.decode(chunk.value, { stream: true }));
-      } catch (_) {
+      } catch (error) {
+        console.warn("[vocab-drive] download UTF-8 decode failed:", error?.name, error?.message);
         await cancel();
         return failure("invalid_response", false, response.status, fileId);
       }
@@ -586,7 +593,8 @@ function pbpCreateDriveClient({
     try {
       parts.push(decoder.decode());
       return { ok: true, body: parts.join("") };
-    } catch (_) {
+    } catch (error) {
+      console.warn("[vocab-drive] download UTF-8 flush failed:", error?.name, error?.message);
       await cancel();
       return failure("invalid_response", false, response.status, fileId);
     }
@@ -1410,7 +1418,8 @@ function pbpCreateDriveSyncRunner({
 
       const uploadPending = async (pending) => {
         let parsed;
-        try { parsed = JSON.parse(pending.body); } catch (_) {
+        try { parsed = JSON.parse(pending.body); } catch (error) {
+          console.warn("[vocab-drive] pending batch JSON invalid:", error?.name);
           return normalizedFailure({ error: "invalid_response" });
         }
         let metadata;
@@ -1418,7 +1427,8 @@ function pbpCreateDriveSyncRunner({
           metadata = pbpVocabDriveMetadata(
             pending.driveFileId, ownerHash, parsed.deviceId, { ...protocol, schema: parsed.schema }
           );
-        } catch (_) {
+        } catch (error) {
+          console.warn("[vocab-drive] pending batch metadata invalid:", error?.name, error?.message);
           return normalizedFailure({ error: "invalid_response" });
         }
         if (!pbpVocabValidateDriveBatch(metadata, pending.body, ownerHash, protocol)) {

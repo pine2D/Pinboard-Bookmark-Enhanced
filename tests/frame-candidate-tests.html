@@ -18,21 +18,9 @@ function check(name, cond, detail) {
   div.textContent = (ok ? "OK " : "X ") + name + (ok ? "" : " :: " + (detail || ""));
   root.appendChild(div);
 }
-// Slice `function dominantFrameOrigin() { ... }` out of a source file: it ends
-// right after its `} catch (_) { return ""; }` line's closing brace.
-function extractDetector(src, label) {
-  const start = src.indexOf("function dominantFrameOrigin()");
-  if (start < 0) throw new Error(label + ": dominantFrameOrigin not found");
-  const catchAt = src.indexOf('} catch (_) { return ""; }', start);
-  if (catchAt < 0) throw new Error(label + ": dominantFrameOrigin catch clause not found");
-  const close = src.indexOf("}", catchAt + '} catch (_) { return ""; }'.length);
-  if (close < 0) throw new Error(label + ": dominantFrameOrigin closing brace not found");
-  const body = src.slice(start, close + 1);
-  return new Function(body + "\nreturn dominantFrameOrigin;")();
-}
 // Slice any inner `function NAME(...) { ... }` out of a source file by brace
-// matching from its header (the emptiness predicate is short and has no
-// string literals containing braces).
+// matching from its header (neither detector nor predicate contains braces in
+// strings, regexes, or comments).
 function extractFunction(src, name, label) {
   const start = src.indexOf("function " + name + "(");
   if (start < 0) throw new Error(label + ": " + name + " not found");
@@ -40,6 +28,9 @@ function extractFunction(src, name, label) {
   if (i < 0) throw new Error(label + ": " + name + " opening brace not found");
   for (; i < src.length; i++) { if (src[i] === "{") depth++; else if (src[i] === "}" && --depth === 0) break; }
   return new Function(src.slice(start, i + 1) + "\nreturn " + name + ";")();
+}
+function extractDetector(src, label) {
+  return extractFunction(src, "dominantFrameOrigin", label);
 }
 const fx = document.getElementById("fx");
 const ORIGIN_A = "https://frame-a.invalid";

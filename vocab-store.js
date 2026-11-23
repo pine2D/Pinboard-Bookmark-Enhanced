@@ -31,7 +31,7 @@ function pbpDictSafeUrl(url) {
     const u = new URL(String(url || ""));
     return (u.protocol === "https:" || u.protocol === "http:") &&
       !u.username && !u.password ? u.href : "";
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: URL parser rejects malformed untrusted URL input */ return ""; }
 }
 
 // contexts[] merge (spec §4.1): dedup by articleUrl+quote; fresh array.
@@ -160,7 +160,7 @@ function pbpVocabValidateEvent(event, expectedRecordKey, leaf = false) {
     if (pbpVocabDotCompare(event.dot, event.dot) !== 0 ||
         !_pbpVocabPositiveInteger(_pbpVocabOwnValue(event.vector, event.dot.deviceId)) ||
         _pbpVocabOwnValue(event.vector, event.dot.deviceId) < event.dot.counter) return false;
-  } catch (_) { return false; }
+  } catch (_) { /* swallow-ok: pbpVocabDotCompare throws TypeError on invalid untrusted dot */ return false; }
   if (Object.prototype.hasOwnProperty.call(event, "versions")) {
     if (leaf || !_pbpVocabDenseArray(event.versions) || event.versions.length < 2 ||
         !event.versions.every(version => pbpVocabValidateEvent(version, event.recordKey, true)) ||
@@ -326,13 +326,16 @@ function _pbpVocabOpenDB() {
       // without this, a long-lived preview tab holds the old version open
       // forever and blocks the upgrade. Close and drop the cached promise so
       // the next call reopens against the new version.
-      db.onversionchange = () => { try { db.close(); } catch (_) {} _pbpVocabDbPromise = null; };
+      db.onversionchange = () => {
+        try { db.close(); } catch (_) { /* swallow-ok: connection is already closing on versionchange */ }
+        _pbpVocabDbPromise = null;
+      };
       resolve(db);
     };
     req.onblocked = () => console.warn("[vocab-store] open blocked: another context still holds an older connection (onversionchange should have closed it)");
     req.onerror = () => reject(req.error);
   });
-  _pbpVocabDbPromise.catch(() => { _pbpVocabDbPromise = null; });
+  _pbpVocabDbPromise.catch(() => { /* swallow-ok: clear cached open promise; callers await and handle rejection */ _pbpVocabDbPromise = null; });
   return _pbpVocabDbPromise;
 }
 
@@ -342,9 +345,15 @@ async function pbpVocabGet(id) {
     return await new Promise((resolve) => {
       const req = db.transaction(_PBP_VOCAB_STORE, "readonly").objectStore(_PBP_VOCAB_STORE).get(id);
       req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => resolve(null);
+      req.onerror = () => {
+        console.warn("[vocab-store] get request failed:", req.error?.name, req.error?.message);
+        resolve(null);
+      };
     });
-  } catch (_) { return null; }
+  } catch (error) {
+    console.warn("[vocab-store] get failed:", error?.name, error?.message);
+    return null;
+  }
 }
 
 function pbpVocabNormalizeGroupName(value) {
@@ -448,8 +457,10 @@ function _pbpVocabWordFromEvent(owner, event) {
 function _pbpVocabDirty(owner) {
   try {
     const pending = globalThis.chrome?.runtime?.sendMessage?.({ type: "PBP_VOCAB_DIRTY", owner });
-    if (pending && typeof pending.catch === "function") pending.catch(() => {});
-  } catch (_) {}
+    if (pending && typeof pending.catch === "function") {
+      pending.catch(() => { /* swallow-ok: advisory dirty ping when no runtime listener is active */ });
+    }
+  } catch (_) { /* swallow-ok: advisory dirty ping outside extension runtime */ }
 }
 
 function _pbpVocabMeta(value) {
@@ -550,8 +561,8 @@ async function _pbpVocabLocalMutation(owner, itemsOrLoad, mutate, requireExistin
     // failed IndexedDB write all collapse into the same bare answer here, so
     // name the cause before it is lost. Never the word itself.
     console.warn("[vocab-store] local mutation failed:", error?.name, error?.message);
-    try { if (tx) tx.abort(); } catch (_) {}
-    if (done) await done.catch(() => {});
+    try { if (tx) tx.abort(); } catch (_) { /* swallow-ok: transaction may already be finished or aborted */ }
+    if (done) await done.catch(() => { /* swallow-ok: wait for aborted transaction settle; original error was logged above */ });
     return { ok: false, changed: 0, results: [] };
   }
 }
@@ -810,8 +821,8 @@ async function pbpVocabActivateAccount(drivePermissionId, ownerHash) {
     return true;
   } catch (error) {
     console.warn("[vocab-store] account activation failed:", error?.name, error?.message);
-    try { if (tx) tx.abort(); } catch (_) {}
-    if (done) await done.catch(() => {});
+    try { if (tx) tx.abort(); } catch (_) { /* swallow-ok: transaction may already be finished or aborted */ }
+    if (done) await done.catch(() => { /* swallow-ok: wait for aborted transaction settle; original error was logged above */ });
     return false;
   }
 }
@@ -954,7 +965,8 @@ async function pbpVocabFreezeOutbox(owner, drivePermissionId, ownerHash, driveFi
   const body = typeof envelope === "string" ? envelope
     : (envelope && typeof envelope.body === "string" ? envelope.body : null);
   let parsed = null;
-  try { parsed = typeof body === "string" ? JSON.parse(body) : null; } catch (_) {}
+  try { parsed = typeof body === "string" ? JSON.parse(body) : null; }
+  catch (error) { console.warn("[vocab-store] outbox freeze batch parse failed:", error?.name); }
   if (!drivePermissionId || !driveFileId || !_pbpVocabValidBatchBody(parsed, ownerHash) ||
       !parsed.entries.length) return null;
   const entries = parsed.entries;
@@ -1024,8 +1036,8 @@ async function pbpVocabCheckpointOwner(owner) {
     await done;
     return metadata.length;
   } catch (error) {
-    try { if (tx) tx.abort(); } catch (_) {}
-    if (done) await done.catch(() => {});
+    try { if (tx) tx.abort(); } catch (_) { /* swallow-ok: transaction may already be finished or aborted */ }
+    if (done) await done.catch(() => { /* swallow-ok: wait for aborted transaction settle before rethrowing */ });
     throw error;
   }
 }
@@ -1134,8 +1146,8 @@ async function pbpVocabApplyRemotePage(owner, ownerHash, batches, cursorCommit) 
     // cause is folded into the code. Never the entries themselves.
     console.warn("[vocab-store] remote page apply failed:",
       remoteFault ? "remote" : "local", error?.name, error?.message);
-    try { if (tx) tx.abort(); } catch (_) {}
-    if (done) await done.catch(() => {});
+    try { if (tx) tx.abort(); } catch (_) { /* swallow-ok: transaction may already be finished or aborted */ }
+    if (done) await done.catch(() => { /* swallow-ok: wait for aborted transaction settle; original error was logged above */ });
     return remoteFault
       ? _pbpVocabRemoteError(badBatch)
       : { ok: false, error: "local_store" };

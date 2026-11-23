@@ -789,7 +789,8 @@ async function pbpApplyBackupPayload(data, {
       result.vocabulary = "failed";
     }
     if (result.vocabularyProcessed || result.vocabulary === "applied") {
-      try { await pbpVocabAll(scope); } catch (_) {}
+      try { await pbpVocabAll(scope); }
+      catch (error) { console.warn("[backup] post-import vocabulary warm read failed:", error?.name, error?.message); }
     }
   }
 
@@ -840,7 +841,9 @@ const PBP_IMPORT_RESULT_STASH_TTL = 5000;
 function pbpStashImportResult(result) {
   try {
     sessionStorage.setItem(PBP_IMPORT_RESULT_STASH, JSON.stringify({ ts: Date.now(), result }));
-  } catch (_) {}
+  } catch (error) {
+    console.warn("[backup] import result stash failed:", error?.name, error?.message);
+  }
 }
 
 // Consumes the stash. A stale entry (a reload that never happened because the
@@ -855,7 +858,8 @@ function pbpTakeImportResult() {
     if (!parsed || typeof parsed !== "object" || typeof parsed.ts !== "number") return null;
     if (Date.now() - parsed.ts > PBP_IMPORT_RESULT_STASH_TTL) return null;
     return parsed.result && typeof parsed.result === "object" ? parsed.result : null;
-  } catch (_) {
+  } catch (error) {
+    console.warn("[backup] import result stash read failed:", error?.name);
     return null;
   }
 }
@@ -1371,9 +1375,15 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       const data = JSON.parse(text);
       const prepared = pbpPreflightBackupPayload(data, exportableKeys);
       const [currentOwner, local] = await Promise.all([
-        readOwner().catch(() => ""),
+        readOwner().catch((error) => {
+          console.warn("[import] preview owner read failed:", error?.name, error?.message);
+          return "";
+        }),
         chrome.storage.local.get(["optSyncEnabled", ...PBP_LARGE_FALLBACK_KEYS])
-          .catch(() => /** @type {Record<string, unknown>} */ ({})),
+          .catch((error) => {
+            console.warn("[import] preview sync-state read failed:", error?.name, error?.message);
+            return /** @type {Record<string, unknown>} */ ({});
+          }),
       ]);
       if (token !== selectionToken) return;
       selectionText = text;
@@ -1518,7 +1528,8 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       }
     } finally {
       if (applyPaused && afterApply) {
-        try { await afterApply(); } catch (_) {}
+        try { await afterApply(); }
+        catch (error) { console.warn("[import] afterApply hook failed:", error?.name, error?.message); }
       }
       setApplyBusy(token, false);
     }
