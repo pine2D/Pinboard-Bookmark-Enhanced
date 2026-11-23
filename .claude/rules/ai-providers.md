@@ -20,12 +20,13 @@ paths:
 
 | provider | 关思考字段 |
 |---|---|
-| zhipu / moonshot(kimi) | `{"thinking":{"type":"disabled"}}` |
+| zhipu | 先传 `{"thinking":{"type":"disabled"}}`；服务端拒绝（如 GLM-5.3+ 中文报错 code 1210「该模型始终思考，不支持关闭思考；请使用 low、high 或 max。」）后回退 `{"reasoning_effort":"low"}` |
+| moonshot(kimi) | `{"thinking":{"type":"disabled"}}` |
 | minimax | 先传 `{"thinking":{"type":"disabled"}}`；服务端拒绝后才尝试 `{"reasoning_effort":"low"}`，避免强制思考模型退回默认的最高强度。是否回退由服务端响应与能力记忆决定，不按模型名写名单 |
 | siliconflow / qwen（阿里云百炼，四个地域及业务空间专属地址同一方言，核实结论与链接见注） | `{"enable_thinking":false}` |
 | openai / mistral / cohere | `{"reasoning_effort":"none"}`（flat，非 Responses 的 nested；cohere compat 端点仅 none/high） |
 | openrouter | `{"reasoning":{"enabled":false}}`（勿用 exclude，仍计费） |
-| gemini | bespoke：`thinkingConfig.thinkingBudget:0` |
+| gemini | bespoke：`thinkingConfig.thinkingLevel:"low"`（2026-11-23 实测复核：Gemini 3.5+ 已对旧 `thinkingBudget:0` 返回 400 `INVALID_ARGUMENT`，`low` 为 2.5 / 3.x / 4.x 全系支持的最低公共档位；旧非思考模型靠 400/422 剥离自愈） |
 | deepseek | thinkingOff（deepseek-reasoner 会拒收，靠 4xx 回退兜住） |
 | groq / custom / ollama | 默认不加 thinkingOff；兼容协议的任务级低思考偏好见后文，Ollama 不发送该字段 |
 | ark（火山方舟，国内与 BytePlus 海外两个地域同一方言） | `{"thinking":{"type":"disabled"}}`，2026-10-28 按官方原文核实，见注 |

@@ -1537,7 +1537,7 @@ suite("custom provider entries", () => {
       window.fetch = async (_url, init) => {
         bodies.push(JSON.parse(init.body));
         return bodies.length === 1
-          ? new Response(JSON.stringify({ error: { message: "Budget 0 is invalid. This model only works in thinking mode." } }), { status: 400 })
+          ? new Response(JSON.stringify({ error: { message: "Invalid JSON payload received. Unknown name \"thinkingLevel\" at 'generation_config.thinking_config': Cannot find field." } }), { status: 400 })
           : new Response('data: {"candidates":[{"content":{"parts":[{"text":"bonjour"}]}}]}\n\n', { status: 200 });
       };
       const stored = {};
@@ -1550,13 +1550,13 @@ suite("custom provider entries", () => {
           set: async (o) => { Object.assign(stored, o); }
         } }
       };
-      const out = await callAIStream({ aiProvider: "gemini", geminiApiKey: "k", geminiModel: "gemini-2.5-pro" },
+      const out = await callAIStream({ aiProvider: "gemini", geminiApiKey: "k", geminiModel: "gemini-2.0-flash" },
         "hi", { noThinking: true, maxTokens: 64 }, () => {});
       assertEq(out, "bonjour", "stream text after the retry");
       assertEq(bodies.length, 2, "one strip-and-retry");
-      assertEq(bodies[0].generationConfig.thinkingConfig.thinkingBudget, 0, "first attempt disables thinking");
+      assertEq(bodies[0].generationConfig.thinkingConfig.thinkingLevel, "low", "first attempt requests low thinking level");
       assertEq("thinkingConfig" in bodies[1].generationConfig, false, "retry drops the rejected field");
-      assertEq(!!(stored.pbpThinkReject && stored.pbpThinkReject[JSON.stringify([2,"gemini","https://generativelanguage.googleapis.com/v1beta","gemini-2.5-pro"])]?.rejected), true, "rejection memoized per model");
+      assertEq(!!(stored.pbpThinkReject && stored.pbpThinkReject[JSON.stringify([2,"gemini","https://generativelanguage.googleapis.com/v1beta","gemini-2.0-flash"])]?.rejected), true, "rejection memoized per model");
     });
 
     await atest("gemini stream honours the reject memo and leaves the reader default untouched", async () => {

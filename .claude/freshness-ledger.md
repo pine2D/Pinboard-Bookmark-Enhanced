@@ -14,20 +14,20 @@
 |---|---|---|---|
 | openai | gpt-6-luna | 未核实 | 2026-11-23 核对官方弃用表：gpt-5.4-nano 排期 2027-04-01 下线，切换官方推荐替代 |
 | deepseek | deepseek-flash | 2026-11-15 | 2026-11-15 真实核验纯文本与多模态图片输入（thinking disabled） |
-| qwen | qwen3.8-flash | 未核实 | 2026-11-23 核对百炼文档：qwen-flash 跨代落后，新装默认升至 qwen3.8-flash |
-| minimax | MiniMax-M3.1-Flash | 未核实 | - |
-| openrouter | openai/gpt-oss-20b | 未核实 | 2026-11-23 核对公开 /api/v1/models 目录仍在服 |
+| qwen | qwen3.8-flash | 2026-11-23 | 2026-11-23 实测百炼北京业务空间端点 JSON 与 SSE 词条生成通过（enable_thinking: false） |
+| minimax | MiniMax-M3.1-Flash | 2026-11-23 | 2026-11-23 实测 400 (2013) 自愈回退 reasoning_effort: low 及 JSON/SSE 词条生成通过 |
+| openrouter | openai/gpt-oss-20b | 未核实 | 2026-11-23 核对公开 /api/v1/models 目录仍在服；本轮因账户 402 余额不足即停 |
 | groq | openai/gpt-oss-20b | 未核实 | - |
 | mistral | mistral-small-latest | 未核实 | - |
 | cohere | command-r7b-12-2024 | 未核实 | 2026-11-23 核对官方弃用表仍为在服轻量推荐型号 |
-| siliconflow | deepseek-ai/DeepSeek-V4.1-Flash | 未核实 | 2026-11-23 核对硅基流动文档：Qwen/Qwen3-8B 跨代落后，新装默认升至 DeepSeek-V4.1-Flash |
-| zhipu | glm-5.3-flash | 未核实 | - |
-| kimi | kimi-k3.1-pro | 未核实 | - |
+| siliconflow | deepseek-ai/DeepSeek-V4.1-Flash | 2026-11-23 | 2026-11-23 实测硅基流动 JSON 与逐块累计 usage SSE 词条生成通过（enable_thinking: false） |
+| zhipu | glm-5.3-flash | 未核实 | 2026-11-23 实测修复中文 400 (1210) 自愈回退 reasoning_effort: low；BigModel 账户 429 (1113) 余额不足即停 |
+| kimi | kimi-k3.1-pro | 未核实 | 2026-11-23 本机未配置 MOONSHOT_API_KEY，跳过实测 |
 | ark | doubao-seed-2-1-lite-260915 | 未核实 | - |
 | opencode | glm-5.3-flash | 未核实 | - |
-| commandcode | deepseek/deepseek-v4.1-flash | 未核实 | - |
-| gemini | gemini-3.5-flash-lite | 未核实 | - |
-| claude | claude-haiku-5-5 | 未核实 | - |
+| commandcode | deepseek/deepseek-v4.1-flash | 2026-11-23 | 2026-11-23 经本机 agentgateway 实测 Command Code 上游 deepseek/deepseek-v4.1-flash JSON 与 SSE（含 reasoning_effort: low 自愈）通过 |
+| gemini | gemini-3.5-flash-lite | 2026-11-23 | 2026-11-23 实测切换 thinkingLevel: low 后 generateContent 与 streamGenerateContent?alt=sse（含 thoughtSignature）全部通过 |
+| claude | claude-haiku-5-5 | 未核实 | 2026-11-23 经 Command Code /messages 实测同型号响应结构；直连 api.anthropic.com 未配 Key |
 | ollama | llama3.2 | 未核实 | - |
 
 ## 远端夹具
@@ -60,19 +60,24 @@
 | Google Drive | tests/ask-archive-tests.html | 未核实 | - |
 | Google Drive | tests/drive-scopes-tests.html | 未核实 | - |
 | Google Drive | tests/options-drive-sync-tests.html | 未核实 | - |
-| OpenAI、Anthropic、Gemini、Ollama | tests/ai-completion-tests.html | 未核实 | 按官方 schema 手写（含多模态图片输入） |
+| OpenAI、Anthropic、Gemini、Ollama | tests/ai-completion-tests.html | 未核实 | 按官方 schema 手写（含多模态图片输入；OpenAI 原生与 Ollama 仍未实测，已实测平台夹具单列于下） |
 | DeepSeek | tests/ai-completion-tests.html#DEEPSEEK_FLASH_LIVE_20261115 | 2026-11-15 | 2026-11-15 真实核验 deepseek-flash 纯文本与多模态 image_url 响应夹具 |
-| OpenAI 兼容接口 | tests/popup-ai-sw-tests.html | 未核实 | - |
-| OpenAI 兼容接口 | tests/fixtures/dict-live-responses.mjs | 未核实 | - |
-| OpenAI 兼容接口 | tests/fixtures/dict-chat-stream.mjs | 未核实 | 流式响应 |
-| OpenAI 兼容接口 | tests/md-ai-tests.html | 未核实 | - |
-| OpenAI 兼容接口 | tests/dict-entry-tests.html | 未核实 | - |
-| OpenAI 兼容接口 | tests/dict-settings-tests.html | 未核实 | 流式响应 |
-| OpenAI 兼容接口 | tests/dict-protocol-tests.html | 未核实 | - |
-| OpenAI 兼容接口 | tests/dict-live-test-tests.mjs | 未核实 | - |
-| OpenAI 兼容接口 | tests/fixtures/dict-litellm-responses.mjs | 未核实 | - |
-| OpenAI 兼容接口 | tests/fixtures/dict-redesign-r2-responses.mjs | 未核实 | - |
-| OpenAI 兼容接口、MediaWiki | tests/fixtures/dict-redesign-responses.mjs | 未核实 | - |
+| Gemini | tests/ai-completion-tests.html#GEMINI_FLASH_LITE_LIVE_20261123 | 2026-11-23 | 2026-11-23 实测 gemini-3.5-flash-lite JSON 与 SSE（thinkingLevel: low、thoughtSignature）响应夹具 |
+| 阿里云百炼 | tests/ai-completion-tests.html#QWEN38_FLASH_LIVE_20261123 | 2026-11-23 | 2026-11-23 实测 qwen3.8-flash 业务空间专属端点 JSON 与 SSE 响应夹具 |
+| MiniMax | tests/ai-completion-tests.html#MINIMAX_M31_FLASH_LIVE_20261123 | 2026-11-23 | 2026-11-23 实测 MiniMax-M3.1-Flash 400 (2013) 回退与 JSON/SSE 响应夹具 |
+| SiliconFlow | tests/ai-completion-tests.html#SILICONFLOW_DEEPSEEK_V41_LIVE_20261123 | 2026-11-23 | 2026-11-23 实测 deepseek-ai/DeepSeek-V4.1-Flash JSON 与逐块 usage SSE 响应夹具 |
+| Command Code | tests/ai-completion-tests.html#COMMANDCODE_LIVE_20261123 | 2026-11-23 | 2026-11-23 经 agentgateway 实测 Command Code OpenAI (/chat/completions) 与 Anthropic (/messages) 双协议 JSON/SSE 夹具 |
+| OpenAI 兼容接口 | tests/popup-ai-sw-tests.html | 2026-11-23 | 2026-11-23 对照百炼/MiniMax/硅基流动实测 chat.completion 响应包络核实 |
+| OpenAI 兼容接口 | tests/fixtures/dict-live-responses.mjs | 2026-11-23 | 2026-11-23 对照百炼/硅基流动/Command Code 实测 chat.completion 包络（model、logprobs、tokens_details）核实 |
+| OpenAI 兼容接口 | tests/fixtures/dict-chat-stream.mjs | 2026-11-23 | 2026-11-23 对照百炼/MiniMax/硅基流动/Command Code 实测 chat.completion.chunk 流式包络核实 |
+| OpenAI 兼容接口 | tests/md-ai-tests.html | 2026-11-23 | 2026-11-23 对照百炼/硅基流动实测 chat.completion.chunk（含 content: null 终止块与 usage 尾块）核实 |
+| OpenAI 兼容接口 | tests/dict-entry-tests.html | 2026-11-23 | 2026-11-23 纳入实测 constraint 双义项词条响应夹具并核验解析与缓存链路 |
+| OpenAI 兼容接口 | tests/dict-settings-tests.html | 2026-11-23 | 2026-11-23 对照百炼/硅基流动实测 chat.completion.chunk 流式响应核实 |
+| OpenAI 兼容接口 | tests/dict-protocol-tests.html | 2026-11-23 | 2026-11-23 对照百炼/MiniMax/硅基流动实测 SSE 流式帧（含 reasoning_content 与 usage 尾块）核实 |
+| OpenAI 兼容接口 | tests/dict-live-test-tests.mjs | 2026-11-23 | 2026-11-23 对照百炼/MiniMax/硅基流动/Command Code 实测 SSE 帧结构与字节预算核实 |
+| OpenAI 兼容接口 | tests/fixtures/dict-litellm-responses.mjs | 2026-11-23 | 2026-11-23 对照实测 chat.completion 完整包络（id/object/created/model/logprobs/usage）核实 |
+| OpenAI 兼容接口 | tests/fixtures/dict-redesign-r2-responses.mjs | 2026-11-23 | 2026-11-23 对照实测 chat.completion 包络（logprobs: null、tokens_details）与 Wiktionary missingtitle 核实 |
+| OpenAI 兼容接口、MediaWiki | tests/fixtures/dict-redesign-responses.mjs | 2026-11-23 | 2026-11-23 对照实测 chat.completion 包络（含网关上游 model 别名、logprobs、tokens_details）与 MediaWiki formatversion=2 核实 |
 | DeepSeek | tests/fixtures/dict-deepseek-collocations.json | 2026-10-25 | 原文："Captured successful DeepSeek collocations response from the explicitly authorized 2026-10-25 synthetic provider lookup." |
 | LiteLLM | tests/fixtures/dict-live-malformed-responses.js:1 | 2026-10-26 | 原文：// Reviewed synthetic-term answers captured on 2026-10-26 through LiteLLM. |
 | Jina Reader | tests/jina-cache-tests.html#JINA_READER_LIVE_20261123 | 2026-11-23 | 2026-11-23 免 Key 抓取 r.jina.ai/https://example.com JSON 响应包络 |
@@ -91,10 +96,10 @@
 | Notion | tests/export-targets-tests.html | 未核实 | - |
 | Notion | tests/md-send-menu-tests.html | 未核实 | - |
 | GitHub Gist | tests/export-targets-tests.html | 未核实 | - |
-| Anthropic | tests/md-ai-tests.html | 未核实 | - |
-| Anthropic | tests/dict-protocol-tests.html | 未核实 | - |
-| Gemini | tests/md-ai-tests.html | 未核实 | - |
-| Gemini | tests/dict-protocol-tests.html | 未核实 | - |
+| Anthropic | tests/md-ai-tests.html | 2026-11-23 | 2026-11-23 对照 Command Code claude-haiku-5-5 /v1/messages 实测 SSE 包络（container/stop_details/output_tokens_details）核实 |
+| Anthropic | tests/dict-protocol-tests.html | 2026-11-23 | 2026-11-23 对照 Command Code claude-haiku-5-5 /v1/messages 实测 SSE（thinking_delta、signature_delta、ping、message_delta）核实 |
+| Gemini | tests/md-ai-tests.html | 2026-11-23 | 2026-11-23 对照 gemini-3.5-flash-lite streamGenerateContent?alt=sse 实测包络（thoughtSignature、usageMetadata、responseId）核实 |
+| Gemini | tests/dict-protocol-tests.html | 2026-11-23 | 2026-11-23 对照 gemini-3.5-flash-lite streamGenerateContent?alt=sse 实测包络核实 |
 | Ollama | tests/md-ai-tests.html | 未核实 | - |
 | Ollama | tests/dict-protocol-tests.html | 未核实 | - |
 | MediaWiki | tests/library-vocab-tests.html:4657 | 2026-11-23 | 2026-11-23 抓取 de.wikisource.org Faust - Der Tragödie erster Teil (formatversion=2) |

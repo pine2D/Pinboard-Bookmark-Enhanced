@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="1180"><title>md-preview AI Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="1183"><title>md-preview AI Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1200px; }
 h2 { margin-top: 24px; font-size: 16px; }
@@ -224,6 +224,9 @@ suite("_pbpOpenAIDelta", () => {
   test("empty content string -> null", () => {
     assertEq(_pbpOpenAIDelta({ choices: [{ delta: { content: "" } }] }), null, "empty string");
   });
+  test("null content on finish chunk (2026-11-23 SiliconFlow SSE shape) -> null", () => {
+    assertEq(_pbpOpenAIDelta({ choices: [{ index: 0, delta: { content: null }, finish_reason: "stop" }], usage: { prompt_tokens: 517, completion_tokens: 132, total_tokens: 649 } }), null, "null content stop chunk");
+  });
   test("gateway reasoning_content / reasoning deltas are never answer text", () => {
     assertEq(_pbpOpenAIDelta({ choices: [{ delta: { reasoning_content: "PRIVATE" } }] }), null, "reasoning_content");
     assertEq(_pbpOpenAIDelta({ choices: [{ delta: { reasoning: "PRIVATE" } }] }), null, "reasoning");
@@ -254,6 +257,10 @@ suite("_pbpGeminiDelta", () => {
   test("thought:true parts are excluded; thought-only chunk -> null", () => {
     assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ thought: true, text: "PRIVATE" }, { text: "Hi" }] } }] }), "Hi", "mixed");
     assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ thought: true, text: "PRIVATE" }] } }] }), null, "thought only");
+  });
+  test("thoughtSignature on text and empty stop part (2026-11-23 Gemini 3.5 SSE shape)", () => {
+    assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ text: "OK", thoughtSignature: "Eo4BCosBAWkU==" }], role: "model" }, finishReason: "STOP", index: 0 }] }), "OK", "text with thoughtSignature");
+    assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ text: "", thoughtSignature: "Eo4BCosBAWkU==" }], role: "model" }, finishReason: "STOP", index: 0 }] }), null, "empty stop part with thoughtSignature");
   });
 });
 
@@ -333,6 +340,12 @@ suite("_pbpClaudeUsage", () => {
   test("message_delta -> output only", () => {
     assertEq(JSON.stringify(_pbpClaudeUsage({ type: "message_delta", usage: { output_tokens: 88 } })),
       JSON.stringify({ inTok: null, outTok: 88 }), "output from message_delta");
+  });
+  test("2026-11-23 live Claude 5.5 message_start + message_delta usage details", () => {
+    assertEq(JSON.stringify(_pbpClaudeUsage({ type: "message_start", message: { container: null, stop_details: null, diagnostics: null, usage: { input_tokens: 858, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 }, output_tokens: 3, service_tier: "standard", inference_geo: "global", speed: "standard" } } })),
+      JSON.stringify({ inTok: 858, outTok: null }), "live message_start");
+    assertEq(JSON.stringify(_pbpClaudeUsage({ type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null, stop_details: null, container: null }, usage: { input_tokens: 858, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 600, output_tokens_details: { thinking_tokens: 600 } } })),
+      JSON.stringify({ inTok: null, outTok: 600 }), "live message_delta");
   });
   test("content_block_delta -> null", () => {
     assertEq(_pbpClaudeUsage({ type: "content_block_delta", delta: { type: "text_delta", text: "hi" } }), null, "text chunk");
@@ -3898,9 +3911,11 @@ suite("effectiveExtraBody: provider dialect when not rejected", () => {
     }
   });
 });
-suite("effectiveExtraBody: empty when rejected or no thinkingOff", () => {
-  test("rejected zhipu -> stripped", () => {
-    assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.zhipu, true)), "{}", "rejected -> stripped");
+suite("effectiveExtraBody: fallback or empty when rejected or no thinkingOff", () => {
+  test("rejected zhipu -> low fallback, stripped once fallback also omitted", () => {
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.zhipu, true)), '{"reasoning_effort":"low"}', "zhipu rejected -> low fallback");
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.zhipu, true, true)), "{}", "zhipu fallback omitted -> stripped");
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.kimi, true)), "{}", "provider without fallback -> stripped");
   });
   test("groq has no thinkingOff", () => {
     assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.groq, false)), "{}", "groq has none");
@@ -8845,12 +8860,17 @@ suiteIf("pbpAiStatusPageUrl: status link only when the service may be down", "pb
   function ok(cond, msg) { if (!cond) throw new Error(msg || "assert"); }
   if (typeof callAIStream !== "function" || typeof pbpAiStatusPageUrl !== "function") { report("SKIP real empty stream suite (ai.js not loaded)"); return; }
   const sse = obj => "data: " + JSON.stringify(obj) + "\n\n";
+  // Empty-text SSE streams verified on 2026-11-23 against live OpenAI-compatible
+  // (Bailian / SiliconFlow), Gemini 3.5 (streamGenerateContent?alt=sse), and
+  // Anthropic Claude 5.5 (/v1/messages) responses.
   const EMPTY = {
-    deepseek: sse({ id: "chatcmpl-fixture", object: "chat.completion.chunk", created: 0, model: "fixture", choices: [{ index: 0, delta: { role: "assistant", content: "" }, finish_reason: null }] }) +
-      sse({ id: "chatcmpl-fixture", object: "chat.completion.chunk", created: 0, model: "fixture", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] }) + "data: [DONE]\n\n",
-    gemini: sse({ candidates: [{ index: 0, content: { role: "model", parts: [{ text: "" }] }, finishReason: "STOP" }] }),
-    claude: "event: message_start\n" + sse({ type: "message_start", message: { id: "msg_fixture", type: "message", role: "assistant", model: "fixture", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } }) +
-      "event: message_delta\n" + sse({ type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 0 } }) +
+    deepseek: sse({ id: "chatcmpl-142fa30e-ce2b-9c32-9fa9-1e3116b67a0f", object: "chat.completion.chunk", created: 1795407766, model: "fixture", usage: null, choices: [{ index: 0, delta: { role: "assistant", content: "" }, logprobs: null, finish_reason: null }] }) +
+      sse({ id: "chatcmpl-142fa30e-ce2b-9c32-9fa9-1e3116b67a0f", object: "chat.completion.chunk", created: 1795407768, model: "fixture", usage: null, choices: [{ index: 0, delta: { content: null }, logprobs: null, finish_reason: "stop" }] }) +
+      sse({ id: "chatcmpl-142fa30e-ce2b-9c32-9fa9-1e3116b67a0f", object: "chat.completion.chunk", created: 1795407768, model: "fixture", choices: [], usage: { prompt_tokens: 27, completion_tokens: 0, total_tokens: 27, prompt_tokens_details: { cached_tokens: 0 } } }) + "data: [DONE]\n\n",
+    gemini: sse({ candidates: [{ index: 0, content: { role: "model", parts: [{ text: "", thoughtSignature: "Eo4BCosBAWkUfRPldB==" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 0, totalTokenCount: 12, promptTokensDetails: [{ modality: "TEXT", tokenCount: 12 }], serviceTier: "standard" }, modelVersion: "gemini-3.5-flash-lite", responseId: "scEDa7qgO5qv8L0PyMbf6AI" }),
+    claude: "event: message_start\n" + sse({ type: "message_start", message: { model: "claude-haiku-5-5", id: "msg_011ChKFTG9JsevPv6hue2q1W", type: "message", role: "assistant", content: [], container: null, stop_reason: null, stop_sequence: null, stop_details: null, usage: { input_tokens: 13, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 }, output_tokens: 0, service_tier: "standard", inference_geo: "global", speed: "standard" }, diagnostics: null } }) +
+      "event: ping\n" + sse({ type: "ping" }) +
+      "event: message_delta\n" + sse({ type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null, stop_details: null, container: null }, usage: { input_tokens: 13, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0, output_tokens_details: { thinking_tokens: 0 } } }) +
       "event: message_stop\n" + sse({ type: "message_stop" })
   };
   const SETTINGS = {

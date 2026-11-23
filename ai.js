@@ -228,12 +228,14 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
 // (rules/ai-providers.md: the model field is free text), and consumed by the
 // body-dialect self-heal below.
 const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature", "reasoning_effort", "response_format",
-  "thinking", "enable_thinking", "thinkingBudget", "thinkingConfig", "reasoning"];
+  "thinking", "enable_thinking", "thinkingBudget", "thinkingLevel", "thinkingConfig", "reasoning"];
 // "The server does not accept this parameter AT ALL", as opposed to "the value
 // you sent is out of range" — the distinction the whole self-heal turns on.
 // "Deprecated for this model" is the same refusal ("`temperature` is deprecated
-// for this model." from a Messages API behind a compatible gateway).
-const _AI_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field)|extra\s+inputs|\bdeprecated\b/;
+// for this model." from a Messages API behind a compatible gateway); Protobuf
+// REST validators say `Unknown name "<field>"`, and Chinese providers return
+// localized refusal text.
+const _AI_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field|name)|extra\s+inputs|\bdeprecated\b|不(?:受)?支持|未知参数|非法参数/;
 function _aiRejectedParam(body, detail) {
   const param = String((body && body.error && body.error.param) || "").trim();
   // Some compatible APIs enumerate only text/json_object and reject the
@@ -255,11 +257,16 @@ function _aiRejectedParam(body, detail) {
     .find(p => param === p || param.startsWith(p + ".") || new RegExp("\\b" + p + "\\b", "i").test(detail));
   if (thinkingParam && (!param || param === thinkingParam || param.startsWith(thinkingParam + ".")) &&
       /not\s+(?:supported|allowed)|unsupported|cannot\s+(?:be\s+)?(?:disabled|zero)|must\s+be\s+(?:true|enabled)|only\s+(?:supports?|allows?)|restricted\s+to\s+true|(?:expected|must\s+be|should\s+be)\s+one\s+of/.test(detail)) return thinkingParam;
-  // Gemini's own wording for a thinking-only model refusing thinkingBudget:0
-  // never says "unsupported": "Budget 0 is invalid. This model only works in
-  // thinking mode." The anchors keep this to the budget; a bare 400 is not it.
+  // Chinese mandatory-thinking endpoints (e.g. Zhipu glm-5.3-flash code 1210:
+  // "该模型始终思考，不支持关闭思考；请使用 low、high 或 max。") omit error.param
+  // and name thinking only in Chinese.
+  if ((!param || param === "thinking" || param.startsWith("thinking.") || param === "enable_thinking") &&
+      /(?:始终(?:启用)?(?:深度)?思考|不支持(?:关闭|禁用)(?:深度)?思考|(?:关闭|禁用)(?:深度)?思考[^。；;]{0,20}不支持)/.test(detail)) return "thinking";
+  // Gemini's own wording for a model refusing thinkingBudget / thinkingLevel
+  // ("Budget 0 is invalid. This model only works in thinking mode.", or a
+  // thinkingLevel refusal). The anchors keep this to thinkingConfig; bare 400s do not match.
   if ((!param || param.startsWith("thinkingConfig")) &&
-      /\bbudget\s+0\s+is\s+invalid\b|\bonly\s+works\s+in\s+thinking\s+mode\b|\bthinking\s*budget\b[^.]{0,60}\b(?:not\s+supported|unsupported)\b/.test(detail)) return "thinkingBudget";
+      /\bbudget\s+0\s+is\s+invalid\b|\bonly\s+works\s+in\s+thinking\s+mode\b|\bthinking\s*(?:budget|level)\b[^.]{0,60}\b(?:not\s+supported|unsupported|invalid)\b/.test(detail)) return "thinkingConfig";
   // The wording gate guards BOTH routes below, error.param included. That field
   // is filled for ANY parameter-level validation error, range errors among them
   // ("max_tokens is too large: this model supports at most 4096 completion
@@ -372,7 +379,7 @@ const OPENAI_COMPAT_PROVIDERS = {
   mistral: { keyField: "mistralApiKey", base: "https://api.mistral.ai/v1", modelField: "mistralModel", defaultModel: "mistral-small-latest", thinkingOff: { reasoning_effort: "none" } },
   cohere: { keyField: "cohereApiKey", base: "https://api.cohere.ai/compatibility/v1", modelField: "cohereModel", defaultModel: "command-r7b-12-2024", thinkingOff: { reasoning_effort: "none" } },
   siliconflow: { keyField: "siliconflowApiKey", base: "https://api.siliconflow.cn/v1", modelField: "siliconflowModel", defaultModel: "deepseek-ai/DeepSeek-V4.1-Flash", thinkingOff: { enable_thinking: false } },
-  zhipu: { keyField: "zhipuApiKey", base: "https://open.bigmodel.cn/api/paas/v4", modelField: "zhipuModel", defaultModel: "glm-5.3-flash", thinkingOff: { thinking: { type: "disabled" } } },
+  zhipu: { keyField: "zhipuApiKey", base: "https://open.bigmodel.cn/api/paas/v4", modelField: "zhipuModel", defaultModel: "glm-5.3-flash", thinkingOff: { thinking: { type: "disabled" } }, thinkingFallback: { reasoning_effort: "low" } },  // GLM-5.3+ requires thinking and defaults to max; fall back to low after disabled is refused.
   kimi: { keyField: "kimiApiKey", base: "https://api.moonshot.cn/v1", modelField: "kimiModel", defaultModel: "kimi-k3.1-pro", thinkingOff: { thinking: { type: "disabled" } } },
   ark: { keyField: "arkApiKey", base: "https://ark.cn-beijing.volces.com/api/v3", modelField: "arkModel", defaultModel: "doubao-seed-2-1-lite-260915", thinkingOff: { thinking: { type: "disabled" } }, regionField: "arkRegion", regions: { cn: "https://ark.cn-beijing.volces.com/api/v3", intl: "https://ark.ap-southeast.bytepluses.com/api/v3" } },  // Volcengine Ark; intl = BytePlus ModelArk (a separate account; model IDs differ). thinkingOff per Ark's deep-thinking doc
   opencode: { keyField: "opencodeApiKey", base: "https://opencode.ai/inference/openai/v1", modelField: "opencodeModel", defaultModel: "glm-5.3-flash", protocolField: "opencodeProtocol", anthropicBase: "https://opencode.ai/inference/anthropic/v1" },  // no thinkingOff: a gateway forwarding to upstream models whose dialects differ
@@ -597,7 +604,8 @@ function _aiEffectiveExtraBody(cfg, thinkRejected, omitThinkingFallback = false)
 }
 function _aiThinkingParamMatches(body, hint) {
   return !!hint && !!body && (Object.hasOwn(body, hint) ||
-    ((hint === "thinkingBudget" || hint === "thinking") && Object.hasOwn(body, "thinkingConfig")));
+    ((hint === "thinkingBudget" || hint === "thinkingLevel" || hint === "thinking") && Object.hasOwn(body, "thinkingConfig")) ||
+    (hint === "thinking" && (Object.hasOwn(body, "enable_thinking") || Object.hasOwn(body, "reasoning"))));
 }
 function _aiShouldRetryNoThink(cfg, thinkRejected, error) {
   return !thinkRejected && [400, 422].includes(error?.status) && _aiThinkingParamMatches(cfg?.thinkingOff, error?.paramHint);
@@ -1176,18 +1184,16 @@ async function _aiReadCompletion(res, protocol, opts) {
   return text;
 }
 
-// Non-streaming Gemini rides the same thinking-off self-heal as the OpenAI-
-// compat table. Every OTHER default-thinking provider already disables
-// reasoning on the tags/summary path, but the bespoke Gemini caller sent no
-// thinkingConfig — and gemini IS the default provider, so quick-save/batch
-// users paid reasoning tokens (and latency) on every request. The field is the
-// verified bespoke dialect (rules/ai-providers.md: thinkingConfig.thinkingBudget:0);
-// models that reject a zero budget (e.g. gemini-2.5-pro) heal via the shared
-// 400/422 strip-and-retry with the per-model memo — never a static allowlist,
-// because the model field is free text.
+// Non-streaming Gemini rides the same low-thinking self-heal as the OpenAI-
+// compat table. Gemini 3.5+ (including gemini-3.5-flash-lite, the shipped
+// default) rejected legacy thinkingBudget:0 with HTTP 400 INVALID_ARGUMENT;
+// thinkingConfig.thinkingLevel:"low" is supported across Gemini 2.5, 3.x and 4.x
+// (aistudio.google.com/docs/thinking), and older non-thinking models heal via
+// the shared 400/422 strip-and-retry with the per-model memo — never a static
+// allowlist, because the model field is free text.
 // bespokeBody: generationConfig, not the OpenAI-compat body — the token-field /
 // temperature repairs below have nothing to rewrite here and must not be tried.
-const _GEMINI_THINKING_CFG = { thinkingOff: { thinkingConfig: { thinkingBudget: 0 } }, bespokeBody: true,
+const _GEMINI_THINKING_CFG = { thinkingOff: { thinkingConfig: { thinkingLevel: "low" } }, bespokeBody: true,
   endpoint: "https://generativelanguage.googleapis.com/v1beta" };
 
 async function callGemini(s, prompt, opts = {}) {
@@ -1965,7 +1971,7 @@ async function _streamGemini(s, prompt, opts, onDelta) {
   // opts.noThinking alone stays the fallback for a caller reaching this
   // function without that wrapper.
   if (opts.extraBody && opts.extraBody.thinkingConfig) generationConfig.thinkingConfig = opts.extraBody.thinkingConfig;
-  else if (opts.noThinking && !opts.extraBody) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  else if (opts.noThinking && !opts.extraBody) generationConfig.thinkingConfig = { thinkingLevel: "low" };
   const imgs = _aiNormalizeImages(opts);
   const parts = imgs
     ? [...imgs.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.base64 } })), { text: prompt }]

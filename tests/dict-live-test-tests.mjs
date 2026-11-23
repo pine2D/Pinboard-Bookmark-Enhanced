@@ -212,15 +212,16 @@ test("diagnostic answer reports exclude reasoning and provider error fields whil
   assert.ok(!serialized.includes(secret)); assert.ok(!serialized.includes("PRIVATE_"));
   assert.equal(completionReport({ error: { message: "PRIVATE_ERROR" } }), null);
 });
-// Handwritten chat.completion.chunk wire bodies (OpenAI streaming reference),
-// written here as literal text, not by the rehearsal fixture's writer.
+// Handwritten chat.completion.chunk wire bodies verified on 2026-11-23 against
+// live Bailian, MiniMax, SiliconFlow, and Command Code SSE streams, written
+// here as literal text (not by the rehearsal fixture's writer).
 const SSE_ANSWER = ': OPENROUTER PROCESSING\r\n\r\n' +
-  'data: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}\n\n' +
-  'data: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{"reasoning_content":"PRIVATE_REASONING","reasoning":"PRIVATE_REASONING"},"finish_reason":null}]}\n\n' +
-  'event: message\nid: 7\ndata: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{"content":"{\\"word\\":\\"pro"},"finish_reason":null}]}\n\n' +
-  'data: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{"content":"vider\\"}"},"finish_reason":null}]}\n\n' +
-  'data: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n' +
-  'data: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[],"usage":{"prompt_tokens":100,"completion_tokens":40,"total_tokens":140,"completion_tokens_details":{"reasoning_tokens":12}}}\n\n' +
+  'data: {"id":"chatcmpl-142fa30e","object":"chat.completion.chunk","created":1795407766,"model":"m","usage":null,"choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}]}\n\n' +
+  'data: {"id":"chatcmpl-142fa30e","object":"chat.completion.chunk","created":1795407766,"model":"m","usage":null,"choices":[{"index":0,"delta":{"reasoning_content":"PRIVATE_REASONING","reasoning":"PRIVATE_REASONING"},"logprobs":null,"finish_reason":null}]}\n\n' +
+  'event: message\nid: 7\ndata: {"id":"chatcmpl-142fa30e","object":"chat.completion.chunk","created":1795407766,"model":"m","usage":null,"choices":[{"index":0,"delta":{"content":"{\\"word\\":\\"pro"},"logprobs":null,"finish_reason":null}]}\n\n' +
+  'data: {"id":"chatcmpl-142fa30e","object":"chat.completion.chunk","created":1795407766,"model":"m","usage":null,"choices":[{"index":0,"delta":{"content":"vider\\"}"},"logprobs":null,"finish_reason":null}]}\n\n' +
+  'data: {"id":"chatcmpl-142fa30e","object":"chat.completion.chunk","created":1795407768,"model":"m","usage":null,"choices":[{"index":0,"delta":{"content":null},"logprobs":null,"finish_reason":"stop"}]}\n\n' +
+  'data: {"id":"chatcmpl-142fa30e","object":"chat.completion.chunk","created":1795407768,"model":"m","choices":[],"usage":{"prompt_tokens":100,"completion_tokens":40,"total_tokens":140,"prompt_tokens_details":{"cached_tokens":0},"completion_tokens_details":{"reasoning_tokens":12}}}\n\n' +
   'data: [DONE]\n\n';
 test("a streamed answer is folded into the same diagnostics without keeping reasoning text", () => {
   const body = streamCompletion(SSE_ANSWER), info = completionMetadata(body);

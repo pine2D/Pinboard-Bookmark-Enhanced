@@ -34,11 +34,16 @@ _pbpVocabAcceptLookupResult=()=>{};
 globalThis.fetch=async(_url,init)=>{
   headers.push(new Headers(init.headers).get('Authorization'));
   if(headers.at(-1)!=='Bearer '+expectedKey)return new Response('{"error":{"message":"Invalid fixture credentials"}}',{status:401});
-  // Dictionary generation streams (plan 2.7): a handwritten OpenAI-compatible
-  // chat.completion.chunk stream (content chunk, separate finish chunk, [DONE]).
-  const chunk=(delta,finish)=>'data: '+JSON.stringify({id:'chatcmpl-fixture',object:'chat.completion.chunk',created:0,model:'arbitrary-model',choices:[{index:0,delta,finish_reason:finish}]})+'\n\n';
-  return new Response(chunk({role:'assistant',content:'{"word":"provider","language":"en","pronunciation":"","meanings":[{"partOfSpeech":"noun","definition":"One who provides.","examples":[]}],"learning":{"version":2,"formation":"","history":"","related":[]}}'},null)+
-    chunk({},'stop')+'data: [DONE]\n\n',{status:200,headers:{'Content-Type':'text/event-stream'}});
+  // Dictionary generation streams (plan 2.7): handwritten OpenAI-compatible
+  // chat.completion.chunk stream verified on 2026-11-23 against live Bailian /
+  // SiliconFlow SSE responses (role chunk, content chunk, stop chunk, usage chunk, [DONE]).
+  const chunk=(choices,usage=null)=>'data: '+JSON.stringify({id:'chatcmpl-142fa30e-ce2b-9c32-9fa9-1e3116b67a0f',object:'chat.completion.chunk',created:1795407766,model:'arbitrary-model',choices,usage})+'\n\n';
+  return new Response(
+    chunk([{index:0,delta:{role:'assistant',content:''},logprobs:null,finish_reason:null}])+
+    chunk([{index:0,delta:{content:'{"word":"provider","language":"en","pronunciation":"","meanings":[{"partOfSpeech":"noun","definition":"One who provides.","examples":[]}],"learning":{"version":2,"formation":"","history":"","related":[]}}'},logprobs:null,finish_reason:null}])+
+    chunk([{index:0,delta:{content:null},logprobs:null,finish_reason:'stop'}])+
+    chunk([],{prompt_tokens:540,completion_tokens:42,total_tokens:582,prompt_tokens_details:{cached_tokens:0}})+
+    'data: [DONE]\n\n',{status:200,headers:{'Content-Type':'text/event-stream;charset=utf-8'}});
 };
 function reset(mode){
   controllers.forEach(ctrl=>ctrl.abort());controllers=[];listeners=new Set(baselineListeners);

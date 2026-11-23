@@ -213,6 +213,8 @@ export const AI_PROVIDERS = deepFreeze([
     modelField: "zhipuModel",
     defaultModel: "glm-5.3-flash",
     thinkingOff: { thinking: { type: "disabled" } },
+    thinkingFallback: { reasoning_effort: "low" },
+    comment: "GLM-5.3+ requires thinking and defaults to max; fall back to low after disabled is refused.",
   },
   {
     id: "kimi",

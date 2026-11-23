@@ -25,42 +25,58 @@ const USAGE = { language: 'zh-Hans', summary: null, items: { sense: '1', title: 
 const sse = events => events.map(event => (event.event ? 'event: ' + event.event + '\n' : '') + 'data: ' +
   (typeof event.data === 'string' ? event.data : JSON.stringify(event.data)) + '\n\n').join('');
 const split = text => [text.slice(0, 15), text.slice(15)];
-const openAiChunk = (model, delta, finish) => ({ id: 'chatcmpl-fixture', object: 'chat.completion.chunk', created: 0, model,
-  choices: [{ index: 0, delta, finish_reason: finish }] });
-// An OpenAI-compatible stream: role chunk, content chunks, a separate finish
-// chunk with an empty delta, then [DONE]. finish is the finish_reason.
+const openAiChunk = (model, delta, finish, usage = null) => ({ id: 'chatcmpl-142fa30e-ce2b-9c32-9fa9-1e3116b67a0f', object: 'chat.completion.chunk', created: 1795407766, model,
+  choices: [{ index: 0, delta, logprobs: null, finish_reason: finish === undefined ? null : finish }], usage });
+// OpenAI-compatible SSE stream verified on 2026-11-23 against live Bailian /
+// MiniMax / SiliconFlow responses: role chunk, reasoning chunk, content chunks,
+// stop chunk, trailing usage chunk, then [DONE].
 const openAiStream = (model, text, finish) => sse([
   { data: openAiChunk(model, { role: 'assistant', content: '' }, null) },
+  { data: openAiChunk(model, { role: 'assistant', reasoning_content: 'Not an answer or a dictionary field.' }, null) },
   ...split(text).map(part => ({ data: openAiChunk(model, { content: part }, null) })),
-  { data: openAiChunk(model, {}, finish) }, { data: '[DONE]' }]);
+  { data: openAiChunk(model, { content: '' }, finish) },
+  { data: { id: 'chatcmpl-142fa30e-ce2b-9c32-9fa9-1e3116b67a0f', object: 'chat.completion.chunk', created: 1795407768, model, choices: [],
+    usage: { prompt_tokens: 540, completion_tokens: 135, total_tokens: 675, prompt_tokens_details: { cached_tokens: 0 } } } },
+  { data: '[DONE]' }]);
 const PROTOCOLS = [
-  { name: 'OpenAI-compatible', model: 'arbitrary-protocol-model-a', contentType: 'text/event-stream',
+  { name: 'OpenAI-compatible', model: 'arbitrary-protocol-model-a', contentType: 'text/event-stream;charset=utf-8',
     settings: { aiProvider: 'custom', customBaseUrl: 'https://example.test/v1', customApiKey: 'fixture', customModel: 'arbitrary-protocol-model-a' },
     envelope: (text, truncated) => openAiStream('arbitrary-protocol-model-a', text, truncated ? 'length' : 'stop') },
+  // Gemini streamGenerateContent?alt=sse wire shape verified on 2026-11-23
+  // against live gemini-3.5-flash-lite (cumulative usageMetadata with
+  // promptTokensDetails/serviceTier, responseId, and thoughtSignature on final part).
   { name: 'Gemini', model: 'arbitrary-protocol-model-b', contentType: 'text/event-stream',
     settings: { aiProvider: 'gemini', geminiApiKey: 'fixture', geminiModel: 'arbitrary-protocol-model-b' },
     envelope: (text, truncated) => sse([
-      { data: { candidates: [{ content: { role: 'model', parts: [{ text: 'Not an answer or a dictionary field.', thought: true }] }, index: 0 }],
-        modelVersion: 'arbitrary-protocol-model-b' } },
-      ...split(text).map(part => ({ data: { candidates: [{ content: { role: 'model', parts: [{ text: part }] }, index: 0 }],
-        modelVersion: 'arbitrary-protocol-model-b' } })),
-      { data: { candidates: [{ content: { role: 'model', parts: [{ text: '' }] }, finishReason: truncated ? 'MAX_TOKENS' : 'STOP', index: 0 }],
-        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 5, totalTokenCount: 6 }, modelVersion: 'arbitrary-protocol-model-b' } }]) },
+      { data: { candidates: [{ content: { parts: [{ text: 'Not an answer or a dictionary field.', thought: true }], role: 'model' }, index: 0 }],
+        usageMetadata: { promptTokenCount: 515, candidatesTokenCount: 0, totalTokenCount: 515, promptTokensDetails: [{ modality: 'TEXT', tokenCount: 515 }], serviceTier: 'standard' },
+        modelVersion: 'arbitrary-protocol-model-b', responseId: 'scEDa7qgO5qv8L0PyMbf6AI' } },
+      ...split(text).map((part, idx) => ({ data: { candidates: [{ content: { parts: [{ text: part }], role: 'model' }, index: 0 }],
+        usageMetadata: { promptTokenCount: 515, candidatesTokenCount: (idx + 1) * 3, totalTokenCount: 515 + (idx + 1) * 3, promptTokensDetails: [{ modality: 'TEXT', tokenCount: 515 }], serviceTier: 'standard' },
+        modelVersion: 'arbitrary-protocol-model-b', responseId: 'scEDa7qgO5qv8L0PyMbf6AI' } })),
+      { data: { candidates: [{ content: { parts: [{ text: '', thoughtSignature: 'Eo4BCosBAWkUfRPldB==' }], role: 'model' }, finishReason: truncated ? 'MAX_TOKENS' : 'STOP', index: 0 }],
+        usageMetadata: { promptTokenCount: 515, candidatesTokenCount: 6, totalTokenCount: 521, promptTokensDetails: [{ modality: 'TEXT', tokenCount: 515 }], serviceTier: 'standard' },
+        modelVersion: 'arbitrary-protocol-model-b', responseId: 'scEDa7qgO5qv8L0PyMbf6AI' } }]) },
+  // Anthropic /v1/messages SSE wire shape verified on 2026-11-23 against live
+  // claude-haiku-5-5 via Command Code (container/stop_details/diagnostics nulls,
+  // cache_creation & output_tokens_details.thinking_tokens, thinking block +
+  // ping + signature_delta before text block).
   { name: 'Claude', model: 'arbitrary-protocol-model-c', contentType: 'text/event-stream',
     settings: { aiProvider: 'claude', claudeApiKey: 'fixture', claudeModel: 'arbitrary-protocol-model-c' },
     envelope: (text, truncated) => sse([
-      { event: 'message_start', data: { type: 'message_start', message: { id: 'msg_fixture', type: 'message', role: 'assistant',
-        model: 'arbitrary-protocol-model-c', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } } },
+      { event: 'message_start', data: { type: 'message_start', message: { model: 'arbitrary-protocol-model-c', id: 'msg_011ChKFTG9JsevPv6hue2q1W', type: 'message', role: 'assistant',
+        content: [], container: null, stop_reason: null, stop_sequence: null, stop_details: null,
+        usage: { input_tokens: 858, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 }, output_tokens: 3, service_tier: 'standard', inference_geo: 'global', speed: 'standard' }, diagnostics: null } } },
       { event: 'content_block_start', data: { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } } },
+      { event: 'ping', data: { type: 'ping' } },
       { event: 'content_block_delta', data: { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'Not an answer or a dictionary field.' } } },
-      { event: 'content_block_delta', data: { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'synthetic' } } },
+      { event: 'content_block_delta', data: { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'CAQS3BEKEAgUGAI4AUIIdGhpbmtpbmc=' } } },
       { event: 'content_block_stop', data: { type: 'content_block_stop', index: 0 } },
       { event: 'content_block_start', data: { type: 'content_block_start', index: 1, content_block: { type: 'text', text: '' } } },
-      { event: 'ping', data: { type: 'ping' } },
       ...split(text).map(part => ({ event: 'content_block_delta', data: { type: 'content_block_delta', index: 1, delta: { type: 'text_delta', text: part } } })),
       { event: 'content_block_stop', data: { type: 'content_block_stop', index: 1 } },
-      { event: 'message_delta', data: { type: 'message_delta', delta: { stop_reason: truncated ? 'max_tokens' : 'end_turn', stop_sequence: null },
-        usage: { output_tokens: 5 } } },
+      { event: 'message_delta', data: { type: 'message_delta', delta: { stop_reason: truncated ? 'max_tokens' : 'end_turn', stop_sequence: null, stop_details: null, container: null },
+        usage: { input_tokens: 858, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 120, output_tokens_details: { thinking_tokens: 12 } } } },
       { event: 'message_stop', data: { type: 'message_stop' } }]) },
   { name: 'Ollama', model: 'arbitrary-protocol-model-d', contentType: 'application/x-ndjson',
     settings: { aiProvider: 'ollama', ollamaBaseUrl: 'http://127.0.0.1:11434', ollamaModel: 'arbitrary-protocol-model-d' },

@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="114"><title>dict-entry Tests</title><style>body{font-family:monospace;padding:16px}.pass{color:green}.fail{color:red}.case{white-space:pre-wrap;padding:4px}</style></head><body><h1>Reusable AI dictionary entries</h1><div id="results"></div><div id="summary"></div>
+<!doctype html><html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="115"><title>dict-entry Tests</title><style>body{font-family:monospace;padding:16px}.pass{color:green}.fail{color:red}.case{white-space:pre-wrap;padding:4px}</style></head><body><h1>Reusable AI dictionary entries</h1><div id="results"></div><div id="summary"></div>
 <script src="../i18n.js"></script><script src="../shared.js"></script><script src="../ai.js"></script>
 <script>
 let owner='acct_test',calls=[],writes=[],reads=[],cache=new Map(),answer='',beforeGet=null,beforeAI=null,beforeDispatch=null,beforeOwner=null,beforeSet=null,live=true,keyAvailable=true,setReceipt=true,getFailure=false,setFailure=false,evidence=[],evidenceFailure=null,detectedLanguage=null,languageChecks=[];
@@ -520,6 +520,17 @@ await test('1A.4 a four-sense charge entry survives parse, save and re-read, and
     const read=await api.roundTripNormalized(record,supplement),item=read.supplements?.[0]?.learning?.items?.[0];
     return outOfRange&&read.entry.meanings.length===4&&item?.sense===4&&read.entry.meanings[item.sense-1].definition.includes('充电');
   }finally{frame.remove();}
+});
+// Live synthetic dictionary entry captured on 2026-11-23 via authorized Batch 3A
+// contract verification (Bailian qwen3.8-flash / SiliconFlow DeepSeek-V4.1-Flash).
+const LIVE_CONSTRAINT_RESPONSE_20261123=JSON.stringify({word:'constraint',language:'en',pronunciation:'/kənˈstreɪnt/',meanings:[
+  {partOfSpeech:'名词',definition:'限制或约束，指对行动、发展或选择施加的强制性界限或条件。',examples:[{text:'Budget constraints forced us to cancel the project.',translation:'预算限制迫使我们取消了该项目。'}]},
+  {partOfSpeech:'名词',definition:'拘束，局促；因不自然或克制而表现出的不自在。',examples:[{text:'She spoke with a certain constraint.',translation:'她说话时带有某种拘束感。'}]}]});
+await test('live-captured 2026-11-23 constraint entry parses, caches and re-reads cleanly',async()=>{
+  reset();answer=LIVE_CONSTRAINT_RESPONSE_20261123;streamPhases=['streaming'];
+  const req=request({term:'constraint',sourceLanguage:'en',target:{name:'简体中文',lang:'zh-Hans'}});
+  const r=await pbpDictEntryRun(req),again=await pbpDictEntryRead(req);
+  return r.cacheSaved&&r.entry.word==='constraint'&&r.entry.meanings.length===2&&again?.entry.meanings[1].definition.includes('拘束')&&calls.length===1;
 });
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();

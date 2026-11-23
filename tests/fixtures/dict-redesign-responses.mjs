@@ -1,15 +1,19 @@
 // Handwritten server-shaped responses for the OFFLINE redesign rehearsal:
-// OpenAI chat.completion envelopes and MediaWiki api.php (formatversion=2)
-// bodies, written by hand from the public response formats. Nothing here is
-// produced by production constructors, and nothing is a live model result.
+// OpenAI-compatible chat.completion envelopes (verified on 2026-11-23 against
+// live Bailian, SiliconFlow, and Command Code gateway responses, including
+// upstream served-model alias behavior) and MediaWiki api.php (formatversion=2,
+// verified on 2026-11-23 against live en/zh/ja.wikisource and en.wiktionary)
+// bodies. Nothing here is produced by production constructors.
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 let sequence = 0;
-// mimo's gateway answers under an upstream alias (as some OpenAI-compatible
-// gateways do): the probe records it, freeze registers it, full accepts it.
+// mimo's gateway answers under an upstream alias (matching live Command Code
+// returning upstream model IDs such as "deepseek/deepseek-v4.1-flash"): the
+// probe records it, freeze registers it, full accepts it.
 const SERVED = { "commandcode/mimo-v2.6-pro": "xiaomi/mimo-v2.6-pro-preview" };
 const completion = (model, content, finish = "stop", usage = { prompt_tokens: 900, completion_tokens: 320, total_tokens: 1220 }, served = SERVED[model] ?? model) => json(200, {
-  id: "chatcmpl-rehearsal-" + (++sequence), object: "chat.completion", created: 1792972800, model: served,
-  choices: [{ index: 0, finish_reason: finish, message: { role: "assistant", content } }], usage });
+  id: "chatcmpl-rehearsal-" + (++sequence), object: "chat.completion", created: 1795407770, model: served, system_fingerprint: "",
+  choices: [{ index: 0, logprobs: null, finish_reason: finish, message: { role: "assistant", content: content === undefined ? "" : content } }],
+  usage: { prompt_tokens_details: { cached_tokens: 0 }, ...usage } });
 
 const ENTRY = {
   provider: ["名词", "提供服务、物品或资源的人或机构。", "Our internet provider is down.", "我们的网络服务商出故障了。"],

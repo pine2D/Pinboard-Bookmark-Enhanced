@@ -1,11 +1,11 @@
 // Handwritten OpenAI-compatible chat completion responses for the offline
 // rehearsal of scripts/dict-redesign-test-r2.mjs (word "charge", en ->
-// zh-Hans). They are independent of the production prompts, parsers and
-// archive constructors: each answer is written the way a model returns it
-// for the arm's schema (confusables without sourceIndex, etymology without
-// example/translation), so the product's own response normalization runs.
-const completion = (id, created, content, usage) => ({ id, object: "chat.completion", created, model: "rehearsal/model-a",
-  choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: JSON.stringify(content) } }], usage });
+// zh-Hans), envelope-verified on 2026-11-23 against live Bailian, SiliconFlow,
+// and Command Code responses. They remain independent of production prompts,
+// parsers and archive constructors.
+const completion = (id, created, content, usage) => ({ id, object: "chat.completion", created, model: "rehearsal/model-a", system_fingerprint: "",
+  choices: [{ index: 0, logprobs: null, finish_reason: "stop", message: { role: "assistant", content: JSON.stringify(content) } }],
+  usage: { prompt_tokens_details: { cached_tokens: 0 }, completion_tokens_details: { reasoning_tokens: 0 }, ...usage } });
 
 export const entryResponse = completion("r2-entry-fixture", 1793059200, {
   word: "charge", language: "en", pronunciation: "/tʃɑːdʒ/",

@@ -67,16 +67,29 @@ function makeStore(initial) {
 }
 
 // ---- Hand-written provider payloads (real server shapes) --------------------
-// OpenAI /v1/chat/completions success envelope, trimmed to the fields the caller
-// reads plus the ones a real reply always carries.
+// OpenAI-compatible /chat/completions success envelope, verified on 2026-11-23
+// against live Bailian (qwen3.8-flash), MiniMax (MiniMax-M3.1-Flash), and
+// SiliconFlow (deepseek-ai/DeepSeek-V4.1-Flash) responses.
 function openaiChatReply(content) {
   return {
-    id: "chatcmpl-9pbp01",
+    id: "chatcmpl-d3024f75-1ff9-95bd-aa35-280c50cdeedf",
     object: "chat.completion",
-    created: 1758000000,
-    model: "gpt-5.4-nano",
-    choices: [{ index: 0, message: { role: "assistant", content }, logprobs: null, finish_reason: "stop" }],
-    usage: { prompt_tokens: 812, completion_tokens: 44, total_tokens: 856 },
+    created: 1795407766,
+    model: "gpt-6-luna",
+    choices: [{
+      index: 0,
+      message: { role: "assistant", content: content === undefined ? "" : content },
+      logprobs: null,
+      finish_reason: "stop",
+    }],
+    usage: {
+      prompt_tokens: 812,
+      completion_tokens: 44,
+      total_tokens: 856,
+      prompt_tokens_details: { cached_tokens: 0 },
+      completion_tokens_details: { reasoning_tokens: 0 },
+    },
+    system_fingerprint: "",
   };
 }
 function jsonResponse(status, body) {
