@@ -154,7 +154,8 @@ try {
       }
       if (name === 'editor' && key.startsWith('platinum-')) {
         const ptFormProbe = await page.evaluate(() => {
-          const cb = document.querySelector('#edit_bookmark_form input[type="checkbox"]');
+          const form = document.querySelector('#edit_bookmark_form');
+          const cb = form.querySelector('input[type="checkbox"]');
           const restCs = getComputedStyle(cb);
           const restRadius = parseFloat(restCs.borderTopLeftRadius);
           cb.checked = true;
@@ -164,16 +165,199 @@ try {
           const indetBg = getComputedStyle(cb).backgroundColor;
           const indetDash = parseFloat(getComputedStyle(cb, '::after').borderTopWidth);
           cb.indeterminate = false;
-          const scrollbarColor = getComputedStyle(document.documentElement).scrollbarColor;
-          return { restRadius, checkedBg, indetBg, indetDash, scrollbarColor };
+
+          // Verify [hidden] attribute immunity, real-color disabled contract, and select boundary rules
+          const probeHost = document.createElement('div');
+          probeHost.innerHTML = `
+            <input type="checkbox" id="pt-hid-cb" hidden>
+            <input type="radio" id="pt-hid-rd" hidden>
+            <input type="checkbox" id="pt-dis-cb" checked disabled>
+            <input type="submit" id="pt-dis-sub" value="Save" disabled>
+            <select id="pt-single-sel" style="width:140px"><option>Gray</option></select>
+            <select id="pt-dis-sel" disabled><option>Disabled</option></select>
+            <select id="pt-aria-dis-sel" aria-disabled="true"><option>AriaDisabled</option></select>
+            <select id="pt-multi-s1" multiple size="1"><option>One</option></select>
+            <select id="pt-zero-sz" size="0"><option>Zero</option></select>
+            <select id="pt-two-sz" size="2"><option>Two</option></select>
+            <select id="pt-lead-two-sz" size="02"><option>LeadTwo</option></select>
+          `;
+          form.appendChild(probeHost);
+          const hidCbRect = document.getElementById('pt-hid-cb').getBoundingClientRect();
+          const hidRdRect = document.getElementById('pt-hid-rd').getBoundingClientRect();
+          const disCb = document.getElementById('pt-dis-cb');
+          const disCbCs = getComputedStyle(disCb);
+          const disSub = document.getElementById('pt-dis-sub');
+          const disSubCs = getComputedStyle(disSub);
+          const disSel = document.getElementById('pt-dis-sel');
+          const disSelCs = getComputedStyle(disSel);
+          const ariaDisSelCs = getComputedStyle(document.getElementById('pt-aria-dis-sel'));
+          const singleSelCs = getComputedStyle(document.getElementById('pt-single-sel'));
+          const multiS1Cs = getComputedStyle(document.getElementById('pt-multi-s1'));
+          const zeroSzCs = getComputedStyle(document.getElementById('pt-zero-sz'));
+          const twoSzCs = getComputedStyle(document.getElementById('pt-two-sz'));
+          const leadTwoSzCs = getComputedStyle(document.getElementById('pt-lead-two-sz'));
+          const out = {
+            restRadius,
+            checkedBg,
+            indetBg,
+            indetDash,
+            scrollbarColor: getComputedStyle(document.documentElement).scrollbarColor,
+            hidCbW: hidCbRect.width,
+            hidRdW: hidRdRect.width,
+            disCbOpacity: disCbCs.opacity,
+            disCbShadow: disCbCs.boxShadow,
+            disCbBg: disCbCs.backgroundColor,
+            disCbMark: getComputedStyle(disCb, '::after').borderBottomColor,
+            disSubOpacity: disSubCs.opacity,
+            disSubShadow: disSubCs.boxShadow,
+            disSelOpacity: disSelCs.opacity,
+            disSelShadow: disSelCs.boxShadow,
+            ariaDisSelBg: ariaDisSelCs.backgroundColor,
+            ariaDisSelShadow: ariaDisSelCs.boxShadow,
+            singleSelPos: singleSelCs.backgroundPosition,
+            multiS1App: multiS1Cs.appearance,
+            multiS1Shadow: multiS1Cs.boxShadow,
+            zeroSzApp: zeroSzCs.appearance,
+            zeroSzShadow: zeroSzCs.boxShadow,
+            twoSzApp: twoSzCs.appearance,
+            twoSzShadow: twoSzCs.boxShadow,
+            leadTwoApp: leadTwoSzCs.appearance,
+            leadTwoShadow: leadTwoSzCs.boxShadow,
+          };
+          probeHost.remove();
+          return out;
         });
         checks++;
         const wantPressedBg = key === 'platinum-dark' ? 'rgb(22, 22, 22)' : 'rgb(102, 102, 102)';
+        const wantDisBg = key === 'platinum-dark' ? 'rgb(44, 44, 44)' : 'rgb(204, 204, 204)';
+        const wantDisFg = key === 'platinum-dark' ? 'rgb(194, 194, 194)' : 'rgb(77, 77, 77)';
         if (ptFormProbe.scrollbarColor !== 'auto' || ptFormProbe.restRadius !== 0 ||
             ptFormProbe.checkedBg !== wantPressedBg || ptFormProbe.indetBg !== wantPressedBg ||
-            ptFormProbe.indetDash !== 2) {
-          failures.push(`${key} Platinum scrollbar/checkbox invariant failed: ${JSON.stringify(ptFormProbe)}`);
+            ptFormProbe.indetDash !== 2 ||
+            ptFormProbe.hidCbW !== 0 || ptFormProbe.hidRdW !== 0 ||
+            ptFormProbe.disCbOpacity !== '1' || ptFormProbe.disCbShadow !== 'none' ||
+            ptFormProbe.disCbBg !== wantDisBg || ptFormProbe.disCbMark !== wantDisFg ||
+            ptFormProbe.disSubOpacity !== '1' || ptFormProbe.disSubShadow !== 'none' ||
+            ptFormProbe.disSelOpacity !== '1' || ptFormProbe.disSelShadow !== 'none' ||
+            ptFormProbe.ariaDisSelBg !== wantDisBg || ptFormProbe.ariaDisSelShadow !== 'none' ||
+            !(/right 6px|calc\(100% - 6px\)/).test(ptFormProbe.singleSelPos) ||
+            !(/right 17px|calc\(100% - 17px\)/).test(ptFormProbe.singleSelPos) ||
+            ptFormProbe.multiS1App === 'base-select' || ptFormProbe.multiS1Shadow === 'none' ||
+            ptFormProbe.zeroSzApp !== 'base-select' || ptFormProbe.zeroSzShadow === 'none' ||
+            ptFormProbe.twoSzApp === 'base-select' || ptFormProbe.twoSzShadow === 'none' ||
+            ptFormProbe.leadTwoApp === 'base-select' || ptFormProbe.leadTwoShadow === 'none') {
+          failures.push(`${key} Platinum scrollbar/checkbox/hidden/disabled/select invariant failed: ${JSON.stringify(ptFormProbe)}`);
         }
+
+        // Verify forced-colors: active radio/checkbox (enabled & disabled), disabled text/submit, #search_query_field & #fulltext keyboard focus, and #sub_banner a.selected:hover
+        for (const fcScheme of ['light', 'dark']) {
+          await page.emulateMedia({ forcedColors: 'active', colorScheme: fcScheme });
+          await page.evaluate(() => {
+            const host = document.createElement('div');
+            host.id = 'pt-fc-probe';
+            host.style.cssText = 'padding:8px;display:inline-flex;gap:8px;align-items:center';
+            host.innerHTML = `<input type="radio" id="pt-fc-r"><input type="checkbox" id="pt-fc-c"><input type="radio" id="pt-fc-dr" disabled><input type="checkbox" id="pt-fc-dc" disabled><input type="text" id="pt-fc-dt" value="disabled" disabled><input type="submit" id="pt-fc-ds" value="Save" disabled>`;
+            document.querySelector('#edit_bookmark_form form').appendChild(host);
+          });
+          const rLoc = page.locator('#pt-fc-r');
+          const cLoc = page.locator('#pt-fc-c');
+          const drLoc = page.locator('#pt-fc-dr');
+          const dcLoc = page.locator('#pt-fc-dc');
+          const rUnchecked = await rLoc.screenshot();
+          const cUnchecked = await cLoc.screenshot();
+          const drUnchecked = await drLoc.screenshot();
+          const dcUnchecked = await dcLoc.screenshot();
+          await page.evaluate(() => {
+            document.getElementById('pt-fc-r').checked = true;
+            document.getElementById('pt-fc-c').checked = true;
+            document.getElementById('pt-fc-dr').checked = true;
+            document.getElementById('pt-fc-dc').checked = true;
+          });
+          const rChecked = await rLoc.screenshot();
+          const cChecked = await cLoc.screenshot();
+          const drChecked = await drLoc.screenshot();
+          const dcChecked = await dcLoc.screenshot();
+          const fcDisColors = await page.evaluate(() => {
+            const dr = document.getElementById('pt-fc-dr');
+            const dt = document.getElementById('pt-fc-dt');
+            const ds = document.getElementById('pt-fc-ds');
+            const shHost = document.createElement('div');
+            const sh = shHost.attachShadow({ mode: 'open' });
+            const canvasRef = document.createElement('span');
+            canvasRef.style.cssText = 'background:Canvas;color:GrayText;forced-color-adjust:none';
+            sh.appendChild(canvasRef);
+            document.body.appendChild(shHost);
+            const refCs = getComputedStyle(canvasRef);
+            const drCs = getComputedStyle(dr);
+            const dtCs = getComputedStyle(dt);
+            const dsCs = getComputedStyle(ds);
+            const dotBg = getComputedStyle(dr, '::after').backgroundColor;
+            const out = {
+              drBg: drCs.backgroundColor, dotBg,
+              dtBg: dtCs.backgroundColor, dtFg: dtCs.color,
+              dsBg: dsCs.backgroundColor, dsFg: dsCs.color,
+              sysCanvas: refCs.backgroundColor, sysGray: refCs.color,
+            };
+            shHost.remove();
+            document.getElementById('pt-fc-probe')?.remove();
+            return out;
+          });
+          await fixture('search-sidebar');
+          await page.keyboard.press('Tab');
+          const searchFocus = await page.evaluate(() => {
+            const shHost = document.createElement('div');
+            const sh = shHost.attachShadow({ mode: 'open' });
+            const outRef = document.createElement('span');
+            outRef.style.cssText = 'outline:2px solid Highlight;forced-color-adjust:none';
+            sh.appendChild(outRef);
+            document.body.appendChild(shHost);
+            const sysHiOutline = getComputedStyle(outRef).outlineColor;
+            const q = document.getElementById('search_query_field');
+            q.focus();
+            const qCs = getComputedStyle(q);
+            const qStyle = qCs.outlineStyle;
+            const qWidth = parseFloat(qCs.outlineWidth) || 0;
+            const qColor = qCs.outlineColor;
+            const ft = document.getElementById('fulltext');
+            ft.focus();
+            const ftCs = getComputedStyle(ft);
+            const ftStyle = ftCs.outlineStyle;
+            const ftWidth = parseFloat(ftCs.outlineWidth) || 0;
+            const ftColor = ftCs.outlineColor;
+            shHost.remove();
+            return { qStyle, qWidth, qColor, ftStyle, ftWidth, ftColor, sysHiOutline };
+          });
+          await fixture('nav');
+          const navSelLoc = page.locator('#sub_banner a.selected');
+          await navSelLoc.hover();
+          const navHover = await page.evaluate(() => {
+            const a = document.querySelector('#sub_banner a.selected');
+            const shHost = document.createElement('div');
+            const sh = shHost.attachShadow({ mode: 'open' });
+            const hiRef = document.createElement('span');
+            hiRef.style.cssText = 'background:Highlight;color:HighlightText;forced-color-adjust:none';
+            sh.appendChild(hiRef);
+            document.body.appendChild(shHost);
+            const refCs = getComputedStyle(hiRef);
+            const cs = getComputedStyle(a);
+            const out = { bg: cs.backgroundColor, fg: cs.color, sysHi: refCs.backgroundColor, sysHiFg: refCs.color };
+            shHost.remove();
+            return out;
+          });
+          await fixture('editor');
+          checks++;
+          if (Buffer.compare(rUnchecked, rChecked) === 0 || Buffer.compare(cUnchecked, cChecked) === 0 ||
+              Buffer.compare(drUnchecked, drChecked) === 0 || Buffer.compare(dcUnchecked, dcChecked) === 0 ||
+              fcDisColors.drBg !== fcDisColors.sysCanvas || fcDisColors.dotBg !== fcDisColors.sysGray ||
+              fcDisColors.dtBg !== fcDisColors.sysCanvas || fcDisColors.dtFg !== fcDisColors.sysGray ||
+              fcDisColors.dsBg !== fcDisColors.sysCanvas || fcDisColors.dsFg !== fcDisColors.sysGray ||
+              searchFocus.qStyle === 'none' || searchFocus.qWidth < 2 || searchFocus.qColor !== searchFocus.sysHiOutline ||
+              searchFocus.ftStyle === 'none' || searchFocus.ftWidth < 2 || searchFocus.ftColor !== searchFocus.sysHiOutline ||
+              navHover.bg !== navHover.sysHi || navHover.fg !== navHover.sysHiFg) {
+            failures.push(`${key} forced-colors (${fcScheme}) failed: radioSame=${Buffer.compare(rUnchecked, rChecked) === 0}, disRadioSame=${Buffer.compare(drUnchecked, drChecked) === 0}, disColors=${JSON.stringify(fcDisColors)}, searchFocus=${JSON.stringify(searchFocus)}, navHover=${JSON.stringify(navHover)}`);
+          }
+        }
+        await page.emulateMedia({ forcedColors: 'none', colorScheme: key === 'platinum-dark' ? 'dark' : 'light' });
       }
       });
     }

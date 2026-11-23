@@ -5690,6 +5690,7 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
   const ptActionLink = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) button.action-link');
   const ptReaderMore = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .xp-dict-more');
   const ptPopupUtil = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) :is(button.add-all-link, button.regen-link, button.clear-all-link, button.offline-clear)');
+  const ptImgFixBtn = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .pbp-img-fix-btn');
   const ptMsgBarPlain = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .msg-bar');
   const ptMsgBarScoped = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] .msg-bar:not(:where(#export-summary))');
   const readerExportSummary = declarationValueMap(fiveSheets[3][1], "#export-summary");
@@ -5704,11 +5705,12 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
   check(minHorizPadPx(ptActionLink) >= 8 && ptActionLink.get("text-decoration") === "none" &&
     minHorizPadPx(ptReaderMore) >= 8 && ptReaderMore.get("text-decoration") === "none" &&
     minHorizPadPx(ptPopupUtil) >= 6 && ptPopupUtil.get("text-decoration") === "none" &&
+    minHorizPadPx(ptImgFixBtn) >= 6 && ptImgFixBtn.get("text-decoration") === "none" &&
     ptMsgBarPlain.size === 0 && ptMsgBarScoped.has("box-shadow") &&
     readerExportSummary.get("box-shadow") === "none" &&
     readerExpScope.get("margin-bottom") === "var(--sp-2)" &&
     !bevelLeaksListRowOpen,
-    "platinum-controls.css / md-preview.css: promoted link buttons (.action-link, .xp-dict-more, .add-all-link/.regen-link/.clear-all-link/.offline-clear) must restore >=6..8px padding + text-decoration:none, #export-summary must exclude .msg-bar group-shadow, .exp-scope must keep margin-bottom, and .pp-rh-open/.rh-open must stay list rows");
+    "platinum-controls.css / md-preview.css: promoted link buttons (.action-link, .xp-dict-more, .add-all-link/.regen-link/.clear-all-link/.offline-clear, .pbp-img-fix-btn) must restore >=6..8px padding + text-decoration:none, #export-summary must exclude .msg-bar group-shadow, .exp-scope must keep margin-bottom, and .pp-rh-open/.rh-open must stay list rows");
 
   // 8e) Pinboard.in shared (classic-list-v2.mjs) & Platinum (_patterns.mjs) composer invariants:
   const classicComposerSrc = readFileSync(resolve(root, "docs/theme-surface/composers/classic-list-v2.mjs"), "utf8");
@@ -5719,18 +5721,20 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     classicComposerSrc.includes("#right_bar, #search_right_bar") &&
     classicComposerSrc.includes(".bookmark > #edit_bookmark_form { flex: 1 1 0% !important;") &&
     classicComposerSrc.includes("#profile_left_column > div:first-child:not(.service_box)") &&
-    patternsComposerSrc.includes('select:not([multiple]):not([size]), select[size="1"]') &&
+    patternsComposerSrc.includes('select:not([hidden]):not([multiple]):not([size]), select:not([hidden]):not([multiple])[size="0"], select:not([hidden]):not([multiple])[size="00"], select:not([hidden]):not([multiple])[size="1"], select:not([hidden]):not([multiple])[size="01"]') &&
+    patternsComposerSrc.includes("background-position: right 6px center, right 17px center !important") &&
     patternsComposerSrc.includes("@supports selector(::picker(select))") &&
-    patternsComposerSrc.includes(":is(:open, :open:hover):not(:disabled)") &&
-    patternsComposerSrc.includes('input[type="checkbox"], input[type="radio"]') &&
-    patternsComposerSrc.includes('input[type="checkbox"]:indeterminate::after') &&
+    patternsComposerSrc.includes(':is(:open, :open:hover):not(:disabled, [aria-disabled="true"])') &&
+    patternsComposerSrc.includes('input[type="checkbox"]:not([hidden]), input[type="radio"]:not([hidden])') &&
+    patternsComposerSrc.includes('input[type="checkbox"]:not([hidden]):indeterminate::after') &&
+    patternsComposerSrc.includes("@media (forced-colors: active)") &&
     patternsComposerSrc.includes("scrollbar-color: auto !important") &&
     patternsComposerSrc.includes("background-clip: content-box, content-box, border-box") &&
     patternsComposerSrc.includes("inset 0 0 0 1px ${chipBorder}, inset 2px 2px 0 ${chipGlint}") &&
     patternsComposerSrc.includes("#search_right_bar::before") &&
     patternsComposerSrc.includes("#profile_left_column > div:first-child:not(.service_box)::before") &&
     patternsComposerSrc.includes(".bookmark > #edit_bookmark_form { flex: 1 1 0% !important;"),
-    "composers (classic-list-v2.mjs / _patterns.mjs): must clear #top_next_prev float gap, style #search_right_bar & #profile_left_column card, flex-fit .bookmark > #edit_bookmark_form, reset scrollbar-color:auto, and keep Platinum controls intact");
+    "composers (classic-list-v2.mjs / _patterns.mjs): must clear #top_next_prev float gap, style #search_right_bar & #profile_left_column card, flex-fit .bookmark > #edit_bookmark_form, reset scrollbar-color:auto, guard [hidden]/multi-select, and keep Platinum forced-colors & 4-7-4 controls intact");
 
   // 8f) Platinum Reader .doc-body must preserve video-mode dual-column workspace width:
   const ptVideoDocBody = declarationValueMap(ptControlsCss, 'html[data-reader-theme="platinum"] body.video-mode:not(.raw-active) .doc-body');
@@ -5830,7 +5834,7 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
 
   const ptBtnRules = parseStyleRules(ptControlsCss).filter((r) =>
     r.context.length === 0 && r.selectors.some((s) => s.includes(".btn:not(") && s.includes(".action-btn:not(")));
-  check(ptBtnRules.length === 3, `platinum-controls.css: expected 3 .btn/.action-btn push-button rules (rest/hover/active), found ${ptBtnRules.length}`);
+  check(ptBtnRules.length === 4, `platinum-controls.css: expected 4 .btn/.action-btn push-button rules (rest/hover/active/disabled), found ${ptBtnRules.length}`);
   for (const r of ptBtnRules) {
     const btnBranch = r.selectors.find((s) => s.includes(".btn:not("));
     const spec = selectorSpecificity(btnBranch);
@@ -5848,32 +5852,70 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
 
   // 8i) Self-contained platinum-ui static anti-trap & Gray zero-purple gates:
   //   (1) Zero purple/lavender across platinum-controls.css, platinum-{light,dark}.tokens.json,
-  //       composePatterns() output, and shipped PINBOARD_THEMES["platinum-*"].css;
+  //       composePatterns() output, and shipped PINBOARD_THEMES["platinum-*"].css (string-aware comment stripping);
   //   (2) R=G=B neutral lock on Platinum pilot neutral palette & ui.popup keys;
   //   (3) Recursive :is()/:not() un-:where()'d #id specificity guard across all rules in platinum-controls.css;
   //   (4) ::before/::after box-sizing: border-box guard when setting width/height/inset;
-  //   (5) box-shadow bevel occlusion guard (no solid inset 0 0 0 <N>px before inset ±1/2px bevel);
+  //   (5) box-shadow bevel occlusion guard (including var() indirection);
   //   (6) Reader & Library prose/video polish (.pbv-play 3px bevel, framed 1px tables + 6px/10px padding, sunken pre + opaque .pb-copy-code).
   const FORBIDDEN_PURPLE_RE = /#(?:9999ff|ccccff|dcdcff|333399|3d3dad|4b4bb8|5c5c9e|9e9eff|9494ff|a9a9ff|b3b3ff|32325c|2b2b4e|6666aa|8585cc|b4b4ff|282831|353540|2b2b34|1f1f26|2a2a33)\b/i;
+  const stripCssCommentsSafe = (cssText) => {
+    let out = "";
+    let i = 0;
+    let quote = null;
+    while (i < cssText.length) {
+      const ch = cssText[i];
+      if (quote) {
+        out += ch;
+        if (ch === "\\" && i + 1 < cssText.length) out += cssText[++i];
+        else if (ch === quote) quote = null;
+        i++;
+      } else if (ch === '"' || ch === "'") {
+        quote = ch;
+        out += ch;
+        i++;
+      } else if (ch === "/" && cssText[i + 1] === "*") {
+        out += "  ";
+        i += 2;
+        while (i < cssText.length && !(cssText[i] === "*" && cssText[i + 1] === "/")) {
+          out += cssText[i] === "\n" ? "\n" : " ";
+          i++;
+        }
+        if (i < cssText.length) {
+          out += "  ";
+          i += 2;
+        }
+      } else {
+        out += ch;
+        i++;
+      }
+    }
+    return out;
+  };
   const ptLightPilotRaw = read("docs/theme-surface/pilots/platinum-light.tokens.json");
   const ptDarkPilotRaw = read("docs/theme-surface/pilots/platinum-dark.tokens.json");
   const ptLightPilot = JSON.parse(ptLightPilotRaw);
   const ptDarkPilot = JSON.parse(ptDarkPilotRaw);
   const shippedSiteThemes = runInNewContext(`${read("pinboard-themes.js")}; PINBOARD_THEMES`);
   const purpleSources = [
-    ["platinum-controls.css", ptControlsCss.replace(/\/\*[\s\S]*?\*\//g, "")],
+    ["platinum-controls.css", stripCssCommentsSafe(ptControlsCss)],
     ["platinum-light.tokens.json", ptLightPilotRaw],
     ["platinum-dark.tokens.json", ptDarkPilotRaw],
-    ["patternsLayer(platinum-light)", patternsLayer(ptLightPilot).replace(/\/\*[\s\S]*?\*\//g, "")],
-    ["patternsLayer(platinum-dark)", patternsLayer(ptDarkPilot).replace(/\/\*[\s\S]*?\*\//g, "")],
-    ["pinboard-themes.js#platinum-light", shippedSiteThemes["platinum-light"].css.replace(/\/\*[\s\S]*?\*\//g, "")],
-    ["pinboard-themes.js#platinum-dark", shippedSiteThemes["platinum-dark"].css.replace(/\/\*[\s\S]*?\*\//g, "")],
+    ["patternsLayer(platinum-light)", stripCssCommentsSafe(patternsLayer(ptLightPilot))],
+    ["patternsLayer(platinum-dark)", stripCssCommentsSafe(patternsLayer(ptDarkPilot))],
+    ["pinboard-themes.js#platinum-light", stripCssCommentsSafe(shippedSiteThemes["platinum-light"].css)],
+    ["pinboard-themes.js#platinum-dark", stripCssCommentsSafe(shippedSiteThemes["platinum-dark"].css)],
   ];
   const purpleHits = [];
   for (const [label, src] of purpleSources) {
     if (FORBIDDEN_PURPLE_RE.test(src)) purpleHits.push(label);
   }
-  check(FORBIDDEN_PURPLE_RE.test("#ccccff") && FORBIDDEN_PURPLE_RE.test("#333399") && !FORBIDDEN_PURPLE_RE.test("#1d4496") && purpleHits.length === 0,
+  check(
+    FORBIDDEN_PURPLE_RE.test("#ccccff") &&
+    FORBIDDEN_PURPLE_RE.test("#333399") &&
+    FORBIDDEN_PURPLE_RE.test(stripCssCommentsSafe('.a::before{content:"/*"}.b{color:#ccccff}.c::before{content:"*/"}')) &&
+    !FORBIDDEN_PURPLE_RE.test(stripCssCommentsSafe('/* #ccccff */ .a { color: #1d4496; }')) &&
+    purpleHits.length === 0,
     `Platinum Gray zero-purple ban violated in: [${purpleHits.join("; ")}]`);
 
   const NEUTRAL_PILOT_KEYS = [
@@ -5931,23 +5973,105 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     }
     return false;
   };
+  const resolveStaticCssVarsAll = (val, propCandidates, localDecls, depth = 0) => {
+    if (!val || depth > 5 || !val.includes("var(")) return [val];
+    for (let i = 0; i < val.length; i++) {
+      if (val.slice(i, i + 4).toLowerCase() === "var(") {
+        const close = closeOfBracket(val, i + 3);
+        const inner = val.slice(i + 4, close);
+        const parts = splitTopLevelComma(inner);
+        const name = (parts[0] || "").trim();
+        const fb = parts.slice(1).join(", ").trim();
+        const prefix = val.slice(0, i);
+        const suffix = val.slice(close + 1);
+        const cands = localDecls?.has(name)
+          ? [localDecls.get(name)]
+          : (propCandidates.get(name)?.size ? [...propCandidates.get(name)] : (fb ? [fb] : []));
+        if (!cands.length) return [val];
+        const out = new Set();
+        for (const c of cands) {
+          for (const exp of resolveStaticCssVarsAll(`${prefix}${c}${suffix}`, propCandidates, localDecls, depth + 1)) {
+            out.add(exp);
+          }
+        }
+        return [...out];
+      }
+    }
+    return [val];
+  };
   const scanPtStaticAntiTraps = (cssText) => {
     const issues = [];
-    for (const r of parseStyleRules(cssText)) {
+    const stripped = stripCssCommentsSafe(cssText);
+    let braceDepth = 0;
+    let parenDepth = 0;
+    let quote = null;
+    for (let i = 0; i < stripped.length; i++) {
+      const ch = stripped[i];
+      if (quote) {
+        if (ch === "\\") i++;
+        else if (ch === quote) quote = null;
+      } else if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === "{") braceDepth++;
+      else if (ch === "}") { braceDepth--; if (braceDepth < 0) { issues.push("unbalanced closing '}'"); break; } }
+      else if (ch === "(") parenDepth++;
+      else if (ch === ")") { parenDepth--; if (parenDepth < 0) { issues.push("unbalanced closing ')'"); break; } }
+    }
+    if (braceDepth > 0) issues.push(`${braceDepth} unclosed '{'`);
+    if (parenDepth > 0) issues.push(`${parenDepth} unclosed '('`);
+
+    const parsedRules = parseStyleRules(cssText);
+    const classifyThemeScope = (r) => {
+      const ctxStr = r.context.join(" ");
+      const selStr = r.selectors.join(", ");
+      const mentionsLight = selStr.includes("platinum-light") || ctxStr.includes("prefers-color-scheme: light");
+      const mentionsDark = selStr.includes("platinum-dark") || ctxStr.includes("prefers-color-scheme: dark");
+      if (mentionsLight && !mentionsDark) return { light: true, dark: false };
+      if (mentionsDark && !mentionsLight) return { light: false, dark: true };
+      return { light: true, dark: true };
+    };
+    const lightPropCandidates = new Map();
+    const darkPropCandidates = new Map();
+    for (const r of parsedRules) {
+      const sc = classifyThemeScope(r);
+      for (const d of parseDeclarations(r.body)) {
+        if (d.property.startsWith("--") && d.value.trim() && d.value.trim() !== "initial") {
+          const v = d.value.trim();
+          if (sc.light) {
+            if (!lightPropCandidates.has(d.property)) lightPropCandidates.set(d.property, new Set());
+            lightPropCandidates.get(d.property).add(v);
+          }
+          if (sc.dark) {
+            if (!darkPropCandidates.has(d.property)) darkPropCandidates.set(d.property, new Set());
+            darkPropCandidates.get(d.property).add(v);
+          }
+        }
+      }
+    }
+    for (const r of parsedRules) {
       const decls = new Map(parseDeclarations(r.body).map((d) => [d.property, d.value.trim()]));
-      const boxShadow = decls.get("box-shadow");
-      if (boxShadow && boxShadow.includes("inset")) {
-        const layers = splitSelectorList(boxShadow);
-        const rings = layers.map((l, idx) => {
-          const m = /^inset\s+0(?:px)?\s+0(?:px)?\s+0(?:px)?\s+([1-9]\d*(?:\.\d+)?)px\b/.exec(l);
-          return m ? { idx, w: parseFloat(m[1]) } : null;
-        }).filter(Boolean);
-        const bevels = layers.map((l, idx) => {
-          const m = /^inset\s+-?([12])px\s+-?[12]px\b/.exec(l);
-          return m ? { idx, w: parseFloat(m[1]) } : null;
-        }).filter(Boolean);
-        if (rings.some((rg) => bevels.some((bv) => bv.idx > rg.idx && bv.w <= rg.w))) {
-          issues.push(`line ${r.lineNum}: box-shadow places solid inset ring before inner bevel (${boxShadow})`);
+      const rawBoxShadow = decls.get("box-shadow");
+      const sc = classifyThemeScope(r);
+      const expandedSet = new Set();
+      if (rawBoxShadow) {
+        if (sc.light) for (const s of resolveStaticCssVarsAll(rawBoxShadow, lightPropCandidates, decls)) expandedSet.add(s);
+        if (sc.dark) for (const s of resolveStaticCssVarsAll(rawBoxShadow, darkPropCandidates, decls)) expandedSet.add(s);
+      }
+      const expandedShadows = [...expandedSet];
+      for (const boxShadow of expandedShadows) {
+        if (boxShadow && boxShadow.includes("inset")) {
+          const layers = splitTopLevelComma(boxShadow);
+          const rings = layers.map((l, idx) => {
+            const m = /^inset\s+0(?:px)?\s+0(?:px)?\s+0(?:px)?\s+([1-9]\d*(?:\.\d+)?)px\b/.exec(l);
+            return m ? { idx, w: parseFloat(m[1]) } : null;
+          }).filter(Boolean);
+          const bevels = layers.map((l, idx) => {
+            const m = /^inset\s+-?([12])px\s+-?[12]px\b/.exec(l);
+            return m ? { idx, w: parseFloat(m[1]) } : null;
+          }).filter(Boolean);
+          if (rings.some((rg) => bevels.some((bv) => bv.idx > rg.idx && bv.w <= rg.w))) {
+            issues.push(`line ${r.lineNum}: box-shadow places solid inset ring before inner bevel (${rawBoxShadow})`);
+            break;
+          }
         }
       }
       const sizesPseudo = decls.has("width") || decls.has("height") || decls.has("inset");
@@ -5967,6 +6091,11 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     scanPtStaticAntiTraps(".x:is(.a, .b:not(#c)) { color: #222; }").length === 1 &&
     scanPtStaticAntiTraps(".x::before { width: 12px; height: 12px; }").length === 1 &&
     scanPtStaticAntiTraps(".bad { box-shadow: inset 0 0 0 1px #000, inset 1px 1px 0 #fff; }").length === 1 &&
+    scanPtStaticAntiTraps(":root { --r: inset 0 0 0 2px #000; --b: inset 1px 1px 0 #fff; } .bad { box-shadow: var(--r), var(--b); }").length === 1 &&
+    scanPtStaticAntiTraps('html[data-theme="platinum-light"] { --s: inset 0 0 0 2px #000; } html[data-theme="platinum-dark"] { --s: inset 1px 1px 0 #444; } .bad { box-shadow: var(--s), inset 1px 1px 0 #fff; }').length === 1 &&
+    scanPtStaticAntiTraps('html[data-theme="platinum-dark"] { --s: inset 1px 1px 0 #444; } html[data-theme="platinum-light"] { --s: inset 0 0 0 2px #000; } .bad { box-shadow: var(--s), inset 1px 1px 0 #fff; }').length === 1 &&
+    scanPtStaticAntiTraps('html[data-theme="platinum-light"] { --a: inset 0 0 0 2px #000; --b: inset 0 0 0 1px #333; } html[data-theme="platinum-dark"] { --a: inset 1px 1px 0 #fff; --b: inset -1px -1px 0 #000; } .clean { box-shadow: var(--a), var(--b); }').length === 0 &&
+    scanPtStaticAntiTraps(".bad)::picker-icon { display: none; }").length >= 1 &&
     scanPtStaticAntiTraps(".ok-chip { box-shadow: inset 0 0 0 1px #000, inset 2px 2px 0 #fff; }").length === 0 &&
     scanPtStaticAntiTraps("#c :is(.a, :where(#d), a[href^=\"#fn:\"])::before { width: 12px; box-sizing: border-box; }").length === 0,
     "ui-contract: scanPtStaticAntiTraps self-test regressed");

@@ -294,10 +294,13 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
   /* 7-stop 135deg metallic polish gradients for 13x13 .tbox window controls */
   --pt-tbox-polish: linear-gradient(135deg, #999 0% 18%, #aaa 18% 32%, #bbb 32% 46%, #ccc 46% 60%, #ddd 60% 75%, #eee 75% 89%, #fff 89% 100%);
   --pt-tbox-polish-pressed: linear-gradient(135deg, #444 0% 14%, #555 14% 25%, #666 25% 36%, #777 36% 47%, #888 47% 58%, #999 58% 69%, #aaa 69% 81%, #bbb 81% 92%, #ccc 92% 100%);
-  --pt-arrows-dark-ink: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="%23222222" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>');
-  --pt-arrows-light-ink: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="%23eeeeee" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>');
-  --pt-arrows-pressed-ink: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="%23ffffff" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>');
+  --pt-arrows-dark-ink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 10' shape-rendering='crispEdges'%3E%3Cpath fill='%23222222' d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1zM0 6h7v1H6v1H5v1H4v1H3V9H2V8H1V7H0z'/%3E%3C/svg%3E");
+  --pt-arrows-light-ink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 10' shape-rendering='crispEdges'%3E%3Cpath fill='%23eeeeee' d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1zM0 6h7v1H6v1H5v1H4v1H3V9H2V8H1V7H0z'/%3E%3C/svg%3E");
+  --pt-arrows-pressed-ink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 10' shape-rendering='crispEdges'%3E%3Cpath fill='%23ffffff' d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1zM0 6h7v1H6v1H5v1H4v1H3V9H2V8H1V7H0z'/%3E%3C/svg%3E");
+  --pt-arrows-disabled-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 10' shape-rendering='crispEdges'%3E%3Cpath fill='%234d4d4d' d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1zM0 6h7v1H6v1H5v1H4v1H3V9H2V8H1V7H0z'/%3E%3C/svg%3E");
+  --pt-arrows-disabled-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 10' shape-rendering='crispEdges'%3E%3Cpath fill='%23c2c2c2' d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1zM0 6h7v1H6v1H5v1H4v1H3V9H2V8H1V7H0z'/%3E%3C/svg%3E");
   --pt-select-arrows: var(--pt-arrows-dark-ink);
+  --pt-select-arrows-disabled: var(--pt-arrows-disabled-dark);
   /* Classic Mac OS 9 Appearance Manager snaps controls, disclosures, and menus
      instantaneously without web fade/slide/height tweens. 0.01ms stays truthy
      for parseFloat(...) || fallback while firing transitionend immediately. */
@@ -315,6 +318,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
 html[data-theme="platinum-dark"],
 html[data-reader-theme="platinum"][style*="dark"] {
   --pt-select-arrows: var(--pt-arrows-light-ink);
+  --pt-select-arrows-disabled: var(--pt-arrows-disabled-light);
   --pt-tbox-polish: linear-gradient(135deg, #333 0% 18%, #3b3b3b 18% 32%, #444 32% 46%, #505050 46% 60%, #595959 60% 75%, #626262 75% 89%, #737373 89% 100%);
   --pt-tbox-polish-pressed: linear-gradient(135deg, #111 0% 14%, #171717 14% 25%, #1e1e1e 25% 36%, #252525 36% 47%, #2c2c2c 47% 58%, #333 58% 69%, #3b3b3b 69% 81%, #414141 81% 92%, #494949 92% 100%);
 }
@@ -322,6 +326,7 @@ html[data-reader-theme="platinum"][style*="dark"] {
 @media (prefers-color-scheme: dark) {
   html[data-reader-theme="platinum"]:not([style*="light"]) {
     --pt-select-arrows: var(--pt-arrows-light-ink);
+    --pt-select-arrows-disabled: var(--pt-arrows-disabled-light);
     --pt-tbox-polish: linear-gradient(135deg, #333 0% 18%, #3b3b3b 18% 32%, #444 32% 46%, #505050 46% 60%, #595959 60% 75%, #626262 75% 89%, #737373 89% 100%);
     --pt-tbox-polish-pressed: linear-gradient(135deg, #111 0% 14%, #171717 14% 25%, #1e1e1e 25% 36%, #252525 36% 47%, #2c2c2c 47% 58%, #333 58% 69%, #3b3b3b 69% 81%, #414141 81% 92%, #494949 92% 100%);
   }
@@ -599,18 +604,88 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .xp-dict-save-change,
       .hl-card-save,
       .hl-card-mic,
-      .pbv-bar button):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active),
+      .pbv-bar button):is(:active, [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active):not(:disabled, [aria-disabled="true"]),
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .lib-cluster > .btn:not(.danger):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], .active),
+  .lib-cluster > .btn:not(.danger):is(:active, [aria-pressed="true"], [aria-expanded="true"], .active):not(:disabled, [aria-disabled="true"]),
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  #vocab-ref-result :is(.xp-dict-connect, .xp-dict-more, .xp-dict-usage-stop):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], .active),
+  #vocab-ref-result :is(.xp-dict-connect, .xp-dict-more, .xp-dict-usage-stop):is(:active, [aria-pressed="true"], [aria-expanded="true"], .active):not(:disabled, [aria-disabled="true"]),
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  #vocab-lookup-bar .xp-dict-connect:is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], .active) {
+  #vocab-lookup-bar .xp-dict-connect:is(:active, [aria-pressed="true"], [aria-expanded="true"], .active):not(:disabled, [aria-disabled="true"]) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
   box-shadow: var(--pt-btn-pressed-shadow);
   transform: none;
+}
+
+/* Mac OS 9 real-color flat disabled contract: zero alpha washout, >= 5.26:1 across all quadrants */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.btn:not(.context-help-toggle, .vocab-group-step, .danger, .theme-preset-btn, .saved-theme-btn, .listbox-trigger, .saved-success, .save-error),
+      button.action-link,
+      .md-strip-btn,
+      .qbtn,
+      .fc-btn,
+      .confirm-popover :is(.confirm-no, .confirm-alt),
+      .theme-name-popover .tnp-cancel,
+      .action-btn:not(.es-quiet, .reader-bookmark-ic, :where(#reader-bookmark-delete, #rail-ocr-btn, #rail-history-btn, #rail-settings-btn)),
+      .toggle-btn:not(:where(.view-toggle > .toggle-btn)),
+      .lib-toggle,
+      .zen-btn,
+      .xp-act,
+      .xp-retry,
+      .xp-ask,
+      .xp-save,
+      .xp-vocab:not([data-face="update"]),
+      .xp-open-vocab,
+      .xp-dict-connect,
+      .xp-dict-speak,
+      .xp-dict-more,
+      .xp-dict-usage-stop,
+      .xp-dict-save-change,
+      .hl-card-save,
+      .hl-card-mic,
+      .pbv-bar button):is(:disabled, [aria-disabled="true"]),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .lib-cluster > .btn:not(.danger):is(:disabled, [aria-disabled="true"]),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .vocab-drive-actions .btn:is(:disabled, [aria-disabled="true"]),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  #vocab-ref-result :is(.xp-dict-connect, .xp-dict-more, .xp-dict-usage-stop):is(:disabled, [aria-disabled="true"]),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  #vocab-lookup-bar .xp-dict-connect:is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border-color: var(--pt-border-subtle);
+  box-shadow: none;
+  transform: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.btn:not(.context-help-toggle, .vocab-group-step, .saved-success, .save-error),
+      button.action-link,
+      .md-strip-btn,
+      .qbtn,
+      .fc-btn,
+      .action-btn,
+      .toggle-btn,
+      .lib-toggle,
+      .zen-btn,
+      .xp-act,
+      .xp-retry,
+      .xp-ask,
+      .xp-save,
+      .xp-vocab,
+      .xp-open-vocab,
+      .xp-dict-connect,
+      .xp-dict-speak,
+      .xp-dict-more,
+      .xp-dict-usage-stop,
+      .xp-dict-save-change,
+      .hl-card-save,
+      .hl-card-mic,
+      .pbv-bar button):disabled:not(.pb-tr-err-retry, :where(#tr-retry-all)) {
+  cursor: not-allowed;
 }
 
 /* Zero optical-hang negative margins & restore push-button padding on promoted link buttons
@@ -682,7 +757,9 @@ html[data-reader-theme="platinum"]
 }
 
 html[data-reader-theme="platinum"]
-  :is(.empty-state .action-btn.es-quiet, .xp-foot .xp-vocab[data-face="update"]):hover:not(:disabled) {
+  :is(.empty-state .action-btn.es-quiet, .xp-foot .xp-vocab[data-face="update"]):hover:not(:active, :disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"]
+  #rendered-view .empty-state a.action-btn.es-quiet:hover:not(:active, [aria-disabled="true"]) {
   background: var(--pt-face);
   color: var(--pt-ink);
   border-color: var(--pt-edge);
@@ -690,12 +767,23 @@ html[data-reader-theme="platinum"]
 }
 
 html[data-reader-theme="platinum"]
-  :is(.empty-state .action-btn.es-quiet, .xp-foot .xp-vocab[data-face="update"]):active:not(:disabled) {
+  :is(.empty-state .action-btn.es-quiet, .xp-foot .xp-vocab[data-face="update"]):active:not(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"]
+  #rendered-view .empty-state :is(a.action-btn, a.action-btn.es-quiet):active:not([aria-disabled="true"]) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
   box-shadow: var(--pt-btn-pressed-shadow);
   transform: none;
+}
+
+html[data-reader-theme="platinum"]
+  :is(.empty-state .action-btn.es-quiet, .xp-foot .xp-vocab[data-face="update"]):is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border: 1px solid var(--pt-border-subtle);
+  box-shadow: none;
 }
 
 /* Compact icon, inline utility & stepper buttons across Popup, Options & Reader */
@@ -746,6 +834,17 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   padding: 1px 6px;
   min-height: 18px;
   line-height: 14px;
+  text-decoration: none;
+}
+
+html[data-reader-theme="platinum"] .pbp-img-fix-btn {
+  padding: 1px 6px;
+  min-height: 20px;
+  line-height: 16px;
+  text-decoration: none;
+}
+
+html[data-reader-theme="platinum"] .pbp-img-fix-btn:is(:hover, :focus-visible) {
   text-decoration: none;
 }
 
@@ -850,10 +949,10 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .rail-kbd-help-btn,
       .pb-copy-code,
       .pbp-img-fix-btn,
-      .rh-clear-btn):is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active),
-html[data-reader-theme="platinum"] #rail-ocr-btn:is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active),
-html[data-reader-theme="platinum"] #rail-history-btn:is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active),
-html[data-reader-theme="platinum"] #rail-settings-btn:is(:active:not(:disabled, [aria-disabled="true"]), [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active) {
+      .rh-clear-btn):is(:active, [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active):not(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #rail-ocr-btn:is(:active, [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active):not(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #rail-history-btn:is(:active, [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active):not(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #rail-settings-btn:is(:active, [aria-pressed="true"], [aria-expanded="true"], [data-saved="true"], .active):not(:disabled, [aria-disabled="true"]) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
@@ -861,20 +960,58 @@ html[data-reader-theme="platinum"] #rail-settings-btn:is(:active:not(:disabled, 
   transform: none;
 }
 
-html[data-reader-theme="platinum"]
-  :is(.typo-step, .typo-seg-btn)[aria-disabled="true"] {
-  opacity: 0.5;
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.offline-queue-item > .actions button,
+      button.add-all-link,
+      button.regen-link,
+      button.clear-all-link,
+      button.offline-clear,
+      .recent-bm-edit,
+      .recent-bm-del,
+      .edit-cancel,
+      .pp-rh-clear,
+      .pp-rh-remove,
+      .batch-cancel-btn,
+      .wayback-perm-help,
+      .wayback-log-retry,
+      .vocab-drive-notice-dismiss,
+      .ask-ic:not(:where(#ask-close)),
+      .skim-ic,
+      .srch-nav,
+      .srch-regex,
+      .typo-step,
+      .typo-seg-btn,
+      .fn-pop-jump,
+      .rail-sec-open,
+      .reader-bookmark-ic,
+      .hl-card-ai-explain,
+      .hl-card-ai-translate,
+      .hl-card-ai-ask,
+      .rail-kbd-help-btn,
+      .pb-copy-code,
+      .pbp-img-fix-btn,
+      .rh-clear-btn,
+      .rh-remove):is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #rail-ocr-btn:is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #rail-history-btn:is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #rail-settings-btn:is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border-color: var(--pt-border-subtle);
   box-shadow: none;
+  transform: none;
 }
 
-/* Fused Segmented Controls (.source-badge / .view-toggle) in Reader: single outer frame, 1px seam */
+/* Fused Segmented Controls (.source-badge / .view-toggle) in Reader: single outer frame, 1px seam,
+   overflow: visible + elevated :focus-visible z-index so outer 2px Platinum focus rings never clip */
 html[data-reader-theme="platinum"] :is(.source-badge, .view-toggle) {
   border: 1px solid var(--pt-edge);
   border-radius: 2px;
   background: var(--pt-face);
   padding: 0;
   gap: 0;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: none;
 }
 
@@ -889,6 +1026,16 @@ html[data-reader-theme="platinum"] :is(.source-badge > .src-seg, .view-toggle > 
   transform: none;
 }
 
+html[data-reader-theme="platinum"] :is(.source-badge > .src-seg, .view-toggle > .toggle-btn):first-child {
+  border-start-start-radius: 1px;
+  border-end-start-radius: 1px;
+}
+
+html[data-reader-theme="platinum"] :is(.source-badge > .src-seg, .view-toggle > .toggle-btn):last-child {
+  border-start-end-radius: 1px;
+  border-end-end-radius: 1px;
+}
+
 html[data-reader-theme="platinum"] :is(.source-badge > .src-seg + .src-seg, .view-toggle > .toggle-btn + .toggle-btn) {
   border-left: 1px solid var(--pt-edge);
 }
@@ -900,10 +1047,27 @@ html[data-reader-theme="platinum"]
 }
 
 html[data-reader-theme="platinum"]
-  :is(.source-badge > .src-seg, .view-toggle > .toggle-btn):is([aria-pressed="true"], [aria-selected="true"], .active) {
+  :is(.source-badge > .src-seg, .view-toggle > .toggle-btn):is([aria-pressed="true"], [aria-selected="true"], .active):not(:disabled, [aria-disabled="true"]) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   box-shadow: var(--pt-mini-pressed);
+}
+
+html[data-reader-theme="platinum"]
+  :is(.source-badge > .src-seg, .view-toggle > .toggle-btn):focus-visible {
+  position: relative;
+  z-index: 2;
+  outline: 2px solid var(--pt-focus);
+  outline-offset: 1px;
+}
+
+html[data-reader-theme="platinum"]
+  :is(.source-badge > .src-seg, .view-toggle > .toggle-btn):is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 /* Theme preset & saved-theme buttons: beveled Platinum rectangular switches */
@@ -983,6 +1147,22 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   box-shadow: var(--pt-mini-bevel);
 }
 
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.theme-name-popover .tnp-save, .confirm-popover .confirm-yes, .ask-clear-yes):is(:disabled, [aria-disabled="true"]),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  #submit-btn:disabled:not(.saved-success, .save-error, .loading),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  #login-btn:disabled:not(.saved-success, .save-error, .loading),
+html[data-reader-theme="platinum"]
+  #reader-bookmark-apply:disabled:not(.saved-success, .save-error, .loading) {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border: 1px solid var(--pt-border-subtle);
+  border-radius: 3px;
+  box-shadow: none;
+}
+
 /* Unified Danger Push Buttons (both .btn.danger and .btn.danger.ghost, plus Reader & Popup destructive actions) */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
   :is(.btn.danger,
@@ -1006,9 +1186,9 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .btn.danger.ghost,
       .ask-clear-btn,
       .hl-card-delete,
-      .pb-tr-err-retry):hover:not(:disabled, :active),
-html[data-reader-theme="platinum"] #reader-bookmark-delete:hover:not(:disabled, :active),
-html[data-reader-theme="platinum"] #tr-retry-all:hover:not(:disabled, :active) {
+      .pb-tr-err-retry):hover:not(:disabled, [aria-disabled="true"], :active),
+html[data-reader-theme="platinum"] #reader-bookmark-delete:hover:not(:disabled, [aria-disabled="true"], :active),
+html[data-reader-theme="platinum"] #tr-retry-all:hover:not(:disabled, [aria-disabled="true"], :active) {
   background: var(--pt-face-hover);
   color: var(--pt-danger-fg);
   border-color: var(--pt-danger-bd);
@@ -1020,13 +1200,29 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .btn.danger.ghost,
       .ask-clear-btn,
       .hl-card-delete,
-      .pb-tr-err-retry):active:not(:disabled),
-html[data-reader-theme="platinum"] #reader-bookmark-delete:active:not(:disabled),
-html[data-reader-theme="platinum"] #tr-retry-all:active:not(:disabled) {
+      .pb-tr-err-retry):active:not(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #reader-bookmark-delete:active:not(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #tr-retry-all:active:not(:disabled, [aria-disabled="true"]) {
   background: var(--pt-danger-bg);
   color: #ffffff;
   border-color: var(--pt-edge);
   box-shadow: var(--pt-btn-pressed-shadow);
+  transform: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  :is(.btn.danger,
+      .btn.danger.ghost,
+      .ask-clear-btn,
+      .hl-card-delete,
+      .pb-tr-err-retry):is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #reader-bookmark-delete:is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #tr-retry-all:is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border-color: var(--pt-border-subtle);
+  box-shadow: none;
   transform: none;
 }
 
@@ -1090,13 +1286,12 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-va
   padding-inline-end: 6px;
 }
 
-/* Full-height right arrow cap inside .listbox-btn's unbroken outer 4-layer bevel:
-   no competing inner rectangle box-shadow on .btn-ic (which previously floated at
-   line-height and sliced across the outer right bevel); ::after draws the authentic
-   Mac OS 9 2-tone vertical etched groove cleanly between top glint and bottom shade. */
+/* Full-height 19px right arrow cap inside .listbox-btn's unbroken outer 4-layer bevel:
+   2px etched groove (0..2px) + 4px left clearance + 7px arrow + 4px right clearance +
+   2px outer right bevel = exact Mac OS 9 4px - 7px - 4px pixel symmetry. */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn > .btn-ic {
   position: relative;
-  width: 22px;
+  width: 19px;
   height: 100%;
   align-self: stretch;
   display: inline-grid;
@@ -1128,11 +1323,16 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-bt
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-btn > .btn-ic::before {
   content: "";
   box-sizing: border-box;
+  position: absolute;
+  inset-inline-end: 6px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 7px;
   height: 10px;
   background-color: currentColor;
-  -webkit-mask: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="black" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>') center / 7px 10px no-repeat;
-  mask: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="7" height="10" shape-rendering="crispEdges"><path fill="black" d="M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0zM0 6h7v1H0zM1 7h5v1H1zM2 8h3v1H2zM3 9h1v1H3z"/></svg>') center / 7px 10px no-repeat;
+  pointer-events: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 10' shape-rendering='crispEdges'%3E%3Cpath fill='black' d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1zM0 6h7v1H6v1H5v1H4v1H3V9H2V8H1V7H0z'/%3E%3C/svg%3E") center / 7px 10px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 10' shape-rendering='crispEdges'%3E%3Cpath fill='black' d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1zM0 6h7v1H6v1H5v1H4v1H3V9H2V8H1V7H0z'/%3E%3C/svg%3E") center / 7px 10px no-repeat;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-trigger {
@@ -1145,9 +1345,9 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-tr
   transition: none;
 }
 
-/* Closed hover only: never overrides open [aria-expanded="true"] */
+/* Closed hover only: never overrides open [aria-expanded="true"] or disabled */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(.listbox-btn, .listbox-trigger):hover:enabled:not([aria-expanded="true"], :active) {
+  :is(.listbox-btn, .listbox-trigger):hover:enabled:not([aria-expanded="true"], [aria-disabled="true"], :active) {
   background: var(--pt-face-hover);
   color: var(--pt-ink);
   border-color: var(--pt-edge);
@@ -1155,7 +1355,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 
 /* Open & active lock: paired dark sunken background + #ffffff ink even under :hover */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(.listbox-btn, .listbox-trigger):is([aria-expanded="true"], [aria-expanded="true"]:hover, :active:enabled) {
+  :is(.listbox-btn, .listbox-trigger):is([aria-expanded="true"], [aria-expanded="true"]:hover, :active):enabled:not([aria-disabled="true"]) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
@@ -1163,19 +1363,44 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .listbox-trigger:is([aria-expanded="true"], [aria-expanded="true"]:hover, :active:enabled) > .btn-ic {
+  .listbox-trigger:is([aria-expanded="true"], [aria-expanded="true"]:hover, :active):enabled:not([aria-disabled="true"]) > .btn-ic {
   color: var(--pt-pressed-fg);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .listbox-btn:is([aria-expanded="true"], [aria-expanded="true"]:hover, :active:enabled) > .btn-ic {
+  .listbox-btn:is([aria-expanded="true"], [aria-expanded="true"]:hover, :active):enabled:not([aria-disabled="true"]) > .btn-ic {
   color: var(--pt-pressed-fg);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .listbox-btn:is([aria-expanded="true"], [aria-expanded="true"]:hover, :active:enabled) > .btn-ic::after {
+  .listbox-btn:is([aria-expanded="true"], [aria-expanded="true"]:hover, :active):enabled:not([aria-disabled="true"]) > .btn-ic::after {
   background: var(--pt-pressed-s1);
   box-shadow: 1px 0 0 var(--pt-pressed-s2);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.listbox-btn, .listbox-trigger):is(:disabled, [aria-disabled="true"]),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .entry-block-sub[data-off] .listbox-btn:disabled {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border-color: var(--pt-border-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .listbox-btn:is(:disabled, [aria-disabled="true"]) > .btn-ic::before {
+  inset-inline-end: 5px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .listbox-btn:is(:disabled, [aria-disabled="true"]) > .btn-ic::after {
+  top: 1px;
+  bottom: 1px;
+  background: var(--pt-border-subtle);
+  box-shadow: none;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-pop {
@@ -1216,24 +1441,30 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-op
   transform: translateY(-60%) rotate(45deg);
 }
 
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .listbox-opt[aria-disabled="true"] {
+  color: var(--pt-ink-muted);
+  cursor: not-allowed;
+}
+
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   .listbox-opt[data-active]:not([aria-disabled="true"]) {
   background: var(--pt-sel-bg);
   color: var(--pt-sel-fg);
 }
 
-/* Native & Customizable <select> (mobile tab picker, Reader export/dictionary/video selects) */
+/* Native & Customizable Single-Select <select> (4px - 7px - 4px arrow cap symmetry;
+   :where() excludes [multiple] & multi-row size>=2 listboxes at 0 specificity delta while keeping size="0"/"00"/"1"/"01" single-select) */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  select:not([hidden]),
-html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) {
+  select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))),
+html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) {
   -webkit-appearance: none;
   appearance: none;
-  padding-inline-end: 26px;
+  padding-inline-end: 25px;
   background-color: var(--pt-face);
   background-image:
     var(--pt-select-arrows),
     linear-gradient(90deg, var(--pt-bevel-d1) 0 1px, var(--pt-glint) 1px 2px);
-  background-position: right 7px center, right 21px center;
+  background-position: right 6px center, right 17px center;
   background-size: 7px 10px, 2px calc(100% - 4px);
   background-repeat: no-repeat;
   color: var(--pt-ink);
@@ -1245,16 +1476,16 @@ html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  select:not([hidden]):hover:not(:disabled, :active),
-html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):hover:not(:disabled, :active) {
+  select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))):hover:not(:disabled, [aria-disabled="true"], :active),
+html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))):hover:not(:disabled, [aria-disabled="true"], :active) {
   background-color: var(--pt-face-hover);
   color: var(--pt-ink);
   border-color: var(--pt-edge);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-  select:not([hidden]):active:not(:disabled),
-html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):active:not(:disabled) {
+  select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))):active:not(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))):active:not(:disabled, [aria-disabled="true"]) {
   background-color: var(--pt-pressed-bg);
   background-image:
     var(--pt-arrows-pressed-ink),
@@ -1264,21 +1495,80 @@ html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-
   box-shadow: var(--pt-btn-pressed-shadow);
 }
 
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))):is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))):is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] .pbv-bar > :where(.row) > select:disabled {
+  opacity: 1;
+  background-color: var(--pt-win);
+  background-image:
+    var(--pt-select-arrows-disabled),
+    linear-gradient(90deg, var(--pt-border-subtle) 0 1px);
+  background-position: right 5px center, right 17px center;
+  background-size: 7px 10px, 1px calc(100% - 2px);
+  color: var(--pt-ink-muted);
+  border-color: var(--pt-border-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Listbox select: all [multiple] (including size="1") and all integer size >= 2 (including leading-zero "02"+) */
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  select:not([hidden]):where([multiple], [size^="0"]:not([size="0"], [size="00"], [size="01"]), [size^="1"]:not([size="1"]), [size^="2"], [size^="3"], [size^="4"], [size^="5"], [size^="6"], [size^="7"], [size^="8"], [size^="9"]),
+html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where([multiple], [size^="0"]:not([size="0"], [size="00"], [size="01"]), [size^="1"]:not([size="1"]), [size^="2"], [size^="3"], [size^="4"], [size^="5"], [size^="6"], [size^="7"], [size^="8"], [size^="9"]) {
+  -webkit-appearance: auto;
+  appearance: auto;
+  height: auto;
+  padding: 3px;
+  background: var(--pt-paper);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-field-edge);
+  border-radius: 0;
+  box-shadow: var(--pt-well-shadow);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  select:not([hidden]):where([multiple], [size^="0"]:not([size="0"], [size="00"], [size="01"]), [size^="1"]:not([size="1"]), [size^="2"], [size^="3"], [size^="4"], [size^="5"], [size^="6"], [size^="7"], [size^="8"], [size^="9"]) :is(option, optgroup),
+html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where([multiple], [size^="0"]:not([size="0"], [size="00"], [size="01"]), [size^="1"]:not([size="1"]), [size^="2"], [size^="3"], [size^="4"], [size^="5"], [size^="6"], [size^="7"], [size^="8"], [size^="9"]) :is(option, optgroup) {
+  background: var(--pt-paper);
+  color: var(--pt-ink);
+  padding: 2px 6px;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  select:not([hidden]):where([multiple], [size^="0"]:not([size="0"], [size="00"], [size="01"]), [size^="1"]:not([size="1"]), [size^="2"], [size^="3"], [size^="4"], [size^="5"], [size^="6"], [size^="7"], [size^="8"], [size^="9"]) option:checked,
+html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where([multiple], [size^="0"]:not([size="0"], [size="00"], [size="01"]), [size^="1"]:not([size="1"]), [size^="2"], [size^="3"], [size^="4"], [size^="5"], [size^="6"], [size^="7"], [size^="8"], [size^="9"]) option:checked {
+  background: linear-gradient(var(--pt-sel-bg), var(--pt-sel-bg)), var(--pt-sel-bg);
+  color: var(--pt-sel-fg);
+  font-weight: 700;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+  select:not([hidden]):where([multiple], [size^="0"]:not([size="0"], [size="00"], [size="01"]), [size^="1"]:not([size="1"]), [size^="2"], [size^="3"], [size^="4"], [size^="5"], [size^="6"], [size^="7"], [size^="8"], [size^="9"]):is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where([multiple], [size^="0"]:not([size="0"], [size="00"], [size="01"]), [size^="1"]:not([size="1"]), [size^="2"], [size^="3"], [size^="4"], [size^="5"], [size^="6"], [size^="7"], [size^="8"], [size^="9"]):is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border-color: var(--pt-border-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 /* Chromium customizable <select> (::picker(select)) across Options & Reader: match .listbox-pop Mac OS 9 menu */
 @supports selector(::picker(select)) {
   html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-    select:not([hidden]),
-  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) {
+    select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))),
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) {
     appearance: base-select;
   }
   html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-    select:not([hidden])::picker-icon,
-  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate)::picker-icon {
+    select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"])))::picker-icon,
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"])))::picker-icon {
     display: none;
   }
   html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-    select:not([hidden]):is(:open, :open:hover):not(:disabled),
-  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):is(:open, :open:hover):not(:disabled) {
+    select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))):is(:open, :open:hover):not(:disabled, [aria-disabled="true"]),
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))):is(:open, :open:hover):not(:disabled, [aria-disabled="true"]) {
     background-color: var(--pt-pressed-bg);
     background-image:
       var(--pt-arrows-pressed-ink),
@@ -1288,8 +1578,14 @@ html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-
     box-shadow: var(--pt-btn-pressed-shadow);
   }
   html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-    select:not([hidden])::picker(select),
-  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate)::picker(select) {
+    select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) optgroup,
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) optgroup {
+    background: transparent;
+    color: var(--pt-ink);
+  }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+    select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"])))::picker(select),
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"])))::picker(select) {
     appearance: base-select;
     margin-top: 2px;
     padding: 2px;
@@ -1300,8 +1596,8 @@ html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-
     box-shadow: var(--pt-window-shadow);
   }
   html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-    select:not([hidden]) option,
-  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option {
+    select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option,
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option {
     position: relative;
     padding: 3px 10px 3px 22px;
     border-radius: 0;
@@ -1312,20 +1608,20 @@ html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-
     background: transparent;
   }
   html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-    select:not([hidden]) option::checkmark,
-  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option::checkmark {
+    select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option::checkmark,
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option::checkmark {
     display: none;
   }
   html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-    select:not([hidden]) option:checked,
-  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option:checked {
+    select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option:checked,
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option:checked {
     background: transparent;
     color: var(--pt-ink);
     font-weight: 700;
   }
   html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-    select:not([hidden]) option:checked::before,
-  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option:checked::before {
+    select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option:checked::before,
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option:checked::before {
     content: "";
     box-sizing: border-box;
     position: absolute;
@@ -1338,8 +1634,15 @@ html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-
     transform: translateY(-60%) rotate(45deg);
   }
   html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
-    select:not([hidden]) option:is(:hover, :focus-visible, :checked:hover, :checked:focus-visible),
-  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate) option:is(:hover, :focus-visible, :checked:hover, :checked:focus-visible) {
+    select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option:is(:disabled, optgroup:disabled option),
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option:is(:disabled, optgroup:disabled option) {
+    color: var(--pt-ink-muted);
+    background: transparent;
+    cursor: not-allowed;
+  }
+  html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"])
+    select:not([hidden]):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option:is(:hover, :focus-visible, :checked:hover, :checked:focus-visible):not(:disabled, optgroup:disabled option),
+  html[data-reader-theme="platinum"] :is(.exp-img-row select, .xp-dict-lang, .pbv-tracks, .pbv-rate):where(:not([multiple]):not([size]:not([size="0"], [size="00"], [size="1"], [size="01"]))) option:is(:hover, :focus-visible, :checked:hover, :checked:focus-visible):not(:disabled, optgroup:disabled option) {
     background: var(--pt-sel-bg);
     color: var(--pt-sel-fg);
     outline: none;
@@ -1395,18 +1698,23 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
       .key-wrap > input,
       .notes-toolbar input[type="search"],
       .vocab-lookup-bar input[type="search"],
-      .vocab-note-input):disabled,
-html[data-reader-theme="platinum"] #reader-dict-query:disabled,
-html[data-reader-theme="platinum"] #pb-hl-card textarea:disabled,
-html[data-reader-theme="platinum"] #search-input:disabled,
-html[data-reader-theme="platinum"] #tr-ask input:disabled,
-html[data-reader-theme="platinum"] #reader-bookmark-editor :is(input[type="text"], textarea):disabled {
-  background-color: var(--pt-paper-alt);
-  color: var(--pt-ink-hint);
-  border: 1px solid var(--pt-divider);
+      .vocab-note-input):is(:disabled, [aria-disabled="true"]),
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .entry-block-sub[data-off] :is(input, textarea):disabled,
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.tags-input-wrap, .vocab-group-unit):has(> input:disabled),
+html[data-reader-theme="platinum"] #reader-dict-query:is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #pb-hl-card textarea:is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #search-input:is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #tr-ask input:is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #reader-bookmark-editor :is(input[type="text"], textarea):is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background-color: var(--pt-face);
+  color: var(--pt-ink-muted);
+  border: 1px solid var(--pt-border-subtle);
   border-radius: 0;
   box-shadow: none;
-  opacity: 0.75;
+  cursor: not-allowed;
 }
 
 /* Fused .vocab-group-unit ([ 分组名称 ▼ ][ + ][ − ]): white sunken well + flush beveled caps */
@@ -1456,9 +1764,12 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   .vocab-group-unit > .vocab-group-step:disabled {
-  opacity: 0.45;
-  background: var(--pt-face);
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border-left-color: var(--pt-border-subtle);
   box-shadow: none;
+  cursor: not-allowed;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
@@ -1602,7 +1913,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   background: var(--pt-face-hover);
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked ~ .switch-track {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked:not(:disabled) ~ .switch-track {
   background: var(--pt-sel-bg);
   border-color: var(--pt-edge);
   box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.35);
@@ -1627,11 +1938,29 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .switch:has(> input:disabled) {
+  cursor: not-allowed;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   .switch > input:disabled ~ .switch-track {
-  opacity: 0.55;
-  background: var(--pt-trough-off);
-  border-color: var(--pt-edge);
+  opacity: 1;
+  background: var(--pt-win);
+  border-color: var(--pt-border-subtle);
   box-shadow: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .switch > input:disabled ~ .switch-track::before {
+  background: var(--pt-win);
+  border-color: var(--pt-border-subtle);
+  box-shadow: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .switch > input:disabled ~ .switch-text {
+  opacity: 1;
+  color: var(--pt-ink-muted);
 }
 
 /* Platinum 0px Sharp Square Depressed Charcoal Checkboxes (+ indeterminate dash) & Round Radios */
@@ -1647,8 +1976,8 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .pick-box >
   border-radius: 0;
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .pick > input:checked ~ .pick-mark,
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .pick > input[type="checkbox"]:indeterminate ~ .pick-mark {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .pick > input:checked:not(:disabled) ~ .pick-mark,
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .pick > input[type="checkbox"]:indeterminate:not(:disabled) ~ .pick-mark {
   background: var(--pt-pressed-bg);
   border-color: var(--pt-edge);
   color: var(--pt-pressed-fg);
@@ -1669,11 +1998,27 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .pick > input:disabled ~ .pick-mark {
-  opacity: 0.55;
-  background: var(--pt-face);
-  border-color: var(--pt-edge);
+  .pick:has(> input:disabled) {
+  cursor: not-allowed;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .pick > input:disabled ~ .pick-mark,
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .pick > input:disabled:checked ~ .pick-mark,
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .pick > input[type="checkbox"]:disabled:indeterminate ~ .pick-mark {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border-color: var(--pt-border-subtle);
   box-shadow: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .pick > input:disabled ~ .pick-text {
+  opacity: 1;
+  color: var(--pt-ink-muted);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar input[type="checkbox"] {
@@ -1687,12 +2032,14 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar
   border: 1px solid var(--pt-edge);
   border-radius: 0;
   background: var(--pt-face);
+  color: var(--pt-ink);
   box-shadow: var(--pt-mini-bevel);
   cursor: pointer;
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar input[type="checkbox"]:is(:checked, :indeterminate) {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar input[type="checkbox"]:is(:checked, :indeterminate):not(:disabled) {
   background: var(--pt-pressed-bg);
+  color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
   box-shadow: var(--pt-btn-pressed-shadow);
 }
@@ -1705,7 +2052,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar
   top: 1px;
   width: 5px;
   height: 9px;
-  border: solid var(--pt-pressed-fg);
+  border: solid currentColor;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -1718,12 +2065,22 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar
   top: 5px;
   width: 8px;
   height: 0;
-  border-top: 2px solid var(--pt-pressed-fg);
+  border-top: 2px solid currentColor;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar input[type="checkbox"]:disabled {
-  opacity: 0.5;
-  cursor: default;
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border-color: var(--pt-border-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .bottom-bar label:has(> input[type="checkbox"]:disabled) {
+  opacity: 1;
+  color: var(--pt-ink-muted);
+  cursor: not-allowed;
 }
 
 html[data-reader-theme="platinum"] .reader-check > input[type="checkbox"] {
@@ -1733,7 +2090,7 @@ html[data-reader-theme="platinum"] .reader-check > input[type="checkbox"] {
   box-shadow: var(--pt-mini-bevel);
 }
 
-html[data-reader-theme="platinum"] .reader-check > input[type="checkbox"]:is(:checked, :indeterminate) {
+html[data-reader-theme="platinum"] .reader-check > input[type="checkbox"]:is(:checked, :indeterminate):not(:disabled) {
   background: var(--pt-pressed-bg);
   border-color: var(--pt-edge);
   box-shadow: var(--pt-btn-pressed-shadow);
@@ -1741,6 +2098,19 @@ html[data-reader-theme="platinum"] .reader-check > input[type="checkbox"]:is(:ch
 
 html[data-reader-theme="platinum"] .reader-check > svg {
   color: var(--pt-pressed-fg);
+}
+
+html[data-reader-theme="platinum"] .reader-check > input[type="checkbox"]:disabled {
+  opacity: 1;
+  background: var(--pt-win);
+  border-color: var(--pt-border-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+html[data-reader-theme="platinum"] .reader-check > input[type="checkbox"]:disabled + svg {
+  opacity: 1;
+  color: var(--pt-ink-muted);
 }
 
 /* Pure Mac OS 9 Neutral Platinum Chips & Tag Controls */
@@ -1762,7 +2132,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .tag-gov-chip > input:checked + .tag-gov-chip-face,
+  .tag-gov-chip > input:checked:not(:disabled) + .tag-gov-chip-face,
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   .tag-gov-chip > input:checked:hover:not(:disabled) + .tag-gov-chip-face {
   background: var(--pt-chip-checked-bg);
@@ -1770,6 +2140,29 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   border-color: var(--pt-edge);
   box-shadow: inset 1px 1px 0 var(--pt-chip-checked-s1), inset -1px -1px 0 var(--pt-chip-checked-s2);
   font-weight: 700;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .tag-gov-chip:has(> input:disabled) {
+  cursor: not-allowed;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .tag-gov-chip > input:disabled + .tag-gov-chip-face,
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .tag-gov-chip > input:disabled:checked + .tag-gov-chip-face {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border-color: var(--pt-border-subtle);
+  box-shadow: none;
+  font-weight: 600;
+  cursor: not-allowed;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .tag-gov-row-queued {
+  opacity: 1;
+  color: var(--pt-ink-muted);
 }
 
 /* Popup suggested tags (.stag) & quick tag presets (.preset-btn):
@@ -1902,12 +2295,19 @@ html[data-reader-theme="platinum"] #ask-chips .ask-chip:active {
 
 /* ==========================================================================
    5. Native Mac OS 9 13x13 .tbox Window Controls (7-Stop Polish + Etched Rim)
+   #rail-toggle preserves base position:fixed (narrow closed drawer) and
+   position:static (open .rail-ident), drawing its 13x13 .tbox on ::before so
+   body.tr-busy:not(.rail-open)'s ::after busy indicator never shifts the glyph.
    ========================================================================== */
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) .fc-dismiss,
+html[data-reader-theme="platinum"] #ask-close {
+  position: relative;
+}
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) .fc-dismiss,
 html[data-reader-theme="platinum"] #ask-close,
 html[data-reader-theme="platinum"] #rail-toggle {
-  position: relative;
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -1925,7 +2325,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .fc-dismiss
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) .fc-dismiss::after,
 html[data-reader-theme="platinum"] #ask-close::after,
-html[data-reader-theme="platinum"] #rail-toggle::after {
+html[data-reader-theme="platinum"] #rail-toggle::before {
   content: "";
   box-sizing: border-box;
   display: block;
@@ -1950,9 +2350,9 @@ html[data-reader-theme="platinum"] #rail-toggle::after {
   box-shadow: 0 0 0 2px var(--pt-win);
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) .fc-dismiss:active::after,
-html[data-reader-theme="platinum"] #ask-close:active::after,
-html[data-reader-theme="platinum"] #rail-toggle:active::after {
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reader-theme="platinum"]) .fc-dismiss:active:not(:disabled)::after,
+html[data-reader-theme="platinum"] #ask-close:active:not(:disabled)::after,
+html[data-reader-theme="platinum"] #rail-toggle:active:not(:disabled)::before {
   --pt-tb-etched: linear-gradient(var(--pt-group-bd) 0 0);
   --pt-tb-lit: linear-gradient(var(--pt-group-glint) 0 0);
   --pt-tb-rim:
@@ -1967,6 +2367,18 @@ html[data-reader-theme="platinum"] #rail-toggle:active::after {
     linear-gradient(to bottom, var(--pt-group-bd) 0 2px, var(--pt-tbox-lip) 2px) 10px 2px / 1px 9px no-repeat,
     var(--pt-tbox-polish-pressed) center / 9px 9px no-repeat,
     var(--pt-tb-rim);
+}
+
+html[data-reader-theme="platinum"] body.tr-busy:not(.rail-open) #rail-toggle::after {
+  box-sizing: border-box;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 0;
+  background: var(--pt-link);
+  border: 1px solid var(--pt-frame);
+  box-shadow: none;
 }
 
 /* ==========================================================================
@@ -2826,14 +3238,34 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  :is(.notes-color-choice:hover, .vocab-export-choice:hover, .notes-color-choice[aria-checked="true"]) {
+  :is(.notes-color-choice:hover, .vocab-export-choice:hover, .notes-color-choice[aria-checked="true"]):not(:disabled, [aria-disabled="true"]) {
   background: var(--pt-sel-bg);
   color: var(--pt-sel-fg);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .vocab-export-choice:hover > .btn-ic {
+  .vocab-export-choice:hover:not(:disabled, [aria-disabled="true"]) > .btn-ic {
   color: inherit;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.notes-color-choice, .vocab-export-choice):is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background: transparent;
+  color: var(--pt-ink-muted);
+  box-shadow: none;
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .notes-color-choice[aria-checked="true"]:is(:disabled, [aria-disabled="true"]) {
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px var(--pt-border-subtle);
+}
+
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  :is(.notes-color-choice, .vocab-export-choice):focus-visible {
+  outline: 2px solid var(--pt-focus);
+  outline-offset: -2px;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .notes-hit-dot {
@@ -2891,14 +3323,20 @@ html[data-reader-theme="platinum"] #reader-bookmark-section > .bookmark-badge {
   box-shadow: none;
 }
 
-html[data-reader-theme="platinum"] #reader-bookmark-section > .bookmark-badge:hover {
+html[data-reader-theme="platinum"] #reader-bookmark-section > .bookmark-badge:hover:not(:disabled, [aria-disabled="true"]) {
   background: transparent;
   color: var(--pt-link);
 }
 
-html[data-reader-theme="platinum"] #reader-bookmark-section > .bookmark-badge:active {
+html[data-reader-theme="platinum"] #reader-bookmark-section > .bookmark-badge:active:not(:disabled, [aria-disabled="true"]) {
   background: transparent;
   color: var(--pt-ink);
+}
+
+html[data-reader-theme="platinum"] #reader-bookmark-section > .bookmark-badge:is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background: transparent;
+  color: var(--pt-ink-muted);
 }
 
 html[data-reader-theme="platinum"] :is(.token-badge, .pbv-ai-note, .hl-item-lang) {
@@ -3008,9 +3446,16 @@ html[data-reader-theme="platinum"] .hl-item-main {
   transition: none;
 }
 
-html[data-reader-theme="platinum"] .hl-item-main:is(:hover, :focus-visible):not(:disabled) {
+html[data-reader-theme="platinum"] .hl-item-main:is(:hover, :focus-visible):not(:disabled, [aria-disabled="true"]) {
   background: var(--pt-row-hover);
   color: var(--pt-ink);
+}
+
+html[data-reader-theme="platinum"] .hl-item-main:is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background: transparent;
+  color: var(--pt-ink-muted);
+  box-shadow: none;
 }
 
 html[data-reader-theme="platinum"] #rail .hl-item-dot {
@@ -3336,12 +3781,12 @@ html[data-reader-theme="platinum"]
 }
 
 /* #explain-pop Lookup / Explain / Translate Floating Window:
-   Row 1 = 23px horizontal 12px 6-ridge pinstripe titlebar (centered title + 4 equal-height 18x18 bevel boxes)
+   Row 1 = 24px horizontal 12px 6-ridge pinstripe titlebar (centered title + 4 equal-height 20x20 bevel boxes)
    Row 2 = clean dialog toolbar strip (.xp-act-group)
    Body  = sunken white Mac document well on .xp-body
    Foot  = bottom Mac .statusbar strip */
 html[data-reader-theme="platinum"] #explain-pop > .xp-head {
-  padding: 3px 6px 6px;
+  padding: 4px 6px 6px;
   row-gap: 7px;
   column-gap: 4px;
   align-items: center;
@@ -3351,18 +3796,18 @@ html[data-reader-theme="platinum"] #explain-pop > .xp-head {
     var(--pt-pinstripe-hi-layer),
     var(--pt-pinstripe-lo-layer),
     linear-gradient(var(--pt-win), var(--pt-win));
-  background-position: 0 23px, 6px 5px, 7px 5px, 0 0;
-  background-size: 100% 1px, calc(100% - 12px) 12px, calc(100% - 12px) 12px, 100% 23px;
+  background-position: 0 24px, 6px 6px, 7px 6px, 0 0;
+  background-size: 100% 1px, calc(100% - 12px) 12px, calc(100% - 12px) 12px, 100% 24px;
   background-repeat: no-repeat;
   border-bottom: 1px solid var(--pt-frame);
 }
 
 html[data-reader-theme="platinum"] #explain-pop > .xp-head > .xp-term {
   flex: 0 1 auto;
-  max-width: calc(100% - 116px);
+  max-width: calc(100% - 128px);
   margin-left: auto;
-  height: 18px;
-  line-height: 18px;
+  height: 20px;
+  line-height: 20px;
   padding: 0 8px;
   font-size: 12px;
   font-weight: 700;
@@ -3373,16 +3818,18 @@ html[data-reader-theme="platinum"] #explain-pop > .xp-head > .xp-term {
 html[data-reader-theme="platinum"] #explain-pop > .xp-head > .xp-drag-zone {
   flex: 0 0 8px;
   min-width: 8px;
-  height: 18px;
+  height: 20px;
   margin-left: auto;
   align-self: center;
   background: transparent;
 }
 
 html[data-reader-theme="platinum"] #explain-pop > .xp-head > .xp-window-actions {
+  position: relative;
+  z-index: 3;
   align-items: center;
-  gap: 3px;
-  height: 18px;
+  gap: var(--sp-1);
+  height: 20px;
   padding-left: 5px;
   background: var(--pt-win);
 }
@@ -3390,13 +3837,13 @@ html[data-reader-theme="platinum"] #explain-pop > .xp-head > .xp-window-actions 
 html[data-reader-theme="platinum"]
   #explain-pop > .xp-head .xp-window-actions > :is(.xp-resize-grip, .xp-dock, .xp-pin, .xp-close) {
   position: relative;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   background: var(--pt-face);
   color: var(--pt-ink);
   border: 1px solid var(--pt-edge);
-  border-radius: 1px;
+  border-radius: 2px;
   box-shadow: var(--pt-mini-bevel);
   transition: none;
 }
@@ -3406,28 +3853,41 @@ html[data-reader-theme="platinum"]
   content: "";
   box-sizing: border-box;
   position: absolute;
-  inset: -3px;
+  left: calc(50% - 12px);
+  top: calc(50% - 12px);
+  width: 24px;
+  height: 24px;
 }
 
 html[data-reader-theme="platinum"]
   #explain-pop > .xp-head .xp-window-actions > :is(.xp-resize-grip, .xp-dock, .xp-pin, .xp-close) svg {
-  width: 11px;
-  height: 11px;
+  width: 13px;
+  height: 13px;
 }
 
 html[data-reader-theme="platinum"]
-  #explain-pop > .xp-head .xp-window-actions > :is(.xp-resize-grip, .xp-dock, .xp-pin, .xp-close):hover:not(:active, [aria-pressed="true"]) {
+  #explain-pop > .xp-head .xp-window-actions > :is(.xp-resize-grip, .xp-dock, .xp-pin, .xp-close):hover:not(:disabled, [aria-disabled="true"], :active, [aria-pressed="true"]) {
   background: var(--pt-face-hover);
   color: var(--pt-ink);
   border-color: var(--pt-edge);
 }
 
 html[data-reader-theme="platinum"]
-  #explain-pop > .xp-head .xp-window-actions > :is(.xp-resize-grip, .xp-dock, .xp-pin, .xp-close):is(:active, [aria-pressed="true"]) {
+  #explain-pop > .xp-head .xp-window-actions > :is(.xp-resize-grip, .xp-dock, .xp-pin, .xp-close):is(:active, [aria-pressed="true"]):not(:disabled, [aria-disabled="true"]) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
   box-shadow: var(--pt-mini-pressed);
+}
+
+html[data-reader-theme="platinum"]
+  #explain-pop > .xp-head .xp-window-actions > :is(.xp-resize-grip, .xp-dock, .xp-pin, .xp-close):is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border-color: var(--pt-border-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 html[data-reader-theme="platinum"] #explain-pop > .reader-dict-session {
@@ -3574,13 +4034,24 @@ html[data-reader-theme="platinum"] #ask-mic:hover:not(:disabled, :active, [aria-
   border-color: var(--pt-edge);
 }
 
-html[data-reader-theme="platinum"] #ask-send:is(:active:not(:disabled), [aria-pressed="true"]),
-html[data-reader-theme="platinum"] #ask-stop:is(:active:not(:disabled), [aria-pressed="true"]),
-html[data-reader-theme="platinum"] #ask-mic:is(:active:not(:disabled), [aria-pressed="true"]) {
+html[data-reader-theme="platinum"] #ask-send:is(:active, [aria-pressed="true"]):not(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #ask-stop:is(:active, [aria-pressed="true"]):not(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #ask-mic:is(:active, [aria-pressed="true"]):not(:disabled, [aria-disabled="true"]) {
   background: var(--pt-pressed-bg);
   color: var(--pt-pressed-fg);
   border-color: var(--pt-edge);
   box-shadow: var(--pt-btn-pressed-shadow);
+}
+
+html[data-reader-theme="platinum"] #ask-send:is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #ask-stop:is(:disabled, [aria-disabled="true"]),
+html[data-reader-theme="platinum"] #ask-mic:is(:disabled, [aria-disabled="true"]) {
+  opacity: 1;
+  background: var(--pt-win);
+  color: var(--pt-ink-muted);
+  border-color: var(--pt-border-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 @media print {
