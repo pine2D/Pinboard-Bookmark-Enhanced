@@ -1298,6 +1298,9 @@ await test('Chinese parameter value, context-limit, and tool errors never poison
     {error:{code:'1210',param:'temperature',message:'temperature 值超出范围，不支持大于 2 的取值'}},
     {error:{code:'1210',param:'temperature',message:'参数 temperature 不支持大于 2 的取值'}},
     {error:{code:'1210',param:'temperature',message:'不支持参数 temperature 的取值 3'}},
+    {error:{code:'1210',param:'temperature',message:'不支持 temperature=0.3，请改为 1'}},
+    {error:{code:'1210',param:'temperature',message:'temperature=0.3 不受支持'}},
+    {error:{code:'1210',param:'temperature',message:'参数 temperature 不支持 0.3'}},
     {error:{code:'1210',message:'该模型始终思考，输入文本超出上下文长度'}},
     {error:{code:'1210',message:'该模型始终思考，不支持超长上下文，请缩短输入'}},
     {error:{code:'1210',message:'工具参数错误'}}
@@ -1305,14 +1308,16 @@ await test('Chinese parameter value, context-limit, and tool errors never poison
     reset([reply(badBody,400),reply(OK)],{});let caught=null;
     try{await run({},s);}catch(e){caught=e;}
     assert(caught?.status===400&&calls.length===1&&!stored.pbpAiParamFix&&!stored.pbpThinkReject,'poisoned on: '+JSON.stringify(badBody));
-    reset([reply(OK)],stored);
-    assert(await run({},s)==='ready'&&calls.length===1&&calls[0].temperature===0.3&&calls[0].thinking?.type==='disabled','subsequent valid call altered after: '+JSON.stringify(badBody));
+    reset([reply(OK),STREAM_DONE.compatible],stored);
+    assert(await run({},s)==='ready'&&await stream({temperature:1},s)==='ready'&&calls.length===2&&calls[0].temperature===0.3&&calls[1].temperature===1&&calls[0].thinking?.type==='disabled','subsequent valid call altered after: '+JSON.stringify(badBody));
   }
   const customS={aiProvider:'custom',customBaseUrl:'https://cn-compat.example/v1',customApiKey:'fixture',customModel:'cn-model'};
   for(const [idx,errObj] of [
     {message:'不支持参数 temperature',param:'temperature'},
     {message:'当前模型不支持 temperature',param:'temperature'},
-    {message:'当前模型不支持 temperature'}
+    {message:'当前模型不支持 temperature'},
+    {message:'temperature 不受支持',param:'temperature'},
+    {message:'temperature 不受支持'}
   ].entries()){
     reset([reply({error:errObj},400),reply(OK)],{});
     assert(await run({},{...customS,customModel:'cn-temp-'+idx})==='ready'&&calls.length===2&&calls[0].temperature===0.3&&!('temperature'in calls[1]),'Chinese unsupported temperature failed: '+JSON.stringify(errObj));

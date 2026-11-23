@@ -154,12 +154,32 @@ async function bootDriveWorker({
       },
     });
     const registeredOnlyAfterMicrotask = deferredRealm.mock.chrome.runtime.onMessage.hasListener(deferredRealm.win.handleRuntimeMessage);
-    check("top-level listener probe catches queueMicrotask-deferred onMessage registration",
+    deferredRealm.dispose();
+
+    // Verify ordinary pbpSwRealm.boot (without afterBootSync/backgroundSource) performs
+    // zero outer fetch() calls so file:// direct opening of SW test pages stays intact.
+    let outerFetchCalls = 0;
+    const realOuterFetch = globalThis.fetch;
+    globalThis.fetch = async (...args) => { outerFetchCalls++; return realOuterFetch(...args); };
+    let plainRealm = null;
+    try {
+      plainRealm = await pbpSwRealm.boot({
+        mock: {
+          id: EXT_ID,
+          manifest: CAPABLE_MANIFEST,
+          storage: { local: { personalLibraryAccount: "alice", bookmarkServiceActive: "pinboard", vocabDriveConnected: false, _legacyWildcardCleanupV1: true, _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
+        },
+      });
+    } finally {
+      globalThis.fetch = realOuterFetch;
+      plainRealm?.dispose();
+    }
+    check("top-level listener probe catches queueMicrotask-deferred onMessage while ordinary boot keeps zero outer fetch calls",
       mutatedBg !== rawBg
       && sampledBeforeMicrotask === true
       && syncSampledHasListener === false
-      && registeredOnlyAfterMicrotask === true);
-    deferredRealm.dispose();
+      && registeredOnlyAfterMicrotask === true
+      && outerFetchCalls === 0);
   }
 
   // 5. Both dirty messages schedule the one shared drive-sync-dirty alarm.

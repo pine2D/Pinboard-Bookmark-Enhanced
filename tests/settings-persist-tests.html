@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="610"><title>Settings Persistence Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="612"><title>Settings Persistence Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -4137,6 +4137,116 @@ async function run() {
         missingWriterV2Result.settings === "failed"
         && missingWriterV1Result.settings === "failed"
         && settingsWritesWithoutWriter === 0);
+
+      // R3-P1 & R3-P3:
+      // 1) Late chunk arrival between degraded [] read and completeness recheck must refuse [];
+      // 2) Cold optSyncEnabled transient failure in syncGetLarge followed by sync routing in recheck must refuse [];
+      // 3) Stale empty localFallback with unpropagated newer cloud generation must refuse [];
+      // 4) Stale non-empty localFallback left after local.remove failure must NOT block a confirmed empty [] cloud generation.
+      console.warn = () => {};
+      const makeMapArea = (obj) => ({
+        get: async (q) => {
+          if (q == null) return structuredClone(obj);
+          if (typeof q === "string") return q in obj ? { [q]: structuredClone(obj[q]) } : {};
+          if (Array.isArray(q)) return Object.fromEntries(q.filter((k) => k in obj).map((k) => [k, structuredClone(obj[k])]));
+          return { ...structuredClone(q), ...Object.fromEntries(Object.keys(q).filter((k) => k in obj).map((k) => [k, structuredClone(obj[k])])) };
+        },
+        set: async (d) => { Object.assign(obj, structuredClone(d)); },
+        remove: async (keys) => { for (const k of [].concat(keys)) delete obj[k]; },
+      });
+      // Case 1: Late chunk arrives right after syncGetLarge's second chunk attempt.
+      let lateArrivalRefusal = "";
+      let lateArrivalWrites = 0;
+      {
+        const lObj = { optSyncEnabled: true };
+        const sObj = { savedThemes: { _chunks: 1, _generation: "g1" } };
+        let chunkReads = 0;
+        const sArea = makeMapArea(sObj);
+        const origGet = sArea.get;
+        sArea.get = async (q) => {
+          const res = await origGet(q);
+          if (Array.isArray(q) && q.includes("savedThemes_g1_0")) {
+            chunkReads++;
+            if (chunkReads === 2) sObj.savedThemes_g1_0 = '[{"name":"CloudTheme","css":"body{}"}]';
+          }
+          return res;
+        };
+        const origSet = sArea.set;
+        sArea.set = async (d) => { lateArrivalWrites++; return origSet(d); };
+        globalThis.chrome.storage.local = makeMapArea(lObj);
+        globalThis.chrome.storage.sync = sArea;
+        _settingsStorageCache = sArea;
+        await pbpWithLargeStorageLock("savedThemes", async () => {
+          const cur = await pbpSyncGetLargeUnlocked("savedThemes", []);
+          try {
+            await pbpAssertChunkedSyncReadComplete("savedThemes", cur);
+            await pbpSyncSetLargeUnlocked("savedThemes", [{ name: "NewOnly", css: "p{}" }]);
+          } catch (err) {
+            lateArrivalRefusal = (err && err.code) || "threw";
+          }
+        });
+      }
+      // Case 2: Cold routing fails once in pbpSyncGetLargeUnlocked, succeeds in pbpAssertChunkedSyncReadComplete.
+      let coldFallbackMismatchRefusal = "";
+      {
+        const lObj = { optSyncEnabled: true };
+        const sObj = { savedThemes: { _chunks: 1, _generation: "g1" }, savedThemes_g1_0: '[{"name":"CloudTheme","css":"body{}"}]' };
+        let routeReads = 0;
+        const lArea = makeMapArea(lObj);
+        const origLGet = lArea.get;
+        lArea.get = async (q) => {
+          if (q && typeof q === "object" && !Array.isArray(q) && "optSyncEnabled" in q) {
+            routeReads++;
+            if (routeReads === 1) throw new Error("transient cold route read error");
+          }
+          return origLGet(q);
+        };
+        globalThis.chrome.storage.local = lArea;
+        globalThis.chrome.storage.sync = makeMapArea(sObj);
+        _settingsStorageCache = null;
+        const cur = await syncGetLarge("savedThemes", []);
+        try { await pbpAssertChunkedSyncReadComplete("savedThemes", cur); }
+        catch (err) { coldFallbackMismatchRefusal = (err && err.code) || "threw"; }
+      }
+      // Case 3: Stale empty localFallback while newer cloud generation g2 is missing chunks.
+      let staleEmptyFallbackRefusal = "";
+      {
+        const lObj = {
+          optSyncEnabled: true,
+          savedThemes_localFallback: pbpLargeFallbackRecord([], "gold", "g0"),
+        };
+        const sObj = { savedThemes: { _chunks: 1, _generation: "g2" } };
+        globalThis.chrome.storage.local = makeMapArea(lObj);
+        globalThis.chrome.storage.sync = makeMapArea(sObj);
+        _settingsStorageCache = globalThis.chrome.storage.sync;
+        const cur = await syncGetLarge("savedThemes", []);
+        try { await pbpAssertChunkedSyncReadComplete("savedThemes", cur); }
+        catch (err) { staleEmptyFallbackRefusal = (err && err.code) || "threw"; }
+      }
+      // Case 4 (R3-P3): Confirmed empty [] cloud generation g2 with leftover stale non-empty localFallback after local.remove failure.
+      let staleNonEmptyAllowed = false;
+      {
+        const lObj = {
+          optSyncEnabled: true,
+          savedThemes_localFallback: pbpLargeFallbackRecord([{ name: "OldLocal", css: "h1{}" }], "gold", "g0"),
+        };
+        const sObj = { savedThemes: { _chunks: 1, _generation: "g2" }, savedThemes_g2_0: "[]" };
+        const lArea = makeMapArea(lObj);
+        lArea.remove = async () => { throw new Error("transient remove failure"); };
+        globalThis.chrome.storage.local = lArea;
+        globalThis.chrome.storage.sync = makeMapArea(sObj);
+        _settingsStorageCache = globalThis.chrome.storage.sync;
+        const cur = await syncGetLarge("savedThemes", []);
+        await pbpAssertChunkedSyncReadComplete("savedThemes", cur);
+        staleNonEmptyAllowed = Array.isArray(cur) && cur.length === 0;
+      }
+      console.warn = prevWarnE7f;
+      check("E7f completeness check refuses late-arriving non-empty chunks, cold-routing local degradation, and stale empty fallbacks, while allowing confirmed empty cloud over stale fallback",
+        lateArrivalRefusal === "chunks_propagating"
+        && lateArrivalWrites === 0
+        && coldFallbackMismatchRefusal === "chunks_propagating"
+        && staleEmptyFallbackRefusal === "chunks_propagating"
+        && staleNonEmptyAllowed === true);
     } finally {
       console.warn = prevWarnE7f;
       globalThis.chrome = prevChromeE7f;
@@ -7226,6 +7336,24 @@ async function run() {
         }
         check("retired OpenAI migration: partial and full reads fetch a single atomic snapshot across string, array, defaults-object, and null queries",
           allAtomic);
+      }
+      {
+        // R3-P2: arbitrary stored string values (including "__pbp_storage_unset__" imported via v2 backup)
+        // never collide with internal defaults-object resolution across SETTINGS_DEFAULTS, array, and null queries.
+        const local = { optSyncEnabled: true, syncApiKeys: false };
+        const sync = { syncApiKeys: false, openaiBaseUrl: "__pbp_storage_unset__", openaiModel: "gpt-4o-mini" };
+        install(local, sync);
+        _settingsStorageCache = null;
+        const fromDefaults = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
+        const fromArray = await pbpReadSettingsWithSecrets(["openaiBaseUrl", "openaiModel"]);
+        const fromNull = await pbpReadSettingsWithSecrets(null);
+        check("retired OpenAI migration: defaults-object read preserves literal '__pbp_storage_unset__' openaiBaseUrl without sentinel collision",
+          fromDefaults.openaiBaseUrl === "__pbp_storage_unset__"
+          && fromDefaults.openaiModel === "gpt-4o-mini"
+          && fromArray.openaiBaseUrl === "__pbp_storage_unset__"
+          && fromArray.openaiModel === "gpt-4o-mini"
+          && fromNull.openaiBaseUrl === "__pbp_storage_unset__"
+          && fromNull.openaiModel === "gpt-4o-mini");
       }
     } finally {
       globalThis.chrome = previousChrome;

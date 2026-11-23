@@ -3428,6 +3428,7 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
     }
   }
   if (storage !== chrome.storage.sync) return;
+  const emptyDefault = Array.isArray(value) ? [] : (typeof value === "object" && value !== null ? {} : "");
   const fallbackKey = pbpLargeFallbackKey(key);
   let fallbacks;
   try {
@@ -3436,17 +3437,23 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
     console.warn("[sync-large] completeness check fallback read failed:", key, error?.name, error?.message);
     throw error;
   }
-  if (fallbacks && Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey)) {
-    const emptyDefault = Array.isArray(value) ? [] : (typeof value === "object" && value !== null ? {} : "");
-    const decodedFallback = pbpDecodeLargeResult(pbpLargeFallbackValue(fallbacks[fallbackKey]), emptyDefault);
-    if (decodedFallback.ok && pbpIsEmptyChunkedValue(decodedFallback.value)) return;
-    throw pbpChunksPropagatingError(key);
-  }
   let meta;
   try { meta = (await chrome.storage.sync.get(key))[key]; }
   catch (error) {
     console.warn("[sync-large] completeness check manifest read failed:", key, error?.name, error?.message);
     throw error;
+  }
+  if (fallbacks && Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey)) {
+    const record = fallbacks[fallbackKey];
+    const freshness = pbpLargeFallbackFreshness(record, meta);
+    if (freshness === "fresh") {
+      const decodedFallback = pbpDecodeLargeResult(pbpLargeFallbackValue(record), emptyDefault);
+      if (decodedFallback.ok && pbpIsEmptyChunkedValue(decodedFallback.value)) return;
+      throw pbpChunksPropagatingError(key);
+    }
+    // "committed" or "stale": cloud moved to this or a newer generation, so an
+    // older fallback neither certifies an unpropagated cloud generation as empty
+    // nor blocks a confirmed empty cloud generation when prior local.remove failed.
   }
   const chunkKeys = pbpChunkStorageKeys(key, meta);
   if (!chunkKeys.length) {
@@ -3454,9 +3461,18 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
     // a cloud record this build cannot decode (bad _chunks, bad _generation);
     // the reader degraded it to the default just the same, so rewriting from
     // that default orphans whatever it points at exactly as a missing chunk
-    // does. `undefined` (never written) and a legacy pre-chunk string (which
-    // decodes fine) are NOT that and must keep passing.
-    if (!meta || typeof meta !== "object") return;
+    // does. `undefined` (never written) and empty/non-contradicting legacy
+    // pre-chunk strings must keep passing.
+    if (meta === undefined || meta === null) return;
+    if (typeof meta === "string") {
+      if (typeof value === "string") {
+        if (meta === "") return;
+        throw pbpChunksPropagatingError(key);
+      }
+      const legacyDecoded = pbpDecodeLargeResult(meta, emptyDefault);
+      if (!legacyDecoded.ok || pbpIsEmptyChunkedValue(legacyDecoded.value)) return;
+      throw pbpChunksPropagatingError(key);
+    }
     throw pbpChunksPropagatingError(key);
   }
   let chunks;
@@ -3465,7 +3481,11 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
     console.warn("[sync-large] completeness check chunk read failed:", key, error?.name, error?.message);
     throw error;
   }
-  if (chunkKeys.every((chunkKey) => typeof chunks[chunkKey] === "string")) return;
+  if (!chunkKeys.every((chunkKey) => typeof chunks[chunkKey] === "string")) {
+    throw pbpChunksPropagatingError(key);
+  }
+  const decodedCloud = pbpDecodeLargeResult(chunkKeys.map((chunkKey) => chunks[chunkKey]).join(""), emptyDefault);
+  if (decodedCloud.ok && pbpIsEmptyChunkedValue(decodedCloud.value)) return;
   throw pbpChunksPropagatingError(key);
 }
 
@@ -4679,8 +4699,6 @@ function pbpQueryRequestsKey(query, key) {
   return typeof query === "object" && Object.prototype.hasOwnProperty.call(query, key);
 }
 
-const PBP_STORAGE_UNSET = "__pbp_storage_unset__";
-
 // The body of pbpReadSettingsWithSecrets; callers hold the secret lock.
 async function pbpReadSettingsUnlocked(query) {
   const state = await pbpReadSecretSyncStateUnlocked();
@@ -4698,44 +4716,26 @@ async function pbpReadSettingsUnlocked(query) {
     settings = await mainArea.get(query);
     if (wantsDictView) settings.dictDefaultView = pbpDictDefaultView(settings);
     if (wantsRetiredAi) pbpApplyRetiredAiModelFallbacks(settings, null, query);
-  } else if (typeof query === "string" || Array.isArray(query)) {
-    const requestedList = typeof query === "string" ? [query] : query;
+  } else {
+    const isObjectQuery = !Array.isArray(query) && typeof query === "object";
+    const requestedList = typeof query === "string"
+      ? [query]
+      : (Array.isArray(query) ? query : Object.keys(query));
     const fetchKeys = requestedList.slice();
     const ensureKey = (k) => { if (!fetchKeys.includes(k)) fetchKeys.push(k); };
     if (wantsDictView) { ensureKey("dictDefaultView"); ensureKey("dictAiAutoGenerate"); }
     if (wantsRetiredAi) { ensureKey("openaiBaseUrl"); ensureKey("aiProvider"); ensureKey("previewAiModelByProvider"); }
-    // Fetch requested fields and evaluation context in ONE atomic storage.get so
-    // concurrent Chrome Sync arrivals cannot stitch two incompatible snapshots.
+    // Fetch requested fields and evaluation context in ONE atomic array-form
+    // storage.get so concurrent Chrome Sync arrivals cannot stitch incompatible
+    // snapshots and no sentinel string can ever collide with stored user data.
     const raw = await mainArea.get(fetchKeys);
     settings = {};
     for (const k of requestedList) {
       if (Object.prototype.hasOwnProperty.call(raw, k)) settings[k] = raw[k];
+      else if (isObjectQuery) settings[k] = query[k];
     }
     if (wantsDictView) settings.dictDefaultView = pbpDictDefaultView(raw);
     if (wantsRetiredAi) pbpApplyRetiredAiModelFallbacks(settings, raw, query);
-  } else {
-    const probeKeys = [];
-    if (wantsDictView) probeKeys.push("dictDefaultView", "dictAiAutoGenerate");
-    if (wantsRetiredAi) probeKeys.push("openaiBaseUrl", "aiProvider", "previewAiModelByProvider");
-    const reqObj = Object.assign({}, query);
-    for (const k of probeKeys) reqObj[k] = PBP_STORAGE_UNSET;
-    // Object-form get inserts defaults; sentinel values distinguish genuinely
-    // stored keys from unset ones within the SAME single storage.get call.
-    const fetched = await mainArea.get(reqObj);
-    const rawProbe = {};
-    settings = Object.assign({}, fetched);
-    for (const k of probeKeys) {
-      if (Object.prototype.hasOwnProperty.call(fetched, k) && fetched[k] !== PBP_STORAGE_UNSET) {
-        rawProbe[k] = fetched[k];
-      }
-      if (Object.prototype.hasOwnProperty.call(query, k)) {
-        settings[k] = Object.prototype.hasOwnProperty.call(rawProbe, k) ? rawProbe[k] : query[k];
-      } else {
-        delete settings[k];
-      }
-    }
-    if (wantsDictView) settings.dictDefaultView = pbpDictDefaultView(rawProbe);
-    if (wantsRetiredAi) pbpApplyRetiredAiModelFallbacks(settings, rawProbe, query);
   }
   settings = await pbpResolveChunkedSettings(settings, mainArea, query);
   if (pbpSecretRoutingActive(state.optSyncEnabled, state.syncApiKeys)) {

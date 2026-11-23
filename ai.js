@@ -236,8 +236,8 @@ const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature
 // REST validators say `Unknown name "<field>"`, and Chinese providers return
 // localized refusal text.
 const _AI_EN_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field|name)|extra\s+inputs|\bdeprecated\b/;
-const _AI_CN_PARAM_REFUSED_RE = /未知(?:参数|字段)|不(?:再)?支持(?:该|此)?(?:参数|字段)|(?:参数|字段)\s*[`'"]?[a-z0-9_]*[`'"]?\s*不(?:受|再)?支持|不(?:再)?支持\s*[`'"]?(?:max_tokens|max_completion_tokens|temperature|reasoning_effort|response_format|thinking|enable_thinking|thinkingbudget|thinkinglevel|thinkingconfig|reasoning)\b/;
-const _AI_CN_VALUE_ERROR_RE = /取值|值必须|值超出|超出范围|介于|大于|小于|至少|至多|不得超过|不能超过|必须为|必须是|工具参数/;
+const _AI_CN_PARAM_REFUSED_RE = /未知(?:参数|字段)|不(?:再)?支持(?:该|此)?(?:参数|字段)|(?:参数|字段)\s*[`'"]?[a-z0-9_]*[`'"]?\s*不(?:受|再)?支持|不(?:再)?支持\s*[`'"]?(?:max_tokens|max_completion_tokens|temperature|reasoning_effort|response_format|thinking|enable_thinking|thinkingbudget|thinkinglevel|thinkingconfig|reasoning)\b(?!\s*[=:：<>≤≥])|\b(?:max_tokens|max_completion_tokens|temperature|reasoning_effort|response_format|thinking|enable_thinking|thinkingbudget|thinkinglevel|thinkingconfig|reasoning)\b[`'"]?\s*(?:不(?:受|再)?支持|不再受支持|已弃用)/;
+const _AI_CN_VALUE_ERROR_RE = /取值|值必须|值超出|超出范围|介于|大于|小于|至少|至多|不得超过|不能超过|必须为|必须是|只能为|只能是|仅支持\s*[-+0-9"'`]|不(?:受|再)?支持\s*[-+0-9]|(?:请)?(?:改为|设为|设置为)\s*[-+0-9"'`]|\b(?:max_tokens|max_completion_tokens|temperature|reasoning_effort|response_format|thinking|enable_thinking|thinkingbudget|thinkinglevel|thinkingconfig|reasoning)\b[`'"]?\s*(?:[=:：<>≤≥]|为\s*[-+0-9"'`])|工具参数/;
 function _aiIsParamRefused(detail) {
   return _AI_EN_PARAM_REFUSED_RE.test(detail) ||
     (_AI_CN_PARAM_REFUSED_RE.test(detail) && !_AI_CN_VALUE_ERROR_RE.test(detail));
