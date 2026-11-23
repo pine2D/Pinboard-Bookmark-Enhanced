@@ -615,7 +615,8 @@ async function pbpApplyBackupPayload(data, {
       let localOnly = !!importRes.fellBackToLocal;
       if (schemaVersion >= 2) {
         if (customOverlayCSS !== undefined) {
-          const overlayRes = saveOverlayWithFallback ? await saveOverlayWithFallback(customOverlayCSS) : null;
+          if (typeof saveOverlayWithFallback !== "function") throw new Error("overlay writer unavailable");
+          const overlayRes = await saveOverlayWithFallback(customOverlayCSS);
           localOnly = localOnly || !!(overlayRes && overlayRes.fellBackToLocal);
         }
       } else {
@@ -641,6 +642,9 @@ async function pbpApplyBackupPayload(data, {
           newOverlay = allowed.some((css) => css && css.trim() === customCSS.trim()) ? "" : customCSS;
         }
         await (await getSettingsStorage()).set({ themePresetKey: resolvedKey || "" });
+        if (customCSS !== undefined && typeof saveOverlayWithFallback !== "function") {
+          throw new Error("overlay writer unavailable");
+        }
         const overlayRes = saveOverlayWithFallback ? await saveOverlayWithFallback(newOverlay) : null;
         localOnly = localOnly || !!(overlayRes && overlayRes.fellBackToLocal);
       }

@@ -25,7 +25,7 @@ const USAGE = { language: 'zh-Hans', summary: null, items: { sense: '1', title: 
 const sse = events => events.map(event => (event.event ? 'event: ' + event.event + '\n' : '') + 'data: ' +
   (typeof event.data === 'string' ? event.data : JSON.stringify(event.data)) + '\n\n').join('');
 const split = text => [text.slice(0, 15), text.slice(15)];
-const openAiChunk = (model, delta, finish, usage = null) => ({ id: 'chatcmpl-142fa30e-ce2b-9c32-9fa9-1e3116b67a0f', object: 'chat.completion.chunk', created: 1795407766, model,
+const openAiChunk = (model, delta, finish, usage = null) => ({ id: 'chatcmpl-fixture-0002', object: 'chat.completion.chunk', created: 1700000002, model,
   choices: [{ index: 0, delta, logprobs: null, finish_reason: finish === undefined ? null : finish }], usage });
 // OpenAI-compatible SSE stream verified on 2026-11-23 against live Bailian /
 // MiniMax / SiliconFlow responses: role chunk, reasoning chunk, content chunks,
@@ -35,7 +35,7 @@ const openAiStream = (model, text, finish) => sse([
   { data: openAiChunk(model, { role: 'assistant', reasoning_content: 'Not an answer or a dictionary field.' }, null) },
   ...split(text).map(part => ({ data: openAiChunk(model, { content: part }, null) })),
   { data: openAiChunk(model, { content: '' }, finish) },
-  { data: { id: 'chatcmpl-142fa30e-ce2b-9c32-9fa9-1e3116b67a0f', object: 'chat.completion.chunk', created: 1795407768, model, choices: [],
+  { data: { id: 'chatcmpl-fixture-0002', object: 'chat.completion.chunk', created: 1700000003, model, choices: [],
     usage: { prompt_tokens: 540, completion_tokens: 135, total_tokens: 675, prompt_tokens_details: { cached_tokens: 0 } } } },
   { data: '[DONE]' }]);
 const PROTOCOLS = [
@@ -50,13 +50,13 @@ const PROTOCOLS = [
     envelope: (text, truncated) => sse([
       { data: { candidates: [{ content: { parts: [{ text: 'Not an answer or a dictionary field.', thought: true }], role: 'model' }, index: 0 }],
         usageMetadata: { promptTokenCount: 515, candidatesTokenCount: 0, totalTokenCount: 515, promptTokensDetails: [{ modality: 'TEXT', tokenCount: 515 }], serviceTier: 'standard' },
-        modelVersion: 'arbitrary-protocol-model-b', responseId: 'scEDa7qgO5qv8L0PyMbf6AI' } },
+        modelVersion: 'arbitrary-protocol-model-b', responseId: 'gemini-resp-fixture-2' } },
       ...split(text).map((part, idx) => ({ data: { candidates: [{ content: { parts: [{ text: part }], role: 'model' }, index: 0 }],
         usageMetadata: { promptTokenCount: 515, candidatesTokenCount: (idx + 1) * 3, totalTokenCount: 515 + (idx + 1) * 3, promptTokensDetails: [{ modality: 'TEXT', tokenCount: 515 }], serviceTier: 'standard' },
-        modelVersion: 'arbitrary-protocol-model-b', responseId: 'scEDa7qgO5qv8L0PyMbf6AI' } })),
-      { data: { candidates: [{ content: { parts: [{ text: '', thoughtSignature: 'Eo4BCosBAWkUfRPldB==' }], role: 'model' }, finishReason: truncated ? 'MAX_TOKENS' : 'STOP', index: 0 }],
+        modelVersion: 'arbitrary-protocol-model-b', responseId: 'gemini-resp-fixture-2' } })),
+      { data: { candidates: [{ content: { parts: [{ text: '', thoughtSignature: 'c3ludGhldGljLXNpZ25hdHVyZQ==' }], role: 'model' }, finishReason: truncated ? 'MAX_TOKENS' : 'STOP', index: 0 }],
         usageMetadata: { promptTokenCount: 515, candidatesTokenCount: 6, totalTokenCount: 521, promptTokensDetails: [{ modality: 'TEXT', tokenCount: 515 }], serviceTier: 'standard' },
-        modelVersion: 'arbitrary-protocol-model-b', responseId: 'scEDa7qgO5qv8L0PyMbf6AI' } }]) },
+        modelVersion: 'arbitrary-protocol-model-b', responseId: 'gemini-resp-fixture-2' } }]) },
   // Anthropic /v1/messages SSE wire shape verified on 2026-11-23 against live
   // claude-haiku-5-5 via Command Code (container/stop_details/diagnostics nulls,
   // cache_creation & output_tokens_details.thinking_tokens, thinking block +
@@ -64,7 +64,7 @@ const PROTOCOLS = [
   { name: 'Claude', model: 'arbitrary-protocol-model-c', contentType: 'text/event-stream',
     settings: { aiProvider: 'claude', claudeApiKey: 'fixture', claudeModel: 'arbitrary-protocol-model-c' },
     envelope: (text, truncated) => sse([
-      { event: 'message_start', data: { type: 'message_start', message: { model: 'arbitrary-protocol-model-c', id: 'msg_011ChKFTG9JsevPv6hue2q1W', type: 'message', role: 'assistant',
+      { event: 'message_start', data: { type: 'message_start', message: { model: 'arbitrary-protocol-model-c', id: 'msg_fixture_0002', type: 'message', role: 'assistant',
         content: [], container: null, stop_reason: null, stop_sequence: null, stop_details: null,
         usage: { input_tokens: 858, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 }, output_tokens: 3, service_tier: 'standard', inference_geo: 'global', speed: 'standard' }, diagnostics: null } } },
       { event: 'content_block_start', data: { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } } },

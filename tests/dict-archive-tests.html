@@ -562,9 +562,12 @@ function driveFixture(options = {}) {
       if (url.pathname === "/upload/drive/v3/files") {
         const parts = init.body.split("\r\n\r\n");
         const uploadedMeta = JSON.parse(parts[1].split("\r\n--")[0]);
+        if (typeof uploadedMeta.id !== "string" || !uploadedMeta.id || typeof uploadedMeta.name !== "string" || !uploadedMeta.name) {
+          throw new Error("unexpected upload metadata: " + JSON.stringify(uploadedMeta));
+        }
         uploads.push({ metadata: uploadedMeta,
           body: parts[2].slice(0, parts[2].lastIndexOf("\r\n--")) });
-        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { kind: "drive#file", id: uploadedMeta.id, name: uploadedMeta.name, mimeType: "application/json" }, failUpload ? 503 : 200);
+        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { kind: "drive#file", id: "drive-dict-file-fixture", name: "pbp-dict-batch-fixture.json", mimeType: "application/json" }, failUpload ? 503 : 200);
       }
       throw new Error("unexpected request " + url.pathname);
     } });

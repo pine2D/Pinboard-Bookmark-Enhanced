@@ -3382,14 +3382,16 @@ async function pbpReadChunkedSyncResult(key, stored, defaultValue) {
 // deliberate escape hatch): it publishes a list the USER supplied rather than
 // one derived from the suspicious read, so it is safe to leave unguarded.
 //
-// FAIL-OPEN on every storage exception, deliberately. A probe that threw
-// whenever it could not reach storage would convert transient platform noise
-// into a refusal to export or to change the sync setting, i.e. it would break
-// the working case to protect the broken one. The read whose result is being
-// checked came back, so the caller already has a usable value; this function
-// only ever UPGRADES a suspicious empty read into a refusal, never a healthy
-// one. Note it does NOT take pbpWithLargeStorageLock, so it is safe to call
-// from inside a caller that already holds it.
+// FAIL-CLOSED on storage exceptions during empty-value verification. Callers
+// invoke this probe only after the reader handed back an empty default ("" /
+// [] / {}), which happens both for genuinely empty state AND when chunks were
+// missing or unreadable. If storage throws while re-checking the cloud
+// manifest or chunks, returning normally would certify an unverified empty
+// fallback as complete and allow backup export or cloud theme write-backs to
+// publish empty data over the user's cloud copy. Read-only UI callers that
+// must keep rendering wrap this check in try/catch and skip write-backs on
+// failure. Note it does NOT take pbpWithLargeStorageLock, so it is safe to
+// call from inside a caller that already holds it.
 //
 // KNOWN RESIDUAL (by design): "the manifest itself has not arrived yet" is
 // undetectable here. A device that holds neither the manifest nor the chunks
@@ -3404,11 +3406,12 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
     || (Array.isArray(value) && value.length === 0)
     || (typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0);
   if (!empty) return;
+  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.sync) return;
   let storage;
   try { storage = await getSettingsStorage(); }
   catch (error) {
     console.warn("[sync-large] completeness check storage lookup failed:", key, error?.name, error?.message);
-    return;
+    throw error;
   }
   if (storage !== chrome.storage.sync) return;
   const fallbackKey = pbpLargeFallbackKey(key);
@@ -3422,7 +3425,7 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
   try { meta = (await chrome.storage.sync.get(key))[key]; }
   catch (error) {
     console.warn("[sync-large] completeness check manifest read failed:", key, error?.name, error?.message);
-    return;
+    throw error;
   }
   const chunkKeys = pbpChunkStorageKeys(key, meta);
   if (!chunkKeys.length) {
@@ -3439,7 +3442,7 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
   try { chunks = await chrome.storage.sync.get(chunkKeys); }
   catch (error) {
     console.warn("[sync-large] completeness check chunk read failed:", key, error?.name, error?.message);
-    return;
+    throw error;
   }
   if (chunkKeys.every((chunkKey) => typeof chunks[chunkKey] === "string")) return;
   throw pbpChunksPropagatingError(key);
@@ -4282,13 +4285,6 @@ async function pbpMigrateRetiredDeepseekModels() {
       if (Object.keys(localPatch).length > 0) {
         await chrome.storage.local.set(localPatch);
       }
-      if (chrome.storage && chrome.storage.sync) {
-        const syncRaw = await chrome.storage.sync.get(keys);
-        const syncPatch = pbpBuildRetiredDeepseekModelPatch(syncRaw);
-        if (Object.keys(syncPatch).length > 0) {
-          await chrome.storage.sync.set(syncPatch);
-        }
-      }
       await chrome.storage.local.set({ [PBP_RETIRED_DEEPSEEK_MODEL_FLAG]: true });
     });
   } catch (e) {
@@ -4361,13 +4357,6 @@ async function pbpMigrateRetiredMinimaxKimiModels() {
       if (Object.keys(localPatch).length > 0) {
         await chrome.storage.local.set(localPatch);
       }
-      if (chrome.storage && chrome.storage.sync) {
-        const syncRaw = await chrome.storage.sync.get(keys);
-        const syncPatch = pbpBuildRetiredMinimaxKimiModelPatch(syncRaw);
-        if (Object.keys(syncPatch).length > 0) {
-          await chrome.storage.sync.set(syncPatch);
-        }
-      }
       await chrome.storage.local.set({ [PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG]: true });
     });
   } catch (e) {
@@ -4375,12 +4364,16 @@ async function pbpMigrateRetiredMinimaxKimiModels() {
   }
 }
 
-// One-shot retirement rewrite for OpenAI's deprecated/scheduled-shutdown
-// lightweight defaults ("gpt-5.4-nano", "gpt-5.4-nano-2026-03-17",
-// "gpt-5-nano", "gpt-5-nano-2025-08-07", "gpt-4o-mini",
-// "gpt-4o-mini-2024-07-18", "gpt-4.1-mini", "gpt-4.1-mini-2025-04-14" ->
-// "gpt-6-luna"). Scoped strictly to official `openai` settings when
-// `openaiBaseUrl` has not been overridden to a 3rd-party proxy.
+// One-shot local retirement rewrite + active-area read-time fallback for
+// OpenAI's deprecated/scheduled-shutdown lightweight defaults ("gpt-5.4-nano",
+// "gpt-5.4-nano-2026-03-17", "gpt-5-nano", "gpt-5-nano-2025-08-07",
+// "gpt-4o-mini", "gpt-4o-mini-2024-07-18", "gpt-4.1-mini",
+// "gpt-4.1-mini-2025-04-14" -> "gpt-6-luna"). Scoped strictly to official
+// `openai` settings when that storage area's own `openaiBaseUrl` has not been
+// overridden to a 3rd-party proxy. Background migration writes local only (never
+// chrome.storage.sync, which lacks CAS and could clobber concurrent remote
+// updates to previewAiModelByProvider or openaiBaseUrl); synced profiles
+// resolve retired defaults at read time in pbpReadSettingsUnlocked.
 // Retire by 2027-01-15 (.claude/expiring-items.md).
 const PBP_RETIRED_OPENAI_MODEL_FLAG = "_retiredOpenaiModelsDone";
 const PBP_RETIRED_OPENAI_MODELS = Object.freeze([
@@ -4402,12 +4395,9 @@ function _pbpIsOfficialOpenaiBase(url) {
   return trimmed === "" || trimmed === official;
 }
 
-function pbpBuildRetiredOpenaiModelPatch(raw, fallbackBaseUrl) {
+function pbpBuildRetiredOpenaiModelPatch(raw) {
   if (!raw || typeof raw !== "object") return {};
-  const effectiveBase = Object.prototype.hasOwnProperty.call(raw, "openaiBaseUrl")
-    ? raw.openaiBaseUrl
-    : fallbackBaseUrl;
-  if (!_pbpIsOfficialOpenaiBase(effectiveBase)) return {};
+  if (!_pbpIsOfficialOpenaiBase(raw.openaiBaseUrl)) return {};
   const patch = {};
   const openaiNext = SETTINGS_DEFAULTS.openaiModel;
   if (typeof raw.openaiModel === "string" && PBP_RETIRED_OPENAI_MODELS.includes(raw.openaiModel)) {
@@ -4435,24 +4425,43 @@ async function pbpMigrateRetiredOpenaiModels() {
       if (recheck && recheck[PBP_RETIRED_OPENAI_MODEL_FLAG] === true) return;
       const keys = ["openaiModel", "openaiBaseUrl", "previewAiModelByProvider", "previewAiModel", "aiProvider"];
       const localRaw = await chrome.storage.local.get(keys);
-      const syncRaw = (chrome.storage && chrome.storage.sync)
-        ? await chrome.storage.sync.get(keys)
-        : null;
-      const localPatch = pbpBuildRetiredOpenaiModelPatch(localRaw, syncRaw && syncRaw.openaiBaseUrl);
+      const localPatch = pbpBuildRetiredOpenaiModelPatch(localRaw);
       if (Object.keys(localPatch).length > 0) {
         await chrome.storage.local.set(localPatch);
-      }
-      if (syncRaw) {
-        const syncPatch = pbpBuildRetiredOpenaiModelPatch(syncRaw, localRaw && localRaw.openaiBaseUrl);
-        if (Object.keys(syncPatch).length > 0) {
-          await chrome.storage.sync.set(syncPatch);
-        }
       }
       await chrome.storage.local.set({ [PBP_RETIRED_OPENAI_MODEL_FLAG]: true });
     });
   } catch (e) {
     console.warn("[ai-migration] retired OpenAI model rewrite failed:", e && e.name, e && e.message);
   }
+}
+
+function pbpQueryRequestsRetiredAiModels(query) {
+  return pbpQueryRequestsKey(query, "openaiModel")
+    || pbpQueryRequestsKey(query, "deepseekModel")
+    || pbpQueryRequestsKey(query, "minimaxModel")
+    || pbpQueryRequestsKey(query, "kimiModel")
+    || pbpQueryRequestsKey(query, "previewAiModelByProvider")
+    || pbpQueryRequestsKey(query, "previewAiModel");
+}
+
+function pbpApplyRetiredAiModelFallbacks(settings, aux, query) {
+  if (!settings || typeof settings !== "object") return settings;
+  const ctx = Object.assign({}, aux || {}, settings);
+  for (const build of [
+    pbpBuildRetiredDeepseekModelPatch,
+    pbpBuildRetiredMinimaxKimiModelPatch,
+    pbpBuildRetiredOpenaiModelPatch,
+  ]) {
+    const patch = build(ctx);
+    for (const [key, value] of Object.entries(patch)) {
+      ctx[key] = value;
+      if (pbpQueryRequestsKey(query, key) && (query !== null || Object.prototype.hasOwnProperty.call(settings, key))) {
+        settings[key] = value;
+      }
+    }
+  }
+  return settings;
 }
 
 // Splits a saveAll-shaped batch into { main, secrets }:
@@ -4654,6 +4663,14 @@ async function pbpReadSettingsUnlocked(query) {
   if (wantsDictView) {
     const rawView = await mainArea.get(["dictDefaultView", "dictAiAutoGenerate"]);
     settings.dictDefaultView = pbpDictDefaultView(rawView);
+  }
+  if (pbpQueryRequestsRetiredAiModels(query)) {
+    const auxKeys = [];
+    if (!Object.prototype.hasOwnProperty.call(settings, "openaiBaseUrl")) auxKeys.push("openaiBaseUrl");
+    if (!Object.prototype.hasOwnProperty.call(settings, "aiProvider")) auxKeys.push("aiProvider");
+    if (!Object.prototype.hasOwnProperty.call(settings, "previewAiModelByProvider")) auxKeys.push("previewAiModelByProvider");
+    const aux = auxKeys.length ? await mainArea.get(auxKeys) : null;
+    pbpApplyRetiredAiModelFallbacks(settings, aux, query);
   }
   settings = await pbpResolveChunkedSettings(settings, mainArea, query);
   if (pbpSecretRoutingActive(state.optSyncEnabled, state.syncApiKeys)) {

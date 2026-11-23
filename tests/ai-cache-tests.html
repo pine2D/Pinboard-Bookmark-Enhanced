@@ -56,10 +56,11 @@ async function allKeys() {
 }
 async function rawEntry(key) {
   const opened = await db();
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const tx = opened.transaction(_PBP_AI_STORE, "readonly");
     const req = tx.objectStore(_PBP_AI_STORE).get(key);
-    req.onsuccess = () => resolve(req.result || null); req.onerror = () => resolve(null);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error || new Error("rawEntry get failed: " + key));
   });
 }
 function rows(prefix, count, firstTs) {

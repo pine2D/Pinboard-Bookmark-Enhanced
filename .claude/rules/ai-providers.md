@@ -26,7 +26,7 @@ paths:
 | siliconflow / qwen（阿里云百炼，四个地域及业务空间专属地址同一方言，核实结论与链接见注） | `{"enable_thinking":false}` |
 | openai / mistral / cohere | `{"reasoning_effort":"none"}`（flat，非 Responses 的 nested；cohere compat 端点仅 none/high） |
 | openrouter | `{"reasoning":{"enabled":false}}`（勿用 exclude，仍计费） |
-| gemini | bespoke：`thinkingConfig.thinkingLevel:"low"`（2026-11-23 实测复核：Gemini 3.5+ 已对旧 `thinkingBudget:0` 返回 400 `INVALID_ARGUMENT`，`low` 为 2.5 / 3.x / 4.x 全系支持的最低公共档位；旧非思考模型靠 400/422 剥离自愈） |
+| gemini | bespoke：先发 `thinkingConfig.thinkingLevel:"low"`（2026-11-23 实测复核：Gemini 3 / 3.5 / 4 系列要求 `thinkingLevel` 并对旧 `thinkingBudget:0` 返回 400 `INVALID_ARGUMENT`）；Gemini 3 之前的 `gemini-2.5-flash` 拒绝 `thinkingLevel` 时经 `thinkingFallback` 回退 `thinkingConfig.thinkingBudget:0` 并缓存 7 天；强制思考（如 `gemini-2.5-pro`）或旧非思考模型在第 3 步剥离 `thinkingConfig` 自愈 |
 | deepseek | thinkingOff（deepseek-reasoner 会拒收，靠 4xx 回退兜住） |
 | groq / custom / ollama | 默认不加 thinkingOff；兼容协议的任务级低思考偏好见后文，Ollama 不发送该字段 |
 | ark（火山方舟，国内与 BytePlus 海外两个地域同一方言） | `{"thinking":{"type":"disabled"}}`，2026-10-28 按官方原文核实，见注 |

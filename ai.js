@@ -235,7 +235,7 @@ const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature
 // for this model." from a Messages API behind a compatible gateway); Protobuf
 // REST validators say `Unknown name "<field>"`, and Chinese providers return
 // localized refusal text.
-const _AI_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field|name)|extra\s+inputs|\bdeprecated\b|不(?:受)?支持|未知参数|非法参数/;
+const _AI_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field|name)|extra\s+inputs|\bdeprecated\b|未知(?:参数|字段)|不支持(?:该|此)?(?:参数|字段)|(?:参数|字段)\s*[`'"]?[a-z_]*[`'"]?\s*不(?:受)?支持/;
 function _aiRejectedParam(body, detail) {
   const param = String((body && body.error && body.error.param) || "").trim();
   // Some compatible APIs enumerate only text/json_object and reject the
@@ -259,14 +259,15 @@ function _aiRejectedParam(body, detail) {
       /not\s+(?:supported|allowed)|unsupported|cannot\s+(?:be\s+)?(?:disabled|zero)|must\s+be\s+(?:true|enabled)|only\s+(?:supports?|allows?)|restricted\s+to\s+true|(?:expected|must\s+be|should\s+be)\s+one\s+of/.test(detail)) return thinkingParam;
   // Chinese mandatory-thinking endpoints (e.g. Zhipu glm-5.3-flash code 1210:
   // "该模型始终思考，不支持关闭思考；请使用 low、high 或 max。") omit error.param
-  // and name thinking only in Chinese.
+  // and name thinking only in Chinese. Require an explicit refusal of disabling
+  // thinking so unrelated context-limit messages ("该模型始终思考，输入文本超出…") never match.
   if ((!param || param === "thinking" || param.startsWith("thinking.") || param === "enable_thinking") &&
-      /(?:始终(?:启用)?(?:深度)?思考|不支持(?:关闭|禁用)(?:深度)?思考|(?:关闭|禁用)(?:深度)?思考[^。；;]{0,20}不支持)/.test(detail)) return "thinking";
+      /(?:不支持(?:关闭|禁用)(?:深度)?思考|(?:关闭|禁用)(?:深度)?思考[^。；;]{0,20}不(?:受)?支持|不再支持(?:关闭|禁用)(?:深度)?思考|始终(?:启用)?(?:深度)?思考[^。\n]{0,30}(?:不支持|不再支持|无法(?:关闭|禁用)|请使用\s*(?:low|medium|high|max)\b))/i.test(detail)) return "thinking";
   // Gemini's own wording for a model refusing thinkingBudget / thinkingLevel
   // ("Budget 0 is invalid. This model only works in thinking mode.", or a
   // thinkingLevel refusal). The anchors keep this to thinkingConfig; bare 400s do not match.
-  if ((!param || param.startsWith("thinkingConfig")) &&
-      /\bbudget\s+0\s+is\s+invalid\b|\bonly\s+works\s+in\s+thinking\s+mode\b|\bthinking\s*(?:budget|level)\b[^.]{0,60}\b(?:not\s+supported|unsupported|invalid)\b/.test(detail)) return "thinkingConfig";
+  if ((!param || param.startsWith("thinkingConfig") || param.startsWith("generation_config.thinking_config")) &&
+      /\bbudget\s+0\s+is\s+invalid\b|\bonly\s+works\s+in\s+thinking\s+mode\b|\bthinking(?:[\s_]*(?:budget|level))\b[^.]{0,80}\b(?:not\s+supported|unsupported|invalid|cannot\s+find\s+field)\b|\bunknown\s+name\s+"thinking_?(?:level|budget|config)"/i.test(detail)) return "thinkingConfig";
   // The wording gate guards BOTH routes below, error.param included. That field
   // is filled for ANY parameter-level validation error, range errors among them
   // ("max_tokens is too large: this model supports at most 4096 completion
@@ -725,7 +726,9 @@ async function _aiWithDialectFallback(provider, model, cfg, makeCall, control = 
   const memoKey = _aiCapabilityKey(provider, model, cfg);
   const [thinkMemo, paramMemo] = await wait(Promise.all([_aiThinkRejected(memoKey), _aiParamFixGet(memoKey)]));
   let thinkRejected = thinkMemo;
-  let dialect = (cfg && cfg.bespokeBody) ? null : _aiBodyDialect(cfg, paramMemo);
+  let dialect = (cfg && cfg.bespokeBody)
+    ? { omitThinkingFallback: !!(paramMemo && paramMemo.omitThinkingFallback) }
+    : _aiBodyDialect(cfg, paramMemo);
   let healedThink = false, healedFallback = false;
   const rememberAccepted = async () => {
     if (healedThink) await _aiThinkReject(memoKey);
@@ -734,7 +737,7 @@ async function _aiWithDialectFallback(provider, model, cfg, makeCall, control = 
   for (let attempt = 1; ; attempt++) {
     const fallbackActive = thinkRejected && !!cfg?.thinkingFallback && !dialect?.omitThinkingFallback;
     try {
-      const out = await makeCall(_aiEffectiveExtraBody(cfg, thinkRejected, dialect?.omitThinkingFallback), dialect);
+      const out = await makeCall(_aiEffectiveExtraBody(cfg, thinkRejected, dialect?.omitThinkingFallback), cfg?.bespokeBody ? null : dialect);
       await keep(rememberAccepted());
       return out;
     } catch (e) {
@@ -749,7 +752,7 @@ async function _aiWithDialectFallback(provider, model, cfg, makeCall, control = 
         throw e;
       }
       if (attempt >= _AI_DIALECT_MAX_ATTEMPTS) throw e;
-      const repair = (status === 400 || status === 422) ? _aiParamRepair(e, dialect) : null;
+      const repair = (!cfg?.bespokeBody && (status === 400 || status === 422)) ? _aiParamRepair(e, dialect) : null;
       if (repair) {
         dialect = { ...dialect, ...repair };
         await wait(_aiParamFixLearn(memoKey, repair));
@@ -1184,17 +1187,22 @@ async function _aiReadCompletion(res, protocol, opts) {
   return text;
 }
 
-// Non-streaming Gemini rides the same low-thinking self-heal as the OpenAI-
-// compat table. Gemini 3.5+ (including gemini-3.5-flash-lite, the shipped
-// default) rejected legacy thinkingBudget:0 with HTTP 400 INVALID_ARGUMENT;
-// thinkingConfig.thinkingLevel:"low" is supported across Gemini 2.5, 3.x and 4.x
-// (aistudio.google.com/docs/thinking), and older non-thinking models heal via
-// the shared 400/422 strip-and-retry with the per-model memo — never a static
-// allowlist, because the model field is free text.
+// Non-streaming and low-effort streaming Gemini ride the same self-heal as the
+// OpenAI-compat table. Gemini 3 / 3.5 / 4+ (including gemini-3.5-flash-lite,
+// the shipped default) require thinkingConfig.thinkingLevel:"low" and reject
+// legacy thinkingBudget:0 with HTTP 400 INVALID_ARGUMENT; Gemini 2.5 Flash
+// rejects thinkingLevel before Gemini 3 and falls back via thinkingFallback to
+// thinkingBudget:0 (memoized 7d in pbpThinkReject); mandatory-thinking (e.g.
+// gemini-2.5-pro) or non-thinking models strip thinkingConfig on the third step
+// (memoized 7d via omitThinkingFallback) — never a static model allowlist.
 // bespokeBody: generationConfig, not the OpenAI-compat body — the token-field /
 // temperature repairs below have nothing to rewrite here and must not be tried.
-const _GEMINI_THINKING_CFG = { thinkingOff: { thinkingConfig: { thinkingLevel: "low" } }, bespokeBody: true,
-  endpoint: "https://generativelanguage.googleapis.com/v1beta" };
+const _GEMINI_THINKING_CFG = {
+  thinkingOff: { thinkingConfig: { thinkingLevel: "low" } },
+  thinkingFallback: { thinkingConfig: { thinkingBudget: 0 } },
+  bespokeBody: true,
+  endpoint: "https://generativelanguage.googleapis.com/v1beta"
+};
 
 async function callGemini(s, prompt, opts = {}) {
   const model = opts.model || s.geminiModel || _AI_BESPOKE_PROVIDERS.gemini.defaultModel;

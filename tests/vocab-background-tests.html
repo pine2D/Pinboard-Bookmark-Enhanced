@@ -32,7 +32,7 @@ async function bootDriveWorker({
   connectResult = { ok: true, permissionId: "google-1", emailAddress: "alice@example.test", displayName: "Alice" },
   runnerImpl,
 } = {}) {
-  const events = { boots: [], rounds: [], runnerCalls: [] };
+  const events = { boots: [], rounds: [], runnerCalls: [], topLevelSync: null };
   const expectsBootRound = local.vocabDriveConnected === true && granted && manifest === CAPABLE_MANIFEST;
   let resolveBootDone = null;
   const bootDone = expectsBootRound ? new Promise((r) => { resolveBootDone = r; }) : Promise.resolve();
@@ -64,6 +64,17 @@ async function bootDriveWorker({
       win.pbpCreateDictArchiveDriveSyncRunner = makeRunner("dictionary");
       win.pbpCreateAskArchiveDriveSyncRunner = makeRunner("ask");
     },
+    afterBoot(win, mock) {
+      const alarmFns = [...mock.chrome.alarms.onAlarm.listeners];
+      events.topLevelSync = {
+        importedScripts: [...win.__importedScripts],
+        alarmCount: alarmFns.length,
+        alarmAllSync: alarmFns.every((fn) => fn.constructor.name !== "AsyncFunction"),
+        hasSyncMessageHandler: typeof win.handleRuntimeMessage === "function"
+          && win.handleRuntimeMessage.constructor.name !== "AsyncFunction"
+          && mock.chrome.runtime.onMessage.hasListener(win.handleRuntimeMessage),
+      };
+    },
   });
   await bootDone;
   await tick(10);
@@ -74,11 +85,18 @@ async function bootDriveWorker({
   const base = await bootDriveWorker({ local: { vocabDriveConnected: false } });
   const { win, mock } = base;
 
-  // 1. Dependency import order recorded from background.js's real importScripts(...) call.
-  const storeImportAt = win.__importedScripts.indexOf("vocab-store.js");
-  const gdriveImportAt = win.__importedScripts.indexOf("vocab-gdrive.js");
+  // 1. Exact SW dependency import list and order recorded synchronously from background.js's real importScripts(...) call.
+  const expectedImports = [
+    "i18n.js", "shared.js", "tag-gov-save.js", "bookmark-services.js",
+    "vocab-store.js", "vocab-gdrive.js", "notes-sync.js", "notes-gdrive.js",
+    "restore-points.js", "ai-cache.js", "dict-archive.js", "dict-archive-gdrive.js",
+    "ask-archive.js", "ask-archive-gdrive.js", "ai.js", "jina.js", "wayback.js",
+  ];
+  const storeImportAt = base.events.topLevelSync.importedScripts.indexOf("vocab-store.js");
+  const gdriveImportAt = base.events.topLevelSync.importedScripts.indexOf("vocab-gdrive.js");
   check("store and Drive scripts are imported in dependency order",
-    storeImportAt !== -1 && gdriveImportAt !== -1 && gdriveImportAt > storeImportAt);
+    JSON.stringify(base.events.topLevelSync.importedScripts) === JSON.stringify(expectedImports) &&
+    storeImportAt !== -1 && gdriveImportAt > storeImportAt);
 
   // 2. Real onAlarm routing for the 3 current + 6 legacy Drive alarm names.
   {
@@ -103,15 +121,12 @@ async function bootDriveWorker({
   }
 
   // 3. Alarm listener registered synchronously at top level and non-async.
-  const alarmListeners = mock.chrome.alarms.onAlarm.listeners;
   check("alarm listener is registered synchronously at top level",
-    alarmListeners.length >= 1 && alarmListeners.every((fn) => fn.constructor.name !== "AsyncFunction"));
+    base.events.topLevelSync.alarmCount >= 1 && base.events.topLevelSync.alarmAllSync);
 
-  // 4. Runtime message listener is non-async and registered at top level.
+  // 4. Runtime message listener is non-async and registered synchronously at top level.
   check("runtime message listener is not async",
-    typeof win.handleRuntimeMessage === "function" &&
-    win.handleRuntimeMessage.constructor.name !== "AsyncFunction" &&
-    mock.chrome.runtime.onMessage.hasListener(win.handleRuntimeMessage));
+    base.events.topLevelSync.hasSyncMessageHandler === true);
 
   // 5. Both dirty messages schedule the one shared drive-sync-dirty alarm.
   {
@@ -212,24 +227,47 @@ async function bootDriveWorker({
     authWorker.dispose();
   }
 
-  // 14. One recovering promise tail serializes every Drive round.
+  // 14. One recovering promise tail serializes every Drive round and recovers after rejection.
   {
-    let active = 0, maxActive = 0;
+    let active = 0, maxActive = 0, tracking = false;
+    const executed = [];
     const serialWorker = await bootDriveWorker({
       local: { vocabDriveConnected: true },
-      runnerImpl: async () => {
+      runnerImpl: async (type) => {
+        if (!tracking) {
+          return { ok: true, status: { drivePermissionId: "google-1", bootstrapComplete: true } };
+        }
         active++;
         maxActive = Math.max(maxActive, active);
-        await tick(15);
+        executed.push(type);
+        await tick(12);
         active--;
         return { ok: true, status: { drivePermissionId: "google-1", bootstrapComplete: true } };
       },
     });
-    await Promise.all([
+    tracking = true;
+    const queueFn = serialWorker.get("queueDriveSync");
+    const [rFail, rOne, rTwo] = await Promise.allSettled([
+      queueFn(async () => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await tick(12);
+        active--;
+        throw new Error("simulated tail rejection");
+      }),
       serialWorker.win.pbpQueueDriveRound({ manual: true }),
       serialWorker.win.pbpQueueDriveRound({ manual: true }),
     ]);
-    check("one recovering promise tail serializes every Drive round", maxActive === 1);
+    const expectedOrder = [
+      "vocabulary", "notes", "dictionary", "ask",
+      "vocabulary", "notes", "dictionary", "ask",
+    ];
+    check("one recovering promise tail serializes every Drive round",
+      maxActive === 1 &&
+      JSON.stringify(executed) === JSON.stringify(expectedOrder) &&
+      rFail.status === "rejected" &&
+      rOne.status === "fulfilled" && rOne.value?.ok === true &&
+      rTwo.status === "fulfilled" && rTwo.value?.ok === true);
     serialWorker.dispose();
   }
 

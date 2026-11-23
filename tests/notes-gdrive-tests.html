@@ -92,9 +92,12 @@ function fixture(ownerHash, options = {}) {
       if (url.pathname === "/upload/drive/v3/files") {
         const parts = init.body.split("\r\n\r\n");
         const metadata = JSON.parse(parts[1].split("\r\n--")[0]);
+        if (typeof metadata.id !== "string" || !metadata.id || typeof metadata.name !== "string" || !metadata.name) {
+          throw new Error("unexpected upload metadata: " + JSON.stringify(metadata));
+        }
         const body = JSON.parse(parts[2].slice(0, parts[2].lastIndexOf("\r\n--")));
         uploads.push({ metadata, body, account: drivePermissionId });
-        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { kind: "drive#file", id: metadata.id, name: metadata.name, mimeType: "application/json" }, failUpload ? 503 : 200);
+        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { kind: "drive#file", id: "drive-notes-file-fixture", name: "pbp-notes-batch-fixture.json", mimeType: "application/json" }, failUpload ? 503 : 200);
       }
       throw new Error("unexpected fixture request: " + url.pathname);
     }

@@ -80,6 +80,13 @@
     if (options.beforeBackground) await options.beforeBackground(win, mock);
     if (!options.depsOnly) {
       await loadScript(doc, base + "background.js");
+      const expectedDeps = options.deps || SW_DEPS;
+      if (win.__importedScripts.length !== expectedDeps.length ||
+          expectedDeps.some((file, idx) => win.__importedScripts[idx] !== file)) {
+        throw new Error(
+          `SW_DEPS drift: background.js importScripts(${JSON.stringify(win.__importedScripts)}) !== ${JSON.stringify(expectedDeps)}`,
+        );
+      }
     }
     if (options.afterBoot) await options.afterBoot(win, mock);
 

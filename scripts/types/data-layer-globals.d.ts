@@ -172,7 +172,11 @@ declare function pbpBookmarkConnection(settings?: Record<string, any> | null): {
   token: string;
   account: string;
   baseUrl: string;
-  [key: string]: any;
+  sharingEnabled?: boolean;
+  connectionId?: string;
+  gatewayType?: string;
+  headers?: [string, string][];
+  readLaterListId?: string;
 };
 declare function pbpBookmarkServiceReadyHere(
   settings: Record<string, any>,

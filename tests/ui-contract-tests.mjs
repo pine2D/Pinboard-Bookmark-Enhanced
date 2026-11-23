@@ -522,9 +522,12 @@ check(mdPreviewJs.includes('renderEmptyState(t("mdPreviewEmpty"), "mdPreviewClos
   "md-preview empty payload state does not offer a localized close action");
 
 {
-  const searchStart = optionsJs.indexOf("function setupOptionsSearch");
-  const searchEnd = optionsJs.indexOf("async function pbpBuildSanitizedDiagnostics", searchStart);
-  const searchSetup = searchStart >= 0 && searchEnd > searchStart ? optionsJs.slice(searchStart, searchEnd) : "";
+  const searchSetup = sliceBetween(
+    optionsJs,
+    "function setupOptionsSearch",
+    "async function pbpBuildSanitizedDiagnostics",
+    "options search setup",
+  );
   check(/id="options-search-input"/.test(optionsHtml) &&
     !/id="options-search-input"[^>]*aria-expanded=/.test(optionsHtml) &&
     !/setAttribute\("aria-expanded"/.test(searchSetup),

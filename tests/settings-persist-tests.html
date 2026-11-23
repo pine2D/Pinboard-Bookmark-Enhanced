@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="602"><title>Settings Persistence Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="607"><title>Settings Persistence Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -4045,6 +4045,34 @@ async function run() {
         badCount === "chunks_propagating" && badGeneration === "chunks_propagating" &&
         notAManifest === "chunks_propagating" &&
         neverWritten === "" && legacyString === "" && nonEmptyRefusal === "");
+
+      console.warn = () => {};
+      let manifestErrThrown = false;
+      let chunkErrThrown = false;
+      globalThis.chrome.storage.sync = {
+        get: async () => { throw new Error("sync manifest read boom"); },
+      };
+      _settingsStorageCache = globalThis.chrome.storage.sync;
+      try { await pbpAssertChunkedSyncReadComplete("savedThemes", []); }
+      catch (_) { manifestErrThrown = true; }
+      globalThis.chrome.storage.sync = {
+        get: async (keys) => {
+          if (Array.isArray(keys)) throw new Error("sync chunk read boom");
+          return { savedThemes: { _chunks: 1, _generation: "g1" } };
+        },
+      };
+      _settingsStorageCache = globalThis.chrome.storage.sync;
+      try { await pbpAssertChunkedSyncReadComplete("savedThemes", []); }
+      catch (_) { chunkErrThrown = true; }
+      const missingWriterResult = await pbpApplyBackupPayload(
+        { _schemaVersion: 2, customOverlayCSS: "body { color: #111; }" },
+        { exportableKeys: ["optTheme"] },
+      );
+      console.warn = prevWarnE7f;
+      check("E7f storage read failures during empty-value completeness recheck fail closed instead of certifying empty",
+        manifestErrThrown === true && chunkErrThrown === true);
+      check("E7f pbpApplyBackupPayload fails settings section when customOverlayCSS is present without saveOverlayWithFallback",
+        missingWriterResult.settings === "failed");
     } finally {
       console.warn = prevWarnE7f;
       globalThis.chrome = prevChromeE7f;
@@ -6737,6 +6765,7 @@ async function run() {
           previewAiModelByProvider: { deepseek: "deepseek-v4-flash-vision-exp", openai: "gpt-5.4-nano" },
         };
         const sync = {
+          optSyncEnabled: true,
           deepseekModel: "deepseek-v4-flash-vision-exp",
           aiProvider: "deepseek",
           previewAiModelByProvider: {},
@@ -6744,12 +6773,15 @@ async function run() {
         };
         install(local, sync);
         await pbpMigrateRetiredDeepseekModels();
-        check("retired DeepSeek migration: rewrites deepseek-v4-flash and deepseek-v4-flash-vision-exp in local and sync while preserving other map entries",
+        local.optSyncEnabled = true;
+        const resolvedSync = await pbpReadSettingsWithSecrets(["deepseekModel", "previewAiModel"]);
+        check("retired DeepSeek migration: rewrites local slugs without mutating sync and resolves active sync retired defaults on read",
           local.deepseekModel === "deepseek-flash"
           && local.previewAiModelByProvider.deepseek === "deepseek-flash"
           && local.previewAiModelByProvider.openai === "gpt-5.4-nano"
-          && sync.deepseekModel === "deepseek-flash"
-          && sync.previewAiModel === "deepseek-flash"
+          && sync.deepseekModel === "deepseek-v4-flash-vision-exp"
+          && resolvedSync.deepseekModel === "deepseek-flash"
+          && resolvedSync.previewAiModel === "deepseek-flash"
           && local[PBP_RETIRED_DEEPSEEK_MODEL_FLAG] === true);
       }
       {
@@ -6769,6 +6801,8 @@ async function run() {
         };
         install(local, sync);
         await pbpMigrateRetiredDeepseekModels();
+        local.optSyncEnabled = true;
+        const resolvedSync = await pbpReadSettingsWithSecrets(["deepseekModel", "previewAiModel"]);
         check("retired DeepSeek migration: preserves deepseek-v4-pro, deepseek-reasoner, padded strings, 3rd-party gateways, and explicit map override",
           local.deepseekModel === "deepseek-v4-pro"
           && local.commandcodeModel === "deepseek/deepseek-v4-flash"
@@ -6776,8 +6810,8 @@ async function run() {
           && local.previewAiModel === "deepseek-v4-flash"
           && local.previewAiModelByProvider.deepseek === "deepseek-reasoner"
           && local.previewAiModelByProvider.commandcode === "deepseek/deepseek-v4-flash"
-          && sync.deepseekModel === "  deepseek-v4-flash  "
-          && sync.previewAiModel === "deepseek-v4-flash"
+          && resolvedSync.deepseekModel === "  deepseek-v4-flash  "
+          && resolvedSync.previewAiModel === "deepseek-v4-flash"
           && local[PBP_RETIRED_DEEPSEEK_MODEL_FLAG] === true);
       }
       {
@@ -6785,28 +6819,28 @@ async function run() {
         const sync = { deepseekModel: "deepseek-v4-flash-vision-exp" };
         install(local, sync);
         await pbpMigrateRetiredDeepseekModels();
-        check("retired DeepSeek migration: one-shot flag prevents overwriting a later user edit",
+        check("retired DeepSeek migration: one-shot flag prevents background rewrite on second startup",
           local.deepseekModel === "deepseek-v4-flash" && sync.deepseekModel === "deepseek-v4-flash-vision-exp");
       }
       {
         const local = { deepseekModel: "deepseek-v4-flash" };
         const sync = { deepseekModel: "deepseek-v4-flash-vision-exp" };
         install(local, sync);
-        const origSyncSet = globalThis.chrome.storage.sync.set;
+        const origLocalSet = globalThis.chrome.storage.local.set;
         let warned = false;
         const origWarn = console.warn;
         console.warn = (...args) => {
           if (String(args[0] || "").includes("[ai-migration]")) warned = true;
         };
         try {
-          globalThis.chrome.storage.sync.set = () => Promise.reject(new Error("QUOTA_BYTES"));
+          globalThis.chrome.storage.local.set = () => Promise.reject(new Error("QUOTA_BYTES"));
           await pbpMigrateRetiredDeepseekModels();
           const unsettledAfterFail = warned && local[PBP_RETIRED_DEEPSEEK_MODEL_FLAG] !== true;
-          globalThis.chrome.storage.sync.set = origSyncSet;
+          globalThis.chrome.storage.local.set = origLocalSet;
           await pbpMigrateRetiredDeepseekModels();
           check("retired DeepSeek migration: storage write failure logs warning and leaves flag unset for retry",
             unsettledAfterFail
-            && sync.deepseekModel === "deepseek-flash"
+            && local.deepseekModel === "deepseek-flash"
             && local[PBP_RETIRED_DEEPSEEK_MODEL_FLAG] === true);
         } finally {
           console.warn = origWarn;
@@ -6832,15 +6866,18 @@ async function run() {
         };
         install(local, sync);
         await pbpMigrateRetiredMinimaxKimiModels();
-        check("retired MiniMax/Kimi migration: rewrites retired M2/M2.5/M2.7 and kimi-k2.6 slugs in local and sync while preserving other map entries",
+        local.optSyncEnabled = true;
+        const resolvedSync = await pbpReadSettingsWithSecrets(["minimaxModel", "kimiModel", "previewAiModel"]);
+        check("retired MiniMax/Kimi migration: rewrites local slugs without mutating sync and resolves active sync retired defaults on read",
           local.minimaxModel === "MiniMax-M3.1-Flash"
           && local.kimiModel === "kimi-k3.1-pro"
           && local.previewAiModelByProvider.minimax === "MiniMax-M3.1-Flash"
           && local.previewAiModelByProvider.kimi === "kimi-k3.1-pro"
           && local.previewAiModelByProvider.openai === "gpt-5.4-nano"
-          && sync.minimaxModel === "MiniMax-M3.1-Flash"
-          && sync.kimiModel === "kimi-k3.1-pro"
-          && sync.previewAiModel === "MiniMax-M3.1-Flash"
+          && sync.minimaxModel === "MiniMax-M2.5"
+          && resolvedSync.minimaxModel === "MiniMax-M3.1-Flash"
+          && resolvedSync.kimiModel === "kimi-k3.1-pro"
+          && resolvedSync.previewAiModel === "MiniMax-M3.1-Flash"
           && local[PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG] === true);
       }
       {
@@ -6861,6 +6898,8 @@ async function run() {
         };
         install(local, sync);
         await pbpMigrateRetiredMinimaxKimiModels();
+        local.optSyncEnabled = true;
+        const resolvedSync = await pbpReadSettingsWithSecrets(["minimaxModel", "kimiModel", "previewAiModel"]);
         check("retired MiniMax/Kimi migration: preserves non-retired models, padded strings, custom/3rd-party gateways, and migrates kimi legacy previewAiModel when only minimax has a map key",
           local.minimaxModel === "MiniMax-M3.1-Pro"
           && local.kimiModel === "kimi-k2.7-code"
@@ -6869,9 +6908,9 @@ async function run() {
           && local.previewAiModelByProvider.minimax === "MiniMax-M3.1-Pro"
           && local.previewAiModelByProvider.kimi === "kimi-k2.5"
           && local.previewAiModelByProvider.openrouter === "MiniMax-M2"
-          && sync.minimaxModel === "  MiniMax-M2  "
-          && sync.kimiModel === "  kimi-k2.6  "
-          && sync.previewAiModel === "kimi-k3.1-pro"
+          && resolvedSync.minimaxModel === "  MiniMax-M2  "
+          && resolvedSync.kimiModel === "  kimi-k2.6  "
+          && resolvedSync.previewAiModel === "kimi-k3.1-pro"
           && local[PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG] === true);
       }
       {
@@ -6879,28 +6918,28 @@ async function run() {
         const sync = { kimiModel: "kimi-k2.6" };
         install(local, sync);
         await pbpMigrateRetiredMinimaxKimiModels();
-        check("retired MiniMax/Kimi migration: one-shot flag prevents overwriting a later user edit",
+        check("retired MiniMax/Kimi migration: one-shot flag prevents background rewrite on second startup",
           local.minimaxModel === "MiniMax-M2" && sync.kimiModel === "kimi-k2.6");
       }
       {
         const local = { minimaxModel: "MiniMax-M2" };
         const sync = { kimiModel: "kimi-k2.6" };
         install(local, sync);
-        const origSyncSet = globalThis.chrome.storage.sync.set;
+        const origLocalSet = globalThis.chrome.storage.local.set;
         let warned = false;
         const origWarn = console.warn;
         console.warn = (...args) => {
           if (String(args[0] || "").includes("[ai-migration]")) warned = true;
         };
         try {
-          globalThis.chrome.storage.sync.set = () => Promise.reject(new Error("QUOTA_BYTES"));
+          globalThis.chrome.storage.local.set = () => Promise.reject(new Error("QUOTA_BYTES"));
           await pbpMigrateRetiredMinimaxKimiModels();
           const unsettledAfterFail = warned && local[PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG] !== true;
-          globalThis.chrome.storage.sync.set = origSyncSet;
+          globalThis.chrome.storage.local.set = origLocalSet;
           await pbpMigrateRetiredMinimaxKimiModels();
           check("retired MiniMax/Kimi migration: storage write failure logs warning and leaves flag unset for retry",
             unsettledAfterFail
-            && sync.kimiModel === "kimi-k3.1-pro"
+            && local.minimaxModel === "MiniMax-M3.1-Flash"
             && local[PBP_RETIRED_MINIMAX_KIMI_MODEL_FLAG] === true);
         } finally {
           console.warn = origWarn;
@@ -6913,6 +6952,7 @@ async function run() {
       }
       {
         const local = {
+          optSyncEnabled: false,
           openaiModel: "gpt-5.4-nano",
           previewAiModelByProvider: { openai: "gpt-5.4-nano-2026-03-17", deepseek: "deepseek-flash" },
         };
@@ -6924,16 +6964,23 @@ async function run() {
         };
         install(local, sync);
         await pbpMigrateRetiredOpenaiModels();
-        check("retired OpenAI migration: rewrites retired gpt-5.4-nano / gpt-5-nano / gpt-4o-mini slugs in local and sync while preserving other map entries",
+        const readSyncOff = await pbpReadSettingsWithSecrets(["openaiModel", "previewAiModelByProvider"]);
+        local.optSyncEnabled = true;
+        const readSyncOn = await pbpReadSettingsWithSecrets(["openaiModel", "previewAiModel"]);
+        check("retired OpenAI migration: rewrites local slugs without mutating sync and resolves both sync-off and sync-on active areas",
           local.openaiModel === "gpt-6-luna"
           && local.previewAiModelByProvider.openai === "gpt-6-luna"
           && local.previewAiModelByProvider.deepseek === "deepseek-flash"
-          && sync.openaiModel === "gpt-6-luna"
-          && sync.previewAiModel === "gpt-6-luna"
+          && sync.openaiModel === "gpt-5-nano"
+          && readSyncOff.openaiModel === "gpt-6-luna"
+          && readSyncOff.previewAiModelByProvider.openai === "gpt-6-luna"
+          && readSyncOn.openaiModel === "gpt-6-luna"
+          && readSyncOn.previewAiModel === "gpt-6-luna"
           && local[PBP_RETIRED_OPENAI_MODEL_FLAG] === true);
       }
       {
         const local = {
+          optSyncEnabled: false,
           openaiModel: "gpt-6.1-sol",
           customModel: "gpt-5.4-nano",
           groqModel: "gpt-5.4-nano",
@@ -6945,49 +6992,122 @@ async function run() {
           openaiBaseUrl: "https://proxy.example/v1",
           openaiModel: "gpt-5.4-nano",
           aiProvider: "openai",
-          previewAiModelByProvider: {},
+          previewAiModelByProvider: { openai: "gpt-4o-mini" },
           previewAiModel: "gpt-5.4-nano",
         };
         install(local, sync);
         await pbpMigrateRetiredOpenaiModels();
-        check("retired OpenAI migration: preserves active models, custom openaiBaseUrl proxies, custom/3rd-party gateways, and non-matching aiProvider",
+        local.optSyncEnabled = true;
+        const proxiedSyncRead = await pbpReadSettingsWithSecrets(["openaiModel", "previewAiModelByProvider", "previewAiModel"]);
+        check("retired OpenAI migration: preserves active models, custom openaiBaseUrl proxies (even on partial queries), custom/3rd-party gateways, and non-matching aiProvider",
           local.openaiModel === "gpt-6.1-sol"
           && local.customModel === "gpt-5.4-nano"
           && local.groqModel === "gpt-5.4-nano"
           && local.previewAiModel === "gpt-5.4-nano"
           && local.previewAiModelByProvider.openai === "gpt-5.4"
           && local.previewAiModelByProvider.openrouter === "gpt-5.4-nano"
-          && sync.openaiModel === "gpt-5.4-nano"
-          && sync.previewAiModel === "gpt-5.4-nano"
+          && proxiedSyncRead.openaiModel === "gpt-5.4-nano"
+          && proxiedSyncRead.previewAiModelByProvider.openai === "gpt-4o-mini"
+          && proxiedSyncRead.previewAiModel === "gpt-5.4-nano"
           && local[PBP_RETIRED_OPENAI_MODEL_FLAG] === true);
+      }
+      {
+        const localSyncOff = { optSyncEnabled: false, openaiModel: "gpt-4o-mini" };
+        const syncInactiveProxy = { openaiBaseUrl: "https://proxy.example/v1", openaiModel: "gpt-4o-mini" };
+        install(localSyncOff, syncInactiveProxy);
+        await pbpMigrateRetiredOpenaiModels();
+        const readOff = await pbpReadSettingsWithSecrets(["openaiModel"]);
+        const localInactiveProxy = { optSyncEnabled: true, openaiBaseUrl: "https://proxy.example/v1", openaiModel: "gpt-4o-mini" };
+        const syncActiveOfficial = { openaiModel: "gpt-4o-mini" };
+        install(localInactiveProxy, syncActiveOfficial);
+        await pbpMigrateRetiredOpenaiModels();
+        const readOn = await pbpReadSettingsWithSecrets(["openaiModel"]);
+        check("retired OpenAI migration: custom openaiBaseUrl in the inactive storage area never suppresses active-area migration",
+          localSyncOff.openaiModel === "gpt-6-luna"
+          && readOff.openaiModel === "gpt-6-luna"
+          && localInactiveProxy.openaiModel === "gpt-4o-mini"
+          && readOn.openaiModel === "gpt-6-luna");
+      }
+      {
+        const local = {
+          optSyncEnabled: false,
+          openaiModel: "gpt-4o-mini",
+          previewAiModelByProvider: { openai: "gpt-4o-mini", gemini: "gemini-3.5-flash-lite" },
+        };
+        const sync = {
+          openaiModel: "gpt-4o-mini",
+          previewAiModelByProvider: { openai: "gpt-4o-mini", gemini: "gemini-3.5-flash-lite" },
+        };
+        install(local, sync);
+        const origLocalSet = globalThis.chrome.storage.local.set;
+        let injected = false;
+        globalThis.chrome.storage.local.set = async (patch) => {
+          if (!injected) {
+            injected = true;
+            // Simulate Chrome Sync delivering another device's proxy + Gemini selection mid-migration.
+            Object.assign(sync, {
+              openaiBaseUrl: "https://proxy.example/v1",
+              openaiModel: "proxy-custom-model",
+              previewAiModelByProvider: { openai: "gpt-4o-mini", gemini: "gemini-4.0-pro" },
+            });
+          }
+          return origLocalSet(patch);
+        };
+        await pbpMigrateRetiredOpenaiModels();
+        await pbpMigrateRetiredOpenaiModels();
+        local.optSyncEnabled = true;
+        const readAfterArrival = await pbpReadSettingsWithSecrets(["openaiBaseUrl", "openaiModel", "previewAiModelByProvider"]);
+        check("retired OpenAI migration: concurrent Chrome Sync arrival preserves remote proxy model and other provider selections across repeated runs",
+          sync.openaiBaseUrl === "https://proxy.example/v1"
+          && sync.openaiModel === "proxy-custom-model"
+          && sync.previewAiModelByProvider.gemini === "gemini-4.0-pro"
+          && sync.previewAiModelByProvider.openai === "gpt-4o-mini"
+          && readAfterArrival.openaiModel === "proxy-custom-model"
+          && readAfterArrival.previewAiModelByProvider.gemini === "gemini-4.0-pro"
+          && readAfterArrival.previewAiModelByProvider.openai === "gpt-4o-mini"
+          && local[PBP_RETIRED_OPENAI_MODEL_FLAG] === true);
+      }
+      {
+        const local = { [PBP_RETIRED_OPENAI_MODEL_FLAG]: true, optSyncEnabled: true };
+        const sync = {
+          openaiModel: "gpt-4o-mini",
+          previewAiModelByProvider: { openai: "gpt-5.4-nano", gemini: "gemini-4.0-pro" },
+        };
+        install(local, sync);
+        const readLateSync = await pbpReadSettingsWithSecrets(["openaiModel", "previewAiModelByProvider"]);
+        check("retired OpenAI migration: late-arriving official-endpoint sync config resolves retired OpenAI defaults on read while keeping sibling provider entries",
+          readLateSync.openaiModel === "gpt-6-luna"
+          && readLateSync.previewAiModelByProvider.openai === "gpt-6-luna"
+          && readLateSync.previewAiModelByProvider.gemini === "gemini-4.0-pro"
+          && sync.previewAiModelByProvider.gemini === "gemini-4.0-pro");
       }
       {
         const local = { [PBP_RETIRED_OPENAI_MODEL_FLAG]: true, openaiModel: "gpt-5.4-nano" };
         const sync = { openaiModel: "gpt-5-nano" };
         install(local, sync);
         await pbpMigrateRetiredOpenaiModels();
-        check("retired OpenAI migration: one-shot flag prevents overwriting a later user edit",
+        check("retired OpenAI migration: one-shot flag prevents background rewrite on second startup",
           local.openaiModel === "gpt-5.4-nano" && sync.openaiModel === "gpt-5-nano");
       }
       {
         const local = { openaiModel: "gpt-5.4-nano" };
         const sync = { openaiModel: "gpt-5-nano" };
         install(local, sync);
-        const origSyncSet = globalThis.chrome.storage.sync.set;
+        const origLocalSet = globalThis.chrome.storage.local.set;
         let warned = false;
         const origWarn = console.warn;
         console.warn = (...args) => {
           if (String(args[0] || "").includes("[ai-migration]")) warned = true;
         };
         try {
-          globalThis.chrome.storage.sync.set = () => Promise.reject(new Error("QUOTA_BYTES"));
+          globalThis.chrome.storage.local.set = () => Promise.reject(new Error("QUOTA_BYTES"));
           await pbpMigrateRetiredOpenaiModels();
           const unsettledAfterFail = warned && local[PBP_RETIRED_OPENAI_MODEL_FLAG] !== true;
-          globalThis.chrome.storage.sync.set = origSyncSet;
+          globalThis.chrome.storage.local.set = origLocalSet;
           await pbpMigrateRetiredOpenaiModels();
           check("retired OpenAI migration: storage write failure logs warning and leaves flag unset for retry",
             unsettledAfterFail
-            && sync.openaiModel === "gpt-6-luna"
+            && local.openaiModel === "gpt-6-luna"
             && local[PBP_RETIRED_OPENAI_MODEL_FLAG] === true);
         } finally {
           console.warn = origWarn;

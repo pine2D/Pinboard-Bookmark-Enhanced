@@ -324,7 +324,7 @@ function pbpCreateDriveClient({
         headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` }
       });
     } catch (error) {
-      console.warn("[vocab-drive] fetch failed:", error?.name, error?.message);
+      console.warn("[vocab-drive] fetch failed:", error?.name);
       return failure("network", true, undefined, fileId);
     }
     if (response && typeof response === "object") responseSignals.set(response, signal);
@@ -568,7 +568,7 @@ function pbpCreateDriveClient({
       try {
         chunk = await reader.read();
       } catch (error) {
-        console.warn("[vocab-drive] download stream read failed:", error?.name, error?.message);
+        console.warn("[vocab-drive] download stream read failed:", error?.name);
         await cancel();
         return failure("network", true, undefined, fileId);
       }

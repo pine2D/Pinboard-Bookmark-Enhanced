@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="45"><title>Wayback Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="46"><title>Wayback Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 h2 { margin-top: 24px; font-size: 16px; }
@@ -371,27 +371,39 @@ suite("pbpWaybackAttemptKey account scoping", () => {
   // the non-secret Pinboard owner the save ran under. Drive the real
   // orchestrator so a revert to "bare url" keys or an untagged log row cannot
   // pass -- the pure suite alone can't see which key shape the caller builds.
-  // Read-only Wayback availability API probed live on 2026-11-23 (`GET
-  // https://archive.org/wayback/available?url=https://example.com` ->
-  // `{"url":"https://example.com","archived_snapshots":{"closest":{"status":"200",
-  // "available":true,"url":"http://web.archive.org/web/20261123030715/https://example.com/",
-  // "timestamp":"20261123030715"}}}`); authenticated SPN2 JSON submission
-  // envelope (`{ url, job_id, status: "pending" }`) verified against official
-  // Internet Archive Save Page Now 2 documentation on 2026-11-23 without firing
-  // live `/save` writes.
+  // Hand-authored Save Page Now 2 (SPN2) server responses per official Internet
+  // Archive documentation (no live /save writes executed):
+  //   - Anonymous `GET https://web.archive.org/save/<url>` returns HTML
+  //     (`text/html; charset=utf-8`), which wayback.js records as `"requested"`.
+  //   - Authenticated S3 `POST https://web.archive.org/save` with `Accept:
+  //     application/json` and `Authorization: LOW <key>:<secret>` returns JSON
+  //     `{ url: "<submitted target>", job_id: "spn2-...", status: "pending" }`,
+  //     which wayback.js records as `"job:spn2-..."`.
   const ARCHIVE_SETTINGS = { waybackArchiveEnabled: true, waybackSkipPrivate: false };
   function installArchiveStubs(store, counter) {
-    globalThis.fetch = async (reqUrl) => {
+    globalThis.fetch = async (reqUrl, init = {}) => {
       counter.fetches++;
-      return {
-        ok: true, status: 200,
-        headers: { get: () => "application/json; charset=utf-8" },
-        json: async () => ({
-          url: String(reqUrl || ""),
-          job_id: "spn2-20261123-" + counter.fetches,
-          status: "pending"
-        })
-      };
+      counter.lastRequest = { url: String(reqUrl || ""), method: init.method || "GET", headers: init.headers || {}, body: init.body || null };
+      if ((init.method || "GET") === "POST" && reqUrl === "https://web.archive.org/save") {
+        const target = new URLSearchParams(String(init.body || "")).get("url") || "";
+        return {
+          ok: true, status: 200,
+          headers: { get: (h) => String(h || "").toLowerCase() === "content-type" ? "application/json; charset=utf-8" : null },
+          json: async () => ({
+            url: target,
+            job_id: "spn2-fixture-" + counter.fetches,
+            status: "pending"
+          })
+        };
+      }
+      if ((init.method || "GET") === "GET" && String(reqUrl || "").startsWith("https://web.archive.org/save/")) {
+        return {
+          ok: true, status: 200,
+          headers: { get: (h) => String(h || "").toLowerCase() === "content-type" ? "text/html; charset=utf-8" : null },
+          text: async () => "<!doctype html><title>Wayback Machine</title>"
+        };
+      }
+      throw new Error("unexpected Wayback endpoint: " + reqUrl);
     };
     globalThis.chrome = {
       permissions: { contains: async () => true },
@@ -419,15 +431,42 @@ suite("pbpWaybackAttemptKey account scoping", () => {
       installArchiveStubs(store, counter);
       await pbpWaybackArchive(url, { ...ARCHIVE_SETTINGS, pinboardToken: token }, {});
       assert(counter.fetches === 1, "the archive request went out");
+      assert(counter.lastRequest.method === "GET" && counter.lastRequest.url === "https://web.archive.org/save/" + encodeURI(url), "anonymous save uses GET /save/<url>");
       const keys = Object.keys(store._waybackAttempts || {});
       assert(keys.length === 1, "exactly one dedup timestamp was written, got " + keys.length);
       assert(keys[0] !== url, "the dedup key must not be the bare URL -- that shape shares one 24h window across accounts");
       assert(keys[0] === pbpWaybackAttemptKey(ACCOUNT, url), "the dedup key must be the account+URL composite, got " + JSON.stringify(keys[0]));
       const row = (store._waybackLog || []).at(-1);
-      assert(row && row.url === url, "the attempt reached the archive log");
+      assert(row && row.url === url && row.outcome === "requested", "anonymous HTML save logs outcome=requested, got " + JSON.stringify(row));
       assert(row.account === ACCOUNT, "the log row must carry the owner so readers can filter to the signed-in account, got " + JSON.stringify(row.account));
       const persisted = JSON.stringify(store);
       assert(!persisted.includes(SECRET) && !persisted.includes(token), "the account is non-secret; no token material may be persisted with it");
+    } finally {
+      globalThis.chrome = prevChrome;
+      globalThis.fetch = prevFetch;
+    }
+  });
+
+  await atest("authenticated S3 archive posts to /save and records the SPN2 job_id without persisting S3 credentials", async () => {
+    const prevChrome = globalThis.chrome;
+    const prevFetch = globalThis.fetch;
+    const url = "https://example.com/spn2-article";
+    const store = {};
+    const counter = { fetches: 0 };
+    try {
+      installArchiveStubs(store, counter);
+      await pbpWaybackArchive(url, {
+        ...ARCHIVE_SETTINGS,
+        pinboardToken: obfuscateKey("alice:AAAA1111"),
+        waybackS3Key: "s3key-fixture",
+        waybackS3Secret: "s3secret-fixture"
+      }, {});
+      assert(counter.fetches === 1 && counter.lastRequest.method === "POST" && counter.lastRequest.url === "https://web.archive.org/save", "authenticated save posts to /save");
+      assert(counter.lastRequest.headers.Authorization === "LOW s3key-fixture:s3secret-fixture", "LOW header sent");
+      const row = (store._waybackLog || []).at(-1);
+      assert(row && row.url === url && row.outcome === "job:spn2-fixture-1" && row.account === "alice", "SPN2 JSON job_id recorded: " + JSON.stringify(row));
+      const persisted = JSON.stringify(store);
+      assert(!persisted.includes("s3key-fixture") && !persisted.includes("s3secret-fixture"), "S3 credentials never persisted in log/dedup store");
     } finally {
       globalThis.chrome = prevChrome;
       globalThis.fetch = prevFetch;

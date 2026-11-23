@@ -669,7 +669,8 @@ async function verifyPostUpgrade(launch, snapshot, { label }) {
     const syncCheck = await chrome.storage.sync.get(['optLang', 'optPrivateDefault', 'optReadlaterDefault', 'previewAiEnabled', 'previewSkimEnabled', 'aiProvider', 'tagSyncMode', 'personalLibraryAccount']);
     const localCheck = await chrome.storage.local.get(['pinboardToken', 'openaiApiKey', 'optSyncEnabled', 'syncApiKeys', 'bookmarkServiceActive']);
     const migratedLocal = await chrome.storage.local.get(['openaiModel', 'minimaxModel', 'kimiModel', 'customModel', 'previewAiModelByProvider']);
-    const migratedSync = await chrome.storage.sync.get(['openaiModel', 'minimaxModel', 'kimiModel']);
+    const rawSyncModels = await chrome.storage.sync.get(['openaiModel', 'minimaxModel', 'kimiModel']);
+    const resolvedSyncModels = await pbpReadSettingsWithSecrets(['openaiModel', 'minimaxModel', 'kimiModel']);
     const offlineQueue = await readOfflineQueueWithIds();
     const owner = await pbpVocabCurrentOwner();
     const pointPayload = await pbpRestorePointRead(pointId, account);
@@ -677,7 +678,8 @@ async function verifyPostUpgrade(launch, snapshot, { label }) {
       settings,
       syncCheck,
       migratedLocal,
-      migratedSync,
+      rawSyncModels,
+      resolvedSyncModels,
       localKeysPresent: {
         hasPinboardToken: !!localCheck.pinboardToken,
         hasOpenaiApiKey: !!localCheck.openaiApiKey,
@@ -703,9 +705,10 @@ async function verifyPostUpgrade(launch, snapshot, { label }) {
   assert.equal(afterSw.migratedLocal?.previewAiModelByProvider?.minimax, 'MiniMax-M3.1-Flash', `[${label}] previewAiModelByProvider.minimax did not migrate`);
   assert.equal(afterSw.migratedLocal?.previewAiModelByProvider?.kimi, 'kimi-k3.1-pro', `[${label}] previewAiModelByProvider.kimi did not migrate`);
   assert.equal(afterSw.migratedLocal?.previewAiModelByProvider?.openrouter, 'MiniMax-M2', `[${label}] 3rd-party router map entry should remain untouched`);
-  assert.equal(afterSw.migratedSync?.openaiModel, 'gpt-6-luna', `[${label}] retired sync openaiModel did not migrate`);
-  assert.equal(afterSw.migratedSync?.minimaxModel, 'MiniMax-M3.1-Flash', `[${label}] retired sync minimaxModel did not migrate`);
-  assert.equal(afterSw.migratedSync?.kimiModel, 'kimi-k3.1-pro', `[${label}] retired sync kimiModel did not migrate`);
+  assert.equal(afterSw.rawSyncModels?.openaiModel, 'gpt-5-nano', `[${label}] background migration must not overwrite chrome.storage.sync directly`);
+  assert.equal(afterSw.resolvedSyncModels?.openaiModel, 'gpt-6-luna', `[${label}] active sync retired openaiModel did not resolve on read`);
+  assert.equal(afterSw.resolvedSyncModels?.minimaxModel, 'MiniMax-M3.1-Flash', `[${label}] active sync retired minimaxModel did not resolve on read`);
+  assert.equal(afterSw.resolvedSyncModels?.kimiModel, 'kimi-k3.1-pro', `[${label}] active sync retired kimiModel did not resolve on read`);
   assert.equal(afterSw.pointPayload?._vocabulary?.records?.length, snapshot.vocab.length, `[${label}] update restore point missing vocabulary`);
   for (const key of snapshot.hlKeys) {
     assert.equal(

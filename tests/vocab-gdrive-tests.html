@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="116"><title>Vocabulary Google Drive Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="117"><title>Vocabulary Google Drive Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -2917,6 +2917,31 @@ function syncHarness(options = {}) {
         (expectCode !== "unexpected" || result.retryable === true);
     });
   }
+  await asyncCheck("transport fetch failure logs error.name only and never leaks credentials from error.message", async () => {
+    const logged = [];
+    const origWarn = console.warn;
+    console.warn = (...args) => { logged.push(args.map((a) => String(a ?? "")).join(" ")); };
+    try {
+      const secretToken = "ya29.SYNTHETIC_BEARER_DO_NOT_LOG";
+      const client = pbpCreateDriveClient({
+        identity: {
+          getAuthToken: async () => ({ token: secretToken }),
+          removeCachedAuthToken: async () => {},
+          clearAllCachedAuthTokens: async () => {},
+        },
+        beforeRequest: async () => true,
+        fetchImpl: async (_url, init) => {
+          throw new TypeError("proxy transport dropped Authorization=" + init.headers.Authorization);
+        },
+      });
+      const res = await client.about();
+      return !res.ok && res.error === "network" &&
+        logged.some((line) => line.includes("[vocab-drive] fetch failed:") && line.includes("TypeError")) &&
+        logged.every((line) => !line.includes(secretToken) && !line.includes("Bearer"));
+    } finally {
+      console.warn = origWarn;
+    }
+  });
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>

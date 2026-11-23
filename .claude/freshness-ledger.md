@@ -85,7 +85,7 @@
 | DeepSeek OCR | tests/md-ocr-tests.html#DEEPSEEK_OCR_LIVE_20261115 | 2026-11-15 | 2026-11-15 真实核验 /v1/tools/ocr (ocr.result) 响应夹具 |
 | DeepSeek TTS | tests/deepseek-speech-tests.html#DEEPSEEK_TTS_LIVE_WAV_HEADER_20261115 | 2026-11-15 | 2026-11-15 真实核验 /v1/tools/tts 24kHz 流式 WAV (0xffffffff) 头部夹具 |
 | DeepSeek ASR | tests/deepseek-speech-tests.html#DEEPSEEK_ASR_LIVE_20261115 | 2026-11-15 | 2026-11-15 真实核验 /v1/tools/asr {request_id, text, duration_ms} 响应夹具 |
-| Wayback Machine | tests/wayback-tests.html:374 | 2026-11-23 | 2026-11-23 只读探测 archive.org/wayback/available 并对照 SPN2 JSON 规范核实 |
+| Wayback Machine | tests/wayback-tests.html:382 | 未核实 | 按官方 SPN2 规范拆分匿名 GET /save/<url> HTML 与认证 POST /save JSON ({url,job_id,status})，未发起线上 /save 写入 |
 | Free Dictionary | tests/md-dict-tests.html:216 | 2026-11-13 | 2026-11-13 复核 es/aprovecho、pl/psa、en/found 线上响应；pl/psa 同步新增 IPA |
 | Free Dictionary | tests/library-vocab-tests.html#FDA_CONSTRAINT | 2026-11-23 | 2026-11-23 抓取 freedictionaryapi.com/api/v1/entries/en/constraint 真实响应 |
 | Free Dictionary | tests/library-listbox-tests.html#FDA_CONSTRAINT | 2026-11-23 | 2026-11-23 抓取 freedictionaryapi.com/api/v1/entries/en/constraint 真实响应 |

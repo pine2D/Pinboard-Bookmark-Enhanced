@@ -396,12 +396,12 @@ async function runSendNetworkPolicyTests() {
         };
       }
       githubSentBody = JSON.parse(opts.body);
-      return { ok: true, status: 201, json: async () => makeGithubGistReply({ content: githubSentBody.files["T.md"].content }) };
+      return { ok: true, status: 201, json: async () => makeGithubGistReply({ content: "# T\n\nbody\n" }) };
     };
     const github = await pbpSendToTarget("github", { meta: { title: "T" }, rawBody: "body", cfg: { token: "token" } });
     assert(github.ok === true, "safe token API request still succeeds");
     assert(github.url === "https://gist.github.com/octocat-fixture/0123456789abcdef0123456789abcdef", "GitHub Gist returns html_url ahead of the API JSON url");
-    assert(githubSentBody && githubSentBody.public === false && typeof githubSentBody.files["T.md"]?.content === "string", "GitHub Gist request stays private (public:false) with inline markdown file");
+    assert(githubSentBody && githubSentBody.public === false && /^---\ntitle: "?T"?[\s\S]*---\n\nbody$/.test(githubSentBody.files["T.md"]?.content || ""), "GitHub Gist request stays private (public:false) with exact frontmattered markdown payload");
     assert(redirects.length === 2, "GitHub precheck and main request both run");
     assert(redirects.every((mode) => mode === "error"), "every token API fetch rejects redirects");
 
@@ -487,11 +487,11 @@ async function runSendNetworkPolicyTests() {
     globalThis.fetch = async (url, opts) => {
       if (url.endsWith("/users/me")) return { ok: true, status: 200, json: async () => makeNotionUserMeReply() };
       notionSentBody = JSON.parse(opts.body);
-      return { ok: true, status: 200, json: async () => makeNotionPageReply({ parentId: notionSentBody.parent.page_id, url: "https://www.notion.so/p1" }) };
+      return { ok: true, status: 200, json: async () => makeNotionPageReply({ parentId: "01234567-89ab-cdef-0123-456789abcdef", url: "https://www.notion.so/p1" }) };
     };
     const notionOk = await pbpSendToTarget("notion", { meta: { title: "T", url: "https://e.x/a", tags: [] }, rawBody: "body", cfg: { token: "tok", parent: "https://www.notion.so/X-0123456789abcdef0123456789abcdef" } });
     assert(notionOk.ok === true && notionOk.url === "https://www.notion.so/p1", "notion success returns the created page url");
-    assert(notionSentBody && notionSentBody.parent.page_id === "01234567-89ab-cdef-0123-456789abcdef" && typeof notionSentBody.markdown === "string", "notion request body carries the parsed parent and a markdown string");
+    assert(notionSentBody && notionSentBody.parent.page_id === "01234567-89ab-cdef-0123-456789abcdef" && notionSentBody.markdown === "> Source: <https://e.x/a>\n\nbody", "notion request body carries the parsed parent and exact markdown payload");
   } finally {
     globalThis.chrome = prevChrome;
     globalThis.fetch = prevFetch;

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="113"><title>Reader Bookmark Tests</title></head><body>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="114"><title>Reader Bookmark Tests</title></head><body>
 <div id="results"></div><script src="../shared.js"></script><script src="../wayback.js"></script><script src="../bookmark-services.js"></script><script src="fixtures/case-filter.js"></script><script src="fixtures/chrome-mock.js"></script><script src="fixtures/sw-realm.js"></script><script>
 function assert(x, msg) { if (!x) throw new Error(msg || "assertion failed"); }
 function equal(a, b) { assert(a === b, JSON.stringify(a) + " !== " + JSON.stringify(b)); }
@@ -168,8 +168,15 @@ function selfHostedServer(service, row, { postgres = false, readLater = null } =
     { status: 500, headers: { "Content-Type": "text/html; charset=utf-8" } });
   const json = (status, value) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
   const plain = (status, text) => new Response(text, { status, headers: { "Content-Type": "text/plain;charset=UTF-8" } });
+  const linkdingSnapshotUrl = (r) => {
+    if (r.web_archive_snapshot_url) return r.web_archive_snapshot_url;
+    const added = Date.parse(r.date_added);
+    return Number.isFinite(added)
+      ? "https://web.archive.org/web/" + new Date(added).toISOString().replace(/[-:T]/g, "").slice(0, 14) + "/" + r.url
+      : null;
+  };
   const linkdingRecord = () => ({ id: row.id, url: row.url, title: row.title, description: row.description, notes: row.notes,
-    web_archive_snapshot_url: null, favicon_url: null, preview_image_url: null, is_archived: row.is_archived, unread: row.unread,
+    web_archive_snapshot_url: linkdingSnapshotUrl(row), favicon_url: null, preview_image_url: null, is_archived: row.is_archived, unread: row.unread,
     shared: row.shared, tag_names: [...row.tag_names], date_added: row.date_added, date_modified: row.date_modified,
     website_title: null, website_description: null });
   const fetchImpl = async (href, init = {}) => {
@@ -208,15 +215,21 @@ function selfHostedServer(service, row, { postgres = false, readLater = null } =
     }
     if (method === "GET" && url.pathname === "/api/v1/bookmarks/check-url") return json(200, { bookmarkId: row && page === row.content.url ? row.id : null });
     // Karakeep 0.34.1 POST /api/v1/bookmarks (verified 2026-11-23): 201 and the
-    // full bookmark plus alreadyExists: false for a URL it does not hold.
-    if (method === "POST" && url.pathname === "/api/v1/bookmarks" && !row) {
-      const now = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
-      const created = { id: "kk2created", createdAt: now, modifiedAt: now, title: body.title === undefined ? null : body.title, archived: body.archived === undefined ? false : body.archived,
-        favourited: body.favourited === undefined ? false : body.favourited, taggingStatus: "pending", summarizationStatus: "pending", embeddingStatus: "pending",
-        note: body.note === undefined ? null : body.note, summary: body.summary === undefined ? null : body.summary, source: body.source === undefined ? "api" : body.source, userId: "user-1", tags: [],
-        content: { type: "link", url: body.url, title: null, description: null, imageUrl: null, favicon: null, htmlContent: null, contentAssetId: null, readerViewStatus: null, readerViewScore: null, crawledAt: null, crawlStatus: "pending", author: null, publisher: null, datePublished: null, dateModified: null }, assets: [] };
-      row = { id: created.id, firstCreatedAt: now, ...created };
-      return json(201, { ...structuredClone(created), alreadyExists: false });
+    // full bookmark plus alreadyExists: false for a URL it does not hold; 200
+    // and the existing bookmark plus alreadyExists: true when already saved.
+    if (method === "POST" && url.pathname === "/api/v1/bookmarks") {
+      if (row && row.content?.url === body.url) {
+        return json(200, { ...structuredClone(row), alreadyExists: true });
+      }
+      if (!row) {
+        const now = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+        const created = { id: "kk2created", createdAt: now, modifiedAt: now, title: body.title === undefined ? null : body.title, archived: body.archived === undefined ? false : body.archived,
+          favourited: body.favourited === undefined ? false : body.favourited, taggingStatus: "pending", summarizationStatus: "pending", embeddingStatus: "pending",
+          note: body.note === undefined ? null : body.note, summary: body.summary === undefined ? null : body.summary, source: body.source === undefined ? "api" : body.source, userId: "user-1", tags: [],
+          content: { type: "link", url: body.url, title: null, description: null, imageUrl: null, favicon: null, htmlContent: null, contentAssetId: null, readerViewStatus: null, readerViewScore: null, crawledAt: null, crawlStatus: "pending", author: null, publisher: null, datePublished: null, dateModified: null }, assets: [] };
+        row = { id: created.id, firstCreatedAt: now, ...created };
+        return json(201, { ...structuredClone(created), alreadyExists: false });
+      }
     }
     if (readLater && method === "GET" && url.pathname === "/api/v1/lists/" + laterList.id) return json(200, structuredClone(laterList));
     if (!row) return plain(404, "Bookmark not found");
@@ -252,7 +265,7 @@ function selfHostedServer(service, row, { postgres = false, readLater = null } =
   const client = pbpCreateBookmarkServiceClient(connection);
   const clientFor = config => pbpCreateBookmarkServiceClient({ ...connection, sharingEnabled: config?.sharingEnabled });
   // remove(): the bookmark is deleted on the server (from another device).
-  return { get row() { return row; }, remove() { row = null; }, requests, failures, client, clientFor };
+  return { get row() { return row; }, remove() { row = null; }, requests, failures, client, clientFor, fetchImpl };
 }
 // Lets every reader request the runtime started, including the ones a result
 // starts (a refresh after a save), finish before the test reads the outcome.
@@ -1581,6 +1594,25 @@ await test("reader save results say saved, updated, merged or partial as the wor
     const got = await run(account, bookmarked, result, action);
     assert(got === want, account + " bookmarked=" + bookmarked + " " + JSON.stringify(result) + " -> " + JSON.stringify(got));
   }
+});
+await test("selfHostedServer matches Karakeep 0.34.1 duplicate POST 200 alreadyExists:true and linkding snapshot fallback", async () => {
+  const kkServer = selfHostedServer("karakeep", null);
+  const first = await kkServer.client.save({ url: URL_ARTICLE, title: "First", notes: "Note 1", tags: ["a"] });
+  const dupRes = await kkServer.fetchImpl("https://keep.example/api/v1/bookmarks", {
+    method: "POST",
+    body: JSON.stringify({ type: "link", url: URL_ARTICLE }),
+  });
+  const dupJson = await dupRes.json();
+  assert(dupRes.status === 200 && dupJson.alreadyExists === true && dupJson.id === first.bookmark.id, "duplicate POST returns 200 alreadyExists:true");
+  const second = await kkServer.client.save({ url: URL_ARTICLE, title: "Second", notes: "Note 2", tags: ["b"] });
+  assert(first.status === "saved" && first.mutation === "created" && second.status === "saved" && second.bookmark.id === first.bookmark.id, "duplicate Karakeep save reconciles onto existing id");
+  const ldServer = selfHostedServer("linkding", {
+    id: 7, url: URL_ARTICLE, title: "T", description: "", notes: "", web_archive_snapshot_url: "",
+    is_archived: false, unread: false, shared: false, tag_names: [],
+    date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z",
+  });
+  const rawCheck = await (await ldServer.fetchImpl("https://links.example/api/bookmarks/check/?url=" + encodeURIComponent(URL_ARTICLE))).json();
+  assert(rawCheck.bookmark?.web_archive_snapshot_url === "https://web.archive.org/web/20261030030122/" + URL_ARTICLE && ldServer.row.web_archive_snapshot_url === "", "linkding empty snapshot_url falls back in serializer without mutating stored row");
 });
 // User decision 2026-11-02: a popup or reader save whose duplicate check gets
 // no answer (a deadline, a dropped connection, a 5xx) is not merged, queued or

@@ -216,9 +216,8 @@ const _origCall = pbpEudicCall;
           message: "",
         }), { status: 200, headers: { "Content-Type": "application/json; charset=utf-8" } });
       }
-      const reqBody = JSON.parse(init.body);
       return new Response(JSON.stringify({
-        message: "单词导入成功,导入数量 : " + reqBody.words.length,
+        message: "单词导入成功,导入数量 : 1",
       }), { status: 201, headers: { "Content-Type": "application/json; charset=utf-8" } });
     };
     const pingOk = await pbpEudicPing("tok123");
@@ -227,7 +226,9 @@ const _origCall = pbpEudicCall;
     const ping401 = await pbpEudicPing("bad-token");
     assert(ping401.ok === false && ping401.error === "auth", "pbpEudicPing maps RFC 9110 401 application/problem+json to auth");
     const liveSend = await pbpEudicSendRows([{ term: "sesquipedalian", language: "en" }], { token: "tok123" });
-    assert(liveSend.stage === "done" && liveSend.added === 1 && liveSend.skipped === 0, "pbpEudicSendRows parses live 201 count through real pbpEudicCall");
+    const postCall = wireCalls.find((c) => c.method === "POST");
+    const sentWordsPayload = JSON.parse(postCall?.body || "{}");
+    assert(liveSend.stage === "done" && liveSend.added === 1 && liveSend.skipped === 0 && JSON.stringify(sentWordsPayload) === JSON.stringify({ language: "en", category_id: "0", words: ["sesquipedalian"] }), "pbpEudicSendRows sends exact {language,category_id,words} payload and parses fixed 201 server count");
     const liveSend401 = await pbpEudicSendRows([{ term: "sesquipedalian", language: "en" }], { token: "bad-token" });
     assert(liveSend401.stage === "auth" && typeof liveSend401.error === "string" && liveSend401.error.includes("Unauthorized"), "pbpEudicSendRows surfaces RFC 9110 401 problem+json body on auth stop");
   } finally {

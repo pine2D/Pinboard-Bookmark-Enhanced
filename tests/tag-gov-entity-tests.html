@@ -92,7 +92,7 @@ function reset(tagsGet, posts) {
     if (u.pathname === "/v1/posts/get") {
       const url = u.searchParams.get("url");
       const rows = wire.lookup ? await wire.lookup(url) : Object.values(wire.posts).flat().filter(post => post.href === url).slice(0, 1);
-      return pbpPinboardDecodedPostsResponse(u.href, new Response(JSON.stringify({ date: "2026-11-23T05:19:00Z", user: account || "alice", posts: rows }), { status: 200, headers: jsonHeaders }));
+      return pbpPinboardDecodedPostsResponse(u.href, new Response(JSON.stringify({ date: "2026-11-23T05:19:00Z", user: account === undefined ? "alice" : account, posts: rows }), { status: 200, headers: jsonHeaders }));
     }
     if (u.pathname === "/v1/posts/add") {
       wire.adds++;

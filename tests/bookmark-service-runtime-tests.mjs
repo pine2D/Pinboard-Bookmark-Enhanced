@@ -172,7 +172,7 @@ const server=createServer(async(req,res)=>{
   // serializers.py BookmarkSerializer: every field, the archive link falling
   // back to a capture at date_added, website_* always null.
   const serialize=row=>{const added=Date.parse(row.date_added);return {id:row.id,url:row.url,title:row.title,description:row.description,notes:row.notes,
-    web_archive_snapshot_url:row.web_archive_snapshot_url!==undefined&&row.web_archive_snapshot_url!==null?row.web_archive_snapshot_url:(Number.isFinite(added)?'https://web.archive.org/web/'+new Date(added).toISOString().replace(/[-:T]/g,'').slice(0,14)+'/'+row.url:null),
+    web_archive_snapshot_url:row.web_archive_snapshot_url?row.web_archive_snapshot_url:(Number.isFinite(added)?'https://web.archive.org/web/'+new Date(added).toISOString().replace(/[-:T]/g,'').slice(0,14)+'/'+row.url:null),
     favicon_url:null,preview_image_url:null,is_archived:row.is_archived,unread:row.unread,shared:row.shared,tag_names:row.tag_names,date_added:row.date_added,date_modified:row.date_modified,website_title:null,website_description:null};};
   if(path==='user/profile/')return reply(200,{theme:'auto',bookmark_date_display:'relative',bookmark_link_target:'_blank',web_archive_integration:'disabled',tag_search:'strict',enable_sharing:true,enable_public_sharing:false,enable_favicons:false,display_url:false,permanent_notes:false,search_preferences:{},version:'1.47.0'});
   if(path==='users/me')return reply(200,{id:'u1',name:'Fixture',email:null,image:null,localUser:true});
@@ -222,6 +222,8 @@ const server=createServer(async(req,res)=>{
       if(tagError)return serverError();
       return reply(201,serialize(row));
     }
+    const existing=[...store.values()].find(b=>b.content?.url===data.url);
+    if(existing)return reply(200,{...existing,alreadyExists:true});
     const id='b'+(store.size+1);
     const createdAt='2026-10-01T00:00:00.000Z';
     // Hand-authored Karakeep 0.34.1 API record schema (verified 2026-11-23), independently filled from HTTP input.

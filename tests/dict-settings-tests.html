@@ -37,7 +37,7 @@ globalThis.fetch=async(_url,init)=>{
   // Dictionary generation streams (plan 2.7): handwritten OpenAI-compatible
   // chat.completion.chunk stream verified on 2026-11-23 against live Bailian /
   // SiliconFlow SSE responses (role chunk, content chunk, stop chunk, usage chunk, [DONE]).
-  const chunk=(choices,usage=null)=>'data: '+JSON.stringify({id:'chatcmpl-142fa30e-ce2b-9c32-9fa9-1e3116b67a0f',object:'chat.completion.chunk',created:1795407766,model:'arbitrary-model',choices,usage})+'\n\n';
+  const chunk=(choices,usage=null)=>'data: '+JSON.stringify({id:'chatcmpl-fixture-0002',object:'chat.completion.chunk',created:1700000002,model:'arbitrary-model',choices,usage})+'\n\n';
   return new Response(
     chunk([{index:0,delta:{role:'assistant',content:''},logprobs:null,finish_reason:null}])+
     chunk([{index:0,delta:{content:'{"word":"provider","language":"en","pronunciation":"","meanings":[{"partOfSpeech":"noun","definition":"One who provides.","examples":[]}],"learning":{"version":2,"formation":"","history":"","related":[]}}'},logprobs:null,finish_reason:null}])+
