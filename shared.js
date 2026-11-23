@@ -3246,7 +3246,7 @@ function pbpRecordLargeReadBasis(key, value, basis, { recordPrimitive = false } 
     const filtered = prevQueue.filter((item) =>
       item.syncArea === curSync
       && item.localArea === curLocal
-      && (entry.degraded === "routing_error" || item.area === entry.area));
+      && (item.degraded === "routing_error" || entry.degraded === "routing_error" || item.area === entry.area));
     filtered.push(Object.assign({}, entry, { value, syncArea: curSync, localArea: curLocal }));
     while (filtered.length > 8) filtered.shift();
     _pbpRecentPrimitiveReadBasis.set(key, filtered);
@@ -3729,13 +3729,42 @@ function pbpSyncWriteFailureKind(error) {
   return "other";
 }
 
-async function pbpFlushPendingOrphanChunksUnlocked(key) {
-  const pending = _pbpPendingOrphanChunkKeys.get(key);
-  if (!pending || !pending.size) return;
+function pbpOrphanChunksKey(key) { return `_pbpOrphanChunks_${key}`; }
+
+async function pbpRecordPendingOrphanChunksUnlocked(key, chunkKeys) {
+  if (!chunkKeys || !chunkKeys.length) return;
+  let pending = _pbpPendingOrphanChunkKeys.get(key);
+  if (!pending) {
+    pending = new Set();
+    _pbpPendingOrphanChunkKeys.set(key, pending);
+  }
+  chunkKeys.forEach((ck) => pending.add(ck));
+  const orphanKey = pbpOrphanChunksKey(key);
   try {
-    await chrome.storage.sync.remove([...pending]);
-    _pbpPendingOrphanChunkKeys.delete(key);
+    const stored = await chrome.storage.local.get(orphanKey);
+    const prev = Array.isArray(stored && stored[orphanKey]) ? stored[orphanKey] : [];
+    prev.forEach((ck) => { if (typeof ck === "string") pending.add(ck); });
+    await chrome.storage.local.set({ [orphanKey]: [...pending] });
   } catch (error) {
+    console.warn("[sync-large] orphan chunk ledger persist failed:", key, error?.name, error?.message);
+  }
+}
+
+async function pbpFlushPendingOrphanChunksUnlocked(key, persistedList) {
+  const orphanKey = pbpOrphanChunksKey(key);
+  const combined = new Set(_pbpPendingOrphanChunkKeys.get(key) || []);
+  if (Array.isArray(persistedList)) {
+    persistedList.forEach((ck) => { if (typeof ck === "string") combined.add(ck); });
+  }
+  if (!combined.size) return;
+  try {
+    await chrome.storage.sync.remove([...combined]);
+    _pbpPendingOrphanChunkKeys.delete(key);
+    await chrome.storage.local.remove(orphanKey).catch((error) => {
+      console.warn("[sync-large] orphan chunk ledger cleanup failed:", key, error?.name, error?.message);
+    });
+  } catch (error) {
+    _pbpPendingOrphanChunkKeys.set(key, combined);
     console.warn("[sync-large] deferred orphan chunk cleanup failed:", key, error?.name, error?.message);
   }
 }
@@ -3770,11 +3799,13 @@ async function pbpSyncSetLargeUnlocked(key, value, opts) {
     return;
   }
   const fallbackKey = pbpLargeFallbackKey(key);
+  const orphanKey = pbpOrphanChunksKey(key);
   let existingFallback = {};
-  try { existingFallback = await chrome.storage.local.get(fallbackKey); }
+  try { existingFallback = await chrome.storage.local.get([fallbackKey, orphanKey]); }
   catch (error) { console.warn("[sync-large] prior fallback read failed:", key, error?.name, error?.message); }
   const hadFallback = Object.prototype.hasOwnProperty.call(existingFallback, fallbackKey);
   const previousFallback = existingFallback[fallbackKey];
+  const persistedOrphans = existingFallback[orphanKey];
   const prior = await chrome.storage.sync.get(key);
   const priorMeta = prior[key];
   if (verifiedBasis && !pbpSameChunkMeta(priorMeta, verifiedBasis.meta)) {
@@ -3782,6 +3813,7 @@ async function pbpSyncSetLargeUnlocked(key, value, opts) {
   }
   const priorChunkKeys = pbpChunkStorageKeys(key, priorMeta);
   if (!str) {
+    await pbpFlushPendingOrphanChunksUnlocked(key, persistedOrphans);
     await chrome.storage.local.remove(fallbackKey);
     await chrome.storage.sync.remove([key, ...priorChunkKeys]);
     return;
@@ -3796,7 +3828,7 @@ async function pbpSyncSetLargeUnlocked(key, value, opts) {
   const chunkData = {};
   chunks.forEach((chunk, i) => { chunkData[`${key}_${generation}_${i}`] = chunk; });
   const newChunkKeys = Object.keys(chunkData);
-  await pbpFlushPendingOrphanChunksUnlocked(key);
+  await pbpFlushPendingOrphanChunksUnlocked(key, persistedOrphans);
   try {
     await chrome.storage.sync.set(chunkData);
     if (verifiedBasis) {
@@ -3813,14 +3845,9 @@ async function pbpSyncSetLargeUnlocked(key, value, opts) {
       },
     });
   } catch (e) {
-    await chrome.storage.sync.remove(newChunkKeys).catch((err) => {
-      let pending = _pbpPendingOrphanChunkKeys.get(key);
-      if (!pending) {
-        pending = new Set();
-        _pbpPendingOrphanChunkKeys.set(key, pending);
-      }
-      newChunkKeys.forEach((ck) => pending.add(ck));
+    await chrome.storage.sync.remove(newChunkKeys).catch(async (err) => {
       console.warn("[sync-large] partial chunk rollback failed:", key, err?.name, err?.message);
+      await pbpRecordPendingOrphanChunksUnlocked(key, newChunkKeys);
     });
     // CLAUDE.md "吞异常必须留痕": everything below folds the platform's own
     // reason into a product outcome (a local fallback record, or a restore of

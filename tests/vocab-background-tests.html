@@ -166,6 +166,11 @@ async function bootDriveWorker({
     let scriptDeferredSeenAfter = false;
     let preImportMicrotaskRanBeforeSyncSample = true;
     let preImportMicrotaskRanAfterBoot = false;
+    let standaloneAwaitRealm = null;
+    let standaloneAwaitSeenInSync = true;
+    let standaloneAwaitSeenAfter = false;
+    let deepSyncRealm = null;
+    let deepSyncSeenInSync = false;
     try {
       plainRealm = await pbpSwRealm.boot({
         mock: {
@@ -186,18 +191,16 @@ async function bootDriveWorker({
         },
         beforeBackground(w, m) {
           const origImport = w.importScripts;
-          const gatedAdd = m.chrome.runtime.onMessage.addListener.bind(m.chrome.runtime.onMessage);
           let preQueued = false;
           w.importScripts = (...args) => {
             if (!preQueued) {
               preQueued = true;
-              // Simulate BOTH a queueMicrotask AND a native async/await IIFE scheduled in background.js BEFORE importScripts!
               w.queueMicrotask(() => { preImportMicrotaskRanAfterBoot = true; });
-              new w.Function("add", "(async () => { await 0; add(handleRuntimeMessage); })();")(gatedAdd);
             }
             return origImport(...args);
           };
-          m.chrome.runtime.onMessage.addListener = () => {};
+          const realAdd = m.chrome.runtime.onMessage.addListener.bind(m.chrome.runtime.onMessage);
+          m.chrome.runtime.onMessage.addListener = (fn) => { w.queueMicrotask(() => realAdd(fn)); };
         },
         afterBootSync(w, m) {
           preImportMicrotaskRanBeforeSyncSample = preImportMicrotaskRanAfterBoot;
@@ -206,12 +209,50 @@ async function bootDriveWorker({
         },
       });
       scriptDeferredSeenAfter = scriptDeferredRealm.mock.chrome.runtime.onMessage.hasListener(scriptDeferredRealm.win.handleRuntimeMessage);
+
+      // R7-P3#7: Standalone line-1 native async/await (with NO explicit queueMicrotask call) must fail sync check,
+      // while a 12-level synchronous helper chain must pass sync check!
+      const standaloneAwaitBg = `(async () => { await 0; chrome.runtime.onMessage.addListener(handleRuntimeMessage); })();\n`
+        + `importScripts(${expectedImports.map((f) => JSON.stringify(f)).join(",")});\n`
+        + `function handleRuntimeMessage() { return false; }\n`;
+      standaloneAwaitRealm = await pbpSwRealm.boot({
+        mock: {
+          id: EXT_ID,
+          manifest: CAPABLE_MANIFEST,
+          storage: { local: { personalLibraryAccount: "alice", bookmarkServiceActive: "pinboard", vocabDriveConnected: false, _legacyWildcardCleanupV1: true, _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
+        },
+        backgroundSource: standaloneAwaitBg,
+        afterBootSync(w, m) {
+          standaloneAwaitSeenInSync = m.chrome.runtime.onMessage.hasListener(w.handleRuntimeMessage);
+        },
+      });
+      standaloneAwaitSeenAfter = standaloneAwaitRealm.mock.chrome.runtime.onMessage.hasListener(standaloneAwaitRealm.win.handleRuntimeMessage);
+
+      const deepChain = Array.from({ length: 12 }, (_, i) =>
+        `function syncStep${i}() { ${i === 11 ? "chrome.runtime.onMessage.addListener(handleRuntimeMessage);" : `syncStep${i + 1}();`} }`
+      ).join("\n");
+      const deepSyncBg = `importScripts(${expectedImports.map((f) => JSON.stringify(f)).join(",")});\n`
+        + `function handleRuntimeMessage() { return false; }\n`
+        + deepChain + `\nsyncStep0();\n`;
+      deepSyncRealm = await pbpSwRealm.boot({
+        mock: {
+          id: EXT_ID,
+          manifest: CAPABLE_MANIFEST,
+          storage: { local: { personalLibraryAccount: "alice", bookmarkServiceActive: "pinboard", vocabDriveConnected: false, _legacyWildcardCleanupV1: true, _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
+        },
+        backgroundSource: deepSyncBg,
+        afterBootSync(w, m) {
+          deepSyncSeenInSync = m.chrome.runtime.onMessage.hasListener(w.handleRuntimeMessage);
+        },
+      });
     } finally {
       globalThis.fetch = realOuterFetch;
       plainRealm?.dispose();
       scriptDeferredRealm?.dispose();
+      standaloneAwaitRealm?.dispose();
+      deepSyncRealm?.dispose();
     }
-    check("top-level listener probe catches queueMicrotask-deferred onMessage (including pre-importScripts microtasks) on both inline and <script src> paths with zero outer fetch calls",
+    check("top-level listener probe catches queueMicrotask and standalone async/await deferrals while allowing deep sync helpers with zero outer fetch calls",
       sampledBeforeMicrotask === true
       && syncSampledHasListener === false
       && registeredOnlyAfterMicrotask === true
@@ -221,6 +262,9 @@ async function bootDriveWorker({
       && scriptDeferredSampledBefore === true
       && scriptDeferredSeenInSync === false
       && scriptDeferredSeenAfter === true
+      && standaloneAwaitSeenInSync === false
+      && standaloneAwaitSeenAfter === true
+      && deepSyncSeenInSync === true
       && outerFetchCalls === 0);
   }
 

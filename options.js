@@ -5451,31 +5451,37 @@ document.addEventListener("DOMContentLoaded", async () => {
   let savedThemes = []; // [{ name: "My Theme", css: "..." }, ...]
 
   async function loadSavedThemes() {
+    const loadSeq = (loadSavedThemes._seq = (loadSavedThemes._seq || 0) + 1);
+    let loaded = [];
     for (let attempt = 0; attempt < 2; attempt++) {
-      savedThemes = await syncGetLarge("savedThemes", []);
-      if (!Array.isArray(savedThemes)) savedThemes = [];
+      let current = await syncGetLarge("savedThemes", []);
+      if (!Array.isArray(current)) current = [];
+      loaded = current;
       // One-time migration from local. K117: the empty read that arms it is
       // exactly the read the chunk assertion distrusts -- a cloud list whose
       // chunks have not landed here reads as [] too, and publishing the legacy
       // local list over it orphans themes the user still has (and then deletes
-      // the local copy). Pass { mergeBase: savedThemes } so if a newer cloud
-      // generation lands before migration commits, we re-read instead of
-      // overwriting it or deleting local.savedThemes.
+      // the local copy). Keep `current` in a call-local binding so overlapping
+      // loads (e.g. startup + backup import) never swap each other's mergeBase,
+      // and retain local.savedThemes on quota fallback until cloud publication
+      // actually succeeds.
       let syncReadComplete = true;
       try {
-        await pbpAssertChunkedSyncReadComplete("savedThemes", savedThemes);
-      } catch (_) { syncReadComplete = false; }
-      if (syncReadComplete && !savedThemes.length) {
+        await pbpAssertChunkedSyncReadComplete("savedThemes", current);
+      } catch (err) {
+        if (attempt === 0 && err && err.concurrentGeneration) continue;
+        syncReadComplete = false;
+      }
+      if (syncReadComplete && !current.length) {
         const local = await chrome.storage.local.get({ savedThemes: [] });
         if (Array.isArray(local.savedThemes) && local.savedThemes.length) {
           try {
-            await syncSetLarge("savedThemes", local.savedThemes, { mergeBase: savedThemes });
-            savedThemes = local.savedThemes;
+            await syncSetLarge("savedThemes", local.savedThemes, { mergeBase: current });
+            loaded = local.savedThemes;
             await chrome.storage.local.remove("savedThemes");
           } catch (err) {
             if (err && err.pbpFellBackToLocal) {
-              savedThemes = local.savedThemes;
-              await chrome.storage.local.remove("savedThemes");
+              loaded = local.savedThemes;
             } else if (attempt === 0 && err && err.concurrentGeneration) {
               continue;
             }
@@ -5484,6 +5490,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       break;
     }
+    if (loadSeq !== loadSavedThemes._seq) return;
+    savedThemes = loaded;
     renderSavedThemes();
   }
 

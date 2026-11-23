@@ -1000,6 +1000,105 @@ async function run() {
               && Array.isArray(renderedThemes) && renderedThemes.map((t) => t.name).join(",") === "CloudNew";
           }
         }
+        // R7-P1#1 (overlapping loadSavedThemes on same page), R7-P1#2 (quota fallback + reopen), R7-P3#5 (pre-recheck arrival renders CloudNew):
+        const makeAreaR7 = (obj) => ({
+          get: async (q) => {
+            if (q == null) return structuredClone(obj);
+            if (typeof q === "string") return q in obj ? { [q]: structuredClone(obj[q]) } : {};
+            if (Array.isArray(q)) return Object.fromEntries(q.filter((k) => k in obj).map((k) => [k, structuredClone(obj[k])]));
+            return { ...structuredClone(q), ...Object.fromEntries(Object.keys(q).filter((k) => k in obj).map((k) => [k, structuredClone(obj[k])])) };
+          },
+          set: async (d) => { Object.assign(obj, structuredClone(d)); },
+          remove: async (keys) => { for (const k of [].concat(keys)) delete obj[k]; },
+        });
+        // 1) Overlapping same-page loadSavedThemes (boot + backup import):
+        {
+          const lMap = { optSyncEnabled: true, savedThemes: [{ name: "Legacy", css: "a{}" }] };
+          const sMap = { savedThemes: "" };
+          const lArea = makeAreaR7(lMap);
+          const sArea = makeAreaR7(sMap);
+          let releaseFirstLocalGet = null;
+          let localReads = 0;
+          const origLGet = lArea.get;
+          lArea.get = async (q) => {
+            if (q && typeof q === "object" && !Array.isArray(q) && "savedThemes" in q && ++localReads === 1) {
+              await new Promise((r) => { releaseFirstLocalGet = r; });
+            }
+            return origLGet(q);
+          };
+          globalThis.chrome = { storage: { local: lArea, sync: sArea, onChanged: { addListener() {} } } };
+          _settingsStorageCache = sArea;
+          const pageHarness = new Function(
+            "syncGetLarge", "syncSetLarge",
+            "let savedThemes = []; function renderSavedThemes() {}\n" + loadSource + "\nreturn { loadSavedThemes, getSavedThemes: () => savedThemes };",
+          )(syncGetLarge, syncSetLarge);
+          const firstLoad = pageHarness.loadSavedThemes();
+          while (!releaseFirstLocalGet) await new Promise((r) => setTimeout(r, 0));
+          sMap.savedThemes = { _chunks: 1, _generation: "g2" };
+          sMap.savedThemes_g2_0 = '[{"name":"CloudNew","css":"div{}"}]';
+          await pageHarness.loadSavedThemes();
+          releaseFirstLocalGet();
+          await firstLoad;
+          const overlapCloud = await syncGetLarge("savedThemes", []);
+          if (!("savedThemes_g2_0" in sMap)
+              || !Array.isArray(lMap.savedThemes) || lMap.savedThemes.length !== 1
+              || overlapCloud.map((t) => t.name).join(",") !== "CloudNew"
+              || pageHarness.getSavedThemes().map((t) => t.name).join(",") !== "CloudNew") {
+            r6LoadMidReadLocalKept = false;
+          }
+        }
+        // 2) Quota rejection on migration + concurrent g2 + page reopen preserves local.savedThemes:
+        {
+          const lMap = { optSyncEnabled: true, savedThemes: [{ name: "Legacy", css: "a{}" }] };
+          const sMap = { savedThemes: "" };
+          const lArea = makeAreaR7(lMap);
+          const sArea = makeAreaR7(sMap);
+          let setTries = 0;
+          sArea.set = async () => {
+            if (++setTries === 1) {
+              sMap.savedThemes = { _chunks: 1, _generation: "g2" };
+              sMap.savedThemes_g2_0 = '[{"name":"CloudNew","css":"div{}"}]';
+              throw new Error("Resource::kQuotaBytes quota exceeded");
+            }
+          };
+          globalThis.chrome = { storage: { local: lArea, sync: sArea, onChanged: { addListener() {} } } };
+          _settingsStorageCache = sArea;
+          const makeLoader = () => new Function(
+            "syncGetLarge", "syncSetLarge",
+            "let savedThemes = []; function renderSavedThemes() {}\n" + loadSource + "\nreturn async () => { await loadSavedThemes(); return savedThemes; };",
+          )(syncGetLarge, syncSetLarge);
+          await makeLoader()();
+          const secondRender = await makeLoader()();
+          if (!Array.isArray(lMap.savedThemes) || lMap.savedThemes.map((t) => t.name).join(",") !== "Legacy"
+              || secondRender.map((t) => t.name).join(",") !== "CloudNew") {
+            r6LoadPostStageLocalKept = false;
+          }
+        }
+        // 3) Complete g2 arriving right before first pbpAssertChunkedSyncReadComplete renders CloudNew (not []):
+        {
+          const lMap = { optSyncEnabled: true };
+          const sMap = { savedThemes: "" };
+          const lArea = makeAreaR7(lMap);
+          const sArea = makeAreaR7(sMap);
+          let metaGets = 0;
+          const origSGet = sArea.get;
+          sArea.get = async (q) => {
+            if (q === "savedThemes" && ++metaGets === 2) {
+              sMap.savedThemes = { _chunks: 1, _generation: "g2" };
+              sMap.savedThemes_g2_0 = '[{"name":"CloudNew","css":"div{}"}]';
+            }
+            return origSGet(q);
+          };
+          globalThis.chrome = { storage: { local: lArea, sync: sArea, onChanged: { addListener() {} } } };
+          _settingsStorageCache = sArea;
+          const rendered = await new Function(
+            "syncGetLarge", "syncSetLarge",
+            "let savedThemes = []; function renderSavedThemes() {}\n" + loadSource + "\nreturn async () => { await loadSavedThemes(); return savedThemes; };",
+          )(syncGetLarge, syncSetLarge)();
+          if (rendered.map((t) => t.name).join(",") !== "CloudNew") {
+            r6LoadPostStageLocalKept = false;
+          }
+        }
       } finally {
         globalThis.chrome = prevChromeR6;
         _settingsStorageCache = prevCacheR6;
@@ -4551,8 +4650,9 @@ async function run() {
         try { await pbpAssertChunkedSyncReadComplete("customOverlayCSS", syncOffRead.value, syncOffRead.basis); }
         catch (err) { interleavedDegradedErr = (err && err.code) || "threw"; }
       }
-      // R6-P1#2, R6-P2#3, R6-P2#4, R6-P3#6:
+      // R6-P1#2, R6-P2#3, R6-P2#4, R6-P3#6, R7-P2#3, R7-P3#6:
       let emptyChunkRescuedOk = true, preRecheckSwapMerged = null, quotaOrphanRetryMerged = null, crossAreaDegradedErr = "";
+      let quotaCommittedToCloud = false, coldRecoveryFirstErr = "", coldRecoverySecondErr = "";
       {
         // R6-P1#2: Corrupted empty chunk savedThemes_g2_0="" under a real manifest must rescue localFallback (committed or stale) and NEVER delete it!
         for (const fbGen of ["g2", "g1"]) {
@@ -4596,23 +4696,23 @@ async function run() {
           await runRealPersistSavedThemes({ type: "save", name: "New", css: "a{}" });
           preRecheckSwapMerged = await syncGetLarge("savedThemes", []);
         }
-        // R6-P2#4: Transient sync.remove failure during rollback flushes pending orphan chunks before next stage so 102400B quota is not exceeded!
+        // R6-P2#4 & R7-P2#3: Transient sync.remove failure persists _pbpOrphanChunks_savedThemes across page close,
+        // flushes ~28KB orphan chunks on reopen so CloudNew(28KB)+Merged(56KB)=84KB fits in 102400B quota and commits to cloud!
         {
-          const bigCss = "a".repeat(36000);
+          const bigCss = "a".repeat(28000);
           const lObj = { optSyncEnabled: true };
           const sObj = { savedThemes: { _chunks: 1, _generation: "g1" }, savedThemes_g1_0: "[]" };
           const sArea = makeMapArea(sObj);
           let stageCount = 0, removeCount = 0;
           const origSSet = sArea.set, origSRem = sArea.remove;
           const calcBytes = (obj) => Object.entries(obj).reduce((sum, [k, v]) => sum + k.length + JSON.stringify(v).length, 0);
+          const g2Chunks = pbpSplitSyncString("savedThemes", "g2", JSON.stringify([{ name: "CloudNew", css: bigCss }]));
           sArea.set = async (d) => {
             const nextBytes = calcBytes(Object.assign({}, sObj, d));
             if (nextBytes > 102400) throw new Error("Resource::kQuotaBytes quota exceeded");
             const res = await origSSet(d);
             if (Object.keys(d).some((k) => k.startsWith("savedThemes_")) && ++stageCount === 1) {
-              // Complete g2 (~36KB) arrives right after Attempt 0 staged ~36KB!
-              const g2Chunks = pbpSplitSyncString("savedThemes", "g2", JSON.stringify([{ name: "CloudNew", css: bigCss }]));
-              g2Chunks.forEach((ch, idx) => { sObj[`savedThemes_g2_${idx}`] = ch; });
+              // Unpropagated g2 manifest arrives right after Attempt 0 staged ~28KB!
               sObj.savedThemes = { _chunks: g2Chunks.length, _generation: "g2" };
             }
             return res;
@@ -4624,10 +4724,27 @@ async function run() {
           globalThis.chrome.storage.local = makeMapArea(lObj);
           globalThis.chrome.storage.sync = sArea;
           _settingsStorageCache = sArea;
+          let firstAborted = false;
+          try { await runRealPersistSavedThemes({ type: "save", name: "New", css: bigCss }); }
+          catch (err) { firstAborted = Boolean(err && err.code === "chunks_propagating"); }
+          const persistedBeforeReopen = Array.isArray(lObj._pbpOrphanChunks_savedThemes) && lObj._pbpOrphanChunks_savedThemes.length === 4;
+          // Simulate closing options.html (in-memory Map lost) and g2 chunks finishing propagation:
+          _pbpPendingOrphanChunkKeys.clear();
+          g2Chunks.forEach((ch, idx) => { sObj[`savedThemes_g2_${idx}`] = ch; });
           await runRealPersistSavedThemes({ type: "save", name: "New", css: bigCss });
-          quotaOrphanRetryMerged = await syncGetLarge("savedThemes", []);
+          const finalGen = sObj.savedThemes && sObj.savedThemes._generation;
+          const finalChunkKeys = pbpChunkStorageKeys("savedThemes", sObj.savedThemes);
+          const rawCloudJson = finalChunkKeys.map((ck) => sObj[ck]).join("");
+          const parsedCloud = rawCloudJson ? JSON.parse(rawCloudJson) : [];
+          const leftoverForeignChunks = Object.keys(sObj).filter((k) =>
+            k.startsWith("savedThemes_") && k !== "savedThemes_g1_0" && !k.startsWith(`savedThemes_${finalGen}_`)).length;
+          quotaOrphanRetryMerged = parsedCloud;
+          quotaCommittedToCloud = firstAborted && persistedBeforeReopen
+            && !("savedThemes_localFallback" in lObj)
+            && !("_pbpOrphanChunks_savedThemes" in lObj)
+            && leftoverForeignChunks === 0;
         }
-        // R6-P3#6: Plain local read of "old{}" followed by switching to sync where unpropagated g2 rescues "old{}" must still refuse!
+        // R6-P3#6 & R7-P3#6: Cross-area switch AND cold-routing error recovery keep unconsumed routing_error!
         {
           const lObj = {
             optSyncEnabled: false,
@@ -4646,6 +4763,29 @@ async function run() {
           const secondOverlay = await syncGetLarge("customOverlayCSS", "");
           try { await pbpAssertChunkedSyncReadComplete("customOverlayCSS", secondOverlay); }
           catch (err) { crossAreaDegradedErr = (err && err.code) || "threw"; }
+
+          // Cold routing fails once returning "old{}", then second read recovers in sync returning "current{}":
+          const lObjCold = { optSyncEnabled: true, customOverlayCSS: "old{}" };
+          const sObjCold = { customOverlayCSS: { _chunks: 1, _generation: "g3" }, customOverlayCSS_g3_0: "current{}" };
+          let coldTries = 0;
+          const lAreaCold = makeMapArea(lObjCold);
+          const origColdGet = lAreaCold.get;
+          lAreaCold.get = async (q) => {
+            if (q && typeof q === "object" && !Array.isArray(q) && "optSyncEnabled" in q && ++coldTries === 1) {
+              throw new Error("cold optSyncEnabled failure");
+            }
+            return origColdGet(q);
+          };
+          const sAreaCold = makeMapArea(sObjCold);
+          globalThis.chrome.storage.local = lAreaCold;
+          globalThis.chrome.storage.sync = sAreaCold;
+          _settingsStorageCache = null;
+          const readOld = await syncGetLarge("customOverlayCSS", "");
+          const readCur = await syncGetLarge("customOverlayCSS", "");
+          try { await pbpAssertChunkedSyncReadComplete("customOverlayCSS", readOld); }
+          catch (err) { coldRecoveryFirstErr = (err && err.code) || "threw"; }
+          try { await pbpAssertChunkedSyncReadComplete("customOverlayCSS", readCur); }
+          catch (err) { coldRecoverySecondErr = (err && err.code) || "threw"; }
         }
       }
       console.warn = prevWarnE7f;
@@ -4655,8 +4795,9 @@ async function run() {
         && postStageErr === "" && Array.isArray(postStageMerged) && postStageMerged.map((t) => t.name).join(",") === "CloudNew,New" && postStageOrphanChunks === 0
         && emptyChunkRescuedOk === true
         && Array.isArray(preRecheckSwapMerged) && preRecheckSwapMerged.map((t) => t.name).join(",") === "CloudNew,New"
-        && Array.isArray(quotaOrphanRetryMerged) && quotaOrphanRetryMerged.map((t) => t.name).join(",") === "CloudNew,New"
+        && quotaCommittedToCloud === true && Array.isArray(quotaOrphanRetryMerged) && quotaOrphanRetryMerged.map((t) => t.name).join(",") === "CloudNew,New"
         && crossAreaDegradedErr === "chunks_propagating"
+        && coldRecoveryFirstErr === "chunks_propagating" && coldRecoverySecondErr === ""
         && incompleteSwapCode === "chunks_propagating" && incompleteSwapSets === 0 && incompleteSwapRemoves === 0
         && nonEmptyColdCode === "chunks_propagating" && nonEmptyColdWrites === 0 && nonEmptyColdRemoves === 0
         && Array.isArray(nonEmptyColdReadback) && nonEmptyColdReadback.length === 1 && nonEmptyColdReadback[0].name === "Cloud"

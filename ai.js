@@ -245,7 +245,7 @@ const _AI_CN_FIELD_CLAUSE_RE = new RegExp(
   + "|\\b(?:" + _AI_HEALABLE_RE_SRC + ")\\b[\`'\\\"]?(?:\\s*(?:参数|字段))?\\s*(?:不(?:受|再)?支持|不再受支持|已弃用)\\s*$"
 );
 const _AI_CN_META_CLAUSE_RE = /^(?:错误(?:码|代码|号)|状态码|(?:error[\s_-]*)?code|request[\s_-]*id|trace[\s_-]*id)\s*[:：=]?\s*[a-z0-9_.-]+$/i;
-const _AI_CN_CLAUSE_VALUE_RE = /取值|值必须|值超出|超出范围|介于|大于|小于|至少|至多|不得超过|不能超过|必须为|必须是|只能为|只能是|小数|整数|浮点数|负数|正数|布尔|字符串|数组|工具参数|[=<>≤≥]/;
+const _AI_CN_CLAUSE_VALUE_RE = /取值|值必须|值超出|超出范围|允许(?:的)?(?:取值|值)|支持(?:的)?(?:取值|值)|有效(?:的)?(?:取值|值)|合法(?:的)?(?:取值|值)|可选(?:的)?(?:取值|值)|介于|大于|小于|至少|至多|不得超过|不能超过|必须为|必须是|只能为|只能是|小数|整数|浮点数|负数|正数|布尔|字符串|数组|工具参数|[=<>≤≥]/;
 const _AI_CN_PARAM_COLON_NUM_RE = new RegExp("\\b(?:" + _AI_HEALABLE_RE_SRC + ")\\s*[:：]\\s*[-+0-9]", "i");
 function _aiCnIsValueClause(rawClause) {
   return _AI_CN_CLAUSE_VALUE_RE.test(rawClause) || _AI_CN_PARAM_COLON_NUM_RE.test(rawClause);
@@ -265,6 +265,17 @@ function _aiCnClauseValueTargetParams(rawClause) {
   let m;
   while ((m = assignRe.exec(rawClause)) !== null) {
     named.add(m[1].toLowerCase());
+  }
+  const snakeRe = /\b([a-z][a-z0-9]*_[a-z0-9_]+)\b/gi;
+  while ((m = snakeRe.exec(rawClause)) !== null) {
+    named.add(m[1].toLowerCase());
+  }
+  const replaceRe = /(?:改用|使用|换用|替代(?:为)?|替换为)\s*[\`'"]?([a-z][a-z0-9_]*)[\`'"]?/gi;
+  while ((m = replaceRe.exec(rawClause)) !== null) {
+    const cand = m[1].toLowerCase();
+    if (!/^(?:int|integer|float|double|number|bool|boolean|str|string|array|object|json|null|true|false)$/.test(cand)) {
+      named.add(cand);
+    }
   }
   return named;
 }

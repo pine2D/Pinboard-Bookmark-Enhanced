@@ -47,8 +47,10 @@
     if (!expectedEl) return true;
     if (doc.currentScript !== expectedEl) return false;
     const prevPrepare = win.Error.prepareStackTrace;
+    const prevLimit = win.Error.stackTraceLimit;
     let frames = null;
     try {
+      win.Error.stackTraceLimit = Infinity;
       win.Error.prepareStackTrace = (_err, sites) => sites.map((s) => ({
         file: s.getFileName() || s.getScriptNameOrSourceURL() || "",
         fn: s.getFunctionName(),
@@ -58,6 +60,7 @@
       frames = new win.Error().stack;
     } finally {
       win.Error.prepareStackTrace = prevPrepare;
+      win.Error.stackTraceLimit = prevLimit;
     }
     if (!Array.isArray(frames)) return true;
     const bgFrames = frames.filter((f) => f.file === bgUrl || f.file.endsWith("/background.js"));
