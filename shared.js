@@ -672,16 +672,16 @@ const SETTINGS_DEFAULTS = {
   // @generated:settings-schema end (settings-defaults-head)
   // @generated:ai-providers start (settings-defaults)
   geminiApiKey: "", geminiModel: "gemini-3.5-flash-lite",
-  openaiApiKey: "", openaiModel: "gpt-5.4-nano", openaiBaseUrl: "https://api.openai.com/v1",
+  openaiApiKey: "", openaiModel: "gpt-6-luna", openaiBaseUrl: "https://api.openai.com/v1",
   claudeApiKey: "", claudeModel: "claude-haiku-5-5",
   deepseekApiKey: "", deepseekModel: "deepseek-flash",
-  qwenApiKey: "", qwenModel: "qwen-flash", qwenRegion: "beijing", qwenWorkspaceId: "",
+  qwenApiKey: "", qwenModel: "qwen3.8-flash", qwenRegion: "beijing", qwenWorkspaceId: "",
   minimaxApiKey: "", minimaxModel: "MiniMax-M3.1-Flash",
   openrouterApiKey: "", openrouterModel: "openai/gpt-oss-20b",
   groqApiKey: "", groqModel: "openai/gpt-oss-20b",
   mistralApiKey: "", mistralModel: "mistral-small-latest",
   cohereApiKey: "", cohereModel: "command-r7b-12-2024",
-  siliconflowApiKey: "", siliconflowModel: "Qwen/Qwen3-8B",
+  siliconflowApiKey: "", siliconflowModel: "deepseek-ai/DeepSeek-V4.1-Flash",
   zhipuApiKey: "", zhipuModel: "glm-5.3-flash",
   kimiApiKey: "", kimiModel: "kimi-k3.1-pro",
   arkApiKey: "", arkModel: "doubao-seed-2-1-lite-260915", arkRegion: "cn",
@@ -4372,6 +4372,86 @@ async function pbpMigrateRetiredMinimaxKimiModels() {
     });
   } catch (e) {
     console.warn("[ai-migration] retired MiniMax/Kimi model rewrite failed:", e && e.name, e && e.message);
+  }
+}
+
+// One-shot retirement rewrite for OpenAI's deprecated/scheduled-shutdown
+// lightweight defaults ("gpt-5.4-nano", "gpt-5.4-nano-2026-03-17",
+// "gpt-5-nano", "gpt-5-nano-2025-08-07", "gpt-4o-mini",
+// "gpt-4o-mini-2024-07-18", "gpt-4.1-mini", "gpt-4.1-mini-2025-04-14" ->
+// "gpt-6-luna"). Scoped strictly to official `openai` settings when
+// `openaiBaseUrl` has not been overridden to a 3rd-party proxy.
+// Retire by 2027-01-15 (.claude/expiring-items.md).
+const PBP_RETIRED_OPENAI_MODEL_FLAG = "_retiredOpenaiModelsDone";
+const PBP_RETIRED_OPENAI_MODELS = Object.freeze([
+  "gpt-5.4-nano",
+  "gpt-5.4-nano-2026-03-17",
+  "gpt-5-nano",
+  "gpt-5-nano-2025-08-07",
+  "gpt-4o-mini",
+  "gpt-4o-mini-2024-07-18",
+  "gpt-4.1-mini",
+  "gpt-4.1-mini-2025-04-14",
+]);
+
+function _pbpIsOfficialOpenaiBase(url) {
+  if (url === undefined || url === null) return true;
+  if (typeof url !== "string") return false;
+  const trimmed = url.trim().replace(/\/+$/, "");
+  const official = String(SETTINGS_DEFAULTS.openaiBaseUrl || "").replace(/\/+$/, "");
+  return trimmed === "" || trimmed === official;
+}
+
+function pbpBuildRetiredOpenaiModelPatch(raw, fallbackBaseUrl) {
+  if (!raw || typeof raw !== "object") return {};
+  const effectiveBase = Object.prototype.hasOwnProperty.call(raw, "openaiBaseUrl")
+    ? raw.openaiBaseUrl
+    : fallbackBaseUrl;
+  if (!_pbpIsOfficialOpenaiBase(effectiveBase)) return {};
+  const patch = {};
+  const openaiNext = SETTINGS_DEFAULTS.openaiModel;
+  if (typeof raw.openaiModel === "string" && PBP_RETIRED_OPENAI_MODELS.includes(raw.openaiModel)) {
+    patch.openaiModel = openaiNext;
+  }
+  const map = raw.previewAiModelByProvider;
+  const hasPlainMap = Boolean(map && typeof map === "object" && !Array.isArray(map));
+  const hasMapOpenai = hasPlainMap && Object.prototype.hasOwnProperty.call(map, "openai");
+  if (hasMapOpenai && typeof map.openai === "string" && PBP_RETIRED_OPENAI_MODELS.includes(map.openai)) {
+    patch.previewAiModelByProvider = Object.assign({}, map, { openai: openaiNext });
+  }
+  if (!hasMapOpenai && raw.aiProvider === "openai"
+      && typeof raw.previewAiModel === "string" && PBP_RETIRED_OPENAI_MODELS.includes(raw.previewAiModel)) {
+    patch.previewAiModel = openaiNext;
+  }
+  return patch;
+}
+
+async function pbpMigrateRetiredOpenaiModels() {
+  try {
+    const doneRead = await chrome.storage.local.get(PBP_RETIRED_OPENAI_MODEL_FLAG);
+    if (doneRead && doneRead[PBP_RETIRED_OPENAI_MODEL_FLAG] === true) return;
+    await pbpWithSecretStorageLock(async () => {
+      const recheck = await chrome.storage.local.get(PBP_RETIRED_OPENAI_MODEL_FLAG);
+      if (recheck && recheck[PBP_RETIRED_OPENAI_MODEL_FLAG] === true) return;
+      const keys = ["openaiModel", "openaiBaseUrl", "previewAiModelByProvider", "previewAiModel", "aiProvider"];
+      const localRaw = await chrome.storage.local.get(keys);
+      const syncRaw = (chrome.storage && chrome.storage.sync)
+        ? await chrome.storage.sync.get(keys)
+        : null;
+      const localPatch = pbpBuildRetiredOpenaiModelPatch(localRaw, syncRaw && syncRaw.openaiBaseUrl);
+      if (Object.keys(localPatch).length > 0) {
+        await chrome.storage.local.set(localPatch);
+      }
+      if (syncRaw) {
+        const syncPatch = pbpBuildRetiredOpenaiModelPatch(syncRaw, localRaw && localRaw.openaiBaseUrl);
+        if (Object.keys(syncPatch).length > 0) {
+          await chrome.storage.sync.set(syncPatch);
+        }
+      }
+      await chrome.storage.local.set({ [PBP_RETIRED_OPENAI_MODEL_FLAG]: true });
+    });
+  } catch (e) {
+    console.warn("[ai-migration] retired OpenAI model rewrite failed:", e && e.name, e && e.message);
   }
 }
 

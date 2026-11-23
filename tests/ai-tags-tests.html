@@ -599,8 +599,8 @@ suite("Model Studio regions and workspaces", () => {
       assertEq(target.fpEndpoint, QWEN_LEGACY, "fpEndpoint");
       assertEq(target.official, true, "official");
       assertEq(_aiTargetOriginPattern(s), "https://dashscope.aliyuncs.com/*", "origin");
-      assertEq(aiCacheFingerprint(s, "tags"), "qwen:qwen-flash:exjgppg|len|s-|c45h", "tags fingerprint");
-      assertEq(aiCacheFingerprint(s, "summary"), "qwen:qwen-flash:exjgppg|lauto|c45h", "summary fingerprint");
+      assertEq(aiCacheFingerprint(s, "tags"), "qwen:qwen3.8-flash:exjgppg|len|s-|c45h", "tags fingerprint");
+      assertEq(aiCacheFingerprint(s, "summary"), "qwen:qwen3.8-flash:exjgppg|lauto|c45h", "summary fingerprint");
     }
     assertEq(OPENAI_COMPAT_PROVIDERS.qwen.regions.beijing, OPENAI_COMPAT_PROVIDERS.qwen.base, "Beijing is the built-in base");
     assertEq(SETTINGS_DEFAULTS.qwenRegion, "beijing", "default region");

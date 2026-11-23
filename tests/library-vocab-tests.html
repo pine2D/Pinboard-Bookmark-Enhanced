@@ -2283,20 +2283,36 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     }
   }
 
-  // Hand-written in freedictionaryapi.com's response shape (tests/md-dict-tests.html
-  // FDA_SAMPLE is the captured reference) -- never produced by our normalizer.
+  // Verbatim response captured on 2026-11-23 from
+  // `GET https://freedictionaryapi.com/api/v1/entries/en/constraint` -- never
+  // produced by our normalizer (server-fixture rule).
   const FDA_CONSTRAINT = {
     word: "constraint",
     entries: [{
       language: { code: "en", name: "English" },
       partOfSpeech: "noun",
-      pronunciations: [{ type: "ipa", text: "/kənˈstreɪnt/", tags: ["Received Pronunciation"] }],
+      pronunciations: [
+        { type: "ipa", text: "/kənˈstɹeɪnt/", tags: ["Canada", "General American", "Received Pronunciation"] },
+        { type: "ipa", text: "/kənˈstɹæɪnt/", tags: ["Australia", "New Zealand"] },
+      ],
       forms: [{ word: "constraints", tags: ["plural"] }],
       senses: [
-        { definition: "Something that constrains; a restriction.", examples: ["Time is the main constraint."],
-          synonyms: ["limitation", "restriction"], antonyms: ["freedom"] },
-        { definition: "Unnatural restraint in manner.", examples: [] },
+        {
+          definition: "Something that constrains; a restriction.",
+          tags: ["countable", "uncountable"],
+          examples: ["An engineer must recognize the difference between a constraint (to work within) and a problem (to be eliminated via resolution)."],
+          quotes: [{ text: "Today’s electricity demand (65 EJ/a) is well covered by the range, but constraints may occur in the long run locally. Amongst large countries, Nigeria and India may need imports to meet electricity demand.", reference: "2015, Quantifying a realistic:" }],
+          synonyms: [], antonyms: [], subsenses: [],
+        },
+        {
+          definition: "An irresistible force or compulsion.",
+          tags: ["countable", "uncountable"],
+          examples: ["They confessed, but only under severe constraint."],
+          quotes: [], synonyms: [], antonyms: [], subsenses: [],
+        },
       ],
+      synonyms: [],
+      antonyms: [],
     }],
     source: { url: "https://en.wiktionary.org/wiki/constraint", license: { name: "CC BY-SA 4.0", url: "https://creativecommons.org/licenses/by-sa/4.0/" } },
   };
@@ -2370,16 +2386,16 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       const ipaVisible = () => !!renderedIpa() && getComputedStyle(renderedIpa()).display !== "none";
       check("a saved word without an IPA still displays pronunciation returned by its dictionary",
         !$id("vocab-detail").querySelector(".vocab-pron-ipa") && ipaVisible());
-      rows[0].ipa = "/kənˈstreɪnt/";
+      rows[0].ipa = "/kənˈstɹeɪnt/";
       _pbpVocabRenderDetail(rows[0]);
       _pbpVocabRelookup(rows[0]);
       await until(() => !!renderedIpa() && !result.hasAttribute("aria-busy"));
       check("an identical pronunciation already displayed in the heading is not repeated in the dictionary",
-        $id("vocab-detail").querySelector(".vocab-pron-ipa").textContent === "/kənˈstreɪnt/" && !ipaVisible());
+        $id("vocab-detail").querySelector(".vocab-pron-ipa").textContent === "/kənˈstɹeɪnt/" && !ipaVisible());
       rows[0].ipa = "/əˈnʌðə/";
       _pbpVocabRenderDetail(rows[0]);
       check("a dictionary pronunciation that differs from the saved heading stays visible after a detail refresh",
-        renderedIpa()?.textContent === "/kənˈstreɪnt/" && ipaVisible());
+        renderedIpa()?.textContent.startsWith("/kənˈstɹeɪnt/") && ipaVisible());
       delete rows[0].ipa;
 
       // A real local-pack shape, not a normalized dictionary fixture: a
@@ -4654,10 +4670,11 @@ await (async () => {
       read:pbpReadSettingsWithSecrets,auto:_pbpVocabAutoLookup,entryRead:pbpDictEntryRead,run:pbpDictEntryRun,owner:pbpVocabCurrentOwner,get:pbpVocabGet,fetch:window.fetch};
     const keep=["hasAIKey","chrome"].map(name=>[name,Object.hasOwn(window,name),window[name]]);
     const owner="acct_examples_library",requests=[],fetched=[];let paid=0;
-    const TITLE="Faust/Erster Teil";
-    const SEARCH={batchcomplete:true,query:{searchinfo:{totalhits:1},search:[{ns:0,title:TITLE,pageid:73881}]}};
-    const PAGE={parse:{title:TITLE,pageid:73881,revid:4207390,categories:[{category:"Drama",sortkey:""}],
-      text:'<div class="mw-parser-output"><span id="ws-author">Johann Wolfgang von Goethe</span><span id="ws-title">Faust. Eine Tragödie</span><div class="poem"><p>Habe nun, ach! Philosophie,<br />\nJuristerei und Medizin,<br />\nUnd leider auch Theologie<br />\nDurchaus studiert, mit heißem Bemühn.\n</p></div></div>'}};
+    // Captured 2026-11-23 from de.wikisource.org (formatversion=2).
+    const TITLE="Faust - Der Tragödie erster Teil";
+    const SEARCH={batchcomplete:true,continue:{sroffset:5,continue:"-||"},query:{searchinfo:{totalhits:14},search:[{ns:0,title:TITLE,pageid:1543}]}};
+    const PAGE={parse:{title:TITLE,pageid:1543,revid:3790310,categories:[{sortkey:"",category:"Fertig"},{sortkey:"",category:"Werke"},{sortkey:"",category:"Drama"},{sortkey:"",category:"Johann_Wolfgang_von_Goethe"}],
+      text:'<div class="mw-content-ltr mw-parser-output" lang="de" dir="ltr"><div id="textdaten" class="notheme noprint ws-noexport"><table><tbody><tr><td>Autor:</td><td><b><span id="ws-author"><a href="/wiki/Johann_Wolfgang_von_Goethe" title="Johann Wolfgang von Goethe">Johann Wolfgang von Goethe</a></span></b></td></tr><tr><td>Titel:</td><td><b><span id="ws-title">Faust. Eine Tragödie von Goethe</span></b></td></tr></tbody></table></div><div class="poem"><p><b>Faust.</b><br />\nHabe nun, ach! Philosophie,<br />\n</p>\n<div style="position:relative;" class="ws-noexport"><span class="zeilennummer">355</span></div>Juristerey und Medicin,<br />\n<p>Und leider auch Theologie!<br />\nDurchaus studirt, mit heißem Bemühn.\n</p></div></div>'}};
     try {
       _vocabCurrentOwner=owner;_vocabRows=[];_pbpVocabAutoLookup=async()=>{};
       _pbpDictLoadPack=async()=>true;window.pbpDictPackLookup=async()=>({state:"unavailable",hits:[]});window.pbpDictPackList=async()=>[];_pbpDictEcdictSide=async()=>{};
@@ -4679,7 +4696,7 @@ await (async () => {
       requests.length=0;find?.click();
       check("examples: the Library click asks first and only for the exact German Wikisource origin",requests.length===1&&JSON.stringify(requests[0])==='{"origins":["https://de.wikisource.org/*"]}'&&!fetched.length);
       await settle();await settle();
-      check("examples: the Library shows one verse line with its source and no translation",block.querySelector(".xp-dict-example")?.textContent==="Und leider auch Theologie"&&block.querySelector(".xp-dict-src a")?.href==="https://de.wikisource.org/w/index.php?oldid=4207390"&&!block.querySelector(".xp-dict-example-translation"));
+      check("examples: the Library shows one verse line with its source and no translation",block.querySelector(".xp-dict-example")?.textContent==="Und leider auch Theologie!"&&block.querySelector(".xp-dict-src a")?.href==="https://de.wikisource.org/w/index.php?oldid=3790310"&&!block.querySelector(".xp-dict-example-translation"));
       check("examples: the Library retrieval stays on Wikisource and never calls AI",fetched.length>0&&fetched.every(c=>c.url.origin==="https://de.wikisource.org")&&paid===0);
       _pbpVocabLookupOther("Gift","de");await settle();
       check("examples: a new Library query replaces the block instead of keeping the old result",host.querySelectorAll(".xp-dict-examples").length===1&&!host.querySelector(".xp-dict-examples .xp-dict-learning-item"));

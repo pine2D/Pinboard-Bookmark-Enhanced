@@ -3070,6 +3070,14 @@ pbpMigrateRetiredDeepseekModels();
 // _retiredMinimaxKimiModelsDone).
 pbpMigrateRetiredMinimaxKimiModels();
 
+// One-shot rewrite of retired/scheduled-shutdown official OpenAI lightweight
+// model slugs ("gpt-5.4-nano", "gpt-5.4-nano-2026-03-17", "gpt-5-nano",
+// "gpt-5-nano-2025-08-07", "gpt-4o-mini", "gpt-4o-mini-2024-07-18",
+// "gpt-4.1-mini", "gpt-4.1-mini-2025-04-14" -> "gpt-6-luna"). Defined in
+// shared.js; retire by 2027-01-15 (.claude/expiring-items.md, flag
+// _retiredOpenaiModelsDone).
+pbpMigrateRetiredOpenaiModels();
+
 // One-shot claim migration (roadmap #19, approved 2026-08-29): pre-existing
 // highlight items carry no owner field — claim them for the CURRENT Pinboard
 // account so the new per-account visibility rule has a defined baseline

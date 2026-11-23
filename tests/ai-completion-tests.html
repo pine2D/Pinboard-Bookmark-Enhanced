@@ -1290,7 +1290,7 @@ await test('Ollama string error bodies reach the message, code and status on bot
 });
 // ---- Reader vision multimodal support (P1-C) ----
 await test('pbpAiSupportsVision gates the four vision providers and allows only deepseek-flash on DeepSeek',async()=>{
-  assert(pbpAiSupportsVision({aiProvider:'openai',openaiApiKey:'k',openaiModel:'gpt-5.4-nano'})===true,'openai');
+  assert(pbpAiSupportsVision({aiProvider:'openai',openaiApiKey:'k',openaiModel:'gpt-6-luna'})===true,'openai');
   assert(pbpAiSupportsVision({aiProvider:'claude',claudeApiKey:'k',claudeModel:'claude-haiku-4-5'})===true,'claude');
   assert(pbpAiSupportsVision({aiProvider:'gemini',geminiApiKey:'k',geminiModel:'gemini-3.5-flash-lite'})===true,'gemini');
   assert(pbpAiSupportsVision({aiProvider:'deepseek',deepseekApiKey:'k',deepseekModel:'deepseek-flash'})===true,'deepseek-flash');
@@ -1309,7 +1309,7 @@ await test('pbpAiSupportsVision gates the four vision providers and allows only 
 await test('vision wire payloads format multimodal content across OpenAI/DeepSeek, Anthropic and Gemini',async()=>{
   const img={mimeType:'image/png',dataBase64:'iVBORw0KGgo='};
   for(const s of [
-    {aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'gpt-5.4-nano'},
+    {aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'gpt-6-luna'},
     {aiProvider:'deepseek',deepseekApiKey:'fixture',deepseekModel:'deepseek-flash'}
   ]){
     reset([reply(PROTOCOLS[0].complete),STREAM_DONE.compatible]);

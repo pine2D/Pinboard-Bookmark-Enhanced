@@ -371,14 +371,26 @@ suite("pbpWaybackAttemptKey account scoping", () => {
   // the non-secret Pinboard owner the save ran under. Drive the real
   // orchestrator so a revert to "bare url" keys or an untagged log row cannot
   // pass -- the pure suite alone can't see which key shape the caller builds.
+  // Read-only Wayback availability API probed live on 2026-11-23 (`GET
+  // https://archive.org/wayback/available?url=https://example.com` ->
+  // `{"url":"https://example.com","archived_snapshots":{"closest":{"status":"200",
+  // "available":true,"url":"http://web.archive.org/web/20261123030715/https://example.com/",
+  // "timestamp":"20261123030715"}}}`); authenticated SPN2 JSON submission
+  // envelope (`{ url, job_id, status: "pending" }`) verified against official
+  // Internet Archive Save Page Now 2 documentation on 2026-11-23 without firing
+  // live `/save` writes.
   const ARCHIVE_SETTINGS = { waybackArchiveEnabled: true, waybackSkipPrivate: false };
   function installArchiveStubs(store, counter) {
-    globalThis.fetch = async () => {
+    globalThis.fetch = async (reqUrl) => {
       counter.fetches++;
       return {
         ok: true, status: 200,
-        headers: { get: () => "application/json" },
-        json: async () => ({ job_id: "job-" + counter.fetches })
+        headers: { get: () => "application/json; charset=utf-8" },
+        json: async () => ({
+          url: String(reqUrl || ""),
+          job_id: "spn2-20261123-" + counter.fetches,
+          status: "pending"
+        })
       };
     };
     globalThis.chrome = {

@@ -578,7 +578,8 @@ assertEq(pbpMd5("The quick brown fox jumps over the lazy dog"), "9e107d9d372bb68
 
 section("WBI signing");
 assertEq(PBP_BILI_MIXIN_TAB.length, 64, "mixin table has 64 entries");
-const navJson = { data: { wbi_img: { img_url: "https://i0.hdslb.com/bfs/wbi/7cd084941338484aae1ad9425b84077c.png", sub_url: "https://i0.hdslb.com/bfs/wbi/4932caff0ff746eab6f01bf08b70ac45.png" } } };
+// Anonymous /x/web-interface/nav envelope probed live on 2026-11-23 (`ip_region` omitted).
+const navJson = { code: -101, message: "账号未登录", ttl: 1, data: { isLogin: false, wbi_img: { img_url: "https://i0.hdslb.com/bfs/wbi/7cd084941338484aae1ad9425b84077c.png", sub_url: "https://i0.hdslb.com/bfs/wbi/4932caff0ff746eab6f01bf08b70ac45.png" } } };
 const mk = pbpBiliMixinKey(navJson);
 assertEq(mk.length, 32, "mixin key is 32 chars");
 check("mixin key is deterministic", pbpBiliMixinKey(navJson) === mk);
@@ -631,8 +632,8 @@ await (async () => {
   const loggedOut = await pbpBiliFetchTranscript("BV1x", 1, { fetchFn: async (url) => {
     if (url.includes("/x/web-interface/nav")) return { ok: true, json: async () => nav };
     if (url.includes("/x/web-interface/view")) return { ok: true, json: async () => view };
-    // Anonymous shape probed live 2026-08-25 (player/wbi/v2 with credentials omitted).
-    if (url.includes("/x/player/wbi/v2")) return { ok: true, json: async () => ({ code: 0, data: { login_mid: 0, login_mid_hash: "", need_login_subtitle: true, subtitle: { allow_submit: false, lan: "", lan_doc: "", subtitles: [] } } }) };
+    // Anonymous /x/player/wbi/v2 shape re-probed live on 2026-11-23 (credentials omitted; ip_info stripped).
+    if (url.includes("/x/player/wbi/v2")) return { ok: true, json: async () => ({ code: 0, message: "OK", ttl: 1, data: { login_mid: 0, login_mid_hash: "", is_owner: false, name: "", need_login_subtitle: true, subtitle: { allow_submit: false, lan: "", lan_doc: "", subtitles: [], subtitle_position: null, font_size_type: 0 } } }) };
     return { ok: true, json: async () => ({}) };
   } });
   check("empty subtitle list + anonymous response -> error:'login'", loggedOut.error === "login");

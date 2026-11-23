@@ -123,6 +123,27 @@ function buildSuggestSweepHarness(source, options) {
       if (!result.fromCache || result.markdown !== "cached" || checks !== 0 || fetches !== 0) throw new Error("cache-first contract failed");
     });
 
+    // Verbatim keyless response captured on 2026-11-23 from
+    // `GET https://r.jina.ai/https://example.com` (`Accept: application/json`).
+    const JINA_READER_LIVE_20261123 = {
+      code: 200,
+      status: 20000,
+      data: {
+        title: "Example Domain",
+        description: "",
+        url: "https://example.com/",
+        finalUrl: "https://example.com/",
+        content: "This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.\n\n[Learn more](https://iana.org/help/example-domains)",
+        publishedTime: "Thu, 19 Nov 2026 22:11:52 GMT",
+        metadata: { lang: "en", viewport: "width=device-width,initial-scale=1" },
+        external: { icon: { "data:,": {} } },
+        httpStatus: 200,
+        httpStatusText: "OK",
+        usage: { outputTokens: 341, measuredTokens: 341, scaledTokens: 341, tokens: 341 },
+      },
+      meta: { usage: { outputTokens: 341, measuredTokens: 341, scaledTokens: 341, tokens: 341 } },
+    };
+
     await acheck("Jina cache miss checks exact permission before one fetch", async () => {
       let checked = null, fetches = 0;
       window.chrome = {
@@ -132,10 +153,15 @@ function buildSuggestSweepHarness(source, options) {
       };
       window.fetch = async () => {
         fetches++;
-        return { ok: true, json: async () => ({ data: { content: "fresh", url: "https://example.com/fresh" } }) };
+        return { ok: true, json: async () => JINA_READER_LIVE_20261123 };
       };
-      const result = await fetchJinaMarkdown("https://example.com/fresh", { cacheDuration: 0 });
-      if (checked?.[0] !== PBP_JINA_ORIGIN_PATTERN || fetches !== 1 || result.fromCache || result.markdown !== "fresh") throw new Error("miss gate failed");
+      const result = await fetchJinaMarkdown("https://example.com", { cacheDuration: 0 });
+      if (checked?.[0] !== PBP_JINA_ORIGIN_PATTERN || fetches !== 1 || result.fromCache
+          || !result.markdown.startsWith("This domain is for use in documentation examples")
+          || result.title !== "Example Domain" || result.url !== "https://example.com/"
+          || result.tokens !== 341 || result.published !== "Thu, 19 Nov 2026 22:11:52 GMT") {
+        throw new Error("miss gate failed: " + JSON.stringify(result));
+      }
     });
 
     await acheck("Jina false, throwing, or missing permission state returns host_permission with zero fetch", async () => {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="597"><title>Settings Persistence Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="602"><title>Settings Persistence Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -6909,6 +6909,93 @@ async function run() {
         const bgSource = await fetch("../background.js").then((r) => r.text());
         check("retired MiniMax/Kimi migration: background.js invokes pbpMigrateRetiredMinimaxKimiModels at top level",
           /^pbpMigrateRetiredMinimaxKimiModels\(\);$/m.test(bgSource));
+      }
+      {
+        const local = {
+          openaiModel: "gpt-5.4-nano",
+          previewAiModelByProvider: { openai: "gpt-5.4-nano-2026-03-17", deepseek: "deepseek-flash" },
+        };
+        const sync = {
+          openaiModel: "gpt-5-nano",
+          aiProvider: "openai",
+          previewAiModelByProvider: {},
+          previewAiModel: "gpt-4o-mini",
+        };
+        install(local, sync);
+        await pbpMigrateRetiredOpenaiModels();
+        check("retired OpenAI migration: rewrites retired gpt-5.4-nano / gpt-5-nano / gpt-4o-mini slugs in local and sync while preserving other map entries",
+          local.openaiModel === "gpt-6-luna"
+          && local.previewAiModelByProvider.openai === "gpt-6-luna"
+          && local.previewAiModelByProvider.deepseek === "deepseek-flash"
+          && sync.openaiModel === "gpt-6-luna"
+          && sync.previewAiModel === "gpt-6-luna"
+          && local[PBP_RETIRED_OPENAI_MODEL_FLAG] === true);
+      }
+      {
+        const local = {
+          openaiModel: "gpt-6.1-sol",
+          customModel: "gpt-5.4-nano",
+          groqModel: "gpt-5.4-nano",
+          aiProvider: "custom",
+          previewAiModel: "gpt-5.4-nano",
+          previewAiModelByProvider: { openai: "gpt-5.4", openrouter: "gpt-5.4-nano" },
+        };
+        const sync = {
+          openaiBaseUrl: "https://proxy.example/v1",
+          openaiModel: "gpt-5.4-nano",
+          aiProvider: "openai",
+          previewAiModelByProvider: {},
+          previewAiModel: "gpt-5.4-nano",
+        };
+        install(local, sync);
+        await pbpMigrateRetiredOpenaiModels();
+        check("retired OpenAI migration: preserves active models, custom openaiBaseUrl proxies, custom/3rd-party gateways, and non-matching aiProvider",
+          local.openaiModel === "gpt-6.1-sol"
+          && local.customModel === "gpt-5.4-nano"
+          && local.groqModel === "gpt-5.4-nano"
+          && local.previewAiModel === "gpt-5.4-nano"
+          && local.previewAiModelByProvider.openai === "gpt-5.4"
+          && local.previewAiModelByProvider.openrouter === "gpt-5.4-nano"
+          && sync.openaiModel === "gpt-5.4-nano"
+          && sync.previewAiModel === "gpt-5.4-nano"
+          && local[PBP_RETIRED_OPENAI_MODEL_FLAG] === true);
+      }
+      {
+        const local = { [PBP_RETIRED_OPENAI_MODEL_FLAG]: true, openaiModel: "gpt-5.4-nano" };
+        const sync = { openaiModel: "gpt-5-nano" };
+        install(local, sync);
+        await pbpMigrateRetiredOpenaiModels();
+        check("retired OpenAI migration: one-shot flag prevents overwriting a later user edit",
+          local.openaiModel === "gpt-5.4-nano" && sync.openaiModel === "gpt-5-nano");
+      }
+      {
+        const local = { openaiModel: "gpt-5.4-nano" };
+        const sync = { openaiModel: "gpt-5-nano" };
+        install(local, sync);
+        const origSyncSet = globalThis.chrome.storage.sync.set;
+        let warned = false;
+        const origWarn = console.warn;
+        console.warn = (...args) => {
+          if (String(args[0] || "").includes("[ai-migration]")) warned = true;
+        };
+        try {
+          globalThis.chrome.storage.sync.set = () => Promise.reject(new Error("QUOTA_BYTES"));
+          await pbpMigrateRetiredOpenaiModels();
+          const unsettledAfterFail = warned && local[PBP_RETIRED_OPENAI_MODEL_FLAG] !== true;
+          globalThis.chrome.storage.sync.set = origSyncSet;
+          await pbpMigrateRetiredOpenaiModels();
+          check("retired OpenAI migration: storage write failure logs warning and leaves flag unset for retry",
+            unsettledAfterFail
+            && sync.openaiModel === "gpt-6-luna"
+            && local[PBP_RETIRED_OPENAI_MODEL_FLAG] === true);
+        } finally {
+          console.warn = origWarn;
+        }
+      }
+      {
+        const bgSource = await fetch("../background.js").then((r) => r.text());
+        check("retired OpenAI migration: background.js invokes pbpMigrateRetiredOpenaiModels at top level",
+          /^pbpMigrateRetiredOpenaiModels\(\);$/m.test(bgSource));
       }
     } finally {
       globalThis.chrome = previousChrome;

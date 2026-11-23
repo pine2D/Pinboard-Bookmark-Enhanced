@@ -867,21 +867,43 @@ async function libraryPageLookupLangCases() {
   }
 }
 
-// Hand-written in freedictionaryapi.com's response shape (tests/md-dict-tests.html
-// FDA_SAMPLE is the captured reference) -- never produced by our normalizer.
+// Verbatim response captured on 2026-11-23 from
+// `GET https://freedictionaryapi.com/api/v1/entries/en/constraint` -- never
+// produced by our normalizer (server-fixture rule).
 const FDA_CONSTRAINT = {
   word: "constraint",
   entries: [{
     language: { code: "en", name: "English" },
     partOfSpeech: "noun",
-    pronunciations: [{ type: "ipa", text: "/kənˈstreɪnt/", tags: ["Received Pronunciation"] }],
+    pronunciations: [
+      { type: "ipa", text: "/kənˈstɹeɪnt/", tags: ["Canada", "General American", "Received Pronunciation"] },
+      { type: "ipa", text: "/kənˈstɹæɪnt/", tags: ["Australia", "New Zealand"] },
+    ],
     forms: [{ word: "constraints", tags: ["plural"] }],
     senses: [
-      { definition: "Something that constrains; a restriction.", examples: ["Time is the main constraint."],
-        synonyms: ["limitation", "restriction"], antonyms: ["freedom"] },
-      { definition: "Unnatural restraint in manner.", examples: [] },
-      { definition: "Compulsion; coercion.", examples: [] },
+      {
+        definition: "Something that constrains; a restriction.",
+        tags: ["countable", "uncountable"],
+        examples: ["An engineer must recognize the difference between a constraint (to work within) and a problem (to be eliminated via resolution)."],
+        quotes: [{ text: "Today’s electricity demand (65 EJ/a) is well covered by the range, but constraints may occur in the long run locally. Amongst large countries, Nigeria and India may need imports to meet electricity demand.", reference: "2015, Quantifying a realistic:" }],
+        synonyms: [], antonyms: [], subsenses: [],
+      },
+      {
+        definition: "An irresistible force or compulsion.",
+        tags: ["countable", "uncountable"],
+        examples: ["They confessed, but only under severe constraint."],
+        quotes: [], synonyms: [], antonyms: [], subsenses: [],
+      },
+      {
+        definition: "The repression of one's feelings.",
+        tags: ["countable", "uncountable"],
+        examples: [],
+        quotes: [{ text: "Although his blood so rose against this man, and his wrath so stirred within him, that he could have struck him dead, he put such fierce constraint upon himself that he passed him without a word or look.", reference: "1841 February–November, Charles Dickens, “Barnaby Rudge.”" }],
+        synonyms: [], antonyms: [], subsenses: [],
+      },
     ],
+    synonyms: [],
+    antonyms: [],
   }],
   source: { url: "https://en.wiktionary.org/wiki/constraint", license: { name: "CC BY-SA 4.0", url: "https://creativecommons.org/licenses/by-sa/4.0/" } },
 };

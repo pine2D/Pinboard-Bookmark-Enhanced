@@ -48,7 +48,7 @@ function _pbpDictEvidenceDocument(html) {
   // the fragment to a document, adopt its nodes, or evaluate its attributes.
   const template = document.createElement("template"); template.innerHTML = html;
   const root = template.content;
-  root.querySelectorAll("script,style,link,img,iframe,object,embed,video,audio,source,svg,math,form,input,button").forEach(node => node.remove());
+  root.querySelectorAll("script,style,link,img,iframe,object,embed,video,audio,source,svg,math,form,input,button,rt,rp").forEach(node => node.remove());
   return root;
 }
 function _pbpDictEvidenceCategories(categories) {
@@ -100,8 +100,8 @@ function _pbpDictEvidenceParagraphNodes(root) {
   const copy = root.cloneNode(true);
   copy.querySelectorAll(".ws-noexport,.wst-header,.headertemplate,.header,.toc,.mw-editsection,.references,.reflist,.navbox,.hatnote,.metadata,.catlinks,.pagenum,sup.reference,table,nav,header,footer").forEach(node => node.remove());
   const body = copy.querySelector(".prp-pages-output, .mw-parser-output") || copy;
-  return [...body.querySelectorAll("p, .poem, .poem-stanza, .verse")].filter(node =>
-    !node.parentElement?.closest("p, .poem, .poem-stanza, .verse"))
+  return [...body.querySelectorAll("p, .poem, .poem-stanza, .ws-poem, .ws-poem-stanza, .verse")].filter(node =>
+    !node.parentElement?.closest("p, .poem, .poem-stanza, .ws-poem, .ws-poem-stanza, .verse"))
     .filter(node => _pbpDictEvidenceText(node.textContent).length >= 15);
 }
 // Original-text examples show one retrieved sentence (prose) or one line
