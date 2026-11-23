@@ -89,13 +89,13 @@
 | Free Dictionary | tests/md-dict-tests.html:216 | 2026-11-13 | 2026-11-13 复核 es/aprovecho、pl/psa、en/found 线上响应；pl/psa 同步新增 IPA |
 | Free Dictionary | tests/library-vocab-tests.html#FDA_CONSTRAINT | 2026-11-23 | 2026-11-23 抓取 freedictionaryapi.com/api/v1/entries/en/constraint 真实响应 |
 | Free Dictionary | tests/library-listbox-tests.html#FDA_CONSTRAINT | 2026-11-23 | 2026-11-23 抓取 freedictionaryapi.com/api/v1/entries/en/constraint 真实响应 |
-| 欧路词典 | tests/eudic-sync-tests.html | 未核实 | 只模拟到调用层的返回值 |
-| AnkiConnect | tests/anki-connect-tests.html | 未核实 | - |
+| 欧路词典 | tests/eudic-sync-tests.html | 未核实 | 只模拟到调用层的返回值；未提供测试令牌 |
+| AnkiConnect | tests/anki-connect-tests.html | 未核实 | 2026-11-23 探测本机 127.0.0.1:8765 未启动，保持未核实 |
 | YouTube 字幕 | tests/md-video-tests.html:429 | 2026-10-24 | 原文：section("YouTube layered captions (v9QtM6qnG50, captured 2026-10-24)"); |
 | B 站字幕 | tests/md-video-tests.html:580 | 2026-11-23 | 2026-11-23 匿名只读抓取 nav、view 与 player/wbi/v2 真实响应包络 |
-| Notion | tests/export-targets-tests.html | 未核实 | - |
-| Notion | tests/md-send-menu-tests.html | 未核实 | - |
-| GitHub Gist | tests/export-targets-tests.html | 未核实 | - |
+| Notion | tests/export-targets-tests.html | 未核实 | 未提供测试集成令牌与父页面 ID |
+| Notion | tests/md-send-menu-tests.html | 未核实 | 未提供测试集成令牌与父页面 ID |
+| GitHub Gist | tests/export-targets-tests.html | 2026-11-23 | 2026-11-23 实测 GET /user (200) 与 POST /gists (201, public: false) 真实响应（含 html_url 优先于 API url）并完成 204/404 清理 |
 | Anthropic | tests/md-ai-tests.html | 2026-11-23 | 2026-11-23 对照 Command Code claude-haiku-5-5 /v1/messages 实测 SSE 包络（container/stop_details/output_tokens_details）核实 |
 | Anthropic | tests/dict-protocol-tests.html | 2026-11-23 | 2026-11-23 对照 Command Code claude-haiku-5-5 /v1/messages 实测 SSE（thinking_delta、signature_delta、ping、message_delta）核实 |
 | Gemini | tests/md-ai-tests.html | 2026-11-23 | 2026-11-23 对照 gemini-3.5-flash-lite streamGenerateContent?alt=sse 实测包络（thoughtSignature、usageMetadata、responseId）核实 |

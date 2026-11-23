@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="153"><title>export-targets Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="155"><title>export-targets Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -329,15 +329,79 @@ async function runSendNetworkPolicyTests() {
       assert(requestCalls === requestsBeforeSend && fetchCalls === 0, mode + " execution gate neither requests nor fetches");
     }
 
+    // GitHub Gist GET /user (200) + POST /gists (201, public:false) server shapes
+    // verified on 2026-11-23 against live api.github.com (with immediate 204/404 cleanup).
+    function makeGithubGistReply(overrides = {}) {
+      const id = overrides.id === undefined ? "0123456789abcdef0123456789abcdef" : overrides.id;
+      const login = overrides.login === undefined ? "octocat-fixture" : overrides.login;
+      const filename = overrides.filename === undefined ? "T.md" : overrides.filename;
+      const content = overrides.content === undefined ? "---\ntitle: \"T\"\n---\n\nbody\n" : overrides.content;
+      const description = overrides.description === undefined ? "T" : overrides.description;
+      return {
+        url: overrides.url === undefined ? "https://api.github.com/gists/" + id : overrides.url,
+        forks_url: "https://api.github.com/gists/" + id + "/forks",
+        commits_url: "https://api.github.com/gists/" + id + "/commits",
+        id,
+        node_id: "G_kwDOFixture",
+        git_pull_url: "https://gist.github.com/" + id + ".git",
+        git_push_url: "https://gist.github.com/" + id + ".git",
+        html_url: overrides.html_url === undefined ? "https://gist.github.com/" + login + "/" + id : overrides.html_url,
+        files: {
+          [filename]: {
+            filename,
+            type: "text/markdown",
+            language: "Markdown",
+            raw_url: "https://gist.githubusercontent.com/" + login + "/" + id + "/raw/fedcba9876543210fedcba9876543210fedcba98/" + filename,
+            size: content.length,
+            truncated: false,
+            content,
+            encoding: "utf-8",
+          },
+        },
+        public: overrides.public === undefined ? false : overrides.public,
+        created_at: "2026-11-23T04:24:00Z",
+        updated_at: "2026-11-23T04:24:01Z",
+        description,
+        comments: 0,
+        user: null,
+        comments_enabled: true,
+        comments_url: "https://api.github.com/gists/" + id + "/comments",
+        owner: {
+          login,
+          id: 1000001,
+          node_id: "U_kgDOFixture",
+          avatar_url: "https://avatars.githubusercontent.com/u/1000001?v=4",
+          gravatar_id: "",
+          url: "https://api.github.com/users/" + login,
+          html_url: "https://github.com/" + login,
+          type: "User",
+          user_view_type: "public",
+          site_admin: false,
+        },
+        forks: [],
+        history: [{ version: "fedcba9876543210fedcba9876543210fedcba98", committed_at: "2026-11-23T04:24:00Z", change_status: { total: 5, additions: 5, deletions: 0 }, url: "https://api.github.com/gists/" + id + "/fedcba9876543210fedcba9876543210fedcba98" }],
+        truncated: false,
+      };
+    }
     const redirects = [];
+    let githubSentBody = null;
     globalThis.chrome.permissions.contains = async () => true;
     globalThis.fetch = async (url, opts) => {
       redirects.push(opts.redirect);
-      if (url.endsWith("/user")) return { ok: true, status: 200 };
-      return { ok: true, status: 201, json: async () => ({ id: "gist-1" }) };
+      if (url.endsWith("/user")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ login: "octocat-fixture", id: 1000001, node_id: "U_kgDOFixture", url: "https://api.github.com/users/octocat-fixture", html_url: "https://github.com/octocat-fixture", type: "User", user_view_type: "public", site_admin: false }),
+        };
+      }
+      githubSentBody = JSON.parse(opts.body);
+      return { ok: true, status: 201, json: async () => makeGithubGistReply({ content: githubSentBody.files["T.md"].content }) };
     };
     const github = await pbpSendToTarget("github", { meta: { title: "T" }, rawBody: "body", cfg: { token: "token" } });
     assert(github.ok === true, "safe token API request still succeeds");
+    assert(github.url === "https://gist.github.com/octocat-fixture/0123456789abcdef0123456789abcdef", "GitHub Gist returns html_url ahead of the API JSON url");
+    assert(githubSentBody && githubSentBody.public === false && typeof githubSentBody.files["T.md"]?.content === "string", "GitHub Gist request stays private (public:false) with inline markdown file");
     assert(redirects.length === 2, "GitHub precheck and main request both run");
     assert(redirects.every((mode) => mode === "error"), "every token API fetch rejects redirects");
 
