@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="113"><title>Reader Bookmark Tests</title></head><body>
-<div id="results"></div><script src="../shared.js"></script><script src="../wayback.js"></script><script src="../bookmark-services.js"></script><script src="fixtures/case-filter.js"></script><script>
+<div id="results"></div><script src="../shared.js"></script><script src="../wayback.js"></script><script src="../bookmark-services.js"></script><script src="fixtures/case-filter.js"></script><script src="fixtures/chrome-mock.js"></script><script src="fixtures/sw-realm.js"></script><script>
 function assert(x, msg) { if (!x) throw new Error(msg || "assertion failed"); }
 function equal(a, b) { assert(a === b, JSON.stringify(a) + " !== " + JSON.stringify(b)); }
 async function test(name, fn) {
@@ -18,83 +18,127 @@ const POST = { href: URL_ARTICLE, description: "Server title", extended: "Server
 const SLOT = { url: URL_ARTICLE, title: "Reader title", account: "alice", tabId: 8, sourceTabUrl: URL_ARTICLE, sourceIncognito: true, tags: ["draft"], description: "Draft notes" };
 const READER = "chrome-extension://test-id/md-preview.html?k=reader-key";
 const SENDER = { id: "test-id", frameId: 0, url: READER, tab: { id: 9, url: READER } };
-let background, runtime;
-async function harness(options = {}) {
-  background ||= await (await fetch("../background.js")).text();
-  const start = background.indexOf("// ---- Reader bookmark workflow ----");
-  const end = background.indexOf("// ---- End reader bookmark workflow ----", start === -1 ? 0 : start);
-  assert(start !== -1 && end !== -1 && end > start, "reader bookmark workflow is not implemented");
-  const env = { token: "alice:new-token", account: "alice", epoch: 1, calls: [], requests: [], post: { ...POST }, ...options };
-  const deps = {
-    chrome: { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p }, storage: { local: { get: async key => ({ [key]: options.slot === null ? null : { ...SLOT, ...(options.slot || {}) } }) } }, tabs: { get: async () => { if (env.closedReader) throw new Error("reader closed after sending"); return { id: 9, url: READER }; }, sendMessage: async (id, msg) => { env.requests.push({ id, msg }); return { ok: true }; } } },
-    getCurrentBookmarkAuth: async () => ({ token: env.token, account: env.account, epoch: env.epoch }),
-    pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { token: env.token, account: env.account, epoch: env.epoch, service: env.service } : null,
-    pbpBookmarkAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
-    fetchExistingBookmark: async (url, token) => { env.calls.push({ url, token }); if (env.onLookup) env.onLookup(); return env.lookup || { exists: !!env.post, lookupFailed: false, post: env.post }; },
-    pbpSaveFailure: reason => ({ status: "failed", reason }),
-    pbpBookmarkFieldsFromPost, pbpEffectivePrivate, pbpSelfHostedAuth: auth => ["karakeep", "linkding"].includes(auth?.service),
-    pbpReadTagVocab: async account => account === env.account ? pbpTagVocabIndex(env.vocab || {}) : null,
-    pbpBookmarkParseTags, pbpCanonicalTagName, pbpSerializeIntentTags,
-    loadSettings: async () => ({ bookmarkService: env.service || "pinboard", optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, qsDefaultTags: "quick", rlDefaultTags: "later", ...env.settings }),
-    submitSaveIntent: async (intent, opts) => { env.submitted = { intent, opts }; if (env.onSubmit) env.onSubmit(); return env.result || { status: "saved", mutation: "created", account: "alice" }; },
+const ROOT_BASE = new URL("../", document.baseURI).href;
+const loadShared = w => pbpSwRealm.loadScript(w.document, ROOT_BASE + "shared.js");
+const loadMdBookmark = w => pbpSwRealm.loadScript(w.document, ROOT_BASE + "md-bookmark.js");
+
+const READER_SW_FNS = [
+  "getCurrentBookmarkAuth", "pbpReadFreshBookmarkAuthForAccount", "pbpBookmarkAuthIsCurrent",
+  "fetchExistingBookmark", "pbpSaveFailure", "pbpSelfHostedAuth", "pbpReadTagVocab", "loadSettings",
+  "submitSaveIntent", "pbpCaptureBookmarkAuth", "t", "pbpCreateBookmarkServiceClient",
+  "pbpStatusCacheSet", "pbpStatusCacheGet", "pbpStatusCacheDelete", "pbpWaybackArchive",
+  "updateBadge", "setIcon", "pbpTakeUndoRecord", "pbpClearNotification", "showNotification",
+  "pinboardFetch", "pbpSweepPreviewOrphans", "pbpReadSettingsWithSecrets", "pbpVideoDetect",
+];
+let swSnap = null;
+async function ensureSw() {
+  if (swSnap) {
+    const { sw } = swSnap, w = sw.win, cm = sw.mock.chrome;
+    Object.assign(w, swSnap.fns);
+    cm.storage.local.get = swSnap.localGet;
+    cm.storage.local.set = swSnap.localSet;
+    cm.tabs.get = swSnap.tabsGet;
+    cm.tabs.query = swSnap.tabsQuery;
+    cm.tabs.create = swSnap.tabsCreate;
+    cm.tabs.sendMessage = swSnap.tabsSendMessage;
+    sw.get("statusCache").clear();
+    return sw;
+  }
+  const sw = await pbpSwRealm.boot({
+    mock: {
+      id: "test-id",
+      storage: { local: { vocabDriveConnected: false, bookmarkServiceActive: "pinboard", _legacyWildcardCleanupV1: true, _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
+    },
+  });
+  await new Promise(r => setTimeout(r, 20));
+  const w = sw.win, cm = sw.mock.chrome;
+  swSnap = {
+    sw,
+    fns: Object.fromEntries(READER_SW_FNS.map(k => [k, w[k]])),
+    localGet: cm.storage.local.get, localSet: cm.storage.local.set,
+    tabsGet: cm.tabs.get, tabsQuery: cm.tabs.query, tabsCreate: cm.tabs.create, tabsSendMessage: cm.tabs.sendMessage,
   };
-  const api = new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { pbpReaderBookmarkContext, pbpPrepareReaderSaveIntent, pbpReaderBookmarkRequest, pbpRouteReaderSaveCommand }; ")(...Object.values(deps));
-  return { ...api, env };
+  return sw;
+}
+
+async function harness(options = {}) {
+  const sw = await ensureSw(), w = sw.win, cm = sw.mock.chrome;
+  const env = { token: "alice:new-token", account: "alice", epoch: 1, calls: [], requests: [], post: { ...POST }, ...options };
+  cm.storage.local.get = async key => ({ [key]: options.slot === null ? null : { ...SLOT, ...(options.slot || {}) } });
+  cm.tabs.get = async () => { if (env.closedReader) throw new Error("reader closed after sending"); return { id: 9, url: READER }; };
+  cm.tabs.sendMessage = async (id, msg) => { env.requests.push({ id, msg }); return { ok: true }; };
+  w.getCurrentBookmarkAuth = async () => ({ token: env.token, account: env.account, epoch: env.epoch });
+  w.pbpReadFreshBookmarkAuthForAccount = async account => account === env.account ? { token: env.token, account: env.account, epoch: env.epoch, service: env.service } : null;
+  w.pbpBookmarkAuthIsCurrent = auth => auth.account === env.account && auth.epoch === env.epoch;
+  w.fetchExistingBookmark = async (url, token) => { env.calls.push({ url, token }); if (env.onLookup) env.onLookup(); return env.lookup || { exists: !!env.post, lookupFailed: false, post: env.post }; };
+  w.pbpSaveFailure = reason => ({ status: "failed", reason });
+  w.pbpSelfHostedAuth = auth => ["karakeep", "linkding"].includes(auth?.service);
+  w.pbpReadTagVocab = async account => account === env.account ? pbpTagVocabIndex(env.vocab || {}) : null;
+  w.loadSettings = async () => ({ bookmarkService: env.service || "pinboard", optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, qsDefaultTags: "quick", rlDefaultTags: "later", ...env.settings });
+  w.submitSaveIntent = async (intent, opts) => { env.submitted = { intent, opts }; if (env.onSubmit) env.onSubmit(); return env.result || { status: "saved", mutation: "created", account: "alice" }; };
+  return {
+    pbpReaderBookmarkContext: w.pbpReaderBookmarkContext,
+    pbpPrepareReaderSaveIntent: w.pbpPrepareReaderSaveIntent,
+    pbpReaderBookmarkRequest: w.pbpReaderBookmarkRequest,
+    pbpRouteReaderSaveCommand: w.pbpRouteReaderSaveCommand,
+    env,
+  };
 }
 function base() { return { mode: "skip", url: URL_ARTICLE, title: "Reader title", notes: "Draft notes", tags: "draft", private: false, toread: false }; }
 async function pipelineHarness(options = {}) {
-  background ||= await (await fetch("../background.js")).text();
-  const start = background.indexOf("const PBP_SAVE_MODES");
-  const end = background.indexOf("// ---- P1: Shared save function ----", start === -1 ? 0 : start);
-  assert(start !== -1 && end !== -1 && end > start, "save pipeline source not found");
+  const sw = await ensureSw(), w = sw.win, cm = sw.mock.chrome;
   const env = { account: "alice", token: "alice:rotated-token", epoch: 1, post: { ...POST }, calls: [], queue: [], ...options };
-  // A linkding connection whose instance allows sharing (shared.js pbpBookmarkConnection).
   const sharing = () => env.sharingEnabled === undefined ? {} : { sharingEnabled: env.sharingEnabled };
-  const deps = {
-    chrome: { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p }, storage: { local: { get: async key => ({ offlineQueue: env.queue, [typeof key === "string" ? key : "unused"]: key === "offlineQueue" ? env.queue : { ...SLOT, ...env.slot } }), set: async values => { if (env.queueWriteFailure) throw new Error("queue storage unavailable"); if (values.offlineQueue) env.queue = values.offlineQueue; } } }, tabs: { query: async () => [], get: async tabId => { assert(tabId === 9, "saving must never inspect the source tab"); if (env.readerClosed) throw new Error("reader closed"); return { id: 9, url: READER }; } } },
-    console, pbpCreateRecoveringTail, pbpOfflineQueueReduce, pbpPinboardAccountFromToken, pbpEffectivePrivate,
-    pbpResolveOfflineQueueToken, pbpDrainOfflineQueue, pbpResolveSavePlan, buildPostsAddUri, POSTS_ADD_URI_BUDGET,
-    loadSettings: async () => ({ pinboardToken: "alice:stale-token", offlineQueueEnabled: true, optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, ...env.settings }),
-    getCurrentBookmarkAuth: async () => ({ account: env.account, token: env.token, epoch: env.epoch, service: env.service, ...sharing() }),
-    pbpCaptureBookmarkAuth: () => ({ account: env.account, epoch: env.epoch }),
-    t: key => key,
-    // Self-hosted cases inject the client so its failures can be scripted. A
-    // clientFor factory also receives the worker's own client settings.
-    pbpCreateBookmarkServiceClient: config => env.clientFor ? env.clientFor(config) : env.client,
-    pbpBookmarkAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
-    // As in the worker, the write lands only for the current owner (a
-    // self-hosted lookup fails closed without it).
-    pbpStatusCacheSet: (url, auth, state) => { (env.cacheWrites ||= []).push({ url, account: auth.account, ...state }); return auth.account === env.account && auth.epoch === env.epoch; }, pbpStatusCacheGet: () => null,
-    pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { account, token: env.token, epoch: env.epoch, service: env.service, ...sharing() } : null,
-    pbpWaybackArchive: async () => {}, updateBadge: async () => {}, setIcon: () => {},
-    statusCache: (env.statusCache ||= new Map()),
-    pbpStatusCacheDelete: (url) => env.statusCache.delete(url),
-    // The notification Undo's own record store and toasts.
-    pbpTakeUndoRecord: async id => { const record = (env.undo ||= {})[id] || null; delete env.undo[id]; return record; },
-    pbpClearNotification: async id => { (env.clearedToasts ||= []).push(id); },
-    showNotification: (id, title, message) => { (env.toasts ||= []).push({ id, title, message }); },
-    pinboardFetch: async raw => {
-      const url = new URL(raw); env.calls.push(url);
-      if (env.networkDown) throw new Error("offline");
-      if (url.pathname.endsWith("/get")) {
-        if (env.onLookup) await env.onLookup();
-        // posts/get?url= answers only the bookmark stored under exactly that address.
-        const held = env.post && env.post.href === url.searchParams.get("url");
-        return { ok: true, status: 200, json: async () => ({ date: "2026-10-23T00:00:00Z", user: "alice", posts: held ? [{ ...env.post }] : [] }) };
-      }
-      if (url.pathname.endsWith("/delete")) {
-        if (env.onDelete) await env.onDelete();
-        const status = env.deleteHttp === undefined ? 200 : env.deleteHttp;
-        const result_code = env.deleteCode === undefined ? (env.post ? "done" : "item not found") : env.deleteCode;
-        if (status === 200 && ["done", "item not found"].includes(result_code)) env.post = null;
-        return { ok: status === 200, status, json: async () => { if (env.badDeleteJson) throw new SyntaxError("Invalid JSON"); return { result_code }; } };
-      }
-      if (env.onWrite) await env.onWrite();
-      env.post = { href: url.searchParams.get("url"), description: url.searchParams.get("description"), extended: url.searchParams.get("extended"), tags: url.searchParams.get("tags"), shared: url.searchParams.get("shared"), toread: url.searchParams.get("toread"), time: url.searchParams.get("dt") || "2026-10-23T00:00:00Z", hash: "abc", meta: "def" };
-      return { ok: true, status: 200, json: async () => ({ result_code: "done" }) };
-    },
+  const sc = sw.get("statusCache");
+  env.statusCache = sc;
+  cm.storage.local.get = async key => ({ offlineQueue: env.queue, [typeof key === "string" ? key : "unused"]: key === "offlineQueue" ? env.queue : { ...SLOT, ...env.slot } });
+  cm.storage.local.set = async values => { if (env.queueWriteFailure) throw new Error("queue storage unavailable"); if (values.offlineQueue) env.queue = values.offlineQueue; };
+  cm.tabs.query = async () => [];
+  cm.tabs.get = async tabId => { assert(tabId === 9, "saving must never inspect the source tab"); if (env.readerClosed) throw new Error("reader closed"); return { id: 9, url: READER }; };
+  w.loadSettings = async () => ({ pinboardToken: "alice:stale-token", offlineQueueEnabled: true, optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, ...env.settings });
+  w.getCurrentBookmarkAuth = async () => ({ account: env.account, token: env.token, epoch: env.epoch, service: env.service, ...sharing() });
+  w.pbpCaptureBookmarkAuth = () => ({ account: env.account, epoch: env.epoch });
+  w.t = key => key;
+  w.pbpCreateBookmarkServiceClient = config => env.clientFor ? env.clientFor(config) : env.client;
+  w.pbpBookmarkAuthIsCurrent = auth => auth.account === env.account && auth.epoch === env.epoch;
+  w.pbpStatusCacheSet = (url, auth, state) => { (env.cacheWrites ||= []).push({ url, account: auth.account, ...state }); return auth.account === env.account && auth.epoch === env.epoch; };
+  w.pbpStatusCacheGet = () => null;
+  w.pbpReadFreshBookmarkAuthForAccount = async account => account === env.account ? { account, token: env.token, epoch: env.epoch, service: env.service, ...sharing() } : null;
+  w.pbpWaybackArchive = async () => {};
+  w.updateBadge = async () => {};
+  w.setIcon = () => {};
+  w.pbpStatusCacheDelete = url => sc.delete(url);
+  w.pbpTakeUndoRecord = async id => { const record = (env.undo ||= {})[id] || null; delete env.undo[id]; return record; };
+  w.pbpClearNotification = async id => { (env.clearedToasts ||= []).push(id); };
+  w.showNotification = (id, title, message) => { (env.toasts ||= []).push({ id, title, message }); };
+  w.pinboardFetch = async raw => {
+    const url = new URL(raw); env.calls.push(url);
+    if (env.networkDown) throw new Error("offline");
+    if (url.pathname.endsWith("/get")) {
+      if (env.onLookup) await env.onLookup();
+      const held = env.post && env.post.href === url.searchParams.get("url");
+      return { ok: true, status: 200, json: async () => ({ date: "2026-10-23T00:00:00Z", user: "alice", posts: held ? [{ ...env.post }] : [] }) };
+    }
+    if (url.pathname.endsWith("/delete")) {
+      if (env.onDelete) await env.onDelete();
+      const status = env.deleteHttp === undefined ? 200 : env.deleteHttp;
+      const result_code = env.deleteCode === undefined ? (env.post ? "done" : "item not found") : env.deleteCode;
+      if (status === 200 && ["done", "item not found"].includes(result_code)) env.post = null;
+      return { ok: status === 200, status, json: async () => { if (env.badDeleteJson) throw new SyntaxError("Invalid JSON"); return { result_code }; } };
+    }
+    if (env.onWrite) await env.onWrite();
+    env.post = { href: url.searchParams.get("url"), description: url.searchParams.get("description"), extended: url.searchParams.get("extended"), tags: url.searchParams.get("tags"), shared: url.searchParams.get("shared"), toread: url.searchParams.get("toread"), time: url.searchParams.get("dt") || "2026-10-23T00:00:00Z", hash: "abc", meta: "def" };
+    return { ok: true, status: 200, json: async () => ({ result_code: "done" }) };
   };
-  return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, submitPopupSaveIntent, pbpReaderBookmarkRequest, processOfflineQueue, bookmarkApi: typeof pbpBookmarkApiRequest === \"function\" ? pbpBookmarkApiRequest : null, undo: typeof pbpRunNotificationUndo === \"function\" ? pbpRunNotificationUndo : null }; ")(...Object.values(deps)), env };
+  return {
+    submitSaveIntent: w.submitSaveIntent,
+    submitPopupSaveIntent: w.submitPopupSaveIntent,
+    pbpReaderBookmarkRequest: w.pbpReaderBookmarkRequest,
+    processOfflineQueue: w.processOfflineQueue,
+    bookmarkApi: w.pbpBookmarkApiRequest,
+    undo: w.pbpRunNotificationUndo,
+    env,
+  };
 }
 // The two self-hosted APIs as the adapter meets them, hand-written from
 // linkding v1.47 (routes.py check(), serializers.py create() and update())
@@ -398,17 +442,19 @@ const TRACKED = URL_ARTICLE + "?utm_source=x&utm_medium=social";
 // The keyboard shortcut's reader opener (background.js), run against a stub
 // tab and the stored cleaning settings; answers the slot it wrote.
 async function shortcutSlot(tab, urlClean) {
-  background ||= await (await fetch("../background.js")).text();
-  const at = background.indexOf("async function openMarkdownPreviewFromShortcut");
-  assert(at >= 0, "shortcut opener not found");
-  const body = background.slice(at, background.indexOf("\n}\n", at) + 2);
+  const sw = await ensureSw(), w = sw.win, cm = sw.mock.chrome;
   const written = [];
-  const chrome = { tabs: { query: async () => [tab], create: async () => ({}) }, storage: { local: { set: async values => { written.push(values); } } } };
   const stored = { aiContentSource: "local", ...(urlClean === undefined ? {} : { urlClean }) };
-  const settingsStorage = { get: async defaults => ({ ...defaults, ...stored }) };
-  const open = new Function("chrome", "pbpSweepPreviewOrphans", "getSettingsStorage", "pbpReadSettingsWithSecrets", "SETTINGS_DEFAULTS", "getCurrentBookmarkAuth", "pbpVideoDetect", "showNotification", "t", "pbpBookmarkLookupUrl",
-    body + "\nreturn openMarkdownPreviewFromShortcut;")(chrome, () => {}, async () => settingsStorage, async defaults => ({ ...defaults, ...stored }), SETTINGS_DEFAULTS, async () => ({ account: "alice" }), () => null, () => { throw new Error("shortcut failed"); }, key => key, pbpBookmarkLookupUrl);
-  await open();
+  cm.tabs.query = async () => [tab];
+  cm.tabs.create = async () => ({});
+  cm.storage.local.set = async values => { written.push(values); };
+  w.pbpSweepPreviewOrphans = () => {};
+  w.pbpReadSettingsWithSecrets = async defaults => ({ ...defaults, ...stored });
+  w.getCurrentBookmarkAuth = async () => ({ account: "alice" });
+  w.pbpVideoDetect = () => null;
+  w.showNotification = () => { throw new Error("shortcut failed"); };
+  w.t = key => key;
+  await w.openMarkdownPreviewFromShortcut();
   equal(written.length, 1);
   const [[key, slot]] = Object.entries(written[0]);
   assert(key.startsWith("md_preview_data_"), "shortcut wrote " + key);
@@ -478,58 +524,115 @@ await test("the shortcut reader takes the toolbar icon's cleaning rule, and keep
 // preview's literal and the pending (embedded-frame) preview's one line,
 // evaluated with the popup's form fields and the notes / summary range it
 // reads just before writing the slot.
+let _popupPreviewFixture = null;
 async function popupPreviewDrafts() {
-  const source = await (await fetch("../popup.js")).text();
-  // The bookmarkDraft object literal last written inside one slot write.
-  const draftIn = (region, label) => {
-    const objectAt = region.lastIndexOf("bookmarkDraft: {");
-    assert(objectAt >= 0, label + " preview has no bookmark draft");
-    const opening = region.indexOf("{", objectAt);
-    let depth = 0, closing = -1;
-    for (let i = opening; i < region.length; i++) {
-      if (region[i] === "{") depth++;
-      else if (region[i] === "}" && --depth === 0) { closing = i; break; }
+  if (_popupPreviewFixture) return _popupPreviewFixture;
+  const popup = await pbpSwRealm.bootPopup({ mock: { id: "test-id" } });
+  const w = popup.win, doc = popup.doc, cm = popup.mock.chrome;
+  const mutTab = { id: 1, url: URL_ARTICLE, title: "Article", incognito: false };
+  popup.set("_activeTabAtOpen", mutTab);
+  popup.set("settings", { ...SETTINGS_DEFAULTS, pinboardToken: "alice:token", bookmarkService: "pinboard", aiContentSource: "local" });
+  w.getPageInfoFromTab = async () => ({ url: URL_ARTICLE, title: "Article", selectedText: "", metaDescription: "", referrer: "", pageText: "body" });
+  w.initPopupDraft = async () => {};
+  w.fetchAllUserTags = async () => {};
+  w.checkExistingBookmark = async () => ({ status: "missing" });
+  let nextExtractResult = { markdown: "# md" };
+  w._cbExecuteScript = async (opts) => (opts && opts.func ? [{ result: nextExtractResult }] : [{}]);
+  w.htmlToMarkdown = () => "# md";
+  w.marked = { lexer: () => [] };
+  w.DOMPurify = { sanitize: (s) => s };
+  w.readingStats = () => ({ words: 1, cjkChars: 0 });
+  w.publishedIso = () => "";
+  w.pbpScrollIntoView = () => {};
+  w.t = k => k;
+  w.showStatus = () => {};
+  w.pbpDismissRemedyStatus = () => {};
+  await w.showMain("alice:token");
+
+  const realReaderHandoff = w.pbpPopupReaderHandoff;
+  const realDescKnown = w.pbpPopupDescriptionKnown;
+  const realHandoffRange = w.pbpPopupHandoffSummaryRange;
+  const realLoadUrlClean = w._loadUrlCleanSettings;
+
+  const readerHandoff = ($idFn, settingsObj, urlClean) => (pageUrl, tab) => {
+    popup.set("settings", { ...settingsObj });
+    doc.getElementById("private-check").checked = !!$idFn?.("private-check")?.checked;
+    doc.getElementById("readlater-check").checked = !!$idFn?.("readlater-check")?.checked;
+    w._loadUrlCleanSettings = () => urlClean;
+    w.pbpPopupReaderHandoff = realReaderHandoff;
+    try { return realReaderHandoff(pageUrl, tab); }
+    finally { w._loadUrlCleanSettings = realLoadUrlClean; }
+  };
+  const describedBy = (known, $idFn) => () => {
+    popup.set("_linkdingDescriptionKnown", !!known);
+    doc.getElementById("linkding-description-input").value = $idFn?.("linkding-description-input")?.value ?? "";
+    return realDescKnown();
+  };
+  const handoffRange = (snapshotFn) => (notes) => {
+    w.pbpAiSummaryOwnershipSnapshot = snapshotFn;
+    try { return realHandoffRange(notes); }
+    finally { w.pbpAiSummaryOwnershipSnapshot = undefined; }
+  };
+  const runPreviewClick = async ({ which, $idFn, settingsObj, tags, extractResult, sharedExplicit, handoffNotes, handoffSummaryRange, vouchFn, urlValue = URL_ARTICLE, tabOverride = { url: URL_ARTICLE, incognito: false } }) => {
+    w.pbpPopupReaderHandoff = realReaderHandoff;
+    w.pbpPopupDescriptionKnown = realDescKnown;
+    w.pbpPopupHandoffSummaryRange = realHandoffRange;
+    w._loadUrlCleanSettings = realLoadUrlClean;
+    mutTab.url = tabOverride.url;
+    mutTab.incognito = !!tabOverride.incognito;
+    popup.set("settings", { ...SETTINGS_DEFAULTS, aiContentSource: "local", ...settingsObj });
+    popup.set("currentTags", Array.isArray(tags) ? tags.slice() : []);
+    popup.set("_linkdingSharedExplicit", !!sharedExplicit);
+    doc.getElementById("url-input").value = urlValue;
+    doc.getElementById("title-input").value = $idFn?.("title-input")?.value ?? "";
+    doc.getElementById("description-input").value = handoffNotes ?? ($idFn?.("description-input")?.value ?? "");
+    doc.getElementById("linkding-description-input").value = $idFn?.("linkding-description-input")?.value ?? "";
+    doc.getElementById("private-check").checked = !!$idFn?.("private-check")?.checked;
+    doc.getElementById("readlater-check").checked = !!$idFn?.("readlater-check")?.checked;
+    w.pbpPopupDescriptionKnown = vouchFn ? () => !!vouchFn() : realDescKnown;
+    w.pbpAiSummaryOwnershipSnapshot = () => handoffSummaryRange;
+
+    let capturedSlot = null, handedPageUrl;
+    cm.storage.local.set = async (obj) => {
+      const entry = Object.entries(obj).find(([k]) => k.startsWith("md_preview_data_"));
+      if (entry) capturedSlot = entry[1];
+    };
+    w.pbpPopupReaderHandoff = (pageUrl, t) => {
+      handedPageUrl = pageUrl;
+      return realReaderHandoff(pageUrl, t);
+    };
+    let resolveTabCreated;
+    const tabCreated = new Promise((r) => { resolveTabCreated = r; });
+    cm.tabs.create = async () => { resolveTabCreated(); return {}; };
+
+    const jinaBtn = doc.getElementById("jina-md-btn");
+    jinaBtn.disabled = false;
+    if (which === "pending") {
+      nextExtractResult = { error: "No content", frameOrigin: "https://frame.example", ...extractResult };
+      jinaBtn.click();
+      await tabCreated;
+    } else {
+      nextExtractResult = { markdown: "# md", ...extractResult };
+      const prevBtn = doc.getElementById("md-strip-preview");
+      prevBtn.onclick = null;
+      jinaBtn.click();
+      await until(() => typeof prevBtn.onclick === "function", "preview button handler");
+      await prevBtn.onclick();
     }
-    assert(closing > opening, label + " draft object did not close");
-    return region.slice(opening, closing + 1);
+    assert(capturedSlot, which + " preview wrote no slot");
+    return { slot: capturedSlot, handedPageUrl };
   };
-  const opener = source.slice(source.indexOf("const openPreview"), source.indexOf("const downloadMd"));
-  const pendingAt = source.indexOf("pending: true, engine, source: engine");
-  assert(pendingAt >= 0, "pending preview slot not found");
-  const pendingSlot = source.slice(pendingAt, source.indexOf("await chrome.tabs.create", pendingAt));
-  // The popup's reader handoff helper, run on the given form, settings and
-  // cleaning settings (popup.js pbpPopupReaderHandoff).
-  const handoffAt = source.indexOf("function pbpPopupReaderHandoff(");
-  assert(handoffAt >= 0, "popup has no reader handoff helper");
-  const readerHandoff = ($id, settings, urlClean) => new Function("$id", "settings", "pbpBookmarkServiceId", "pbpBookmarkLookupUrl", "_loadUrlCleanSettings",
-    source.slice(handoffAt, source.indexOf("\n}\n", handoffAt) + 2) + "\nreturn pbpPopupReaderHandoff;")($id, settings, pbpBookmarkServiceId, pbpBookmarkLookupUrl, () => urlClean);
-  const normalDraft = new Function("$id", "settings", "currentTags", "pbpBookmarkServiceId", "pbpBookmarkFormatTags", "result", "_linkdingSharedExplicit",
-    "handoffNotes", "handoffSummaryRange", "pbpPopupDescriptionKnown", "handoff", "return (" + draftIn(opener, "normal") + ");");
-  const pendingDraft = new Function("$id", "settings", "pbpBookmarkServiceId", "_linkdingSharedExplicit",
-    "handoffNotes", "handoffSummaryRange", "pbpPopupDescriptionKnown", "handoff", "return (" + draftIn(pendingSlot, "pending") + ");");
-  const handoffFor = ($id, settings) => readerHandoff($id, settings, SETTINGS_DEFAULTS.urlClean)(URL_ARTICLE, { incognito: false });
-  const normal = ($id, settings, ...rest) => normalDraft($id, settings, ...rest, handoffFor($id, settings));
-  const pending = ($id, settings, ...rest) => pendingDraft($id, settings, ...rest, handoffFor($id, settings));
-  // The popup's own answer to "can I vouch for the Description box?".
-  const knownAt = source.indexOf("function pbpPopupDescriptionKnown(");
-  assert(knownAt >= 0, "popup has no Description provenance helper");
-  const describedBy = (known, $id) => new Function("_linkdingDescriptionKnown", "$id",
-    source.slice(knownAt, source.indexOf("\n}\n", knownAt) + 2) + "\nreturn pbpPopupDescriptionKnown;")(known, $id);
-  const helperAt = source.indexOf("function pbpPopupHandoffSummaryRange(");
-  assert(helperAt >= 0, "popup has no handoff summary range helper");
-  const handoffRange = (snapshot) => new Function("pbpAiSummaryOwnershipSnapshot",
-    source.slice(helperAt, source.indexOf("\n}\n", helperAt) + 2) + "\nreturn pbpPopupHandoffSummaryRange;")(snapshot);
-  // The page address each popup handoff passes pbpPopupReaderHandoff, read
-  // from the call itself and evaluated against the given extraction result,
-  // url-input value and tab.
-  const handoffArgIn = (region, label) => {
-    const call = region.match(/const handoff = pbpPopupReaderHandoff\(([^;]*)\);/);
-    assert(call, label + " preview builds no reader handoff");
-    return (result, url, tab) => new Function("result", "url", "tab", "pbpPopupReaderHandoff", call[0] + "\nreturn handoff;")(result, url, tab, pageUrl => pageUrl);
+
+  const normal = async ($idFn, settingsObj, currentTagsArr, _svcId, _fmtTags, extractResult, sharedExplicit, handoffNotes, handoffSummaryRange, vouchFn) =>
+    (await runPreviewClick({ which: "normal", $idFn, settingsObj, tags: currentTagsArr, extractResult, sharedExplicit, handoffNotes, handoffSummaryRange, vouchFn })).slot.bookmarkDraft;
+  const pending = async ($idFn, settingsObj, _svcId, sharedExplicit, handoffNotes, handoffSummaryRange, vouchFn) =>
+    (await runPreviewClick({ which: "pending", $idFn, settingsObj, tags: [], extractResult: {}, sharedExplicit, handoffNotes, handoffSummaryRange, vouchFn })).slot.bookmarkDraft;
+  const handoffPage = {
+    normal: async (result, url, tab) => (await runPreviewClick({ which: "normal", $idFn: () => ({}), settingsObj: { bookmarkService: "pinboard" }, tags: [], extractResult: result, urlValue: url, tabOverride: tab })).handedPageUrl,
+    pending: async (result, url, tab) => (await runPreviewClick({ which: "pending", $idFn: () => ({}), settingsObj: { bookmarkService: "pinboard" }, tags: [], extractResult: result, urlValue: url, tabOverride: tab })).handedPageUrl,
   };
-  const handoffPage = { normal: handoffArgIn(opener, "normal"),
-    pending: handoffArgIn(source.slice(source.lastIndexOf("typeof result.frameOrigin", pendingAt), pendingAt), "pending") };
-  return { normal, pending, handoffRange, describedBy, readerHandoff, handoffPage };
+  _popupPreviewFixture = { normal, pending, handoffRange, describedBy, readerHandoff, handoffPage };
+  return _popupPreviewFixture;
 }
 await test("normal and pending popup preview payloads carry linkding Description into reader state", async () => {
   const { normal, pending } = await popupPreviewDrafts();
@@ -537,8 +640,8 @@ await test("normal and pending popup preview payloads carry linkding Description
   const $id = name => ({ value: fields[name], checked: fields[name] });
   for (const service of ["linkding", "pinboard"]) for (const sharedExplicit of [false,true]) {
     const settings = { bookmarkService: service }, account = service === "linkding" ? "linkding:fixture" : "alice";
-    for (const draft of [normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, sharedExplicit, "Note", undefined, () => true),
-      pending($id, settings, pbpBookmarkServiceId, sharedExplicit, "Note", undefined, () => true)]) {
+    for (const draft of [await normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, sharedExplicit, "Note", undefined, () => true),
+      await pending($id, settings, pbpBookmarkServiceId, sharedExplicit, "Note", undefined, () => true)]) {
       if (service === "linkding") {
         equal(draft.summary, "first second");
         const h = await harness({ account, service, post: null, slot: { account, bookmarkDraft: draft } });
@@ -597,7 +700,6 @@ await test("a reader-created linkding bookmark stays unshared whatever the popup
 // The reader editor's own Share box (handoff D5 c) still decides: it opens
 // unticked for a new bookmark, and only the user's own click shares it.
 await test("reader editor shares a new linkding bookmark only when its own Share box is clicked", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const account = "linkding:https://links.example/:conn-1";
   const bookmarkDraft = { title: "Popup title", tags: "one", notes: "Popup notes", private: false, sharedExplicit: true, toread: false };
   for (const clicks of [0, 1, 2]) {
@@ -611,8 +713,8 @@ await test("reader editor shares a new linkding bookmark only when its own Share
       w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
         sendMessage: msg => { const request = h.pbpReaderBookmarkRequest(msg, SENDER); pending.push(request); return request; },
         onMessage: { addListener: () => {} } } };
-      w.eval(await (await fetch("../shared.js")).text());
-      w.t = k => k; w.eval(runtime);
+      await loadShared(w);
+      w.t = k => k; await loadMdBookmark(w);
       w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "", draft: bookmarkDraft } } }));
       await settle(pending);
       await w.pbpReaderBookmarkAction("edit");
@@ -633,7 +735,6 @@ await test("reader editor shares a new linkding bookmark only when its own Share
 // address and owner and hands it as the server now holds it, which the export
 // metadata takes over (md-preview.js).
 await test("a reader save announces the bookmark under its cleaned address with the server's tags, Description and Notes", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const account = "linkding:https://links.example/:conn-1";
   const row = { id: 7, url: URL_ARTICLE, title: "Stored title", description: "Stored description", notes: "Stored notes", is_archived: false, unread: false,
     shared: false, tag_names: ["two-words", "one"], date_added: "2026-10-01T08:00:00.000000Z", date_modified: "2026-10-01T08:00:00.000000Z" };
@@ -647,8 +748,8 @@ await test("a reader save announces the bookmark under its cleaned address with 
     w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
       sendMessage: msg => { const request = h.pbpReaderBookmarkRequest(msg, SENDER); pending.push(request); return request; },
       onMessage: { addListener: () => {} } } };
-    w.eval(await (await fetch("../shared.js")).text());
-    w.t = k => k; w.eval(runtime);
+    await loadShared(w);
+    w.t = k => k; await loadMdBookmark(w);
     w.document.addEventListener("pbp:bookmark-changed", e => changed.push(JSON.parse(JSON.stringify(e.detail))));
     w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: TRACKED, bookmarkUrl: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "" } } }));
     await settle(pending);
@@ -666,7 +767,6 @@ await test("a reader save announces the bookmark under its cleaned address with 
   } finally { frame.remove(); }
 });
 await test("the reader names a linkding tag the server cannot store, queues nothing and keeps the editor open to shorten it", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const account = "linkding:https://links.example/:conn-1";
   const long = "x".repeat(65), shown = "x".repeat(40) + "\u2026", fits = "\u{1F600}".repeat(64);
   const same = (actual, expected) => equal(JSON.stringify(actual), JSON.stringify(expected));
@@ -681,8 +781,8 @@ await test("the reader names a linkding tag the server cannot store, queues noth
     w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
       sendMessage: msg => { const request = h.pbpReaderBookmarkRequest(msg, SENDER); pending.push(request); return request; },
       onMessage: { addListener: () => {} } } };
-    w.eval(await (await fetch("../shared.js")).text());
-    w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; w.eval(runtime);
+    await loadShared(w);
+    w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; await loadMdBookmark(w);
     w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "", draft: bookmarkDraft } } }));
     await settle(pending);
     await w.pbpReaderBookmarkAction("save"); await settle(pending);
@@ -743,15 +843,14 @@ await test("the reader names a linkding tag the server cannot store, queues noth
 // PBP_READER_BOOKMARK_COMMAND listener captured: the global quick-save and
 // read-later shortcuts reach the reader through it.
 async function tagFixReader(h, account, bookmarkDraft) {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const frame = document.createElement("iframe"); document.body.append(frame);
   const w = frame.contentWindow, pending = [], listeners = [];
   w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
   w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
     sendMessage: msg => { const request = h.pbpReaderBookmarkRequest(msg, SENDER); pending.push(request); return request; },
     onMessage: { addListener: fn => listeners.push(fn) } } };
-  w.eval(await (await fetch("../shared.js")).text());
-  w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; w.eval(runtime);
+  await loadShared(w);
+  w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; await loadMdBookmark(w);
   w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "", draft: bookmarkDraft } } }));
   await settle(pending);
   const command = async action => {
@@ -861,8 +960,8 @@ await test("popup preview payloads leave out a Description the popup cannot vouc
     const fields = { "title-input": "T", "description-input": "Note", "linkding-description-input": box, "private-check": true, "readlater-check": false };
     const $id = name => ({ value: fields[name], checked: fields[name] });
     const vouch = describedBy(known, $id), where = JSON.stringify({ known, box });
-    for (const draft of [normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, false, "Note", undefined, vouch),
-      pending($id, settings, pbpBookmarkServiceId, false, "Note", undefined, vouch)]) {
+    for (const draft of [await normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, false, "Note", undefined, vouch),
+      await pending($id, settings, pbpBookmarkServiceId, false, "Note", undefined, vouch)]) {
       assert(Object.hasOwn(draft, "summary") === (expected !== undefined) && draft.summary === expected, where + ": handed " + JSON.stringify(draft.summary));
       const h = await harness({ account, service: "linkding", post: null, slot: { account, bookmarkDraft: draft } });
       const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
@@ -894,8 +993,8 @@ await test("popup handoffs carry the cleaned address, incognito source, privacy 
     const where = which + " incognito=" + incognito + " readLater=" + readLater;
     equal(handoff.sourceIncognito, incognito, where);
     const draft = which === "normal"
-      ? normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, false, "Note", undefined, () => true)
-      : pending($id, settings, pbpBookmarkServiceId, false, "Note", undefined, () => true);
+      ? await normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, false, "Note", undefined, () => true)
+      : await pending($id, settings, pbpBookmarkServiceId, false, "Note", undefined, () => true);
     // The reader worker's settings: private only by the incognito default.
     const h = await pipelineHarness({ post: null, slot: { url: TRACKED, bookmarkUrl: handoff.bookmarkUrl, sourceIncognito: handoff.sourceIncognito, bookmarkDraft: draft },
       settings: { optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false } });
@@ -919,7 +1018,7 @@ await test("popup handoffs derive the bookmark address from the tab, not the ext
   const tab = { url: TRACKED, incognito: false };
   for (const resultUrl of [URL_ARTICLE + "/", "https://example.com/redirected?utm_source=x", TRACKED, undefined]) {
     for (const which of ["normal", "pending"]) {
-      const page = handoffPage[which]({ url: resultUrl }, URL_ARTICLE, tab);
+      const page = await handoffPage[which]({ url: resultUrl }, URL_ARTICLE, tab);
       for (const [label, urlClean] of [["cleaning on open", SETTINGS_DEFAULTS.urlClean], ["cleaning off", { ...SETTINGS_DEFAULTS.urlClean, enabled: false }]]) {
         const where = which + " result.url=" + resultUrl + " " + label;
         equal(readerHandoff(() => null, { bookmarkService: "pinboard" }, urlClean)(page, tab).bookmarkUrl, pbpBookmarkLookupUrl(tab.url, urlClean), where);
@@ -939,11 +1038,11 @@ await test("popup preview payloads carry the summary range the popup vouches for
   const $id = name => ({ value: fields[name], checked: fields[name] });
   for (const service of ["pinboard", "karakeep", "linkding"]) for (const handed of [range, undefined]) {
     const settings = { bookmarkService: service };
-    const plain = normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, false, "Note", handed, () => true);
+    const plain = await normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, false, "Note", handed, () => true);
     equal(plain.notes, "Note");
     equal(Object.hasOwn(plain, "summaryRange"), !!handed, service + ": normal draft range presence");
     if (handed) equal(JSON.stringify(plain.summaryRange), JSON.stringify(range));
-    const framed = pending($id, settings, pbpBookmarkServiceId, false, "Note", handed, () => true);
+    const framed = await pending($id, settings, pbpBookmarkServiceId, false, "Note", handed, () => true);
     if (service === "linkding") assert(framed && !("notes" in framed) && !("summaryRange" in framed), "linkding pending draft gained Notes ownership");
     // Without a range the draft vouches for no notes: the reader saves the
     // slot's description, and the draft only carries the form's flags.
@@ -1420,11 +1519,10 @@ await test("a self-hosted Undo failure names its cause from the shared table", a
   equal(JSON.stringify(h.env.toasts.map(toast => [toast.title, toast.message])), JSON.stringify([["bgUndoFailed", "bookmarkErrGatewayDenied"]]));
 });
 await test("runtime script implements guarded shared keyboard and action state", async () => {
-  runtime = await (await fetch("../md-bookmark.js")).text(); assert(!runtime.startsWith("<!DOCTYPE"), "reader runtime is not implemented");
   const frame = document.createElement("iframe"); document.body.append(frame); const w = frame.contentWindow;
   w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
   const calls = []; w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p, sendMessage: async msg => { calls.push(msg); return msg.type === "mdReaderBookmarkState" ? { known: true, bookmarked: false, account: "alice" } : { status: "queued", account: "alice" }; }, onMessage: { addListener: fn => { w._runtimeHandler = fn; } } } };
-  w.t = k => k; w.eval(runtime); w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account: "alice", bookmark: { tags: [], notes: "" } } })); await new Promise(r => setTimeout(r, 20));
+  w.t = k => k; await loadMdBookmark(w); w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account: "alice", bookmark: { tags: [], notes: "" } } })); await new Promise(r => setTimeout(r, 20));
   for (const opts of [{ repeat: true }, { ctrlKey: true }, { metaKey: true }, { altKey: true }, { isComposing: true }, { keyCode: 229 }]) w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "s", bubbles: true, ...opts })); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 0);
   const input = w.document.createElement("input"); w.document.body.append(input); input.focus(); input.dispatchEvent(new w.KeyboardEvent("keydown", { key: "s", bubbles: true })); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 0); input.blur();
   const overlay = w.document.createElement("div"); overlay.setAttribute("popover", "auto"); w.document.body.append(overlay); overlay.showPopover(); w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "s", bubbles: true })); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 0); overlay.hidePopover();
@@ -1438,19 +1536,18 @@ await test("runtime script implements guarded shared keyboard and action state",
 // the copy that sends the user to Edit. A result without a mutation (Pinboard)
 // is told by the bar's state before the save.
 await test("reader save results say saved, updated, merged or partial as the worker reports them", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const run = async (account, bookmarked, result, action) => {
     const frame = document.createElement("iframe"); document.body.append(frame);
     try {
       const w = frame.contentWindow;
       w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-      w.eval(await (await fetch("../shared.js")).text());
+      await loadShared(w);
       const state = { known: true, bookmarked, account, bookmark: { tags: "", notes: "", toread: false } };
       const pending = [];
       w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
         sendMessage: msg => { const reply = Promise.resolve(msg.type === "mdReaderBookmarkState" ? state : { ...result, account }); pending.push(reply); return reply; },
         onMessage: { addListener() {} } } };
-      w.t = k => k; w.eval(runtime);
+      w.t = k => k; await loadMdBookmark(w);
       w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "" } } }));
       await settle(pending);
       const saves = pending.length;
@@ -1579,15 +1676,14 @@ await test("a reader edit or Read Later on a bookmark deleted elsewhere does not
   assert(en.readerBookmarkDeletedElsewhere?.message, "en catalogue lacks readerBookmarkDeletedElsewhere");
 });
 await test("reader save, delete and lookup show self-hosted causes", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const run = async (account, handler, act) => {
     const frame = document.createElement("iframe"); document.body.append(frame);
     try {
       const w = frame.contentWindow;
       w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-      w.eval(await (await fetch("../shared.js")).text());
+      await loadShared(w);
       w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p, sendMessage: async msg => handler(msg), onMessage: { addListener() {} } } };
-      w.t = k => k; w.eval(runtime);
+      w.t = k => k; await loadMdBookmark(w);
       w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "" } } }));
       await new Promise(r => setTimeout(r, 30));
       await act(w); await new Promise(r => setTimeout(r, 30));
@@ -1605,15 +1701,14 @@ await test("reader save, delete and lookup show self-hosted causes", async () =>
     w => w.pbpReaderBookmarkAction("later")), "readerBookmarkAccountChanged");
 });
 await test("reader save, delete and lookup name every self-hosted cause from the shared table; Pinboard keeps its copy", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const run = async (account, handler, act) => {
     const frame = document.createElement("iframe"); document.body.append(frame);
     try {
       const w = frame.contentWindow;
       w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-      w.eval(await (await fetch("../shared.js")).text());
+      await loadShared(w);
       w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p, sendMessage: async msg => handler(msg), onMessage: { addListener() {} } } };
-      w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; w.eval(runtime);
+      w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; await loadMdBookmark(w);
       w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "" } } }));
       await new Promise(r => setTimeout(r, 30));
       await act(w); await new Promise(r => setTimeout(r, 30));
@@ -1645,7 +1740,6 @@ await test("reader save, delete and lookup name every self-hosted cause from the
     w => w.pbpReaderBookmarkAction("later")), "readerBookmarkAccountChanged");
 });
 await test("a Save or Read Later the worker refuses for an over-long title names the limit in the rail", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   for (const [service, limit] of [["linkding", 512], ["karakeep", 1000]]) for (const action of ["save", "later"]) {
     const frame = document.createElement("iframe"); document.body.append(frame);
     try {
@@ -1654,10 +1748,10 @@ await test("a Save or Read Later the worker refuses for an over-long title names
         ? { known: true, bookmarked: false, account, bookmark: null }
         : { status: "failed", reason: "too_long", limit, account };
       w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-      w.eval(await (await fetch("../shared.js")).text());
+      await loadShared(w);
       w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
         sendMessage: msg => { const r = Promise.resolve(handler(msg)); pending.push(r); return r; }, onMessage: { addListener() {} } } };
-      w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; w.eval(runtime);
+      w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; await loadMdBookmark(w);
       w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "x".repeat(limit + 1), account } }));
       await settle(pending);
       await w.pbpReaderBookmarkAction(action); await settle(pending);
@@ -1668,7 +1762,6 @@ await test("a Save or Read Later the worker refuses for an over-long title names
   }
 });
 await test("each reader status keeps the placeholders of its own copy after a tag fix and a later remote failure", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const account = "linkding:https://ld.example:c1", long = "x".repeat(65), shown = "x".repeat(40) + "…";
   const tagCopy = "bookmarkErrTagTooLong:" + shown + ":64", remoteCopy = "bookmarkErrRemote:400";
   const same = (a, b) => equal(JSON.stringify(a), JSON.stringify(b));
@@ -1685,10 +1778,10 @@ await test("each reader status keeps the placeholders of its own copy after a ta
           : { status: "failed", reason: "remote", httpStatus: 400, account };
       };
       w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-      w.eval(await (await fetch("../shared.js")).text());
+      await loadShared(w);
       w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
         sendMessage: msg => { const r = Promise.resolve(handler(msg)); pending.push(r); return r; }, onMessage: { addListener() {} } } };
-      w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; w.eval(runtime);
+      w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; await loadMdBookmark(w);
       w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "", draft: { title: "Article", tags: long, notes: "" } } } }));
       await settle(pending);
       const el = name => w.document.getElementById("reader-bookmark-" + name);
@@ -1711,21 +1804,19 @@ await test("each reader status keeps the placeholders of its own copy after a ta
   }
 });
 await test("reader lookup of a rejected self-hosted token names the token, not a missing connection", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const frame = document.createElement("iframe"); document.body.append(frame);
   try {
     const w = frame.contentWindow, ld = "linkding:https://ld.example:c1";
     w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-    w.eval(await (await fetch("../shared.js")).text());
+    await loadShared(w);
     w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p, sendMessage: async () => ({ known: false, reason: "not_logged_in", httpStatus: 401, account: ld }), onMessage: { addListener() {} } } };
-    w.t = k => k; w.eval(runtime);
+    w.t = k => k; await loadMdBookmark(w);
     w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account: ld, bookmark: { tags: [], notes: "" } } }));
     await new Promise(r => setTimeout(r, 40));
     equal(w.document.getElementById("reader-bookmark-status").textContent, "bookmarkErrAuth");
   } finally { frame.remove(); }
 });
 await test("real reader editor shows the configured privacy default and saves the user's checkbox choice", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   for (const privateDefault of [false, true]) {
     const h = await pipelineHarness({ post: null, slot: { sourceIncognito: false }, settings: { optPrivateDefault: privateDefault } });
     const frame = document.createElement("iframe"); document.body.append(frame);
@@ -1736,8 +1827,8 @@ await test("real reader editor shows the configured privacy default and saves th
       w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
         sendMessage: msg => { const request = h.pbpReaderBookmarkRequest(msg, SENDER); pending.push(request); return request; },
         onMessage: { addListener: () => {} } } };
-      w.eval(await (await fetch("../shared.js")).text());
-      w.t = k => k; w.eval(runtime);
+      await loadShared(w);
+      w.t = k => k; await loadMdBookmark(w);
       w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account: "alice", bookmark: { tags: [], notes: "" } } }));
       await Promise.all(pending); await new Promise(resolve => setTimeout(resolve, 0));
       await w.pbpReaderBookmarkAction("edit");
@@ -1752,16 +1843,15 @@ await test("real reader editor shows the configured privacy default and saves th
   }
 });
 await test("reader linkding editor shows supported sharing and inverts the saved private choice", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   for (const sharingSupported of [undefined,false,true]) {
     const frame=document.createElement("iframe");document.body.append(frame);
     try {
       const w=frame.contentWindow, messages=[];
       w.document.body.innerHTML='<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-      w.eval(await (await fetch("../shared.js")).text());
+      await loadShared(w);
       w.t=k=>k;
       w.chrome={runtime:{id:"test-id",getURL:p=>p,onMessage:{addListener(){}},sendMessage:async msg=>{messages.push(msg);return {known:true,bookmarked:true,account:"linkding:c1",privacySupported:false,sharingSupported,bookmark:{title:"T",notes:"",tags:"",private:false,toread:false}};}}};
-      w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account:"linkding:c1"}}));
+      await loadMdBookmark(w);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account:"linkding:c1"}}));
       await readerIdle(w);await w.pbpReaderBookmarkAction("edit");
       const box=w.document.getElementById("reader-bookmark-private");
       equal(box.closest("label").hidden,sharingSupported!==true);
@@ -1770,15 +1860,14 @@ await test("reader linkding editor shows supported sharing and inverts the saved
   }
 });
 await test("reader title-only edit does not fabricate sharing intent, but explicit toggle back remains a choice", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   for(const toggles of [0,1,2]) {
     const frame=document.createElement("iframe");document.body.append(frame);
     try {
       const w=frame.contentWindow,messages=[];
       w.document.body.innerHTML='<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-      w.eval(await(await fetch("../shared.js")).text());w.t=k=>k;
+      await loadShared(w);w.t=k=>k;
       w.chrome={runtime:{id:"test-id",getURL:p=>p,onMessage:{addListener(){}},sendMessage:async msg=>{messages.push(msg);return {known:true,bookmarked:true,account:"linkding:c1",privacySupported:false,sharingSupported:true,bookmark:{title:"T",notes:"",tags:"",private:false,toread:false}};}}};
-      w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account:"linkding:c1"}}));
+      await loadMdBookmark(w);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account:"linkding:c1"}}));
       await readerIdle(w);await w.pbpReaderBookmarkAction("edit");
       const box=w.document.getElementById("reader-bookmark-private");
       for(let i=0;i<toggles;i++)box.click();
@@ -1790,19 +1879,18 @@ await test("reader title-only edit does not fabricate sharing intent, but explic
   }
 });
 await test("reader Description uses a textarea, shows only for linkding, and preserves words on edit", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   for (const [account, supported] of [["linkding:fixture", true], ["karakeep:fixture", false], ["alice", false]]) {
     const frame = document.createElement("iframe"); document.body.append(frame);
     try {
       const w = frame.contentWindow, messages = [];
       w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-      w.eval(await (await fetch("../shared.js")).text()); w.t = key => key;
+      await loadShared(w); w.t = key => key;
       w.chrome = { runtime: { id: "test-id", getURL: path => path, onMessage: { addListener() {} }, sendMessage: async msg => {
         messages.push(msg); return msg.type === "mdReaderBookmarkState"
           ? { known: true, bookmarked: true, account, descriptionSupported: supported, bookmark: { title: "T", notes: "N", tags: "one", summary: "first\nsecond", private: true, toread: false } }
           : { status: "queued", account };
       } } };
-      w.eval(runtime); w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "T", account } }));
+      await loadMdBookmark(w); w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "T", account } }));
       await readerIdle(w); await w.pbpReaderBookmarkAction("edit");
       const input = w.document.getElementById("reader-bookmark-summary");
       if (!supported) { assert(!input || input.closest("label").hidden); continue; }
@@ -1819,7 +1907,6 @@ await test("reader Description uses a textarea, shows only for linkding, and pre
 // an untouched multi-line value stays as stored and an unknown one stays for
 // linkding to fill. Polls the editor's own busy state; no fixed waits.
 await test("reader edits send a Description only when the user changed it, keeping its line breaks", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   for (const [bookmarked, stored, typed, sent] of [
     [true, "first\nsecond", undefined, undefined], [true, "first\nsecond", "first   second", "first   second"],
     [true, "first\nsecond", "", ""], [true, "first\nsecond", " changed \n value", "changed \n value"],
@@ -1832,13 +1919,13 @@ await test("reader edits send a Description only when the user changed it, keepi
     try {
       const w = frame.contentWindow, messages = [], account = "linkding:fixture", where = JSON.stringify({ bookmarked, stored, typed });
       w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-      w.eval(await (await fetch("../shared.js")).text()); w.t = key => key;
+      await loadShared(w); w.t = key => key;
       w.chrome = { runtime: { id: "test-id", getURL: path => path, onMessage: { addListener() {} }, sendMessage: async msg => {
         messages.push(msg); return msg.type === "mdReaderBookmarkState"
           ? { known: true, bookmarked, account, descriptionSupported: true, bookmark: { title: "T", notes: "N", tags: "one", ...(stored === undefined ? {} : { summary: stored }), private: true, toread: false } }
           : { status: "queued", account };
       } } };
-      w.eval(runtime); w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "T", account } }));
+      await loadMdBookmark(w); w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "T", account } }));
       await readerIdle(w);
       await w.pbpReaderBookmarkAction("edit");
       const input = w.document.getElementById("reader-bookmark-summary");
@@ -1852,19 +1939,18 @@ await test("reader edits send a Description only when the user changed it, keepi
   }
 });
 await test("reader validates self-hosted quotes locally and shows the edit hint", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   for (const [account, quoted] of [["linkding:fixture",true],["alice",false]]) {
     const frame=document.createElement("iframe");document.body.append(frame);
     try {
       const w=frame.contentWindow,messages=[];
       w.document.body.innerHTML='<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-      w.eval(await (await fetch("../shared.js")).text()); w.t=k=>k;
+      await loadShared(w); w.t=k=>k;
       w.chrome={runtime:{id:"test-id",getURL:p=>p,onMessage:{addListener(){}},sendMessage:async msg=>{
         messages.push(msg);return msg.type==="mdReaderBookmarkState"
           ? {known:true,bookmarked:true,account,quotedTags:quoted,bookmark:{title:"T",notes:"",tags:quoted?'"machine learning"':'literal"tag',private:true,toread:false}}
           : {status:"queued",account};
       }}};
-      w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account}}));
+      await loadMdBookmark(w);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account}}));
       await readerIdle(w);await w.pbpReaderBookmarkAction("edit");
       const input=w.document.getElementById("reader-bookmark-tags"),apply=w.document.getElementById("reader-bookmark-apply");
       equal(input.closest("label").firstElementChild.textContent,quoted?"readerBookmarkTagsQuoted":"readerBookmarkTags");
@@ -1882,20 +1968,19 @@ await test("reader validates self-hosted quotes locally and shows the edit hint"
   }
 });
 await test("reader editor rejects over-limit titles locally, keeps the full input, and allows correction", async () => {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   for (const [service, limit] of [["linkding",512],["karakeep",1000]]) {
     const frame=document.createElement("iframe");document.body.append(frame);
     try {
       const w=frame.contentWindow, messages=[], account=service+":fixture";
       w.document.body.innerHTML='<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-      w.eval(await (await fetch("../shared.js")).text());
+      await loadShared(w);
       w.t=(key,value)=>key+(value===undefined?"":":"+value);
       w.chrome={runtime:{id:"test-id",getURL:p=>p,onMessage:{addListener(){}},sendMessage:async msg=>{
         messages.push(msg);return msg.type === "mdReaderBookmarkState"
           ? {known:true,bookmarked:true,account,bookmark:{title:"T",notes:"",tags:"",private:true,toread:false}}
           : {status:"queued",account};
       }}};
-      w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account}}));
+      await loadMdBookmark(w);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account}}));
       await readerIdle(w);await w.pbpReaderBookmarkAction("edit");
       const title=w.document.getElementById("reader-bookmark-title"), apply=w.document.getElementById("reader-bookmark-apply");
       equal(title.maxLength,-1);
@@ -1915,15 +2000,14 @@ await test("reader editor rejects over-limit titles locally, keeps the full inpu
 });
 async function deleteUiHarness(options = {}) {
   const h = await pipelineHarness(options);
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const frame = document.createElement("iframe"); frame.width = 800; frame.height = 600; document.body.append(frame);
   const w = frame.contentWindow;
   w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"><p>Keep reading</p></div><div id="reader-notes">Keep highlight notes</div>';
-  w.eval(await (await fetch("../shared.js")).text());
+  await loadShared(w);
   const requests = [];
   w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
     sendMessage: msg => { requests.push(msg); return h.pbpReaderBookmarkRequest(msg, SENDER); }, onMessage: { addListener: () => {} } } };
-  w.t = k => k; w.eval(runtime);
+  w.t = k => k; await loadMdBookmark(w);
   const settle = async () => {
     for (let i = 0; i < 200; i++) {
       await new Promise(resolve => setTimeout(resolve, 1));
@@ -2002,14 +2086,13 @@ await test("delete ignores duplicate confirmation and stale completion after acc
 
 // ---- G19 / G20: connection bar and badge ----
 async function barFrame(account, handler, detailExtra = {}) {
-  runtime ||= await (await fetch("../md-bookmark.js")).text();
   const frame = document.createElement("iframe"); document.body.append(frame);
   const w = frame.contentWindow, requests = [], states = [];
   w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
-  w.eval(await (await fetch("../shared.js")).text());
+  await loadShared(w);
   w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p, onMessage: { addListener() {} },
     sendMessage: async msg => { requests.push(msg); return handler(msg); } } };
-  w.t = k => k; w.eval(runtime);
+  w.t = k => k; await loadMdBookmark(w);
   w.document.addEventListener("pbp:bookmark-state", e => states.push(e.detail));
   w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "" }, ...detailExtra } }));
   await new Promise(r => setTimeout(r, 30));

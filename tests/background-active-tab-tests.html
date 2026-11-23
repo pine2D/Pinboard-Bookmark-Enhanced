@@ -12,6 +12,8 @@ body { font-family: monospace; padding: 16px; max-width: 1000px; }
 <script src="../shared.js"></script>
 <script src="../wayback.js"></script>
 <script src="../bookmark-services.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 function assert(condition, message) {
   if (!condition) throw new Error(message || "assertion failed");
@@ -31,111 +33,149 @@ async function test(name, fn) {
   document.getElementById("results").appendChild(div);
 }
 
-function buildHarness(source, queryTabs, bookmarkResult = true) {
-  const start = source.indexOf("async function _getFocusedActiveTab");
-  const end = source.indexOf("// ---- \u6807\u7b7e\u9875\u6fc0\u6d3b/\u66f4\u65b0\u65f6\u5237\u65b0\u56fe\u6807", start === -1 ? 0 : start);
-  assert(start !== -1 && end !== -1 && end > start, "active-tab refresh helpers not found");
+const EXT_ID = "feoognahlmfmbllpmgailahcnjppiegb";
+const EXT_URL = `chrome-extension://${EXT_ID}/popup.html`;
+const SW_FNS = [
+  "_getFocusedActiveTab", "_scheduleCurrentTabRefresh", "_scheduleTabCheck", "noteActivity",
+  "debouncedCheck", "setIcon", "_writeCurrentTabMirror", "getCurrentBookmarkAuth", "pbpStatusCacheGet",
+  "pbpStatusCacheSet", "pbpStatusCacheDelete", "checkBookmarked", "getSettingsStorage", "pinboardFetch",
+  "pinboardFetchImmediate", "pbpBookmarkAuthIsCurrent", "pbpMigrateLegacyWildcardPermission",
+  "saveFromBackground", "resolvePrefixSettings", "loadSettings", "pbpLoadTagVocab", "showNotification",
+  "pbpSaveFailure", "getPageInfoFromTab", "buildAutoNotes", "pbpNotesDescription", "pbpPageInfoReadable",
+  "hasAIKey", "getAICache", "callAI", "buildCombinedPrompt", "parseAICombined", "setAICache",
+  "escapeForExtended", "buildTagPrompt", "refineTags", "parseAITags", "buildSummaryPrompt",
+  "submitSaveIntent", "processOfflineQueue", "t", "pbpI18nReady", "pbpBookmarkClient", "_ensureIconDecode",
+  "pbpBookmarkServiceId", "handleSaveTabSet", "fetch",
+];
 
+let swSnaps = [], swCursor = 0, popupRealm = null;
+
+function snapshotSw(sw) {
+  const w = sw.win, cm = sw.mock.chrome;
+  return {
+    sw,
+    fns: Object.fromEntries(SW_FNS.map((k) => [k, w[k]])),
+    consoleWarn: w.console.warn.bind(w.console),
+    tabsQuery: cm.tabs.query, tabsGet: cm.tabs.get, tabsCreate: cm.tabs.create,
+    localGet: cm.storage.local.get, localSet: cm.storage.local.set,
+    sessionGet: cm.storage.session.get, sessionSet: cm.storage.session.set, sessionRemove: cm.storage.session.remove,
+    permContains: cm.permissions.contains, permRemove: cm.permissions.remove,
+    actionSetIcon: cm.action.setIcon,
+  };
+}
+
+function resetSw(snap) {
+  const { sw } = snap, w = sw.win, cm = sw.mock.chrome;
+  Object.assign(w, snap.fns);
+  w.console.warn = snap.consoleWarn;
+  cm.tabs.query = snap.tabsQuery;
+  cm.tabs.get = snap.tabsGet;
+  cm.tabs.create = snap.tabsCreate;
+  cm.storage.local.get = snap.localGet;
+  cm.storage.local.set = snap.localSet;
+  cm.storage.session.get = snap.sessionGet;
+  cm.storage.session.set = snap.sessionSet;
+  cm.storage.session.remove = snap.sessionRemove;
+  cm.permissions.contains = snap.permContains;
+  cm.permissions.remove = snap.permRemove;
+  cm.action.setIcon = snap.actionSetIcon;
+  sw.get("statusCache").clear();
+  sw.get("_pendingChecks").clear();
+  sw.get("_lastIconState").clear();
+  sw.get("_iconPageUrl").clear();
+  sw.get("_lastCheckedUrl").clear();
+  const imgData = sw.get("_iconImageData");
+  for (const k of Object.keys(imgData)) delete imgData[k];
+  sw.set("_pinboardAuthEpoch", 0);
+  sw.set("_settingsCache", null);
+  sw.set("_statusMirrorTail", w.Promise.resolve());
+  return sw;
+}
+
+async function bootRealms() {
+  const mockCfg = {
+    id: EXT_ID,
+    storage: { local: { vocabDriveConnected: false, bookmarkServiceActive: "pinboard", _legacyWildcardCleanupV1: true, _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
+  };
+  const [sw0, sw1, pop] = await Promise.all([
+    pbpSwRealm.boot({ mock: mockCfg }),
+    pbpSwRealm.boot({ mock: mockCfg }),
+    pbpSwRealm.bootPopup({ mock: { id: EXT_ID } }),
+  ]);
+  await new Promise((r) => setTimeout(r, 25));
+  swSnaps = [snapshotSw(sw0), snapshotSw(sw1)];
+  popupRealm = pop;
+}
+
+function buildHarness(_source, queryTabs, bookmarkResult = true) {
+  const sw = resetSw(swSnaps[0]), w = sw.win, cm = sw.mock.chrome;
   const calls = { queries: [], schedule: [], activity: 0, checks: [], icons: [], mirrors: [], cacheReads: [] };
   let scheduledWork = Promise.resolve();
-  const chrome = { tabs: { query: async (query) => {
+  cm.tabs.query = async (query) => {
     calls.queries.push(query);
     return [queryTabs.shift()];
-  } } };
-  const schedule = (tabId, fn, delay) => {
+  };
+  w._scheduleTabCheck = (tabId, fn, delay) => {
     calls.schedule.push({ tabId, delay });
     scheduledWork = fn();
   };
-  const noteActivity = () => { calls.activity++; };
-  // K0: debouncedCheck answers { bookmarked, target } -- `target` is the URL it
-  // actually asked Pinboard about (the cleaned one whenever urlClean applies),
-  // and it is the ONLY key the status cache holds that answer under. A
-  // non-boolean bookmarkResult stands for the disabled/short-circuit path,
-  // where debouncedCheck returns nothing at all.
-  const debouncedCheck = async (url) => {
+  w.noteActivity = () => { calls.activity++; };
+  w.debouncedCheck = async (url) => {
     calls.checks.push(url);
     if (typeof bookmarkResult !== "boolean") return undefined;
     return { bookmarked: bookmarkResult, target: stripTrackingParams(url, { enabled: true }).cleaned };
   };
-  const setIcon = (tabId, state) => { calls.icons.push({ tabId, state }); };
-  const writeMirror = async (...args) => { calls.mirrors.push(args); };
-  // _scheduleCurrentTabRefresh re-derives auth + cache to compute the tri-state icon
-  // (Task 2); iconStateFor itself is a real global via the shared.js <script> tag above.
-  const getCurrentBookmarkAuth = async () => ({ token: "t", account: "alice", epoch: 1 });
-  const pbpStatusCacheGet = (url, auth) => {
+  w.setIcon = (tabId, state) => { calls.icons.push({ tabId, state }); };
+  w._writeCurrentTabMirror = async (...args) => { calls.mirrors.push(args); };
+  w.getCurrentBookmarkAuth = async () => ({ token: "t", account: "alice", epoch: 1 });
+  w.pbpStatusCacheGet = (url) => {
     calls.cacheReads.push(url);
     return { bookmarked: bookmarkResult === true };
   };
-
-  const make = new Function(
-    "chrome", "_scheduleTabCheck", "noteActivity", "debouncedCheck", "setIcon", "_writeCurrentTabMirror",
-    "getCurrentBookmarkAuth", "pbpStatusCacheGet",
-    source.slice(start, end) + "; return { _getFocusedActiveTab, _scheduleCurrentTabRefresh };"
-  );
-  const api = make(chrome, schedule, noteActivity, debouncedCheck, setIcon, writeMirror,
-    getCurrentBookmarkAuth, pbpStatusCacheGet);
-  return { api, calls, wait: () => scheduledWork };
+  return {
+    api: { _getFocusedActiveTab: w._getFocusedActiveTab, _scheduleCurrentTabRefresh: w._scheduleCurrentTabRefresh },
+    calls,
+    wait: () => scheduledWork,
+  };
 }
 
-// K0: the whole bookmark-status chain in one scope -- the cache primitives,
-// debouncedCheck and checkBookmarked, sliced from the shipped file rather than
-// re-implemented. The invariant under test is that the URL handed to posts/get,
-// the _pendingChecks dedup key and the statusCache key are ONE value, and that
-// the value is the URL the popup saves under (popup.js _bookmarkPrefetchUrl).
-// Asserting that with stubs for checkBookmarked would prove nothing: the cache
-// key is written inside checkBookmarked, so it has to be the real one.
-function buildStatusChainHarness(source, { urlClean, warm = true, posts = [], hold = false } = {}) {
-  const cacheStart = source.indexOf("const statusCache = new Map();");
-  const cacheEnd = source.indexOf("// ---- P2: Cached token + invalidation ----", cacheStart);
-  const checkStart = source.indexOf("async function debouncedCheck(url) {");
-  const checkEnd = source.indexOf("// ---- Load settings with deobfuscation", checkStart);
-  const lookupStart = source.indexOf("async function checkBookmarked(url, capturedAuth = null) {");
-  const lookupEnd = source.indexOf("// ---- Badge: unread count ----", lookupStart);
-  assert(cacheStart >= 0 && cacheEnd > cacheStart, "status cache primitives not found");
-  assert(checkStart >= 0 && checkEnd > checkStart, "debouncedCheck source not found");
-  assert(lookupStart >= 0 && lookupEnd > lookupStart, "checkBookmarked source not found");
-
+function buildStatusChainHarness(_source, { urlClean, warm = true, posts = [], hold = false } = {}) {
+  const sw = resetSw(swSnaps[swCursor++ % swSnaps.length]), w = sw.win;
   const fetches = [];
   const storageReads = [];
-  // epoch 0 matches the `let _pinboardAuthEpoch = 0` the sliced cache block declares.
   const auth = { token: "alice:secret", account: "alice", epoch: 0 };
   const stored = { optCheckBookmarkStatus: true, urlClean };
-  // `hold` keeps every posts/get in flight so a concurrency assertion can look
-  // at _pendingChecks while the merge window is still open.
   let release = () => {};
-  const gate = hold ? new Promise((resolve) => { release = resolve; }) : Promise.resolve();
-  const deps = {
-    SETTINGS_DEFAULTS,
-    stripTrackingParams,
-    pbpPinboardAccountFromToken,
-    _warmSettings: warm ? { ...stored } : null,
-    getCurrentBookmarkAuth: async () => auth,
-    getSettingsStorage: async () => ({
-      get: async (defaults) => {
-        storageReads.push(Object.keys(defaults));
-        const out = { ...defaults };
-        for (const key of Object.keys(defaults)) if (stored[key] !== undefined) out[key] = stored[key];
-        return out;
-      },
-    }),
-    pinboardFetch: async (requestUrl) => {
-      fetches.push(requestUrl);
-      await gate;
-      return { ok: true, status: 200, json: async () => ({ posts }) };
+  const gate = hold ? new w.Promise((resolve) => { release = resolve; }) : w.Promise.resolve();
+  sw.set("_settingsCache", warm ? { ...stored } : null);
+  w.getCurrentBookmarkAuth = async () => auth;
+  w.getSettingsStorage = async () => ({
+    get: async (defaults) => {
+      storageReads.push(Object.keys(defaults));
+      const out = { ...defaults };
+      for (const key of Object.keys(defaults)) if (stored[key] !== undefined) out[key] = stored[key];
+      return out;
     },
-    console: { warn: () => {} },
+  });
+  w.pinboardFetch = async (requestUrl) => {
+    fetches.push(requestUrl);
+    await gate;
+    return { ok: true, status: 200, json: async () => ({ posts }) };
   };
-  const names = Object.keys(deps);
-  const body = [
-    "const _pendingChecks = new Map();",
-    "let _settingsCache = _warmSettings;",
-    source.slice(cacheStart, cacheEnd),
-    source.slice(checkStart, checkEnd),
-    source.slice(lookupStart, lookupEnd),
-    "return { debouncedCheck, checkBookmarked, statusCache, pendingChecks: _pendingChecks, pbpStatusCacheGet };",
-  ].join("\n");
-  const api = new Function(...names, body)(...names.map((name) => deps[name]));
-  return { api, auth, fetches, storageReads, release: () => release() };
+  w.console.warn = () => {};
+  return {
+    api: {
+      debouncedCheck: w.debouncedCheck,
+      checkBookmarked: w.checkBookmarked,
+      statusCache: sw.get("statusCache"),
+      pendingChecks: sw.get("_pendingChecks"),
+      pbpStatusCacheGet: w.pbpStatusCacheGet,
+    },
+    auth,
+    fetches,
+    storageReads,
+    release: () => release(),
+  };
 }
 
 const K0_URL_CLEAN_ON = { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
@@ -143,127 +183,94 @@ const K0_TRACKED = "https://example.com/post?utm_source=newsletter";
 const K0_CLEAN = "https://example.com/post";
 const K0_POST = { href: K0_CLEAN, description: "Article", extended: "Notes", tags: "alpha beta", shared: "no", toread: "no" };
 
-// The tabs.onUpdated listener decides two things per event: whether to schedule
-// a status check, and whether the per-tab icon dedup entry still describes what
-// the toolbar shows. Both are behavioural, so drive the real listener with the
-// real _urlWithoutFragment rather than reading the source as text.
-function buildTabUpdateHarness(source) {
-  const helperStart = source.indexOf("function _urlWithoutFragment");
-  const helperEnd = source.indexOf("function _scheduleCurrentTabRefresh", helperStart);
-  const listener = source.match(/chrome\.tabs\.onUpdated\.addListener\(\(tabId, changeInfo, tab\) => \{[\s\S]*?\n\}\);/);
-  assert(helperStart >= 0 && helperEnd > helperStart && listener, "tabs.onUpdated listener not found");
+function buildTabUpdateHarness(_source) {
+  const sw = resetSw(swSnaps[0]), w = sw.win, cm = sw.mock.chrome;
   const calls = { refresh: [] };
-  const state = { icons: new Map(), checked: new Map(), iconPages: new Map() };
-  let handler = null;
-  const deps = {
-    chrome: { tabs: { onUpdated: { addListener: (fn) => { handler = fn; } } } },
-    _lastIconState: state.icons,
-    _iconPageUrl: state.iconPages,
-    _lastCheckedUrl: state.checked,
-    _scheduleCurrentTabRefresh: (tabId, tabUrl) => calls.refresh.push({ tabId, url: tabUrl }),
+  const icons = sw.get("_lastIconState");
+  const iconPages = sw.get("_iconPageUrl");
+  const checked = sw.get("_lastCheckedUrl");
+  w._scheduleCurrentTabRefresh = (tabId, tabUrl) => calls.refresh.push({ tabId, url: tabUrl });
+  return {
+    fire: (...args) => cm.tabs.onUpdated.dispatch(...args),
+    calls,
+    icons,
+    checked,
+    iconPages,
   };
-  new Function(...Object.keys(deps), source.slice(helperStart, helperEnd) + listener[0])(...Object.values(deps));
-  return { fire: (...args) => handler(...args), calls, ...state };
 }
 
-function buildProxyHarness(source) {
-  const start = source.indexOf('if (message.type === "pinboard_api_call")');
-  const end = source.indexOf('if (message.type === "retry_offline_item"', start);
-  assert(start >= 0 && end > start, "Pinboard proxy branch not found");
-  const branch = source.slice(start, end);
-  const runBranch = new Function(
-    "message", "sendResponse", "pinboardFetch", "pinboardFetchImmediate",
-    "pbpIsAllowedPinboardApiUrl", "getCurrentBookmarkAuth",
-    "pbpAuthorizePinboardApiUrl", "pbpBookmarkAuthIsCurrent", branch
-  );
+function buildProxyHarness(_source) {
   return {
-    branch,
     async invoke(message) {
+      const sw = resetSw(swSnaps[0]), w = sw.win;
       const calls = { fetch: [], responses: [] };
       const fetchStub = (...args) => {
         calls.fetch.push(args);
-        return Promise.resolve({ ok: true, status: 200, text: async () => "{}" });
+        return w.Promise.resolve({ ok: true, status: 200, text: async () => "{}" });
       };
       const auth = { token: "alice:new", account: "alice", epoch: 1 };
-      const returned = runBranch(
-        message,
-        (response) => calls.responses.push(response),
-        fetchStub,
-        fetchStub,
-        pbpIsAllowedPinboardApiUrl,
-        async () => auth,
-        pbpAuthorizePinboardApiUrl,
-        (candidate) => candidate === auth
-      );
+      w.pinboardFetch = fetchStub;
+      w.pinboardFetchImmediate = fetchStub;
+      w.getCurrentBookmarkAuth = async () => auth;
+      w.pbpBookmarkAuthIsCurrent = (candidate) => candidate === auth;
+      const returned = w.handleRuntimeMessage(message, { id: EXT_ID, url: EXT_URL }, (response) => calls.responses.push(response));
       await new Promise((resolve) => setTimeout(resolve, 0));
-      return { branch, calls, returned };
-    }
+      return { calls, returned };
+    },
   };
 }
 
-function buildLegacyPermissionMigrationHarness(source, chrome) {
-  const start = source.indexOf("const PBP_LEGACY_WILDCARD_CLEANUP_KEY");
-  const end = source.indexOf("pbpMigrateLegacyWildcardPermission().catch", start);
-  assert(start >= 0 && end > start, "legacy wildcard migration not found");
-  return new Function("chrome", source.slice(start, end) +
-    "; return { key: PBP_LEGACY_WILDCARD_CLEANUP_KEY, run: pbpMigrateLegacyWildcardPermission };")(chrome);
+function buildLegacyPermissionMigrationHarness(_source, customChrome) {
+  const sw = resetSw(swSnaps[0]), w = sw.win, cm = sw.mock.chrome;
+  cm.storage.local.get = customChrome.storage.local.get;
+  cm.storage.local.set = customChrome.storage.local.set;
+  cm.permissions.contains = customChrome.permissions.contains;
+  cm.permissions.remove = customChrome.permissions.remove;
+  return {
+    key: sw.get("PBP_LEGACY_WILDCARD_CLEANUP_KEY"),
+    run: () => w.pbpMigrateLegacyWildcardPermission(),
+  };
 }
 
-function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch = {}, hasKey = true, overrides = {}) {
-  const start = source.indexOf("async function saveFromBackground");
-  const end = source.indexOf("// Helper: resolve prefix-specific settings", start);
-  assert(start >= 0 && end > start, "background save function not found");
-  const notifications = [];
-  const intents = [];
-  const deliveries = [];
+function buildBackgroundSaveHarness(_source, callAI, cached = {}, settingsPatch = {}, hasKey = true, overrides = {}) {
+  const sw = resetSw(swSnaps[0]), w = sw.win, cm = sw.mock.chrome;
+  const notifications = [], intents = [], deliveries = [], extractionCalls = [], cacheWrites = [];
+  const i18nReadyCalls = { count: 0 };
   const settings = {
     pinboardToken: "token", bgSaveMode: "merge", aiProvider: "openai",
     aiCacheDuration: 60, aiContentSource: "local", aiTagSeparator: "space",
     _aiTags: true, _aiSummary: true, _autoNotes: false, _blockquote: false,
     customTagPrompt: "", customSummaryPrompt: "", ...settingsPatch,
   };
-  const extractionCalls = [];
-  const cacheWrites = [];
-  const i18nReadyCalls = { count: 0 };
-  const dependencies = {
-    getCurrentBookmarkAuth: async () => ({ token: "alice:token", account: "alice", epoch: 1 }),
-    loadSettings: async () => settings,
-    pbpServiceEffectivePrivate,
-    pbpLoadTagVocab: async (account) => ({ account, timestamp: undefined, counts: null, index: null }),
-    pbpCanonicalTagName,
-    showNotification: (...args) => notifications.push(args),
-    pbpSaveFailure: (reason) => ({ status: "failed", reason }),
-    getPageInfoFromTab: async (...args) => { extractionCalls.push(args); return { pageText: "article body", ...(overrides.pageInfo || {}) }; },
-    buildAutoNotes: () => "",
-    // ai.js's: a page read as HTML (or with no recorded type).
-    pbpPageInfoReadable:info=>!!info&&info._pbpUnavailable!==true&&["","text/html","application/xhtml+xml"].includes(String(info.contentType||"").split(";")[0].trim()),
-    hasAIKey: () => hasKey,
-    getAICache: async (_url, kind) => cached[kind] ?? null,
-    callAI,
-    buildCombinedPrompt: () => "combined",
-    parseAICombined: () => ({ tags: ["combined-tag"], summary: "combined-summary" }),
-    setAICache: async (...args) => { cacheWrites.push(args); },
-    escapeForExtended: (value) => value,
-    buildTagPrompt: () => "tags",
-    refineTags: (tags) => tags,
-    parseAITags: (value) => value,
-    AI_TAG_CAP: 12,
-    buildSummaryPrompt: () => "summary",
-    submitSaveIntent: async (intent, options) => { intents.push(intent); deliveries.push(options); return { status: "saved", mutation: "updated" }; },
-    processOfflineQueue: () => Promise.resolve(),
-    t: (key, value) => `${key}:${value || ""}`,
-    // K100: pbpI18nReady must be a dep of every harness that slices
-    // saveFromBackground, or the sliced function throws ReferenceError. Default
-    // is an already-resolved promise so the 57 existing cases below stay unchanged.
-    pbpI18nReady: () => { i18nReadyCalls.count++; return Promise.resolve(); },
-    // A self-hosted quick save checks its exact host grant first (granted here).
-    chrome: { permissions: { contains: async () => true } },
-    ...overrides,
-  };
-  const names = Object.keys(dependencies);
-  const make = new Function(...names, source.slice(start, end) + "; return saveFromBackground;");
+  w.getCurrentBookmarkAuth = async () => ({ token: "alice:token", account: "alice", epoch: 1 });
+  w.loadSettings = async () => settings;
+  w.pbpLoadTagVocab = async (account) => ({ account, timestamp: undefined, counts: null, index: null });
+  w.showNotification = (...args) => notifications.push(args);
+  w.pbpSaveFailure = (reason) => ({ status: "failed", reason });
+  w.getPageInfoFromTab = async (...args) => { extractionCalls.push(args); return { pageText: "article body", ...(overrides.pageInfo || {}) }; };
+  w.buildAutoNotes = () => "";
+  w.pbpPageInfoReadable = (info) => !!info && info._pbpUnavailable !== true && ["", "text/html", "application/xhtml+xml"].includes(String(info.contentType || "").split(";")[0].trim());
+  w.hasAIKey = () => hasKey;
+  w.getAICache = async (_url, kind) => cached[kind] ?? null;
+  w.callAI = callAI;
+  w.buildCombinedPrompt = () => "combined";
+  w.parseAICombined = () => ({ tags: ["combined-tag"], summary: "combined-summary" });
+  w.setAICache = async (...args) => { cacheWrites.push(args); };
+  w.buildTagPrompt = () => "tags";
+  w.refineTags = (tags) => tags;
+  w.parseAITags = (value) => value;
+  w.buildSummaryPrompt = () => "summary";
+  w.submitSaveIntent = async (intent, options) => { intents.push(intent); deliveries.push(options); return { status: "saved", mutation: "updated" }; };
+  w.processOfflineQueue = () => w.Promise.resolve();
+  w.t = (key, value) => `${key}:${value || ""}`;
+  w.pbpI18nReady = () => { i18nReadyCalls.count++; return w.Promise.resolve(); };
+  cm.permissions.contains = overrides.chrome?.permissions?.contains || (async () => true);
+  for (const [k, v] of Object.entries(overrides)) {
+    if (k === "pageInfo" || k === "chrome") continue;
+    w[k] = v;
+  }
   return {
-    save: make(...names.map((name) => dependencies[name])),
+    save: (opts) => w.saveFromBackground(opts),
     notifications,
     intents,
     deliveries,
@@ -273,106 +280,69 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
   };
 }
 
-// G14: the status chain a failed self-hosted check runs through, end to end in
-// one scope: the real cache, debouncedCheck/_dedupedBookmarkCheck,
-// checkBookmarked, fetchExistingBookmark, the toolbar refresh and the worker's
-// lookup_bookmark branch. Only the adapter's lookup is stubbed, failing the
-// way bookmark-services.js fails it (pbpBookmarkServiceError: code + status).
 const G14_URL = "https://example.com/article";
-function buildStatusFailureHarness(source, { service = "linkding", failure = null, bookmark = null, pinboardStatus = 200, checkStatus = true, linkdingPreload = true, session = {} } = {}) {
-  const slice = (from, to) => {
-    const start = source.indexOf(from);
-    const end = source.indexOf(to, start === -1 ? 0 : start);
-    assert(start !== -1 && end !== -1 && end > start, "source slice not found: " + from);
-    return source.slice(start, end);
-  };
-  const lookups = [];
-  const pinboardRequests = [];
-  const icons = [];
-  const listeners = {};
-  // The lookup's answer can change between steps (a page saved, a server down).
+function buildStatusFailureHarness(_source, { service = "linkding", failure = null, bookmark = null, pinboardStatus = 200, checkStatus = true, linkdingPreload = true, session = {} } = {}) {
+  const sw = resetSw(swSnaps[swCursor++ % swSnaps.length]), w = sw.win, cm = sw.mock.chrome;
+  const lookups = [], pinboardRequests = [], icons = [];
   const answer = { failure, bookmark };
   const activeTab = { id: 7, url: G14_URL, title: "Article", active: true };
-  // tab.foreground false: tab 7 is not the focused window's active tab (the
-  // user is on tab 99), so a check scheduled for it does not run.
   const tab = { foreground: true };
-  let scheduled = Promise.resolve();
-  // epoch 0 matches the `let _pinboardAuthEpoch = 0` the sliced cache block declares.
+  let scheduled = w.Promise.resolve();
   const auth = service === "pinboard"
     ? { service: "pinboard", token: "alice:secret", account: "alice", epoch: 0 }
     : { service, token: "fixture-token", account: service + ":https://bookmarks.example/:id-1", baseUrl: "https://bookmarks.example/", epoch: 0 };
-  const deps = {
-    SETTINGS_DEFAULTS, stripTrackingParams, pbpBookmarkLookupUrl, pbpPinboardAccountFromToken,
-    pbpSelfHostedAuth, pbpBookmarkAsPost, pbpBookmarkFailureRetryable, pbpRetryAfterDelay, iconStateFor,
-    getCurrentBookmarkAuth: async () => auth,
-    getSettingsStorage: async () => ({ get: async (defaults) => ({ ...defaults }) }),
-    pbpBookmarkClient: () => {
-      const lookup = async (url) => {
-        lookups.push(url);
-        if (answer.onLookup) answer.onLookup(url);
-        if (answer.failure) throw pbpBookmarkServiceError(answer.failure.code, answer.failure.status);
-        return answer.bookmark && answer.bookmark.url === url ? answer.bookmark : null;
-      };
-      // check(): the same answer plus what the server read from the page (none here).
-      return { lookup, check: async (url) => ({ bookmark: await lookup(url), metadata: null }) };
-    },
-    pinboardFetch: async (url) => {
-      pinboardRequests.push(url);
-      if (pinboardStatus !== 200) return { ok: false, status: pinboardStatus, json: async () => ({}) };
-      return { ok: true, status: 200, json: async () => ({ posts: [] }) };
-    },
-    // The real setIcon runs; the platform call records the state it was given.
-    chrome: {
-      tabs: {
-        query: async () => [tab.foreground ? { ...activeTab } : { id: 99, url: "https://elsewhere.example/", title: "Elsewhere", active: true }],
-        get: async (id) => { if (id !== 7) throw new Error("No tab with id: " + id); return { ...activeTab, active: tab.foreground }; },
-        onActivated: { addListener: (fn) => { listeners.activated = fn; } },
-        onUpdated: { addListener: (fn) => { listeners.updated = fn; } },
-      },
-      action: { setIcon: (details, done) => { icons.push({ tabId: details.tabId, state: details.path }); if (done) done(); } },
-      runtime: { lastError: undefined },
-      // storage.session as the next worker finds it: `session` is shared
-      // between two harnesses to stand for a worker that was stopped.
-      storage: { session: {
-        get: async (key) => (key in session ? { [key]: structuredClone(session[key]) } : {}),
-        set: async (items) => { for (const [key, value] of Object.entries(items)) session[key] = structuredClone(value); },
-        remove: async (key) => { delete session[key]; },
-      } },
-    },
-    ICONS_DEFAULT: "default", ICON_PATHS: { default: "default", saved: "saved", toread: "toread" },
-    _iconImageData: {}, _ensureIconDecode: () => {},
-    _scheduleTabCheck: (tabId, fn) => { scheduled = fn(); },
-    noteActivity: () => {},
-    _writeCurrentTabMirror: async () => {},
-    console: { warn: () => {} },
+  sw.set("_settingsCache", { optCheckBookmarkStatus: checkStatus, linkdingPreload, urlClean: SETTINGS_DEFAULTS.urlClean });
+  w.getCurrentBookmarkAuth = async () => auth;
+  w.getSettingsStorage = async () => ({ get: async (defaults) => ({ ...defaults }) });
+  w.pbpBookmarkClient = () => {
+    const lookup = async (url) => {
+      lookups.push(url);
+      if (answer.onLookup) answer.onLookup(url);
+      if (answer.failure) throw pbpBookmarkServiceError(answer.failure.code, answer.failure.status);
+      return answer.bookmark && answer.bookmark.url === url ? answer.bookmark : null;
+    };
+    return { lookup, check: async (url) => ({ bookmark: await lookup(url), metadata: null }) };
   };
-  const body = [
-    "const _pendingChecks = new Map();",
-    "let _settingsCache = { optCheckBookmarkStatus: " + checkStatus + ", linkdingPreload: " + linkdingPreload + ", urlClean: SETTINGS_DEFAULTS.urlClean };",
-    slice("const statusCache = new Map();", "// ---- P2: Cached token + invalidation ----"),
-    slice("async function debouncedCheck(url) {", "// ---- Load settings with deobfuscation"),
-    slice("async function checkBookmarked(url, capturedAuth = null) {", "// ---- Badge: unread count ----"),
-    slice("async function pbpBookmarkPostsResponse(", "async function pbpBookmarkDeleteResponse("),
-    slice("async function fetchExistingBookmark(", "async function pbpSendResolvedPlan("),
-    slice("const _lastIconState = new Map();", "// ---- 检查 URL 是否已收藏"),
-    slice("async function _getFocusedActiveTab", "chrome.windows.onFocusChanged"),
-    "function handleMessage(message, sendResponse) {\n" + slice('if (message.type === "lookup_bookmark" && message.url) {', 'if (message.type === "PBP_POPUP_DRAFT")') + "\n  return false;\n}",
-    "return { handleMessage, _scheduleCurrentTabRefresh, setIcon, statusCache, pbpStatusCacheSet, pbpStatusCacheDelete, CACHE_TTL, mirrorSettled: () => _statusMirrorTail };",
-  ].join("\n");
-  const api = new Function(...Object.keys(deps), body)(...Object.values(deps));
+  w.pinboardFetch = async (url) => {
+    pinboardRequests.push(url);
+    if (pinboardStatus !== 200) return { ok: false, status: pinboardStatus, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => ({ posts: [] }) };
+  };
+  const iconPaths = sw.get("ICON_PATHS");
+  w._ensureIconDecode = () => {};
+  cm.tabs.query = async () => [tab.foreground ? { ...activeTab } : { id: 99, url: "https://elsewhere.example/", title: "Elsewhere", active: true }];
+  cm.tabs.get = async (id) => { if (id !== 7) throw new Error("No tab with id: " + id); return { ...activeTab, active: tab.foreground }; };
+  cm.action.setIcon = (details, done) => {
+    const state = details.path === iconPaths.saved ? "saved" : details.path === iconPaths.toread ? "toread" : "default";
+    icons.push({ tabId: details.tabId, state });
+    if (done) done();
+  };
+  cm.storage.session.get = async (key) => (key in session ? { [key]: structuredClone(session[key]) } : {});
+  cm.storage.session.set = async (items) => { for (const [key, value] of Object.entries(items)) session[key] = structuredClone(value); };
+  cm.storage.session.remove = async (key) => { delete session[key]; };
+  w._scheduleTabCheck = (_tabId, fn) => { scheduled = fn(); };
+  w.noteActivity = () => {};
+  w._writeCurrentTabMirror = async () => {};
+  w.console.warn = () => {};
+
+  const api = {
+    handleMessage: (message, sendResponse) => w.handleRuntimeMessage(message, { id: EXT_ID, url: EXT_URL }, sendResponse),
+    _scheduleCurrentTabRefresh: w._scheduleCurrentTabRefresh,
+    setIcon: w.setIcon,
+    statusCache: sw.get("statusCache"),
+    pbpStatusCacheSet: w.pbpStatusCacheSet,
+    pbpStatusCacheDelete: w.pbpStatusCacheDelete,
+    CACHE_TTL: sw.get("CACHE_TTL"),
+    mirrorSettled: () => sw.get("_statusMirrorTail"),
+  };
   return {
     api, auth, lookups, pinboardRequests, icons, answer, tab, session,
     refresh: async () => { api._scheduleCurrentTabRefresh(7, activeTab.url); await scheduled; },
-    // The tab moves to `url` the way tabs.onUpdated reports it: an in-page
-    // route change (pushState) carries only changeInfo.url, a new document
-    // its "complete" status; the scheduled check then runs to its end.
-    // loading: the shape Chromium also gives a pushState route change,
-    // status "loading" with the new url (the icon stays as it was).
     setTabUrl: (url) => { activeTab.url = url; },
     navigate: async (url, { sameDocument, loading = false }) => {
       activeTab.url = url;
-      scheduled = Promise.resolve();
-      listeners.updated(7, loading ? { status: "loading", url } : sameDocument ? { url } : { status: "complete" }, { ...activeTab });
+      scheduled = w.Promise.resolve();
+      cm.tabs.onUpdated.dispatch(7, loading ? { status: "loading", url } : sameDocument ? { url } : { status: "complete" }, { ...activeTab });
       await scheduled;
     },
     lookup: () => new Promise((resolve) => {
@@ -384,10 +354,8 @@ const G14_FAILURES = [{ code: "network" }, { code: "timeout" }, { code: "server"
 const G14_BOOKMARK = { id: 1, url: G14_URL, title: "Article", notes: "", summary: "", tags: ["alpha"], private: true, toread: false, time: "2026-01-01T00:00:00Z" };
 
 async function run() {
-  const [source, popupSource] = await Promise.all([
-    fetch("../background.js").then((response) => response.text()),
-    fetch("../popup.js").then((response) => response.text()),
-  ]);
+  await bootRealms();
+  const source = null;
   const url = "https://example.com/article";
 
   await test("Pinboard proxy allowlist accepts only the v1 API origin", () => {
@@ -442,15 +410,24 @@ async function run() {
     // exactly the clamped-timeout shape — never the caller's options (method/
     // headers smuggling). message.options above is deliberately hostile.
     assert(result.calls.fetch.length === 1, "proxy did not dispatch exactly once");
+    assert(String(result.calls.fetch[0][0]).includes("auth_token=alice%3Anew"), "proxy did not rewrite auth token");
     const fwd = result.calls.fetch[0][1];
     assert(fwd === undefined ||
       (fwd && Object.keys(fwd).join(",") === "timeoutMs" && typeof fwd.timeoutMs === "number" &&
        fwd.timeoutMs >= 1000 && fwd.timeoutMs <= 60000),
       "pinboardFetch received something beyond the clamped timeoutMs shape");
-    assert(result.branch.includes("pbpIsAllowedPinboardApiUrl(message.url)"), "branch does not call allowlist helper");
-    assert(!result.branch.includes("message.options"), "branch still reads message.options");
-    const override = popupSource.slice(popupSource.indexOf("pinboardFetch = function"), popupSource.indexOf("let currentTags"));
-    assert(!override.includes("options"), "Popup proxy still sends options");
+    const popupMessages = [];
+    popupRealm.mock.chrome.runtime.sendMessage = (msg, cb) => {
+      popupMessages.push(msg);
+      if (typeof cb === "function") cb({ ok: true, status: 200, text: "{}" });
+      return popupRealm.win.Promise.resolve({ ok: true, status: 200, text: "{}" });
+    };
+    await popupRealm.win.pinboardFetch("https://api.pinboard.in/v1/posts/get?format=json", {
+      method: "POST",
+      headers: { Authorization: "attacker" },
+    });
+    assert(popupMessages.length === 1 && popupMessages[0].type === "pinboard_api_call", "Popup proxy did not send pinboard_api_call");
+    assert(!("options" in popupMessages[0]), "Popup proxy still sends options");
   });
 
   await test("legacy wildcard migration marker makes cleanup one-time", async () => {
@@ -730,9 +707,7 @@ async function run() {
   });
 
   await test("Quick Save and Read Later AI settings both request Defuddle extraction", async () => {
-    const resolverStart = source.indexOf("function resolvePrefixSettings");
-    const resolverEnd = source.indexOf("// B4: write current tab data", resolverStart);
-    const resolvePrefix = new Function(source.slice(resolverStart, resolverEnd) + "; return resolvePrefixSettings;")();
+    const resolvePrefix = swSnaps[0].sw.win.resolvePrefixSettings;
     for (const prefix of ["qs", "rl"]) {
       const configured = { [prefix + "AiTags"]: prefix === "qs", [prefix + "AiSummary"]: prefix === "rl" };
       const h = buildBackgroundSaveHarness(source, async () => "ai-result", {}, { _aiTags: false, _aiSummary: false });
@@ -790,62 +765,53 @@ async function run() {
   });
 
   await test("activated and updated listeners share the guarded scheduler", () => {
-    const activated = source.match(/chrome\.tabs\.onActivated\.addListener\([\s\S]*?\n}\);/)[0];
-    const updated = source.match(/chrome\.tabs\.onUpdated\.addListener\([\s\S]*?\n}\);/)[0];
-    assert(activated.includes("_scheduleCurrentTabRefresh(tabId)"), "activated listener bypasses scheduler");
-    assert(updated.includes("_scheduleCurrentTabRefresh(tabId, tab.url)"), "updated listener bypasses scheduler");
-    assert(!/noteActivity|debouncedCheck|_writeCurrentTabMirror/.test(activated + updated), "listener performs unguarded work");
+    const sw = resetSw(swSnaps[0]), w = sw.win, cm = sw.mock.chrome;
+    const scheduled = [];
+    let unguarded = 0;
+    w._scheduleCurrentTabRefresh = (...args) => scheduled.push(args);
+    w.noteActivity = () => { unguarded++; };
+    w.debouncedCheck = async () => { unguarded++; };
+    w._writeCurrentTabMirror = async () => { unguarded++; };
+    cm.tabs.onActivated.dispatch({ tabId: 7 });
+    cm.tabs.onUpdated.dispatch(7, { status: "complete" }, { id: 7, url });
+    assert(scheduled.length === 2 && scheduled[0][0] === 7 && scheduled[0].length === 1, "activated listener bypasses scheduler");
+    assert(scheduled[1][0] === 7 && scheduled[1][1] === url, "updated listener bypasses scheduler");
+    assert(unguarded === 0, "listener performs unguarded work");
   });
 
   await test("token test fetch refuses redirects and keeps its deadline", async () => {
-    // Pinboard v1 is GET-only, so the token rides the query string: following a
-    // 3xx would hand the plaintext token to whatever host the Location names,
-    // and CORS only withholds the response, never the request. Same invariant
-    // shared.js's _executePinboardFetch enforces for every other v1 call.
-    const start = source.indexOf('if (message.type === "test_pinboard_token"');
-    const end = source.indexOf("// ---- Image-fix Referer rules", start);
-    assert(start >= 0 && end > start, "token test branch not found");
+    const sw = resetSw(swSnaps[0]), w = sw.win;
     const calls = [];
     const responses = [];
-    const runBranch = new Function("message", "sendResponse", "fetch",
-      source.slice(start, end));
-    runBranch(
+    w.fetch = (requestUrl, init) => { calls.push({ url: requestUrl, init }); return w.Promise.resolve({ ok: true, status: 200 }); };
+    w.handleRuntimeMessage(
       { type: "test_pinboard_token", token: "alice:secret" },
+      { id: EXT_ID, url: EXT_URL },
       (response) => responses.push(response),
-      (requestUrl, init) => { calls.push({ url: requestUrl, init }); return Promise.resolve({ ok: true, status: 200 }); }
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert(calls.length === 1, "token test did not reach fetch");
     assert(calls[0].init?.redirect === "error", "a 3xx would replay the plaintext token to its target");
-    assert(calls[0].init?.signal instanceof AbortSignal, "token test lost its timeout");
+    assert(calls[0].init?.signal instanceof w.AbortSignal, "token test lost its timeout");
     assert(calls[0].url.includes("auth_token=alice%3Asecret"), "token is not carried on the query string any more");
     assert(responses[0]?.ok === true, "token test stopped answering its caller");
   });
 
   await test("tab-set save carries a deadline and reports the abort", async () => {
-    // The message handler is fire-and-forget and the popup re-enables its button
-    // on a timer, so these notifications are the only feedback a stalled
-    // pinboard.in can still produce.
-    const start = source.indexOf("async function handleSaveTabSet");
-    const end = source.indexOf("// ---- Storage change listener ----", start);
-    assert(start >= 0 && end > start, "tab set handler not found");
+    const sw = resetSw(swSnaps[0]), w = sw.win, cm = sw.mock.chrome;
     const calls = [];
     const notifications = [];
-    const deps = {
-      chrome: { tabs: { create: () => {} } },
-      loadSettings: async () => ({bookmarkService:"pinboard"}),
-      pbpBookmarkServiceId: settings => settings.bookmarkService,
-      fetch: async (requestUrl, init) => {
-        calls.push({ url: requestUrl, init });
-        throw Object.assign(new Error("signal timed out"), { name: "TimeoutError" });
-      },
-      showNotification: (...args) => notifications.push(args),
-      t: (key, ...args) => (args.length ? `${key}:${args.join(":")}` : key),
+    cm.tabs.create = () => {};
+    w.loadSettings = async () => ({ bookmarkService: "pinboard" });
+    w.pbpBookmarkServiceId = (settings) => settings.bookmarkService;
+    w.fetch = async (requestUrl, init) => {
+      calls.push({ url: requestUrl, init });
+      throw Object.assign(new Error("signal timed out"), { name: "TimeoutError" });
     };
-    const handleSaveTabSet = new Function(...Object.keys(deps),
-      source.slice(start, end) + "; return handleSaveTabSet;")(...Object.values(deps));
-    await handleSaveTabSet([{ title: "A", url: "https://a.example/" }]);
-    assert(calls[0]?.init?.signal instanceof AbortSignal, "tab-set save has no deadline");
+    w.showNotification = (...args) => notifications.push(args);
+    w.t = (key, ...args) => (args.length ? `${key}:${args.join(":")}` : key);
+    await w.handleSaveTabSet([{ title: "A", url: "https://a.example/" }]);
+    assert(calls[0]?.init?.signal instanceof w.AbortSignal, "tab-set save has no deadline");
     assert(notifications.length === 1 && notifications[0][0] === "tabset-error" && notifications[0][3] === "error",
       "a timed-out tab-set save produced no feedback");
   });
@@ -884,11 +850,18 @@ async function run() {
     assert(route.calls.refresh.length === 1, "in-page route change skipped the scheduler");
   });
 
-  await test("window focus listener ignores WINDOW_ID_NONE and enters the same scheduler", () => {
-    const listener = source.match(/chrome\.windows\.onFocusChanged\.addListener\([\s\S]*?\n}\);/)[0];
-    assert(listener.includes("chrome.windows.WINDOW_ID_NONE"), "WINDOW_ID_NONE is not ignored");
-    assert(/query\(\{ active: true, windowId \}\)/.test(listener), "focused window is not queried");
-    assert(listener.includes("_scheduleCurrentTabRefresh(tab.id, tab.url)"), "focus listener bypasses scheduler");
+  await test("window focus listener ignores WINDOW_ID_NONE and enters the same scheduler", async () => {
+    const sw = resetSw(swSnaps[0]), w = sw.win, cm = sw.mock.chrome;
+    const queries = [], scheduled = [];
+    cm.tabs.query = async (q) => { queries.push(q); return [{ id: 7, url }]; };
+    w._scheduleCurrentTabRefresh = (...args) => scheduled.push(args);
+    cm.windows.onFocusChanged.dispatch(cm.windows.WINDOW_ID_NONE);
+    await new Promise((r) => setTimeout(r, 0));
+    assert(queries.length === 0 && scheduled.length === 0, "WINDOW_ID_NONE is not ignored");
+    cm.windows.onFocusChanged.dispatch(42);
+    await new Promise((r) => setTimeout(r, 0));
+    assert(queries.length === 1 && queries[0].active === true && queries[0].windowId === 42, "focused window is not queried");
+    assert(scheduled.length === 1 && scheduled[0][0] === 7 && scheduled[0][1] === url, "focus listener bypasses scheduler");
   });
 
   await test("current focused HTTP tab is checked and applied once", async () => {

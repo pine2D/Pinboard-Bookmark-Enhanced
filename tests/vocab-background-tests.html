@@ -2,134 +2,286 @@
 <html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="17"><title>Vocabulary Background Tests</title>
 <style>body{font-family:monospace;padding:16px}.case{padding:6px}.pass{color:#0a0}.fail{color:#c00}</style>
 </head><body><h1>Vocabulary Background Tests</h1><div id="summary"></div><div id="results"></div>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const root = document.getElementById("results"); let pass = 0, fail = 0;
 function check(name, ok) { ok ? pass++ : fail++; const row = document.createElement("div"); row.className = "case " + (ok ? "pass" : "fail"); row.textContent = `${ok ? "✓" : "✗"} ${name}`; root.appendChild(row); }
-(async () => {
-  const source = await fetch("../background.js").then((response) => response.text());
-  const importsStart = source.indexOf("importScripts(");
-  const importsEnd = source.indexOf(");", importsStart === -1 ? 0 : importsStart);
-  if (importsStart === -1 || importsEnd === -1 || importsEnd <= importsStart) throw new Error("anchor not found: importScripts source");
-  const imports = source.slice(importsStart, importsEnd + 2);
-  const alarmsStart = source.indexOf("chrome.alarms.onAlarm.addListener");
-  const alarmsEnd = source.indexOf("// React to settings change", alarmsStart === -1 ? 0 : alarmsStart);
-  if (alarmsStart === -1 || alarmsEnd === -1 || alarmsEnd <= alarmsStart) throw new Error("anchor not found: alarm listener source");
-  const alarms = source.slice(alarmsStart, alarmsEnd);
-  // Roadmap #35 named the router, so the body now STARTS at the function
-  // declaration and the addListener line trails it.
-  const messagesStart = source.indexOf("function handleRuntimeMessage");
-  if (messagesStart === -1) throw new Error("anchor not found: handleRuntimeMessage source");
-  const messages = source.slice(messagesStart);
-  const bootAt = source.indexOf("function pbpBootDriveSync");
-  const bootEnd = source.indexOf("\nasync function pbpDisconnectVocabDrive", bootAt === -1 ? 0 : bootAt);
-  if (bootAt === -1 || bootEnd === -1 || bootEnd <= bootAt) throw new Error("anchor not found: pbpBootDriveSync source");
-  const boot = source.slice(bootAt, bootEnd);
-  const startupAt = source.indexOf("chrome.runtime.onStartup.addListener");
-  const startupEnd = source.indexOf("chrome.runtime.onInstalled.addListener", startupAt === -1 ? 0 : startupAt);
-  if (startupAt === -1 || startupEnd === -1 || startupEnd <= startupAt) throw new Error("anchor not found: onStartup listener source");
-  const startup = source.slice(startupAt, startupEnd);
-  const syncNowAt = messages.indexOf('message.type === "vocabDriveSyncNow"');
-  const syncNowEnd = messages.indexOf('message.type === "vocabDriveDisconnect"', syncNowAt === -1 ? 0 : syncNowAt);
-  if (syncNowAt === -1 || syncNowEnd === -1 || syncNowEnd <= syncNowAt) throw new Error("anchor not found: vocabDriveSyncNow handler");
-  const syncNow = messages.slice(syncNowAt, syncNowEnd);
-  const connectAt = messages.indexOf('message.type === "vocabDriveConnect"');
-  const connectEnd = messages.indexOf('message.type === "vocabDriveStatus"', connectAt === -1 ? 0 : connectAt);
-  if (connectAt === -1 || connectEnd === -1 || connectEnd <= connectAt) throw new Error("anchor not found: vocabDriveConnect handler");
-  const connect = messages.slice(connectAt, connectEnd);
-  const responseAt = source.indexOf("async function pbpVocabDriveResponse");
-  const responseEnd = source.indexOf("\n\nasync function pbpBootDriveSync", responseAt === -1 ? 0 : responseAt);
-  if (responseAt === -1 || responseEnd === -1 || responseEnd <= responseAt) throw new Error("anchor not found: pbpVocabDriveResponse source");
-  let responseFactory = null;
-  try {
-    responseFactory = new Function("pbpGetVocabDriveStatus",
-      `${source.slice(responseAt, responseEnd)}; return typeof pbpVocabDriveResponse === "function" ? pbpVocabDriveResponse : null;`);
-  } catch (_) {}
-  const storeImportAt = imports.indexOf('"vocab-store.js"');
-  const gdriveImportAt = imports.indexOf('"vocab-gdrive.js"');
-  check("store and Drive scripts are imported in dependency order", storeImportAt !== -1 && gdriveImportAt !== -1 && gdriveImportAt > storeImportAt);
-  // Simplest miss: routing only the new names, so a pre-migration vocab-sync-* alarm is dropped.
-  check("all three drive-sync alarm names and the legacy names are routed", ["PBP_DRIVE_DIRTY_ALARM", "PBP_DRIVE_PERIODIC_ALARM", "PBP_DRIVE_RETRY_ALARM"].every((name) => alarms.includes(`alarm.name === ${name}`)) && alarms.includes("PBP_DRIVE_LEGACY_ALARMS.includes(alarm.name)") && !/"(vocab|notes)-sync-/.test(alarms));
-  check("alarm listener is registered synchronously at top level", /chrome\.alarms\.onAlarm\.addListener\(\(alarm\) =>/.test(alarms) && !/addListener\(async/.test(alarms));
-  check("runtime message listener is not async", /function handleRuntimeMessage\(message, sender, sendResponse\)/.test(messages) &&
-    !/async function handleRuntimeMessage/.test(messages) && !/onMessage\.addListener\(async/.test(messages) &&
-    messages.includes("chrome.runtime.onMessage.addListener(handleRuntimeMessage);"));
-  const dirtyAt = messages.indexOf('message.type === "PBP_VOCAB_DIRTY" || message.type === "PBP_NOTES_DIRTY"');
-  const dirtyEnd = messages.indexOf('message.type === "vocabDriveConnect"', dirtyAt === -1 ? 0 : dirtyAt);
-  const dirty = dirtyAt !== -1 && dirtyEnd !== -1 && dirtyEnd > dirtyAt ? messages.slice(dirtyAt, dirtyEnd) : "";
-  // Simplest miss: the handler still gating on a per-dataset switch, or one dataset still calling a per-dataset scheduler.
-  check("both dirty messages schedule the one shared drive-sync alarm", dirtyAt !== -1 && dirtyEnd !== -1 && dirtyEnd > dirtyAt && dirty.includes("pbpDriveEnabled()") && !/pbpDrive(Type)Enabled/.test(dirty) && (dirty.match(/pbpDriveScheduleDirty\(chrome\.alarms\)/g) || []).length === 1 && !/pbp(Vocab|Notes)ScheduleDirty/.test(source));
-  check("connect message is handled", messages.includes('message.type === "vocabDriveConnect"'));
-  check("status message is handled", messages.includes('message.type === "vocabDriveStatus"'));
-  const failedHandler = responseFactory?.(async () => ({
-    connected: true, owner: "alice",
-    connection: { lastError: "network", retryAt: 1234, blocked: false },
-    vocabulary: { lastSuccessAt: 1, lastError: null, retryAt: null, blocked: false, hasPending: true, notices: 0 },
-    notes: { lastSuccessAt: 2, lastError: "corrupt", retryAt: null, blocked: true, hasPending: false, notices: 0 },
-    noticeTerms: [], lastSuccessAt: 1, hasPending: true
-  }));
-  const failedResponse = failedHandler
-    ? await failedHandler({ ok: false, error: "network" }) : null;
-  check("failed Drive operations return the latest authoritative status",
-    failedResponse?.ok === false && failedResponse.error === "network" &&
-    failedResponse.status?.connected === true && failedResponse.status?.owner === "alice" &&
-    failedResponse.status?.connection?.retryAt === 1234 && failedResponse.status?.notes?.blocked === true);
-  // Simplest miss: rebuild a partial status in the response path instead of passing the fresh one through -- notes.blocked disappears.
-  const degradedHandler = responseFactory?.(async () => {
-    throw new Error("status unavailable");
+
+const EXT_ID = "abcdefghijklmnopabcdefghijklmnop";
+const EXT_SENDER = { id: EXT_ID, url: `chrome-extension://${EXT_ID}/options.html` };
+const CAPABLE_MANIFEST = {
+  manifest_version: 3, name: "test", version: "0.0.0",
+  optional_permissions: ["identity"],
+  optional_host_permissions: ["https://*/*"],
+  oauth2: { client_id: "1234567890-active.apps.googleusercontent.com", scopes: ["https://www.googleapis.com/auth/drive.appdata"] }
+};
+const INCAPABLE_MANIFEST = {
+  manifest_version: 3, name: "test", version: "0.0.0",
+  optional_permissions: ["identity"],
+  optional_host_permissions: ["https://*/*"],
+  oauth2: { client_id: "", scopes: ["https://www.googleapis.com/auth/drive.appdata"] }
+};
+const tick = (ms = 20) => new Promise((r) => setTimeout(r, ms));
+
+// Boot a real background.js realm with controllable Drive runners and connect client.
+async function bootDriveWorker({
+  manifest = CAPABLE_MANIFEST,
+  local = {},
+  granted = true,
+  connectResult = { ok: true, permissionId: "google-1", emailAddress: "alice@example.test", displayName: "Alice" },
+  runnerImpl,
+} = {}) {
+  const events = { boots: [], rounds: [], runnerCalls: [] };
+  const expectsBootRound = local.vocabDriveConnected === true && granted && manifest === CAPABLE_MANIFEST;
+  let resolveBootDone = null;
+  const bootDone = expectsBootRound ? new Promise((r) => { resolveBootDone = r; }) : Promise.resolve();
+  const realm = await pbpSwRealm.boot({
+    mock: {
+      id: EXT_ID,
+      manifest,
+      storage: { local: { personalLibraryAccount: "alice", bookmarkServiceActive: "pinboard", _legacyWildcardCleanupV1: true, _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true, ...local } },
+      permissions: granted
+        ? { permissions: ["identity"], origins: ["https://www.googleapis.com/*"] }
+        : { permissions: [], origins: [] },
+    },
+    beforeBackground(win) {
+      win.pbpCreateDriveClient = () => ({
+        connect: async () => (typeof connectResult === "function" ? connectResult() : structuredClone(connectResult)),
+        about: async () => ({ ok: true, permissionId: "google-1", emailAddress: "alice@example.test", displayName: "Alice" }),
+      });
+      const makeRunner = (type) => () => async (opts) => {
+        events.runnerCalls.push({ type, opts: structuredClone(opts) });
+        try {
+          if (runnerImpl) return await runnerImpl(type, opts);
+          return { ok: true, status: { drivePermissionId: "google-1", bootstrapComplete: true } };
+        } finally {
+          if (type === "ask" && resolveBootDone) { resolveBootDone(); resolveBootDone = null; }
+        }
+      };
+      win.pbpCreateDriveSyncRunner = makeRunner("vocabulary");
+      win.pbpCreateNotesDriveSyncRunner = makeRunner("notes");
+      win.pbpCreateDictArchiveDriveSyncRunner = makeRunner("dictionary");
+      win.pbpCreateAskArchiveDriveSyncRunner = makeRunner("ask");
+    },
   });
-  const degradedResponse = degradedHandler
-    ? await degradedHandler({
-        ok:false, error:"permission", remoteBody:"must not escape"
-      }) : null;
-  check("status lookup failure degrades to a sanitized error response",
-    degradedResponse?.ok === false && degradedResponse.error === "permission" &&
-    !("status" in degradedResponse) && !("remoteBody" in degradedResponse));
-  check("connect and sync-now both use the shared authoritative response path",
-    (connect.match(/pbpVocabDriveResponse\(result\)/g) || []).length === 1 &&
-    (syncNow.match(/pbpVocabDriveResponse\(result\)/g) || []).length === 1);
-  check("sync-now message preserves persisted backoff unless explicitly forced",
-    syncNowAt >= 0 &&
-    /pbpQueueDriveRound\(\{\s*interactive: false,\s*force: message\.force === true,\s*manual: true\s*\}\)/
-      .test(syncNow) &&
-    /if \(message\.force === true\) await chrome\.alarms\.clear\(PBP_DRIVE_RETRY_ALARM\);/.test(syncNow));
-  // A retryable auth failure means the token could not be minted right now,
-  // not that the grant is gone. Dropping the flag makes pbpBootDriveSync
-  // return early, so the retry alarm the round just reconciled does nothing.
-  // Only pbpConnectDrive may clear it, and only on connect()'s own refusal (A4).
-  const connectFnAt = source.indexOf("async function pbpConnectDrive");
-  const connectFnEnd = source.indexOf("\n}\n", connectFnAt === -1 ? 0 : connectFnAt);
-  const connectFn = connectFnAt !== -1 && connectFnEnd !== -1 && connectFnEnd > connectFnAt ? source.slice(connectFnAt, connectFnEnd) : "";
-  const retryableGuardAt = connectFn.indexOf("account.retryable !== true");
-  // The first clear is the permission precheck (spec §10.8); the refusal clear is the last one.
-  const refusalClearAt = connectFn.lastIndexOf("PBP_VOCAB_DRIVE_CONNECTED_KEY]: false");
-  check("connect keeps the device connected when auth is only retryable",
-    retryableGuardAt !== -1 && refusalClearAt !== -1 && retryableGuardAt < refusalClearAt &&
-    !connect.includes("PBP_VOCAB_DRIVE_CONNECTED_KEY]: false"));
-  // Simplest miss: leave the old clearing branch in the vocabDriveConnect handler, where it also fires on round results (A4).
-  check("disconnect message is handled", messages.includes('message.type === "vocabDriveDisconnect"'));
-  // Simplest miss: a second tail left behind for one dataset, which lets the two run concurrently again.
-  check("one recovering promise tail serializes every Drive round", source.includes("const queueDriveSync = pbpCreateRecoveringTail();") && (source.match(/return queueDriveSync\(async \(\) =>/g) || []).length === 1 && !/queue(Vocab|Notes)Sync/.test(source));
-  check("boot invokes only one noninteractive cold-start sync",
-    bootAt >= 0 && boot.includes("interactive: false") && !boot.includes("interactive: true") &&
-    !startup.includes("pbpBootDriveSync") &&
-    boot.includes("if (!await pbpVocabDriveIsConnected()) return { ok: true };") &&
-    !boot.includes("status: await pbpGetVocabDriveStatus()") &&
-    !boot.includes("pbpDriveEnsurePeriodic") &&
-    /if \(!granted\) \{[\s\S]*PBP_VOCAB_DRIVE_CONNECTED_KEY[\s\S]*false[\s\S]*pbpClearDriveAlarms\(\)[\s\S]*error: "permission"/
-      .test(boot) &&
-    !connect.includes("pbpDriveEnsurePeriodic"));
-  check("background never requests optional permissions", !source.includes("chrome.permissions.request(") && !source.includes("permissions.request("));
-  check("inactive OAuth capability gates boot and every Drive message path",
-    source.includes("pbpVocabDriveOAuthActive(chrome.runtime.getManifest())") &&
-    boot.includes("PBP_VOCAB_DRIVE_CAPABLE") &&
-    ["PBP_VOCAB_DIRTY", "vocabDriveConnect", "vocabDriveStatus",
-      "vocabDriveSyncNow", "vocabDriveDisconnect"].every((type) => {
-        const at = messages.indexOf(`message.type === "${type}"`);
-        if (at === -1) return false;
-        const next = messages.indexOf("\n  if (message.type ===", at + 1);
-        const handler = messages.slice(at, next !== -1 && next > at ? next : messages.length);
-        return handler.includes("PBP_VOCAB_DRIVE_CAPABLE");
-      }));
+  await bootDone;
+  await tick(10);
+  return { ...realm, events };
+}
+
+(async () => {
+  const base = await bootDriveWorker({ local: { vocabDriveConnected: false } });
+  const { win, mock } = base;
+
+  // 1. Dependency import order recorded from background.js's real importScripts(...) call.
+  const storeImportAt = win.__importedScripts.indexOf("vocab-store.js");
+  const gdriveImportAt = win.__importedScripts.indexOf("vocab-gdrive.js");
+  check("store and Drive scripts are imported in dependency order",
+    storeImportAt !== -1 && gdriveImportAt !== -1 && gdriveImportAt > storeImportAt);
+
+  // 2. Real onAlarm routing for the 3 current + 6 legacy Drive alarm names.
+  {
+    const alarmWorker = await bootDriveWorker({ local: { vocabDriveConnected: true } });
+    const seen = [];
+    alarmWorker.win.pbpBootDriveSync = (opts) => {
+      seen.push(opts === undefined ? "unthrottled" : opts);
+      return Promise.resolve({ ok: true });
+    };
+    const validAlarms = [
+      alarmWorker.get("PBP_DRIVE_DIRTY_ALARM"),
+      alarmWorker.get("PBP_DRIVE_PERIODIC_ALARM"),
+      alarmWorker.get("PBP_DRIVE_RETRY_ALARM"),
+      ...alarmWorker.get("PBP_DRIVE_LEGACY_ALARMS"),
+    ];
+    for (const name of validAlarms) alarmWorker.mock.fireAlarm(name);
+    for (const ignored of ["drive-sync-other", "vocab-sync", "keepalive"]) alarmWorker.mock.fireAlarm(ignored);
+    await tick(10);
+    check("all three drive-sync alarm names and the legacy names are routed",
+      validAlarms.length === 9 && seen.length === 9 && seen.every((x) => x === "unthrottled"));
+    alarmWorker.dispose();
+  }
+
+  // 3. Alarm listener registered synchronously at top level and non-async.
+  const alarmListeners = mock.chrome.alarms.onAlarm.listeners;
+  check("alarm listener is registered synchronously at top level",
+    alarmListeners.length >= 1 && alarmListeners.every((fn) => fn.constructor.name !== "AsyncFunction"));
+
+  // 4. Runtime message listener is non-async and registered at top level.
+  check("runtime message listener is not async",
+    typeof win.handleRuntimeMessage === "function" &&
+    win.handleRuntimeMessage.constructor.name !== "AsyncFunction" &&
+    mock.chrome.runtime.onMessage.hasListener(win.handleRuntimeMessage));
+
+  // 5. Both dirty messages schedule the one shared drive-sync-dirty alarm.
+  {
+    const dirtyWorker = await bootDriveWorker({ local: { vocabDriveConnected: true } });
+    await dirtyWorker.mock.chrome.alarms.clearAll();
+    const r1 = await dirtyWorker.mock.dispatchMessage({ type: "PBP_VOCAB_DIRTY" }, EXT_SENDER);
+    const a1 = await dirtyWorker.mock.chrome.alarms.get(dirtyWorker.get("PBP_DRIVE_DIRTY_ALARM"));
+    await dirtyWorker.mock.chrome.alarms.clearAll();
+    const r2 = await dirtyWorker.mock.dispatchMessage({ type: "PBP_NOTES_DIRTY" }, EXT_SENDER);
+    const a2 = await dirtyWorker.mock.chrome.alarms.get(dirtyWorker.get("PBP_DRIVE_DIRTY_ALARM"));
+    check("both dirty messages schedule the one shared drive-sync alarm",
+      r1?.ok === true && !!a1 && r2?.ok === true && !!a2);
+    dirtyWorker.dispose();
+  }
+
+  // 6 & 7. Connect and status messages are handled on the real router.
+  {
+    const msgWorker = await bootDriveWorker({ local: { vocabDriveConnected: false } });
+    const statusRes = await msgWorker.mock.dispatchMessage({ type: "vocabDriveStatus" }, EXT_SENDER);
+    const connectRes = await msgWorker.mock.dispatchMessage({ type: "vocabDriveConnect" }, EXT_SENDER);
+    check("connect message is handled", connectRes?.ok === true && connectRes.status?.connected === true);
+    check("status message is handled", statusRes?.ok === true && statusRes.status?.connected === false);
+    msgWorker.dispose();
+  }
+
+  // 8 & 9. Real pbpVocabDriveResponse authoritative status + sanitized degradation.
+  {
+    const respWorker = await bootDriveWorker({ local: { vocabDriveConnected: true } });
+    respWorker.win.pbpGetVocabDriveStatus = async () => ({
+      connected: true, owner: "alice",
+      connection: { lastError: "network", retryAt: 1234, blocked: false },
+      vocabulary: { lastSuccessAt: 1, lastError: null, retryAt: null, blocked: false, hasPending: true, notices: 0 },
+      notes: { lastSuccessAt: 2, lastError: "corrupt", retryAt: null, blocked: true, hasPending: false, notices: 0 },
+      noticeTerms: [], lastSuccessAt: 1, hasPending: true
+    });
+    const failedResponse = await respWorker.win.pbpVocabDriveResponse({ ok: false, error: "network" });
+    check("failed Drive operations return the latest authoritative status",
+      failedResponse?.ok === false && failedResponse.error === "network" &&
+      failedResponse.status?.connected === true && failedResponse.status?.owner === "alice" &&
+      failedResponse.status?.connection?.retryAt === 1234 && failedResponse.status?.notes?.blocked === true);
+
+    respWorker.win.pbpGetVocabDriveStatus = async () => { throw new Error("status unavailable"); };
+    const degradedResponse = await respWorker.win.pbpVocabDriveResponse({
+      ok: false, error: "permission", remoteBody: "must not escape"
+    });
+    check("status lookup failure degrades to a sanitized error response",
+      degradedResponse?.ok === false && degradedResponse.error === "permission" &&
+      !("status" in degradedResponse) && !("remoteBody" in degradedResponse));
+    respWorker.dispose();
+  }
+
+  // 10 & 11. Connect and sync-now both return authoritative status, and sync-now preserves backoff unless forced.
+  {
+    const syncWorker = await bootDriveWorker({ local: { vocabDriveConnected: true } });
+    syncWorker.events.runnerCalls.length = 0;
+    await syncWorker.mock.chrome.alarms.create(syncWorker.get("PBP_DRIVE_RETRY_ALARM"), { when: Date.now() + 60000 });
+    const unforced = await syncWorker.mock.dispatchMessage({ type: "vocabDriveSyncNow", force: false }, EXT_SENDER);
+    const unforcedOpts = syncWorker.events.runnerCalls[0]?.opts;
+    await syncWorker.mock.chrome.alarms.create(syncWorker.get("PBP_DRIVE_RETRY_ALARM"), { when: Date.now() + 60000 });
+    let alarmClearedBeforeRun = false;
+    const origQueue = syncWorker.win.pbpQueueDriveRound;
+    syncWorker.win.pbpQueueDriveRound = async (opts) => {
+      alarmClearedBeforeRun = !(await syncWorker.mock.chrome.alarms.get(syncWorker.get("PBP_DRIVE_RETRY_ALARM")));
+      return origQueue(opts);
+    };
+    const forced = await syncWorker.mock.dispatchMessage({ type: "vocabDriveSyncNow", force: true }, EXT_SENDER);
+    const forcedOpts = syncWorker.events.runnerCalls.at(-1)?.opts;
+    const connected = await syncWorker.mock.dispatchMessage({ type: "vocabDriveConnect" }, EXT_SENDER);
+    check("connect and sync-now both use the shared authoritative response path",
+      unforced?.status?.owner === "alice" && forced?.status?.owner === "alice" && connected?.status?.owner === "alice");
+    check("sync-now message preserves persisted backoff unless explicitly forced",
+      unforcedOpts?.force === false && unforcedOpts?.interactive === false &&
+      forcedOpts?.force === true && forcedOpts?.interactive === false && alarmClearedBeforeRun === true);
+    syncWorker.dispose();
+  }
+
+  // 12 & 13. Connect keeps device connected on retryable auth failure, clears on refusal; disconnect handled.
+  {
+    let mode = "retryable";
+    const authWorker = await bootDriveWorker({
+      local: { vocabDriveConnected: true },
+      connectResult: () => mode === "retryable"
+        ? { ok: false, error: "auth", retryable: true }
+        : { ok: false, error: "auth", retryable: false },
+    });
+    const rRetry = await authWorker.mock.dispatchMessage({ type: "vocabDriveConnect" }, EXT_SENDER);
+    const keptAfterRetryable = authWorker.mock.storageData("local").vocabDriveConnected === true;
+    mode = "refused";
+    const rRefused = await authWorker.mock.dispatchMessage({ type: "vocabDriveConnect" }, EXT_SENDER);
+    const clearedAfterRefusal = authWorker.mock.storageData("local").vocabDriveConnected === false;
+    check("connect keeps the device connected when auth is only retryable",
+      rRetry?.ok === false && keptAfterRetryable && rRefused?.ok === false && clearedAfterRefusal);
+
+    await authWorker.mock.chrome.storage.local.set({ vocabDriveConnected: true });
+    const disc = await authWorker.mock.dispatchMessage({ type: "vocabDriveDisconnect" }, EXT_SENDER);
+    check("disconnect message is handled",
+      disc?.ok === true && authWorker.mock.storageData("local").vocabDriveConnected === false);
+    authWorker.dispose();
+  }
+
+  // 14. One recovering promise tail serializes every Drive round.
+  {
+    let active = 0, maxActive = 0;
+    const serialWorker = await bootDriveWorker({
+      local: { vocabDriveConnected: true },
+      runnerImpl: async () => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await tick(15);
+        active--;
+        return { ok: true, status: { drivePermissionId: "google-1", bootstrapComplete: true } };
+      },
+    });
+    await Promise.all([
+      serialWorker.win.pbpQueueDriveRound({ manual: true }),
+      serialWorker.win.pbpQueueDriveRound({ manual: true }),
+    ]);
+    check("one recovering promise tail serializes every Drive round", maxActive === 1);
+    serialWorker.dispose();
+  }
+
+  // 15. Boot invokes one non-interactive cold-start sync, not onStartup, and clears flag+alarms on missing grant.
+  {
+    const coldWorker = await bootDriveWorker({ local: { vocabDriveConnected: true } });
+    const initialVocabRuns = coldWorker.events.runnerCalls.filter((c) => c.type === "vocabulary");
+    coldWorker.events.runnerCalls.length = 0;
+    coldWorker.mock.chrome.runtime.onStartup.dispatch();
+    await tick(20);
+    const startupRuns = coldWorker.events.runnerCalls.length;
+
+    const ungrantedWorker = await bootDriveWorker({ local: { vocabDriveConnected: true }, granted: false });
+    await ungrantedWorker.mock.chrome.alarms.create("drive-sync-periodic", { periodInMinutes: 15 });
+    await ungrantedWorker.mock.chrome.storage.local.set({ vocabDriveConnected: true });
+    const denied = await ungrantedWorker.win.pbpBootDriveSync();
+    const afterData = ungrantedWorker.mock.storageData("local");
+    const leftAlarms = await ungrantedWorker.mock.chrome.alarms.getAll();
+    check("boot invokes only one noninteractive cold-start sync",
+      initialVocabRuns.length === 1 && initialVocabRuns[0].opts?.interactive === false &&
+      startupRuns === 0 && denied?.ok === false && denied.error === "permission" &&
+      afterData.vocabDriveConnected === false &&
+      !leftAlarms.some((a) => a.name.startsWith("drive-sync-")));
+    coldWorker.dispose();
+    ungrantedWorker.dispose();
+  }
+
+  // 16. Background never requests optional permissions (presence check, not a slice anchor).
+  const bgSource = await fetch("../background.js").then((r) => r.text());
+  check("background never requests optional permissions",
+    !bgSource.includes("chrome.permissions.request(") && !bgSource.includes("permissions.request("));
+
+  // 17. Inactive OAuth capability gates boot and every Drive message path.
+  {
+    const offWorker = await bootDriveWorker({
+      manifest: INCAPABLE_MANIFEST,
+      local: { vocabDriveConnected: true },
+    });
+    const bootRes = await offWorker.win.pbpBootDriveSync();
+    const types = ["PBP_VOCAB_DIRTY", "vocabDriveConnect", "vocabDriveStatus", "vocabDriveSyncNow", "vocabDriveDisconnect"];
+    const replies = [];
+    for (const type of types) {
+      replies.push(await offWorker.mock.dispatchMessage({ type }, EXT_SENDER));
+    }
+    check("inactive OAuth capability gates boot and every Drive message path",
+      offWorker.get("PBP_VOCAB_DRIVE_CAPABLE") === false &&
+      bootRes?.ok === true && offWorker.events.runnerCalls.length === 0 &&
+      replies.every((r) => r?.ok === false && r.error === "unavailable"));
+    offWorker.dispose();
+  }
+
+  base.dispose();
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>

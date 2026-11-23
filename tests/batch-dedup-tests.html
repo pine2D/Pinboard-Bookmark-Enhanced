@@ -11,6 +11,9 @@ body { font-family: monospace; padding: 16px; max-width: 900px; }
 <div id="results"></div>
 <script src="../shared.js"></script>
 <script src="../wayback.js"></script>
+<script src="../ai.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 async function test(name, fn) {
   let ok = true;
@@ -31,166 +34,177 @@ function equal(actual, expected, message) {
   if (actual !== expected) throw new Error(`${message || "values differ"}: ${actual} !== ${expected}`);
 }
 
-let popupBatchSource;
-let popupBatchPermissionSource;
-let popupBatchSetupSource;
+let _swRealmPromise = null;
+function getBatchSwRealm() {
+  return (_swRealmPromise ||= pbpSwRealm.boot({
+    mock: { id: "test-id", storage: { local: { _driveScopeKeysRetiredDone: true } } },
+  }));
+}
 
-// Run the shipped SW entry points. External work is bounded to local doubles:
-// the AI cache supplies names verbatim; Pinboard runs the shipped delivery and
-// URI builder against a hand-written success response, never the network.
-async function createSaveTagsHarness(service, names, opts = {}) {
-  const source = await (await fetch("../background.js")).text();
-  function block(startMarker, endMarker) {
-    const start = source.indexOf(startMarker);
-    const end = source.indexOf(endMarker, start === -1 ? 0 : start);
-    assert(start !== -1 && end !== -1 && end > start, "SW source block not found: " + startMarker);
-    return source.slice(start, end);
+function ensureBatchFramesHost() {
+  let host = document.getElementById("pbp-batch-frames");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "pbp-batch-frames";
+    host.style.cssText = "position:fixed;left:-9999px;top:0;width:10px;height:10px;opacity:0;pointer-events:none;overflow:hidden";
+    document.body.appendChild(host);
   }
-  const settings = {bookmarkService:service, pinboardToken:"fixture-token", _aiTags:true, batchAiTags:true, ...(opts.settings || {})};
-  const auth = {service, account:"test-owner", token:"fixture-token", baseUrl:"https://bookmarks.example/", epoch:0};
-  const calls = {intents:[], uris:[], names:[], progress:[], lookups:[], extracted:[], queries:0, remoteFetches:[], cacheSources:[]};
-  const state = {epoch:0, account:auth.account};
-  const dependencies = {
-    getCurrentBookmarkAuth:async () => ({...auth, account:state.account, epoch:state.epoch}),
-    // Shape copied from the real self-hosted catch branch of fetchExistingBookmark
-    // when the client's beforeRequest sees a stale epoch.
-    fetchExistingBookmark:async (url, token, lookupAuth) => {
-      calls.lookups.push({url, epoch:lookupAuth?.epoch, account:lookupAuth?.account});
-      if (lookupAuth?.epoch !== state.epoch || lookupAuth?.account !== state.account) return {exists:false, lookupFailed:true, reason:"account_changed", retryable:false};
-      return {exists:false};
-    },
-    pbpBookmarkHostGranted:async () => true,
-    loadSettings:async () => settings,
-    pbpLoadTagVocab:async account => ({account, timestamp:Date.now(), counts:null, index:pbpTagVocabIndex(Object.fromEntries(names.map(name => [name, 1])))}),
-    pbpCanonicalTagName, pbpTagGroupKey, pbpBatchRemoteExtractEngine, pbpMarkdownToPlainText,
-    fetchDeepseekMarkdown:opts.fetchDeepseekMarkdown || (async (url, o) => {
-      calls.remoteFetches.push({engine:"deepseek", url, apiKey:o?.apiKey});
-      return {markdown:"# DeepSeek Body", title:"DS Title", url};
-    }),
-    fetchJinaMarkdown:opts.fetchJinaMarkdown || (async (url, o) => {
-      calls.remoteFetches.push({engine:"jina", url, apiKey:o?.apiKey});
-      return {markdown:"# Jina Body", title:"Jina Title", url};
-    }),
-    chrome:{permissions:{contains:async (spec) => opts.containsOrigin ? opts.containsOrigin(spec?.origins?.[0] || "") : true}, storage:{local:{get:async () => ({}), set:async () => {}}},
-      tabs:{query:async () => { calls.queries++; return (opts.liveTabs || []).map(lt => ({...lt})); }}},
-    getPageInfoFromTab:async (tabId, o) => {
-      calls.extracted.push({tabId, expectedUrl:o?.expectedUrl});
-      if (opts.liveTabs && !opts.liveTabs.some(lt => lt.id === tabId && lt.url === o?.expectedUrl)) return null;
-      return {pageText:"Synthetic public text"};
-    },
-    _cbTabsGet:async id => (opts.liveTabs || []).find(lt => lt.id === id) || null,
-    buildAutoNotes:() => "",
-    pbpNotesDescription:() => "", pbpPageInfoReadable:info=>!!info&&info._pbpUnavailable!==true&&["","text/html","application/xhtml+xml"].includes(String(info.contentType||"").split(";")[0].trim()),
-    hasAIKey:() => true,
-    getAICache:async (_url, _type, _dur, src) => { calls.cacheSources.push(src); return names.slice(); },
-    setAICache:async () => {},
-    callAI:async () => { throw new Error("unexpected AI request"); },
-    showNotification() {},
-    notifySaveFailure() { throw new Error("save failed"); },
-    processOfflineQueue:async () => {},
-    updateBadge:async () => {},
-    _newBatchRunId:() => "test-run",
-    _removeBatchRecordIfOwned:async () => {},
-    _writeBatchProgress:async row => { calls.progress.push(row); return true; },
-    t:key => key,
-    submitSaveIntent:async (intent, context = {}) => {
-      const invalid = delivery.validateSaveIntent(intent);
-      if (invalid) return invalid;
-      calls.intents.push(intent);
-      if (opts.lookupAware) {
-        const deliveryAuth = {...auth, account:state.account, epoch:state.epoch};
-        // Like the real path: a prefetched answer for this page and account is reused.
-        const prefetched = context.lookup?.url === intent.url && context.lookup.account === deliveryAuth.account ? context.lookup.found : undefined;
-        const found = prefetched || await dependencies.fetchExistingBookmark(intent.url, deliveryAuth.token, deliveryAuth);
-        if (found.lookupFailed) return {status:"failed", reason:found.reason, account:state.account};
-      }
-      if (service === "pinboard") {
-        return (await delivery.deliverSaveIntent(intent, settings, auth)).result;
-      } else {
-        calls.names.push(pbpBookmarkParseTags(intent.tags));
-      }
-      if (opts.onSave) opts.onSave(state, calls.intents.length);
-      return {status:"saved", mutation:"created", account:auth.account};
-    },
+  return host;
+}
+
+async function bootPopupBatchRealm(setup) {
+  const iframe = document.createElement("iframe");
+  ensureBatchFramesHost().appendChild(iframe);
+  const win = iframe.contentWindow;
+  const doc = iframe.contentDocument;
+  doc.open();
+  doc.write("<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body></body></html>");
+  doc.close();
+  // Copy shared constants/helpers already loaded by <script src="../shared.js">
+  // and <script src="../ai.js"> on the test host page, then load popup-batch.js
+  // via real <script src> so V8 credits coverage to popup-batch.js.
+  Object.assign(win, {
+    SETTINGS_DEFAULTS, PBP_ICONS, BATCH_STALE_TTL, batchIsRunning,
+    PBP_BOOKMARK_FAILURE_KEYS, PBP_BOOKMARK_STOP_CODES, PBP_BOOKMARK_GATEWAY_CODES,
+    pbpBookmarkFailureArgs, pbpBatchRemoteExtractEngine, pbpRemoteExtractOriginPattern,
+    pbpPinboardAccountFromToken, pbpAiCustomKeySeal, pbpAiResolveTarget,
+  });
+  if (setup) await setup(win, doc);
+  const base = new URL("../", document.baseURI).href;
+  await pbpSwRealm.loadScript(doc, base + "popup-batch.js");
+  return {
+    win,
+    doc,
+    get(expr) { return win.eval(expr); },
   };
-  const validatorSource = block("function pbpSaveFailure(", "// Delivery-time merge/skip");
-  const deliverySource = block("async function pbpSendResolvedPlan(", "// Serialize ALL offlineQueue writes");
-  const delivery = new Function("PBP_SAVE_MODES", "pinboardFetch", "pbpBookmarkAuthIsCurrent", "fetchExistingBookmark",
-    validatorSource + deliverySource + "\nreturn {validateSaveIntent, deliverSaveIntent};")(
-    new Set(["create", "update", "merge", "skip", "overwrite"]),
-    async uri => { calls.uris.push(uri); return {ok:true, status:200, json:async () => ({result_code:"done"})}; },
-    () => true, async () => ({exists:false}));
-  const swSource = block("async function saveFromBackground(", "// Failure-reason -> showNotification")
-    + block("async function _runBatchSave(", "// ===================== Tab Set");
-  const keys = Object.keys(dependencies);
-  const entry = new Function(...keys, "let _batchRunning = false;\n" + swSource + "\nreturn {saveFromBackground, _runBatchSave};")(...keys.map(key => dependencies[key]));
-  const tabs = opts.tabs || [{id:1, url:"https://example.com/tags", title:"Tags"}];
-  return {calls, state, quick:() => entry.saveFromBackground({url:"https://example.com/tags", title:"Tags", tab:{id:1}}),
-    batch:() => entry._runBatchSave(tabs, auth.account),
-    resume:(startIndex = 0) => entry._runBatchSave(tabs, auth.account, {runId:"test-run", startIndex, resumeCount:1, counts:{}})};
 }
 
-async function getPopupBatchSource() {
-  return (await (await fetch("../popup-batch.js")).text());
-}
+// Run the shipped SW entry points via real <script src> in sw-realm.js.
+// External work is bounded to local doubles: the AI cache supplies names verbatim;
+// Pinboard runs the shipped delivery and URI builder against a hand-written response.
+async function createSaveTagsHarness(service, names, opts = {}) {
+  const sw = await getBatchSwRealm();
+  const { win, mock } = sw;
+  await mock.chrome.storage.local.clear();
+  await mock.chrome.storage.local.set({ _driveScopeKeysRetiredDone: true });
+  sw.set("_batchRunning", false);
 
-async function getPopupBatchProgressSource() {
-  if (popupBatchSource) return popupBatchSource;
-  const source = await getPopupBatchSource();
-  const start = source.indexOf("function renderBatchProgress");
-  const end = source.indexOf("// ---- Tag Presets ----", start === -1 ? 0 : start);
-  assert(start !== -1 && end !== -1 && end > start, "batch progress source block not found");
-  popupBatchSource = source.slice(start, end);
-  return popupBatchSource;
-}
+  const settings = { bookmarkService: service, pinboardToken: "fixture-token", _aiTags: true, batchAiTags: true, ...(opts.settings || {}) };
+  const auth = { service, account: "test-owner", token: "fixture-token", baseUrl: "https://bookmarks.example/", epoch: 0 };
+  const calls = { intents: [], uris: [], names: [], progress: [], lookups: [], extracted: [], queries: 0, remoteFetches: [], cacheSources: [] };
+  const state = { epoch: 0, account: auth.account };
 
-async function getPopupBatchPermissionSource() {
-  if (popupBatchPermissionSource) return popupBatchPermissionSource;
-  const source = await getPopupBatchSource();
-  const start = source.indexOf("function batchAiPermissionOrigins");
-  const end = source.indexOf("function showBatchAiPermission", start === -1 ? 0 : start);
-  assert(start !== -1 && end !== -1 && end > start, "batch permission source block not found");
-  popupBatchPermissionSource = source.slice(start, end);
-  return popupBatchPermissionSource;
-}
+  const lookupFn = async (url, token, lookupAuth) => {
+    calls.lookups.push({ url, epoch: lookupAuth?.epoch, account: lookupAuth?.account });
+    if (lookupAuth?.epoch !== state.epoch || lookupAuth?.account !== state.account) {
+      return { exists: false, lookupFailed: true, reason: "account_changed", retryable: false };
+    }
+    return { exists: false };
+  };
 
-async function getPopupBatchSetupSource() {
-  if (popupBatchSetupSource) return popupBatchSetupSource;
-  const source = await getPopupBatchSource();
-  const start = source.indexOf("let batchAiPermissionPending");
-  const end = source.indexOf("// ---- Background batch progress", start === -1 ? 0 : start);
-  assert(start !== -1 && end !== -1 && end > start, "batch setup source block not found");
-  popupBatchSetupSource = source.slice(start, end);
-  return popupBatchSetupSource;
-}
+  win.getCurrentBookmarkAuth = async () => ({ ...auth, account: state.account, epoch: state.epoch });
+  win.pbpBookmarkAuthIsCurrent = () => true;
+  win.fetchExistingBookmark = lookupFn;
+  win.pbpBookmarkHostGranted = async () => true;
+  win.loadSettings = async () => settings;
+  win.pbpLoadTagVocab = async account => ({ account, timestamp: Date.now(), counts: null, index: pbpTagVocabIndex(Object.fromEntries(names.map(name => [name, 1]))) });
+  win.fetchDeepseekMarkdown = opts.fetchDeepseekMarkdown || (async (url, o) => {
+    calls.remoteFetches.push({ engine: "deepseek", url, apiKey: o?.apiKey });
+    return { markdown: "# DeepSeek Body", title: "DS Title", url };
+  });
+  win.fetchJinaMarkdown = opts.fetchJinaMarkdown || (async (url, o) => {
+    calls.remoteFetches.push({ engine: "jina", url, apiKey: o?.apiKey });
+    return { markdown: "# Jina Body", title: "Jina Title", url };
+  });
+  mock.chrome.permissions.contains = async (spec) => opts.containsOrigin ? opts.containsOrigin(spec?.origins?.[0] || "") : true;
+  mock.chrome.tabs.query = async () => { calls.queries++; return (opts.liveTabs || []).map(lt => ({ ...lt })); };
+  win.getPageInfoFromTab = async (tabId, o) => {
+    calls.extracted.push({ tabId, expectedUrl: o?.expectedUrl });
+    if (opts.liveTabs && !opts.liveTabs.some(lt => lt.id === tabId && lt.url === o?.expectedUrl)) return null;
+    return { pageText: "Synthetic public text" };
+  };
+  win._cbTabsGet = async id => (opts.liveTabs || []).find(lt => lt.id === id) || null;
+  win.buildAutoNotes = () => "";
+  win.pbpNotesDescription = () => "";
+  win.hasAIKey = () => true;
+  win.getAICache = async (_url, _type, _dur, src) => { calls.cacheSources.push(src); return names.slice(); };
+  win.setAICache = async () => {};
+  win.callAI = async () => { throw new Error("unexpected AI request"); };
+  win.showNotification = () => {};
+  win.notifySaveFailure = () => { throw new Error("save failed"); };
+  win.processOfflineQueue = async () => {};
+  win.updateBadge = async () => {};
+  win._newBatchRunId = () => "test-run";
+  win._removeBatchRecordIfOwned = async () => {};
+  win._writeBatchProgress = async row => { calls.progress.push(row); return true; };
+  win.t = key => key;
+  win.pinboardFetch = async uri => {
+    calls.uris.push(uri);
+    return { ok: true, status: 200, json: async () => ({ result_code: "done" }) };
+  };
 
-// The real resolver, for the case that names a custom entry; ai.js's top
-// level only declares, so it evaluates without chrome.
-let realResolveTarget = null;
-async function getRealResolveTarget(t) {
-  if (realResolveTarget) return realResolveTarget;
-  const aiSource = await (await fetch("../ai.js")).text();
-  realResolveTarget = new Function("t", aiSource + "\nreturn pbpAiResolveTarget;")(t);
-  return realResolveTarget;
+  const realValidate = win.validateSaveIntent;
+  const realDeliver = win.deliverSaveIntent;
+  win.submitSaveIntent = async (intent, context = {}) => {
+    const invalid = realValidate(intent);
+    if (invalid) return invalid;
+    calls.intents.push(intent);
+    if (opts.lookupAware) {
+      const deliveryAuth = { ...auth, account: state.account, epoch: state.epoch };
+      const prefetched = context.lookup?.url === intent.url && context.lookup.account === deliveryAuth.account ? context.lookup.found : undefined;
+      const found = prefetched || await lookupFn(intent.url, deliveryAuth.token, deliveryAuth);
+      if (found.lookupFailed) return { status: "failed", reason: found.reason, account: state.account };
+    }
+    if (service === "pinboard") {
+      win.fetchExistingBookmark = async () => ({ exists: false });
+      try {
+        return (await realDeliver(intent, settings, auth)).result;
+      } finally {
+        win.fetchExistingBookmark = lookupFn;
+      }
+    } else {
+      calls.names.push(pbpBookmarkParseTags(intent.tags));
+    }
+    if (opts.onSave) opts.onSave(state, calls.intents.length);
+    return { status: "saved", mutation: "created", account: auth.account };
+  };
+
+  const tabs = opts.tabs || [{ id: 1, url: "https://example.com/tags", title: "Tags" }];
+  return {
+    calls,
+    state,
+    quick: () => win.saveFromBackground({ url: "https://example.com/tags", title: "Tags", tab: { id: 1 } }),
+    batch: () => win._runBatchSave(tabs, auth.account),
+    resume: (startIndex = 0) => win._runBatchSave(tabs, auth.account, { runId: "test-run", startIndex, resumeCount: 1, counts: {} }),
+  };
 }
 
 // A built-in's label the way the resolver forms it: its prov* name when the
 // catalogue has one, else the id.
-function stubResolveTarget(s, t, id = (s && s.aiProvider) || "gemini") {
+function stubResolveTarget(s, tFn, id = (s && s.aiProvider) || "gemini") {
   const key = "prov" + id[0].toUpperCase() + id.slice(1);
-  const name = t(key);
+  const name = tFn(key);
   return { label: name && name !== key ? name : id };
 }
 
 async function createPermissionHarness(providerOrigin = "https://api.example/*", { realResolver = false } = {}) {
-  const source = await getPopupBatchPermissionSource();
-  const t = (key, ...args) => key + ":" + args.join("|");
-  const factory = new Function(
-    "_aiTargetOriginPattern", "t", "pbpAiResolveTarget",
-    source + "\nreturn { batchAiPermissionOrigins, batchAiPermissionRows };"
-  );
-  const resolve = realResolver ? await getRealResolveTarget(t) : (s, id) => stubResolveTarget(s, t, id);
-  return factory(() => providerOrigin, t, resolve);
+  const tFn = (key, ...args) => key + ":" + args.join("|");
+  const realm = await bootPopupBatchRealm(async (win, doc) => {
+    if (realResolver) {
+      const base = new URL("../", document.baseURI).href;
+      await pbpSwRealm.loadScript(doc, base + "shared.js");
+      win.t = tFn;
+      await pbpSwRealm.loadScript(doc, base + "ai.js");
+    } else {
+      win.pbpAiResolveTarget = (s, id) => stubResolveTarget(s, tFn, id);
+    }
+    win._aiTargetOriginPattern = () => providerOrigin;
+    win.t = tFn;
+  });
+  return {
+    batchAiPermissionOrigins: realm.win.batchAiPermissionOrigins,
+    batchAiPermissionRows: realm.win.batchAiPermissionRows,
+  };
 }
 
 function fakeElement() {
@@ -271,38 +285,29 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
       },
     },
   };
-  const source = await getPopupBatchSetupSource();
-  const factory = new Function(
-    "$id", "t", "setBtnIcon", "chrome", "showStatus", "batchIsRunning",
-    "BATCH_STALE_TTL", "getSettingsStorage", "pbpApplySecretOverlay", "pbpReadBookmarkConnection",
-    "deobfuscateKey", "settings", "hasAIKey", "wireBatchProgress", "setTimeout",
-    "_aiTargetOriginPattern", "pbpPinboardAccountFromToken", "document", "pbpAiResolveTarget",
-    source + "\nreturn { setupTabSet, getPending: () => batchAiPermissionPending };"
-  );
-  const api = factory(
-    (id) => elements[id] || null,
-    (key, ...args) => args.length ? key + ":" + args.join(":") : key,
-    (button, _icon, label) => { button.label = label; },
-    chromeStub,
-    (id, message, kind) => calls.statuses.push({ id, message, kind }),
-    () => false,
-    BATCH_STALE_TTL,
-    async () => ({ get: async () => ({ pinboardToken: "token" }) }),
-    async (value) => value,
-    async () => ({ service:"pinboard", token:"alice:token", account:"alice" }),
-    (value) => value,
-    { aiProvider: "openai", batchAiTags: ai, batchAiSummary: false, batchSkipExisting: skip },
-    () => true,
-    () => {},
-    () => 0,
-    () => "https://api.example/*",
-    pbpPinboardAccountFromToken,
-    document,
-    (s) => stubResolveTarget(s, (key, ...args) => args.length ? key + ":" + args.join(":") : key)
-  );
-  api.setupTabSet();
+  const tFn = (key, ...args) => args.length ? key + ":" + args.join(":") : key;
+  const realm = await bootPopupBatchRealm((win) => {
+    win.$id = (id) => elements[id] || null;
+    win.t = tFn;
+    win.setBtnIcon = (button, _icon, label) => { button.label = label; };
+    win.chrome = chromeStub;
+    win.showStatus = (id, message, kind) => calls.statuses.push({ id, message, kind });
+    win.batchIsRunning = () => false;
+    win.getSettingsStorage = async () => ({ get: async () => ({ pinboardToken: "token" }) });
+    win.pbpApplySecretOverlay = async (value) => value;
+    win.pbpReadBookmarkConnection = async () => ({ service: "pinboard", token: "alice:token", account: "alice" });
+    win.deobfuscateKey = (value) => value;
+    win.settings = { aiProvider: "openai", batchAiTags: ai, batchAiSummary: false, batchSkipExisting: skip };
+    win.hasAIKey = () => true;
+    win.setTimeout = () => 0;
+    win._aiTargetOriginPattern = () => "https://api.example/*";
+    win.pbpAiResolveTarget = (s) => stubResolveTarget(s, tFn);
+  });
+  realm.win.wireBatchProgress = () => {};
+  realm.win.setupTabSet();
   return {
-    ...api,
+    setupTabSet: realm.win.setupTabSet,
+    getPending: () => realm.get("batchAiPermissionPending"),
     elements,
     calls,
     setRequest: (value) => { state.request = value; },
@@ -314,9 +319,7 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
 
 async function createUiHarness(storedProgress, now, opts = {}) {
   if (storedProgress) storedProgress = { account: "alice", ...storedProgress };
-  // documentElement mirrors a page that never marks motion-ready, so the
-  // progress teardown stays on its synchronous .hidden path under test.
-  const documentStub = { activeElement: null, documentElement: { classList: { contains: () => false } } };
+  let activeEl = null;
   const elements = {
     "batch-bookmark-btn": fakeElement(),
     "batch-progress": fakeElement(),
@@ -325,8 +328,8 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     "batch-cancel-btn": fakeButton(),
   };
   elements["batch-cancel-btn"].querySelector = () => ({ innerHTML: "" });
-  elements["batch-bookmark-btn"].focus = function () { this.focused = true; documentStub.activeElement = this; };
-  elements["batch-progress"].focus = function () { this.focused = true; documentStub.activeElement = this; };
+  elements["batch-bookmark-btn"].focus = function () { this.focused = true; activeEl = this; };
+  elements["batch-progress"].focus = function () { this.focused = true; activeEl = this; };
   const statuses = [];
   const writes = [];
   const dismissed = [];
@@ -346,30 +349,24 @@ async function createUiHarness(storedProgress, now, opts = {}) {
       },
     },
   };
-  const source = await getPopupBatchProgressSource();
-  const factory = new Function(
-    "$id", "PBP_ICONS", "t", "showStatus", "setBtnIcon", "setTimeout",
-    "chrome", "batchIsRunning", "BATCH_STALE_TTL", "Date", "document", "readBatchAccount", "pbpDismissRemedyStatus",
-    source + "\nreturn { renderBatchProgress, wireBatchProgress };"
-  );
-  const api = factory(
-    (id) => elements[id] || null,
-    PBP_ICONS,
-    (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
-    (id, message, kind, opts) => statuses.push({ id, message, kind, remedy: opts?.remedy === true, key: opts?.key }),
-    (button, _icon, label) => { button.label = label; },
-    (callback) => { timer = callback; return 0; },
-    chromeStub,
-    batchIsRunning,
-    BATCH_STALE_TTL,
-    { now: () => now },
-    documentStub,
-    async () => ({ token: "alice:token", account: "alice" }),
-    (key) => dismissed.push(key)
-  );
+  const realm = await bootPopupBatchRealm((win, doc) => {
+    // Keep motion-ready absent on doc.documentElement so teardown stays synchronous,
+    // and reflect fakeElement focus on doc.activeElement.
+    Object.defineProperty(doc, "activeElement", { get: () => activeEl, configurable: true });
+    win.Date.now = () => now;
+    win.$id = (id) => elements[id] || null;
+    win.t = (key, ...args) => args.length ? `${key}:${args.join(":")}` : key;
+    win.showStatus = (id, message, kind, o) => statuses.push({ id, message, kind, remedy: o?.remedy === true, key: o?.key });
+    win.setBtnIcon = (button, _icon, label) => { button.label = label; };
+    win.setTimeout = (callback) => { timer = callback; return 0; };
+    chromeStub.storage.local.get = () => win.Promise.resolve({ batch_progress: storedProgress });
+    win.chrome = chromeStub;
+    win.pbpDismissRemedyStatus = (key) => dismissed.push(key);
+  });
+  realm.win.readBatchAccount = () => realm.win.Promise.resolve({ token: "alice:token", account: "alice" });
   return {
-    ...api,
-    renderBatchProgress: (progress) => api.renderBatchProgress({ account: "alice", ...progress }, "alice"),
+    wireBatchProgress: realm.win.wireBatchProgress,
+    renderBatchProgress: (progress) => realm.win.renderBatchProgress({ account: "alice", ...progress }, "alice"),
     elements, statuses, writes, dismissed, runTimer: () => timer?.()
   };
 }
@@ -471,11 +468,6 @@ async function createUiHarness(storedProgress, now, opts = {}) {
   }
   await test("Batch AI origins are exact, deduplicated, ceiling-filtered, and include the provider", async () => {
     const h = await createPermissionHarness();
-    // Roadmap #33: the optional_host_permissions ceiling is https + literal-
-    // loopback http only. A plain-http origin in the request list would make
-    // the WHOLE permissions.request throw, so it must be filtered out here
-    // (the tab still saves; only its AI extraction degrades). Loopback http
-    // stays requestable (local Ollama precedent).
     const origins = h.batchAiPermissionOrigins([
       { url: "https://one.example/a" },
       { url: "https://one.example/b" },
@@ -586,9 +578,6 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     equal(h.elements["batch-permission-grant"].focused, true);
   });
 
-  // Critique 2026-10-21: batch AI bills the key per tab, so even with every
-  // site granted the run is confirmed first -- in the same inline card, as a
-  // confirm-only step with nothing left to request.
   await test("already-granted exact origins skip the request but still confirm the AI run", async () => {
     const h = await createBatchClickHarness({ contains: true });
     await h.click();
@@ -632,8 +621,6 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     equal(h.elements["batch-permission-grant"].textContent, "batchPermGrant");
   });
 
-  // P26: the cards say what the run does to pages already saved, as
-  // batchSkipExisting decides in the worker (default false: merged into).
   await test("every confirm card names skip or merge from the setting, and only skip mode says pages are skipped", async () => {
     const tabs = Array.from({ length: 4 }, (_, i) => ({ id: i + 1, url: `https://site-${i + 1}.example/p` }));
     const shown = {};
@@ -646,8 +633,6 @@ async function createUiHarness(storedProgress, now, opts = {}) {
       "grant:false": "batchConfirmDetailAiMerge", "confirm-ai:false": "batchConfirmDetailAiMerge", "confirm:false": "batchConfirmDetailMerge",
       "grant:true": "batchConfirmDetailAi", "confirm-ai:true": "batchConfirmDetailAi", "confirm:true": "batchConfirmDetail",
     }));
-    // The copy behind the keys, in every locale: merge never says skipped, no
-    // card bills AI for "new" tabs only, and skip mode's says saved pages get none.
     const skippedWord = { en: /skipped/i, de: /übersprungen/i, fr: /ignorées/i, ja: /スキップ/, pl: /pominięte/i, ru: /пропущены/i, zh_CN: /跳过/, zh_HK: /略過|跳過/, zh_TW: /略過|跳過/ };
     const newWord = { en: /\bnew tab/i, de: /neuen Tab/i, fr: /nouvel onglet/i, ja: /新しいタブ/, pl: /nowej karty/i, ru: /новой вкладки/i, zh_CN: /新标签页/, zh_HK: /新標籤頁/, zh_TW: /新分頁/ };
     for (const loc of Object.keys(skippedWord)) {
@@ -741,16 +726,21 @@ async function createUiHarness(storedProgress, now, opts = {}) {
   });
 
   await test("Batch permission source has no native confirm, truncation, or all-sites wildcard", async () => {
-    const source = await getPopupBatchSource();
+    const source = await (await fetch("../popup-batch.js")).text();
     assert(!source.includes("confirm("), "native confirm remains");
     assert(!source.includes("BATCH_PERMISSION_DISCLOSE_LIMIT"), "disclosure is still capped");
     assert(!source.includes("batchPermMore"), "hidden-origin copy remains");
     assert(!source.includes("*://*/*"), "popup-batch.js still contains all-sites wildcard");
-    const start = source.indexOf('grantBtn?.addEventListener("click", async () =>');
-    const end = source.indexOf('cancelBtn?.addEventListener', start);
-    const handler = source.slice(start, end);
-    equal(handler.indexOf("await chrome.permissions.request"), handler.indexOf("await "), "permission request is not Grant's first await");
-    assert(handler.indexOf("await chrome.permissions.request") < handler.indexOf("await dispatchBatchSave"), "Batch starts before permission grant");
+    // Behavioural proof that Grant enters chrome.permissions.request synchronously
+    // on the click turn (zero prior awaits, preserving transient user activation)
+    // and dispatches Batch strictly after the grant resolves.
+    const h = await createBatchClickHarness();
+    await h.click();
+    const granting = h.grant();
+    equal(h.calls.request.length, 1, "permission request is not Grant's first await");
+    equal(h.calls.messages.length, 0, "Batch starts before permission grant");
+    await granting;
+    equal(h.calls.order.join(","), "request,send");
   });
 
   await test("permission disclosure markup is semantic and fully keyboard operable", async () => {
@@ -825,8 +815,6 @@ async function createUiHarness(storedProgress, now, opts = {}) {
       "cancel failure was silent");
   });
 
-  // User decision 2026-11-05: the user has to press Cancel again, so the card
-  // stays until a cancel request is written or the user dismisses it.
   await test("a failed cancel stays on screen until a cancel request goes through", async () => {
     const h = await createUiHarness(null, 5000, { setReject: true, setRejectOnce: {} });
     h.renderBatchProgress({ runId: "run-a", running: true, done: false, total: 4, i: 1, saved: 1, failed: 0 });
@@ -931,20 +919,15 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     const notApi = await createUiHarness(null, 5000);
     notApi.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, error: "not_api" });
     equal(notApi.statuses[0].message, "bookmarkErrNotApi");
-    // A rejected token and a missing host grant stop a run too and name their cause.
     for (const [code, key] of [["auth", "bookmarkErrAuth"], ["permission", "bookmarkPermissionDenied"]]) {
       const stopped = await createUiHarness(null, 5000);
       stopped.renderBatchProgress({ running: false, done: true, total: 3, i: 1, saved: 0, error: code });
       equal(stopped.statuses[0].message, key, code + " fell back to the raw batchFailed code");
       equal(stopped.statuses[0].kind, "error");
     }
-    // Any other thrown message keeps batchFailed.
     const other = await createUiHarness(null, 5000);
     other.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, error: "boom" });
     equal(other.statuses[0].message, "batchFailed:boom");
-    // Only the stop codes read the shared table: a thrown message that happens
-    // to spell another table code (a Pinboard run's own error) is not
-    // relabelled as a self-hosted server cause.
     for (const code of Object.keys(PBP_BOOKMARK_FAILURE_KEYS).filter((code) => code !== "auth" && !PBP_BOOKMARK_STOP_CODES.includes(code) && code !== "account_changed")) {
       const thrown = await createUiHarness(null, 5000);
       thrown.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, error: code });
@@ -968,6 +951,8 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     await Promise.resolve(); await Promise.resolve();
     equal(staleDone.statuses.length, 0, "stale completion should stay hidden");
   });
+
+  (await _swRealmPromise)?.dispose();
 })();
 </script>
 </body></html>

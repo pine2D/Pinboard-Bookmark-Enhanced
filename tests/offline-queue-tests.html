@@ -12,6 +12,8 @@ h2 { margin-top: 24px; font-size: 16px; }
 <h1>offlineQueue reducer Tests</h1>
 <div id="results"></div>
 <script src="../shared.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 async function test(name, fn) {
   try { await fn();
@@ -31,22 +33,21 @@ async function suite(name, fn) {
   await fn(); results.appendChild = savedAppend; results.appendChild(div);
 }
 
-// Exercise the production queue serializer, normalizer and intent validator.
+let _sharedSwPromise = null;
+function getSharedSw() {
+  return (_sharedSwPromise ||= pbpSwRealm.boot({
+    mock: { id: "test-id", storage: { local: { _driveScopeKeysRetiredDone: true } } },
+  }));
+}
+
+// Exercise the production queue serializer, normalizer and intent validator on real background.js.
 async function queueIntentHarness() {
-  const source = await (await fetch("../background.js")).text();
-  const block = (startText, endText) => {
-    const start = source.indexOf(startText);
-    const end = source.indexOf(endText, start === -1 ? 0 : start);
-    assert(start !== -1 && end !== -1 && end > start, "queue intent source block not found");
-    return source.slice(start, end);
+  const sw = await getSharedSw();
+  return {
+    validateSaveIntent: sw.win.validateSaveIntent,
+    normalizeOfflineSaveIntent: sw.win.normalizeOfflineSaveIntent,
+    queueRecordFromSaveIntent: sw.win.queueRecordFromSaveIntent,
   };
-  return new Function("pbpPinboardAccountFromToken", `
-    const PBP_SAVE_MODES = new Set(["create", "update", "merge", "overwrite", "skip"]);
-    ${block("function pbpSaveFailure(", "// Delivery-time merge/skip decisions")}
-    ${block("function normalizeOfflineSaveIntent(", "// pinboardFetch serializes")}
-    ${block("function queueRecordFromSaveIntent(", "function submitSaveIntent(")}
-    return { validateSaveIntent, normalizeOfflineSaveIntent, queueRecordFromSaveIntent };
-  `)(pbpPinboardAccountFromToken);
 }
 const SAVE_INTENT = Object.freeze({ mode: "create", url: "https://example.com/a", title: "Title",
   notes: "Note", tags: "tag", private: false, toread: true, archive: false });
@@ -57,9 +58,6 @@ const Q = () => ([
   { queueId: "c", url: "https://c.com" },
 ]);
 
-// The popup's queue bar (popup-offline.js) on real DOM, answered by a stub
-// worker. Returns the bar text and, once expanded, each row's meta line.
-let popupOfflineSource;
 // A translator over a real _locales file, with chrome.i18n's positional
 // placeholder substitution: renders rows in the copy users see.
 async function localeTranslator(locale) {
@@ -75,31 +73,47 @@ async function localeTranslator(locale) {
   };
 }
 
+// The popup's queue bar (popup-offline.js) loaded via real <script src> inside
+// an isolated document realm, answered by a stub worker.
 async function renderQueueBar(response, translate) {
-  popupOfflineSource ||= await (await fetch("../popup-offline.js")).text();
-  const host = document.createElement("div");
-  host.innerHTML = '<div id="oq-bar" class="hidden"><span id="oq-text"></span><button id="oq-toggle" aria-expanded="false"></button></div><div id="oq-list" class="hidden"></div>';
-  document.body.appendChild(host);
+  let hostRoot = document.getElementById("pbp-oq-frames");
+  if (!hostRoot) {
+    hostRoot = document.createElement("div");
+    hostRoot.id = "pbp-oq-frames";
+    hostRoot.style.cssText = "position:fixed;left:-9999px;top:0;width:10px;height:10px;opacity:0;pointer-events:none;overflow:hidden";
+    document.body.appendChild(hostRoot);
+  }
+  const iframe = document.createElement("iframe");
+  hostRoot.appendChild(iframe);
+  const win = iframe.contentWindow;
+  const doc = iframe.contentDocument;
+  doc.open();
+  doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><div id="oq-bar" class="hidden"><span id="oq-text"></span><button id="oq-toggle" aria-expanded="false"></button></div><div id="oq-list" class="hidden"></div></body></html>');
+  doc.close();
   const ids = { "offline-queue-bar": "oq-bar", "offline-queue-text": "oq-text", "offline-queue-toggle": "oq-toggle", "offline-queue-list": "oq-list" };
-  const byId = (id) => host.querySelector("#" + (ids[id] || id));
+  const byId = (id) => doc.getElementById(ids[id] || id);
   const tr = translate || ((key, ...args) => args.length ? key + ":" + args.join(":") : key);
-  const chromeStub = {
+  const base = new URL("../", document.baseURI).href;
+  win.chrome = {
     runtime: { lastError: null, sendMessage: (message, callback) => callback(message.type === "get_offline_queue" ? response : null) },
     storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } },
   };
-  const win = {};
-  new Function("window", "chrome", "$id", "t", popupOfflineSource)(win, chromeStub, byId, tr);
+  await pbpSwRealm.loadScript(doc, base + "shared.js");
+  win.$id = byId;
+  win.t = tr;
+  win.showConfirmPopover = () => {};
+  win.showStatus = () => {};
+  await pbpSwRealm.loadScript(doc, base + "popup-offline.js");
   win.PPOffline.init();
   await win.PPOffline.refresh();
   const text = byId("offline-queue-text").textContent;
-  byId("offline-queue-toggle").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  byId("offline-queue-toggle").dispatchEvent(new win.MouseEvent("click", { bubbles: true, cancelable: true }));
   for (let i = 0; i < 20 && !byId("offline-queue-list").querySelector(".offline-queue-item"); i++) await new Promise((r) => setTimeout(r, 0));
   const rows = [...byId("offline-queue-list").querySelectorAll(".offline-queue-item")].map((row) => ({
     id: row.dataset.queueId, meta: row.querySelector(".offline-queue-meta").textContent, html: row.outerHTML,
     reason: row.querySelector(".error-text > :first-child")?.textContent || "",
     hint: row.querySelector(".error-text > :nth-child(2)")?.textContent || "",
     buttons: [...row.querySelectorAll(".actions button")].map((button) => button.getAttribute("aria-label")) }));
-  host.remove();
   return { text, rows };
 }
 
@@ -545,23 +559,22 @@ await suite("offline queue", async () => {
   // draft holds a newer edit; other owners and other pages are never touched.
   await test("a replayed queued save clears its popup session draft but keeps newer edits and other rows", async () => {
     const source = await (await fetch("../background.js")).text();
-    const start = source.indexOf("async function pbpClearReplayedPopupDraft(");
-    const end = source.indexOf("// Connection-level replay pause. A gateway,", start);
-    assert(start >= 0 && end > start, "pbpClearReplayedPopupDraft source not found");
     assert(/onSuccess:[\s\S]{0,400}pbpClearReplayedPopupDraft\(item\)/.test(source), "onSuccess does not clear the draft");
+    const draftSw = await pbpSwRealm.boot({
+      mock: { id: "test-id", storage: { local: { _driveScopeKeysRetiredDone: true } } },
+    });
+    await new Promise((r) => setTimeout(r, 20));
     const LD = "linkding:https://ld.example/:c1";
     const url = "https://page.example/a";
     const draft = (over = {}) => ({ url, title: "T", notes: "N", tags: ["Work", "x y"], tagInput: "", private: false, toread: false, archive: false, archiveTouched: false, ...over });
     const key = (owner, kind, u) => "pbp-popup-draft:" + encodeURIComponent(owner) + ":" + kind + ":" + encodeURIComponent(u);
     const row = (owner, u, d) => ({ owner, pageUrl: u, incognito: false, updatedAt: Date.now(), draft: d });
     const run = async (item, rows, currentAccount = LD) => {
-      const store = { ...rows };
-      const chromeStub = { storage: { session: { get: async () => ({ ...store }), remove: async (keys) => { for (const k of [].concat(keys)) delete store[k]; } } } };
-      const fn = new Function("chrome", "navigator", "getCurrentBookmarkAuth", "pbpBookmarkAccountService", "pbpBookmarkParseTags", "pbpBookmarkDescriptionText",
-        source.slice(start, end) + "\nreturn pbpClearReplayedPopupDraft;")(
-        chromeStub, { locks: { request: (name, cb) => cb() } }, async () => ({ account: currentAccount }), pbpBookmarkAccountService, pbpBookmarkParseTags, pbpBookmarkDescriptionText);
-      await fn(item);
-      return Object.keys(store);
+      await draftSw.mock.chrome.storage.session.clear();
+      await draftSw.mock.chrome.storage.session.set(rows);
+      draftSw.win.getCurrentBookmarkAuth = async () => ({ account: currentAccount });
+      await draftSw.win.pbpClearReplayedPopupDraft(item);
+      return Object.keys(draftSw.mock.storageData("session")).filter((k) => k.startsWith("pbp-popup-draft:"));
     };
     const item = { queueId: "q1", account: LD, url, title: "T", notes: "N", tags: 'work "x y"' };
     const other = key("alice", "normal", url), otherPage = key(LD, "normal", "https://page.example/b");
@@ -590,31 +603,33 @@ await suite("offline queue", async () => {
       const newer = { [key(LD, "normal", url)]: row(LD, url, draft({ sharedExplicit: false, ...over })) };
       assert((await run(queuedLd, newer)).length === 1, "a newer " + label + " edit was cleared");
     }
+    draftSw.dispose();
   });
-  // The production keepalive check and release (background.js), with only
-  // the queue, pause, connection and alarm stores stubbed.
+  // The production keepalive check and release (background.js), loaded via real
+  // <script src> in an SW realm with only queue, pause, connection and alarm stores controlled.
   await test("the keepalive alarm is released when only records replay will not send remain", async () => {
-    const source = await (await fetch("../background.js")).text();
-    const start = source.indexOf("let _keepaliveAlarmEnsured = false;");
-    const end = source.indexOf("// Badge refresh is its own", start);
-    assert(start >= 0 && end > start, "keepalive source not found");
-    const pauseStart = source.indexOf("const PBP_OFFLINE_QUEUE_PAUSE_KEY");
-    const pauseEnd = source.indexOf("function pbpReadOfflineQueuePause()", pauseStart);
-    assert(pauseStart >= 0 && pauseEnd > pauseStart, "pause source not found");
+    const keepaliveSw = await pbpSwRealm.boot({
+      mock: { id: "test-id", storage: { local: { _driveScopeKeysRetiredDone: true } } },
+    });
+    await new Promise((r) => setTimeout(r, 20));
     const LD = "linkding:https://ld.example/:c1", KK = "karakeep:https://kk.example/:u1";
     const run = async (queue, pause) => {
       const log = { ensured: 0, cleared: 0 };
-      const local = { offlineQueue: queue, ...(pause ? { offlineQueuePause: pause } : {}) };
-      const deps = {
-        chrome: { storage: { local: { get: async (keys) => Object.fromEntries([].concat(keys).filter((k) => local[k] !== undefined).map((k) => [k, local[k]])) },
-          session: { get: async () => ({ _lastActivityTs: 0 }) } }, alarms: { clear: async () => { log.cleared++; return true; } } },
-        ensurePeriodicAlarm: () => { log.ensured++; }, _lastActivityTs: 0, KEEPALIVE_WINDOW_MS: 600000,
-        getCurrentBookmarkAuth: async () => ({ account: LD, token: "fixture" }),
-      };
-      const api = new Function(...Object.keys(deps), source.slice(pauseStart, pauseEnd) + source.slice(start, end)
-        + "\nreturn { _keepaliveAlarmStillNeeded, _maybeReleaseKeepaliveAlarm };")(...Object.values(deps));
-      const needed = await api._keepaliveAlarmStillNeeded();
-      await api._maybeReleaseKeepaliveAlarm();
+      await keepaliveSw.mock.chrome.storage.local.clear();
+      await keepaliveSw.mock.chrome.storage.local.set({
+        _driveScopeKeysRetiredDone: true,
+        offlineQueue: queue,
+        ...(pause ? { offlineQueuePause: pause } : {}),
+      });
+      await keepaliveSw.mock.chrome.storage.session.clear();
+      await keepaliveSw.mock.chrome.storage.session.set({ _lastActivityTs: 0 });
+      keepaliveSw.set("_lastActivityTs", 0);
+      keepaliveSw.set("_keepaliveAlarmEnsured", false);
+      keepaliveSw.win.getCurrentBookmarkAuth = async () => ({ account: LD, token: "fixture" });
+      keepaliveSw.win.ensurePeriodicAlarm = () => { log.ensured++; };
+      keepaliveSw.mock.chrome.alarms.clear = async () => { log.cleared++; return true; };
+      const needed = await keepaliveSw.win._keepaliveAlarmStillNeeded();
+      await keepaliveSw.win._maybeReleaseKeepaliveAlarm();
       return { needed, ...log };
     };
     const now = Date.now();
@@ -635,6 +650,7 @@ await suite("offline queue", async () => {
       const r = await run(queue);
       assert(r.needed && r.cleared === 0, label + ": " + JSON.stringify(r));
     }
+    keepaliveSw.dispose();
   });
   await test("drain skips items the hook marks and reports failures to onFailure", async () => {
     const run = async (hooks) => {
@@ -662,6 +678,7 @@ await suite("offline queue", async () => {
     assert(plain.outcomes.length === 3 && !plain.outcomes[0].acknowledged && plain.outcomes[1].acknowledged, "outcomes unchanged without hooks");
     assert(plain.queue.map((i) => i.queueId).join() === "a", "only the failed item remains without hooks");
   });
+  (await _sharedSwPromise)?.dispose();
 });
 })();
 </script>

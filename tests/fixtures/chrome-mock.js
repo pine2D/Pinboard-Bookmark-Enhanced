@@ -241,9 +241,10 @@
             return total;
           });
         },
+        getKeys: (...args) => invoke("storage." + area + ".getKeys", args, () => [...data.keys()]),
+        setAccessLevel: (...args) => invoke("storage." + area + ".setAccessLevel", args, () => undefined),
         onChanged,
       };
-      if (area === "session") obj.setAccessLevel = (...args) => invoke("storage.session.setAccessLevel", args, () => undefined);
       return obj;
     }
     chrome.storage = { local: makeArea("local"), sync: makeArea("sync"), session: makeArea("session"), onChanged: globalChanged };
@@ -252,9 +253,13 @@
     // https://developer.chrome.com/docs/extensions/reference/api/runtime
     const extensionId = options.id || "abcdefghijklmnopabcdefghijklmnop";
     let sendHandler = null;
+    let contexts = clone(options.contexts || []);
     runtime.id = extensionId;
     runtime.getURL = (path) => "chrome-extension://" + extensionId + "/" + String(path || "").replace(/^\//, "");
     runtime.getManifest = () => clone(options.manifest || { manifest_version: 3, name: "test", version: "0.0.0" });
+    runtime.getContexts = (...args) => invoke("runtime.getContexts", args, (filter = {}) => clone(contexts.filter((c) =>
+      !filter || !Array.isArray(filter.contextTypes) || filter.contextTypes.includes(c.contextType))));
+    runtime.getPlatformInfo = (...args) => invoke("runtime.getPlatformInfo", args, () => ({ os: "linux", arch: "x86-64", nacl_arch: "x86-64" }));
     runtime.onMessage = makeEvent("runtime.onMessage", record);
     runtime.onInstalled = makeEvent("runtime.onInstalled", record);
     runtime.onStartup = makeEvent("runtime.onStartup", record);
@@ -326,6 +331,7 @@
     const tabs = (options.tabs || []).map((t, i) => ({ id: i + 1, index: i, windowId: 1, active: false, highlighted: false, pinned: false, incognito: false, ...t }));
     let tabsMessageHandler = null;
     const currentWindow = options.currentWindowId || 1;
+    let focusedWindow = options.focusedWindowId !== undefined ? options.focusedWindowId : currentWindow;
     const matchUrl = (pattern, url) => {
       if (!url) return false;
       const re = new RegExp("^" + String(pattern).split("*").map((s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$");
@@ -338,12 +344,19 @@
       query: (...args) => invoke("tabs.query", args, (info = {}) => clone(tabs.filter((t) =>
         (info.active === undefined || t.active === info.active)
         && (info.currentWindow === undefined || (t.windowId === currentWindow) === info.currentWindow)
+        && (info.lastFocusedWindow === undefined || (t.windowId === focusedWindow) === info.lastFocusedWindow)
         && (info.windowId === undefined || t.windowId === info.windowId)
         && (info.url === undefined || [].concat(info.url).some((p) => matchUrl(p, t.url)))))),
       get: (...args) => invoke("tabs.get", args, (id) => {
         const tab = tabs.find((t) => t.id === id);
         if (!tab) throw new Error("No tab with id: " + id + ".");
         return clone(tab);
+      }),
+      reload: (...args) => invoke("tabs.reload", args, (tabId) => {
+        const id = typeof tabId === "number" ? tabId : (tabs.find((t) => t.active && t.windowId === currentWindow) || {}).id;
+        const tab = tabs.find((t) => t.id === id);
+        if (!tab) throw new Error("No tab with id: " + id + ".");
+        return undefined;
       }),
       create: (...args) => invoke("tabs.create", args, (props = {}) => {
         const tab = { id: tabs.reduce((m, t) => Math.max(m, t.id), 0) + 1, index: tabs.length, windowId: props.windowId || currentWindow,
@@ -442,6 +455,87 @@
 
     chrome.runtime = runtime;
 
+    // ---- windows / action / notifications / DNR / scripting / commands / identity ----
+    // https://developer.chrome.com/docs/extensions/reference/api/windows
+    // https://developer.chrome.com/docs/extensions/reference/api/action
+    // https://developer.chrome.com/docs/extensions/reference/api/notifications
+    // https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest
+    // https://developer.chrome.com/docs/extensions/reference/api/scripting
+    // https://developer.chrome.com/docs/extensions/reference/api/commands
+    // https://developer.chrome.com/docs/extensions/reference/api/identity
+    chrome.windows = {
+      WINDOW_ID_NONE: -1,
+      onFocusChanged: makeEvent("windows.onFocusChanged", record),
+    };
+    chrome.action = {
+      setIcon: (...args) => invoke("action.setIcon", args, () => undefined),
+      setBadgeText: (...args) => invoke("action.setBadgeText", args, () => undefined),
+      setBadgeBackgroundColor: (...args) => invoke("action.setBadgeBackgroundColor", args, () => undefined),
+    };
+    const notifications = new Map();
+    chrome.notifications = {
+      onButtonClicked: makeEvent("notifications.onButtonClicked", record),
+      onClosed: makeEvent("notifications.onClosed", record),
+      create(...args) {
+        const a = Array.from(args);
+        const cb = typeof a[a.length - 1] === "function" ? a.pop() : null;
+        const id = typeof a[0] === "string" ? a.shift() : "notif-" + (notifications.size + 1);
+        const opts = a[0] || {};
+        return invoke("notifications.create", cb ? [id, opts, cb] : [id, opts], (nid, o) => {
+          notifications.set(nid, clone(o));
+          return nid;
+        });
+      },
+      clear: (...args) => invoke("notifications.clear", args, (id) => notifications.delete(id)),
+      getAll: (...args) => invoke("notifications.getAll", args, () => Object.fromEntries([...notifications].map(([k]) => [k, true]))),
+    };
+    const sessionRules = new Map((options.sessionRules || []).map((r) => [r.id, clone(r)]));
+    chrome.declarativeNetRequest = {
+      getSessionRules: (...args) => invoke("declarativeNetRequest.getSessionRules", args, (filter) => {
+        const list = [...sessionRules.values()];
+        return clone(filter && Array.isArray(filter.ruleIds) ? list.filter((r) => filter.ruleIds.includes(r.id)) : list);
+      }),
+      updateSessionRules: (...args) => invoke("declarativeNetRequest.updateSessionRules", args, (req = {}) => {
+        for (const id of req.removeRuleIds || []) sessionRules.delete(id);
+        for (const r of req.addRules || []) sessionRules.set(r.id, clone(r));
+        return undefined;
+      }),
+    };
+    const registeredScripts = new Map();
+    let executeScriptHandler = null;
+    chrome.scripting = {
+      registerContentScripts: (...args) => invoke("scripting.registerContentScripts", args, (scripts = []) => {
+        for (const s of scripts) registeredScripts.set(s.id, clone(s));
+        return undefined;
+      }),
+      unregisterContentScripts: (...args) => invoke("scripting.unregisterContentScripts", args, (filter) => {
+        const ids = filter && Array.isArray(filter.ids) ? filter.ids : [...registeredScripts.keys()];
+        for (const id of ids) {
+          if (!registeredScripts.has(id)) throw new Error("Nonexistent script ID '" + id + "'");
+          registeredScripts.delete(id);
+        }
+        return undefined;
+      }),
+      getRegisteredContentScripts: (...args) => invoke("scripting.getRegisteredContentScripts", args, (filter) => {
+        const list = [...registeredScripts.values()];
+        return clone(filter && Array.isArray(filter.ids) ? list.filter((s) => filter.ids.includes(s.id)) : list);
+      }),
+      executeScript: (...args) => invoke("scripting.executeScript", args, async (injection) =>
+        executeScriptHandler ? clone(await executeScriptHandler(clone(injection))) : [{ frameId: 0, result: undefined }]),
+    };
+    chrome.commands = {
+      onCommand: makeEvent("commands.onCommand", record),
+    };
+    let authTokenAnswer = options.authToken !== undefined ? options.authToken : { token: "mock-oauth-token" };
+    if (!options.omitIdentity) {
+      chrome.identity = {
+        getAuthToken: (...args) => invoke("identity.getAuthToken", args, async (details) =>
+          typeof authTokenAnswer === "function" ? clone(await authTokenAnswer(clone(details))) : clone(authTokenAnswer)),
+        removeCachedAuthToken: (...args) => invoke("identity.removeCachedAuthToken", args, () => undefined),
+        clearAllCachedAuthTokens: (...args) => invoke("identity.clearAllCachedAuthTokens", args, () => undefined),
+      };
+    }
+
     return {
       chrome,
       calls,
@@ -455,6 +549,10 @@
       },
       onSendMessage(fn) { sendHandler = fn; },
       onTabsSendMessage(fn) { tabsMessageHandler = fn; },
+      onExecuteScript(fn) { executeScriptHandler = fn; },
+      setContexts(list) { contexts = clone(list || []); },
+      setFocusedWindow(id) { focusedWindow = id; },
+      setAuthToken(v) { authTokenAnswer = v; },
       dispatchMessage,
       fireAlarm,
       setPermissionRequestAnswer(v) { requestAnswer = v === true; },
@@ -462,6 +560,7 @@
       userGesture(ms = 5000) { gestureUntil = Date.now() + ms; },
       endUserGesture() { gestureUntil = 0; },
       storageData: (area) => Object.fromEntries([...stores[area]].map(([k, v]) => [k, clone(v)])),
+      notifications: () => Object.fromEntries([...notifications].map(([k, v]) => [k, clone(v)])),
       tabs,
     };
   }

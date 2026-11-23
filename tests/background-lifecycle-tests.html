@@ -2,21 +2,11 @@
 <html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="72"><title>Background Lifecycle Tests</title>
 <style>body{font-family:monospace;padding:16px}.case{padding:6px}.pass{color:#0a0}.fail{color:#c00}</style>
 </head><body><h1>Background Lifecycle Tests</h1><div id="summary"></div><div id="results"></div>
-<!--
-  MV3 lifecycle behaviour of background.js that no other suite drives:
-    - pbpSweepInterruptedBatch: it must never close out a batch that a retry
-      claimed while the sweep was awaiting storage, and must never announce a
-      terminal state that storage refused to keep.
-    - the Undo notification record: it outlives the worker that created it, so it
-      lives in storage.session with an expiry, swept by a named alarm instead of
-      a setTimeout that dies with the worker.
-  Both harnesses run the real source sliced out of background.js.
--->
 <script src="../shared.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const root = document.getElementById("results"); let pass = 0, fail = 0;
-// A sync try/catch around a promise-returning chrome API "passes" every behavioural
-// assertion while leaking an unhandled rejection — watch for it directly.
 const unhandled = [];
 addEventListener("unhandledrejection", (event) => { unhandled.push(event.reason); event.preventDefault(); });
 function check(name, ok) {
@@ -27,9 +17,21 @@ function check(name, ok) {
   root.appendChild(row);
 }
 
-// chrome.storage hands back a structured clone, never a live reference: a fake
-// that leaks the stored object would make a missing write-back look like a
-// success. Clone on the way in and on the way out.
+const EXT_ID = "feoognahlmfmbllpmgailahcnjppiegb";
+const EXT_URL = `chrome-extension://${EXT_ID}/popup.html`;
+const CAPABLE_MANIFEST = {
+  manifest_version: 3, name: "test", version: "0.0.0",
+  optional_permissions: ["identity"],
+  optional_host_permissions: ["https://*/*"],
+  oauth2: { client_id: "1234567890-active.apps.googleusercontent.com", scopes: ["https://www.googleapis.com/auth/drive.appdata"] }
+};
+const INCAPABLE_MANIFEST = {
+  manifest_version: 3, name: "test", version: "0.0.0",
+  optional_permissions: ["identity"],
+  optional_host_permissions: ["https://*/*"],
+  oauth2: { client_id: "", scopes: ["https://www.googleapis.com/auth/drive.appdata"] }
+};
+
 function makeStore(initial, hooks) {
   const data = structuredClone(initial || {});
   const h = hooks || {};
@@ -46,189 +48,336 @@ function makeStore(initial, hooks) {
       if (h.onSet) await h.onSet();
       for (const [k, v] of Object.entries(obj)) data[k] = structuredClone(v);
     },
-    async remove(key) { delete data[key]; },
+    async remove(key) { for (const k of [].concat(key)) delete data[k]; },
   };
 }
 
-// ---- Batch sweep harness ----
-function buildSweepHarness(source, opts) {
-  const start = source.indexOf("let _batchRunning = false;");
-  const end = source.indexOf("function handleBatchSave", start);
-  if (start < 0 || end <= start) throw new Error("batch sweep source not found");
-  const notifications = [];
+let capableSw = null, routerSw = null, realCapable = null, realRouter = null;
+
+async function bootRealms() {
+  [capableSw, routerSw] = await Promise.all([
+    pbpSwRealm.boot({
+      mock: {
+        id: EXT_ID,
+        manifest: CAPABLE_MANIFEST,
+        storage: { local: { vocabDriveConnected: false, bookmarkServiceActive: "pinboard", _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
+        permissions: { permissions: ["identity"], origins: ["https://www.googleapis.com/*"] },
+      },
+    }),
+    pbpSwRealm.boot({
+      mock: {
+        id: EXT_ID,
+        manifest: INCAPABLE_MANIFEST,
+        storage: { local: { vocabDriveConnected: false, bookmarkServiceActive: "pinboard", _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
+      },
+    }),
+  ]);
+  capableSw.win.addEventListener("unhandledrejection", (event) => { unhandled.push(event.reason); event.preventDefault(); });
+  routerSw.win.addEventListener("unhandledrejection", (event) => { unhandled.push(event.reason); event.preventDefault(); });
+  await new Promise((r) => setTimeout(r, 30));
+
+  const cw = capableSw.win, cm = capableSw.mock.chrome;
+  realCapable = {
+    fns: Object.fromEntries([
+      "getCurrentBookmarkAuth", "showNotification", "t", "handleBatchSave",
+      "pbpSweepInterruptedBatch", "_writeBatchProgress", "pbpRestrictStorageAccess",
+      "pbpVocabDriveIsConnected", "pbpClearDriveAlarms", "pbpQueueDriveRound", "pbpBootDriveSync",
+      "pbpRememberUndo", "pbpTakeUndoRecord", "pbpSweepExpiredUndo", "pbpClearNotification",
+      "pbpImgFixSweepRules", "_syncBadgeAlarm", "handleSaveTabSet", "loadSettings",
+      "pbpBookmarkServiceId", "updateBadge", "processOfflineQueue", "ensureKeepAlive",
+      "_maybeReleaseKeepaliveAlarm", "prewarmTagsNow", "primeSettings", "pbpMigrateSecretsToLocal",
+      "scheduleEffectiveAuthRefresh", "pbpOfflinePauseOnCredentialChange", "syncPrewarmTagsAlarm",
+      "pbpSyncSiteThemeScript", "pbpReconcileBookmarkService", "pbpReadBookmarkConnection", "fetch", "setTimeout",
+    ].map((k) => [k, cw[k]])),
+    consoleWarn: cw.console.warn.bind(cw.console),
+    localGet: cm.storage.local.get, localSet: cm.storage.local.set, localRemove: cm.storage.local.remove, localSetAccess: cm.storage.local.setAccessLevel,
+    syncSetAccess: cm.storage.sync.setAccessLevel,
+    sessionGet: cm.storage.session.get, sessionSet: cm.storage.session.set, sessionRemove: cm.storage.session.remove,
+    alarmsGet: cm.alarms.get, alarmsCreate: cm.alarms.create, alarmsClear: cm.alarms.clear,
+    permContains: cm.permissions.contains,
+    notifClear: cm.notifications.clear,
+    dnrGet: cm.declarativeNetRequest.getSessionRules, dnrUpdate: cm.declarativeNetRequest.updateSessionRules,
+    tabsQuery: cm.tabs.query, tabsGet: cm.tabs.get, tabsCreate: cm.tabs.create,
+  };
+
+  const rw = routerSw.win, rm = routerSw.mock.chrome;
+  realRouter = {
+    fns: Object.fromEntries([
+      "noteActivity", "pbpVocabDriveIsConnected", "pbpDriveEnabled", "pbpDriveScheduleDirty",
+      "pbpQueueDriveRound", "pbpGetVocabDriveStatus", "pbpVocabDriveResponse", "pbpVocabClearNotices",
+      "pbpDisconnectVocabDrive", "pbpDictOwnerScope", "getCurrentBookmarkAuth", "pbpBookmarkAuthIsCurrent",
+      "pbpStatusCacheGet", "pbpStatusCacheSet", "pbpSameBookmark", "pbpSaveFailure",
+      "submitPopupSaveIntent", "notifySaveFailure", "handleBatchSave", "handleSaveTabSet",
+      "loadSettings", "pbpWaybackArchive", "pbpIsAllowedPinboardApiUrl", "pbpAuthorizePinboardApiUrl",
+      "pinboardFetch", "pinboardFetchImmediate", "retryOfflineItem", "readOfflineQueueWithIds",
+      "mutateOfflineQueue", "checkBookmarked", "extractForPreview", "pbpImgFixInstallRule",
+      "pbpImgFixRemoveRules", "pbpImgFixSweepRules", "_imgFixIsPreviewUrl", "deobfuscateKey",
+      "showNotification", "t", "pbpWithLargeStorageLock", "pbpReadLargeWithFallbackUnlocked",
+      "getSettingsStorage",
+    ].map((k) => [k, rw[k]])),
+    consoleWarn: rw.console.warn.bind(rw.console),
+    getContexts: rm.runtime.getContexts,
+    tabsQuery: rm.tabs.query,
+  };
+}
+
+function resetCapable() {
+  const cw = capableSw.win, cm = capableSw.mock.chrome;
+  Object.assign(cw, realCapable.fns);
+  cw.console.warn = realCapable.consoleWarn;
+  cm.storage.local.get = realCapable.localGet;
+  cm.storage.local.set = realCapable.localSet;
+  cm.storage.local.remove = realCapable.localRemove;
+  cm.storage.local.setAccessLevel = realCapable.localSetAccess;
+  cm.storage.sync.setAccessLevel = realCapable.syncSetAccess;
+  cm.storage.session.get = realCapable.sessionGet;
+  cm.storage.session.set = realCapable.sessionSet;
+  cm.storage.session.remove = realCapable.sessionRemove;
+  cm.alarms.get = realCapable.alarmsGet;
+  cm.alarms.create = realCapable.alarmsCreate;
+  cm.alarms.clear = realCapable.alarmsClear;
+  cm.permissions.contains = realCapable.permContains;
+  cm.notifications.clear = realCapable.notifClear;
+  cm.declarativeNetRequest.getSessionRules = realCapable.dnrGet;
+  cm.declarativeNetRequest.updateSessionRules = realCapable.dnrUpdate;
+  cm.tabs.query = realCapable.tabsQuery;
+  cm.tabs.get = realCapable.tabsGet;
+  cm.tabs.create = realCapable.tabsCreate;
+  capableSw.set("_batchRunning", false);
+}
+
+function buildSweepHarness(opts) {
+  resetCapable();
+  const notifications = [], resumes = [];
   const local = makeStore({ batch_progress: opts.progress }, opts.hooks);
-  const resumes = [];
-  const deps = {
-    chrome: { storage: { local } },
-    batchIsRunning,
-    BATCH_STALE_TTL,
-    getCurrentBookmarkAuth: async () => ({ token: "alice:t", account: opts.account || "alice", epoch: 0 }),
-    showNotification: (...args) => { notifications.push(args); },
-    t: (key, ...args) => (args.length ? `${key}:${args.join(":")}` : key),
-    handleBatchSave: (tabs, account, reserved, resumeState) => { resumes.push({ tabs, account, reserved, resumeState }); return Promise.resolve(); },
-    console,
+  const cw = capableSw.win, cm = capableSw.mock.chrome;
+  cm.storage.local.get = local.get;
+  cm.storage.local.set = local.set;
+  cm.storage.local.remove = local.remove;
+  cw.getCurrentBookmarkAuth = async () => ({ token: "alice:t", account: opts.account || "alice", epoch: 0 });
+  cw.showNotification = (...args) => { notifications.push(args); };
+  cw.t = (key, ...args) => (args.length ? `${key}:${args.join(":")}` : key);
+  cw.handleBatchSave = (tabs, account, reserved, resumeState) => { resumes.push({ tabs, account, reserved, resumeState }); return Promise.resolve(); };
+  return {
+    pbpSweepInterruptedBatch: cw.pbpSweepInterruptedBatch,
+    _writeBatchProgress: cw._writeBatchProgress,
+    setBatchRunning: (value) => capableSw.set("_batchRunning", value),
+    notifications, resumes, local,
   };
-  const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
-    return {
-      pbpSweepInterruptedBatch,
-      _writeBatchProgress,
-      setBatchRunning: (value) => { _batchRunning = value; },
-    };`);
-  return { ...factory(...Object.values(deps)), notifications, resumes, local };
 }
 
-function buildStorageAccessHarness(source, opts) {
-  const start = source.indexOf("const PBP_STORAGE_ACCESS_RETRY_ALARM");
-  const end = source.indexOf("// Re-assert trusted-only storage", start === -1 ? 0 : start);
-  if (start === -1 || end === -1 || end <= start) return null;
+function buildStorageAccessHarness(opts) {
+  resetCapable();
   const calls = { local: [], sync: [], create: [], clear: [], warn: [] };
   const o = opts || {};
-  const area = (name) => ({
-    async setAccessLevel(value) {
+  const session = o.session || {};
+  const cw = capableSw.win, cm = capableSw.mock.chrome;
+  for (const name of ["local", "sync"]) {
+    cm.storage[name].setAccessLevel = async (value) => {
       calls[name].push(value);
       if (o.rejectArea === name) throw new Error(name + " unavailable");
-    },
-  });
-  // storage.session outlives the worker but not the browser session, so a
-  // caller can hand the SAME object to several harnesses to model consecutive
-  // worker generations — which is the only way a retry budget can be observed.
-  const session = o.session || {};
-  const sessionArea = {
-    async get(query) {
-      const out = {};
-      for (const [key, fallback] of Object.entries(query || {})) {
-        out[key] = key in session ? session[key] : fallback;
-      }
-      return out;
-    },
-    async set(obj) { Object.assign(session, structuredClone(obj)); },
-    async remove(key) { for (const k of [].concat(key)) delete session[k]; },
+    };
+  }
+  cm.storage.session.get = async (query) => {
+    const out = {};
+    for (const [key, fallback] of Object.entries(query || {})) out[key] = key in session ? session[key] : fallback;
+    return out;
   };
-  const deps = {
-    chrome: {
-      storage: { local: area("local"), sync: area("sync"), session: sessionArea },
-      alarms: {
-        create: async (...args) => { calls.create.push(args); },
-        clear: async (...args) => { calls.clear.push(args); return true; },
-      },
-    },
-    console: { warn: (...args) => calls.warn.push(args) },
+  cm.storage.session.set = async (obj) => { Object.assign(session, structuredClone(obj)); };
+  cm.storage.session.remove = async (key) => { for (const k of [].concat(key)) delete session[k]; };
+  cm.alarms.create = async (...args) => { calls.create.push(args); };
+  cm.alarms.clear = async (...args) => { calls.clear.push(args); return true; };
+  cw.console.warn = (...args) => { calls.warn.push(args); };
+  return {
+    PBP_STORAGE_ACCESS_RETRY_ALARM: capableSw.get("PBP_STORAGE_ACCESS_RETRY_ALARM"),
+    PBP_STORAGE_ACCESS_RETRY_KEY: capableSw.get("PBP_STORAGE_ACCESS_RETRY_KEY"),
+    PBP_STORAGE_ACCESS_MAX_RETRIES: capableSw.get("PBP_STORAGE_ACCESS_MAX_RETRIES"),
+    pbpRestrictStorageAccess: cw.pbpRestrictStorageAccess,
+    calls, session,
   };
-  const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
-    return {
-      PBP_STORAGE_ACCESS_RETRY_ALARM, PBP_STORAGE_ACCESS_RETRY_KEY,
-      PBP_STORAGE_ACCESS_MAX_RETRIES, pbpRestrictStorageAccess,
-    };`);
-  return { ...factory(...Object.values(deps)), calls, session };
 }
 
-// Cold-start Drive sync: this call sits at the SW top level, so it re-runs on
-// EVERY wake, and an idle browser is still woken every 5 minutes by the
-// storage-warm alarm. Only the wake path carries a throttle; the drive-sync-*
-// alarms are the real schedule and must stay immediate.
-function buildBootDriveSyncHarness(source, opts) {
-  const start = source.indexOf("const PBP_VOCAB_BOOT_SYNC_KEY");
-  const end = source.indexOf("async function pbpDisconnectVocabDrive", start === -1 ? 0 : start);
-  if (start === -1 || end === -1 || end <= start) return null;
+function buildBootDriveSyncHarness(opts) {
+  resetCapable();
   const o = opts || {};
   const local = o.local || {};
   const syncs = [];
-  const deps = {
-    chrome: {
-      storage: { local: {
-        async get(query) {
-          const out = {};
-          for (const [key, fallback] of Object.entries(query || {})) {
-            out[key] = key in local ? local[key] : fallback;
-          }
-          return out;
-        },
-        async set(obj) { Object.assign(local, structuredClone(obj)); },
-      } },
-      permissions: { contains: async () => true },
-      alarms: { clear: async () => true },
-    },
-    PBP_VOCAB_DRIVE_CAPABLE: true,
-    PBP_VOCAB_DRIVE_CONNECTED_KEY: "vocabDriveConnected",
-    PBP_GOOGLE_API_ORIGIN: "https://www.googleapis.com/*",
-    pbpVocabDriveIsConnected: async () => true,
-    pbpClearDriveAlarms: async () => {},
-    pbpQueueDriveRound: async (options) => { syncs.push(options); return { ok: true }; },
-    console,
+  const cw = capableSw.win, cm = capableSw.mock.chrome;
+  cm.storage.local.get = async (query) => {
+    const out = {};
+    for (const [key, fallback] of Object.entries(query || {})) out[key] = key in local ? local[key] : fallback;
+    return out;
   };
-  const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
-    return { PBP_VOCAB_BOOT_SYNC_KEY, PBP_VOCAB_BOOT_SYNC_MIN_MS, pbpBootDriveSync };`);
-  return { ...factory(...Object.values(deps)), syncs, local };
+  cm.storage.local.set = async (obj) => { Object.assign(local, structuredClone(obj)); };
+  cm.permissions.contains = async () => true;
+  cm.alarms.clear = async () => true;
+  cw.pbpVocabDriveIsConnected = async () => true;
+  cw.pbpClearDriveAlarms = async () => {};
+  cw.pbpQueueDriveRound = async (options) => { syncs.push(options); return { ok: true }; };
+  return {
+    PBP_VOCAB_BOOT_SYNC_KEY: capableSw.get("PBP_VOCAB_BOOT_SYNC_KEY"),
+    PBP_VOCAB_BOOT_SYNC_MIN_MS: capableSw.get("PBP_VOCAB_BOOT_SYNC_MIN_MS"),
+    pbpBootDriveSync: cw.pbpBootDriveSync,
+    syncs, local,
+  };
 }
 
-// The real onAlarm listener, sliced out and fed each alarm name. Only the
-// Drive branch matters here; the other branches get inert stand-ins.
-function buildDriveAlarmRouterHarness(source) {
-  const start = source.indexOf("chrome.alarms.onAlarm.addListener");
-  const end = source.indexOf("// React to settings change", start === -1 ? 0 : start);
-  if (start === -1 || end === -1 || end <= start) return null;
-  const boots = [], listeners = [];
+function buildDriveAlarmRouterHarness() {
+  resetCapable();
+  const boots = [];
   const inert = () => Promise.resolve();
-  const deps = {
-    chrome: { alarms: { onAlarm: { addListener: (fn) => listeners.push(fn) } } },
-    PBP_STORAGE_ACCESS_RETRY_ALARM: "storage-access-retry", PBP_UNDO_ALARM: "undo-expire",
-    // Contract values (vocab-gdrive.js); this page does not load that script.
-    PBP_DRIVE_DIRTY_ALARM: "drive-sync-dirty", PBP_DRIVE_PERIODIC_ALARM: "drive-sync-periodic",
-    PBP_DRIVE_RETRY_ALARM: "drive-sync-retry",
-    PBP_DRIVE_LEGACY_ALARMS: Object.freeze(["vocab-sync-dirty", "vocab-sync-periodic", "vocab-sync-retry",
-      "notes-sync-dirty", "notes-sync-periodic", "notes-sync-retry"]),
-    pbpBootDriveSync: (...args) => { boots.push(args); return Promise.resolve({ ok: true }); },
-    pbpRestrictStorageAccess: inert, processOfflineQueue: inert, pbpSweepInterruptedBatch: inert,
-    ensureKeepAlive: () => {}, _maybeReleaseKeepaliveAlarm: () => {}, updateBadge: inert,
-    pbpSweepExpiredUndo: inert, prewarmTagsNow: inert, primeSettings: inert, pbpMigrateSecretsToLocal: inert,
-    console,
-  };
-  new Function(...Object.keys(deps), source.slice(start, end))(...Object.values(deps));
+  const cw = capableSw.win, cm = capableSw.mock.chrome;
+  cw.pbpBootDriveSync = (...args) => { boots.push(args); return Promise.resolve({ ok: true }); };
+  cw.pbpRestrictStorageAccess = inert;
+  cw.processOfflineQueue = inert;
+  cw.pbpSweepInterruptedBatch = inert;
+  cw.ensureKeepAlive = () => {};
+  cw._maybeReleaseKeepaliveAlarm = () => {};
+  cw.updateBadge = inert;
+  cw.pbpSweepExpiredUndo = inert;
+  cw.prewarmTagsNow = inert;
+  cw.primeSettings = inert;
+  cw.pbpMigrateSecretsToLocal = inert;
+  const listeners = cm.alarms.onAlarm.listeners;
   return { fire: (name) => listeners.forEach((fn) => fn({ name })), boots, listeners };
 }
 
-// ---- Undo notification harness ----
-function buildUndoHarness(source, opts) {
-  const start = source.indexOf("// F7: Track recent saves");
-  const end = source.indexOf("// ---- Show Chrome notification", start === -1 ? 0 : start);
-  if (start === -1 || end === -1 || end <= start) throw new Error("undo source not found");
+function buildUndoHarness(opts) {
+  resetCapable();
   const o = opts || {};
-  const cleared = [];
-  const alarms = [];
-  let pendingClear = null;
+  const cleared = [], alarms = [];
+  let pendingClear = null, timersScheduled = 0;
   const session = makeStore(o.session || {}, o.hooks);
-  const deps = {
-    chrome: {
-      storage: { session },
-      notifications: {
-        clear: (id) => {
-          cleared.push(id);
-          // Deferred rejection: the caller can only survive it by awaiting the
-          // promise — a sync try/catch resolves before the rejection ever lands.
-          if (o.clearRejects) return new Promise((_, reject) => { pendingClear = reject; });
-          return Promise.resolve(true);
-        },
-      },
-      alarms: { create: (name, info) => { alarms.push({ name, info }); } },
-    },
-    console,
+  const cw = capableSw.win, cm = capableSw.mock.chrome;
+  const recentSaves = capableSw.get("_recentSaves");
+  recentSaves.clear();
+  cm.storage.session.get = session.get;
+  cm.storage.session.set = session.set;
+  cm.storage.session.remove = session.remove;
+  cm.notifications.clear = (id) => {
+    cleared.push(id);
+    if (o.clearRejects) return new Promise((_, reject) => { pendingClear = reject; });
+    return Promise.resolve(true);
   };
-  const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
-    return {
-      _recentSaves, PBP_UNDO_KEY, PBP_UNDO_TTL, PBP_UNDO_ALARM,
-      pbpRememberUndo, pbpTakeUndoRecord, pbpSweepExpiredUndo, pbpClearNotification,
-    };`);
-  return { ...factory(...Object.values(deps)), cleared, alarms, session,
-    rejectClear: (error) => { pendingClear && pendingClear(error); } };
+  cm.alarms.create = (name, info) => { alarms.push({ name, info }); };
+  cw.setTimeout = (...args) => { timersScheduled++; return realCapable.fns.setTimeout(...args); };
+  return {
+    _recentSaves: recentSaves,
+    PBP_UNDO_KEY: capableSw.get("PBP_UNDO_KEY"),
+    PBP_UNDO_TTL: capableSw.get("PBP_UNDO_TTL"),
+    PBP_UNDO_ALARM: capableSw.get("PBP_UNDO_ALARM"),
+    pbpRememberUndo: cw.pbpRememberUndo,
+    pbpTakeUndoRecord: cw.pbpTakeUndoRecord,
+    pbpSweepExpiredUndo: cw.pbpSweepExpiredUndo,
+    pbpClearNotification: cw.pbpClearNotification,
+    cleared, alarms, session,
+    timersScheduled: () => timersScheduled,
+    rejectClear: (error) => { pendingClear && pendingClear(error); },
+  };
+}
+
+function buildRouterHarness(opts) {
+  const o = opts || {};
+  const calls = [];
+  const spy = (name, ret) => (...args) => { calls.push([name, args]); return typeof ret === "function" ? ret(...args) : ret; };
+  const rw = routerSw.win, rm = routerSw.mock.chrome;
+  Object.assign(rw, realRouter.fns);
+  rw.console.warn = o.console ? o.console.warn : realRouter.consoleWarn;
+  routerSw.set("_batchRunning", false);
+  routerSw.get("statusCache").clear();
+
+  rm.runtime.getContexts = spy("getContexts", o.getContexts || (() => Promise.resolve(o.popupContexts || [])));
+  rm.tabs.query = async () => [];
+
+  rw.noteActivity = spy("noteActivity");
+  rw.pbpVocabDriveIsConnected = spy("vocabConnected", Promise.resolve(false));
+  rw.pbpDriveEnabled = spy("driveEnabled", Promise.resolve(false));
+  rw.pbpDriveScheduleDirty = spy("driveDirty", Promise.resolve());
+  rw.pbpQueueDriveRound = spy("driveRound", Promise.resolve({ ok: true }));
+  rw.pbpGetVocabDriveStatus = spy("vocabStatus", Promise.resolve({}));
+  rw.pbpVocabDriveResponse = (r) => r;
+  rw.pbpVocabClearNotices = spy("vocabClear", Promise.resolve());
+  rw.pbpDisconnectVocabDrive = spy("vocabDisc", Promise.resolve());
+  rw.pbpDictOwnerScope = (a) => "acct_" + a;
+  rw.getCurrentBookmarkAuth = async () => ({ token: "alice:t", account: "alice", epoch: 0 });
+  rw.pbpBookmarkAuthIsCurrent = () => true;
+  rw.pbpStatusCacheGet = () => null;
+  rw.pbpStatusCacheSet = spy("cacheSet", true);
+  rw.pbpSameBookmark = () => false;
+  rw.pbpSaveFailure = (code) => ({ status: "failed", code });
+  rw.submitPopupSaveIntent = spy("saveIntent", () => (
+    o.saveReject ? Promise.reject(new Error("boom")) : Promise.resolve(o.saveResult || { status: "saved" })
+  ));
+  rw.notifySaveFailure = spy("notifyFail");
+  rw.handleBatchSave = spy("batchSave", Promise.resolve());
+  rw.handleSaveTabSet = spy("saveTabSet", Promise.resolve());
+  rw.loadSettings = o.loadSettings || (async () => ({}));
+  rw.pbpWaybackArchive = spy("wayback", Promise.resolve());
+  rw.pbpIsAllowedPinboardApiUrl = (u) => String(u).startsWith("https://api.pinboard.in/v1/");
+  rw.pbpAuthorizePinboardApiUrl = (u) => u;
+  rw.pinboardFetch = spy("pinFetch", Promise.resolve({ ok: true, status: 200, text: async () => "{}" }));
+  rw.pinboardFetchImmediate = spy("pinFetchNow", Promise.resolve({ ok: true, status: 200, text: async () => "{}" }));
+  rw.retryOfflineItem = spy("retryItem", Promise.resolve({ ok: true, result: {} }));
+  rw.readOfflineQueueWithIds = spy("readQueue", Promise.resolve([]));
+  rw.mutateOfflineQueue = spy("mutQueue", Promise.resolve([]));
+  rw.checkBookmarked = spy("checkBm", Promise.resolve(null));
+  rw.extractForPreview = spy("extract", Promise.resolve({ error: "empty" }));
+  rw.pbpImgFixInstallRule = spy("imgInstall", Promise.resolve(786001));
+  rw.pbpImgFixRemoveRules = spy("imgRemove", Promise.resolve());
+  rw.pbpImgFixSweepRules = spy("imgSweep", Promise.resolve());
+  rw._imgFixIsPreviewUrl = (u) => typeof u === "string" && u.includes("md-preview.html");
+  rw.deobfuscateKey = (v) => v;
+  rw.showNotification = spy("notify");
+  rw.t = (k, ...a) => (a.length ? `${k}:${a.join(":")}` : k);
+  rw.pbpWithLargeStorageLock = o.pbpWithLargeStorageLock || ((key, fn) => fn());
+  rw.pbpReadLargeWithFallbackUnlocked = async (key, read, dflt) => (await read()) ?? dflt;
+  rw.getSettingsStorage = async () => ({ get: async () => ({ customOverlayCSS: "/*ov*/" }) });
+
+  const invoke = (message, sender) => new Promise((resolve) => {
+    const out = { responses: [], held: undefined };
+    const settle = () => resolve(out);
+    out.held = rw.handleRuntimeMessage(message, sender || { id: EXT_ID, url: EXT_URL }, (r) => {
+      calls.push(["sendResponse", [r]]);
+      out.responses.push(r);
+      settle();
+    });
+    if (out.held !== true || out.responses.length) settle();
+    setTimeout(settle, 250);
+  });
+  return { invoke, calls };
+}
+
+function buildImgFixSweepHarness(opts) {
+  resetCapable();
+  const o = opts || {};
+  const calls = [];
+  const spy = (name, ret) => (...args) => { calls.push([name, args]); return typeof ret === "function" ? ret(...args) : ret; };
+  const cw = capableSw.win, cm = capableSw.mock.chrome;
+  const tabDoc = capableSw.get("_imgFixTabDoc");
+  const ruleOwner = capableSw.get("_imgFixRuleOwner");
+  tabDoc.clear();
+  ruleOwner.clear();
+  capableSw.set("_imgFixStartupSweepOk", false);
+  cm.declarativeNetRequest.getSessionRules = spy("getSessionRules", () => Promise.resolve(o.rules || []));
+  cm.declarativeNetRequest.updateSessionRules = spy("updateSessionRules", () => Promise.resolve());
+  cm.tabs.query = o.tabsQuery || spy("tabsQuery", () => Promise.resolve(o.tabsResult || []));
+  cm.tabs.get = spy("tabsGet", () => Promise.resolve(null));
+  return {
+    sweep: cw.pbpImgFixSweepRules,
+    tabDoc,
+    ruleOwner,
+    startupOk: () => capableSw.get("_imgFixStartupSweepOk"),
+    calls,
+  };
 }
 
 (async () => {
-  const source = await fetch("../background.js").then((response) => response.text());
+  await bootRealms();
   const STALE = { running: true, done: false, runId: "run-a", account: "alice", i: 3, total: 9, ts: Date.now() - 10 * 60 * 1000 };
 
   // ---- pbpSweepInterruptedBatch ----
   {
-    const h = buildSweepHarness(source, { progress: STALE });
+    const h = buildSweepHarness({ progress: STALE });
     await h.pbpSweepInterruptedBatch();
     const written = h.local.data.batch_progress;
     check("a stale running record is closed out and announced once",
@@ -236,18 +385,13 @@ function buildUndoHarness(source, opts) {
       written.i === 3 && written.total === 9 && typeof written.ts === "number" &&
       h.notifications.length === 1 && h.notifications[0][2] === "batchInterrupted:3:9");
   }
-
-  // ---- Resume path (roadmap #34): a valid job snapshot revives the batch
-  // at its cursor instead of declaring it interrupted; the revival budget
-  // (resumeCount >= 2) converges a repeatedly-dying batch to interrupted.
   {
     const job = {
-      runId: "run-a",
-      account: "alice",
+      runId: "run-a", account: "alice",
       tabs: [{ id: 1, url: "https://a/1" }, { id: 2, url: "https://a/2" }, { id: 3, url: "https://a/3" }],
       next: 1, counts: { processed: 1, saved: 1 }, resumeCount: 0, ts: 1,
     };
-    const h = buildSweepHarness(source, { progress: STALE });
+    const h = buildSweepHarness({ progress: STALE });
     h.local.data.batch_job = job;
     await h.pbpSweepInterruptedBatch();
     check("sweep resumes a valid interrupted job at its cursor instead of closing it",
@@ -257,7 +401,7 @@ function buildUndoHarness(source, opts) {
       h.notifications.length === 0 && h.local.data.batch_progress.error === undefined);
   }
   {
-    const h = buildSweepHarness(source, { progress: STALE });
+    const h = buildSweepHarness({ progress: STALE });
     h.local.data.batch_job = { runId: "run-a", account: "alice", tabs: [{ url: "https://a/1" }], next: 0, counts: {}, resumeCount: 2, ts: 1 };
     await h.pbpSweepInterruptedBatch();
     check("a job past its revival budget is dropped and the batch closes as interrupted",
@@ -265,63 +409,46 @@ function buildUndoHarness(source, opts) {
       h.local.data.batch_progress.error === "interrupted" && h.notifications.length === 1);
   }
   {
-    const h = buildSweepHarness(source, { progress: STALE });
-    h.local.data.batch_job = {
-      runId: "run-b", account: "alice", tabs: [{ url: "https://b/1" }],
-      next: 0, counts: {}, resumeCount: 0, ts: 2,
-    };
+    const h = buildSweepHarness({ progress: STALE });
+    h.local.data.batch_job = { runId: "run-b", account: "alice", tabs: [{ url: "https://b/1" }], next: 0, counts: {}, resumeCount: 0, ts: 2 };
     await h.pbpSweepInterruptedBatch();
     check("a same-account job from another run is never resumed or deleted",
       h.resumes.length === 0 && h.local.data.batch_job.runId === "run-b" &&
       h.local.data.batch_progress.error === "interrupted");
   }
   {
-    const h = buildSweepHarness(source, { progress: STALE });
-    h.local.data.batch_job = {
-      account: "alice", tabs: [{ url: "https://legacy/1" }],
-      next: 0, counts: {}, resumeCount: 0, ts: 1,
-    };
+    const h = buildSweepHarness({ progress: STALE });
+    h.local.data.batch_job = { account: "alice", tabs: [{ url: "https://legacy/1" }], next: 0, counts: {}, resumeCount: 0, ts: 1 };
     await h.pbpSweepInterruptedBatch();
     check("a legacy job without runId cannot attach to a newer progress record",
       h.resumes.length === 0 && h.local.data.batch_progress.error === "interrupted");
   }
-
   {
-    const h = buildSweepHarness(source, { progress: { ...STALE, ts: Date.now() } });
+    const h = buildSweepHarness({ progress: { ...STALE, ts: Date.now() } });
     await h.pbpSweepInterruptedBatch();
     check("a fresh heartbeat is never swept",
       h.local.data.batch_progress.running === true && h.notifications.length === 0);
   }
-
   {
-    // Same timestamp is possible with millisecond storage writes. Identity,
-    // not timestamp coincidence, decides whether the sweep still owns it.
-    let gets = 0;
-    let harness;
-    harness = buildSweepHarness(source, {
+    let gets = 0, harness;
+    harness = buildSweepHarness({
       progress: STALE,
-      hooks: { onGet: async () => {
-        if (++gets === 2) harness.local.data.batch_progress = { ...STALE, runId: "run-b", i: 0 };
-      } },
+      hooks: { onGet: async () => { if (++gets === 2) harness.local.data.batch_progress = { ...STALE, runId: "run-b", i: 0 }; } },
     });
     await harness.pbpSweepInterruptedBatch();
     check("a replacement run with the same timestamp is not terminated",
       harness.local.data.batch_progress.runId === "run-b" &&
       harness.local.data.batch_progress.running === true && harness.notifications.length === 0);
   }
-
   {
-    const h = buildSweepHarness(source, { progress: { ...STALE, account: "bob" } });
+    const h = buildSweepHarness({ progress: { ...STALE, account: "bob" } });
     await h.pbpSweepInterruptedBatch();
     check("another account's record is left untouched",
       h.local.data.batch_progress.running === true && h.notifications.length === 0);
   }
-
   {
-    // TOCTOU: startBatchSave reserves _batchRunning synchronously while the sweep
-    // is parked on its first storage read.
     let harness;
-    harness = buildSweepHarness(source, {
+    harness = buildSweepHarness({
       progress: STALE,
       hooks: { onGet: async () => { harness && harness.setBatchRunning(true); } },
     });
@@ -331,19 +458,11 @@ function buildUndoHarness(source, opts) {
       harness.local.data.batch_progress.done === false &&
       harness.notifications.length === 0);
   }
-
   {
-    // The retry already rewrote batch_progress: the sweep read one record and must
-    // only ever terminate that same record.
-    let gets = 0;
-    let harness;
-    harness = buildSweepHarness(source, {
+    let gets = 0, harness;
+    harness = buildSweepHarness({
       progress: STALE,
-      hooks: { onGet: async () => {
-        // Hook runs before the read: replace on the second get, so the sweep sees
-        // the stale record first and the retry's record when it re-confirms.
-        if (++gets === 2) harness.local.data.batch_progress = { ...STALE, i: 0, ts: Date.now() };
-      } },
+      hooks: { onGet: async () => { if (++gets === 2) harness.local.data.batch_progress = { ...STALE, i: 0, ts: Date.now() }; } },
     });
     await harness.pbpSweepInterruptedBatch();
     check("a record replaced mid-sweep is not overwritten with the stale one",
@@ -351,9 +470,8 @@ function buildUndoHarness(source, opts) {
       harness.local.data.batch_progress.i === 0 &&
       harness.notifications.length === 0);
   }
-
   {
-    const h = buildSweepHarness(source, {
+    const h = buildSweepHarness({
       progress: STALE,
       hooks: { onSet: async () => { throw new Error("QUOTA_BYTES quota exceeded"); } },
     });
@@ -363,9 +481,8 @@ function buildUndoHarness(source, opts) {
     check("_writeBatchProgress reports whether the record landed",
       (await h._writeBatchProgress({ running: true })) === false);
   }
-
   {
-    const h = buildSweepHarness(source, { progress: STALE });
+    const h = buildSweepHarness({ progress: STALE });
     check("_writeBatchProgress reports a successful write",
       (await h._writeBatchProgress({ running: true, i: 1 })) === true &&
       h.local.data.batch_progress.i === 1);
@@ -373,33 +490,28 @@ function buildUndoHarness(source, opts) {
 
   // ---- Trusted-only storage access ----
   {
-    const h = buildStorageAccessHarness(source, {});
+    const h = buildStorageAccessHarness({});
     check("trusted-only setup applies the exact access level to local and sync",
-      h && await h.pbpRestrictStorageAccess() === true &&
+      await h.pbpRestrictStorageAccess() === true &&
       h.calls.local[0]?.accessLevel === "TRUSTED_CONTEXTS" &&
       h.calls.sync[0]?.accessLevel === "TRUSTED_CONTEXTS" &&
       h.calls.clear.some((args) => args[0] === h.PBP_STORAGE_ACCESS_RETRY_ALARM));
   }
   {
-    const h = buildStorageAccessHarness(source, { rejectArea: "local" });
+    const h = buildStorageAccessHarness({ rejectArea: "local" });
     check("a trusted-only rejection is logged and schedules one bounded retry",
-      h && await h.pbpRestrictStorageAccess() === false && h.calls.warn.length >= 1 &&
+      await h.pbpRestrictStorageAccess() === false && h.calls.warn.length >= 1 &&
       h.calls.create.length === 1 && h.calls.create[0][0] === h.PBP_STORAGE_ACCESS_RETRY_ALARM &&
       h.calls.create[0][1]?.delayInMinutes >= 0.5);
   }
   {
-    // A permanently unavailable API (missing on this Chrome build, refused by
-    // policy) used to re-arm the one-shot alarm every minute forever, waking the
-    // worker and re-running the whole boot sequence with it. Each retry starts a
-    // FRESH worker generation, so the budget has to survive one.
-    const session = {};
-    const delays = [];
+    const session = {}, delays = [];
     for (let generation = 0; generation < 9; generation++) {
-      const h = buildStorageAccessHarness(source, { rejectArea: "local", session });
+      const h = buildStorageAccessHarness({ rejectArea: "local", session });
       await h.pbpRestrictStorageAccess();
       for (const args of h.calls.create) delays.push(args[1]?.delayInMinutes);
     }
-    const budget = buildStorageAccessHarness(source, {}).PBP_STORAGE_ACCESS_MAX_RETRIES;
+    const budget = buildStorageAccessHarness({}).PBP_STORAGE_ACCESS_MAX_RETRIES;
     check("repeated trusted-only failures stop re-arming the retry alarm instead of looping forever",
       budget >= 1 && delays.length === budget &&
       delays.every((delay, i) => delay === Math.min(30, 2 ** i)) &&
@@ -407,116 +519,114 @@ function buildUndoHarness(source, opts) {
   }
   {
     const session = {};
-    const failed = buildStorageAccessHarness(source, { rejectArea: "sync", session });
+    const failed = buildStorageAccessHarness({ rejectArea: "sync", session });
     await failed.pbpRestrictStorageAccess();
-    const recovered = buildStorageAccessHarness(source, { session });
+    const firstDelay = failed.calls.create[0]?.[1]?.delayInMinutes;
+    const recovered = buildStorageAccessHarness({ session });
     await recovered.pbpRestrictStorageAccess();
-    // Read the budget where it matters: right after the success, before the
-    // next failure writes its own attempt back into the same store.
     const budgetCleared = !(recovered.PBP_STORAGE_ACCESS_RETRY_KEY in session);
-    const failedAgain = buildStorageAccessHarness(source, { rejectArea: "sync", session });
+    const clearedRetry = recovered.calls.clear.some((args) => args[0] === recovered.PBP_STORAGE_ACCESS_RETRY_ALARM);
+    const failedAgain = buildStorageAccessHarness({ rejectArea: "sync", session });
     await failedAgain.pbpRestrictStorageAccess();
     check("a successful re-assert clears the retry budget for the next failure",
-      budgetCleared &&
-      recovered.calls.clear.some((args) => args[0] === recovered.PBP_STORAGE_ACCESS_RETRY_ALARM) &&
+      budgetCleared && clearedRetry &&
       failedAgain.calls.create.length === 1 &&
-      failedAgain.calls.create[0][1]?.delayInMinutes === failed.calls.create[0][1]?.delayInMinutes);
+      failedAgain.calls.create[0][1]?.delayInMinutes === firstDelay);
   }
-  check("the storage-access retry alarm calls the same idempotent setup function",
-    source.includes('alarm.name === PBP_STORAGE_ACCESS_RETRY_ALARM') &&
-    source.includes('pbpRestrictStorageAccess().catch'));
+  {
+    const h = buildStorageAccessHarness({});
+    capableSw.mock.chrome.alarms.onAlarm.listeners.forEach((fn) => fn({ name: h.PBP_STORAGE_ACCESS_RETRY_ALARM }));
+    await new Promise((r) => setTimeout(r, 0));
+    check("the storage-access retry alarm calls the same idempotent setup function",
+      h.calls.local[0]?.accessLevel === "TRUSTED_CONTEXTS" &&
+      h.calls.sync[0]?.accessLevel === "TRUSTED_CONTEXTS");
+  }
 
   // ---- Cold-start Drive sync throttle ----
   {
     const local = {};
-    const first = buildBootDriveSyncHarness(source, { local });
-    const window = first.PBP_VOCAB_BOOT_SYNC_MIN_MS;
-    await first.pbpBootDriveSync({ throttleMs: window });
-    const second = buildBootDriveSyncHarness(source, { local });
-    await second.pbpBootDriveSync({ throttleMs: window });
-    const third = buildBootDriveSyncHarness(source, { local });
-    await third.pbpBootDriveSync({ throttleMs: window });
-    const stamped = Number(local[first.PBP_VOCAB_BOOT_SYNC_KEY]) || 0;
+    let h = buildBootDriveSyncHarness({ local });
+    const windowMs = h.PBP_VOCAB_BOOT_SYNC_MIN_MS;
+    await h.pbpBootDriveSync({ throttleMs: windowMs });
+    const firstCount = h.syncs.length;
+    h = buildBootDriveSyncHarness({ local });
+    await h.pbpBootDriveSync({ throttleMs: windowMs });
+    const secondCount = h.syncs.length;
+    h = buildBootDriveSyncHarness({ local });
+    await h.pbpBootDriveSync({ throttleMs: windowMs });
+    const thirdCount = h.syncs.length;
+    const stamped = Number(local[h.PBP_VOCAB_BOOT_SYNC_KEY]) || 0;
     check("a wake within the throttle window opens no second Drive session",
-      window >= 15 * 60 * 1000 && first.syncs.length === 1 &&
-      second.syncs.length === 0 && third.syncs.length === 0 && stamped > 0);
+      windowMs >= 15 * 60 * 1000 && firstCount === 1 &&
+      secondCount === 0 && thirdCount === 0 && stamped > 0);
 
-    local[first.PBP_VOCAB_BOOT_SYNC_KEY] = stamped - window - 5 * 60 * 1000;
-    const later = buildBootDriveSyncHarness(source, { local });
-    await later.pbpBootDriveSync({ throttleMs: window });
+    local[h.PBP_VOCAB_BOOT_SYNC_KEY] = stamped - windowMs - 5 * 60 * 1000;
+    const later = buildBootDriveSyncHarness({ local });
+    await later.pbpBootDriveSync({ throttleMs: windowMs });
     check("a wake past the throttle window syncs again",
       later.syncs.length === 1 && later.syncs[0].interactive === false);
   }
   {
-    // drive-sync-dirty / -periodic / -retry drive the real schedule: a word the
-    // user just saved must not wait out somebody else's cold-start window.
     const local = {};
-    const alarmDriven = buildBootDriveSyncHarness(source, { local });
+    const alarmDriven = buildBootDriveSyncHarness({ local });
     await alarmDriven.pbpBootDriveSync();
     await alarmDriven.pbpBootDriveSync();
     await alarmDriven.pbpBootDriveSync();
-    const router = buildDriveAlarmRouterHarness(source);
-    ["drive-sync-dirty", "drive-sync-periodic", "drive-sync-retry"].forEach((name) => router?.fire(name));
-    // Simplest miss: the router passing the cold-start throttle, or routing only one of the three names.
+    const unthrottledRuns = alarmDriven.syncs.length;
+    const router = buildDriveAlarmRouterHarness();
+    ["drive-sync-dirty", "drive-sync-periodic", "drive-sync-retry"].forEach((name) => router.fire(name));
     check("alarm-driven Drive syncs are never throttled",
-      alarmDriven.syncs.length === 3 && !!router && router.listeners.length === 1 &&
+      unthrottledRuns === 3 && router.listeners.length >= 1 &&
       router.boots.length === 3 && router.boots.every((args) => args.length === 0));
   }
   {
-    // Y3-02: a round an alarm already ran counts toward the cold-start window,
-    // otherwise an idle browser syncs twice per period (wake boot + periodic).
     const local = {};
-    const alarmRound = buildBootDriveSyncHarness(source, { local });
+    let alarmRound = buildBootDriveSyncHarness({ local });
     await alarmRound.pbpBootDriveSync();
-    const wake = buildBootDriveSyncHarness(source, { local });
+    const firstRuns = alarmRound.syncs.length;
+    const bootKey = alarmRound.PBP_VOCAB_BOOT_SYNC_KEY;
+    const wake = buildBootDriveSyncHarness({ local });
     await wake.pbpBootDriveSync({ throttleMs: wake.PBP_VOCAB_BOOT_SYNC_MIN_MS });
     check("a round run by an alarm stamps the cold-start window, so the next wake boot skips",
-      alarmRound.syncs.length === 1 && Number(local[alarmRound.PBP_VOCAB_BOOT_SYNC_KEY]) > 0 && wake.syncs.length === 0);
+      firstRuns === 1 && Number(local[bootKey]) > 0 && wake.syncs.length === 0);
+    alarmRound = buildBootDriveSyncHarness({ local });
     await alarmRound.pbpBootDriveSync();
-    check("alarm-driven syncs still run back to back while stamping", alarmRound.syncs.length === 2);
+    check("alarm-driven syncs still run back to back while stamping", firstRuns + alarmRound.syncs.length === 2);
   }
   {
-    // Y3-02 review: a periodic alarm wakes a cold worker. The top-level boot
-    // reads the stamp before the alarm handler writes one, and the stamp is
-    // already a hair older than the window. Only one round may run.
     const local = {};
-    const probe = buildBootDriveSyncHarness(source, { local });
-    local[probe.PBP_VOCAB_BOOT_SYNC_KEY] = Date.now() - probe.PBP_VOCAB_BOOT_SYNC_MIN_MS - 300;
-    const topLevel = buildBootDriveSyncHarness(source, { local });
-    const alarm = buildBootDriveSyncHarness(source, { local });
-    await Promise.all([
-      topLevel.pbpBootDriveSync({ throttleMs: topLevel.PBP_VOCAB_BOOT_SYNC_MIN_MS }),
-      alarm.pbpBootDriveSync()
+    const shared = buildBootDriveSyncHarness({ local });
+    local[shared.PBP_VOCAB_BOOT_SYNC_KEY] = Date.now() - shared.PBP_VOCAB_BOOT_SYNC_MIN_MS - 300;
+    const [topRes, alarmRes] = await Promise.all([
+      shared.pbpBootDriveSync({ throttleMs: shared.PBP_VOCAB_BOOT_SYNC_MIN_MS }),
+      shared.pbpBootDriveSync()
     ]);
     check("a periodic-alarm wake runs one round, not the boot plus the alarm",
-      topLevel.syncs.length + alarm.syncs.length === 1 && alarm.syncs.length === 1);
+      shared.syncs.length === 1 && topRes?.throttled === true && alarmRes?.ok === true);
     const lost = {};
-    const stale = buildBootDriveSyncHarness(source, { local: lost });
+    const stale = buildBootDriveSyncHarness({ local: lost });
     lost[stale.PBP_VOCAB_BOOT_SYNC_KEY] = Date.now() - stale.PBP_VOCAB_BOOT_SYNC_MIN_MS - 10 * 60 * 1000;
     await stale.pbpBootDriveSync({ throttleMs: stale.PBP_VOCAB_BOOT_SYNC_MIN_MS });
     check("a stamp well past the window (alarm lost) still lets the wake boot run", stale.syncs.length === 1);
   }
   {
-    const router = buildDriveAlarmRouterHarness(source);
+    const router = buildDriveAlarmRouterHarness();
     ["vocab-sync-dirty", "vocab-sync-periodic", "vocab-sync-retry",
-      "notes-sync-dirty", "notes-sync-periodic", "notes-sync-retry"].forEach((name) => router?.fire(name));
-    const legacyBoots = router ? router.boots.length : -1;
-    ["keepalive", "drive-sync-other", "vocab-sync"].forEach((name) => router?.fire(name));
-    // Simplest miss: dropping the six pre-upgrade names, or matching any name with a "sync" prefix.
+      "notes-sync-dirty", "notes-sync-periodic", "notes-sync-retry"].forEach((name) => router.fire(name));
+    const legacyBoots = router.boots.length;
+    ["keepalive", "drive-sync-other", "vocab-sync"].forEach((name) => router.fire(name));
     check("legacy vocab-sync-* and notes-sync-* alarms route to the unified boot until the migration retires them",
       legacyBoots === 6 && router.boots.length === 6 && router.boots.every((args) => args.length === 0));
   }
 
   // ---- Undo notification record ----
   {
-    const h = buildUndoHarness(source, {});
+    const h = buildUndoHarness({});
     await h.pbpRememberUndo("qs-saved-1", { url: "https://example.com/a", account: "alice", expiresAt: Date.now() + h.PBP_UNDO_TTL });
     check("persisting an undo record schedules the expiry alarm instead of a timer",
       h.alarms.length === 1 && h.alarms[0].name === h.PBP_UNDO_ALARM &&
-      h.alarms[0].info.delayInMinutes >= 0.5 && !/setTimeout\(/.test(source.slice(
-        source.indexOf("// F7: Track recent saves"), source.indexOf("// F7: Handle undo button click"))));
+      h.alarms[0].info.delayInMinutes >= 0.5 && h.timersScheduled() === 0);
 
-    // A new worker generation: the Map is gone, the toast is not.
     h._recentSaves.clear();
     const revived = await h.pbpTakeUndoRecord("qs-saved-1");
     check("an undo record survives the worker generation that created it",
@@ -525,16 +635,14 @@ function buildUndoHarness(source, opts) {
       Object.keys(h.session.data[h.PBP_UNDO_KEY] || {}).length === 0 &&
       (await h.pbpTakeUndoRecord("qs-saved-1")) === null);
   }
-
   {
     const expired = { url: "https://example.com/b", account: "alice", expiresAt: Date.now() - 1 };
-    const h = buildUndoHarness(source, { session: { _undoSaves: { "qs-saved-2": expired } } });
+    const h = buildUndoHarness({ session: { _undoSaves: { "qs-saved-2": expired } } });
     check("an expired record is refused even while still in session storage",
       (await h.pbpTakeUndoRecord("qs-saved-2")) === null);
   }
-
   {
-    const h = buildUndoHarness(source, { session: { _undoSaves: {
+    const h = buildUndoHarness({ session: { _undoSaves: {
       "qs-saved-3": { url: "https://example.com/c", account: "alice", expiresAt: Date.now() - 1 },
       "qs-saved-4": { url: "https://example.com/d", account: "alice", expiresAt: Date.now() + 60000 },
     } } });
@@ -547,11 +655,8 @@ function buildUndoHarness(source, opts) {
     check("the expiry sweep keeps a live record and schedules another pass",
       "qs-saved-4" in left && h.alarms.some((a) => a.name === h.PBP_UNDO_ALARM));
   }
-
   {
-    // notifications.clear() rejects asynchronously: a sync try/catch would never
-    // see it and the sweep would abort with the record half-removed.
-    const h = buildUndoHarness(source, {
+    const h = buildUndoHarness({
       clearRejects: true,
       session: { _undoSaves: { "qs-saved-5": { url: "https://example.com/e", account: "alice", expiresAt: Date.now() - 1 } } },
     });
@@ -559,125 +664,23 @@ function buildUndoHarness(source, opts) {
     let outcome = null;
     const sweeping = h.pbpSweepExpiredUndo().then(() => { outcome = "resolved"; }, () => { outcome = "threw"; });
     await new Promise((resolve) => setTimeout(resolve, 0));
-    const awaitedTheClear = outcome === null; // still parked on the pending clear
+    const awaitedTheClear = outcome === null;
     h.rejectClear(new Error("notification gone"));
     await sweeping;
-    await new Promise((resolve) => setTimeout(resolve, 0)); // let unhandledrejection fire
+    await new Promise((resolve) => setTimeout(resolve, 0));
     check("a rejected notifications.clear() is awaited, caught, and does not abort the sweep",
       awaitedTheClear && outcome === "resolved" && unhandled.length === leakedBefore &&
       h.cleared.length === 1 && Object.keys(h.session.data[h.PBP_UNDO_KEY] || {}).length === 0);
   }
-
   {
-    const h = buildUndoHarness(source, { hooks: { onSet: async () => { throw new Error("session unavailable"); } } });
+    const h = buildUndoHarness({ hooks: { onSet: async () => { throw new Error("session unavailable"); } } });
     await h.pbpRememberUndo("qs-saved-6", { url: "https://example.com/f", account: "alice", expiresAt: Date.now() + 60000 });
     const record = await h.pbpTakeUndoRecord("qs-saved-6");
     check("a session-storage failure degrades to memory instead of losing Undo",
       record && record.url === "https://example.com/f");
   }
 
-  // ---- Message router (roadmap #35): the newly NAMED handleRuntimeMessage
-  // sliced with spy deps — shallow routing assertions: given a message.type,
-  // the expected internal function is reached and the async channel is held.
-  const EXT_ID = "feoognahlmfmbllpmgailahcnjppiegb";
-  const EXT_URL = `chrome-extension://${EXT_ID}/popup.html`;
-  function buildRouterHarness(opts) {
-    const start = source.indexOf("function handleRuntimeMessage");
-    const end = source.indexOf("chrome.runtime.onMessage.addListener(handleRuntimeMessage);", start);
-    if (start < 0 || end <= start) throw new Error("router source not found");
-    const o = opts || {};
-    const calls = [];
-    const spy = (name, ret) => (...args) => { calls.push([name, args]); return typeof ret === "function" ? ret(...args) : ret; };
-    const deps = {
-      chrome: {
-        runtime: {
-          id: EXT_ID, getURL: (p) => `chrome-extension://${EXT_ID}/${p}`,
-          // K45: popup-context lookup after a "failed" save_intent result.
-          // Flippable per test via opts.popupContexts (default: no popup open),
-          // or fully overridable via opts.getContexts for a test that needs to
-          // hold the probe open (M2: proving sendResponse never waits on it).
-          getContexts: spy("getContexts", o.getContexts || (() => Promise.resolve(o.popupContexts || []))),
-        },
-        storage: {
-          local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
-          session: { get: async () => ({}), set: async () => {} },
-        },
-        tabs: { query: async () => [] },
-      },
-      noteActivity: spy("noteActivity"),
-      PBP_VOCAB_DRIVE_CAPABLE: false,
-      PBP_VOCAB_DRIVE_CONNECTED_KEY: "k",
-      pbpVocabDriveIsConnected: spy("vocabConnected", Promise.resolve(false)),
-      pbpDriveEnabled: spy("driveEnabled", Promise.resolve(false)),
-      pbpDriveScheduleDirty: spy("driveDirty", Promise.resolve()),
-      pbpQueueDriveRound: spy("driveRound", Promise.resolve({ ok: true })),
-      pbpGetVocabDriveStatus: spy("vocabStatus", Promise.resolve({})),
-      pbpVocabDriveResponse: (r) => r,
-      pbpVocabClearNotices: spy("vocabClear", Promise.resolve()),
-      pbpDisconnectVocabDrive: spy("vocabDisc", Promise.resolve()),
-      pbpDictOwnerScope: (a) => "acct_" + a,
-      getCurrentBookmarkAuth: async () => ({ token: "alice:t", account: "alice", epoch: 0 }),
-      pbpBookmarkAuthIsCurrent: () => true,
-      pbpStatusCacheGet: () => null,
-      pbpStatusCacheSet: spy("cacheSet", true),
-      pbpSameBookmark: () => false,
-      pbpSaveFailure: (code) => ({ status: "failed", code }),
-      // K45: overridable per test via opts.saveResult / opts.saveReject so the
-      // save_intent branch's post-sendResponse notify logic can be exercised
-      // for failed/queued/saved outcomes and for the internal-error catch path.
-      submitPopupSaveIntent: spy("saveIntent", () => (
-        o.saveReject ? Promise.reject(new Error("boom")) : Promise.resolve(o.saveResult || { status: "saved" })
-      )),
-      notifySaveFailure: spy("notifyFail"),
-      handleBatchSave: spy("batchSave", Promise.resolve()),
-      handleSaveTabSet: spy("saveTabSet", Promise.resolve()),
-      // K19: overridable via opts.loadSettings so a test can hand back a
-      // deferred promise and prove the overlay lock below is not waiting on
-      // it to settle first (concurrency), without disturbing every other
-      // test in this harness that just wants the default {}.
-      loadSettings: o.loadSettings || (async () => ({})),
-      pbpWaybackArchive: spy("wayback", Promise.resolve()),
-      pbpIsAllowedPinboardApiUrl: (u) => String(u).startsWith("https://api.pinboard.in/v1/"),
-      pbpAuthorizePinboardApiUrl: (u) => u,
-      pinboardFetch: spy("pinFetch", Promise.resolve({ ok: true, status: 200, text: async () => "{}" })),
-      pinboardFetchImmediate: spy("pinFetchNow", Promise.resolve({ ok: true, status: 200, text: async () => "{}" })),
-      retryOfflineItem: spy("retryItem", Promise.resolve({ ok: true, result: {} })),
-      readOfflineQueueWithIds: spy("readQueue", Promise.resolve([])),
-      mutateOfflineQueue: spy("mutQueue", Promise.resolve([])),
-      checkBookmarked: spy("checkBm", Promise.resolve(null)),
-      statusCache: new Map(),
-      extractForPreview: spy("extract", Promise.resolve({ error: "empty" })),
-      pbpImgFixInstallRule: spy("imgInstall", Promise.resolve(786001)),
-      pbpImgFixRemoveRules: spy("imgRemove", Promise.resolve()),
-      pbpImgFixSweepRules: spy("imgSweep", Promise.resolve()),
-      _imgFixIsPreviewUrl: (u) => typeof u === "string" && u.includes("md-preview.html"),
-      _batchRunning: false,
-      deobfuscateKey: (v) => v,
-      showNotification: spy("notify"),
-      t: (k, ...a) => (a.length ? `${k}:${a.join(":")}` : k),
-      // K19: overridable via opts.pbpWithLargeStorageLock for the same
-      // concurrency proof as loadSettings above.
-      pbpWithLargeStorageLock: o.pbpWithLargeStorageLock || ((key, fn) => fn()),
-      pbpReadLargeWithFallbackUnlocked: async (key, read, dflt) => (await read()) ?? dflt,
-      getSettingsStorage: async () => ({ get: async () => ({ customOverlayCSS: "/*ov*/" }) }),
-      console: o.console || console,
-    };
-    const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
-      return handleRuntimeMessage;`);
-    const handler = factory(...Object.values(deps));
-    const invoke = (message, sender) => new Promise((resolve) => {
-      const out = { responses: [], held: undefined };
-      const settle = () => resolve(out);
-      // The sendResponse marker lands in `calls` at the exact moment the
-      // listener calls it, alongside every other spy call, so a test can
-      // read call order off one array instead of comparing timestamps.
-      out.held = handler(message, sender || { id: EXT_ID, url: EXT_URL }, (r) => { calls.push(["sendResponse", [r]]); out.responses.push(r); settle(); });
-      if (out.held !== true || out.responses.length) settle();
-      setTimeout(settle, 250); // async branch that never responds in stubs
-    });
-    return { invoke, calls };
-  }
-
+  // ---- Message router ----
   {
     const h = buildRouterHarness();
     const foreign = await h.invoke({ type: "save_intent" }, { id: "other-ext", url: EXT_URL });
@@ -694,14 +697,10 @@ function buildUndoHarness(source, opts) {
     const args = h.calls.find(([n]) => n === "saveIntent")?.[1] || [];
     check("router: save_intent reaches submitPopupSaveIntent and holds the channel",
       r.held === true && h.calls.some(([n]) => n === "saveIntent"));
-    // The popup's summary range rides beside the intent, never inside it.
     check("router: save_intent hands the popup's summary range to the worker beside the intent",
       args[0] === intent && args[1] === "alice" && args[2] === summaryRange && !Object.hasOwn(intent, "summaryRange"));
   }
   {
-    // A popup that cannot tell which block it owns sends no range (undefined
-    // does not survive the message channel); only an explicit null says its
-    // notes hold none. The router must not turn one into the other.
     const handed = [];
     for (const message of [{}, { summaryRange: null }]) {
       const h = buildRouterHarness();
@@ -712,10 +711,6 @@ function buildUndoHarness(source, opts) {
     check("router: save_intent passes an absent summary range as unknown and null as no owned block",
       handed[0] === undefined && handed[1] === null);
   }
-  // ---- K45: a failed popup-initiated save notifies iff no popup context is
-  // left to show it. notifySaveFailure runs after sendResponse, inside an
-  // await on getContexts — give the microtask queue a tick to drain before
-  // inspecting h.calls (same idiom used above for unhandledrejection).
   {
     const h = buildRouterHarness({ saveResult: { status: "failed", reason: "conflict" } });
     const r = await h.invoke({ type: "save_intent", intent: { mode: "create" }, account: "alice" });
@@ -755,11 +750,6 @@ function buildUndoHarness(source, opts) {
       r.responses[0]?.status === "failed" && r.responses[0]?.code === "internal" &&
       !h.calls.some(([n]) => n === "notifyFail"));
   }
-  // ---- I2: sendResponse(result) must not wait on the post-response
-  // getContexts probe. Hold getContexts open indefinitely and prove, from the
-  // recorded call order, that the caller's answer is already delivered while
-  // the probe is still hanging -- then release it and confirm the deferred
-  // notify still fires exactly once.
   {
     let releaseGetContexts = null;
     const h = buildRouterHarness({
@@ -799,8 +789,6 @@ function buildUndoHarness(source, opts) {
   }
   {
     const h = buildRouterHarness();
-    // NOTE this branch keys on message.ACTION, not message.type — a wire-shape
-    // asymmetry the popup depends on; locking it here keeps it deliberate.
     const r = await h.invoke({ action: "startBatchSave", tabs: [{ url: "https://x.example/" }], account: "alice" });
     check("router: startBatchSave (action key) reserves and hands off to handleBatchSave",
       r.responses[0]?.status === "started" && h.calls.some(([n]) => n === "batchSave"));
@@ -828,10 +816,6 @@ function buildUndoHarness(source, opts) {
       !("pinboardToken" in p) && !Object.keys(p).some((k) => /token|key/i.test(k) && k !== "themePresetKey") &&
       smuggle.responses[0]?.error === "forbidden");
   }
-  // ---- K19: get_site_prefs parallelizes loadSettings() with the overlay-CSS
-  // lock+read (previously two serial awaits). The response shape must stay
-  // byte-identical, and the two reads must actually run concurrently rather
-  // than the parallelization being a no-op refactor.
   {
     const h = buildRouterHarness();
     const site = { id: EXT_ID, url: "https://pinboard.in/u:alice/t:tag" };
@@ -841,10 +825,6 @@ function buildUndoHarness(source, opts) {
       JSON.stringify(prefs.responses[0]) === JSON.stringify(expected));
   }
   {
-    // Stub loadSettings with a promise that never settles until released, and
-    // prove the overlay lock is invoked before that release -- RED under the
-    // old `await loadSettings(); await pbpWithLargeStorageLock(...)` serial
-    // code, which cannot call the lock helper until loadSettings resolves.
     let releaseSettings = null;
     const settingsPromise = new Promise((resolve) => { releaseSettings = () => resolve({}); });
     const lockCalls = [];
@@ -862,10 +842,7 @@ function buildUndoHarness(source, opts) {
     check("router: get_site_prefs still resolves the full response once the deferred loadSettings settles",
       r.responses[0]?.optTheme === "auto" && r.responses[0]?.overlayCss === "/*ov*/");
   }
-
   {
-    // G5-02: a failed settings read must answer null and leave a trace with
-    // only the error name and message (no settings values, no overlay CSS).
     const warns = [];
     const h = buildRouterHarness({
       loadSettings: () => Promise.reject(Object.assign(new Error("sync read failed"), { name: "Error" })),
@@ -879,36 +856,7 @@ function buildUndoHarness(source, opts) {
       !JSON.stringify(warns[0]).includes("/*ov*/"));
   }
 
-  // ---- K12: pbpImgFixSweepRules startup scan scopes its tabs.query() to a
-  // URL match pattern instead of listing every tab. buildRouterHarness above
-  // stubs pbpImgFixSweepRules out entirely (spy("imgSweep", ...)), so it never
-  // exercises the real sweep body; this harness slices the real function
-  // (plus its module-scope state and helpers) straight out of background.js.
-  function buildImgFixSweepHarness(opts) {
-    const start = source.indexOf("const PBP_IMGFIX_RULE_MIN");
-    const end = source.indexOf("// A preview tab navigating AWAY is the leak", start === -1 ? 0 : start);
-    if (start === -1 || end === -1 || end <= start) throw new Error("imgfix sweep source not found");
-    const o = opts || {};
-    const calls = [];
-    const spy = (name, ret) => (...args) => { calls.push([name, args]); return typeof ret === "function" ? ret(...args) : ret; };
-    const chrome = {
-      runtime: { id: EXT_ID, getURL: (p) => `chrome-extension://${EXT_ID}/${p}` },
-      declarativeNetRequest: {
-        getSessionRules: spy("getSessionRules", () => Promise.resolve(o.rules || [])),
-        updateSessionRules: spy("updateSessionRules", () => Promise.resolve()),
-      },
-      tabs: {
-        query: o.tabsQuery || spy("tabsQuery", () => Promise.resolve(o.tabsResult || [])),
-        get: spy("tabsGet", () => Promise.resolve(null)),
-      },
-    };
-    const deps = { chrome };
-    const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
-      return { sweep: pbpImgFixSweepRules, tabDoc: _imgFixTabDoc, ruleOwner: _imgFixRuleOwner, startupOk: () => _imgFixStartupSweepOk };`);
-    const h = factory(...Object.values(deps));
-    return { ...h, calls, chrome };
-  }
-
+  // ---- K12: pbpImgFixSweepRules ----
   {
     const h = buildImgFixSweepHarness({ rules: [] });
     await h.sweep(undefined);
@@ -917,13 +865,6 @@ function buildUndoHarness(source, opts) {
       !!call && JSON.stringify(call[1][0]) === JSON.stringify({ url: `chrome-extension://${EXT_ID}/md-preview.html*` }));
   }
   {
-    // A stub that "lies" about the match pattern -- it hands back a tab whose
-    // URL is NOT actually a preview page, simulating a browser-side match
-    // pattern that disagrees with _imgFixIsPreviewUrl at some edge. The rule
-    // parked on that tab id must still be swept: the second check inside the
-    // .filter(_imgFixIsPreviewUrl) call must not let the lying tab establish
-    // ownership, or a stranded rule would survive the very sweep meant to
-    // clean it up.
     const lyingTabId = 999;
     const rule = { id: 786050, condition: { tabIds: [lyingTabId] } };
     const h = buildImgFixSweepHarness({
@@ -941,34 +882,36 @@ function buildUndoHarness(source, opts) {
   // ---- Pinboard-only background work off Pinboard ----
   const bookmarkServiceOf = (settings) => settings?.bookmarkService === "karakeep" || settings?.bookmarkService === "linkding" ? settings.bookmarkService : "pinboard";
   {
-    const aStart = source.indexOf("async function _syncBadgeAlarm");
-    const aEnd = source.indexOf("_syncKeepaliveAlarm();\n_syncBadgeAlarm();", aStart === -1 ? 0 : aStart);
-    const lStart = source.indexOf("chrome.storage.onChanged.addListener((changes) => {\n  if (changes.optShowBadge");
-    const lEnd = source.indexOf("// ---- Markdown preview via keyboard shortcut", lStart === -1 ? 0 : lStart);
-    check("badge alarm / storage listener source markers exist", aStart !== -1 && aEnd !== -1 && aEnd > aStart && lStart !== -1 && lEnd !== -1 && lEnd > lStart);
+    resetCapable();
+    check("badge alarm / storage listener are registered on the worker",
+      typeof capableSw.win._syncBadgeAlarm === "function" && capableSw.mock.chrome.storage.onChanged.listeners.length >= 1);
     const build = (settings) => {
-      const alarms = new Set(), badgeUpdates = [], listeners = [];
-      const chrome = {
-        alarms: {
-          get: async (name) => (alarms.has(name) ? { name } : undefined),
-          create: (name) => { alarms.add(name); },
-          clear: async (name) => alarms.delete(name),
-        },
-        storage: { onChanged: { addListener: (fn) => listeners.push(fn) } },
+      resetCapable();
+      const alarms = new Set(), badgeUpdates = [];
+      const cw = capableSw.win, cm = capableSw.mock.chrome;
+      cm.alarms.get = async (name) => (alarms.has(name) ? { name } : undefined);
+      cm.alarms.create = (name) => { alarms.add(name); };
+      cm.alarms.clear = async (name) => alarms.delete(name);
+      cw.loadSettings = async () => settings;
+      cw.pbpBookmarkServiceId = bookmarkServiceOf;
+      cw.updateBadge = async () => { badgeUpdates.push(1); };
+      cw.scheduleEffectiveAuthRefresh = () => {};
+      cw.pbpOfflinePauseOnCredentialChange = () => {};
+      cw.syncPrewarmTagsAlarm = async () => {};
+      cw.pbpSyncSiteThemeScript = () => {};
+      cw.pbpReconcileBookmarkService = async () => {};
+      return {
+        _syncBadgeAlarm: cw._syncBadgeAlarm,
+        alarms,
+        badgeUpdates,
+        fire: (changes) => cm.storage.onChanged.dispatch(changes, "sync"),
       };
-      const deps = { chrome, loadSettings: async () => settings, pbpBookmarkServiceId: bookmarkServiceOf,
-        PBP_BOOKMARK_ACTIVE_KEY: "bookmarkServiceActive",
-        updateBadge: async () => { badgeUpdates.push(1); } };
-      const factory = new Function(...Object.keys(deps), `${source.slice(aStart, aEnd)}\n${source.slice(lStart, lEnd)}
-        return { _syncBadgeAlarm };`);
-      const api = factory(...Object.values(deps));
-      return { ...api, alarms, badgeUpdates, fire: (changes) => listeners.forEach((fn) => fn(changes, "sync")) };
     };
     const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
     for (const service of ["karakeep", "linkding"]) {
       const settings = { optShowBadge: true, bookmarkService: service };
       const h = build(settings);
-      h.alarms.add("badge-refresh"); // left over from when Pinboard was active
+      h.alarms.add("badge-refresh");
       await h._syncBadgeAlarm();
       check(service + " with the badge switch on has no badge-refresh alarm", !h.alarms.has("badge-refresh"));
       settings.bookmarkService = "pinboard";
@@ -979,8 +922,6 @@ function buildUndoHarness(source, opts) {
       h.fire({ bookmarkService: { newValue: service } });
       await settle();
       check("switching Pinboard -> " + service + " clears the alarm from the storage event", !h.alarms.has("badge-refresh") && h.badgeUpdates.length === 2);
-      // This device's own service is a local key of its own (a synced choice
-      // alone does not switch it): its change re-syncs the poll too.
       settings.bookmarkService = "pinboard";
       h.fire({ bookmarkServiceActive: { newValue: "pinboard" } });
       await settle();
@@ -996,21 +937,17 @@ function buildUndoHarness(source, opts) {
     }
   }
   {
-    const start = source.indexOf("async function handleSaveTabSet");
-    const end = source.indexOf("// ---- Storage change listener ----", start === -1 ? 0 : start);
-    if (start === -1 || end === -1 || end <= start) throw new Error("handleSaveTabSet source not found");
     const build = (service) => {
+      resetCapable();
       const notes = [], fetches = [], created = [];
-      const deps = {
-        loadSettings: async () => ({ bookmarkService: service }), pbpBookmarkServiceId: bookmarkServiceOf,
-        showNotification: (...args) => { notes.push(args); },
-        t: (k, ...a) => (a.length ? `${k}:${a.join(":")}` : k),
-        fetch: async (url) => { fetches.push(String(url)); return { ok: true, status: 200 }; },
-        chrome: { tabs: { create: (info) => { created.push(info); } } },
-        AbortSignal, FormData, console,
-      };
-      const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}\nreturn handleSaveTabSet;`);
-      return { run: factory(...Object.values(deps)), notes, fetches, created };
+      const cw = capableSw.win, cm = capableSw.mock.chrome;
+      cw.loadSettings = async () => ({ bookmarkService: service });
+      cw.pbpBookmarkServiceId = bookmarkServiceOf;
+      cw.showNotification = (...args) => { notes.push(args); };
+      cw.t = (k, ...a) => (a.length ? `${k}:${a.join(":")}` : k);
+      cw.fetch = async (url) => { fetches.push(String(url)); return { ok: true, status: 200 }; };
+      cm.tabs.create = (info) => { created.push(info); };
+      return { run: cw.handleSaveTabSet, notes, fetches, created };
     };
     for (const service of ["karakeep", "linkding"]) {
       const h = build(service);
@@ -1025,6 +962,8 @@ function buildUndoHarness(source, opts) {
       h.fetches.length === 1 && h.fetches[0] === "https://pinboard.in/tabs/save/" && h.notes.length === 1 && h.notes[0][0] === "tabset-saved");
   }
 
+  capableSw.dispose();
+  routerSw.dispose();
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>

@@ -1,6 +1,6 @@
 {
   "note": "Slice anchors per test file (scripts/slice-anchor-lint.mjs). Only shrinks: refresh with --update after removing anchors. New tests load the real file with tests/fixtures/chrome-mock.js instead of cutting source.",
-  "total": 1296,
+  "total": 1106,
   "files": {
     "tests/ai-tags-tests.html": {
       "count": 1,
@@ -13,31 +13,6 @@
         }
       ]
     },
-    "tests/background-active-tab-tests.html": {
-      "count": 44,
-      "growth": [
-        {
-          "date": "2026-11-10",
-          "from": 28,
-          "to": 44,
-          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
-        }
-      ]
-    },
-    "tests/background-lifecycle-tests.html": {
-      "count": 22
-    },
-    "tests/batch-dedup-tests.html": {
-      "count": 20,
-      "growth": [
-        {
-          "date": "2026-11-10",
-          "from": 12,
-          "to": 20,
-          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
-        }
-      ]
-    },
     "tests/bookmark-live-preflight-tests.mjs": {
       "count": 2
     },
@@ -46,9 +21,6 @@
     },
     "tests/drive-migration-tests.html": {
       "count": 9
-    },
-    "tests/drive-scopes-tests.html": {
-      "count": 15
     },
     "tests/export-targets-tests.html": {
       "count": 6
@@ -88,17 +60,6 @@
     "tests/md-video-tests.html": {
       "count": 3
     },
-    "tests/offline-queue-tests.html": {
-      "count": 12,
-      "growth": [
-        {
-          "date": "2026-11-10",
-          "from": 6,
-          "to": 12,
-          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
-        }
-      ]
-    },
     "tests/options-ai-custom-tests.html": {
       "count": 4
     },
@@ -117,17 +78,6 @@
     "tests/popup-ai-sw-tests.html": {
       "count": 6
     },
-    "tests/popup-draft-tests.html": {
-      "count": 39,
-      "growth": [
-        {
-          "date": "2026-11-10",
-          "from": 13,
-          "to": 40,
-          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
-        }
-      ]
-    },
     "tests/popup-save-tests.html": {
       "count": 353,
       "growth": [
@@ -138,9 +88,6 @@
           "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
         }
       ]
-    },
-    "tests/reader-bookmark-tests.html": {
-      "count": 14
     },
     "tests/restore-points-tests.html": {
       "count": 3,
@@ -209,9 +156,6 @@
           "reason": "counting correction from review round 2: regex split separators (ui-contract 271, 2456, 5298) and reads of each name in a literal array (ui-contract 2044) now count; all four already exist on main (old and new lint run on the same git archive of main); no test changed"
         }
       ]
-    },
-    "tests/vocab-background-tests.html": {
-      "count": 24
     }
   }
 }

@@ -2,19 +2,24 @@
 <html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="86"><title>Popup Draft Tests</title></head><body>
 <h1>Popup Draft Tests</h1><div id="results"></div>
 <script src="../shared.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const assert = (v,m) => { if(!v)throw new Error(m||'assertion failed'); };
 async function test(name,fn){const d=document.createElement('div');d.className='case';try{await fn();d.classList.add('pass');d.textContent='PASS '+name;}catch(e){d.classList.add('fail');d.textContent='FAIL '+name+': '+e.message;}document.getElementById('results').append(d);}
 (async()=>{
- const source=await(await fetch('../background.js')).text();
- const start=source.indexOf('async function pbpRunPopupDraft('),end=source.indexOf('// Popup drafts end',start === -1 ? 0 : start);
+ const sw=await pbpSwRealm.boot({mock:{storage:{local:{vocabDriveConnected:false,bookmarkServiceActive:'pinboard',_driveScopeKeysRetiredDone:true,_webhookSyncScrubDone:true}}}});
  let run;
  const rows={};let owner='alice';let duringRead=null;let failSet=false;
  const session={async get(key){if(duringRead){const f=duringRead;duringRead=null;f();}return key===null?structuredClone(rows):{[key]:structuredClone(rows[key])};},async set(values){if(failSet)throw new Error('synthetic write failure');Object.assign(rows,structuredClone(values));},async remove(keys){for(const k of Array.isArray(keys)?keys:[keys])delete rows[k];}};
+ sw.mock.chrome.storage.session.get=session.get;
+ sw.mock.chrome.storage.session.set=session.set;
+ sw.mock.chrome.storage.session.remove=session.remove;
+ sw.win.getCurrentBookmarkAuth=async()=>({account:owner});
  const msg=(action,extra={})=>({account:'alice',action,pageUrl:'https://example.com/article',incognito:false,...extra});
  const draft={url:'https://example.com/article',title:'Edited title',notes:'Private note',tags:['One','Two'],tagInput:'unsubmitted',private:true,toread:true,archive:false,archiveTouched:true};
  const read=()=>run(msg('read'));
- await test('production draft handler can be loaded',()=>{assert(start!==-1&&end!==-1&&end>start,'draft handler is not implemented');run=new Function('chrome','getCurrentBookmarkAuth','navigator',source.slice(start,end)+'\nreturn pbpRunPopupDraft;')({storage:{session}},async()=>({account:owner}),navigator);});
+ await test('production draft handler can be loaded',()=>{assert(typeof sw.win.pbpRunPopupDraft==='function','draft handler is not implemented');run=m=>sw.win.pbpRunPopupDraft(m);});
  await test('write and read preserve the complete form including pending tag text',async()=>{const w=await run(msg('write',{draft}));const r=await read();assert(w.ok&&r.ok&&r.account==='alice');assert(JSON.stringify(r.draft)===JSON.stringify(draft));});
  await test('stored draft contains no unrecognized fields or credentials',async()=>{await run(msg('write',{draft:{...draft,token:'FORBIDDEN',apiKey:'FORBIDDEN',content:'FORBIDDEN'}}));const row=Object.values(rows)[0];assert(!JSON.stringify(row).includes('FORBIDDEN'));});
  await test('another URL cannot restore the article draft',async()=>{assert((await run(msg('read',{pageUrl:'https://example.com/other'}))).draft===null);});
@@ -43,40 +48,114 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    for(const sharedExplicit of [false,true]) {await run(msg('write',{draft:{...draft,sharedExplicit}}));assert((await read()).draft.sharedExplicit===sharedExplicit,'sharing provenance dropped');}
    for(const sharedExplicit of [null,1,'true'])assert(!(await run(msg('write',{draft:{...draft,sharedExplicit}}))).ok,'invalid sharing marker accepted');
  });
- const uiSource=await(await fetch('../popup.js')).text();
- const aiSource=await(await fetch('../popup-ai.js')).text();
- const cacheSource=await(await fetch('../ai-cache.js')).text();
- const a=uiSource.indexOf('let _popupDraftContext ='),b=uiSource.indexOf('// Popup draft UI end',a===-1?0:a);
- assert(a!==-1&&b!==-1&&b>a,'popup draft UI slice not found');
+ const popupPool=await Promise.all(Array.from({length:4},()=>pbpSwRealm.bootPopup()));
+ let popupCursor=0;
+ const FORM_IDS=['url-input','title-input','description-input','linkding-description-input','tags-input','private-check','share-check','readlater-check','archive-check','desc-char-count','submit-btn','delete-btn','existing-banner','url-warning','status-msg','linkding-description-row'];
  function uiHarness(service="pinboard",{worker=false,pageInfo={},settings={}}={}){
-   const elements={};for(const id of ['url-input','title-input','description-input','linkding-description-input','tags-input','private-check','share-check','readlater-check','archive-check','desc-char-count','submit-btn','delete-btn','existing-banner','url-warning']){const e=document.createElement(id==='description-input'||id==='linkding-description-input'?'textarea':'input');if(e.tagName==='INPUT')e.type=id.endsWith('check')?'checkbox':'text';elements[id]=e;if(id.endsWith('check')){const label=document.createElement('label');label.append(e);}}elements['status-msg']=document.createElement('p');elements['linkding-description-row']=document.createElement('div');
-   const flags={'title-input':false,'description-input':false,'linkding-description-input':false,'private-check':false,'readlater-check':false};
+   const p=popupPool[popupCursor++%popupPool.length];
+   p.resetBody();
+   delete p.doc.body.dataset.editMode;
+   const elements={};
+   for(const id of FORM_IDS){
+     const el=p.doc.getElementById(id);
+     elements[id]=el;
+     if(!el)continue;
+     if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'){el.readOnly=false;el.disabled=false;if(el.type==='checkbox')el.checked=false;else el.value='';}
+   }
+   elements['share-check'].closest('label').hidden=false;
+   const flags=p.get('fieldDirtyFlags');
+   for(const k of Object.keys(flags))flags[k]=false;
    let resolveRead,rejectRead,resolveWrite,resolveClear;let delayWrite=false,delayClear=false;let currentOwner='alice';const sent=[],statuses=[],dismissed=[];
-   const deps={$id:id=>elements[id],currentTags:[],fieldDirtyFlags:flags,_tagsUserTouched:false,_archiveUserTouched:false,
-     renderTags(){if(api)api.pbpRememberPopupDraft();},showStatus:(...args)=>statuses.push(args),pbpDismissRemedyStatus:k=>dismissed.push(k),t:k=>k,
-     existingBookmark:null,settings:{waybackArchiveEnabled:true,...settings},pbpBookmarkServiceId:()=>service,pbpBookmarkConnection:()=>({account:currentOwner,sharingEnabled:true}),pbpReadBookmarkConnection:async()=>({account:currentOwner}),_waybackHostGranted:true,_pageInfoReady:true,
-     buildPostsAddUri:()=>'',POSTS_ADD_URI_BUDGET:8192,pbpWaybackShouldArchive:({isPrivate})=>!isPrivate,
-     _activeTabAtOpen:{url:'https://example.com/article',title:'Tab title'},invalidateBookmarkLookup(){},
-     _aiSummaryValue:'',_aiSummaryRange:null,_aiLastLegacySummaryRange:()=>null,showSummaryActions(){},
-     autoResizeTextarea(){},
-     pageInfo,pbpNotesDescription:info=>info.metaDescription||'',pbpPageInfoReadable:info=>!!info&&info._pbpUnavailable!==true,
-     escapeForExtended:s=>s,
-     checkExistingBookmark:async()=>({status:'found'}),pbpScrollIntoView(){},
-     document:{body:{dataset:{}},createElement:tag=>document.createElement(tag),createTextNode:s=>document.createTextNode(s)},
-     window:{location:{reload(){sent.push({action:'reload'});}}},
-     chrome:{runtime:{sendMessage(m){sent.push(m);if(worker)return run(m);if(m.action==='read')return new Promise((r,j)=>{resolveRead=r;rejectRead=j;});if(m.action==='write'&&delayWrite)return new Promise(r=>{resolveWrite=r;});if(m.action==='clear'&&delayClear)return new Promise(r=>{resolveClear=r;});return Promise.resolve({ok:true,account:currentOwner});}}},
-     pbpReadSettingsWithSecrets:async()=>({pinboardToken:currentOwner+':fake'}),pbpPinboardAccountFromToken:t=>t.split(':')[0]};
-   const sliceFn=name=>{const s=uiSource.indexOf('function '+name+'('),e=uiSource.indexOf('\n}',s===-1?0:s);assert(s!==-1&&e!==-1&&e>s,'popup.js slice missing: '+name);return uiSource.slice(s,e+2);};
-   const recentStart=uiSource.indexOf('async function loadBookmarkForEdit('),recentEnd=uiSource.indexOf('// ===================== Recent Bookmarks',recentStart===-1?0:recentStart);
-   assert(recentStart!==-1&&recentEnd!==-1&&recentEnd>recentStart,'popup.js loadBookmarkForEdit slice missing');
-   const aiSlice=name=>{const s=aiSource.indexOf('function '+name+'('),e=aiSource.indexOf('\n}',s===-1?0:s);assert(s!==-1&&e!==-1&&e>s,'popup-ai.js slice missing: '+name);return aiSource.slice(s,e+2);};
-   const cacheSlice=name=>{const s=cacheSource.indexOf('function '+name+'('),e=cacheSource.indexOf('\n}',s===-1?0:s);assert(s!==-1&&e!==-1&&e>s,'ai-cache.js slice missing: '+name);return cacheSource.slice(s,e+2);};
-   const submitFnStart=uiSource.indexOf('function setupSubmit(');
-   const failedDirtyStart=uiSource.indexOf('      const fieldsAtSubmit = Object.fromEntries(Object.keys(fieldDirtyFlags).map(',submitFnStart===-1?0:submitFnStart);
-   const failedDirtyEnd=uiSource.indexOf('      // Host permission first:',failedDirtyStart===-1?0:failedDirtyStart);
-   assert(submitFnStart!==-1&&failedDirtyStart!==-1&&failedDirtyEnd!==-1&&failedDirtyEnd>failedDirtyStart,'popup.js setupSubmit dirty-flag slice missing');
-   const names=Object.keys(deps);let api;api=new Function(...names,[uiSource.slice(a,b),sliceFn('pbpPopupFormIsDirty'),sliceFn('updateCharCount'),sliceFn('recomputeArchiveCheck'),uiSource.slice(recentStart,recentEnd),aiSlice('pbpAiWrapSummary'),aiSlice('upsertSummary'),aiSlice('removeSummary'),aiSlice('_aiLinkdingSummaryRange'),aiSlice('_aiUpsertLinkdingSummary'),aiSlice('_aiRemoveLinkdingSummary'),aiSlice('_aiRestoreLinkdingSummary'),aiSlice('_aiLinkdingClaimedRange'),aiSlice('pbpAiLinkdingSummaryText'),aiSlice('pbpAiRemoveSummaryRange'),cacheSlice('pbpAiSummaryRangeValid'),sliceFn('shouldUpdateField'),aiSlice('_aiUrlEquivalent'),cacheSlice('pbpAiPageUrlNorm'),sliceFn('_loadUrlCleanSettings'),aiSlice('pbpPopupFormHoldsOpenedPage'),sliceFn('pbpPopupPrefillDescription'),sliceFn('pbpPopupPrefillTitle'),sliceFn('pbpPopupFormHoldsPage'),sliceFn('pbpPopupFillPageDescription'),sliceFn('pbpPopupRenderDescriptionHint'),sliceFn('pbpPopupSyncPageDescription'),sliceFn('pbpPopupUrlEdited'),sliceFn('setupUrlInput'),
-     'return {pbpPopupDraftOfDeletedRecent,prefillTitle:pbpPopupPrefillTitle,shouldUpdateField,prefill:pbpPopupPrefillDescription,syncPageDescription:pbpPopupSyncPageDescription,setupUrlInput,initPopupDraft,setupPopupDraftTracking,pbpPopupDraftSnapshot,pbpRememberPopupDraft,pbpPopupDescriptionKnown,forgetDescription(){_linkdingDescriptionKnown=false;},pbpDiscardPopupDraft,updateCharCount,recomputeArchiveCheck,loadBookmarkForEdit,exitEditMode,pbpPopupFormIsDirty,upsertSummary,removeSummary,restoreLinkdingSummary:_aiRestoreLinkdingSummary,chip(){_tagsUserTouched=true;currentTags.push("Chip");renderTags();},failedSubmit(){'+uiSource.slice(failedDirtyStart,failedDirtyEnd)+'}};'].join('\n'))(...names.map(n=>deps[n]));api.setupPopupDraftTracking();
+   p.setOnReload(()=>sent.push({action:'reload'}));
+   p.set('currentTags',[]);
+   p.set('_tagsUserTouched',false);
+   p.set('_archiveUserTouched',false);
+   p.set('existingBookmark',null);
+   p.set('bookmarkLookup',{status:'idle',url:'',generation:0,promise:null,formLoaded:false});
+   p.set('_waybackHostGranted',true);
+   p.set('_pageInfoReady',true);
+   p.set('_activeTabAtOpen',{url:'https://example.com/article',title:'Tab title'});
+   p.set('pageInfo',pageInfo);
+   p.set('settings',{waybackArchiveEnabled:true,...settings});
+   p.set('_popupDraftContext',null);
+   p.set('_linkdingDescriptionKnown',false);
+   p.set('_linkdingDescriptionPending',false);
+   p.set('_linkdingPageDescription',null);
+   p.set('_linkdingSharedExplicit',false);
+   p.set('_linkdingSharedRevision',0);
+   p.set('_popupDraftRevision',0);
+   p.set('_popupDraftWriteRevision',0);
+   p.set('_popupDraftUserUrl',false);
+   p.set('_popupDraftUrlSource',null);
+   p.set('_popupDraftRestored',false);
+   p.set('_popupDraftEdited',false);
+   p.set('_popupDraftLastSnapshot','');
+   p.get('_popupDraftChangedFields').clear();
+   p.set('_popupDraftRestoredFields',new p.win.Set());
+   p.set('_popupDraftSummaryAi','');
+   p.set('_popupDraftBase',null);
+   p.set('_popupEarlyTagKeys','');
+   p.set('_aiSummaryValue','');
+   p.set('_aiSummaryRange',null);
+   p.set('_aiSummaryOwnershipChecked',null);
+   p.win.pbpBookmarkServiceId=()=>service;
+   p.win.pbpBookmarkConnection=()=>({account:currentOwner,sharingEnabled:true});
+   p.win.pbpReadBookmarkConnection=async()=>({account:currentOwner});
+   p.win.pbpReadSettingsWithSecrets=async()=>({pinboardToken:currentOwner+':fake'});
+   p.win.pbpWaybackShouldArchive=({isPrivate})=>!isPrivate;
+   p.win.pbpNotesDescription=info=>info.metaDescription||'';
+   p.win.pbpPageInfoReadable=info=>!!info&&info._pbpUnavailable!==true;
+   p.win.escapeForExtended=s=>s;
+   p.win.checkExistingBookmark=async()=>({status:'found'});
+   p.win.showSummaryActions=()=>{};
+   p.win.autoResizeTextarea=()=>{};
+   p.win.pbpScrollIntoView=()=>{};
+   p.win.t=k=>k;
+   p.win.console.warn=(...args)=>console.warn(...args);
+   p.win.showStatus=(...args)=>statuses.push(args);
+   p.win.pbpDismissRemedyStatus=k=>dismissed.push(k);
+   p.win.renderTags=()=>{p.win.pbpRememberPopupDraft();};
+   p.mock.chrome.runtime.sendMessage=m=>{
+     if(m&&m.type==='save_intent')return p.win.Promise.resolve({status:'failed',reason:'remote'});
+     sent.push(m);
+     if(worker)return run(m);
+     if(m.action==='read')return new p.win.Promise((r,j)=>{resolveRead=r;rejectRead=j;});
+     if(m.action==='write'&&delayWrite)return new p.win.Promise(r=>{resolveWrite=r;});
+     if(m.action==='clear'&&delayClear)return new p.win.Promise(r=>{resolveClear=r;});
+     return p.win.Promise.resolve({ok:true,account:currentOwner});
+   };
+   const api={
+     pbpPopupDraftOfDeletedRecent:u=>p.win.pbpPopupDraftOfDeletedRecent(u),
+     prefillTitle:(t,u)=>p.win.pbpPopupPrefillTitle(t,u),
+     shouldUpdateField:id=>p.win.shouldUpdateField(id),
+     prefill:()=>p.win.pbpPopupPrefillDescription(),
+     syncPageDescription:()=>p.win.pbpPopupSyncPageDescription(),
+     setupUrlInput:()=>p.win.setupUrlInput(),
+     initPopupDraft:(acct,tab)=>p.win.initPopupDraft(acct,tab),
+     setupPopupDraftTracking:()=>p.win.setupPopupDraftTracking(),
+     pbpPopupDraftSnapshot:()=>p.win.pbpPopupDraftSnapshot(),
+     pbpRememberPopupDraft:()=>p.win.pbpRememberPopupDraft(),
+     pbpPopupDescriptionKnown:()=>p.win.pbpPopupDescriptionKnown(),
+     forgetDescription(){p.set('_linkdingDescriptionKnown',false);},
+     pbpDiscardPopupDraft:all=>p.win.pbpDiscardPopupDraft(all),
+     updateCharCount:()=>p.win.updateCharCount(),
+     recomputeArchiveCheck:()=>p.win.recomputeArchiveCheck(),
+     loadBookmarkForEdit:(u,tok)=>p.win.loadBookmarkForEdit(u,tok),
+     exitEditMode:()=>p.win.exitEditMode(),
+     pbpPopupFormIsDirty:()=>p.win.pbpPopupFormIsDirty(),
+     upsertSummary:(s,o)=>p.win.upsertSummary(s,o),
+     removeSummary:()=>p.win.removeSummary(),
+     restoreLinkdingSummary:c=>p.win._aiRestoreLinkdingSummary(c),
+     chip(){p.set('_tagsUserTouched',true);p.get('currentTags').push('Chip');p.win.renderTags();},
+     failedSubmit(){
+       if(!elements['url-input'].value)elements['url-input'].value='https://example.com/article';
+       if(!elements['title-input'].value)elements['title-input'].value='Article';
+       p.set('bookmarkLookup',{status:'missing',url:elements['url-input'].value.trim(),generation:1,promise:null,formLoaded:false});
+       p.win.setupSubmit(currentOwner+':fake');
+       elements['submit-btn'].click();
+     },
+   };
+   api.setupPopupDraftTracking();
    return {api,elements,flags,sent,statuses,dismissed,delayClears(){delayClear=true;},releaseClear:ok=>resolveClear({ok}),delayWrites(){delayWrite=true;},failWrite(){resolveWrite({ok:false});},okWrite(){resolveWrite({ok:true,account:currentOwner});},rejectRestore:()=>rejectRead(new Error('Synthetic IPC failure')),failRestore:()=>resolveRead({ok:false,error:'storage'}),release:(d=draft)=>resolveRead({ok:true,account:'alice',draft:d}),owner:o=>{currentOwner=o;}};
  }
  await test('restore applies the full form and guards later prefills',async()=>{const h=uiHarness();const pending=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release();await pending;assert(JSON.stringify(h.api.pbpPopupDraftSnapshot())===JSON.stringify(draft));assert(Object.entries(h.flags).filter(([id])=>id!=='linkding-description-input').every(([,v])=>v));});
