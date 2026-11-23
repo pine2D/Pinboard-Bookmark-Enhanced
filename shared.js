@@ -2196,16 +2196,23 @@ try {
   }
 } catch (_) { /* swallow-ok: service worker and restricted contexts have no localStorage */ }
 
+let _lastSettingsRoutingDegraded = false;
+
 async function getSettingsStorage() {
-  if (_settingsStorageCache) return _settingsStorageCache;
+  if (_settingsStorageCache) {
+    _lastSettingsRoutingDegraded = false;
+    return _settingsStorageCache;
+  }
   try {
     const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
     _settingsStorageCache = optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+    _lastSettingsRoutingDegraded = false;
     try {
       if (typeof localStorage !== "undefined") localStorage.setItem("pp-sync-enabled", optSyncEnabled ? "1" : "0");
     } catch (_) { /* swallow-ok: service worker and restricted contexts have no localStorage */ }
     return _settingsStorageCache;
   } catch (error) {
+    _lastSettingsRoutingDegraded = true;
     console.warn("[settings] optSyncEnabled read failed, falling back to local:", error?.name, error?.message);
     return chrome.storage.local;
   }
@@ -3138,8 +3145,14 @@ const PBP_UTF8_ENCODER = new TextEncoder();
 
 function pbpLargeFallbackKey(key) { return `${key}_localFallback`; }
 
+function pbpCloneLargeDefault(defaultValue) {
+  if (Array.isArray(defaultValue)) return defaultValue.slice();
+  if (defaultValue && typeof defaultValue === "object") return Object.assign({}, defaultValue);
+  return defaultValue;
+}
+
 function pbpDecodeLargeResult(raw, defaultValue) {
-  if (raw === undefined) return { ok: true, value: defaultValue };
+  if (raw === undefined) return { ok: true, value: pbpCloneLargeDefault(defaultValue) };
   if (typeof defaultValue === "string") {
     return typeof raw === "string"
       ? { ok: true, value: raw }
@@ -3149,18 +3162,18 @@ function pbpDecodeLargeResult(raw, defaultValue) {
     try { raw = JSON.parse(raw); }
     catch (error) {
       console.warn("[sync-large] JSON decode failed:", error?.name);
-      return { ok: false, value: defaultValue };
+      return { ok: false, value: pbpCloneLargeDefault(defaultValue) };
     }
   }
   if (Array.isArray(defaultValue)) {
     return Array.isArray(raw)
-      ? { ok: true, value: raw }
-      : { ok: false, value: defaultValue };
+      ? { ok: true, value: raw.slice() }
+      : { ok: false, value: pbpCloneLargeDefault(defaultValue) };
   }
   if (defaultValue && typeof defaultValue === "object") {
     return raw && typeof raw === "object" && !Array.isArray(raw)
-      ? { ok: true, value: raw }
-      : { ok: false, value: defaultValue };
+      ? { ok: true, value: Object.assign({}, raw) }
+      : { ok: false, value: pbpCloneLargeDefault(defaultValue) };
   }
   return { ok: true, value: raw };
 }
@@ -3209,27 +3222,86 @@ function pbpLargeFallbackFreshness(record, stored) {
   return current === record._base ? "fresh" : "stale";
 }
 
+const _pbpLargeObjectBasis = new WeakMap();
+const _pbpChunkedSettingsBasis = new WeakMap();
+const _pbpLastPrimitiveReadBasis = new Map();
+
+function pbpRecordLargeReadBasis(key, value, basis, { recordPrimitive = false } = {}) {
+  const entry = Object.assign({ key }, basis);
+  if (value && typeof value === "object") {
+    _pbpLargeObjectBasis.set(value, entry);
+    _pbpLastPrimitiveReadBasis.delete(key);
+  } else if (recordPrimitive) {
+    _pbpLastPrimitiveReadBasis.set(key, Object.assign({}, entry, {
+      value,
+      syncArea: (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync) || null,
+      localArea: (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) || null,
+    }));
+  }
+  return entry;
+}
+
+function pbpLookupLargeReadBasis(key, value, explicitBasis) {
+  if (explicitBasis) return explicitBasis;
+  if (value && typeof value === "object") {
+    const entry = _pbpLargeObjectBasis.get(value);
+    return entry && entry.key === key ? entry : null;
+  }
+  const entry = _pbpLastPrimitiveReadBasis.get(key);
+  if (!entry) return null;
+  _pbpLastPrimitiveReadBasis.delete(key);
+  const curSync = (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync) || null;
+  const curLocal = (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) || null;
+  if (entry.syncArea !== curSync || entry.localArea !== curLocal) return null;
+  return Object.is(entry.value, value) ? entry : null;
+}
+
+function pbpSameChunkMeta(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  return a._generation === b._generation && a._chunks === b._chunks;
+}
+
 // Shared in-lock read for one chunked key: fallback-record freshness handling
 // plus ONE metadata retry when a chunk read fails with no fallback in play (a
 // foreign device's generation swap can land between the metadata read and the
 // chunk read — the same race the content-script reader retries).
-async function pbpReadLargeWithFallbackUnlocked(key, readMeta, defaultValue) {
+async function pbpReadLargeWithFallbackDetailUnlocked(key, readMeta, defaultValue) {
   let stored = await readMeta();
   const fallbackKey = pbpLargeFallbackKey(key);
   let fallbacks = {};
+  let fallbackReadFailed = false;
   try { fallbacks = await chrome.storage.local.get(fallbackKey); }
-  catch (error) { console.warn("[sync-large] local fallback read failed:", key, error?.name, error?.message); }
+  catch (error) {
+    fallbackReadFailed = true;
+    console.warn("[sync-large] local fallback read failed:", key, error?.name, error?.message);
+  }
   if (Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey)) {
     const record = fallbacks[fallbackKey];
     const freshness = pbpLargeFallbackFreshness(record, stored);
-    if (freshness === "fresh") return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
+    if (freshness === "fresh") {
+      const decoded = pbpDecodeLargeResult(pbpLargeFallbackValue(record), defaultValue);
+      return {
+        value: decoded.value,
+        basis: { value: decoded.value, degraded: decoded.ok ? null : "corrupt_fallback", area: "sync", source: "fresh_fallback", meta: stored },
+      };
+    }
     if (freshness === "committed") {
       const committed = await pbpReadChunkedSyncResult(key, stored, defaultValue);
-      if (!committed.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
+      if (!committed.ok) {
+        const rescued = pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
+        return {
+          value: rescued,
+          basis: { value: rescued, degraded: "stale_fallback_rescue", area: "sync", source: "committed_fallback", meta: stored },
+        };
+      }
       await chrome.storage.local.remove(fallbackKey).catch((error) => {
         console.warn("[sync-large] committed fallback cleanup failed:", key, error?.name, error?.message);
       });
-      return committed.value;
+      return {
+        value: committed.value,
+        basis: { value: committed.value, degraded: null, area: "sync", source: "cloud", meta: stored },
+      };
     }
     // "stale" — another device committed a newer generation. Confirm the
     // replacement actually READS before destroying this device's last known
@@ -3237,18 +3309,39 @@ async function pbpReadLargeWithFallbackUnlocked(key, readMeta, defaultValue) {
     // The remove stays inside the caller's lock so it cannot race a writer's
     // fresh record.
     const replacement = await pbpReadChunkedSyncResult(key, stored, defaultValue);
-    if (!replacement.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
+    if (!replacement.ok) {
+      const rescued = pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
+      return {
+        value: rescued,
+        basis: { value: rescued, degraded: "stale_fallback_rescue", area: "sync", source: "stale_fallback", meta: stored },
+      };
+    }
     await chrome.storage.local.remove(fallbackKey).catch((error) => {
       console.warn("[sync-large] stale fallback cleanup failed:", key, error?.name, error?.message);
     });
-    return replacement.value;
+    return {
+      value: replacement.value,
+      basis: { value: replacement.value, degraded: null, area: "sync", source: "cloud", meta: stored },
+    };
   }
   let result = await pbpReadChunkedSyncResult(key, stored, defaultValue);
   if (!result.ok) {
     stored = await readMeta();
     result = await pbpReadChunkedSyncResult(key, stored, defaultValue);
   }
-  return result.value;
+  const degradedReason = !result.ok
+    ? "unreadable_cloud"
+    : (fallbackReadFailed ? "fallback_read_error" : null);
+  return {
+    value: result.value,
+    basis: { value: result.value, degraded: degradedReason, area: "sync", source: "cloud", meta: stored },
+  };
+}
+
+async function pbpReadLargeWithFallbackUnlocked(key, readMeta, defaultValue) {
+  const detail = await pbpReadLargeWithFallbackDetailUnlocked(key, readMeta, defaultValue);
+  pbpRecordLargeReadBasis(key, detail.value, detail.basis);
+  return detail.value;
 }
 
 function pbpNewChunkGeneration() {
@@ -3407,8 +3500,13 @@ function pbpIsEmptyChunkedValue(value) {
     || (typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0);
 }
 
-async function pbpAssertChunkedSyncReadComplete(key, value) {
-  if (!pbpIsEmptyChunkedValue(value)) return;
+async function pbpAssertChunkedSyncReadCompleteWithBasis(key, value, explicitBasis) {
+  const matchedBasis = pbpLookupLargeReadBasis(key, value, explicitBasis);
+  if (matchedBasis && matchedBasis.degraded === "routing_error") {
+    throw pbpChunksPropagatingError(key);
+  }
+  const isEmpty = pbpIsEmptyChunkedValue(value);
+  if (!isEmpty && !(matchedBasis && matchedBasis.degraded)) return;
   if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.sync) return;
   let storage = _settingsStorageCache;
   if (!storage) {
@@ -3428,6 +3526,10 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
     }
   }
   if (storage !== chrome.storage.sync) return;
+  if (matchedBasis && matchedBasis.degraded) {
+    throw pbpChunksPropagatingError(key);
+  }
+  if (!isEmpty) return;
   const emptyDefault = Array.isArray(value) ? [] : (typeof value === "object" && value !== null ? {} : "");
   const fallbackKey = pbpLargeFallbackKey(key);
   let fallbacks;
@@ -3442,6 +3544,9 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
   catch (error) {
     console.warn("[sync-large] completeness check manifest read failed:", key, error?.name, error?.message);
     throw error;
+  }
+  if (matchedBasis && matchedBasis.area === "sync" && !pbpSameChunkMeta(meta, matchedBasis.meta)) {
+    throw pbpChunksPropagatingError(key);
   }
   if (fallbacks && Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey)) {
     const record = fallbacks[fallbackKey];
@@ -3461,8 +3566,8 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
     // a cloud record this build cannot decode (bad _chunks, bad _generation);
     // the reader degraded it to the default just the same, so rewriting from
     // that default orphans whatever it points at exactly as a missing chunk
-    // does. `undefined` (never written) and empty/non-contradicting legacy
-    // pre-chunk strings must keep passing.
+    // does. `undefined` (never written) and genuinely empty legacy pre-chunk
+    // strings pass; non-empty or truncated/corrupt legacy JSON strings refuse.
     if (meta === undefined || meta === null) return;
     if (typeof meta === "string") {
       if (typeof value === "string") {
@@ -3470,7 +3575,7 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
         throw pbpChunksPropagatingError(key);
       }
       const legacyDecoded = pbpDecodeLargeResult(meta, emptyDefault);
-      if (!legacyDecoded.ok || pbpIsEmptyChunkedValue(legacyDecoded.value)) return;
+      if (legacyDecoded.ok && pbpIsEmptyChunkedValue(legacyDecoded.value)) return;
       throw pbpChunksPropagatingError(key);
     }
     throw pbpChunksPropagatingError(key);
@@ -3489,6 +3594,10 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
   throw pbpChunksPropagatingError(key);
 }
 
+async function pbpAssertChunkedSyncReadComplete(key, value) {
+  return pbpAssertChunkedSyncReadCompleteWithBasis(key, value, null);
+}
+
 // No new user-facing string: every call site already has a failure path (the
 // export's generic message, the sync toggle's syncMigrationFailed, the theme
 // popover's reportAutoSaveFailure). The code is what callers and tests match
@@ -3505,9 +3614,14 @@ function pbpChunksPropagatingError(key) {
 // were never requested and are skipped.
 async function pbpAssertChunkedSettingsComplete(settings) {
   if (!settings || typeof settings !== "object") return;
+  const perKeyBasis = _pbpChunkedSettingsBasis.get(settings) || null;
   for (const key of PBP_CHUNKED_SETTING_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(settings, key)) continue;
-    await pbpAssertChunkedSyncReadComplete(key, settings[key]);
+    await pbpAssertChunkedSyncReadCompleteWithBasis(
+      key,
+      settings[key],
+      perKeyBasis ? (perKeyBasis.get(key) || null) : null,
+    );
   }
 }
 
@@ -3520,8 +3634,19 @@ async function pbpResolveChunkedSettings(settings, storage, query) {
   });
   if (!requested.length) return settings;
   const out = Object.assign({}, settings);
+  const perKeyBasis = new Map();
   if (storage === chrome.storage.local) {
-    requested.forEach((key) => { out[key] = pbpDecodeLargeValue(out[key], SETTINGS_DEFAULTS[key]); });
+    requested.forEach((key) => {
+      const decoded = pbpDecodeLargeResult(out[key], SETTINGS_DEFAULTS[key]);
+      out[key] = decoded.value;
+      perKeyBasis.set(key, pbpRecordLargeReadBasis(key, decoded.value, {
+        degraded: null,
+        area: "local",
+        source: "local",
+        meta: undefined,
+      }));
+    });
+    _pbpChunkedSettingsBasis.set(out, perKeyBasis);
     return out;
   }
   // Resolve all requested keys in PARALLEL: each key serializes under its own
@@ -3533,17 +3658,25 @@ async function pbpResolveChunkedSettings(settings, storage, query) {
     // Metadata is (re-)read INSIDE the lock: the row captured by the caller's
     // bulk get() may predate a concurrent generation swap whose stale chunks
     // are already deleted. A metadata read failure degrades to that snapshot.
-    out[key] = await pbpWithLargeStorageLock(key, () =>
-      pbpReadLargeWithFallbackUnlocked(key, async () => {
+    let metaReadFailed = false;
+    const detail = await pbpWithLargeStorageLock(key, () =>
+      pbpReadLargeWithFallbackDetailUnlocked(key, async () => {
         try {
           const fresh = await storage.get(key);
           return fresh[key];
         } catch (error) {
+          metaReadFailed = true;
           console.warn("[sync-large] locked metadata re-read failed:", key, error?.name, error?.message);
           return out[key];
         }
       }, SETTINGS_DEFAULTS[key]));
+    const basis = metaReadFailed && !detail.basis.degraded
+      ? Object.assign({}, detail.basis, { degraded: "meta_read_error" })
+      : detail.basis;
+    out[key] = detail.value;
+    perKeyBasis.set(key, pbpRecordLargeReadBasis(key, detail.value, basis));
   }));
+  _pbpChunkedSettingsBasis.set(out, perKeyBasis);
   return out;
 }
 
@@ -3573,8 +3706,25 @@ function pbpSyncWriteFailureKind(error) {
   return "other";
 }
 
-async function pbpSyncSetLargeUnlocked(key, value) {
+async function pbpSyncSetLargeUnlocked(key, value, opts) {
   const storage = await getSettingsStorage();
+  const hasMergeBase = Boolean(opts && typeof opts === "object" && Object.prototype.hasOwnProperty.call(opts, "mergeBase"));
+  if (hasMergeBase && _lastSettingsRoutingDegraded) {
+    throw pbpChunksPropagatingError(key);
+  }
+  let verifiedBasis = null;
+  if (hasMergeBase) {
+    const rawBase = opts.mergeBase;
+    const entry = rawBase && typeof rawBase === "object" ? _pbpLargeObjectBasis.get(rawBase) : null;
+    verifiedBasis = entry && entry.key === key ? entry : null;
+    if (!verifiedBasis || verifiedBasis.degraded) {
+      throw pbpChunksPropagatingError(key);
+    }
+    const currentArea = storage === chrome.storage.sync ? "sync" : "local";
+    if (currentArea !== verifiedBasis.area) {
+      throw pbpChunksPropagatingError(key);
+    }
+  }
   const str = typeof value === "string" ? value : JSON.stringify(value);
   if (storage === chrome.storage.local) {
     if (!str) {
@@ -3588,6 +3738,9 @@ async function pbpSyncSetLargeUnlocked(key, value) {
   const fallbackKey = pbpLargeFallbackKey(key);
   const prior = await chrome.storage.sync.get(key);
   const priorMeta = prior[key];
+  if (verifiedBasis && !pbpSameChunkMeta(priorMeta, verifiedBasis.meta)) {
+    throw pbpChunksPropagatingError(key);
+  }
   const priorChunkKeys = pbpChunkStorageKeys(key, priorMeta);
   if (!str) {
     await chrome.storage.local.remove(fallbackKey);
@@ -3661,12 +3814,22 @@ function syncSetLarge(key, value) {
 
 async function pbpSyncGetLargeUnlocked(key, defaultValue) {
   const storage = await getSettingsStorage();
+  const routingDegraded = _lastSettingsRoutingDegraded;
   if (storage === chrome.storage.local) {
     const data = await chrome.storage.local.get({ [key]: defaultValue });
-    return pbpDecodeLargeValue(data[key], defaultValue);
+    const decoded = pbpDecodeLargeResult(data[key], defaultValue);
+    pbpRecordLargeReadBasis(key, decoded.value, {
+      degraded: routingDegraded ? "routing_error" : null,
+      area: "local",
+      source: "local",
+      meta: undefined,
+    }, { recordPrimitive: true });
+    return decoded.value;
   }
-  return pbpReadLargeWithFallbackUnlocked(key,
+  const detail = await pbpReadLargeWithFallbackDetailUnlocked(key,
     async () => (await chrome.storage.sync.get(key))[key], defaultValue);
+  pbpRecordLargeReadBasis(key, detail.value, detail.basis, { recordPrimitive: true });
+  return detail.value;
 }
 
 function syncGetLarge(key, defaultValue) {
@@ -4732,12 +4895,17 @@ async function pbpReadSettingsUnlocked(query) {
     settings = {};
     for (const k of requestedList) {
       if (Object.prototype.hasOwnProperty.call(raw, k)) settings[k] = raw[k];
-      else if (isObjectQuery) settings[k] = query[k];
+      else if (isObjectQuery) {
+        const defVal = query[k];
+        settings[k] = defVal && typeof defVal === "object" ? structuredClone(defVal) : defVal;
+      }
     }
     if (wantsDictView) settings.dictDefaultView = pbpDictDefaultView(raw);
     if (wantsRetiredAi) pbpApplyRetiredAiModelFallbacks(settings, raw, query);
   }
-  settings = await pbpResolveChunkedSettings(settings, mainArea, query);
+  const resolvedChunked = await pbpResolveChunkedSettings(settings, mainArea, query);
+  const chunkedBasis = _pbpChunkedSettingsBasis.get(resolvedChunked);
+  settings = resolvedChunked;
   if (pbpSecretRoutingActive(state.optSyncEnabled, state.syncApiKeys)) {
     const requested = pbpRequestedSecretKeys(query, settings);
     const localSecrets = await chrome.storage.local.get([...requested]);
@@ -4748,6 +4916,9 @@ async function pbpReadSettingsUnlocked(query) {
     const local = await chrome.storage.local.get(PBP_BOOKMARK_ACTIVE_KEY);
     const active = local && local[PBP_BOOKMARK_ACTIVE_KEY];
     if (PBP_BOOKMARK_SERVICES.includes(active)) settings.bookmarkService = active;
+  }
+  if (chunkedBasis && settings && typeof settings === "object") {
+    _pbpChunkedSettingsBasis.set(settings, chunkedBasis);
   }
   return settings;
 }

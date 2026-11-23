@@ -236,14 +236,60 @@ const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature
 // REST validators say `Unknown name "<field>"`, and Chinese providers return
 // localized refusal text.
 const _AI_EN_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field|name)|extra\s+inputs|\bdeprecated\b/;
-const _AI_CN_PARAM_REFUSED_RE = /未知(?:参数|字段)|不(?:再)?支持(?:该|此)?(?:参数|字段)|(?:参数|字段)\s*[`'"]?[a-z0-9_]*[`'"]?\s*不(?:受|再)?支持|不(?:再)?支持\s*[`'"]?(?:max_tokens|max_completion_tokens|temperature|reasoning_effort|response_format|thinking|enable_thinking|thinkingbudget|thinkinglevel|thinkingconfig|reasoning)\b(?!\s*[=:：<>≤≥])|\b(?:max_tokens|max_completion_tokens|temperature|reasoning_effort|response_format|thinking|enable_thinking|thinkingbudget|thinkinglevel|thinkingconfig|reasoning)\b[`'"]?\s*(?:不(?:受|再)?支持|不再受支持|已弃用)/;
-const _AI_CN_VALUE_ERROR_RE = /取值|值必须|值超出|超出范围|介于|大于|小于|至少|至多|不得超过|不能超过|必须为|必须是|只能为|只能是|仅支持\s*[-+0-9"'`]|不(?:受|再)?支持\s*[-+0-9]|(?:请)?(?:改为|设为|设置为)\s*[-+0-9"'`]|\b(?:max_tokens|max_completion_tokens|temperature|reasoning_effort|response_format|thinking|enable_thinking|thinkingbudget|thinkinglevel|thinkingconfig|reasoning)\b[`'"]?\s*(?:[=:：<>≤≥]|为\s*[-+0-9"'`])|工具参数/;
-function _aiIsParamRefused(detail) {
-  return _AI_EN_PARAM_REFUSED_RE.test(detail) ||
-    (_AI_CN_PARAM_REFUSED_RE.test(detail) && !_AI_CN_VALUE_ERROR_RE.test(detail));
+const _AI_HEALABLE_RE_SRC = "max_tokens|max_completion_tokens|temperature|reasoning_effort|response_format|thinking|enable_thinking|thinkingbudget|thinkinglevel|thinkingconfig|reasoning";
+const _AI_CN_FIELD_CLAUSE_RE = new RegExp(
+  "未知(?:参数|字段)(?:\\s*[\`'\\\"]?[a-z0-9_]+[\`'\\\"]?)?\\s*$"
+  + "|不(?:再)?支持(?:该|此)?(?:参数|字段)(?:\\s*[\`'\\\"]?[a-z0-9_]+[\`'\\\"]?)?\\s*$"
+  + "|(?:参数|字段)\\s*[\`'\\\"]?[a-z0-9_]*[\`'\\\"]?\\s*(?:不(?:受|再)?支持|不再受支持|已弃用)\\s*$"
+  + "|不(?:再)?支持\\s*[\`'\\\"]?(?:" + _AI_HEALABLE_RE_SRC + ")[\`'\\\"]?(?:\\s*(?:参数|字段))?\\s*$"
+  + "|\\b(?:" + _AI_HEALABLE_RE_SRC + ")\\b[\`'\\\"]?(?:\\s*(?:参数|字段))?\\s*(?:不(?:受|再)?支持|不再受支持|已弃用)\\s*$"
+);
+const _AI_CN_CLAUSE_VALUE_RE = /取值|值必须|值超出|超出范围|介于|大于|小于|至少|至多|不得超过|不能超过|必须为|必须是|只能为|只能是|小数|整数|浮点数|负数|正数|布尔|字符串|数组|工具参数|[=:：<>≤≥]/;
+function _aiCnClauseNamesParam(clause, name) {
+  return new RegExp("(^|[^a-z0-9_])" + name + "(?=$|[^a-z0-9_])", "i").test(clause);
+}
+function _aiCnRefusedParam(rawMsg, targetParam) {
+  if (!rawMsg) return null;
+  const clauses = rawMsg.split(/[，,。；;！!？?\n]+/)
+    .map((c) => c.replace(/\s*[（(][^）)]*[）)]\s*$/, "").trim())
+    .filter(Boolean);
+  if (targetParam) {
+    if (!_AI_HEALABLE_PARAMS.includes(targetParam)) return null;
+    if (clauses.some((c) => _aiCnClauseNamesParam(c, targetParam) && _AI_CN_CLAUSE_VALUE_RE.test(c))) {
+      return null;
+    }
+    for (const clause of clauses) {
+      if (_AI_CN_CLAUSE_VALUE_RE.test(clause)) continue;
+      if (!_AI_CN_FIELD_CLAUSE_RE.test(clause)) continue;
+      const asciiTokens = clause.match(/[a-z][a-z0-9_]*/gi) || [];
+      if (!asciiTokens.length || asciiTokens.some((tok) => tok.toLowerCase() === targetParam.toLowerCase())) {
+        return targetParam;
+      }
+    }
+    return null;
+  }
+  for (const clause of clauses) {
+    if (_AI_CN_CLAUSE_VALUE_RE.test(clause)) continue;
+    if (!_AI_CN_FIELD_CLAUSE_RE.test(clause)) continue;
+    let best = null, bestAt = Infinity;
+    for (const p of _AI_HEALABLE_PARAMS) {
+      const m = new RegExp("(^|[^a-z0-9_])(" + p + ")(?=$|[^a-z0-9_])", "i").exec(clause);
+      if (!m) continue;
+      const at = m.index + m[1].length;
+      if (at < bestAt && !clauses.some((c) => _aiCnClauseNamesParam(c, p) && _AI_CN_CLAUSE_VALUE_RE.test(c))) {
+        best = p;
+        bestAt = at;
+      }
+    }
+    if (best) return best;
+  }
+  return null;
 }
 function _aiRejectedParam(body, detail) {
   const param = String((body && body.error && body.error.param) || "").trim();
+  const rawMsg = String(typeof (body && body.error) === "string"
+    ? body.error
+    : ((body && body.error && body.error.message) || "")).trim().toLowerCase();
   // Some compatible APIs enumerate only text/json_object and reject the
   // schema variant without saying "unsupported". This is a format capability
   // refusal, unlike an invalid schema definition or an out-of-range budget.
@@ -254,7 +300,9 @@ function _aiRejectedParam(body, detail) {
   // support feature: structured-outputs") refuse the same request member.
   if (!param && /\bstructured[\s_-]?outputs?\b|\bjson[\s_-]?mode\b/.test(detail) &&
       /does\s+not\s+support|not\s+supported|unsupported/.test(detail)) return "response_format";
-  if (_aiIsParamRefused(detail) && _AI_HEALABLE_PARAMS.includes(param)) return param;
+  if (_AI_EN_PARAM_REFUSED_RE.test(detail) && _AI_HEALABLE_PARAMS.includes(param)) return param;
+  const cnNamedParam = param ? _aiCnRefusedParam(rawMsg, param) : null;
+  if (cnNamedParam) return cnNamedParam;
   // Value refusals can identify a mandatory-thinking endpoint without guessing
   // from every 400. Never interpret an unrelated schema/context error this way.
   // An enumeration of the accepted values ("Invalid option: expected one of
@@ -275,16 +323,7 @@ function _aiRejectedParam(body, detail) {
   // thinkingLevel refusal). The anchors keep this to thinkingConfig; bare 400s do not match.
   if ((!param || param.startsWith("thinkingConfig") || param.startsWith("generation_config.thinking_config")) &&
       /\bbudget\s+0\s+is\s+invalid\b|\bonly\s+works\s+in\s+thinking\s+mode\b|\bthinking(?:[\s_]*(?:budget|level))\b[^.]{0,80}\b(?:not\s+supported|unsupported|invalid|cannot\s+find\s+field)\b|\bunknown\s+name\s+"thinking_?(?:level|budget|config)"/i.test(detail)) return "thinkingConfig";
-  // The wording gate guards BOTH routes below, error.param included. That field
-  // is filled for ANY parameter-level validation error, range errors among them
-  // ("max_tokens is too large: this model supports at most 4096 completion
-  // tokens"), and a rename is the wrong answer to those: the retry would send an
-  // equally-too-large budget under a new name, the memo would persist the wrong
-  // spelling with no expiry, and the real error would surface only after the
-  // whole retry ladder. Same reason the message route needs it: an incidental
-  // mention ("128000 in the max_tokens" inside a context-length error) must
-  // never rewrite the request body.
-  if (!_aiIsParamRefused(detail)) return null;
+  if (!_AI_EN_PARAM_REFUSED_RE.test(detail)) return _aiCnRefusedParam(rawMsg, param);
   if (_AI_HEALABLE_PARAMS.indexOf(param) !== -1) return param;
   // Message-only servers (some compat proxies leave error.param null): the
   // refused field is named BEFORE the suggested replacement ("...'max_tokens'

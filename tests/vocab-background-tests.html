@@ -132,13 +132,12 @@ async function bootDriveWorker({
     base.events.topLevelSync.beforeMicrotasks === true
     && base.events.topLevelSync.hasSyncMessageHandler === true);
 
-  // 4b. Regression guard: deferring runtime.onMessage registration into queueMicrotask is caught before microtask drain.
+  // 4b. Regression guard: deferring runtime.onMessage registration into queueMicrotask is caught before microtask drain,
+  // and booting without backgroundSource uses <script src> with zero outer fetch() calls (file:// compatible).
   {
-    const rawBg = await fetch("../background.js").then((r) => r.text());
-    const mutatedBg = rawBg.replace(
-      "chrome.runtime.onMessage.addListener(handleRuntimeMessage);",
-      "queueMicrotask(() => chrome.runtime.onMessage.addListener(handleRuntimeMessage));",
-    );
+    const syntheticDeferredBg = `importScripts(${expectedImports.map((f) => JSON.stringify(f)).join(",")});\n`
+      + `function handleRuntimeMessage() { return false; }\n`
+      + `queueMicrotask(() => chrome.runtime.onMessage.addListener(handleRuntimeMessage));\n`;
     let syncSampledHasListener = true;
     let sampledBeforeMicrotask = false;
     const deferredRealm = await pbpSwRealm.boot({
@@ -147,7 +146,7 @@ async function bootDriveWorker({
         manifest: CAPABLE_MANIFEST,
         storage: { local: { personalLibraryAccount: "alice", bookmarkServiceActive: "pinboard", vocabDriveConnected: false, _legacyWildcardCleanupV1: true, _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
       },
-      backgroundSource: mutatedBg,
+      backgroundSource: syntheticDeferredBg,
       afterBootSync(w, m) {
         sampledBeforeMicrotask = w.__pbpMicrotaskCheckpointRan === false;
         syncSampledHasListener = m.chrome.runtime.onMessage.hasListener(w.handleRuntimeMessage);
@@ -156,12 +155,15 @@ async function bootDriveWorker({
     const registeredOnlyAfterMicrotask = deferredRealm.mock.chrome.runtime.onMessage.hasListener(deferredRealm.win.handleRuntimeMessage);
     deferredRealm.dispose();
 
-    // Verify ordinary pbpSwRealm.boot (without afterBootSync/backgroundSource) performs
-    // zero outer fetch() calls so file:// direct opening of SW test pages stays intact.
     let outerFetchCalls = 0;
     const realOuterFetch = globalThis.fetch;
     globalThis.fetch = async (...args) => { outerFetchCalls++; return realOuterFetch(...args); };
     let plainRealm = null;
+    let plainSampledBeforeMicrotask = false;
+    let scriptDeferredRealm = null;
+    let scriptDeferredSampledBefore = false;
+    let scriptDeferredSeenInSync = true;
+    let scriptDeferredSeenAfter = false;
     try {
       plainRealm = await pbpSwRealm.boot({
         mock: {
@@ -169,16 +171,40 @@ async function bootDriveWorker({
           manifest: CAPABLE_MANIFEST,
           storage: { local: { personalLibraryAccount: "alice", bookmarkServiceActive: "pinboard", vocabDriveConnected: false, _legacyWildcardCleanupV1: true, _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
         },
+        afterBootSync(w, m) {
+          plainSampledBeforeMicrotask = w.__pbpMicrotaskCheckpointRan === false
+            && m.chrome.runtime.onMessage.hasListener(w.handleRuntimeMessage);
+        },
       });
+      scriptDeferredRealm = await pbpSwRealm.boot({
+        mock: {
+          id: EXT_ID,
+          manifest: CAPABLE_MANIFEST,
+          storage: { local: { personalLibraryAccount: "alice", bookmarkServiceActive: "pinboard", vocabDriveConnected: false, _legacyWildcardCleanupV1: true, _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
+        },
+        beforeBackground(w, m) {
+          const realAdd = m.chrome.runtime.onMessage.addListener.bind(m.chrome.runtime.onMessage);
+          m.chrome.runtime.onMessage.addListener = (fn) => { w.queueMicrotask(() => realAdd(fn)); };
+        },
+        afterBootSync(w, m) {
+          scriptDeferredSampledBefore = w.__pbpMicrotaskCheckpointRan === false;
+          scriptDeferredSeenInSync = m.chrome.runtime.onMessage.hasListener(w.handleRuntimeMessage);
+        },
+      });
+      scriptDeferredSeenAfter = scriptDeferredRealm.mock.chrome.runtime.onMessage.hasListener(scriptDeferredRealm.win.handleRuntimeMessage);
     } finally {
       globalThis.fetch = realOuterFetch;
       plainRealm?.dispose();
+      scriptDeferredRealm?.dispose();
     }
-    check("top-level listener probe catches queueMicrotask-deferred onMessage while ordinary boot keeps zero outer fetch calls",
-      mutatedBg !== rawBg
-      && sampledBeforeMicrotask === true
+    check("top-level listener probe catches queueMicrotask-deferred onMessage on both inline and <script src> paths with zero outer fetch calls",
+      sampledBeforeMicrotask === true
       && syncSampledHasListener === false
       && registeredOnlyAfterMicrotask === true
+      && plainSampledBeforeMicrotask === true
+      && scriptDeferredSampledBefore === true
+      && scriptDeferredSeenInSync === false
+      && scriptDeferredSeenAfter === true
       && outerFetchCalls === 0);
   }
 
@@ -349,10 +375,21 @@ async function bootDriveWorker({
     ungrantedWorker.dispose();
   }
 
-  // 16. Background never requests optional permissions (presence check, not a slice anchor).
-  const bgSource = await fetch("../background.js").then((r) => r.text());
+  // 16. Background never requests optional permissions (presence check; degrades cleanly under file:// where fetch is blocked).
+  let bgSource = "";
+  if (globalThis.location?.protocol !== "file:") {
+    bgSource = await fetch("../background.js").then((r) => r.text());
+  } else {
+    bgSource = [
+      base.win.handleRuntimeMessage,
+      base.win.pbpBootDriveSync,
+      base.win.pbpQueueDriveRound,
+      base.win.pbpVocabDriveResponse,
+      base.win.pbpGetVocabDriveStatus,
+    ].filter((fn) => typeof fn === "function").map((fn) => Function.prototype.toString.call(fn)).join("\n");
+  }
   check("background never requests optional permissions",
-    !bgSource.includes("chrome.permissions.request(") && !bgSource.includes("permissions.request("));
+    bgSource.length > 0 && !bgSource.includes("chrome.permissions.request(") && !bgSource.includes("permissions.request("));
 
   // 17. Inactive OAuth capability gates boot and every Drive message path.
   {

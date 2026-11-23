@@ -59,9 +59,25 @@
     const mock = globalThis.pbpChromeMock.create(options.mock || {});
     win.chrome = mock.chrome;
     win.__importedScripts = [];
+    let syncSampled = false;
     // Stub: WorkerGlobalScope.importScripts does not exist on Window; the
     // dependency scripts are loaded via <script src> below in identical order.
-    win.importScripts = (...files) => { win.__importedScripts.push(...files); };
+    // When background.js runs via external <script src> (zero fetch() under
+    // both file:// and http://), queueing `afterBootSync` inside importScripts
+    // places it at the HEAD of the FIFO microtask queue so it executes at the
+    // script's microtask checkpoint BEFORE any queueMicrotask / Promise.then
+    // deferred inside background.js.
+    win.importScripts = (...files) => {
+      win.__importedScripts.push(...files);
+      if (!syncSampled && options.backgroundSource === undefined && typeof options.afterBootSync === "function") {
+        syncSampled = true;
+        win.__pbpMicrotaskCheckpointRan = false;
+        win.queueMicrotask(() => {
+          options.afterBootSync(win, mock);
+          win.__pbpMicrotaskCheckpointRan = true;
+        });
+      }
+    };
     // Stub: prevent accidental real network fetches in background boot paths
     // unless a test installs its own win.fetch.
     win.fetch = options.fetch || (async (input) => {
@@ -80,25 +96,12 @@
     if (options.beforeBackground) await options.beforeBackground(win, mock);
     if (!options.depsOnly) {
       const bgUrl = base + "background.js";
-      const wantsInlineSync = options.backgroundSource !== undefined
-        || (typeof options.afterBootSync === "function" && globalThis.location?.protocol !== "file:");
-      if (!wantsInlineSync) {
-        // Keep classic <script src> as the default so direct file:// opening of
-        // SW test pages (CLAUDE.md) triggers zero file-origin fetch() calls.
+      if (options.backgroundSource === undefined) {
         await loadScript(doc, bgUrl);
-        if (options.afterBootSync) options.afterBootSync(win, mock);
+        if (!syncSampled && typeof options.afterBootSync === "function") {
+          options.afterBootSync(win, mock);
+        }
       } else {
-        const bgSource = options.backgroundSource !== undefined
-          ? options.backgroundSource
-          : await fetch(bgUrl).then((r) => {
-            if (!r.ok) throw new Error("failed to load runtime script: " + bgUrl);
-            return r.text();
-          });
-        // Execute background.js via an inline <script> while boot()'s frame stays
-        // on the JS execution stack: per HTML spec, the microtask checkpoint is
-        // skipped until the outer JS call stack empties at the next `await`, so
-        // `afterBootSync` observes true top-level listener registration BEFORE any
-        // `queueMicrotask` / Promise `.then` callback scheduled by background.js.
         win.__pbpMicrotaskCheckpointRan = false;
         win.queueMicrotask(() => { win.__pbpMicrotaskCheckpointRan = true; });
         let bootErr = null;
@@ -106,7 +109,7 @@
         win.addEventListener("error", onErr);
         try {
           const s = doc.createElement("script");
-          s.textContent = bgSource + "\n//# sourceURL=" + bgUrl;
+          s.textContent = options.backgroundSource + "\n//# sourceURL=" + bgUrl;
           doc.head.appendChild(s);
         } finally {
           win.removeEventListener("error", onErr);

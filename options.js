@@ -5488,7 +5488,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         await pbpAssertChunkedSyncReadComplete("savedThemes", current);
         const merged = pbpApplySavedThemeOp(current, op);
         try {
-          await pbpSyncSetLargeUnlocked("savedThemes", merged);
+          await pbpSyncSetLargeUnlocked("savedThemes", merged, { mergeBase: current });
         } catch (e) {
           // Sync quota: the merged list IS stored, in the device-local
           // fallback record the write just left behind, so the popover must

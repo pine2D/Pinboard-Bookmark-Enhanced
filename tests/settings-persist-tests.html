@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="612"><title>Settings Persistence Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="614"><title>Settings Persistence Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -763,6 +763,7 @@ async function run() {
       return new Function(...Object.keys(deps), persistSource + "\nreturn persistSavedThemes;")(
         ...Object.values(deps));
     };
+    globalThis.__pbpTestMakePersist = makePersist;
     const attempt = async (run) => {
       try { return { ok: true, value: await run() }; } catch (error) { return { ok: false, error }; }
     };
@@ -4032,18 +4033,20 @@ async function run() {
       syncBacking.badGeneration = { _chunks: 2, _generation: "not a generation!" };
       syncBacking.notAManifest = [1, 2, 3];
       // ...while the two shapes that mean "legitimately empty" must pass:
-      // never written at all, and a legacy pre-chunk string (which decodes).
-      syncBacking.legacyString = "legacy pre-chunk value";
-      const [badCount, badGeneration, notAManifest, neverWritten, legacyString] = await Promise.all(
-        ["badCount", "badGeneration", "notAManifest", "neverWritten", "legacyString"].map(refused));
+      // never written at all, and an empty legacy pre-chunk JSON string ("[]"),
+      // whereas a truncated/corrupt legacy JSON string must be refused.
+      syncBacking.legacyString = "[]";
+      syncBacking.corruptLegacyJson = '[{"name":"Cloud","css":"a{}"}';
+      const [badCount, badGeneration, notAManifest, corruptLegacyJson, neverWritten, legacyString] = await Promise.all(
+        ["badCount", "badGeneration", "notAManifest", "corruptLegacyJson", "neverWritten", "legacyString"].map(refused));
       let nonEmptyRefusal = "";
       syncBacking.stillFilled = { _chunks: 3, _generation: "g1" };
       try { await pbpAssertChunkedSyncReadComplete("stillFilled", [{ name: "One" }]); }
       catch (error) { nonEmptyRefusal = (error && error.code) || "threw"; }
       console.warn = prevWarnE7f;
-      check("E7f an undecodable manifest is refused, while never-written and legacy pre-chunk values pass",
+      check("E7f an undecodable manifest or truncated legacy JSON is refused, while never-written and empty legacy pre-chunk values pass",
         badCount === "chunks_propagating" && badGeneration === "chunks_propagating" &&
-        notAManifest === "chunks_propagating" &&
+        notAManifest === "chunks_propagating" && corruptLegacyJson === "chunks_propagating" &&
         neverWritten === "" && legacyString === "" && nonEmptyRefusal === "");
 
       console.warn = () => {};
@@ -4247,6 +4250,136 @@ async function run() {
         && coldFallbackMismatchRefusal === "chunks_propagating"
         && staleEmptyFallbackRefusal === "chunks_propagating"
         && staleNonEmptyAllowed === true);
+
+      // R4-P1 & R4-P2#3:
+      // a) Generation swap g1->g2 arriving inside completeness check before pbpSyncSetLargeUnlocked
+      //    refuses mergeBase with 0 sync.set / 0 sync.remove and leaves CloudNew readable;
+      // b) Cold routing error returning non-empty local [LocalOld] refuses mergeBase with 0 sync writes;
+      // c) Unpropagated g2 rescuing non-empty stale fallback [LocalOld] refuses mergeBase with 0 sync writes;
+      // d) Truncated legacy pre-chunk JSON string refuses mergeBase with 0 sync writes.
+      console.warn = () => {};
+      const runRealPersistSavedThemes = globalThis.__pbpTestMakePersist(
+        pbpSyncSetLargeUnlocked,
+        pbpSyncGetLargeUnlocked,
+      );
+      let genSwapCode = "", genSwapSets = 0, genSwapRemoves = 0, genSwapReadback = null;
+      {
+        const lObj = {
+          optSyncEnabled: true,
+          savedThemes_localFallback: pbpLargeFallbackRecord([{ name: "OldLocal", css: "h1{}" }], "gold", "g0"),
+        };
+        const sObj = { savedThemes: { _chunks: 1, _generation: "g1" }, savedThemes_g1_0: "[]" };
+        const lArea = makeMapArea(lObj);
+        let removeCalls = 0;
+        const origLRem = lArea.remove;
+        lArea.remove = async (k) => { if (++removeCalls === 1) throw new Error("first remove fails"); return origLRem(k); };
+        const sArea = makeMapArea(sObj);
+        let manifestChecks = 0;
+        const origSGet = sArea.get;
+        sArea.get = async (q) => {
+          const res = await origSGet(q);
+          if (q === "savedThemes" && ++manifestChecks === 2) {
+            // Right after pbpAssertChunkedSyncReadComplete reads g1 manifest (before g1 chunk read), g2 arrives!
+            sObj.savedThemes = { _chunks: 1, _generation: "g2" };
+            sObj.savedThemes_g2_0 = '[{"name":"CloudNew","css":"div{}"}]';
+          }
+          return res;
+        };
+        const origSSet = sArea.set, origSRem = sArea.remove;
+        sArea.set = async (d) => { genSwapSets++; return origSSet(d); };
+        sArea.remove = async (k) => { genSwapRemoves++; return origSRem(k); };
+        globalThis.chrome.storage.local = lArea;
+        globalThis.chrome.storage.sync = sArea;
+        _settingsStorageCache = sArea;
+        try {
+          await runRealPersistSavedThemes({ type: "save", name: "New", css: "a{}" });
+        } catch (err) {
+          genSwapCode = (err && err.code) || "threw";
+        }
+        genSwapReadback = await syncGetLarge("savedThemes", []);
+      }
+      let nonEmptyColdCode = "", nonEmptyColdWrites = 0, nonEmptyColdRemoves = 0, nonEmptyColdReadback = null;
+      {
+        const lObj = { optSyncEnabled: true, savedThemes: [{ name: "LocalOld", css: "b{}" }] };
+        const sObj = { savedThemes: { _chunks: 1, _generation: "g1" }, savedThemes_g1_0: '[{"name":"Cloud","css":"c{}"}]' };
+        const lArea = makeMapArea(lObj);
+        let routeTries = 0;
+        const origLGet = lArea.get;
+        lArea.get = async (q) => {
+          if (q && typeof q === "object" && !Array.isArray(q) && "optSyncEnabled" in q && ++routeTries === 1) {
+            throw new Error("cold route boom");
+          }
+          return origLGet(q);
+        };
+        const sArea = makeMapArea(sObj);
+        const origSSet = sArea.set, origSRem = sArea.remove;
+        sArea.set = async (d) => { nonEmptyColdWrites++; return origSSet(d); };
+        sArea.remove = async (k) => { nonEmptyColdRemoves++; return origSRem(k); };
+        globalThis.chrome.storage.local = lArea;
+        globalThis.chrome.storage.sync = sArea;
+        _settingsStorageCache = null;
+        try {
+          await runRealPersistSavedThemes({ type: "save", name: "New", css: "a{}" });
+        } catch (err) {
+          nonEmptyColdCode = (err && err.code) || "threw";
+        }
+        nonEmptyColdReadback = await syncGetLarge("savedThemes", []);
+      }
+      let nonEmptyStaleRescueCode = "", nonEmptyStaleRescueWrites = 0, nonEmptyStaleRescueRemoves = 0, nonEmptyStaleRescueReadback = null;
+      {
+        const lObj = {
+          optSyncEnabled: true,
+          savedThemes_localFallback: pbpLargeFallbackRecord([{ name: "LocalOld", css: "b{}" }], "g1", "g0"),
+        };
+        const sObj = { savedThemes: { _chunks: 1, _generation: "g2" } };
+        const sArea = makeMapArea(sObj);
+        const origSGet = sArea.get, origSSet = sArea.set, origSRem = sArea.remove;
+        sArea.get = async (q) => {
+          const res = await origSGet(q);
+          if (Array.isArray(q) && q.includes("savedThemes_g2_0")) {
+            sObj.savedThemes_g2_0 = '[{"name":"Cloud","css":"c{}"}]';
+          }
+          return res;
+        };
+        sArea.set = async (d) => { nonEmptyStaleRescueWrites++; return origSSet(d); };
+        sArea.remove = async (k) => { nonEmptyStaleRescueRemoves++; return origSRem(k); };
+        globalThis.chrome.storage.local = makeMapArea(lObj);
+        globalThis.chrome.storage.sync = sArea;
+        _settingsStorageCache = sArea;
+        try {
+          await runRealPersistSavedThemes({ type: "save", name: "New", css: "a{}" });
+        } catch (err) {
+          nonEmptyStaleRescueCode = (err && err.code) || "threw";
+        }
+        nonEmptyStaleRescueReadback = await syncGetLarge("savedThemes", []);
+      }
+      let corruptLegacySaveCode = "", corruptLegacyWrites = 0, corruptLegacyRemoves = 0;
+      {
+        const lObj = { optSyncEnabled: true };
+        const sObj = { savedThemes: '[{"name":"Cloud","css":"a{}"}' };
+        const sArea = makeMapArea(sObj);
+        const origSSet = sArea.set, origSRem = sArea.remove;
+        sArea.set = async (d) => { corruptLegacyWrites++; return origSSet(d); };
+        sArea.remove = async (k) => { corruptLegacyRemoves++; return origSRem(k); };
+        globalThis.chrome.storage.local = makeMapArea(lObj);
+        globalThis.chrome.storage.sync = sArea;
+        _settingsStorageCache = sArea;
+        try {
+          await runRealPersistSavedThemes({ type: "save", name: "New", css: "b{}" });
+        } catch (err) {
+          corruptLegacySaveCode = (err && err.code) || "threw";
+        }
+      }
+      console.warn = prevWarnE7f;
+      check("E7f merge-base CAS refuses mid-recheck generation swaps, non-empty degraded reads, and truncated legacy JSON with zero cloud writes",
+        typeof runRealPersistSavedThemes === "function"
+        && genSwapCode === "chunks_propagating" && genSwapSets === 0 && genSwapRemoves === 0
+        && Array.isArray(genSwapReadback) && genSwapReadback.length === 1 && genSwapReadback[0].name === "CloudNew"
+        && nonEmptyColdCode === "chunks_propagating" && nonEmptyColdWrites === 0 && nonEmptyColdRemoves === 0
+        && Array.isArray(nonEmptyColdReadback) && nonEmptyColdReadback.length === 1 && nonEmptyColdReadback[0].name === "Cloud"
+        && nonEmptyStaleRescueCode === "chunks_propagating" && nonEmptyStaleRescueWrites === 0 && nonEmptyStaleRescueRemoves === 0
+        && Array.isArray(nonEmptyStaleRescueReadback) && nonEmptyStaleRescueReadback.length === 1 && nonEmptyStaleRescueReadback[0].name === "Cloud"
+        && corruptLegacySaveCode === "chunks_propagating" && corruptLegacyWrites === 0 && corruptLegacyRemoves === 0);
     } finally {
       console.warn = prevWarnE7f;
       globalThis.chrome = prevChromeE7f;
@@ -7354,6 +7487,26 @@ async function run() {
           && fromArray.openaiModel === "gpt-4o-mini"
           && fromNull.openaiBaseUrl === "__pbp_storage_unset__"
           && fromNull.openaiModel === "gpt-4o-mini");
+      }
+      {
+        // R4-P2: defaults-object read clones missing object/array defaults (such as SETTINGS_DEFAULTS.exportTargets
+        // and SETTINGS_DEFAULTS.urlClean) so mutating s.exportTargets.obsidian on a sync-off device never leaks
+        // local Obsidian vault/folder into sync on pbpDisableSyncApiKeys() (full real options.html UI flow is also
+        // covered in tests/bookmark-service-runtime-tests.mjs).
+        const local = { optSyncEnabled: false, obsidianEnabled: true, obsidianVault: "FixtureVault", obsidianFolder: "FixtureFolder" };
+        const sync = { syncApiKeys: true };
+        install(local, sync);
+        _settingsStorageCache = null;
+        const s = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
+        deobfuscateSettings(s);
+        s.exportTargets.obsidian = { enabled: !!s.obsidianEnabled, vault: s.obsidianVault, folder: s.obsidianFolder };
+        s.urlClean.customParams.push("utm_local_only");
+        await pbpDisableSyncApiKeys();
+        check("retired OpenAI migration: defaults-object read clones missing object and array defaults so local Obsidian migration cannot leak into sync on keys-off",
+          Object.keys(SETTINGS_DEFAULTS.exportTargets || {}).length === 0
+          && Array.isArray(SETTINGS_DEFAULTS.urlClean?.customParams) && SETTINGS_DEFAULTS.urlClean.customParams.length === 0
+          && JSON.stringify(sync.exportTargets) === "{}"
+          && sync.syncApiKeys === false);
       }
     } finally {
       globalThis.chrome = previousChrome;

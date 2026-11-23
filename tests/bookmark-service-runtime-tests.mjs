@@ -1809,7 +1809,7 @@ try{
           const get=area.get.bind(area);
           area.get=(query,...rest)=>{
             const result=get(query,...rest);
-            if(query&&typeof query==='object'&&Object.hasOwn(query,'optPrivateDefault')){
+            if(query&&typeof query==='object'&&(Array.isArray(query)?query.includes('optPrivateDefault'):Object.hasOwn(query,'optPrivateDefault'))){
               state.settingsWaiting=true;
               return settingsReady.then(()=>result);
             }
@@ -1912,6 +1912,38 @@ try{
     const map=(await stored(['previewAiModelByProvider'])).previewAiModelByProvider;
     assert(Object.values(map).every(v=>v===''),'every provider override is cleared: '+JSON.stringify(map));
   }finally{await options.close();}
+  // R4-P2: With local optSyncEnabled=false, cloud syncApiKeys=true, and legacy
+  // local obsidian* keys (no exportTargets stored in either area), opening
+  // real options.html and turning off credential sync must leave both
+  // SETTINGS_DEFAULTS.exportTargets and chrome.storage.sync.exportTargets empty.
+  const beforeObsKeys=await worker.evaluate(async()=>({
+    local:await chrome.storage.local.get(['optSyncEnabled','obsidianEnabled','obsidianVault','obsidianFolder','exportTargets']),
+    sync:await chrome.storage.sync.get(['syncApiKeys','exportTargets']),
+  }));
+  await worker.evaluate(async()=>{
+    await chrome.storage.local.remove('exportTargets');
+    await chrome.storage.sync.remove('exportTargets');
+    await chrome.storage.local.set({optSyncEnabled:false,obsidianEnabled:true,obsidianVault:'FixtureVault',obsidianFolder:'FixtureFolder'});
+    await chrome.storage.sync.set({syncApiKeys:true});
+  });
+  const obsOptions=await openOptions('#storage');
+  try{
+    await obsOptions.locator('label.switch:has(#opt-sync-api-keys)').click();
+    await obsOptions.locator('.confirm-yes').click();
+    await until(async()=>(await worker.evaluate(()=>chrome.storage.sync.get('syncApiKeys'))).syncApiKeys===false,'credential sync turned off');
+    const afterSyncTargets=(await worker.evaluate(()=>chrome.storage.sync.get('exportTargets'))).exportTargets;
+    const pageDefaultKeys=await obsOptions.evaluate(()=>Object.keys(SETTINGS_DEFAULTS.exportTargets||{}));
+    assert.deepEqual(afterSyncTargets||{},{},'local Obsidian vault leaked into chrome.storage.sync.exportTargets');
+    assert.deepEqual(pageDefaultKeys,[],'SETTINGS_DEFAULTS.exportTargets was mutated in memory');
+  }finally{
+    await obsOptions.close();
+    await worker.evaluate(async before=>{
+      await chrome.storage.local.remove(['optSyncEnabled','obsidianEnabled','obsidianVault','obsidianFolder','exportTargets']);
+      await chrome.storage.sync.remove(['syncApiKeys','exportTargets']);
+      await chrome.storage.local.set(before.local);
+      await chrome.storage.sync.set(before.sync);
+    },beforeObsKeys);
+  }
   console.log('settings: saved theme releases the preset, shortcuts refresh on return, reader reset clears every provider override');
   });
   await block('archive log follows the bookmark connection',['linkding'],async()=>{
