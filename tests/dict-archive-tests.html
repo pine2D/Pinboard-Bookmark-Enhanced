@@ -545,6 +545,13 @@ function driveFixture(options = {}) {
       entries: [REMOTE_V2_ENTRY, REMOTE_V3_SUPPLEMENT, REMOTE_V4_PATTERNS] })
     : JSON.stringify(options.version2 ? batchV2() : batch());
   const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json; charset=UTF-8" } });
+  let reservedSeq = 0;
+  const reservedFiles = new Map();
+  const reserveFile = id => {
+    reservedFiles.set(id, { kind: "drive#file", id, name: "pbp-dict-entry-" + id + ".json", mimeType: "application/json" });
+    return id;
+  };
+  ["frozen-v1-id", "frozen-v2-id", "frozen-v3-id"].forEach(reserveFile);
   const client = pbpCreateDriveClient({ protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL,
     identity: { getAuthToken: async () => ({ token: "token:" + permissionId }), removeCachedAuthToken: async () => {} },
     beforeRequest: async () => enabled,
@@ -558,16 +565,17 @@ function driveFixture(options = {}) {
         options.afterDownload?.({ owner: () => { owner = OTHER; }, google: () => { permissionId = "google-b"; }, disable: () => { enabled = false; } });
         return new Response(options.corrupt ? "{bad json" : body, { headers: { "Content-Type": "application/json" } });
       }
-      if (url.pathname === "/drive/v3/files/generateIds") return json({ kind: "drive#generatedIds", space: "appDataFolder", ids: ["upload-" + (uploads.length + 1)] });
+      if (url.pathname === "/drive/v3/files/generateIds") return json({ kind: "drive#generatedIds", space: "appDataFolder", ids: [reserveFile("dict-upload-" + (++reservedSeq))] });
       if (url.pathname === "/upload/drive/v3/files") {
         const parts = init.body.split("\r\n\r\n");
         const uploadedMeta = JSON.parse(parts[1].split("\r\n--")[0]);
-        if (typeof uploadedMeta.id !== "string" || !uploadedMeta.id || typeof uploadedMeta.name !== "string" || !uploadedMeta.name) {
+        const expectedFile = typeof uploadedMeta.id === "string" ? reservedFiles.get(uploadedMeta.id) : null;
+        if (!expectedFile || uploadedMeta.name !== expectedFile.name) {
           throw new Error("unexpected upload metadata: " + JSON.stringify(uploadedMeta));
         }
         uploads.push({ metadata: uploadedMeta,
           body: parts[2].slice(0, parts[2].lastIndexOf("\r\n--")) });
-        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { kind: "drive#file", id: "drive-dict-file-fixture", name: "pbp-dict-batch-fixture.json", mimeType: "application/json" }, failUpload ? 503 : 200);
+        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { ...expectedFile }, failUpload ? 503 : 200);
       }
       throw new Error("unexpected request " + url.pathname);
     } });
@@ -604,6 +612,7 @@ test("real runner bootstraps an empty device and reuses a peer's complete entry"
   const read = await f.store.read(request());
   assert(result.ok && result.changed && result.status.bootstrapComplete && read.model === "peer-model");
   assert((await f.store.getAccountState("google-a", HASH)).pageToken === "after" && f.uploads.length === 1);
+  assert(f.uploads[0].metadata.id === "dict-upload-1" && f.uploads[0].metadata.name === "pbp-dict-entry-dict-upload-1.json");
   assert(!f.uploads[0].body.includes(OWNER) && f.uploads[0].metadata.appProperties.pbpKind === "dict-entry-batch");
 });
 test("real runner downloads independently authored schema 2 literary evidence and emits schema 4", async () => {
@@ -612,7 +621,8 @@ test("real runner downloads independently authored schema 2 literary evidence an
   assert(result.ok && read.archiveId === REMOTE_V2_ENTRY.recordKey && read.supplements.length === 1);
   assert(read.supplements[0].learning.language.lang === "zh-CN");
   assert(read.supplements[0].sources[0].work === "The Pickwick Papers");
-  assert(f.uploads.length === 1 && f.uploads[0].metadata.appProperties.schema === "4");
+  assert(f.uploads.length === 1 && f.uploads[0].metadata.id === "dict-upload-1" &&
+    f.uploads[0].metadata.name === "pbp-dict-entry-dict-upload-1.json" && f.uploads[0].metadata.appProperties.schema === "4");
   assert(JSON.parse(f.uploads[0].body).schema === 4);
   assert(JSON.parse(f.uploads[0].body).entries.some(event => event.recordKey === REMOTE_V2_SUPPLEMENT.recordKey));
   assert((await f.store.getAccountState("google-a", HASH)).protocolSchema === 4);
@@ -697,7 +707,8 @@ test("frozen uploads retry identical file ID and body after a worker restart", a
   const first = await f.run(); const pending = await f.store.listPendingBatches("google-a", HASH);
   await f.store.close(); f.failUpload(false); const second = await f.run({ force: true });
   assert(first.error === "server" && pending.length === 1 && second.ok && f.uploads.length === 2);
-  assert(f.uploads[0].metadata.id === f.uploads[1].metadata.id && f.uploads[0].body === f.uploads[1].body);
+  assert(f.uploads[0].metadata.id === "dict-upload-1" && f.uploads[1].metadata.id === "dict-upload-1" &&
+    f.uploads[1].metadata.name === "pbp-dict-entry-dict-upload-1.json" && f.uploads[0].body === f.uploads[1].body);
   assert(!(await f.store.listPendingBatches("google-a", HASH)).length && f.connection() === null);
 });
 for (const change of ["owner", "google", "disable"]) test(change + " changes during download prevent archive and cursor commits", async () => {

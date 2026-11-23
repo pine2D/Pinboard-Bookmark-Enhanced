@@ -79,7 +79,32 @@
     }
     if (options.beforeBackground) await options.beforeBackground(win, mock);
     if (!options.depsOnly) {
-      await loadScript(doc, base + "background.js");
+      const bgUrl = base + "background.js";
+      const bgSource = options.backgroundSource !== undefined
+        ? options.backgroundSource
+        : await fetch(bgUrl).then((r) => {
+          if (!r.ok) throw new Error("failed to load runtime script: " + bgUrl);
+          return r.text();
+        });
+      // Execute background.js via an inline <script> while boot()'s frame stays
+      // on the JS execution stack: per HTML spec, the microtask checkpoint is
+      // skipped until the outer JS call stack empties at the next `await`, so
+      // `afterBootSync` observes true top-level listener registration BEFORE any
+      // `queueMicrotask` / Promise `.then` callback scheduled by background.js.
+      win.__pbpMicrotaskCheckpointRan = false;
+      win.queueMicrotask(() => { win.__pbpMicrotaskCheckpointRan = true; });
+      let bootErr = null;
+      const onErr = (ev) => { bootErr = ev.error || new Error(ev.message || "background.js top-level error"); };
+      win.addEventListener("error", onErr);
+      try {
+        const s = doc.createElement("script");
+        s.textContent = bgSource + "\n//# sourceURL=" + bgUrl;
+        doc.head.appendChild(s);
+      } finally {
+        win.removeEventListener("error", onErr);
+      }
+      if (bootErr) throw bootErr;
+      if (options.afterBootSync) options.afterBootSync(win, mock);
       const expectedDeps = options.deps || SW_DEPS;
       if (win.__importedScripts.length !== expectedDeps.length ||
           expectedDeps.some((file, idx) => win.__importedScripts[idx] !== file)) {

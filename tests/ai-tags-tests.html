@@ -1532,13 +1532,17 @@ suite("custom provider entries", () => {
     // Gemini's bespoke stream branch: only the translate path asks for a zero
     // thinking budget, and that request needs the same 400/422 strip-and-retry
     // + per-model memo the non-streaming caller gets.
-    await atest("gemini translate stream strips a rejected thinking budget, retries and memoizes", async () => {
+    await atest("gemini translate stream negotiates thinkingLevel:low -> thinkingBudget:0 -> strip and memoizes", async () => {
       const bodies = [];
       window.fetch = async (_url, init) => {
         bodies.push(JSON.parse(init.body));
-        return bodies.length === 1
-          ? new Response(JSON.stringify({ error: { message: "Invalid JSON payload received. Unknown name \"thinkingLevel\" at 'generation_config.thinking_config': Cannot find field." } }), { status: 400 })
-          : new Response('data: {"candidates":[{"content":{"parts":[{"text":"bonjour"}]}}]}\n\n', { status: 200 });
+        if (bodies.length === 1) {
+          return new Response(JSON.stringify({ error: { message: "Invalid JSON payload received. Unknown name \"thinkingLevel\" at 'generation_config.thinking_config': Cannot find field." } }), { status: 400 });
+        }
+        if (bodies.length === 2) {
+          return new Response(JSON.stringify({ error: { message: "Thinking budget is not supported for this model." } }), { status: 400 });
+        }
+        return new Response('data: {"candidates":[{"content":{"parts":[{"text":"bonjour"}]}}]}\n\n', { status: 200 });
       };
       const stored = {};
       window.chrome = {
@@ -1546,17 +1550,22 @@ suite("custom provider entries", () => {
         i18n: { getMessage: () => "" },
         permissions: { contains: async () => true },
         storage: { local: {
-          get: async () => (stored.pbpThinkReject ? { pbpThinkReject: stored.pbpThinkReject } : {}),
+          get: async (k) => {
+            if (typeof k === "string") return k in stored ? { [k]: stored[k] } : {};
+            return { ...stored };
+          },
           set: async (o) => { Object.assign(stored, o); }
         } }
       };
+      const gKey = JSON.stringify([2, "gemini:d2", "https://generativelanguage.googleapis.com/v1beta", "gemini-2.0-flash"]);
       const out = await callAIStream({ aiProvider: "gemini", geminiApiKey: "k", geminiModel: "gemini-2.0-flash" },
         "hi", { noThinking: true, maxTokens: 64 }, () => {});
       assertEq(out, "bonjour", "stream text after the retry");
-      assertEq(bodies.length, 2, "one strip-and-retry");
+      assertEq(bodies.length, 3, "three-step negotiation");
       assertEq(bodies[0].generationConfig.thinkingConfig.thinkingLevel, "low", "first attempt requests low thinking level");
-      assertEq("thinkingConfig" in bodies[1].generationConfig, false, "retry drops the rejected field");
-      assertEq(!!(stored.pbpThinkReject && stored.pbpThinkReject[JSON.stringify([2,"gemini","https://generativelanguage.googleapis.com/v1beta","gemini-2.0-flash"])]?.rejected), true, "rejection memoized per model");
+      assertEq(bodies[1].generationConfig.thinkingConfig.thinkingBudget, 0, "second attempt tries legacy zero budget");
+      assertEq("thinkingConfig" in bodies[2].generationConfig, false, "third attempt drops the rejected field");
+      assertEq(!!(stored.pbpThinkReject?.[gKey]?.rejected && stored.pbpAiParamFix?.[gKey]?.omitThinkingFallback), true, "both rejections memoized per model under d2");
     });
 
     await atest("gemini stream honours the reject memo and leaves the reader default untouched", async () => {
@@ -1565,18 +1574,25 @@ suite("custom provider entries", () => {
         bodies.push(JSON.parse(init.body));
         return new Response('data: {"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}\n\n', { status: 200 });
       };
+      const gKey = JSON.stringify([2, "gemini:d2", "https://generativelanguage.googleapis.com/v1beta", "gemini-2.5-pro"]);
       window.chrome = {
         runtime: { id: "test-extension" },
         i18n: { getMessage: () => "" },
         permissions: { contains: async () => true },
         storage: { local: {
-          get: async () => ({ pbpThinkReject: { [JSON.stringify([2,"gemini","https://generativelanguage.googleapis.com/v1beta","gemini-2.5-pro"])]: {rejected:true,expiresAt:Date.now()+86400000} } }),
+          get: async (k) => {
+            const seed = {
+              pbpThinkReject: { [gKey]: { rejected: true, expiresAt: Date.now() + 86400000 } },
+              pbpAiParamFix: { [gKey]: { omitThinkingFallback: true, expiresAt: Date.now() + 86400000 } },
+            };
+            return typeof k === "string" ? (k in seed ? { [k]: seed[k] } : {}) : seed;
+          },
           set: async () => {}
         } }
       };
       const s = { aiProvider: "gemini", geminiApiKey: "k", geminiModel: "gemini-2.5-pro" };
       await callAIStream(s, "hi", { noThinking: true, maxTokens: 64 }, () => {});
-      assertEq(bodies.length, 1, "memo skips the attempt known to fail");
+      assertEq(bodies.length, 1, "memo skips the attempts known to fail");
       assertEq("thinkingConfig" in bodies[0].generationConfig, false, "memoized model gets no thinking field");
       // ask / skim / explain / dict pass no noThinking: streaming keeps thinking
       // ON by default (3c03380 scoped the shared self-heal to callAI).

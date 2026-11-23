@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="607"><title>Settings Persistence Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="610"><title>Settings Persistence Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -4049,6 +4049,49 @@ async function run() {
       console.warn = () => {};
       let manifestErrThrown = false;
       let chunkErrThrown = false;
+      let coldRouteErrThrown = false;
+      let coldSyncReads = 0;
+      let fallbackErrThrown = false;
+      let nonEmptyFallbackRefusal = "";
+      globalThis.chrome.storage.sync = {
+        get: async () => { coldSyncReads++; return {}; },
+      };
+      globalThis.chrome.storage.local = {
+        get: async () => { throw new Error("cold optSyncEnabled boom"); },
+      };
+      _settingsStorageCache = null;
+      try { await pbpAssertChunkedSyncReadComplete("savedThemes", []); }
+      catch (_) { coldRouteErrThrown = true; }
+
+      const nonEmptyThemeFallback = pbpLargeFallbackRecord([{ name: "FallbackTheme", css: "body{}" }], "g1", null);
+      let fbReads = 0;
+      globalThis.chrome.storage.local = {
+        get: async (q) => {
+          if (q === "savedThemes_localFallback") {
+            fbReads++;
+            if (fbReads === 1) throw new Error("first local fallback read boom");
+            return { savedThemes_localFallback: nonEmptyThemeFallback };
+          }
+          return { optSyncEnabled: true };
+        },
+      };
+      globalThis.chrome.storage.sync = { get: async () => ({}) };
+      _settingsStorageCache = globalThis.chrome.storage.sync;
+      const degradedThemes = await syncGetLarge("savedThemes", []);
+      try { await pbpAssertChunkedSyncReadComplete("savedThemes", degradedThemes); }
+      catch (err) { nonEmptyFallbackRefusal = (err && err.code) || "threw"; }
+
+      globalThis.chrome.storage.local = {
+        get: async (q) => {
+          if (q === "savedThemes_localFallback") throw new Error("both local fallback reads boom");
+          return { optSyncEnabled: true };
+        },
+      };
+      const degradedTwice = await syncGetLarge("savedThemes", []);
+      try { await pbpAssertChunkedSyncReadComplete("savedThemes", degradedTwice); }
+      catch (_) { fallbackErrThrown = true; }
+
+      globalThis.chrome.storage.local = { get: async () => ({}) };
       globalThis.chrome.storage.sync = {
         get: async () => { throw new Error("sync manifest read boom"); },
       };
@@ -4064,15 +4107,36 @@ async function run() {
       _settingsStorageCache = globalThis.chrome.storage.sync;
       try { await pbpAssertChunkedSyncReadComplete("savedThemes", []); }
       catch (_) { chunkErrThrown = true; }
-      const missingWriterResult = await pbpApplyBackupPayload(
-        { _schemaVersion: 2, customOverlayCSS: "body { color: #111; }" },
+
+      let settingsWritesWithoutWriter = 0;
+      const prevTestStorageE7f = globalThis.__pbpTestStorage;
+      globalThis.__pbpTestStorage = {
+        get: async () => ({}),
+        set: async () => { settingsWritesWithoutWriter++; },
+      };
+      const missingWriterV2Result = await pbpApplyBackupPayload(
+        { _schemaVersion: 2, optTheme: "dark", customOverlayCSS: "body { color: #111; }" },
         { exportableKeys: ["optTheme"] },
       );
+      const missingWriterV1Result = await pbpApplyBackupPayload(
+        { themePresetKey: "solarized" },
+        { exportableKeys: ["themePresetKey"] },
+      );
+      if (prevTestStorageE7f === undefined) delete globalThis.__pbpTestStorage;
+      else globalThis.__pbpTestStorage = prevTestStorageE7f;
       console.warn = prevWarnE7f;
       check("E7f storage read failures during empty-value completeness recheck fail closed instead of certifying empty",
         manifestErrThrown === true && chunkErrThrown === true);
-      check("E7f pbpApplyBackupPayload fails settings section when customOverlayCSS is present without saveOverlayWithFallback",
-        missingWriterResult.settings === "failed");
+      check("E7f completeness check fails closed on cold routing failure, fallback read failure, and non-empty local fallback mismatch",
+        coldRouteErrThrown === true && coldSyncReads === 0
+        && Array.isArray(degradedThemes) && degradedThemes.length === 0
+        && nonEmptyFallbackRefusal === "chunks_propagating"
+        && Array.isArray(degradedTwice) && degradedTwice.length === 0
+        && fallbackErrThrown === true);
+      check("E7f pbpApplyBackupPayload fails settings section before any write when v1 or v2 customOverlayCSS lacks saveOverlayWithFallback",
+        missingWriterV2Result.settings === "failed"
+        && missingWriterV1Result.settings === "failed"
+        && settingsWritesWithoutWriter === 0);
     } finally {
       console.warn = prevWarnE7f;
       globalThis.chrome = prevChromeE7f;
@@ -7118,6 +7182,51 @@ async function run() {
         check("retired OpenAI migration: background.js invokes pbpMigrateRetiredOpenaiModels at top level",
           /^pbpMigrateRetiredOpenaiModels\(\);$/m.test(bgSource));
       }
+      {
+        // R2-02: single-snapshot read across string, array, defaults-object, and null
+        // queries so a concurrent Chrome Sync update right after the first sync.get
+        // can never stitch old proxy model + new official endpoint into "gpt-6-luna".
+        const queries = [
+          "openaiModel",
+          ["openaiModel"],
+          { openaiModel: SETTINGS_DEFAULTS.openaiModel },
+          null,
+        ];
+        let allAtomic = true;
+        for (const q of queries) {
+          const local = { optSyncEnabled: true, syncApiKeys: false };
+          const sync = { syncApiKeys: false, openaiBaseUrl: "https://proxy.example/v1", openaiModel: "gpt-4o-mini" };
+          install(local, sync);
+          _settingsStorageCache = null;
+          const origSyncGet = globalThis.chrome.storage.sync.get;
+          let mainSyncReads = 0;
+          globalThis.chrome.storage.sync.get = async (arg) => {
+            const isSecretFlagRead = arg === "syncApiKeys";
+            const isChunkMetaRead = typeof arg === "string" && PBP_CHUNKED_SETTING_KEYS.includes(arg);
+            const snap = await origSyncGet(arg);
+            if (!isSecretFlagRead && !isChunkMetaRead) {
+              mainSyncReads++;
+              if (mainSyncReads === 1) {
+                Object.assign(sync, {
+                  openaiBaseUrl: "https://api.openai.com/v1",
+                  openaiModel: "chosen-new",
+                });
+              }
+            }
+            return snap;
+          };
+          const first = await pbpReadSettingsWithSecrets(q);
+          const second = await pbpReadSettingsWithSecrets(q);
+          const onlyModelKey = q === null
+            ? (first.openaiBaseUrl === "https://proxy.example/v1" && second.openaiBaseUrl === "https://api.openai.com/v1")
+            : (Object.keys(first).join(",") === "openaiModel" && Object.keys(second).join(",") === "openaiModel");
+          if (mainSyncReads !== 2 || first.openaiModel !== "gpt-4o-mini" || second.openaiModel !== "chosen-new" || !onlyModelKey) {
+            allAtomic = false;
+          }
+        }
+        check("retired OpenAI migration: partial and full reads fetch a single atomic snapshot across string, array, defaults-object, and null queries",
+          allAtomic);
+      }
     } finally {
       globalThis.chrome = previousChrome;
       if (previousStorage === undefined) delete globalThis.__pbpTestStorage; else globalThis.__pbpTestStorage = previousStorage;
@@ -7143,6 +7252,61 @@ async function run() {
     globalThis.chrome = {storage:{local:area,sync:area}};
     globalThis.__pbpTestStorage = area;
     try {
+      {
+        // R2-01: saving an edit to Qwen only while another device concurrently switches
+        // openaiBaseUrl to a 3rd-party proxy must preserve raw sync.previewAiModelByProvider.openai.
+        const savedTestStorage = globalThis.__pbpTestStorage;
+        delete globalThis.__pbpTestStorage;
+        const localData = { optSyncEnabled: true, syncApiKeys: false };
+        const syncData = {
+          syncApiKeys: false,
+          aiProvider: "qwen",
+          qwenModel: "q0",
+          openaiBaseUrl: "https://api.openai.com/v1",
+          previewAiModelByProvider: { openai: "gpt-4o-mini", gemini: "G", qwen: "q0" },
+        };
+        const makeArea = (backing, beforeSet) => ({
+          async get(q) {
+            if (q == null) return structuredClone(backing);
+            if (typeof q === "string") return q in backing ? { [q]: structuredClone(backing[q]) } : {};
+            if (Array.isArray(q)) return Object.fromEntries(q.filter((k) => k in backing).map((k) => [k, structuredClone(backing[k])]));
+            return { ...structuredClone(q), ...Object.fromEntries(Object.keys(q).filter((k) => k in backing).map((k) => [k, structuredClone(backing[k])])) };
+          },
+          async set(patch) {
+            if (beforeSet) beforeSet(patch);
+            Object.assign(backing, structuredClone(patch));
+          },
+          async remove(keys) { for (const k of [].concat(keys)) delete backing[k]; },
+        });
+        let remoteSwitched = false;
+        globalThis.chrome = {
+          storage: {
+            local: makeArea(localData),
+            sync: makeArea(syncData, () => {
+              if (!remoteSwitched) {
+                remoteSwitched = true;
+                syncData.openaiBaseUrl = "https://proxy.example/v1";
+              }
+            }),
+          },
+        };
+        _settingsStorageCache = null;
+        const saveRes = await persistSettings(
+          { qwenModel: "q1", previewAiModelByProvider: { openai: "gpt-6-luna", gemini: "G", qwen: "q1" } },
+          { previewModelChanges: { qwen: "q1" } },
+        );
+        const rereadProxy = await pbpReadSettingsWithSecrets(["openaiBaseUrl", "previewAiModelByProvider"]);
+        check("model merge: editing another provider while remote switches openaiBaseUrl to a proxy preserves raw cloud OpenAI selection",
+          saveRes.ok === true
+          && syncData.openaiBaseUrl === "https://proxy.example/v1"
+          && syncData.previewAiModelByProvider.gemini === "G"
+          && syncData.previewAiModelByProvider.qwen === "q1"
+          && syncData.previewAiModelByProvider.openai === "gpt-4o-mini"
+          && rereadProxy.previewAiModelByProvider.openai === "gpt-4o-mini");
+        globalThis.chrome = { storage: { local: area, sync: area } };
+        globalThis.__pbpTestStorage = savedTestStorage;
+        _settingsStorageCache = priorCache;
+      }
       const stale = {...values.previewAiModelByProvider};
       const one = persistSettings({previewAiModelByProvider:{...stale,gemini:"g1"}}, {previewModelChanges:{gemini:"g1"}});
       const two = persistSettings({previewAiModelByProvider:{...stale,openai:"o1"}}, {previewModelChanges:{openai:"o1"}});

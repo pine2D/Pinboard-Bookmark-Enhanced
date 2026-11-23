@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="17"><title>Vocabulary Background Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="18"><title>Vocabulary Background Tests</title>
 <style>body{font-family:monospace;padding:16px}.case{padding:6px}.pass{color:#0a0}.fail{color:#c00}</style>
 </head><body><h1>Vocabulary Background Tests</h1><div id="summary"></div><div id="results"></div>
 <script src="fixtures/chrome-mock.js"></script>
@@ -64,9 +64,10 @@ async function bootDriveWorker({
       win.pbpCreateDictArchiveDriveSyncRunner = makeRunner("dictionary");
       win.pbpCreateAskArchiveDriveSyncRunner = makeRunner("ask");
     },
-    afterBoot(win, mock) {
+    afterBootSync(win, mock) {
       const alarmFns = [...mock.chrome.alarms.onAlarm.listeners];
       events.topLevelSync = {
+        beforeMicrotasks: win.__pbpMicrotaskCheckpointRan === false,
         importedScripts: [...win.__importedScripts],
         alarmCount: alarmFns.length,
         alarmAllSync: alarmFns.every((fn) => fn.constructor.name !== "AsyncFunction"),
@@ -122,11 +123,44 @@ async function bootDriveWorker({
 
   // 3. Alarm listener registered synchronously at top level and non-async.
   check("alarm listener is registered synchronously at top level",
-    base.events.topLevelSync.alarmCount >= 1 && base.events.topLevelSync.alarmAllSync);
+    base.events.topLevelSync.beforeMicrotasks === true
+    && base.events.topLevelSync.alarmCount >= 1
+    && base.events.topLevelSync.alarmAllSync);
 
   // 4. Runtime message listener is non-async and registered synchronously at top level.
   check("runtime message listener is not async",
-    base.events.topLevelSync.hasSyncMessageHandler === true);
+    base.events.topLevelSync.beforeMicrotasks === true
+    && base.events.topLevelSync.hasSyncMessageHandler === true);
+
+  // 4b. Regression guard: deferring runtime.onMessage registration into queueMicrotask is caught before microtask drain.
+  {
+    const rawBg = await fetch("../background.js").then((r) => r.text());
+    const mutatedBg = rawBg.replace(
+      "chrome.runtime.onMessage.addListener(handleRuntimeMessage);",
+      "queueMicrotask(() => chrome.runtime.onMessage.addListener(handleRuntimeMessage));",
+    );
+    let syncSampledHasListener = true;
+    let sampledBeforeMicrotask = false;
+    const deferredRealm = await pbpSwRealm.boot({
+      mock: {
+        id: EXT_ID,
+        manifest: CAPABLE_MANIFEST,
+        storage: { local: { personalLibraryAccount: "alice", bookmarkServiceActive: "pinboard", vocabDriveConnected: false, _legacyWildcardCleanupV1: true, _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
+      },
+      backgroundSource: mutatedBg,
+      afterBootSync(w, m) {
+        sampledBeforeMicrotask = w.__pbpMicrotaskCheckpointRan === false;
+        syncSampledHasListener = m.chrome.runtime.onMessage.hasListener(w.handleRuntimeMessage);
+      },
+    });
+    const registeredOnlyAfterMicrotask = deferredRealm.mock.chrome.runtime.onMessage.hasListener(deferredRealm.win.handleRuntimeMessage);
+    check("top-level listener probe catches queueMicrotask-deferred onMessage registration",
+      mutatedBg !== rawBg
+      && sampledBeforeMicrotask === true
+      && syncSampledHasListener === false
+      && registeredOnlyAfterMicrotask === true);
+    deferredRealm.dispose();
+  }
 
   // 5. Both dirty messages schedule the one shared drive-sync-dirty alarm.
   {

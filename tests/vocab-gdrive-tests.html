@@ -1216,18 +1216,40 @@ function syncHarness(options = {}) {
     });
     const download = await downloadClient.download(DRIVE_FILE_ID);
     let invalidCancelled = false;
-    const invalidUtf8 = pbpCreateDriveClient({
-      identity: identityFixture(),
-      fetchImpl: async () => readerResponse(
-        [new Uint8Array([0xc3, 0x28])],
-        () => { invalidCancelled = true; }
-      )
-    });
-    const invalid = await invalidUtf8.download(DRIVE_FILE_ID);
+    let flushCancelled = false;
+    const utf8Warns = [];
+    const realWarn = console.warn;
+    console.warn = (...args) => { utf8Warns.push(args); };
+    let invalid, invalidFlush;
+    try {
+      const invalidUtf8 = pbpCreateDriveClient({
+        identity: identityFixture(),
+        fetchImpl: async () => readerResponse(
+          [new Uint8Array([0xc3, 0x28])],
+          () => { invalidCancelled = true; }
+        )
+      });
+      invalid = await invalidUtf8.download(DRIVE_FILE_ID);
+      const truncatedUtf8 = pbpCreateDriveClient({
+        identity: identityFixture(),
+        fetchImpl: async () => readerResponse(
+          [new Uint8Array([0xe2, 0x82])],
+          () => { flushCancelled = true; }
+        )
+      });
+      invalidFlush = await truncatedUtf8.download(DRIVE_FILE_ID);
+    } finally {
+      console.warn = realWarn;
+    }
     return !errorResult.ok && errorResult.error === "server" && errorResult.retryable === true &&
       download.ok && download.body === "é-small" &&
       !invalid.ok && invalid.error === "invalid_response" && invalid.retryable === false &&
-      invalidCancelled;
+      invalidCancelled &&
+      !invalidFlush.ok && invalidFlush.error === "invalid_response" && invalidFlush.retryable === false &&
+      flushCancelled &&
+      utf8Warns.length === 2 &&
+      utf8Warns[0].length === 2 && utf8Warns[0][0] === "[vocab-drive] download UTF-8 decode failed:" && utf8Warns[0][1] === "TypeError" &&
+      utf8Warns[1].length === 2 && utf8Warns[1][0] === "[vocab-drive] download UTF-8 flush failed:" && utf8Warns[1][1] === "TypeError";
   });
 
   await asyncCheck("network failure is retryable and exact 4 MiB succeeds", async () => {

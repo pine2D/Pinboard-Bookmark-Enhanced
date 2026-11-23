@@ -3400,26 +3400,47 @@ async function pbpReadChunkedSyncResult(key, stored, defaultValue) {
 // a full-area get(null) on every export and every theme save, which the write
 // path deliberately avoids too (E12 asserts it never scans). That window
 // stays open.
-async function pbpAssertChunkedSyncReadComplete(key, value) {
-  const empty = value == null
+function pbpIsEmptyChunkedValue(value) {
+  return value == null
     || (typeof value === "string" && value === "")
     || (Array.isArray(value) && value.length === 0)
     || (typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0);
-  if (!empty) return;
+}
+
+async function pbpAssertChunkedSyncReadComplete(key, value) {
+  if (!pbpIsEmptyChunkedValue(value)) return;
   if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.sync) return;
-  let storage;
-  try { storage = await getSettingsStorage(); }
-  catch (error) {
-    console.warn("[sync-large] completeness check storage lookup failed:", key, error?.name, error?.message);
-    throw error;
+  let storage = _settingsStorageCache;
+  if (!storage) {
+    if (!chrome.storage.local || typeof chrome.storage.local.get !== "function") {
+      throw new Error("settings routing storage unavailable");
+    }
+    try {
+      const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
+      storage = optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+      _settingsStorageCache = storage;
+      try {
+        if (typeof localStorage !== "undefined") localStorage.setItem("pp-sync-enabled", optSyncEnabled ? "1" : "0");
+      } catch (_) { /* swallow-ok: service worker and restricted contexts have no localStorage */ }
+    } catch (error) {
+      console.warn("[sync-large] completeness check storage lookup failed:", key, error?.name, error?.message);
+      throw error;
+    }
   }
   if (storage !== chrome.storage.sync) return;
   const fallbackKey = pbpLargeFallbackKey(key);
+  let fallbacks;
   try {
-    const fallbacks = await chrome.storage.local.get(fallbackKey);
-    if (Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey)) return;
+    fallbacks = await chrome.storage.local.get(fallbackKey);
   } catch (error) {
     console.warn("[sync-large] completeness check fallback read failed:", key, error?.name, error?.message);
+    throw error;
+  }
+  if (fallbacks && Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey)) {
+    const emptyDefault = Array.isArray(value) ? [] : (typeof value === "object" && value !== null ? {} : "");
+    const decodedFallback = pbpDecodeLargeResult(pbpLargeFallbackValue(fallbacks[fallbackKey]), emptyDefault);
+    if (decodedFallback.ok && pbpIsEmptyChunkedValue(decodedFallback.value)) return;
+    throw pbpChunksPropagatingError(key);
   }
   let meta;
   try { meta = (await chrome.storage.sync.get(key))[key]; }
@@ -3752,7 +3773,11 @@ async function persistSettings(data, { previewModelChanges, previewModelReset = 
       if (previewModelReset || (previewModelChanges && typeof previewModelChanges === "object")) {
         delete batch.previewAiModelByProvider;
         if (previewModelReset || Object.keys(previewModelChanges).length || batch.previewAiModel === "") {
-          const latest = await pbpReadSettingsUnlocked({ previewAiModelByProvider: {}, previewAiModel: "", aiProvider: "gemini" });
+          // Merge onto the RAW stored map so saving one provider never rewrites
+          // another provider's unedited cloud entry (e.g. a retired official slug
+          // that another device concurrently pointed at a 3rd-party proxy);
+          // retired-slug translation happens strictly on read.
+          const latest = await storage.get({ previewAiModelByProvider: {}, previewAiModel: "", aiProvider: "gemini" });
           const map = latest.previewAiModelByProvider && typeof latest.previewAiModelByProvider === "object"
             && !Array.isArray(latest.previewAiModelByProvider) ? { ...latest.previewAiModelByProvider } : {};
           if (!Object.hasOwn(map, latest.aiProvider) && typeof latest.previewAiModel === "string" && latest.previewAiModel.trim()) {
@@ -4436,6 +4461,15 @@ async function pbpMigrateRetiredOpenaiModels() {
   }
 }
 
+// Permanent active-area read-time legacy-slug compatibility for DeepSeek
+// ("deepseek-v4-flash", "deepseek-v4-flash-vision-exp" -> "deepseek-flash"),
+// MiniMax ("MiniMax-M2*" -> "MiniMax-M3.1-Flash"), Kimi ("kimi-k2.6" ->
+// "kimi-k3.1-pro"), and official-endpoint OpenAI ("gpt-5.4-nano*", "gpt-5-nano*",
+// "gpt-4o-mini*", "gpt-4.1-mini*" -> "gpt-6-luna"). Background startup writers
+// (`pbpMigrateRetired*Models`, retiring 2027-01-15 per .claude/expiring-items.md)
+// rewrite `chrome.storage.local` only and never write `chrome.storage.sync`, so
+// cloud profiles and legacy backups keep relying on `pbpApplyRetiredAiModelFallbacks`
+// on read (same permanent lifecycle as `pbpDictDefaultView`).
 function pbpQueryRequestsRetiredAiModels(query) {
   return pbpQueryRequestsKey(query, "openaiModel")
     || pbpQueryRequestsKey(query, "deepseekModel")
@@ -4456,7 +4490,7 @@ function pbpApplyRetiredAiModelFallbacks(settings, aux, query) {
     const patch = build(ctx);
     for (const [key, value] of Object.entries(patch)) {
       ctx[key] = value;
-      if (pbpQueryRequestsKey(query, key) && (query !== null || Object.prototype.hasOwnProperty.call(settings, key))) {
+      if (pbpQueryRequestsKey(query, key) && (query != null || Object.prototype.hasOwnProperty.call(settings, key))) {
         settings[key] = value;
       }
     }
@@ -4645,6 +4679,8 @@ function pbpQueryRequestsKey(query, key) {
   return typeof query === "object" && Object.prototype.hasOwnProperty.call(query, key);
 }
 
+const PBP_STORAGE_UNSET = "__pbp_storage_unset__";
+
 // The body of pbpReadSettingsWithSecrets; callers hold the secret lock.
 async function pbpReadSettingsUnlocked(query) {
   const state = await pbpReadSecretSyncStateUnlocked();
@@ -4653,24 +4689,53 @@ async function pbpReadSettingsUnlocked(query) {
   try {
     if (typeof localStorage !== "undefined") localStorage.setItem("pp-sync-enabled", state.optSyncEnabled ? "1" : "0");
   } catch (_) { /* swallow-ok: service worker and restricted contexts have no localStorage */ }
-  let settings = await mainArea.get(query);
-  // Object-form get inserts defaults, so resolve this migration from raw
-  // keys in the SAME locked storage area. Reads before startup prime and
-  // late-arriving synced legacy preferences retain their original behavior.
-  const wantsDictView = query == null || query === "dictDefaultView" ||
-    (Array.isArray(query) ? query.includes("dictDefaultView") :
-      typeof query === "object" && Object.prototype.hasOwnProperty.call(query, "dictDefaultView"));
-  if (wantsDictView) {
-    const rawView = await mainArea.get(["dictDefaultView", "dictAiAutoGenerate"]);
-    settings.dictDefaultView = pbpDictDefaultView(rawView);
-  }
-  if (pbpQueryRequestsRetiredAiModels(query)) {
-    const auxKeys = [];
-    if (!Object.prototype.hasOwnProperty.call(settings, "openaiBaseUrl")) auxKeys.push("openaiBaseUrl");
-    if (!Object.prototype.hasOwnProperty.call(settings, "aiProvider")) auxKeys.push("aiProvider");
-    if (!Object.prototype.hasOwnProperty.call(settings, "previewAiModelByProvider")) auxKeys.push("previewAiModelByProvider");
-    const aux = auxKeys.length ? await mainArea.get(auxKeys) : null;
-    pbpApplyRetiredAiModelFallbacks(settings, aux, query);
+  const wantsDictView = pbpQueryRequestsKey(query, "dictDefaultView");
+  const wantsRetiredAi = pbpQueryRequestsRetiredAiModels(query);
+  let settings;
+  if (!wantsDictView && !wantsRetiredAi) {
+    settings = await mainArea.get(query);
+  } else if (query == null) {
+    settings = await mainArea.get(query);
+    if (wantsDictView) settings.dictDefaultView = pbpDictDefaultView(settings);
+    if (wantsRetiredAi) pbpApplyRetiredAiModelFallbacks(settings, null, query);
+  } else if (typeof query === "string" || Array.isArray(query)) {
+    const requestedList = typeof query === "string" ? [query] : query;
+    const fetchKeys = requestedList.slice();
+    const ensureKey = (k) => { if (!fetchKeys.includes(k)) fetchKeys.push(k); };
+    if (wantsDictView) { ensureKey("dictDefaultView"); ensureKey("dictAiAutoGenerate"); }
+    if (wantsRetiredAi) { ensureKey("openaiBaseUrl"); ensureKey("aiProvider"); ensureKey("previewAiModelByProvider"); }
+    // Fetch requested fields and evaluation context in ONE atomic storage.get so
+    // concurrent Chrome Sync arrivals cannot stitch two incompatible snapshots.
+    const raw = await mainArea.get(fetchKeys);
+    settings = {};
+    for (const k of requestedList) {
+      if (Object.prototype.hasOwnProperty.call(raw, k)) settings[k] = raw[k];
+    }
+    if (wantsDictView) settings.dictDefaultView = pbpDictDefaultView(raw);
+    if (wantsRetiredAi) pbpApplyRetiredAiModelFallbacks(settings, raw, query);
+  } else {
+    const probeKeys = [];
+    if (wantsDictView) probeKeys.push("dictDefaultView", "dictAiAutoGenerate");
+    if (wantsRetiredAi) probeKeys.push("openaiBaseUrl", "aiProvider", "previewAiModelByProvider");
+    const reqObj = Object.assign({}, query);
+    for (const k of probeKeys) reqObj[k] = PBP_STORAGE_UNSET;
+    // Object-form get inserts defaults; sentinel values distinguish genuinely
+    // stored keys from unset ones within the SAME single storage.get call.
+    const fetched = await mainArea.get(reqObj);
+    const rawProbe = {};
+    settings = Object.assign({}, fetched);
+    for (const k of probeKeys) {
+      if (Object.prototype.hasOwnProperty.call(fetched, k) && fetched[k] !== PBP_STORAGE_UNSET) {
+        rawProbe[k] = fetched[k];
+      }
+      if (Object.prototype.hasOwnProperty.call(query, k)) {
+        settings[k] = Object.prototype.hasOwnProperty.call(rawProbe, k) ? rawProbe[k] : query[k];
+      } else {
+        delete settings[k];
+      }
+    }
+    if (wantsDictView) settings.dictDefaultView = pbpDictDefaultView(rawProbe);
+    if (wantsRetiredAi) pbpApplyRetiredAiModelFallbacks(settings, rawProbe, query);
   }
   settings = await pbpResolveChunkedSettings(settings, mainArea, query);
   if (pbpSecretRoutingActive(state.optSyncEnabled, state.syncApiKeys)) {

@@ -599,6 +599,14 @@ async function pbpApplyBackupPayload(data, {
   delete safeData.bookmarkService;
   if (selected.settings && hasSettings) {
     try {
+      const requireOverlayWriter = () => {
+        if (typeof saveOverlayWithFallback !== "function") throw new Error("overlay writer unavailable");
+        return saveOverlayWithFallback;
+      };
+      // Both v2 explicit customOverlayCSS and every v1 settings restore (which
+      // normalizes customCSS onto the overlay and clears any prior overlay when
+      // customCSS was absent) require the overlay writer before mutating settings.
+      if (schemaVersion < 2 || customOverlayCSS !== undefined) requireOverlayWriter();
       // A v1 restore needs the preset registry before its first write.
       if (schemaVersion < 2 && loadThemes) await loadThemes();
       if (safeData.exportTargets) {
@@ -615,8 +623,7 @@ async function pbpApplyBackupPayload(data, {
       let localOnly = !!importRes.fellBackToLocal;
       if (schemaVersion >= 2) {
         if (customOverlayCSS !== undefined) {
-          if (typeof saveOverlayWithFallback !== "function") throw new Error("overlay writer unavailable");
-          const overlayRes = await saveOverlayWithFallback(customOverlayCSS);
+          const overlayRes = await requireOverlayWriter()(customOverlayCSS);
           localOnly = localOnly || !!(overlayRes && overlayRes.fellBackToLocal);
         }
       } else {
@@ -642,10 +649,7 @@ async function pbpApplyBackupPayload(data, {
           newOverlay = allowed.some((css) => css && css.trim() === customCSS.trim()) ? "" : customCSS;
         }
         await (await getSettingsStorage()).set({ themePresetKey: resolvedKey || "" });
-        if (customCSS !== undefined && typeof saveOverlayWithFallback !== "function") {
-          throw new Error("overlay writer unavailable");
-        }
-        const overlayRes = saveOverlayWithFallback ? await saveOverlayWithFallback(newOverlay) : null;
+        const overlayRes = await requireOverlayWriter()(newOverlay);
         localOnly = localOnly || !!(overlayRes && overlayRes.fellBackToLocal);
       }
       result.settings = localOnly ? "local-only" : "applied";

@@ -259,8 +259,8 @@ suite("_pbpGeminiDelta", () => {
     assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ thought: true, text: "PRIVATE" }] } }] }), null, "thought only");
   });
   test("thoughtSignature on text and empty stop part (2026-11-23 Gemini 3.5 SSE shape)", () => {
-    assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ text: "OK", thoughtSignature: "Eo4BCosBAWkU==" }], role: "model" }, finishReason: "STOP", index: 0 }] }), "OK", "text with thoughtSignature");
-    assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ text: "", thoughtSignature: "Eo4BCosBAWkU==" }], role: "model" }, finishReason: "STOP", index: 0 }] }), null, "empty stop part with thoughtSignature");
+    assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ text: "OK", thoughtSignature: "c3ludGhldGljLXNpZ25hdHVyZQ==" }], role: "model" }, finishReason: "STOP", index: 0 }] }), "OK", "text with thoughtSignature");
+    assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ text: "", thoughtSignature: "c3ludGhldGljLXNpZ25hdHVyZQ==" }], role: "model" }, finishReason: "STOP", index: 0 }] }), null, "empty stop part with thoughtSignature");
   });
 });
 

@@ -585,7 +585,7 @@ function pbpCreateDriveClient({
       try {
         parts.push(decoder.decode(chunk.value, { stream: true }));
       } catch (error) {
-        console.warn("[vocab-drive] download UTF-8 decode failed:", error?.name, error?.message);
+        console.warn("[vocab-drive] download UTF-8 decode failed:", error?.name);
         await cancel();
         return failure("invalid_response", false, response.status, fileId);
       }
@@ -594,7 +594,7 @@ function pbpCreateDriveClient({
       parts.push(decoder.decode());
       return { ok: true, body: parts.join("") };
     } catch (error) {
-      console.warn("[vocab-drive] download UTF-8 flush failed:", error?.name, error?.message);
+      console.warn("[vocab-drive] download UTF-8 flush failed:", error?.name);
       await cancel();
       return failure("invalid_response", false, response.status, fileId);
     }

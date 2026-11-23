@@ -383,6 +383,7 @@ async function runSendNetworkPolicyTests() {
         truncated: false,
       };
     }
+    const EXPECTED_GIST_CONTENT = '---\ntitle: "T"\nurl: \ndate: \ntags: []\nsource: \n---\n\nbody';
     const redirects = [];
     let githubSentBody = null;
     globalThis.chrome.permissions.contains = async () => true;
@@ -396,12 +397,14 @@ async function runSendNetworkPolicyTests() {
         };
       }
       githubSentBody = JSON.parse(opts.body);
-      return { ok: true, status: 201, json: async () => makeGithubGistReply({ content: "# T\n\nbody\n" }) };
+      return { ok: true, status: 201, json: async () => makeGithubGistReply({ content: EXPECTED_GIST_CONTENT }) };
     };
     const github = await pbpSendToTarget("github", { meta: { title: "T" }, rawBody: "body", cfg: { token: "token" } });
     assert(github.ok === true, "safe token API request still succeeds");
     assert(github.url === "https://gist.github.com/octocat-fixture/0123456789abcdef0123456789abcdef", "GitHub Gist returns html_url ahead of the API JSON url");
-    assert(githubSentBody && githubSentBody.public === false && /^---\ntitle: "?T"?[\s\S]*---\n\nbody$/.test(githubSentBody.files["T.md"]?.content || ""), "GitHub Gist request stays private (public:false) with exact frontmattered markdown payload");
+    assert(githubSentBody && githubSentBody.public === false && githubSentBody.description === "T" &&
+      githubSentBody.files?.["T.md"]?.content === EXPECTED_GIST_CONTENT,
+      "GitHub Gist request stays private (public:false) with exact frontmattered markdown payload");
     assert(redirects.length === 2, "GitHub precheck and main request both run");
     assert(redirects.every((mode) => mode === "error"), "every token API fetch rejects redirects");
 

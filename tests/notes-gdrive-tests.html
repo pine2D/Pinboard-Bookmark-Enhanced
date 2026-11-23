@@ -70,6 +70,8 @@ function fixture(ownerHash, options = {}) {
     return { token };
   }, async removeCachedAuthToken(details) { issued.delete(details.token); } };
   const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
+  let reservedSeq = 0;
+  const reservedFiles = new Map();
   const client = pbpCreateDriveClient({ identity, protocol: PBP_NOTES_DRIVE_PROTOCOL,
     beforeRequest: async () => {
       if (switchInUploadGate) { await Promise.resolve(); owner = "acct_bob"; switchInUploadGate = false; }
@@ -88,16 +90,21 @@ function fixture(ownerHash, options = {}) {
         if (options.afterDownload) options.afterDownload({ disable: () => { enabled = false; }, switchOwner: () => { owner = "acct_bob"; }, switchGoogle: () => { drivePermissionId = "google-b"; }, goOffline: () => { offline = true; } });
         return new Response(options.corrupt ? "{bad json" : remoteBody, { headers: { "Content-Type": "application/json" } });
       }
-      if (url.pathname === "/drive/v3/files/generateIds") return json({ kind: "drive#generatedIds", space: "appDataFolder", ids: ["notes-upload-" + (uploads.length + 1)] });
+      if (url.pathname === "/drive/v3/files/generateIds") {
+        const id = "notes-upload-" + (++reservedSeq);
+        reservedFiles.set(id, { kind: "drive#file", id, name: "pbp-notes-" + id + ".json", mimeType: "application/json" });
+        return json({ kind: "drive#generatedIds", space: "appDataFolder", ids: [id] });
+      }
       if (url.pathname === "/upload/drive/v3/files") {
         const parts = init.body.split("\r\n\r\n");
         const metadata = JSON.parse(parts[1].split("\r\n--")[0]);
-        if (typeof metadata.id !== "string" || !metadata.id || typeof metadata.name !== "string" || !metadata.name) {
+        const expectedFile = typeof metadata.id === "string" ? reservedFiles.get(metadata.id) : null;
+        if (!expectedFile || metadata.name !== expectedFile.name) {
           throw new Error("unexpected upload metadata: " + JSON.stringify(metadata));
         }
         const body = JSON.parse(parts[2].slice(0, parts[2].lastIndexOf("\r\n--")));
         uploads.push({ metadata, body, account: drivePermissionId });
-        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { kind: "drive#file", id: "drive-notes-file-fixture", name: "pbp-notes-batch-fixture.json", mimeType: "application/json" }, failUpload ? 503 : 200);
+        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { ...expectedFile }, failUpload ? 503 : 200);
       }
       throw new Error("unexpected fixture request: " + url.pathname);
     }
@@ -142,8 +149,9 @@ function fixture(ownerHash, options = {}) {
     const record = f.data[ARTICLE], state = await f.store.getAccountState("google-a", hash);
     return result.ok && result.changed && record.items[0].owner === OWNER && record.items[0].note === "Remote note" &&
       state?.pageToken === "notes-end" && f.uploads.length === 1 &&
+      f.uploads[0].metadata.id === "notes-upload-1" &&
+      f.uploads[0].metadata.name === "pbp-notes-notes-upload-1.json" &&
       f.uploads[0].metadata.appProperties.pbpKind === "notes-batch" &&
-      f.uploads[0].metadata.name.startsWith("pbp-notes-") &&
       !Object.hasOwn(f.uploads[0].body.entries[0].value.item, "owner") &&
       // Simplest miss: success leaves the shared record untouched instead of clearing it.
       f.connectionPuts.length === 1 && f.connectionPuts[0][0] === hash && f.connectionPuts[0][1] === null;
@@ -154,7 +162,9 @@ function fixture(ownerHash, options = {}) {
     f.failUpload(false); const second = await f.run({ force: true });
     // Simplest miss: a 503 still folded into "network".
     return first.error === "server" && pending.length === 1 && second.ok &&
-      f.uploads.length === 2 && f.uploads[0].metadata.id === f.uploads[1].metadata.id &&
+      f.uploads.length === 2 && f.uploads[0].metadata.id === "notes-upload-1" &&
+      f.uploads[1].metadata.id === "notes-upload-1" &&
+      f.uploads[1].metadata.name === "pbp-notes-notes-upload-1.json" &&
       (await f.store.listPendingBatches("google-a", hash)).length === 0 && f.connection() === null;
   });
   await test("notes quota failure keeps remote cursor before the unapplied page", async () => {

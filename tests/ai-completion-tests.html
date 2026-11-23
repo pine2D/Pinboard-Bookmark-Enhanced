@@ -1,4 +1,4 @@
-<!doctype html><meta charset="utf-8"><meta name="pbp-expected-count" content="130"><title>AI completion and required-thinking tests</title>
+<!doctype html><meta charset="utf-8"><meta name="pbp-expected-count" content="131"><title>AI completion and required-thinking tests</title>
 <div id="results"></div><div id="summary"></div>
 <script src="../i18n.js"></script><script src="../shared.js"></script><script src="../ai.js"></script>
 <script>
@@ -556,7 +556,7 @@ await test('dictionary stream bodies equal their non-stream bodies apart from st
   const openai={aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'dict-model'};
   const openaiKey=JSON.stringify([2,'openai','https://api.openai.com/v1','dict-model']);
   const customKey=JSON.stringify([2,'custom','https://example.test/v1','free-model']);
-  const geminiKey=JSON.stringify([2,'gemini',GEMINI_BASE,'free-model']);
+  const geminiKey=JSON.stringify([2,'gemini:d2',GEMINI_BASE,'free-model']);
   const memo=extra=>({...extra,expiresAt:Date.now()+6*86400000});
   const cases=[
     ['compatible gateway',PROTOCOLS[0],STREAM_DONE.compatible,{},b=>b.response_format?.type==='json_object'&&b.max_completion_tokens===8192&&b.reasoning_effort==='none'],
@@ -604,7 +604,7 @@ await test('dictionary stream repairs share the four-attempt cap and recheck the
 await test('Gemini streams declaring minimum or low reasoning negotiate thinkingLevel:low -> thinkingBudget:0',async()=>{
   for(const effort of ['minimum','low']){
     const gModel='stream-thinking-only-'+effort,s={aiProvider:'gemini',geminiApiKey:'fixture',geminiModel:gModel};
-    const gKey=JSON.stringify([2,'gemini',GEMINI_BASE,gModel]);
+    const gKey=JSON.stringify([2,'gemini:d2',GEMINI_BASE,gModel]);
     reset([reply(GEMINI_BUDGET_REFUSED,400),STREAM_DONE.gemini]);
     assert(await stream({...DICT_OPTS,reasoningEffort:effort},s)==='ready');
     assert(calls.length===2&&checks===2&&calls[0].generationConfig.thinkingConfig?.thinkingLevel==='low'&&calls[1].generationConfig.thinkingConfig?.thinkingBudget===0,effort+': thinkingLevel->thinkingBudget:0 was not negotiated');
@@ -1258,7 +1258,7 @@ await test('Gemini thinkingConfig negotiates thinkingLevel:low -> thinkingBudget
   const levelRefusals=['Thinking level is not supported for this model.','Invalid JSON payload received. Unknown name "thinkingLevel" at \'generation_config.thinking_config\': Cannot find field.','Invalid JSON payload received. Unknown name "thinking_level" at \'generation_config.thinking_config\': Cannot find field.'];
   for(const [i,message] of levelRefusals.entries()){
     const model='gemini-25-flash-'+i,s={aiProvider:'gemini',geminiApiKey:'fixture',geminiModel:model};
-    const gKey=JSON.stringify([2,'gemini',GEMINI_BASE,model]);
+    const gKey=JSON.stringify([2,'gemini:d2',GEMINI_BASE,model]);
     reset([reply(geminiRefusal(message),400),reply(PROTOCOLS[1].complete),reply(PROTOCOLS[1].complete)]);
     await run({},s);await run({},s);
     assert(calls.length===3&&calls[0].generationConfig.thinkingConfig?.thinkingLevel==='low'&&calls[1].generationConfig.thinkingConfig?.thinkingBudget===0&&calls[2].generationConfig.thinkingConfig?.thinkingBudget===0&&stored.pbpThinkReject?.[gKey]?.rejected===true&&!stored.pbpAiParamFix?.[gKey]?.omitThinkingFallback,'complete 2.5 fallback: '+message);
@@ -1268,11 +1268,11 @@ await test('Gemini thinkingConfig negotiates thinkingLevel:low -> thinkingBudget
   const budgetRefusals=['Budget 0 is invalid. This model only works in thinking mode.','Thinking budget is not supported for this model.','thinkingBudget is not supported for this model.'];
   for(const [i,budgetMsg] of budgetRefusals.entries()){
     const model='gemini-25-pro-'+i,s={aiProvider:'gemini',geminiApiKey:'fixture',geminiModel:model};
-    const gKey=JSON.stringify([2,'gemini',GEMINI_BASE,model]);
+    const gKey=JSON.stringify([2,'gemini:d2',GEMINI_BASE,model]);
     reset([reply(geminiRefusal(levelRefusals[0]),400),reply(geminiRefusal(budgetMsg),400),reply(PROTOCOLS[1].complete),reply(PROTOCOLS[1].complete)]);
     await run({},s);await run({},s);
     assert(calls.length===4&&calls[0].generationConfig.thinkingConfig?.thinkingLevel==='low'&&calls[1].generationConfig.thinkingConfig?.thinkingBudget===0&&!('thinkingConfig'in calls[2].generationConfig)&&!('thinkingConfig'in calls[3].generationConfig)&&stored.pbpThinkReject?.[gKey]?.rejected===true&&stored.pbpAiParamFix?.[gKey]?.omitThinkingFallback===true,'complete 3-step strip: '+budgetMsg);
-    const sStream={...s,geminiModel:model+'-s'},gsKey=JSON.stringify([2,'gemini',GEMINI_BASE,model+'-s']);
+    const sStream={...s,geminiModel:model+'-s'},gsKey=JSON.stringify([2,'gemini:d2',GEMINI_BASE,model+'-s']);
     reset([reply(geminiRefusal(levelRefusals[0]),400),reply(geminiRefusal(budgetMsg),400),STREAM_DONE.gemini]);
     assert(await stream({noThinking:true},sStream)==='ready'&&calls.length===3&&!('thinkingConfig'in calls[2].generationConfig)&&stored.pbpAiParamFix?.[gsKey]?.omitThinkingFallback===true,'stream 3-step strip: '+budgetMsg);
   }
@@ -1282,13 +1282,24 @@ await test('Gemini thinkingConfig negotiates thinkingLevel:low -> thinkingBudget
     assert(error?.status===400&&calls.length===1&&!stored.pbpThinkReject,'unrelated 400 retried: '+message);
   }
 });
+await test('v3.3 unscoped Gemini pbpThinkReject cache entries never skip v3.4 primary thinkingLevel:low',async()=>{
+  const model='gemini-3.5-flash-lite',s={aiProvider:'gemini',geminiApiKey:'fixture',geminiModel:model};
+  const v33Key=JSON.stringify([2,'gemini',GEMINI_BASE,model]);
+  const v34Key=JSON.stringify([2,'gemini:d2',GEMINI_BASE,model]);
+  reset([reply(PROTOCOLS[1].complete),STREAM_DONE.gemini],{pbpThinkReject:{[v33Key]:fresh()}});
+  assert(await run({},s)==='ready'&&await stream({noThinking:true},s)==='ready','v3.3 cache blocked v3.4 primary');
+  assert(calls.length===2&&calls[0].generationConfig.thinkingConfig?.thinkingLevel==='low'&&calls[1].generationConfig.thinkingConfig?.thinkingLevel==='low'&&!stored.pbpThinkReject?.[v34Key]&&!stored.pbpAiParamFix?.[v34Key],'v3.3 cache caused fallback instead of thinkingLevel:low');
+});
 await test('Chinese parameter value, context-limit, and tool errors never poison pbpAiParamFix, while explicit Chinese field/thinking refusals heal',async()=>{
   const s={aiProvider:'zhipu',zhipuApiKey:'fixture',zhipuModel:'glm-5.3-flash'};
   for(const badBody of [
     {error:{code:'1210',message:'非法参数 temperature，值必须介于0与1之间'}},
     {error:{code:'1210',param:'temperature',message:'非法参数 temperature，值必须介于0与1之间'}},
     {error:{code:'1210',param:'temperature',message:'temperature 值超出范围，不支持大于 2 的取值'}},
+    {error:{code:'1210',param:'temperature',message:'参数 temperature 不支持大于 2 的取值'}},
+    {error:{code:'1210',param:'temperature',message:'不支持参数 temperature 的取值 3'}},
     {error:{code:'1210',message:'该模型始终思考，输入文本超出上下文长度'}},
+    {error:{code:'1210',message:'该模型始终思考，不支持超长上下文，请缩短输入'}},
     {error:{code:'1210',message:'工具参数错误'}}
   ]){
     reset([reply(badBody,400),reply(OK)],{});let caught=null;
@@ -1298,8 +1309,16 @@ await test('Chinese parameter value, context-limit, and tool errors never poison
     assert(await run({},s)==='ready'&&calls.length===1&&calls[0].temperature===0.3&&calls[0].thinking?.type==='disabled','subsequent valid call altered after: '+JSON.stringify(badBody));
   }
   const customS={aiProvider:'custom',customBaseUrl:'https://cn-compat.example/v1',customApiKey:'fixture',customModel:'cn-model'};
-  reset([reply({error:{message:'不支持参数 temperature',param:'temperature'}},400),reply(OK)],{});
-  assert(await run({},customS)==='ready'&&calls.length===2&&calls[0].temperature===0.3&&!('temperature'in calls[1]),'explicit Chinese unsupported parameter should drop temperature');
+  for(const [idx,errObj] of [
+    {message:'不支持参数 temperature',param:'temperature'},
+    {message:'当前模型不支持 temperature',param:'temperature'},
+    {message:'当前模型不支持 temperature'}
+  ].entries()){
+    reset([reply({error:errObj},400),reply(OK)],{});
+    assert(await run({},{...customS,customModel:'cn-temp-'+idx})==='ready'&&calls.length===2&&calls[0].temperature===0.3&&!('temperature'in calls[1]),'Chinese unsupported temperature failed: '+JSON.stringify(errObj));
+  }
+  reset([reply({error:{message:'当前模型不支持 max_tokens，请使用 max_completion_tokens',param:'max_tokens'}},400),reply(OK)],{});
+  assert(await run({maxTokens:64},{...customS,customModel:'cn-tok'})==='ready'&&calls.length===2&&calls[0].max_tokens===64&&calls[1].max_completion_tokens===64&&!('max_tokens'in calls[1]),'Chinese unsupported max_tokens rename failed');
   const arkS={aiProvider:'ark',arkApiKey:'fixture',arkModel:'glm-5-3-flash-260828'};
   reset([reply({error:{message:'始终启用思考，不再支持禁用思考'}},400),reply(OK)],{});
   assert(await run({},arkS)==='ready'&&calls.length===2&&calls[0].thinking?.type==='disabled'&&!('thinking'in calls[1]),'explicit Chinese mandatory-thinking refusal should strip thinking');

@@ -235,7 +235,13 @@ const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature
 // for this model." from a Messages API behind a compatible gateway); Protobuf
 // REST validators say `Unknown name "<field>"`, and Chinese providers return
 // localized refusal text.
-const _AI_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field|name)|extra\s+inputs|\bdeprecated\b|未知(?:参数|字段)|不支持(?:该|此)?(?:参数|字段)|(?:参数|字段)\s*[`'"]?[a-z_]*[`'"]?\s*不(?:受)?支持/;
+const _AI_EN_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field|name)|extra\s+inputs|\bdeprecated\b/;
+const _AI_CN_PARAM_REFUSED_RE = /未知(?:参数|字段)|不(?:再)?支持(?:该|此)?(?:参数|字段)|(?:参数|字段)\s*[`'"]?[a-z0-9_]*[`'"]?\s*不(?:受|再)?支持|不(?:再)?支持\s*[`'"]?(?:max_tokens|max_completion_tokens|temperature|reasoning_effort|response_format|thinking|enable_thinking|thinkingbudget|thinkinglevel|thinkingconfig|reasoning)\b/;
+const _AI_CN_VALUE_ERROR_RE = /取值|值必须|值超出|超出范围|介于|大于|小于|至少|至多|不得超过|不能超过|必须为|必须是|工具参数/;
+function _aiIsParamRefused(detail) {
+  return _AI_EN_PARAM_REFUSED_RE.test(detail) ||
+    (_AI_CN_PARAM_REFUSED_RE.test(detail) && !_AI_CN_VALUE_ERROR_RE.test(detail));
+}
 function _aiRejectedParam(body, detail) {
   const param = String((body && body.error && body.error.param) || "").trim();
   // Some compatible APIs enumerate only text/json_object and reject the
@@ -248,7 +254,7 @@ function _aiRejectedParam(body, detail) {
   // support feature: structured-outputs") refuse the same request member.
   if (!param && /\bstructured[\s_-]?outputs?\b|\bjson[\s_-]?mode\b/.test(detail) &&
       /does\s+not\s+support|not\s+supported|unsupported/.test(detail)) return "response_format";
-  if (_AI_PARAM_REFUSED_RE.test(detail) && _AI_HEALABLE_PARAMS.includes(param)) return param;
+  if (_aiIsParamRefused(detail) && _AI_HEALABLE_PARAMS.includes(param)) return param;
   // Value refusals can identify a mandatory-thinking endpoint without guessing
   // from every 400. Never interpret an unrelated schema/context error this way.
   // An enumeration of the accepted values ("Invalid option: expected one of
@@ -260,9 +266,10 @@ function _aiRejectedParam(body, detail) {
   // Chinese mandatory-thinking endpoints (e.g. Zhipu glm-5.3-flash code 1210:
   // "该模型始终思考，不支持关闭思考；请使用 low、high 或 max。") omit error.param
   // and name thinking only in Chinese. Require an explicit refusal of disabling
-  // thinking so unrelated context-limit messages ("该模型始终思考，输入文本超出…") never match.
+  // thinking or an accepted-effort prompt so unrelated messages ("该模型始终思考，
+  // 不支持超长上下文…" / "…输入文本超出…") never match.
   if ((!param || param === "thinking" || param.startsWith("thinking.") || param === "enable_thinking") &&
-      /(?:不支持(?:关闭|禁用)(?:深度)?思考|(?:关闭|禁用)(?:深度)?思考[^。；;]{0,20}不(?:受)?支持|不再支持(?:关闭|禁用)(?:深度)?思考|始终(?:启用)?(?:深度)?思考[^。\n]{0,30}(?:不支持|不再支持|无法(?:关闭|禁用)|请使用\s*(?:low|medium|high|max)\b))/i.test(detail)) return "thinking";
+      /(?:(?:不(?:再)?支持|无法|禁止|不能)(?:关闭|禁用)(?:深度)?思考|(?:关闭|禁用)(?:深度)?思考[^。；;,\n]{0,16}不(?:受|再)?支持|始终(?:启用)?(?:深度)?思考[^。\n]{0,24}请使用\s*(?:low|medium|high|max)\b)/i.test(detail)) return "thinking";
   // Gemini's own wording for a model refusing thinkingBudget / thinkingLevel
   // ("Budget 0 is invalid. This model only works in thinking mode.", or a
   // thinkingLevel refusal). The anchors keep this to thinkingConfig; bare 400s do not match.
@@ -277,7 +284,7 @@ function _aiRejectedParam(body, detail) {
   // whole retry ladder. Same reason the message route needs it: an incidental
   // mention ("128000 in the max_tokens" inside a context-length error) must
   // never rewrite the request body.
-  if (!_AI_PARAM_REFUSED_RE.test(detail)) return null;
+  if (!_aiIsParamRefused(detail)) return null;
   if (_AI_HEALABLE_PARAMS.indexOf(param) !== -1) return param;
   // Message-only servers (some compat proxies leave error.param null): the
   // refused field is named BEFORE the suggested replacement ("...'max_tokens'
@@ -618,7 +625,8 @@ function _aiCapabilityKey(provider, model, cfg) {
   // Versioned keys deliberately ignore old, unscoped decisions. Endpoint
   // changes and upgrades must get a fresh chance to accept their own dialect.
   const endpoint = String(cfg?.endpoint || cfg?.base || "").trim().replace(/\/+$/, "");
-  const scopedProvider = cfg?.capabilityScope ? provider + ":" + cfg.capabilityScope : provider;
+  const dialectProvider = cfg?.dialectVersion ? provider + ":d" + cfg.dialectVersion : provider;
+  const scopedProvider = cfg?.capabilityScope ? dialectProvider + ":" + cfg.capabilityScope : dialectProvider;
   return JSON.stringify([2, scopedProvider, endpoint, model || ""]);
 }
 function _aiCapabilityFresh(record) {
@@ -1200,6 +1208,7 @@ async function _aiReadCompletion(res, protocol, opts) {
 const _GEMINI_THINKING_CFG = {
   thinkingOff: { thinkingConfig: { thinkingLevel: "low" } },
   thinkingFallback: { thinkingConfig: { thinkingBudget: 0 } },
+  dialectVersion: 2,
   bespokeBody: true,
   endpoint: "https://generativelanguage.googleapis.com/v1beta"
 };

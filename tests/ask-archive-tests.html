@@ -220,7 +220,8 @@ test("snapshot counts pending bodies without exposing their content", async () =
 function driveFixture(options = {}) {
   pbpVocabDriveForgetIdentity();
   let owner = OWNER, enabled = true, permissionId = "google-a", sessionPermissionId = "", failUpload = options.failUpload === true;
-  const calls = [], uploads = [], connectionPuts = [];
+  let reservedSeq = 0;
+  const calls = [], uploads = [], connectionPuts = [], reservedFiles = new Map();
   let connectionState = null;
   const metadata = { id: "peer-file", name: "pbp-ask-history-peer-file.json", parents: ["1opaque-appdata-folder"],
     mimeType: "application/json", appProperties: { pbpKind: "ask-history-batch", schema: "1", owner: HASH, device: "peer-a" } };
@@ -239,16 +240,21 @@ function driveFixture(options = {}) {
         options.afterDownload?.({ owner: () => { owner = OTHER; }, google: () => { permissionId = "google-b"; }, disable: () => { enabled = false; } });
         return new Response(options.corrupt ? "{bad json" : body, { headers: { "Content-Type": "application/json" } });
       }
-      if (url.pathname === "/drive/v3/files/generateIds") return json({ kind: "drive#generatedIds", space: "appDataFolder", ids: ["upload-" + (uploads.length + 1)] });
+      if (url.pathname === "/drive/v3/files/generateIds") {
+        const id = "ask-upload-" + (++reservedSeq);
+        reservedFiles.set(id, { kind: "drive#file", id, name: "pbp-ask-history-" + id + ".json", mimeType: "application/json" });
+        return json({ kind: "drive#generatedIds", space: "appDataFolder", ids: [id] });
+      }
       if (url.pathname === "/upload/drive/v3/files") {
         const parts = init.body.split("\r\n\r\n");
         const uploadedMeta = JSON.parse(parts[1].split("\r\n--")[0]);
-        if (typeof uploadedMeta.id !== "string" || !uploadedMeta.id || typeof uploadedMeta.name !== "string" || !uploadedMeta.name) {
+        const expectedFile = typeof uploadedMeta.id === "string" ? reservedFiles.get(uploadedMeta.id) : null;
+        if (!expectedFile || uploadedMeta.name !== expectedFile.name) {
           throw new Error("unexpected upload metadata: " + JSON.stringify(uploadedMeta));
         }
         uploads.push({ metadata: uploadedMeta,
           body: parts[2].slice(0, parts[2].lastIndexOf("\r\n--")) });
-        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { kind: "drive#file", id: "drive-ask-file-fixture", name: "pbp-ask-batch-fixture.json", mimeType: "application/json" }, failUpload ? 503 : 200);
+        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { ...expectedFile }, failUpload ? 503 : 200);
       }
       throw new Error("unexpected request " + url.pathname);
     } });
@@ -285,6 +291,7 @@ test("real runner bootstraps an empty device and reuses a peer's complete entry"
   const read = await f.store.read(request());
   assert(result.ok && result.changed && result.status.bootstrapComplete && read[0].records[0].model === "peer-model");
   assert((await f.store.getAccountState("google-a", HASH)).pageToken === "after" && f.uploads.length === 1);
+  assert(f.uploads[0].metadata.id === "ask-upload-1" && f.uploads[0].metadata.name === "pbp-ask-history-ask-upload-1.json");
   assert(!f.uploads[0].body.includes(OWNER) && f.uploads[0].metadata.appProperties.pbpKind === "ask-history-batch");
 });
 test("frozen uploads retry identical file ID and body after a worker restart", async () => {
@@ -292,7 +299,8 @@ test("frozen uploads retry identical file ID and body after a worker restart", a
   const first = await f.run(); const pending = await f.store.listPendingBatches("google-a", HASH);
   await f.store.close(); f.failUpload(false); const second = await f.run({ force: true });
   assert(first.error === "server" && pending.length === 1 && second.ok && f.uploads.length === 2);
-  assert(f.uploads[0].metadata.id === f.uploads[1].metadata.id && f.uploads[0].body === f.uploads[1].body);
+  assert(f.uploads[0].metadata.id === "ask-upload-1" && f.uploads[1].metadata.id === "ask-upload-1" &&
+    f.uploads[1].metadata.name === "pbp-ask-history-ask-upload-1.json" && f.uploads[0].body === f.uploads[1].body);
   assert(!(await f.store.listPendingBatches("google-a", HASH)).length && f.connection() === null);
 });
 for (const change of ["owner", "google", "disable"]) test(change + " changes during download prevent archive and cursor commits", async () => {
