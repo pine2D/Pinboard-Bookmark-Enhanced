@@ -2,30 +2,30 @@
 // The runner never imports it: a run reaches it only through
 // main(argv, { pinboard: { transport, intervalMs, mock: true } }).
 //
-// Shapes are hand-written from the public API documentation
-// (https://pinboard.in/api, read 2026-11-02) in their format=json form, as
-// the extension's own parsers read them; nothing here is built from the
+// Shapes are hand-written and verified live on 2026-11-23 against
+// https://api.pinboard.in/v1/ (format=json returns Content-Type: text/json; charset=utf-8),
+// as the extension's own parsers read them; nothing here is built from the
 // request it answers beyond the stored fields:
 //   posts/add     {"result_code":"done"}; replace=no on a stored URL answers
-//                 {"result_code":"item already exists"} (the docs only say
-//                 "will throw an error"; the extension matches /already exists/)
-//   posts/delete  {"result_code":"done"} | {"result_code":"item not found"}
+//                 HTTP 200 {"result_code":"item already exists"} (verified live
+//                 2026-11-23; the extension matches /already exists/)
+//   posts/delete  {"result_code":"done"} | {"result_code":"item not found"} (HTTP 200)
 //   posts/get     {"date","user","posts":[{href, description, extended, meta,
 //                 hash, time, shared, toread, tags}]} (shared/toread "yes"|"no",
 //                 tags one space-separated string); an unknown URL gives posts []
-//                 and tags come back with " & < > as entities (seen live
-//                 2026-11-04); a tag stored literally as X&quot;y therefore
-//                 reads X&amp;quot;y
+//                 and tags come back with " & < > as entities (verified live
+//                 2026-11-04 & 2026-11-23); a tag stored literally as X&quot;y
+//                 therefore reads X&amp;quot;y
 //   posts/all     with format=json a bare array of the same post objects;
-//                 ?tag=<name> lists the posts carrying exactly that stored tag
-//                 (hand-written from the live facts, not measured: whether the
-//                 real endpoint matches a literal-entity stored name is what
-//                 the entity-repair live module measures)
-//   tags/get      {"<tag>": count, ...} over the whole account, names verbatim
-//                 as stored; a freshly created tag holding a literal entity is
-//                 seen live to be missing for a while (entityTagLagMs)
-//   user/api_token {"result":"<hex>"}
-//   a bad token   HTTP 401 with an HTML body; rate limiting HTTP 429 (HTML)
+//                 ?tag=<name> lists the posts carrying that exact stored literal
+//                 tag (verified live 2026-11-23 in pinboard.tag-gov.entity-repair:
+//                 postsAllMatchedLiteral=true)
+//   tags/get      {"<tag>": count, ...} (numeric counts on live v1) over the whole
+//                 account, names verbatim as stored; a freshly created tag holding
+//                 a literal entity lags before appearing (~24.1s measured 2026-11-23)
+//   user/api_token {"result":"<UPPER_HEX>"}
+//   a bad token   HTTP 401 text/html; charset=UTF-8 ("API requires authentication");
+//                 rate limiting HTTP 429 (HTML, unprovoked on live account)
 //   anything else HTTP 404 (HTML)
 import { createHash, randomBytes } from 'node:crypto';
 
@@ -42,8 +42,8 @@ export function createPinboardMock({ token, user = String(token || '').split(':'
   const posts = new Map();
   const calls = [];
   const state = { rateLimitNext: 0 };
-  const html = (status, title) => ({ status, contentType: 'text/html; charset=utf-8', body: `<html><head><title>${title}</title></head><body><h1>${title}</h1></body></html>` });
-  const json = body => ({ status: 200, contentType: 'application/json; charset=utf-8', body: JSON.stringify(body) });
+  const html = (status, title) => ({ status, contentType: 'text/html; charset=UTF-8', body: status === 401 ? 'API requires authentication' : `<html><head><title>${title}</title></head><body><h1>${title}</h1></body></html>` });
+  const json = body => ({ status: 200, contentType: 'text/json; charset=utf-8', body: JSON.stringify(body) });
   const stamp = () => now().toISOString().replace(/\.\d{3}Z$/, 'Z');
   const tagCounts = () => {
     const counts = { ...libraryTags };

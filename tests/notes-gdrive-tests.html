@@ -27,7 +27,9 @@ function fixture(ownerHash, options = {}) {
   };
   let owner = OWNER, enabled = true, drivePermissionId = "google-a", activePermissionId = "", offline = false,
     rejectArticles = false, rejectFrozen = false, switchInUploadGate = false, failUpload = options.failUpload === true;
-  // Server response fixtures deliberately use Drive's opaque folder ID.
+  // Google Drive v3 appDataFolder server shapes verified live on 2026-11-23
+  // (31-char opaque folder ID in parents[], HTTP 200 {kind:"drive#file",id,name,mimeType}
+  // on multipart upload, and {kind:"drive#startPageToken"} / {kind:"drive#generatedIds"}).
   const remoteMetadata = { id: "notes-remote", name: "pbp-notes-notes-remote.json",
     parents: ["1opaque-real-appdata-folder"], mimeType: "application/json",
     appProperties: { pbpKind: "notes-batch", schema: "1", owner: ownerHash, device: "peer-a" } };
@@ -77,22 +79,22 @@ function fixture(ownerHash, options = {}) {
       const url = new URL(input); calls.push(url.pathname + url.search);
       if (url.pathname === "/drive/v3/about") {
         if (offline) throw new TypeError("offline fixture");
-        return json({ user: { permissionId: drivePermissionId, emailAddress: "alice@example.test" } });
+        return json({ user: { displayName: "Alice", permissionId: drivePermissionId, emailAddress: "alice@example.test" } });
       }
-      if (url.pathname === "/drive/v3/changes/startPageToken") return json({ startPageToken: "notes-start" });
+      if (url.pathname === "/drive/v3/changes/startPageToken") return json({ kind: "drive#startPageToken", startPageToken: "notes-start" });
       if (url.pathname === "/drive/v3/files") return json({ files: options.remote ? [remoteMetadata] : [] });
       if (url.pathname === "/drive/v3/changes") return json({ changes: [], newStartPageToken: "notes-end" });
       if (url.pathname === "/drive/v3/files/notes-remote") {
         if (options.afterDownload) options.afterDownload({ disable: () => { enabled = false; }, switchOwner: () => { owner = "acct_bob"; }, switchGoogle: () => { drivePermissionId = "google-b"; }, goOffline: () => { offline = true; } });
-        return new Response(options.corrupt ? "{bad json" : remoteBody);
+        return new Response(options.corrupt ? "{bad json" : remoteBody, { headers: { "Content-Type": "application/json" } });
       }
-      if (url.pathname === "/drive/v3/files/generateIds") return json({ ids: ["notes-upload-" + (uploads.length + 1)] });
+      if (url.pathname === "/drive/v3/files/generateIds") return json({ kind: "drive#generatedIds", space: "appDataFolder", ids: ["notes-upload-" + (uploads.length + 1)] });
       if (url.pathname === "/upload/drive/v3/files") {
         const parts = init.body.split("\r\n\r\n");
         const metadata = JSON.parse(parts[1].split("\r\n--")[0]);
         const body = JSON.parse(parts[2].slice(0, parts[2].lastIndexOf("\r\n--")));
         uploads.push({ metadata, body, account: drivePermissionId });
-        return json({}, failUpload ? 503 : 201);
+        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { kind: "drive#file", id: metadata.id, name: metadata.name, mimeType: "application/json" }, failUpload ? 503 : 200);
       }
       throw new Error("unexpected fixture request: " + url.pathname);
     }

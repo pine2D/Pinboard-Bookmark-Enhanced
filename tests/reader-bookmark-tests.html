@@ -13,7 +13,9 @@ async function test(name, fn) {
   done();
 }
 const URL_ARTICLE = "https://example.com/article";
-// Hand-authored Pinboard posts/get response, including its real yes/no flags.
+// Hand-authored Pinboard v1 posts/get, posts/add, and posts/delete shapes
+// (verified live 2026-11-23 against api.pinboard.in/v1/, including yes/no flags,
+// {date, user, posts}, and delete {result_code: "done" | "item not found"}).
 const POST = { href: URL_ARTICLE, description: "Server title", extended: "Server notes", tags: "server two", shared: "no", toread: "yes", time: "2020-01-02T03:04:05Z", hash: "abc", meta: "def" };
 const SLOT = { url: URL_ARTICLE, title: "Reader title", account: "alice", tabId: 8, sourceTabUrl: URL_ARTICLE, sourceIncognito: true, tags: ["draft"], description: "Draft notes" };
 const READER = "chrome-extension://test-id/md-preview.html?k=reader-key";

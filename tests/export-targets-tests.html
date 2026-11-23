@@ -405,9 +405,78 @@ async function runSendNetworkPolicyTests() {
     assert(redirects.length === 2, "GitHub precheck and main request both run");
     assert(redirects.every((mode) => mode === "error"), "every token API fetch rejects redirects");
 
+    // Notion API (Notion-Version: 2026-03-11) GET /v1/users/me (200), POST /v1/pages
+    // unshared 404 (object_not_found), and POST /v1/pages (200 markdown ingestion)
+    // server shapes verified on 2026-11-23 against live api.notion.com (with immediate in_trash:true cleanup).
+    function makeNotionUserMeReply(overrides = {}) {
+      const botId = overrides.id === undefined ? "00000000-0000-4000-8000-000000000099" : overrides.id;
+      return {
+        object: "user",
+        id: botId,
+        name: overrides.name === undefined ? "Fixture Integration" : overrides.name,
+        avatar_url: null,
+        type: "bot",
+        bot: {
+          owner: { type: "user", user: { object: "user", id: "00000000-0000-4000-8000-000000000098" } },
+          workspace_name: "Fixture Workspace",
+          workspace_id: "00000000-0000-4000-8000-000000000097",
+          workspace_limits: { max_file_upload_size_in_bytes: 5242880 },
+        },
+        request_id: "00000000-0000-4000-8000-000000000001",
+      };
+    }
+    function makeNotionNotFoundReply(overrides = {}) {
+      return {
+        object: "error",
+        status: 404,
+        code: overrides.code === undefined ? "object_not_found" : overrides.code,
+        message: overrides.message === undefined
+          ? "Could not find page with ID: 01234567-89ab-cdef-0123-456789abcdef. Make sure the relevant pages and databases are shared with your integration \"Fixture Integration\"."
+          : overrides.message,
+        additional_data: {},
+        request_id: "00000000-0000-4000-8000-000000000404",
+      };
+    }
+    function makeNotionPageReply(overrides = {}) {
+      const id = overrides.id === undefined ? "11111111-2222-4333-8444-555555555555" : overrides.id;
+      const parentId = overrides.parentId === undefined ? "01234567-89ab-cdef-0123-456789abcdef" : overrides.parentId;
+      const title = overrides.title === undefined ? "T" : overrides.title;
+      const botUser = { object: "user", id: "00000000-0000-4000-8000-000000000099" };
+      return {
+        object: "page",
+        id,
+        created_time: "2026-11-23T05:18:00.000Z",
+        last_edited_time: "2026-11-23T05:18:00.000Z",
+        created_by: botUser,
+        last_edited_by: botUser,
+        cover: null,
+        icon: null,
+        parent: { type: "page_id", page_id: parentId },
+        in_trash: false,
+        is_archived: false,
+        is_locked: false,
+        properties: {
+          title: {
+            id: "title",
+            type: "title",
+            title: [{
+              type: "text",
+              text: { content: title, link: null },
+              annotations: { bold: false, italic: false, strikethrough: false, underline: false, code: false, color: "default" },
+              plain_text: title,
+              href: null,
+            }],
+          },
+        },
+        url: overrides.url === undefined ? "https://www.notion.so/T-" + id.replace(/-/g, "") : overrides.url,
+        public_url: null,
+        request_id: "00000000-0000-4000-8000-000000000200",
+      };
+    }
+
     globalThis.fetch = async (url) => {
-      if (url.endsWith("/users/me")) return { ok: true, status: 200 };
-      return { ok: false, status: 404, json: async () => ({ object: "error", code: "object_not_found" }) };
+      if (url.endsWith("/users/me")) return { ok: true, status: 200, json: async () => makeNotionUserMeReply() };
+      return { ok: false, status: 404, json: async () => makeNotionNotFoundReply() };
     };
     const copiedBeforeNotion = copied.length;
     const notion404 = await pbpSendToTarget("notion", { meta: { title: "T", url: "https://e.x/a", tags: ["t"] }, rawBody: "body", cfg: { token: "tok", parent: "0123456789abcdef0123456789abcdef" } });
@@ -416,9 +485,9 @@ async function runSendNetworkPolicyTests() {
 
     let notionSentBody = null;
     globalThis.fetch = async (url, opts) => {
-      if (url.endsWith("/users/me")) return { ok: true, status: 200 };
+      if (url.endsWith("/users/me")) return { ok: true, status: 200, json: async () => makeNotionUserMeReply() };
       notionSentBody = JSON.parse(opts.body);
-      return { ok: true, status: 200, json: async () => ({ object: "page", id: "p1", url: "https://www.notion.so/p1" }) };
+      return { ok: true, status: 200, json: async () => makeNotionPageReply({ parentId: notionSentBody.parent.page_id, url: "https://www.notion.so/p1" }) };
     };
     const notionOk = await pbpSendToTarget("notion", { meta: { title: "T", url: "https://e.x/a", tags: [] }, rawBody: "body", cfg: { token: "tok", parent: "https://www.notion.so/X-0123456789abcdef0123456789abcdef" } });
     assert(notionOk.ok === true && notionOk.url === "https://www.notion.so/p1", "notion success returns the created page url");

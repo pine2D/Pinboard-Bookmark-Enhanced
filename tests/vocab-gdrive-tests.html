@@ -15,9 +15,17 @@ const OWNER_HASH = "a".repeat(64);
 const OTHER_OWNER_HASH = "b".repeat(64);
 const DEVICE_ID = "device-a";
 const DRIVE_FILE_ID = "file:opaque+id";
-// Drive resolves the create-time "appDataFolder" alias to a real folder ID, so
-// every fixture standing in for a SERVER RESPONSE carries this instead. Remote
-// fixtures must never be a verbatim echo of the write-side constructor.
+// Drive v3 appDataFolder server shapes verified live on 2026-11-23 against
+// www.googleapis.com: about.get returns {user:{displayName,permissionId,emailAddress}}
+// (20-digit numeric permissionId); changes/startPageToken returns
+// {kind:"drive#startPageToken",startPageToken:"<digits>"}; files/generateIds returns
+// {kind:"drive#generatedIds",space:"appDataFolder",ids:["<33-char>"]}; multipart
+// upload returns HTTP 200 {kind:"drive#file",id,name,mimeType}; files.get/files.list
+// resolve the create-time "appDataFolder" alias to a 31-char opaque folder ID in
+// parents[]; changes.list returns {changes:[{file,removed,fileId}],newStartPageToken};
+// 404 returns {error:{code:404,message,errors:[{domain:"global",reason:"notFound",
+// location:"fileId",locationType:"parameter"}]}}. Remote fixtures must never be a
+// verbatim echo of the write-side constructor.
 const APPDATA_PARENT_ID = "opaque-appdata-folder-id";
 const OWNER_SCOPE = "acct_pin-a";
 const ENVELOPE = { ownerHash: OWNER_HASH, deviceId: DEVICE_ID, createdAt: 123 };
@@ -1335,7 +1343,7 @@ function syncHarness(options = {}) {
       identity: identityFixture(),
       fetchImpl: async (url, init) => {
         calls.push({ url: String(url), init });
-        return jsonResponse({ ids: [opaqueId] });
+        return jsonResponse({ kind: "drive#generatedIds", space: "appDataFolder", ids: [opaqueId] });
       }
     });
     const result = await client.generateId();
@@ -1354,7 +1362,7 @@ function syncHarness(options = {}) {
       identity: identityFixture(),
       fetchImpl: async (url, init) => {
         calls.push({ url: String(url), init });
-        return jsonResponse({ id: DRIVE_FILE_ID }, 201);
+        return jsonResponse({ kind: "drive#file", id: DRIVE_FILE_ID, name: meta.name, mimeType: "application/json" }, 200);
       }
     });
     const result = await client.upload(meta, frozen);
@@ -1597,7 +1605,7 @@ function syncHarness(options = {}) {
       fetchImpl: async (url) => {
         calls.push(String(url));
         return calls.length === 1
-          ? jsonResponse({ startPageToken: pageToken })
+          ? jsonResponse({ kind: "drive#startPageToken", startPageToken: pageToken })
           : calls.length === 2 ? jsonResponse({
             changes: [{ removed: true, fileId: "removed-id" }],
             nextPageToken
@@ -2626,16 +2634,16 @@ function syncHarness(options = {}) {
       identity: identityFixture(),
       fetchImpl: async (url, init) => {
         const path = new URL(url).pathname;
-        if (path === "/drive/v3/about") return jsonResponse({ user: { permissionId: "alias-permission" } });
-        if (path === "/drive/v3/changes/startPageToken") return jsonResponse({ startPageToken: "alias-start" });
+        if (path === "/drive/v3/about") return jsonResponse({ user: { displayName: "Alias", permissionId: "alias-permission", emailAddress: "alias@example.test" } });
+        if (path === "/drive/v3/changes/startPageToken") return jsonResponse({ kind: "drive#startPageToken", startPageToken: "alias-start" });
         if (path === "/drive/v3/files") return jsonResponse({ files: [remoteMetadata] });
         if (path === "/drive/v3/files/remote-alias-file") return new Response(remoteBody);
         if (path === "/drive/v3/changes") return jsonResponse({ changes: [], newStartPageToken: "alias-end" });
-        if (path === "/drive/v3/files/generateIds") return jsonResponse({ ids: ["merged-alias-upload"] });
+        if (path === "/drive/v3/files/generateIds") return jsonResponse({ kind: "drive#generatedIds", space: "appDataFolder", ids: ["merged-alias-upload"] });
         if (path === "/upload/drive/v3/files") {
           const part = init.body.split("\r\nContent-Type: application/json\r\n\r\n")[1];
           uploads.push(JSON.parse(part.slice(0, part.lastIndexOf("\r\n--"))));
-          return jsonResponse({ id: "merged-alias-upload" }, 201);
+          return jsonResponse({ kind: "drive#file", id: "merged-alias-upload", name: "pbp-vocab-merged-alias-upload.json", mimeType: "application/json" }, 200);
         }
         throw new Error("unexpected fixture request");
       }
@@ -2842,8 +2850,8 @@ function syncHarness(options = {}) {
       mimeType:"application/json",appProperties:{pbpKind:"vocab-batch",schema:"1",owner:ownerHash,device:"old-device"}};
     const client = pbpCreateDriveClient({identity:identityFixture(),fetchImpl:async(url,init)=>{
       const path = new URL(url).pathname; requests.push(init.method+" "+path);
-      if (path.endsWith("/about")) return jsonResponse({user:{permissionId}});
-      if (path.endsWith("/changes/startPageToken")) return jsonResponse({startPageToken:"pending-start"});
+      if (path.endsWith("/about")) return jsonResponse({user:{displayName:"Pending",permissionId,emailAddress:"pending@example.test"}});
+      if (path.endsWith("/changes/startPageToken")) return jsonResponse({kind:"drive#startPageToken",startPageToken:"pending-start"});
       if (path === "/drive/v3/files") return jsonResponse({files:[]});
       if (path === "/drive/v3/changes") return jsonResponse({changes:[],newStartPageToken:"pending-end"});
       if (path === "/upload/drive/v3/files") { sent.push(init.body); return jsonResponse({},409); }

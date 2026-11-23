@@ -138,6 +138,7 @@ async function createSaveTagsHarness(service, names, opts = {}) {
   win._removeBatchRecordIfOwned = async () => {};
   win._writeBatchProgress = async row => { calls.progress.push(row); return true; };
   win.t = key => key;
+  // Pinboard v1 posts/add?format=json reply ({"result_code":"done"}, verified live 2026-11-23).
   win.pinboardFetch = async uri => {
     calls.uris.push(uri);
     return { ok: true, status: 200, json: async () => ({ result_code: "done" }) };

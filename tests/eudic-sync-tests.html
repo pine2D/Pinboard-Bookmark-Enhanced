@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="39"><title>eudic-sync Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="44"><title>eudic-sync Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -93,6 +93,13 @@ const b2 = pbpEudicBuildBody("fr", "not_array");
 assertEq(b2.words.length, 0, "non-array words → []");
 
 section("pbpEudicParseResult");
+// Wire shapes verified live on 2026-11-23 against https://api.frdic.com:
+// - POST /api/open/v1/studylist/words -> 201 application/json; charset=utf-8
+//   {"message":"单词导入成功,导入数量 : 1"} (ASCII colon surrounded by spaces)
+// - GET /api/open/v1/studylist/category?language=en -> 200 application/json; charset=utf-8
+//   {"data":[{"id","language","name","add_time"}],"message":"..."}
+// - Invalid NIS token -> 401 application/problem+json; charset=utf-8 (ASP.NET RFC 9110 ProblemDetails)
+//   {"type":"https://tools.ietf.org/html/rfc9110#section-15.5.2","title":"Unauthorized","status":401,"traceId":"..."}
 const r1 = pbpEudicParseResult(201, '{"message":"单词导入成功,导入数量 : 2"}');
 assert(r1.ok === true && r1.imported === 2, "201 + count parsed");
 const r2 = pbpEudicParseResult(201, '{"message":"单词导入成功"}');
@@ -184,6 +191,49 @@ const _origCall = pbpEudicCall;
   assert(callCount === 0 && result4.stage === "owner", "ownerCheck fail: no API call + owner stage");
 
   pbpEudicCall = _origCall;
+
+  section("live wire shapes (verified 2026-11-23 against api.frdic.com)");
+  const origFetch = window.fetch;
+  try {
+    const wireCalls = [];
+    const makeEudicProblem401 = (overrides = {}) => ({
+      type: overrides.type === undefined ? "https://tools.ietf.org/html/rfc9110#section-15.5.2" : overrides.type,
+      title: overrides.title === undefined ? "Unauthorized" : overrides.title,
+      status: overrides.status === undefined ? 401 : overrides.status,
+      traceId: overrides.traceId === undefined ? "00-fixture0000000000000000000000000-fixture000000000-00" : overrides.traceId,
+    });
+    window.fetch = async (url, init = {}) => {
+      wireCalls.push({ url, method: init.method || "GET", auth: init.headers?.Authorization || "", body: init.body });
+      if (init.headers?.Authorization === "NIS bad-token") {
+        return new Response(JSON.stringify(makeEudicProblem401()), {
+          status: 401,
+          headers: { "Content-Type": "application/problem+json; charset=utf-8" },
+        });
+      }
+      if (String(url).endsWith("/api/open/v1/studylist/category?language=en")) {
+        return new Response(JSON.stringify({
+          data: [{ id: "0", language: "en", name: "默认生词本", add_time: "2026-01-01T00:00:00Z" }],
+          message: "",
+        }), { status: 200, headers: { "Content-Type": "application/json; charset=utf-8" } });
+      }
+      const reqBody = JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        message: "单词导入成功,导入数量 : " + reqBody.words.length,
+      }), { status: 201, headers: { "Content-Type": "application/json; charset=utf-8" } });
+    };
+    const pingOk = await pbpEudicPing("tok123");
+    assert(pingOk.ok === true && pingOk.error === null, "pbpEudicPing accepts live 200 {data,message} category envelope");
+    assert(wireCalls[0].url === "https://api.frdic.com/api/open/v1/studylist/category?language=en" && wireCalls[0].auth === "NIS tok123", "pbpEudicPing sends GET category?language=en with NIS header");
+    const ping401 = await pbpEudicPing("bad-token");
+    assert(ping401.ok === false && ping401.error === "auth", "pbpEudicPing maps RFC 9110 401 application/problem+json to auth");
+    const liveSend = await pbpEudicSendRows([{ term: "sesquipedalian", language: "en" }], { token: "tok123" });
+    assert(liveSend.stage === "done" && liveSend.added === 1 && liveSend.skipped === 0, "pbpEudicSendRows parses live 201 count through real pbpEudicCall");
+    const liveSend401 = await pbpEudicSendRows([{ term: "sesquipedalian", language: "en" }], { token: "bad-token" });
+    assert(liveSend401.stage === "auth" && typeof liveSend401.error === "string" && liveSend401.error.includes("Unauthorized"), "pbpEudicSendRows surfaces RFC 9110 401 problem+json body on auth stop");
+  } finally {
+    window.fetch = origFetch;
+  }
+
   document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
 })();
 </script>

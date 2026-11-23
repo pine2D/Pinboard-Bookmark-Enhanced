@@ -97,13 +97,14 @@ async function run() {
   }
 
   // ---------- P0c: posts reads come back with the tags the user typed ----------
-  // Server shapes as Pinboard answered them live on 2026-11-04: posts/get and
-  // posts/recent wrap {"posts":[...]}, posts/all is a bare array; `"`, `&`, `<`
+  // Server shapes as Pinboard answered them live on 2026-11-04 and re-verified on
+  // 2026-11-23 (Content-Type: text/json; charset=utf-8): posts/get and posts/recent
+  // wrap {"date","user","posts":[...]}, posts/all is a bare array; `"`, `&`, `<`
   // and `>` inside tags arrive as entities, `'` and the title verbatim. A tag
   // a merge already wrote back as `&quot;` arrives as `&amp;quot;`.
   {
     const previousFetch = globalThis.fetch;
-    const answer = (body) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const answer = (body) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "text/json; charset=utf-8" } }));
     const entityTags = "a_q&quot;uote a_a&amp;b a_l&lt;t a_g&gt;t a_ap'os a_old&amp;quot;x";
     const typedTags = "a_q\"uote a_a&b a_l<t a_g>t a_ap'os a_old&quot;x";
     const post = { href: "https://example.com/a", description: "T &amp; \"x\"", tags: entityTags };

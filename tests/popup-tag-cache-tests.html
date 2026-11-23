@@ -544,6 +544,7 @@ function typeInto(value) {
     remedyDismissals.length = 0;
     settings.pinboardToken = "alice:token";
     settings.tagSyncMode = "fresh";
+    // Pinboard v1 tags/get?format=json returns numeric counts {"<tag>": <number>} (verified live 2026-11-23).
     const realFetch = window.pinboardFetch;
     window.pinboardFetch = async () => ({ ok: true, status: 200, json: async () => ({ js: 3 }) });
     try { await fetchAllUserTags("alice:token"); }

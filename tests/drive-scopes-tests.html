@@ -254,16 +254,17 @@ async function connectDuringSync(sessionPermissionId, { pinIdentity = false } = 
           },
           async removeCachedAuthToken() {}, async clearAllCachedAuthTokens() {}
         },
+        // Google Drive v3 about.get & changes.list shapes verified live on 2026-11-23.
         fetchImpl: async (input, init = {}) => {
           const path = new URL(input).pathname;
           if (path === "/drive/v3/about") {
             const permissionId = String(init.headers?.Authorization || "").replace(/^Bearer token-/, "");
-            const payload = { user: { permissionId, emailAddress: "current@example.test", displayName: "Current" } };
-            return new Response(JSON.stringify(payload), { headers: { "Content-Type": "application/json" } });
+            const payload = { user: { displayName: "Current", permissionId, emailAddress: "current@example.test" } };
+            return new Response(JSON.stringify(payload), { headers: { "Content-Type": "application/json; charset=UTF-8" } });
           }
           if (path === "/drive/v3/changes") {
             if (number === 0 && ++changesReads === 1) { changesPending(); await changesGate; }
-            return new Response('{"changes":[],"newStartPageToken":"after-connect"}', { headers: { "Content-Type": "application/json" } });
+            return new Response('{"changes":[],"newStartPageToken":"after-connect"}', { headers: { "Content-Type": "application/json; charset=UTF-8" } });
           }
           throw new Error("Unexpected Drive request: " + path);
         }

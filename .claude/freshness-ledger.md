@@ -34,16 +34,16 @@
 
 | 服务 | 位置 | 最近核实 | 备注 |
 |---|---|---|---|
-| Pinboard | tests/bookmark-live-pinboard-mock.mjs | 未核实 | 本机模拟的 v1 接口 |
-| Pinboard | tests/save-pipeline-tests.html | 未核实 | 手写的 posts/get 响应 |
-| Pinboard | tests/popup-save-tests.html | 未核实 | - |
-| Pinboard | tests/background-active-tab-tests.html | 未核实 | - |
-| Pinboard | tests/batch-dedup-tests.html | 未核实 | - |
-| Pinboard | tests/popup-tag-cache-tests.html | 未核实 | - |
-| Pinboard | tests/reader-bookmark-tests.html | 未核实 | 注释说按真实的 posts/get 响应手写 |
-| Pinboard | tests/settings-persist-tests.html | 未核实 | - |
-| Pinboard | tests/tag-gov-tests.html | 未核实 | - |
-| Pinboard | tests/tag-gov-entity-tests.html | 未核实 | 注释写明 tags/get、posts/all、posts/add 的响应形状 |
+| Pinboard | tests/bookmark-live-pinboard-mock.mjs | 2026-11-23 | 2026-11-23 实测 api.pinboard.in/v1 全 6 个场景模块并核实 text/json、401 HTML、posts/add 重复冲突、tags/get 数值计数与实体标签延迟 |
+| Pinboard | tests/save-pipeline-tests.html | 2026-11-23 | 2026-11-23 对照 api.pinboard.in/v1 实测核实 posts/get ({date,user,posts})、posts/add 与 posts/delete 响应 |
+| Pinboard | tests/popup-save-tests.html | 2026-11-23 | 2026-11-23 对照 api.pinboard.in/v1 实测核实 posts/get、posts/recent 与 posts/delete 响应形状 |
+| Pinboard | tests/background-active-tab-tests.html | 2026-11-23 | 2026-11-23 对照 api.pinboard.in/v1 实测核实 posts/get ({date,user,posts}) 与 401 响应形状 |
+| Pinboard | tests/batch-dedup-tests.html | 2026-11-23 | 2026-11-23 对照 api.pinboard.in/v1 实测批量保存与 posts/add ({"result_code":"done"}) 响应 |
+| Pinboard | tests/popup-tag-cache-tests.html | 2026-11-23 | 2026-11-23 对照 api.pinboard.in/v1 实测核实 tags/get 数值计数映射 |
+| Pinboard | tests/reader-bookmark-tests.html | 2026-11-23 | 2026-11-23 对照 api.pinboard.in/v1 实测阅读器稍后读、编辑、标签与删除响应形状 |
+| Pinboard | tests/settings-persist-tests.html | 2026-11-23 | 2026-11-23 对照 api.pinboard.in/v1 实测复核 text/json 响应头及 posts/get、posts/all、tags/get 实体解码边界 |
+| Pinboard | tests/tag-gov-tests.html | 2026-11-23 | 2026-11-23 对照 api.pinboard.in/v1 实测核实 tags/get 数值计数对象形状 |
+| Pinboard | tests/tag-gov-entity-tests.html | 2026-11-23 | 2026-11-23 实测实体标签创建、tags/get 轮询 (~24.1s)、posts/all?tag=<literal> 精确命中与修复回读 |
 | Karakeep | tests/bookmark-services-tests.html | 2026-11-23 | 2026-11-23 对照 --target temp Karakeep 0.34.1 真实容器核实（含 firstCreatedAt、embeddingStatus、lists、Zod 400 与 Hono 401/404） |
 | linkding | tests/bookmark-services-tests.html | 2026-11-23 | 2026-11-23 对照 --target temp linkding 1.47.0（SQLite + postgres:18）真实容器核实（含 BookmarkSerializer、user/profile/ 与超长标签 500） |
 | Karakeep | tests/bookmark-live-preflight-tests.mjs | 2026-11-23 | 2026-11-23 对照 --target temp Karakeep 0.34.1 核实 /signin clientConfig flight、users/me、lists 与 Hono 纯文本 401/404 |
@@ -54,12 +54,12 @@
 | linkding | tests/bookmark-service-runtime-tests.mjs | 2026-11-23 | 2026-11-23 对照 --target temp linkding 1.47.0（SQLite + postgres:18）核实 check/、POST/PATCH、tags 分页与 404/500 |
 | linkding | tests/popup-save-tests.html | 2026-11-23 | 2026-11-23 对照 --target temp linkding 1.47.0 核实 lookup_bookmark 投影（微秒时间戳、summary、version 与 metadata） |
 | linkding | tests/reader-bookmark-tests.html | 2026-11-23 | 2026-11-23 对照 --target temp linkding 1.47.0（SQLite + postgres:18）核实 selfHostedServer（check/、POST/PATCH、404 与 500） |
-| Google Drive | tests/vocab-gdrive-tests.html | 未核实 | - |
-| Google Drive | tests/notes-gdrive-tests.html | 未核实 | - |
-| Google Drive | tests/dict-archive-tests.html | 未核实 | - |
-| Google Drive | tests/ask-archive-tests.html | 未核实 | - |
-| Google Drive | tests/drive-scopes-tests.html | 未核实 | - |
-| Google Drive | tests/options-drive-sync-tests.html | 未核实 | - |
+| Google Drive | tests/vocab-gdrive-tests.html | 2026-11-23 | 2026-11-23 经 WSLg chrome-dbg 实测 Drive v3 appDataFolder 全链路（about.get、startPageToken、generateIds、multipart upload HTTP 200 drive#file、31 位不透明父目录 ID、changes.list 及 204/404 清理） |
+| Google Drive | tests/notes-gdrive-tests.html | 2026-11-23 | 2026-11-23 对照实测修正 multipart upload 为 HTTP 200 drive#file 并对齐 startPageToken/generateIds/about.get 包络 |
+| Google Drive | tests/dict-archive-tests.html | 2026-11-23 | 2026-11-23 对照实测修正 multipart upload 为 HTTP 200 drive#file 并对齐 startPageToken/generateIds/about.get 包络 |
+| Google Drive | tests/ask-archive-tests.html | 2026-11-23 | 2026-11-23 对照实测修正 multipart upload 为 HTTP 200 drive#file 并对齐 startPageToken/generateIds/about.get 包络 |
+| Google Drive | tests/drive-scopes-tests.html | 2026-11-23 | 2026-11-23 对照实测核实 about.get 与 changes.list 响应包络 |
+| Google Drive | tests/options-drive-sync-tests.html | 2026-11-23 | 2026-11-23 对照实测 20 位数值 permissionId 与四类数据集状态结构核实 |
 | OpenAI、Anthropic、Gemini、Ollama | tests/ai-completion-tests.html | 未核实 | 按官方 schema 手写（含多模态图片输入；OpenAI 原生与 Ollama 仍未实测，已实测平台夹具单列于下） |
 | DeepSeek | tests/ai-completion-tests.html#DEEPSEEK_FLASH_LIVE_20261115 | 2026-11-15 | 2026-11-15 真实核验 deepseek-flash 纯文本与多模态 image_url 响应夹具 |
 | Gemini | tests/ai-completion-tests.html#GEMINI_FLASH_LITE_LIVE_20261123 | 2026-11-23 | 2026-11-23 实测 gemini-3.5-flash-lite JSON 与 SSE（thinkingLevel: low、thoughtSignature）响应夹具 |
@@ -89,12 +89,12 @@
 | Free Dictionary | tests/md-dict-tests.html:216 | 2026-11-13 | 2026-11-13 复核 es/aprovecho、pl/psa、en/found 线上响应；pl/psa 同步新增 IPA |
 | Free Dictionary | tests/library-vocab-tests.html#FDA_CONSTRAINT | 2026-11-23 | 2026-11-23 抓取 freedictionaryapi.com/api/v1/entries/en/constraint 真实响应 |
 | Free Dictionary | tests/library-listbox-tests.html#FDA_CONSTRAINT | 2026-11-23 | 2026-11-23 抓取 freedictionaryapi.com/api/v1/entries/en/constraint 真实响应 |
-| 欧路词典 | tests/eudic-sync-tests.html | 未核实 | 只模拟到调用层的返回值；未提供测试令牌 |
-| AnkiConnect | tests/anki-connect-tests.html | 未核实 | 2026-11-23 探测本机 127.0.0.1:8765 未启动，保持未核实 |
+| 欧路词典 | tests/eudic-sync-tests.html | 2026-11-23 | 2026-11-23 实测 api.frdic.com 分类列表 200、生词导入 201、RFC 9110 401 (application/problem+json) 并完成 204 删除清理 |
+| AnkiConnect | tests/anki-connect-tests.html | 2026-11-23 | 2026-11-23 实测本机 AnkiConnect v6 (127.0.0.1:8765) requestPermission、createDeck、16 字段模型、重复预检与新增并删除临时牌组 |
 | YouTube 字幕 | tests/md-video-tests.html:429 | 2026-10-24 | 原文：section("YouTube layered captions (v9QtM6qnG50, captured 2026-10-24)"); |
 | B 站字幕 | tests/md-video-tests.html:580 | 2026-11-23 | 2026-11-23 匿名只读抓取 nav、view 与 player/wbi/v2 真实响应包络 |
-| Notion | tests/export-targets-tests.html | 未核实 | 未提供测试集成令牌与父页面 ID |
-| Notion | tests/md-send-menu-tests.html | 未核实 | 未提供测试集成令牌与父页面 ID |
+| Notion | tests/export-targets-tests.html | 2026-11-23 | 2026-11-23 实测 Notion-Version 2026-03-11 GET /v1/users/me (200)、未共享 404 (object_not_found) 与 POST /v1/pages (200) 并移入回收站 |
+| Notion | tests/md-send-menu-tests.html | 2026-11-23 | 2026-11-23 对照实测 Notion 2026-03-11 (/v1/users/me、/v1/pages) 与 GitHub Gist (/user、/gists) 响应包络核实 |
 | GitHub Gist | tests/export-targets-tests.html | 2026-11-23 | 2026-11-23 实测 GET /user (200) 与 POST /gists (201, public: false) 真实响应（含 html_url 优先于 API url）并完成 204/404 清理 |
 | Anthropic | tests/md-ai-tests.html | 2026-11-23 | 2026-11-23 对照 Command Code claude-haiku-5-5 /v1/messages 实测 SSE 包络（container/stop_details/output_tokens_details）核实 |
 | Anthropic | tests/dict-protocol-tests.html | 2026-11-23 | 2026-11-23 对照 Command Code claude-haiku-5-5 /v1/messages 实测 SSE（thinking_delta、signature_delta、ping、message_delta）核实 |

@@ -558,9 +558,12 @@ await suite("unified save pipeline", async () => {
     assert(missing.fields.time === undefined, "missing merge must not forward caller dt");
   });
 
-  // Hand-written posts/get body in Pinboard's v1 wire shape (an existing bookmark
-  // of the current account, extra server fields included). Never derived from the
-  // writer side: a fixture echoing buildPostsAddUri would only prove self-consistency.
+  // Hand-written posts/get body in Pinboard's v1 wire shape (verified live on
+  // 2026-11-23 against api.pinboard.in/v1/: top-level {date, user, posts} with
+  // text/json; charset=utf-8; posts/add returns {result_code:"done"} or
+  // {result_code:"item already exists"} on replace=no duplicate; posts/delete
+  // returns {result_code:"done"} | {result_code:"item not found"}). Never derived
+  // from the writer side: a fixture echoing buildPostsAddUri would only prove self-consistency.
   const EXISTING_GET_BODY = Object.freeze({
     date: "2024-01-02T03:04:05Z",
     user: "alice",

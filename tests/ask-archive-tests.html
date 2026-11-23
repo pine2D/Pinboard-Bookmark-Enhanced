@@ -215,34 +215,37 @@ test("snapshot counts pending bodies without exposing their content", async () =
   assert(snapshot.batches.length === 1 && !Object.hasOwn(snapshot.batches[0], "body") && !snapshot.outbox.length);
 });
 
+// Google Drive v3 appDataFolder server shapes verified live on 2026-11-23:
+// opaque folder ID in parents[], string appProperties, and HTTP 200 {kind:"drive#file",id,name,mimeType} on upload.
 function driveFixture(options = {}) {
   pbpVocabDriveForgetIdentity();
-  let owner = OWNER, enabled = true, permissionId = "google-a", sessionPermissionId = "", failUpload = !!options.failUpload;
+  let owner = OWNER, enabled = true, permissionId = "google-a", sessionPermissionId = "", failUpload = options.failUpload === true;
   const calls = [], uploads = [], connectionPuts = [];
   let connectionState = null;
   const metadata = { id: "peer-file", name: "pbp-ask-history-peer-file.json", parents: ["1opaque-appdata-folder"],
     mimeType: "application/json", appProperties: { pbpKind: "ask-history-batch", schema: "1", owner: HASH, device: "peer-a" } };
   const body = JSON.stringify(batch());
-  const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
+  const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json; charset=UTF-8" } });
   const client = pbpCreateDriveClient({ protocol: PBP_ASK_ARCHIVE_DRIVE_PROTOCOL,
     identity: { getAuthToken: async () => ({ token: "token:" + permissionId }), removeCachedAuthToken: async () => {} },
     beforeRequest: async () => enabled,
     fetchImpl: async (input, init) => {
       const url = new URL(input); calls.push(url.pathname + url.search);
-      if (url.pathname === "/drive/v3/about") return json({ user: { permissionId, emailAddress: "test@example.test" } });
-      if (url.pathname === "/drive/v3/changes/startPageToken") return json({ startPageToken: "before" });
+      if (url.pathname === "/drive/v3/about") return json({ user: { displayName: "Test", permissionId, emailAddress: "test@example.test" } });
+      if (url.pathname === "/drive/v3/changes/startPageToken") return json({ kind: "drive#startPageToken", startPageToken: "before" });
       if (url.pathname === "/drive/v3/files") return json({ files: options.remote ? [metadata] : [] });
       if (url.pathname === "/drive/v3/changes") return json({ changes: [], newStartPageToken: "after" });
       if (url.pathname === "/drive/v3/files/peer-file") {
         options.afterDownload?.({ owner: () => { owner = OTHER; }, google: () => { permissionId = "google-b"; }, disable: () => { enabled = false; } });
-        return new Response(options.corrupt ? "{bad json" : body);
+        return new Response(options.corrupt ? "{bad json" : body, { headers: { "Content-Type": "application/json" } });
       }
-      if (url.pathname === "/drive/v3/files/generateIds") return json({ ids: ["upload-" + (uploads.length + 1)] });
+      if (url.pathname === "/drive/v3/files/generateIds") return json({ kind: "drive#generatedIds", space: "appDataFolder", ids: ["upload-" + (uploads.length + 1)] });
       if (url.pathname === "/upload/drive/v3/files") {
         const parts = init.body.split("\r\n\r\n");
-        uploads.push({ metadata: JSON.parse(parts[1].split("\r\n--")[0]),
+        const uploadedMeta = JSON.parse(parts[1].split("\r\n--")[0]);
+        uploads.push({ metadata: uploadedMeta,
           body: parts[2].slice(0, parts[2].lastIndexOf("\r\n--")) });
-        return json({}, failUpload ? 503 : 201);
+        return json(failUpload ? { error: { code: 503, message: "Backend Error" } } : { kind: "drive#file", id: uploadedMeta.id, name: uploadedMeta.name, mimeType: "application/json" }, failUpload ? 503 : 200);
       }
       throw new Error("unexpected request " + url.pathname);
     } });

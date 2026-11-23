@@ -70,14 +70,63 @@ async function fixture({ realRuntime = false } = {}) {
     // browser APIs and remote responses are fixtures; no mock decides whether
     // a stale send is allowed to reach POST or the clipboard.
     params.chrome.permissions = { request: async () => true, contains: async () => true };
+    // Notion (2026-03-11: GET /v1/users/me 200, POST /v1/pages 200) and GitHub Gist
+    // (GET /user 200, POST /gists 201) response envelopes verified live on 2026-11-23.
     const fetchFixture = async (url, opts) => {
       state.requests.push({ url, ...opts });
       if (state.networkWaits[0]?.method === opts.method) return state.networkWaits.shift().wait.promise;
-      if (opts.method === "GET") return { ok: true, status: 200 };
-      if (url === "https://api.notion.com/v1/pages") {
-        return { ok: true, status: 200, json: async () => ({ object: "page", id: "fixture-created", url: "https://fixture.test/created" }) };
+      if (opts.method === "GET") {
+        if (url === "https://api.notion.com/v1/users/me") {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              object: "user",
+              id: "00000000-0000-4000-8000-000000000099",
+              name: "Fixture Integration",
+              avatar_url: null,
+              type: "bot",
+              bot: { owner: { type: "user" }, workspace_name: "Fixture Workspace", workspace_id: "00000000-0000-4000-8000-000000000097", workspace_limits: { max_file_upload_size_in_bytes: 5242880 } },
+              request_id: "00000000-0000-4000-8000-000000000001",
+            }),
+          };
+        }
+        return { ok: true, status: 200, json: async () => ({ login: "octocat-fixture", id: 1000001, type: "User" }) };
       }
-      return { ok: true, status: 201, json: async () => ({ id: "fixture-created", html_url: "https://fixture.test/created" }) };
+      if (url === "https://api.notion.com/v1/pages") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            object: "page",
+            id: "11111111-2222-4333-8444-555555555555",
+            created_time: "2026-11-23T05:18:00.000Z",
+            last_edited_time: "2026-11-23T05:18:00.000Z",
+            created_by: { object: "user", id: "00000000-0000-4000-8000-000000000099" },
+            last_edited_by: { object: "user", id: "00000000-0000-4000-8000-000000000099" },
+            cover: null,
+            icon: null,
+            parent: { type: "page_id", page_id: "01234567-89ab-cdef-0123-456789abcdef" },
+            in_trash: false,
+            is_archived: false,
+            is_locked: false,
+            properties: { title: { id: "title", type: "title", title: [{ type: "text", text: { content: "Fixture", link: null }, plain_text: "Fixture", href: null }] } },
+            url: "https://fixture.test/created",
+            public_url: null,
+            request_id: "00000000-0000-4000-8000-000000000200",
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 201,
+        json: async () => ({
+          url: "https://api.github.com/gists/fixture-created",
+          id: "fixture-created",
+          html_url: "https://fixture.test/created",
+          public: false,
+        }),
+      };
     };
     const runtime = new w.Function("PBP_EXPORT_TARGETS", "pbpBuildFileBody", "deobfuscateKey", "chrome", "fetch", "navigator",
       sendSource + "\nreturn { pbpSendToTarget, pbpRequestTargetPermission };")(

@@ -962,7 +962,8 @@ async function withPopupSubmitFixture(options, check) {
       assert(stuck.main.join() === "pinboardErrorAuth" && stuck.recent.join() === "pinboardErrorAuth", JSON.stringify(stuck));
     });
     await testAsync("a 2xx delete answer without a readable result_code never prints 'undefined'", async () => {
-      // Real posts/delete bodies: done and item not found delete; anything else is a failure.
+      // Real posts/delete bodies (verified live 2026-11-23 against api.pinboard.in/v1/):
+      // done and item not found delete; anything else is a failure.
       for (const [data, want] of [
         [{ result_code: "done" }, "deleted"],
         [{ result_code: "item not found" }, "deleted"],
@@ -6643,7 +6644,8 @@ async function withPopupSubmitFixture(options, check) {
         return new Promise((resolve) => { answer = () => resolve({ ok: true, status: 200, data: { result_code: "done" }, account: "alice" }); });
       } } };
       const api = new Function("chrome", "settings", pbpPopupBookmarkApiSource + "\nreturn pbpPopupBookmarkApi;")(chromeStub, settingsStub);
-      // Pinboard posts/recent?format=json, as the API returns it.
+      // Pinboard posts/recent & posts/get?format=json envelope ({date, user, posts},
+      // verified live 2026-11-23 against api.pinboard.in/v1/).
       const posts = ["a", "b", "c"].map((name, i) => ({ href: "https://" + name + ".example/", description: "Page " + name, extended: "",
         meta: "m" + i, hash: "h" + i, time: "2026-11-0" + (i + 1) + "T08:00:00Z", shared: "yes", toread: "no", tags: "" }));
       let current = posts;

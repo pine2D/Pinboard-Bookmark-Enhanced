@@ -51,6 +51,8 @@ function suite(name, fn) {
 }
 
 // ============ pbpTagGovNormalizeCounts ============
+// Live Pinboard v1 tags/get?format=json returns numeric counts {"<tag>": 3}
+// (verified 2026-11-23); normalize also accepts legacy numeric strings.
 suite("pbpTagGovNormalizeCounts", () => {
   test("accepts the real tags/get object shape and normalizes numeric strings", () => {
     const counts = pbpTagGovNormalizeCounts({ javascript: "12", chrome: 3, unused: "0" });

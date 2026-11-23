@@ -54,10 +54,12 @@ async function test(name, fn) {
 }
 function assert(value, message) { if (!value) throw new Error(message || "assertion failed"); }
 
-// ---- Fake Pinboard, wire shapes only (hand-written from the 2026-11-04 live probe) ----
-// tags/get: {"tagname": count}. posts/all?format=json: a bare array of post objects.
-// posts/add: {"result_code":"done"}. posts/all passes through the REAL decode exit
-// (pbpPinboardDecodedPostsResponse), as shared.js's pinboardFetch does, so the wire
+// ---- Fake Pinboard, wire shapes only (verified live 2026-11-04 & 2026-11-23) ----
+// tags/get: {"tagname": count} (numeric counts; literal-entity tags appear after ~24s lag).
+// posts/all?format=json: a bare array of post objects (?tag=<literal> matched live).
+// posts/get?format=json: {"date","user","posts":[...]}.
+// posts/add: {"result_code":"done"}. posts/all and posts/get pass through the REAL decode
+// exit (pbpPinboardDecodedPostsResponse), as shared.js's pinboardFetch does, so the wire
 // `&amp;quot;` reaches code as the stored `&quot;`.
 let wire;            // { tags, posts: {tagLiteral: [wirePost...]}, addResult(url, n) }
 let calls;           // every request URL, in order
@@ -81,21 +83,22 @@ function reset(tagsGet, posts) {
   window.pinboardFetch = async (url) => {
     calls.push(url);
     const u = new URL(url);
-    if (u.pathname === "/v1/tags/get") return new Response(JSON.stringify(wire.tags), { status: 200 });
+    const jsonHeaders = { "Content-Type": "text/json; charset=utf-8" };
+    if (u.pathname === "/v1/tags/get") return new Response(JSON.stringify(wire.tags), { status: 200, headers: jsonHeaders });
     if (u.pathname === "/v1/posts/all") {
       const list = wire.posts[u.searchParams.get("tag")] || [];
-      return pbpPinboardDecodedPostsResponse(url, new Response(JSON.stringify(list), { status: 200 }));
+      return pbpPinboardDecodedPostsResponse(url, new Response(JSON.stringify(list), { status: 200, headers: jsonHeaders }));
     }
     if (u.pathname === "/v1/posts/get") {
       const url = u.searchParams.get("url");
       const rows = wire.lookup ? await wire.lookup(url) : Object.values(wire.posts).flat().filter(post => post.href === url).slice(0, 1);
-      return pbpPinboardDecodedPostsResponse(u.href, new Response(JSON.stringify({ posts: rows }), { status: 200 }));
+      return pbpPinboardDecodedPostsResponse(u.href, new Response(JSON.stringify({ date: "2026-11-23T05:19:00Z", user: account || "alice", posts: rows }), { status: 200, headers: jsonHeaders }));
     }
     if (u.pathname === "/v1/posts/add") {
       wire.adds++;
       if (onAdd) await onAdd(u, wire.adds);
       const r = wire.addResult ? wire.addResult(u, wire.adds) : "done";
-      return new Response(JSON.stringify({ result_code: r }), { status: wire.addStatus ? wire.addStatus(wire.adds) : 200 });
+      return new Response(JSON.stringify({ result_code: r }), { status: wire.addStatus ? wire.addStatus(wire.adds) : 200, headers: jsonHeaders });
     }
     return new Response("{}", { status: 404 });
   };

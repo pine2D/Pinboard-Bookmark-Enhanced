@@ -29,19 +29,23 @@
 function t(key, value) { return key + (value === undefined ? "" : ":" + value); }
 let owner = "acct_alice";
 const messages = [], permissionRequests = [], storageListeners = [], runtimeListeners = [], localGets = [];
-// Status in the exact shape pbpGetVocabDriveStatus returns (spec §6.2),
-// written by hand; === undefined decides defaults so "" / 0 survive.
+// Status in the exact shape pbpGetVocabDriveStatus returns (spec §6.2; Google
+// about.get 20-digit numeric permissionId, displayName, emailAddress and four
+// dataset scopes verified live on 2026-11-23), written by hand; === undefined
+// decides defaults so "" / 0 survive.
 const dataset = (patch = {}) => {
   const row = {lastSuccessAt:null,lastError:null,retryAt:null,blocked:false,hasPending:false,notices:0};
   for (const [key, value] of Object.entries(patch)) if (value !== undefined) row[key] = value;
   return row;
 };
 const fixture = {
-  connected:true, owner:"alice", drivePermissionId:"perm-alice",
+  connected:true, owner:"alice", drivePermissionId:"01234567890123456789",
   emailAddress:"alice@example.test", displayName:"Alice",
   connection:{lastError:null,retryAt:null,blocked:false},
   vocabulary:dataset({lastSuccessAt:Date.UTC(2026,6,24,8,0)}),
   notes:dataset({lastSuccessAt:Date.UTC(2026,6,23,8,0)}),
+  dictionary:dataset({lastSuccessAt:Date.UTC(2026,6,24,8,0)}),
+  ask:dataset({lastSuccessAt:Date.UTC(2026,6,24,8,0)}),
   noticeTerms:[], lastSuccessAt:Date.UTC(2026,6,23,8,0), hasPending:false
 };
 const withConn = (patch, base = fixture) => ({...base, connection:{...base.connection, ...patch}});

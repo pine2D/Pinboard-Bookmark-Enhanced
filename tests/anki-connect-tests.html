@@ -63,13 +63,17 @@ assert(!("key" in (req1.params || {})), "key never inside params");
 assert(!("key" in pbpAnkiBuildRequest("version", {}, "")), "empty key omitted");
 
 section("pbpAnkiParseResult");
+// Envelope shapes verified live on 2026-11-23 against AnkiConnect v6 (127.0.0.1:8765,
+// HTTP 200 Content-Type: application/json): version -> {"result":6,"error":null},
+// requestPermission -> {"result":{"permission":"granted","requireApikey":false,"version":6},"error":null},
+// deleteNotes / deleteDecks -> {"result":null,"error":null}.
 assert(pbpAnkiParseResult("not json").ok === false, "malformed json -> ok:false");
 assert(pbpAnkiParseResult('"str"').ok === false, "non-object json -> ok:false");
 const pr1 = pbpAnkiParseResult('{"result": null, "error": "deck not found"}');
 assert(pr1.ok === false && pr1.error === "deck not found", "error envelope surfaces");
 const pr2 = pbpAnkiParseResult('{"result": [1, 2], "error": null}');
 assert(pr2.ok === true && pr2.result.length === 2, "success envelope");
-assert(pbpAnkiParseResult('{"result": {"permission": "granted", "version": 6, "requireApikey": true}, "error": null}').result.requireApikey === true, "lowercase requireApikey spelling reaches caller");
+assert(pbpAnkiParseResult('{"result": {"permission": "granted", "requireApikey": true, "version": 6}, "error": null}').result.requireApikey === true, "lowercase requireApikey spelling reaches caller");
 
 section("pbpAnkiFieldsMatch");
 assertEq(pbpAnkiFieldsMatch(["Term", "Reading", "Definition", "Context", "Source", "License"]), true, "exact match passes");
@@ -105,7 +109,11 @@ async function runMultilingualChecks() {
   };
   const legacyRow = {term:'Gift',reading:'/ɡɪft/',definition:'poison',contexts:['First','Second'],source:'https://one.test/',license:'CC0',language:'de',groups:['Chapter 1']};
   const test = async (name, fn) => { try { await fn(); check(name,true); } catch(e) { check(name,false,e.message); } };
-  // Hand-written v6 responses from official API schema, never from a production note/model builder.
+  // Hand-written AnkiConnect v6 responses verified live on 2026-11-23 against
+  // local Anki desktop (127.0.0.1:8765), never from a production note/model builder:
+  // createDeck returns a numeric deck ID; canAddNotesWithErrorDetail returns
+  // {"canAdd":true} or {"canAdd":false,"error":"cannot create note because it is a duplicate"};
+  // addNotes returns numeric note IDs. Defaults use === undefined.
   async function withService(options, callback) {
     const requests=[];
     window.fetch = async (endpoint, init) => {
@@ -114,14 +122,14 @@ async function runMultilingualChecks() {
       let result=null,error=null;
       switch(request.action) {
         case 'createDeck':result=1700000000001;break;
-        case 'modelNames':result=options.models ?? ['Pinboard Vocab','Pinboard Vocab Multilingual'];if(options.afterModels)options.afterModels();break;
-        case 'modelFieldNames':result=options.fields ?? (request.params.modelName===modelName ? completeFields : legacyFields);break;
+        case 'modelNames':result=options.models === undefined ? ['Pinboard Vocab','Pinboard Vocab Multilingual'] : options.models;if(options.afterModels)options.afterModels();break;
+        case 'modelFieldNames':result=options.fields === undefined ? (request.params.modelName===modelName ? completeFields : legacyFields) : options.fields;break;
         case 'createModel':result={id:1700000000002,name:modelName,type:0,flds:[],tmpls:[],css:''};break;
-        case 'canAddNotesWithErrorDetail':result=options.precheck ?? (options.precheckAll ? request.params.notes.map(()=>({canAdd:true})) : [{canAdd:true}]);if(options.afterPrecheck)options.afterPrecheck();break;
-        case 'addNotes':if(options.addHandler){const r=options.addHandler(request.params.notes);result=r.result;error=r.error;break;}result=options.addError ? null : (options.added ?? [1700000000003]);error=options.addError ?? null;break;
+        case 'canAddNotesWithErrorDetail':result=options.precheck === undefined ? (options.precheckAll ? request.params.notes.map(()=>({canAdd:true})) : [{canAdd:true}]) : options.precheck;if(options.afterPrecheck)options.afterPrecheck();break;
+        case 'addNotes':if(options.addHandler){const r=options.addHandler(request.params.notes);result=r.result;error=r.error;break;}result=options.addError ? null : (options.added === undefined ? [1700000000003] : options.added);error=options.addError === undefined ? null : options.addError;break;
         default:throw new Error('unexpected mutating or unsupported action '+request.action);
       }
-      return {ok:true,text:async()=>JSON.stringify({result,error})};
+      return {ok:true,status:200,headers:{get:(h)=>String(h).toLowerCase()==='content-type'?'application/json':null},text:async()=>JSON.stringify({result,error})};
     };
     try { return await callback(requests); }
     finally { window.fetch=originalFetch; }
