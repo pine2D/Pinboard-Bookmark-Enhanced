@@ -4262,7 +4262,7 @@ async function run() {
         pbpSyncSetLargeUnlocked,
         pbpSyncGetLargeUnlocked,
       );
-      let genSwapCode = "", genSwapSets = 0, genSwapRemoves = 0, genSwapReadback = null;
+      let genSwapMerged = null, genSwapErr = "";
       {
         const lObj = {
           optSyncEnabled: true,
@@ -4279,24 +4279,77 @@ async function run() {
         sArea.get = async (q) => {
           const res = await origSGet(q);
           if (q === "savedThemes" && ++manifestChecks === 2) {
-            // Right after pbpAssertChunkedSyncReadComplete reads g1 manifest (before g1 chunk read), g2 arrives!
+            // Right after pbpAssertChunkedSyncReadComplete reads g1 manifest, complete g2 arrives!
             sObj.savedThemes = { _chunks: 1, _generation: "g2" };
             sObj.savedThemes_g2_0 = '[{"name":"CloudNew","css":"div{}"}]';
           }
           return res;
         };
-        const origSSet = sArea.set, origSRem = sArea.remove;
-        sArea.set = async (d) => { genSwapSets++; return origSSet(d); };
-        sArea.remove = async (k) => { genSwapRemoves++; return origSRem(k); };
         globalThis.chrome.storage.local = lArea;
         globalThis.chrome.storage.sync = sArea;
         _settingsStorageCache = sArea;
         try {
           await runRealPersistSavedThemes({ type: "save", name: "New", css: "a{}" });
         } catch (err) {
-          genSwapCode = (err && err.code) || "threw";
+          genSwapErr = (err && err.code) || "threw";
         }
-        genSwapReadback = await syncGetLarge("savedThemes", []);
+        genSwapMerged = await syncGetLarge("savedThemes", []);
+      }
+      let postStageMerged = null, postStageErr = "", postStageOrphanChunks = 0;
+      {
+        const lObj = { optSyncEnabled: true };
+        const sObj = { savedThemes: { _chunks: 1, _generation: "g1" }, savedThemes_g1_0: "[]" };
+        const sArea = makeMapArea(sObj);
+        let chunkSets = 0;
+        const origSSet = sArea.set;
+        sArea.set = async (d) => {
+          const res = await origSSet(d);
+          const keys = Object.keys(d);
+          if (keys.some((k) => k.startsWith("savedThemes_")) && ++chunkSets === 1) {
+            // Complete g2 arrives AFTER first attempt staged its chunks, right before manifest publish!
+            sObj.savedThemes = { _chunks: 1, _generation: "g2" };
+            sObj.savedThemes_g2_0 = '[{"name":"CloudNew","css":"div{}"}]';
+          }
+          return res;
+        };
+        globalThis.chrome.storage.local = makeMapArea(lObj);
+        globalThis.chrome.storage.sync = sArea;
+        _settingsStorageCache = sArea;
+        try {
+          await runRealPersistSavedThemes({ type: "save", name: "New", css: "a{}" });
+        } catch (err) {
+          postStageErr = (err && err.code) || "threw";
+        }
+        postStageMerged = await syncGetLarge("savedThemes", []);
+        const activeGen = sObj.savedThemes && sObj.savedThemes._generation;
+        postStageOrphanChunks = Object.keys(sObj).filter((k) =>
+          k.startsWith("savedThemes_") && k !== "savedThemes_g1_0" && !k.startsWith(`savedThemes_${activeGen}_`)).length;
+      }
+      let incompleteSwapCode = "", incompleteSwapSets = 0, incompleteSwapRemoves = 0;
+      {
+        const lObj = { optSyncEnabled: true };
+        const sObj = { savedThemes: { _chunks: 1, _generation: "g1" }, savedThemes_g1_0: "[]" };
+        const sArea = makeMapArea(sObj);
+        let manifestChecks = 0;
+        const origSGet = sArea.get, origSSet = sArea.set, origSRem = sArea.remove;
+        sArea.get = async (q) => {
+          const res = await origSGet(q);
+          if (q === "savedThemes" && ++manifestChecks === 2) {
+            // Unpropagated g2 (missing chunk) arrives mid-recheck: must refuse with 0 cloud writes!
+            sObj.savedThemes = { _chunks: 1, _generation: "g2" };
+          }
+          return res;
+        };
+        sArea.set = async (d) => { incompleteSwapSets++; return origSSet(d); };
+        sArea.remove = async (k) => { incompleteSwapRemoves++; return origSRem(k); };
+        globalThis.chrome.storage.local = makeMapArea(lObj);
+        globalThis.chrome.storage.sync = sArea;
+        _settingsStorageCache = sArea;
+        try {
+          await runRealPersistSavedThemes({ type: "save", name: "New", css: "a{}" });
+        } catch (err) {
+          incompleteSwapCode = (err && err.code) || "threw";
+        }
       }
       let nonEmptyColdCode = "", nonEmptyColdWrites = 0, nonEmptyColdRemoves = 0, nonEmptyColdReadback = null;
       {
@@ -4370,16 +4423,73 @@ async function run() {
           corruptLegacySaveCode = (err && err.code) || "threw";
         }
       }
+      let emptyLegacyStringSaved = null;
+      {
+        const lObj = { optSyncEnabled: true };
+        const sObj = { savedThemes: "" };
+        const sArea = makeMapArea(sObj);
+        globalThis.chrome.storage.local = makeMapArea(lObj);
+        globalThis.chrome.storage.sync = sArea;
+        _settingsStorageCache = sArea;
+        await runRealPersistSavedThemes({ type: "save", name: "New", css: "b{}" });
+        emptyLegacyStringSaved = await syncGetLarge("savedThemes", []);
+      }
+      let fifoFirstErr = "", fifoSecondErr = "", interleavedDegradedErr = "", interleavedFreshErr = "";
+      {
+        const lObj = { optSyncEnabled: true };
+        const sObj = {};
+        let fbCalls = 0;
+        const lArea = makeMapArea(lObj);
+        const origLGet = lArea.get;
+        lArea.get = async (q) => {
+          if (q === "customOverlayCSS_localFallback" && ++fbCalls === 2) {
+            throw new Error("second overlay fallback read fails");
+          }
+          return origLGet(q);
+        };
+        const sArea = makeMapArea(sObj);
+        globalThis.chrome.storage.local = lArea;
+        globalThis.chrome.storage.sync = sArea;
+        _settingsStorageCache = sArea;
+        const v1 = await syncGetLarge("customOverlayCSS", "");
+        const v2 = await syncGetLarge("customOverlayCSS", "");
+        try { await pbpAssertChunkedSyncReadComplete("customOverlayCSS", v1); }
+        catch (err) { fifoFirstErr = (err && err.code) || "threw"; }
+        try { await pbpAssertChunkedSyncReadComplete("customOverlayCSS", v2); }
+        catch (err) { fifoSecondErr = (err && err.code) || "threw"; }
+
+        // Out-of-order { withBasis: true } interleaving (export vs sync-off toggle):
+        const lObj2 = {
+          optSyncEnabled: true,
+          customOverlayCSS_localFallback: pbpLargeFallbackRecord("old{}", "g1", "g0"),
+        };
+        const sObj2 = { customOverlayCSS: { _chunks: 1, _generation: "g2" } };
+        const sArea2 = makeMapArea(sObj2);
+        globalThis.chrome.storage.local = makeMapArea(lObj2);
+        globalThis.chrome.storage.sync = sArea2;
+        _settingsStorageCache = sArea2;
+        const syncOffRead = await syncGetLarge("customOverlayCSS", "", { withBasis: true });
+        sObj2.customOverlayCSS_g2_0 = "current{}";
+        const exportRead = await syncGetLarge("customOverlayCSS", "", { withBasis: true });
+        try { await pbpAssertChunkedSyncReadComplete("customOverlayCSS", exportRead.value, exportRead.basis); }
+        catch (err) { interleavedFreshErr = (err && err.code) || "threw"; }
+        try { await pbpAssertChunkedSyncReadComplete("customOverlayCSS", syncOffRead.value, syncOffRead.basis); }
+        catch (err) { interleavedDegradedErr = (err && err.code) || "threw"; }
+      }
       console.warn = prevWarnE7f;
-      check("E7f merge-base CAS refuses mid-recheck generation swaps, non-empty degraded reads, and truncated legacy JSON with zero cloud writes",
+      check("E7f merge-base CAS re-merges complete concurrent generations, refuses unpropagated/degraded/truncated reads with zero cloud writes, allows empty legacy string, and isolates concurrent overlay basis",
         typeof runRealPersistSavedThemes === "function"
-        && genSwapCode === "chunks_propagating" && genSwapSets === 0 && genSwapRemoves === 0
-        && Array.isArray(genSwapReadback) && genSwapReadback.length === 1 && genSwapReadback[0].name === "CloudNew"
+        && genSwapErr === "" && Array.isArray(genSwapMerged) && genSwapMerged.map((t) => t.name).join(",") === "CloudNew,New"
+        && postStageErr === "" && Array.isArray(postStageMerged) && postStageMerged.map((t) => t.name).join(",") === "CloudNew,New" && postStageOrphanChunks === 0
+        && incompleteSwapCode === "chunks_propagating" && incompleteSwapSets === 0 && incompleteSwapRemoves === 0
         && nonEmptyColdCode === "chunks_propagating" && nonEmptyColdWrites === 0 && nonEmptyColdRemoves === 0
         && Array.isArray(nonEmptyColdReadback) && nonEmptyColdReadback.length === 1 && nonEmptyColdReadback[0].name === "Cloud"
         && nonEmptyStaleRescueCode === "chunks_propagating" && nonEmptyStaleRescueWrites === 0 && nonEmptyStaleRescueRemoves === 0
         && Array.isArray(nonEmptyStaleRescueReadback) && nonEmptyStaleRescueReadback.length === 1 && nonEmptyStaleRescueReadback[0].name === "Cloud"
-        && corruptLegacySaveCode === "chunks_propagating" && corruptLegacyWrites === 0 && corruptLegacyRemoves === 0);
+        && corruptLegacySaveCode === "chunks_propagating" && corruptLegacyWrites === 0 && corruptLegacyRemoves === 0
+        && Array.isArray(emptyLegacyStringSaved) && emptyLegacyStringSaved.map((t) => t.name).join(",") === "New"
+        && fifoFirstErr === "" && fifoSecondErr === "chunks_propagating"
+        && interleavedFreshErr === "" && interleavedDegradedErr === "chunks_propagating");
     } finally {
       console.warn = prevWarnE7f;
       globalThis.chrome = prevChromeE7f;

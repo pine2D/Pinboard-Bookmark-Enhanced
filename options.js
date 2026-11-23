@@ -4018,7 +4018,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
           }
           // 2. Migrate customOverlayCSS (large value) — read from old, then switch pref, then write to new
-          const customOverlayCSS = await syncGetLarge("customOverlayCSS", "");
+          const overlayRead = await syncGetLarge("customOverlayCSS", "", { withBasis: true });
+          const customOverlayCSS = overlayRead && typeof overlayRead === "object" && Object.prototype.hasOwnProperty.call(overlayRead, "value")
+            ? overlayRead.value : overlayRead;
+          const customOverlayBasis = overlayRead && typeof overlayRead === "object" && Object.prototype.hasOwnProperty.call(overlayRead, "basis")
+            ? overlayRead.basis : null;
           const savedThemes = await syncGetLarge("savedThemes", []);
           // K117: this is a read-modify-write across areas. When sync is being
           // turned OFF the read came from the cloud, where an empty value can
@@ -4026,7 +4030,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           // local (and publishing it on later re-enable) would delete the
           // theme the user still has. Abort into the existing rollback rather
           // than migrating a value we could not actually read.
-          await pbpAssertChunkedSyncReadComplete("customOverlayCSS", customOverlayCSS);
+          await pbpAssertChunkedSyncReadComplete("customOverlayCSS", customOverlayCSS, customOverlayBasis);
           await pbpAssertChunkedSyncReadComplete("savedThemes", savedThemes);
           await chrome.storage.local.set({ optSyncEnabled: enabling });
           _settingsStorageCache = newStorage;
@@ -5479,23 +5483,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function persistSavedThemes(op) {
     try {
       return await pbpWithLargeStorageLock("savedThemes", async () => {
-        const current = await pbpSyncGetLargeUnlocked("savedThemes", []);
-        // K117: this re-read is the MERGE BASE. An empty read that the cloud
-        // contradicts is not "no themes" -- merging onto it and writing
-        // publishes a new generation that orphans the ones the user still has.
-        // The assertion takes no lock of its own, so it is safe in here; both
-        // callers wrap this function in try/catch -> reportAutoSaveFailure.
-        await pbpAssertChunkedSyncReadComplete("savedThemes", current);
-        const merged = pbpApplySavedThemeOp(current, op);
-        try {
-          await pbpSyncSetLargeUnlocked("savedThemes", merged, { mergeBase: current });
-        } catch (e) {
-          // Sync quota: the merged list IS stored, in the device-local
-          // fallback record the write just left behind, so the popover must
-          // still close and the list still repaint; #opt-sync-local-only
-          // (refreshed below) is the "this device only" feedback. Anything
-          // else is a genuine failure and reaches the caller.
-          if (!(e && e.pbpFellBackToLocal)) throw e;
+        let merged = [];
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const current = await pbpSyncGetLargeUnlocked("savedThemes", []);
+          // K117: this re-read is the MERGE BASE. An empty read that the cloud
+          // contradicts is not "no themes" -- merging onto it and writing
+          // publishes a new generation that orphans the ones the user still has.
+          // If a newer complete cloud generation arrives while staging, re-read
+          // and merge onto it inside the lock before publishing.
+          await pbpAssertChunkedSyncReadComplete("savedThemes", current);
+          merged = pbpApplySavedThemeOp(current, op);
+          try {
+            await pbpSyncSetLargeUnlocked("savedThemes", merged, { mergeBase: current });
+          } catch (e) {
+            if (attempt < 2 && e && e.concurrentGeneration) continue;
+            // Sync quota: the merged list IS stored, in the device-local
+            // fallback record the write just left behind, so the popover must
+            // still close and the list still repaint; #opt-sync-local-only
+            // (refreshed below) is the "this device only" feedback. Anything
+            // else is a genuine failure and reaches the caller.
+            if (!(e && e.pbpFellBackToLocal)) throw e;
+          }
+          break;
         }
         savedThemes = merged;
         return merged;

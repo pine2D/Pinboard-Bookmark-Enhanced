@@ -164,6 +164,8 @@ async function bootDriveWorker({
     let scriptDeferredSampledBefore = false;
     let scriptDeferredSeenInSync = true;
     let scriptDeferredSeenAfter = false;
+    let preImportMicrotaskRanBeforeSyncSample = true;
+    let preImportMicrotaskRanAfterBoot = false;
     try {
       plainRealm = await pbpSwRealm.boot({
         mock: {
@@ -183,10 +185,21 @@ async function bootDriveWorker({
           storage: { local: { personalLibraryAccount: "alice", bookmarkServiceActive: "pinboard", vocabDriveConnected: false, _legacyWildcardCleanupV1: true, _driveScopeKeysRetiredDone: true, _webhookSyncScrubDone: true } },
         },
         beforeBackground(w, m) {
+          const origImport = w.importScripts;
+          let preQueued = false;
+          w.importScripts = (...args) => {
+            if (!preQueued) {
+              preQueued = true;
+              // Simulate a queueMicrotask scheduled in background.js BEFORE importScripts executes!
+              w.queueMicrotask(() => { preImportMicrotaskRanAfterBoot = true; });
+            }
+            return origImport(...args);
+          };
           const realAdd = m.chrome.runtime.onMessage.addListener.bind(m.chrome.runtime.onMessage);
           m.chrome.runtime.onMessage.addListener = (fn) => { w.queueMicrotask(() => realAdd(fn)); };
         },
         afterBootSync(w, m) {
+          preImportMicrotaskRanBeforeSyncSample = preImportMicrotaskRanAfterBoot;
           scriptDeferredSampledBefore = w.__pbpMicrotaskCheckpointRan === false;
           scriptDeferredSeenInSync = m.chrome.runtime.onMessage.hasListener(w.handleRuntimeMessage);
         },
@@ -197,11 +210,13 @@ async function bootDriveWorker({
       plainRealm?.dispose();
       scriptDeferredRealm?.dispose();
     }
-    check("top-level listener probe catches queueMicrotask-deferred onMessage on both inline and <script src> paths with zero outer fetch calls",
+    check("top-level listener probe catches queueMicrotask-deferred onMessage (including pre-importScripts microtasks) on both inline and <script src> paths with zero outer fetch calls",
       sampledBeforeMicrotask === true
       && syncSampledHasListener === false
       && registeredOnlyAfterMicrotask === true
       && plainSampledBeforeMicrotask === true
+      && preImportMicrotaskRanBeforeSyncSample === false
+      && preImportMicrotaskRanAfterBoot === true
       && scriptDeferredSampledBefore === true
       && scriptDeferredSeenInSync === false
       && scriptDeferredSeenAfter === true

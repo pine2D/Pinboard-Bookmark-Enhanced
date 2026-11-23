@@ -60,23 +60,27 @@
     win.chrome = mock.chrome;
     win.__importedScripts = [];
     let syncSampled = false;
+    const realQueueMicrotask = win.queueMicrotask.bind(win);
+    const realPromiseThen = win.Promise.prototype.then;
+    const restoreBootMicrotaskHooks = () => {
+      win.queueMicrotask = realQueueMicrotask;
+      win.Promise.prototype.then = realPromiseThen;
+    };
+    const ensureBootSyncAtQueueHead = () => {
+      if (syncSampled || options.backgroundSource !== undefined || typeof options.afterBootSync !== "function") return;
+      syncSampled = true;
+      win.__pbpMicrotaskCheckpointRan = false;
+      restoreBootMicrotaskHooks();
+      realQueueMicrotask(() => {
+        options.afterBootSync(win, mock);
+        win.__pbpMicrotaskCheckpointRan = true;
+      });
+    };
     // Stub: WorkerGlobalScope.importScripts does not exist on Window; the
     // dependency scripts are loaded via <script src> below in identical order.
-    // When background.js runs via external <script src> (zero fetch() under
-    // both file:// and http://), queueing `afterBootSync` inside importScripts
-    // places it at the HEAD of the FIFO microtask queue so it executes at the
-    // script's microtask checkpoint BEFORE any queueMicrotask / Promise.then
-    // deferred inside background.js.
     win.importScripts = (...files) => {
       win.__importedScripts.push(...files);
-      if (!syncSampled && options.backgroundSource === undefined && typeof options.afterBootSync === "function") {
-        syncSampled = true;
-        win.__pbpMicrotaskCheckpointRan = false;
-        win.queueMicrotask(() => {
-          options.afterBootSync(win, mock);
-          win.__pbpMicrotaskCheckpointRan = true;
-        });
-      }
+      ensureBootSyncAtQueueHead();
     };
     // Stub: prevent accidental real network fetches in background boot paths
     // unless a test installs its own win.fetch.
@@ -97,9 +101,25 @@
     if (!options.depsOnly) {
       const bgUrl = base + "background.js";
       if (options.backgroundSource === undefined) {
-        await loadScript(doc, bgUrl);
+        if (typeof options.afterBootSync === "function") {
+          win.queueMicrotask = (cb) => {
+            ensureBootSyncAtQueueHead();
+            return realQueueMicrotask(cb);
+          };
+          win.Promise.prototype.then = function (onFulfilled, onRejected) {
+            ensureBootSyncAtQueueHead();
+            return realPromiseThen.call(this, onFulfilled, onRejected);
+          };
+        }
+        try {
+          await loadScript(doc, bgUrl);
+        } finally {
+          restoreBootMicrotaskHooks();
+        }
         if (!syncSampled && typeof options.afterBootSync === "function") {
+          win.__pbpMicrotaskCheckpointRan = false;
           options.afterBootSync(win, mock);
+          win.__pbpMicrotaskCheckpointRan = true;
         }
       } else {
         win.__pbpMicrotaskCheckpointRan = false;

@@ -238,26 +238,34 @@ const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature
 const _AI_EN_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field|name)|extra\s+inputs|\bdeprecated\b/;
 const _AI_HEALABLE_RE_SRC = "max_tokens|max_completion_tokens|temperature|reasoning_effort|response_format|thinking|enable_thinking|thinkingbudget|thinkinglevel|thinkingconfig|reasoning";
 const _AI_CN_FIELD_CLAUSE_RE = new RegExp(
-  "未知(?:参数|字段)(?:\\s*[\`'\\\"]?[a-z0-9_]+[\`'\\\"]?)?\\s*$"
-  + "|不(?:再)?支持(?:该|此)?(?:参数|字段)(?:\\s*[\`'\\\"]?[a-z0-9_]+[\`'\\\"]?)?\\s*$"
-  + "|(?:参数|字段)\\s*[\`'\\\"]?[a-z0-9_]*[\`'\\\"]?\\s*(?:不(?:受|再)?支持|不再受支持|已弃用)\\s*$"
-  + "|不(?:再)?支持\\s*[\`'\\\"]?(?:" + _AI_HEALABLE_RE_SRC + ")[\`'\\\"]?(?:\\s*(?:参数|字段))?\\s*$"
+  "未知(?:参数|字段)(?:\\s*[:：]?\\s*[\`'\\\"]?[a-z0-9_]+[\`'\\\"]?)?\\s*$"
+  + "|不(?:再)?支持(?:该|此)?(?:参数|字段)(?:\\s*[:：]?\\s*[\`'\\\"]?[a-z0-9_]+[\`'\\\"]?)?\\s*$"
+  + "|(?:参数|字段)\\s*[:：]?\\s*[\`'\\\"]?[a-z0-9_]*[\`'\\\"]?\\s*(?:不(?:受|再)?支持|不再受支持|已弃用)\\s*$"
+  + "|不(?:再)?支持\\s*[:：]?\\s*[\`'\\\"]?(?:" + _AI_HEALABLE_RE_SRC + ")[\`'\\\"]?(?:\\s*(?:参数|字段))?\\s*$"
   + "|\\b(?:" + _AI_HEALABLE_RE_SRC + ")\\b[\`'\\\"]?(?:\\s*(?:参数|字段))?\\s*(?:不(?:受|再)?支持|不再受支持|已弃用)\\s*$"
 );
-const _AI_CN_CLAUSE_VALUE_RE = /取值|值必须|值超出|超出范围|介于|大于|小于|至少|至多|不得超过|不能超过|必须为|必须是|只能为|只能是|小数|整数|浮点数|负数|正数|布尔|字符串|数组|工具参数|[=:：<>≤≥]/;
-function _aiCnClauseNamesParam(clause, name) {
-  return new RegExp("(^|[^a-z0-9_])" + name + "(?=$|[^a-z0-9_])", "i").test(clause);
+const _AI_CN_CLAUSE_VALUE_RE = /取值|值必须|值超出|超出范围|介于|大于|小于|至少|至多|不得超过|不能超过|必须为|必须是|只能为|只能是|小数|整数|浮点数|负数|正数|布尔|字符串|数组|工具参数|[=<>≤≥]|[:：]\s*[-+0-9]/;
+function _aiCnStripSafeTrailingNote(rawClause) {
+  return rawClause.replace(/\s*[（(]([^）)]*)[）)]\s*$/, (full, inner) =>
+    (_AI_CN_CLAUSE_VALUE_RE.test(inner) ? full : "")).trim();
+}
+function _aiCnValueClauseVetoesParam(rawClauses, paramName) {
+  for (const rawClause of rawClauses) {
+    if (!_AI_CN_CLAUSE_VALUE_RE.test(rawClause)) continue;
+    const asciiTokens = rawClause.match(/[a-z][a-z0-9_]*/gi) || [];
+    if (!asciiTokens.length || asciiTokens.some((tok) => tok.toLowerCase() === paramName.toLowerCase())) {
+      return true;
+    }
+  }
+  return false;
 }
 function _aiCnRefusedParam(rawMsg, targetParam) {
   if (!rawMsg) return null;
-  const clauses = rawMsg.split(/[，,。；;！!？?\n]+/)
-    .map((c) => c.replace(/\s*[（(][^）)]*[）)]\s*$/, "").trim())
-    .filter(Boolean);
+  const rawClauses = rawMsg.split(/[，,。；;！!？?\n]+/).map((c) => c.trim()).filter(Boolean);
+  const clauses = rawClauses.map(_aiCnStripSafeTrailingNote).filter(Boolean);
   if (targetParam) {
     if (!_AI_HEALABLE_PARAMS.includes(targetParam)) return null;
-    if (clauses.some((c) => _aiCnClauseNamesParam(c, targetParam) && _AI_CN_CLAUSE_VALUE_RE.test(c))) {
-      return null;
-    }
+    if (_aiCnValueClauseVetoesParam(rawClauses, targetParam)) return null;
     for (const clause of clauses) {
       if (_AI_CN_CLAUSE_VALUE_RE.test(clause)) continue;
       if (!_AI_CN_FIELD_CLAUSE_RE.test(clause)) continue;
@@ -276,7 +284,7 @@ function _aiCnRefusedParam(rawMsg, targetParam) {
       const m = new RegExp("(^|[^a-z0-9_])(" + p + ")(?=$|[^a-z0-9_])", "i").exec(clause);
       if (!m) continue;
       const at = m.index + m[1].length;
-      if (at < bestAt && !clauses.some((c) => _aiCnClauseNamesParam(c, p) && _AI_CN_CLAUSE_VALUE_RE.test(c))) {
+      if (at < bestAt && !_aiCnValueClauseVetoesParam(rawClauses, p)) {
         best = p;
         bestAt = at;
       }
