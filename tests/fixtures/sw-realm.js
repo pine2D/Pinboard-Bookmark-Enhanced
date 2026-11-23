@@ -31,14 +31,73 @@
     return host;
   }
 
-  function loadScript(doc, src) {
+  function loadScript(doc, src, onCreated) {
     return new Promise((resolve, reject) => {
       const s = doc.createElement("script");
       s.src = src;
       s.onload = () => resolve();
       s.onerror = () => reject(new Error("failed to load runtime script: " + src));
+      if (onCreated) onCreated(s);
       doc.head.appendChild(s);
     });
+  }
+
+  function isTopLevelScriptStackActive(win, doc, getActiveScript, bgUrl) {
+    const expectedEl = getActiveScript();
+    if (!expectedEl) return true;
+    if (doc.currentScript !== expectedEl) return false;
+    const prevPrepare = win.Error.prepareStackTrace;
+    let frames = null;
+    try {
+      win.Error.prepareStackTrace = (_err, sites) => sites.map((s) => ({
+        file: s.getFileName() || s.getScriptNameOrSourceURL() || "",
+        fn: s.getFunctionName(),
+        line: typeof s.getEnclosingLineNumber === "function" ? s.getEnclosingLineNumber() : 1,
+        col: typeof s.getEnclosingColumnNumber === "function" ? s.getEnclosingColumnNumber() : 1,
+      }));
+      frames = new win.Error().stack;
+    } finally {
+      win.Error.prepareStackTrace = prevPrepare;
+    }
+    if (!Array.isArray(frames)) return true;
+    const bgFrames = frames.filter((f) => f.file === bgUrl || f.file.endsWith("/background.js"));
+    if (!bgFrames.length) return true;
+    const rootFrame = bgFrames[bgFrames.length - 1];
+    return rootFrame.fn === null && rootFrame.line === 1 && rootFrame.col === 1;
+  }
+
+  function gateMockEventListenersToScript(mockChrome, win, doc, getActiveScript, bgUrl) {
+    const originals = [];
+    const deferred = [];
+    let active = true;
+    const seen = new Set();
+    const visit = (obj) => {
+      if (!obj || typeof obj !== "object" || seen.has(obj)) return;
+      seen.add(obj);
+      if (typeof obj.addListener === "function" && typeof obj.hasListener === "function") {
+        const origAdd = obj.addListener.bind(obj);
+        originals.push(() => { obj.addListener = origAdd; });
+        obj.addListener = (...args) => {
+          if (active && !isTopLevelScriptStackActive(win, doc, getActiveScript, bgUrl)) {
+            deferred.push(() => origAdd(...args));
+            return;
+          }
+          return origAdd(...args);
+        };
+      }
+      for (const key of Object.keys(obj)) {
+        try { visit(obj[key]); } catch (_) { /* ignore getter throws on mock handles */ }
+      }
+    };
+    visit(mockChrome);
+    return {
+      releaseAndReplay() {
+        if (!active) return;
+        active = false;
+        for (const restore of originals) restore();
+        while (deferred.length) deferred.shift()();
+      },
+    };
   }
 
   // options:
@@ -66,15 +125,9 @@
       win.queueMicrotask = realQueueMicrotask;
       win.Promise.prototype.then = realPromiseThen;
     };
+    let ensureBootSyncAtQueueHeadImpl = null;
     const ensureBootSyncAtQueueHead = () => {
-      if (syncSampled || options.backgroundSource !== undefined || typeof options.afterBootSync !== "function") return;
-      syncSampled = true;
-      win.__pbpMicrotaskCheckpointRan = false;
-      restoreBootMicrotaskHooks();
-      realQueueMicrotask(() => {
-        options.afterBootSync(win, mock);
-        win.__pbpMicrotaskCheckpointRan = true;
-      });
+      if (ensureBootSyncAtQueueHeadImpl) ensureBootSyncAtQueueHeadImpl();
     };
     // Stub: WorkerGlobalScope.importScripts does not exist on Window; the
     // dependency scripts are loaded via <script src> below in identical order.
@@ -97,10 +150,37 @@
     for (const file of options.deps || SW_DEPS) {
       await loadScript(doc, base + file);
     }
+    const bgUrl = base + "background.js";
+    let bgScriptEl = null;
+    const listenerGate = !options.depsOnly && typeof options.afterBootSync === "function"
+      ? gateMockEventListenersToScript(mock.chrome, win, doc, () => bgScriptEl, bgUrl)
+      : null;
     if (options.beforeBackground) await options.beforeBackground(win, mock);
     if (!options.depsOnly) {
-      const bgUrl = base + "background.js";
+      const finishBootSync = () => {
+        if (typeof options.afterBootSync === "function") {
+          options.afterBootSync(win, mock);
+        }
+        if (listenerGate) listenerGate.releaseAndReplay();
+      };
       if (options.backgroundSource === undefined) {
+        const invokeBootSyncOnce = () => {
+          if (syncSampled) return;
+          syncSampled = true;
+          restoreBootMicrotaskHooks();
+          finishBootSync();
+          win.__pbpMicrotaskCheckpointRan = true;
+        };
+        ensureBootSyncAtQueueHeadImpl = () => {
+          if (syncSampled || typeof options.afterBootSync !== "function") return;
+          syncSampled = true;
+          win.__pbpMicrotaskCheckpointRan = false;
+          restoreBootMicrotaskHooks();
+          realQueueMicrotask(() => {
+            finishBootSync();
+            win.__pbpMicrotaskCheckpointRan = true;
+          });
+        };
         if (typeof options.afterBootSync === "function") {
           win.queueMicrotask = (cb) => {
             ensureBootSyncAtQueueHead();
@@ -112,14 +192,15 @@
           };
         }
         try {
-          await loadScript(doc, bgUrl);
+          await loadScript(doc, bgUrl, (el) => { bgScriptEl = el; });
         } finally {
           restoreBootMicrotaskHooks();
-        }
-        if (!syncSampled && typeof options.afterBootSync === "function") {
-          win.__pbpMicrotaskCheckpointRan = false;
-          options.afterBootSync(win, mock);
-          win.__pbpMicrotaskCheckpointRan = true;
+          if (listenerGate && !syncSampled) {
+            win.__pbpMicrotaskCheckpointRan = false;
+            invokeBootSyncOnce();
+          } else if (listenerGate) {
+            listenerGate.releaseAndReplay();
+          }
         }
       } else {
         win.__pbpMicrotaskCheckpointRan = false;
@@ -129,13 +210,17 @@
         win.addEventListener("error", onErr);
         try {
           const s = doc.createElement("script");
+          bgScriptEl = s;
           s.textContent = options.backgroundSource + "\n//# sourceURL=" + bgUrl;
           doc.head.appendChild(s);
         } finally {
           win.removeEventListener("error", onErr);
         }
-        if (bootErr) throw bootErr;
-        if (options.afterBootSync) options.afterBootSync(win, mock);
+        if (bootErr) {
+          if (listenerGate) listenerGate.releaseAndReplay();
+          throw bootErr;
+        }
+        finishBootSync();
       }
       const expectedDeps = options.deps || SW_DEPS;
       if (win.__importedScripts.length !== expectedDeps.length ||

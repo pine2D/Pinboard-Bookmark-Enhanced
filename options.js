@@ -5451,27 +5451,38 @@ document.addEventListener("DOMContentLoaded", async () => {
   let savedThemes = []; // [{ name: "My Theme", css: "..." }, ...]
 
   async function loadSavedThemes() {
-    savedThemes = await syncGetLarge("savedThemes", []);
-    if (!Array.isArray(savedThemes)) savedThemes = [];
-    // One-time migration from local. K117: the empty read that arms it is
-    // exactly the read the chunk assertion distrusts -- a cloud list whose
-    // chunks have not landed here reads as [] too, and publishing the legacy
-    // local list over it orphans themes the user still has (and then deletes
-    // the local copy). Reachable right after an import, which re-runs this
-    // load. Skipping the migration for one load costs nothing; it runs on the
-    // next load once the read is trustworthy. Non-throwing on purpose: the
-    // assertion fails open on storage errors, and a load must still render.
-    let syncReadComplete = true;
-    try {
-      await pbpAssertChunkedSyncReadComplete("savedThemes", savedThemes);
-    } catch (_) { syncReadComplete = false; }
-    if (syncReadComplete && !savedThemes.length) {
-      const local = await chrome.storage.local.get({ savedThemes: [] });
-      if (Array.isArray(local.savedThemes) && local.savedThemes.length) {
-        savedThemes = local.savedThemes;
-        await syncSetLarge("savedThemes", savedThemes);
-        await chrome.storage.local.remove("savedThemes");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      savedThemes = await syncGetLarge("savedThemes", []);
+      if (!Array.isArray(savedThemes)) savedThemes = [];
+      // One-time migration from local. K117: the empty read that arms it is
+      // exactly the read the chunk assertion distrusts -- a cloud list whose
+      // chunks have not landed here reads as [] too, and publishing the legacy
+      // local list over it orphans themes the user still has (and then deletes
+      // the local copy). Pass { mergeBase: savedThemes } so if a newer cloud
+      // generation lands before migration commits, we re-read instead of
+      // overwriting it or deleting local.savedThemes.
+      let syncReadComplete = true;
+      try {
+        await pbpAssertChunkedSyncReadComplete("savedThemes", savedThemes);
+      } catch (_) { syncReadComplete = false; }
+      if (syncReadComplete && !savedThemes.length) {
+        const local = await chrome.storage.local.get({ savedThemes: [] });
+        if (Array.isArray(local.savedThemes) && local.savedThemes.length) {
+          try {
+            await syncSetLarge("savedThemes", local.savedThemes, { mergeBase: savedThemes });
+            savedThemes = local.savedThemes;
+            await chrome.storage.local.remove("savedThemes");
+          } catch (err) {
+            if (err && err.pbpFellBackToLocal) {
+              savedThemes = local.savedThemes;
+              await chrome.storage.local.remove("savedThemes");
+            } else if (attempt === 0 && err && err.concurrentGeneration) {
+              continue;
+            }
+          }
+        }
       }
+      break;
     }
     renderSavedThemes();
   }
@@ -5489,11 +5500,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           // K117: this re-read is the MERGE BASE. An empty read that the cloud
           // contradicts is not "no themes" -- merging onto it and writing
           // publishes a new generation that orphans the ones the user still has.
-          // If a newer complete cloud generation arrives while staging, re-read
-          // and merge onto it inside the lock before publishing.
-          await pbpAssertChunkedSyncReadComplete("savedThemes", current);
-          merged = pbpApplySavedThemeOp(current, op);
+          // If a newer complete cloud generation arrives before or while staging,
+          // re-read and merge onto it inside the lock before publishing.
           try {
+            await pbpAssertChunkedSyncReadComplete("savedThemes", current);
+            merged = pbpApplySavedThemeOp(current, op);
             await pbpSyncSetLargeUnlocked("savedThemes", merged, { mergeBase: current });
           } catch (e) {
             if (attempt < 2 && e && e.concurrentGeneration) continue;

@@ -244,30 +244,51 @@ const _AI_CN_FIELD_CLAUSE_RE = new RegExp(
   + "|不(?:再)?支持\\s*[:：]?\\s*[\`'\\\"]?(?:" + _AI_HEALABLE_RE_SRC + ")[\`'\\\"]?(?:\\s*(?:参数|字段))?\\s*$"
   + "|\\b(?:" + _AI_HEALABLE_RE_SRC + ")\\b[\`'\\\"]?(?:\\s*(?:参数|字段))?\\s*(?:不(?:受|再)?支持|不再受支持|已弃用)\\s*$"
 );
-const _AI_CN_CLAUSE_VALUE_RE = /取值|值必须|值超出|超出范围|介于|大于|小于|至少|至多|不得超过|不能超过|必须为|必须是|只能为|只能是|小数|整数|浮点数|负数|正数|布尔|字符串|数组|工具参数|[=<>≤≥]|[:：]\s*[-+0-9]/;
+const _AI_CN_META_CLAUSE_RE = /^(?:错误(?:码|代码|号)|状态码|(?:error[\s_-]*)?code|request[\s_-]*id|trace[\s_-]*id)\s*[:：=]?\s*[a-z0-9_.-]+$/i;
+const _AI_CN_CLAUSE_VALUE_RE = /取值|值必须|值超出|超出范围|介于|大于|小于|至少|至多|不得超过|不能超过|必须为|必须是|只能为|只能是|小数|整数|浮点数|负数|正数|布尔|字符串|数组|工具参数|[=<>≤≥]/;
+const _AI_CN_PARAM_COLON_NUM_RE = new RegExp("\\b(?:" + _AI_HEALABLE_RE_SRC + ")\\s*[:：]\\s*[-+0-9]", "i");
+function _aiCnIsValueClause(rawClause) {
+  return _AI_CN_CLAUSE_VALUE_RE.test(rawClause) || _AI_CN_PARAM_COLON_NUM_RE.test(rawClause);
+}
 function _aiCnStripSafeTrailingNote(rawClause) {
   return rawClause.replace(/\s*[（(]([^）)]*)[）)]\s*$/, (full, inner) =>
-    (_AI_CN_CLAUSE_VALUE_RE.test(inner) ? full : "")).trim();
+    (_aiCnIsValueClause(inner) ? full : "")).trim();
+}
+function _aiCnClauseValueTargetParams(rawClause) {
+  const named = new Set();
+  for (const p of _AI_HEALABLE_PARAMS) {
+    if (new RegExp("(^|[^a-z0-9_])" + p + "(?=$|[^a-z0-9_])", "i").test(rawClause)) {
+      named.add(p.toLowerCase());
+    }
+  }
+  const assignRe = /\b([a-z][a-z0-9_]*)\s*=/gi;
+  let m;
+  while ((m = assignRe.exec(rawClause)) !== null) {
+    named.add(m[1].toLowerCase());
+  }
+  return named;
 }
 function _aiCnValueClauseVetoesParam(rawClauses, paramName) {
+  const target = paramName.toLowerCase();
   for (const rawClause of rawClauses) {
-    if (!_AI_CN_CLAUSE_VALUE_RE.test(rawClause)) continue;
-    const asciiTokens = rawClause.match(/[a-z][a-z0-9_]*/gi) || [];
-    if (!asciiTokens.length || asciiTokens.some((tok) => tok.toLowerCase() === paramName.toLowerCase())) {
-      return true;
-    }
+    if (_AI_CN_META_CLAUSE_RE.test(rawClause)) continue;
+    if (!_aiCnIsValueClause(rawClause)) continue;
+    const named = _aiCnClauseValueTargetParams(rawClause);
+    if (!named.size || named.has(target)) return true;
   }
   return false;
 }
 function _aiCnRefusedParam(rawMsg, targetParam) {
   if (!rawMsg) return null;
-  const rawClauses = rawMsg.split(/[，,。；;！!？?\n]+/).map((c) => c.trim()).filter(Boolean);
+  const rawClauses = rawMsg.split(/[，,。；;！!？?\n]+/)
+    .map((c) => c.trim())
+    .filter((c) => Boolean(c) && !_AI_CN_META_CLAUSE_RE.test(c));
   const clauses = rawClauses.map(_aiCnStripSafeTrailingNote).filter(Boolean);
   if (targetParam) {
     if (!_AI_HEALABLE_PARAMS.includes(targetParam)) return null;
     if (_aiCnValueClauseVetoesParam(rawClauses, targetParam)) return null;
     for (const clause of clauses) {
-      if (_AI_CN_CLAUSE_VALUE_RE.test(clause)) continue;
+      if (_aiCnIsValueClause(clause)) continue;
       if (!_AI_CN_FIELD_CLAUSE_RE.test(clause)) continue;
       const asciiTokens = clause.match(/[a-z][a-z0-9_]*/gi) || [];
       if (!asciiTokens.length || asciiTokens.some((tok) => tok.toLowerCase() === targetParam.toLowerCase())) {
@@ -277,7 +298,7 @@ function _aiCnRefusedParam(rawMsg, targetParam) {
     return null;
   }
   for (const clause of clauses) {
-    if (_AI_CN_CLAUSE_VALUE_RE.test(clause)) continue;
+    if (_aiCnIsValueClause(clause)) continue;
     if (!_AI_CN_FIELD_CLAUSE_RE.test(clause)) continue;
     let best = null, bestAt = Infinity;
     for (const p of _AI_HEALABLE_PARAMS) {

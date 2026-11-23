@@ -146,7 +146,7 @@ declare function persistSettings(
   data: Record<string, any>,
   opts?: { previewModelChanges?: Record<string, string>; previewModelReset?: boolean },
 ): Promise<{ ok: boolean; fellBackToLocal?: boolean; error?: Error }>;
-declare function syncSetLarge(key: string, value: any): Promise<any>;
+declare function syncSetLarge(key: string, value: any, opts?: { mergeBase?: unknown }): Promise<any>;
 declare function syncGetLarge<T = any>(key: string, defaultValue: T, opts?: { withBasis?: false }): Promise<T>;
 declare function syncGetLarge<T = any>(key: string, defaultValue: T, opts: { withBasis: true }): Promise<{ value: T; basis: unknown }>;
 declare function pbpAssertChunkedSyncReadComplete(key: string, value: unknown, explicitBasis?: unknown): Promise<void>;

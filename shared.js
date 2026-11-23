@@ -2312,6 +2312,7 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.optSyncEnabled) {
       _settingsStorageCache = null;
+      _pbpRecentPrimitiveReadBasis.clear();
       try {
         const v = changes.optSyncEnabled.newValue;
         if (typeof v === "boolean" && typeof localStorage !== "undefined") {
@@ -3152,9 +3153,7 @@ function pbpCloneLargeDefault(defaultValue) {
 }
 
 function pbpDecodeLargeResult(raw, defaultValue) {
-  if (raw === undefined || (raw === "" && typeof defaultValue !== "string")) {
-    return { ok: true, value: pbpCloneLargeDefault(defaultValue) };
-  }
+  if (raw === undefined) return { ok: true, value: pbpCloneLargeDefault(defaultValue) };
   if (typeof defaultValue === "string") {
     return typeof raw === "string"
       ? { ok: true, value: raw }
@@ -3178,6 +3177,13 @@ function pbpDecodeLargeResult(raw, defaultValue) {
       : { ok: false, value: pbpCloneLargeDefault(defaultValue) };
   }
   return { ok: true, value: raw };
+}
+
+function pbpDecodeUnchunkedLargeResult(raw, defaultValue) {
+  if (raw === "" && typeof defaultValue !== "string") {
+    return { ok: true, value: pbpCloneLargeDefault(defaultValue) };
+  }
+  return pbpDecodeLargeResult(raw, defaultValue);
 }
 
 function pbpDecodeLargeValue(raw, defaultValue) {
@@ -3226,7 +3232,8 @@ function pbpLargeFallbackFreshness(record, stored) {
 
 const _pbpLargeObjectBasis = new WeakMap();
 const _pbpChunkedSettingsBasis = new WeakMap();
-const _pbpRecentPrimitiveReadBasis = new Map();
+var _pbpRecentPrimitiveReadBasis = new Map();
+const _pbpPendingOrphanChunkKeys = new Map();
 
 function pbpRecordLargeReadBasis(key, value, basis, { recordPrimitive = false } = {}) {
   const entry = Object.assign({ key }, basis);
@@ -3236,7 +3243,10 @@ function pbpRecordLargeReadBasis(key, value, basis, { recordPrimitive = false } 
     const curSync = (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync) || null;
     const curLocal = (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) || null;
     const prevQueue = _pbpRecentPrimitiveReadBasis.get(key) || [];
-    const filtered = prevQueue.filter((item) => item.syncArea === curSync && item.localArea === curLocal);
+    const filtered = prevQueue.filter((item) =>
+      item.syncArea === curSync
+      && item.localArea === curLocal
+      && (entry.degraded === "routing_error" || item.area === entry.area));
     filtered.push(Object.assign({}, entry, { value, syncArea: curSync, localArea: curLocal }));
     while (filtered.length > 8) filtered.shift();
     _pbpRecentPrimitiveReadBasis.set(key, filtered);
@@ -3244,7 +3254,7 @@ function pbpRecordLargeReadBasis(key, value, basis, { recordPrimitive = false } 
   return entry;
 }
 
-function pbpLookupLargeReadBasis(key, value, explicitBasis) {
+function pbpLookupLargeReadBasis(key, value, explicitBasis, requiredArea = null) {
   if (explicitBasis) return explicitBasis;
   if (value && typeof value === "object") {
     const entry = _pbpLargeObjectBasis.get(value);
@@ -3255,7 +3265,10 @@ function pbpLookupLargeReadBasis(key, value, explicitBasis) {
   const curSync = (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync) || null;
   const curLocal = (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) || null;
   const idx = queue.findIndex((item) =>
-    item.syncArea === curSync && item.localArea === curLocal && Object.is(item.value, value));
+    item.syncArea === curSync
+    && item.localArea === curLocal
+    && Object.is(item.value, value)
+    && (!requiredArea || item.area === requiredArea || item.degraded === "routing_error"));
   if (idx === -1) return null;
   return queue.splice(idx, 1)[0];
 }
@@ -3412,7 +3425,7 @@ function pbpSplitSyncString(key, generation, str) {
 
 async function pbpReadChunkedSyncResult(key, stored, defaultValue) {
   if (stored === undefined || typeof stored === "string") {
-    return pbpDecodeLargeResult(stored, defaultValue); // missing or pre-chunk migration data
+    return pbpDecodeUnchunkedLargeResult(stored, defaultValue); // missing or pre-chunk migration data
   }
   const chunkKeys = pbpChunkStorageKeys(key, stored);
   // CLAUDE.md "吞异常必须留痕": both ok:false exits hand back the DEFAULT
@@ -3505,7 +3518,11 @@ function pbpIsEmptyChunkedValue(value) {
 }
 
 async function pbpAssertChunkedSyncReadCompleteWithBasis(key, value, explicitBasis) {
-  const matchedBasis = pbpLookupLargeReadBasis(key, value, explicitBasis);
+  const isPrimitiveImplicit = !explicitBasis && !(value && typeof value === "object");
+  let matchedBasis = isPrimitiveImplicit ? null : pbpLookupLargeReadBasis(key, value, explicitBasis);
+  if (isPrimitiveImplicit) {
+    matchedBasis = pbpLookupLargeReadBasis(key, value, null, "sync");
+  }
   if (matchedBasis && matchedBasis.degraded === "routing_error") {
     throw pbpChunksPropagatingError(key);
   }
@@ -3550,7 +3567,7 @@ async function pbpAssertChunkedSyncReadCompleteWithBasis(key, value, explicitBas
     throw error;
   }
   if (matchedBasis && matchedBasis.area === "sync" && !pbpSameChunkMeta(meta, matchedBasis.meta)) {
-    throw pbpChunksPropagatingError(key);
+    throw pbpConcurrentGenerationError(key);
   }
   if (fallbacks && Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey)) {
     const record = fallbacks[fallbackKey];
@@ -3574,11 +3591,7 @@ async function pbpAssertChunkedSyncReadCompleteWithBasis(key, value, explicitBas
     // strings pass; non-empty or truncated/corrupt legacy JSON strings refuse.
     if (meta === undefined || meta === null) return;
     if (typeof meta === "string") {
-      if (typeof value === "string") {
-        if (meta === "") return;
-        throw pbpChunksPropagatingError(key);
-      }
-      const legacyDecoded = pbpDecodeLargeResult(meta, emptyDefault);
+      const legacyDecoded = pbpDecodeUnchunkedLargeResult(meta, emptyDefault);
       if (legacyDecoded.ok && pbpIsEmptyChunkedValue(legacyDecoded.value)) return;
       throw pbpChunksPropagatingError(key);
     }
@@ -3647,7 +3660,7 @@ async function pbpResolveChunkedSettings(settings, storage, query) {
   const perKeyBasis = new Map();
   if (storage === chrome.storage.local) {
     requested.forEach((key) => {
-      const decoded = pbpDecodeLargeResult(out[key], SETTINGS_DEFAULTS[key]);
+      const decoded = pbpDecodeUnchunkedLargeResult(out[key], SETTINGS_DEFAULTS[key]);
       out[key] = decoded.value;
       perKeyBasis.set(key, pbpRecordLargeReadBasis(key, decoded.value, {
         degraded: null,
@@ -3716,6 +3729,17 @@ function pbpSyncWriteFailureKind(error) {
   return "other";
 }
 
+async function pbpFlushPendingOrphanChunksUnlocked(key) {
+  const pending = _pbpPendingOrphanChunkKeys.get(key);
+  if (!pending || !pending.size) return;
+  try {
+    await chrome.storage.sync.remove([...pending]);
+    _pbpPendingOrphanChunkKeys.delete(key);
+  } catch (error) {
+    console.warn("[sync-large] deferred orphan chunk cleanup failed:", key, error?.name, error?.message);
+  }
+}
+
 async function pbpSyncSetLargeUnlocked(key, value, opts) {
   const storage = await getSettingsStorage();
   const hasMergeBase = Boolean(opts && typeof opts === "object" && Object.prototype.hasOwnProperty.call(opts, "mergeBase"));
@@ -3772,6 +3796,7 @@ async function pbpSyncSetLargeUnlocked(key, value, opts) {
   const chunkData = {};
   chunks.forEach((chunk, i) => { chunkData[`${key}_${generation}_${i}`] = chunk; });
   const newChunkKeys = Object.keys(chunkData);
+  await pbpFlushPendingOrphanChunksUnlocked(key);
   try {
     await chrome.storage.sync.set(chunkData);
     if (verifiedBasis) {
@@ -3789,6 +3814,12 @@ async function pbpSyncSetLargeUnlocked(key, value, opts) {
     });
   } catch (e) {
     await chrome.storage.sync.remove(newChunkKeys).catch((err) => {
+      let pending = _pbpPendingOrphanChunkKeys.get(key);
+      if (!pending) {
+        pending = new Set();
+        _pbpPendingOrphanChunkKeys.set(key, pending);
+      }
+      newChunkKeys.forEach((ck) => pending.add(ck));
       console.warn("[sync-large] partial chunk rollback failed:", key, err?.name, err?.message);
     });
     // CLAUDE.md "吞异常必须留痕": everything below folds the platform's own
@@ -3824,8 +3855,8 @@ async function pbpSyncSetLargeUnlocked(key, value, opts) {
   }
 }
 
-function syncSetLarge(key, value) {
-  return pbpWithLargeStorageLock(key, () => pbpSyncSetLargeUnlocked(key, value));
+function syncSetLarge(key, value, opts) {
+  return pbpWithLargeStorageLock(key, () => pbpSyncSetLargeUnlocked(key, value, opts));
 }
 
 async function pbpSyncGetLargeUnlocked(key, defaultValue, opts) {
@@ -3834,7 +3865,7 @@ async function pbpSyncGetLargeUnlocked(key, defaultValue, opts) {
   const routingDegraded = _lastSettingsRoutingDegraded;
   if (storage === chrome.storage.local) {
     const data = await chrome.storage.local.get({ [key]: defaultValue });
-    const decoded = pbpDecodeLargeResult(data[key], defaultValue);
+    const decoded = pbpDecodeUnchunkedLargeResult(data[key], defaultValue);
     const basis = pbpRecordLargeReadBasis(key, decoded.value, {
       degraded: routingDegraded ? "routing_error" : null,
       area: "local",

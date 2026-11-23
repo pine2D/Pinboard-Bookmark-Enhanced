@@ -186,17 +186,18 @@ async function bootDriveWorker({
         },
         beforeBackground(w, m) {
           const origImport = w.importScripts;
+          const gatedAdd = m.chrome.runtime.onMessage.addListener.bind(m.chrome.runtime.onMessage);
           let preQueued = false;
           w.importScripts = (...args) => {
             if (!preQueued) {
               preQueued = true;
-              // Simulate a queueMicrotask scheduled in background.js BEFORE importScripts executes!
+              // Simulate BOTH a queueMicrotask AND a native async/await IIFE scheduled in background.js BEFORE importScripts!
               w.queueMicrotask(() => { preImportMicrotaskRanAfterBoot = true; });
+              new w.Function("add", "(async () => { await 0; add(handleRuntimeMessage); })();")(gatedAdd);
             }
             return origImport(...args);
           };
-          const realAdd = m.chrome.runtime.onMessage.addListener.bind(m.chrome.runtime.onMessage);
-          m.chrome.runtime.onMessage.addListener = (fn) => { w.queueMicrotask(() => realAdd(fn)); };
+          m.chrome.runtime.onMessage.addListener = () => {};
         },
         afterBootSync(w, m) {
           preImportMicrotaskRanBeforeSyncSample = preImportMicrotaskRanAfterBoot;
