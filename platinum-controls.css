@@ -40,7 +40,8 @@ html[data-theme="platinum-light"] {
   --pt-shadow-drop: #262626;
   --pt-glint: #ffffff;
   --pt-glint-soft: rgba(255, 255, 255, 0.65);
-  --pt-trough-off: #bcbcbc;
+  --pt-sunken-lo: #808080;
+  --pt-sunken-hi: #f4f4f4;
   --pt-bevel-d1: #777777;
   --pt-bevel-d2: #aaaaaa;
   --pt-bevel-mid: #8e8e8e;
@@ -110,7 +111,8 @@ html[data-theme="platinum-dark"] {
   --pt-shadow-drop: #050505;
   --pt-glint: #666666;
   --pt-glint-soft: rgba(255, 255, 255, 0.14);
-  --pt-trough-off: #1a1a1a;
+  --pt-sunken-lo: #0a0a0a;
+  --pt-sunken-hi: #444444;
   --pt-bevel-d1: #141414;
   --pt-bevel-d2: #262626;
   --pt-bevel-mid: #181818;
@@ -175,7 +177,8 @@ html[data-reader-theme="platinum"] {
   --pt-shadow-drop: light-dark(#262626, #050505);
   --pt-glint: light-dark(#ffffff, #666666);
   --pt-glint-soft: light-dark(rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.14));
-  --pt-trough-off: light-dark(#bcbcbc, #1a1a1a);
+  --pt-sunken-lo: light-dark(#808080, #0a0a0a);
+  --pt-sunken-hi: light-dark(#f4f4f4, #444444);
   --pt-bevel-d1: light-dark(#777777, #141414);
   --pt-bevel-d2: light-dark(#aaaaaa, #262626);
   --pt-bevel-mid: light-dark(#8e8e8e, #181818);
@@ -270,6 +273,7 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"], [data-reade
   --pt-group-shadow: inset 1px 1px 0 var(--pt-group-glint), 1px 1px 0 var(--pt-group-glint);
   --pt-well-shadow: inset 1px 1px 0 var(--pt-bevel-mid), 1px 1px 0 var(--pt-glint);
   --pt-sunken-shadow: inset 1px 1px 0 var(--pt-bevel-mid), inset -1px -1px 0 var(--pt-paper-alt);
+  --pt-bevel-sunken: inset 1px 1px 0 var(--pt-sunken-lo), inset -1px -1px 0 var(--pt-sunken-hi);
   --pt-window-shadow: inset 1px 1px 0 var(--pt-glint), inset -1px -1px 0 var(--pt-bevel-mid), 2px 2px 0 var(--pt-shadow-drop);
   /* Centered 12px 6-ridge (1px-offset) pinstripes sampled from native Mac OS 9.0 */
   --pt-pinstripe-hi-layer: repeating-linear-gradient(to bottom, var(--pt-stripe-hi) 0 1px, transparent 1px 2px);
@@ -1882,83 +1886,84 @@ html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   box-shadow: var(--pt-btn-shadow);
 }
 
-/* Rectangular 28x16 Sunken Trough + Flush 14x14 Mechanical Slider Switch:
-   1px outer frame + 14px flush slider (1 + 14 + 1 = 16px) eliminates double-border
-   moiré and 1px top/bottom slit asymmetry, while --pt-trough-off keeps the off
-   trough darker/recessed behind the raised Platinum slider thumb. */
+/* Square 28x16 Recessed Bevel Switch (1:1 platinum-ui .pt-switch parity):
+   1px framed sunken trough (--pt-win off / --pt-pressed-bg on + --pt-bevel-sunken)
+   with a 12x12 4-sided framed raised square thumb inset 1px inside all edges. */
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch-track {
+  box-sizing: border-box;
+  width: 28px;
+  height: 16px;
   border-radius: 0;
-  border: 1px solid var(--pt-edge);
-  background: var(--pt-trough-off);
-  box-shadow: inset 1px 1px 0 var(--pt-bevel-d1), inset -1px -1px 0 var(--pt-glint-soft);
+  border: 1px solid var(--pt-frame);
+  background: var(--pt-win);
+  box-shadow: var(--pt-bevel-sunken);
   transition: none;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch-track::before {
   box-sizing: border-box;
-  top: 0;
-  left: 0;
-  width: 14px;
-  height: 14px;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
   border-radius: 0;
   background: var(--pt-face);
-  border: 0;
-  border-right: 1px solid var(--pt-edge);
+  border: 1px solid var(--pt-frame);
   box-shadow: var(--pt-mini-bevel);
   transition: none;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .switch:hover > input:enabled ~ .switch-track::before {
+  .switch:hover > input:enabled:not([aria-disabled="true"]) ~ .switch-track::before {
   background: var(--pt-face-hover);
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked:not(:disabled) ~ .switch-track {
-  background: var(--pt-sel-bg);
-  border-color: var(--pt-edge);
-  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.35);
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .switch > input:checked:not(:disabled, [aria-disabled="true"]) ~ .switch-track {
+  background: var(--pt-pressed-bg);
+  border-color: var(--pt-frame);
+  box-shadow: var(--pt-bevel-sunken);
 }
 
-html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked ~ .switch-track::before {
-  border-right: 0;
-  border-left: 1px solid var(--pt-edge);
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .switch > input:checked ~ .switch-track::before {
   transform: translateX(12px);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
   .switch > input:focus-visible ~ .switch-track {
   outline: 2px solid var(--pt-focus);
-  outline-offset: 1px;
-  box-shadow: inset 1px 1px 0 var(--pt-bevel-d1), inset -1px -1px 0 var(--pt-glint-soft);
+  outline-offset: 2px;
+  box-shadow: var(--pt-bevel-sunken);
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .switch > input:checked:focus-visible ~ .switch-track {
-  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.35);
-}
-
+  .switch:has(> input:is(:disabled, [aria-disabled="true"])),
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .switch:has(> input:disabled) {
+  .switch > input[type="checkbox"]:is(:disabled, [aria-disabled="true"]) {
   cursor: not-allowed;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .switch > input:disabled ~ .switch-track {
+  .switch > input:is(:disabled, [aria-disabled="true"]) ~ .switch-track,
+html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
+  .switch > input:checked:is(:disabled, [aria-disabled="true"]) ~ .switch-track {
   opacity: 1;
   background: var(--pt-win);
   border-color: var(--pt-border-subtle);
   box-shadow: none;
+  cursor: not-allowed;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .switch > input:disabled ~ .switch-track::before {
+  .switch > input:is(:disabled, [aria-disabled="true"]) ~ .switch-track::before {
   background: var(--pt-win);
   border-color: var(--pt-border-subtle);
   box-shadow: none;
 }
 
 html:is([data-theme="platinum-light"], [data-theme="platinum-dark"])
-  .switch > input:disabled ~ .switch-text {
+  .switch > input:is(:disabled, [aria-disabled="true"]) ~ .switch-text {
   opacity: 1;
   color: var(--pt-ink-muted);
 }

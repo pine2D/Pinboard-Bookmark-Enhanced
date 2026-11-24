@@ -6118,6 +6118,47 @@ for (const boot of [runPopupEarly, runOptionsEarly]) {
     ptReaderTbl.get("border-radius") === "0" && ptAskTbl.get("border-radius") === "0" && ptLibAskTbl.get("border-radius") === "0" &&
     ptReaderCells.get("padding") === "6px 10px" && ptLibAskCells.get("padding") === "6px 10px",
     "platinum-controls.css: .pbv-play must be a 3px beveled button, #rendered-view pre must be a 0px sunken well with opaque .pb-copy-code, and Reader/Library tables must be 0px framed grids with 6px 10px cell padding");
+
+  const ptSwitchTrack = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch-track');
+  const ptSwitchThumb = declarationValueMap(ptControlsCss, 'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch-track::before');
+  const ptSwitchCheckedTrack = declarationValueMap(
+    ptControlsCss,
+    'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked:not(:disabled, [aria-disabled="true"]) ~ .switch-track',
+  );
+  const ptSwitchCheckedThumb = declarationValueMap(
+    ptControlsCss,
+    'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:checked ~ .switch-track::before',
+  );
+  const ptSwitchFocusTrack = declarationValueMap(
+    ptControlsCss,
+    'html:is([data-theme="platinum-light"], [data-theme="platinum-dark"]) .switch > input:focus-visible ~ .switch-track',
+  );
+  check(
+    ptSwitchTrack.get("box-sizing") === "border-box" &&
+    ptSwitchTrack.get("width") === "28px" &&
+    ptSwitchTrack.get("height") === "16px" &&
+    ptSwitchTrack.get("border-radius") === "0" &&
+    ptSwitchTrack.get("border") === "1px solid var(--pt-frame)" &&
+    ptSwitchTrack.get("background") === "var(--pt-win)" &&
+    ptSwitchTrack.get("box-shadow") === "var(--pt-bevel-sunken)" &&
+    ptSwitchThumb.get("box-sizing") === "border-box" &&
+    ptSwitchThumb.get("top") === "1px" &&
+    ptSwitchThumb.get("left") === "1px" &&
+    ptSwitchThumb.get("width") === "12px" &&
+    ptSwitchThumb.get("height") === "12px" &&
+    ptSwitchThumb.get("border-radius") === "0" &&
+    ptSwitchThumb.get("background") === "var(--pt-face)" &&
+    ptSwitchThumb.get("border") === "1px solid var(--pt-frame)" &&
+    ptSwitchThumb.get("box-shadow") === "var(--pt-mini-bevel)" &&
+    ptSwitchCheckedTrack.get("background") === "var(--pt-pressed-bg)" &&
+    ptSwitchCheckedTrack.get("box-shadow") === "var(--pt-bevel-sunken)" &&
+    ptSwitchCheckedThumb.get("transform") === "translateX(12px)" &&
+    !ptSwitchCheckedThumb.has("border-left") &&
+    !ptSwitchCheckedThumb.has("border-right") &&
+    ptSwitchFocusTrack.get("outline") === "2px solid var(--pt-focus)" &&
+    ptSwitchFocusTrack.get("outline-offset") === "2px" &&
+    ptSwitchFocusTrack.get("box-shadow") === "var(--pt-bevel-sunken)",
+    "platinum-controls.css: .switch must match platinum-ui .pt-switch 1:1 (28x16 sunken trough with --pt-win/--pt-pressed-bg + --pt-bevel-sunken and 12x12 4-sided framed thumb inset 1px)");
 }
 
 // --- popup-theme-early.js: mirror "1" picks sync directly, zero local.get calls ---

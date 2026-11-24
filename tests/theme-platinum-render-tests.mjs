@@ -651,6 +651,12 @@ try {
           <label class="tag-gov-chip"><input type="radio" id="pt-tg-dis-chk" checked disabled><span class="tag-gov-chip-face"><span>tag-a</span></span></label>
           <label class="tag-gov-chip"><input type="radio" id="pt-tg-dis-unc" disabled><span class="tag-gov-chip-face"><span>tag-b</span></span></label>
         </div>
+        <div id="pt-switch-strip" style="display:flex;gap:18px;align-items:center;padding:8px 12px;background:var(--pt-paper);">
+          <label class="switch" style="gap:8px"><input type="checkbox" role="switch" id="pt-sw-off"><span class="switch-text">Off</span><span class="switch-track" id="pt-sw-off-tr"></span></label>
+          <label class="switch" style="gap:8px"><input type="checkbox" role="switch" id="pt-sw-on" checked><span class="switch-text">On</span><span class="switch-track" id="pt-sw-on-tr"></span></label>
+          <label class="switch" style="gap:8px"><input type="checkbox" role="switch" id="pt-sw-dis-off" disabled><span class="switch-text">Dis Off</span><span class="switch-track" id="pt-sw-dis-off-tr"></span></label>
+          <label class="switch" style="gap:8px"><input type="checkbox" role="switch" id="pt-sw-dis-on" checked disabled><span class="switch-text">Dis On</span><span class="switch-track" id="pt-sw-dis-on-tr"></span></label>
+        </div>
       `;
       document.querySelector(".panel.active").appendChild(host);
       document.getElementById("pt-pick-ind-dis").indeterminate = true;
@@ -666,6 +672,19 @@ try {
       const queuedRowCs = getComputedStyle(document.getElementById("pt-queued-row"));
       const tgChkFaceCs = getComputedStyle(document.querySelector("#pt-tg-dis-chk + .tag-gov-chip-face"));
       const tgUncFaceCs = getComputedStyle(document.querySelector("#pt-tg-dis-unc + .tag-gov-chip-face"));
+      const swOffTr = document.getElementById("pt-sw-off-tr");
+      const swOnTr = document.getElementById("pt-sw-on-tr");
+      const swDisOffTr = document.getElementById("pt-sw-dis-off-tr");
+      const swDisOnTr = document.getElementById("pt-sw-dis-on-tr");
+      const swOffRect = swOffTr.getBoundingClientRect();
+      const swOffCs = getComputedStyle(swOffTr);
+      const swOffTh = getComputedStyle(swOffTr, "::before");
+      const swOnCs = getComputedStyle(swOnTr);
+      const swOnTh = getComputedStyle(swOnTr, "::before");
+      const swDisOffCs = getComputedStyle(swDisOffTr);
+      const swDisOffTh = getComputedStyle(swDisOffTr, "::before");
+      const swDisOnCs = getComputedStyle(swDisOnTr);
+      const swDisOnTh = getComputedStyle(swDisOnTr, "::before");
 
       const chkCs = getComputedStyle(chkMark);
       const indCs = getComputedStyle(indMark);
@@ -687,15 +706,69 @@ try {
         queuedOp: queuedRowCs.opacity,
         tgChkBg: tgChkFaceCs.backgroundColor, tgChkFg: tgChkFaceCs.color, tgChkShadow: tgChkFaceCs.boxShadow,
         tgUncBg: tgUncFaceCs.backgroundColor, tgUncFg: tgUncFaceCs.color, tgUncShadow: tgUncFaceCs.boxShadow,
+        swGeom: {
+          w: Math.round(swOffRect.width),
+          h: Math.round(swOffRect.height),
+          radius: swOffCs.borderTopLeftRadius,
+          trBorders: [swOffCs.borderTopWidth, swOffCs.borderRightWidth, swOffCs.borderBottomWidth, swOffCs.borderLeftWidth],
+          thW: swOffTh.width,
+          thH: swOffTh.height,
+          thTop: swOffTh.top,
+          thLeft: swOffTh.left,
+          thBorders: [swOffTh.borderTopWidth, swOffTh.borderRightWidth, swOffTh.borderBottomWidth, swOffTh.borderLeftWidth],
+          offBg: swOffCs.backgroundColor,
+          offShadow: swOffCs.boxShadow,
+          offThBg: swOffTh.backgroundColor,
+          offThShadow: swOffTh.boxShadow,
+          offThTf: swOffTh.transform,
+          onBg: swOnCs.backgroundColor,
+          onShadow: swOnCs.boxShadow,
+          onThBg: swOnTh.backgroundColor,
+          onThBorders: [swOnTh.borderTopWidth, swOnTh.borderRightWidth, swOnTh.borderBottomWidth, swOnTh.borderLeftWidth],
+          onThTf: swOnTh.transform,
+          disOffBg: swDisOffCs.backgroundColor,
+          disOffShadow: swDisOffCs.boxShadow,
+          disOffThBg: swDisOffTh.backgroundColor,
+          disOffThShadow: swDisOffTh.boxShadow,
+          disOnBg: swDisOnCs.backgroundColor,
+          disOnShadow: swDisOnCs.boxShadow,
+          disOnThTf: swDisOnTh.transform,
+        },
       };
     });
     const nativeArrowSym = await measureRightCapClearance(page.locator("#pt-native-sel"), 19, 2);
     const listboxArrowSym = await measureRightCapClearance(page.locator("#pt-lb-btn"), 19, 2);
+    const swOffPng = await page.locator("#pt-sw-off-tr").screenshot();
+    const swOnPng = await page.locator("#pt-sw-on-tr").screenshot();
+    const swDisOffPng = await page.locator("#pt-sw-dis-off-tr").screenshot();
+    const swDisOnPng = await page.locator("#pt-sw-dis-on-tr").screenshot();
+    if (SHOTS_DIR) {
+      await page.locator("#pt-switch-strip").screenshot({ path: resolve(SHOTS_DIR, `switch-states-${mode}.png`) });
+    }
     await page.evaluate(() => document.getElementById("pt-opt-audit")?.remove());
     record(
       nativeArrowSym.leftClear === 8 && nativeArrowSym.arrowW === 14 && nativeArrowSym.rightClear === 8 &&
       listboxArrowSym.leftClear === 8 && listboxArrowSym.arrowW === 14 && listboxArrowSym.rightClear === 8,
       `options/${mode}: 2x DPR arrow cap symmetry expected 8/14/8, got native=${JSON.stringify(nativeArrowSym)} listbox=${JSON.stringify(listboxArrowSym)}`,
+    );
+    const swg = optControlsAudit.swGeom;
+    record(
+      swg.w === 28 && swg.h === 16 && swg.radius === "0px" &&
+      swg.trBorders.every((b) => b === "1px") &&
+      swg.thW === "12px" && swg.thH === "12px" && swg.thTop === "1px" && swg.thLeft === "1px" &&
+      swg.thBorders.every((b) => b === "1px") &&
+      swg.onThBorders.every((b) => b === "1px") &&
+      swg.offBg === wantDisSurfaceBg && swg.offShadow !== "none" &&
+      swg.offThBg === wantDisFieldBg && swg.offThShadow !== "none" && swg.offThTf === "none" &&
+      swg.onBg === wantPressedBg && swg.onShadow === swg.offShadow &&
+      swg.onThBg === wantDisFieldBg && swg.onThTf === "matrix(1, 0, 0, 1, 12, 0)" &&
+      swg.disOffBg === wantDisSurfaceBg && swg.disOffShadow === "none" &&
+      swg.disOffThBg === wantDisSurfaceBg && swg.disOffThShadow === "none" &&
+      swg.disOnBg === wantDisSurfaceBg && swg.disOnShadow === "none" &&
+      swg.disOnThTf === "matrix(1, 0, 0, 1, 12, 0)" &&
+      Buffer.compare(swOffPng, swOnPng) !== 0 &&
+      Buffer.compare(swDisOffPng, swDisOnPng) !== 0,
+      `options/${mode}: .switch 1:1 platinum-ui geometry/palette failed: ${JSON.stringify(swg)}`,
     );
     record(
       optControlsAudit.chkOp === "1" && optControlsAudit.chkBg === wantDisSurfaceBg && optControlsAudit.chkShadow === "none" &&
