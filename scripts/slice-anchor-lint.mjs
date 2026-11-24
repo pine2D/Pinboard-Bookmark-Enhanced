@@ -455,7 +455,11 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
       case 'ChainExpression': return T(node.expression);
       case 'ParenthesizedExpression': return T(node.expression);
       case 'SequenceExpression': return T(node.expressions[node.expressions.length - 1]);
-      case 'AssignmentExpression': return T(node.right);
+      case 'AssignmentExpression':
+        if (node.operator === '=') return T(node.right);
+        if (node.operator === '+=') return union(flat(T(node.left)), flat(T(node.right)));
+        if (node.operator === '||=' || node.operator === '??=' || node.operator === '&&=') return union(T(node.left), T(node.right));
+        return null;
       case 'ConditionalExpression': return union(T(node.consequent), T(node.alternate));
       case 'LogicalExpression': return union(T(node.left), T(node.right));
       case 'TemplateLiteral': return node.expressions.reduce((a, e) => union(a, flat(T(e)) && src(flat(T(e)).targets)), null);

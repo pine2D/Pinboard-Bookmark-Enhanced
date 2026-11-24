@@ -5,77 +5,36 @@
 // are read back with ai-cache.js's own functions, the ones the popup and the
 // worker call.
 
-let _pbpFixturePopupAiRealmPromise = null;
-let _pbpFixturePopupAiQueue = Promise.resolve();
-
-function _pbpGetPopupSummaryRealm() {
-  return (_pbpFixturePopupAiRealmPromise ||= pbpSwRealm.loadRealmScripts([
+async function pbpFixturePopupSummary({ service = "pinboard", account, url, notes, existingBookmark = null }) {
+  const realm = await pbpSwRealm.loadRealmScripts([
     "shared.js",
     "ai-cache.js",
     "popup-ai.js",
-  ]));
-}
-
-function _pbpRunSerializedPopupSummary(fn) {
-  const op = _pbpFixturePopupAiQueue.then(fn);
-  _pbpFixturePopupAiQueue = op.catch(() => {});
-  return op;
-}
-
-async function pbpFixturePopupSummary({ service = "pinboard", account, url, notes, existingBookmark = null }) {
-  const realm = await _pbpGetPopupSummaryRealm();
+  ]);
   const fields = {
     "description-input": { value: notes },
     "url-input": { value: url },
     "linkding-description-input": { value: "" },
   };
   const shown = [];
-  const session = { range: null, value: "", checked: null };
-
-  const applyContext = () => {
-    realm.win.$id = (id) => fields[id] || null;
-    realm.win.pbpPopupAiAccountIsCurrent = (candidate) => candidate === account;
-    realm.win.pageInfo = { url };
-    realm.win.existingBookmark = existingBookmark;
-    realm.win.showSummaryActions = (fromCache) => shown.push(fromCache);
-    realm.win.settings = { bookmarkService: service };
-    realm.win.updateCharCount = () => {};
-    realm.win.autoResizeTextarea = () => {};
-    realm.set("_aiSummaryRange", session.range);
-    realm.set("_aiSummaryValue", session.value);
-    realm.set("_aiSummaryOwnershipChecked", session.checked);
-  };
-
-  const captureSession = () => {
-    session.range = realm.get("_aiSummaryRange");
-    session.value = realm.get("_aiSummaryValue");
-    session.checked = realm.get("_aiSummaryOwnershipChecked");
-  };
-
-  const runSync = (fn) => {
-    applyContext();
-    try {
-      return fn();
-    } finally {
-      captureSession();
-    }
-  };
+  realm.win.$id = (id) => fields[id] || null;
+  realm.win.pbpPopupAiAccountIsCurrent = (candidate) => candidate === account;
+  realm.win.pageInfo = { url };
+  realm.win.existingBookmark = existingBookmark;
+  realm.win.showSummaryActions = (fromCache) => shown.push(fromCache);
+  realm.win.settings = { bookmarkService: service };
+  realm.win.updateCharCount = () => {};
+  realm.win.autoResizeTextarea = () => {};
+  realm.win.pbpAiGetSummaryOwnership = (...args) => pbpAiGetSummaryOwnership(...args);
 
   return {
     field: fields["description-input"],
     shown,
-    restore: () => _pbpRunSerializedPopupSummary(async () => {
-      applyContext();
-      try {
-        return await realm.win._aiRestoreSummaryOwnership(account, url, null);
-      } finally {
-        captureSession();
-      }
-    }),
-    regenerate: (summary) => runSync(() => realm.win.upsertSummary(summary)),
-    remove: () => runSync(() => realm.win.removeSummary()),
+    restore: () => realm.win._aiRestoreSummaryOwnership(account, url, null),
+    regenerate: (summary) => realm.win.upsertSummary(summary),
+    remove: () => realm.win.removeSummary(),
     // What this popup's save would hand the worker for the notes on screen.
-    snapshot: () => runSync(() => realm.win.pbpAiSummaryOwnershipSnapshot(fields["description-input"].value)),
+    snapshot: () => realm.win.pbpAiSummaryOwnershipSnapshot(fields["description-input"].value),
   };
 }
 

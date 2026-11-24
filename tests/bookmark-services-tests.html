@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="186"><title>Bookmark Services Tests</title></head><body>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="187"><title>Bookmark Services Tests</title></head><body>
 <h1>Bookmark services</h1><div id="results"></div><div id="summary"></div>
 <script src="../shared.js"></script><script src="../bookmark-services.js"></script>
 <script src="../options-backup.js"></script>
@@ -403,60 +403,61 @@ test("linkding reconnect reuses the connection ID only for the same URL and toke
 });
 
 // Exercise the real worker save/replay pipeline with raw server fixtures.
-let _sharedWorkerRealmPromise = null;
+const _idleWorkerRealms = [];
+async function createWorkerRealmSlot() {
+  const sw = await pbpSwRealm.boot();
+  sw.win.console.warn = (...args) => console.warn(...args);
+  sw.win.console.error = (...args) => console.error(...args);
+  sw.win.Date.now = () => Date.now();
+  const real = {
+    submitSaveIntent: sw.win.submitSaveIntent,
+    submitPopupSaveIntent: sw.win.submitPopupSaveIntent,
+    sendOfflineItem: sw.win.sendOfflineItem,
+    fetchExistingBookmark: sw.win.fetchExistingBookmark,
+    pbpCheckOverlongTitle: sw.win.pbpCheckOverlongTitle,
+    pbpVerifyBookmarkConnection: sw.win.pbpVerifyBookmarkConnection,
+    processOfflineQueue: sw.win.processOfflineQueue,
+    retryOfflineItem: sw.win.retryOfflineItem,
+    pbpOfflinePauseOnCredentialChange: sw.win.pbpOfflinePauseOnCredentialChange,
+    pbpReadOfflineQueuePause: sw.win.pbpReadOfflineQueuePause,
+    pbpBookmarkClient: sw.win.pbpBookmarkClient,
+    mutateOfflineQueue: sw.win.mutateOfflineQueue,
+    pbpReadTagVocab: sw.win.pbpReadTagVocab,
+    pbpLoadTagVocab: sw.win.pbpLoadTagVocab,
+    saveFromBackground: sw.win.saveFromBackground,
+    handleBatchSave: sw.win.handleBatchSave,
+    pbpStatusCacheFormPosts: sw.win.pbpStatusCacheFormPosts,
+  };
+  return { sw, real };
+}
 async function getSharedWorkerRealm() {
-  if (_sharedWorkerRealmPromise) return _sharedWorkerRealmPromise;
-  _sharedWorkerRealmPromise = (async () => {
-    const sw = await pbpSwRealm.boot();
-    sw.win.console.warn = (...args) => console.warn(...args);
-    sw.win.console.error = (...args) => console.error(...args);
-    sw.win.Date.now = () => Date.now();
-    const real = {
-      submitSaveIntent: sw.win.submitSaveIntent,
-      submitPopupSaveIntent: sw.win.submitPopupSaveIntent,
-      sendOfflineItem: sw.win.sendOfflineItem,
-      fetchExistingBookmark: sw.win.fetchExistingBookmark,
-      pbpCheckOverlongTitle: sw.win.pbpCheckOverlongTitle,
-      pbpVerifyBookmarkConnection: sw.win.pbpVerifyBookmarkConnection,
-      processOfflineQueue: sw.win.processOfflineQueue,
-      retryOfflineItem: sw.win.retryOfflineItem,
-      pbpOfflinePauseOnCredentialChange: sw.win.pbpOfflinePauseOnCredentialChange,
-      pbpReadOfflineQueuePause: sw.win.pbpReadOfflineQueuePause,
-      pbpBookmarkClient: sw.win.pbpBookmarkClient,
-      mutateOfflineQueue: sw.win.mutateOfflineQueue,
-      pbpReadTagVocab: sw.win.pbpReadTagVocab,
-      pbpLoadTagVocab: sw.win.pbpLoadTagVocab,
-      saveFromBackground: sw.win.saveFromBackground,
-      handleBatchSave: sw.win.handleBatchSave,
-      pbpStatusCacheFormPosts: sw.win.pbpStatusCacheFormPosts,
-    };
-    return { sw, real };
-  })();
-  return _sharedWorkerRealmPromise;
+  if (!_idleWorkerRealms.length) _idleWorkerRealms.push(await createWorkerRealmSlot());
+  return _idleWorkerRealms[0];
 }
 
 async function workerHarness(service, replies, options = {}) {
-  const { sw, real } = await getSharedWorkerRealm();
+  if (!_idleWorkerRealms.length) _idleWorkerRealms.push(await createWorkerRealmSlot());
+  const baseMock = _idleWorkerRealms[0].sw.mock.chrome;
   const settings = {...SETTINGS_DEFAULTS, bookmarkService:service, pinboardToken:"", offlineQueueEnabled:true,
     [service + "Url"]:"https://bookmarks.example/base/", [service + "Token"]:JSON.stringify({v:1,baseUrl:"https://bookmarks.example/base/",token:"fixture-secret",connectionId:"connection1",userId:"user1"})};
   const state = {settings, epoch:0, permitted:true, calls:[], queue:[], local:{}, sends:0, cache:new Map(), sideEffects:[], notifications:[], ...options};
   const auth = async () => ({...pbpBookmarkConnection(settings), epoch:state.epoch});
   const harnessChrome = {
-    ...sw.mock.chrome,
+    ...baseMock,
     permissions:{
-      ...sw.mock.chrome.permissions,
+      ...baseMock.permissions,
       contains:async()=>state.permitted,
     },
     tabs:{
-      ...sw.mock.chrome.tabs,
+      ...baseMock.tabs,
       query:async()=>state.tabs||[],
     },
     runtime:{
-      ...sw.mock.chrome.runtime,
+      ...baseMock.runtime,
       sendMessage:async(...args)=>{(state.messages||=[]).push(args);if(state.sendMessageHang)return new Promise(()=>{});if(state.sendMessageError)throw state.sendMessageError;},
     },
     storage:{
-      ...sw.mock.chrome.storage,
+      ...baseMock.storage,
       local:{
         // Generic key-value store; offlineQueue stays mirrored in state.queue.
         get:async keys=>{(state.reads||=[]).push(...(typeof keys==="string"||Array.isArray(keys)?[].concat(keys):keys==null?["<all>"]:Object.keys(keys)));
@@ -469,7 +470,13 @@ async function workerHarness(service, replies, options = {}) {
     },
   };
 
-  const installWorkerEnv = () => {
+  let leased = null;
+  let activeOps = 0;
+  let batchRunning = false;
+  let activeProducerApply = null;
+
+  const installWorkerEnv = (slot) => {
+    const { sw, real } = slot;
     sw.win.t = key => key;
     sw.win.loadSettings = async () => ({ ...settings });
     sw.win.getCurrentBookmarkAuth = auth;
@@ -502,30 +509,78 @@ async function workerHarness(service, replies, options = {}) {
     sw.win.processOfflineQueue = real.processOfflineQueue;
   };
 
-  const runInWorker = (fn) => {
-    installWorkerEnv();
-    return fn();
+  const withHarnessSlot = (fn, producerApply = null) => {
+    const finishOp = (slot) => {
+      activeOps--;
+      if (activeOps === 0) {
+        batchRunning = Boolean(slot.sw.get("_batchRunning"));
+        activeProducerApply = null;
+        leased = null;
+        _idleWorkerRealms.push(slot);
+      } else if (!producerApply && activeProducerApply) {
+        activeProducerApply(slot);
+      }
+    };
+    const enterWithSlot = (slot, freshLease) => {
+      if (freshLease) {
+        leased = slot;
+        installWorkerEnv(slot);
+        slot.sw.set("_batchRunning", batchRunning);
+      }
+      if (producerApply) {
+        activeProducerApply = producerApply;
+        producerApply(slot);
+      } else {
+        installWorkerEnv(slot);
+      }
+      let out;
+      try {
+        out = fn(slot);
+      } catch (err) {
+        finishOp(slot);
+        throw err;
+      }
+      return Promise.resolve(out).finally(() => finishOp(slot));
+    };
+    if (activeOps > 0 && leased) {
+      activeOps++;
+      return enterWithSlot(leased, false);
+    }
+    activeOps++;
+    if (_idleWorkerRealms.length) {
+      return enterWithSlot(_idleWorkerRealms.pop(), true);
+    }
+    return createWorkerRealmSlot().then(
+      (slot) => enterWithSlot(slot, true),
+      (err) => { activeOps--; throw err; },
+    );
   };
 
   return {
-    submitSaveIntent: (...args) => runInWorker(() => real.submitSaveIntent(...args)),
-    submitPopupSaveIntent: (...args) => runInWorker(() => real.submitPopupSaveIntent(...args)),
-    sendOfflineItem: (...args) => runInWorker(() => real.sendOfflineItem(...args)),
-    fetchExistingBookmark: (...args) => runInWorker(() => real.fetchExistingBookmark(...args)),
-    pbpCheckOverlongTitle: (...args) => runInWorker(() => real.pbpCheckOverlongTitle(...args)),
-    verifyConnection: (...args) => runInWorker(() => real.pbpVerifyBookmarkConnection(...args)),
-    processOfflineQueue: (...args) => runInWorker(() => real.processOfflineQueue(...args)),
-    retryOfflineItem: (...args) => runInWorker(() => real.retryOfflineItem(...args)),
-    pbpOfflinePauseOnCredentialChange: (...args) => runInWorker(() => real.pbpOfflinePauseOnCredentialChange(...args)),
-    readPause: (...args) => runInWorker(() => real.pbpReadOfflineQueuePause(...args)),
-    client: (...args) => runInWorker(() => real.pbpBookmarkClient(...args)),
-    mutateOfflineQueue: (...args) => runInWorker(() => real.mutateOfflineQueue(...args)),
-    pbpReadTagVocab: (...args) => runInWorker(() => real.pbpReadTagVocab(...args)),
-    pbpLoadTagVocab: (...args) => runInWorker(() => real.pbpLoadTagVocab(...args)),
+    submitSaveIntent: (...args) => withHarnessSlot(({ real }) => real.submitSaveIntent(...args)),
+    submitPopupSaveIntent: (...args) => withHarnessSlot(({ real }) => real.submitPopupSaveIntent(...args)),
+    sendOfflineItem: (...args) => withHarnessSlot(({ real }) => real.sendOfflineItem(...args)),
+    fetchExistingBookmark: (...args) => withHarnessSlot(({ real }) => real.fetchExistingBookmark(...args)),
+    pbpCheckOverlongTitle: (...args) => withHarnessSlot(({ real }) => real.pbpCheckOverlongTitle(...args)),
+    verifyConnection: (...args) => withHarnessSlot(({ real }) => real.pbpVerifyBookmarkConnection(...args)),
+    processOfflineQueue: (...args) => withHarnessSlot(({ real }) => real.processOfflineQueue(...args)),
+    retryOfflineItem: (...args) => withHarnessSlot(({ real }) => real.retryOfflineItem(...args)),
+    pbpOfflinePauseOnCredentialChange: (...args) => withHarnessSlot(({ real }) => real.pbpOfflinePauseOnCredentialChange(...args)),
+    readPause: (...args) => withHarnessSlot(({ real }) => real.pbpReadOfflineQueuePause(...args)),
+    client: (...args) => new Proxy({}, {
+      get: (_target, prop) => (...mArgs) => withHarnessSlot(({ real }) => {
+        const cli = real.pbpBookmarkClient(...args);
+        const fn = cli && cli[prop];
+        return typeof fn === "function" ? fn.apply(cli, mArgs) : fn;
+      }),
+    }),
+    mutateOfflineQueue: (...args) => withHarnessSlot(({ real }) => real.mutateOfflineQueue(...args)),
+    pbpReadTagVocab: (...args) => withHarnessSlot(({ real }) => real.pbpReadTagVocab(...args)),
+    pbpLoadTagVocab: (...args) => withHarnessSlot(({ real }) => real.pbpLoadTagVocab(...args)),
     state,
     auth,
     chrome: harnessChrome,
-    _installWorkerEnv: installWorkerEnv,
+    _withHarnessSlot: withHarnessSlot,
   };
 }
 const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"work",private:true,toread:false};
@@ -533,19 +588,19 @@ const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"w
 // intents and delivery options to a worker harness. Every summary is fresh, as
 // when the AI cache has nothing (left) for the page.
 async function producers(h, {autoNotes, summary, settings: overrides = {}, realVocab = false}) {
-  const { sw, real } = await getSharedWorkerRealm();
+  const { sw: baseSw } = await getSharedWorkerRealm();
   const settings = {...h.state.settings, bgSaveMode:"merge", _defaultTags:"", _autoNotes:true, _blockquote:false, _aiTags:false, _aiSummary:true,
     batchAiSummary:true, batchAiTags:false, optBatchTagEnabled:false, batchSkipExisting:false, waybackArchiveBatch:false, ...overrides};
   const producerChrome = realVocab
     ? h.chrome
-    : { ...sw.mock.chrome, permissions: h.chrome.permissions, storage: { ...sw.mock.chrome.storage, local: { get: async () => ({}), set: async () => {}, remove: async () => {} } } };
-  const callHarness = (fn) => Promise.resolve().then(fn).finally(applyProducerEnv);
-  function applyProducerEnv() {
+    : { ...baseSw.mock.chrome, permissions: h.chrome.permissions, storage: { ...baseSw.mock.chrome.storage, local: { get: async () => ({}), set: async () => {}, remove: async () => {} } } };
+  function applyProducerEnv(slot) {
+    const { sw } = slot;
     sw.win.loadSettings = async () => ({ ...settings });
     sw.win.getCurrentBookmarkAuth = h.auth;
-    sw.win.submitSaveIntent = (...args) => callHarness(() => h.submitSaveIntent(...args));
-    sw.win.fetchExistingBookmark = (...args) => callHarness(() => h.fetchExistingBookmark(...args));
-    sw.win.pbpCheckOverlongTitle = (...args) => callHarness(() => h.pbpCheckOverlongTitle(...args));
+    sw.win.submitSaveIntent = (...args) => h.submitSaveIntent(...args);
+    sw.win.fetchExistingBookmark = (...args) => h.fetchExistingBookmark(...args);
+    sw.win.pbpCheckOverlongTitle = (...args) => h.pbpCheckOverlongTitle(...args);
     sw.win.hasAIKey = () => true;
     sw.win.buildAutoNotes = () => autoNotes;
     sw.win.getAICache = async () => null;
@@ -553,7 +608,7 @@ async function producers(h, {autoNotes, summary, settings: overrides = {}, realV
     sw.win.callAI = async () => { h.state.aiCalls = (h.state.aiCalls || 0) + 1; return summary; };
     sw.win.buildSummaryPrompt = () => "summary prompt";
     sw.win.getPageInfoFromTab = async () => { h.state.extractions = (h.state.extractions || 0) + 1; return { pageText: "article body" }; };
-    sw.win.pbpLoadTagVocab = realVocab ? ((...args) => callHarness(() => h.pbpLoadTagVocab(...args))) : async account => ({ account, timestamp: undefined, counts: null, index: null });
+    sw.win.pbpLoadTagVocab = realVocab ? ((...args) => h.pbpLoadTagVocab(...args)) : async account => ({ account, timestamp: undefined, counts: null, index: null });
     sw.win.pbpServiceEffectivePrivate = () => true;
     sw.win.pbpNotesDescription = () => "";
     sw.win.pbpPageInfoReadable = info => !!info && info._pbpUnavailable !== true && ["", "text/html", "application/xhtml+xml"].includes(String(info.contentType || "").split(";")[0].trim());
@@ -567,16 +622,11 @@ async function producers(h, {autoNotes, summary, settings: overrides = {}, realV
     sw.win._writeBatchProgress = async row => { (h.state.progress ||= []).push(row); };
     sw.win.chrome = producerChrome;
   }
-  const runProducer = async (fn) => {
-    h._installWorkerEnv();
-    sw.set("_batchRunning", false);
-    applyProducerEnv();
-    return fn();
-  };
+  const runProducer = (fn) => h._withHarnessSlot(fn, applyProducerEnv);
   const tab = {id:9, url:pageUrl, title:"Title", incognito:false};
   return {
-    quickSave:(overrides={})=>runProducer(()=>real.saveFromBackground({url:pageUrl, title:"Title", tab, notifyId:"qs", notifyTitle:"Quick saved", notifyCategory:"quickSave", ...overrides})),
-    batchSave:(tabs=[tab])=>runProducer(()=>real.handleBatchSave(tabs)),
+    quickSave:(overrides={})=>runProducer(({ real })=>real.saveFromBackground({url:pageUrl, title:"Title", tab, notifyId:"qs", notifyTitle:"Quick saved", notifyCategory:"quickSave", ...overrides})),
+    batchSave:(tabs=[tab])=>runProducer(({ real })=>real.handleBatchSave(tabs)),
   };
 }
 // Karakeep notes are plain text, so its summary block is a paragraph of its
@@ -2283,6 +2333,32 @@ test("every placeholder the save failure copy fills keeps its name and order in 
   }
   for(const key of ["bookmarkErrTagTooLong","bgTagTooLongSkip"])equal([key,contract(en[key])],[key,JSON.stringify([["tag","$1"],["max","$2"]])]);
   for(const key of ["batchTagTooLong","batchTagTooLongSkip"])equal([key,contract(en[key])],[key,JSON.stringify([["count","$1"],["tag","$2"],["max","$3"]])]);
+});
+test("concurrent worker and popup fixtures stay isolated, and concurrent batchSave on one harness honors _batchRunning",async()=>{
+  const hA=await workerHarness("linkding",[]);
+  const hB=await workerHarness("karakeep",[]);
+  const accA=(await hA.auth()).account, accB=(await hB.auth()).account;
+  hA.state.local.offlineQueuePause={account:accA,reason:"gateway_denied",ts:1};
+  hB.state.local.offlineQueuePause={account:accB,reason:"auth",ts:2};
+  const [pauseA,pauseB]=await Promise.all([hA.readPause(),hB.readPause()]);
+  equal([pauseA?.account,pauseA?.reason,pauseB?.account,pauseB?.reason],[accA,"gateway_denied",accB,"auth"]);
+
+  await pbpFixtureClearSummaryOwnership();
+  const legacyNotes="[AI Summary]\n<blockquote>A summary.</blockquote>";
+  const popA=await pbpFixturePopupSummary({service:"pinboard",account:"alice",url:pageUrl,notes:legacyNotes,existingBookmark:{extended:legacyNotes}});
+  const popB=await pbpFixturePopupSummary({service:"pinboard",account:"bob",url:pageUrl+"?other=1",notes:"Other notes"});
+  const restorePromise=popA.restore();
+  popB.snapshot();
+  equal(await restorePromise,"legacy");
+
+  let authCalls=0;
+  const hMutex=await workerHarness("karakeep",[]);
+  hMutex.state.settings.karakeepToken="";
+  const origAuth=hMutex.auth;
+  hMutex.auth=async()=>{authCalls++;return origAuth();};
+  const pMutex=await producers(hMutex,{autoNotes:"",summary:""});
+  await Promise.all([pMutex.batchSave([]),pMutex.batchSave([])]);
+  equal(authCalls,1);
 });
 (async()=>{let pass=0,fail=0;for(const item of cases){const row=document.createElement("div");try{await item.run();row.className="pass";row.textContent="PASS "+item.name;pass++;}catch(e){row.className="fail";row.textContent="FAIL "+item.name+": "+e.message;fail++;}document.getElementById("results").appendChild(row);}document.getElementById("summary").textContent=`${pass} passed, ${fail} failed`;})();
 </script></body></html>

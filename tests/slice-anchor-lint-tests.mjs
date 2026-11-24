@@ -219,6 +219,11 @@ test('cached source loaded via logical assignment (||=, ??=, &&=) counts anchors
       new Function(workerSource.slice(s, e));
       cachedPopup.slice(cachedPopup.indexOf("function ensureMdConvert("));
       holder.css.slice(holder.css.indexOf(".tags-input-wrap"));
+      let preloaded = await (await fetch("../background.js")).text();
+      const shortNullish = (preloaded ??= "");
+      const shortOr = (preloaded ||= "");
+      new Function(shortNullish.slice(shortNullish.indexOf("function fromNullishShortCircuit(")));
+      new Function(shortOr.slice(shortOr.indexOf("function fromOrShortCircuit(")));
     }
   `);
   assert.deepEqual(a.map((x) => [x.marker.value, x.targets[0]]), [
@@ -226,6 +231,8 @@ test('cached source loaded via logical assignment (||=, ??=, &&=) counts anchors
     ['// ---- end', 'background.js'],
     ['function ensureMdConvert(', 'popup.js'],
     ['.tags-input-wrap', 'popup.css'],
+    ['function fromNullishShortCircuit(', 'background.js'],
+    ['function fromOrShortCircuit(', 'background.js'],
   ]);
 });
 // ---- what does not count ----

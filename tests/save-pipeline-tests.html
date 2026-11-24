@@ -1156,22 +1156,26 @@ await suite("unified save pipeline", async () => {
     const summaryCacheCalls = [];
     const makeCacheSpies = (store = null) => ({
       getAICache: async (url, kind, duration, source, account, s) => {
-        if (kind === "summary") summaryCacheCalls.push({ op: "get", account, hasSettings: !!s });
-        if (store) return store.has(`${kind}:${url}:${account}`) ? store.get(`${kind}:${url}:${account}`) : null;
+        if (kind === "summary") summaryCacheCalls.push({ op: "get", url, source, account, hasSettings: !!s });
+        if (store) {
+          const key = `${kind}\0${url}\0${source}\0${account}`;
+          return store.has(key) ? store.get(key) : null;
+        }
         return null;
       },
       setAICache: async (url, kind, value, duration, source, account, s) => {
-        if (kind === "summary") summaryCacheCalls.push({ op: "set", account, hasSettings: !!s, value });
-        if (store) store.set(`${kind}:${url}:${account}`, value);
+        if (kind === "summary") summaryCacheCalls.push({ op: "set", url, source, account, hasSettings: !!s, value });
+        if (store) store.set(`${kind}\0${url}\0${source}\0${account}`, value);
       },
     });
-    const assertRunSummaryReadAndWrite = (label, fromIdx, expectedValue) => {
+    const assertRunSummaryReadAndWrite = (label, fromIdx, expectedUrl, expectedValue) => {
       const slice = summaryCacheCalls.slice(fromIdx);
       const gets = slice.filter((c) => c.op === "get");
       const sets = slice.filter((c) => c.op === "set");
       assert(gets.length >= 1, label + " missed summary cache read: " + JSON.stringify(slice));
       equal(sets.length, 1, label + " must write summary cache exactly once: " + JSON.stringify(slice));
       equal(sets[0].value, expectedValue, label + " wrote wrong summary value");
+      assert(slice.every((c) => c.url === expectedUrl), label + " used wrong cache URL: " + JSON.stringify(slice));
       assert(slice.every((c) => c.account === "alice"), label + " lost captured account: " + JSON.stringify(slice));
       assert(slice.every((c) => c.hasSettings), label + " lost settings snapshot: " + JSON.stringify(slice));
     };
@@ -1179,7 +1183,7 @@ await suite("unified save pipeline", async () => {
     for (const toread of [false, true]) {
       for (const both of [false, true]) {
         const label = (toread ? "Read Later " : "Quick Save ") + (both ? "combined" : "single");
-        const liveStore = !both ? new Map() : null;
+        const liveStore = new Map();
         let aiCalls = 0;
         const fromIdx = summaryCacheCalls.length;
         const h = await createBackgroundSaveHarness({
@@ -1200,11 +1204,9 @@ await suite("unified save pipeline", async () => {
           },
         });
         await runBackgroundSave(h, { toread });
-        assertRunSummaryReadAndWrite(label, fromIdx, both ? "Combined summary" : "AI summary");
-        if (liveStore) {
-          await runBackgroundSave(h, { toread });
-          equal(aiCalls, 1, label + " second run must reuse written summary cache without paying for AI again");
-        }
+        assertRunSummaryReadAndWrite(label, fromIdx, BASE_INTENT.url, both ? "Combined summary" : "AI summary");
+        await runBackgroundSave(h, { toread });
+        equal(aiCalls, 1, label + " second run must reuse written summary cache without paying for AI again");
       }
     }
     // 2. pbpRunPopupAiCall (worker-executed popup paid call, combined + single)
@@ -1226,24 +1228,31 @@ await suite("unified save pipeline", async () => {
       const sets = slice.filter((c) => c.op === "set");
       equal(sets.length, 1, "popup AI " + mode + " must write summary cache once");
       equal(sets[0].value, mode === "combined" ? "Popup combined summary" : "Popup summary", "popup AI " + mode + " summary value");
-      assert(slice.every((c) => c.account === "alice" && c.hasSettings), "popup AI " + mode + " cache account/settings");
+      assert(slice.every((c) => c.url === BASE_INTENT.url && c.account === "alice" && c.hasSettings), "popup AI " + mode + " cache url/account/settings");
     }
     // 3. Batch Save (single + combined)
     for (const both of [false, true]) {
       const label = "Batch " + (both ? "combined" : "single");
+      const liveStore = new Map();
+      let aiCalls = 0;
       const fromIdx = summaryCacheCalls.length;
-      const swCacheSpies = makeCacheSpies();
+      const swCacheSpies = makeCacheSpies(liveStore);
+      const tabs = batchTabs(1);
       const b = await createBatchSaveHarness({
         settings: { batchAiTags: both, batchAiSummary: true },
         hasAIKey: true,
         pageInfo: { pageText: "article body" },
+        callAI: async () => { aiCalls++; return "AI summary"; },
+        outcomes: [{ status: "saved", mutation: "created" }, { status: "saved", mutation: "merged" }],
       });
       // Spy setAICache / getAICache through callerSw directly so full argument list is inspected
       const sw = _callerSwState.sw;
       sw.win.getAICache = swCacheSpies.getAICache;
       sw.win.setAICache = swCacheSpies.setAICache;
-      await b.handleBatchSave(batchTabs(1));
-      assertRunSummaryReadAndWrite(label, fromIdx, both ? "  Combined\n summary  " : "AI summary");
+      await b.handleBatchSave(tabs);
+      assertRunSummaryReadAndWrite(label, fromIdx, tabs[0].url, both ? "  Combined\n summary  " : "AI summary");
+      await b.handleBatchSave(tabs);
+      equal(aiCalls, 1, label + " second run must hit exact-URL summary cache without paying for AI again");
     }
   });
 

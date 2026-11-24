@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="14"><title>Options Reset Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="15"><title>Options Reset Tests</title>
 <style>
   .case.pass { color: #0a0; }
   .case.fail { color: #c00; font-weight: bold; }
@@ -132,6 +132,27 @@ async function test(name,fn){try{await fn();pass(name);}catch(e){fail(name,e && 
       }
       const missing = authoredIds.filter((id) => !known.has(id));
       if (missing.length) throw new Error("whitelist id(s) not found in any panel's fields/nested: " + missing.join(", "));
+    });
+
+    await test("bootOptions(autoInit:false) honors removeEventListener after boot before runInit", async () => {
+      let removedCount = 0, keptTargetOk = false;
+      const onRemoved = () => { removedCount++; };
+      const onKept = (ev) => { keptTargetOk = (ev && ev.target === deferred.doc); };
+      const deferred = await pbpSwRealm.bootOptions({
+        autoInit: false,
+        beforeScripts(_win, _mock, d) {
+          d.addEventListener("DOMContentLoaded", onRemoved);
+          d.addEventListener("DOMContentLoaded", onKept);
+        },
+      });
+      try {
+        deferred.doc.removeEventListener("DOMContentLoaded", onRemoved);
+        await deferred.runInit();
+        if (removedCount !== 0) throw new Error("removed DOMContentLoaded listener ran " + removedCount + " time(s)");
+        if (!keptTargetOk) throw new Error("kept DOMContentLoaded listener did not receive doc as event.target");
+      } finally {
+        deferred.dispose();
+      }
     });
   } finally {
     realm.dispose();

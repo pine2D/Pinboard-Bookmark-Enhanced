@@ -505,14 +505,13 @@
       for (const src of tpl.sources) await loadScript(doc, src);
     } finally {
       delete doc.readyState;
-      doc.addEventListener = origAdd;
-      doc.removeEventListener = origRemove;
     }
 
     let initialized = false;
     async function runInit() {
       if (initialized) return;
       initialized = true;
+      doc.addEventListener = origAdd;
       dclPending.length = 0;
       const ev = new win.Event("DOMContentLoaded", { bubbles: true });
       doc.dispatchEvent(ev);

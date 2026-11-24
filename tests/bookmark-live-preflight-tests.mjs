@@ -399,22 +399,23 @@ try {
           mkdirSync(join(dst, '..'), { recursive: true });
           writeFileSync(dst, readFileSync(join(root, f)));
         }
-        writeFileSync(join(extConst, 'extra-worker-nested.js'), 'self.__pbpExtraWorkerDepLoaded = true;\n');
-        writeFileSync(join(extConst, 'extra-worker-dep.js'), 'const NESTED_WORKER_DEP = "extra-worker-nested.js";\nimportScripts(NESTED_WORKER_DEP);\n');
+        writeFileSync(join(extConst, 'worker helper.js'), 'self.__pbpExtraWorkerDepLoaded = true;\n');
+        writeFileSync(join(extConst, 'selection-sample.js'), 'window.__pbpSelectionSample = 42;\n');
+        writeFileSync(join(extConst, 'extra-worker-dep.js'), 'const NESTED_WORKER_DEP = "worker helper.js";\nimportScripts(NESTED_WORKER_DEP);\nasync function injectExtraSample(tabId) {\n  const files = [];\n  files.push("selection-sample.js");\n  await chrome.scripting.executeScript({ target: { tabId }, files });\n}\n');
         const origBg = readFileSync(join(root, 'background.js'), 'utf8');
         writeFileSync(join(extConst, 'background.js'), 'const EXTRA_WORKER_DEP = "extra-worker-dep.js";\nimportScripts(EXTRA_WORKER_DEP);\n' + origBg);
         const constSurfaces = live.surfaceFiles(extConst);
-        assert(constSurfaces.worker.includes('extra-worker-dep.js') && constSurfaces.worker.includes('extra-worker-nested.js'), 'const + nested importScripts tracked');
-        const constRouted = live.routeChangedFiles(['extra-worker-dep.js', 'extra-worker-nested.js'], undefined, constSurfaces);
+        assert(constSurfaces.worker.includes('extra-worker-dep.js') && constSurfaces.worker.includes('worker helper.js') && constSurfaces.worker.includes('selection-sample.js'), 'const + space + pushed executeScript files tracked');
+        const constRouted = live.routeChangedFiles(['extra-worker-dep.js', 'worker helper.js', 'selection-sample.js'], undefined, constSurfaces);
         assert.deepEqual(constRouted.modules, ids);
         assert.deepEqual(constRouted.uncovered, []);
         const constLoaded = await launchWorkerScripts(extConst);
         assert.equal(constLoaded.extraLoaded, true);
-        assert(constLoaded.scripts.includes('extra-worker-dep.js') && constLoaded.scripts.includes('extra-worker-nested.js'));
+        assert(constLoaded.scripts.includes('extra-worker-dep.js') && constLoaded.scripts.includes('worker helper.js'));
         for (const f of constLoaded.scripts) assert(constSurfaces.worker.includes(f), 'temp worker runtime script tracked: ' + f);
         rmSync(extConst, { recursive: true, force: true });
       }
-      // Fail closed when importScripts or executeScript({ files }) is dynamic.
+      // Fail closed when importScripts or executeScript({ files }) is dynamic or conditionally mutated.
       {
         const extDynSw = mkdtempSync(join(dir, 'ext-dyn-sw-'));
         writeFileSync(join(extDynSw, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'x', version: '1.0', background: { service_worker: 'background.js' } }));
@@ -425,6 +426,8 @@ try {
         const extDynExec = mkdtempSync(join(dir, 'ext-dyn-exec-'));
         writeFileSync(join(extDynExec, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'x', version: '1.0', background: { service_worker: 'background.js' } }));
         writeFileSync(join(extDynExec, 'background.js'), 'chrome.scripting.executeScript({ target: { tabId: 1 }, files: [globalThis.__dynInject] });\n');
+        assert.throws(() => live.surfaceFiles(extDynExec), e => e.code === 'execute_script_files_unresolved');
+        writeFileSync(join(extDynExec, 'background.js'), 'const files = []; if (globalThis.__cond) files.push("selection-sample.js"); chrome.scripting.executeScript({ target: { tabId: 1 }, files });\n');
         assert.throws(() => live.surfaceFiles(extDynExec), e => e.code === 'execute_script_files_unresolved');
         rmSync(extDynExec, { recursive: true, force: true });
       }

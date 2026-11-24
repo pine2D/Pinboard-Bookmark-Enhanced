@@ -356,6 +356,8 @@ function collectPatternNames(pat, out = []) {
 
 function buildConstScopes(ast) {
   const nodeScopes = new WeakMap();
+  const nodeParents = new WeakMap();
+  const mutableBindings = [];
   const shadowVarUp = (scope, name) => {
     for (let cur = scope; cur; cur = cur.parent) {
       cur.bindings.set(name, { shadowed: true });
@@ -368,7 +370,20 @@ function buildConstScopes(ast) {
       if (stmt.type === 'VariableDeclaration') {
         for (const decl of stmt.declarations) {
           if (stmt.kind === 'const' && decl.id.type === 'Identifier' && !scope.bindings.has(decl.id.name)) {
-            scope.bindings.set(decl.id.name, { init: decl.init, scope });
+            const frozen = isObjectFreezeCall(decl.init);
+            const isMutableContainer = !frozen && (decl.init?.type === 'ArrayExpression' || decl.init?.type === 'ObjectExpression');
+            const binding = {
+              init: decl.init,
+              scope,
+              declId: decl.id,
+              stmts: Array.isArray(stmts) ? stmts : null,
+              isMutableContainer,
+              pushOps: [],
+              consumerIndices: [],
+              tainted: false,
+            };
+            scope.bindings.set(decl.id.name, binding);
+            if (isMutableContainer) mutableBindings.push(binding);
           } else {
             for (const n of collectPatternNames(decl.id)) {
               if (stmt.kind === 'var') shadowVarUp(scope, n);
@@ -381,36 +396,37 @@ function buildConstScopes(ast) {
       }
     }
   };
-  const visit = (node, parent) => {
+  const visit = (node, parentScope, parentNode) => {
     if (!node || typeof node.type !== 'string') return;
-    let scope = parent;
+    if (parentNode) nodeParents.set(node, parentNode);
+    let scope = parentScope;
     if (node.type === 'Program') {
       scope = { parent: null, bindings: new Map(), isFnOrRoot: true, cbExecParam: '' };
       preScanStatements(node.body, scope);
     } else if (node.type === 'BlockStatement') {
-      scope = { parent, bindings: new Map(), isFnOrRoot: false, cbExecParam: parent.cbExecParam };
+      scope = { parent: parentScope, bindings: new Map(), isFnOrRoot: false, cbExecParam: parentScope.cbExecParam };
       preScanStatements(node.body, scope);
       if (scope.cbExecParam && scope.bindings.has(scope.cbExecParam)) scope.cbExecParam = '';
     } else if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
       const fnName = node.id?.name || '';
       const firstParam = node.params?.[0]?.type === 'Identifier' ? node.params[0].name : '';
-      let cbExecParam = fnName === '_cbExecuteScript' ? firstParam : (parent?.cbExecParam || '');
-      scope = { parent, bindings: new Map(), isFnOrRoot: true, cbExecParam: '' };
+      let cbExecParam = fnName === '_cbExecuteScript' ? firstParam : (parentScope?.cbExecParam || '');
+      scope = { parent: parentScope, bindings: new Map(), isFnOrRoot: true, cbExecParam: '' };
       if (fnName) scope.bindings.set(fnName, { shadowed: true });
       for (const p of node.params || []) for (const n of collectPatternNames(p)) scope.bindings.set(n, { shadowed: true });
       if (cbExecParam && fnName !== '_cbExecuteScript' && scope.bindings.has(cbExecParam)) cbExecParam = '';
       scope.cbExecParam = cbExecParam;
     } else if (node.type === 'ForStatement' || node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
-      scope = { parent, bindings: new Map(), isFnOrRoot: false, cbExecParam: parent.cbExecParam };
+      scope = { parent: parentScope, bindings: new Map(), isFnOrRoot: false, cbExecParam: parentScope.cbExecParam };
       const init = node.init || node.left;
       if (init?.type === 'VariableDeclaration') preScanStatements([init], scope);
       if (scope.cbExecParam && scope.bindings.has(scope.cbExecParam)) scope.cbExecParam = '';
     } else if (node.type === 'CatchClause') {
-      scope = { parent, bindings: new Map(), isFnOrRoot: false, cbExecParam: parent.cbExecParam };
+      scope = { parent: parentScope, bindings: new Map(), isFnOrRoot: false, cbExecParam: parentScope.cbExecParam };
       for (const n of collectPatternNames(node.param)) scope.bindings.set(n, { shadowed: true });
       if (scope.cbExecParam && scope.bindings.has(scope.cbExecParam)) scope.cbExecParam = '';
     } else if (node.type === 'SwitchStatement') {
-      scope = { parent, bindings: new Map(), isFnOrRoot: false, cbExecParam: parent.cbExecParam };
+      scope = { parent: parentScope, bindings: new Map(), isFnOrRoot: false, cbExecParam: parentScope.cbExecParam };
       for (const c of node.cases || []) preScanStatements(c.consequent, scope);
       if (scope.cbExecParam && scope.bindings.has(scope.cbExecParam)) scope.cbExecParam = '';
     }
@@ -418,11 +434,75 @@ function buildConstScopes(ast) {
     for (const k of Object.keys(node)) {
       if (k === 'loc' || k === 'range' || k === 'parent') continue;
       const v = node[k];
-      if (Array.isArray(v)) { for (const c of v) if (c && typeof c.type === 'string') visit(c, scope); }
-      else if (v && typeof v.type === 'string') visit(v, scope);
+      if (Array.isArray(v)) { for (const c of v) if (c && typeof c.type === 'string') visit(c, scope, node); }
+      else if (v && typeof v.type === 'string') visit(v, scope, node);
     }
   };
-  visit(ast, null);
+  visit(ast, null, null);
+
+  if (mutableBindings.length) {
+    const ancestorStmtIndex = (node, stmts) => {
+      if (!stmts) return -1;
+      for (let cur = node; cur; cur = nodeParents.get(cur)) {
+        const idx = stmts.indexOf(cur);
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    };
+    const isPureConsumer = (idNode, parent) => {
+      if (!parent) return false;
+      if (isObjectFreezeCall(parent)) return true;
+      if (parent.type === 'SpreadElement') {
+        const gp = nodeParents.get(parent);
+        return gp?.type === 'ArrayExpression' || gp?.type === 'ObjectExpression' || gp?.type === 'CallExpression';
+      }
+      if (parent.type === 'Property' && parent.value === idNode) return true;
+      if (parent.type === 'CallExpression' && parent.arguments[0] === idNode) {
+        const callee = parent.callee?.type === 'ChainExpression' ? parent.callee.expression : parent.callee;
+        return (callee?.type === 'Identifier' && (callee.name === 'executeScript' || callee.name === '_cbExecuteScript'))
+          || (callee?.type === 'MemberExpression' && !callee.computed && callee.property?.type === 'Identifier' && callee.property.name === 'executeScript');
+      }
+      return false;
+    };
+    const checkRefs = node => {
+      if (!node || typeof node.type !== 'string') return;
+      if (node.type === 'Identifier') {
+        const parent = nodeParents.get(node);
+        const nonRef = (parent?.type === 'MemberExpression' && !parent.computed && parent.property === node)
+          || (parent?.type === 'Property' && !parent.computed && parent.key === node)
+          || ((parent?.type === 'FunctionDeclaration' || parent?.type === 'FunctionExpression' || parent?.type === 'ClassDeclaration' || parent?.type === 'ClassExpression') && parent.id === node)
+          || ((parent?.type === 'LabeledStatement' || parent?.type === 'BreakStatement' || parent?.type === 'ContinueStatement') && parent.label === node);
+        if (!nonRef) {
+          const b = lookupConstBinding(node.name, nodeScopes.get(node));
+          if (b && b.isMutableContainer && node !== b.declId) {
+            const call = parent?.type === 'MemberExpression' && !parent.computed && parent.object === node && parent.property?.name === 'push'
+              ? nodeParents.get(parent)
+              : null;
+            const exprStmt = call?.type === 'CallExpression' && call.callee === parent ? nodeParents.get(call) : null;
+            const pushIdx = b.init?.type === 'ArrayExpression' && exprStmt?.type === 'ExpressionStatement' && b.stmts
+              ? b.stmts.indexOf(exprStmt)
+              : -1;
+            if (pushIdx !== -1) {
+              b.pushOps.push({ stmtIndex: pushIdx, call, scope: nodeScopes.get(call) });
+            } else if (isPureConsumer(node, parent)) {
+              const cIdx = ancestorStmtIndex(node, b.stmts);
+              if (cIdx === -1) b.tainted = true;
+              else b.consumerIndices.push(cIdx);
+            } else {
+              b.tainted = true;
+            }
+          }
+        }
+      }
+      for (const k of Object.keys(node)) {
+        if (k === 'loc' || k === 'range' || k === 'parent') continue;
+        const v = node[k];
+        if (Array.isArray(v)) { for (const c of v) if (c && typeof c.type === 'string') checkRefs(c); }
+        else if (v && typeof v.type === 'string') checkRefs(v);
+      }
+    };
+    checkRefs(ast);
+  }
   return nodeScopes;
 }
 
@@ -494,10 +574,29 @@ function evalConstStringList(node, scope, seen = new Set()) {
   }
   if (node.type === 'Identifier') {
     const b = lookupConstBinding(node.name, scope);
-    if (!b || !b.init || seen.has(b)) return null;
+    if (!b || b.tainted || !b.init || seen.has(b)) return null;
     const next = new Set(seen);
     next.add(b);
-    return evalConstStringList(b.init, b.scope, next);
+    const base = evalConstStringList(b.init, b.scope, next);
+    if (!base) return null;
+    if (b.pushOps?.length) {
+      const declIdx = b.stmts ? b.stmts.findIndex(s => s?.type === 'VariableDeclaration' && s.declarations.some(d => d.id === b.declId)) : -1;
+      for (const op of [...b.pushOps].sort((a, c) => a.stmtIndex - c.stmtIndex)) {
+        if (declIdx === -1 || op.stmtIndex <= declIdx || b.consumerIndices.some(ci => op.stmtIndex >= ci)) return null;
+        for (const arg of op.call.arguments) {
+          if (arg.type === 'SpreadElement') {
+            const sub = evalConstStringList(arg.argument, op.scope, next);
+            if (!sub) return null;
+            base.push(...sub);
+          } else {
+            const s = evalConstString(arg, op.scope, next);
+            if (s === null) return null;
+            base.push(s);
+          }
+        }
+      }
+    }
+    return base;
   }
   return null;
 }
@@ -508,7 +607,7 @@ function evalConstObject(node, scope, seen = new Set()) {
   if (node.type === 'ObjectExpression') return { node, scope };
   if (node.type === 'Identifier') {
     const b = lookupConstBinding(node.name, scope);
-    if (!b || !b.init || seen.has(b)) return null;
+    if (!b || b.tainted || !b.init || seen.has(b)) return null;
     const next = new Set(seen);
     next.add(b);
     return evalConstObject(b.init, b.scope, next);
@@ -530,13 +629,27 @@ function walkAstCalls(ast, nodeScopes, onCall) {
   visit(ast);
 }
 
+const CANONICAL_EXT_HOST = 'abcdefghijklmnopabcdefghijklmnop';
+export function canonicalExtRelPath(raw) {
+  const s = String(raw || '');
+  if (!s) return '';
+  try {
+    const u = new URL(s, 'chrome-extension://' + CANONICAL_EXT_HOST + '/');
+    if (u.protocol !== 'chrome-extension:' || u.hostname !== CANONICAL_EXT_HOST) return '';
+    const p = u.pathname.replace(/^\/+/, '');
+    return p ? p.split('/').map(seg => decodeURIComponent(seg)).join('/') : '';
+  } catch {
+    return s.split(/[?#]/)[0].replace(/^\.?\//, '');
+  }
+}
+
 const surfaceCache = new Map();
 export function surfaceFiles(dir = ROOT) {
   const key = String(dir);
   if (key === String(ROOT) && surfaceCache.has(key)) return surfaceCache.get(key);
   const read = rel => { try { return readFileSync(join(dir, rel), 'utf8'); } catch { return null; } };
   const local = f => !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(f);
-  const norm = f => f.replace(/^\.?\//, '');
+  const norm = canonicalExtRelPath;
   const parseJs = (text, errCode) => {
     if (typeof text !== 'string') fail(errCode);
     try { return getEspree().parse(text, { ecmaVersion: 'latest' }); } catch { fail(errCode); }
@@ -666,7 +779,7 @@ export async function readWorkerLoadedScripts(ctx, worker) {
         let msg;
         try { msg = JSON.parse(message); } catch { return; }
         if (msg.method === 'Debugger.scriptParsed' && typeof msg.params?.url === 'string' && msg.params.url.startsWith(extPrefix)) {
-          const rel = msg.params.url.slice(extPrefix.length).split(/[?#]/)[0];
+          const rel = canonicalExtRelPath(msg.params.url.slice(extPrefix.length));
           if (rel) loaded.add(rel);
         } else if (msg.id === id) {
           clearTimeout(timer);
@@ -695,7 +808,7 @@ export async function readWorkerLoadedScripts(ctx, worker) {
 // worker and connects through options.html, so neither needs declaring.
 export function surfaceOfUrl(url, extension) {
   if (!extension || typeof url !== 'string' || !url.startsWith(extension)) return '';
-  const path = url.slice(extension.length).split(/[?#]/)[0];
+  const path = canonicalExtRelPath(url.slice(extension.length));
   return Object.keys(SURFACE_PAGES).find(name => SURFACE_PAGES[name] === path) || '';
 }
 export function undeclaredSurfaces(declared = [], driven = []) {
@@ -3142,7 +3255,7 @@ export class LiveRun {
     await worker.evaluate(() => primeSettings());
     const workerSurfaceSet = new Set(surfaceFiles(this.extRoot).worker);
     const loadedWorkerScripts = await readWorkerLoadedScripts(ctx, worker);
-    const swEntry = worker.url().slice(this.extension.length).split(/[?#]/)[0];
+    const swEntry = canonicalExtRelPath(worker.url().slice(this.extension.length));
     check(loadedWorkerScripts.includes(swEntry) && loadedWorkerScripts.every(f => workerSurfaceSet.has(f)), 'worker_surface_untracked', true);
     this.guardCfg = this.buildGuardCfg();
     this.poolSet = new Set(Object.values(this.pools).flat());
