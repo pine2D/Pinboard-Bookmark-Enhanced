@@ -84,6 +84,7 @@ function readStoredZip(bytes) {
   const dec = new TextDecoder();
   while (p + 4 <= bytes.length && dv.getUint32(p, true) === 0x04034b50) {
     if (p + 30 > bytes.length) throw new Error("truncated ZIP local header");
+    const flags = dv.getUint16(p + 6, true);
     const method = dv.getUint16(p + 8, true);
     const crc = dv.getUint32(p + 14, true);
     const csize = dv.getUint32(p + 18, true);
@@ -91,11 +92,12 @@ function readStoredZip(bytes) {
     const nameLen = dv.getUint16(p + 26, true);
     const extraLen = dv.getUint16(p + 28, true);
     const dataStart = p + 30 + nameLen + extraLen;
+    if (flags !== 0 || method !== 0) throw new Error(`unsupported ZIP local flags=${flags} method=${method}`);
     if (csize !== usize || dataStart + csize > bytes.length) throw new Error("corrupt ZIP local entry bounds");
     const name = dec.decode(bytes.subarray(p + 30, p + 30 + nameLen));
     if (out.has(name)) throw new Error("duplicate ZIP entry: " + name);
     const data = bytes.subarray(dataStart, dataStart + csize);
-    localRecords.push({ name, method, crc, size: csize, offset: p });
+    localRecords.push({ name, flags, method, crc, size: csize, offset: p });
     out.set(name, { method, crc, data, text: dec.decode(data) });
     p = dataStart + csize;
   }
@@ -103,6 +105,7 @@ function readStoredZip(bytes) {
   let cdCount = 0;
   while (p + 4 <= bytes.length && dv.getUint32(p, true) === 0x02014b50) {
     if (p + 46 > bytes.length) throw new Error("truncated ZIP central directory header");
+    const flags = dv.getUint16(p + 8, true);
     const method = dv.getUint16(p + 10, true);
     const crc = dv.getUint32(p + 16, true);
     const csize = dv.getUint32(p + 20, true);
@@ -115,7 +118,8 @@ function readStoredZip(bytes) {
     if (nextP > bytes.length) throw new Error("truncated ZIP central directory payload");
     const name = dec.decode(bytes.subarray(p + 46, p + 46 + nameLen));
     const expected = localRecords[cdCount];
-    if (!expected || expected.name !== name || expected.method !== method || expected.crc !== crc ||
+    if (!expected || expected.name !== name || flags !== 0 || method !== 0 ||
+        expected.flags !== flags || expected.method !== method || expected.crc !== crc ||
         expected.size !== csize || csize !== usize || expected.offset !== lhOffset) {
       throw new Error(`central directory mismatch at #${cdCount} (${name})`);
     }
@@ -193,12 +197,15 @@ function parseYamlDoubleQuoted(raw) {
 function validateBareYamlScalar(val, key) {
   if (val === "") return true;
   if (key === "words") return /^\d+$/.test(val);
-  // Strict YAML 1.2 plain scalar check: no whitespace (incl. U+3000), no trailing ':',
-  // no ': ', no leading indicator, no flow delimiters/quotes/comments.
+  if (key === "date" || key === "published" || key === "clipped") return /^\d{4}-\d{2}-\d{2}$/.test(val);
+  // Strict YAML 1.2 plain string scalar check: must remain a string in YAML 1.1/1.2 core schema
+  // (never coerced to bool/null/int/float/hex/octal).
   return /^[\x21-\x7E]+$/.test(val) &&
     !/^[-\?:,\[\]\{\}#&*!|>'"%@`]/.test(val) &&
     !/[#"'\[\]\{\},]/.test(val) &&
-    !val.endsWith(":");
+    !val.endsWith(":") &&
+    !/^(?:true|false|null|yes|no|on|off|~)$/i.test(val) &&
+    !/^[+-]?(?:\d|\.)/.test(val);
 }
 
 function parseGeneratedFrontmatter(fm, expectedBody) {
@@ -313,11 +320,21 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
       if (name === "OEBPS/content.xhtml") contentDoc = doc;
     }
   }
-  const rootfile = containerDoc && containerDoc.querySelector("rootfile");
-  if (!rootfile || rootfile.getAttribute("full-path") !== "OEBPS/content.opf") {
+  const CONTAINER_NS = "urn:oasis:names:tc:opendocument:xmlns:container";
+  const OPF_NS = "http://www.idpf.org/2007/opf";
+  if (!containerDoc || containerDoc.documentElement.namespaceURI !== CONTAINER_NS || containerDoc.documentElement.localName !== "container") {
+    return "container.xml root element missing OASIS container namespace";
+  }
+  const rootfiles = [...containerDoc.getElementsByTagNameNS(CONTAINER_NS, "rootfile")];
+  if (rootfiles.length !== 1 || rootfiles[0].getAttribute("full-path") !== "OEBPS/content.opf") {
     return "container.xml rootfile does not point to OEBPS/content.opf";
   }
-  const manifestItems = opfDoc ? [...opfDoc.querySelectorAll("manifest > item")] : [];
+  if (!opfDoc || opfDoc.documentElement.namespaceURI !== OPF_NS || opfDoc.documentElement.localName !== "package") {
+    return "content.opf root element missing OPF package namespace";
+  }
+  const manifestEl = [...opfDoc.documentElement.children].find((el) => el.namespaceURI === OPF_NS && el.localName === "manifest");
+  const spineEl = [...opfDoc.documentElement.children].find((el) => el.namespaceURI === OPF_NS && el.localName === "spine");
+  const manifestItems = manifestEl ? [...manifestEl.children].filter((el) => el.namespaceURI === OPF_NS && el.localName === "item") : [];
   const byId = new Map(), seenHrefs = new Set();
   for (const item of manifestItems) {
     const id = item.getAttribute("id") || "";
@@ -340,7 +357,8 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
   const navEntry = byId.get("nav");
   const contentEntry = byId.get("content");
   const cssEntry = byId.get("css");
-  if (!navEntry || navEntry.href !== "nav.xhtml" || navEntry.mediaType !== "application/xhtml+xml" || !/\bnav\b/.test(navEntry.properties)) {
+  const navProps = navEntry ? navEntry.properties.trim().split(/\s+/).filter(Boolean) : [];
+  if (!navEntry || navEntry.href !== "nav.xhtml" || navEntry.mediaType !== "application/xhtml+xml" || !navProps.includes("nav")) {
     return "OPF manifest missing canonical nav item";
   }
   if (!contentEntry || contentEntry.href !== "content.xhtml" || contentEntry.mediaType !== "application/xhtml+xml") {
@@ -349,7 +367,7 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
   if (!cssEntry || cssEntry.href !== "styles.css" || cssEntry.mediaType !== "text/css") {
     return "OPF manifest missing canonical styles.css item";
   }
-  const spineRefs = opfDoc ? [...opfDoc.querySelectorAll("spine > itemref")] : [];
+  const spineRefs = spineEl ? [...spineEl.children].filter((el) => el.namespaceURI === OPF_NS && el.localName === "itemref") : [];
   if (spineRefs.length !== 1) return `expected 1 spine itemref, got ${spineRefs.length}`;
   const spineIdref = spineRefs[0].getAttribute("idref") || "";
   const spineTarget = byId.get(spineIdref);
@@ -607,25 +625,30 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
     const colonUrlFm = applyFrontmatter("Body", {
       title: "Report",
       url: "https://example.org/report:",
-      source: "本地　采集",
+      source: "0x2a",
       published: "Spring 2026:",
     });
+    const fwSrcFm = applyFrontmatter("Body", { source: "本地　采集" });
     const parsedColonFm = parseGeneratedFrontmatter(colonUrlFm, "Body");
-    check("applyFrontmatter quotes trailing-colon URLs and full-width-space sources for valid YAML",
-      parsedColonFm.ok && colonUrlFm.includes('url: "https://example.org/report:"') &&
-      colonUrlFm.includes('source: "本地　采集"') && parsedColonFm.map.published === "Spring 2026:",
+    const parsedFwFm = parseGeneratedFrontmatter(fwSrcFm, "Body");
+    check("applyFrontmatter quotes trailing-colon URLs, numeric-like sources (0x2a), and full-width-space sources",
+      parsedColonFm.ok && parsedFwFm.ok &&
+      colonUrlFm.includes('url: "https://example.org/report:"') &&
+      colonUrlFm.includes('source: "0x2a"') &&
+      fwSrcFm.includes('source: "本地　采集"') &&
+      parsedColonFm.map.source === "0x2a" && parsedColonFm.map.published === "Spring 2026:",
       colonUrlFm);
 
-    const symMd = "## ✨\n\nSparkle.\n\n## ---\n\nDashes.\n\n## ***\n\nStars.\n\n## +\n\nPlus.\n\n## Real Heading\n\nBody.";
+    const symMd = "## ✨\n\nSparkle.\n\n## ---\n\nDashes.\n\n## ***\n\nStars.\n\n## +\n\nPlus.\n\n## ~~~\n\nTildes.\n\n## ```\n\nBackticks.\n\n## Real Heading\n\nBody.";
     const symToc = buildToc(symMd, { minLevel: 2, maxLevel: 4 });
     const symExport = composeExport(symMd, { url: "https://example.com" }, { includeToc: true });
     const symTocDoc = document.implementation.createHTMLDocument("");
     symTocDoc.body.innerHTML = renderMarkdown(symToc.tocMarkdown);
     const symLis = [...symTocDoc.querySelectorAll("ul > li")].map((li) => li.textContent.trim());
-    check("buildToc & composeExport render literal TOC list items for ## --- / ## *** / ## + without <hr> or (#)",
+    check("buildToc & composeExport render literal TOC list items for ## --- / *** / + / ~~~ / ``` without <hr> or (#)",
       !/\(#\)/.test(symToc.tocMarkdown) && !/\(#\)/.test(symExport) &&
-      !symTocDoc.querySelector("hr") &&
-      JSON.stringify(symLis) === JSON.stringify(["✨", "---", "***", "+", "Real Heading"]),
+      !symTocDoc.querySelector("hr") && !symTocDoc.querySelector("pre") &&
+      JSON.stringify(symLis) === JSON.stringify(["✨", "---", "***", "+", "~~~", "```", "Real Heading"]),
       JSON.stringify({ toc: symToc.tocMarkdown, symLis }));
 
     const svgTextMd = htmlToMarkdown('<div><svg width="120" height="120" viewBox="0 0 120 120"><text x="10" y="20">one=1</text></svg></div>', { baseUrl: "https://example.com" });

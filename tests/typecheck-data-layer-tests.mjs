@@ -171,7 +171,7 @@ test('strictNullChecks and cross-file ambient signatures catch null dereferences
       `expected possibly-undefined diagnostic on (new marked.Renderer()).parser, got:\n${res.errors.join('\n')}`,
     );
     assert.ok(
-      !res.errors.some((line) => line.includes('renderer.def')),
+      !res.errors.some((line) => line.includes("Property 'def'")),
       `marked.Renderer.prototype.def must be recognized without error, got:\n${res.errors.join('\n')}`,
     );
     assert.ok(

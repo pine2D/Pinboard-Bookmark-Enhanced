@@ -1232,7 +1232,8 @@ function applyFrontmatter(md, meta, opts) {
       !/^[-\?:,\[\]\{\}#&*!|>'"%@`]/.test(s) &&
       !/[#"'\[\]\{\},]/.test(s) &&
       !s.endsWith(":") &&
-      !/^(?:true|false|null|yes|no|on|off|~|[+-]?(?:\d|\.\d))$/i.test(s);
+      !/^(?:true|false|null|yes|no|on|off|~)$/i.test(s) &&
+      !/^[+-]?(?:\d|\.)/.test(s);
   };
   const lines = ["---"];
   for (const f of fields) {
@@ -1581,7 +1582,7 @@ function buildToc(md, opts) {
     const label = h._label || h.text;
     delete h._label;
     if (h.slug) return indent + "- [" + label + "](#" + h.slug + ")";
-    const plainItem = /^[-+*_>#]/.test(label)
+    const plainItem = /^[-+*_>#`~]/.test(label)
       ? "\\" + label
       : label.replace(/^(\d+)([.)])/, "$1\\$2");
     return indent + "- " + plainItem;
