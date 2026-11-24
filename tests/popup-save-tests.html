@@ -208,7 +208,9 @@ async function withPopupSubmitFixture(options, check) {
     ]);
     const aiJsSource = await (await fetch("../ai.js")).text();
     const aiCacheSource = await (await fetch("../ai-cache.js")).text();
-    const [pbpPageInfoReadable, pbpNotesDescription] = new Function(aiJsSource.slice(aiJsSource.indexOf("function pbpPageInfoReadable("),aiJsSource.indexOf("function buildAutoNotes("))+";return [pbpPageInfoReadable, pbpNotesDescription];")();
+    const pbpIdxOf = (src, marker, from = 0) => { const i = src.indexOf(marker, from); assert(i !== -1, "slice marker not found: " + marker); return i; };
+    const pbpLastIdxOf = (src, marker, from = Infinity) => { const i = src.lastIndexOf(marker, from); assert(i !== -1, "slice marker not found: " + marker); return i; };
+    const [pbpPageInfoReadable, pbpNotesDescription] = new Function(aiJsSource.slice(pbpIdxOf(aiJsSource, "function pbpPageInfoReadable("),pbpIdxOf(aiJsSource, "function buildAutoNotes("))+";return [pbpPageInfoReadable, pbpNotesDescription];")();
     // The one place a sliced popup/popup-ai fragment becomes runnable code.
     // The body runs in strict mode, so a module-level name the fragment needs
     // but nobody declared throws a ReferenceError the first time it runs (sloppy
@@ -239,29 +241,29 @@ async function withPopupSubmitFixture(options, check) {
     const handlerEnd = setupSource.indexOf('  document.addEventListener("keydown"');
     assert(handlerEnd > 0, "legacy submit click-handler boundary not found");
     const submit = setupSource.slice(0, handlerEnd);
-    const policyIndex = submit.indexOf("const savePolicy = pbpPopupSavePolicy");
-    const snapshotIndex = submit.indexOf('url: $id("url-input").value.trim()', policyIndex);
-    const ownershipIndex = submit.indexOf("saveUrl !== url", snapshotIndex);
-    const intentIndex = submit.indexOf("const intent = {", ownershipIndex);
-    const sendIndex = submit.indexOf('chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft, summaryRange: summaryOwnership,', intentIndex);
+    const policyIndex = pbpIdxOf(submit, "const savePolicy = pbpPopupSavePolicy");
+    const snapshotIndex = pbpIdxOf(submit, 'url: $id("url-input").value.trim()', policyIndex);
+    const ownershipIndex = pbpIdxOf(submit, "saveUrl !== url", snapshotIndex);
+    const intentIndex = pbpIdxOf(submit, "const intent = {", ownershipIndex);
+    const sendIndex = pbpIdxOf(submit, 'chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft, summaryRange: summaryOwnership,', intentIndex);
     const tagHelperStart = source.indexOf("function pbpRebasePopupTags(");
-    const tagHelperEnd = source.indexOf("// Wayback per-save toggle", tagHelperStart);
+    const tagHelperEnd = pbpIdxOf(source, "// Wayback per-save toggle", tagHelperStart);
     assert(tagHelperStart >= 0 && tagHelperEnd > tagHelperStart, "pbpRebasePopupTags source not found");
     const tagHelperSource = source.slice(tagHelperStart, tagHelperEnd);
     const resetStart = source.indexOf("async function resetPinboardSession(");
-    const resetEnd = source.indexOf("// ===================== URL Clean Helpers", resetStart);
+    const resetEnd = pbpIdxOf(source, "// ===================== URL Clean Helpers", resetStart);
     assert(resetStart >= 0 && resetEnd > resetStart, "resetPinboardSession source not found");
     const resetSource = source.slice(resetStart, resetEnd);
     const logoutStart = source.indexOf('$id("logout-link").addEventListener');
-    const logoutEnd = source.indexOf("// ===================== Login", logoutStart);
+    const logoutEnd = pbpIdxOf(source, "// ===================== Login", logoutStart);
     assert(logoutStart >= 0 && logoutEnd > logoutStart, "logout-link source not found");
     const logoutSource = source.slice(logoutStart, logoutEnd);
     const lookupStart = source.indexOf("async function checkExistingBookmark(");
-    const lookupEnd = source.indexOf("// ===================== Submit / Delete", lookupStart);
+    const lookupEnd = pbpIdxOf(source, "// ===================== Submit / Delete", lookupStart);
     assert(lookupStart >= 0 && lookupEnd > lookupStart, "checkExistingBookmark source not found");
     const lookupSource = source.slice(lookupStart, lookupEnd);
     const offlineClearStart = source.indexOf("async function showOfflineQueueStatus() {");
-    const offlineClearEnd = source.indexOf("// ===================== Helpers", offlineClearStart);
+    const offlineClearEnd = pbpIdxOf(source, "// ===================== Helpers", offlineClearStart);
     assert(offlineClearStart >= 0 && offlineClearEnd > offlineClearStart, "showOfflineQueueStatus source not found");
     const offlineClearSource = source.slice(offlineClearStart, offlineClearEnd);
     const rebasePopupTags = new Function("unionTags", `${tagHelperSource}\nreturn pbpRebasePopupTags;`)(unionTags);
@@ -300,7 +302,7 @@ async function withPopupSubmitFixture(options, check) {
     await testAsync("linkding popup shows only supported sharing, defaulting to unshared", async () => {
       const start = source.indexOf("function pbpPopupBookmarkPrivacy(");
       assert(start >= 0, "sharing UI setup is missing");
-      const body = source.slice(start, source.indexOf("\n}",start)+2);
+      const body = source.slice(start, pbpIdxOf(source, "\n}", start)+2);
       for (const sharing of [undefined,false,true]) {
         const elements = {};
         for (const name of ["private-check","share-check"]) {
@@ -452,7 +454,7 @@ async function withPopupSubmitFixture(options, check) {
       // The shipped wait on the #fragment probe, over this harness's lookup:
       // none of these lookups carries a probe, so it only closes the miss.
       const awaitStart = source.indexOf("const PBP_FRAGMENT_PROBE_SAVE_WAIT_MS");
-      const awaitEnd = source.indexOf("// ===================== Existing Bookmark", awaitStart);
+      const awaitEnd = pbpIdxOf(source, "// ===================== Existing Bookmark", awaitStart);
       assert(awaitStart >= 0 && awaitEnd > awaitStart, "the #fragment probe wait was not found");
       const pbpFragmentProbeWait = new Function("bookmarkLookup", "setTimeout", "clearTimeout", "pbpDismissFragmentMatch", "_fragmentMatchFeedback",
         source.slice(awaitStart, awaitEnd) + "\nreturn pbpFragmentProbeWait;")(bookmarkLookup, setTimeoutStub, clearTimeoutStub, () => {}, null);
@@ -529,7 +531,7 @@ async function withPopupSubmitFixture(options, check) {
         pbpAiSaveSummaryOwnership: async (...args) => { receiptWrites.push(args); },
       };
       const names = Object.keys(dependencies);
-      const factory = new Function(...names, `${source.slice(source.indexOf("function pbpPopupExpectedVersion("), source.indexOf(realDraft ? "// Popup draft UI end" : "function pbpRememberPopupDraft("))}\n${resetSource}\n${realLookup ? lookupSource : ""}\n${setupSource}\nreturn {setupSubmit, remember:pbpRememberPopupDraft, restore:typeof initPopupDraft === "function" ? initPopupDraft : null, tags:()=>currentTags, base:()=>_popupDraftBase, snapshot:pbpPopupDraftSnapshot, sharing:()=>_linkdingSharedExplicit, changeSharing:()=>{_linkdingSharedExplicit=true;_linkdingSharedRevision++;}};`);
+      const factory = new Function(...names, `${source.slice(pbpIdxOf(source, "function pbpPopupExpectedVersion("), pbpIdxOf(source, realDraft ? "// Popup draft UI end" : "function pbpRememberPopupDraft("))}\n${resetSource}\n${realLookup ? lookupSource : ""}\n${setupSource}\nreturn {setupSubmit, remember:pbpRememberPopupDraft, restore:typeof initPopupDraft === "function" ? initPopupDraft : null, tags:()=>currentTags, base:()=>_popupDraftBase, snapshot:pbpPopupDraftSnapshot, sharing:()=>_linkdingSharedExplicit, changeSharing:()=>{_linkdingSharedExplicit=true;_linkdingSharedRevision++;}};`);
       const submitApi = factory(...names.map((name) => dependencies[name]));
       const setupSubmit = submitApi.setupSubmit;
       setupSubmit("alice:token");
@@ -747,7 +749,7 @@ async function withPopupSubmitFixture(options, check) {
     // source against the real classifier, then checks every key it can return
     // exists in the shipped English catalogue.
     test("save failures name their cause and only retryable ones offer Retry", () => {
-      const viewSource = source.slice(source.indexOf("function pbpSaveErrorView("), source.indexOf("function showSaveError("));
+      const viewSource = source.slice(pbpIdxOf(source, "function pbpSaveErrorView("), pbpIdxOf(source, "function showSaveError("));
       const view = new Function("t", "classifyPinboardError", "POSTS_ADD_URI_BUDGET", `${viewSource}\nreturn pbpSaveErrorView;`)(
         (key, ...args) => key + (args.length ? "(" + args.join(",") + ")" : ""), classifyPinboardError, 3900);
       const cases = [
@@ -773,7 +775,7 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     function bookmarkErrorView(service) {
-      const viewSource = source.slice(source.indexOf("function pbpSaveErrorView("), source.indexOf("function showSaveError("));
+      const viewSource = source.slice(pbpIdxOf(source, "function pbpSaveErrorView("), pbpIdxOf(source, "function showSaveError("));
       return new Function("t", "classifyPinboardError", "POSTS_ADD_URI_BUDGET", "settings", "pbpBookmarkServiceId", "pbpBookmarkFailureKey", "PBP_BOOKMARK_GATEWAY_CODES",
         `${viewSource}\nreturn pbpSaveErrorView;`)(
         (key, ...args) => key + (args.length ? "(" + args.join(",") + ")" : ""), classifyPinboardError, 3900,
@@ -869,20 +871,20 @@ async function withPopupSubmitFixture(options, check) {
       const api = async () => ({ ...resp, json: async () => resp.data || {} });
       const confirms = [];
       const showConfirmPopover = (anchor, opts) => confirms.push(opts);
-      const failFrom = source.indexOf("function pbpDeleteFailureText(");
+      const failFrom = pbpIdxOf(source, "function pbpDeleteFailureText(");
       const pbpDeleteFailureText = new Function("pbpBookmarkFailureText", "t",
-        source.slice(failFrom, source.indexOf("\n}\n", failFrom) + 3) + "\nreturn pbpDeleteFailureText;")(pbpBookmarkFailureText, t);
-      const codeFrom = source.indexOf("function pbpDeleteCodeText(");
-      const pbpDeleteCodeText = new Function("t", source.slice(codeFrom, source.indexOf("\n}\n", codeFrom) + 3) + "\nreturn pbpDeleteCodeText;")(t);
+        source.slice(failFrom, pbpIdxOf(source, "\n}\n", failFrom) + 3) + "\nreturn pbpDeleteFailureText;")(pbpBookmarkFailureText, t);
+      const codeFrom = pbpIdxOf(source, "function pbpDeleteCodeText(");
+      const pbpDeleteCodeText = new Function("t", source.slice(codeFrom, pbpIdxOf(source, "\n}\n", codeFrom) + 3) + "\nreturn pbpDeleteCodeText;")(t);
       // The Pinboard failure text over the real pbpSaveErrorView; the session reset is recorded.
       const pinboardView = bookmarkErrorView("pinboard");
-      const pbFrom = source.indexOf("async function pbpPinboardDeleteFailureText(");
+      const pbFrom = pbpIdxOf(source, "async function pbpPinboardDeleteFailureText(");
       const pbpPinboardDeleteFailureText = new Function("resetPinboardSession", "settings", "pbpSaveErrorView", "t",
-        source.slice(pbFrom, source.indexOf("\n}\n", pbFrom) + 3) + "\nreturn pbpPinboardDeleteFailureText;")(
+        source.slice(pbFrom, pbpIdxOf(source, "\n}\n", pbFrom) + 3) + "\nreturn pbpPinboardDeleteFailureText;")(
         async (token) => { results.resets.push(token); return resetOk; }, { pinboardToken: "tok:1" }, pinboardView, t);
       // Main Delete button.
       const mainStart = source.indexOf('$id("delete-btn").addEventListener("click", () => {');
-      const mainEnd = source.lastIndexOf("\n  });\n", source.indexOf("// ===================== Edit From Recent"));
+      const mainEnd = pbpLastIdxOf(source, "\n  });\n", pbpIdxOf(source, "// ===================== Edit From Recent"));
       assert(mainStart >= 0 && mainEnd > mainStart, "main delete handler source not found");
       const url = "https://example.test/a";
       const statuses = [];
@@ -896,7 +898,7 @@ async function withPopupSubmitFixture(options, check) {
       results.main = statuses.map((x) => x[0]);
       // Recent-list delete.
       const recStart = source.indexOf("const reportDeleteFailure = (msg) => {");
-      const recEnd = source.indexOf('del.addEventListener("click", doDelete);', recStart);
+      const recEnd = pbpIdxOf(source, 'del.addEventListener("click", doDelete);', recStart);
       assert(recStart >= 0 && recEnd > recStart, "recent delete handler source not found");
       const reports = [];
       const body = source.slice(recStart, recEnd).replace(/const reportDeleteFailure = [\s\S]*?\n      };\n/, "const reportDeleteFailure = (msg) => reports.push(msg);\n");
@@ -992,7 +994,7 @@ async function withPopupSubmitFixture(options, check) {
     test("deleting a recent bookmark row hands focus to a neighbour", () => {
       const start = source.indexOf("function pbpRemoveRecentRow(row) {");
       assert(start >= 0, "pbpRemoveRecentRow is missing");
-      const body = source.slice(start, source.indexOf("\n}\n", start) + 3);
+      const body = source.slice(start, pbpIdxOf(source, "\n}\n", start) + 3);
       assert(source.includes("pbpRemoveRecentRow(row);"), "the delete handler does not use pbpRemoveRecentRow");
       const host = document.createElement("div");
       host.innerHTML = '<input id="rb-url"><button id="rb-submit">Save</button><div id="rb-list"></div>';
@@ -1205,7 +1207,7 @@ async function withPopupSubmitFixture(options, check) {
     // A queued save used to print "queued (offline)" in body colour even when
     // Pinboard itself answered 5xx (impeccable critique 2026-10-20).
     await testAsync("a queued save names its cause in the warning card and can be sent now", async () => {
-      const cardSource = source.slice(source.indexOf("function showSaveQueued("), source.indexOf("function esc(s)"));
+      const cardSource = source.slice(pbpIdxOf(source, "function showSaveQueued("), pbpIdxOf(source, "function esc(s)"));
       assert(cardSource.includes("function showSaveQueued("), "showSaveQueued source not found");
       const run = (result, retryResp) => {
         const log = { cards: [], status: [], retried: [], cleared: 0, placed: 0 };
@@ -1682,7 +1684,7 @@ async function withPopupSubmitFixture(options, check) {
 
     test("reader initial intents preserve service tags and an existing serialized draft", () => {
       const start = backgroundSource.indexOf("function pbpReaderInitialIntent(");
-      const end = backgroundSource.indexOf("function pbpDeleteBookmarkInOrder(", start);
+      const end = pbpIdxOf(backgroundSource, "function pbpDeleteBookmarkInOrder(", start);
       assert(start >= 0 && end > start, "reader initial intent source not found");
       const initialIntent = new Function(backgroundSource.slice(start, end) + "\nreturn pbpReaderInitialIntent;")();
       const names = ["machine learning", 'say"hello', "path\\name"];
@@ -1762,7 +1764,7 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     await testAsync("Pinboard proxy binds an auth reset to the token in its failed request", async () => {
-      const proxySource = source.slice(source.indexOf("function _pbpProxyPinboardFetch("), source.indexOf("pinboardFetch = function"));
+      const proxySource = source.slice(pbpIdxOf(source, "function _pbpProxyPinboardFetch("), pbpIdxOf(source, "pinboardFetch = function"));
       const resetTokens = [];
       const proxy = new Function("chrome", "resetPinboardSession", proxySource + "\nreturn _pbpProxyPinboardFetch;")(
         { runtime: { sendMessage: async () => ({ ok: false, status: 401, text: "" }) } },
@@ -1812,17 +1814,17 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     test("submit stays inert until its own handlers are bound", () => {
-      const showMainStart = source.indexOf("async function showMain(");
-      const bindIndex = source.indexOf("  setupSubmit(token);", showMainStart);
-      const readyIndex = source.indexOf("  _pageInfoReady = true;", showMainStart);
+      const showMainStart = pbpIdxOf(source, "async function showMain(");
+      const bindIndex = pbpIdxOf(source, "  setupSubmit(token);", showMainStart);
+      const readyIndex = pbpIdxOf(source, "  _pageInfoReady = true;", showMainStart);
       assert(bindIndex > showMainStart && readyIndex > bindIndex,
         "the submit gate opens before setupSubmit() binds the click and Ctrl+Enter handlers");
-      const counterStart = source.indexOf("function updateCharCount()");
-      const counterSource = source.slice(counterStart, source.indexOf("\n}\n", counterStart));
+      const counterStart = pbpIdxOf(source, "function updateCharCount()");
+      const counterSource = source.slice(counterStart, pbpIdxOf(source, "\n}\n", counterStart));
       const disableLine = counterSource.split("\n").find((line) => /\bsub\.disabled\s*=/.test(line));
       assert(disableLine && disableLine.includes("_pageInfoReady"),
         "the char counter re-derives submit.disabled without consulting page-info readiness");
-      const waitStart = source.indexOf("await _pageInfoPromise", showMainStart);
+      const waitStart = pbpIdxOf(source, "await _pageInfoPromise", showMainStart);
       assert(waitStart > showMainStart && !/disabled\s*=\s*false/.test(source.slice(waitStart, bindIndex)),
         "something re-enables submit between the page-info wait and the handler binding");
     });
@@ -1847,7 +1849,7 @@ async function withPopupSubmitFixture(options, check) {
 
     test("K69: showMain no longer races a 100ms conditional focus against existingBookmark", () => {
       const mainStart = source.indexOf("async function showMain(token)");
-      const mainEnd = source.indexOf("\n// ===================== Existing Bookmark", mainStart);
+      const mainEnd = pbpIdxOf(source, "\n// ===================== Existing Bookmark", mainStart);
       assert(mainStart >= 0 && mainEnd > mainStart, "showMain source not found");
       const mainBody = source.slice(mainStart, mainEnd);
       assert(!mainBody.includes('$id("description-input").focus()'), "showMain still focuses notes on an existing bookmark");
@@ -2003,9 +2005,9 @@ async function withPopupSubmitFixture(options, check) {
     }
 
     await testAsync("K69 fix round 1: showMain reveals an initially-hidden #main-section (unprimed mirror) and still focuses #tags-input", async () => {
-      const showMainStart = source.indexOf("async function showMain(token)");
+      const showMainStart = pbpIdxOf(source, "async function showMain(token)");
       const revealStart = source.indexOf('document.documentElement.dataset.section = "main";', showMainStart);
-      const revealEnd = source.indexOf('const qa = document.querySelector(".quick-actions");', showMainStart);
+      const revealEnd = pbpIdxOf(source, 'const qa = document.querySelector(".quick-actions");', showMainStart);
       assert(revealStart >= 0 && revealEnd > revealStart, "showMain's section-reveal block not found");
       const revealBlock = source.slice(revealStart, revealEnd);
 
@@ -2044,9 +2046,9 @@ async function withPopupSubmitFixture(options, check) {
     // await, exactly like showMain()'s own synchronous classList.add/remove
     // pair -- and asserts the reveal still lands focus on #tags-input.
     await testAsync("K69 fix round 2: a control still focused inside the just-hidden #login-section does not block the #tags-input reveal focus", async () => {
-      const showMainStart = source.indexOf("async function showMain(token)");
+      const showMainStart = pbpIdxOf(source, "async function showMain(token)");
       const revealStart = source.indexOf('document.documentElement.dataset.section = "main";', showMainStart);
-      const revealEnd = source.indexOf('const qa = document.querySelector(".quick-actions");', showMainStart);
+      const revealEnd = pbpIdxOf(source, 'const qa = document.querySelector(".quick-actions");', showMainStart);
       assert(revealStart >= 0 && revealEnd > revealStart, "showMain's section-reveal block not found");
       const revealBlock = source.slice(revealStart, revealEnd);
 
@@ -2087,7 +2089,7 @@ async function withPopupSubmitFixture(options, check) {
     // block, fails loudly here.
     await testAsync("K70: the showMain visibility switch unhides #suggest-row synchronously when optShowSuggestTags is on", async () => {
       const switchStart = source.indexOf('if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {');
-      const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
+      const switchEnd = pbpIdxOf(source, "if (settings.optShowQuickLinks === false) {", switchStart);
       assert(switchStart >= 0 && switchEnd > switchStart, "showMain's visibility-switch block not found");
       const switchBlock = source.slice(switchStart, switchEnd);
       // finding 6: the unhide is now null-guarded (matches its neighbours'
@@ -2108,8 +2110,8 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     await testAsync("K70: with optShowSuggestTags off, the visibility switch leaves #suggest-row hidden", async () => {
-      const switchStart = source.indexOf('if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {');
-      const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
+      const switchStart = pbpIdxOf(source, 'if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {');
+      const switchEnd = pbpIdxOf(source, "if (settings.optShowQuickLinks === false) {", switchStart);
       const switchBlock = source.slice(switchStart, switchEnd);
 
       const suggestRow = createElementStub({ classes: ["hidden", "row"] });
@@ -2127,8 +2129,8 @@ async function withPopupSubmitFixture(options, check) {
     // ONLY "suggest-row" misses, so the rest of the block still resolves
     // real elements and the deref under test genuinely runs.
     await testAsync("finding 6: the showMain visibility switch does not throw when #suggest-row is missing and optShowSuggestTags is on", async () => {
-      const switchStart = source.indexOf('if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {');
-      const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
+      const switchStart = pbpIdxOf(source, 'if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {');
+      const switchEnd = pbpIdxOf(source, "if (settings.optShowQuickLinks === false) {", switchStart);
       const switchBlock = source.slice(switchStart, switchEnd);
       const settingsStub = { optShowSearch: true, optShowAiSummary: true, optShowAiTags: true, optShowSuggestTags: true };
       const run = new Function("$id", "document", "settings", "hasAIKey", switchBlock + "\nreturn true;");
@@ -2152,8 +2154,8 @@ async function withPopupSubmitFixture(options, check) {
       await testAsync("AI setup visibility: " + name, async () => {
         const root = document.createElement("div");
         root.innerHTML = '<div id="ai-setup-row" class="row hidden"></div><div class="row"><div id="ai-suggest-tags"><button id="ai-tags-btn"></button></div></div><button id="ai-summary-btn"></button><span id="ai-summary-hint"></span><div id="suggest-row" class="hidden"></div>';
-        const switchStart = source.indexOf('if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {');
-        const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
+        const switchStart = pbpIdxOf(source, 'if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {');
+        const switchEnd = pbpIdxOf(source, "if (settings.optShowQuickLinks === false) {", switchStart);
         const run = new Function("$id", "document", "settings", "hasAIKey", source.slice(switchStart, switchEnd));
         run(id => root.querySelector("#" + id), document,
           { optShowSearch: true, optShowAiTags: tags, optShowAiSummary: summary, optShowSuggestTags: false }, () => keyed);
@@ -2267,7 +2269,7 @@ async function withPopupSubmitFixture(options, check) {
 
     test("Jina extraction failure falls through to local Defuddle (A9)", () => {
       const fnStart = popupAiSource.indexOf("async function ensurePageText");
-      const fnEnd = popupAiSource.indexOf("async function enrichPageTextIfJina", fnStart);
+      const fnEnd = pbpIdxOf(popupAiSource, "async function enrichPageTextIfJina", fnStart);
       const fn = popupAiSource.slice(fnStart, fnEnd);
       assert(fnStart >= 0 && fnEnd > fnStart, "ensurePageText source not found");
       assert(fn.includes("await enrichPageTextIfJina(s);"), "jina branch present");
@@ -2277,14 +2279,14 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     test("video transcript tier: contains-only, before the configured source, zero cost off video pages (T7.13)", () => {
-      const fnStart = popupAiSource.indexOf("async function ensurePageText");
-      const fnEnd = popupAiSource.indexOf("async function enrichPageTextIfJina", fnStart);
+      const fnStart = pbpIdxOf(popupAiSource, "async function ensurePageText");
+      const fnEnd = pbpIdxOf(popupAiSource, "async function enrichPageTextIfJina", fnStart);
       const fn = popupAiSource.slice(fnStart, fnEnd);
       assert(fn.includes('return "transcript"'), "transcript source reported");
-      assert(fn.includes('if (effectiveEngine === "jina") {') && fn.indexOf("pbpAiTranscriptText(") < fn.indexOf('if (effectiveEngine === "jina") {'), "transcript tier runs before the jina branch");
+      assert(fn.includes('if (effectiveEngine === "jina") {') && pbpIdxOf(fn, "pbpAiTranscriptText(") < pbpIdxOf(fn, 'if (effectiveEngine === "jina") {'), "transcript tier runs before the jina branch");
       assert(!popupAiSource.includes("permissions.request"), "popup-ai.js must never request a permission (automatic path)");
-      const helper = popupAiSource.slice(popupAiSource.indexOf("async function pbpAiVideoGrant"));
-      assert(helper.indexOf("pbpVideoDetect(") < helper.indexOf("permissions.contains"), "URL detect precedes the permission probe: non-video pages never touch permissions");
+      const helper = popupAiSource.slice(pbpIdxOf(popupAiSource, "async function pbpAiVideoGrant"));
+      assert(pbpIdxOf(helper, "pbpVideoDetect(") < pbpIdxOf(helper, "permissions.contains"), "URL detect precedes the permission probe: non-video pages never touch permissions");
       assert(helper.includes("permissions.contains"), "the tier is gated on an existing grant");
       assert(popupAiSource.includes('"md-video.js"'), "the video module is loaded at runtime, on demand");
       assert(!popupHtml.includes("md-video.js"), "popup.html never lists md-video.js: zero parse cost on non-video pages");
@@ -2320,10 +2322,10 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     test("a rider on an in-flight combined never re-enters the combined branch (r2 M4)", () => {
-      const fetchSrc = popupAiSource.slice(popupAiSource.indexOf("async function fetchAIArtifacts"),
-        popupAiSource.indexOf("// ---- AI Summary core logic"));
-      const riderStart = fetchSrc.indexOf("if (_inflightAI.has(combinedKey))");
-      const riderEnd = fetchSrc.indexOf("const otherCached", riderStart);
+      const fetchSrc = popupAiSource.slice(pbpIdxOf(popupAiSource, "async function fetchAIArtifacts"),
+        pbpIdxOf(popupAiSource, "// ---- AI Summary core logic"));
+      const riderStart = pbpIdxOf(fetchSrc, "if (_inflightAI.has(combinedKey))");
+      const riderEnd = pbpIdxOf(fetchSrc, "const otherCached", riderStart);
       const rider = fetchSrc.slice(riderStart, riderEnd);
       assert(rider.includes("return callSingle();"), "rider must exit via single call, not fall through");
     });
@@ -2344,7 +2346,7 @@ async function withPopupSubmitFixture(options, check) {
       const stillCount = (popupAiSource.match(/_aiOpStillCurrent\(account\)/g) || []).length;
       assert(stillCount >= 8, "doAISummary/doAITags commits must gate on stillCurrent, got " + stillCount);
       assert(popupAiSource.includes("_aiOpStillCurrent(restoreAccount)"), "auto-restore must carry the URL guard too");
-      const lookupFn = popupAiSource.slice(popupAiSource.indexOf("async function _aiAwaitBookmarkLookup"), popupAiSource.indexOf("function _aiOpStillCurrent"));
+      const lookupFn = popupAiSource.slice(pbpIdxOf(popupAiSource, "async function _aiAwaitBookmarkLookup"), pbpIdxOf(popupAiSource, "function _aiOpStillCurrent"));
       assert(lookupFn.includes("for (let i = 0; i < 5; i++)") && lookupFn.includes("cur === p || !cur"),
         "lookup await must re-settle a replaced promise (bounded)");
     });
@@ -2361,19 +2363,19 @@ async function withPopupSubmitFixture(options, check) {
 
     test("summary paths settle the bookmark lookup before touching the notes (A2)", () => {
       assert(popupAiSource.includes("async function _aiAwaitBookmarkLookup"), "lookup-settle helper missing");
-      const doSummary = popupAiSource.slice(popupAiSource.indexOf("async function doAISummary"), popupAiSource.indexOf("// ---- Show regenerate"));
+      const doSummary = popupAiSource.slice(pbpIdxOf(popupAiSource, "async function doAISummary"), pbpIdxOf(popupAiSource, "// ---- Show regenerate"));
       assert(doSummary.includes("await _aiAwaitBookmarkLookup();"), "doAISummary must settle the lookup first");
-      const setupAi = popupAiSource.slice(popupAiSource.indexOf("function setupAIFeatures()"), popupAiSource.indexOf("function _aiSummaryBlockMatches"));
+      const setupAi = popupAiSource.slice(pbpIdxOf(popupAiSource, "function setupAIFeatures()"), pbpIdxOf(popupAiSource, "function _aiSummaryBlockMatches"));
       assert(setupAi.includes("_aiAwaitBookmarkLookup()"), "cached-summary auto-restore must settle the lookup first");
-      assert(setupAi.indexOf("_aiAwaitBookmarkLookup()") < setupAi.indexOf("pbpShouldRestoreCachedSummary"),
+      assert(pbpIdxOf(setupAi, "_aiAwaitBookmarkLookup()") < pbpIdxOf(setupAi, "pbpShouldRestoreCachedSummary"),
         "restore guard must run AFTER the lookup settles");
     });
 
     await testAsync("cached summary initialization waits for a lookup started after setup", async () => {
       const lookupStart = popupAiSource.indexOf("async function _aiAwaitBookmarkLookup");
-      const lookupEnd = popupAiSource.indexOf("function _aiOpStillCurrent", lookupStart);
+      const lookupEnd = pbpIdxOf(popupAiSource, "function _aiOpStillCurrent", lookupStart);
       const blockStart = popupAiSource.indexOf("  const restoreAccount = pbpPopupAiAccount();");
-      const blockEnd = popupAiSource.indexOf('  $id("ai-tags-btn").addEventListener', blockStart);
+      const blockEnd = pbpIdxOf(popupAiSource, '  $id("ai-tags-btn").addEventListener', blockStart);
       assert(lookupStart >= 0 && lookupEnd > lookupStart && blockStart >= 0 && blockEnd > blockStart,
         "cached-summary initialization source not found");
       const events = [];
@@ -2417,10 +2419,10 @@ async function withPopupSubmitFixture(options, check) {
     // the restore adopts a summary already in the notes, and leaves a
     // restored draft (the user's own last state) alone.
     await testAsync("reopening never appends a second copy of the cached summary", async () => {
-      const lookupStart = popupAiSource.indexOf("async function _aiAwaitBookmarkLookup");
-      const lookupEnd = popupAiSource.indexOf("function _aiOpStillCurrent", lookupStart);
-      const blockStart = popupAiSource.indexOf("  const restoreAccount = pbpPopupAiAccount();");
-      const blockEnd = popupAiSource.indexOf('  $id("ai-tags-btn").addEventListener', blockStart);
+      const lookupStart = pbpIdxOf(popupAiSource, "async function _aiAwaitBookmarkLookup");
+      const lookupEnd = pbpIdxOf(popupAiSource, "function _aiOpStillCurrent", lookupStart);
+      const blockStart = pbpIdxOf(popupAiSource, "  const restoreAccount = pbpPopupAiAccount();");
+      const blockEnd = pbpIdxOf(popupAiSource, '  $id("ai-tags-btn").addEventListener', blockStart);
       const run = async ({ notes, adopt, restored = [] }) => {
         const events = [];
         sliceRuntime({
@@ -2449,8 +2451,8 @@ async function withPopupSubmitFixture(options, check) {
       // A draft that changed only other fields does not speak for the notes.
       const otherFields = await run({ notes: "", adopt: null, restored: ["tags", "title"] });
       assert(otherFields === "adopt-check,upsert", "a draft that left the notes alone blocked the cached summary: " + otherFields);
-      const hs = popupAiSource.indexOf("function pbpAiWrapSummary");
-      const he = popupAiSource.indexOf("const AI_BQ_REGEX", hs);
+      const hs = pbpIdxOf(popupAiSource, "function pbpAiWrapSummary");
+      const he = pbpIdxOf(popupAiSource, "const AI_BQ_REGEX", hs);
       const helpers = sliceRuntime({ escapeForExtended: (v) => v }, popupAiSource.slice(hs, he) +
         "; return { pbpAiWrapSummary, pbpAiFindLastExactSummaryRange };");
       const range = helpers.pbpAiFindLastExactSummaryRange("note\n\n" + helpers.pbpAiWrapSummary("cached summary"), "cached summary");
@@ -2461,7 +2463,7 @@ async function withPopupSubmitFixture(options, check) {
 
     test("batch startup account race writes a terminal progress record (A13)", () => {
       const fnStart = backgroundSource.indexOf("async function _runBatchSave");
-      const guardEnd = backgroundSource.indexOf("const total = tabs.length", fnStart);
+      const guardEnd = pbpIdxOf(backgroundSource, "const total = tabs.length", fnStart);
       const guard = backgroundSource.slice(fnStart, guardEnd);
       assert(fnStart >= 0 && guardEnd > fnStart, "_runBatchSave source not found");
       assert(guard.includes('error: "account_changed"') && guard.includes("done: true"),
@@ -2497,7 +2499,7 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     await testAsync("provenance survives hotkeys, removal, and form switches (r2 M3)", async () => {
-      const hotkey = source.slice(source.indexOf('document.querySelector(`.stag[data-alt-num='));
+      const hotkey = source.slice(pbpIdxOf(source, 'document.querySelector(`.stag[data-alt-num='));
       assert(hotkey.slice(0, 400).includes("el.click();") && !hotkey.slice(0, 400).includes("addTag(el.dataset.tag)"),
         "Alt+N must route through the chip click handler");
       const removeSrc = await fetch("../popup-tags.js").then(r => r.text());
@@ -2506,7 +2508,7 @@ async function withPopupSubmitFixture(options, check) {
       const from = removeSrc.indexOf("function removeTag(");
       assert(from >= 0, "removeTag missing from popup-tags.js");
       const removal = new Function("pbpTagDedupeKey", "_aiSessionAddedTags", "currentTags", "renderTags",
-        '"use strict";\nlet _tagsUserTouched = false;\n' + removeSrc.slice(from, removeSrc.indexOf("\n}", from) + 2) +
+        '"use strict";\nlet _tagsUserTouched = false;\n' + removeSrc.slice(from, pbpIdxOf(removeSrc, "\n}", from) + 2) +
         "\nreturn { removeTag, tags: () => currentTags, touched: () => _tagsUserTouched };");
       const provenance = new Set([pbpTagDedupeKey("web-design"), pbpTagDedupeKey("python")]);
       const r = removal(pbpTagDedupeKey, provenance, ["python", "web_design", "rust"], () => {});
@@ -2538,21 +2540,21 @@ async function withPopupSubmitFixture(options, check) {
       counts = {}, bookmarkNames = [], attach = false, duringCall = null, lateLookup = false,
       disableRefreshedChip = false, urlClean }) {
       const renderStart = popupAiSource.indexOf("function renderAITags(");
-      const renderEnd = popupAiSource.indexOf("\n}\n", renderStart);
+      const renderEnd = pbpIdxOf(popupAiSource, "\n}\n", renderStart);
       assert(renderStart >= 0 && renderEnd > renderStart, "renderAITags source not found");
       const urlStart = popupAiSource.indexOf("function _aiUrlEquivalent");
-      const urlEnd = popupAiSource.indexOf("function pbpAiSyncUrlEditState", urlStart);
+      const urlEnd = pbpIdxOf(popupAiSource, "function pbpAiSyncUrlEditState", urlStart);
       assert(urlStart >= 0 && urlEnd > urlStart, "URL-equivalence helpers not found");
       // The real op-liveness guard, not a stub: it is what decides whether the
       // handler's finally may write the retraction back into the form.
       const acctStart = popupAiSource.indexOf("function pbpPopupAiAccount()");
-      const acctEnd = popupAiSource.indexOf("function setAiProgress", acctStart);
+      const acctEnd = pbpIdxOf(popupAiSource, "function setAiProgress", acctStart);
       assert(acctStart >= 0 && acctEnd > acctStart, "account helpers not found");
       const liveStart = popupAiSource.indexOf("function _aiOpStillCurrent");
-      const liveEnd = popupAiSource.indexOf("function pbpAiWrapSummary", liveStart);
+      const liveEnd = pbpIdxOf(popupAiSource, "function pbpAiWrapSummary", liveStart);
       assert(liveStart >= 0 && liveEnd > liveStart, "op-liveness guard not found");
       const alignStart = popupAiSource.indexOf("function finalizeAITags(");
-      const alignEnd = popupAiSource.indexOf("// The two codes the worker mints itself", alignStart);
+      const alignEnd = pbpIdxOf(popupAiSource, "// The two codes the worker mints itself", alignStart);
       assert(alignStart >= 0 && alignEnd > alignStart, "AI tag alignment source not found");
 
       const container = document.createElement("div");
@@ -2564,9 +2566,9 @@ async function withPopupSubmitFixture(options, check) {
       let badgeCalls = 0;
       const calls = { renderTags: 0, doAITags: 0, status: [] };
       const tagAddRemoveSource = popupTagsSource.slice(
-        popupTagsSource.indexOf("function addTag("), popupTagsSource.indexOf("function renderTags() {"));
+        pbpIdxOf(popupTagsSource, "function addTag("), pbpIdxOf(popupTagsSource, "function renderTags() {"));
       const clearStart = popupTagsSource.indexOf('$id("tags-clear-all")?.addEventListener("click"');
-      const clearEnd = popupTagsSource.indexOf('$id("tags-copy-all")', clearStart);
+      const clearEnd = pbpIdxOf(popupTagsSource, '$id("tags-copy-all")', clearStart);
       assert(clearStart >= 0 && clearEnd > clearStart, "clear-all source not found");
       const clearAllSource = popupTagsSource.slice(clearStart, clearEnd);
       // `const URL = ...` at the top of this page is a GLOBAL LEXICAL binding,
@@ -2624,7 +2626,7 @@ async function withPopupSubmitFixture(options, check) {
         "return { renderAITags, addTag, removeTag, provenance: _aiSessionAddedTags, tags: () => currentTags.slice()," +
         " touched: () => _tagsUserTouched, account: pbpPopupAiAccount, show: pbpShowAITagResult, refresh: pbpRefreshDisplayedAITagsForBookmark," +
         " setLookup: state => {bookmarkLookup=state;}, acceptLookup: post => { const existingBookmark=post; let submittedTags; const preserveLiveTags=false; const pbpPopupDraftRestoredField=()=>false; " +
-        source.slice(source.indexOf("        const ownTagNames ="), source.indexOf('        $id("submit-btn").textContent = t("update");', source.indexOf("        const ownTagNames ="))) + "} };"
+        source.slice(pbpIdxOf(source, "        const ownTagNames ="), pbpIdxOf(source, '        $id("submit-btn").textContent = t("update");', pbpIdxOf(source, "        const ownTagNames ="))) + "} };"
       );
 
       if (lateLookup) runtime.show(tags, true, {pinboardToken:"alice:0123456789ABCDEF"}, runtime.account());
@@ -2829,7 +2831,7 @@ async function withPopupSubmitFixture(options, check) {
 
     function summaryHelpers() {
       const helperStart = popupAiSource.indexOf("function pbpAiWrapSummary");
-      const helperEnd = popupAiSource.indexOf("const AI_BQ_REGEX", helperStart);
+      const helperEnd = pbpIdxOf(popupAiSource, "const AI_BQ_REGEX", helperStart);
       assert(helperStart >= 0 && helperEnd > helperStart, "summary ownership helpers missing");
       return sliceRuntime({
         escapeForExtended: (value) => "[" + value + "]",
@@ -2847,7 +2849,7 @@ async function withPopupSubmitFixture(options, check) {
       const from = popupAiSource.indexOf("function _aiUrlEquivalent(");
       assert(from >= 0, "_aiUrlEquivalent missing from popup-ai.js");
       return sliceRuntime({ pbpAiPageUrlNorm: summaryReceiptApi().pbpAiPageUrlNorm },
-        popupAiSource.slice(from, popupAiSource.indexOf("\n}", from) + 2) + "\nreturn _aiUrlEquivalent;");
+        popupAiSource.slice(from, pbpIdxOf(popupAiSource, "\n}", from) + 2) + "\nreturn _aiUrlEquivalent;");
     })();
 
     // The same-page check also asks for the popup's own cleaned address of its
@@ -2859,7 +2861,7 @@ async function withPopupSubmitFixture(options, check) {
       assert(from >= 0, "_loadUrlCleanSettings missing from popup.js");
       const holds = popupAiSource.indexOf("function pbpPopupFormHoldsOpenedPage(");
       assert(holds >= 0, "pbpPopupFormHoldsOpenedPage missing from popup-ai.js");
-      return source.slice(from, source.indexOf("\n}", from) + 2) + "\n" + popupAiSource.slice(holds, popupAiSource.indexOf("\n}", holds) + 2);
+      return source.slice(from, pbpIdxOf(source, "\n}", from) + 2) + "\n" + popupAiSource.slice(holds, pbpIdxOf(popupAiSource, "\n}", holds) + 2);
     })();
 
     // One builder for the sliced Description prefill. The slice runs in strict
@@ -2868,10 +2870,10 @@ async function withPopupSubmitFixture(options, check) {
     // sloppy-mode implicit global. `initial` seeds the Description state
     // (default: known, nothing pending, no page text); the returned function
     // runs the prefill once and reports the state it left behind.
-    const hintStart = source.indexOf("// The grey hint in an empty Description box:");
-    const hintSource = source.slice(hintStart, source.indexOf("\n}\n", hintStart) + 3);
+    const hintStart = pbpIdxOf(source, "// The grey hint in an empty Description box:");
+    const hintSource = source.slice(hintStart, pbpIdxOf(source, "\n}\n", hintStart) + 3);
     const prefillHarness = ({ known = true, pending = false, pageText = null } = {}) => {
-      const start = source.indexOf("function pbpPopupPrefillDescription("), end = source.indexOf("function recomputeArchiveCheck(", start);
+      const start = source.indexOf("function pbpPopupPrefillDescription("), end = pbpIdxOf(source, "function recomputeArchiveCheck(", start);
       assert(start >= 0 && end > start, "prefill source not found");
       const run = (pageInfo, settings, shouldUpdateField, $id) => sliceRuntime({
         pageInfo, settings, shouldUpdateField, $id, pbpNotesDescription, pbpPageInfoReadable, t: key => key, _aiUrlEquivalent: aiUrlEquivalent, _initial: { known, pending, pageText }
@@ -3008,7 +3010,7 @@ async function withPopupSubmitFixture(options, check) {
     // the real one is handed in. The prefix comes from its real declaration.
     function summaryReceiptApi({ stripTrackingParams = (url) => ({ cleaned: String(url) }) } = {}) {
       const start = aiCacheSource.indexOf("// ---- Summary ownership receipts ----");
-      const end = aiCacheSource.indexOf("// ---- End summary ownership receipts ----", start);
+      const end = pbpIdxOf(aiCacheSource, "// ---- End summary ownership receipts ----", start);
       const prefix = aiCacheSource.match(/^const _PBP_AI_SUMMARY_OWNER_PREFIX = .*;$/m);
       assert(start >= 0 && end > start && prefix, "summary ownership receipt section missing");
       const entries = new Map();
@@ -3035,7 +3037,7 @@ async function withPopupSubmitFixture(options, check) {
     function summaryOwnershipRuntime(description, service = "pinboard") {
       const receipts = summaryReceiptApi();
       const start = popupAiSource.indexOf("function _aiUrlEquivalent");
-      const end = popupAiSource.indexOf("// ---- Setup AI feature listeners ----", start);
+      const end = pbpIdxOf(popupAiSource, "// ---- Setup AI feature listeners ----", start);
       assert(start >= 0 && end > start, "summary ownership runtime missing");
       const api = sliceRuntime({
         pbpAiPageUrlNorm: receipts.pbpAiPageUrlNorm,
@@ -3051,7 +3053,7 @@ async function withPopupSubmitFixture(options, check) {
     function summaryRestoreRuntime(description, options = {}) {
       const receipts = summaryReceiptApi();
       const start = popupAiSource.indexOf("function _aiUrlEquivalent");
-      const end = popupAiSource.indexOf('// Unified "no AI key"', start);
+      const end = pbpIdxOf(popupAiSource, '// Unified "no AI key"', start);
       assert(start >= 0 && end > start, "summary restore runtime missing");
       const field = { value: description };
       const urlField = { value: URL };
@@ -3365,7 +3367,7 @@ async function withPopupSubmitFixture(options, check) {
       assert(!invalid.removed && invalid.value === value, "invalid ownership guessed a deletion");
 
       const runtimeStart = popupAiSource.indexOf("function pbpAiWrapSummary");
-      const runtimeEnd = popupAiSource.indexOf("// Unified \"no AI key\"", runtimeStart);
+      const runtimeEnd = pbpIdxOf(popupAiSource, "// Unified \"no AI key\"", runtimeStart);
       assert(runtimeStart >= 0 && runtimeEnd > runtimeStart, "summary runtime source missing");
       const createRuntime = (description, service = "pinboard") => {
         const field = { value: description };
@@ -3399,7 +3401,7 @@ async function withPopupSubmitFixture(options, check) {
 
     await testAsync("popup summary cache, render, and inflight work are session-account scoped", async () => {
       const fetchStart = popupAiSource.indexOf("async function fetchAIArtifacts");
-      const fetchEnd = popupAiSource.indexOf("// ---- AI Summary core logic", fetchStart);
+      const fetchEnd = pbpIdxOf(popupAiSource, "// ---- AI Summary core logic", fetchStart);
       assert(fetchStart >= 0 && fetchEnd > fetchStart, "fetchAIArtifacts source not found");
       const keys = [];
       let currentAccount = "alice";
@@ -3429,15 +3431,15 @@ async function withPopupSubmitFixture(options, check) {
       assert(keys.join("|") === `alice|openai#summary|summary|${URL}|local|bob|openai#summary|summary|${URL}|local`,
         "summary inflight key is not owner+fingerprint-scoped: " + keys.join("|"));
 
-      const setupAi = popupAiSource.slice(popupAiSource.indexOf("function setupAIFeatures()"), popupAiSource.indexOf("// ---- Insert or replace AI summary"));
-      const doSummary = popupAiSource.slice(popupAiSource.indexOf("async function doAISummary"), popupAiSource.indexOf("// ---- Show regenerate"));
-      const doTags = popupAiSource.slice(popupAiSource.indexOf("async function doAITags"), popupAiSource.indexOf("function renderAITags"));
+      const setupAi = popupAiSource.slice(pbpIdxOf(popupAiSource, "function setupAIFeatures()"), pbpIdxOf(popupAiSource, "// ---- Insert or replace AI summary"));
+      const doSummary = popupAiSource.slice(pbpIdxOf(popupAiSource, "async function doAISummary"), pbpIdxOf(popupAiSource, "// ---- Show regenerate"));
+      const doTags = popupAiSource.slice(pbpIdxOf(popupAiSource, "async function doAITags"), pbpIdxOf(popupAiSource, "function renderAITags"));
       assert(setupAi.includes("restoreAccount") && setupAi.includes("_aiOpStillCurrent(restoreAccount)"),
         "cached summary restore lacks owner recheck (stillCurrent = account + URL liveness)");
       // The fast-path read goes through pbpAiFastCached (transcript namespace
       // first on video pages, T7.13); it must still carry the account and the
       // settings fingerprint into every getAICache probe it makes.
-      const fastCached = popupAiSource.slice(popupAiSource.indexOf("async function pbpAiFastCached"), popupAiSource.indexOf("// ---- Video transcript as AI content"));
+      const fastCached = popupAiSource.slice(pbpIdxOf(popupAiSource, "async function pbpAiFastCached"), pbpIdxOf(popupAiSource, "// ---- Video transcript as AI content"));
       assert(doSummary.includes('pbpAiFastCached("summary", s, account)') &&
         fastCached.includes("getAICache(pageInfo.url, kind, s.aiCacheDuration, src, account, s)") &&
         doSummary.includes('setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s)'),
@@ -3460,16 +3462,16 @@ async function withPopupSubmitFixture(options, check) {
     // executed paths touch is injected, PBP_AI_VIA_SW included, so both sides
     // of the rollback switch are reachable from here.
     const k44SliceA = popupAiSource.slice(
-      popupAiSource.indexOf("function finalizeAITags"),
-      popupAiSource.indexOf("function _aiResetSummaryActions"));
+      pbpIdxOf(popupAiSource, "function finalizeAITags"),
+      pbpIdxOf(popupAiSource, "function _aiResetSummaryActions"));
     const k44SliceB = popupAiSource.slice(
-      popupAiSource.indexOf("async function doAITags"),
-      popupAiSource.indexOf("// Tags added via AI chips"));
+      pbpIdxOf(popupAiSource, "async function doAITags"),
+      pbpIdxOf(popupAiSource, "// Tags added via AI chips"));
     // The error card itself, for the cases that judge RENDERED text rather than
     // the Error object handed to it.
     const k44SliceC = popupAiSource.slice(
-      popupAiSource.indexOf("function showAIError(op, err, opSettings)"),
-      popupAiSource.indexOf("let _aiErrorHideTimer = null;"));
+      pbpIdxOf(popupAiSource, "function showAIError(op, err, opSettings)"),
+      pbpIdxOf(popupAiSource, "let _aiErrorHideTimer = null;"));
     assert(k44SliceC.includes("ai-error-message"), "showAIError source not found");
     // The real table, sliced out rather than retyped: a renamed label must not
     // be able to pass here and fail in the product.
@@ -3478,8 +3480,8 @@ async function withPopupSubmitFixture(options, check) {
       return sub === undefined ? raw : raw.replace(/\$[A-Za-z0-9_]+\$|\{0\}|%s/, sub);
     };
     const providerLabelSource = popupAiSource.slice(
-      popupAiSource.indexOf("const AI_PROVIDER_LABEL = {"),
-      popupAiSource.indexOf("// Find first provider OTHER than"));
+      pbpIdxOf(popupAiSource, "const AI_PROVIDER_LABEL = {"),
+      pbpIdxOf(popupAiSource, "// Find first provider OTHER than"));
     const { AI_PROVIDER_LABEL, pbpAiProviderLabel } = sliceFn("t", providerLabelSource +
       "; return { AI_PROVIDER_LABEL, pbpAiProviderLabel };")(tEn);
     assert(AI_PROVIDER_LABEL.openai === "OpenAI", "provider label table not found");
@@ -3516,16 +3518,16 @@ async function withPopupSubmitFixture(options, check) {
     // copy to identity, and a cleaned-address case on it would pass vacuously.
     const pageGuardSource = (() => {
       const from = popupAiSource.indexOf("function _aiUrlEquivalent(");
-      const to = popupAiSource.indexOf("// Settle any in-flight same-URL bookmark lookup", from);
+      const to = pbpIdxOf(popupAiSource, "// Settle any in-flight same-URL bookmark lookup", from);
       const live = popupAiSource.indexOf("function _aiOpStillCurrent(");
       const clean = source.indexOf("function _loadUrlCleanSettings(");
       assert(from >= 0 && to > from && live >= 0 && clean >= 0, "same-page guard source not found");
-      return popupAiSource.slice(from, to) + "\n" + popupAiSource.slice(live, popupAiSource.indexOf("\n}", live) + 2)
-        + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2);
+      return popupAiSource.slice(from, to) + "\n" + popupAiSource.slice(live, pbpIdxOf(popupAiSource, "\n}", live) + 2)
+        + "\n" + source.slice(clean, pbpIdxOf(source, "\n}", clean) + 2);
     })();
     const pageGuardStrip = (() => {
       const from = sharedSource.indexOf("function stripTrackingParams(");
-      const to = sharedSource.indexOf("// True when two URLs refer to the same bookmark", from);
+      const to = pbpIdxOf(sharedSource, "// True when two URLs refer to the same bookmark", from);
       assert(from >= 0 && to > from, "stripTrackingParams source not found");
       const strip = new Function("URL", sharedSource.slice(from, to) + "\nreturn stripTrackingParams;")(window.URL);
       assert(strip(URL + "?utm_source=x", {}).cleaned === URL, "the re-scoped stripTrackingParams is still degraded");
@@ -3664,8 +3666,8 @@ async function withPopupSubmitFixture(options, check) {
       // With the real card appended, its declaration shadows the showAIError
       // parameter above - the cases that want rendered text opt in, the rest
       // keep the recording stub.
-      const realSummary = o.realSummary ? popupAiSource.slice(popupAiSource.indexOf("function upsertSummary("), popupAiSource.indexOf('// Unified "no AI key"')) : "";
-      const realDraftEdit = o.realSummary ? source.slice(source.indexOf("function pbpPopupDraftFieldEdited("),source.indexOf("function setupPopupDraftTracking(")) : "";
+      const realSummary = o.realSummary ? popupAiSource.slice(pbpIdxOf(popupAiSource, "function upsertSummary("), pbpIdxOf(popupAiSource, '// Unified "no AI key"')) : "";
+      const realDraftEdit = o.realSummary ? source.slice(pbpIdxOf(source, "function pbpPopupDraftFieldEdited("),pbpIdxOf(source, "function setupPopupDraftTracking(")) : "";
       // realPageGuard: the same-page check itself is real (popup-ai.js's guard
       // functions over the real cleaning and the stored urlClean settings), so
       // the case decides which addresses count as the opened page.
@@ -3847,9 +3849,9 @@ async function withPopupSubmitFixture(options, check) {
     // is refused before anything starts.
     function summaryLinksRuntime({ urlClean, pageUrl, formUrl }) {
       const from = popupAiSource.indexOf("function _aiUrlEquivalent(");
-      const to = popupAiSource.indexOf("function pbpAiSyncUrlEditState", from);
+      const to = pbpIdxOf(popupAiSource, "function pbpAiSyncUrlEditState", from);
       const start = popupAiSource.indexOf("function showSummaryActions(");
-      const end = popupAiSource.indexOf("\n}\n", start);
+      const end = pbpIdxOf(popupAiSource, "\n}\n", start);
       const clean = source.indexOf("function _loadUrlCleanSettings(");
       assert(from >= 0 && to > from && start >= 0 && end > start && clean >= 0, "summary action source not found");
       const bar = document.createElement("div");
@@ -3860,7 +3862,7 @@ async function withPopupSubmitFixture(options, check) {
       const calls = { doAISummary: 0, status: [] };
       const show = sliceFn("$id", "t", "pageInfo", "settings", "stripTrackingParams", "pbpAiPageUrlNorm",
         "doAISummary", "showStatus", "removeSummary", "_aiResetSummaryActions",
-        popupAiSource.slice(from, to) + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) + "\n" +
+        popupAiSource.slice(from, to) + "\n" + source.slice(clean, pbpIdxOf(source, "\n}", clean) + 2) + "\n" +
         popupAiSource.slice(start, end + 2) + "\nreturn showSummaryActions;"
       )(id => fields[id] || null, key => key, { url: pageUrl }, { urlClean }, pageGuardStrip,
         summaryReceiptApi({ stripTrackingParams: pageGuardStrip }).pbpAiPageUrlNorm,
@@ -3903,12 +3905,12 @@ async function withPopupSubmitFixture(options, check) {
     // another page's; the worker then leaves the receipt alone.
     function ownershipSnapshotRuntime(pageUrl, formUrl) {
       const from = popupAiSource.indexOf("function _aiUrlEquivalent");
-      const to = popupAiSource.indexOf("// ---- Setup AI feature listeners ----", from);
+      const to = pbpIdxOf(popupAiSource, "// ---- Setup AI feature listeners ----", from);
       const clean = source.indexOf("function _loadUrlCleanSettings(");
       assert(from >= 0 && to > from && clean >= 0, "summary ownership runtime missing");
       const fields = { "url-input": { value: formUrl } };
       return sliceFn("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "_AI_BQ_REGEX_SHARED", "$id", "pageInfo", "existingBookmark", "settings", "stripTrackingParams",
-        popupAiSource.slice(from, to) + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) +
+        popupAiSource.slice(from, to) + "\n" + source.slice(clean, pbpIdxOf(source, "\n}", clean) + 2) +
         "; return { snapshot: pbpAiSummaryOwnershipSnapshot, checked(url) { _aiSummaryOwnershipChecked = { bookmark: existingBookmark, url }; } };"
       )(summaryReceiptApi({ stripTrackingParams: pageGuardStrip }).pbpAiPageUrlNorm, summaryReceiptApi().pbpAiSummaryRangeValid, /$a/g,
         id => fields[id] || null, { url: pageUrl }, null,
@@ -3935,9 +3937,9 @@ async function withPopupSubmitFixture(options, check) {
     // summary replaces it instead of appending a second one.
     await testAsync("a summary saved from a cleaned address is owned again on reopen without an AI cache", async () => {
       const from = popupAiSource.indexOf("function _aiUrlEquivalent");
-      const to = popupAiSource.indexOf('// Unified "no AI key"', from);
+      const to = pbpIdxOf(popupAiSource, '// Unified "no AI key"', from);
       const blockStart = popupAiSource.indexOf("  const restoreAccount = pbpPopupAiAccount();");
-      const blockEnd = popupAiSource.indexOf('  $id("ai-tags-btn").addEventListener', blockStart);
+      const blockEnd = pbpIdxOf(popupAiSource, '  $id("ai-tags-btn").addEventListener', blockStart);
       const clean = source.indexOf("function _loadUrlCleanSettings(");
       assert(from >= 0 && to > from && blockStart >= 0 && blockEnd > blockStart && clean >= 0, "summary restore source missing");
       const cleaning = (aggressiveMode, customParams) => ({ enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode, customParams, excludeParams: [] });
@@ -3958,7 +3960,7 @@ async function withPopupSubmitFixture(options, check) {
           const api = sliceFn("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "pbpAiLoadSummaryOwnership", "_AI_BQ_REGEX_SHARED",
             "$id", "pbpPopupAiAccount", "pbpPopupAiAccountIsCurrent", "pbpAiFastCached", "pageInfo", "existingBookmark", "settings",
             "stripTrackingParams", "escapeForExtended", "showSummaryActions", "pbpShouldRestoreCachedSummary", "updateCharCount", "autoResizeTextarea",
-            "let bookmarkLookup = { promise: null };" + popupAiSource.slice(from, to) + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) +
+            "let bookmarkLookup = { promise: null };" + popupAiSource.slice(from, to) + "\n" + source.slice(clean, pbpIdxOf(source, "\n}", clean) + 2) +
             "\nfunction start() {" + popupAiSource.slice(blockStart, blockEnd) + "}" +
             "\nreturn { start, upsertSummary, snapshot: pbpAiSummaryOwnershipSnapshot };"
           )(receipts.pbpAiPageUrlNorm, receipts.pbpAiSummaryRangeValid, receipts.pbpAiLoadSummaryOwnership, _AI_BQ_REGEX_SHARED,
@@ -3985,11 +3987,11 @@ async function withPopupSubmitFixture(options, check) {
     // completed check vouches for "none" under the address the save writes.
     await testAsync("a summary click and a new page's restore read the receipt under the cleaned address", async () => {
       const from = popupAiSource.indexOf("function _aiUrlEquivalent");
-      const to = popupAiSource.indexOf('// Unified "no AI key"', from);
+      const to = pbpIdxOf(popupAiSource, '// Unified "no AI key"', from);
       const blockStart = popupAiSource.indexOf("  const restoreAccount = pbpPopupAiAccount();");
-      const blockEnd = popupAiSource.indexOf('  $id("ai-tags-btn").addEventListener', blockStart);
+      const blockEnd = pbpIdxOf(popupAiSource, '  $id("ai-tags-btn").addEventListener', blockStart);
       const sumFrom = popupAiSource.indexOf("async function doAISummary(");
-      const sumTo = popupAiSource.indexOf("function _aiResetSummaryActions()", sumFrom);
+      const sumTo = pbpIdxOf(popupAiSource, "function _aiResetSummaryActions()", sumFrom);
       const clean = source.indexOf("function _loadUrlCleanSettings(");
       assert(from >= 0 && to > from && blockStart >= 0 && blockEnd > blockStart && sumFrom >= 0 && sumTo > sumFrom && clean >= 0,
         "summary ownership sources missing");
@@ -4003,7 +4005,7 @@ async function withPopupSubmitFixture(options, check) {
           "stripTrackingParams", "escapeForExtended", "showSummaryActions", "pbpShouldRestoreCachedSummary", "updateCharCount", "autoResizeTextarea",
           "hasAIKey", "showSetKeyError", "showStatus", "t",
           "let bookmarkLookup = { promise: null };" + popupAiSource.slice(from, to) + "\n" + popupAiSource.slice(sumFrom, sumTo) +
-          "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) +
+          "\n" + source.slice(clean, pbpIdxOf(source, "\n}", clean) + 2) +
           "\nfunction start() {" + popupAiSource.slice(blockStart, blockEnd) + "}" +
           "\nreturn { start, doAISummary, snapshot: pbpAiSummaryOwnershipSnapshot };"
         )(receipts.pbpAiPageUrlNorm, receipts.pbpAiSummaryRangeValid, receipts.pbpAiLoadSummaryOwnership, _AI_BQ_REGEX_SHARED,
@@ -4043,7 +4045,7 @@ async function withPopupSubmitFixture(options, check) {
     });
     function pressCombinedAi(h) {
       const startAt = source.indexOf('  document.addEventListener("keydown", function onPopupShortcut(e) {');
-      const endAt = source.indexOf("\n  });\n", startAt);
+      const endAt = pbpIdxOf(source, "\n  });\n", startAt);
       assert(startAt >= 0 && endAt > startAt, "Shift+Enter listener missing");
       let handler;
       const runs = {};
@@ -4427,16 +4429,16 @@ async function withPopupSubmitFixture(options, check) {
       assert(labelZh("custom") === "自定义", "custom provider name is not localized: " + labelZh("custom"));
       assert(labelZh("zhipu") === "Zhipu", "brand name lost: " + labelZh("zhipu"));
       assert(labelZh("qwen") === "百炼", "Model Studio short name is not localized: " + labelZh("qwen"));
-      const progressSrc = popupAiSource.slice(popupAiSource.indexOf("function setAiProgress("),
-        popupAiSource.indexOf("function clearAiProgress("));
+      const progressSrc = popupAiSource.slice(pbpIdxOf(popupAiSource, "function setAiProgress("),
+        pbpIdxOf(popupAiSource, "function clearAiProgress("));
       const label = { textContent: "", setAttribute() {} };
       const btn = { childNodes: [], dataset: {}, classList: { contains: () => false }, querySelector: () => label };
       sliceFn("$id", "t", "pbpAiProviderLabel", "AI_BUTTON_BASE_TEXT", "AI_STAGE_STARTED", "AI_STAGE_TIMERS", "Node", "setTimeout",
         progressSrc + "\nreturn setAiProgress;")(() => btn, tZh, labelZh, new Map(), new Map(), new Map(), { TEXT_NODE: 3 }, () => 0)(
         "ai-summary-btn", { provider: "custom", stage: "calling" });
       assert(label.textContent === " · 调用 自定义…", "progress label shows the internal id: " + label.textContent);
-      const card = popupAiSource.slice(popupAiSource.indexOf("function showAIError(op, err, opSettings)"),
-        popupAiSource.indexOf("let _aiErrorHideTimer = null;"));
+      const card = popupAiSource.slice(pbpIdxOf(popupAiSource, "function showAIError(op, err, opSettings)"),
+        pbpIdxOf(popupAiSource, "let _aiErrorHideTimer = null;"));
       assert(!/AI_PROVIDER_LABEL\[/.test(card), "the error card bypasses the display-name helper");
     });
 
@@ -4450,16 +4452,16 @@ async function withPopupSubmitFixture(options, check) {
     const realAi = sliceFn("t", "URL", "chrome", sharedSource + "\n" + aiJsSource +
       "\nreturn { hasAIKey, pbpAiResolveTarget, pbpAiExpandProviderOrder, pbpAiFirstConfiguredProvider, pbpAiCustomKeySeal, pbpSanitizeAiOverrides };")(
       tEn, window.URL, undefined);
-    const fallbackSrc = popupAiSource.slice(popupAiSource.indexOf("const AI_PROVIDER_ORDER = ["),
-      popupAiSource.indexOf("function showAIError(op, err, opSettings)"));
+    const fallbackSrc = popupAiSource.slice(pbpIdxOf(popupAiSource, "const AI_PROVIDER_ORDER = ["),
+      pbpIdxOf(popupAiSource, "function showAIError(op, err, opSettings)"));
     const buildFallback = ({ granted = false } = {}) => sliceFn(
       "hasAIKey", "pbpAiResolveTarget", "pbpAiExpandProviderOrder", "pbpAiFirstConfiguredProvider",
       "SETTINGS_DEFAULTS", "_aiTargetOriginPattern", "chrome", "t",
       fallbackSrc + "\nreturn { pbpAiFallbackCandidates, pickFallbackProvider, _aiPopupProviderLabel, probe: _aiProbeOllamaGrant };")(
       realAi.hasAIKey, realAi.pbpAiResolveTarget, realAi.pbpAiExpandProviderOrder, realAi.pbpAiFirstConfiguredProvider,
       SETTINGS_DEFAULTS, () => "http://localhost/*", { permissions: { contains: async () => granted } }, tEn);
-    const orderAt = popupAiSource.indexOf("const AI_PROVIDER_ORDER = [") + "const AI_PROVIDER_ORDER = ".length;
-    const SOURCE_ORDER = JSON.parse(popupAiSource.slice(orderAt, popupAiSource.indexOf("];", orderAt) + 1));
+    const orderAt = pbpIdxOf(popupAiSource, "const AI_PROVIDER_ORDER = [") + "const AI_PROVIDER_ORDER = ".length;
+    const SOURCE_ORDER = JSON.parse(popupAiSource.slice(orderAt, pbpIdxOf(popupAiSource, "];", orderAt) + 1));
     const B = { id: "custom-bbbbbb", name: "Relay B", protocol: "openai", baseUrl: "https://b.example/v1", model: "mb", slot: 2 };
     const C = { id: "custom-cccccc", name: "Relay C", protocol: "anthropic", baseUrl: "https://c.example/v1", model: "mc", slot: 3 };
     const chainBase = {
@@ -4568,8 +4570,8 @@ async function withPopupSubmitFixture(options, check) {
       const tZh = (key) => zh[key] || key;
       const { pbpAiProviderLabel: labelZh } = sliceFn("t", providerLabelSource +
         "; return { pbpAiProviderLabel };")(tZh);
-      const progressSrc = popupAiSource.slice(popupAiSource.indexOf("function setAiProgress("),
-        popupAiSource.indexOf("function clearAiProgress("));
+      const progressSrc = popupAiSource.slice(pbpIdxOf(popupAiSource, "function setAiProgress("),
+        pbpIdxOf(popupAiSource, "function clearAiProgress("));
       const run = (args) => {
         const label = { textContent: "", setAttribute() {} };
         const btn = { childNodes: [], dataset: {}, classList: { contains: () => false }, querySelector: () => label };
@@ -4585,8 +4587,8 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     await testAsync("Retry reruns the failed snapshot; Try-with overlays only aiProvider; neither touches global settings", async () => {
-      const handlerSrc = popupAiSource.slice(popupAiSource.indexOf('$id("ai-error-retry")?.addEventListener'),
-        popupAiSource.indexOf('$id("ai-error-details-toggle")?.addEventListener'));
+      const handlerSrc = popupAiSource.slice(pbpIdxOf(popupAiSource, '$id("ai-error-retry")?.addEventListener'),
+        pbpIdxOf(popupAiSource, '$id("ai-error-details-toggle")?.addEventListener'));
       assert(handlerSrc.includes("ai-error-fallback"), "error card handlers not found");
       const global = { ...chainSettings, aiProvider: "openai", customModel: "GLOBAL" };
       const globalJson = JSON.stringify(global);
@@ -4848,33 +4850,33 @@ async function withPopupSubmitFixture(options, check) {
 
     test("setup restore and cache click share adoption before any append", () => {
       const setupAi = popupAiSource.slice(
-        popupAiSource.indexOf("function setupAIFeatures()"),
-        popupAiSource.indexOf("// ---- Insert or replace AI summary"));
+        pbpIdxOf(popupAiSource, "function setupAIFeatures()"),
+        pbpIdxOf(popupAiSource, "// ---- Insert or replace AI summary"));
       const doSummary = popupAiSource.slice(
-        popupAiSource.indexOf("async function doAISummary"),
-        popupAiSource.indexOf("// ---- Show regenerate"));
+        pbpIdxOf(popupAiSource, "async function doAISummary"),
+        pbpIdxOf(popupAiSource, "// ---- Show regenerate"));
       assert(setupAi.includes("_aiRestoreSummaryOwnership") &&
         setupAi.includes("existingBookmark"),
         "existing bookmark initialization does not restore ownership");
       assert(!setupAi.includes("if (!cached) return"),
         "receipt restore is still incorrectly gated by AI cache availability");
       const restoreAt = doSummary.indexOf("_aiRestoreSummaryOwnership");
-      const upsertAt = doSummary.indexOf("upsertSummary(cached)");
+      const upsertAt = pbpIdxOf(doSummary, "upsertSummary(cached)");
       assert(restoreAt >= 0 && upsertAt > restoreAt,
         "cache click appends before attempting ownership restore");
     });
 
     test("malformed save responses enter the recoverable error state", () => {
-      const malformedIndex = submit.indexOf('typeof result.status !== "string"');
-      const catchIndex = submit.indexOf("} catch (e) {", malformedIndex);
-      const recoveryIndex = submit.indexOf("submitErrorResetTimer = setTimeout", catchIndex);
+      const malformedIndex = pbpIdxOf(submit, 'typeof result.status !== "string"');
+      const catchIndex = pbpIdxOf(submit, "} catch (e) {", malformedIndex);
+      const recoveryIndex = pbpIdxOf(submit, "submitErrorResetTimer = setTimeout", catchIndex);
       assert(malformedIndex > sendIndex && catchIndex > malformedIndex, "malformed result guard missing");
       assert(submit.slice(catchIndex, recoveryIndex).includes('setSubmitState("error")'), "message rejection does not show an error");
       assert(recoveryIndex > catchIndex, "error state does not auto-recover");
     });
 
     await testAsync("validated login does not enter memory when credential persistence fails", async () => {
-      const loginSource = source.slice(source.indexOf('$id("login-form").addEventListener'), source.indexOf("// ===================== Main"));
+      const loginSource = source.slice(pbpIdxOf(source, '$id("login-form").addEventListener'), pbpIdxOf(source, "// ===================== Main"));
       let loginHandler;
       let mainCalls = 0;
       const errors = [];
@@ -4911,7 +4913,7 @@ async function withPopupSubmitFixture(options, check) {
     // reply background.js's handler sends for that outcome.
     await testAsync("login failure reads the reply's own status/error instead of always blaming the token", async () => {
       async function loginErrorKeyFor(res) {
-        const loginSource = source.slice(source.indexOf('$id("login-form").addEventListener'), source.indexOf("// ===================== Main"));
+        const loginSource = source.slice(pbpIdxOf(source, '$id("login-form").addEventListener'), pbpIdxOf(source, "// ===================== Main"));
         let loginHandler;
         const errors = [];
         const loginButton = { disabled: false, addEventListener: (_type, fn) => { loginHandler = fn; } };
@@ -4946,8 +4948,8 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     test("both Pinboard 401 paths share reset-and-reload behavior", () => {
-      const fetch401 = source.slice(source.indexOf("function _pbpProxyPinboardFetch"), source.indexOf("let currentTags"));
-      const loginSource = source.slice(source.indexOf('$id("login-form").addEventListener'), source.indexOf("// ===================== Main"));
+      const fetch401 = source.slice(pbpIdxOf(source, "function _pbpProxyPinboardFetch"), pbpIdxOf(source, "let currentTags"));
+      const loginSource = source.slice(pbpIdxOf(source, '$id("login-form").addEventListener'), pbpIdxOf(source, "// ===================== Main"));
       assert(fetch401.includes("resetPinboardSession(") && !fetch401.includes("showLogin()"), "pinboardFetch 401 still mutates the live view");
       assert(resetSource.includes('type: "PBP_RESET_PINBOARD_AUTH", expectedToken') && resetSource.includes("if (!result?.ok) return false"), "session reset bypasses or ignores conditional worker reset");
       assert(!resetSource.includes("pbpDiscardPopupDraft"), "automatic auth reset discards a later session's drafts");
@@ -4959,7 +4961,7 @@ async function withPopupSubmitFixture(options, check) {
       finally { window.persistSettings = realPersist; }
       assert(JSON.stringify(patches) === JSON.stringify([{ pinboardToken: "" }, { karakeepToken: "" }, { linkdingToken: "" }, { pinboardToken: "" }]), "logout does not clear exactly the active service's token through persistSettings: " + JSON.stringify(patches));
       assert(!resetSource.includes("storage.local") && !logoutSource.includes("storage.local"), "token clear still hand-routes a storage area");
-      assert(loginSource.includes("const saved = await persistSettings") && loginSource.indexOf("if (!saved.ok)") < loginSource.indexOf("settings.pinboardToken = token"), "login enters memory before persistence succeeds");
+      assert(loginSource.includes("const saved = await persistSettings") && pbpIdxOf(loginSource, "if (!saved.ok)") < pbpIdxOf(loginSource, "settings.pinboardToken = token"), "login enters memory before persistence succeeds");
       assert(resetSource.includes('settings.pinboardToken = ""') && resetSource.includes("window.location.reload()"), "session reset does not clear memory and reload");
     });
 
@@ -5068,7 +5070,7 @@ async function withPopupSubmitFixture(options, check) {
     // no reply could reach, because the proxy dropped the reason string on the
     // way. These build the shipped proxy and the shipped lookup into one scope
     // and feed them worker replies, so the whole chain has to carry the cause.
-    const proxySource = source.slice(source.indexOf("function _pbpProxyPinboardFetch"), source.indexOf("let currentTags"));
+    const proxySource = source.slice(pbpIdxOf(source, "function _pbpProxyPinboardFetch"), pbpIdxOf(source, "let currentTags"));
 
     function createLookupHarness(workerReply, { nullField = "", service = "pinboard", dirtyDescription = false, realDescription = false, onRefresh = () => {}, tArgs = false } = {}) {
       const statuses = [];
@@ -5157,7 +5159,7 @@ async function withPopupSubmitFixture(options, check) {
     // workerReply answers the worker messages by type and address.
     const HASHED = URL + "#section-2";
     const fragmentProbeStart = source.indexOf("// ---- The same page saved without its #fragment");
-    const fragmentProbeEnd = source.indexOf("// ===================== Existing Bookmark", fragmentProbeStart);
+    const fragmentProbeEnd = pbpIdxOf(source, "// ===================== Existing Bookmark", fragmentProbeStart);
     assert(fragmentProbeStart >= 0 && fragmentProbeEnd > fragmentProbeStart, "the #fragment probe source was not found");
     const fragmentProbeSource = source.slice(fragmentProbeStart, fragmentProbeEnd);
     function createFragmentHarness(service, answer, { deletedRecentUrl = null } = {}) {
@@ -5280,7 +5282,7 @@ async function withPopupSubmitFixture(options, check) {
 
     await testAsync("showStatus: an error with a remedy never auto-hides, a plain one hides after 4 s", async () => {
       const start = source.indexOf("function showStatus(id, msg, kind, opts)");
-      const end = source.indexOf("// Save failures stay on screen", start);
+      const end = pbpIdxOf(source, "// Save failures stay on screen", start);
       assert(start >= 0 && end > start, "showStatus source was not found");
       const cards = [];
       const win = {};
@@ -5294,7 +5296,7 @@ async function withPopupSubmitFixture(options, check) {
 
     await testAsync("a remedy card is retired by a later success/info status, a new error, the next save, or its condition ending", async () => {
       const start = source.indexOf("function showStatus(id, msg, kind, opts)");
-      const end = source.indexOf("// result: a save-intent failure", start);
+      const end = pbpIdxOf(source, "// result: a save-intent failure", start);
       assert(start >= 0 && end > start, "showStatus source was not found");
       const make = () => {
         const cards = [];
@@ -5349,23 +5351,23 @@ async function withPopupSubmitFixture(options, check) {
         [source, "obsidianClipboardFailed"], [popupAiSource, "aiEmptyResult"],
       ];
       for (const [src, key] of sites) {
-        const calls = src.split('showStatus("status-msg", t("' + key + '")').slice(1).map((rest) => rest.slice(0, rest.indexOf(";")));
+        const calls = src.split('showStatus("status-msg", t("' + key + '")').slice(1).map((rest) => rest.slice(0, pbpIdxOf(rest, ";")));
         assert(calls.length > 0, key + ": no call shows it");
         for (const call of calls) assert(call.includes('{ remedy: true, key: "' + key + '" }'), key + ": a call hides on a timer: " + call);
         assert(src.includes('pbpDismissRemedyStatus("' + key + '")'), key + ": nothing retires the card when the action works");
       }
-      const tagFallback = popupTagsSource.slice(popupTagsSource.indexOf("function showTagSyncError("), popupTagsSource.indexOf("// ---- Tags Input Setup"));
+      const tagFallback = popupTagsSource.slice(pbpIdxOf(popupTagsSource, "function showTagSyncError("), pbpIdxOf(popupTagsSource, "// ---- Tags Input Setup"));
       assert(tagFallback.includes('"error", { remedy: true, key: "tagSyncFailed" }'), "the tag sync fallback card hides on a timer");
-      const sync = popupTagsSource.slice(popupTagsSource.indexOf("async function fetchAllUserTags("), popupTagsSource.indexOf("function showTagSyncError("));
+      const sync = popupTagsSource.slice(pbpIdxOf(popupTagsSource, "async function fetchAllUserTags("), pbpIdxOf(popupTagsSource, "function showTagSyncError("));
       assert(/applyTagData\(data\);\s*if \(typeof pbpDismissRemedyStatus === "function"\) pbpDismissRemedyStatus\("tagSyncFailed"\);/.test(sync), "a sync that works leaves the failure card up");
       // An AI summary served from the cache is a success too.
-      const cached = popupAiSource.slice(popupAiSource.indexOf("const cached = await pbpAiFastCached(\"summary\""), popupAiSource.indexOf("setAiProgress(\"ai-summary-btn\", { provider: s.aiProvider, stage: \"extracting\""));
+      const cached = popupAiSource.slice(pbpIdxOf(popupAiSource, "const cached = await pbpAiFastCached(\"summary\""), pbpIdxOf(popupAiSource, "setAiProgress(\"ai-summary-btn\", { provider: s.aiProvider, stage: \"extracting\""));
       assert(/pbpDismissRemedyStatus\("aiEmptyResult"\);\s*showSummaryActions\(true\)/.test(cached), "a cached summary leaves the empty-result card up");
     });
 
     await testAsync("#fragment address: a save waits at most 3 s for a pending probe", async () => {
-      const waitStart = source.indexOf("const PBP_FRAGMENT_PROBE_SAVE_WAIT_MS");
-      const waitEnd = source.indexOf("// ===================== Existing Bookmark", waitStart);
+      const waitStart = pbpIdxOf(source, "const PBP_FRAGMENT_PROBE_SAVE_WAIT_MS");
+      const waitEnd = pbpIdxOf(source, "// ===================== Existing Bookmark", waitStart);
       const delays = [];
       const probe = { promise: new Promise(() => {}), settled: false };
       const lookup = { status: "missing", fragmentProbe: probe };
@@ -5565,7 +5567,7 @@ async function withPopupSubmitFixture(options, check) {
     // error). Its reply is what the cold popup lookup reads.
     function selfHostedLookupWorker(service, failure) {
       const branchStart = backgroundSource.indexOf('if (message.type === "lookup_bookmark" && message.url) {');
-      const branchEnd = backgroundSource.indexOf('if (message.type === "PBP_POPUP_DRAFT")', branchStart);
+      const branchEnd = pbpIdxOf(backgroundSource, 'if (message.type === "PBP_POPUP_DRAFT")', branchStart);
       assert(branchStart >= 0 && branchEnd > branchStart, "worker lookup_bookmark branch not found");
       const auth = { service, account: service + ":https://bookmarks.example/:id-1", token: "fixture-token", baseUrl: "https://bookmarks.example/" };
       const deps = {
@@ -5650,7 +5652,7 @@ async function withPopupSubmitFixture(options, check) {
     // vacuously. Everything else it reads (the tier tables, _isOAuthCallback,
     // _matchHostRule) is an unshadowed shared.js global.
     const stripStart = sharedSource.indexOf("function stripTrackingParams(");
-    const stripEnd = sharedSource.indexOf("// True when two URLs refer to the same bookmark", stripStart);
+    const stripEnd = pbpIdxOf(sharedSource, "// True when two URLs refer to the same bookmark", stripStart);
     assert(stripStart >= 0 && stripEnd > stripStart, "stripTrackingParams source not found");
     const realStripTrackingParams = new Function("URL", sharedSource.slice(stripStart, stripEnd) + "\nreturn stripTrackingParams;")(window.URL);
     // The icon's cleaning rule (pbpBookmarkLookupUrl), over that same real strip.
@@ -5660,13 +5662,13 @@ async function withPopupSubmitFixture(options, check) {
 
     function createWorkerLookupHarness({ posts = [K1_POST], token = "alice:token", workerAccount = "alice", seedCache = null, hold = false, brokenWorker = false, unauthorized = false } = {}) {
       const cacheStart = backgroundSource.indexOf("const statusCache = new Map();");
-      const cacheEnd = backgroundSource.indexOf("// ---- P2: Cached token + invalidation ----", cacheStart);
+      const cacheEnd = pbpIdxOf(backgroundSource, "// ---- P2: Cached token + invalidation ----", cacheStart);
       const checkStart = backgroundSource.indexOf("async function debouncedCheck(url) {");
-      const checkEnd = backgroundSource.indexOf("// ---- Load settings with deobfuscation", checkStart);
+      const checkEnd = pbpIdxOf(backgroundSource, "// ---- Load settings with deobfuscation", checkStart);
       const bookmarkStart = backgroundSource.indexOf("async function checkBookmarked(url, capturedAuth = null) {");
-      const bookmarkEnd = backgroundSource.indexOf("// ---- Badge: unread count ----", bookmarkStart);
+      const bookmarkEnd = pbpIdxOf(backgroundSource, "// ---- Badge: unread count ----", bookmarkStart);
       const branchStart = backgroundSource.indexOf('if (message.type === "get_bookmark_data" && message.url) {');
-      const branchEnd = backgroundSource.indexOf('if (message.type === "get_offline_queue")', branchStart);
+      const branchEnd = pbpIdxOf(backgroundSource, 'if (message.type === "get_offline_queue")', branchStart);
       assert(cacheStart >= 0 && cacheEnd > cacheStart, "worker status cache primitives not found");
       assert(checkStart >= 0 && checkEnd > checkStart, "worker debouncedCheck not found");
       assert(bookmarkStart >= 0 && bookmarkEnd > bookmarkStart, "worker checkBookmarked not found");
@@ -5913,7 +5915,7 @@ async function withPopupSubmitFixture(options, check) {
     // regen-link branch, so none of its extra dependencies are needed).
     function aiTagFocusRuntime(tags) {
       const renderStart = popupAiSource.indexOf("function renderAITags(");
-      const renderEnd = popupAiSource.indexOf("\n}\n", renderStart);
+      const renderEnd = pbpIdxOf(popupAiSource, "\n}\n", renderStart);
       assert(renderStart >= 0 && renderEnd > renderStart, "renderAITags source not found");
       const container = document.createElement("div");
       document.body.appendChild(container);
@@ -6158,8 +6160,8 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     await testAsync("K71: a missing #tags-input (harness/edit states) never throws from an AI chip or Add all", async () => {
-      const renderStart = popupAiSource.indexOf("function renderAITags(");
-      const renderEnd = popupAiSource.indexOf("\n}\n", renderStart);
+      const renderStart = pbpIdxOf(popupAiSource, "function renderAITags(");
+      const renderEnd = pbpIdxOf(popupAiSource, "\n}\n", renderStart);
       const container = document.createElement("div");
       document.body.appendChild(container);
       const currentTags = [];
@@ -6204,7 +6206,7 @@ async function withPopupSubmitFixture(options, check) {
     // contract does not touch spelling alignment.
     function suggestTagFocusRuntime(popularTags, recommendedTags) {
       const buildStart = popupTagsSource.indexOf("function buildSuggestGroup(");
-      const buildEnd = popupTagsSource.indexOf("\n  } catch (e) {", buildStart);
+      const buildEnd = pbpIdxOf(popupTagsSource, "\n  } catch (e) {", buildStart);
       assert(buildStart >= 0 && buildEnd > buildStart, "buildSuggestGroup source not found");
       const container = document.createElement("div");
       document.body.appendChild(container);
@@ -6293,8 +6295,8 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     await testAsync("K71: a missing #tags-input (harness/edit states) never throws from a suggest chip or Add all", async () => {
-      const buildStart = popupTagsSource.indexOf("function buildSuggestGroup(");
-      const buildEnd = popupTagsSource.indexOf("\n  } catch (e) {", buildStart);
+      const buildStart = pbpIdxOf(popupTagsSource, "function buildSuggestGroup(");
+      const buildEnd = pbpIdxOf(popupTagsSource, "\n  } catch (e) {", buildStart);
       const container = document.createElement("div");
       document.body.appendChild(container);
       const runtime = new Function(
@@ -6335,12 +6337,12 @@ async function withPopupSubmitFixture(options, check) {
     // fetchRecentBookmarks) now gates that behind a dirty check + the same
     // showConfirmPopover family the row's own delete button already uses.
     const formIsDirtyStart = source.indexOf("function pbpPopupFormIsDirty()");
-    const formIsDirtyEnd = source.indexOf("function pbpRebasePopupTags(", formIsDirtyStart);
+    const formIsDirtyEnd = pbpIdxOf(source, "function pbpRebasePopupTags(", formIsDirtyStart);
     assert(formIsDirtyStart >= 0 && formIsDirtyEnd > formIsDirtyStart, "pbpPopupFormIsDirty source not found");
     const formIsDirtySource = source.slice(formIsDirtyStart, formIsDirtyEnd);
 
     const recentBookmarksStart = source.indexOf("// ===================== Recent Bookmarks");
-    const recentBookmarksEnd = source.indexOf("// ===================== Offline Queue Status", recentBookmarksStart);
+    const recentBookmarksEnd = pbpIdxOf(source, "// ===================== Offline Queue Status", recentBookmarksStart);
     assert(recentBookmarksStart >= 0 && recentBookmarksEnd > recentBookmarksStart, "fetchRecentBookmarks source not found");
     const recentBookmarksSource = source.slice(recentBookmarksStart, recentBookmarksEnd);
 
@@ -6381,7 +6383,7 @@ async function withPopupSubmitFixture(options, check) {
     });
 
     const addRemoveTagStart = popupTagsSource.indexOf("function addTag(");
-    const addRemoveTagEnd = popupTagsSource.indexOf("function renderTags() {", addRemoveTagStart);
+    const addRemoveTagEnd = pbpIdxOf(popupTagsSource, "function renderTags() {", addRemoveTagStart);
     assert(addRemoveTagStart >= 0 && addRemoveTagEnd > addRemoveTagStart, "addTag/removeTag source not found");
     const addRemoveTagSource = popupTagsSource.slice(addRemoveTagStart, addRemoveTagEnd);
 
@@ -6423,7 +6425,7 @@ async function withPopupSubmitFixture(options, check) {
 
     test("K75: Clear all -- a one-click destructive edit -- makes the form dirty", () => {
       const start = popupTagsSource.indexOf('$id("tags-clear-all")?.addEventListener("click"');
-      const end = popupTagsSource.indexOf('$id("tags-copy-all")', start);
+      const end = pbpIdxOf(popupTagsSource, '$id("tags-copy-all")', start);
       assert(start >= 0 && end > start, "tags-clear-all handler source not found");
       let handler = null;
       const deps = {
@@ -6448,7 +6450,7 @@ async function withPopupSubmitFixture(options, check) {
 
     test("K75: a drag reorder of the tag chips makes the form dirty", () => {
       const start = popupTagsSource.indexOf('el.addEventListener("drop", (e) => {');
-      const end = popupTagsSource.indexOf("d.appendChild(el);", start);
+      const end = pbpIdxOf(popupTagsSource, "d.appendChild(el);", start);
       assert(start >= 0 && end > start, "chip drop handler source not found");
       let handler = null;
       const deps = {
@@ -6614,7 +6616,7 @@ async function withPopupSubmitFixture(options, check) {
     // the opener, the worker answers in its real shape, and only then does the
     // redraw decide where focus lands.
     const pbpPopupBookmarkApiStart = source.indexOf("async function pbpPopupBookmarkApi(action, url) {");
-    const pbpPopupBookmarkApiSource = source.slice(pbpPopupBookmarkApiStart, source.indexOf("\n}\n", pbpPopupBookmarkApiStart) + 3);
+    const pbpPopupBookmarkApiSource = source.slice(pbpPopupBookmarkApiStart, pbpIdxOf(source, "\n}\n", pbpPopupBookmarkApiStart) + 3);
     const confirmThroughPopover = async (opener) => {
       opener.focus();
       opener.click();
@@ -6807,7 +6809,7 @@ async function withPopupSubmitFixture(options, check) {
     // content-sized button jump under the pointer. Real <button>, shipped code.
     test("submit button width only grows across a save cycle", () => {
       const fnStart = source.indexOf("  let saveWaitNoteTimer = null;");
-      const fnEnd = source.indexOf("\n  }\n", source.indexOf("  function setSubmitState(state, label) {")) + 4;
+      const fnEnd = pbpIdxOf(source, "\n  }\n", pbpIdxOf(source, "  function setSubmitState(state, label) {")) + 4;
       assert(fnStart >= 0 && fnEnd > fnStart, "setSubmitState source not found");
       const btn = document.createElement("button");
       btn.style.cssText = "font: 13px sans-serif; padding: 0 8px; white-space: nowrap;";
@@ -6835,7 +6837,7 @@ async function withPopupSubmitFixture(options, check) {
     // in an ellipsis fragment; it is now hidden whole, and one that fits stays.
     await testAsync("a shortcut hint that would ellipsize is hidden whole", async () => {
       const start = source.indexOf('if (typeof ResizeObserver === "function") {\n  const clipObserver');
-      const end = source.indexOf("\n}\n", start) + 3;
+      const end = pbpIdxOf(source, "\n}\n", start) + 3;
       assert(start > 0 && end > start, "hint clip observer not found");
       const make = (id, text) => {
         const el = document.createElement("span");
@@ -6883,7 +6885,7 @@ async function withPopupSubmitFixture(options, check) {
     // the note goes away with the loading state unless something replaced it.
     test("a slow save explains the rate limit and takes the note down after", () => {
       const fnStart = source.indexOf("  let saveWaitNoteTimer = null;");
-      const fnEnd = source.indexOf("\n  }\n", source.indexOf("  function setSubmitState(state, label) {")) + 4;
+      const fnEnd = pbpIdxOf(source, "\n  }\n", pbpIdxOf(source, "  function setSubmitState(state, label) {")) + 4;
       assert(fnStart >= 0 && fnEnd > fnStart, "setSubmitState source not found");
       const make = () => {
         const btn = document.createElement("button");
@@ -6939,7 +6941,7 @@ async function withPopupSubmitFixture(options, check) {
     // "Saving…" showing. Past 800ms the line says what it is waiting for.
     test("linkding: a save waiting on the #fragment probe says so after 800ms, and only then", () => {
       const fnStart = source.indexOf("  let saveWaitNoteTimer = null;");
-      const fnEnd = source.indexOf("\n  }\n", source.indexOf("  function setSubmitState(state, label) {")) + 4;
+      const fnEnd = pbpIdxOf(source, "\n  }\n", pbpIdxOf(source, "  function setSubmitState(state, label) {")) + 4;
       assert(fnStart >= 0 && fnEnd > fnStart, "setSubmitState source not found");
       const make = (service) => {
         const btn = document.createElement("button");
@@ -6995,7 +6997,7 @@ async function withPopupSubmitFixture(options, check) {
         d.setSaveWaitingForProbe(false);
         assert(!d.status.classList.contains("hidden"), "the probe answering took Pinboard's rate-limit line down");
       } finally { d.btn.remove(); }
-      const click = source.slice(source.indexOf("const fragmentProbeWait = pbpFragmentProbeWait("), source.indexOf("const savePolicy = pbpPopupSavePolicy(", source.indexOf("const fragmentProbeWait = pbpFragmentProbeWait(")));
+      const click = source.slice(pbpIdxOf(source, "const fragmentProbeWait = pbpFragmentProbeWait("), pbpIdxOf(source, "const savePolicy = pbpPopupSavePolicy(", pbpIdxOf(source, "const fragmentProbeWait = pbpFragmentProbeWait(")));
       assert(/setSaveWaitingForProbe\(true\)[\s\S]*await fragmentProbeWait[\s\S]*setSaveWaitingForProbe\(false\)/.test(click), "the save does not bracket its probe wait");
     });
 
@@ -7003,7 +7005,7 @@ async function withPopupSubmitFixture(options, check) {
     // form's status card, far from the row that is still standing.
     test("recent-list delete failures report inside the recent list", () => {
       const start = source.indexOf('del.className = "recent-bm-del";');
-      const end = source.indexOf("del.addEventListener(\"click\", doDelete);", start);
+      const end = pbpIdxOf(source, "del.addEventListener(\"click\", doDelete);", start);
       assert(start >= 0 && end > start, "recent delete block not found");
       const block = source.slice(start, end);
       assert(/showFeedback\(\{[^}]*target: container/.test(block), "failure card must mount in the recent list (target: container)");
@@ -7023,7 +7025,7 @@ async function withPopupSubmitFixture(options, check) {
     // listener, sliced out of popup.js.
     test("Shift+Enter breaks a line in the notes and runs AI everywhere else", () => {
       const startAt = source.indexOf('  document.addEventListener("keydown", function onPopupShortcut(e) {');
-      const endAt = source.indexOf("\n  });\n", startAt);
+      const endAt = pbpIdxOf(source, "\n  });\n", startAt);
       assert(startAt >= 0 && endAt > startAt, "popup.js: the Ctrl/Shift+Enter keydown listener was not found");
       let handler = null;
       const calls = [];
@@ -7045,7 +7047,7 @@ async function withPopupSubmitFixture(options, check) {
       const tagsBox = document.createElement("input");
       const inTags = press(tagsBox);
       assert(inTags === true && calls.join(",") === "summary,tags", "elsewhere Shift+Enter runs the AI fill: " + calls.join(","));
-      const tagsSource = popupTagsSource.slice(popupTagsSource.indexOf("else if ((e.key === \"Enter\""));
+      const tagsSource = popupTagsSource.slice(pbpIdxOf(popupTagsSource, "else if ((e.key === \"Enter\""));
       assert(tagsSource.startsWith('else if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab")'),
         "the tags input must not also commit a tag on Shift+Enter (one key, one action)");
     });
@@ -7132,7 +7134,7 @@ async function withPopupSubmitFixture(options, check) {
     function extractPopupFn(name) {
       const start = source.indexOf("function " + name + "(");
       assert(start >= 0, name + " is missing from popup.js");
-      return source.slice(start, source.indexOf("\n}", start) + 2);
+      return source.slice(start, pbpIdxOf(source, "\n}", start) + 2);
     }
     function runServiceHints(service, readLaterListId) {
       const makeEl = () => { const attrs = {}; return { attrs, title: "", textContent: "", setAttribute(k, v) { attrs[k] = v; } }; };
@@ -7183,12 +7185,12 @@ async function withPopupSubmitFixture(options, check) {
       const code = source.split("\n").filter((line) => !/^\s*\/\//.test(line)).join("\n");
       const start = code.indexOf("async function showMain(");
       assert(start >= 0, "showMain is missing from popup.js");
-      const body = code.slice(start, code.indexOf("\n}", start));
-      const privacyAt = body.indexOf("pbpPopupBookmarkPrivacy();"), hintsAt = body.indexOf("pbpPopupServiceHints();");
+      const body = code.slice(start, pbpIdxOf(code, "\n}", start));
+      const privacyAt = body.indexOf("pbpPopupBookmarkPrivacy();"), hintsAt = pbpIdxOf(body, "pbpPopupServiceHints();");
       assert(privacyAt >= 0 && hintsAt > privacyAt, "showMain no longer calls pbpPopupServiceHints() after pbpPopupBookmarkPrivacy(): self-hosted popups would show Pinboard-only hints again");
       const logoutAt = code.indexOf('$id("logout-link"), {');
       assert(logoutAt >= 0, "logout confirm popover call not found");
-      const popover = code.slice(logoutAt, code.indexOf("onConfirm", logoutAt));
+      const popover = code.slice(logoutAt, pbpIdxOf(code, "onConfirm", logoutAt));
       assert(/detail:\s*t\(\s*pbpLogoutDetailKey\(/.test(popover), "logout confirm detail is no longer taken from pbpLogoutDetailKey(service)");
       assert(!/t\(\s*["']confirmLogoutDetail["']\s*\)/.test(popover), "logout confirm detail is hard-wired to the Pinboard wording");
     });
@@ -7294,7 +7296,7 @@ async function withPopupSubmitFixture(options, check) {
 
     // ---- 乙: container-level roving toolbars ----
     const rovingStart = popupTagsSource.indexOf("function syncSuggestTagStates() {");
-    const rovingEnd = popupTagsSource.indexOf("// Alt+1..9 slot assignment", rovingStart);
+    const rovingEnd = pbpIdxOf(popupTagsSource, "// Alt+1..9 slot assignment", rovingStart);
     assert(rovingStart >= 0 && rovingEnd > rovingStart,
       "popup-tags.js: syncSuggestTagStates / roving-toolbar block not found");
     const rovingSource = popupTagsSource.slice(rovingStart, rovingEnd);
@@ -7456,7 +7458,7 @@ async function withPopupSubmitFixture(options, check) {
         "popup-tags.js: the arrow-key handler is no longer bound on the container");
       assert(/pbpSyncRovingToolbars\(\);/.test(rovingSource),
         "popup-tags.js: syncSuggestTagStates no longer drives the roving maintenance");
-      assert(/^\s*syncSuggestTagStates\(\);/m.test(popupTagsSource.slice(popupTagsSource.indexOf("function pbpAssignAltNumBadges()"))),
+      assert(/^\s*syncSuggestTagStates\(\);/m.test(popupTagsSource.slice(pbpIdxOf(popupTagsSource, "function pbpAssignAltNumBadges()"))),
         "popup-tags.js: pbpAssignAltNumBadges no longer opens with syncSuggestTagStates() -- the rebuild path would stop re-applying the roving state");
     });
 
@@ -7662,8 +7664,8 @@ async function withPopupSubmitFixture(options, check) {
     // Selfhosted UX follow-up: a failed duplicate check leaves a status card; the
     // save-error card that Save then adds must replace it, not sit beside it.
     test("save error card dismisses the earlier lookup status card, and no other card", () => {
-      const from = source.indexOf("function showSaveError(");
-      const body = source.slice(from, source.indexOf("\n}\n", from) + 3);
+      const from = pbpIdxOf(source, "function showSaveError(");
+      const body = source.slice(from, pbpIdxOf(source, "\n}\n", from) + 3);
       let dismissed = 0, shown = 0;
       const win = { _lastStatusFeedback: null };
       const submitBar = { after() { shown++; } };
@@ -7689,7 +7691,7 @@ async function withPopupSubmitFixture(options, check) {
     test("a failed self-hosted delete leads with the failure and then the cause", () => {
       const from = source.indexOf("function pbpDeleteFailureText(");
       assert(from >= 0, "pbpDeleteFailureText missing");
-      const body = source.slice(from, source.indexOf("\n}\n", from) + 3);
+      const body = source.slice(from, pbpIdxOf(source, "\n}\n", from) + 3);
       const fn = new Function("pbpBookmarkFailureText", "t", `${body}\nreturn pbpDeleteFailureText;`)(
         pbpBookmarkFailureText, (key, ...args) => key + (args.length ? "(" + args.join(",") + ")" : ""));
       assert(fn({ error: "network" }, "linkding") === "bookmarkDeleteFailedReason(bookmarkErrNetwork)", "network: " + fn({ error: "network" }, "linkding"));
@@ -7700,26 +7702,26 @@ async function withPopupSubmitFixture(options, check) {
     test("a SingleFile caveat is its own warning card, not text inside the success line", () => {
       const from = source.indexOf("function showSaveWarning(");
       assert(from >= 0, "showSaveWarning missing");
-      const body = source.slice(from, source.indexOf("\n}\n", from) + 3);
+      const body = source.slice(from, pbpIdxOf(source, "\n}\n", from) + 3);
       let shown = null, inserted = 0;
       new Function("clearSaveError", "showFeedback", "$id", `let _saveErrorFeedback = null;\n${body}\nshowSaveWarning("careful");`)(
         () => {}, (opts) => { shown = opts; return { element: {}, dismiss() {} }; },
         () => ({ closest: () => ({ after() { inserted++; } }) }));
       assert(shown && shown.variant === "warning" && shown.message === "careful" && inserted === 1, "card: " + JSON.stringify(shown));
-      const flow = source.slice(source.indexOf("const singleFileSilent"), source.indexOf("const singleFileSilent") + 600);
+      const flow = source.slice(pbpIdxOf(source, "const singleFileSilent"), pbpIdxOf(source, "const singleFileSilent") + 600);
       assert(flow.includes('showSaveWarning(t("singleFileNoResponse"))'), "the SingleFile note is not routed to the warning card");
       assert(!flow.includes("statusEl.appendChild"), "the SingleFile note is still appended to the success line");
     });
     test("a tag_too_long save failure marks the offending tag chip", () => {
       const at = source.indexOf('result.reason === "tag_too_long") markInvalidTag(result.tag)');
       assert(at >= 0, "popup.js does not mark the refused tag");
-      assert(source.lastIndexOf('result.reason === "partial" || result.reason === "tag_too_long"', at) > at - 900, "the mark is outside the partial/tag_too_long branch");
+      assert(pbpLastIdxOf(source, 'result.reason === "partial" || result.reason === "tag_too_long"', at) > at - 900, "the mark is outside the partial/tag_too_long branch");
     });
     test("linkding moves the AI summary controls under Description and other services keep them under Notes", () => {
       const from = source.indexOf("function pbpPopupPlaceSummaryControls(");
       assert(from >= 0, "pbpPopupPlaceSummaryControls missing");
       assert(source.includes("pbpPopupPlaceSummaryControls(linkding);"), "prefill does not place the controls");
-      const body = source.slice(from, source.indexOf("\n}\n", from) + 3);
+      const body = source.slice(from, pbpIdxOf(source, "\n}\n", from) + 3);
       const host = document.createElement("div");
       host.innerHTML = '<div id="linkding-description-row"><div class="field"><textarea></textarea></div></div>'
         + '<div class="field"><div class="notes-bar"><span id="desc-char-count"></span><span id="ai-summary-hint"></span>'

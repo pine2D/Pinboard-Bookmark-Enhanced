@@ -17,6 +17,8 @@ document.addEventListener("DOMContentLoaded", (event) => event.stopImmediateProp
 <script src="../options-backup.js"></script>
 <script src="../export-targets.js"></script>
 <script src="../options.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -746,22 +748,27 @@ async function run() {
       pbpApplySavedThemeOp([null, { name: 1, css: "x" }, { name: "ok", css: "y" }], null)
         .map((theme) => theme.name).join(",") === "ok");
 
-    const optionsSource = await fetch("../options.js").then((response) => response.text());
-    const persistStart = optionsSource.indexOf("  async function persistSavedThemes(");
-    const persistEnd = optionsSource.indexOf("  function renderSavedThemes(", persistStart);
-    check("persistSavedThemes: slice found", persistStart >= 0 && persistEnd > persistStart);
-    const persistSource = optionsSource.slice(persistStart, persistEnd);
-    const makePersist = (write, read) => {
-      const deps = {
-        savedThemes: [{ name: "T1", css: "a{}" }],
-        pbpApplySavedThemeOp,
-        pbpWithLargeStorageLock: (_key, work) => work(),
-        pbpSyncGetLargeUnlocked: read || (async () => stored.map((theme) => ({ ...theme }))),
-        pbpSyncSetLargeUnlocked: write,
-        pbpRefreshSyncLocalFallbackStatus: async () => {},
-      };
-      return new Function(...Object.keys(deps), persistSource + "\nreturn persistSavedThemes;")(
-        ...Object.values(deps));
+    const optPersistRealm = await pbpSwRealm.bootOptions();
+    check("persistSavedThemes: slice found", typeof optPersistRealm.win.__PBP_persistSavedThemes === "function");
+    const makePersist = (write, read) => async (op) => {
+      const prevRead = optPersistRealm.win.pbpSyncGetLargeUnlocked;
+      const prevWrite = optPersistRealm.win.pbpSyncSetLargeUnlocked;
+      const prevAssert = optPersistRealm.win.pbpAssertChunkedSyncReadComplete;
+      const prevRefresh = optPersistRealm.win.pbpRefreshSyncLocalFallbackStatus;
+      optPersistRealm.win.pbpSyncGetLargeUnlocked = read || (async () => stored.map((theme) => ({ ...theme })));
+      optPersistRealm.win.pbpSyncSetLargeUnlocked = write;
+      if (read === pbpSyncGetLargeUnlocked && write === pbpSyncSetLargeUnlocked) {
+        optPersistRealm.win.pbpAssertChunkedSyncReadComplete = pbpAssertChunkedSyncReadComplete;
+      }
+      optPersistRealm.win.pbpRefreshSyncLocalFallbackStatus = async () => {};
+      try {
+        return await optPersistRealm.win.__PBP_persistSavedThemes(op);
+      } finally {
+        optPersistRealm.win.pbpSyncGetLargeUnlocked = prevRead;
+        optPersistRealm.win.pbpSyncSetLargeUnlocked = prevWrite;
+        optPersistRealm.win.pbpAssertChunkedSyncReadComplete = prevAssert;
+        optPersistRealm.win.pbpRefreshSyncLocalFallbackStatus = prevRefresh;
+      }
     };
     globalThis.__pbpTestMakePersist = makePersist;
     const attempt = async (run) => {
@@ -788,15 +795,9 @@ async function run() {
     check("E2b persistSavedThemes still rejects a genuine storage failure",
       !failed.ok && failed.error && failed.error.message === "storage down");
 
-    // K117: the in-lock re-read IS the merge base. Hand-written server shape --
-    // the manifest claims three chunks and one has not propagated here, so the
-    // reader degrades to []. Merging onto that and writing would publish a new
-    // generation and orphan every theme the user still has. Both call sites
-    // wrap persistSavedThemes in try/catch -> reportAutoSaveFailure, so the
-    // rejection asserted here is what the existing auto-save failure UI shows.
     await (async () => {
-      const prevChromeE2b = globalThis.chrome;
-      const prevCacheE2b = _settingsStorageCache;
+      const prevStorage = optPersistRealm.win.chrome.storage;
+      const prevCacheE2b = optPersistRealm.get("_settingsStorageCache");
       const propagatingSync = {
         savedThemes: { _chunks: 3, _generation: "g1" },
         savedThemes_g1_0: '[{"name":"T2",',
@@ -817,14 +818,12 @@ async function run() {
             (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete propagatingSync[key]);
           },
         };
-        globalThis.chrome = {
-          storage: {
-            local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
-            sync: syncStub,
-            onChanged: { addListener() {} },
-          },
+        optPersistRealm.win.chrome.storage = {
+          local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
+          sync: syncStub,
+          onChanged: { addListener() {} },
         };
-        _settingsStorageCache = syncStub;
+        optPersistRealm.set("_settingsStorageCache", syncStub);
         const propagating = await attempt(() => makePersist(
           async () => { propagatingWrites++; },
           async () => [],
@@ -834,8 +833,9 @@ async function run() {
           propagatingWrites === 0 &&
           JSON.stringify(propagatingSync.savedThemes) === manifestBefore);
       } finally {
-        globalThis.chrome = prevChromeE2b;
-        _settingsStorageCache = prevCacheE2b;
+        optPersistRealm.win.chrome.storage = prevStorage;
+        optPersistRealm.set("_settingsStorageCache", prevCacheE2b);
+        optPersistRealm.dispose();
       }
     })();
   })();
@@ -848,15 +848,12 @@ async function run() {
   // over that orphans the themes still in the cloud AND deletes the local copy,
   // leaving nothing. Reachable right after a backup import re-runs this load.
   await (async () => {
-    const loadOptionsSource = await fetch("../options.js").then((response) => response.text());
-    const loadStart = loadOptionsSource.indexOf("  async function loadSavedThemes(");
-    const loadEnd = loadOptionsSource.indexOf("  // Merge, never overwrite:", loadStart);
-    check("E2c loadSavedThemes: slice found", loadStart >= 0 && loadEnd > loadStart);
-    const loadSource = loadOptionsSource.slice(loadStart, loadEnd);
+    const optLoadProbe = await pbpSwRealm.bootOptions();
+    check("E2c loadSavedThemes: slice found", typeof optLoadProbe.win.__PBP_loadSavedThemes === "function");
+    optLoadProbe.dispose();
 
     const runLoad = async (syncBacking) => {
-      const prevChromeE2c = globalThis.chrome;
-      const prevCacheE2c = _settingsStorageCache;
+      const realm = await pbpSwRealm.bootOptions();
       const legacyThemes = [{ name: "Legacy", css: "a{}" }];
       const localBacking = { savedThemes: legacyThemes };
       const writes = [];
@@ -874,45 +871,35 @@ async function run() {
             (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete syncBacking[key]);
           },
         };
-        globalThis.chrome = {
-          storage: {
-            local: {
-              get: async (keys) => {
-                if (typeof keys === "string") {
-                  return keys in localBacking ? { [keys]: localBacking[keys] } : {};
-                }
-                const out = Object.assign({}, keys);
-                Object.keys(keys).forEach((key) => {
-                  if (key in localBacking) out[key] = localBacking[key];
-                });
-                return out;
-              },
-              set: async (data) => { Object.assign(localBacking, data); },
-              remove: async (keys) => {
-                (Array.isArray(keys) ? keys : [keys]).forEach((key) => {
-                  localRemoves.push(key);
-                  delete localBacking[key];
-                });
-              },
+        realm.win.chrome.storage = {
+          local: {
+            get: async (keys) => {
+              if (typeof keys === "string") {
+                return keys in localBacking ? { [keys]: localBacking[keys] } : {};
+              }
+              const out = Object.assign({}, keys);
+              Object.keys(keys).forEach((key) => {
+                if (key in localBacking) out[key] = localBacking[key];
+              });
+              return out;
             },
-            sync: syncStub,
-            onChanged: { addListener() {} },
+            set: async (data) => { Object.assign(localBacking, data); },
+            remove: async (keys) => {
+              (Array.isArray(keys) ? keys : [keys]).forEach((key) => {
+                localRemoves.push(key);
+                delete localBacking[key];
+              });
+            },
           },
+          sync: syncStub,
+          onChanged: { addListener() {} },
         };
-        _settingsStorageCache = syncStub;
-        const deps = {
-          savedThemes: [],
-          // The degraded read the real syncGetLarge performs for both cases;
-          // what separates them is the cloud manifest the REAL assertion reads.
-          syncGetLarge: async () => [],
-          syncSetLarge: async (key, value) => { writes.push({ key, value }); },
-          renderSavedThemes: () => {},
-        };
-        await new Function(...Object.keys(deps), loadSource + "\nreturn loadSavedThemes;")(
-          ...Object.values(deps))();
+        realm.set("_settingsStorageCache", syncStub);
+        realm.win.syncGetLarge = async () => [];
+        realm.win.syncSetLarge = async (key, value) => { writes.push({ key, value }); };
+        await realm.win.__PBP_loadSavedThemes();
       } finally {
-        globalThis.chrome = prevChromeE2c;
-        _settingsStorageCache = prevCacheE2c;
+        realm.dispose();
       }
       return { writes, localRemoves, localBacking, legacyThemes };
     };
@@ -921,7 +908,6 @@ async function run() {
       savedThemes: { _chunks: 3, _generation: "g1" },
       savedThemes_g1_0: '[{"name":"Cloud",',
       savedThemes_g1_1: '"css":"b{}"}',
-      // savedThemes_g1_2 has not arrived on this device yet.
     });
     check("E2c a chunk still in flight skips the legacy theme migration entirely",
       incomplete.writes.length === 0 &&
@@ -929,30 +915,24 @@ async function run() {
       Array.isArray(incomplete.localBacking.savedThemes) &&
       incomplete.localBacking.savedThemes.length === 1);
 
-    // Never written to sync at all is NOT the same condition: undefined
-    // metadata must keep migrating, or the legacy list never reaches the cloud.
     const clean = await runLoad({});
-    // R6-P1#1: When sync.savedThemes="" and local.savedThemes=[Legacy], if complete g2=[CloudNew]
-    // arrives either while reading local.savedThemes or right after staging migration chunks,
-    // real loadSavedThemes must NOT overwrite CloudNew or delete local.savedThemes!
     let r6LoadMidReadCloud = null, r6LoadMidReadLocalKept = false, r6LoadPostStageCloud = null, r6LoadPostStageLocalKept = false;
     {
-      const prevChromeR6 = globalThis.chrome;
-      const prevCacheR6 = _settingsStorageCache;
-      try {
-        for (const mode of ["during-local-get", "after-chunk-stage"]) {
+      const makeAreaR6 = (obj) => ({
+        get: async (q) => {
+          if (q == null) return structuredClone(obj);
+          if (typeof q === "string") return q in obj ? { [q]: structuredClone(obj[q]) } : {};
+          if (Array.isArray(q)) return Object.fromEntries(q.filter((k) => k in obj).map((k) => [k, structuredClone(obj[k])]));
+          return { ...structuredClone(q), ...Object.fromEntries(Object.keys(q).filter((k) => k in obj).map((k) => [k, structuredClone(obj[k])])) };
+        },
+        set: async (d) => { Object.assign(obj, structuredClone(d)); },
+        remove: async (keys) => { for (const k of [].concat(keys)) delete obj[k]; },
+      });
+      for (const mode of ["during-local-get", "after-chunk-stage"]) {
+        const realm = await pbpSwRealm.bootOptions();
+        try {
           const lMap = { optSyncEnabled: true, savedThemes: [{ name: "Legacy", css: "a{}" }] };
           const sMap = { savedThemes: "" };
-          const makeAreaR6 = (obj) => ({
-            get: async (q) => {
-              if (q == null) return structuredClone(obj);
-              if (typeof q === "string") return q in obj ? { [q]: structuredClone(obj[q]) } : {};
-              if (Array.isArray(q)) return Object.fromEntries(q.filter((k) => k in obj).map((k) => [k, structuredClone(obj[k])]));
-              return { ...structuredClone(q), ...Object.fromEntries(Object.keys(q).filter((k) => k in obj).map((k) => [k, structuredClone(obj[k])])) };
-            },
-            set: async (d) => { Object.assign(obj, structuredClone(d)); },
-            remove: async (keys) => { for (const k of [].concat(keys)) delete obj[k]; },
-          });
           const lArea = makeAreaR6(lMap);
           const sArea = makeAreaR6(sMap);
           if (mode === "during-local-get") {
@@ -978,18 +958,11 @@ async function run() {
               return res;
             };
           }
-          globalThis.chrome = { storage: { local: lArea, sync: sArea, onChanged: { addListener() {} } } };
-          _settingsStorageCache = sArea;
-          let renderedThemes = null;
-          const realDeps = {
-            savedThemes: [],
-            syncGetLarge,
-            syncSetLarge,
-            renderSavedThemes: () => {},
-          };
-          renderedThemes = await new Function(...Object.keys(realDeps), loadSource + "\nreturn async () => { await loadSavedThemes(); return savedThemes; };")(
-            ...Object.values(realDeps))();
-          const cloudReadback = await syncGetLarge("savedThemes", []);
+          realm.win.chrome.storage = { local: lArea, sync: sArea, onChanged: { addListener() {} } };
+          realm.set("_settingsStorageCache", sArea);
+          await realm.win.__PBP_loadSavedThemes();
+          const renderedThemes = realm.win.__PBP_getSavedThemes();
+          const cloudReadback = await realm.win.syncGetLarge("savedThemes", []);
           if (mode === "during-local-get") {
             r6LoadMidReadCloud = cloudReadback;
             r6LoadMidReadLocalKept = Array.isArray(lMap.savedThemes) && lMap.savedThemes.length === 1
@@ -999,24 +972,18 @@ async function run() {
             r6LoadPostStageLocalKept = Array.isArray(lMap.savedThemes) && lMap.savedThemes.length === 1
               && Array.isArray(renderedThemes) && renderedThemes.map((t) => t.name).join(",") === "CloudNew";
           }
+        } finally {
+          realm.dispose();
         }
-        // R7-P1#1 (overlapping loadSavedThemes on same page), R7-P1#2 (quota fallback + reopen), R7-P3#5 (pre-recheck arrival renders CloudNew):
-        const makeAreaR7 = (obj) => ({
-          get: async (q) => {
-            if (q == null) return structuredClone(obj);
-            if (typeof q === "string") return q in obj ? { [q]: structuredClone(obj[q]) } : {};
-            if (Array.isArray(q)) return Object.fromEntries(q.filter((k) => k in obj).map((k) => [k, structuredClone(obj[k])]));
-            return { ...structuredClone(q), ...Object.fromEntries(Object.keys(q).filter((k) => k in obj).map((k) => [k, structuredClone(obj[k])])) };
-          },
-          set: async (d) => { Object.assign(obj, structuredClone(d)); },
-          remove: async (keys) => { for (const k of [].concat(keys)) delete obj[k]; },
-        });
-        // 1) Overlapping same-page loadSavedThemes (boot + backup import):
-        {
+      }
+      // 1) Overlapping same-page loadSavedThemes (boot + backup import):
+      {
+        const realm = await pbpSwRealm.bootOptions();
+        try {
           const lMap = { optSyncEnabled: true, savedThemes: [{ name: "Legacy", css: "a{}" }] };
           const sMap = { savedThemes: "" };
-          const lArea = makeAreaR7(lMap);
-          const sArea = makeAreaR7(sMap);
+          const lArea = makeAreaR6(lMap);
+          const sArea = makeAreaR6(sMap);
           let releaseFirstLocalGet = null;
           let localReads = 0;
           const origLGet = lArea.get;
@@ -1026,60 +993,69 @@ async function run() {
             }
             return origLGet(q);
           };
-          globalThis.chrome = { storage: { local: lArea, sync: sArea, onChanged: { addListener() {} } } };
-          _settingsStorageCache = sArea;
-          const pageHarness = new Function(
-            "syncGetLarge", "syncSetLarge",
-            "let savedThemes = []; function renderSavedThemes() {}\n" + loadSource + "\nreturn { loadSavedThemes, getSavedThemes: () => savedThemes };",
-          )(syncGetLarge, syncSetLarge);
-          const firstLoad = pageHarness.loadSavedThemes();
+          realm.win.chrome.storage = { local: lArea, sync: sArea, onChanged: { addListener() {} } };
+          realm.set("_settingsStorageCache", sArea);
+          const firstLoad = realm.win.__PBP_loadSavedThemes();
           while (!releaseFirstLocalGet) await new Promise((r) => setTimeout(r, 0));
           sMap.savedThemes = { _chunks: 1, _generation: "g2" };
           sMap.savedThemes_g2_0 = '[{"name":"CloudNew","css":"div{}"}]';
-          await pageHarness.loadSavedThemes();
+          await realm.win.__PBP_loadSavedThemes();
           releaseFirstLocalGet();
           await firstLoad;
-          const overlapCloud = await syncGetLarge("savedThemes", []);
+          const overlapCloud = await realm.win.syncGetLarge("savedThemes", []);
+          const pageThemes = realm.win.__PBP_getSavedThemes();
           if (!("savedThemes_g2_0" in sMap)
               || !Array.isArray(lMap.savedThemes) || lMap.savedThemes.length !== 1
               || overlapCloud.map((t) => t.name).join(",") !== "CloudNew"
-              || pageHarness.getSavedThemes().map((t) => t.name).join(",") !== "CloudNew") {
+              || pageThemes.map((t) => t.name).join(",") !== "CloudNew") {
             r6LoadMidReadLocalKept = false;
           }
+        } finally {
+          realm.dispose();
         }
-        // 2) Quota rejection on migration + concurrent g2 + page reopen preserves local.savedThemes:
-        {
-          const lMap = { optSyncEnabled: true, savedThemes: [{ name: "Legacy", css: "a{}" }] };
-          const sMap = { savedThemes: "" };
-          const lArea = makeAreaR7(lMap);
-          const sArea = makeAreaR7(sMap);
-          let setTries = 0;
-          sArea.set = async () => {
-            if (++setTries === 1) {
-              sMap.savedThemes = { _chunks: 1, _generation: "g2" };
-              sMap.savedThemes_g2_0 = '[{"name":"CloudNew","css":"div{}"}]';
-              throw new Error("Resource::kQuotaBytes quota exceeded");
-            }
-          };
-          globalThis.chrome = { storage: { local: lArea, sync: sArea, onChanged: { addListener() {} } } };
-          _settingsStorageCache = sArea;
-          const makeLoader = () => new Function(
-            "syncGetLarge", "syncSetLarge",
-            "let savedThemes = []; function renderSavedThemes() {}\n" + loadSource + "\nreturn async () => { await loadSavedThemes(); return savedThemes; };",
-          )(syncGetLarge, syncSetLarge);
-          await makeLoader()();
-          const secondRender = await makeLoader()();
+      }
+      // 2) Quota rejection on migration + concurrent g2 + page reopen preserves local.savedThemes:
+      {
+        const lMap = { optSyncEnabled: true, savedThemes: [{ name: "Legacy", css: "a{}" }] };
+        const sMap = { savedThemes: "" };
+        const lArea = makeAreaR6(lMap);
+        const sArea = makeAreaR6(sMap);
+        let setTries = 0;
+        sArea.set = async () => {
+          if (++setTries === 1) {
+            sMap.savedThemes = { _chunks: 1, _generation: "g2" };
+            sMap.savedThemes_g2_0 = '[{"name":"CloudNew","css":"div{}"}]';
+            throw new Error("Resource::kQuotaBytes quota exceeded");
+          }
+        };
+        const realm1 = await pbpSwRealm.bootOptions();
+        const realm2 = await pbpSwRealm.bootOptions();
+        try {
+          realm1.win.chrome.storage = { local: lArea, sync: sArea, onChanged: { addListener() {} } };
+          realm1.set("_settingsStorageCache", sArea);
+          await realm1.win.__PBP_loadSavedThemes();
+
+          realm2.win.chrome.storage = { local: lArea, sync: sArea, onChanged: { addListener() {} } };
+          realm2.set("_settingsStorageCache", sArea);
+          await realm2.win.__PBP_loadSavedThemes();
+          const secondRender = realm2.win.__PBP_getSavedThemes();
           if (!Array.isArray(lMap.savedThemes) || lMap.savedThemes.map((t) => t.name).join(",") !== "Legacy"
               || secondRender.map((t) => t.name).join(",") !== "CloudNew") {
             r6LoadPostStageLocalKept = false;
           }
+        } finally {
+          realm1.dispose();
+          realm2.dispose();
         }
-        // 3) Complete g2 arriving right before first pbpAssertChunkedSyncReadComplete renders CloudNew (not []):
-        {
+      }
+      // 3) Complete g2 arriving right before first pbpAssertChunkedSyncReadComplete renders CloudNew (not []):
+      {
+        const realm = await pbpSwRealm.bootOptions();
+        try {
           const lMap = { optSyncEnabled: true };
           const sMap = { savedThemes: "" };
-          const lArea = makeAreaR7(lMap);
-          const sArea = makeAreaR7(sMap);
+          const lArea = makeAreaR6(lMap);
+          const sArea = makeAreaR6(sMap);
           let metaGets = 0;
           const origSGet = sArea.get;
           sArea.get = async (q) => {
@@ -1089,19 +1065,16 @@ async function run() {
             }
             return origSGet(q);
           };
-          globalThis.chrome = { storage: { local: lArea, sync: sArea, onChanged: { addListener() {} } } };
-          _settingsStorageCache = sArea;
-          const rendered = await new Function(
-            "syncGetLarge", "syncSetLarge",
-            "let savedThemes = []; function renderSavedThemes() {}\n" + loadSource + "\nreturn async () => { await loadSavedThemes(); return savedThemes; };",
-          )(syncGetLarge, syncSetLarge)();
+          realm.win.chrome.storage = { local: lArea, sync: sArea, onChanged: { addListener() {} } };
+          realm.set("_settingsStorageCache", sArea);
+          await realm.win.__PBP_loadSavedThemes();
+          const rendered = realm.win.__PBP_getSavedThemes();
           if (rendered.map((t) => t.name).join(",") !== "CloudNew") {
             r6LoadPostStageLocalKept = false;
           }
+        } finally {
+          realm.dispose();
         }
-      } finally {
-        globalThis.chrome = prevChromeR6;
-        _settingsStorageCache = prevCacheR6;
       }
     }
     check("E2c an empty cloud with no manifest still migrates the legacy local list, while concurrent cloud arrival preserves CloudNew and local.savedThemes",
@@ -1423,10 +1396,9 @@ async function run() {
       check("dictionary backup rejects unsupported modes and unbounded learner profile", rejected === 4);
       // The registry is the authority on which regions exist; the backup enum
       // must accept exactly those, or a valid synced value fails the whole file.
-      const aiSrc = await (await fetch("../ai.js")).text();
-      const regStart = aiSrc.indexOf("const OPENAI_COMPAT_PROVIDERS = {");
-      const regEnd = aiSrc.indexOf("\n};", regStart);
-      const registry = new Function(aiSrc.slice(regStart, regEnd + 3) + "\nreturn OPENAI_COMPAT_PROVIDERS;")();
+      const aiRegRealm = await pbpSwRealm.loadRealmScripts(["ai.js"]);
+      const registry = aiRegRealm.get("OPENAI_COMPAT_PROVIDERS");
+      aiRegRealm.dispose();
       const regional = Object.values(registry).filter((cfg) => cfg.regionField);
       let enumsMatch = regional.length > 0;
       for (const cfg of regional) {
@@ -1486,12 +1458,41 @@ async function run() {
             saveOverlay: async () => ({ fellBackToLocal: false }), assertOverlay: () => {} });
         roundTrip = roundTrip && JSON.stringify(delta) === JSON.stringify({ optTheme: "dark" }) &&
           state.settings.arkRegion === "eu" && state.settings.opencodeProtocol === "";
-        const optSrc = await (await fetch("../options.js")).text();
-        const collectAt = optSrc.indexOf("function collectSettingsFromForm");
-        const collect = collectAt < 0 ? "" : optSrc.slice(collectAt, optSrc.indexOf("\n  }\n", collectAt));
-        roundTrip = roundTrip && collect.includes('pbpOptKnownEnumPatch("qwenRegion"') && collect.includes('pbpOptKnownEnumPatch("arkRegion"') &&
-          collect.includes('pbpOptKnownEnumPatch("opencodeProtocol"') && collect.includes('pbpOptKnownEnumPatch("commandcodeProtocol"') &&
-          !/\b(?:qwenRegion|arkRegion|opencodeProtocol|commandcodeProtocol): \$id\(/.test(collect);
+        const enumOptRealm = await pbpSwRealm.bootOptions({
+          mock: {
+            storage: {
+              local: {
+                qwenRegion: "future-qwen-region",
+                arkRegion: "eu",
+                opencodeProtocol: "",
+                commandcodeProtocol: "future-proto",
+                optTheme: "auto",
+              },
+            },
+          },
+        });
+        try {
+          // Force the four provider selects to unknown/blank values and collect via real collectSettingsFromForm().
+          for (const selId of ["opt-qwen-region", "opt-ark-region", "opt-opencode-protocol", "opt-commandcode-protocol"]) {
+            const sel = enumOptRealm.doc.getElementById(selId);
+            if (sel) sel.value = "";
+          }
+          const collected = enumOptRealm.win.__PBP_collectSettingsFromForm();
+          const themeSel = enumOptRealm.doc.getElementById("opt-theme");
+          themeSel.value = "dark";
+          await enumOptRealm.win.pbpOptionsFlushAutoSave();
+          const afterLocal = enumOptRealm.mock.storageData("local");
+          roundTrip = roundTrip &&
+            !("qwenRegion" in collected) && !("arkRegion" in collected) &&
+            !("opencodeProtocol" in collected) && !("commandcodeProtocol" in collected) &&
+            afterLocal.optTheme === "dark" &&
+            afterLocal.qwenRegion === "future-qwen-region" &&
+            afterLocal.arkRegion === "eu" &&
+            afterLocal.opencodeProtocol === "" &&
+            afterLocal.commandcodeProtocol === "future-proto";
+        } finally {
+          enumOptRealm.dispose();
+        }
       }
       check("unknown provider enum values survive an options round-trip unchanged", roundTrip);
     } finally { globalThis.chrome = savedChrome; _settingsStorageCache = savedCache; }
@@ -2187,55 +2188,57 @@ async function run() {
       // Slice the named function and drive it against the same install()
       // fixture; the shared.js helpers it calls are the page globals.
       {
-        const bgSource = await fetch("../background.js").then((r) => r.text());
-        const sStart = bgSource.indexOf("async function pbpScrubLegacySyncWebhookUrls");
-        const sEnd = bgSource.indexOf("pbpScrubLegacySyncWebhookUrls();", sStart);
-        check("E4b scrub: slice found", sStart >= 0 && sEnd > sStart);
-        const scrubFactory = new Function(
-          bgSource.slice(sStart, sEnd) + "\nreturn pbpScrubLegacySyncWebhookUrls;");
+        const swScrub = await pbpSwRealm.boot();
+        try {
+          check("E4b scrub: slice found", typeof swScrub.win.pbpScrubLegacySyncWebhookUrls === "function");
+          const runScrub = async () => {
+            const prevChromeSw = swScrub.win.chrome;
+            swScrub.win.chrome = globalThis.chrome;
+            try { await swScrub.win.pbpScrubLegacySyncWebhookUrls(); }
+            finally { swScrub.win.chrome = prevChromeSw; }
+          };
 
-        // keys-off with a legacy plaintext webhook URL in sync, empty local:
-        // rescue lands locally, sync keeps ordinary fields but loses secrets.
-        const scrubLocal1 = { optSyncEnabled: false };
-        const scrubSync1 = {
-          syncApiKeys: false,
-          exportTargets: { webhook: { enabled: true, url: "https://hook.example/cap-secret", token: "obf:hook-tok" } },
-        };
-        install(scrubLocal1, scrubSync1);
-        await scrubFactory()();
-        check("E4b scrub: rescued sync-only webhook secrets into local",
-          scrubLocal1.exportTargets.webhook.url === "https://hook.example/cap-secret" &&
-          scrubLocal1.exportTargets.webhook.token === "obf:hook-tok");
-        check("E4b scrub: sync copy keeps ordinary fields but loses url+token",
-          scrubSync1.exportTargets.webhook.enabled === true &&
-          !("url" in scrubSync1.exportTargets.webhook) &&
-          !("token" in scrubSync1.exportTargets.webhook) &&
-          scrubLocal1._webhookSyncScrubDone === true);
+          const scrubLocal1 = { optSyncEnabled: false };
+          const scrubSync1 = {
+            syncApiKeys: false,
+            exportTargets: { webhook: { enabled: true, url: "https://hook.example/cap-secret", token: "obf:hook-tok" } },
+          };
+          install(scrubLocal1, scrubSync1);
+          await runScrub();
+          check("E4b scrub: rescued sync-only webhook secrets into local",
+            scrubLocal1.exportTargets.webhook.url === "https://hook.example/cap-secret" &&
+            scrubLocal1.exportTargets.webhook.token === "obf:hook-tok");
+          check("E4b scrub: sync copy keeps ordinary fields but loses url+token",
+            scrubSync1.exportTargets.webhook.enabled === true &&
+            !("url" in scrubSync1.exportTargets.webhook) &&
+            !("token" in scrubSync1.exportTargets.webhook) &&
+            scrubLocal1._webhookSyncScrubDone === true);
 
-        // keys-on: sync copy is live credential-sync data — untouched, flag set.
-        const scrubLocal2 = { optSyncEnabled: true };
-        const scrubSync2 = {
-          syncApiKeys: true,
-          exportTargets: { webhook: { enabled: true, url: "https://hook.example/live" } },
-        };
-        install(scrubLocal2, scrubSync2);
-        const scrubSync2Before = JSON.stringify(scrubSync2);
-        await scrubFactory()();
-        check("E4b scrub: keys-on sync copy untouched, flag set",
-          JSON.stringify(scrubSync2) === scrubSync2Before.replace('}', '}') &&
-          scrubSync2.exportTargets.webhook.url === "https://hook.example/live" &&
-          scrubLocal2._webhookSyncScrubDone === true);
+          const scrubLocal2 = { optSyncEnabled: true };
+          const scrubSync2 = {
+            syncApiKeys: true,
+            exportTargets: { webhook: { enabled: true, url: "https://hook.example/live" } },
+          };
+          install(scrubLocal2, scrubSync2);
+          const scrubSync2Before = JSON.stringify(scrubSync2);
+          await runScrub();
+          check("E4b scrub: keys-on sync copy untouched, flag set",
+            JSON.stringify(scrubSync2) === scrubSync2Before &&
+            scrubSync2.exportTargets.webhook.url === "https://hook.example/live" &&
+            scrubLocal2._webhookSyncScrubDone === true);
 
-        // flag already set: full no-op, sync never rewritten.
-        const scrubLocal3 = { optSyncEnabled: false, _webhookSyncScrubDone: true };
-        const scrubSync3 = {
-          syncApiKeys: false,
-          exportTargets: { webhook: { enabled: true, url: "https://hook.example/left" } },
-        };
-        install(scrubLocal3, scrubSync3);
-        await scrubFactory()();
-        check("E4b scrub: done flag short-circuits, legacy sync value untouched",
-          scrubSync3.exportTargets.webhook.url === "https://hook.example/left");
+          const scrubLocal3 = { optSyncEnabled: false, _webhookSyncScrubDone: true };
+          const scrubSync3 = {
+            syncApiKeys: false,
+            exportTargets: { webhook: { enabled: true, url: "https://hook.example/left" } },
+          };
+          install(scrubLocal3, scrubSync3);
+          await runScrub();
+          check("E4b scrub: done flag short-circuits, legacy sync value untouched",
+            scrubSync3.exportTargets.webhook.url === "https://hook.example/left");
+        } finally {
+          swScrub.dispose();
+        }
       }
 
       // Regression (602062f review): enabling key sync from a device that
@@ -2371,27 +2374,30 @@ async function run() {
   })();
 
   await (async () => {
-    const backgroundSource = await fetch("../background.js").then((response) => response.text());
-    const start = backgroundSource.indexOf("let _settingsCache = null;");
-    const end = backgroundSource.indexOf("// F7: Track recent saves", start);
-    check("_settingsCache: slice found", start >= 0 && end > start);
-    // A broken anchor above already produced a named FAIL for the guard; the
-    // factory(...) calls below throw immediately (a ReferenceError from the
-    // undefined loadSettings/etc identifiers) when cacheSource is garbage.
-    // Contain that here instead of letting it propagate out of this IIFE and
-    // abort run(), which would drop the (unrelated) mdMemo check right below
-    // and every later E5-E12 block in the file.
+    const swCache = await pbpSwRealm.boot();
+    check("_settingsCache: slice found", typeof swCache.win.loadSettings === "function" && typeof swCache.win.invalidateSettingsCache === "function");
     try {
-    const cacheSource = backgroundSource.slice(start, end);
-    const factory = new Function("SETTINGS_DEFAULTS", "pbpReadSettingsWithSecrets", "deobfuscateSettings",
-      `${cacheSource}\nreturn { loadSettings, invalidateSettingsCache, cached: () => _settingsCache };`);
+    const makeSwCache = (readImpl) => {
+      swCache.win.updateBadge = async () => {};
+      swCache.win.pbpResetBookmarkStatusView = () => {};
+      swCache.win.initI18n = () => {};
+      swCache.win.invalidateSettingsCache();
+      swCache.set("_settingsCachePending", null);
+      swCache.set("_settingsCacheGeneration", 0);
+      swCache.win.pbpReadSettingsWithSecrets = readImpl;
+      return {
+        loadSettings: () => swCache.win.loadSettings(),
+        invalidateSettingsCache: () => swCache.win.invalidateSettingsCache(),
+        cached: () => swCache.get("_settingsCache"),
+      };
+    };
 
     let reads = 0;
     const releases = [];
-    const concurrentCache = factory(SETTINGS_DEFAULTS, () => {
+    const concurrentCache = makeSwCache(() => {
       reads++;
       return new Promise((resolve) => { releases.push(resolve); });
-    }, deobfuscateSettings);
+    });
     const concurrentA = concurrentCache.loadSettings();
     const concurrentB = concurrentCache.loadSettings();
     await Promise.resolve();
@@ -2402,32 +2408,34 @@ async function run() {
 
     reads = 0;
     let releaseStale;
-    const invalidatedCache = factory(SETTINGS_DEFAULTS, () => {
+    const invalidatedCache = makeSwCache(() => {
       reads++;
       if (reads === 1) {
         return new Promise((resolve) => { releaseStale = () => resolve({ pinboardToken: obfuscateKey("alice:old") }); });
       }
       return Promise.resolve({ pinboardToken: obfuscateKey("alice:new") });
-    }, deobfuscateSettings);
+    });
     const invalidatedA = invalidatedCache.loadSettings();
     const invalidatedB = invalidatedCache.loadSettings();
     invalidatedCache.invalidateSettingsCache();
     releaseStale();
     const [freshA, freshB] = await Promise.all([invalidatedA, invalidatedB]);
     const cached = await invalidatedCache.loadSettings();
+    const epochBefore = swCache.get("_pinboardAuthEpoch");
+    swCache.mock.chrome.storage.onChanged.dispatch({ optSyncEnabled: { oldValue: false, newValue: true } }, "local");
+    const syncRerouteInvalidated = swCache.get("_settingsCache") === null && swCache.get("_pinboardAuthEpoch") > epochBefore;
     check("E4 background settings cache: pending invalidation causes exactly one fresh reread for every caller",
       reads === 2 && freshA.pinboardToken === "alice:new" && freshB === freshA && cached === freshA &&
-      invalidatedCache.cached() === freshA && backgroundSource.includes("changes.optSyncEnabled") &&
-      backgroundSource.includes("invalidateBookmarkAuthState()"));
+      syncRerouteInvalidated);
 
     reads = 0;
     const firstError = new Error("settings unavailable");
-    const retryCache = factory(SETTINGS_DEFAULTS, () => {
+    const retryCache = makeSwCache(() => {
       reads++;
       return reads === 1
         ? Promise.reject(firstError)
         : Promise.resolve({ pinboardToken: obfuscateKey("alice:retry") });
-    }, deobfuscateSettings);
+    });
     let rejectedWith = null;
     try { await retryCache.loadSettings(); } catch (error) { rejectedWith = error; }
     const retried = await retryCache.loadSettings();
@@ -2436,13 +2444,13 @@ async function run() {
 
     reads = 0;
     let releaseLateValue;
-    const lateValueCache = factory(SETTINGS_DEFAULTS, () => {
+    const lateValueCache = makeSwCache(() => {
       reads++;
       if (reads === 1) {
         return new Promise((resolve) => { releaseLateValue = () => resolve({ pinboardToken: obfuscateKey("alice:old") }); });
       }
       return Promise.resolve({ pinboardToken: obfuscateKey("alice:fresh-first") });
-    }, deobfuscateSettings);
+    });
     const lateValueWaiter = lateValueCache.loadSettings();
     lateValueCache.invalidateSettingsCache();
     const freshFirst = await lateValueCache.loadSettings();
@@ -2455,7 +2463,7 @@ async function run() {
     reads = 0;
     let rejectLateRead;
     let releaseFreshRead;
-    const lateRejectCache = factory(SETTINGS_DEFAULTS, () => {
+    const lateRejectCache = makeSwCache(() => {
       reads++;
       if (reads === 1) return new Promise((_, reject) => { rejectLateRead = reject; });
       if (reads === 2) {
@@ -2464,7 +2472,7 @@ async function run() {
         });
       }
       return Promise.resolve({ pinboardToken: obfuscateKey("alice:unexpected-extra-read") });
-    }, deobfuscateSettings);
+    });
     const lateRejectA = lateRejectCache.loadSettings();
     const lateRejectB = lateRejectCache.loadSettings();
     lateRejectCache.invalidateSettingsCache();
@@ -2477,6 +2485,7 @@ async function run() {
       event.preventDefault();
     };
     window.addEventListener("unhandledrejection", onUnhandledRejection);
+    swCache.win.addEventListener("unhandledrejection", onUnhandledRejection);
     rejectLateRead(new Error("stale generation failed"));
     await Promise.resolve();
     await Promise.resolve();
@@ -2484,16 +2493,13 @@ async function run() {
     const lateRejectResult = await lateRejectOutcome;
     await new Promise((resolve) => setTimeout(resolve, 0));
     window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    swCache.win.removeEventListener("unhandledrejection", onUnhandledRejection);
     const lateRejectValues = lateRejectResult.values || [];
     check("E4 background settings cache: late stale rejection joins and cannot clear the fresh pending entry",
       !lateRejectResult.error && !unhandledReason && reads === 2 && lateRejectValues.length === 3 &&
       lateRejectValues.every((value) => value === lateRejectValues[0]) &&
       lateRejectValues[0]?.pinboardToken === "alice:fresh-pending" && lateRejectCache.cached() === lateRejectValues[0]);
     } catch (error) {
-      // Render the same named rows the happy path would have produced, so
-      // this block's row count in the suite is unaffected by which anchor
-      // (if any) broke -- a broken _settingsCache anchor is already named by
-      // the guard above.
       for (const name of [
         "E4 background settings cache: concurrent callers share one read",
         "E4 background settings cache: pending invalidation causes exactly one fresh reread for every caller",
@@ -2501,125 +2507,93 @@ async function run() {
         "E4 background settings cache: late stale value cannot replace a completed fresh generation",
         "E4 background settings cache: late stale rejection joins and cannot clear the fresh pending entry",
       ]) check(name + " -- " + String(error && error.message), false);
+    } finally {
+      swCache.dispose();
     }
 
-    // md-preview's memo is the same singleflight shape as loadSettings above,
-    // so it gets the same BEHAVIOR probe: source-text greps here would stay
-    // green for the bug they were meant to catch (a rejected promise is
-    // truthy, so `if (!_pbpAiSettingsPromise)` used to pin one transient
-    // storage failure onto every AI entry point for the rest of the session).
-    const mdAiSource = await fetch("../md-ai-core.js").then((response) => response.text());
-    const mdMemoStart = mdAiSource.indexOf("let _pbpAiSettingsPromise = null;");
-    const mdMemoEnd = mdAiSource.indexOf("// Gate: master switch on AND a usable AI key", mdMemoStart);
-    check("_pbpAiSettingsPromise: slice found", mdMemoStart >= 0 && mdMemoEnd > mdMemoStart);
-    // Same containment as the _settingsCache block above: mdMemoFactory(...)
-    // throws immediately when mdMemoSource is garbage (an undefined
-    // pbpAiGetSettings identifier in its own return statement).
+    const mdRealm = await pbpSwRealm.loadRealmScripts(["shared.js", "md-ai-core.js"]);
+    check("_pbpAiSettingsPromise: slice found", typeof mdRealm.win.pbpAiGetSettings === "function");
     try {
-    const mdMemoSource = mdAiSource.slice(mdMemoStart, mdMemoEnd);
-    const mdMemoFactory = new Function("chrome", "SETTINGS_DEFAULTS", "pbpReadSettingsWithSecrets",
-      "deobfuscateSettings", "pbpSettingsKeysChanged",
-      `${mdMemoSource}\nreturn { pbpAiGetSettings };`);
-
-    let mdOnChanged = null;
-    let mdReads = 0;
-    const mdFirstError = new Error("md settings unavailable");
-    const mdMemo = mdMemoFactory(
-      { storage: { onChanged: { addListener: (listener) => { mdOnChanged = listener; } } } },
-      SETTINGS_DEFAULTS,
-      () => {
+      let mdReads = 0;
+      const mdFirstError = new Error("md settings unavailable");
+      mdRealm.win.pbpReadSettingsWithSecrets = () => {
         mdReads++;
         return mdReads === 1
           ? Promise.reject(mdFirstError)
           : Promise.resolve({ pinboardToken: obfuscateKey(`alice:md-${mdReads}`) });
-      },
-      deobfuscateSettings, pbpSettingsKeysChanged);
-
-    // Settled-wrapped so a regression (every later call replaying the pinned
-    // rejection) reports one red row instead of tearing down the whole suite.
-    const mdRead = () => mdMemo.pbpAiGetSettings().then((value) => ({ value }), (error) => ({ error }));
-    let mdRejectedWith = null;
-    try { await mdMemo.pbpAiGetSettings(); } catch (error) { mdRejectedWith = error; }
-    const mdRetried = await mdRead();
-    const mdMemoized = await mdRead();
-    mdOnChanged?.({ aiProvider: { oldValue: "gemini", newValue: "openai" } }, "local");
-    const mdAfterChange = await mdRead();
-    check("E4 md AI cache: a rejected read is not pinned and storage changes still invalidate",
-      mdRejectedWith === mdFirstError && mdReads === 3 && typeof mdOnChanged === "function" &&
-      mdRetried.value?.pinboardToken === "alice:md-2" && mdMemoized.value === mdRetried.value &&
-      mdAfterChange.value?.pinboardToken === "alice:md-3");
+      };
+      const mdRead = () => mdRealm.win.pbpAiGetSettings().then((value) => ({ value }), (error) => ({ error }));
+      let mdRejectedWith = null;
+      try { await mdRealm.win.pbpAiGetSettings(); } catch (error) { mdRejectedWith = error; }
+      const mdRetried = await mdRead();
+      const mdMemoized = await mdRead();
+      const hasMdListener = mdRealm.mock.chrome.storage.onChanged.hasListeners();
+      mdRealm.mock.chrome.storage.onChanged.dispatch({ aiProvider: { oldValue: "gemini", newValue: "openai" } }, "local");
+      const mdAfterChange = await mdRead();
+      check("E4 md AI cache: a rejected read is not pinned and storage changes still invalidate",
+        mdRejectedWith === mdFirstError && mdReads === 3 && hasMdListener &&
+        mdRetried.value?.pinboardToken === "alice:md-2" && mdMemoized.value === mdRetried.value &&
+        mdAfterChange.value?.pinboardToken === "alice:md-3");
     } catch (error) {
       check("E4 md AI cache: a rejected read is not pinned and storage changes still invalidate" + " -- " + String(error && error.message), false);
+    } finally {
+      mdRealm.dispose();
     }
   })();
 
-  // ---------- K11: debouncedCheck reads optCheckBookmarkStatus from the warm
-  // _settingsCache instead of a redundant single-key storage.get, falling back
-  // to today's single-key fresh read only when the cache is cold. Sliced
-  // together with loadSettings/invalidateSettingsCache (they sit contiguously
-  // in background.js) so debouncedCheck's `_settingsCache` reference resolves
-  // to the SAME cache loadSettings() warms/clears -- not a copy. ----------
   await (async () => {
-    const backgroundSource = await fetch("../background.js").then((response) => response.text());
-    const k11Start = backgroundSource.indexOf("async function debouncedCheck");
-    const k11End = backgroundSource.indexOf("// F7: Track recent saves", k11Start);
-    check("K11 debouncedCheck+_settingsCache: slice found", k11Start >= 0 && k11End > k11Start);
+    const swK11 = await pbpSwRealm.boot();
+    check("K11 debouncedCheck+_settingsCache: slice found", typeof swK11.win.debouncedCheck === "function");
     try {
-      const k11Source = backgroundSource.slice(k11Start, k11End);
-      const k11Factory = new Function(
-        "SETTINGS_DEFAULTS", "getSettingsStorage", "pbpReadSettingsWithSecrets", "deobfuscateSettings", "pbpCheckBookmarkStatus",
-        `const getCurrentBookmarkAuth = async () => ({ service: "pinboard", token: "alice:secret", account: "alice", epoch: 0 });\nlet _pinboardAuthEpoch = 0;\nconst _pendingChecks = new Map();\n${k11Source}\n` +
-        `return { debouncedCheck, loadSettings, invalidateSettingsCache, cached: () => _settingsCache };`
-      );
+      const configureK11 = ({ getStorageImpl, readSecretsImpl, checkImpl }) => {
+        swK11.win.invalidateSettingsCache();
+        swK11.set("_settingsLoadPromise", null);
+        swK11.set("_settingsCache", null);
+        swK11.get("_pendingChecks").clear();
+        swK11.win.getCurrentBookmarkAuth = async () => ({ service: "pinboard", token: "alice:secret", account: "alice", epoch: swK11.get("_pinboardAuthEpoch") });
+        swK11.win.getSettingsStorage = getStorageImpl;
+        swK11.win.pbpReadSettingsWithSecrets = readSecretsImpl;
+        swK11.win.pbpCheckBookmarkStatus = checkImpl;
+        return {
+          debouncedCheck: (u) => swK11.win.debouncedCheck(u),
+          loadSettings: () => swK11.win.loadSettings(),
+          cached: () => swK11.get("_settingsCache"),
+        };
+      };
 
-      // Warm cache: loadSettings() has already populated _settingsCache (the
-      // same way this callback's own next step -- getCurrentBookmarkAuth ->
-      // getCachedToken -- warms it) -- no storage.get for optCheckBookmarkStatus.
       {
         let getCalls = 0, checkCalls = 0;
-        const api = k11Factory(
-          SETTINGS_DEFAULTS,
-          async () => ({ get: async () => { getCalls++; return { optCheckBookmarkStatus: true }; } }),
-          async () => ({ ...SETTINGS_DEFAULTS, optCheckBookmarkStatus: true }),
-          deobfuscateSettings,
-          async () => { checkCalls++; return { bookmarked: true }; }
-        );
+        const api = configureK11({
+          getStorageImpl: async () => ({ get: async () => { getCalls++; return { optCheckBookmarkStatus: true }; } }),
+          readSecretsImpl: async () => ({ ...SETTINGS_DEFAULTS, optCheckBookmarkStatus: true }),
+          checkImpl: async () => { checkCalls++; return { bookmarked: true }; },
+        });
         await api.loadSettings();
-        getCalls = 0; // the warm-up read above isn't the behavior under test
+        getCalls = 0;
         await api.debouncedCheck("https://example.com/warm");
         check("K11 warm cache: debouncedCheck takes optCheckBookmarkStatus from _settingsCache, no storage.get",
           getCalls === 0 && checkCalls === 1 && api.cached()?.optCheckBookmarkStatus === true);
       }
 
-      // Cold cache: no prior loadSettings() call, so _settingsCache is still
-      // null -- debouncedCheck must keep today's single-key fresh read, and
-      // must not have warmed _settingsCache as a side effect (no new
-      // invalidation-chain coupling on the cold path).
       {
         let getCalls = 0, checkCalls = 0;
-        const api = k11Factory(
-          SETTINGS_DEFAULTS,
-          async () => ({ get: async () => { getCalls++; return { optCheckBookmarkStatus: true }; } }),
-          async () => ({ ...SETTINGS_DEFAULTS, optCheckBookmarkStatus: true }),
-          deobfuscateSettings,
-          async () => { checkCalls++; return { bookmarked: true }; }
-        );
+        const api = configureK11({
+          getStorageImpl: async () => ({ get: async () => { getCalls++; return { optCheckBookmarkStatus: true }; } }),
+          readSecretsImpl: async () => ({ ...SETTINGS_DEFAULTS, optCheckBookmarkStatus: true }),
+          checkImpl: async () => { checkCalls++; return { bookmarked: true }; },
+        });
         await api.debouncedCheck("https://example.com/cold");
         check("K11 cold cache: debouncedCheck falls back to the single-key storage.get",
           getCalls === 1 && checkCalls === 1 && api.cached() === null);
       }
 
-      // Warm cache with the toggle off: the check is skipped entirely, and
-      // still without any storage.get for the disabled key.
       {
         let getCalls = 0, checkCalls = 0;
-        const api = k11Factory(
-          SETTINGS_DEFAULTS,
-          async () => ({ get: async () => { getCalls++; return { optCheckBookmarkStatus: true }; } }),
-          async () => ({ ...SETTINGS_DEFAULTS, optCheckBookmarkStatus: false }),
-          deobfuscateSettings,
-          async () => { checkCalls++; return true; }
-        );
+        const api = configureK11({
+          getStorageImpl: async () => ({ get: async () => { getCalls++; return { optCheckBookmarkStatus: true }; } }),
+          readSecretsImpl: async () => ({ ...SETTINGS_DEFAULTS, optCheckBookmarkStatus: false }),
+          checkImpl: async () => { checkCalls++; return true; },
+        });
         await api.loadSettings();
         getCalls = 0;
         await api.debouncedCheck("https://example.com/disabled");
@@ -2632,6 +2606,8 @@ async function run() {
         "K11 cold cache: debouncedCheck falls back to the single-key storage.get",
         "K11 warm cache with optCheckBookmarkStatus===false: check is skipped, no storage.get",
       ]) check(name + " -- " + String(error && error.message), false);
+    } finally {
+      swK11.dispose();
     }
   })();
 
@@ -2962,52 +2938,82 @@ async function run() {
     localArea.optSyncEnabled = true;
     syncArea.syncApiKeys = true;
 
-    // Drive the real Options sync-toggle handler: its paused stripped write
-    // must retain the lock until keys-on can restore the full local target.
+    // Drive the real Options sync-toggle and sync-keys-toggle handlers booted
+    // inside an isolated Options page realm (zero source slicing).
     const optionsSource = await fetch("../options.js").then((response) => response.text());
-    const syncHandlerStart = optionsSource.indexOf('syncToggle?.addEventListener("change", async () => {');
-    const syncHandlerEnd = optionsSource.indexOf("  // syncApiKeys toggle:", syncHandlerStart);
-    check("syncToggle handler: slice found", syncHandlerStart >= 0 && syncHandlerEnd > syncHandlerStart);
-    const syncHandlerSource = optionsSource.slice(syncHandlerStart, syncHandlerEnd);
-    const keysHandlerStart = optionsSource.indexOf('syncKeysToggle?.addEventListener("change", async () => {', syncHandlerEnd);
-    const keysHandlerEnd = optionsSource.indexOf("  // ---- Apply options page theme", keysHandlerStart);
-    check("syncKeysToggle handler: slice found", keysHandlerStart >= 0 && keysHandlerEnd > keysHandlerStart);
-    const keysHandlerSource = optionsSource.slice(keysHandlerStart, keysHandlerEnd);
-    check("E5 Options handlers: settings migration is fully locked and disable uses the authoritative transition helper",
-      syncHandlerSource.indexOf("await pbpWithSecretStorageLock") < syncHandlerSource.indexOf("oldStorage.get") &&
-      syncHandlerSource.includes("pbpResolveChunkedSettings") &&
-      syncHandlerSource.includes("PBP_CHUNKED_SETTING_KEYS") &&
-      syncHandlerSource.includes("await syncSetLarge(key, value)") &&
-      keysHandlerSource.includes("pbpDisableSyncApiKeys()") &&
-      keysHandlerSource.includes("pbpReadSecretSyncState(") &&
-      !keysHandlerSource.includes("storage.local.set({ syncApiKeys: false })"));
-    check("E5 Options handler: conflict confirmation runs before the cross-context secret-storage lock",
-      syncHandlerSource.indexOf("await pbpAskSyncConflict(") >= 0 &&
-      syncHandlerSource.indexOf("await pbpAskSyncConflict(") <
-        syncHandlerSource.indexOf("await pbpWithSecretStorageLock") &&
-      !/\bconfirm\(|pbpAsk/.test(syncHandlerSource.slice(syncHandlerSource.indexOf("await pbpWithSecretStorageLock"))));
-    check("E5 Options auto-save persists only the baseline delta and serializes saves",
-      optionsSource.includes("pbpSaveOptionsSnapshot(savedState, data, overlayValue") &&
-      optionsSource.includes("pbpQueueOptionsSave(autoSaveState, saveAll)"));
-
-    if (syncHandlerStart < 0 || syncHandlerEnd <= syncHandlerStart || keysHandlerStart < 0 || keysHandlerEnd <= keysHandlerStart) {
-      // Everything below drives REAL execution semantics through
-      // new Function(...) built from syncHandlerSource/keysHandlerSource --
-      // a broken anchor here does not just throw (e.g. calling the resulting
-      // undefined handler function): several paths would hang forever
-      // instead, since a handler that never runs never resolves the promise
-      // a later await is waiting on (see handlerMainStarted below). Bail out
-      // of this behavioral sub-suite instead of letting either failure mode
-      // abort run() or stall the whole page; the two guards above already
-      // named exactly which anchor broke.
-      return;
+    async function bootSyncHarness(opts = {}) {
+      let syncChangeHandler = null;
+      let keysChangeHandler = null;
+      const timers = [];
+      const opt = await pbpSwRealm.bootOptions({
+        withStyles: !!opts.withStyles,
+        beforeScripts(win, _mock, doc) {
+          const syncEl = doc.getElementById("opt-sync-enabled");
+          const keysEl = doc.getElementById("opt-sync-api-keys");
+          if (syncEl) {
+            const origAdd = syncEl.addEventListener.bind(syncEl);
+            syncEl.addEventListener = (type, fn, listenerOpts) => {
+              if (type === "change" && !syncChangeHandler) syncChangeHandler = fn;
+              return origAdd(type, fn, listenerOpts);
+            };
+          }
+          if (keysEl) {
+            const origAdd = keysEl.addEventListener.bind(keysEl);
+            keysEl.addEventListener = (type, fn, listenerOpts) => {
+              if (type === "change" && !keysChangeHandler) keysChangeHandler = fn;
+              return origAdd(type, fn, listenerOpts);
+            };
+          }
+        },
+      });
+      if (opts.visible) {
+        // Keep the iframe inside #pbp-sw-realms: reparenting a connected iframe
+        // reloads its browsing context in Blink and wipes the booted listeners.
+        opt.iframe.style.cssText = "width:800px;height:600px;border:0;";
+      }
+      const syncToggleEl = opt.doc.getElementById("opt-sync-enabled");
+      const syncKeysToggleEl = opt.doc.getElementById("opt-sync-api-keys");
+      const errEl = opt.doc.getElementById("opt-sync-error");
+      Object.defineProperty(opt.doc, "hidden", { configurable: true, get: () => false });
+      opt.win.t = (key) => key;
+      opt.win.setTimeout = (fn, delay) => { timers.push({ fn, delay }); return timers.length; };
+      function configure(cfg = {}) {
+        timers.length = 0;
+        if (errEl) { errEl.textContent = ""; errEl.classList.add("hidden"); }
+        opt.doc.body.style.opacity = "";
+        opt.doc.getElementById("opt-global-error")?.classList.add("hidden");
+        if (opt.doc.getElementById("opt-global-alert")) {
+          opt.doc.getElementById("opt-global-alert").textContent = "";
+          opt.doc.getElementById("opt-global-alert").classList.add("hidden");
+        }
+        if (cfg.chrome) {
+          opt.win.chrome.storage = {
+            ...opt.mock.chrome.storage,
+            ...cfg.chrome.storage,
+          };
+        }
+        opt.set("_settingsStorageCache", null);
+        if (syncToggleEl && typeof cfg.syncChecked === "boolean") syncToggleEl.checked = cfg.syncChecked;
+        if (syncKeysToggleEl) {
+          if (typeof cfg.keysChecked === "boolean") syncKeysToggleEl.checked = cfg.keysChecked;
+          if (typeof cfg.keysDisabled === "boolean") syncKeysToggleEl.disabled = cfg.keysDisabled;
+        }
+        opt.win.syncGetLarge = cfg.syncGetLarge || (async (key) => (key === "savedThemes" ? [] : ""));
+        opt.win.syncSetLarge = cfg.syncSetLarge || (async () => {});
+        opt.win.pbpAskSyncConflict = cfg.pbpAskSyncConflict || (async () => "cloud");
+        opt.win.pbpAskConfirmChoice = cfg.pbpAskConfirmChoice || (async () => "yes");
+      }
+      async function runSyncChange() {
+        const res = await syncChangeHandler.call(syncToggleEl, new opt.win.Event("change", { bubbles: true }));
+        return res;
+      }
+      function flushSuccessWatchdog() {
+        const w = timers.find((timer) => timer.delay === 2000);
+        if (w) w.fn();
+      }
+      return { opt, syncToggleEl, syncKeysToggleEl, errEl, timers, configure, runSyncChange, flushSuccessWatchdog, getSyncHandler: () => syncChangeHandler, getKeysHandler: () => keysChangeHandler };
     }
 
-    const handlerLocal = {
-      optSyncEnabled: false,
-      exportTargets: { github: { enabled: true, token: "obf:handler-token" } },
-    };
-    const handlerSync = { syncApiKeys: false };
     const area = (backing) => ({
       get: async (keys) => {
         if (keys == null) return Object.assign({}, backing);
@@ -3024,6 +3030,120 @@ async function run() {
       set: async (data) => { Object.assign(backing, data); },
       remove: async (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete backing[key]); },
     });
+
+    const syncHarness = await bootSyncHarness();
+    check("syncToggle handler: slice found", typeof syncHarness.getSyncHandler() === "function");
+    check("syncKeysToggle handler: slice found", typeof syncHarness.getKeysHandler() === "function");
+
+    {
+      // Verify lock-before-migration-read and authoritative keys-disable helper behaviourally.
+      const lockProbeLocal = { optSyncEnabled: false, optTheme: "dark", customTagPrompt: "probe-prompt" };
+      const lockProbeSync = { syncApiKeys: false };
+      let sawSettingKeysReadWhileLocked = false;
+      let holdingLock = true;
+      let releaseOuterLock;
+      let outerLockAcquiredResolve;
+      const outerLockAcquired = new Promise((r) => { outerLockAcquiredResolve = r; });
+      const heldOuter = syncHarness.opt.win.pbpWithSecretStorageLock(async () => {
+        outerLockAcquiredResolve();
+        await new Promise((r) => { releaseOuterLock = r; });
+      });
+      await outerLockAcquired;
+      const baseLocalArea = area(lockProbeLocal);
+      let sawResolveWhileLocked = false;
+      const origResolveChunked = syncHarness.opt.win.pbpResolveChunkedSettings;
+      syncHarness.opt.win.pbpResolveChunkedSettings = async (...args) => {
+        if (holdingLock) sawResolveWhileLocked = true;
+        return origResolveChunked(...args);
+      };
+      const probedLargeWrites = [];
+      syncHarness.configure({
+        chrome: { storage: { local: baseLocalArea, sync: area(lockProbeSync) } },
+        syncChecked: true,
+        keysChecked: false,
+        keysDisabled: true,
+        syncSetLarge: async (key, value) => { probedLargeWrites.push(key); },
+      });
+      const pendingMigration = syncHarness.runSyncChange();
+      await new Promise((r) => setTimeout(r, 20));
+      const blockedBehindLock = !sawResolveWhileLocked && probedLargeWrites.length === 0;
+      holdingLock = false;
+      releaseOuterLock();
+      await Promise.all([heldOuter, pendingMigration]);
+      syncHarness.opt.win.pbpResolveChunkedSettings = origResolveChunked;
+      syncHarness.flushSuccessWatchdog();
+
+      let disableHelperCalls = 0;
+      let syncStateReads = 0;
+      const origDisable = syncHarness.opt.win.pbpDisableSyncApiKeys;
+      const origReadState = syncHarness.opt.win.pbpReadSecretSyncState;
+      const keysDisableLocal = { optSyncEnabled: true };
+      const keysDisableSync = { syncApiKeys: true };
+      let wroteSyncApiKeysToLocal = false;
+      const keysLocalArea = area(keysDisableLocal);
+      syncHarness.configure({
+        chrome: {
+          storage: {
+            local: {
+              ...keysLocalArea,
+              set: async (data) => {
+                if (data && Object.prototype.hasOwnProperty.call(data, "syncApiKeys")) wroteSyncApiKeysToLocal = true;
+                return keysLocalArea.set(data);
+              },
+            },
+            sync: area(keysDisableSync),
+          },
+        },
+        syncChecked: true,
+        keysChecked: false,
+        keysDisabled: false,
+      });
+      syncHarness.opt.win.pbpDisableSyncApiKeys = async () => { disableHelperCalls++; keysDisableSync.syncApiKeys = false; };
+      syncHarness.opt.win.pbpReadSecretSyncState = async (opts) => { syncStateReads++; return origReadState(opts); };
+      await syncHarness.getKeysHandler().call(syncHarness.syncKeysToggleEl, new syncHarness.opt.win.Event("change", { bubbles: true }));
+      syncHarness.opt.win.pbpDisableSyncApiKeys = origDisable;
+      syncHarness.opt.win.pbpReadSecretSyncState = origReadState;
+      check("E5 Options handlers: settings migration is fully locked and disable uses the authoritative transition helper",
+        blockedBehindLock && probedLargeWrites.includes("customTagPrompt") &&
+        disableHelperCalls === 1 && syncStateReads >= 1 && !wroteSyncApiKeysToLocal);
+    }
+
+    {
+      // Conflict modal runs BEFORE acquiring the cross-context secret-storage Web Lock.
+      const modalLocal = { optSyncEnabled: false };
+      const modalSync = { syncApiKeys: false, optTheme: "cloud-theme" };
+      let releaseModal;
+      let modalOpenedResolve;
+      const modalOpened = new Promise((r) => { modalOpenedResolve = r; });
+      syncHarness.configure({
+        chrome: { storage: { local: area(modalLocal), sync: area(modalSync) } },
+        syncChecked: true,
+        keysChecked: false,
+        keysDisabled: true,
+        pbpAskSyncConflict: async () => {
+          modalOpenedResolve();
+          return new Promise((r) => { releaseModal = () => r("cancel"); });
+        },
+      });
+      const pendingModalRun = syncHarness.runSyncChange();
+      await modalOpened;
+      let lockFreeDuringModal = false;
+      await syncHarness.opt.win.pbpWithSecretStorageLock(async () => { lockFreeDuringModal = true; });
+      releaseModal();
+      await pendingModalRun;
+      check("E5 Options handler: conflict confirmation runs before the cross-context secret-storage lock",
+        lockFreeDuringModal);
+    }
+
+    check("E5 Options auto-save persists only the baseline delta and serializes saves",
+      optionsSource.includes("pbpSaveOptionsSnapshot(savedState, data, overlayValue") &&
+      optionsSource.includes("pbpQueueOptionsSave(autoSaveState, saveAll)"));
+
+    const handlerLocal = {
+      optSyncEnabled: false,
+      exportTargets: { github: { enabled: true, token: "obf:handler-token" } },
+    };
+    const handlerSync = { syncApiKeys: false };
     const handlerChrome = { storage: { local: area(handlerLocal), sync: area(handlerSync) } };
     let releaseHandlerMain;
     let handlerMainStartedResolve;
@@ -3038,47 +3158,21 @@ async function run() {
         handlerMainStartedResolve();
       });
     };
-    const previousHandlerChrome = globalThis.chrome;
-    globalThis.chrome = handlerChrome;
     const handlerLargeWrites = [];
-    let syncChangeHandler;
-    const syncToggleStub = { checked: true, addEventListener: (_type, fn) => { syncChangeHandler = fn; } };
-    const handlerDeps = {
-      syncToggle: syncToggleStub,
-      syncKeysToggle: { disabled: true },
+    syncHarness.configure({
       chrome: handlerChrome,
-      SETTINGS_DEFAULTS,
-      pbpWithSecretStorageLock,
-      pbpReadSecretSyncStateUnlocked,
-      pbpSplitSecretBatch,
-      pbpOverlaySecrets,
-      pbpResolveChunkedSettings,
-      PBP_CHUNKED_SETTING_KEYS,
-      pbpLargeFallbackKey,
-      pbpLargeFallbackRecord,
-      pbpNewChunkGeneration,
-      syncGetLarge: async (key) => key === "savedThemes" ? [] : "",
+      syncChecked: true,
+      keysChecked: false,
+      keysDisabled: true,
       syncSetLarge: async (key, value) => { handlerLargeWrites.push({ key, value }); },
-      pauseOptionsAutoSave: async () => {},
-      setAwaitingChoice: () => {},
-      saveAll: async () => ({ ok: true }),
-      resumeOptionsAutoSave: () => {},
-      pbpAskSyncConflict: async () => "cloud",
-      $id: () => null,
-      t: (key) => key,
-      document: { body: { style: {} }, querySelector: () => ({ dataset: { panel: "general" } }) },
-      sessionStorage: { setItem() {} },
-      setTimeout: () => 0,
-      location: { reload() {} },
-      console,
-    };
-    new Function(...Object.keys(handlerDeps), syncHandlerSource)(...Object.values(handlerDeps));
-    const heldOptionsMigration = syncChangeHandler();
+    });
+    const heldOptionsMigration = syncHarness.runSyncChange();
     await handlerMainStarted;
-    const enableDuringOptionsMigration = pbpEnableSyncApiKeys();
+    const enableDuringOptionsMigration = syncHarness.opt.win.pbpEnableSyncApiKeys();
     await Promise.resolve();
     releaseHandlerMain();
     await Promise.all([heldOptionsMigration, enableDuringOptionsMigration]);
+    syncHarness.flushSuccessWatchdog();
     check("E5 Options handler lock: keys-on wins after the real stripped migration write",
       handlerSync.syncApiKeys === true && handlerSync.exportTargets.github.token === "obf:handler-token");
 
@@ -3086,16 +3180,15 @@ async function run() {
     const longSync = { syncApiKeys: false };
     const longChrome = { storage: { local: area(longLocal), sync: area(longSync) } };
     const longWrites = [];
-    let longHandler;
-    const longDeps = {
-      ...handlerDeps,
-      syncToggle: { checked: true, addEventListener: (_type, fn) => { longHandler = fn; } },
+    syncHarness.configure({
       chrome: longChrome,
+      syncChecked: true,
+      keysChecked: false,
+      keysDisabled: true,
       syncSetLarge: async (key, value) => { longWrites.push({ key, value }); },
-    };
-    globalThis.chrome = longChrome;
-    new Function(...Object.keys(longDeps), syncHandlerSource)(...Object.values(longDeps));
-    await longHandler();
+    });
+    await syncHarness.runSyncChange();
+    syncHarness.flushSuccessWatchdog();
     check("E5 Options handler: enabling sync dispatches long prompt text to the large-value codec",
       longLocal.optSyncEnabled === true && !("customTagPrompt" in longSync) &&
       longWrites.some((entry) => entry.key === "customTagPrompt" && entry.value === longLocal.customTagPrompt));
@@ -3113,16 +3206,15 @@ async function run() {
     };
     const offChrome = { storage: { local: area(offLocal), sync: area(offSync) } };
     const offWrites = [];
-    let offHandler;
-    const offDeps = {
-      ...handlerDeps,
-      syncToggle: { checked: false, addEventListener: (_type, fn) => { offHandler = fn; } },
+    syncHarness.configure({
       chrome: offChrome,
+      syncChecked: false,
+      keysChecked: false,
+      keysDisabled: true,
       syncSetLarge: async (key, value) => { offWrites.push({ key, value }); },
-    };
-    globalThis.chrome = offChrome;
-    new Function(...Object.keys(offDeps), syncHandlerSource)(...Object.values(offDeps));
-    await offHandler();
+    });
+    await syncHarness.runSyncChange();
+    syncHarness.flushSuccessWatchdog();
     check("E5 Options handler: disabling sync decodes chunk metadata before writing local settings",
       offLocal.optSyncEnabled === false && !("customSummaryPrompt" in offLocal) &&
       offWrites.some((entry) => entry.key === "customSummaryPrompt" && entry.value === "decoded prompt"));
@@ -3132,63 +3224,73 @@ async function run() {
       offLocal.exportTargets.webhook.token === "obf:local-auth" &&
       offLocal.exportTargets.obsidian.vault === "cloud-vault");
 
-    const joinLocal = {
-      optSyncEnabled: false, optTheme: "local-theme", openaiApiKey: "obf:stale-local",
-      exportTargets: { github: { enabled: false, token: "obf:stale-local-target", repo: "local" } },
-    };
-    const joinSync = {
-      syncApiKeys: true, optTheme: "cloud-theme", openaiApiKey: "obf:cloud-current",
-      exportTargets: { github: { enabled: true, token: "obf:cloud-target", repo: "cloud" } },
-    };
-    const joinChrome = { storage: { local: area(joinLocal), sync: area(joinSync) } };
-    const cloudSecretsBeforeJoin = JSON.stringify({
-      openaiApiKey: joinSync.openaiApiKey,
-      exportTargets: joinSync.exportTargets,
-    });
-    let joinHandler;
-    // Drive the production reload watchdog against the real alert markup and
-    // stylesheet. A cancelled reload keeps the old form suspended: the user
-    // must still be able to see why another reload is required.
-    const optionsDoc = new DOMParser().parseFromString(await fetch("../options.html").then(r => r.text()), "text/html");
-    const reloadNotice = optionsDoc.getElementById("opt-global-error").cloneNode(true);
-    const optionsStyle = document.createElement("link");
-    optionsStyle.rel = "stylesheet";
-    optionsStyle.href = "../options.css";
-    const optionsStyleLoaded = new Promise(resolve => { optionsStyle.onload = resolve; });
-    document.head.appendChild(optionsStyle);
-    await optionsStyleLoaded;
-    document.body.appendChild(reloadNotice);
-    const joinTimers = [];
-    let joinResumes = 0;
-    const joinDeps = {
-      ...handlerDeps,
-      syncToggle: { checked: true, addEventListener: (_type, fn) => { joinHandler = fn; } },
-      syncKeysToggle: { disabled: true },
-      chrome: joinChrome,
-      $id: id => reloadNotice.id === id ? reloadNotice : reloadNotice.querySelector(`#${id}`),
-      setTimeout: (fn, delay) => { joinTimers.push({ fn, delay }); return joinTimers.length; },
-      resumeOptionsAutoSave: () => { joinResumes++; },
-    };
-    globalThis.chrome = joinChrome;
-    const writesBeforeCloudJoin = handlerLargeWrites.length;
-    new Function(...Object.keys(joinDeps), syncHandlerSource)(...Object.values(joinDeps));
-    await joinHandler();
-    check("E5 Options handler: choosing cloud preserves ordinary settings, secrets, and skips all migration writes",
-      joinLocal.optSyncEnabled === true && cloudSecretsBeforeJoin === JSON.stringify({
+    {
+      // Dedicated visible Options realm with real stylesheet to verify reload
+      // watchdog alert rendering + permanently suspended stale-form auto-save.
+      const joinHarness = await bootSyncHarness({ withStyles: true, visible: true });
+      const joinLocal = {
+        optSyncEnabled: false, optTheme: "local-theme", openaiApiKey: "obf:stale-local",
+        exportTargets: { github: { enabled: false, token: "obf:stale-local-target", repo: "local" } },
+      };
+      const joinSync = {
+        syncApiKeys: true, optTheme: "cloud-theme", openaiApiKey: "obf:cloud-current",
+        exportTargets: { github: { enabled: true, token: "obf:cloud-target", repo: "cloud" } },
+      };
+      let joinSyncWrites = 0;
+      const baseJoinSyncArea = area(joinSync);
+      const joinChrome = {
+        storage: {
+          local: area(joinLocal),
+          sync: {
+            ...baseJoinSyncArea,
+            set: async (data) => { joinSyncWrites++; return baseJoinSyncArea.set(data); },
+          },
+        },
+      };
+      const cloudSecretsBeforeJoin = JSON.stringify({
         openaiApiKey: joinSync.openaiApiKey,
         exportTargets: joinSync.exportTargets,
-      }) && joinSync.optTheme === "cloud-theme" && handlerLargeWrites.length === writesBeforeCloudJoin);
-    joinTimers.find(timer => timer.delay === 2000).fn();
-    check("E5 Options handler: cancelling the cloud-settings reload leaves the reload notice visibly rendered",
-      reloadNotice.querySelector("#opt-global-alert").textContent === "syncReloadNeeded" &&
-      reloadNotice.querySelector("#opt-global-alert").getClientRects().length > 0);
-    check("E5 Options handler: cancelled cloud reload keeps stale-form saving suspended and preserves the cloud",
-      joinResumes === 0 && cloudSecretsBeforeJoin === JSON.stringify({
-        openaiApiKey: joinSync.openaiApiKey,
-        exportTargets: joinSync.exportTargets,
-      }) && joinSync.optTheme === "cloud-theme");
-    reloadNotice.remove();
-    optionsStyle.remove();
+      });
+      const joinLargeWrites = [];
+      joinHarness.configure({
+        chrome: joinChrome,
+        syncChecked: true,
+        keysChecked: false,
+        keysDisabled: true,
+        syncSetLarge: async (key, value) => { joinLargeWrites.push({ key, value }); },
+        pbpAskSyncConflict: async () => "cloud",
+      });
+      await joinHarness.runSyncChange();
+      check("E5 Options handler: choosing cloud preserves ordinary settings, secrets, and skips all migration writes",
+        joinLocal.optSyncEnabled === true && cloudSecretsBeforeJoin === JSON.stringify({
+          openaiApiKey: joinSync.openaiApiKey,
+          exportTargets: joinSync.exportTargets,
+        }) && joinSync.optTheme === "cloud-theme" && joinLargeWrites.length === 0);
+      joinHarness.flushSuccessWatchdog();
+      const joinAlert = joinHarness.opt.doc.getElementById("opt-global-alert");
+      check("E5 Options handler: cancelling the cloud-settings reload leaves the reload notice visibly rendered",
+        joinAlert.textContent === "syncReloadNeeded" &&
+        joinAlert.getClientRects().length > 0);
+      // Prove auto-save stayed suspended: mutating a form control and firing
+      // change + flushing timers must not write stale form state to joinSync.
+      const writesBeforeEdit = joinSyncWrites;
+      const themeRadio = joinHarness.opt.doc.querySelector('input[name="opt-theme"][value="dark"]');
+      if (themeRadio) {
+        themeRadio.checked = true;
+        themeRadio.dispatchEvent(new joinHarness.opt.win.Event("change", { bubbles: true }));
+      }
+      for (const timer of joinHarness.timers.slice()) {
+        if (timer.delay < 2000) timer.fn();
+      }
+      await new Promise((r) => setTimeout(r, 20));
+      check("E5 Options handler: cancelled cloud reload keeps stale-form saving suspended and preserves the cloud",
+        joinSyncWrites === writesBeforeEdit && cloudSecretsBeforeJoin === JSON.stringify({
+          openaiApiKey: joinSync.openaiApiKey,
+          exportTargets: joinSync.exportTargets,
+        }) && joinSync.optTheme === "cloud-theme");
+      joinHarness.opt.dispose();
+      joinHarness.opt.iframe.style.cssText = "";
+    }
 
     const overwriteLocal = {
       optSyncEnabled: false,
@@ -3204,16 +3306,15 @@ async function run() {
     };
     const overwriteChrome = { storage: { local: area(overwriteLocal), sync: area(overwriteSync) } };
     const overwriteAnswers = ["overwrite"];
-    let overwriteHandler;
-    const overwriteDeps = {
-      ...handlerDeps,
-      syncToggle: { checked: true, addEventListener: (_type, fn) => { overwriteHandler = fn; } },
+    syncHarness.configure({
       chrome: overwriteChrome,
+      syncChecked: true,
+      keysChecked: false,
+      keysDisabled: true,
       pbpAskSyncConflict: async () => overwriteAnswers.shift(),
-    };
-    globalThis.chrome = overwriteChrome;
-    new Function(...Object.keys(overwriteDeps), syncHandlerSource)(...Object.values(overwriteDeps));
-    await overwriteHandler();
+    });
+    await syncHarness.runSyncChange();
+    syncHarness.flushSuccessWatchdog();
     check("E5 Options handler: explicit overwrite publishes ordinary target settings but preserves cloud credentials",
       overwriteLocal.optSyncEnabled === true && overwriteSync.optTheme === "device-theme" &&
       overwriteSync.openaiApiKey === "obf:current-cloud-key" &&
@@ -3223,84 +3324,67 @@ async function run() {
     const abortLocal = { optSyncEnabled: false, optTheme: "device-theme" };
     const abortSync = { syncApiKeys: false, optTheme: "cloud-theme" };
     const abortChrome = { storage: { local: area(abortLocal), sync: area(abortSync) } };
-    const abortToggle = { checked: true, addEventListener: (_type, fn) => { abortHandler = fn; } };
-    let abortHandler;
-    const abortDeps = {
-      ...handlerDeps,
-      syncToggle: abortToggle,
+    syncHarness.configure({
       chrome: abortChrome,
+      syncChecked: true,
+      keysChecked: false,
+      keysDisabled: true,
       pbpAskSyncConflict: async () => "cancel",
-    };
-    globalThis.chrome = abortChrome;
-    new Function(...Object.keys(abortDeps), syncHandlerSource)(...Object.values(abortDeps));
-    await abortHandler();
+    });
+    await syncHarness.runSyncChange();
     check("E5 Options handler: cancelling both conflict choices leaves sync off and both copies untouched",
-      abortToggle.checked === false && abortLocal.optSyncEnabled === false &&
+      syncHarness.syncToggleEl.checked === false && abortLocal.optSyncEnabled === false &&
       abortLocal.optTheme === "device-theme" && abortSync.optTheme === "cloud-theme");
 
     // A cloud holding nothing but synced credentials is still a real profile.
-    // pbpCloudSettingsAvailable (the sync-off hint's probe) drops every
-    // API_KEY_FIELDS entry, and those all sit in SETTINGS_DEFAULTS with a ""
-    // default, so wiring this handler to that probe would read this cloud as
-    // hollow and silence BOTH confirms -- including the overwrite branch,
-    // whose Cancel is the only way back out of turning sync on.
     const credsLocal = { optSyncEnabled: false, optTheme: SETTINGS_DEFAULTS.optTheme };
     const credsSync = { syncApiKeys: true, openaiApiKey: "obf:cloud-key" };
     const credsChrome = { storage: { local: area(credsLocal), sync: area(credsSync) } };
     const credsPrompts = [];
-    let credsHandler;
-    const credsToggle = { checked: true, addEventListener: (_type, fn) => { credsHandler = fn; } };
-    const credsDeps = {
-      ...handlerDeps,
-      syncToggle: credsToggle,
+    syncHarness.configure({
       chrome: credsChrome,
+      syncChecked: true,
+      keysChecked: false,
+      keysDisabled: true,
       pbpAskSyncConflict: async () => { credsPrompts.push("conflict"); return "cancel"; },
-    };
-    globalThis.chrome = credsChrome;
-    new Function(...Object.keys(credsDeps), syncHandlerSource)(...Object.values(credsDeps));
-    await credsHandler();
+    });
+    await syncHarness.runSyncChange();
     check("E5 Options handler: a credentials-only cloud profile still offers both conflict choices",
       credsPrompts.join("|") === "conflict" &&
-      credsToggle.checked === false && credsLocal.optSyncEnabled === false &&
+      syncHarness.syncToggleEl.checked === false && credsLocal.optSyncEnabled === false &&
       !("optTheme" in credsSync));
 
     const fallbackLocal = { optSyncEnabled: false, customTagPrompt: "device prompt" };
     const fallbackSync = { syncApiKeys: false };
     const fallbackChrome = { storage: { local: area(fallbackLocal), sync: area(fallbackSync) } };
-    let fallbackHandler;
-    const fallbackToggle = { checked: true, addEventListener: (_type, fn) => { fallbackHandler = fn; } };
-    const fallbackDeps = {
-      ...handlerDeps,
-      syncToggle: fallbackToggle,
+    syncHarness.configure({
       chrome: fallbackChrome,
+      syncChecked: true,
+      keysChecked: false,
+      keysDisabled: true,
       syncSetLarge: async (key) => {
         if (key === "customTagPrompt") throw new Error("temporary sync failure");
       },
-    };
-    globalThis.chrome = fallbackChrome;
-    new Function(...Object.keys(fallbackDeps), syncHandlerSource)(...Object.values(fallbackDeps));
-    await fallbackHandler();
+    });
+    await syncHarness.runSyncChange();
     check("E5 Options handler: non-quota large-write failure aborts instead of creating a misleading fallback",
-      fallbackToggle.checked === false && fallbackLocal.optSyncEnabled === false &&
+      syncHarness.syncToggleEl.checked === false && fallbackLocal.optSyncEnabled === false &&
       !("customTagPrompt_localFallback" in fallbackLocal));
 
     const rollbackLocal = { optSyncEnabled: true };
     const rollbackSync = { syncApiKeys: false, customTagPrompt: "cloud prompt" };
     const rollbackChrome = { storage: { local: area(rollbackLocal), sync: area(rollbackSync) } };
-    let rollbackHandler;
     let rollbackLargeCalls = 0;
-    const rollbackToggle = { checked: false, addEventListener: (_type, fn) => { rollbackHandler = fn; } };
-    const rollbackDeps = {
-      ...handlerDeps,
-      syncToggle: rollbackToggle,
+    syncHarness.configure({
       chrome: rollbackChrome,
+      syncChecked: false,
+      keysChecked: false,
+      keysDisabled: true,
       syncSetLarge: async () => { rollbackLargeCalls++; throw new Error("local write failed"); },
-    };
-    globalThis.chrome = rollbackChrome;
-    new Function(...Object.keys(rollbackDeps), syncHandlerSource)(...Object.values(rollbackDeps));
-    await rollbackHandler();
+    });
+    await syncHarness.runSyncChange();
     check("E5 Options handler: disabling sync rolls the device flag back when a large local write fails",
-      rollbackLargeCalls === 1 && rollbackToggle.checked === true && rollbackLocal.optSyncEnabled === true);
+      rollbackLargeCalls === 1 && syncHarness.syncToggleEl.checked === true && rollbackLocal.optSyncEnabled === true);
 
     const staleLocal = { optSyncEnabled: true, optTheme: "stale-local" };
     const staleSync = { optSyncEnabled: true, syncApiKeys: false, optTheme: "fresh-sync" };
@@ -3310,25 +3394,20 @@ async function run() {
     staleChrome.storage.local.set = (data) => { staleWrites++; return staleLocalSet(data); };
     const staleSyncSet = staleChrome.storage.sync.set;
     staleChrome.storage.sync.set = (data) => { staleWrites++; return staleSyncSet(data); };
-    let staleSyncChangeHandler;
-    const staleDeps = {
-      ...handlerDeps,
-      syncToggle: { checked: true, addEventListener: (_type, fn) => { staleSyncChangeHandler = fn; } },
-      syncKeysToggle: { disabled: false },
+    syncHarness.configure({
       chrome: staleChrome,
-    };
-    globalThis.chrome = staleChrome;
-    new Function(...Object.keys(staleDeps), syncHandlerSource)(...Object.values(staleDeps));
-    await staleSyncChangeHandler();
+      syncChecked: true,
+      keysChecked: false,
+      keysDisabled: false,
+    });
+    await syncHarness.runSyncChange();
+    syncHarness.flushSuccessWatchdog();
     check("E5 Options handler: stale duplicate sync-enable is a zero-write no-op",
       staleWrites === 0 && staleSync.optTheme === "fresh-sync");
 
-    // K117: turning sync OFF is a read-modify-write across areas -- it reads
-    // the cloud and writes what it read into local. Hand-written server shape
-    // (chrome.storage.sync propagates per ITEM): the manifest claims three
-    // chunks and only two have landed on this device, so the REAL syncGetLarge
-    // below degrades to []. Migrating that value would drop the user's themes
-    // here and publish the empty list on the next re-enable.
+    // K117: turning sync OFF is a read-modify-write across areas -- an incomplete
+    // chunk manifest on sync must abort before overwriting local with [].
+    const realRealmSyncGetLarge = syncHarness.opt.win.eval("syncGetLarge");
     const propagatingLocal = { optSyncEnabled: true };
     const propagatingSync = {
       syncApiKeys: false,
@@ -3339,34 +3418,22 @@ async function run() {
     const propagatingChrome = { storage: { local: area(propagatingLocal), sync: area(propagatingSync) } };
     const propagatingManifestBefore = JSON.stringify(propagatingSync.savedThemes);
     const propagatingWrites = [];
-    const propagatingError = { textContent: "", classList: { add() {}, remove() {} } };
-    let propagatingHandler;
-    const propagatingToggle = { checked: false, addEventListener: (_type, fn) => { propagatingHandler = fn; } };
-    const propagatingDeps = {
-      ...handlerDeps,
-      syncToggle: propagatingToggle,
+    syncHarness.configure({
       chrome: propagatingChrome,
-      syncGetLarge,
+      syncChecked: false,
+      keysChecked: false,
+      keysDisabled: true,
+      syncGetLarge: realRealmSyncGetLarge,
       syncSetLarge: async (key, value) => { propagatingWrites.push({ key, value }); },
-      $id: (id) => (id === "opt-sync-error" ? propagatingError : null),
-    };
-    const propagatingCache = _settingsStorageCache;
-    globalThis.chrome = propagatingChrome;
-    _settingsStorageCache = null;
-    new Function(...Object.keys(propagatingDeps), syncHandlerSource)(...Object.values(propagatingDeps));
-    await propagatingHandler();
-    _settingsStorageCache = propagatingCache;
+    });
+    await syncHarness.runSyncChange();
     check("E5 Options handler: a chunk still propagating aborts the migration instead of migrating an empty value",
-      propagatingError.textContent === "syncMigrationFailed" &&
-      propagatingToggle.checked === true && propagatingLocal.optSyncEnabled === true &&
+      syncHarness.errEl.textContent === "syncMigrationFailed" &&
+      syncHarness.syncToggleEl.checked === true && propagatingLocal.optSyncEnabled === true &&
       !propagatingWrites.some((entry) => entry.key === "savedThemes") &&
       !("savedThemes" in propagatingLocal) &&
       JSON.stringify(propagatingSync.savedThemes) === propagatingManifestBefore);
 
-    // Same degrade, but for one of the four PBP_CHUNKED_SETTING_KEYS: those
-    // reach the migration through pbpResolveChunkedSettings and are re-written
-    // into the destination area verbatim, so an undecodable prompt must abort
-    // BEFORE any large write happens.
     const promptLocal = { optSyncEnabled: true };
     const promptSync = {
       syncApiKeys: false,
@@ -3375,32 +3442,19 @@ async function run() {
     };
     const promptChrome = { storage: { local: area(promptLocal), sync: area(promptSync) } };
     const promptWrites = [];
-    const promptError = { textContent: "", classList: { add() {}, remove() {} } };
-    let promptHandler;
-    const promptToggle = { checked: false, addEventListener: (_type, fn) => { promptHandler = fn; } };
-    const promptDeps = {
-      ...handlerDeps,
-      syncToggle: promptToggle,
+    syncHarness.configure({
       chrome: promptChrome,
+      syncChecked: false,
+      keysChecked: false,
+      keysDisabled: true,
       syncSetLarge: async (key, value) => { promptWrites.push({ key, value }); },
-      $id: (id) => (id === "opt-sync-error" ? promptError : null),
-    };
-    const promptCache = _settingsStorageCache;
-    globalThis.chrome = promptChrome;
-    _settingsStorageCache = null;
-    new Function(...Object.keys(promptDeps), syncHandlerSource)(...Object.values(promptDeps));
-    await promptHandler();
-    _settingsStorageCache = promptCache;
+    });
+    await syncHarness.runSyncChange();
     check("E5 Options handler: an unreadable chunked setting aborts the migration before any large write",
-      promptError.textContent === "syncMigrationFailed" &&
-      promptToggle.checked === true && promptLocal.optSyncEnabled === true &&
+      syncHarness.errEl.textContent === "syncMigrationFailed" &&
+      syncHarness.syncToggleEl.checked === true && promptLocal.optSyncEnabled === true &&
       promptWrites.length === 0 && !("customTagPrompt" in promptLocal));
 
-    // Regression guard for the sync-ROUTE gate: while sync is being turned ON
-    // the large reads still come from LOCAL, so a stray cloud manifest left by
-    // an earlier sync-on session says nothing about them. Without that gate
-    // every enable migration on such a profile would abort. The REAL
-    // syncGetLarge is injected so the gate is exercised end to end.
     const strayLocal = { optSyncEnabled: false, optTheme: "device-theme" };
     const straySync = {
       syncApiKeys: false,
@@ -3409,31 +3463,24 @@ async function run() {
     };
     const strayChrome = { storage: { local: area(strayLocal), sync: area(straySync) } };
     const strayWrites = [];
-    const strayError = { textContent: "", classList: { add() {}, remove() {} } };
     const strayAnswers = ["overwrite"];
-    let strayHandler;
-    const strayToggle = { checked: true, addEventListener: (_type, fn) => { strayHandler = fn; } };
-    const strayDeps = {
-      ...handlerDeps,
-      syncToggle: strayToggle,
+    syncHarness.configure({
       chrome: strayChrome,
-      syncGetLarge,
+      syncChecked: true,
+      keysChecked: false,
+      keysDisabled: true,
+      syncGetLarge: realRealmSyncGetLarge,
       syncSetLarge: async (key, value) => { strayWrites.push({ key, value }); },
       pbpAskSyncConflict: async () => strayAnswers.shift(),
-      $id: (id) => (id === "opt-sync-error" ? strayError : null),
-    };
-    const strayCache = _settingsStorageCache;
-    globalThis.chrome = strayChrome;
-    _settingsStorageCache = null;
-    new Function(...Object.keys(strayDeps), syncHandlerSource)(...Object.values(strayDeps));
-    await strayHandler();
-    _settingsStorageCache = strayCache;
+    });
+    await syncHarness.runSyncChange();
+    syncHarness.flushSuccessWatchdog();
     check("E5 Options handler: a stray cloud manifest never blocks enabling sync, whose reads come from local",
-      strayLocal.optSyncEnabled === true && strayError.textContent === "" &&
-      strayToggle.checked === true && strayAnswers.length === 0 &&
+      strayLocal.optSyncEnabled === true && syncHarness.errEl.textContent === "" &&
+      syncHarness.syncToggleEl.checked === true && strayAnswers.length === 0 &&
       strayWrites.some((entry) => entry.key === "savedThemes"));
 
-    globalThis.chrome = previousHandlerChrome;
+    syncHarness.opt.dispose();
 
     delete globalThis.__pbpTestStorage;
     delete globalThis.__pbpTestSyncSetLarge;
@@ -5164,15 +5211,49 @@ async function run() {
         customDisplayName: "a\tb", optTheme: "dark" }), "", { enabled: false });
       cleanPreview = pbpBuildBackupPreview(preflight({ aiCustomProviders: LIST7, optTheme: "dark" }), "", { enabled: false });
     } catch (_) {}
-    const backupSource = await fetch("../options-backup.js").then((response) => response.text());
-    const renderSlice = backupSource.slice(backupSource.indexOf("const renderPreview ="),
-      backupSource.indexOf("const renderResult =", backupSource.indexOf("const renderPreview =")));
     const enLocale = await fetch("../_locales/en/messages.json").then((response) => response.json());
+    let dropWarnRendered = "", cleanWarnRendered = "non-empty";
+    {
+      const prevOptRealm = await pbpSwRealm.bootOptions({
+        mock: { messages: enLocale, storage: { local: { optLang: "en" } } },
+      });
+      try {
+        const input = prevOptRealm.doc.getElementById("import-settings-file");
+        const feedBackupFile = async (payloadObj) => {
+          const previewBox = prevOptRealm.doc.getElementById("backup-import-preview");
+          if (previewBox) previewBox.hidden = true;
+          const dt = new prevOptRealm.win.DataTransfer();
+          dt.items.add(new prevOptRealm.win.File([JSON.stringify(payloadObj)], "backup.json", { type: "application/json" }));
+          input.files = dt.files;
+          input.dispatchEvent(new prevOptRealm.win.Event("change", { bubbles: true }));
+          const deadline = Date.now() + 2000;
+          while (previewBox && previewBox.hidden && Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 10));
+          }
+          return (prevOptRealm.doc.getElementById("backup-preview-warning")?.textContent || "").trim();
+        };
+        const hdrClean = { ...HDR, _backup: { ...HDR._backup, includesSecrets: false } };
+        dropWarnRendered = await feedBackupFile({
+          ...hdrClean,
+          aiCustomProviders: withEntry({ slot: 1 }),
+          customDisplayName: "a\tb",
+          optTheme: "dark",
+        });
+        cleanWarnRendered = await feedBackupFile({
+          ...hdrClean,
+          aiCustomProviders: LIST7,
+          optTheme: "dark",
+        });
+      } finally {
+        prevOptRealm.dispose();
+      }
+    }
     check("E7g preview: a dropped key is named in the preview and warned about, a clean file names none",
       sameJson([...(dropPreview?.droppedKeys || [])].sort(), ["aiCustomProviders", "customDisplayName"]) &&
       sameJson(cleanPreview?.droppedKeys, []) &&
-      renderSlice.includes('t("backupPreviewDroppedFields", preview.droppedKeys') &&
-      renderSlice.includes("PBP_BACKUP_DROPPED_LABELS[key]") &&
+      dropWarnRendered.includes(enLocale[PBP_BACKUP_DROPPED_LABELS.aiCustomProviders].message) &&
+      dropWarnRendered.includes(enLocale[PBP_BACKUP_DROPPED_LABELS.customDisplayName].message) &&
+      cleanWarnRendered === "" &&
       ["aiCustomProviders", "customDisplayName", "qwenWorkspaceId"].every((key) =>
         typeof PBP_BACKUP_DROPPED_LABELS[key] === "string" && !!enLocale[PBP_BACKUP_DROPPED_LABELS[key]] &&
         !/[()]/.test(enLocale[PBP_BACKUP_DROPPED_LABELS[key]].message)) &&
@@ -5202,10 +5283,9 @@ async function run() {
     check("M3 backup: other enum keys still reject an unknown value, and dropped region/format keys have labels",
       legacyRejected === 3 && labelOk);
 
-    const popupSource = await fetch("../popup-ai.js").then((response) => response.text());
-    const orderAt = popupSource.indexOf("const AI_PROVIDER_ORDER = [");
-    const order = Function('"use strict"; return ' +
-      popupSource.slice(orderAt + "const AI_PROVIDER_ORDER = ".length, popupSource.indexOf("];", orderAt) + 1))();
+    const popupOrderRealm = await pbpSwRealm.loadRealmScripts(["shared.js", "popup-ai.js"]);
+    const order = Array.from(popupOrderRealm.get("AI_PROVIDER_ORDER"));
+    popupOrderRealm.dispose();
     const map25 = {};
     order.concat(LIST7.map((entry) => entry.id)).forEach((id) => { map25[id] = "model"; });
     const map33 = { ...map25 };
@@ -5524,11 +5604,21 @@ async function run() {
         settingsWrites === settingsBeforeGenuineFailure + 1);
 
       const optionsSource = await (await fetch("../options.js")).text();
-      const helperStart = optionsSource.indexOf("async function saveOverlayWithFallback");
-      const helperClose = optionsSource.indexOf('document.addEventListener("DOMContentLoaded"');
-      check("saveOverlayWithFallback: slice found", helperStart >= 0 && helperClose > helperStart);
-      const helperSource = optionsSource.slice(helperStart, helperClose);
-      check("E9 overlay persistence helper never writes UI status", !helperSource.includes("auto-save-status"));
+      check("saveOverlayWithFallback: slice found", typeof saveOverlayWithFallback === "function");
+      {
+        largeError = null;
+        const statusEl = document.createElement("span");
+        statusEl.id = "auto-save-status";
+        statusEl.textContent = "SENTINEL_UNCHANGED";
+        document.body.appendChild(statusEl);
+        try {
+          await saveOverlayWithFallback("body { color: red; }");
+          check("E9 overlay persistence helper never writes UI status", statusEl.textContent === "SENTINEL_UNCHANGED");
+        } finally {
+          statusEl.remove();
+          delete _domRefs["auto-save-status"];
+        }
+      }
       // Source contracts for the options-init migration fixes (that code runs
       // only inside the real page bootstrap, so pin its load-bearing lines).
       check("E9 migrationV2 treats only legacy customCSS as old data (a bare preset key must not trigger the erase path)",
@@ -6466,9 +6556,13 @@ async function run() {
     check("E11 highlight restore writes nothing after an account switch during its storage read",
       await highlightOwnerBoundary("read"));
 
+    if (typeof _pbpVocabDbPromise !== "undefined" && _pbpVocabDbPromise) {
+      try { (await _pbpVocabDbPromise).close(); } catch (_) {}
+      _pbpVocabDbPromise = null;
+    }
     const dbDelete = indexedDB.deleteDatabase("pbp-vocab");
     await new Promise((resolve) => {
-      dbDelete.onsuccess = dbDelete.onerror = dbDelete.onblocked = resolve;
+      dbDelete.onsuccess = dbDelete.onerror = resolve;
     });
     const importRows = Array.from({ length: 101 }, (_, index) =>
       makeRecord(index === 0 ? "merge" : "word-" + index));
@@ -6915,39 +7009,37 @@ async function run() {
       check("E12 backup apply reports each selected fallback section as local-only",
         partial.settings === "local-only" && partial.themes === "local-only");
 
-      const optionsSource = await fetch("../options.js").then((response) => response.text());
-      const keysStart = optionsSource.indexOf('syncKeysToggle?.addEventListener("change", async () => {');
-      const keysEnd = optionsSource.indexOf("  // ---- Apply options page theme", keysStart);
-      check("syncKeysToggle handler: slice found", keysStart >= 0 && keysEnd > keysStart);
-      const keysSource = optionsSource.slice(keysStart, keysEnd);
-      let keysHandler;
-      let confirms = 0;
-      let disables = 0;
-      const keysToggle = {
-        checked: false,
-        disabled: false,
-        dataset: {},
-        addEventListener: (_type, handler) => { keysHandler = handler; },
-      };
-      const keysDeps = {
-        syncKeysToggle: keysToggle,
-        pbpAskConfirmChoice: async () => { confirms++; return "no"; },
-        setAwaitingChoice: () => {},
-        t: (key) => key,
-        pbpEnableSyncApiKeys: async () => {},
-        pbpDisableSyncApiKeys: async () => { disables++; },
-        pbpReadSecretSyncState: async () => ({ optSyncEnabled: true, syncApiKeys: true }),
-        $id: () => null,
-        setTimeout: () => 0,
-        console,
-      };
-      new Function(...Object.keys(keysDeps), keysSource)(...Object.values(keysDeps));
-      if (keysHandler) await keysHandler();
-      check("E12 disabling credential sync confirms before mutation and cancel restores the checkbox",
-        confirms === 1 && disables === 0 && keysToggle.checked === true &&
-        keysSource.indexOf("await pbpAskConfirmChoice(") >= 0 &&
-        keysSource.indexOf("await pbpAskConfirmChoice(") <
-          keysSource.indexOf("pbpDisableSyncApiKeys()"));
+      let keysListenerE12 = null;
+      const e12OptRealm = await pbpSwRealm.bootOptions({
+        mock: { storage: { local: { optSyncEnabled: true }, sync: { syncApiKeys: true } } },
+        beforeScripts(_win, _mock, doc) {
+          const keysEl = doc.getElementById("opt-sync-api-keys");
+          const origAdd = keysEl.addEventListener.bind(keysEl);
+          keysEl.addEventListener = (type, fn, opts) => {
+            if (type === "change" && !keysListenerE12) keysListenerE12 = fn;
+            return origAdd(type, fn, opts);
+          };
+        },
+      });
+      try {
+        check("syncKeysToggle handler: slice found", typeof keysListenerE12 === "function");
+        let confirms = 0;
+        let disables = 0;
+        let disablesWhileConfirmOpen = -1;
+        e12OptRealm.win.pbpDisableSyncApiKeys = async () => { disables++; };
+        e12OptRealm.win.pbpAskConfirmChoice = async () => {
+          confirms++;
+          disablesWhileConfirmOpen = disables;
+          return "no";
+        };
+        const keysToggle = e12OptRealm.doc.getElementById("opt-sync-api-keys");
+        keysToggle.checked = false;
+        await keysListenerE12.call(keysToggle, new e12OptRealm.win.Event("change"));
+        check("E12 disabling credential sync confirms before mutation and cancel restores the checkbox",
+          confirms === 1 && disables === 0 && disablesWhileConfirmOpen === 0 && keysToggle.checked === true);
+      } finally {
+        e12OptRealm.dispose();
+      }
 
       const enMessages = await fetch("../_locales/en/messages.json")
         .then((response) => response.json());

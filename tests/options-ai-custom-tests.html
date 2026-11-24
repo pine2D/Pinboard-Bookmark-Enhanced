@@ -17,6 +17,8 @@ body { font-family: monospace; padding: 16px; max-width: 1200px; }
 <script src="../shared.js"></script>
 <script src="../ai.js"></script>
 <script src="../options-connectivity.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 
 <script>
 // t() reads chrome.i18n; the key comes back as its own text.
@@ -369,63 +371,71 @@ test("render options: a fallback label is interface text a later language load r
 
 (async () => {
   await atest("health: pbpForgetConnectionHealth removes only ai:<id> through the serial write tail", async () => {
-    const source = await fetch("../options.js").then((r) => r.text());
-    const start = source.indexOf("const PBP_CONNECTION_HEALTH_IDS = new Set([");
-    const end = source.indexOf("// Set only while pbpExpandOptionsAncestors", start);
-    assert(start > 0 && end > start, "health block found");
-    const store = { _connectionHealthV1: {
-      "ai:custom-b2b2b2": { ok: true, code: "connected", checkedAt: 1 },
-      "ai:gemini": { ok: false, code: "failed", checkedAt: 1 },
-    } };
-    const local = {
-      get: async (k) => { await new Promise((r) => setTimeout(r, 5)); return { [k]: JSON.parse(JSON.stringify(store[k] || {})) }; },
-      set: async (o) => { await new Promise((r) => setTimeout(r, 1)); Object.assign(store, JSON.parse(JSON.stringify(o))); },
-    };
-    const mod = new Function("chrome", "PBP_CONNECTION_HEALTH_KEY",
-      source.slice(start, end) + "\nreturn { pbpRecordConnectionHealth, pbpForgetConnectionHealth };")({ storage: { local } }, "_connectionHealthV1");
-    const [a, b] = await Promise.all([
-      mod.pbpForgetConnectionHealth("ai:custom-b2b2b2"),
-      mod.pbpRecordConnectionHealth("ai:custom-a1a1a1", true, "connected"),
-    ]);
-    assertEq(a, true, "forget result");
-    assertEq(b, true, "record result");
-    const map = store._connectionHealthV1;
-    assert(!("ai:custom-b2b2b2" in map), "forgotten");
-    assert(map["ai:gemini"] && map["ai:custom-a1a1a1"], "other records and the concurrent write kept");
-    assertEq(await mod.pbpForgetConnectionHealth("ai:custom-zzzzzz"), false, "absent id is a no-op");
+    const realm = await pbpSwRealm.bootOptions({
+      autoInit: false,
+      mock: {
+        storage: {
+          local: {
+            _connectionHealthV1: {
+              "ai:custom-b2b2b2": { ok: true, code: "connected", checkedAt: 1 },
+              "ai:gemini": { ok: false, code: "failed", checkedAt: 1 },
+            },
+          },
+        },
+      },
+      beforeScripts(win, mock) {
+        const origGet = mock.chrome.storage.local.get.bind(mock.chrome.storage.local);
+        const origSet = mock.chrome.storage.local.set.bind(mock.chrome.storage.local);
+        mock.chrome.storage.local.get = async (...args) => {
+          await new Promise((r) => setTimeout(r, 5));
+          return origGet(...args);
+        };
+        mock.chrome.storage.local.set = async (...args) => {
+          await new Promise((r) => setTimeout(r, 1));
+          return origSet(...args);
+        };
+      },
+    });
+    try {
+      const [a, b] = await Promise.all([
+        realm.win.pbpForgetConnectionHealth("ai:custom-b2b2b2"),
+        realm.win.pbpRecordConnectionHealth("ai:custom-a1a1a1", true, "connected"),
+      ]);
+      assertEq(a, true, "forget result");
+      assertEq(b, true, "record result");
+      const map = realm.mock.storageData("local")._connectionHealthV1;
+      assert(!("ai:custom-b2b2b2" in map), "forgotten");
+      assert(map["ai:gemini"] && map["ai:custom-a1a1a1"], "other records and the concurrent write kept");
+      assertEq(await realm.win.pbpForgetConnectionHealth("ai:custom-zzzzzz"), false, "absent id is a no-op");
+    } finally {
+      realm.dispose();
+    }
   });
 
   await atest("reset: panel reset keeps entries and keys and reopening an entry shows the saved values", async () => {
-    const [html, source] = await Promise.all([
-      fetch("../options.html").then((r) => r.text()),
-      fetch("../options.js").then((r) => r.text()),
-    ]);
-    const panel = document.importNode(new DOMParser().parseFromString(html, "text/html").querySelector("#panel-ai"), true);
-    const scratch = document.getElementById("scratch");
-    scratch.replaceChildren(panel);
+    const realm = await pbpSwRealm.bootOptions();
     try {
-      const PANEL_DEFAULTS = new Function("return (" + extractBalanced(source, "const PANEL_DEFAULTS = {", "{", "}") + ")")();
-      const body = extractBalanced(source, "function applyPanelReset(def, root) {", "{", "}");
-      const applyPanelReset = new Function("$id", "syncSubRows", "syncPromptStates",
-        "return function applyPanelReset(def, root) " + body)((id) => document.getElementById(id), () => {}, () => {});
-      const st = pbpOptAiCustomState(S({ ...C, aiCustomProviders: [B, A], customApiKey3: SLOT3 }));
-      assert(pbpOptAiCustomFillPanel(st, B.id), "fill B");
-      const before = pbpOptAiCustomCollect(st);
+      const doc = realm.doc;
+      const PANEL_DEFAULTS = realm.win.__PBP_PANEL_DEFAULTS;
+      const applyPanelReset = realm.win.__PBP_applyPanelReset;
+      const st = realm.win.pbpOptAiCustomState(S({ ...C, aiCustomProviders: [B, A], customApiKey3: SLOT3 }));
+      assert(realm.win.pbpOptAiCustomFillPanel(st, B.id), "fill B");
+      const before = realm.win.pbpOptAiCustomCollect(st);
       for (const id of ["opt-custom-name", "opt-custom-protocol", "opt-custom-baseurl", "opt-custom-model"]) {
         assert(!(id in PANEL_DEFAULTS.ai.fields) && PANEL_DEFAULTS.ai.skip.includes(id), id + " is skipped by the reset, not cleared");
       }
-      applyPanelReset(PANEL_DEFAULTS.ai, document);
-      assertEq(document.getElementById("opt-custom-baseurl").value, B.baseUrl, "the shared panel still shows the entry");
-      assertDeep(pbpOptAiCustomCollect(st), before, "entries, list and key slots kept");
-      assert(pbpOptAiCustomFillPanel(st, B.id), "refill B");
-      const saved = pbpOptAiCustomCollect(st).aiCustomProviders.find((e) => e.id === B.id);
-      assertEq(document.getElementById("opt-custom-name").value, saved.name, "name");
-      assertEq(document.getElementById("opt-custom-protocol").value, saved.protocol, "format");
-      assertEq(document.getElementById("opt-custom-baseurl").value, saved.baseUrl, "base URL");
-      assertEq(document.getElementById("opt-custom-key").value, pbpAiCustomKeyOpen(pbpOptAiCustomCollect(st), saved), "key");
-      assertEq(document.getElementById("opt-custom-model").value, saved.model, "model");
+      applyPanelReset(PANEL_DEFAULTS.ai, doc);
+      assertEq(doc.getElementById("opt-custom-baseurl").value, B.baseUrl, "the shared panel still shows the entry");
+      assertDeep(realm.win.pbpOptAiCustomCollect(st), before, "entries, list and key slots kept");
+      assert(realm.win.pbpOptAiCustomFillPanel(st, B.id), "refill B");
+      const saved = realm.win.pbpOptAiCustomCollect(st).aiCustomProviders.find((e) => e.id === B.id);
+      assertEq(doc.getElementById("opt-custom-name").value, saved.name, "name");
+      assertEq(doc.getElementById("opt-custom-protocol").value, saved.protocol, "format");
+      assertEq(doc.getElementById("opt-custom-baseurl").value, saved.baseUrl, "base URL");
+      assertEq(doc.getElementById("opt-custom-key").value, pbpAiCustomKeyOpen(realm.win.pbpOptAiCustomCollect(st), saved), "key");
+      assertEq(doc.getElementById("opt-custom-model").value, saved.model, "model");
     } finally {
-      scratch.replaceChildren();
+      realm.dispose();
     }
   });
 

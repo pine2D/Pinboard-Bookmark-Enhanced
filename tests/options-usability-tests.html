@@ -196,6 +196,8 @@ async function pbpAiCacheStats() {
 <script src="../export-targets.js"></script>
 <script src="../tag-gov.js"></script>
 <script src="../options.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass=0, fail=0;
@@ -946,32 +948,51 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("the Reader master switch re-renders the connection overview", async () => {
-    // The wiring lives inside the DOMContentLoaded closure this fixture blocks,
-    // so run that slice of the real file with the two dependencies injected --
-    // the listener registration itself is what is under test, not a grep for it.
-    const source = await fetch("../options.js").then((response) => response.text());
-    const start = source.indexOf('  for (const id of ["opt-pinboard-token", "opt-ai-provider"');
-    const end = source.indexOf("  chrome.storage.onChanged?.addListener(", start);
-    assert(start >= 0 && end > start, "the connection-overview wiring block moved");
-    let scheduled = 0;
-    const deps = {
-      $id: (id) => document.getElementById(id),
-      scheduleConnectionOverview: () => { scheduled++; },
-    };
-    new Function(...Object.keys(deps), source.slice(start, end))(...Object.values(deps));
-    aiMasterEl().dispatchEvent(new Event("change", { bubbles: true }));
-    assert(scheduled === 1, "the Reader master switch scheduled " + scheduled + " re-renders");
-    document.getElementById("opt-openai-key").dispatchEvent(new Event("input", { bubbles: true }));
-    assert(scheduled === 2, "the provider-key leg stopped scheduling re-renders");
-    qsSummary().dispatchEvent(new Event("change", { bubbles: true }));
-    assert(scheduled === 3, "a switch listed by a [data-ai-unavailable] block did not schedule a re-render");
+    const realm = await pbpSwRealm.bootOptions({
+      mock: {
+        permissions: { origins: ["https://api.openai.com/*"] },
+        storage: { local: { aiProvider: "openai", openaiApiKey: obfuscateKey("sk-test-key"), previewAiEnabled: true } },
+      },
+    });
+    try {
+      let renders = 0;
+      const origRender = realm.win.renderConnectionOverview;
+      realm.set("renderConnectionOverview", async (...args) => {
+        renders++;
+        return origRender.apply(realm.win, args);
+      });
+      const flush = () => new Promise((r) => realm.win.setTimeout(r, 150));
+      const master = realm.doc.getElementById("opt-preview-ai-enabled");
+      master.checked = false;
+      master.dispatchEvent(new realm.win.Event("change", { bubbles: true }));
+      await flush();
+      assert(renders === 1, "the Reader master switch scheduled " + renders + " re-renders");
+      const keyEl = realm.doc.getElementById("opt-openai-key");
+      keyEl.value = "sk-test-key-2";
+      keyEl.dispatchEvent(new realm.win.Event("input", { bubbles: true }));
+      await flush();
+      assert(renders === 2, "the provider-key leg stopped scheduling re-renders");
+      const qsSum = realm.doc.getElementById("qs-ai-summary");
+      qsSum.checked = !qsSum.checked;
+      qsSum.dispatchEvent(new realm.win.Event("change", { bubbles: true }));
+      await flush();
+      assert(renders === 3, "a switch listed by a [data-ai-unavailable] block did not schedule a re-render");
+    } finally {
+      realm.dispose();
+    }
   });
 
   await test("default options hint text meets WCAG AA against the page background", async () => {
-    const css = await fetch("../options.css").then((response) => response.text());
     const vars = {};
-    for (const match of css.matchAll(/(?:^|\n):root\s*\{([^}]*)\}/g)) {
-      for (const decl of match[1].matchAll(/--([\w-]+)\s*:\s*(#[0-9a-f]{6})\s*;/gi)) vars[decl[1]] = decl[2];
+    for (const sheet of Array.from(document.styleSheets)) {
+      if (!(sheet.href || "").endsWith("/options.css")) continue;
+      for (const rule of Array.from(sheet.cssRules || [])) {
+        if (rule.selectorText !== ":root" || !rule.style) continue;
+        for (const prop of ["opt-fg-hint", "opt-bg", "opt-btn-bg"]) {
+          const v = rule.style.getPropertyValue("--" + prop).trim();
+          if (/^#[0-9a-f]{6}$/i.test(v)) vars[prop] = v;
+        }
+      }
     }
     const rgb = (hex) => [1,3,5].map((i) => parseInt(hex.slice(i, i + 2), 16));
     const lum = (hex) => rgb(hex).map((value) => {
@@ -987,24 +1008,17 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("density map: parses and every value is a valid density tier", async () => {
-    // options-theme-early.js is not loaded by this fixture (its top-level
-    // code reaches for `location`/matchMedia state this suite doesn't stand
-    // up) -- assert against the fetched source text instead of the live
-    // constant, same pattern as the options.js/options.css fetch checks
-    // above. This fixture only guards the map's own shape (fixwave F4):
-    // the exact KEY SET is pinned against the pilots' ui.density field by
-    // tests/ui-contract-tests.mjs (expanded through PBP_OPTIONS_ADAPTIVE_MAP,
-    // fixwave F5), which is where a compact/comfortable pilot addition or
-    // removal belongs -- enumerating theme names here just duplicates that
-    // registry check and goes stale the moment a pilot's tier changes.
-    const source = await fetch("../options-theme-early.js").then((response) => response.text());
-    const match = source.match(/PBP_OPTIONS_DENSITY_MAP\s*=\s*Object\.freeze\(\{([^}]*)\}\)/);
-    assert(match, "PBP_OPTIONS_DENSITY_MAP definition not found in options-theme-early.js");
-    const map = new Function(`"use strict"; return {${match[1]}};`)();
-    const entries = Object.entries(map);
-    assert(entries.length > 0, "density map is empty");
-    assert(entries.every(([, value]) => value === "compact" || value === "comfortable"),
-      "density map has a value outside {compact, comfortable}: " + JSON.stringify(map));
+    const realm = await pbpSwRealm.loadRealmScripts(["options-theme-early.js"]);
+    try {
+      const map = realm.get("PBP_OPTIONS_DENSITY_MAP");
+      assert(map && typeof map === "object", "PBP_OPTIONS_DENSITY_MAP definition not found in options-theme-early.js");
+      const entries = Object.entries(map);
+      assert(entries.length > 0, "density map is empty");
+      assert(entries.every(([, value]) => value === "compact" || value === "comfortable"),
+        "density map has a value outside {compact, comfortable}: " + JSON.stringify(map));
+    } finally {
+      realm.dispose();
+    }
   });
 
   let diagnostics = null;

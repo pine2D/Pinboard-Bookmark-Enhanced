@@ -14,6 +14,8 @@ body { font-family: monospace; padding: 16px; max-width: 1000px; }
 <div id="summary"></div>
 <div id="results"></div>
 <div id="ui-host"></div>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <!--
   restore-points.js against the real store modules: vocabulary is seeded with
   vocab-store.js's own writer (pbpVocabSaveWord) and highlights with
@@ -709,46 +711,66 @@ async function run() {
 
   // ---------- trigger: service worker update ----------
   {
-    const source = await fetch("../background.js").then((response) => response.text());
-    const start = source.indexOf("chrome.runtime.onInstalled.addListener(");
-    const end = source.indexOf("\n});\n", start);
-    const slice = start >= 0 && end > start ? source.slice(start, end + 4) : "";
-    const makeListener = (createStub) => {
-      let listener = null;
-      const fakeChrome = { runtime: { onInstalled: { addListener: (fn) => { listener = fn; } } } };
-      if (slice) {
-        new Function("chrome", "primeSettings", "pbpReconcileBookmarkService", "readOfflineQueueWithIds", "pbpRestorePointCreate", slice)(
-          fakeChrome, () => Promise.resolve(), () => Promise.resolve(), () => Promise.resolve(), createStub);
-      }
-      return listener;
+    const makeSwWithCreateStub = async (createStub, onWarn) => {
+      const sw = await pbpSwRealm.boot({
+        beforeBackground(win) {
+          win.primeSettings = () => Promise.resolve();
+          win.pbpReconcileBookmarkService = () => Promise.resolve();
+          win.pbpRestorePointCreate = createStub;
+          if (onWarn) {
+            const origWarn = win.console.warn.bind(win.console);
+            win.console.warn = (...args) => { onWarn(args.map(String).join(" ")); origWarn(...args); };
+          }
+        },
+        afterBoot(win) {
+          win.readOfflineQueueWithIds = () => Promise.resolve([]);
+        },
+      });
+      return sw;
     };
     const calls = [];
     let finish = null;
-    const listener = makeListener((reason) => { calls.push(reason); return new Promise((resolve) => { finish = resolve; }); });
+    const sw1 = await makeSwWithCreateStub((reason) => { calls.push(reason); return new Promise((resolve) => { finish = resolve; }); });
     let updateDone = null;
-    if (listener) {
-      listener({ reason: "install" });
-      listener({ reason: "chrome_update" });
-      updateDone = listener({ reason: "update" });
+    try {
+      const hasListener = sw1.mock.chrome.runtime.onInstalled.hasListeners();
+      sw1.mock.chrome.runtime.onInstalled.dispatch({ reason: "install" });
+      sw1.mock.chrome.runtime.onInstalled.dispatch({ reason: "chrome_update" });
+      updateDone = sw1.mock.chrome.runtime.onInstalled.dispatch({ reason: "update" })[0];
+      check("onInstalled takes an \"update\" point on an extension update and on nothing else",
+        hasListener && calls.join() === "update", JSON.stringify({ hasListener, calls }));
+      let settled = false;
+      Promise.resolve(updateDone).then(() => { settled = true; });
+      await tick(20);
+      const pendingWhileWriting = settled === false && updateDone && typeof updateDone.then === "function";
+      if (finish) finish(null);
+      await tick(0);
+      check("the onInstalled listener stays pending until the update point is written", pendingWhileWriting && settled === true);
+
+      const swWarnings = [];
+      const sw2 = await makeSwWithCreateStub(
+        () => Promise.reject(new DOMException("quota", "QuotaExceededError")),
+        (line) => swWarnings.push(line),
+      );
+      try {
+        const outcome = await (async () => {
+          try { await sw2.mock.chrome.runtime.onInstalled.dispatch({ reason: "update" })[0]; return "resolved"; }
+          catch (_) { return "rejected"; }
+        })();
+        check("a failing update point is warned about and does not reject the listener",
+          outcome === "resolved" && swWarnings.some((line) => line.includes("[restore-points]") && line.includes("QuotaExceededError")),
+          swWarnings.join(" / "));
+      } finally {
+        sw2.dispose();
+      }
+
+      const imported = sw1.win.__importedScripts || [];
+      const order = ["shared.js", "vocab-store.js", "notes-sync.js", "restore-points.js"].map((name) => imported.indexOf(name));
+      check("the service worker loads restore-points.js after the modules it reads",
+        order.every((index) => index >= 0) && order[3] > order[0] && order[3] > order[1] && order[3] > order[2]);
+    } finally {
+      sw1.dispose();
     }
-    check("onInstalled takes an \"update\" point on an extension update and on nothing else",
-      !!listener && calls.join() === "update", JSON.stringify({ found: !!slice, calls }));
-    let settled = false;
-    Promise.resolve(updateDone).then(() => { settled = true; });
-    await tick(20);
-    const pendingWhileWriting = settled === false && updateDone instanceof Promise;
-    if (finish) finish(null);
-    await tick(0);
-    check("the onInstalled listener stays pending until the update point is written", pendingWhileWriting && settled === true);
-    const failing = makeListener(() => Promise.reject(new DOMException("quota", "QuotaExceededError")));
-    const outcome = await quietly(async () => { try { await failing({ reason: "update" }); return "resolved"; } catch (_) { return "rejected"; } });
-    check("a failing update point is warned about and does not reject the listener",
-      outcome.value === "resolved" && outcome.warnings.some((line) => line.includes("[restore-points]") && line.includes("QuotaExceededError")),
-      outcome.warnings.join(" / "));
-    const imports = (source.match(/importScripts\(([\s\S]*?)\);/) || [])[1] || "";
-    const order = ["shared.js", "vocab-store.js", "notes-sync.js", "restore-points.js"].map((name) => imports.indexOf(`"${name}"`));
-    check("the service worker loads restore-points.js after the modules it reads",
-      order.every((index) => index >= 0) && order[3] > order[0] && order[3] > order[1] && order[3] > order[2]);
     for (const page of ["options.html", "library.html"]) {
       const html = await fetch("../" + page).then((response) => response.text());
       const doc = new DOMParser().parseFromString(html, "text/html");

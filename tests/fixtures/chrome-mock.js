@@ -520,8 +520,12 @@
         const list = [...registeredScripts.values()];
         return clone(filter && Array.isArray(filter.ids) ? list.filter((s) => filter.ids.includes(s.id)) : list);
       }),
-      executeScript: (...args) => invoke("scripting.executeScript", args, async (injection) =>
-        executeScriptHandler ? clone(await executeScriptHandler(clone(injection))) : [{ frameId: 0, result: undefined }]),
+      executeScript: (...args) => invoke("scripting.executeScript", args, async (injection) => {
+        if (!executeScriptHandler) return [{ frameId: 0, result: undefined }];
+        const copy = clone(injection);
+        if (copy && typeof injection?.func === "function") copy.func = injection.func;
+        return clone(await executeScriptHandler(copy));
+      }),
     };
     chrome.commands = {
       onCommand: makeEvent("commands.onCommand", record),

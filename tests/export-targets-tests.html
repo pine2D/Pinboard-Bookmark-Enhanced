@@ -18,6 +18,8 @@ h2 { margin-top: 24px; }
 <script src="../shared.js"></script>
 <script src="../export-targets.js"></script>
 <script src="../md-export-send.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -505,63 +507,104 @@ async function runSendNetworkPolicyTests() {
 
 async function runOptionsTestButtonDeadlineTests() {
   section("options.js export-target Test button precheck deadline (K49)");
-  // options.js's Test button click handler lives inside the page's single
-  // DOMContentLoaded closure (options.js:1021), nested inside
-  // renderExportTargets's per-row forEach -- there is no exported function to
-  // call and no way to run it here without a full options.html DOM + storage
-  // bootstrap (this page intentionally stays that light, per the other
-  // suites that block the same closure -- tests/options-usability-tests.html,
-  // tests/settings-persist-tests.html). So this pins the fix as a literal
-  // source contract instead, the same technique settings-persist-tests.html
-  // uses for options.js helpers it also cannot execute in isolation.
-  const optionsSource = await (await fetch("../options.js")).text();
   const withPrecheck = pbpExportTargetIds().filter((id) => typeof PBP_EXPORT_TARGETS[id].precheckRequest === "function");
   assert(withPrecheck.length >= 2 && withPrecheck.includes("notion") && withPrecheck.includes("github"),
     "sanity: >=2 registry rows still define precheckRequest, or this pin would be vacuous");
 
-  const handlerStart = optionsSource.indexOf('testBtn.addEventListener("click", async () => {');
-  const handlerEnd = optionsSource.indexOf('testWrap.appendChild(testBtn); testWrap.appendChild(testStatus);', handlerStart === -1 ? 0 : handlerStart);
-  assert(handlerStart !== -1 && handlerEnd !== -1 && handlerEnd > handlerStart,
-    "K49 anchor: the Test button click handler is still found by this literal shape -- every registry row with precheckRequest (notion, github) is rendered through this single shared handler, so pinning it once covers all of them");
-  const handler = optionsSource.slice(handlerStart, handlerEnd);
+  const capturedSignals = [];
+  const capturedUrls = [];
+  const realm = await pbpSwRealm.bootOptions({
+    mock: {
+      userGesture: true,
+      permissionRequestAnswer: true,
+      permissions: { origins: ["https://api.notion.com/*", "https://api.github.com/*"] },
+      storage: {
+        local: {
+          exportTargets: {
+            notion: { enabled: true, token: obfuscateKey("ntn_test"), parent: "0123456789abcdef0123456789abcdef" },
+            github: { enabled: true, token: obfuscateKey("ghp_test") },
+          },
+        },
+      },
+    },
+    fetch: async (input, init) => {
+      const href = String(input || "");
+      const m = href.match(/\/(_locales\/[^/]+\/messages\.json)$/);
+      if (m) return fetch("../" + m[1]);
+      capturedUrls.push(href);
+      capturedSignals.push(init && init.signal);
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    },
+  });
+  try {
+    const githubCard = realm.doc.getElementById("et-github");
+    const testBtn = githubCard.querySelector(".fg-actions button");
+    assert(!!githubCard && !!testBtn, "options renders the GitHub Gist card and its Test button");
+    const testStatus = testBtn.nextElementSibling;
+    testBtn.click();
+    await new Promise((r) => setTimeout(r, 40));
 
-  assert(handler.includes("const pr = row.precheckRequest({ port }, token);"),
-    "handler still calls row.precheckRequest the same way as the send path (md-export-send.js)");
-  assert(/await fetch\(pr\.url,\s*\{[^}]*signal:\s*AbortSignal\.timeout\(20000\)[^}]*\}\)/.test(handler),
-    "K49: the precheck fetch carries the same 20s deadline as the send path (md-export-send.js:87) -- a hung endpoint must not leave the button stuck for minutes");
-  assert(/\}\s*catch\s*\(_\)\s*\{\s*testStatus\.classList\.add\("err"\);\s*testStatus\.textContent = t\("mdSendTestDown"\);\s*\}/.test(handler),
-    "K49: a TimeoutError thrown by the 20s deadline falls into this existing catch, which already renders mdSendTestDown -- zero new copy keys");
-  assert(/\}\s*finally\s*\{\s*testBtn\.disabled = false;\s*testBtn\.removeAttribute\("aria-busy"\);\s*\}/.test(handler),
-    "K49: the disabled/aria-busy reset stays in the existing finally, so a 20s timeout still re-enables the button instead of leaving it stuck");
+    assert(capturedUrls.includes("https://api.github.com/user"),
+      "handler still calls row.precheckRequest the same way as the send path (md-export-send.js)");
+    assert(capturedSignals.length >= 1 && capturedSignals[0] && typeof capturedSignals[0].aborted === "boolean",
+      "K49: the precheck fetch carries an AbortSignal deadline so a hung endpoint cannot leave the button stuck");
+    assert(testStatus.classList.contains("err") && testStatus.textContent === realm.win.t("mdSendTestDown"),
+      "K49: a TimeoutError thrown by the 20s deadline renders mdSendTestDown with .err");
+    assert(testBtn.disabled === false && !testBtn.hasAttribute("aria-busy"),
+      "K49: the disabled/aria-busy reset in finally re-enables the button after a 20s timeout");
+  } finally {
+    realm.dispose();
+  }
 }
 
 async function runPopupObsidianTests() {
   section("popup Obsidian click closure");
-  const popupSource = await (await fetch("../popup.js")).text();
-  const begin = popupSource.indexOf("      const downloadMd = () => {");
-  const end = popupSource.indexOf('\n      // No "Copied" state', begin === -1 ? 0 : begin);
-  if (begin === -1 || end === -1 || end <= begin) throw new Error("popup export closures missing");
-  const make = settings => {
-    const host = document.createElement("div");
-    host.innerHTML = '<div id="md-actions-strip"><button id="md-strip-copy"></button><button id="md-strip-preview"></button><button id="md-strip-dl"></button><button id="md-strip-obsidian"></button></div>';
+  const make = async (settings) => {
     const state = { opened: [], copied: [], messages: [], failClipboard: false };
-    const params = {
-      settings, result: { title: "Fixture", url: "https://fixture.test/article" },
-      attachExtendedMeta: meta => meta, $id: id => host.querySelector("#" + id),
-      clippedDate: "2026-10-24", currentTags: ["fixture"], url: "https://fixture.test/article", markdown: "Fixture body",
-      composeExport, applyFrontmatter, safeFilename, buildObsidianUri,
-      navigator: { clipboard: { writeText: async body => {
-        if (state.failClipboard) throw new Error("clipboard unavailable");
-        state.copied.push(body);
-      } } },
-      window: { open: uri => { state.opened.push(uri); return {}; } },
-      sessionStorage: { getItem: () => true }, t: key => key,
-      showStatus: (...args) => state.messages.push(args),
-      exportSource: "local", deepseekFallbackNotice: "",
-      copyMd: () => {}, openPreview: () => {}, downloadFile: () => {}, pbpScrollIntoView: () => {}
-    };
-    new Function(...Object.keys(params), popupSource.slice(begin, end))(...Object.values(params));
-    return { state, button: host.querySelector("#md-strip-obsidian") };
+    const pop = await pbpSwRealm.bootPopup({
+      mock: {
+        tabs: [{ id: 1, active: true, url: "https://fixture.test/article", title: "Fixture" }],
+        storage: { local: { ...settings, pinboardToken: obfuscateKey("alice:tok"), aiContentSource: "local" } },
+      },
+      beforeScripts(win, mock) {
+        mock.onSendMessage((msg) => {
+          if (msg?.type === "get_bookmark_data") return { account: "alice", posts: [] };
+          if (msg?.type === "get_offline_queue") return { queue: [] };
+          if (msg?.type === "PBP_POPUP_DRAFT") return { ok: true, account: "alice", draft: null };
+          if (msg?.type === "pinboard_api_call") return { ok: true, status: 200, text: "{}" };
+          return {};
+        });
+        Object.defineProperty(win.navigator, "clipboard", {
+          configurable: true,
+          value: {
+            writeText: async (body) => {
+              if (state.failClipboard) throw new Error("clipboard unavailable");
+              state.copied.push(body);
+            },
+          },
+        });
+        win.open = (uri) => { state.opened.push(uri); return {}; };
+      },
+    });
+    pop.set("settings", { ...pop.get("settings"), ...settings, aiContentSource: "local" });
+    pop.set("currentTags", ["fixture"]);
+    pop.win.extractLocalMarkdown = async () => ({
+      title: "Fixture",
+      url: "https://fixture.test/article",
+      markdown: "Fixture body",
+      contentHtml: "<p>Fixture body</p>",
+    });
+    const origShowStatus = pop.win.showStatus;
+    pop.win.showStatus = (...args) => { state.messages.push(args); return origShowStatus(...args); };
+    await pop.win.showMain("alice:tok");
+    pop.set("settings", { ...pop.get("settings"), ...settings, aiContentSource: "local" });
+    pop.set("currentTags", ["fixture"]);
+    pop.doc.getElementById("jina-md-btn").click();
+    for (let i = 0; i < 60 && pop.doc.getElementById("md-actions-strip").classList.contains("hidden"); i++) {
+      await new Promise((r) => setTimeout(r, 15));
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    return { state, pop, button: pop.doc.getElementById("md-strip-obsidian") };
   };
   const legacy = { obsidianEnabled: true, obsidianVault: "Legacy vault", obsidianFolder: "Legacy folder" };
   const cases = [
@@ -572,49 +615,66 @@ async function runPopupObsidianTests() {
     { name: "modern enabled state overrides a disabled legacy mirror", settings: { ...legacy, obsidianEnabled: false, exportTargets: { obsidian: { enabled: true, route: "append", vault: "New vault", folder: "" } } }, action: "new", vault: "New vault", file: "Fixture", append: true }
   ];
   for (const tc of cases) {
-    const f = make(tc.settings);
-    await f.button.onclick?.();
-    const parsed = f.state.opened[0] ? new URL(f.state.opened[0]) : null;
-    assert(f.button.style.display !== "none" && parsed?.hostname === tc.action
-      && parsed.searchParams.get("vault") === tc.vault && parsed.searchParams.get("file") === tc.file
-      && parsed.searchParams.has("append") === tc.append && parsed.searchParams.has("clipboard")
-      && f.state.copied.length === 1 && f.state.copied[0].includes("Fixture body"), "popup: " + tc.name);
+    const f = await make(tc.settings);
+    try {
+      await f.button.onclick?.();
+      const parsed = f.state.opened[0] ? new URL(f.state.opened[0]) : null;
+      assert(f.button.style.display !== "none" && parsed?.hostname === tc.action
+        && parsed.searchParams.get("vault") === tc.vault && parsed.searchParams.get("file") === tc.file
+        && parsed.searchParams.has("append") === tc.append && parsed.searchParams.has("clipboard")
+        && f.state.copied.length === 1 && f.state.copied[0].includes("Fixture body"), "popup: " + tc.name);
+    } finally { f.pop.dispose(); }
   }
-  const disabled = make({ ...legacy, exportTargets: { obsidian: { enabled: false, route: "daily" } } });
-  assert(disabled.button.style.display === "none" && !disabled.button.onclick, "popup: modern disabled state suppresses a stale enabled mirror");
-  const failed = make({ ...legacy, exportTargets: { obsidian: { enabled: true, route: "daily", vault: "Fixture" } } });
-  failed.state.failClipboard = true;
-  await failed.button.onclick?.();
-  assert(failed.state.opened.length === 0 && failed.state.messages.some(args => args[1] === "obsidianClipboardFailed"), "popup: clipboard failure blocks the protocol handoff");
+  const disabled = await make({ ...legacy, exportTargets: { obsidian: { enabled: false, route: "daily" } } });
+  try {
+    assert(disabled.button.style.display === "none" && !disabled.button.onclick, "popup: modern disabled state suppresses a stale enabled mirror");
+  } finally { disabled.pop.dispose(); }
+  const failed = await make({ ...legacy, exportTargets: { obsidian: { enabled: true, route: "daily", vault: "Fixture" } } });
+  try {
+    failed.state.failClipboard = true;
+    await failed.button.onclick?.();
+    assert(failed.state.opened.length === 0 && failed.state.messages.some(args => args[1] === failed.pop.win.t("obsidianClipboardFailed")), "popup: clipboard failure blocks the protocol handoff");
+  } finally { failed.pop.dispose(); }
 
   section("popup Markdown dependency readiness");
-  const loaderBegin = popupSource.indexOf("let _mdConvertLoadPromise = null;");
-  const loaderEnd = popupSource.indexOf("\nlet _turndownLoadPromise", loaderBegin === -1 ? 0 : loaderBegin);
-  if (loaderBegin === -1 || loaderEnd === -1 || loaderEnd <= loaderBegin) throw new Error("popup Markdown loader missing");
   for (const alreadyConverted of [false, true]) {
     const state = { appended: [], pending: [] };
-    const globals = { htmlToMarkdown: alreadyConverted ? () => "" : undefined, marked: undefined, DOMPurify: undefined };
-    const doc = {
-      createElement: () => ({}),
-      head: { appendChild: script => { state.appended.push(script.src); state.pending.push(script); } }
-    };
-    const scope = new Function("document", "globals", "with (globals) { " + popupSource.slice(loaderBegin, loaderEnd) + "\nreturn ensureMdConvert; }")(doc, globals);
-    let resolved = false;
-    const pending = scope().then(() => { resolved = true; });
-    await Promise.resolve();
-    const beforeLoads = resolved;
-    while (state.pending.length) {
-      const script = state.pending.shift();
-      if (script.src === "md-convert.js") globals.htmlToMarkdown = () => "";
-      if (script.src === "vendor/marked.min.js") globals.marked = { lexer: () => [] };
-      if (script.src === "vendor/purify.min.js") globals.DOMPurify = { sanitize: () => "" };
-      script.onload();
+    const pop = await pbpSwRealm.bootPopup();
+    try {
+      if (alreadyConverted) pop.win.htmlToMarkdown = () => "";
+      const origCreate = pop.doc.createElement.bind(pop.doc);
+      const origAppend = pop.doc.head.appendChild.bind(pop.doc.head);
+      pop.doc.createElement = (tag) => {
+        if (String(tag).toLowerCase() === "script") return { _isFakeScript: true, src: "", onload: null, onerror: null };
+        return origCreate(tag);
+      };
+      pop.doc.head.appendChild = (node) => {
+        if (node && node._isFakeScript) {
+          state.appended.push(node.src);
+          state.pending.push(node);
+          return node;
+        }
+        return origAppend(node);
+      };
+      let resolved = false;
+      const pending = pop.win.ensureMdConvert().then(() => { resolved = true; });
       await Promise.resolve();
+      const beforeLoads = resolved;
+      while (state.pending.length) {
+        const script = state.pending.shift();
+        if (script.src === "md-convert.js") pop.win.htmlToMarkdown = () => "";
+        if (script.src === "vendor/marked.min.js") pop.win.marked = { lexer: () => [] };
+        if (script.src === "vendor/purify.min.js") pop.win.DOMPurify = { sanitize: () => "" };
+        script.onload();
+        await Promise.resolve();
+      }
+      await pending;
+      assert(!beforeLoads && state.appended.includes("vendor/marked.min.js") && typeof pop.win.marked?.lexer === "function"
+        && state.appended.includes("vendor/purify.min.js") && typeof pop.win.DOMPurify?.sanitize === "function",
+        "popup loader waits for lexer and sanitizer even when md-convert " + (alreadyConverted ? "already exists" : "is absent"));
+    } finally {
+      pop.dispose();
     }
-    await pending;
-    assert(!beforeLoads && state.appended.includes("vendor/marked.min.js") && typeof globals.marked?.lexer === "function"
-      && state.appended.includes("vendor/purify.min.js") && typeof globals.DOMPurify?.sanitize === "function",
-      "popup loader waits for lexer and sanitizer even when md-convert " + (alreadyConverted ? "already exists" : "is absent"));
   }
 }
 

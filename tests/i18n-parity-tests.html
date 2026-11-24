@@ -948,12 +948,12 @@ async function loadLocale(loc) {
   // touching this check, and a future copy edit that translates one is caught.
   {
     const chipHtml = await (await fetch("../options.html")).text();
-    const hosts = [...chipHtml.matchAll(/<([a-z]+)[^>]*\bdata-i18n="([A-Za-z0-9_]+)"[^>]*>([\s\S]*?)<\/\1>/g)];
-    const unwrap = (s) => s.replace(/&quot;/g, '"').replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+    const chipDoc = new DOMParser().parseFromString(chipHtml, "text/html");
     const chipKeys = new Map();
-    for (const [, , key, inner] of hosts) {
-      const codes = [...inner.matchAll(/<code>([\s\S]*?)<\/code>/g)].map((m) => unwrap(m[1]));
+    for (const host of chipDoc.querySelectorAll("[data-i18n]")) {
+      const key = host.getAttribute("data-i18n") || "";
+      if (!/^[A-Za-z0-9_]+$/.test(key)) continue;
+      const codes = [...host.querySelectorAll("code")].map((code) => code.textContent || "");
       if (codes.length) chipKeys.set(key, codes);
     }
     const chipOffenders = [];

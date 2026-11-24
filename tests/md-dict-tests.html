@@ -15,6 +15,8 @@ h2 { margin-top: 24px; }
 <script src="../dict-evidence.js"></script>
 <script src="../dict-entry.js"></script>
 <script src="../md-vocab-echo.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -1062,6 +1064,9 @@ async function runDictLookupChainTests() {
   window.pbpAiCacheGet = async (key) => cache.has(key) ? { result: cache.get(key) } : null;
   window.pbpAiCacheSet = async (key, result) => { cache.set(key, result); };
   _pbpDictHasPerm = async () => true;
+  const realOnLineDesc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator), "onLine")
+    || Object.getOwnPropertyDescriptor(navigator, "onLine");
+  Object.defineProperty(navigator, "onLine", { configurable: true, get: () => true });
   const dataFor = (word) => ({ ...FDA_SAMPLE, word, source: { ...FDA_SAMPLE.source, url: "https://en.wiktionary.org/wiki/" + encodeURIComponent(word) } });
   try {
     _pbpDictFetch = async (_lang, candidate) => {
@@ -1113,6 +1118,10 @@ async function runDictLookupChainTests() {
     assert(slot.textContent.includes("dictNoEntry") && slot.querySelector("a").href === "https://en.wiktionary.org/wiki/ghost%20word",
       "all semantic misses end as no-entry with an encoded fixed-domain fallback");
   } finally {
+    delete navigator.onLine;
+    if (realOnLineDesc && Object.prototype.hasOwnProperty.call(navigator, "onLine")) {
+      Object.defineProperty(navigator, "onLine", realOnLineDesc);
+    }
     _pbpDictHasPerm = realPerm;
     _pbpDictFetch = realFetch;
     if (realCacheGet === undefined) delete window.pbpAiCacheGet; else window.pbpAiCacheGet = realCacheGet;
@@ -3226,9 +3235,9 @@ async function runDictionaryEntrySettingsTests() {
     // model, base, region, workspace, format) and the custom-entry fields must
     // rebuild the lookup, derived from the evaluated registry, not typed here.
     {
-      const aiSrc=await (await fetch("../ai.js")).text();
-      const regStart=aiSrc.indexOf("const OPENAI_COMPAT_PROVIDERS = {"),regEnd=aiSrc.indexOf("\n};",regStart);
-      const registry=new Function(aiSrc.slice(regStart,regEnd+3)+"\nreturn OPENAI_COMPAT_PROVIDERS;")();
+      const aiRealm=await pbpSwRealm.loadRealmScripts(["ai.js"]);
+      const registry=aiRealm.get("OPENAI_COMPAT_PROVIDERS");
+      aiRealm.dispose();
       const fields=new Set(["aiCustomProviders","customDisplayName","customApiKey2","customApiKey8"]);
       for(const cfg of Object.values(registry))for(const f of ["keyField","modelField","baseField","regionField","workspaceField","protocolField"])if(cfg[f])fields.add(cfg[f]);
       const allRelevant=[...fields].every(key=>_pbpDictSettingsKeyRelevant(key));

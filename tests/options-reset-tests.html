@@ -203,41 +203,30 @@ test("tags def resets tag-sort-by-pop to on", () => {
      isolation. PANEL_DEFAULTS.appearance.after is an uninvoked arrow function
      referencing applyPreset(), which is fine to eval as long as it is never
      called. -->
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
-function extractBalanced(source, marker, open, close) {
-  const at = source.indexOf(marker);
-  if (at === -1) throw new Error("could not find `" + marker + "` in options.js");
-  const openIdx = at + marker.length - 1;
-  if (source[openIdx] !== open) throw new Error("`" + marker + "` is not followed by `" + open + "`");
-  let depth = 0;
-  for (let i = openIdx; i < source.length; i++) {
-    if (source[i] === open) depth++;
-    else if (source[i] === close) {
-      depth--;
-      if (depth === 0) return source.slice(openIdx, i + 1);
-    }
-  }
-  throw new Error("unbalanced `" + open + "`/`" + close + "` reading `" + marker + "`");
-}
-
 (async () => {
-  const source = await fetch("../options.js").then((response) => response.text());
-  const panelDefaultsLiteral = extractBalanced(source, "const PANEL_DEFAULTS = {", "{", "}");
-  const authoredIdsLiteral = extractBalanced(source, "const RESET_AUTHORED_IDS = [", "[", "]");
-  test("K168: reset-authored whitelist ids resolve in the real PANEL_DEFAULTS fields/nested", () => {
-    const panelDefaults = new Function("return (" + panelDefaultsLiteral + ")")();
-    const authoredIds = new Function("return (" + authoredIdsLiteral + ")")();
-    if (!Array.isArray(authoredIds) || !authoredIds.length) throw new Error("RESET_AUTHORED_IDS extracted empty");
-    const known = new Set();
-    for (const def of Object.values(panelDefaults)) {
-      Object.keys(def.fields || {}).forEach((id) => known.add(id));
-      Object.values(def.nested || {}).forEach((group) => {
-        Object.keys(group).forEach((id) => known.add(id));
-      });
-    }
-    const missing = authoredIds.filter((id) => !known.has(id));
-    if (missing.length) throw new Error("whitelist id(s) not found in any panel's fields/nested: " + missing.join(", "));
-  });
+  const realm = await pbpSwRealm.bootOptions();
+  try {
+    const panelDefaults = realm.win.__PBP_PANEL_DEFAULTS;
+    const authoredIds = realm.win.__PBP_RESET_AUTHORED_IDS;
+    test("K168: reset-authored whitelist ids resolve in the real PANEL_DEFAULTS fields/nested", () => {
+      if (!panelDefaults || typeof panelDefaults !== "object") throw new Error("PANEL_DEFAULTS missing on booted options realm");
+      if (!Array.isArray(authoredIds) || !authoredIds.length) throw new Error("RESET_AUTHORED_IDS missing or empty");
+      const known = new Set();
+      for (const def of Object.values(panelDefaults)) {
+        Object.keys(def.fields || {}).forEach((id) => known.add(id));
+        Object.values(def.nested || {}).forEach((group) => {
+          Object.keys(group).forEach((id) => known.add(id));
+        });
+      }
+      const missing = authoredIds.filter((id) => !known.has(id));
+      if (missing.length) throw new Error("whitelist id(s) not found in any panel's fields/nested: " + missing.join(", "));
+    });
+  } finally {
+    realm.dispose();
+  }
 })().catch((error) => {
   fail("K168: reset-authored whitelist ids resolve in the real PANEL_DEFAULTS fields/nested", error && error.message || String(error));
 });

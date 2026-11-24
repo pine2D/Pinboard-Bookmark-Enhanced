@@ -245,36 +245,43 @@
         try { win.eval(`${ident} = window.__pbpSetValue`); }
         finally { delete win.__pbpSetValue; }
       },
-      // Stop periodic timers without removing the iframe before coverage stops.
+      // Stop periodic timers and close cached IDB handles without removing the iframe before coverage stops.
       dispose() {
         try {
           const maxId = win.setTimeout(() => {}, 0);
           for (let id = 1; id <= maxId; id++) { win.clearTimeout(id); win.clearInterval(id); }
         } catch { /* swallow-ok: realm teardown best-effort */ }
+        try {
+          win.eval(`
+            for (const p of [
+              typeof _pbpVocabDbPromise !== "undefined" && _pbpVocabDbPromise,
+              typeof _pbpAiDbPromise !== "undefined" && _pbpAiDbPromise,
+              typeof _pbpPackDbPromise !== "undefined" && _pbpPackDbPromise,
+              typeof _pbpMultiDbPromise !== "undefined" && _pbpMultiDbPromise,
+            ]) {
+              if (p && typeof p.then === "function") p.then((db) => { try { db && db.close(); } catch (_) {} }, () => {});
+            }
+            if (typeof _pbpVocabDbPromise !== "undefined") _pbpVocabDbPromise = null;
+            if (typeof _pbpAiDbPromise !== "undefined") _pbpAiDbPromise = null;
+          `);
+        } catch { /* swallow-ok: realm IDB teardown best-effort */ }
       },
     };
   }
 
-  let _popupTemplate = null;
-  async function loadPopupTemplate() {
-    if (_popupTemplate) return _popupTemplate;
-    const base = new URL("../", document.baseURI).href;
-    const response = await fetch(base + "popup.html");
-    if (!response.ok) throw new Error("Cannot load popup.html: " + response.status);
-    const parsed = new DOMParser().parseFromString(await response.text(), "text/html");
-    const sources = [...parsed.querySelectorAll("script[defer][src]")]
-      .map((s) => new URL(s.getAttribute("src"), response.url).href);
-    parsed.querySelectorAll("script").forEach((s) => s.remove());
-    _popupTemplate = { bodyHtml: parsed.body.innerHTML, sources };
-    return _popupTemplate;
+  function defaultExtensionFetch(realmLabel, base) {
+    return async (input) => {
+      const href = String(input || "");
+      const m = href.match(/\/(_locales\/[^/]+\/messages\.json)$/);
+      if (m) return fetch(base + m[1]);
+      if (href.startsWith("chrome-extension://") && href.endsWith(".png")) {
+        throw new Error("icon PNG fetch disabled in unit test realm");
+      }
+      throw new Error(`unmocked fetch in ${realmLabel} realm: ${href}`);
+    };
   }
 
-  // Boots popup.html's markup + deferred runtime scripts in consumer order
-  // inside an isolated same-origin <iframe>, AFTER DOMContentLoaded has already
-  // fired so popup.js's automatic session/tab bootstrap stays dormant unless
-  // explicitly invoked.
-  async function bootPopup(options = {}) {
-    const tpl = await loadPopupTemplate();
+  async function createEmptyIframe(search = "") {
     const iframe = document.createElement("iframe");
     const emptyUrl = new URL("fixtures/empty-realm.html", document.baseURI).href;
     await new Promise((resolve, reject) => {
@@ -283,38 +290,33 @@
       iframe.src = emptyUrl;
       ensureHost().appendChild(iframe);
     });
-    const win = iframe.contentWindow;
-    const doc = iframe.contentDocument;
-    doc.body.innerHTML = tpl.bodyHtml;
+    if (search) {
+      iframe.contentWindow.history.replaceState(null, "", emptyUrl + search);
+    }
+    const baseEl = iframe.contentDocument.createElement("base");
+    baseEl.href = new URL("../", document.baseURI).href;
+    iframe.contentDocument.head.appendChild(baseEl);
+    return iframe;
+  }
 
-    let onReload = options.onReload || null;
+  function wireReloadTrap(win, getHandler) {
     if (win.navigation && typeof win.navigation.addEventListener === "function") {
       win.navigation.addEventListener("navigate", (e) => {
         if (e.navigationType === "reload") {
           if (e.cancelable) e.preventDefault();
-          if (typeof onReload === "function") onReload();
+          const fn = getHandler();
+          if (typeof fn === "function") fn();
         }
       });
     }
+  }
 
-    const mock = globalThis.pbpChromeMock.create(options.mock || {});
-    win.chrome = mock.chrome;
-    win.fetch = options.fetch || (async (input) => {
-      throw new Error("unmocked fetch in popup realm: " + String(input || ""));
-    });
-
-    if (options.beforeScripts) await options.beforeScripts(win, mock, doc);
-    for (const src of tpl.sources) {
-      await loadScript(doc, src);
-    }
-    if (options.afterBoot) await options.afterBoot(win, mock, doc);
-
+  function realmHandle(win, doc, mock, extra = {}) {
     return {
       win,
       doc,
       mock,
-      resetBody() { doc.body.innerHTML = tpl.bodyHtml; },
-      setOnReload(fn) { onReload = fn; },
+      ...extra,
       get(expr) { return win.eval(expr); },
       set(ident, value) {
         win.__pbpSetValue = value;
@@ -326,9 +328,228 @@
           const maxId = win.setTimeout(() => {}, 0);
           for (let id = 1; id <= maxId; id++) { win.clearTimeout(id); win.clearInterval(id); }
         } catch { /* swallow-ok: realm teardown best-effort */ }
+        try {
+          win.eval(`
+            for (const p of [
+              typeof _pbpVocabDbPromise !== "undefined" && _pbpVocabDbPromise,
+              typeof _pbpAiDbPromise !== "undefined" && _pbpAiDbPromise,
+              typeof _pbpPackDbPromise !== "undefined" && _pbpPackDbPromise,
+              typeof _pbpMultiDbPromise !== "undefined" && _pbpMultiDbPromise,
+            ]) {
+              if (p && typeof p.then === "function") p.then((db) => { try { db && db.close(); } catch (_) {} }, () => {});
+            }
+            if (typeof _pbpVocabDbPromise !== "undefined") _pbpVocabDbPromise = null;
+            if (typeof _pbpAiDbPromise !== "undefined") _pbpAiDbPromise = null;
+          `);
+        } catch { /* swallow-ok: realm IDB teardown best-effort */ }
       },
     };
   }
 
-  globalThis.pbpSwRealm = { SW_DEPS, boot, bootPopup, loadScript };
+  async function loadStylesheet(doc, href, media) {
+    await new Promise((resolve, reject) => {
+      const link = doc.createElement("link");
+      link.rel = "stylesheet";
+      if (media) link.media = media;
+      link.href = href;
+      link.onload = () => resolve();
+      link.onerror = () => reject(new Error("failed to load stylesheet: " + href));
+      doc.head.appendChild(link);
+    });
+  }
+
+  async function loadSurfaceTemplate(pageFile) {
+    const base = new URL("../", document.baseURI).href;
+    const response = await fetch(base + pageFile);
+    if (!response.ok) throw new Error(`Cannot load ${pageFile}: ${response.status}`);
+    const parsed = new DOMParser().parseFromString(await response.text(), "text/html");
+    const styles = [...parsed.querySelectorAll('link[rel="stylesheet"][href]')]
+      .map((l) => ({ href: new URL(l.getAttribute("href"), response.url).href, media: l.getAttribute("media") || "" }));
+    const earlySources = [...parsed.querySelectorAll("script[src]:not([defer])")]
+      .map((s) => new URL(s.getAttribute("src"), response.url).href);
+    const sources = [...parsed.querySelectorAll("script[defer][src]")]
+      .map((s) => new URL(s.getAttribute("src"), response.url).href);
+    parsed.querySelectorAll("script").forEach((s) => s.remove());
+    return { bodyHtml: parsed.body.innerHTML, styles, earlySources, sources, base };
+  }
+
+  let _popupTemplate = null;
+  async function loadPopupTemplate() {
+    if (!_popupTemplate) _popupTemplate = await loadSurfaceTemplate("popup.html");
+    return _popupTemplate;
+  }
+
+  let _optionsTemplate = null;
+  async function loadOptionsTemplate() {
+    if (!_optionsTemplate) _optionsTemplate = await loadSurfaceTemplate("options.html");
+    return _optionsTemplate;
+  }
+
+  let _readerTemplate = null;
+  async function loadReaderTemplate() {
+    if (!_readerTemplate) _readerTemplate = await loadSurfaceTemplate("md-preview.html");
+    return _readerTemplate;
+  }
+
+  // Loads an explicit list of repo-root runtime scripts inside an isolated
+  // same-origin <iframe> backed by chrome-mock.js.
+  async function loadRealmScripts(files, options = {}) {
+    const base = new URL("../", document.baseURI).href;
+    const iframe = await createEmptyIframe(options.search || "");
+    const win = iframe.contentWindow;
+    const doc = iframe.contentDocument;
+    let onReload = options.onReload || null;
+    wireReloadTrap(win, () => onReload);
+    const mock = globalThis.pbpChromeMock.create(options.mock || {});
+    win.chrome = mock.chrome;
+    win.fetch = options.fetch || defaultExtensionFetch("script", base);
+    if (options.bodyHtml) doc.body.innerHTML = options.bodyHtml;
+    if (options.beforeScripts) await options.beforeScripts(win, mock, doc);
+    for (const file of files) {
+      const src = /^https?:|^chrome-extension:/.test(file) ? file : base + String(file).replace(/^(\.\.\/)+/, "");
+      await loadScript(doc, src);
+    }
+    if (options.afterBoot) await options.afterBoot(win, mock, doc);
+    return realmHandle(win, doc, mock, {
+      iframe,
+      setOnReload(fn) { onReload = fn; },
+    });
+  }
+
+  // Boots popup.html's markup + deferred runtime scripts in consumer order
+  // inside an isolated same-origin <iframe>, AFTER DOMContentLoaded has already
+  // fired so popup.js's automatic session/tab bootstrap stays dormant unless
+  // explicitly invoked.
+  async function bootPopup(options = {}) {
+    const tpl = await loadPopupTemplate();
+    const iframe = await createEmptyIframe(options.search || "");
+    const win = iframe.contentWindow;
+    const doc = iframe.contentDocument;
+    doc.body.innerHTML = tpl.bodyHtml;
+
+    let onReload = options.onReload || null;
+    wireReloadTrap(win, () => onReload);
+
+    const mock = globalThis.pbpChromeMock.create(options.mock || {});
+    win.chrome = mock.chrome;
+    win.fetch = options.fetch || defaultExtensionFetch("popup", tpl.base);
+
+    if (options.beforeScripts) await options.beforeScripts(win, mock, doc);
+    for (const src of tpl.sources) {
+      await loadScript(doc, src);
+    }
+    if (options.afterBoot) await options.afterBoot(win, mock, doc);
+
+    return realmHandle(win, doc, mock, {
+      iframe,
+      resetBody() { doc.body.innerHTML = tpl.bodyHtml; },
+      setOnReload(fn) { onReload = fn; },
+    });
+  }
+
+  // Boots options.html's markup + deferred runtime scripts in consumer order.
+  // When autoInit !== false (default true), dispatches DOMContentLoaded and
+  // awaits every registered DOMContentLoaded listener's returned promise so
+  // options.js's async initialization settles before returning.
+  async function bootOptions(options = {}) {
+    const tpl = await loadOptionsTemplate();
+    const iframe = await createEmptyIframe(options.search || "");
+    const win = iframe.contentWindow;
+    const doc = iframe.contentDocument;
+    if (options.withStyles) {
+      for (const st of tpl.styles) await loadStylesheet(doc, st.href, st.media);
+    }
+    doc.body.innerHTML = tpl.bodyHtml;
+
+    let onReload = options.onReload || null;
+    wireReloadTrap(win, () => onReload);
+
+    const mock = globalThis.pbpChromeMock.create(options.mock || {});
+    win.chrome = mock.chrome;
+    win.fetch = options.fetch || defaultExtensionFetch("options", tpl.base);
+
+    const dclListeners = [];
+    const origAdd = doc.addEventListener.bind(doc);
+    doc.addEventListener = function (type, listener, opts) {
+      if (type === "DOMContentLoaded" && typeof listener === "function") {
+        dclListeners.push({ listener, once: !!(opts && typeof opts === "object" && opts.once) });
+      }
+      return origAdd(type, listener, opts);
+    };
+
+    if (options.beforeScripts) await options.beforeScripts(win, mock, doc);
+    if (options.withEarlyTheme !== false) {
+      for (const src of tpl.earlySources) await loadScript(doc, src);
+    }
+    Object.defineProperty(doc, "readyState", { configurable: true, value: "interactive" });
+    try {
+      for (const src of tpl.sources) await loadScript(doc, src);
+    } finally {
+      delete doc.readyState;
+      doc.addEventListener = origAdd;
+    }
+
+    let initialized = false;
+    async function runInit() {
+      if (initialized) return;
+      initialized = true;
+      const ev = new win.Event("DOMContentLoaded", { bubbles: true });
+      const pending = dclListeners.map(({ listener }) => Promise.resolve().then(() => listener.call(doc, ev)));
+      await Promise.all(pending);
+    }
+    if (options.autoInit !== false) await runInit();
+    if (options.afterBoot) await options.afterBoot(win, mock, doc);
+
+    return realmHandle(win, doc, mock, {
+      iframe,
+      runInit,
+      resetBody() { doc.body.innerHTML = tpl.bodyHtml; },
+      setOnReload(fn) { onReload = fn; },
+    });
+  }
+
+  // Boots md-preview.html's markup + deferred runtime scripts in consumer order
+  // with readyState="interactive" while scripts load, then fires DOMContentLoaded
+  // and awaits md-preview.js's main async IIFE completion (__pbpReaderBootPromise).
+  async function bootReader(options = {}) {
+    const tpl = await loadReaderTemplate();
+    const iframe = await createEmptyIframe(options.search !== undefined ? options.search : "?k=fixture");
+    const win = iframe.contentWindow;
+    const doc = iframe.contentDocument;
+    if (options.withStyles) {
+      for (const st of tpl.styles) await loadStylesheet(doc, st.href, st.media);
+    }
+    doc.body.innerHTML = tpl.bodyHtml;
+
+    let onReload = options.onReload || null;
+    wireReloadTrap(win, () => onReload);
+
+    const mock = globalThis.pbpChromeMock.create(options.mock || {});
+    win.chrome = mock.chrome;
+    win.fetch = options.fetch || defaultExtensionFetch("reader", tpl.base);
+
+    if (options.beforeScripts) await options.beforeScripts(win, mock, doc);
+    if (options.withEarlyTheme !== false) {
+      for (const src of tpl.earlySources) await loadScript(doc, src);
+    }
+    Object.defineProperty(doc, "readyState", { configurable: true, value: "interactive" });
+    try {
+      for (const src of tpl.sources) await loadScript(doc, src);
+    } finally {
+      delete doc.readyState;
+    }
+    doc.dispatchEvent(new win.Event("DOMContentLoaded", { bubbles: true }));
+    if (options.awaitBoot !== false && win.__pbpReaderBootPromise) {
+      await win.__pbpReaderBootPromise;
+    }
+    if (options.afterBoot) await options.afterBoot(win, mock, doc);
+
+    return realmHandle(win, doc, mock, {
+      iframe,
+      resetBody() { doc.body.innerHTML = tpl.bodyHtml; },
+      setOnReload(fn) { onReload = fn; },
+    });
+  }
+
+  globalThis.pbpSwRealm = { SW_DEPS, boot, bootPopup, bootOptions, bootReader, loadRealmScripts, loadScript };
 })();

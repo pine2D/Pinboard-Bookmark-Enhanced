@@ -13,6 +13,8 @@ body { font-family: monospace; padding: 16px; max-width: 900px; }
 <script src="../ai.js"></script>
 <script src="../jina.js"></script>
 <script src="../popup-ai.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -72,42 +74,63 @@ async function acheck(name, fn) {
 // asserting resolveCacheMs boundaries with a hand-passed TTL never touched that.
 // Entries are written in the shapes their real writers produce: jina.js stores
 // { result, timestamp }, popup-tags.js stores { data, timestamp, account }.
-function buildSuggestSweepHarness(source, options) {
+let _sweepSwPromise = null;
+function getSweepSw() {
+  if (!_sweepSwPromise) _sweepSwPromise = pbpSwRealm.boot();
+  return _sweepSwPromise;
+}
+
+async function buildSuggestSweepHarness(options) {
   const o = options || {};
-  const start = source.indexOf("const SUGGEST_SWEEP_INTERVAL_MS");
-  const end = source.indexOf("// Best-effort sweep of orphaned per-tab preview payloads", start);
-  if (start < 0 || end <= start) throw new Error("suggest sweep source not found");
+  const sw = await getSweepSw();
   const data = structuredClone(o.entries || {});
   const removed = [];
   const calls = { getNull: 0, getKeys: 0, failSet: !!o.failSet };
-  const deps = {
-    chrome: { storage: { local: {
-      async get(query) {
-        if (query === null || query === undefined) { calls.getNull++; return structuredClone(data); }
-        const out = {};
-        if (Array.isArray(query)) { for (const key of query) if (key in data) out[key] = structuredClone(data[key]); return out; }
-        for (const [key, fallback] of Object.entries(query)) {
-          out[key] = key in data ? structuredClone(data[key]) : fallback;
-        }
-        return out;
-      },
-      ...(o.noGetKeys ? {} : { async getKeys() { calls.getKeys++; return Object.keys(data); } }),
-      async set(obj) { if (calls.failSet) { const e = new Error("quota"); e.name = "QuotaError"; throw e; } for (const [key, value] of Object.entries(obj)) data[key] = structuredClone(value); },
-      async remove(keys) {
-        for (const key of [].concat(keys)) { removed.push(key); delete data[key]; }
-      },
-    } } },
-    pbpReadSettingsWithSecrets: async (defaults) => ({ ...defaults, ...(o.settings || {}) }),
-    console: o.console || console,
+  const localStub = {
+    async get(query) {
+      if (query === null || query === undefined) { calls.getNull++; return structuredClone(data); }
+      const out = {};
+      if (typeof query === "string") { if (query in data) out[query] = structuredClone(data[query]); return out; }
+      if (Array.isArray(query)) { for (const key of query) if (key in data) out[key] = structuredClone(data[key]); return out; }
+      for (const [key, fallback] of Object.entries(query)) {
+        out[key] = key in data ? structuredClone(data[key]) : fallback;
+      }
+      return out;
+    },
+    ...(o.noGetKeys ? {} : { async getKeys() { calls.getKeys++; return Object.keys(data); } }),
+    async set(obj) {
+      if (calls.failSet) { const e = new Error("quota"); e.name = "QuotaError"; throw e; }
+      for (const [key, value] of Object.entries(obj)) data[key] = structuredClone(value);
+    },
+    async remove(keys) {
+      for (const key of [].concat(keys)) { removed.push(key); delete data[key]; }
+    },
   };
-  const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}\nreturn sweepSuggestCache;`);
-  return { run: factory(...Object.values(deps)), data, removed, calls };
+  return {
+    async run() {
+      const prevLocal = sw.win.chrome.storage.local;
+      const prevRead = sw.win.pbpReadSettingsWithSecrets;
+      const prevWarn = sw.win.console.warn;
+      sw.win.chrome.storage.local = localStub;
+      sw.win.pbpReadSettingsWithSecrets = async (defaults) => ({ ...defaults, ...(o.settings || {}) });
+      if (o.console?.warn) sw.win.console.warn = o.console.warn;
+      try {
+        await sw.win.sweepSuggestCache();
+      } finally {
+        sw.win.chrome.storage.local = prevLocal;
+        sw.win.pbpReadSettingsWithSecrets = prevRead;
+        sw.win.console.warn = prevWarn;
+      }
+    },
+    data,
+    removed,
+    calls,
+  };
 }
 
 (async function () {
   const realChrome = window.chrome;
   const realFetch = window.fetch;
-  const backgroundSource = await fetch("../background.js").then((response) => response.text());
   try {
     await acheck("Jina cache hit needs neither permission check nor fetch", async () => {
       let checks = 0, fetches = 0;
@@ -441,7 +464,7 @@ function buildSuggestSweepHarness(source, options) {
     });
 
     await acheck("sweep keeps a jina_md_ or deepseek_md_ entry the user's longer AI cache duration still covers", async () => {
-      const h = buildSuggestSweepHarness(backgroundSource, { settings: { aiCacheDuration: 1440 }, entries: entries() });
+      const h = await buildSuggestSweepHarness({ settings: { aiCacheDuration: 1440 }, entries: entries() });
       await h.run();
       if (h.removed.includes("jina_md_https://example.com/a") || h.removed.includes("deepseek_md_https://example.com/a")) {
         throw new Error("swept an entry the reader would still serve");
@@ -449,7 +472,7 @@ function buildSuggestSweepHarness(source, options) {
     });
 
     await acheck("sweep still drops a cached_suggest_ entry past its own hour, whatever the AI cache duration", async () => {
-      const h = buildSuggestSweepHarness(backgroundSource, { settings: { aiCacheDuration: 1440 }, entries: entries() });
+      const h = await buildSuggestSweepHarness({ settings: { aiCacheDuration: 1440 }, entries: entries() });
       await h.run();
       if (!h.removed.includes("cached_suggest_https://example.com/a")) throw new Error("suggest cache outlived its own TTL");
     });
@@ -458,7 +481,7 @@ function buildSuggestSweepHarness(source, options) {
       const fresh = entries();
       fresh["jina_md_https://example.com/a"].timestamp = Date.now();
       fresh["deepseek_md_https://example.com/a"].timestamp = Date.now();
-      const h = buildSuggestSweepHarness(backgroundSource, { settings: { aiCacheDuration: 0 }, entries: fresh });
+      const h = await buildSuggestSweepHarness({ settings: { aiCacheDuration: 0 }, entries: fresh });
       await h.run();
       if (!h.removed.includes("jina_md_https://example.com/a") || !h.removed.includes("deepseek_md_https://example.com/a")) {
         throw new Error("disabled cache kept an unreachable entry forever");
@@ -474,7 +497,7 @@ function buildSuggestSweepHarness(source, options) {
     });
     for (const noGetKeys of [false, true]) {
       await acheck("sweep " + (noGetKeys ? "without getKeys falls back to get(null)" : "with getKeys never calls get(null)") + " and evicts only stale cache entries", async () => {
-        const h = buildSuggestSweepHarness(backgroundSource, { settings: { aiCacheDuration: 60 }, entries: mixed(), noGetKeys });
+        const h = await buildSuggestSweepHarness({ settings: { aiCacheDuration: 60 }, entries: mixed(), noGetKeys });
         await h.run();
         if (noGetKeys ? h.calls.getNull !== 1 : (h.calls.getNull !== 0 || h.calls.getKeys !== 1)) throw new Error("wrong read path: " + JSON.stringify(h.calls));
         if (h.removed.length !== 3 || !h.removed.includes("jina_md_https://example.com/a") || !h.removed.includes("deepseek_md_https://example.com/a") || !h.removed.includes("cached_suggest_https://example.com/a")) throw new Error("removed " + JSON.stringify(h.removed));
@@ -485,7 +508,7 @@ function buildSuggestSweepHarness(source, options) {
     // ---- Y4-04: a failed sweep leaves a trace (label and error name only) ----
     await acheck("a failing cache sweep warns once under [cache-sweep] without keys or URLs", async () => {
       const warns = [];
-      const h = buildSuggestSweepHarness(backgroundSource, { settings: { aiCacheDuration: 60 }, entries: entries(), failSet: true,
+      const h = await buildSuggestSweepHarness({ settings: { aiCacheDuration: 60 }, entries: entries(), failSet: true,
         console: { log() {}, warn: (...a) => warns.push(a) } });
       await h.run();
       if (warns.length !== 1 || !String(warns[0][0]).startsWith("[cache-sweep]")) throw new Error("warns " + JSON.stringify(warns));
@@ -493,15 +516,21 @@ function buildSuggestSweepHarness(source, options) {
     });
 
     await acheck("a failing preview-orphan sweep warns once under [preview-sweep] without keys", async () => {
-      const start = backgroundSource.indexOf("const PREVIEW_SWEEP_INTERVAL_MS");
-      const end = backgroundSource.indexOf("\n// Cold-start residue clean", start);
-      if (start < 0 || end <= start) throw new Error("preview sweep source not found");
+      const sw = await getSweepSw();
       const warns = [];
-      const chromeStub = { runtime: { getURL: (p) => "chrome-extension://x/" + p },
-        tabs: { query: async () => { const e = new Error("tabs gone"); e.name = "TabsError"; throw e; } },
-        storage: { local: { get: async () => ({ _previewSweepTs: 0 }) } } };
-      const run = new Function("chrome", "console", backgroundSource.slice(start, end) + "\nreturn pbpSweepPreviewOrphans;")(chromeStub, { warn: (...a) => warns.push(a) });
-      await run();
+      const prevTabs = sw.win.chrome.tabs;
+      const prevLocal = sw.win.chrome.storage.local;
+      const prevWarn = sw.win.console.warn;
+      sw.win.chrome.tabs = { query: async () => { const e = new Error("tabs gone"); e.name = "TabsError"; throw e; } };
+      sw.win.chrome.storage.local = { get: async () => ({ _previewSweepTs: 0 }) };
+      sw.win.console.warn = (...a) => warns.push(a);
+      try {
+        await sw.win.pbpSweepPreviewOrphans();
+      } finally {
+        sw.win.chrome.tabs = prevTabs;
+        sw.win.chrome.storage.local = prevLocal;
+        sw.win.console.warn = prevWarn;
+      }
       if (warns.length !== 1 || !String(warns[0][0]).startsWith("[preview-sweep]") || warns[0][1] !== "TabsError") throw new Error("warns " + JSON.stringify(warns));
     });
   } finally {

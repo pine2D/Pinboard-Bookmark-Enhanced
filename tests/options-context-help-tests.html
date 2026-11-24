@@ -23,7 +23,6 @@ function test(name, fn) {
 
 (async () => {
   const source = await fetch("../options.html").then((response) => response.text());
-  const cssSource = await fetch("../options.css").then((response) => response.text());
   const inert = source
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
     .replace("<head>", "<head><base href=\"../\">");
@@ -267,9 +266,20 @@ function test(name, fn) {
         violations.push(key + " has a per-instance inline transform");
       }
     });
-    const calibrationBlocks = [...cssSource.matchAll(/([^{}]+)\{([^{}]*--context-help-optical-y\s*:[^{}]+)\}/g)];
-    assert(calibrationBlocks.length >= 1, "context-help optical calibration contract missing");
-    calibrationBlocks.forEach(([, selector]) => {
+    const calibrationSelectors = [];
+    const walkCssRules = (ruleList) => {
+      for (const rule of Array.from(ruleList || [])) {
+        if (rule.style && rule.style.getPropertyValue("--context-help-optical-y").trim()) {
+          calibrationSelectors.push(rule.selectorText || "");
+        }
+        if (rule.cssRules) walkCssRules(rule.cssRules);
+      }
+    };
+    for (const sheet of Array.from(doc.styleSheets)) {
+      if ((sheet.href || "").endsWith("/options.css")) walkCssRules(sheet.cssRules);
+    }
+    assert(calibrationSelectors.length >= 1, "context-help optical calibration contract missing");
+    calibrationSelectors.forEach((selector) => {
       assert(selector.includes("[data-help-role"), "non-role optical calibration selector=" + selector.trim());
     });
     assert(!violations.length, violations.slice(0, 12).join("; "));

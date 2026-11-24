@@ -1305,194 +1305,6 @@ async function showMain(token) {
   // tag add.
   if (typeof syncSuggestTagStates === "function") syncSuggestTagStates();
 
-// ---- Local Markdown extraction via Defuddle ----
-// Uses _cbExecuteScript from ai.js to consume chrome.runtime.lastError via
-// callback — promise form leaks "Unchecked runtime.lastError: No tab with id"
-// when tab closes mid-injection (see ai.js:_cbExecuteScript for detail).
-async function extractLocalMarkdown(tabId) {
-  const injectRes = await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
-  if (!injectRes) return { error: "Cannot access this page" };
-  // site-rules.js is OPTIONAL — inject separately and ignore failure so a broken
-  // rule file can never mask the working Defuddle path (the inline func guards on
-  // `typeof applySiteRule`). Mirrors the ignore-failure inject in ai.js.
-  await _cbExecuteScript({ target: { tabId }, files: ["site-rules.js"] });
-  try {
-    const results = await _cbExecuteScript({
-      target: { tabId },
-      func: () => {
-        // Embedded-frame candidate (2026-08-25): twin of background.js's
-        // extractPageForMarkdown helper (isolated script contexts may carry a
-        // small duplicate, CLAUDE.md). Origin only, https only, cross-origin
-        // only, opaque sandboxed frames excluded, must cover >= 40% of the
-        // viewport -- the reader turns it into a one-click exact-origin grant.
-        function dominantFrameOrigin() {
-          try {
-            const vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
-            let best = null, bestArea = 0;
-            for (const f of document.querySelectorAll("iframe")) {
-              if (f.hasAttribute("srcdoc")) continue; // src is decorative on srcdoc frames
-              let origin;
-              try { origin = new URL(f.src, location.href).origin; } catch (_) { continue; }
-              if (!/^https:\/\//.test(origin) || origin === location.origin) continue;
-              const sb = f.getAttribute("sandbox");
-              if (sb !== null && !/\ballow-same-origin\b/.test(sb)) continue;
-              // Hidden by itself OR by any ancestor (opacity does not inherit)
-              let hidden = false;
-              for (let n = f; n && !hidden; n = n.parentElement) {
-                const cs = getComputedStyle(n);
-                hidden = cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) === 0;
-              }
-              if (hidden) continue;
-              const r = f.getBoundingClientRect();
-              // Visible intersection with the viewport, not the element's raw size
-              const w = Math.min(r.right, vw) - Math.max(r.left, 0);
-              const h = Math.min(r.bottom, vh) - Math.max(r.top, 0);
-              const area = Math.max(0, w) * Math.max(0, h);
-              if (area > bestArea) { bestArea = area; best = origin; }
-            }
-            return best && bestArea >= 0.4 * vw * vh ? best : "";
-          } catch (_) { return ""; }
-        }
-        // "Nothing here" is judged on TEXT, not on the HTML string: Defuddle hands
-        // back the main container even when all it holds is an <iframe> (claude.ai
-        // artifact pages, device 2026-08-26), and a truthy-string gate let that empty
-        // shell pass as an article, so the frame offer below never appeared.
-        // Media-only articles (a comic, a gallery) stay content.
-        function extractionLooksEmpty(html) {
-          const s = String(html || "");
-          if (/<(img|picture|video|audio|svg|canvas|object|embed|math)\b/i.test(s)) return false;
-          return !/\S/.test(s.replace(/<[^>]*>/g, " ").replace(/&(nbsp|#160|#xa0);/gi, " "));
-        }
-        // Per-site custom extractor (site-rules.js) runs first; falls through to Defuddle.
-        try {
-          if (typeof applySiteRule === "function") {
-            const hit = applySiteRule(document, location.href);
-            if (hit && hit.error) return { error: hit.error };
-            if (hit && hit.contentHtml) {
-              // E1: normalize lazy-load img placeholders (data-src/srcset) on
-              // an INERT-document div -- a div from the LIVE document fetches
-              // every <img> it holds even while detached, and fixLazyImages
-              // promotes data-src onto src first. Mirrors site-rules.js's
-              // inertDoc(), which this serialized page function cannot reach
-              // (closure-free by contract). pbpNormalizeLazyImages comes from
-              // site-rules.js, already injected above (extractLocalMarkdown's
-              // _cbExecuteScript call).
-              const div = document.implementation.createHTMLDocument("").createElement("div");
-              div.innerHTML = hit.contentHtml;
-              if (typeof pbpNormalizeLazyImages === "function") pbpNormalizeLazyImages(div, location.href);
-              if (typeof pbpUpgradeSrcsetImages === "function") pbpUpgradeSrcsetImages(div, location.href);
-              return { contentHtml: div.innerHTML, title: hit.title || document.title, url: location.href, math: !!hit.math, forum: !!hit.forum };
-            }
-          }
-        } catch (_) { /* fall through to Defuddle */ }
-        if (typeof Defuddle === "undefined") return { error: "Defuddle not available" };
-        // Patch window.URL in the ISOLATED world to prevent defuddle from
-        // throwing "Failed to construct 'URL': Invalid URL" on relative/weird hrefs
-        // (GitHub pages etc.). Defuddle is UMD and resolves `URL` at runtime, so this
-        // interception works. Only affects isolated world; page's window.URL untouched.
-        const OriginalURL = window.URL;
-        if (!window.__pp_urlShimInstalled) {
-          const SafeURL = function(u, b) {
-            try { return b !== undefined ? new OriginalURL(u, b) : new OriginalURL(u); }
-            catch (_) { return new OriginalURL("about:blank"); }
-          };
-          SafeURL.prototype = OriginalURL.prototype;
-          try { SafeURL.createObjectURL = OriginalURL.createObjectURL.bind(OriginalURL); } catch (_) {}
-          try { SafeURL.revokeObjectURL = OriginalURL.revokeObjectURL.bind(OriginalURL); } catch (_) {}
-          try { SafeURL.canParse = OriginalURL.canParse && OriginalURL.canParse.bind(OriginalURL); } catch (_) {}
-          window.URL = SafeURL;
-          window.__pp_urlShimInstalled = true;
-        }
-        try {
-          const clone = document.cloneNode(true);
-          // E1: normalize lazy-load img placeholders on the CLONE before
-          // Defuddle parses it -- the live DOM is never touched.
-          if (typeof pbpNormalizeLazyImages === "function") pbpNormalizeLazyImages(clone, location.href);
-          if (typeof pbpUpgradeSrcsetImages === "function") pbpUpgradeSrcsetImages(clone, location.href);
-          if (typeof pbpPreDefuddleNormalize === "function") pbpPreDefuddleNormalize(clone);
-          // Suppress Defuddle's own console.error noise on third-party pages: "Defuddle: …" and the bare ("Defuddle", "Error processing document:", e) form its retried parse attempts log
-          const _origCE = console.error;
-          console.error = (...a) => { if (!/^Defuddle(?::|$)/.test(String(a[0]))) _origCE.apply(console, a); };
-          let result;
-          try { result = new Defuddle(clone).parse(); } finally { console.error = _origCE; }
-          if (!result?.content || extractionLooksEmpty(result.content)) return { error: "No content extracted", frameOrigin: dominantFrameOrigin() };
-          // X4: Defuddle's parse() result also carries author/published/site/image
-          // (its internal MetadataExtractor already does JSON-LD + meta-tag
-          // resolution) -- keep them so the preview/export layer can surface them.
-          return {
-            contentHtml: result.content, title: result.title || document.title, url: location.href,
-            math: !!document.querySelector("math") || (typeof pbpContentHasMath === "function" && pbpContentHasMath(result.content)),
-            author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || "",
-            // The source page's declared language: the reader can only tell
-            // CJK and RTL scripts apart by glyphs, so Latin / Cyrillic
-            // articles take their lang from here (md-preview.js).
-            lang: result.language || document.documentElement.lang || ""
-          };
-        } catch (e) { return { error: e.message }; }
-      }
-    });
-    if (results?.[0]?.result) return results[0].result;
-    return { error: "Script execution failed" };
-  } catch (e) { return { error: e.message }; }
-}
-
-// Lazy-load md-convert.js, lexer and sanitizer on demand (saves parse/compile from every
-// popup open — its only popup consumers are the Markdown preview/copy/export
-// button flow and the AI pageText fallback, never the first paint). Same
-// pattern as ensureTurndown below; md-convert.js ships in the ZIP as a root
-// *.js automatically.
-let _mdConvertLoadPromise = null;
-function ensureMdConvert() {
-  const hasConverter = typeof htmlToMarkdown !== "undefined";
-  const hasLexer = typeof marked !== "undefined" && typeof marked.lexer === "function";
-  const hasSanitizer = typeof DOMPurify !== "undefined" && typeof DOMPurify.sanitize === "function";
-  if (hasConverter && hasLexer && hasSanitizer) return Promise.resolve();
-  if (_mdConvertLoadPromise) return _mdConvertLoadPromise;
-  _mdConvertLoadPromise = (async () => {
-    const files = [];
-    if (!hasLexer) files.push("vendor/marked.min.js");
-    if (!hasSanitizer) files.push("vendor/purify.min.js");
-    if (!hasConverter) files.push("md-convert.js");
-    // Sequential loads leave no pending duplicate injection if a failed load
-    // is retried, and resolve only when every conversion dependency is ready.
-    for (const src of files) await new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = src;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error(src + " load failed"));
-      document.head.appendChild(s);
-    });
-  })().catch(error => {
-    _mdConvertLoadPromise = null;
-    throw error;
-  });
-  return _mdConvertLoadPromise;
-}
-
-// Lazy-load Turndown library on demand (saves ~27KB from popup startup)
-let _turndownLoadPromise = null;
-function ensureTurndown() {
-  if (typeof TurndownService !== "undefined") return Promise.resolve();
-  if (_turndownLoadPromise) return _turndownLoadPromise;
-  _turndownLoadPromise = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "vendor/turndown.js";
-    s.onload = () => resolve();
-    s.onerror = () => { _turndownLoadPromise = null; reject(new Error("turndown load failed")); };
-    document.head.appendChild(s);
-  });
-  return _turndownLoadPromise;
-}
-
-// Convert HTML to Markdown for clipboard. Lazy-loads Turndown, then
-// delegates to the shared global htmlToMarkdown() from md-convert.js.
-async function htmlToMarkdownAsync(html, opts) {
-  // md-convert.js (htmlToMarkdown) is lazy-loaded too — settle both deps here
-  // so every caller path is covered, not just the Markdown button flow.
-  try { await ensureMdConvert(); await ensureTurndown(); } catch (_) { return html; }
-  return htmlToMarkdown(html, opts);
-}
-
   // ---- Markdown export button ----
   const jinaMdBtn = $id("jina-md-btn");
   // Video pages (T7.13): the preview strip's entry opens the caption
@@ -2008,6 +1820,194 @@ async function htmlToMarkdownAsync(html, opts) {
   if (settings.optShowRecent) fetchRecentBookmarks(token);
 
   document.querySelector(".tags-input-wrap")?.addEventListener("click", () => $id("tags-input").focus());
+}
+
+// ---- Local Markdown extraction via Defuddle ----
+// Uses _cbExecuteScript from ai.js to consume chrome.runtime.lastError via
+// callback — promise form leaks "Unchecked runtime.lastError: No tab with id"
+// when tab closes mid-injection (see ai.js:_cbExecuteScript for detail).
+async function extractLocalMarkdown(tabId) {
+  const injectRes = await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
+  if (!injectRes) return { error: "Cannot access this page" };
+  // site-rules.js is OPTIONAL — inject separately and ignore failure so a broken
+  // rule file can never mask the working Defuddle path (the inline func guards on
+  // `typeof applySiteRule`). Mirrors the ignore-failure inject in ai.js.
+  await _cbExecuteScript({ target: { tabId }, files: ["site-rules.js"] });
+  try {
+    const results = await _cbExecuteScript({
+      target: { tabId },
+      func: () => {
+        // Embedded-frame candidate (2026-08-25): twin of background.js's
+        // extractPageForMarkdown helper (isolated script contexts may carry a
+        // small duplicate, CLAUDE.md). Origin only, https only, cross-origin
+        // only, opaque sandboxed frames excluded, must cover >= 40% of the
+        // viewport -- the reader turns it into a one-click exact-origin grant.
+        function dominantFrameOrigin() {
+          try {
+            const vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
+            let best = null, bestArea = 0;
+            for (const f of document.querySelectorAll("iframe")) {
+              if (f.hasAttribute("srcdoc")) continue; // src is decorative on srcdoc frames
+              let origin;
+              try { origin = new URL(f.src, location.href).origin; } catch (_) { continue; }
+              if (!/^https:\/\//.test(origin) || origin === location.origin) continue;
+              const sb = f.getAttribute("sandbox");
+              if (sb !== null && !/\ballow-same-origin\b/.test(sb)) continue;
+              // Hidden by itself OR by any ancestor (opacity does not inherit)
+              let hidden = false;
+              for (let n = f; n && !hidden; n = n.parentElement) {
+                const cs = getComputedStyle(n);
+                hidden = cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) === 0;
+              }
+              if (hidden) continue;
+              const r = f.getBoundingClientRect();
+              // Visible intersection with the viewport, not the element's raw size
+              const w = Math.min(r.right, vw) - Math.max(r.left, 0);
+              const h = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+              const area = Math.max(0, w) * Math.max(0, h);
+              if (area > bestArea) { bestArea = area; best = origin; }
+            }
+            return best && bestArea >= 0.4 * vw * vh ? best : "";
+          } catch (_) { return ""; }
+        }
+        // "Nothing here" is judged on TEXT, not on the HTML string: Defuddle hands
+        // back the main container even when all it holds is an <iframe> (claude.ai
+        // artifact pages, device 2026-08-26), and a truthy-string gate let that empty
+        // shell pass as an article, so the frame offer below never appeared.
+        // Media-only articles (a comic, a gallery) stay content.
+        function extractionLooksEmpty(html) {
+          const s = String(html || "");
+          if (/<(img|picture|video|audio|svg|canvas|object|embed|math)\b/i.test(s)) return false;
+          return !/\S/.test(s.replace(/<[^>]*>/g, " ").replace(/&(nbsp|#160|#xa0);/gi, " "));
+        }
+        // Per-site custom extractor (site-rules.js) runs first; falls through to Defuddle.
+        try {
+          if (typeof applySiteRule === "function") {
+            const hit = applySiteRule(document, location.href);
+            if (hit && hit.error) return { error: hit.error };
+            if (hit && hit.contentHtml) {
+              // E1: normalize lazy-load img placeholders (data-src/srcset) on
+              // an INERT-document div -- a div from the LIVE document fetches
+              // every <img> it holds even while detached, and fixLazyImages
+              // promotes data-src onto src first. Mirrors site-rules.js's
+              // inertDoc(), which this serialized page function cannot reach
+              // (closure-free by contract). pbpNormalizeLazyImages comes from
+              // site-rules.js, already injected above (extractLocalMarkdown's
+              // _cbExecuteScript call).
+              const div = document.implementation.createHTMLDocument("").createElement("div");
+              div.innerHTML = hit.contentHtml;
+              if (typeof pbpNormalizeLazyImages === "function") pbpNormalizeLazyImages(div, location.href);
+              if (typeof pbpUpgradeSrcsetImages === "function") pbpUpgradeSrcsetImages(div, location.href);
+              return { contentHtml: div.innerHTML, title: hit.title || document.title, url: location.href, math: !!hit.math, forum: !!hit.forum };
+            }
+          }
+        } catch (_) { /* fall through to Defuddle */ }
+        if (typeof Defuddle === "undefined") return { error: "Defuddle not available" };
+        // Patch window.URL in the ISOLATED world to prevent defuddle from
+        // throwing "Failed to construct 'URL': Invalid URL" on relative/weird hrefs
+        // (GitHub pages etc.). Defuddle is UMD and resolves `URL` at runtime, so this
+        // interception works. Only affects isolated world; page's window.URL untouched.
+        const OriginalURL = window.URL;
+        if (!window.__pp_urlShimInstalled) {
+          const SafeURL = function(u, b) {
+            try { return b !== undefined ? new OriginalURL(u, b) : new OriginalURL(u); }
+            catch (_) { return new OriginalURL("about:blank"); }
+          };
+          SafeURL.prototype = OriginalURL.prototype;
+          try { SafeURL.createObjectURL = OriginalURL.createObjectURL.bind(OriginalURL); } catch (_) {}
+          try { SafeURL.revokeObjectURL = OriginalURL.revokeObjectURL.bind(OriginalURL); } catch (_) {}
+          try { SafeURL.canParse = OriginalURL.canParse && OriginalURL.canParse.bind(OriginalURL); } catch (_) {}
+          window.URL = SafeURL;
+          window.__pp_urlShimInstalled = true;
+        }
+        try {
+          const clone = document.cloneNode(true);
+          // E1: normalize lazy-load img placeholders on the CLONE before
+          // Defuddle parses it -- the live DOM is never touched.
+          if (typeof pbpNormalizeLazyImages === "function") pbpNormalizeLazyImages(clone, location.href);
+          if (typeof pbpUpgradeSrcsetImages === "function") pbpUpgradeSrcsetImages(clone, location.href);
+          if (typeof pbpPreDefuddleNormalize === "function") pbpPreDefuddleNormalize(clone);
+          // Suppress Defuddle's own console.error noise on third-party pages: "Defuddle: …" and the bare ("Defuddle", "Error processing document:", e) form its retried parse attempts log
+          const _origCE = console.error;
+          console.error = (...a) => { if (!/^Defuddle(?::|$)/.test(String(a[0]))) _origCE.apply(console, a); };
+          let result;
+          try { result = new Defuddle(clone).parse(); } finally { console.error = _origCE; }
+          if (!result?.content || extractionLooksEmpty(result.content)) return { error: "No content extracted", frameOrigin: dominantFrameOrigin() };
+          // X4: Defuddle's parse() result also carries author/published/site/image
+          // (its internal MetadataExtractor already does JSON-LD + meta-tag
+          // resolution) -- keep them so the preview/export layer can surface them.
+          return {
+            contentHtml: result.content, title: result.title || document.title, url: location.href,
+            math: !!document.querySelector("math") || (typeof pbpContentHasMath === "function" && pbpContentHasMath(result.content)),
+            author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || "",
+            // The source page's declared language: the reader can only tell
+            // CJK and RTL scripts apart by glyphs, so Latin / Cyrillic
+            // articles take their lang from here (md-preview.js).
+            lang: result.language || document.documentElement.lang || ""
+          };
+        } catch (e) { return { error: e.message }; }
+      }
+    });
+    if (results?.[0]?.result) return results[0].result;
+    return { error: "Script execution failed" };
+  } catch (e) { return { error: e.message }; }
+}
+
+// Lazy-load md-convert.js, lexer and sanitizer on demand (saves parse/compile from every
+// popup open — its only popup consumers are the Markdown preview/copy/export
+// button flow and the AI pageText fallback, never the first paint). Same
+// pattern as ensureTurndown below; md-convert.js ships in the ZIP as a root
+// *.js automatically.
+let _mdConvertLoadPromise = null;
+function ensureMdConvert() {
+  const hasConverter = typeof htmlToMarkdown !== "undefined";
+  const hasLexer = typeof marked !== "undefined" && typeof marked.lexer === "function";
+  const hasSanitizer = typeof DOMPurify !== "undefined" && typeof DOMPurify.sanitize === "function";
+  if (hasConverter && hasLexer && hasSanitizer) return Promise.resolve();
+  if (_mdConvertLoadPromise) return _mdConvertLoadPromise;
+  _mdConvertLoadPromise = (async () => {
+    const files = [];
+    if (!hasLexer) files.push("vendor/marked.min.js");
+    if (!hasSanitizer) files.push("vendor/purify.min.js");
+    if (!hasConverter) files.push("md-convert.js");
+    // Sequential loads leave no pending duplicate injection if a failed load
+    // is retried, and resolve only when every conversion dependency is ready.
+    for (const src of files) await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error(src + " load failed"));
+      document.head.appendChild(s);
+    });
+  })().catch(error => {
+    _mdConvertLoadPromise = null;
+    throw error;
+  });
+  return _mdConvertLoadPromise;
+}
+
+// Lazy-load Turndown library on demand (saves ~27KB from popup startup)
+let _turndownLoadPromise = null;
+function ensureTurndown() {
+  if (typeof TurndownService !== "undefined") return Promise.resolve();
+  if (_turndownLoadPromise) return _turndownLoadPromise;
+  _turndownLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "vendor/turndown.js";
+    s.onload = () => resolve();
+    s.onerror = () => { _turndownLoadPromise = null; reject(new Error("turndown load failed")); };
+    document.head.appendChild(s);
+  });
+  return _turndownLoadPromise;
+}
+
+// Convert HTML to Markdown for clipboard. Lazy-loads Turndown, then
+// delegates to the shared global htmlToMarkdown() from md-convert.js.
+async function htmlToMarkdownAsync(html, opts) {
+  // md-convert.js (htmlToMarkdown) is lazy-loaded too — settle both deps here
+  // so every caller path is covered, not just the Markdown button flow.
+  try { await ensureMdConvert(); await ensureTurndown(); } catch (_) { return html; }
+  return htmlToMarkdown(html, opts);
 }
 
 // ---- The same page saved without its #fragment (user ruling 2026-11-02) ----

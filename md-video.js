@@ -4312,7 +4312,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         detected, granted: true,
         tracks: Array.isArray(fixture.tracks) ? fixture.tracks : [], track: fixture.track || null,
         segments: Array.isArray(fixture.segments) ? fixture.segments : [], error: fixture.error || null,
-        wasUnpunct: false, meta: fixture.meta || { title: (ctx && ctx.title) || "", url: (ctx && ctx.pageUrl) || "" },
+        wasUnpunct: !!fixture.wasUnpunct, meta: fixture.meta || { title: (ctx && ctx.title) || "", url: (ctx && ctx.pageUrl) || "" },
         useLogin: false, ytHadTab: false, ytFetchFn: null, ytFetchTabId: null,
         errorStatus: null, captionsVia: "fixture",
       };

@@ -1355,7 +1355,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   return rects;
 }
 
-(async function () {
+const _pbpReaderBoot = (async function () {
   initI18n();
   applyI18n();
   // Wired here, ahead of the file://-safe bailout right below and every
@@ -4862,6 +4862,14 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     menu.appendChild(foot);
   }
 
+  if (typeof window !== "undefined" && location.protocol !== "chrome-extension:") {
+    window.__PBP_readerTestHooks = {
+      setupSendMenu: () => setupSendMenu(),
+      captureExportJob,
+      prepareExportAsk,
+      bumpArticleRevision: () => { _articleRevision++; },
+    };
+  }
   await setupSendMenu();
   // exportTargets mixes ordinary settings with credentials/capability URLs.
   // With settings sync on and credentials sync off, either area's write can
@@ -4896,6 +4904,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   console.error("md-preview init failed:", e);
   renderEmptyState(t("mdEngineExtractFailed"));
 });
+if (typeof window !== "undefined" && location.protocol !== "chrome-extension:") window.__pbpReaderBootPromise = _pbpReaderBoot;
 
 // ---- Copy to clipboard with visual feedback ----
 async function copyToClipboard(text, btn) {

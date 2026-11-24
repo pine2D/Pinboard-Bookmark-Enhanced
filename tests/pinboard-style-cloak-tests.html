@@ -3,6 +3,8 @@
 <style>.case{font-family:monospace;white-space:pre}.pass{color:#176}.fail{color:#b00}</style>
 </head><body>
 <div id="results"></div>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 // ============================================================
 // Tests for pinboard-style.js FOUC cloak gate (F2)
@@ -188,35 +190,80 @@ const LIGHT = "rgb(250, 249, 246)", DARK = "rgb(28, 27, 26)";
 // (Served over http by .qa-scan/run-test.mjs, so fetch resolves.)
 // ============================================================
 (async () => {
-  const src = await (await fetch("../pinboard-style.js")).text();
-  // Semantic slices, never source layout: these gates answer "does the shipped
-  // file still carry the policy", so putting braces on a one-line `if`, or
-  // moving a comment between two statements, must not make them red — a red
-  // gate has to mean a behaviour regression, or it stops being believed.
-  const cacheAt = src.indexOf("const cacheCloakBg");
-  const cacheEnd = src.indexOf("};", cacheAt);
-  // Both ends must be found, or the slice is empty and the check fails closed —
-  // slice(at, -1) would otherwise hand it the whole rest of the file.
-  const cacheBody = cacheAt === -1 || cacheEnd === -1 ? "" : src.slice(cacheAt, cacheEnd);
+  async function runPinboardStyleRealm({ prefs, osDark = false, seedStorage = {} }) {
+    let darkMatches = osDark;
+    const mqlListeners = [];
+    const lsMap = new Map(Object.entries(seedStorage));
+    const lsShim = {
+      getItem: (k) => (lsMap.has(String(k)) ? lsMap.get(String(k)) : null),
+      setItem: (k, v) => { lsMap.set(String(k), String(v)); },
+      removeItem: (k) => { lsMap.delete(String(k)); },
+    };
+    const realm = await pbpSwRealm.loadRealmScripts(
+      ["pinboard-themes.js", "pinboard-style.js"],
+      {
+        beforeScripts(win, mock) {
+          Object.defineProperty(win, "localStorage", { configurable: true, value: lsShim });
+          win.matchMedia = (q) => ({
+            media: q,
+            get matches() { return q === "(prefers-color-scheme: dark)" ? darkMatches : false; },
+            addEventListener(type, fn) { if (type === "change") mqlListeners.push(fn); },
+            removeEventListener() {},
+          });
+          mock.onSendMessage(async (msg) => (msg?.type === "get_site_prefs" ? prefs : null));
+        },
+      }
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    return {
+      realm,
+      lsMap,
+      mqlListeners,
+      flipOs(nextDark) {
+        darkMatches = nextDark;
+        for (const fn of mqlListeners.slice()) fn({ matches: nextDark });
+      },
+    };
+  }
+
+  // 1) Explicit light/dark override drops the opposite mode's cloak key.
+  const explicitRun = await runPinboardStyleRealm({
+    prefs: { optTheme: "dark", themePresetKey: "dracula", customFont: "", overlayCss: "" },
+    osDark: false,
+    seedStorage: { pbp_cloak_bg_d: "rgb(1, 2, 3)", pbp_cloak_bg_l: "rgb(250, 250, 250)" },
+  });
   check("#51 source: an explicit light/dark override drops the opposite mode's cloak key",
-    cacheBody.includes('optTheme !== "auto"') && cacheBody.includes("removeItem(pbpCloakBgKey(!isDark))"),
+    !explicitRun.lsMap.has("pbp_cloak_bg_l") && explicitRun.lsMap.has("pbp_cloak_bg_d") &&
+    explicitRun.lsMap.get("pbp_cloak_bg_d") !== "rgb(1, 2, 3)" &&
+    explicitRun.mqlListeners.length === 0,
     "cacheCloakBg still leaves the other mode's stale colour for the next cold load to find");
-  const at = src.indexOf('.addEventListener("change"');
-  const registration = at === -1 ? "" : src.slice(Math.max(0, at - 200), at);
-  const handler = at === -1 ? "" : src.slice(at, at + 500);
+  explicitRun.realm.dispose();
+
+  // 2) Auto mode follows an OS light/dark flip while the tab stays open.
+  const autoRun = await runPinboardStyleRealm({
+    prefs: { optTheme: "auto", themePresetKey: "catppuccin", customFont: "", overlayCss: "" },
+    osDark: false,
+    seedStorage: {},
+  });
+  const lightCss = autoRun.realm.doc.getElementById("pbp-injected")?.textContent || "";
+  const lightBg = autoRun.lsMap.get("pbp_cloak_bg_l") || "";
   check("#110 source: auto mode follows an OS light/dark flip while the tab stays open",
-    registration.includes('optTheme === "auto"') &&
-    registration.includes('window.matchMedia("(prefers-color-scheme: dark)")'),
+    autoRun.mqlListeners.length === 1 && !autoRun.realm.doc.documentElement.classList.contains("pbp-dark") && !!lightCss,
     "no matchMedia change listener — a parked pinboard.in tab keeps the old variant until reload");
+
+  autoRun.flipOs(true);
+  const darkCss = autoRun.realm.doc.getElementById("pbp-injected")?.textContent || "";
+  const darkBg = autoRun.lsMap.get("pbp_cloak_bg_d") || "";
   check("#110 source: the OS-flip re-apply re-runs the theme through applyTheme",
-    handler.includes("isDark = !!e.matches") && handler.includes("applyTheme(isDark)"),
+    autoRun.realm.doc.documentElement.classList.contains("pbp-dark") && !!darkCss && darkCss !== lightCss,
     "the flip handler does not re-resolve the mode and re-apply it");
   check("#110 source: the OS-flip re-apply re-keys the cloak cache to the mode now on screen",
-    /cacheCloakBg\(\);/.test(handler),
+    !!lightBg && !!darkBg && darkBg !== lightBg,
     "after a flip the next cold load would paint the other mode's cached background");
   check("#110 source: applying a theme reuses the existing #pbp-injected node",
-    /document\.getElementById\("pbp-injected"\)/.test(src),
+    autoRun.realm.doc.querySelectorAll("#pbp-injected").length === 1,
     "a re-apply would stack a second style element instead of rewriting the first");
+  autoRun.realm.dispose();
 
   const summary = document.createElement("div");
   summary.style.cssText = "margin-top:1em;font-family:monospace;font-weight:bold";

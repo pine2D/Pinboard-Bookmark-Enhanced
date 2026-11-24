@@ -1844,36 +1844,136 @@ await (async () => {
   assert(pbpVideoIsTransientAiError(null) === false && pbpVideoIsTransientAiError(new Error("boom")) === false,
     "transient: nothing, and an error nobody classified, are not transient");
 
-  // The caller's gate, evaluated rather than grepped: the literal expression is
-  // sliced out of the shipped source and RUN, so a gate rewritten to read the
-  // total batch count (or to fan out unconditionally) fails here.
-  const src = await fetch("../md-video.js").then((r) => r.text());
-  const gm = src.match(/\bconcurrency:\s*([^,\n]+),/);
-  assert(!!gm, "caller gate: the punctuation driver call passes an explicit worker count");
-  const gateExpr = gm ? gm[1].trim() : "";
-  assert(/\bfreshPaid\b/.test(gateExpr) && !/\bfreshTotal\b/.test(gateExpr) && !/\bbatches\b/.test(gateExpr),
-    "caller gate: it is keyed on freshPaid -- the batches this pass actually buys -- not on freshTotal (whose display fallback would open the pool for a pass with nothing to pay for) and not on the total batch count");
-  const gate = gm ? new Function("freshPaid", "return (" + gateExpr + ");") : () => null;
-  assertEq(gate(3), 1, "caller gate: three paid batches stay serial");
-  assertEq(gate(4), 2, "caller gate: four paid batches open the pool to two");
-  assertEq(gate(0), 1, "caller gate: an all-cached pass has nothing to pay for and stays serial");
-  assertEq(gate(19), 2, "caller gate: a two-hour lecture's 19 paid batches still cap at two");
-  // ...and the display count keeps the fallback the gate must not inherit.
-  const fm = src.match(/const freshTotal = ([^;\n]+);/);
-  assert(fm && /\bfreshPaid\b/.test(fm[1]) && /batches\.length/.test(fm[1]),
-    "caller gate: freshTotal is still freshPaid || batches.length, so a fully cached pass counts 1/N rather than 1/0 -- the fallback lives on the display side only");
+  // Drive the real mounted workbench's .pbv-ai-punct button to verify
+  // freshPaid-based concurrency and partial-pass status copy without slicing source.
+  async function runMountedAiPunctCase({ batchCount, cachedCount = 0, callImpl }) {
+    // Each segment is >1600 unpunctuated letters so pbpVideoMergeParagraphs +
+    // pbpVideoSplitBatches(paras, 1600) flushes 1 paragraph per batch and
+    // produces `expectedBatches.length === batchCount`.
+    const segs = Array.from({ length: batchCount }, (_, idx) => ({
+      from: idx * 60,
+      to: idx * 60 + 5,
+      content: ("alpha beta gamma delta epsilon zeta eta theta " + String.fromCharCode(97 + (idx % 26)) + " ").repeat(36).trim(),
+    }));
+    const paras = pbpVideoMergeParagraphs(segs);
+    const expectedBatches = pbpVideoSplitBatches(paras, 1600);
+    const frame = document.createElement("iframe");
+    frame.style.cssText = "width:900px;height:600px;border:0;position:absolute;left:-10000px";
+    frame.srcdoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body class="video-mode">
+<div id="rendered-view"><p>Reading text.</p></div>
+<script>
+window.chrome = {
+  i18n: { getMessage: (k, a) => Array.isArray(a) ? k + ":" + a.join(":") : k },
+  runtime: { getURL: (p) => p },
+  permissions: { contains: async () => true, request: async () => true },
+  storage: { local: { get: async () => ({}), set: async () => {} }, onChanged: { addListener: () => {} } }
+};
+<\/script>
+<script src="../i18n.js"><\/script><script src="../shared.js"><\/script><script src="../ai.js"><\/script><script src="../ai-cache.js"><\/script>
+<script src="../md-ai-core.js"><\/script><script src="../md-video.js"><\/script>
+</body></html>`;
+    const loaded = new Promise((r) => frame.addEventListener("load", r, { once: true }));
+    document.body.appendChild(frame);
+    await loaded;
+    const w = frame.contentWindow, d = frame.contentDocument;
+    try {
+      const cachedMap = {};
+      for (let i = 0; i < Math.min(cachedCount, expectedBatches.length); i++) {
+        const b = expectedBatches[i];
+        cachedMap[w.pbpAiHash(b)] = b + ".";
+      }
+      w.pbpVideoFixture = {
+        tracks: [{ baseUrl: "https://x/en.xml", lang: "en", label: "English (auto)", asr: true }],
+        track: { baseUrl: "https://x/en.xml", lang: "en", label: "English (auto)", asr: true },
+        segments: segs,
+        wasUnpunct: true,
+        meta: { title: "Fixture", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", trackLabel: "English (auto)" },
+      };
+      w.pbpAiGetSettings = async () => ({ previewAiEnabled: true, aiProvider: "openai", openaiApiKey: "sk-test", openaiModel: "gpt-test" });
+      w.pbpAiAvailable = () => true;
+      w.ensureAIHostPermissionWithGesture = async () => {};
+      w.pbpAiCacheGet = async () => ({ result: { batches: cachedMap } });
+      w.pbpAiCacheAppend = async () => {};
+      const seenConcurrencies = [];
+      const tCalls = [];
+      const origT = w.t;
+      w.t = (k, ...args) => { tCalls.push([k, ...args]); return k + (args.length ? ":" + args.join(":") : ""); };
+      void origT;
+      const origRun = w.pbpVideoRunPunctBatches;
+      w.pbpVideoRunPunctBatches = (batches, worker, opts) => {
+        seenConcurrencies.push(opts && opts.concurrency);
+        return origRun(batches, worker, opts);
+      };
+      let aiCalls = 0;
+      w.callAI = async (_sa, prompt) => {
+        const idx = aiCalls++;
+        const raw = prompt.split("\n\n").slice(1).join("\n\n");
+        return callImpl ? callImpl(idx, raw) : raw + ".";
+      };
+      w.pbpVideoInit({ pageUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", title: "Fixture", account: "u" });
+      d.querySelector(".pbv-poster").click();
+      let aiBtn = null;
+      for (let i = 0; i < 40; i++) {
+        aiBtn = d.querySelector(".pbv-ai-punct");
+        if (aiBtn && !aiBtn.hidden) break;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      if (!aiBtn || aiBtn.hidden) throw new Error(".pbv-ai-punct did not become visible");
+      aiBtn.click();
+      for (let i = 0; i < 60 && aiBtn.getAttribute("aria-busy") === "true"; i++) {
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      await new Promise((r) => setTimeout(r, 20));
+      const statusText = (d.querySelector(".pbv-status")?.textContent || "").trim();
+      return { concurrency: seenConcurrencies[0], aiCalls, tCalls, statusText, actualBatches: expectedBatches.length };
+    } finally {
+      frame.remove();
+    }
+  }
 
-  // Which status line a partial pass paints. A batch that was rate limited or
-  // timed out never reached the conservation gate, so the "failed the check"
-  // copy would name a cause that never happened; a mixed pass takes the
-  // rate-limit line because that is the half that says what to do about it.
-  const pm = src.match(/const partialMsg = ([\s\S]*?);\n/);
-  assert(!!pm, "partial copy: the partial-pass status line picks its key from an inspectable expression");
-  const pick = pm ? new Function("t", "transientSeen", "rejected", "batches", "return (" + pm[1] + ");") : () => null;
-  const keyOf = (seen) => pick((k) => k, seen, 2, ["a", "b", "c"]);
-  assertEq(keyOf(0), "mdVideoAiPunctPartial", "partial copy: conservation failures only -> the check-failed line");
-  assertEq(keyOf(1), "mdVideoAiPunctRateLimited", "partial copy: a rate-limited or timed-out batch -> the rate-limited line, not 'failed the check'");
-  assertEq(keyOf(2), "mdVideoAiPunctRateLimited", "partial copy: a mixed pass prefers the rate-limited line -- it is the actionable half");
+  const r3 = await runMountedAiPunctCase({ batchCount: 3 });
+  assert(typeof r3.concurrency === "number" && r3.actualBatches === 3,
+    "caller gate: the punctuation driver call passes an explicit worker count");
+  const r4Cached3 = await runMountedAiPunctCase({ batchCount: 4, cachedCount: 3 });
+  assert(r4Cached3.actualBatches === 4 && r4Cached3.aiCalls === 1 && r4Cached3.concurrency === 1,
+    "caller gate: it is keyed on freshPaid -- the batches this pass actually buys -- not on freshTotal and not on the total batch count");
+  assertEq(r3.concurrency, 1, "caller gate: three paid batches stay serial");
+  const r4 = await runMountedAiPunctCase({ batchCount: 4 });
+  assertEq(r4.concurrency, 2, "caller gate: four paid batches open the pool to two");
+  const rAllCached = await runMountedAiPunctCase({ batchCount: 4, cachedCount: 4 });
+  assertEq(rAllCached.concurrency, 1, "caller gate: an all-cached pass has nothing to pay for and stays serial");
+  const r19 = await runMountedAiPunctCase({ batchCount: 19 });
+  assertEq(r19.concurrency, 2, "caller gate: a two-hour lecture's 19 paid batches still cap at two");
+  assert(rAllCached.aiCalls === 0 && r4Cached3.tCalls.some((c) => c[0] === "mdVideoAiPunctProgress" && c[1] === "1" && c[2] === "1"),
+    "caller gate: progress counts only freshPaid (1/1 when 3 of 4 are cached) while 4/4 cached makes zero AI calls");
+
+  const pCheckOnly = await runMountedAiPunctCase({
+    batchCount: 3,
+    callImpl: (idx, raw) => (idx < 2 ? "rewritten words fail conservation" : raw + "."),
+  });
+  const pOneTransient = await runMountedAiPunctCase({
+    batchCount: 3,
+    callImpl: (idx, raw) => {
+      if (idx === 0) throw Object.assign(new Error("429"), { status: 429 });
+      if (idx === 1) return "rewritten words";
+      return raw + ".";
+    },
+  });
+  const pTwoTransient = await runMountedAiPunctCase({
+    batchCount: 3,
+    callImpl: (idx, raw) => {
+      if (idx < 2) throw Object.assign(new Error("503"), { status: 503 });
+      return raw + ".";
+    },
+  });
+  assert(pCheckOnly.statusText.includes(":") && pOneTransient.statusText.includes(":"),
+    "partial copy: the partial-pass status line renders a parameterized localization key");
+  assertEq(pCheckOnly.statusText.split(":")[0], "mdVideoAiPunctPartial",
+    "partial copy: conservation failures only -> the check-failed line");
+  assertEq(pOneTransient.statusText.split(":")[0], "mdVideoAiPunctRateLimited",
+    "partial copy: a rate-limited or timed-out batch -> the rate-limited line, not 'failed the check'");
+  assertEq(pTwoTransient.statusText.split(":")[0], "mdVideoAiPunctRateLimited",
+    "partial copy: a mixed pass prefers the rate-limited line -- it is the actionable half");
 })();
 
 

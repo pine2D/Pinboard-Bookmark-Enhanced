@@ -32,7 +32,7 @@ const legacyAlarms = () => LEGACY_ALARMS.map((name) => ({ name, scheduledTime: 1
 function migrationHarness(source, opts = {}) {
   const start = source.indexOf("const PBP_DRIVE_SCOPE_RETIRE_FLAG");
   const end = source.indexOf("\npbpRetireDriveScopeKeys();", start);
-  if (start < 0 || end <= start) return null;
+  if (start < 0 || end < 0 || end <= start) return null;
   const local = structuredClone(opts.local || {});
   const vocab = new Map((opts.vocabRows || []).map((row) => [row.key, structuredClone(row)]));
   const alarmMap = new Map((opts.alarms || []).map((alarm) => [alarm.name, structuredClone(alarm)]));
@@ -112,7 +112,7 @@ function connectionResidue(h, hash) {
 function onAlarmHarness(source) {
   const start = source.indexOf("chrome.alarms.onAlarm.addListener");
   const end = source.indexOf("\n});", start);
-  if (start < 0 || end <= start) return null;
+  if (start < 0 || end < 0 || end <= start) return null;
   let listener = null; const boots = [];
   const deps = {
     chrome: { alarms: { onAlarm: { addListener(fn) { listener = fn; } } } },
@@ -313,7 +313,8 @@ function onAlarmHarness(source) {
     const callAt = source.indexOf("\npbpRetireDriveScopeKeys();");
     const prewarmAt = source.indexOf("const queuePrewarmAlarmSync");
     check("placement: migration and its single top-level call sit after the top-level boot call, outside the boot and drive-scopes slices",
-      bootSliceStart >= 0 && bootCall > bootSliceStart && migStart > bootCall && callAt > migStart && callAt < prewarmAt &&
+      bootSliceStart >= 0 && bootCall >= 0 && migStart >= 0 && callAt >= 0 && prewarmAt >= 0 &&
+      bootCall > bootSliceStart && migStart > bootCall && callAt > migStart && callAt < prewarmAt &&
       source.indexOf("\npbpRetireDriveScopeKeys();", callAt + 1) === -1);
   }
 

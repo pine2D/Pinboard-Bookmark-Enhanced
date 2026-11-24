@@ -5,6 +5,8 @@
 <script src="../vendor/marked.min.js"></script>
 <script src="../md-convert.js"></script>
 <script src="../export-targets.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
 const deferred = () => {
@@ -14,146 +16,175 @@ const deferred = () => {
 };
 const tick = () => new Promise(r => setTimeout(r, 0));
 async function settle() { for (let i = 0; i < 5; i++) await tick(); }
-let source, sendSource;
 async function fixture({ realRuntime = false } = {}) {
-  const frame = document.createElement("iframe");
-  document.body.appendChild(frame);
-  const w = frame.contentWindow, d = w.document;
-  d.body.innerHTML = '<div id="send-split"><button id="send-primary"><span id="send-primary-ic"></span><span id="send-primary-label" class="btn-label"></span></button><button id="send-caret"></button><div id="send-menu" hidden></div></div><div id="send-status" hidden></div><div id="copy-status"></div>';
+  let _includeAsk = false;
+  let _expAskEl = null;
   const state = {
     settings: { exportTargets: { github: { enabled: true, token: "first" } } },
     flags: { optSyncEnabled: false, syncApiKeys: false },
-    markdown: "Fixture body", includeAsk: false,
+    markdown: "Fixture body",
+    get includeAsk() { return _includeAsk; },
+    set includeAsk(v) {
+      _includeAsk = !!v;
+      if (_expAskEl) _expAskEl.setAttribute("aria-pressed", _includeAsk ? "true" : "false");
+    },
     askSnapshot: { url: "https://fixture.test/article", account: "qa", title: "Fixture", rounds: [{ q: "Question", a: "Answer" }], count: 1 },
     sendGuardWaits: [], ownerReads: [], askReads: [], requests: [], networkWaits: [], copied: [],
     composed: [], reads: [], lastReads: [], listeners: [], sends: [], sendWaits: [], permissionWaits: [], lastWrites: [], optionsTabs: []
   };
-  const params = {
-    exportSettings: {},
-    libraryOwner: "qa", bookmarkAccount: "qa", _articleRevision: 0, exportAskRevision: 0,
-    exportScope: "article", expIncludeAsk: {}, expIncludeHl: null, pbpExpTglOn: () => state.includeAsk,
-    url: "https://fixture.test/article", title: "Fixture",
-    pbpAskExportSnapshot: async () => state.askReads.length ? state.askReads.shift().promise : structuredClone(state.askSnapshot),
-    SETTINGS_DEFAULTS: { pinboardToken: "" },
-    pbpPinboardAccountFromToken: token => String(token || "").split(":")[0],
-    pbpPersonalLibraryAccount: async () => state.ownerReads.length ? (await state.ownerReads.shift().promise).personalLibraryAccount : "qa",
-    pbpReadBookmarkConnection: async () => ({account: String(state.settings.pinboardToken || "qa:key").split(":")[0]}),
-    PBP_EXPORT_TARGETS,
-    pbpExportTargetIds,
-    pbpReadSettingsWithSecrets: async defaults => {
-      if (Object.hasOwn(defaults, "pinboardToken") && state.ownerReads.length) return state.ownerReads.shift().promise;
-      return state.reads.length ? state.reads.shift().promise : ({ pinboardToken: "qa:key", ...structuredClone(state.settings) });
-    },
-    pbpReadSecretSyncState: async () => ({ ...state.flags }),
-    pbpSettingsAreaName: async () => state.flags.optSyncEnabled ? "sync" : "local",
-    pbpGetLastTarget: async () => state.lastReads.length ? state.lastReads.shift().promise : "github",
-    pbpSetLastTarget: async () => state.lastWrites.length ? state.lastWrites.shift().promise : undefined,
-    pbpRequestTargetPermission: async () => state.permissionWaits.length ? state.permissionWaits.shift().promise : true,
-    pbpSendToTarget: async (id, ctx, options) => {
-      if (state.sendGuardWaits.length) await state.sendGuardWaits.shift().promise;
-      if (!await options.isCurrent()) return { ok: false, error: "context_changed" };
-      state.sends.push({ id, ctx });
-      return state.sendWaits.length ? state.sendWaits.shift().promise : { ok: true, fellBack: false };
-    },
-    buildMeta: () => ({ title: "Fixture", url: "https://fixture.test/article" }),
-    buildExportOpts: () => ({ imagePolicy: "embed", math: true }),
-    composeExport: (body, meta, opts) => { state.composed.push(opts); return body; },
-    getViewMarkdown: () => state.markdown,
-    imgFixExportNote: () => {},
-    PBP_ICONS: { gear: "<svg data-ic=gear></svg>" },
-    pbpOpenOptionsTab: tab => state.optionsTabs.push(tab),
-    t: key => key === "mdSendTo" ? "Send to {name}" : key,
-    chrome: { storage: { onChanged: { addListener: fn => state.listeners.push(fn) } } }
-  };
-  if (realRuntime) {
-    // Run the production sender, including its output-boundary guard. Only the
-    // browser APIs and remote responses are fixtures; no mock decides whether
-    // a stale send is allowed to reach POST or the clipboard.
-    params.chrome.permissions = { request: async () => true, contains: async () => true };
-    // Notion (2026-03-11: GET /v1/users/me 200, POST /v1/pages 200) and GitHub Gist
-    // (GET /user 200, POST /gists 201) response envelopes verified live on 2026-11-23.
-    const fetchFixture = async (url, opts) => {
-      state.requests.push({ url, ...opts });
-      if (state.networkWaits[0]?.method === opts.method) return state.networkWaits.shift().wait.promise;
-      if (opts.method === "GET") {
-        if (url === "https://api.notion.com/v1/users/me") {
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({
-              object: "user",
-              id: "00000000-0000-4000-8000-000000000099",
-              name: "Fixture Integration",
-              avatar_url: null,
-              type: "bot",
-              bot: { owner: { type: "user" }, workspace_name: "Fixture Workspace", workspace_id: "00000000-0000-4000-8000-000000000097", workspace_limits: { max_file_upload_size_in_bytes: 5242880 } },
-              request_id: "00000000-0000-4000-8000-000000000001",
-            }),
-          };
-        }
-        return { ok: true, status: 200, json: async () => ({ login: "octocat-fixture", id: 1000001, type: "User" }) };
-      }
-      if (url === "https://api.notion.com/v1/pages") {
+  const fetchFixture = async (input, opts) => {
+    const url = String(input || "");
+    const m = url.match(/\/(_locales\/[^/]+\/messages\.json)$/);
+    if (m) return fetch("../" + m[1]);
+    if (!realRuntime) throw new Error("unexpected fetch in non-realRuntime Send-to fixture: " + url);
+    state.requests.push({ url, ...opts });
+    if (state.networkWaits[0]?.method === opts.method) return state.networkWaits.shift().wait.promise;
+    if (opts.method === "GET") {
+      if (url === "https://api.notion.com/v1/users/me") {
         return {
           ok: true,
           status: 200,
           json: async () => ({
-            object: "page",
-            id: "11111111-2222-4333-8444-555555555555",
-            created_time: "2026-11-23T05:18:00.000Z",
-            last_edited_time: "2026-11-23T05:18:00.000Z",
-            created_by: { object: "user", id: "00000000-0000-4000-8000-000000000099" },
-            last_edited_by: { object: "user", id: "00000000-0000-4000-8000-000000000099" },
-            cover: null,
-            icon: null,
-            parent: { type: "page_id", page_id: "01234567-89ab-cdef-0123-456789abcdef" },
-            in_trash: false,
-            is_archived: false,
-            is_locked: false,
-            properties: { title: { id: "title", type: "title", title: [{ type: "text", text: { content: "Fixture", link: null }, plain_text: "Fixture", href: null }] } },
-            url: "https://fixture.test/created",
-            public_url: null,
-            request_id: "00000000-0000-4000-8000-000000000200",
+            object: "user",
+            id: "00000000-0000-4000-8000-000000000099",
+            name: "Fixture Integration",
+            avatar_url: null,
+            type: "bot",
+            bot: { owner: { type: "user" }, workspace_name: "Fixture Workspace", workspace_id: "00000000-0000-4000-8000-000000000097", workspace_limits: { max_file_upload_size_in_bytes: 5242880 } },
+            request_id: "00000000-0000-4000-8000-000000000001",
           }),
         };
       }
+      return { ok: true, status: 200, json: async () => ({ login: "octocat-fixture", id: 1000001, type: "User" }) };
+    }
+    if (url === "https://api.notion.com/v1/pages") {
       return {
         ok: true,
-        status: 201,
+        status: 200,
         json: async () => ({
-          url: "https://api.github.com/gists/fixture-created",
-          id: "fixture-created",
-          html_url: "https://fixture.test/created",
-          public: false,
+          object: "page",
+          id: "11111111-2222-4333-8444-555555555555",
+          created_time: "2026-11-23T05:18:00.000Z",
+          last_edited_time: "2026-11-23T05:18:00.000Z",
+          created_by: { object: "user", id: "00000000-0000-4000-8000-000000000099" },
+          last_edited_by: { object: "user", id: "00000000-0000-4000-8000-000000000099" },
+          cover: null,
+          icon: null,
+          parent: { type: "page_id", page_id: "01234567-89ab-cdef-0123-456789abcdef" },
+          in_trash: false,
+          is_archived: false,
+          is_locked: false,
+          properties: { title: { id: "title", type: "title", title: [{ type: "text", text: { content: "Fixture", link: null }, plain_text: "Fixture", href: null }] } },
+          url: "https://fixture.test/created",
+          public_url: null,
+          request_id: "00000000-0000-4000-8000-000000000200",
         }),
       };
+    }
+    return {
+      ok: true,
+      status: 201,
+      json: async () => ({
+        url: "https://api.github.com/gists/fixture-created",
+        id: "fixture-created",
+        html_url: "https://fixture.test/created",
+        public: false,
+      }),
     };
-    const runtime = new w.Function("PBP_EXPORT_TARGETS", "pbpBuildFileBody", "deobfuscateKey", "chrome", "fetch", "navigator",
-      sendSource + "\nreturn { pbpSendToTarget, pbpRequestTargetPermission };")(
-      PBP_EXPORT_TARGETS, pbpBuildFileBody, deobfuscateKey, params.chrome, fetchFixture,
-      { clipboard: { writeText: async body => { state.copied.push(body); } } });
-    params.pbpSendToTarget = runtime.pbpSendToTarget;
-    params.pbpRequestTargetPermission = runtime.pbpRequestTargetPermission;
+  };
+
+  const realm = await pbpSwRealm.bootReader({
+    fetch: fetchFixture,
+    mock: {
+      userGesture: true,
+      permissionRequestAnswer: true,
+      permissions: { origins: ["https://api.github.com/*", "https://api.notion.com/*"] },
+      storage: {
+        local: {
+          pinboardToken: obfuscateKey("qa:key"),
+          personalLibraryAccount: "qa",
+          exportTargets: { github: { enabled: true, token: "first" } },
+          md_preview_data_fixture: {
+            url: "https://fixture.test/article",
+            title: "Fixture",
+            markdown: "Fixture body",
+            contentHtml: "",
+            source: "local",
+            math: true,
+            account: "qa",
+            tags: [],
+            description: "",
+          },
+        },
+      },
+    },
+    beforeScripts(win, mock) {
+      const origAdd = mock.chrome.storage.onChanged.addListener.bind(mock.chrome.storage.onChanged);
+      mock.chrome.storage.onChanged.addListener = (fn) => {
+        state.listeners.push(fn);
+        return origAdd(fn);
+      };
+      Object.defineProperty(win.navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: async (body) => { state.copied.push(body); } },
+      });
+    },
+  });
+
+  const w = realm.win;
+  const d = realm.doc;
+  _expAskEl = d.getElementById("exp-include-ask");
+  if (_expAskEl) _expAskEl.setAttribute("aria-pressed", _includeAsk ? "true" : "false");
+  w.t = (key) => (key === "mdSendTo" ? "Send to {name}" : key);
+  const gearHtml = realm.get("PBP_ICONS.gear");
+  w.pbpViewMarkdown = () => state.markdown;
+  w.pbpAskExportSnapshot = async () => (state.askReads.length ? state.askReads.shift().promise : structuredClone(state.askSnapshot));
+  w.pbpPersonalLibraryAccount = async () => (state.ownerReads.length ? (await state.ownerReads.shift().promise).personalLibraryAccount : "qa");
+  w.pbpReadBookmarkConnection = async () => ({ account: String(state.settings.pinboardToken || "qa:key").split(":")[0] });
+  w.pbpReadSettingsWithSecrets = async (defaults) => {
+    if (defaults && Object.hasOwn(defaults, "pinboardToken") && state.ownerReads.length) return state.ownerReads.shift().promise;
+    return state.reads.length ? state.reads.shift().promise : ({ pinboardToken: "qa:key", ...structuredClone(state.settings) });
+  };
+  w.pbpReadSecretSyncState = async () => ({ ...state.flags });
+  w.pbpSettingsAreaName = async () => (state.flags.optSyncEnabled ? "sync" : "local");
+  w.pbpGetLastTarget = async () => (state.lastReads.length ? state.lastReads.shift().promise : "github");
+  w.pbpSetLastTarget = async () => (state.lastWrites.length ? state.lastWrites.shift().promise : undefined);
+  w.pbpOpenOptionsTab = (tab) => state.optionsTabs.push(tab);
+  const realCompose = w.composeExport;
+  w.composeExport = (body, meta, opts) => { state.composed.push(opts); return realCompose ? realCompose(body, meta, opts) : body; };
+  const expImgPol = d.getElementById("exp-image-policy");
+  if (expImgPol) expImgPol.value = "embed";
+  const expFrontmatter = d.getElementById("exp-frontmatter");
+  if (expFrontmatter) { expFrontmatter.checked = true; expFrontmatter.setAttribute("aria-pressed", "true"); }
+  // Mark article as having math so buildExportOpts().math === true matches the fixture contract
+  const mathProbe = d.createElement("span");
+  mathProbe.className = "katex";
+  d.getElementById("rendered-view").appendChild(mathProbe);
+
+  if (!realRuntime) {
+    w.pbpRequestTargetPermission = async () => (state.permissionWaits.length ? state.permissionWaits.shift().promise : true);
+    w.pbpSendToTarget = async (id, ctx, options) => {
+      if (state.sendGuardWaits.length) await state.sendGuardWaits.shift().promise;
+      if (!await options.isCurrent()) return { ok: false, error: "context_changed" };
+      state.sends.push({ id, ctx });
+      return state.sendWaits.length ? state.sendWaits.shift().promise : { ok: true, fellBack: false };
+    };
   }
-  const begin = source.indexOf("  let _sendMenuCtl = null;");
-  const end = source.indexOf("\n})().catch", begin);
-  assert(begin >= 0 && end > begin, "production Send-to lifecycle block missing");
-  const flashStart = source.indexOf("function flashButtonLabel(");
-  const flashEnd = source.indexOf("\n// renderMarkdown", flashStart);
-  const captureStart = source.indexOf("  function captureExportJob()");
-  const captureEnd = source.indexOf("  function updateExportSummary()", captureStart);
-  assert(captureStart >= 0 && captureEnd > captureStart, "production export job helpers missing");
-  const AsyncFunction = w.eval("(async function(){}).constructor");
-  const api = await new AsyncFunction(...Object.keys(params),
-    source.slice(flashStart, flashEnd) + "\n" + source.slice(captureStart, captureEnd) + "\n" + source.slice(begin, end) + "\nreturn { refresh: setupSendMenu, retireArticle: () => { _articleRevision++; } };")(...Object.values(params));
+
+  await w.__PBP_readerTestHooks.setupSendMenu();
+
   return {
-    ...api, state, d,
+    refresh: () => w.__PBP_readerTestHooks.setupSendMenu(),
+    retireArticle: () => w.__PBP_readerTestHooks.bumpArticleRevision(),
+    gearHtml,
+    state,
+    d,
     click: () => d.getElementById("send-primary").click(),
     changed: async (changes, area = "local") => {
       await Promise.all(state.listeners.map(fn => fn(changes, area)));
       await settle();
     },
-    close: () => frame.remove()
+    close: () => { realm.dispose(); realm.iframe.remove(); },
   };
 }
 let pass = 0, fail = 0;
@@ -166,13 +197,11 @@ async function test(name, fn, options) {
   document.getElementById("results").appendChild(row);
 }
 (async () => {
-  source = await (await fetch("../md-preview.js")).text();
-  sendSource = await (await fetch("../md-export-send.js")).text();
   await test("empty state names the settings action: label, gear, no caret, click opens settings", async f => {
     f.state.settings = { exportTargets: {} }; await f.refresh();
     const p = f.d.getElementById("send-primary");
     assert(f.d.getElementById("send-primary-label").textContent === "mdSendSetupEllipsis", "label is not the setup key");
-    assert(f.d.getElementById("send-primary-ic").querySelector("svg[data-ic=gear]"), "gear icon missing");
+    assert(f.d.getElementById("send-primary-ic").querySelector('svg circle[r="3"]') && f.d.getElementById("send-primary-ic").innerHTML.includes("M12.22 2h"), "gear icon missing");
     assert(f.d.getElementById("send-caret").hasAttribute("hidden"), "caret visible in empty state");
     assert(p.title === "mdSendNoneConfigured", "supplementary title lost");
     f.click(); await settle();
@@ -180,10 +209,11 @@ async function test(name, fn, options) {
   });
   await test("leaving the empty state restores target label, icon and caret", async f => {
     f.state.settings = { exportTargets: {} }; await f.refresh();
+    const emptyIcon = f.d.getElementById("send-primary-ic").innerHTML;
     f.state.settings = { exportTargets: { notebooklm: { enabled: true } } }; await f.refresh();
     const label = f.d.getElementById("send-primary-label").textContent;
     assert(label.startsWith("Send to ") && label !== "mdSendSetupEllipsis", "label not restored: " + label);
-    assert(!f.d.querySelector("#send-primary-ic svg[data-ic=gear]") , "gear survived");
+    assert(f.d.getElementById("send-primary-ic").innerHTML !== emptyIcon, "gear survived");
     assert(!f.d.getElementById("send-caret").hasAttribute("hidden"), "caret still hidden");
     assert(!f.d.getElementById("send-split").classList.contains("send-empty"), "send-empty survived");
     f.click(); await settle();

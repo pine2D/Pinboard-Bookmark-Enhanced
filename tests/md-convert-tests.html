@@ -24,6 +24,8 @@ h2 { margin-top: 24px; }
 <script src="../md-epub.js"></script>
 <script src="../site-rules.js?v=1"></script>
 <script src="../md-highlight.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -4494,38 +4496,66 @@ section("GitHub Discussions pilot: loaded thread fidelity and narrow dispatch");
 <script>
 window._pbpSiteEntryDone = (async () => {
   section("site identity: actual popup, background and AI entry points");
-  const sources = await Promise.all(["popup.js", "background.js", "ai.js"].map(async f => {
-    try { return await (await fetch("../" + f)).text(); } catch (_) { return ""; }
-  }));
   const entries = ["extractLocalMarkdown", "extractPageForMarkdown", "getPageInfoFromTab"];
   const sample = '<article data-testid="tweet"><div data-testid="User-Name"><span>Alice</span></div><a role="link" href="/alice/status/222"><time datetime="2026-10-24">Today</time></a><div data-testid="tweetText">Short post</div></article>';
-  for (let i = 0; i < entries.length; i++) {
-    for (const mode of ["missing", "short", "generic"]) {
-      const label = entries[i] + " / " + mode;
-      if (!sources[i]) {
-        const row = document.createElement("div"); row.className = "case skip";
-        row.textContent = label + " (file:// source fetch unavailable)"; root.appendChild(row); continue;
+  const sw = await pbpSwRealm.boot();
+  const pop = await pbpSwRealm.bootPopup();
+  const aiRealm = await pbpSwRealm.loadRealmScripts(["i18n.js", "shared.js", "site-rules.js", "ai.js"]);
+  try {
+    for (let i = 0; i < entries.length; i++) {
+      for (const mode of ["missing", "short", "generic"]) {
+        const label = entries[i] + " / " + mode;
+        try {
+          const url = mode === "generic" ? "https://example.com/article" : "https://x.com/alice/status/222";
+          const html = mode === "missing" ? sample.replace("/alice/status/222", "/other/status/111") : sample;
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          let calls = 0;
+          const genericText = "Ordinary article content retained by the Defuddle fallback. ".repeat(3);
+          class NativeExtractor { parse() { calls++; return { content: "<p>" + genericText + "</p>", title: "Ordinary article" }; } }
+          const winStub = {
+            URL,
+            __pp_urlShimInstalled: true,
+            getSelection: () => null,
+            addEventListener() {},
+            removeEventListener() {},
+            innerWidth: 1200,
+            innerHeight: 800,
+            getComputedStyle: (el) => getComputedStyle(el),
+          };
+          const evalInjected = (fn, args = []) => {
+            const run = new Function(
+              "document", "location", "window", "Defuddle", "applySiteRule",
+              "AI_CONTENT_HEAD", "AI_CONTENT_TAIL", "setTimeout",
+              "return (" + fn.toString() + ")(...arguments[8]);",
+            );
+            return run(doc, new URL(url), winStub, NativeExtractor, applySiteRule, 3200, 800, () => 0, args);
+          };
+          let result;
+          if (i === 0) {
+            pop.mock.onExecuteScript(async (inj) => (typeof inj.func === "function"
+              ? [{ frameId: 0, result: await evalInjected(inj.func, inj.args || []) }]
+              : [{ frameId: 0 }]));
+            result = await pop.win.extractLocalMarkdown(7);
+          } else if (i === 1) {
+            result = await evalInjected(sw.win.extractPageForMarkdown, []);
+          } else {
+            aiRealm.win._cbTabsGet = async () => ({ id: 7, url });
+            aiRealm.win._cbExecuteScript = async (inj) => (typeof inj.func === "function"
+              ? [{ frameId: 0, result: await evalInjected(inj.func, inj.args || []) }]
+              : [{ frameId: 0 }]);
+            result = await aiRealm.win.getPageInfoFromTab(7, { withDefuddle: true, expectedUrl: url });
+          }
+          const okay = mode === "missing" ? (i === 2 ? result === null : result?.error === "site_target_missing") && calls === 0
+            : mode === "short" ? (i === 2 ? result?.pageText : result?.contentHtml)?.includes("Short post") && calls === 0
+            : (i === 2 ? result?.pageText : result?.contentHtml)?.includes(genericText.trim()) && calls === 1;
+          check(label, okay, JSON.stringify({ result, calls }));
+        } catch (e) { check(label, false, e.message); }
       }
-      try {
-        const name = entries[i], start = sources[i].search(new RegExp("(?:async )?function " + name + "\\("));
-        const end = sources[i].indexOf("\n}", start) + 2;
-        const source = sources[i].slice(start, end);
-        const url = mode === "generic" ? "https://example.com/article" : "https://x.com/alice/status/222";
-        const doc = new DOMParser().parseFromString(mode === "missing" ? sample.replace('/alice/status/222', '/other/status/111') : sample, "text/html");
-        let calls = 0;
-        const genericText = "Ordinary article content retained by the Defuddle fallback. ".repeat(3);
-        // Defuddle's real result shape: article HTML in content, no textContent.
-        class NativeExtractor { parse() { calls++; return { content: '<p>' + genericText + '</p>', title: 'Ordinary article' }; } }
-        const win = { URL, __pp_urlShimInstalled: true, getSelection: () => null, addEventListener() {}, removeEventListener() {} };
-        const execute = async options => options.func ? [{ result: await options.func(...(options.args || [])) }] : [{}];
-        const fn = new Function("document", "location", "window", "Defuddle", "_cbExecuteScript", "_cbTabsGet", "AI_CONTENT_HEAD", "AI_CONTENT_TAIL", "setTimeout", source + "\nreturn " + name)(doc, new URL(url), win, NativeExtractor, execute, async () => ({ url }), 3200, 800, () => 0);
-        const result = await fn(7, { withDefuddle: true, expectedUrl: url });
-        const okay = mode === "missing" ? (i === 2 ? result === null : result?.error === "site_target_missing") && calls === 0
-          : mode === "short" ? (i === 2 ? result?.pageText : result?.contentHtml)?.includes("Short post") && calls === 0
-          : (i === 2 ? result?.pageText : result?.contentHtml)?.includes(genericText.trim()) && calls === 1;
-        check(label, okay, JSON.stringify({ result, calls }));
-      } catch (e) { check(label, false, e.message); }
     }
+  } finally {
+    sw.dispose();
+    pop.dispose();
+    aiRealm.dispose();
   }
 })();
 </script>

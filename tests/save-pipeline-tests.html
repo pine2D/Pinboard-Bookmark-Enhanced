@@ -14,6 +14,9 @@ h2 { margin-top: 24px; font-size: 16px; }
 <script src="../shared.js"></script>
 <script src="../wayback.js"></script>
 <script src="../ai-cache.js"></script>
+<script src="../i18n.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script src="fixtures/summary-ownership.js"></script>
 <script src="fixtures/case-filter.js"></script>
 <script>
@@ -62,109 +65,89 @@ function response(status, data, parseFails) {
   };
 }
 
-let backgroundSource;
-let coreSource;
-let backgroundSaveSource;
-let batchSaveSource;
-let undoSource;
-async function getBackgroundSource() {
-  if (!backgroundSource) backgroundSource = await (await fetch("../background.js")).text();
-  return backgroundSource;
-}
-async function getCoreSource() {
-  if (coreSource) return coreSource;
-  const source = await getBackgroundSource();
-  const start = source.indexOf("const PBP_SAVE_MODES");
-  const end = source.indexOf("// ---- P1: Shared save function ----", start);
-  assert(start >= 0 && end > start, "unified pipeline source block not found");
-  coreSource = source.slice(start, end);
-  return coreSource;
+const SW_OVERRIDE_KEYS = [
+  "chrome", "console", "setTimeout", "pinboardFetch", "cleanupStatusCache", "loadSettings",
+  "setIcon", "updateBadge", "pbpWaybackArchive", "pbpCaptureBookmarkAuth", "pbpBookmarkAuthIsCurrent",
+  "pbpBookmarkAuthEpoch", "pbpStatusCacheGet", "pbpStatusCacheSet", "getCurrentBookmarkAuth",
+  "pbpReadSettingsWithSecrets", "deobfuscateKey", "pbpLoadTagVocab", "pbpSaveFailure", "showNotification",
+  "t", "getPageInfoFromTab", "buildAutoNotes", "hasAIKey", "submitSaveIntent", "submitPopupSaveIntent",
+  "processOfflineQueue", "pbpI18nReady", "_newBatchRunId", "_removeBatchRecordIfOwned", "_writeBatchProgress",
+  "pbpNotesDescription", "pbpPageInfoReadable", "getAICache", "setAICache", "callAI", "buildCombinedPrompt",
+  "parseAICombined", "buildSummaryPrompt", "buildTagPrompt", "parseAITags", "refineTags", "fetchExistingBookmark",
+  "extractForPreview", "_cbTabsGet", "pbpReloadTabAndSettle", "pbpSweepPreviewOrphans", "handleBatchSave",
+  "pbpRunPopupDraft", "notifySaveFailure", "pbpBookmarkAccountService", "pbpReadSecretSyncStateUnlocked",
+  "invalidateBookmarkAuthState", "openMarkdownPreviewFromShortcut", "handleSaveTabSet",
+  "pbpRouteReaderSaveCommand", "resolvePrefixSettings", "pbpBookmarkLookupUrl", "noteActivity",
+  "initI18n", "pbpReleaseDroppedSummaryHolds", "getSettingsStorage", "saveFromBackground",
+];
+
+let _coreSwState = null;
+let _callerSwState = null;
+
+async function bootManagedSw() {
+  const sw = await pbpSwRealm.boot();
+  sw.dispose();
+  const orig = {};
+  for (const key of SW_OVERRIDE_KEYS) orig[key] = sw.win[key];
+  return { sw, orig };
 }
 
-async function getBackgroundSaveSource() {
-  if (backgroundSaveSource) return backgroundSaveSource;
-  const source = await getBackgroundSource();
-  const start = source.indexOf("async function saveFromBackground");
-  const end = source.indexOf("// Helper: resolve prefix-specific settings", start === -1 ? 0 : start);
-  assert(start !== -1 && end !== -1 && end > start, "background save preparation source not found");
-  backgroundSaveSource = source.slice(start, end);
-  return backgroundSaveSource;
+function resetManagedSw(state) {
+  const { sw, orig } = state;
+  for (const key of SW_OVERRIDE_KEYS) sw.win[key] = orig[key];
+  sw.win.console = console;
+  sw.get("statusCache").clear();
+  sw.get("_recentSaves").clear();
+  sw.set("_pinboardAuthEpoch", 0);
+  sw.set("_batchRunning", false);
+  sw.set("_settingsCache", null);
+  sw.set("_settingsStorageCache", null);
+  return sw;
 }
 
-async function getBatchSaveSource() {
-  if (batchSaveSource) return batchSaveSource;
-  const source = await getBackgroundSource();
-  const start = source.indexOf("function handleBatchSave");
-  const end = source.indexOf("// ===================== Tab Set", start === -1 ? 0 : start);
-  assert(start !== -1 && end !== -1 && end > start, "batch save source not found");
-  batchSaveSource = source.slice(start, end);
-  return batchSaveSource;
+async function acquireCoreSw() {
+  if (!_coreSwState) _coreSwState = await bootManagedSw();
+  return resetManagedSw(_coreSwState);
 }
 
-async function getUndoSource() {
-  if (undoSource) return undoSource;
-  const source = await getBackgroundSource();
-  const start = source.indexOf("const _recentSaves");
-  const end = source.indexOf("// ---- 设置图标", start === -1 ? 0 : start);
-  assert(start !== -1 && end !== -1 && end > start, "Undo notification source not found");
-  // Undo deletes through the reader's ordered delete; the Pinboard request
-  // and failure shapes are the worker's own.
-  const piece = (from, to) => {
-    const a = source.indexOf(from), b = source.indexOf(to, a === -1 ? 0 : a);
-    assert(a !== -1 && b !== -1 && b > a, "Undo dependency source not found: " + from);
-    return source.slice(a, b);
-  };
-  undoSource = source.slice(start, end)
-    + piece("async function pbpBookmarkDeleteResponse(", "async function pbpBookmarkTagCounts(")
-    + piece("function pbpBookmarkFailure(", "// A vocabulary cache is advisory.")
-    + piece("function pbpSaveFailure(", "function validateSaveIntent(")
-    + piece("function pbpDeleteBookmarkInOrder(", "// The popup's bookmark requests");
-  return undoSource;
+async function acquireCallerSw() {
+  if (!_callerSwState) _callerSwState = await bootManagedSw();
+  return resetManagedSw(_callerSwState);
+}
+
+function extSender(sw, page = "popup.html") {
+  return { id: sw.win.chrome.runtime.id, url: sw.win.chrome.runtime.getURL(page) };
 }
 
 async function createStatusCacheHarness(initialToken, initialFetch) {
-  const source = await getBackgroundSource();
-  const cacheStart = source.indexOf("// URL 状态缓存");
-  const cacheEnd = source.indexOf("// ---- P2: Cached token", cacheStart === -1 ? 0 : cacheStart);
-  const checkStart = source.indexOf("async function checkBookmarked");
-  const checkEnd = source.indexOf("// ---- Badge:", checkStart === -1 ? 0 : checkStart);
-  const branchStart = source.indexOf('if (message.type === "get_bookmark_data"');
-  const branchEnd = source.indexOf('if (message.type === "get_offline_queue"', branchStart === -1 ? 0 : branchStart);
-  assert(cacheStart !== -1 && cacheEnd !== -1 && cacheEnd > cacheStart &&
-    checkStart !== -1 && checkEnd !== -1 && checkEnd > checkStart,
-    "account-scoped status cache source not found");
-  assert(branchStart !== -1 && branchEnd !== -1 && branchEnd > branchStart, "bookmark-data branch not found");
-
-  const factory = new Function("initialToken", "initialFetch", "pbpPinboardAccountFromToken", "console", `
-    ${source.slice(cacheStart, cacheEnd)}
-    let currentToken = initialToken;
-    let fetchHandler = initialFetch;
-    const pinboardFetch = (...args) => fetchHandler(...args);
-    async function getCurrentBookmarkAuth() {
-      return { token: currentToken || "", account: pbpPinboardAccountFromToken(currentToken), epoch: _pinboardAuthEpoch };
-    }
-    ${source.slice(checkStart, checkEnd)}
-    function invokeBookmarkData(message, sendResponse) {
-      ${source.slice(branchStart, branchEnd)}
-      throw new Error("unhandled message");
-    }
-    return {
-      checkBookmarked,
-      invokeBookmarkData,
-      rawCache: statusCache,
-      setAuth(token) {
-        _pinboardAuthEpoch++;
-        currentToken = token;
-        statusCache.clear();
-      },
-      seedRaw(url, account, value) { statusCache.set(url, { ...value, account }); },
-      setFetch(fn) { fetchHandler = fn; },
-    };
-  `);
-  return factory(initialToken, initialFetch, pbpPinboardAccountFromToken, console);
+  const sw = await acquireCoreSw();
+  let currentToken = initialToken;
+  let fetchHandler = initialFetch;
+  const rawCache = sw.get("statusCache");
+  sw.win.pinboardFetch = (...args) => fetchHandler(...args);
+  sw.win.getCurrentBookmarkAuth = async () => ({
+    token: currentToken || "",
+    account: pbpPinboardAccountFromToken(currentToken),
+    epoch: sw.get("_pinboardAuthEpoch"),
+  });
+  return {
+    checkBookmarked: (...args) => sw.win.checkBookmarked(...args),
+    invokeBookmarkData(message, sendResponse) {
+      return sw.win.handleRuntimeMessage(message, extSender(sw), sendResponse);
+    },
+    rawCache,
+    setAuth(token) {
+      sw.set("_pinboardAuthEpoch", sw.get("_pinboardAuthEpoch") + 1);
+      currentToken = token;
+      rawCache.clear();
+    },
+    seedRaw(url, account, value) { rawCache.set(url, { ...value, account }); },
+    setFetch(fn) { fetchHandler = fn; },
+  };
 }
 
 async function createHarness(options) {
+  const sw = await acquireCoreSw();
   const opts = options || {};
   const storageData = { offlineQueue: (opts.queue || []).map((item) => ({ ...item })) };
   const events = [];
@@ -172,7 +155,8 @@ async function createHarness(options) {
   const waybackCalls = [];
   const iconCalls = [];
   const badgeCalls = [];
-  const statusCache = new Map(opts.cacheEntries || []);
+  const statusCache = sw.get("statusCache");
+  for (const [k, v] of (opts.cacheEntries || [])) statusCache.set(k, v);
   const settings = {
     pinboardToken: "alice:current-token",
     offlineQueueEnabled: true,
@@ -196,7 +180,9 @@ async function createHarness(options) {
     return true;
   };
   const chromeStub = {
+    ...sw.mock.chrome,
     storage: {
+      ...sw.mock.chrome.storage,
       local: {
         get: async (key) => {
           if (typeof key === "string") return { [key]: storageData[key] };
@@ -209,74 +195,61 @@ async function createHarness(options) {
         },
       },
     },
-    tabs: { query: async () => opts.activeTab ? [opts.activeTab] : [] },
-    // The reader's own extension origin; preview slots sit in storageData.
-    runtime: { id: "test-id" },
+    tabs: { ...sw.mock.chrome.tabs, query: async () => opts.activeTab ? [opts.activeTab] : [] },
+    runtime: {
+      ...sw.mock.chrome.runtime,
+      id: "test-id",
+      getURL: (p = "") => "chrome-extension://test-id/" + String(p).replace(/^\//, ""),
+    },
   };
-  const pinboardFetchStub = async (url) => {
+  sw.win.chrome = chromeStub;
+  sw.win.pinboardFetch = async (url) => {
     fetchCalls.push(url);
     if (!opts.pinboardFetch) throw new Error("unexpected Pinboard request");
     return opts.pinboardFetch(url, fetchCalls);
   };
-  const waybackStub = (url, loadedSettings, archiveOptions) => {
+  sw.win.cleanupStatusCache = () => {};
+  sw.win.loadSettings = async () => settings;
+  sw.win.setIcon = (tabId, bookmarked) => iconCalls.push({ tabId, bookmarked });
+  sw.win.updateBadge = () => { badgeCalls.push(true); return Promise.resolve(); };
+  sw.win.pbpWaybackArchive = (url, loadedSettings, archiveOptions) => {
     waybackCalls.push({ url, settings: loadedSettings, options: archiveOptions });
     events.push("wayback");
     if (opts.waybackThrows) throw new Error("wayback unavailable");
     return Promise.resolve();
   };
-  const deps = {
-    chrome: chromeStub,
-    pinboardFetch: pinboardFetchStub,
-    statusCache,
-    cleanupStatusCache: () => {},
-    loadSettings: async () => settings,
-    setIcon: (tabId, bookmarked) => iconCalls.push({ tabId, bookmarked }),
-    updateBadge: () => { badgeCalls.push(true); return Promise.resolve(); },
-    pbpWaybackArchive: waybackStub,
-    pbpSameBookmark,
-    pbpCreateRecoveringTail,
-    pbpOfflineQueueReduce,
-    pbpPinboardAccountFromToken,
-    pbpOfflineQueueAccount,
-    pbpResolveOfflineQueueToken,
-    pbpDrainOfflineQueue,
-    pbpResolveSavePlan,
-    PBP_TAG_VOCAB_STALE_CEILING, pbpTagVocabIndex, pbpTagGroupKey, pbpAlignTagName,
-    buildPostsAddUri,
-    POSTS_ADD_URI_BUDGET,
-    pbpCaptureBookmarkAuth: captureAuth,
-    pbpBookmarkAuthIsCurrent: authIsCurrent,
-    pbpStatusCacheGet: statusCacheGet,
-    pbpStatusCacheSet: statusCacheSet,
-    getCurrentBookmarkAuth: async () => ({
-      token: authState.token || "",
-      account: pbpPinboardAccountFromToken(authState.token),
-      epoch: authState.epoch,
-    }),
-  };
-  const source = await getCoreSource();
-  const background = await getBackgroundSource();
-  const freshStart = background.indexOf("async function pbpReadFreshBookmarkAuthForAccount("), freshEnd = background.indexOf("// An automatic auth reset", freshStart);
-  deps.pbpBookmarkAuthEpoch = () => authState.epoch;
-  deps.pbpReadSettingsWithSecrets = async () => ({ pinboardToken: authState.token });
-  deps.SETTINGS_DEFAULTS = SETTINGS_DEFAULTS;
-  deps.deobfuscateKey = (value) => value;
-  const factory = new Function(...Object.keys(deps), background.slice(freshStart, freshEnd) + source + `
-    return {
-      validateSaveIntent, fetchExistingBookmark, deliverSaveIntent,
-      submitSaveIntent, submitPopupSaveIntent, sendOfflineItem,
-      drainOfflineQueueIds, readOfflineQueueWithIds, retryOfflineItem,
-      normalizeOfflineSaveIntent, applySaveResultSideEffects, processOfflineQueue,
-      mutateOfflineQueue, pbpReaderBookmarkRequest
-    };
-  `);
+  sw.win.pbpCaptureBookmarkAuth = captureAuth;
+  sw.win.pbpBookmarkAuthIsCurrent = authIsCurrent;
+  sw.win.pbpStatusCacheGet = statusCacheGet;
+  sw.win.pbpStatusCacheSet = statusCacheSet;
+  sw.win.getCurrentBookmarkAuth = async () => ({
+    token: authState.token || "",
+    account: pbpPinboardAccountFromToken(authState.token),
+    epoch: authState.epoch,
+  });
+  sw.win.pbpBookmarkAuthEpoch = () => authState.epoch;
+  sw.win.pbpReadSettingsWithSecrets = async () => ({ pinboardToken: authState.token ? obfuscateKey(authState.token) : "" });
   return {
-    ...factory(...Object.values(deps)),
+    validateSaveIntent: (...args) => sw.win.validateSaveIntent(...args),
+    fetchExistingBookmark: (...args) => sw.win.fetchExistingBookmark(...args),
+    deliverSaveIntent: (...args) => sw.win.deliverSaveIntent(...args),
+    submitSaveIntent: (...args) => sw.win.submitSaveIntent(...args),
+    submitPopupSaveIntent: (...args) => sw.win.submitPopupSaveIntent(...args),
+    sendOfflineItem: (...args) => sw.win.sendOfflineItem(...args),
+    drainOfflineQueueIds: (...args) => sw.win.drainOfflineQueueIds(...args),
+    readOfflineQueueWithIds: (...args) => sw.win.readOfflineQueueWithIds(...args),
+    retryOfflineItem: (...args) => sw.win.retryOfflineItem(...args),
+    normalizeOfflineSaveIntent: (...args) => sw.win.normalizeOfflineSaveIntent(...args),
+    applySaveResultSideEffects: (...args) => sw.win.applySaveResultSideEffects(...args),
+    processOfflineQueue: (...args) => sw.win.processOfflineQueue(...args),
+    mutateOfflineQueue: (...args) => sw.win.mutateOfflineQueue(...args),
+    pbpReaderBookmarkRequest: (...args) => sw.win.pbpReaderBookmarkRequest(...args),
     storageData, settings, authState, events, fetchCalls, waybackCalls, iconCalls, badgeCalls, statusCache,
   };
 }
 
 async function createBackgroundSaveHarness(options) {
+  const sw = await acquireCallerSw();
   const opts = options || {};
   const cachedSettings = opts.cachedSettings || {
     pinboardToken: "alice:old-token",
@@ -297,11 +270,9 @@ async function createBackgroundSaveHarness(options) {
   let drainCalls = 0;
   let i18nReadyCalls = 0;
   const result = opts.result || { status: "queued", queueId: "q1" };
-  const deps = {
+  const overrides = {
     loadSettings: opts.loadSettings || (async () => settingsSequence[Math.min(loadCount++, settingsSequence.length - 1)]),
-    pbpServiceEffectivePrivate,
     pbpLoadTagVocab: async (account) => ({ account, timestamp: Date.now(), counts: null, index: opts.tagVocabIndex || null }),
-    pbpCanonicalTagName, pbpTagGroupKey,
     pbpSaveFailure: (reason) => ({ status: "failed", reason }),
     showNotification: (...args) => notifications.push(args),
     t: opts.t || ((key, ...args) => args.length ? `${key}:${args.join(":")}` : key),
@@ -331,21 +302,14 @@ async function createBackgroundSaveHarness(options) {
       baseUrl: "https://bookmarks.example/",
       ...(opts.auth || {}),
     }),
-    // A self-hosted quick save checks its exact host grant first (granted here).
-    chrome: { permissions: { contains: async () => true } },
-    POSTS_ADD_URI_BUDGET,
-    // K100: pbpI18nReady is a dep of saveFromBackground now (awaited on the
-    // not-logged-in branch only) — every harness slicing it needs this or the
-    // sliced function throws ReferenceError. Defaults to already-resolved so
-    // the many existing cases in this file are unaffected.
+    chrome: { ...sw.mock.chrome, permissions: { contains: async () => true } },
     pbpI18nReady: opts.pbpI18nReady || (() => { i18nReadyCalls++; return Promise.resolve(); }),
-    // AI-enabled cases supply the collaborators the summary path calls.
     ...(opts.deps || {}),
   };
-  const source = await getBackgroundSaveSource();
-  const factory = new Function(...Object.keys(deps), source + "\nreturn saveFromBackground;");
+  for (const [k, v] of Object.entries(overrides)) sw.win[k] = v;
   return {
-    saveFromBackground: factory(...Object.values(deps)),
+    saveFromBackground: (...args) => sw.win.saveFromBackground(...args),
+    rawSaveFromBackground: _callerSwState.orig.saveFromBackground,
     cachedSettings,
     notifications,
     intents,
@@ -356,6 +320,7 @@ async function createBackgroundSaveHarness(options) {
 }
 
 async function createBatchSaveHarness(options) {
+  const sw = await acquireCallerSw();
   const opts = options || {};
   const settings = {
     pinboardToken: "alice:token",
@@ -382,7 +347,7 @@ async function createBatchSaveHarness(options) {
   const lookups = [];
   const outcomes = opts.outcomes || [{ status: "saved", mutation: "created" }];
   let outcomeIndex = 0;
-  const deps = {
+  const overrides = {
     _newBatchRunId: () => opts.runId || "test-batch-run",
     _removeBatchRecordIfOwned: async (key) => { removed.push(key); return true; },
     _writeBatchProgress: async (value) => progress.push({ ...value }),
@@ -393,7 +358,7 @@ async function createBatchSaveHarness(options) {
     hasAIKey: () => opts.hasAIKey === true,
     getPageInfoFromTab: async (...args) => { extractionCalls.push(args); return opts.pageInfo === undefined ? null : opts.pageInfo; },
     pbpNotesDescription: (info) => info.metaDescription || "",
-    pbpPageInfoReadable:info=>!!info&&info._pbpUnavailable!==true&&["","text/html","application/xhtml+xml"].includes(String(info.contentType||"").split(";")[0].trim()),
+    pbpPageInfoReadable: info => !!info && info._pbpUnavailable !== true && ["", "text/html", "application/xhtml+xml"].includes(String(info.contentType || "").split(";")[0].trim()),
     getAICache: async (_url, kind) => opts.cached?.[kind] ?? null,
     setAICache: async (...args) => { cacheWrites.push(args); },
     callAI: opts.callAI || (async () => "AI summary"),
@@ -403,16 +368,22 @@ async function createBatchSaveHarness(options) {
     buildTagPrompt: opts.buildTagPrompt || (() => "tags"),
     parseAITags: () => ["ai-tag"],
     refineTags: (tags) => tags,
-    chrome: { permissions: { contains: async () => true }, storage: { local: { get: opts.storageGet || (async () => ({})),
-      set: async (value) => { if (value.batch_job) jobs.push(JSON.parse(JSON.stringify(value.batch_job))); } } } },
+    chrome: {
+      ...sw.mock.chrome,
+      permissions: { contains: async () => true },
+      storage: {
+        ...sw.mock.chrome.storage,
+        local: {
+          get: opts.storageGet || (async () => ({})),
+          set: async (value) => { if (value.batch_job) jobs.push(JSON.parse(JSON.stringify(value.batch_job))); },
+        },
+      },
+    },
     pbpLoadTagVocab: async (account) => ({ account, timestamp: Date.now(), counts: opts.tagVocabCounts || null, index: opts.tagVocabIndex || null }),
-    // Skip mode's duplicate check before AI. Default: the page is not saved yet.
     fetchExistingBookmark: async (url, token, auth) => {
       lookups.push({ url, token, account: auth?.account });
       return opts.lookup ? opts.lookup(url) : { exists: false, lookupFailed: false, post: null };
     },
-    pbpCanonicalTagName, pbpTagGroupKey,
-    pbpServiceEffectivePrivate,
     submitSaveIntent: async (prepared, deliveryOptions) => {
       intents.push({ prepared, deliveryOptions });
       if (opts.submitSaveIntent) return opts.submitSaveIntent(prepared, deliveryOptions, intents.length - 1);
@@ -425,22 +396,10 @@ async function createBatchSaveHarness(options) {
       return opts.updateBadge ? opts.updateBadge() : Promise.resolve();
     },
   };
-  // The worker's real notification mapping, so a stopped run's copy is the
-  // one a quick save with the same failure would show.
-  const background = await getBackgroundSource();
-  const notifyStart = background.indexOf("function notifySaveFailure(");
-  const notifyEnd = background.indexOf("// Helper: resolve prefix-specific settings", notifyStart);
-  assert(notifyStart >= 0 && notifyEnd > notifyStart, "notifySaveFailure source not found");
-  deps.notifySaveFailure = new Function("showNotification", "t", background.slice(notifyStart, notifyEnd) + "\nreturn notifySaveFailure;")(deps.showNotification, deps.t);
-  // The worker's real host grant pre-check, bound to this harness's chrome.
-  const grantStart = background.indexOf("async function pbpBookmarkHostGranted(");
-  const grantEnd = background.indexOf("// Failure-reason -> showNotification", grantStart);
-  assert(grantStart >= 0 && grantEnd > grantStart, "pbpBookmarkHostGranted source not found");
-  deps.pbpBookmarkHostGranted = new Function("chrome", background.slice(grantStart, grantEnd) + "\nreturn pbpBookmarkHostGranted;")(deps.chrome);
-  const source = await getBatchSaveSource();
-  const factory = new Function(...Object.keys(deps), `let _batchRunning = false;\n${source}\nreturn handleBatchSave;`);
+  for (const [k, v] of Object.entries(overrides)) sw.win[k] = v;
   return {
-    handleBatchSave: factory(...Object.values(deps)),
+    handleBatchSave: (...args) => sw.win.handleBatchSave(...args),
+    rawHandleBatchSave: _callerSwState.orig.handleBatchSave,
     intents,
     progress,
     notifications,
@@ -728,32 +687,19 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("queued Pinboard dispatch rejects switch/logout and rewrites same-account rotation", async () => {
-    const sharedSource = await (await fetch("../shared.js")).text();
-    const start = sharedSource.indexOf("const _pinboardQueue = [];");
-    const end = sharedSource.indexOf("// ---- Pinboard posts/add URI builder", start);
-    assert(start >= 0 && end > start, "Pinboard queue source not found");
+    const sharedRealm = await pbpSwRealm.loadRealmScripts(["shared.js"]);
     async function dispatch(currentToken, queuedToken) {
       const fetchCalls = [];
-      const chrome = { storage: { local: {
+      sharedRealm.win.chrome = { storage: { local: {
         get: async () => ({ _pbRateLimitTs: 0 }),
         set: async () => {},
       } } };
-      const factory = new Function(
-        "chrome", "pbpReadSettingsWithSecrets", "SETTINGS_DEFAULTS",
-        "pbpAuthorizePinboardApiUrl", "deobfuscateKey", "fetch",
-        sharedSource.slice(start, end) + "; return pinboardFetch;"
-      );
-      const queuedFetch = factory(
-        chrome,
-        async () => ({ pinboardToken: obfuscateKey(currentToken) }),
-        SETTINGS_DEFAULTS,
-        pbpAuthorizePinboardApiUrl,
-        deobfuscateKey,
-        async (requestUrl) => { fetchCalls.push(requestUrl); return response(200, {}); }
-      );
+      sharedRealm.win.pbpReadSettingsWithSecrets = async () => ({ pinboardToken: obfuscateKey(currentToken) });
+      sharedRealm.win.fetch = async (requestUrl) => { fetchCalls.push(requestUrl); return response(200, {}); };
+      sharedRealm.set("_pbLastCallTs", 0);
       let error = null;
       try {
-        await queuedFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${encodeURIComponent(queuedToken)}&format=json`);
+        await sharedRealm.win.pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${encodeURIComponent(queuedToken)}&format=json`);
       } catch (e) { error = e; }
       return { fetchCalls, error };
     }
@@ -766,34 +712,32 @@ await suite("unified save pipeline", async () => {
     const rotated = await dispatch("alice:new", "alice:old");
     equal(rotated.fetchCalls.length, 1, "same-account rotation was cancelled");
     equal(new URL(rotated.fetchCalls[0]).searchParams.get("auth_token"), "alice:new");
+    sharedRealm.dispose();
   });
 
   await test("preview re-extraction preserves immutable opener owner, tags, and description", async () => {
-    const source = await getBackgroundSource();
-    const start = source.indexOf('if (message.type === "reextractMarkdown")');
-    const end = source.indexOf("\n}\nchrome.runtime.onMessage.addListener(handleRuntimeMessage);", start);
-    assert(start >= 0 && end > start, "reextract branch not found");
+    const sw = await acquireCallerSw();
     const key = "md_preview_data_owner-test";
     let slot = {
       pending: true, url: BASE_INTENT.url, tabId: 7,
       account: "alice", tags: ["Tag-A", "two words"], description: "A notes\nline 2",
     };
-    const chrome = { storage: { local: {
-      get: async () => ({ [key]: slot }),
-      set: async (values) => { slot = values[key]; },
-    } } };
-    const factory = new Function("chrome", "extractForPreview", `
-      return function invoke(message, sendResponse) { ${source.slice(start, end)} };
-    `);
-    const invoke = factory(chrome, async ({ engine }) => ({
+    sw.win.chrome = {
+      ...sw.mock.chrome,
+      storage: { ...sw.mock.chrome.storage, local: {
+        get: async () => ({ [key]: slot }),
+        set: async (values) => { slot = values[key]; },
+      } },
+    };
+    sw.win.extractForPreview = async ({ engine }) => ({
       source: engine, markdown: "# rebuilt", contentHtml: "", title: "Rebuilt", url: BASE_INTENT.url,
-    }));
+    });
     const malicious = {
       type: "reextractMarkdown", url: BASE_INTENT.url, tabId: 7, engine: "jina", k: "owner-test",
       account: "bob", tags: ["Bob-secret"], description: "Bob notes",
     };
     const result = await new Promise((resolve) => {
-      equal(invoke(malicious, resolve), true, "async reextract channel not retained");
+      equal(sw.win.handleRuntimeMessage(malicious, extSender(sw, "md-preview.html?k=owner-test"), resolve), true, "async reextract channel not retained");
     });
     equal(result.ok, true);
     equal(slot.account, "alice");
@@ -805,21 +749,23 @@ await suite("unified save pipeline", async () => {
   // url to its own canonical address and a message cannot name another; a
   // slot from before bookmarkUrl existed gains none.
   await test("preview re-extraction keeps the handoff's bookmark address", async () => {
-    const source = await getBackgroundSource();
-    const start = source.indexOf('if (message.type === "reextractMarkdown")');
-    const end = source.indexOf("\n}\nchrome.runtime.onMessage.addListener(handleRuntimeMessage);", start);
-    assert(start >= 0 && end > start, "reextract branch not found");
     const key = "md_preview_data_bookmark-url";
     const page = "https://example.com/post?utm_source=feed", canonical = "https://example.com/post/";
     for (const handed of ["https://example.com/post", undefined]) {
+      const sw = await acquireCallerSw();
       let slot = { pending: true, url: page, tabId: 7, account: "alice", tags: [], description: "",
         ...(handed === undefined ? {} : { bookmarkUrl: handed }) };
-      const chrome = { storage: { local: { get: async () => ({ [key]: slot }), set: async (values) => { slot = values[key]; } } } };
-      const invoke = new Function("chrome", "extractForPreview", `
-        return function invoke(message, sendResponse) { ${source.slice(start, end)} };
-      `)(chrome, async ({ engine }) => ({ source: engine, markdown: "# rebuilt", contentHtml: "", title: "Rebuilt", url: canonical }));
+      sw.win.chrome = {
+        ...sw.mock.chrome,
+        storage: { ...sw.mock.chrome.storage, local: { get: async () => ({ [key]: slot }), set: async (values) => { slot = values[key]; } } },
+      };
+      sw.win.extractForPreview = async ({ engine }) => ({ source: engine, markdown: "# rebuilt", contentHtml: "", title: "Rebuilt", url: canonical });
       const result = await new Promise((resolve) => {
-        equal(invoke({ type: "reextractMarkdown", url: page, tabId: 7, engine: "jina", k: "bookmark-url", bookmarkUrl: "https://evil.test/" }, resolve), true);
+        equal(sw.win.handleRuntimeMessage(
+          { type: "reextractMarkdown", url: page, tabId: 7, engine: "jina", k: "bookmark-url", bookmarkUrl: "https://evil.test/" },
+          extSender(sw, "md-preview.html?k=bookmark-url"),
+          resolve
+        ), true);
       });
       equal(result.ok, true);
       equal(slot.url, canonical, "the Jina pass did not rewrite url");
@@ -829,29 +775,23 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("refresh-then-extract reloads only the unchanged source tab, with the page grant, before extracting", async () => {
-    const source = await getBackgroundSource();
-    const start = source.indexOf('if (message.type === "reextractMarkdown")');
-    const end = source.indexOf("\n}\nchrome.runtime.onMessage.addListener(handleRuntimeMessage);", start);
-    assert(start >= 0 && end > start, "reextract branch not found");
     const key = "md_preview_data_refresh-test";
     const page = "https://laohuangniu.net/apps/text-audio";
     async function run({ engine = "local", liveUrl = page, granted = true }) {
+      const sw = await acquireCallerSw();
       const log = [];
       let slot = { url: page, tabId: 9, sourceTabUrl: page, account: "alice", tags: [], description: "" };
-      const chrome = {
-        storage: { local: { get: async () => ({ [key]: slot }), set: async (v) => { slot = v[key]; log.push("write"); } } },
+      sw.win.chrome = {
+        ...sw.mock.chrome,
+        storage: { ...sw.mock.chrome.storage, local: { get: async () => ({ [key]: slot }), set: async (v) => { slot = v[key]; log.push("write"); } } },
         permissions: { contains: async ({ origins }) => { log.push("contains:" + origins[0]); return granted; } },
       };
-      const factory = new Function("chrome", "extractForPreview", "_cbTabsGet", "pbpReloadTabAndSettle", `
-        return function invoke(message, sendResponse) { ${source.slice(start, end)} };
-      `);
-      const invoke = factory(chrome,
-        async () => { log.push("extract"); return { source: "local", contentHtml: "<p>x</p>", markdown: "", title: "T", url: page }; },
-        async () => ({ id: 9, url: liveUrl }),
-        async () => { log.push("reload"); return true; });
-      const res = await new Promise((resolve) => invoke({
+      sw.win.extractForPreview = async () => { log.push("extract"); return { source: "local", contentHtml: "<p>x</p>", markdown: "", title: "T", url: page }; };
+      sw.win._cbTabsGet = async () => ({ id: 9, url: liveUrl });
+      sw.win.pbpReloadTabAndSettle = async () => { log.push("reload"); return true; };
+      const res = await new Promise((resolve) => sw.win.handleRuntimeMessage({
         type: "reextractMarkdown", url: page, tabId: 9, engine, sourceTabUrl: page, k: "refresh-test", reloadSource: true,
-      }, resolve));
+      }, extSender(sw, "md-preview.html?k=refresh-test"), resolve));
       return { res, log };
     }
     const moved = await run({ liveUrl: "https://example.com/elsewhere" });
@@ -869,59 +809,118 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("preview opener and restore payloads carry account, tags, and description", async () => {
-    const [popupSource, previewSource, source] = await Promise.all([
-      fetch("../popup.js").then((r) => r.text()),
-      fetch("../md-preview.js").then((r) => r.text()),
-      getBackgroundSource(),
-    ]);
-    const popupPayload = popupSource.slice(popupSource.indexOf("const openPreview"), popupSource.indexOf("const downloadMd"));
-    assert(popupPayload.includes("account: sessionAccount"), "popup preview payload has no owner");
-    assert(popupPayload.includes('description: $id("description-input")?.value || ""'), "popup preview drops notes");
-    // The real reader's restored account, tags, notes and draft are checked
-    // by readerHandoffAccountChecks in bookmark-service-runtime-tests.mjs.
-    // The reader bar owns the lookup (owner-checked there); the preview page sends no lookup of its own.
+    // 1. Popup openPreview handoff payload carries sessionAccount + description-input.
+    const pop = await pbpSwRealm.bootPopup({
+      mock: {
+        tabs: [{ id: 7, url: BASE_INTENT.url, title: "New title", active: true }],
+        storage: { local: { pinboardToken: obfuscateKey("alice:tok") } },
+      },
+      beforeScripts(_win, mock) {
+        mock.onSendMessage((msg) => {
+          if (msg?.type === "get_bookmark_data") return { account: "alice", posts: [] };
+          if (msg?.type === "get_offline_queue") return { queue: [] };
+          if (msg?.type === "PBP_POPUP_DRAFT") return { ok: true, account: "alice", draft: null };
+          if (msg?.type === "pinboard_api_call") return { ok: true, status: 200, text: "{}" };
+          return {};
+        });
+      },
+    });
+    pop.win.extractLocalMarkdown = async () => ({ markdown: "# Article", contentHtml: "", title: "New title", url: BASE_INTENT.url });
+    pop.set("settings", { ...pop.get("settings"), pinboardToken: "alice:tok" });
+    await pop.win.showMain("alice:tok");
+    const descEl = pop.doc.getElementById("description-input");
+    descEl.value = "Popup notes";
+    pop.doc.getElementById("jina-md-btn").click();
+    const deadline = performance.now() + 3000;
+    while (pop.doc.getElementById("md-actions-strip").classList.contains("hidden") && performance.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    assert(!pop.doc.getElementById("md-actions-strip").classList.contains("hidden"), "Markdown strip did not open");
+    await pop.doc.getElementById("md-strip-preview").onclick();
+    const popStored = await pop.mock.chrome.storage.local.get(null);
+    const popSlotKey = Object.keys(popStored).find((k) => k.startsWith("md_preview_data_"));
+    assert(popSlotKey, "popup preview did not write md_preview_data_*");
+    equal(popStored[popSlotKey].account, "alice", "popup preview payload has no owner");
+    equal(popStored[popSlotKey].description, "Popup notes", "popup preview drops notes");
+    pop.dispose();
+
+    // 2. Reader page sends no standalone mdPreviewBookmarkInfo lookup of its own.
+    const previewSource = await fetch("../md-preview.js").then((r) => r.text());
     const previewCode = previewSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     assert(!/mdPreviewBookmarkInfo/.test(previewCode), "preview page still sends its own bookmark lookup");
-    const shortcut = source.slice(source.indexOf("async function openMarkdownPreviewFromShortcut"));
-    assert(shortcut.includes('account: auth.account || ""'), "shortcut preview payload has no owner field");
+
+    // 3. Shortcut openMarkdownPreviewFromShortcut payload carries auth.account.
+    const sw = await acquireCallerSw();
+    let shortcutSlot = null;
+    sw.win.pbpSweepPreviewOrphans = () => {};
+    sw.win.getCurrentBookmarkAuth = async () => ({ account: "alice", token: "alice:tok", epoch: 0 });
+    sw.win.extractForPreview = async () => ({ source: "local", markdown: "# Shortcut", contentHtml: "", title: "New title", url: BASE_INTENT.url });
+    sw.win.chrome = {
+      ...sw.mock.chrome,
+      tabs: {
+        ...sw.mock.chrome.tabs,
+        query: async () => [{ id: 8, url: BASE_INTENT.url, title: "New title" }],
+        create: async () => ({ id: 99 }),
+      },
+      storage: {
+        ...sw.mock.chrome.storage,
+        local: {
+          get: async (k) => (typeof k === "string" && shortcutSlot ? { [k]: shortcutSlot } : {}),
+          set: async (vals) => {
+            const k = Object.keys(vals).find((key) => key.startsWith("md_preview_data_"));
+            if (k) shortcutSlot = vals[k];
+          },
+        },
+      },
+    };
+    await sw.win.openMarkdownPreviewFromShortcut();
+    assert(shortcutSlot, "shortcut preview did not write md_preview_data_*");
+    equal(shortcutSlot.account, "alice", "shortcut preview payload has no owner field");
   });
 
   await test("reader shortcut on a non-web tab says unsupported, not empty (B40)", async () => {
-    const source = await getBackgroundSource();
-    const s0 = source.indexOf("async function openMarkdownPreviewFromShortcut");
-    const s1 = source.indexOf("  // Open the preview INSTANTLY", s0);
-    assert(s0 >= 0 && s1 > s0, "shortcut guard source not found");
+    const sw = await acquireCallerSw();
     let active = null;
     const notes = [];
-    const open = new Function("pbpSweepPreviewOrphans", "chrome", "showNotification", "t",
-      source.slice(s0, s1) + "  return \"proceeded\";\n}\nreturn openMarkdownPreviewFromShortcut;"
-    )(() => {}, { tabs: { query: async () => [active] } }, (...args) => notes.push(args), (key) => key);
+    let previewTabsOpened = 0;
+    sw.win.pbpSweepPreviewOrphans = () => {};
+    sw.win.showNotification = (...args) => notes.push(args);
+    sw.win.t = (key) => key;
+    sw.win.getCurrentBookmarkAuth = async () => ({ account: "alice", token: "alice:tok", epoch: 0 });
+    sw.win.extractForPreview = async () => ({ source: "local", markdown: "# hi", contentHtml: "", title: "Hi", url: "https://example.com/" });
+    sw.win.chrome = {
+      ...sw.mock.chrome,
+      tabs: {
+        ...sw.mock.chrome.tabs,
+        query: async () => [active],
+        create: async () => { previewTabsOpened++; return { id: 99 }; },
+      },
+      storage: { ...sw.mock.chrome.storage, local: { get: async () => ({}), set: async () => {} } },
+    };
     active = { id: 1, url: "chrome://newtab/" };
-    equal(await open(), undefined, "a chrome:// tab was opened in the reader");
+    await sw.win.openMarkdownPreviewFromShortcut();
+    equal(previewTabsOpened, 0, "a chrome:// tab was opened in the reader");
     equal(notes.at(-1)[2], "bgMdPreviewUnsupported", "unsupported page was blamed on missing content");
     active = { id: 2, url: "httpfoo://example" };
-    await open();
+    await sw.win.openMarkdownPreviewFromShortcut();
+    equal(previewTabsOpened, 0, "a non-http scheme opened in the reader");
     equal(notes.at(-1)[2], "bgMdPreviewUnsupported", "a non-http scheme slipped past the prefix check");
     active = { id: 3, url: "https://example.com/" };
-    equal(await open(), "proceeded", "a web page was refused");
+    await sw.win.openMarkdownPreviewFromShortcut();
+    equal(previewTabsOpened, 1, "a web page was refused");
   });
 
   await test("concurrent Batch start messages reserve exactly one run before auth resolves", async () => {
-    const source = await getBackgroundSource();
-    const start = source.indexOf('if (message.action === "startBatchSave"');
-    const end = source.indexOf('if (message.type === "pinboard_api_call"', start);
-    assert(start >= 0 && end > start, "Batch message branch not found");
+    const sw = await acquireCallerSw();
     let releaseAuth;
     const auth = new Promise((resolve) => { releaseAuth = resolve; });
     let starts = 0;
-    const factory = new Function("getCurrentBookmarkAuth", "handleBatchSave", `
-      let _batchRunning = false;
-      return function invoke(message, sendResponse) { ${source.slice(start, end)} };
-    `);
-    const invoke = factory(() => auth, async () => { starts++; });
+    sw.win.getCurrentBookmarkAuth = () => auth;
+    sw.win.handleBatchSave = async () => { starts++; };
     const responses = [];
-    equal(invoke({ action: "startBatchSave", tabs: [{}], account: "alice" }, (r) => responses.push(r)), true);
-    equal(invoke({ action: "startBatchSave", tabs: [{}], account: "alice" }, (r) => responses.push(r)), true);
+    const sender = extSender(sw);
+    equal(sw.win.handleRuntimeMessage({ action: "startBatchSave", tabs: [{}], account: "alice" }, sender, (r) => responses.push(r)), true);
+    equal(sw.win.handleRuntimeMessage({ action: "startBatchSave", tabs: [{}], account: "alice" }, sender, (r) => responses.push(r)), true);
     equal(responses[0]?.status, "busy", "second start was not rejected synchronously");
     releaseAuth({ token: "alice:key", account: "alice", epoch: 1 });
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -1011,17 +1010,16 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("conditional auth reset serializes credential reads and clears with newer writes", async () => {
-    const source = await getBackgroundSource();
-    const start = source.indexOf("async function pbpResetPinboardAuth("), end = source.indexOf("// Conditional auth reset end", start);
-    assert(start >= 0 && end > start, "conditional reset handler is not implemented");
+    const sw = await acquireCallerSw();
     let token = "alice:failed-token", releaseRead, readStarted, writerFinished = false;
     const readGate = new Promise((resolve) => { releaseRead = resolve; });
     const started = new Promise((resolve) => { readStarted = resolve; });
-    const local = { get: async () => { readStarted(); await readGate; return { pinboardToken: token }; }, set: async (values) => { token = values.pinboardToken; } };
-    const reset = new Function("chrome", "pbpWithSecretStorageLock", "pbpReadSecretSyncStateUnlocked", "deobfuscateKey", "pbpPinboardAccountFromToken", "invalidateBookmarkAuthState", source.slice(start, end) + "\nreturn pbpResetPinboardAuth;")(
-      { storage: { local, session: { get: async () => ({}), remove: async () => {} } } }, pbpWithSecretStorageLock, async () => ({ optSyncEnabled: false, syncApiKeys: false }), (value) => value, pbpPinboardAccountFromToken, () => {}
-    );
-    const pending = reset("alice:failed-token");
+    const local = { get: async () => { readStarted(); await readGate; return { pinboardToken: token }; }, set: async (values) => { if ("pinboardToken" in values) token = values.pinboardToken; } };
+    sw.win.chrome = { ...sw.mock.chrome, storage: { ...sw.mock.chrome.storage, local, session: { get: async () => ({}), remove: async () => {} } } };
+    sw.win.pbpReadSecretSyncStateUnlocked = async () => ({ optSyncEnabled: false, syncApiKeys: false });
+    sw.win.deobfuscateKey = (value) => value;
+    sw.win.invalidateBookmarkAuthState = () => {};
+    const pending = sw.win.pbpResetPinboardAuth("alice:failed-token");
     await started;
     const writer = pbpWithSecretStorageLock(async () => { token = "bob:new-token"; writerFinished = true; });
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -1033,9 +1031,6 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("conditional auth reset clears only the exact routed token", async () => {
-    const source = await getBackgroundSource();
-    const start = source.indexOf("async function pbpResetPinboardAuth("), end = source.indexOf("// Conditional auth reset end", start);
-    assert(start >= 0 && end > start, "conditional reset handler is not implemented");
     for (const state of [
       { optSyncEnabled: false, syncApiKeys: false },
       { optSyncEnabled: true, syncApiKeys: false },
@@ -1043,21 +1038,23 @@ await suite("unified save pipeline", async () => {
     ]) {
       const destination = state.optSyncEnabled && state.syncApiKeys ? "sync" : "local";
       for (const token of ["alice:failed-token", "alice:rotated-token", "bob:new-token", ""]) {
+        const sw = await acquireCallerSw();
         const data = { local: { pinboardToken: "bob:local-token" }, sync: { pinboardToken: "bob:sync-token" } };
         data[destination].pinboardToken = token;
         const drafts = { "pbp-popup-draft:alice:normal:article": { owner: "alice" }, "pbp-popup-draft:bob:normal:article": { owner: "bob" }, unrelated: { value: 1 } };
         const writes = [];
         const area = (name) => ({ get: async () => ({ ...data[name] }), set: async (values) => { Object.assign(data[name], values); writes.push(name); } });
         const session = { get: async () => ({ ...drafts }), remove: async (keys) => { keys.forEach((key) => delete drafts[key]); } };
-        const reset = new Function("chrome", "pbpWithSecretStorageLock", "pbpReadSecretSyncStateUnlocked", "deobfuscateKey", "pbpPinboardAccountFromToken", "invalidateBookmarkAuthState", source.slice(start, end) + "\nreturn pbpResetPinboardAuth;")(
-          { storage: { local: area("local"), sync: area("sync"), session } }, pbpWithSecretStorageLock, async () => state, (value) => value, pbpPinboardAccountFromToken, () => {}
-        );
-        const result = await reset("alice:failed-token");
+        sw.win.chrome = { ...sw.mock.chrome, storage: { ...sw.mock.chrome.storage, local: area("local"), sync: area("sync"), session } };
+        sw.win.pbpReadSecretSyncStateUnlocked = async () => state;
+        sw.win.deobfuscateKey = (value) => value;
+        sw.win.invalidateBookmarkAuthState = () => {};
+        const result = await sw.win.pbpResetPinboardAuth("alice:failed-token");
         const matched = token === "alice:failed-token";
         equal(result.ok, matched, "conditional reset acknowledged a different token");
         equal(data[destination].pinboardToken, matched ? "" : token, "reset changed the wrong routed token");
         equal(writes.length, matched ? 2 : 0, "reset writes only matched credentials and adopts its library");
-        if (matched) equal(data[state.optSyncEnabled ? "sync" : "local"].personalLibraryAccount,"alice","logout must retain the old library");
+        if (matched) equal(data[state.optSyncEnabled ? "sync" : "local"].personalLibraryAccount, "alice", "logout must retain the old library");
         equal(data[destination === "local" ? "sync" : "local"].pinboardToken, destination === "local" ? "bob:sync-token" : "bob:local-token", "reset touched the other storage area");
         equal(Object.hasOwn(drafts, "pbp-popup-draft:alice:normal:article"), !matched, "reset did not conditionally clear only the failed owner's drafts");
         assert(drafts["pbp-popup-draft:bob:normal:article"] && drafts.unrelated, "reset removed another owner's draft or unrelated session data");
@@ -1066,21 +1063,19 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("conditional auth reset reports storage rejection without clearing credentials", async () => {
-    const source = await getBackgroundSource();
-    const start = source.indexOf("async function pbpResetPinboardAuth("), end = source.indexOf("// Conditional auth reset end", start);
     for (const phase of ["routing", "tokenRead", "draftRead", "draftRemove", "tokenWrite"]) {
+      const sw = await acquireCallerSw();
       let token = "alice:failed-token", invalidations = 0;
       const fail = (at) => { if (phase === at) throw new Error("synthetic storage failure"); };
-      const local = { get: async () => { fail("tokenRead"); return { pinboardToken: token }; }, set: async (values) => { fail("tokenWrite"); token = values.pinboardToken; } };
+      const local = { get: async () => { fail("tokenRead"); return { pinboardToken: token }; }, set: async (values) => { fail("tokenWrite"); if ("pinboardToken" in values) token = values.pinboardToken; } };
       const session = { get: async () => { fail("draftRead"); return { "pbp-popup-draft:alice:normal:article": { owner: "alice" } }; }, remove: async () => { fail("draftRemove"); } };
       const warnings = [];
-      const deps = { chrome: { storage: { local, session } }, pbpWithSecretStorageLock,
-        pbpReadSecretSyncStateUnlocked: async () => { fail("routing"); return { optSyncEnabled: false, syncApiKeys: false }; },
-        deobfuscateKey: (value) => value, pbpPinboardAccountFromToken,
-        invalidateBookmarkAuthState: () => { invalidations++; }, console: { warn: (...args) => warnings.push(args) } };
-      const names = Object.keys(deps);
-      const reset = new Function(...names, source.slice(start, end) + "\nreturn pbpResetPinboardAuth;")(...names.map((name) => deps[name]));
-      const result = await reset("alice:failed-token");
+      sw.win.chrome = { ...sw.mock.chrome, storage: { ...sw.mock.chrome.storage, local, session } };
+      sw.win.pbpReadSecretSyncStateUnlocked = async () => { fail("routing"); return { optSyncEnabled: false, syncApiKeys: false }; };
+      sw.win.deobfuscateKey = (value) => value;
+      sw.win.invalidateBookmarkAuthState = () => { invalidations++; };
+      sw.win.console = { ...console, warn: (...args) => warnings.push(args) };
+      const result = await sw.win.pbpResetPinboardAuth("alice:failed-token");
       equal(result.error, "storage", "storage rejection was acknowledged as a reset");
       equal(token, "alice:failed-token", "failed reset cleared credentials");
       equal(invalidations, 0, "failed storage reset invalidated the session");
@@ -1090,9 +1085,7 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("conditional auth reset orders in-flight drafts and blocks later old-owner writes", async () => {
-    const source = await getBackgroundSource();
-    const start = source.indexOf("async function pbpResetPinboardAuth("), end = source.indexOf("// Conditional auth reset end", start);
-    const draftStart = source.indexOf("async function pbpRunPopupDraft("), draftEnd = source.indexOf("// Popup drafts end", draftStart);
+    const sw = await acquireCallerSw();
     const rows = {}; let token = "alice:failed-token", releaseRead, readStarted, holdRead = true;
     const started = new Promise((resolve) => { readStarted = resolve; });
     const readGate = new Promise((resolve) => { releaseRead = resolve; });
@@ -1101,18 +1094,17 @@ await suite("unified save pipeline", async () => {
       set: async (values) => Object.assign(rows, structuredClone(values)),
       remove: async (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete rows[key]); },
     };
-    const deps = { chrome: { storage: { session, local: { get: async () => ({ pinboardToken: token }), set: async (values) => { token = values.pinboardToken; } } } },
-      pbpWithSecretStorageLock, pbpReadSecretSyncStateUnlocked: async () => ({ optSyncEnabled: false, syncApiKeys: false }),
-      deobfuscateKey: (value) => value, pbpPinboardAccountFromToken, invalidateBookmarkAuthState() {},
-      getCurrentBookmarkAuth: async () => ({ account: pbpPinboardAccountFromToken(token) }), navigator };
-    const names = Object.keys(deps);
-    const api = new Function(...names, source.slice(start, end) + source.slice(draftStart, draftEnd) + "\nreturn {pbpResetPinboardAuth,pbpRunPopupDraft};")(...names.map((name) => deps[name]));
+    sw.win.chrome = { ...sw.mock.chrome, storage: { ...sw.mock.chrome.storage, session, local: { get: async () => ({ pinboardToken: token }), set: async (values) => { if ("pinboardToken" in values) token = values.pinboardToken; } } } };
+    sw.win.pbpReadSecretSyncStateUnlocked = async () => ({ optSyncEnabled: false, syncApiKeys: false });
+    sw.win.deobfuscateKey = (value) => value;
+    sw.win.invalidateBookmarkAuthState = () => {};
+    sw.win.getCurrentBookmarkAuth = async () => ({ account: pbpPinboardAccountFromToken(token) });
     const draft = { url: BASE_INTENT.url, title: "Draft", notes: "Unsaved", tags: [], tagInput: "", private: false, toread: false, archive: false, archiveTouched: false };
     const message = { account: "alice", action: "write", pageUrl: BASE_INTENT.url, incognito: false, draft };
-    const first = api.pbpRunPopupDraft(message);
+    const first = sw.win.pbpRunPopupDraft(message);
     await started;
-    const resetting = api.pbpResetPinboardAuth("alice:failed-token");
-    const late = api.pbpRunPopupDraft(message);
+    const resetting = sw.win.pbpResetPinboardAuth("alice:failed-token");
+    const late = sw.win.pbpRunPopupDraft(message);
     releaseRead();
     assert((await first).ok, "reset bypassed the in-flight draft write");
     assert((await resetting).ok, "matching auth reset failed");
@@ -1121,44 +1113,111 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("save_intent listener preserves the Chrome 110 async response contract", async () => {
-    const source = await getBackgroundSource();
-    const start = source.indexOf('if (message.type === "save_intent")');
-    const end = source.indexOf('if (message.type === "archive_url"', start);
-    const branch = source.slice(start, end);
-    assert(start >= 0 && end > start, "save_intent branch not found");
     {
-      // Run the branch itself against a recording boundary: what the worker hands
-      // submitPopupSaveIntent is observable, how the call is spelled is not.
+      const sw = await acquireCallerSw();
       const received = [];
-      const run = new Function("message", "sender", "sendResponse", "submitPopupSaveIntent", "pbpRunPopupDraft", "chrome", "notifySaveFailure", "pbpBookmarkAccountService", "pbpSaveFailure", "console", "return " + "(() => {" + branch + " return 'fell-through'; })();");
-      const intent = { mode: "update" }, summaryRange = { start: 3, end: 9 };
-      const held = run({ type: "save_intent", intent, account: "alice", summaryRange }, {}, () => {}, (...args) => { received.push(args); return new Promise(() => {}); },
-        async () => {}, { runtime: { getContexts: async () => [] } }, () => {}, () => "pinboard", () => ({}), console);
+      sw.win.submitPopupSaveIntent = (...args) => { received.push(args); return new Promise(() => {}); };
+      sw.win.pbpRunPopupDraft = async () => {};
+      sw.win.chrome = { ...sw.mock.chrome, runtime: { ...sw.mock.chrome.runtime, getContexts: async () => [] } };
+      sw.win.notifySaveFailure = () => {};
+      sw.win.pbpBookmarkAccountService = () => "pinboard";
+      const intentObj = { mode: "update" }, summaryRange = { start: 3, end: 9 };
+      const held = sw.win.handleRuntimeMessage(
+        { type: "save_intent", intent: intentObj, account: "alice", summaryRange },
+        extSender(sw),
+        () => {}
+      );
       assert(held === true && received.length === 1, "the branch did not hand off to the popup boundary exactly once");
-      assert(received[0][0] === intent && received[0][1] === "alice" && received[0][2] === summaryRange, "the guarded boundary did not receive (intent, account, summaryRange)");
+      assert(received[0][0] === intentObj && received[0][1] === "alice" && received[0][2] === summaryRange, "the guarded boundary did not receive (intent, account, summaryRange)");
     }
-    assert(branch.includes("return true;"), "listener keeps the response channel open");
-    // K45's sendResponse-before-getContexts ordering, and the deferred notify
-    // that fires only after the probe resolves, are exercised behaviourally
-    // (a controllable hung getContexts + recorded call order) in
-    // background-lifecycle-tests.html's router harness (I2) rather than as
-    // source-text position comparisons here.
-    assert(branch.includes('pbpSaveFailure("internal")'), "a rejected submitPopupSaveIntent still answers with the private internal-failure envelope");
-    assert(!branch.includes("persisted") && !branch.includes("retryable"), "private envelope does not cross the message boundary");
+    {
+      const sw = await acquireCallerSw();
+      sw.win.submitPopupSaveIntent = () => Promise.reject(new Error("boom"));
+      sw.win.pbpRunPopupDraft = async () => {};
+      sw.win.chrome = { ...sw.mock.chrome, runtime: { ...sw.mock.chrome.runtime, getContexts: async () => [] } };
+      sw.win.notifySaveFailure = () => {};
+      sw.win.pbpBookmarkAccountService = () => "pinboard";
+      sw.win.console = { ...console, error() {}, warn() {} };
+      const reply = await new Promise((resolve) => {
+        const held = sw.win.handleRuntimeMessage(
+          { type: "save_intent", intent: { mode: "create" }, account: "alice" },
+          extSender(sw),
+          resolve
+        );
+        equal(held, true, "listener keeps the response channel open");
+      });
+      equal(reply?.status, "failed", "a rejected submitPopupSaveIntent still answers with the failure status");
+      equal(reply?.reason, "internal", "a rejected submitPopupSaveIntent answers with internal reason");
+      assert(!Object.hasOwn(reply, "persisted") && !Object.hasOwn(reply, "retryable"), "private envelope does not cross the message boundary");
+    }
   });
 
   await test("background Quick, Read Later, popup-AI, and Batch summary caches always carry captured account", async () => {
-    const source = await getBackgroundSource();
-    const summaryCalls = source.match(/(?:get|set)AICache\([^\n]*"summary"[^\n]*\)/g) || [];
-    // K44 added a ninth site: pbpRunPopupAiCall, which runs the popup's paid
-    // call inside the worker. It sits between the quick-save block and the batch
-    // loop in source order, and like batch it carries the operation's own
-    // validated `account` binding rather than the quick-save startAuth capture.
-    equal(summaryCalls.length, 9, "unexpected production summary cache call count");
-    assert(summaryCalls.slice(0, 4).every((call) => call.includes("startAuth.account")),
-      "Quick/Read Later summary cache lost captured account");
-    assert(summaryCalls.slice(4).every((call) => /, account, s\)$/.test(call)),
-      "popup-AI/Batch summary cache lost its captured account");
+    const summaryCacheCalls = [];
+    const cacheSpies = (miss) => ({
+      getAICache: async (url, kind, duration, source, account, s) => {
+        if (kind === "summary") summaryCacheCalls.push({ op: "get", account, hasSettings: !!s });
+        return miss ? null : (kind === "summary" ? "Cached summary" : ["cached-tag"]);
+      },
+      setAICache: async (url, kind, value, duration, source, account, s) => {
+        if (kind === "summary") summaryCacheCalls.push({ op: "set", account, hasSettings: !!s });
+      },
+    });
+    // 1. Quick Save + Read Later (single + combined)
+    for (const toread of [false, true]) {
+      for (const both of [false, true]) {
+        const h = await createBackgroundSaveHarness({
+          cachedSettings: {
+            pinboardToken: "alice:token", bgSaveMode: "merge", optPrivateDefault: false, optPrivateIncognito: false,
+            _defaultTags: "", _autoNotes: false, _blockquote: false, _aiTags: both, _aiSummary: true,
+          },
+          deps: {
+            hasAIKey: () => true,
+            getPageInfoFromTab: async () => ({ pageText: "article body" }),
+            callAI: async () => "AI summary",
+            parseAICombined: () => ({ tags: ["t"], summary: "Combined summary" }),
+            parseAITags: () => ["t"],
+            refineTags: (t) => t,
+            buildCombinedPrompt: () => "c",
+            buildSummaryPrompt: () => "s",
+            ...cacheSpies(true),
+          },
+        });
+        await runBackgroundSave(h, { toread });
+      }
+    }
+    // 2. pbpRunPopupAiCall (worker-executed popup paid call, combined + single)
+    for (const mode of ["single", "combined"]) {
+      const sw = await acquireCallerSw();
+      sw.win.getCurrentBookmarkAuth = async () => ({ account: "alice", token: "alice:token", epoch: 0 });
+      sw.win.loadSettings = async () => ({ ...SETTINGS_DEFAULTS, pinboardToken: "alice:token" });
+      sw.win.callAI = async () => "Popup summary";
+      sw.win.parseAICombined = () => ({ tags: ["t"], summary: "Popup combined summary" });
+      sw.win.parseAITags = () => ["t"];
+      sw.win.refineTags = (t) => t;
+      Object.assign(sw.win, cacheSpies(true));
+      const res = await sw.win.pbpRunPopupAiCall({
+        account: "alice", url: BASE_INTENT.url, prompt: "p", inflightKey: "k-" + mode, kind: "summary", mode,
+      });
+      equal(res.ok, true, "popup AI summary call succeeded: " + mode);
+    }
+    // 3. Batch Save (single + combined)
+    for (const both of [false, true]) {
+      const swCacheSpies = cacheSpies(true);
+      const b = await createBatchSaveHarness({
+        settings: { batchAiTags: both, batchAiSummary: true },
+        hasAIKey: true,
+        pageInfo: { pageText: "article body" },
+      });
+      // Spy setAICache / getAICache through callerSw directly so full argument list is inspected
+      const sw = _callerSwState.sw;
+      sw.win.getAICache = swCacheSpies.getAICache;
+      sw.win.setAICache = swCacheSpies.setAICache;
+      await b.handleBatchSave(batchTabs(1));
+    }
+    assert(summaryCacheCalls.length >= 10, "expected summary cache reads and writes across all 4 entry points");
+    assert(summaryCacheCalls.every((c) => c.account === "alice"), "summary cache call lost captured account: " + JSON.stringify(summaryCacheCalls));
+    assert(summaryCacheCalls.every((c) => c.hasSettings), "summary cache call lost settings snapshot");
   });
 
   await test("delivery create emits explicit replace, shared, and read-later values", async () => {
@@ -1576,18 +1635,51 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("offline queue migration stays lazy at worker eval and runs on every queue entry point", async () => {
-    const source = await getBackgroundSource();
-    const alarmBlock = source.slice(source.indexOf('if (alarm.name === "keepalive")'), source.indexOf('if (alarm.name === "prewarm-tags")'));
-    const startupBlock = source.slice(source.indexOf("chrome.runtime.onStartup.addListener"), source.indexOf("chrome.runtime.onInstalled.addListener"));
-    const installBlock = source.slice(source.indexOf("chrome.runtime.onInstalled.addListener"), source.indexOf("chrome.runtime.onMessage.addListener"));
-    const getBlock = source.slice(source.indexOf('if (message.type === "get_offline_queue")'), source.indexOf('if (message.type === "save_intent")'));
-    equal(source.split("\n").filter((line) => line === "readOfflineQueueWithIds().catch(() => {});").length, 0,
-      "ordinary worker evaluation must not proactively read offlineQueue");
-    assert(alarmBlock.includes("processOfflineQueue()"), "keepalive alarm no longer drains through the guarded path");
-    assert(startupBlock.includes("processOfflineQueue()"), "startup no longer drains through the guarded path");
-    assert(installBlock.includes('reason === "install" || reason === "update"') && installBlock.includes("readOfflineQueueWithIds()"),
-      "install/update no longer performs the one-time queue migration");
-    assert(getBlock.includes("readOfflineQueueWithIds()"), "get_offline_queue no longer migrates before returning data");
+    let evalQueueWrites = 0;
+    const lazySw = await pbpSwRealm.boot({
+      mock: {
+        storage: {
+          local: {
+            offlineQueue: [{ queueId: "boot-legacy", token: obfuscateKey("alice:legacy"), url: BASE_INTENT.url }],
+          },
+        },
+      },
+      beforeBackground(_win, mock) {
+        const origSet = mock.chrome.storage.local.set.bind(mock.chrome.storage.local);
+        mock.chrome.storage.local.set = async (vals) => {
+          if (vals && typeof vals === "object" && "offlineQueue" in vals) evalQueueWrites++;
+          return origSet(vals);
+        };
+      },
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    equal(evalQueueWrites, 0, "ordinary worker evaluation must not proactively migrate offlineQueue");
+
+    let drainCount = 0;
+    let migrateCount = 0;
+    lazySw.win.processOfflineQueue = async () => { drainCount++; };
+    lazySw.win.readOfflineQueueWithIds = async () => { migrateCount++; return []; };
+    lazySw.win.getCurrentBookmarkAuth = async () => ({ account: "alice", token: "alice:tok", epoch: 0 });
+
+    await Promise.all(lazySw.mock.chrome.alarms.onAlarm.dispatch({ name: "keepalive" }));
+    equal(drainCount, 1, "keepalive alarm no longer drains through the guarded path");
+
+    await Promise.all(lazySw.mock.chrome.runtime.onStartup.dispatch());
+    equal(drainCount, 2, "startup no longer drains through the guarded path");
+
+    await Promise.all(lazySw.mock.chrome.runtime.onInstalled.dispatch({ reason: "install" }));
+    await new Promise((r) => setTimeout(r, 10));
+    equal(migrateCount, 1, "install no longer performs the one-time queue migration");
+
+    await Promise.all(lazySw.mock.chrome.runtime.onInstalled.dispatch({ reason: "update" }));
+    await new Promise((r) => setTimeout(r, 10));
+    equal(migrateCount, 2, "update no longer performs the one-time queue migration");
+
+    await new Promise((resolve) => {
+      lazySw.win.handleRuntimeMessage({ type: "get_offline_queue", account: "alice" }, extSender(lazySw), resolve);
+    });
+    equal(migrateCount, 3, "get_offline_queue no longer migrates before returning data");
+    lazySw.dispose();
 
     const h = await createHarness({
       queue: [{ queueId: "account-a", token: obfuscateKey("alice:legacy-token"), ...intent({ mode: "overwrite" }) }],
@@ -1612,10 +1704,6 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("background Quick and Read Later prepare snapshotted mode, privacy, and read-later intents", async () => {
-    const productionSource = await getBackgroundSaveSource();
-    for (const legacyCall of ["fetchExistingBookmark(", "buildPostsAddUri(", "pinboardFetch(", "enqueueOfflineSave(", "pbpWaybackArchive(", "updateBadge(", "setIcon("]) {
-      assert(!productionSource.includes(legacyCall), `legacy delivery call remains: ${legacyCall}`);
-    }
     const quick = await createBackgroundSaveHarness({
       cachedSettings: {
         pinboardToken: "token", bgSaveMode: "skip", optPrivateDefault: false,
@@ -1626,6 +1714,10 @@ await suite("unified save pipeline", async () => {
         settings.optPrivateIncognito = false;
       },
     });
+    const productionSource = quick.rawSaveFromBackground.toString();
+    for (const legacyCall of ["fetchExistingBookmark(", "buildPostsAddUri(", "pinboardFetch(", "enqueueOfflineSave(", "pbpWaybackArchive(", "updateBadge(", "setIcon("]) {
+      assert(!productionSource.includes(legacyCall), `legacy delivery call remains: ${legacyCall}`);
+    }
     await runBackgroundSave(quick, { tab: { id: 9, url: BASE_INTENT.url, incognito: true } });
     equal(quick.intents[0].mode, "skip");
     equal(quick.intents[0].private, true);
@@ -1827,71 +1919,65 @@ await suite("unified save pipeline", async () => {
     const captured = await pending;
     equal(captured.account, "alice", "pending save must retain its delivery account");
 
-    let clickHandler;
+    const sw = await acquireCallerSw();
     let currentToken = "";
     let authEpoch = 0;
     let switchDuringRead = false;
     const deleteCalls = [];
-    // The slice contains the real showNotification, so its own chrome call is
-    // the only honest place to observe a toast (and it keeps the notifyErrors
-    // gate in the path). posts/delete answers are written in the server's shape:
-    // an HTTP status plus a result_code body.
     const toasts = [];
     let deleteAnswer = () => ({ ok: true, status: 200, json: async () => ({ result_code: "done" }) });
     const notificationChrome = {
+      ...sw.mock.chrome,
       notifications: {
-        onButtonClicked: { addListener(fn) { clickHandler = fn; } },
+        ...sw.mock.chrome.notifications,
         create(id, opts) { toasts.push({ id, title: opts?.title, message: opts?.message }); },
         clear: async () => true,
       },
-      tabs: { query: async () => [] },
-      storage: { local: { get: async () => ({ offlineQueue: [] }), set: async () => {} } },
+      tabs: { ...sw.mock.chrome.tabs, query: async () => [] },
+      storage: {
+        local: { get: async () => ({ offlineQueue: [] }), set: async () => {} },
+      },
     };
     const settled = async () => { await new Promise((resolve) => setTimeout(resolve, 0)); };
-    const deps = {
-      chrome: notificationChrome,
-      SETTINGS_DEFAULTS,
-      pbpReadSettingsWithSecrets: async () => {
-        const tokenAtRead = currentToken;
-        if (switchDuringRead) {
-          switchDuringRead = false;
-          authEpoch++;
-          currentToken = "bob:after-race";
-        }
-        return { pinboardToken: tokenAtRead ? obfuscateKey(tokenAtRead) : "" };
-      },
-      deobfuscateKey,
-      pbpResolveOfflineQueueToken,
-      pbpPinboardAccountFromToken,
-      pbpBookmarkAuthEpoch: () => authEpoch,
-      pbpBookmarkAuthIsCurrent: (auth) => !!auth?.account && auth.epoch === authEpoch,
-      pinboardFetch: async (url) => {
-        const answer = deleteAnswer();
-        deleteCalls.push(url);
-        if (answer instanceof Error) throw answer;
-        return answer;
-      },
-      getCurrentBookmarkAuth: async () => ({
-        token: currentToken, account: pbpPinboardAccountFromToken(currentToken), epoch: authEpoch,
-      }),
-      getSettingsStorage: async () => ({ get: async (defaults) => defaults }),
-      statusCache: new Map(),
-      pbpCaptureBookmarkAuth: (token) => ({ account: pbpPinboardAccountFromToken(token), epoch: authEpoch }),
-      pbpStatusCacheSet: (url, auth, value) => {
-        if (!auth?.account || auth.epoch !== authEpoch) return false;
-        deps.statusCache.set(url, { ...value, account: auth.account });
-        return true;
-      },
-      t: (key) => key,
-      setTimeout: () => 0,
-      console,
-      runOfflineQueueConsumer: pbpCreateRecoveringTail(), runSaveDeliveryTransaction: pbpCreateRecoveringTail(),
-      runOfflineQueueWrite: pbpCreateRecoveringTail(), pbpReleaseDroppedSummaryHolds: async () => {},
-      updateBadge: async () => {}, setIcon: () => {},
+    sw.win.chrome = notificationChrome;
+    sw.win.pbpReadSettingsWithSecrets = async () => {
+      const tokenAtRead = currentToken;
+      if (switchDuringRead) {
+        switchDuringRead = false;
+        authEpoch++;
+        currentToken = "bob:after-race";
+      }
+      return { pinboardToken: tokenAtRead ? obfuscateKey(tokenAtRead) : "" };
     };
-    const source = await getUndoSource();
-    const factory = new Function(...Object.keys(deps), `${source}\nreturn { recent: _recentSaves };`);
-    const { recent } = factory(...Object.values(deps));
+    sw.win.deobfuscateKey = deobfuscateKey;
+    sw.win.pbpBookmarkAuthEpoch = () => authEpoch;
+    sw.win.pbpBookmarkAuthIsCurrent = (auth) => !!auth?.account && auth.epoch === authEpoch;
+    sw.win.pinboardFetch = async (url) => {
+      const answer = deleteAnswer();
+      deleteCalls.push(url);
+      if (answer instanceof Error) throw answer;
+      return answer;
+    };
+    sw.win.getCurrentBookmarkAuth = async () => ({
+      token: currentToken, account: pbpPinboardAccountFromToken(currentToken), epoch: authEpoch,
+    });
+    sw.win.getSettingsStorage = async () => ({ get: async (defaults) => defaults });
+    const rawCache = sw.get("statusCache");
+    sw.win.pbpCaptureBookmarkAuth = (token) => ({ account: pbpPinboardAccountFromToken(token), epoch: authEpoch });
+    sw.win.pbpStatusCacheSet = (url, auth, value) => {
+      if (!auth?.account || auth.epoch !== authEpoch) return false;
+      rawCache.set(url, { ...value, account: auth.account });
+      return true;
+    };
+    sw.win.t = (key) => key;
+    sw.win.setTimeout = () => 0;
+    sw.win.pbpReleaseDroppedSummaryHolds = async () => {};
+    sw.win.updateBadge = async () => {};
+    sw.win.setIcon = () => {};
+    const recent = sw.get("_recentSaves");
+    const clickHandler = async (id, btnIdx) => {
+      await Promise.all(sw.mock.chrome.notifications.onButtonClicked.dispatch(id, btnIdx));
+    };
 
     recent.set("logout", { url: BASE_INTENT.url, account: "alice" });
     authEpoch++;
@@ -1986,21 +2072,21 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("Quick Save and Read Later shortcuts save under the cleaned address and read the page by the tab's own", async () => {
-    const background = await getBackgroundSource();
-    const start = background.indexOf("chrome.commands.onCommand.addListener(");
-    const end = background.indexOf("\n});\n", start);
-    assert(start >= 0 && end > start, "onCommand listener source not found");
     for (const [command, toread] of [["quick_save", false], ["read_later", true]]) {
       for (const urlClean of [SETTINGS_DEFAULTS.urlClean, { ...SETTINGS_DEFAULTS.urlClean, enabled: false }, { ...SETTINGS_DEFAULTS.urlClean, onPopupOpen: false }]) {
-        let listener;
+        const sw = await acquireCallerSw();
         const saves = [];
-        const chromeStub = { commands: { onCommand: { addListener: fn => { listener = fn; } } },
-          tabs: { query: async () => [{ id: 4, url: TRACKED, title: "Post" }] } };
-        new Function("chrome", "openMarkdownPreviewFromShortcut", "handleSaveTabSet", "showNotification", "t",
-          "pbpRouteReaderSaveCommand", "loadSettings", "resolvePrefixSettings", "saveFromBackground", "pbpBookmarkLookupUrl", "pbpI18nReady",
-          background.slice(start, end + 4))(chromeStub, async () => {}, async () => {}, () => {}, k => k,
-          async () => false, async () => ({ urlClean }), () => ({}), async args => { saves.push(args); }, pbpBookmarkLookupUrl, async () => {});
-        await listener(command);
+        sw.win.chrome = { ...sw.mock.chrome, tabs: { ...sw.mock.chrome.tabs, query: async () => [{ id: 4, url: TRACKED, title: "Post" }] } };
+        sw.win.openMarkdownPreviewFromShortcut = async () => {};
+        sw.win.handleSaveTabSet = async () => {};
+        sw.win.showNotification = () => {};
+        sw.win.t = k => k;
+        sw.win.pbpRouteReaderSaveCommand = async () => false;
+        sw.win.loadSettings = async () => ({ urlClean });
+        sw.win.resolvePrefixSettings = () => ({});
+        sw.win.saveFromBackground = async args => { saves.push(args); };
+        sw.win.pbpI18nReady = async () => {};
+        await Promise.all(sw.mock.chrome.commands.onCommand.dispatch(command));
         equal(saves.length, 1);
         const cleaning = urlClean.enabled && urlClean.onPopupOpen;
         equal(saves[0].url, cleaning ? CLEANED : TRACKED, command + " saved under the wrong address");
@@ -2014,19 +2100,21 @@ await suite("unified save pipeline", async () => {
   // the worker's idle timer once the keepalive window has lapsed, so the handler
   // must reopen the window before its first await.
   await test("every shortcut reopens the keepalive window before its first await", async () => {
-    const background = await getBackgroundSource();
-    const start = background.indexOf("chrome.commands.onCommand.addListener(");
-    const end = background.indexOf("\n});\n", start);
     for (const command of ["quick_save", "read_later", "save_tabset", "markdown_preview"]) {
-      let listener, noted = 0;
-      const chromeStub = { commands: { onCommand: { addListener: fn => { listener = fn; } } },
-        tabs: { query: async () => [{ id: 4, url: "https://example.com/a", title: "Post" }] } };
-      new Function("chrome", "openMarkdownPreviewFromShortcut", "handleSaveTabSet", "showNotification", "t",
-        "pbpRouteReaderSaveCommand", "loadSettings", "resolvePrefixSettings", "saveFromBackground", "pbpBookmarkLookupUrl", "pbpI18nReady", "noteActivity",
-        background.slice(start, end + 4))(chromeStub, async () => {}, async () => {}, () => {}, k => k,
-        async () => false, async () => ({ urlClean: SETTINGS_DEFAULTS.urlClean }), () => ({}), async () => {}, pbpBookmarkLookupUrl,
-        () => new Promise(() => {}), () => { noted++; });
-      listener(command); // pbpI18nReady never settles: only the synchronous prefix runs
+      const sw = await acquireCallerSw();
+      let noted = 0;
+      sw.win.chrome = { ...sw.mock.chrome, tabs: { ...sw.mock.chrome.tabs, query: async () => [{ id: 4, url: "https://example.com/a", title: "Post" }] } };
+      sw.win.openMarkdownPreviewFromShortcut = async () => {};
+      sw.win.handleSaveTabSet = async () => {};
+      sw.win.showNotification = () => {};
+      sw.win.t = k => k;
+      sw.win.pbpRouteReaderSaveCommand = async () => false;
+      sw.win.loadSettings = async () => ({ urlClean: SETTINGS_DEFAULTS.urlClean });
+      sw.win.resolvePrefixSettings = () => ({});
+      sw.win.saveFromBackground = async () => {};
+      sw.win.pbpI18nReady = () => new Promise(() => {});
+      sw.win.noteActivity = () => { noted++; };
+      sw.mock.chrome.commands.onCommand.dispatch(command); // pbpI18nReady never settles: only the synchronous prefix runs
       equal(noted, 1, command + " did not note activity before its first await");
     }
   });
@@ -2035,25 +2123,28 @@ await suite("unified save pipeline", async () => {
   // network round-trip, so on a cold worker it must wait for the manual-language
   // refresh first.
   await test("shortcut notifications wait for the language refresh before any copy is built", async () => {
-    const background = await getBackgroundSource();
-    const start = background.indexOf("chrome.commands.onCommand.addListener(");
-    const end = background.indexOf("\n});\n", start);
     for (const scenario of ["quick_save", "read_later", "bad_page", "tabset_empty", "md_bad_page"]) {
-      let listener, ready = false, release;
+      const sw = await acquireCallerSw();
+      let ready = false, release;
       const gate = new Promise(r => { release = () => { ready = true; r(); }; });
       const notes = [], saves = [];
       const tabUrl = scenario === "bad_page" || scenario === "md_bad_page" ? "chrome://extensions" : "https://example.com/a";
-      const chromeStub = { commands: { onCommand: { addListener: fn => { listener = fn; } } },
-        tabs: { query: async () => scenario === "tabset_empty" ? [{ id: 1, url: "chrome://x", title: "x" }] : [{ id: 4, url: tabUrl, title: "Post" }] } };
+      sw.win.chrome = {
+        ...sw.mock.chrome,
+        tabs: { ...sw.mock.chrome.tabs, query: async () => scenario === "tabset_empty" ? [{ id: 1, url: "chrome://x", title: "x" }] : [{ id: 4, url: tabUrl, title: "Post" }] },
+      };
       const t = k => (ready ? "MANUAL:" : "BROWSER:") + k;
-      new Function("chrome", "openMarkdownPreviewFromShortcut", "handleSaveTabSet", "showNotification", "t",
-        "pbpRouteReaderSaveCommand", "loadSettings", "resolvePrefixSettings", "saveFromBackground", "pbpBookmarkLookupUrl", "pbpI18nReady",
-        background.slice(start, end + 4))(chromeStub,
-        async () => { notes.push(["mdpv", t("bgMdPreviewFailed")]); }, async () => {},
-        (...a) => notes.push(a), t, async () => false, async () => ({ urlClean: SETTINGS_DEFAULTS.urlClean }), () => ({}),
-        async args => { saves.push(args); }, pbpBookmarkLookupUrl, () => gate);
+      sw.win.t = t;
+      sw.win.openMarkdownPreviewFromShortcut = async () => { notes.push(["mdpv", t("bgMdPreviewFailed")]); };
+      sw.win.handleSaveTabSet = async () => {};
+      sw.win.showNotification = (...a) => notes.push(a);
+      sw.win.pbpRouteReaderSaveCommand = async () => false;
+      sw.win.loadSettings = async () => ({ urlClean: SETTINGS_DEFAULTS.urlClean });
+      sw.win.resolvePrefixSettings = () => ({});
+      sw.win.saveFromBackground = async args => { saves.push(args); };
+      sw.win.pbpI18nReady = () => gate;
       const command = { quick_save: "quick_save", read_later: "read_later", bad_page: "quick_save", tabset_empty: "save_tabset", md_bad_page: "markdown_preview" }[scenario];
-      const running = listener(command);
+      const running = Promise.all(sw.mock.chrome.commands.onCommand.dispatch(command));
       await new Promise(r => setTimeout(r, 20));
       equal(notes.length + saves.length, 0, scenario + " acted before the language refresh finished");
       release();
@@ -2065,18 +2156,14 @@ await suite("unified save pipeline", async () => {
 
   // X4-01: a language change reaches a running worker through storage.onChanged.
   await test("a language change re-initializes the worker's strings, other changes do not", async () => {
-    const background = await getBackgroundSource();
-    const start = background.indexOf("// Follow a language change");
-    const end = background.indexOf("\n});\n", start);
-    assert(start >= 0 && end > start, "language listener source not found");
-    let listener, calls = 0;
-    new Function("chrome", "initI18n", background.slice(start, end + 4))(
-      { storage: { onChanged: { addListener: fn => { listener = fn; } } } }, () => { calls++; });
-    listener({ optLang: { oldValue: "zh_CN", newValue: "en" } }, "sync"); equal(calls, 1, "sync optLang");
-    listener({ optLang: { oldValue: "en", newValue: "auto" } }, "local"); equal(calls, 2, "local optLang");
-    listener({ optSyncEnabled: { oldValue: false, newValue: true } }, "local"); equal(calls, 3, "optSyncEnabled moves optLang's storage area");
-    listener({ optLang: { newValue: "en" } }, "managed"); equal(calls, 3, "other areas are ignored");
-    listener({ optTheme: { newValue: "dark" } }, "sync"); equal(calls, 3, "unrelated keys are ignored");
+    const sw = await acquireCallerSw();
+    let calls = 0;
+    sw.win.initI18n = () => { calls++; };
+    sw.mock.chrome.storage.onChanged.dispatch({ optLang: { oldValue: "zh_CN", newValue: "en" } }, "sync"); equal(calls, 1, "sync optLang");
+    sw.mock.chrome.storage.onChanged.dispatch({ optLang: { oldValue: "en", newValue: "auto" } }, "local"); equal(calls, 2, "local optLang");
+    sw.mock.chrome.storage.onChanged.dispatch({ optSyncEnabled: { oldValue: false, newValue: true } }, "local"); equal(calls, 3, "optSyncEnabled moves optLang's storage area");
+    sw.mock.chrome.storage.onChanged.dispatch({ optLang: { newValue: "en" } }, "managed"); equal(calls, 3, "other areas are ignored");
+    sw.mock.chrome.storage.onChanged.dispatch({ optTheme: { newValue: "dark" } }, "sync"); equal(calls, 3, "unrelated keys are ignored");
   });
 
   await test("a 2xx Pinboard answer without a result code is not shown as Pinboard's own error", async () => {
@@ -2461,50 +2548,38 @@ await suite("unified save pipeline", async () => {
   });
 
   await test("K100: initI18n() stays synchronous and pbpI18nReady tracks the latest refresh", async () => {
-    const i18nSource = await (await fetch("../i18n.js")).text();
-    const chromeStub = {
-      runtime: { getManifest: () => ({ version: "9.9.9" }), getURL: (p) => "i18n-fixture://" + p },
-      i18n: { getMessage: (key) => key },
-    };
-    // Two distinct fetch resolvers, released under test control, so the test can
-    // prove the SECOND pbpI18nReady() promise stays pending until the SECOND
-    // fetch resolves rather than resolving early off the first one.
     const pendingFetches = [];
     const fetchStub = async () => new Promise((resolve) => {
       pendingFetches.push(() => resolve({ ok: true, json: async () => ({}) }));
     });
-    // optLang differs between the two calls (en vs zh_CN) so the version-stamp
-    // short-circuit (i18n.js: _i18nMessagesLang === optLang) never fires and each
-    // initI18n() call is guaranteed to perform its own real fetch.
     const storageData = { optLang: "en" };
-    const getSettingsStorage = async () => ({
-      get: async (defaults) => ({ ...defaults, ...storageData }),
+    const i18nRealm = await pbpSwRealm.loadRealmScripts(["i18n.js"], {
+      fetch: fetchStub,
+      beforeScripts(win) {
+        win.chrome = {
+          runtime: { getManifest: () => ({ version: "9.9.9" }), getURL: (p) => "i18n-fixture://" + p },
+          i18n: { getMessage: (key) => key },
+        };
+        win.getSettingsStorage = async () => ({
+          get: async (defaults) => ({ ...defaults, ...storageData }),
+        });
+        win.localStorage.clear();
+      },
     });
-    const localStorageStub = (() => {
-      const store = new Map();
-      return {
-        getItem: (k) => (store.has(k) ? store.get(k) : null),
-        setItem: (k, v) => store.set(k, String(v)),
-        removeItem: (k) => store.delete(k),
-      };
-    })();
-    const factory = new Function(
-      "chrome", "fetch", "localStorage", "getSettingsStorage",
-      i18nSource + "\nreturn { initI18n, pbpI18nReady };"
-    );
-    const { initI18n, pbpI18nReady } = factory(chromeStub, fetchStub, localStorageStub, getSettingsStorage);
+    const initI18n = i18nRealm.win.initI18n;
+    const pbpI18nReady = i18nRealm.win.pbpI18nReady;
 
     const firstReturn = initI18n();
     equal(firstReturn, undefined, "initI18n() must keep returning undefined");
     const firstReady = pbpI18nReady();
-    assert(firstReady instanceof Promise, "pbpI18nReady() must return a promise");
-    await new Promise((resolve) => setTimeout(resolve, 0)); // flush microtasks until the fetch() call itself lands in pendingFetches
+    assert(firstReady && typeof firstReady.then === "function", "pbpI18nReady() must return a promise");
+    await new Promise((resolve) => setTimeout(resolve, 0));
     equal(pendingFetches.length, 1, "first initI18n() should have started exactly one fetch");
     pendingFetches.shift()();
     await firstReady;
 
     storageData.optLang = "zh_CN";
-    const secondReturn = initI18n(); // hits the _i18nReady early-return branch (initI18n called a second time)
+    const secondReturn = initI18n();
     equal(secondReturn, undefined, "repeat initI18n() call must also return undefined");
     const secondReady = pbpI18nReady();
     assert(secondReady !== firstReady, "pbpI18nReady() should track the latest refresh, not the first one");
@@ -2517,17 +2592,10 @@ await suite("unified save pipeline", async () => {
     pendingFetches.shift()();
     await secondReady;
     assert(secondReadyResolved, "pbpI18nReady() did not resolve after its refresh landed");
+    i18nRealm.dispose();
   });
 
   await test("Batch delegates mixed outcomes to unified intents and aggregates once", async () => {
-    const productionSource = await getBatchSaveSource();
-    for (const legacyCall of [
-      "buildPostsAddUri(", "pinboardFetch(", "statusCache", "pbpWaybackArchive(",
-      "fetchExistingUrlSet(", "computeSavedUrlSet(", "cached_existing_urls",
-    ]) {
-      assert(!productionSource.includes(legacyCall), `legacy Batch delivery remains: ${legacyCall}`);
-    }
-
     const h = await createBatchSaveHarness({ outcomes: [
       { status: "saved", mutation: "created" },
       { status: "queued", queueId: "q1" },
@@ -2535,6 +2603,13 @@ await suite("unified save pipeline", async () => {
       { status: "failed", reason: "too_long" },
       { status: "failed", reason: "api" },
     ] });
+    const productionSource = h.rawHandleBatchSave.toString();
+    for (const legacyCall of [
+      "buildPostsAddUri(", "pinboardFetch(", "statusCache", "pbpWaybackArchive(",
+      "fetchExistingUrlSet(", "computeSavedUrlSet(", "cached_existing_urls",
+    ]) {
+      assert(!productionSource.includes(legacyCall), `legacy Batch delivery remains: ${legacyCall}`);
+    }
     await h.handleBatchSave(batchTabs(5));
 
     equal(h.intents.length, 5);

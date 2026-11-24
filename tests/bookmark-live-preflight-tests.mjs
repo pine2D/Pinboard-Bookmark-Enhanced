@@ -365,7 +365,16 @@ try {
       // the options page and the default locale belong to all of them.
       const surfaces = live.surfaceFiles(root);
       const tags = (page, re) => [...readFileSync(join(root, page), 'utf8').matchAll(re)].map(x => x[1]).filter(f => !/^[a-z]+:|^\/\//i.test(f));
-      const imported = [...readFileSync(join(root, 'background.js'), 'utf8').match(/importScripts\(([\s\S]*?)\)/)[1].matchAll(/"([^"]+)"/g)].map(x => x[1]);
+      const { createRequire: makeReq } = await import('node:module');
+      const espree = makeReq(join(root, '.qa-scan', 'package.json'))('espree');
+      const bgAst = espree.parse(readFileSync(join(root, 'background.js'), 'utf8'), { ecmaVersion: 'latest' });
+      const imported = [];
+      for (const stmt of bgAst.body) {
+        const expr = stmt.type === 'ExpressionStatement' ? stmt.expression : null;
+        if (expr?.type === 'CallExpression' && expr.callee.type === 'Identifier' && expr.callee.name === 'importScripts') {
+          for (const arg of expr.arguments) if (arg.type === 'Literal' && typeof arg.value === 'string') imported.push(arg.value);
+        }
+      }
       for (const f of ['manifest.json', 'background.js', '_locales/en/messages.json', ...imported]) assert(surfaces.worker.includes(f), 'worker loads ' + f);
       for (const [name, page] of Object.entries(live.SURFACE_PAGES)) {
         for (const f of [page, ...tags(page, /<script\b[^>]*\bsrc="([^"]+)"/g)]) assert(surfaces[name].includes(f), name + ' loads ' + f);

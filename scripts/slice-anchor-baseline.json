@@ -1,47 +1,9 @@
 {
   "note": "Slice anchors per test file (scripts/slice-anchor-lint.mjs). Only shrinks: refresh with --update after removing anchors. New tests load the real file with tests/fixtures/chrome-mock.js instead of cutting source.",
-  "total": 1106,
+  "total": 933,
   "files": {
-    "tests/ai-tags-tests.html": {
-      "count": 1,
-      "growth": [
-        {
-          "date": "2026-11-10",
-          "from": 0,
-          "to": 1,
-          "reason": "counting correction from review round 1: the lint now follows eval scopes, || [] fallbacks, const-held regexes, more fetch/read forms, split pieces, wrapper/object/options helpers and loop markers; every newly counted anchor already existed on main (old and new lint run on the same tree); no test changed"
-        }
-      ]
-    },
-    "tests/bookmark-live-preflight-tests.mjs": {
-      "count": 2
-    },
-    "tests/bookmark-services-tests.html": {
-      "count": 8
-    },
     "tests/drive-migration-tests.html": {
       "count": 9
-    },
-    "tests/export-targets-tests.html": {
-      "count": 6
-    },
-    "tests/frame-candidate-tests.html": {
-      "count": 3
-    },
-    "tests/i18n-parity-tests.html": {
-      "count": 1
-    },
-    "tests/jina-cache-tests.html": {
-      "count": 4
-    },
-    "tests/md-convert-tests.html": {
-      "count": 1
-    },
-    "tests/md-dict-tests.html": {
-      "count": 2
-    },
-    "tests/md-highlight-commit-tests.html": {
-      "count": 4
     },
     "tests/md-preview-contrast-tests.mjs": {
       "count": 2,
@@ -54,30 +16,6 @@
         }
       ]
     },
-    "tests/md-send-menu-tests.html": {
-      "count": 6
-    },
-    "tests/md-video-tests.html": {
-      "count": 3
-    },
-    "tests/options-ai-custom-tests.html": {
-      "count": 4
-    },
-    "tests/options-context-help-tests.html": {
-      "count": 1
-    },
-    "tests/options-reset-tests.html": {
-      "count": 2
-    },
-    "tests/options-usability-tests.html": {
-      "count": 4
-    },
-    "tests/pinboard-style-cloak-tests.html": {
-      "count": 3
-    },
-    "tests/popup-ai-sw-tests.html": {
-      "count": 6
-    },
     "tests/popup-save-tests.html": {
       "count": 353,
       "growth": [
@@ -88,40 +26,6 @@
           "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
         }
       ]
-    },
-    "tests/restore-points-tests.html": {
-      "count": 3,
-      "growth": [
-        {
-          "date": "2026-11-10",
-          "from": 2,
-          "to": 3,
-          "reason": "counting correction from review round 1: the lint now follows eval scopes, || [] fallbacks, const-held regexes, more fetch/read forms, split pieces, wrapper/object/options helpers and loop markers; every newly counted anchor already existed on main (old and new lint run on the same tree); no test changed"
-        }
-      ]
-    },
-    "tests/save-pipeline-tests.html": {
-      "count": 72,
-      "growth": [
-        {
-          "date": "2026-11-10",
-          "from": 63,
-          "to": 71,
-          "reason": "measurement fix: the lint now also counts helpers that read the source from their closure (block(start, end)); no test changed"
-        },
-        {
-          "date": "2026-11-10",
-          "from": 71,
-          "to": 72,
-          "reason": "counting correction from review round 1: the lint now follows eval scopes, || [] fallbacks, const-held regexes, more fetch/read forms, split pieces, wrapper/object/options helpers and loop markers; every newly counted anchor already existed on main (old and new lint run on the same tree); no test changed"
-        }
-      ]
-    },
-    "tests/settings-persist-tests.html": {
-      "count": 36
-    },
-    "tests/tag-gov-entity-tests.html": {
-      "count": 1
     },
     "tests/theme-ui-derive-tests.mjs": {
       "count": 15,

@@ -4844,6 +4844,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       })()
     };
   }
+  if (typeof window !== "undefined" && location.protocol !== "chrome-extension:") {
+    window.__PBP_collectSettingsFromForm = collectSettingsFromForm;
+  }
 
   const savedState = {
     // The delta baseline must not certify itself. collectSettingsFromForm
@@ -5531,6 +5534,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     } finally {
       await pbpRefreshSyncLocalFallbackStatus();
     }
+  }
+  if (typeof window !== "undefined" && location.protocol !== "chrome-extension:") {
+    window.__PBP_loadSavedThemes = loadSavedThemes;
+    window.__PBP_persistSavedThemes = persistSavedThemes;
+    window.__PBP_getSavedThemes = () => savedThemes;
   }
 
   function renderSavedThemes() {

@@ -42,6 +42,8 @@ function uiLangToBCP47() { return "en"; }
 <script src="../tag-gov.js"></script>
 <script src="../options.js"></script>
 <script src="../tag-gov-save.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -296,9 +298,48 @@ window.showConfirmPopover = (anchor, opts) => { confirmOpts = opts; return true;
     assert(document.getElementById("tag-gov-entity-status").textContent === "", "status kept");
     assert(_tagGovEntityItems.length === 0, "items kept");
     assert(document.getElementById("tag-gov-entity-repair").disabled, "repair button live on an empty list");
-    const source = await fetch("../options.js").then((r) => r.text());
-    const at = source.indexOf('$id("tag-gov-problems")?.replaceChildren();');
-    assert(at > 0 && source.slice(at, at + 900).includes("pbpResetTagGovEntitySection();"), "account listener does not reset the entity section");
+    const optRealm = await pbpSwRealm.bootOptions({
+      mock: {
+        permissions: { origins: ["https://api.pinboard.in/*"] },
+        storage: { local: { pinboardToken: obfuscateKey("alice:TOK") } },
+      },
+      beforeScripts(_win, mock) {
+        mock.onSendMessage((msg) => {
+          if (msg?.type === "pinboard_api_call" && String(msg.url || "").includes("tags/get")) {
+            return { ok: true, status: 200, text: JSON.stringify({ "c&quot;d": 4 }) };
+          }
+          if (msg?.type === "pinboard_api_call") {
+            return { ok: true, status: 200, text: "{}" };
+          }
+          return {};
+        });
+      },
+      fetch: async (input) => {
+        const href = String(input || "");
+        const m = href.match(/\/(_locales\/[^/]+\/messages\.json)$/);
+        if (m) return fetch("../" + m[1]);
+        if (href.includes("tags/get")) {
+          return new Response(JSON.stringify({ "c&quot;d": 4 }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+      },
+    });
+    try {
+      optRealm.doc.getElementById("tab-tags")?.click();
+      await new Promise((r) => setTimeout(r, 30));
+      await optRealm.win.scanTagGovEntities();
+      assert(optRealm.doc.getElementById("tag-gov-entity-list").textContent.includes("c&quot;d"), "booted options precondition");
+      await optRealm.mock.chrome.storage.local.set({ pinboardToken: obfuscateKey("bob:TOK2") });
+      await new Promise((r) => setTimeout(r, 30));
+      assert(optRealm.doc.getElementById("tag-gov-entity-list").childNodes.length === 0
+        && optRealm.doc.getElementById("tag-gov-entity-count").textContent === ""
+        && optRealm.doc.getElementById("tag-gov-entity-status").textContent === ""
+        && optRealm.get("_tagGovEntityItems.length") === 0
+        && optRealm.doc.getElementById("tag-gov-entity-repair").disabled,
+        "account listener does not reset the entity section");
+    } finally {
+      optRealm.dispose();
+    }
   });
 
   await test("account lost during the repair: the button is not left disabled and the not-signed-in explanation shows", async () => {

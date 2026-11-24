@@ -29,6 +29,8 @@
 <script src="../i18n.js"></script>
 <script src="../shared.js"></script>
 <script src="../ai.js"></script>
+<script src="fixtures/chrome-mock.js"></script>
+<script src="fixtures/sw-realm.js"></script>
 <script>
 const root = document.getElementById("results"); let pass = 0, fail = 0;
 // A sync try/catch around a promise-returning API "passes" every behavioural
@@ -103,74 +105,79 @@ function jsonResponse(status, body) {
   };
 }
 
-let backgroundSource = null;
-async function getSource() {
-  if (!backgroundSource) backgroundSource = await (await fetch("../background.js")).text();
-  return backgroundSource;
+let _aiSwRealm = null;
+async function getAiSw() {
+  if (!_aiSwRealm) {
+    _aiSwRealm = await pbpSwRealm.boot({ mock: { id: "feoognahlmfmbllpmgailahcnjppiegb" } });
+  }
+  return _aiSwRealm;
 }
 
-// ---- Harness: the popup-AI worker block sliced out of background.js ---------
-// PBP_AI_OVERRIDE_FIELDS / pbpSanitizeAiOverrides moved to shared.js when the
-// popup started building the overrides with the SAME list (K44-b); they are
-// injected below as the real globals this page already loaded.
-const AI_BLOCK_START = "// Structured clone drops the Error prototype";
-const AI_BLOCK_END = "// ---- 监听来自 popup 的消息 ----";
-
-function buildAiHarness(source, opts) {
+function buildAiHarness(_unused, opts) {
   const o = opts || {};
-  const start = source.indexOf(AI_BLOCK_START);
-  const end = source.indexOf(AI_BLOCK_END, start);
-  if (start < 0 || end <= start) throw new Error("popup AI worker block not found in background.js");
+  const sw = _aiSwRealm;
+  if (!sw) throw new Error("SW realm not booted");
   const calls = { callAI: [], setAICache: [], loadSettings: 0, warn: [] };
-  // getCurrentBookmarkAuth is re-read at every gate; a list lets a case model an
-  // account switch that lands BETWEEN two specific gates.
   const accounts = o.accounts || ["alice"];
   let authReads = 0;
   const local = makeStore(o.local);
   const reply = o.callAI || (async () => (o.reply !== undefined ? o.reply : "ok"));
-  const deps = {
-    chrome: { storage: { local } },
-    loadSettings: async () => { calls.loadSettings++; return structuredClone(o.settings || {}); },
-    getCurrentBookmarkAuth: async () => {
+  const runWithConfiguredSw = async (fn) => {
+    const prev = {
+      local: sw.win.chrome.storage.local,
+      loadSettings: sw.win.loadSettings,
+      getCurrentBookmarkAuth: sw.win.getCurrentBookmarkAuth,
+      callAI: sw.win.callAI,
+      setAICache: sw.win.setAICache,
+      t: sw.win.t,
+      warn: sw.win.console.warn,
+      error: sw.win.console.error,
+    };
+    sw.win.chrome.storage.local = local;
+    sw.win.loadSettings = async () => { calls.loadSettings++; return structuredClone(o.settings || {}); };
+    sw.win.getCurrentBookmarkAuth = async () => {
       const account = accounts[Math.min(authReads++, accounts.length - 1)];
       return { token: `${account}:token`, account, epoch: 0 };
-    },
-    callAI: async (s, prompt, callOpts) => {
+    };
+    sw.win.callAI = async (s, prompt, callOpts) => {
       calls.callAI.push({ s, prompt, opts: callOpts });
       return reply(s, prompt, callOpts);
-    },
-    // The REAL registry: dedup is the behaviour under test, a stub would assert
-    // nothing about it.
-    getOrCreateInflight,
-    parseAICombined, parseAITags, refineTags,
-    AI_TAG_CAP, API_KEY_FIELDS, PBP_AI_OVERRIDE_FIELDS, pbpSanitizeAiOverrides,
-    // The real resolver; t is pinned so a localized message is exact.
-    pbpAiResolveTarget, t: (key) => "msg:" + key,
-    setAICache: async (...args) => { calls.setAICache.push(args); if (o.setAICache) return o.setAICache(...args); },
-    console: { warn: (...a) => calls.warn.push(a), log: () => {}, error: (...a) => calls.warn.push(a) },
+    };
+    sw.win.setAICache = async (...args) => {
+      calls.setAICache.push(args);
+      if (o.setAICache) return o.setAICache(...args);
+    };
+    sw.win.t = (key) => "msg:" + key;
+    sw.win.console.warn = (...a) => calls.warn.push(a);
+    sw.win.console.error = (...a) => calls.warn.push(a);
+    try {
+      return await fn();
+    } finally {
+      sw.win.chrome.storage.local = prev.local;
+      sw.win.loadSettings = prev.loadSettings;
+      sw.win.getCurrentBookmarkAuth = prev.getCurrentBookmarkAuth;
+      sw.win.callAI = prev.callAI;
+      sw.win.setAICache = prev.setAICache;
+      sw.win.t = prev.t;
+      sw.win.console.warn = prev.warn;
+      sw.win.console.error = prev.error;
+    }
   };
-  const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
-    return { pbpRunPopupAiCall, pbpSanitizeAiOverrides, pbpAiErrorEnvelope, PBP_AI_OVERRIDE_FIELDS };`);
-  return { ...factory(...Object.values(deps)), calls, local, get authReads() { return authReads; } };
+  return {
+    pbpRunPopupAiCall: (msg) => runWithConfiguredSw(() => sw.win.pbpRunPopupAiCall(msg)),
+    pbpSanitizeAiOverrides: sw.win.pbpSanitizeAiOverrides,
+    pbpAiErrorEnvelope: sw.win.pbpAiErrorEnvelope,
+    swObjectPrototype: sw.win.Object.prototype,
+    swErrorConstructor: sw.win.Error,
+    PBP_AI_OVERRIDE_FIELDS: sw.get("PBP_AI_OVERRIDE_FIELDS"),
+    calls,
+    local,
+    get authReads() { return authReads; },
+  };
 }
 
-
-// ---- Harness: the popup's routing slice, sliced out of popup-ai.js ----------
-// K44-b. The popup half is under test here only where it MEETS the worker; its
-// own behaviour is covered in popup-save-tests.html. _inflightAI is per
-// generation on purpose: in the product each popup document gets a fresh Map,
-// and the dedup that matters across generations is the worker's.
-let popupAiSource = null;
-async function getPopupSource() {
-  if (!popupAiSource) popupAiSource = await (await fetch("../popup-ai.js")).text();
-  return popupAiSource;
-}
-
-function buildPopupHarness(source, opts) {
+async function buildPopupHarness(opts) {
   const o = opts || {};
-  const start = source.indexOf("function finalizeAITags");
-  const end = source.indexOf("function _aiResetSummaryActions");
-  if (start < 0 || end <= start) throw new Error("popup AI routing slice not found in popup-ai.js");
   const sent = [];
   const inflight = new Map();
   const snapshot = {
@@ -178,42 +185,36 @@ function buildPopupHarness(source, opts) {
     aiTagSeparator: "-", optRespectTagCase: false,
     customTagPrompt: "", customSummaryPrompt: "",
   };
-  const deps = {
-    PBP_AI_VIA_SW: true,
-    settings: snapshot,
-    pageInfo: { url: "https://example.com/a", pageText: "body" },
-    allUserTags: [],
-    tagCaseMap: {},
-    _inflightAI: inflight,
-    chrome: { runtime: { sendMessage: (msg) => { sent.push(msg); return o.send(msg); } } },
-    _ensureAIHostPermission: async () => {},
-    pbpSanitizeAiOverrides, AI_TAG_CAP,
-    $id: () => ({ value: "" }),
-    getOrCreateInflight: (key, factory) => {
-      if (inflight.has(key)) return inflight.get(key);
-      let p;
-      p = Promise.resolve().then(factory).finally(() => { if (inflight.get(key) === p) inflight.delete(key); });
-      inflight.set(key, p);
-      return p;
+  const pop = await pbpSwRealm.bootPopup({
+    beforeScripts(_win, mock) {
+      mock.onSendMessage((msg) => { sent.push(msg); return o.send(msg); });
     },
-    aiCacheFingerprint: () => o.fingerprint,
-    getAICache: async () => null,
-    setAICache: async () => {},
-    callAI: async () => { throw new Error("the popup document must not call the provider itself"); },
-    buildSummaryPrompt: () => "SUMMARY PROMPT",
-    buildTagPrompt: () => "TAG PROMPT",
-    buildCombinedPrompt: () => "COMBINED PROMPT",
-    parseAITags: () => [], refineTags: (tags) => tags, parseAICombined: () => ({ tags: [], summary: "" }),
-    pbpRelevantTagsFirst: () => [],
-    pbpPopupAiAccountIsCurrent: () => true,
+  });
+  pop.set("settings", snapshot);
+  pop.set("pageInfo", { url: "https://example.com/a", pageText: "body" });
+  pop.set("allUserTags", []);
+  pop.get("_inflightAI").clear();
+  pop.win._ensureAIHostPermission = async () => {};
+  pop.win.aiCacheFingerprint = () => o.fingerprint;
+  pop.win.getAICache = async () => null;
+  pop.win.setAICache = async () => {};
+  pop.win.callAI = async () => { throw new Error("the popup document must not call the provider itself"); };
+  pop.win.buildSummaryPrompt = () => "SUMMARY PROMPT";
+  pop.win.buildTagPrompt = () => "TAG PROMPT";
+  pop.win.buildCombinedPrompt = () => "COMBINED PROMPT";
+  pop.win.parseAITags = () => [];
+  pop.win.refineTags = (tags) => tags;
+  pop.win.parseAICombined = () => ({ tags: [], summary: "" });
+  pop.win.pbpRelevantTagsFirst = () => [];
+  pop.win.pbpPopupAiAccountIsCurrent = () => true;
+  return {
+    fetchAIArtifacts: (...args) => pop.win.fetchAIArtifacts(...args),
+    snapshot,
+    sent,
+    dispose: () => pop.dispose(),
   };
-  const api = new Function(...Object.keys(deps),
-    source.slice(start, end) + "\n; return { fetchAIArtifacts };")(...Object.values(deps));
-  return { ...api, snapshot, sent };
 }
 
-// Unique per case: _inflightAI is ONE module-level Map for the whole page, so a
-// reused key would leak dedup state between cases.
 let keySeq = 0;
 function freshKey(suffix) { return `alice|fp-${++keySeq}|${suffix || "combined"}|https://example.com/a`; }
 
@@ -237,85 +238,40 @@ function cacheWrite(calls, type) {
   return row ? { url: row[0], type: row[1], result: row[2], duration: row[3], source: row[4], account: row[5], settings: row[6] } : null;
 }
 
-// ---- Harness: the message router sliced out of background.js ----------------
 const EXT_ID = "feoognahlmfmbllpmgailahcnjppiegb";
 const EXT_URL = `chrome-extension://${EXT_ID}/popup.html`;
 
-function buildRouterHarness(source, opts) {
+function buildRouterHarness(_unused, opts) {
   const o = opts || {};
-  const start = source.indexOf("function handleRuntimeMessage");
-  const end = source.indexOf("chrome.runtime.onMessage.addListener(handleRuntimeMessage);", start);
-  if (start < 0 || end <= start) throw new Error("router source not found");
+  const sw = _aiSwRealm;
+  if (!sw) throw new Error("SW realm not booted");
   const calls = [];
-  const spy = (name, ret) => (...args) => { calls.push([name, args]); return typeof ret === "function" ? ret(...args) : ret; };
-  const deps = {
-    chrome: {
-      runtime: { id: EXT_ID, getURL: (p) => `chrome-extension://${EXT_ID}/${p}` },
-      storage: {
-        local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
-        session: { get: async () => ({}), set: async () => {} },
-      },
-      tabs: { query: async () => [] },
-    },
-    noteActivity: spy("noteActivity"),
-    pbpRunPopupAiCall: (...args) => { calls.push(["aiCall", args]); return o.aiCall ? o.aiCall(...args) : Promise.resolve({ ok: true, tags: null, summary: "s" }); },
-    // Real, not a stub: the branch's rejection arm serializes through it, and a
-    // stub would hide a missing symbol there (the first RED this suite caught).
-    pbpAiErrorEnvelope: buildAiHarness(source, { settings: {} }).pbpAiErrorEnvelope,
-    PBP_VOCAB_DRIVE_CAPABLE: false,
-    PBP_VOCAB_DRIVE_CONNECTED_KEY: "k",
-    pbpVocabDriveIsConnected: spy("vocabConnected", Promise.resolve(false)),
-    pbpDriveEnabled: spy("driveEnabled", Promise.resolve(false)),
-    pbpDriveScheduleDirty: spy("driveDirty", Promise.resolve()),
-    pbpQueueDriveRound: spy("driveRound", Promise.resolve({ ok: true })),
-    pbpGetVocabDriveStatus: spy("vocabStatus", Promise.resolve({})),
-    pbpVocabDriveResponse: (r) => r,
-    pbpVocabClearNotices: spy("vocabClear", Promise.resolve()),
-    pbpDisconnectVocabDrive: spy("vocabDisc", Promise.resolve()),
-    pbpDictOwnerScope: (a) => "acct_" + a,
-    getCurrentBookmarkAuth: async () => ({ token: "alice:t", account: "alice", epoch: 0 }),
-    pbpBookmarkAuthIsCurrent: () => true,
-    pbpStatusCacheGet: () => null,
-    pbpStatusCacheSet: spy("cacheSet", true),
-    pbpSameBookmark: () => false,
-    pbpSaveFailure: (code) => ({ status: "failed", code }),
-    submitPopupSaveIntent: spy("saveIntent", Promise.resolve({ status: "saved" })),
-    handleBatchSave: spy("batchSave", Promise.resolve()),
-    handleSaveTabSet: spy("saveTabSet", Promise.resolve()),
-    loadSettings: async () => ({}),
-    pbpWaybackArchive: spy("wayback", Promise.resolve()),
-    pbpIsAllowedPinboardApiUrl: (u) => String(u).startsWith("https://api.pinboard.in/v1/"),
-    pbpAuthorizePinboardApiUrl: (u) => u,
-    pinboardFetch: spy("pinFetch", Promise.resolve({ ok: true, status: 200, text: async () => "{}" })),
-    pinboardFetchImmediate: spy("pinFetchNow", Promise.resolve({ ok: true, status: 200, text: async () => "{}" })),
-    retryOfflineItem: spy("retryItem", Promise.resolve({ ok: true, result: {} })),
-    readOfflineQueueWithIds: spy("readQueue", Promise.resolve([])),
-    mutateOfflineQueue: spy("mutQueue", Promise.resolve([])),
-    checkBookmarked: spy("checkBm", Promise.resolve(null)),
-    statusCache: new Map(),
-    extractForPreview: spy("extract", Promise.resolve({ error: "empty" })),
-    pbpImgFixInstallRule: spy("imgInstall", Promise.resolve(786001)),
-    pbpImgFixRemoveRules: spy("imgRemove", Promise.resolve()),
-    pbpImgFixSweepRules: spy("imgSweep", Promise.resolve()),
-    _imgFixIsPreviewUrl: (u) => typeof u === "string" && u.includes("md-preview.html"),
-    _batchRunning: false,
-    deobfuscateKey: (v) => v,
-    showNotification: spy("notify"),
-    t: (k, ...a) => (a.length ? `${k}:${a.join(":")}` : k),
-    pbpWithLargeStorageLock: (key, fn) => fn(),
-    pbpReadLargeWithFallbackUnlocked: async (key, read, dflt) => (await read()) ?? dflt,
-    getSettingsStorage: async () => ({ get: async () => ({ customOverlayCSS: "/*ov*/" }) }),
-    console,
-  };
-  const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
-    return handleRuntimeMessage;`);
-  const handler = factory(...Object.values(deps));
   const invoke = (message, sender, respond) => new Promise((resolve) => {
     const out = { responses: [], held: undefined, respondThrew: false };
-    const settle = () => resolve(out);
-    out.held = handler(message, sender || { id: EXT_ID, url: EXT_URL }, (r) => {
+    const prevNote = sw.win.noteActivity;
+    const prevAiCall = sw.win.pbpRunPopupAiCall;
+    const restore = () => {
+      sw.win.noteActivity = prevNote;
+      sw.win.pbpRunPopupAiCall = prevAiCall;
+    };
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      restore();
+      resolve(out);
+    };
+    sw.win.noteActivity = (...args) => { calls.push(["noteActivity", args]); return prevNote(...args); };
+    sw.win.pbpRunPopupAiCall = (...args) => {
+      calls.push(["aiCall", args]);
+      return o.aiCall ? o.aiCall(...args) : Promise.resolve({ ok: true, tags: null, summary: "s" });
+    };
+    out.held = sw.win.handleRuntimeMessage(message, sender || { id: EXT_ID, url: EXT_URL }, (r) => {
       out.responses.push(r);
-      if (respond) { try { respond(r); } catch (e) { out.respondThrew = true; throw e; } }
+      if (respond) {
+        try { respond(r); }
+        catch (e) { out.respondThrew = true; settle(); throw e; }
+      }
       settle();
     });
     if (out.held !== true || out.responses.length) settle();
@@ -325,7 +281,8 @@ function buildRouterHarness(source, opts) {
 }
 
 (async () => {
-  const source = await getSource();
+  const sw = await getAiSw();
+  const source = null;
 
   // ======================================================================
   // A. the paid reply lands in the cache whether or not the popup survived
@@ -662,7 +619,9 @@ function buildRouterHarness(source, opts) {
     });
     const r = await h.pbpRunPopupAiCall(baseMessage());
     const clone = structuredClone(r);
-    return !(r.error instanceof Error) && Object.getPrototypeOf(r.error) === Object.prototype &&
+    return !(r.error instanceof Error) && !(r.error instanceof h.swErrorConstructor) &&
+      Object.getPrototypeOf(r.error) === h.swObjectPrototype &&
+      Object.getPrototypeOf(clone.error) === Object.prototype &&
       clone.error.message === "boom" && clone.error.code === "network" && clone.error.status === 503;
   });
 
@@ -995,7 +954,7 @@ function buildRouterHarness(source, opts) {
   // H. router wiring and the MV3 iron rules
   // ======================================================================
   await testCase("handleRuntimeMessage is NOT async (an async listener cannot hold the channel)", async () => {
-    return /(^|\n)function handleRuntimeMessage\(/.test(source) && !/async function handleRuntimeMessage/.test(source);
+    return typeof sw.win.handleRuntimeMessage === "function" && sw.win.handleRuntimeMessage.constructor.name === "Function";
   });
 
   await testCase("PBP_AI_CALL reaches pbpRunPopupAiCall and holds the async channel", async () => {
@@ -1038,8 +997,6 @@ function buildRouterHarness(source, opts) {
   // states the whole point of the feature: the document that started the call is
   // gone, a NEW popup asks for the same thing, and nobody pays twice.
   await testCase("a reopened popup rides the call the dead one started — one provider request", async () => {
-    const source = await getSource();
-    const popupSource = await getPopupSource();
     let settleCall;
     const provider = new Promise((resolve) => { settleCall = resolve; });
     const worker = buildAiHarness(source, {
@@ -1051,26 +1008,32 @@ function buildRouterHarness(source, opts) {
     const fingerprint = `fp-reopen-${++keySeq}`;
     const send = (msg) => worker.pbpRunPopupAiCall(msg);
 
-    const dying = buildPopupHarness(popupSource, { send, fingerprint });
-    const abandoned = dying.fetchAIArtifacts("summary", true, "alice", dying.snapshot, "local");
-    abandoned.catch(() => {});                 // Chrome destroys the document here
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    if (worker.calls.callAI.length !== 1) return false;
+    const dying = await buildPopupHarness({ send, fingerprint });
+    const reopened = await buildPopupHarness({ send, fingerprint });
+    try {
+      const abandoned = dying.fetchAIArtifacts("summary", true, "alice", dying.snapshot, "local");
+      abandoned.catch(() => {});                 // Chrome destroys the document here
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (worker.calls.callAI.length !== 1) return false;
 
-    const reopened = buildPopupHarness(popupSource, { send, fingerprint });
-    const second = reopened.fetchAIArtifacts("summary", true, "alice", reopened.snapshot, "local");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    settleCall("the answer that was already paid for");
-    const got = await second;
+      const second = reopened.fetchAIArtifacts("summary", true, "alice", reopened.snapshot, "local");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      settleCall("the answer that was already paid for");
+      const got = await second;
 
-    const key = `alice|${fingerprint}|summary|https://example.com/a|local`;
-    return worker.calls.callAI.length === 1 &&
-      got === "the answer that was already paid for" &&
-      worker.calls.setAICache.some((args) => args[1] === "summary" && args[2] === got) &&
-      dying.sent.length === 1 && reopened.sent.length === 1 &&
-      dying.sent[0].inflightKey === key && reopened.sent[0].inflightKey === key;
+      const key = `alice|${fingerprint}|summary|https://example.com/a|local`;
+      return worker.calls.callAI.length === 1 &&
+        got === "the answer that was already paid for" &&
+        worker.calls.setAICache.some((args) => args[1] === "summary" && args[2] === got) &&
+        dying.sent.length === 1 && reopened.sent.length === 1 &&
+        dying.sent[0].inflightKey === key && reopened.sent[0].inflightKey === key;
+    } finally {
+      dying.dispose();
+      reopened.dispose();
+    }
   });
 
+  sw.dispose();
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>
