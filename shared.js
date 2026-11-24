@@ -2559,24 +2559,22 @@ const PBP_DIAG_ERROR_NAMES = Object.freeze([
 const _pbpDiagWriteTail = pbpCreateRecoveringTail();
 
 function _pbpDiagWithLock(task) {
-  let entered = false;
+  let queued = null;
+  const enqueueOnce = () => (queued || (queued = _pbpDiagWriteTail(task)));
   try {
     const hasExtRuntime = typeof chrome !== "undefined" && Boolean(chrome && chrome.runtime && chrome.runtime.id);
     const locks = hasExtRuntime && typeof navigator !== "undefined" && navigator ? navigator.locks : null;
     if (locks && typeof locks.request === "function") {
-      return Promise.resolve(locks.request(PBP_DIAG_LOCK_NAME, () => {
-        entered = true;
-        return _pbpDiagWriteTail(task);
-      })).catch((err) => {
-        if (!entered) return _pbpDiagWriteTail(task);
+      return Promise.resolve(locks.request(PBP_DIAG_LOCK_NAME, enqueueOnce)).catch((err) => {
+        if (!queued) return enqueueOnce();
         throw err;
       });
     }
   } catch (_) {
     /* swallow-ok: restricted hosts or opaque frames may throw SecurityError reading or calling navigator.locks */
-    if (!entered) return _pbpDiagWriteTail(task);
+    return enqueueOnce();
   }
-  return _pbpDiagWriteTail(task);
+  return enqueueOnce();
 }
 
 function pbpSafeErrorName(err) {

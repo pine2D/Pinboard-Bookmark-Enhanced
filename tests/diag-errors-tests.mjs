@@ -59,6 +59,7 @@ function createOriginHarness(initialLocal = {}, opts = {}) {
     const state = {
       failGet: !!pageOpts.failGet,
       failSet: !!pageOpts.failSet,
+      enumCalls: 0,
     };
     const local = {
       async get(keys) {
@@ -66,7 +67,10 @@ function createOriginHarness(initialLocal = {}, opts = {}) {
         if (state.failGet || opts.failGet) {
           throw new DOMException("storage read blocked", "InvalidStateError");
         }
-        if (keys == null) return structuredClone(store);
+        if (keys == null) {
+          state.enumCalls += 1;
+          return structuredClone(store);
+        }
         const list = typeof keys === "string" ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys);
         const out = {};
         for (const k of list) {
@@ -112,6 +116,7 @@ function createOriginHarness(initialLocal = {}, opts = {}) {
         if (state.failGet || opts.failGet) {
           throw new DOMException("storage getKeys blocked", "InvalidStateError");
         }
+        state.enumCalls += 1;
         return Object.keys(store);
       },
       async getBytesInUse() {
@@ -356,6 +361,16 @@ test("pbpDiagErrors: two independent extension pages concurrently writing never 
 test("pbpDiagErrors: shared Web Lock serializes reclaim with writer close, double clears, and post-clear writes", async () => {
   const origin = createOriginHarness();
 
+  // Case 0 (mutation-proof lock-order check): Popup A reads H (211) and pauses in beforeSet
+  // before committing N (212). Settings B starts pbpReclaimLocalStorage(["misc"]) while A holds
+  // the lock: B MUST block on the lock with 0 storage enumerations until A releases (removing
+  // the lock or narrowing it to local.remove fails both enumCalls===0 and the empty-disk check).
+  let notifyPausedBeforeSet;
+  let releaseBeforeSet;
+  const pausedBeforeSet = new Promise((r) => { notifyPausedBeforeSet = r; });
+  const beforeSetGate = new Promise((r) => { releaseBeforeSet = r; });
+  let holdBeforeSet = false;
+
   // Case 1: Popup A reads H, writes [H, N] to storage, and closes right as its write lands
   // while Settings B's pbpReclaimLocalStorage(["misc"]) is queued on the lock -> B sweeps [H, N].
   let notifyWrote;
@@ -364,6 +379,13 @@ test("pbpDiagErrors: shared Web Lock serializes reclaim with writer close, doubl
   let popupA;
   popupA = origin.makePageContext({
     pathname: "/popup.html",
+    async beforeSet() {
+      if (holdBeforeSet) {
+        holdBeforeSet = false;
+        notifyPausedBeforeSet();
+        await beforeSetGate;
+      }
+    },
     async afterSet() {
       if (closeOnWrite) {
         closeOnWrite = false;
@@ -375,6 +397,41 @@ test("pbpDiagErrors: shared Web Lock serializes reclaim with writer close, doubl
   const optionsB = origin.makePageContext({ pathname: "/options.html" });
   const pageC = origin.makePageContext({ pathname: "/library.html" });
 
+  await popupA.ctx.pbpRecordDiagError({
+    surface: "popup",
+    op: "bookmark_delete",
+    code: "network",
+    errorName: "TypeError",
+    status: 211,
+  });
+  assert.equal((await optionsB.ctx.pbpReadDiagErrors()).length, 1);
+
+  holdBeforeSet = true;
+  const inflightAppend0 = popupA.ctx.pbpRecordDiagError({
+    surface: "popup",
+    op: "obsidian_clip",
+    code: "denied",
+    errorName: "NotAllowedError",
+    status: 212,
+  });
+  await pausedBeforeSet;
+
+  optionsB.state.enumCalls = 0;
+  const queuedReclaim0 = optionsB.ctx.pbpReclaimLocalStorage(["misc"]);
+  await new Promise((r) => setTimeout(r, 15));
+  assert.equal(
+    optionsB.state.enumCalls,
+    0,
+    "reclaim(['misc']) must wait on pbp-diag-errors Web Lock before enumerating storage",
+  );
+  releaseBeforeSet();
+  await inflightAppend0;
+  const reclaimed0 = plain(await queuedReclaim0);
+  assert.equal(reclaimed0.removed.misc.keys.includes("pbpDiagErrors"), true);
+  assert.equal("pbpDiagErrors" in origin.store, false);
+  assert.deepEqual(plain(await optionsB.ctx.pbpReadDiagErrors()), []);
+
+  // Re-seed H and verify writer closing right after its write lands while reclaim is queued:
   await popupA.ctx.pbpRecordDiagError({
     surface: "popup",
     op: "bookmark_delete",
@@ -489,6 +546,25 @@ test("pbpDiagErrors: hostile getters, revoked proxies, throwing navigator.locks,
   assert.ok(restrictedEntry && restrictedEntry.op === "obsidian_clip");
   const restrictedRead = plain(await restrictedHost.ctx.pbpReadDiagErrors());
   assert.equal(restrictedRead[restrictedRead.length - 1].op, "obsidian_clip");
+
+  // Lock adapter that invokes callback synchronously and then throws synchronously must not double-enqueue:
+  const syncThrowLockHost = makePageContext({ pathname: "/popup.html" });
+  syncThrowLockHost.ctx.navigator.locks = {
+    request(_name, cb) {
+      cb();
+      throw new Error("adapter threw after invoking callback");
+    },
+  };
+  await makePageContext({ pathname: "/options.html" }).ctx.pbpReclaimLocalStorage(["misc"]);
+  const onceOnly = plain(await syncThrowLockHost.ctx.pbpRecordDiagError({
+    surface: "popup",
+    op: "bookmark_delete",
+    code: "network",
+    status: 503,
+  }));
+  assert.ok(onceOnly && onceOnly.status === 503);
+  const onceRows = plain(await syncThrowLockHost.ctx.pbpReadDiagErrors());
+  assert.equal(onceRows.length, 1, "post-callback sync throw in custom lock adapter must not double-write");
 
   // Accessor property on input record:
   let statusReads = 599;
