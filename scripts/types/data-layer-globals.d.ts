@@ -116,10 +116,43 @@ declare class TurndownService {
 
 declare namespace marked {
   class Renderer {
-    [key: string]: any;
+    parser: {
+      parse(tokens: any[]): string;
+      parseInline(tokens: any[]): string;
+    };
+    space(token: any): string;
+    code(token: any): string;
+    blockquote(token: any): string;
+    html(token: any): string;
+    heading(token: any): string;
+    hr(token: any): string;
+    list(token: any): string;
+    listitem(token: any): string;
+    checkbox(token: any): string;
+    paragraph(token: any): string;
+    table(token: any): string;
+    tablerow(token: any): string;
+    tablecell(token: any): string;
+    strong(token: any): string;
+    em(token: any): string;
+    codespan(token: any): string;
+    br(token: any): string;
+    del(token: any): string;
+    link(token: any): string;
+    image(token: any): string;
+    text(token: any): string;
   }
   class TextRenderer {
-    [key: string]: any;
+    strong(token: any): string;
+    em(token: any): string;
+    codespan(token: any): string;
+    del(token: any): string;
+    html(token: any): string;
+    text(token: any): string;
+    link(token: any): string;
+    image(token: any): string;
+    br(): string;
+    checkbox(token: any): string;
   }
   namespace Parser {
     function parseInline(tokens: any[], options?: Record<string, any>): string;

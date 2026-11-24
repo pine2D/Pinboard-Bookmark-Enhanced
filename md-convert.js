@@ -720,7 +720,10 @@ function slugify(text) {
 
 // Reserve the final id as well as the base counter. A real "Contents-1"
 // heading must not collide with the suffix assigned to a second "Contents".
+// Pure-symbol/emoji headings whose slugify() base is "" keep "" so md-epub.js
+// can backfill deterministic pbp-h-N ids and buildToc omits broken (#) links.
 function _pbpUniqueHeadingSlug(base, seen) {
+  if (!base) return "";
   let slug = base, n = seen[base] || 0;
   while (Object.prototype.hasOwnProperty.call(seen, slug)) slug = base + "-" + (++n);
   seen[base] = n;
@@ -1115,15 +1118,20 @@ function highlightCodeBlocksChunked(root) {
 
 // ── Export transform ①: YAML frontmatter ──
 
-// Escape a string for a YAML double-quoted scalar (quotes / colons / newlines).
+// Escape a string for a YAML 1.2 double-quoted scalar (quotes / colons / newlines /
+// C0 & C1 controls / NEL & Unicode line separators / lone surrogates & noncharacters).
 function yamlString(s) {
-  const str = s == null ? "" : String(s);
+  const str = String(s == null ? "" : s)
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]|[\uFFFE\uFFFF]/g, "\uFFFD");
   const escaped = str
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
+    .replace(/\t/g, "\\t")
     .replace(/\r\n/g, "\\n")
     .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\n");
+    .replace(/\r/g, "\\n")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u2028\u2029]/g, (ch) =>
+      "\\u" + ch.charCodeAt(0).toString(16).padStart(4, "0"));
   return '"' + escaped + '"';
 }
 
@@ -1204,17 +1212,24 @@ function publishedIso(s) {
 // published/clipped/site/image/words) trail description in that fixed order, each only
 // when present on meta -- see applyFrontmatter's own tail below for the
 // emission rules.
+/**
+ * @param {string} md
+ * @param {Record<string, any>} [meta]
+ * @param {{ fields?: string[] }} [opts]
+ * @returns {string}
+ */
 function applyFrontmatter(md, meta, opts) {
   meta = meta || {};
   opts = opts || {};
   const fields = opts.fields || ["title", "url", "date", "tags", "source"];
+  const bareSafe = (v) => !v || !/[\x00-\x20\x7F-\x9F\u2028\u2029\uD800-\uDFFF\uFFFE\uFFFF#"']/.test(String(v));
   const lines = ["---"];
   for (const f of fields) {
     if (f === "title") lines.push("title: " + yamlString(meta.title || ""));
-    else if (f === "url") lines.push("url: " + (meta.url || ""));
+    else if (f === "url") lines.push("url: " + (bareSafe(meta.url) ? (meta.url || "") : yamlString(meta.url)));
     else if (f === "date") lines.push("date: " + (!meta.date || /^\d{4}-\d{2}-\d{2}$/.test(meta.date) ? (meta.date || "") : yamlString(meta.date)));
     else if (f === "tags") lines.push("tags: [" + (Array.isArray(meta.tags) ? meta.tags.map(yamlString).join(", ") : "") + "]");
-    else if (f === "source") lines.push("source: " + (meta.source || ""));
+    else if (f === "source") lines.push("source: " + (bareSafe(meta.source) ? (meta.source || "") : yamlString(meta.source)));
   }
   if (meta.description) lines.push("description: " + yamlString(meta.description));
   // notes: linkding's Notes beside its Description (md-preview.js buildMeta).
@@ -1554,7 +1569,7 @@ function buildToc(md, opts) {
     const indent = "  ".repeat(h.level - minLevel);
     const label = h._label || h.text;
     delete h._label;
-    return indent + "- [" + label + "](#" + h.slug + ")";
+    return indent + "- " + (h.slug ? "[" + label + "](#" + h.slug + ")" : label);
   }).join("\n");
   return { tocMarkdown: "## Contents\n" + body, headings };
 }
@@ -1633,13 +1648,33 @@ function composeExport(canonicalMd, meta, opts) {
 // latin, ...) passes through untouched; cap at 80 code points; empty -> "untitled".
 // (Moved/unified from md-preview.js. Was a script whitelist until B3 -- that
 // collapsed ja/ko/ru/de titles into underscore strings.)
+const _PBP_WIN32_RESERVED_RE = /^(?:con|prn|aux|nul|(?:com|lpt)[1-9\u00b9\u00b2\u00b3])(?:\.|$)/i;
+function _pbpTruncateFilename(str, maxChars, maxBytes) {
+  const enc = new TextEncoder();
+  let out = "", count = 0, used = 0;
+  for (const ch of Array.from(str)) {
+    if (count >= maxChars) break;
+    const b = enc.encode(ch).length;
+    if (used + b > maxBytes) break;
+    out += ch;
+    count++;
+    used += b;
+  }
+  return out;
+}
+
+/**
+ * @param {string} [title]
+ * @returns {string}
+ */
 function safeFilename(title) {
   let cleaned = String(title || "")
-    .replace(/[\\/?%*:|"<>#\x00-\x1F\x7F]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "_")
-    .replace(/^\s+|[\s.]+$/g, "");
+    .replace(/[\\/?%*:|"<>#\x00-\x1F\x7F]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "_");
+  cleaned = _pbpTruncateFilename(cleaned, 80, 200).replace(/[\s.]+$/g, "");
   if (!cleaned) return "untitled";
-  if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(cleaned)) cleaned = "_" + cleaned;
-  cleaned = Array.from(cleaned).slice(0, 80).join("").replace(/[\s.]+$/g, "");
+  if (_PBP_WIN32_RESERVED_RE.test(cleaned)) {
+    cleaned = _pbpTruncateFilename("_" + cleaned, 80, 200).replace(/[\s.]+$/g, "");
+  }
   return cleaned || "untitled";
 }
 
@@ -2124,19 +2159,38 @@ function composeStyledHtml(canonicalMd, meta, opts) {
 // the URI short → no length limit, mirrors the official Obsidian Web Clipper);
 // otherwise the body rides in &content. vault/folder optional (empty vault =
 // current vault; empty folder = vault root). Pure string assembly — no chrome/DOM.
+function _pbpWellFormedUriPart(v) {
+  const s = String(v == null ? "" : v);
+  return typeof s.toWellFormed === "function"
+    ? s.toWellFormed()
+    : s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD");
+}
+
+/**
+ * @param {{
+ *   action?: "new" | "daily" | string,
+ *   name?: string,
+ *   folder?: string,
+ *   vault?: string,
+ *   clipboard?: boolean,
+ *   append?: boolean,
+ *   content?: string,
+ * }} [opts]
+ * @returns {string}
+ */
 function buildObsidianUri(opts) {
   opts = opts || {};
   const action = opts.action === "daily" ? "daily" : "new";
-  const name = opts.name || "Untitled";
-  const folder = (opts.folder || "").replace(/^\/+|\/+$/g, "");
+  const name = _pbpWellFormedUriPart(opts.name || "Untitled");
+  const folder = _pbpWellFormedUriPart(opts.folder || "").replace(/^\/+|\/+$/g, "");
   const path = (folder ? folder + "/" : "") + name;
   const params = [];
   if (action === "new") params.push("file=" + encodeURIComponent(path));
   let u = "obsidian://" + action + (params.length ? "?" + params.join("&") : "");
   const addParam = (p) => { u += (u.indexOf("?") === -1 ? "?" : "&") + p; };
-  if (opts.vault) addParam("vault=" + encodeURIComponent(opts.vault));
+  if (opts.vault) addParam("vault=" + encodeURIComponent(_pbpWellFormedUriPart(opts.vault)));
   if (opts.clipboard) addParam("clipboard");
   if (opts.append) addParam("append");
-  if (opts.content) addParam("content=" + encodeURIComponent(opts.content));
+  if (opts.content) addParam("content=" + encodeURIComponent(_pbpWellFormedUriPart(opts.content)));
   return u;
 }

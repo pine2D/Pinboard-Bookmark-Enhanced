@@ -194,6 +194,12 @@ async function getPageInfoFromTab(tabId, opts = {}) {
 
 
 // ---- Fetch with timeout ----
+/**
+ * @param {string | URL} url
+ * @param {RequestInit} [options]
+ * @param {number} [timeoutMs]
+ * @returns {Promise<Response>}
+ */
 function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
   // A caller's signal is CHAINED, not replaced (research T4.4): Cancel in
   // the reader aborts the in-flight request instead of waiting out the

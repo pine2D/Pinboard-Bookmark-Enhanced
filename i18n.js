@@ -181,16 +181,21 @@ function _resolveMsg(entry, args) {
  * When a manual language is loaded (via mirror or async refresh), uses
  * that; otherwise falls back to chrome.i18n.getMessage (browser locale).
  * Usage: t("key") or t("key", "arg1", "arg2")
+ * @param {string} key
+ * @param {...(string | number)} args
+ * @returns {string}
  */
 function t(key, ...args) {
+  const strArgs = args.map(String);
   if (_i18nMessages && _i18nMessages[key]) {
-    return _resolveMsg(_i18nMessages[key], args) || key;
+    return _resolveMsg(_i18nMessages[key], strArgs) || key;
   }
-  const msg = chrome.i18n.getMessage(key, args.length ? args : undefined);
+  const msg = chrome.i18n.getMessage(key, strArgs.length ? strArgs : undefined);
   return msg || key;
 }
 
 // Map the active UI locale to the BCP-47 tag used by <html lang> and :lang().
+/** @returns {string} */
 function uiLangToBCP47() {
   let lang = null;
   try { lang = localStorage.getItem("pp-i18n-lang"); } catch (_) {}

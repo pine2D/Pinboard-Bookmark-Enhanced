@@ -121,10 +121,24 @@ test('strictNullChecks and cross-file ambient signatures catch null dereferences
         '}',
       ].join('\n'),
     );
+    appendFileSync(
+      join(dir, 'export-targets.js'),
+      [
+        '',
+        'async function __pbpTypecheckExpandedModuleProbe() {',
+        '  const badObsidian = buildObsidianUri({ title: "wrong-prop" });',
+        '  const meta = await pbpEcdictMeta();',
+        '  const unguardedMeta = meta.state;',
+        '  const badFetchArity = fetchWithTimeout();',
+        '  const badRenderer = (new marked.Renderer()).nonExistentHook;',
+        '  return [badObsidian, unguardedMeta, badFetchArity, badRenderer];',
+        '}',
+      ].join('\n'),
+    );
 
     const res = runDataLayerTypecheck({ root: dir, qaRoot: QA_ROOT });
     assert.equal(res.ok, false, 'injected null/property/arity defects must fail typecheck');
-    // TS18047 ('pattern' is possibly 'null') or TS2531, TS2339 (Property 'nonExistentField' does not exist), TS2554 (Expected 1 arguments, but got 0)
+    // TS18047 ('pattern'/'meta' is possibly 'null') or TS2531, TS2339 (unknown property), TS2353 (unknown object-literal option), TS2554 (wrong arity)
     assert.ok(
       res.codes.includes(18047) || res.codes.includes(2531),
       `expected null-dereference diagnostic code, got ${JSON.stringify(res.codes)}:\n${res.errors.join('\n')}`,
@@ -132,6 +146,22 @@ test('strictNullChecks and cross-file ambient signatures catch null dereferences
     assert.ok(
       res.codes.includes(2339),
       `expected unknown-property diagnostic TS2339, got ${JSON.stringify(res.codes)}:\n${res.errors.join('\n')}`,
+    );
+    assert.ok(
+      res.codes.includes(2353),
+      `expected excess-property diagnostic TS2353 on buildObsidianUri, got ${JSON.stringify(res.codes)}:\n${res.errors.join('\n')}`,
+    );
+    assert.ok(
+      res.errors.some((line) => line.includes('meta') && (line.includes('TS18047') || line.includes('TS2531'))),
+      `expected null-dereference diagnostic on pbpEcdictMeta(), got:\n${res.errors.join('\n')}`,
+    );
+    assert.ok(
+      res.errors.some((line) => line.startsWith('export-targets.js:') && line.includes('TS2554') && line.includes('Expected 1-3 arguments')),
+      `expected arity diagnostic TS2554 on fetchWithTimeout(), got:\n${res.errors.join('\n')}`,
+    );
+    assert.ok(
+      res.errors.some((line) => line.includes('nonExistentHook') && line.includes('TS2339')),
+      `expected unknown-property diagnostic TS2339 on marked.Renderer, got:\n${res.errors.join('\n')}`,
     );
     assert.ok(
       res.codes.includes(2554),

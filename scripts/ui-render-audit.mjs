@@ -9886,7 +9886,7 @@ async function runSweep(page, sw, extBase) {
           // Park the pointer: clicking Scan and scrolling can leave a section
           // summary under the cursor, causing headerFace to read its hover colour.
           await page.mouse.move(0, 0);
-          await page.waitForTimeout(150);
+          await settleAnimations(page);
           return true;
         };
         await scan("options", "tag-gov-entity-scan", openScanned);
@@ -9896,7 +9896,7 @@ async function runSweep(page, sw, extBase) {
             // Park the pointer: the click leaves it where a section summary can
             // land after the list reflows, and the audit would read its hover face.
             await page.mouse.move(0, 0);
-            await page.waitForTimeout(100);
+            await settleAnimations(page);
             return true;
           });
         }

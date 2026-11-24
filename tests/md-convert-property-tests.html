@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="320"><title>md-convert &amp; md-epub Property Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="330"><title>md-convert &amp; md-epub Property Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -25,8 +25,8 @@ body { font-family: monospace; padding: 16px; max-width: 1000px; }
 <script src="../md-highlight.js"></script>
 <script>
 // Deterministic property-based / adversarial-boundary suite for md-convert.js and md-epub.js.
-// 最简单漏判反例：仅用干净 ASCII 样例测试转换链，未覆盖孤立代理对、C0 控制符、RTL 双向隔离符、
-// Zalgo 组合标记、畸形嵌套 HTML/SVG 或 YAML 分隔符注入，导致 EPUB XML 解析崩溃或导出结构击穿。
+// 最简单漏判反例：仅检查首尾围栏出现或仅遍历已存在 ZIP 条目，导致提前闭合围栏、YAML 非法控制符、
+// Win32 截断后露出的保留设备名（含 COM¹/LPT²）、前导全角空格误删或缺失正文的残缺 EPUB 全部漏过。
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
 function check(name, cond, detail) {
@@ -50,6 +50,7 @@ function mulberry32(seed) {
 
 const ATOMS = [
   "\x00", "\x01", "\x07", "\x08", "\x0B", "\x0C", "\x1B[31m", "\x1F", "\x7F",
+  "\x85", "\x9F", "\u2028", "\u2029",
   "\uFFFE", "\uFFFF", "\uD800", "\uDBFF", "\uDC00", "\uDFFF", "\uD83D\uDE80",
   "e\u0301\u0308\u0327\u0336", "\u200B\u200C\u200D\uFEFF",
   "\u202Ertl-override\u202C", "\u2066bidi-isolate\u2069", "العربية עברית 中文 日本語",
@@ -61,7 +62,7 @@ const ATOMS = [
   "<table><tr><td>unclosed<td>cell<tr><th>h</table>",
   "| a | b |\n|---|---|\n| 1 | 2 | 3 |\n",
   "## Heading [link](#frag) `code **bold**` ==mark==",
-  "CON", "aux.txt", "../etc/passwd", "a/b\\c:d*e?f\"g<h>i|j...",
+  "## ✨", "CON", "COM¹", "LPT².md", "aux.txt", "../etc/passwd", "a/b\\c:d*e?f\"g<h>i|j...",
 ];
 
 function genAdversarialString(rng, minParts, maxParts) {
@@ -94,6 +95,95 @@ function readStoredZip(bytes) {
   return out;
 }
 
+const WIN32_RESERVED_RE = /^(?:con|prn|aux|nul|(?:com|lpt)[1-9\u00b9\u00b2\u00b3])(?:\.|$)/i;
+// YAML 1.2.2 §5.1 c-printable forbids C0 (except \t \n \r), DEL (0x7F), C1 (0x80-0x9F except 0x85 NEL,
+// and unescaped 0x85/U+2028/U+2029 break single-line scalars), lone UTF-16 surrogates, and U+FFFE/U+FFFF.
+const YAML_RAW_FORBIDDEN_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u2028\u2029\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+function normalizeExpectedYamlText(s) {
+  return String(s == null ? "" : s)
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]|[\uFFFE\uFFFF]/g, "\uFFFD")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+}
+
+function parseYamlDoubleQuoted(raw) {
+  if (typeof raw !== "string" || raw.length < 2 || raw[0] !== '"' || raw[raw.length - 1] !== '"') {
+    throw new Error("not a double-quoted YAML scalar: " + raw);
+  }
+  let out = "";
+  for (let i = 1; i < raw.length - 1; i++) {
+    const ch = raw[i];
+    if (ch === '"') throw new Error("unescaped quote inside YAML scalar");
+    if (ch !== "\\") { out += ch; continue; }
+    const next = raw[++i];
+    if (next === "\\") out += "\\";
+    else if (next === '"') out += '"';
+    else if (next === "n") out += "\n";
+    else if (next === "t") out += "\t";
+    else if (next === "r") out += "\r";
+    else if (next === "u") {
+      const hex = raw.slice(i + 1, i + 5);
+      if (!/^[0-9a-fA-F]{4}$/.test(hex)) throw new Error("invalid \\uXXXX escape: " + hex);
+      const cp = parseInt(hex, 16);
+      if ((cp >= 0xD800 && cp <= 0xDFFF) || cp === 0xFFFE || cp === 0xFFFF) {
+        throw new Error("non-scalar code point in YAML \\u escape: " + hex);
+      }
+      out += String.fromCharCode(cp);
+      i += 4;
+    } else {
+      throw new Error("unexpected YAML escape \\" + next);
+    }
+  }
+  return out;
+}
+
+function parseGeneratedFrontmatter(fm, expectedBody) {
+  if (!fm.startsWith("---\n")) return { ok: false, reason: "missing opening ---" };
+  const endFenceIdx = fm.indexOf("\n---\n\n");
+  if (endFenceIdx <= 4) return { ok: false, reason: "missing closing ---" };
+  if (fm.slice(endFenceIdx + 6) !== expectedBody) {
+    return { ok: false, reason: `tail mismatch after first closing fence: ${JSON.stringify(fm.slice(endFenceIdx + 6, endFenceIdx + 60))}` };
+  }
+  const inner = fm.slice(4, endFenceIdx);
+  if (YAML_RAW_FORBIDDEN_RE.test(inner)) return { ok: false, reason: "forbidden raw YAML character present" };
+  const map = Object.create(null);
+  for (const line of inner.split("\n")) {
+    if (line === "---") return { ok: false, reason: "injected --- line inside frontmatter" };
+    const sep = line.indexOf(": ");
+    if (sep <= 0 && !line.endsWith(":")) return { ok: false, reason: "malformed YAML line: " + line };
+    const key = sep > 0 ? line.slice(0, sep) : line.slice(0, -1);
+    const val = sep > 0 ? line.slice(sep + 2) : "";
+    if (key === "tags") {
+      if (!val.startsWith("[") || !val.endsWith("]")) return { ok: false, reason: "tags not flow array: " + val };
+      const body = val.slice(1, -1).trim();
+      if (!body) { map.tags = []; continue; }
+      const items = [];
+      let cur = "", inStr = false, esc = false;
+      for (let i = 0; i < body.length; i++) {
+        const c = body[i];
+        if (esc) { cur += c; esc = false; continue; }
+        if (c === "\\") { cur += c; esc = true; continue; }
+        if (c === '"') { inStr = !inStr; cur += c; continue; }
+        if (!inStr && c === ",") {
+          items.push(parseYamlDoubleQuoted(cur.trim()));
+          cur = "";
+          continue;
+        }
+        cur += c;
+      }
+      if (inStr) return { ok: false, reason: "unclosed quote in tags" };
+      if (cur.trim()) items.push(parseYamlDoubleQuoted(cur.trim()));
+      map.tags = items;
+    } else if (val.startsWith('"')) {
+      map[key] = parseYamlDoubleQuoted(val);
+    } else {
+      map[key] = val;
+    }
+  }
+  return { ok: true, map };
+}
+
 function assertCleanSanitizedDom(html, label) {
   const doc = document.implementation.createHTMLDocument("");
   const div = doc.createElement("div");
@@ -109,12 +199,62 @@ function assertCleanSanitizedDom(html, label) {
         return { ok: false, reason: `${label}: dangerous scheme in ${n}=${v}` };
       }
     }
+    if (el.tagName === "IMG") {
+      const src = el.getAttribute("src") || "";
+      if (/^data:image\/svg\+xml;base64,/i.test(src)) {
+        const rawSvg = atob(src.slice(src.indexOf(",") + 1));
+        if (/<script\b|\bon[a-z]+\s*=|(?:javascript|vbscript):/i.test(rawSvg)) {
+          return { ok: false, reason: `${label}: dangerous payload survived inside data:image/svg+xml` };
+        }
+      }
+    }
   }
   return { ok: true, reason: "" };
 }
 
+function validateEpubArchive(entries, xmlParser, sentinelText) {
+  const firstKey = entries.keys().next().value;
+  if (firstKey !== "mimetype" || entries.get("mimetype")?.text !== "application/epub+zip" || entries.get("mimetype")?.method !== 0) {
+    return `bad mimetype entry: first=${firstKey}`;
+  }
+  const required = ["mimetype", "META-INF/container.xml", "OEBPS/content.opf", "OEBPS/nav.xhtml", "OEBPS/content.xhtml", "OEBPS/styles.css"];
+  for (const req of required) {
+    if (!entries.has(req)) return `missing required EPUB member: ${req}`;
+  }
+  let opfDoc = null, containerDoc = null, contentDoc = null;
+  for (const [name, entry] of entries) {
+    if (pbpCrc32(entry.data) !== entry.crc) return `${name}: CRC mismatch`;
+    if (name.endsWith(".xml") || name.endsWith(".opf") || name.endsWith(".xhtml")) {
+      const mime = name.endsWith(".xhtml") ? "application/xhtml+xml" : "application/xml";
+      const doc = xmlParser.parseFromString(entry.text, mime);
+      const errNode = doc.querySelector("parsererror");
+      if (errNode) return `${name}: XML parsererror: ${errNode.textContent.slice(0, 160)}`;
+      if (name === "OEBPS/content.opf") opfDoc = doc;
+      if (name === "META-INF/container.xml") containerDoc = doc;
+      if (name === "OEBPS/content.xhtml") contentDoc = doc;
+    }
+  }
+  const rootfile = containerDoc && containerDoc.querySelector("rootfile");
+  if (!rootfile || rootfile.getAttribute("full-path") !== "OEBPS/content.opf") {
+    return "container.xml rootfile does not point to OEBPS/content.opf";
+  }
+  const manifestItems = opfDoc ? [...opfDoc.querySelectorAll("manifest > item")] : [];
+  if (manifestItems.length < 3) return "content.opf manifest missing core items";
+  for (const item of manifestItems) {
+    const href = item.getAttribute("href") || "";
+    if (!href || !entries.has("OEBPS/" + href)) return `OPF manifest item missing from ZIP: OEBPS/${href}`;
+  }
+  const bodyText = contentDoc && contentDoc.body ? contentDoc.body.textContent || "" : "";
+  if (sentinelText && !bodyText.includes(sentinelText)) {
+    return `content.xhtml missing rendered sentinel "${sentinelText}"`;
+  }
+  return "";
+}
+
 (async () => {
   const rng = mulberry32(0x20261124);
+  const utf8Enc = new TextEncoder();
+  const utf8Dec = new TextDecoder();
 
   // 1. 60 adversarial markdown -> renderMarkdown + sanitized DOM + buildToc + readingStats
   for (let i = 0; i < 60; i++) {
@@ -127,13 +267,16 @@ function assertCleanSanitizedDom(html, label) {
       plain = markdownToPlainText(sample);
     } catch (e) { threw = e; }
     const domOk = !threw ? assertCleanSanitizedDom(html, `sample#${i}`) : { ok: false, reason: String(threw) };
-    const tocOk = !!toc && !/\(#\)/.test(toc.tocMarkdown) && toc.headings.every((h) => typeof h.slug === "string" && h.slug.length > 0);
-    const statsOk = !!stats && Number.isFinite(stats.words) && stats.words >= 0 && Number.isFinite(stats.minutes) && stats.minutes >= 1 && typeof plain === "string";
+    const tocOk = !!toc && !/\(#\)/.test(toc.tocMarkdown) &&
+      toc.headings.every((h) => typeof h.slug === "string" && (h.slug ? !h.slug.startsWith("-") : slugify(h.text) === ""));
+    const expectedZero = !!stats && stats.words === 0 && stats.cjkChars === 0;
+    const statsOk = !!stats && Number.isFinite(stats.words) && stats.words >= 0 &&
+      Number.isFinite(stats.minutes) && (expectedZero ? stats.minutes === 0 : stats.minutes >= 1) && typeof plain === "string";
     check(`renderMarkdown/buildToc/stats adversarial #${i}`, !threw && domOk.ok && tocOk && statsOk,
       threw ? String(threw && threw.stack || threw) : domOk.reason || JSON.stringify({ toc, stats }));
   }
 
-  // 2. 60 adversarial HTML -> htmlToMarkdown -> renderMarkdown + SVG sanitization
+  // 2. 60 adversarial HTML -> htmlToMarkdown -> renderMarkdown + decoded SVG sanitization
   for (let i = 0; i < 60; i++) {
     const body = `<article><h1>${genAdversarialString(rng, 1, 4)}</h1><div>${genAdversarialString(rng, 3, 10)}</div></article>`;
     let md = "", rendered = "", threw = null;
@@ -161,43 +304,63 @@ function assertCleanSanitizedDom(html, label) {
       threw ? String(threw) : `norm diff=${once !== twice}, tex diff=${texOnce !== texTwice}`);
   }
 
-  // 4. 60 adversarial frontmatter + safeFilename + composeStyledHtml invariants
+  // 4. 60 adversarial frontmatter (UTF-8 round-trip + YAML parse) + safeFilename + Obsidian URI + composeStyledHtml
   for (let i = 0; i < 60; i++) {
     const rawTitle = genAdversarialString(rng, 1, 4);
-    const body = "Paragraph body " + i;
+    const rawAuthor = genAdversarialString(rng, 1, 2);
+    const rawPublished = genAdversarialString(rng, 1, 2);
+    const body = "Paragraph body sentinel #" + i + "\n---\ntrailing body fence";
     const tags = [genAdversarialString(rng, 1, 2), "tag:colon", "quote\"tag", "line\nbreak"];
-    let fm = "", fname = "", styled = "", threw = null;
+    let fm = "", fname = "", styled = "", threw = null, fmCheck = { ok: false, reason: "not run" }, uriOk = false;
     try {
-      fm = applyFrontmatter(body, {
+      const rawFm = applyFrontmatter(body, {
         title: rawTitle,
         url: "https://example.com/a?x=1&y=2",
-        author: genAdversarialString(rng, 1, 2),
-        published: genAdversarialString(rng, 1, 2),
+        author: rawAuthor,
+        published: rawPublished,
         clipped: "2026-11-24",
         tags,
       });
+      // Round-trip through UTF-8 Blob bytes exactly as downloadFile() writes to disk
+      fm = utf8Dec.decode(new Uint8Array(await new Blob([rawFm], { type: "text/markdown;charset=utf-8" }).arrayBuffer()));
+      const expectedUtf8Body = utf8Dec.decode(utf8Enc.encode(body));
+      fmCheck = parseGeneratedFrontmatter(fm, expectedUtf8Body);
+      if (fmCheck.ok) {
+        if (fmCheck.map.title !== normalizeExpectedYamlText(rawTitle)) {
+          fmCheck = { ok: false, reason: `title round-trip mismatch: got ${JSON.stringify(fmCheck.map.title)}` };
+        } else if (rawAuthor && fmCheck.map.author !== normalizeExpectedYamlText(rawAuthor)) {
+          fmCheck = { ok: false, reason: `author round-trip mismatch: got ${JSON.stringify(fmCheck.map.author)}` };
+        } else if (JSON.stringify(fmCheck.map.tags) !== JSON.stringify(tags.map(normalizeExpectedYamlText))) {
+          fmCheck = { ok: false, reason: `tags round-trip mismatch: got ${JSON.stringify(fmCheck.map.tags)}` };
+        }
+      }
       fname = safeFilename(rawTitle);
+      const uri = buildObsidianUri({ name: fname, folder: "Clips/Sub", vault: "MainVault", clipboard: true, append: true });
+      const parsedUri = new URL(uri);
+      uriOk = parsedUri.protocol === "obsidian:" &&
+        parsedUri.searchParams.get("file") === "Clips/Sub/" + fname &&
+        parsedUri.searchParams.get("vault") === "MainVault" &&
+        parsedUri.searchParams.has("append");
       styled = composeStyledHtml(body, { title: rawTitle, url: "https://example.com" }, {});
     } catch (e) { threw = e; }
-    // Frontmatter must open with ---\n, close with \n---\n\n before body, and never allow rawTitle/author to inject an early closing \n---\n
-    const endFenceIdx = fm.indexOf("\n---\n\n");
-    const bodyIdx = fm.lastIndexOf(body);
-    const innerYaml = endFenceIdx > 4 ? fm.slice(4, endFenceIdx) : "";
-    const noInjectedFence = fm.startsWith("---\n") && endFenceIdx > 4 && bodyIdx > endFenceIdx && !/(?:^|\n)---(?:\n|$)/.test(innerYaml);
-    let uriOk = false;
-    try { uriOk = typeof encodeURIComponent(fname) === "string" && buildObsidianUri({ name: fname, clipboard: true }).startsWith("obsidian://"); } catch (_) { uriOk = false; }
-    const safeNameOk = uriOk && typeof fname === "string" && [...fname].length > 0 && [...fname].length <= 80 &&
-      fname !== "." && fname !== ".." && !/[<>:"/\\|?*\x00-\x1f\x7f]/.test(fname) && !/[\s.]$/.test(fname) &&
-      !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(fname);
+    const byteLen = utf8Enc.encode(fname).length;
+    const safeNameOk = uriOk && typeof fname === "string" &&
+      [...fname].length > 0 && [...fname].length <= 80 && byteLen <= 200 &&
+      safeFilename(fname) === fname &&
+      fname !== "." && fname !== ".." &&
+      !/[<>:"/\\|?*\x00-\x1f\x7f]/.test(fname) &&
+      !/[\s.]$/.test(fname) &&
+      !WIN32_RESERVED_RE.test(fname);
     const styledOk = typeof styled === "string" && !/<script\b/i.test(styled);
-    check(`frontmatter/safeFilename/composeStyledHtml #${i}`, !threw && noInjectedFence && safeNameOk && styledOk,
-      threw ? String(threw) : JSON.stringify({ noInjectedFence, fname, safeNameOk }));
+    check(`frontmatter/safeFilename/composeStyledHtml #${i}`, !threw && fmCheck.ok && safeNameOk && styledOk,
+      threw ? String(threw && threw.stack || threw) : (!fmCheck.ok ? fmCheck.reason : JSON.stringify({ fname, byteLen, safeNameOk, uriOk })));
   }
 
-  // 5. 60 adversarial EPUB builds -> real Blink XML/XHTML parser verification (zero <parsererror>)
+  // 5. 60 adversarial EPUB builds -> required-member + OPF manifest + Blink XML/XHTML + rendered body verification
   const xmlParser = new DOMParser();
   for (let i = 0; i < 60; i++) {
-    const md = `## ${genAdversarialString(rng, 1, 3)}\n\n${genAdversarialString(rng, 3, 8)}\n\n### !@#$\n\n![img](https://example.com/pic.png)`;
+    const sentinel = `EPUB_SENTINEL_${i}`;
+    const md = `## ${genAdversarialString(rng, 1, 3)}\n\n${sentinel} ${genAdversarialString(rng, 3, 8)}\n\n### !@#$\n\n![img](https://example.com/pic.png)`;
     const meta = {
       title: genAdversarialString(rng, 1, 3),
       author: genAdversarialString(rng, 1, 2),
@@ -212,55 +375,37 @@ function assertCleanSanitizedDom(html, label) {
       const blob = pbpBuildEpub({ md, meta: safeMeta });
       const bytes = new Uint8Array(await blob.arrayBuffer());
       const entries = readStoredZip(bytes);
-      const firstKey = entries.keys().next().value;
-      if (firstKey !== "mimetype" || entries.get("mimetype")?.text !== "application/epub+zip" || entries.get("mimetype")?.method !== 0) {
-        xmlProblem = `bad mimetype entry: first=${firstKey}`;
-      }
-      for (const [name, entry] of entries) {
-        if (pbpCrc32(entry.data) !== entry.crc) {
-          xmlProblem = `${name}: CRC mismatch`;
-          break;
-        }
-        if (name.endsWith(".xml") || name.endsWith(".opf") || name.endsWith(".xhtml")) {
-          const mime = name.endsWith(".xhtml") ? "application/xhtml+xml" : "application/xml";
-          const doc = xmlParser.parseFromString(entry.text, mime);
-          const errNode = doc.querySelector("parsererror");
-          if (errNode) {
-            xmlProblem = `${name}: XML parsererror: ${errNode.textContent.slice(0, 160)}`;
-            break;
-          }
-        }
-      }
+      xmlProblem = validateEpubArchive(entries, xmlParser, sentinel);
     } catch (e) {
       xmlProblem = String(e && e.stack || e);
     }
-    check(`pbpBuildEpub strict XML/CRC validity #${i}`, !xmlProblem, xmlProblem);
+    check(`pbpBuildEpub strict XML/CRC/manifest validity #${i}`, !xmlProblem, xmlProblem);
   }
 
-  // 6. 20 oversized & pathological boundary inputs (64KB+ lines, deep nesting, lone surrogates)
+  // 6. 20 oversized & pathological boundary inputs with semantic content/scale assertions
   const extremeCases = [
-    ["empty string", ""],
-    ["64KB unbroken word", "a".repeat(65536)],
-    ["64KB combining marks", "o" + "\u0308".repeat(4096)],
-    ["lone high surrogate", "\uD800hello\uD800"],
-    ["lone low surrogate", "\uDC00world\uDFFF"],
-    ["reversed surrogate pair", "\uDC00\uD800"],
-    ["all C0 controls", Array.from({ length: 32 }, (_, c) => String.fromCharCode(c)).join("")],
-    ["deep nested blockquotes", "> ".repeat(60) + "deep"],
-    ["1000 markdown headings", Array.from({ length: 200 }, (_, n) => `## Heading ${n}`).join("\n\n")],
-    ["unclosed fenced code block 32KB", "```python\n" + "x = 1\n".repeat(5000)],
-    ["unclosed inline math dollars", "$a + b + $c + $$d + e"],
-    ["bare LaTeX align env", "\\begin{align}\nx &= 1 \\\\\ny &= 2\n\\end{align}"],
-    ["malformed table pipes", "|h1|h2|\n|--|\n" + "|a|b|c|d|\n".repeat(100)],
-    ["SVG over 300KB ceiling dropped cleanly", `<svg width="200" height="200"><text>${"x".repeat(310000)}</text></svg>`],
-    ["SVG icon under 64px dropped cleanly", `<svg width="24" height="24"><rect width="24" height="24"/></svg>`],
-    ["nested SVG keeps outer diagram only", `<svg width="100" height="100"><svg width="80" height="80"><circle r="10"/></svg></svg>`],
-    ["HTML merged comments split cleanly", "<!--a--><!--b-->text<!---->"],
-    ["Bidi isolates in links", "[label \u202Eevil\u202C](https://example.com/\u2066path\u2069)"],
-    ["YAML frontmatter null/control strip", "---\ntitle: test\x00\x07\n---"],
-    ["EPUB strip invalid XML preserves valid astral plane", "𠀋🚀文字\x00\uFFFE\uD800end"],
+    ["empty string", "", (res) => res.md === "" && res.html.trim() === ""],
+    ["64KB unbroken word", "a".repeat(65536), (res) => res.html.includes("a".repeat(1024)) && res.md.length >= 65536],
+    ["4096 combining marks on base letter", "o" + "\u0308".repeat(4096), (res) => res.html.includes("o\u0308") && res.md.includes("o\u0308")],
+    ["lone high surrogate", "\uD800hello\uD800", (res) => res.stripped === "hello" && res.html.includes("hello")],
+    ["lone low surrogate", "\uDC00world\uDFFF", (res) => res.stripped === "world" && res.html.includes("world")],
+    ["reversed surrogate pair", "\uDC00\uD800keep", (res) => res.stripped === "keep" && res.html.includes("keep")],
+    ["all C0 controls", Array.from({ length: 32 }, (_, c) => String.fromCharCode(c)).join(""), (res) => !/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(res.stripped)],
+    ["deep nested blockquotes", "> ".repeat(60) + "deepleaf", (res) => res.html.includes("deepleaf")],
+    ["1000 markdown headings", Array.from({ length: 1000 }, (_, n) => `## Heading ${n}`).join("\n\n"), (res) => buildToc(res.raw, { minLevel: 2, maxLevel: 4 }).headings.length === 1000],
+    ["unclosed fenced code block 32KB", "```python\n" + "x = 1\n".repeat(5000), (res) => res.html.includes("<code") && res.html.includes("x = 1")],
+    ["unclosed inline math dollars", "$a + b + $c + $$d + e", (res) => res.html.includes("a + b")],
+    ["bare LaTeX align env", "\\begin{align}\nx &= 1 \\\\\ny &= 2\n\\end{align}", (res) => res.l1.includes("$$")],
+    ["malformed table pipes", "|h1|h2|\n|--|\n" + "|a|b|c|d|\n".repeat(100), (res) => res.html.includes("h1")],
+    ["SVG over 300KB ceiling dropped cleanly", `<svg width="200" height="200"><text>${"x".repeat(310000)}</text></svg>`, (res) => !res.md.includes("data:image/svg+xml")],
+    ["SVG icon under 64px dropped cleanly", `<svg width="24" height="24"><rect width="24" height="24"/></svg>`, (res) => !res.md.includes("data:image/svg+xml")],
+    ["valid 120px diagram SVG retained as data URI", `<svg width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="60" r="40"/></svg>`, (res) => res.md.includes("data:image/svg+xml;base64,")],
+    ["HTML merged comments split cleanly", "<!--a--><!--b-->kept<!---->", (res) => res.md.includes("kept") && !res.md.includes("<!--")],
+    ["Bidi isolates in links", "[label \u202Eevil\u202C](https://example.com/\u2066path\u2069)", (res) => res.html.includes("<a ")],
+    ["YAML frontmatter null/control strip", "---\ntitle: test\x00\x07\n---", () => parseGeneratedFrontmatter(applyFrontmatter("b", { title: "test\x00\x07" }), "b").ok],
+    ["EPUB strip invalid XML preserves valid astral plane", "𠀋🚀文字\x00\uFFFE\uD800end", (res) => res.stripped === "𠀋🚀文字end" && res.html.includes("𠀋🚀文字") && res.md.includes("𠀋🚀文字")],
   ];
-  for (const [label, input] of extremeCases) {
+  for (const [label, input, verify] of extremeCases) {
     let prob = "";
     try {
       const h = renderMarkdown(input);
@@ -274,8 +419,84 @@ function assertCleanSanitizedDom(html, label) {
       const domRes = assertCleanSanitizedDom(h, label);
       if (!domRes.ok) prob = domRes.reason;
       if (typeof m !== "string") prob = "htmlToMarkdown non-string";
+      if (!prob && verify && !verify({ raw: input, html: h, md: m, l1, stripped })) {
+        prob = "semantic retention/drop check failed on " + label;
+      }
     } catch (e) { prob = String(e && e.stack || e); }
     check(`extreme boundary: ${label}`, !prob, prob);
+  }
+
+  // 7. 10 targeted regression & negative-control invariants
+  {
+    const truncatedDev = safeFilename("CON" + " ".repeat(77) + "甲");
+    check("safeFilename blocks Win32 device name exposed after 80-char truncation and stays idempotent",
+      truncatedDev === "_CON" && safeFilename(truncatedDev) === "_CON", truncatedDev);
+
+    const supNames = ["COM\u00B9", "LPT\u00B2.md", "lpt\u00B3.txt"].map(safeFilename);
+    check("safeFilename blocks Win32 superscript device names COM¹/LPT²/LPT³",
+      supNames.every((n) => n.startsWith("_") && !WIN32_RESERVED_RE.test(n) && safeFilename(n) === n),
+      JSON.stringify(supNames));
+
+    const fwTitle = safeFilename("　序章");
+    const plainTitle = safeFilename("序章");
+    const fwUri = new URL(buildObsidianUri({ name: fwTitle, append: true, clipboard: true }));
+    const plainUri = new URL(buildObsidianUri({ name: plainTitle, append: true, clipboard: true }));
+    check("safeFilename & Obsidian append preserve distinct leading U+3000 full-width space titles",
+      fwTitle === "　序章" && plainTitle === "序章" && fwUri.searchParams.get("file") !== plainUri.searchParams.get("file"),
+      `${fwTitle} vs ${plainTitle}`);
+
+    const astral80 = safeFilename("𠀋".repeat(80));
+    const astralBytes = utf8Enc.encode(astral80 + ".epub").length;
+    check("safeFilename caps UTF-8 bytes so astral CJK filenames + extension fit 255-byte NAME_MAX",
+      astralBytes <= 255 && !/[\uD800-\uDFFF]/.test(astral80.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")),
+      `bytes=${astralBytes}, len=${[...astral80].length}`);
+
+    let badVaultUri = "";
+    try {
+      badVaultUri = buildObsidianUri({
+        name: "note\uD800",
+        folder: "dir\uDC00/sub",
+        vault: "vault\uD800",
+        content: "text\uDFFF",
+      });
+    } catch (e) { badVaultUri = "ERR:" + e.message; }
+    check("buildObsidianUri sanitizes lone surrogates in vault/folder/name/content without URIError",
+      badVaultUri.startsWith("obsidian://new?") && new URL(badVaultUri).searchParams.get("vault") === "vault\uFFFD",
+      badVaultUri);
+
+    const ctrlMetaFm = applyFrontmatter("Body text", {
+      title: "Tab\tand\x0Bvtab\x7Fdel\x85nel\u2028ls\uFFFE\uD800",
+      url: "https://example.com/p",
+      tags: ["a\x00b", "c\u2029d"],
+    });
+    const parsedCtrlFm = parseGeneratedFrontmatter(ctrlMetaFm, "Body text");
+    check("applyFrontmatter escapes YAML 1.2 forbidden controls/line-breaks and replaces non-scalars",
+      parsedCtrlFm.ok && parsedCtrlFm.map.title === "Tab\tand\x0Bvtab\x7Fdel\x85nel\u2028ls\uFFFD\uFFFD" &&
+      parsedCtrlFm.map.tags[0] === "a\x00b" && parsedCtrlFm.map.tags[1] === "c\u2029d",
+      JSON.stringify(parsedCtrlFm));
+
+    const symMd = "## ✨\n\nSparkle text.\n\n## !@#$\n\nPunct text.\n\n## Real Heading\n\nBody.";
+    const symToc = buildToc(symMd, { minLevel: 2, maxLevel: 4 });
+    const symExport = composeExport(symMd, { url: "https://example.com" }, { includeToc: true });
+    check("buildToc & composeExport omit broken (#) links and bogus -1 slugs on symbol-only headings",
+      !/\(#\)/.test(symToc.tocMarkdown) && !/\(#\)/.test(symExport) &&
+      symToc.headings[0].slug === "" && symToc.headings[1].slug === "" && symToc.headings[2].slug === "real-heading",
+      JSON.stringify(symToc));
+
+    const emptyStats = readingStats("\x0b\x0c\x0b   \n\n");
+    const nonEmptyStats = readingStats("Hello 中文");
+    check("readingStats reports 0 minutes for whitespace/control-only text and >=1 for readable words",
+      emptyStats.words === 0 && emptyStats.cjkChars === 0 && emptyStats.minutes === 0 &&
+      nonEmptyStats.words === 1 && nonEmptyStats.cjkChars === 2 && nonEmptyStats.minutes === 1,
+      JSON.stringify({ emptyStats, nonEmptyStats }));
+
+    const brokenXmlDoc = xmlParser.parseFromString("<html xmlns='http://www.w3.org/1999/xhtml'><body><p>unclosed</body></html>", "application/xhtml+xml");
+    check("negative control: Blink XHTML parser flags unclosed tags with parsererror",
+      !!brokenXmlDoc.querySelector("parsererror"));
+
+    const guttedEntries = new Map([["mimetype", { method: 0, crc: pbpCrc32(utf8Enc.encode("application/epub+zip")), data: utf8Enc.encode("application/epub+zip"), text: "application/epub+zip" }]]);
+    check("negative control: validateEpubArchive rejects gutted mimetype-only archive",
+      validateEpubArchive(guttedEntries, xmlParser, "x").includes("missing required EPUB member"));
   }
 
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;

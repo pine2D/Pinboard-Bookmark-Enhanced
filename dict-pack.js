@@ -236,6 +236,10 @@ const PBP_ECDICT_COLUMNS = Object.freeze([
 // never be looked up. The `|| ""` coercion is copied verbatim rather than
 // improved: `String(x == null ? "" : x)` reads better but disagrees on 0 and
 // false, and "reads better" is not worth two subtly different identities.
+/**
+ * @param {unknown} word
+ * @returns {string}
+ */
 function pbpEcdictKey(word) {
   return String(word || "").normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
 }
@@ -293,6 +297,10 @@ function pbpEcdictInt(v) {
 // Literal backslash-n, not a real newline: ECDICT writes "n. 罩\nv. 覆盖".
 // Splitting into separate senses is required -- substituting a real newline
 // renders as a space, because .xp-dict-senses li is white-space: normal.
+/**
+ * @param {unknown} translation
+ * @returns {string[]}
+ */
 function pbpEcdictSenses(translation) {
   return String(translation == null ? "" : translation)
     .split("\\n").map((s) => s.trim()).filter(Boolean);
@@ -993,7 +1001,12 @@ async function pbpEcdictLookup(term) {
 // transaction for every key, never one transaction per visible row. Returns a
 // Map of key -> rows for the keys that hit; a missing key is simply absent.
 // Resolves to an empty Map when no pack is ready, so callers need no state check.
+/**
+ * @param {readonly string[]} keys
+ * @returns {Promise<Map<string, Array<{ translation?: string, [key: string]: any }>>>}
+ */
 async function pbpEcdictLookupMany(keys) {
+  /** @type {Map<string, Array<{ translation?: string, [key: string]: any }>>} */
   const out = new Map();
   try {
     const wanted = [...new Set((Array.isArray(keys) ? keys : []).map(pbpEcdictKey).filter(Boolean))];
@@ -1021,12 +1034,24 @@ async function pbpEcdictLookupMany(keys) {
   } catch (_) { return out; }
 }
 
+/**
+ * @typedef {{
+ *   state: string,
+ *   rung?: string,
+ *   decodedCrc32?: string | number,
+ *   [key: string]: any,
+ * }} PbpEcdictMetaRecord
+ */
+
+/**
+ * @returns {Promise<PbpEcdictMetaRecord | null>}
+ */
 async function pbpEcdictMeta() {
   try {
     const db = await _pbpPackOpenDB();
     return await new Promise((resolve) => {
       const req = db.transaction(_PBP_PACK_META, "readonly").objectStore(_PBP_PACK_META).get(_PBP_ECDICT_META_ID);
-      req.onsuccess = () => resolve(req.result || null);
+      req.onsuccess = () => resolve(/** @type {PbpEcdictMetaRecord | null} */ (req.result || null));
       req.onerror = () => { console.warn("[pack] ecdict meta failed:", req.error?.name); resolve({ state: "error" }); };
     });
   } catch (error) { console.warn("[pack] ecdict meta failed:", error?.name, error?.message); return { state: "error" }; }
