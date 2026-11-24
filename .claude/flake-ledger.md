@@ -26,3 +26,4 @@
 | 2026-11-18 | bookmark-service-runtime：跨窗口切换后的服务单选框 | 本页已写入 linkding，另一窗口切回 Karakeep 后单选框仍停在 linkding；固定两个写入的响应顺序可以复现 | 已根治 3d977db1 | - |
 | 2026-11-18 | reader-save-export：Ask 导出夹具的个人库身份 | 启动时尚未完成的初始化覆盖了夹具的 qa 身份，读取 Ask 档案报 account_changed；串行建立夹具后双窗口导出通过 | 已根治 535ad4ae | - |
 | 2026-11-18 | tests/ai-cache-tests.html：空池并发写入精确容量 | 页面一次停在 20/32，下一项并发写入两个缓存池；独立运行时全部 32 项通过，首次停顿原因未确定 | 已根治 96102ee4 | - |
+| 2026-11-24 | render-audit 分片 0：tag-gov-entity-scan 标题面色 | 首次运行点击扫描并滚动后鼠标留在重排后的小节 summary 上，headerFace 测得悬停色 rgb(32, 94, 166) 而非 rgb(16, 15, 15)，重跑通过 | 已根治 f6461c98 | - |
