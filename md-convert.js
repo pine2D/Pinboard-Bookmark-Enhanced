@@ -1689,10 +1689,10 @@ function _pbpTruncateFilename(str, maxChars, maxBytes) {
 function safeFilename(title) {
   let cleaned = String(title || "")
     .replace(/[\\/?%*:|"<>#\x00-\x1F\x7F]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "_");
-  cleaned = _pbpTruncateFilename(cleaned, 80, 200).replace(/[\s.]+$/g, "");
+  cleaned = _pbpTruncateFilename(cleaned, 80, 240).replace(/[\s.]+$/g, "");
   if (!cleaned) return "untitled";
   if (_PBP_WIN32_RESERVED_RE.test(cleaned)) {
-    cleaned = _pbpTruncateFilename("_" + cleaned, 80, 200).replace(/[\s.]+$/g, "");
+    cleaned = _pbpTruncateFilename("_" + cleaned, 80, 240).replace(/[\s.]+$/g, "");
   }
   return cleaned || "untitled";
 }

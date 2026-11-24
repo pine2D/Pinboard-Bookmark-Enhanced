@@ -484,7 +484,7 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
     } catch (e) { threw = e; }
     const byteLen = utf8Enc.encode(fname).length;
     const safeNameOk = uriOk && typeof fname === "string" &&
-      [...fname].length > 0 && [...fname].length <= 80 && byteLen <= 200 &&
+      [...fname].length > 0 && [...fname].length <= 80 && byteLen <= 240 &&
       safeFilename(fname) === fname &&
       fname !== "." && fname !== ".." &&
       !/[<>:"/\\|?*\x00-\x1f\x7f]/.test(fname) &&

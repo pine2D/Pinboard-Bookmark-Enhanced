@@ -370,16 +370,20 @@ function buildConstScopes(ast) {
       if (stmt.type === 'VariableDeclaration') {
         for (const decl of stmt.declarations) {
           if (stmt.kind === 'const' && decl.id.type === 'Identifier' && !scope.bindings.has(decl.id.name)) {
-            const frozen = isObjectFreezeCall(decl.init);
-            const isMutableContainer = !frozen && (decl.init?.type === 'ArrayExpression' || decl.init?.type === 'ObjectExpression');
+            const innerInit = isObjectFreezeCall(decl.init)
+              ? (decl.init.type === 'ChainExpression' ? decl.init.expression : decl.init).arguments[0]
+              : decl.init;
+            const isMutableContainer = innerInit?.type === 'ArrayExpression' || innerInit?.type === 'ObjectExpression';
             const binding = {
               init: decl.init,
+              innerInit,
               scope,
               declId: decl.id,
               stmts: Array.isArray(stmts) ? stmts : null,
               isMutableContainer,
               pushOps: [],
               consumerIndices: [],
+              depTargets: [],
               tainted: false,
             };
             scope.bindings.set(decl.id.name, binding);
@@ -449,20 +453,54 @@ function buildConstScopes(ast) {
       }
       return -1;
     };
-    const isPureConsumer = (idNode, parent) => {
-      if (!parent) return false;
-      if (isObjectFreezeCall(parent)) return true;
+    const isExecCall = call => {
+      if (call?.type !== 'CallExpression') return false;
+      const callee = call.callee?.type === 'ChainExpression' ? call.callee.expression : call.callee;
+      return (callee?.type === 'Identifier' && (callee.name === 'executeScript' || callee.name === '_cbExecuteScript'))
+        || (callee?.type === 'MemberExpression' && !callee.computed && callee.property?.type === 'Identifier' && callee.property.name === 'executeScript');
+    };
+    const isImportCall = call => {
+      if (call?.type !== 'CallExpression') return false;
+      const callee = call.callee?.type === 'ChainExpression' ? call.callee.expression : call.callee;
+      return (callee?.type === 'Identifier' && callee.name === 'importScripts')
+        || (callee?.type === 'MemberExpression' && !callee.computed && callee.property?.type === 'Identifier' && callee.property.name === 'importScripts'
+          && callee.object?.type === 'Identifier' && (callee.object.name === 'self' || callee.object.name === 'globalThis'));
+    };
+    const isPureConsumerChain = (expr, ownerBinding, seen = new Set()) => {
+      const parent = nodeParents.get(expr);
+      if (!parent || seen.has(expr)) return false;
+      const next = new Set(seen);
+      next.add(expr);
+      if (isObjectFreezeCall(parent)) return isPureConsumerChain(parent, ownerBinding, next);
+      if (parent.type === 'VariableDeclarator' && parent.init === expr && parent.id?.type === 'Identifier') {
+        const targetB = nodeScopes.get(parent)?.bindings.get(parent.id.name);
+        if (!targetB || targetB.shadowed) return false;
+        ownerBinding.depTargets.push(targetB);
+        return true;
+      }
       if (parent.type === 'SpreadElement') {
         const gp = nodeParents.get(parent);
-        return gp?.type === 'ArrayExpression' || gp?.type === 'ObjectExpression' || gp?.type === 'CallExpression';
+        if (isImportCall(gp)) return true;
+        if (gp?.type === 'ArrayExpression' || gp?.type === 'ObjectExpression') return isPureConsumerChain(gp, ownerBinding, next);
+        return false;
       }
-      if (parent.type === 'Property' && parent.value === idNode) return true;
-      if (parent.type === 'CallExpression' && parent.arguments[0] === idNode) {
-        const callee = parent.callee?.type === 'ChainExpression' ? parent.callee.expression : parent.callee;
-        return (callee?.type === 'Identifier' && (callee.name === 'executeScript' || callee.name === '_cbExecuteScript'))
-          || (callee?.type === 'MemberExpression' && !callee.computed && callee.property?.type === 'Identifier' && callee.property.name === 'executeScript');
+      if (parent.type === 'ArrayExpression') return isPureConsumerChain(parent, ownerBinding, next);
+      if (parent.type === 'Property' && parent.kind === 'init' && parent.value === expr) {
+        const gp = nodeParents.get(parent);
+        return gp?.type === 'ObjectExpression' && isPureConsumerChain(gp, ownerBinding, next);
       }
+      if (isExecCall(parent) && parent.arguments[0] === expr) return true;
+      if (isImportCall(parent) && parent.arguments.includes(expr)) return true;
       return false;
+    };
+    const isReadOnlyArrayLength = (idNode, parent, b) => {
+      if (b.innerInit?.type !== 'ArrayExpression') return false;
+      if (parent?.type !== 'MemberExpression' || parent.computed || parent.object !== idNode || parent.property?.name !== 'length') return false;
+      const gp = nodeParents.get(parent);
+      if (gp?.type === 'AssignmentExpression' && gp.left === parent) return false;
+      if (gp?.type === 'UpdateExpression' && gp.argument === parent) return false;
+      if (gp?.type === 'UnaryExpression' && gp.operator === 'delete') return false;
+      return true;
     };
     const checkRefs = node => {
       if (!node || typeof node.type !== 'string') return;
@@ -479,12 +517,14 @@ function buildConstScopes(ast) {
               ? nodeParents.get(parent)
               : null;
             const exprStmt = call?.type === 'CallExpression' && call.callee === parent ? nodeParents.get(call) : null;
-            const pushIdx = b.init?.type === 'ArrayExpression' && exprStmt?.type === 'ExpressionStatement' && b.stmts
+            const pushIdx = b.innerInit?.type === 'ArrayExpression' && exprStmt?.type === 'ExpressionStatement' && b.stmts
               ? b.stmts.indexOf(exprStmt)
               : -1;
             if (pushIdx !== -1) {
               b.pushOps.push({ stmtIndex: pushIdx, call, scope: nodeScopes.get(call) });
-            } else if (isPureConsumer(node, parent)) {
+            } else if (isReadOnlyArrayLength(node, parent, b)) {
+              // Read-only `if (files.length)` check neither mutates nor escapes `files`.
+            } else if (isPureConsumerChain(node, b)) {
               const cIdx = ancestorStmtIndex(node, b.stmts);
               if (cIdx === -1) b.tainted = true;
               else b.consumerIndices.push(cIdx);
@@ -502,6 +542,16 @@ function buildConstScopes(ast) {
       }
     };
     checkRefs(ast);
+    let taintPropagated = true;
+    while (taintPropagated) {
+      taintPropagated = false;
+      for (const b of mutableBindings) {
+        if (!b.tainted && b.depTargets.some(t => t.tainted)) {
+          b.tainted = true;
+          taintPropagated = true;
+        }
+      }
+    }
   }
   return nodeScopes;
 }
@@ -649,7 +699,8 @@ export function surfaceFiles(dir = ROOT) {
   if (key === String(ROOT) && surfaceCache.has(key)) return surfaceCache.get(key);
   const read = rel => { try { return readFileSync(join(dir, rel), 'utf8'); } catch { return null; } };
   const local = f => !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(f);
-  const norm = canonicalExtRelPath;
+  const cleanFsPath = f => String(f || '').replace(/^\.?\//, '');
+  const normUrl = canonicalExtRelPath;
   const parseJs = (text, errCode) => {
     if (typeof text !== 'string') fail(errCode);
     try { return getEspree().parse(text, { ecmaVersion: 'latest' }); } catch { fail(errCode); }
@@ -693,14 +744,15 @@ export function surfaceFiles(dir = ROOT) {
     });
     return found;
   };
-  // Follow executeScript({ files: [...] }) one script at a time.
-  const close = start => {
-    const out = new Set(start.map(norm));
+  // Follow executeScript({ files: [...] }) one script at a time. `startPaths`
+  // are already repo-relative filesystem paths (never re-decoded as URLs).
+  const close = startPaths => {
+    const out = new Set(startPaths.map(cleanFsPath).filter(Boolean));
     const queue = [...out].filter(f => f.endsWith('.js'));
     while (queue.length) {
       const rel = queue.shift();
       const text = read(rel);
-      for (const f of extractExecScriptFiles(text || '').filter(local).map(norm)) {
+      for (const f of extractExecScriptFiles(text || '').filter(local).map(normUrl).filter(Boolean)) {
         if (!out.has(f)) { out.add(f); if (f.endsWith('.js')) queue.push(f); }
       }
     }
@@ -708,7 +760,7 @@ export function surfaceFiles(dir = ROOT) {
   };
   let manifest = {};
   try { manifest = JSON.parse(read('manifest.json') || '{}'); } catch { manifest = {}; }
-  const sw = manifest.background?.service_worker ? norm(manifest.background.service_worker) : '';
+  const sw = manifest.background?.service_worker ? cleanFsPath(manifest.background.service_worker) : '';
   const locale = manifest.default_locale ? ['_locales/' + manifest.default_locale + '/messages.json'] : [];
   const workerScripts = new Set(sw ? [sw] : []);
   const workerQueue = sw ? [sw] : [];
@@ -728,15 +780,15 @@ export function surfaceFiles(dir = ROOT) {
           if (!list) fail('worker_import_unresolved');
           for (const raw of list) {
             if (!local(raw)) continue;
-            const f = norm(raw);
-            if (!workerScripts.has(f)) { workerScripts.add(f); if (f.endsWith('.js')) workerQueue.push(f); }
+            const f = normUrl(raw);
+            if (f && !workerScripts.has(f)) { workerScripts.add(f); if (f.endsWith('.js')) workerQueue.push(f); }
           }
         } else {
           const raw = evalConstString(arg, scope);
           if (raw === null) fail('worker_import_unresolved');
           if (!local(raw)) continue;
-          const f = norm(raw);
-          if (!workerScripts.has(f)) { workerScripts.add(f); if (f.endsWith('.js')) workerQueue.push(f); }
+          const f = normUrl(raw);
+          if (f && !workerScripts.has(f)) { workerScripts.add(f); if (f.endsWith('.js')) workerQueue.push(f); }
         }
       }
     });
@@ -746,7 +798,7 @@ export function surfaceFiles(dir = ROOT) {
     const html = read(page) || '';
     const scripts = [...html.matchAll(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)].map(x => x[1]);
     const styles = [...html.matchAll(/<link\b[^>]*>/gi)].filter(x => /\brel\s*=\s*["']?stylesheet/i.test(x[0])).map(x => (x[0].match(/\bhref\s*=\s*["']([^"']+)["']/i) || [])[1]).filter(Boolean);
-    out[name] = close([page, ...scripts, ...styles].filter(local));
+    out[name] = close([cleanFsPath(page), ...[...scripts, ...styles].filter(local).map(normUrl).filter(Boolean)]);
   }
   const frozen = Object.freeze(out);
   if (key === String(ROOT)) surfaceCache.set(key, frozen);

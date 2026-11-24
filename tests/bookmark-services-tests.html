@@ -471,6 +471,7 @@ async function workerHarness(service, replies, options = {}) {
   };
 
   let leased = null;
+  let pendingLease = null;
   let activeOps = 0;
   let batchRunning = false;
   let activeProducerApply = null;
@@ -542,17 +543,33 @@ async function workerHarness(service, replies, options = {}) {
       }
       return Promise.resolve(out).finally(() => finishOp(slot));
     };
-    if (activeOps > 0 && leased) {
+    if (leased) {
       activeOps++;
       return enterWithSlot(leased, false);
+    }
+    if (pendingLease) {
+      activeOps++;
+      return pendingLease.then(
+        (slot) => enterWithSlot(slot, false),
+        (err) => { activeOps--; throw err; },
+      );
     }
     activeOps++;
     if (_idleWorkerRealms.length) {
       return enterWithSlot(_idleWorkerRealms.pop(), true);
     }
-    return createWorkerRealmSlot().then(
-      (slot) => enterWithSlot(slot, true),
-      (err) => { activeOps--; throw err; },
+    const acquiring = createWorkerRealmSlot();
+    pendingLease = acquiring;
+    return acquiring.then(
+      (slot) => {
+        if (pendingLease === acquiring) pendingLease = null;
+        return enterWithSlot(slot, true);
+      },
+      (err) => {
+        if (pendingLease === acquiring) pendingLease = null;
+        activeOps--;
+        throw err;
+      },
     );
   };
 
@@ -2350,15 +2367,44 @@ test("concurrent worker and popup fixtures stay isolated, and concurrent batchSa
   const restorePromise=popA.restore();
   popB.snapshot();
   equal(await restorePromise,"legacy");
+  const iframesBefore=document.querySelectorAll("#pbp-sw-realms iframe").length;
+  const popC=await pbpFixturePopupSummary({service:"pinboard",account:"alice",url:pageUrl,notes:legacyNotes,existingBookmark:{extended:legacyNotes}});
+  const popD=await pbpFixturePopupSummary({service:"pinboard",account:"bob",url:pageUrl+"?other=2",notes:"More"});
+  equal(await popC.restore(),"legacy");
+  popD.snapshot();
+  equal(document.querySelectorAll("#pbp-sw-realms iframe").length,iframesBefore);
 
+  // Even when all idle worker realms in the pool are occupied, two concurrent
+  // batchSave([]) calls on a third harness share its pending lease and enter auth once.
+  const hold=[];
+  const blockers=[];
+  const slotTarget=Math.max(2,_idleWorkerRealms.length);
+  for(let i=0;i<slotTarget;i++){
+    const hb=await workerHarness("karakeep",[]);
+    let release;
+    const gate=new Promise(r=>{release=r;});
+    hb.auth=async()=>{await gate;return {service:"karakeep",account:"",token:"",epoch:0};};
+    const pb=await producers(hb,{autoNotes:"",summary:""});
+    blockers.push({done:pb.batchSave([]),release});
+  }
+  equal(_idleWorkerRealms.length,0);
   let authCalls=0;
   const hMutex=await workerHarness("karakeep",[]);
   hMutex.state.settings.karakeepToken="";
   const origAuth=hMutex.auth;
   hMutex.auth=async()=>{authCalls++;return origAuth();};
   const pMutex=await producers(hMutex,{autoNotes:"",summary:""});
-  await Promise.all([pMutex.batchSave([]),pMutex.batchSave([])]);
-  equal(authCalls,1);
+  // Drain the slot pre-warmed by workerHarness() so pendingLease is exercised.
+  const extraHold=_idleWorkerRealms.splice(0);
+  hold.push(...extraHold);
+  try{
+    await Promise.all([pMutex.batchSave([]),pMutex.batchSave([])]);
+    equal(authCalls,1);
+  }finally{
+    _idleWorkerRealms.push(...hold);
+    for(const b of blockers)b.release();
+    await Promise.all(blockers.map(b=>b.done));
+  }
 });
 (async()=>{let pass=0,fail=0;for(const item of cases){const row=document.createElement("div");try{await item.run();row.className="pass";row.textContent="PASS "+item.name;pass++;}catch(e){row.className="fail";row.textContent="FAIL "+item.name+": "+e.message;fail++;}document.getElementById("results").appendChild(row);}document.getElementById("summary").textContent=`${pass} passed, ${fail} failed`;})();
 </script></body></html>

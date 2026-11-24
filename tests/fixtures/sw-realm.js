@@ -247,7 +247,7 @@
         finally { delete win.__pbpSetValue; }
       },
       // Stop periodic timers and close cached IDB handles without removing the iframe before coverage stops.
-      dispose() {
+      dispose(opts = {}) {
         try {
           const maxId = win.setTimeout(() => {}, 0);
           for (let id = 1; id <= maxId; id++) { win.clearTimeout(id); win.clearInterval(id); }
@@ -266,6 +266,11 @@
             if (typeof _pbpAiDbPromise !== "undefined") _pbpAiDbPromise = null;
           `);
         } catch { /* swallow-ok: realm IDB teardown best-effort */ }
+        if (opts && opts.removeIframe) {
+          try {
+            if (iframe && typeof iframe.remove === "function") iframe.remove();
+          } catch { /* swallow-ok: iframe removal best-effort */ }
+        }
       },
     };
   }
@@ -324,7 +329,7 @@
         try { win.eval(`${ident} = window.__pbpSetValue`); }
         finally { delete win.__pbpSetValue; }
       },
-      dispose() {
+      dispose(opts = {}) {
         try {
           const maxId = win.setTimeout(() => {}, 0);
           for (let id = 1; id <= maxId; id++) { win.clearTimeout(id); win.clearInterval(id); }
@@ -343,6 +348,11 @@
             if (typeof _pbpAiDbPromise !== "undefined") _pbpAiDbPromise = null;
           `);
         } catch { /* swallow-ok: realm IDB teardown best-effort */ }
+        if (opts && opts.removeIframe) {
+          try {
+            if (extra.iframe && typeof extra.iframe.remove === "function") extra.iframe.remove();
+          } catch { /* swallow-ok: iframe removal best-effort */ }
+        }
       },
     };
   }
@@ -491,7 +501,7 @@
     doc.removeEventListener = function (type, listener, opts) {
       if (type === "DOMContentLoaded" && typeof listener === "function") {
         const wrapped = dclWrapped.get(listener);
-        if (wrapped) return origRemove(type, wrapped, opts);
+        if (wrapped) origRemove(type, wrapped, opts);
       }
       return origRemove(type, listener, opts);
     };
