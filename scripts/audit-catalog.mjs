@@ -11,6 +11,7 @@ export const AUDIT_SURFACES = Object.freeze(['popup', 'options', 'library', 'md-
 const ui = ['popup', 'options', 'library', 'md-preview'];
 function ownership(name) {
   if (name === 'bookmark-live-preflight') return ['tooling'];
+  if (name === 'diag-errors') return ['background', 'options'];
   if (name === 'deepseek-speech') return ['background', 'library', 'options', 'md-preview'];
   if (/^dict-(?:entry|usage|evidence|archive)$/.test(name)) return ['library', 'md-preview'];
   if (name === 'ask-history') return ['md-preview'];

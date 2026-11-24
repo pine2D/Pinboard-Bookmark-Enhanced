@@ -293,7 +293,7 @@ function invalidateBookmarkLookup() {
     banner.textContent = "";
     banner.classList.add("hidden");
   }
-  try { localStorage.removeItem("pp-last-tab"); } catch (_) {}
+  try { localStorage.removeItem("pp-last-tab"); } catch (_) { /* swallow-ok: localStorage unavailable */ }
   const deleteBtn = $id("delete-btn");
   if (deleteBtn) {
     // The confirm popover is a body child now, not a descendant of the
@@ -581,7 +581,7 @@ function pbpPopupReplayEarlyTagKeys() {
 }
 function pbpPopupHasWebUrl(value) {
   try { const u = new URL(value); return /^https?:$/.test(u.protocol) && !u.username && !u.password; }
-  catch (_) { return false; }
+  catch (_) { /* swallow-ok: non-URL value rejected */ return false; }
 }
 async function initPopupDraft(account, tab) {
   if (!account || !tab?.url || !/^https?:\/\//.test(tab.url)) return;
@@ -716,7 +716,7 @@ async function resetPinboardSession(expectedToken) {
   // login screen to read: a popup that forgets the token with no explanation
   // reads as a bug, and a server-side revocation is exactly what the user needs
   // to know before typing the same token back in.
-  try { sessionStorage.setItem("pp-auth-reset", "1"); } catch (_) {}
+  try { sessionStorage.setItem("pp-auth-reset", "1"); } catch (_) { /* swallow-ok: sessionStorage unavailable */ }
   window.location.reload();
   return true;
 }
@@ -855,7 +855,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (u && !_popupDraftUserUrl && !document.activeElement?.isSameNode(u)) u.value = "";
       if (ti && shouldUpdateField("title-input") && !document.activeElement?.isSameNode(ti)) ti.value = "";
     }
-  } catch (_) {}
+  } catch (e) { console.warn("[popup] active tab prefill query failed:", e?.name); }
 
   settings = await settingsPromise;
   deobfuscateSettings(settings);
@@ -961,7 +961,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ===================== Login =====================
 function showLogin() {
   document.documentElement.dataset.section = "login";
-  try { localStorage.removeItem("pp-logged-in"); } catch (_) {}
+  try { localStorage.removeItem("pp-logged-in"); } catch (_) { /* swallow-ok: localStorage unavailable */ }
   $id("login-section").classList.remove("hidden");
   $id("main-section").classList.add("hidden");
   const qa = document.querySelector(".quick-actions");
@@ -970,7 +970,7 @@ function showLogin() {
   try {
     authReset = sessionStorage.getItem("pp-auth-reset") === "1";
     if (authReset) sessionStorage.removeItem("pp-auth-reset");
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: sessionStorage unavailable */ }
   if (authReset) showElement("login-error", t("pinboardErrorAuth"));
 }
 // Semantic form submit covers both the button and Enter in the token field.
@@ -1020,7 +1020,7 @@ $id("login-form").addEventListener("submit", async (event) => {
 // ===================== Main =====================
 async function showMain(token) {
   document.documentElement.dataset.section = "main";
-  try { localStorage.setItem("pp-logged-in", "1"); } catch (_) {}
+  try { localStorage.setItem("pp-logged-in", "1"); } catch (_) { /* swallow-ok: localStorage unavailable */ }
   $id("login-section").classList.add("hidden");
   $id("main-section").classList.remove("hidden");
   // #tags-input's HTML autofocus only fires when it is a focusable candidate
@@ -1168,7 +1168,7 @@ async function showMain(token) {
     ? (_ucs.enabled && _ucs.onPopupOpen ? pbpPopupCleanAddress(tab.url, _ucs).cleaned : tab.url)
     : "";
   const _bookmarkPrefetchPromise = pbpPopupHasWebUrl(_bookmarkPrefetchUrl)
-    ? chrome.runtime.sendMessage({ type: "get_bookmark_data", url: _bookmarkPrefetchUrl, account: sessionAccount }).catch(() => null)
+    ? chrome.runtime.sendMessage({ type: "get_bookmark_data", url: _bookmarkPrefetchUrl, account: sessionAccount }).catch(() => { /* swallow-ok: cold worker prefetch miss falls back to lookup_bookmark */ return null; })
     : Promise.resolve(null);
   // Tag entry only needs the DOM, so wire it before the wait below: typing tags
   // is the first thing a keyboard user does once the form paints.
@@ -1279,7 +1279,8 @@ async function showMain(token) {
           pbpRememberPopupDraft();
           showStatus("status-msg", t("waybackPermDenied"), "error", { remedy: true });
         }
-      } catch (_) {
+      } catch (err) {
+        console.warn("[popup] wayback permission request failed:", err?.name);
         e.target.checked = false;
         pbpRememberPopupDraft();
         showStatus("status-msg", t("waybackPermDenied"), "error", { remedy: true });
@@ -1322,7 +1323,7 @@ async function showMain(token) {
         prevBtn.setAttribute("aria-label", t("mdStripPreviewVideo"));
       }
     }
-  } catch (_) {}
+  } catch (e) { console.warn("[popup] video strip button label setup failed:", e?.name); }
   if (jinaMdBtn) {
     let remoteGrantPattern = "";
     const effectivePreviewEngine = typeof pbpEffectiveExtractEngine === "function"
@@ -1350,7 +1351,7 @@ async function showMain(token) {
         let granted = false;
         try {
           granted = await chrome.permissions.request({ origins: [remoteGrantPattern] });
-        } catch (_) {}
+        } catch (e) { console.warn("[popup] remote extractor permission request failed:", e?.name); }
         if (!granted) {
           showStatus("status-msg", t("aiErrorHostPermission", remoteGrantPattern.replace(/\/\*$/, "")), "error", { remedy: true });
           jinaMdBtn.disabled = false;
@@ -1442,7 +1443,10 @@ async function showMain(token) {
             const videoQ = (typeof pbpVideoDetect === "function" && pbpVideoDetect(tab.url || url)) ? "&video=1" : "";
             await chrome.tabs.create({ url: "md-preview.html?k=" + k + videoQ });
             opened = true;
-          } catch (_) { /* storage quota / tab failure: fall through to the ordinary failure feedback below */ }
+          } catch (e) {
+            console.warn("[popup] reader handoff open failed:", e?.name);
+            if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "popup", op: "reader_handoff", code: "storage", errorName: e?.name });
+          }
           if (opened) {
             setBtnIcon(jinaMdBtn, "doc", origLabel); jinaMdBtn.disabled = false; jinaMdBtn.title = "";
             return;
@@ -1547,7 +1551,7 @@ async function showMain(token) {
         const author = (result.author || "").trim();
         if (author) meta.author = author.slice(0, 200);
         let site = (result.site || "").trim();
-        if (!site) { try { site = new URL(result.url || url).hostname; } catch (_) { site = ""; } }
+        if (!site) { try { site = new URL(result.url || url).hostname; } catch (_) { /* swallow-ok: malformed source URL omits site meta */ site = ""; } }
         if (site) meta.site = site.slice(0, 200);
         const published = publishedIso(result.published || "");
         meta.date = published || "";
@@ -1742,7 +1746,9 @@ async function showMain(token) {
         );
         try {
           await navigator.clipboard.writeText(out);
-        } catch (_) {
+        } catch (e) {
+          console.warn("[popup] Obsidian clipboard write failed:", e?.name);
+          if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "popup", op: "obsidian_clip", code: "denied", errorName: e?.name });
           // Clipboard failed — do NOT fall back to inlining `out` into the
           // obsidian:// URI: popup.html doesn't load export-targets.js's
           // PBP_URI_BUDGET gate, so a long note would silently no-op past
@@ -1849,7 +1855,7 @@ async function extractLocalMarkdown(tabId) {
             for (const f of document.querySelectorAll("iframe")) {
               if (f.hasAttribute("srcdoc")) continue; // src is decorative on srcdoc frames
               let origin;
-              try { origin = new URL(f.src, location.href).origin; } catch (_) { continue; }
+              try { origin = new URL(f.src, location.href).origin; } catch (_) { /* swallow-ok: invalid iframe src in page world */ continue; }
               if (!/^https:\/\//.test(origin) || origin === location.origin) continue;
               const sb = f.getAttribute("sandbox");
               if (sb !== null && !/\ballow-same-origin\b/.test(sb)) continue;
@@ -1868,7 +1874,7 @@ async function extractLocalMarkdown(tabId) {
               if (area > bestArea) { bestArea = area; best = origin; }
             }
             return best && bestArea >= 0.4 * vw * vh ? best : "";
-          } catch (_) { return ""; }
+          } catch (_) { /* swallow-ok: page-world frame inspection failure degrades to empty */ return ""; }
         }
         // "Nothing here" is judged on TEXT, not on the HTML string: Defuddle hands
         // back the main container even when all it holds is an <iframe> (claude.ai
@@ -1901,7 +1907,7 @@ async function extractLocalMarkdown(tabId) {
               return { contentHtml: div.innerHTML, title: hit.title || document.title, url: location.href, math: !!hit.math, forum: !!hit.forum };
             }
           }
-        } catch (_) { /* fall through to Defuddle */ }
+        } catch (_) { /* swallow-ok: site rule threw in page world; fall through to Defuddle */ }
         if (typeof Defuddle === "undefined") return { error: "Defuddle not available" };
         // Patch window.URL in the ISOLATED world to prevent defuddle from
         // throwing "Failed to construct 'URL': Invalid URL" on relative/weird hrefs
@@ -1911,12 +1917,12 @@ async function extractLocalMarkdown(tabId) {
         if (!window.__pp_urlShimInstalled) {
           const SafeURL = function(u, b) {
             try { return b !== undefined ? new OriginalURL(u, b) : new OriginalURL(u); }
-            catch (_) { return new OriginalURL("about:blank"); }
+            catch (_) { /* swallow-ok: invalid relative href inside page DOM falls back to about:blank */ return new OriginalURL("about:blank"); }
           };
           SafeURL.prototype = OriginalURL.prototype;
-          try { SafeURL.createObjectURL = OriginalURL.createObjectURL.bind(OriginalURL); } catch (_) {}
-          try { SafeURL.revokeObjectURL = OriginalURL.revokeObjectURL.bind(OriginalURL); } catch (_) {}
-          try { SafeURL.canParse = OriginalURL.canParse && OriginalURL.canParse.bind(OriginalURL); } catch (_) {}
+          try { SafeURL.createObjectURL = OriginalURL.createObjectURL.bind(OriginalURL); } catch (_) { /* swallow-ok: optional URL static method bind */ }
+          try { SafeURL.revokeObjectURL = OriginalURL.revokeObjectURL.bind(OriginalURL); } catch (_) { /* swallow-ok: optional URL static method bind */ }
+          try { SafeURL.canParse = OriginalURL.canParse && OriginalURL.canParse.bind(OriginalURL); } catch (_) { /* swallow-ok: optional URL static method bind */ }
           window.URL = SafeURL;
           window.__pp_urlShimInstalled = true;
         }
@@ -2006,7 +2012,7 @@ function ensureTurndown() {
 async function htmlToMarkdownAsync(html, opts) {
   // md-convert.js (htmlToMarkdown) is lazy-loaded too — settle both deps here
   // so every caller path is covered, not just the Markdown button flow.
-  try { await ensureMdConvert(); await ensureTurndown(); } catch (_) { return html; }
+  try { await ensureMdConvert(); await ensureTurndown(); } catch (e) { console.warn("[popup] markdown converter lazy-load failed:", e?.name); return html; }
   return htmlToMarkdown(html, opts);
 }
 
@@ -2201,6 +2207,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
               const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : undefined;
               dateStr = d.toLocaleDateString(locale, dOpts);
             } catch (_) {
+              /* swallow-ok: unsupported Intl locale falls back to default toLocaleDateString */
               dateStr = d.toLocaleDateString(undefined, dOpts);
             }
             parts.push(t("savedOnDate", dateStr));
@@ -2261,7 +2268,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
           };
           localStorage.setItem("pp-last-tab", JSON.stringify(mirror));
         }
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: localStorage tab mirror write optional */ }
       return { status: bookmarkLookup.status, url: lookupUrl };
     } catch (e) {
       if (bookmarkLookup.generation === generation && bookmarkLookup.url === lookupUrl && $id("url-input").value.trim() === lookupUrl) {
@@ -2386,7 +2393,7 @@ async function pbpPopupLookupPosts(token, lookupUrl, prefetch, forceFresh) {
       }
       if (cached?.account !== lookupAccount) cached = null;
       if (cached?.posts) data = { posts: cached.posts, metadata: cached.metadata ?? null };
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: worker cache probe miss falls through to lookup_bookmark */ }
   }
   // K1: a cold miss goes BACK to the worker rather than straight to the
   // network. The worker resolves it through the same status cache and
@@ -2427,7 +2434,7 @@ async function pbpPopupLookupPosts(token, lookupUrl, prefetch, forceFresh) {
       // worker side leaves a trail to tell that apart from a real outage in
       // the field. Only a genuinely unreachable worker (rejected
       // sendMessage, caught below) falls through to the direct call.
-    } catch (_) { /* worker unreachable — fall through to the direct call */ }
+    } catch (_) { /* swallow-ok: worker unreachable; fall through to direct API call */ }
     if (workerError) throw workerError;
   }
   if (!data) {
@@ -2750,7 +2757,7 @@ function setupSubmit(token) {
         });
       let attemptsStored = {};
       if (archiveIndicatorRequested) {
-        try { attemptsStored = await chrome.storage.local.get("_waybackAttempts"); } catch (_) {}
+        try { attemptsStored = await chrome.storage.local.get("_waybackAttempts"); } catch (e) { console.warn("[popup] wayback attempts read failed:", e?.name); }
       }
       if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
         if (ownsSubmitUi()) setSubmitState("idle");
@@ -2817,7 +2824,7 @@ function setupSubmit(token) {
       if (result.status === "queued") {
         showSaveQueued(result);
         setSubmitState("idle");
-        try { if (window.PPOffline) await window.PPOffline.refresh(); } catch (_) {}
+        try { if (window.PPOffline) await window.PPOffline.refresh(); } catch (e) { console.warn("[popup] offline bar refresh failed:", e?.name); }
         return;
       }
 
@@ -2964,7 +2971,7 @@ function setupSubmit(token) {
               statusEl.appendChild(indicator);
             }
           }
-        } catch (_) {}
+        } catch (e) { console.warn("[popup] archive indicator render failed:", e?.name); }
         // Tell, don't auto-submit: the draft the user was mid-typing at click
         // time never made it into currentTags (Enter/Tab/Space/comma are the
         // only submit gestures). Say so instead of silently dropping it or
@@ -2980,13 +2987,13 @@ function setupSubmit(token) {
               statusEl.appendChild(document.createTextNode(" · "));
               statusEl.appendChild(tagDraftNote);
             }
-          } catch (_) {}
+          } catch (e) { console.warn("[popup] unsaved tag draft note render failed:", e?.name); }
         }
         // The bookmark is saved either way; SingleFile not answering only
         // means no snapshot, so say it beside the success and stay open.
         const singleFileSilent = result.singleFile === "failed";
         if (singleFileSilent) {
-          try { showSaveWarning(t("singleFileNoResponse")); } catch (_) {}
+          try { showSaveWarning(t("singleFileNoResponse")); } catch (e) { console.warn("[popup] SingleFile warning render failed:", e?.name); }
         }
         // A merge tells the user what the service did to a bookmark it already
         // had, so the popup stays open for it (user decision 2026-11-02).
@@ -3173,13 +3180,15 @@ function setupSubmit(token) {
           const deleted = data.result_code === "done" || data.result_code === "item not found";
           // Promise form: an unhandled rejection here (no receiver) would
           // escape this handler entirely.
-          if (deleted) chrome.runtime.sendMessage({ type: "bookmark_deleted", url: deleteUrl, account: submitAccount })?.catch?.(() => {});
+          if (deleted) chrome.runtime.sendMessage({ type: "bookmark_deleted", url: deleteUrl, account: submitAccount })?.catch?.(() => { /* swallow-ok: fire-and-forget worker cache invalidation */ });
           if (!ownsDeleteForm()) return;
           if (deleted) {
             showStatus("status-msg", t("deleted"), "success");
             setTimeout(() => { if (ownsDeleteForm()) window.close(); }, 800);
           } else showStatus("status-msg", pbpDeleteCodeText(data), "error");
         } catch (e) {
+          console.warn("[popup] bookmark delete failed:", e?.name);
+          if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "popup", op: "bookmark_delete", code: "network", errorName: e?.name });
           if (ownsDeleteForm()) showStatus("status-msg", t("networkError"), "error");
         } finally {
           // finally, not a trailing statement: the failure branch above returns
@@ -3323,7 +3332,7 @@ async function fetchRecentBookmarks(token) {
       a.title = p.description;
       const titleText = (p.description || p.href).substring(0, 50);
       try { const host = new URL(p.href).hostname.replace(/^www\./, ""); a.innerHTML = esc(titleText) + ` <span class="recent-bm-domain">${esc(host)}</span>`; }
-      catch (_) { a.textContent = titleText; }
+      catch (_) { /* swallow-ok: malformed recent bookmark href omits domain span */ a.textContent = titleText; }
       row.appendChild(a);
       const edit = document.createElement("button");
       edit.type = "button";
@@ -3392,7 +3401,7 @@ async function fetchRecentBookmarks(token) {
                 pbpRemoveRecentRow(row);
                 // Promise form: an unhandled rejection here (no receiver) would
                 // escape this handler entirely.
-                chrome.runtime.sendMessage({ type: "bookmark_deleted", url: p.href, account })?.catch?.(() => {});
+                chrome.runtime.sendMessage({ type: "bookmark_deleted", url: p.href, account })?.catch?.(() => { /* swallow-ok: fire-and-forget worker cache invalidation */ });
               } else {
                 // Same feedback the main Delete button gives -- a failed delete
                 // that leaves the row in place is otherwise indistinguishable
@@ -3676,7 +3685,7 @@ function showSaveQueued(result) {
         const btn = card?.querySelector(".fc-actions .fc-btn");
         if (btn) btn.disabled = true;
         const resp = await window.PPOffline.retry(queueId);
-        try { await window.PPOffline.refresh(); } catch (_) {}
+        try { await window.PPOffline.refresh(); } catch (e) { console.warn("[popup] offline card refresh failed:", e?.name); }
         if (resp && resp.ok) {
           clearSaveError();
           showStatus("status-msg", t("bookmarkSaved"), "success");

@@ -14,7 +14,7 @@ const PBP_DICT_EVIDENCE_LANGUAGES = Object.freeze({
 });
 function _pbpDictEvidenceError(code) { return Object.assign(new Error(code), { code }); }
 function _pbpDictEvidenceLang(language) {
-  try { return Intl.getCanonicalLocales(language || "und")[0]; } catch (_) { return "und"; }
+  try { return Intl.getCanonicalLocales(language || "und")[0]; } catch (_) { /* swallow-ok: invalid locale falls back to und */ return "und"; }
 }
 // Two retrieval kinds remain: "literature" reads one source sentence or verse
 // line from Wikisource for the free original-text examples (1C.1/1C.2), and
@@ -78,7 +78,7 @@ function _pbpDictEvidenceTitleLink(node, origin) {
     if (url.origin !== origin || !url.pathname.startsWith("/wiki/")) return "";
     const title = decodeURIComponent(url.pathname.slice(6)).replace(/_/g, " ");
     return title && title.length <= 200 && !title.includes(":") ? title : "";
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: malformed or un-decodable wiki href skipped */ return ""; }
 }
 function _pbpDictEvidenceMetadata(page, root, origin) {
   const text = selector => _pbpDictEvidenceText(root.querySelector(selector)?.textContent).slice(0, 200);
@@ -154,7 +154,7 @@ function _pbpDictEvidenceJoinSentences(parts, language) {
 function _pbpDictEvidenceSplitSentences(text, language) {
   let parts;
   try { parts = [...new Intl.Segmenter(language, { granularity: "sentence" }).segment(text)].map(row => row.segment); }
-  catch (_) { parts = text.match(/[^.!?。！？]+[.!?。！？]+["'”’»」』]?|[^.!?。！？]+$/gu) || [text]; }
+  catch (_) { /* swallow-ok: Intl.Segmenter unsupported for locale; use punctuation regex fallback */ parts = text.match(/[^.!?。！？]+[.!?。！？]+["'”’»」』]?|[^.!?。！？]+$/gu) || [text]; }
   // Ideographic full stops end a sentence whatever the segmenter's locale data
   // says; closing quotes and brackets stay with the sentence they close.
   return _pbpDictEvidenceJoinSentences(parts, language).flatMap(part => part.match(/[^。！？]+(?:[。！？]+[」』”’）)]*)?|[。！？]+[」』”’）)]*/gu) || []);
@@ -278,7 +278,7 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
             raw += decoder.decode(value, { stream: true });
           }
           raw += decoder.decode();
-        } finally { await reader.cancel().catch(() => {}); }
+        } finally { await reader.cancel().catch(() => { /* swallow-ok: cancelling already-closed or aborted response stream */ }); }
       } else raw = await response.text();
       await check();
       if (raw.length > 1800000) throw _pbpDictEvidenceError("source_failed");

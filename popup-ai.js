@@ -131,7 +131,7 @@ async function ensurePageText(s, buttonId) {
         const info = await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: pageInfo.url });
         if (info?.pageText) { pageInfo.pageText = info.pageText; pageInfo._pbpTextSource = "local"; }
       }
-    } catch (_) { /* tab gone / inject failed — pageText stays empty, caller will surface aiNoContent */ }
+    } catch (_) { /* swallow-ok: tab gone or script injection blocked; pageText stays empty and caller surfaces aiNoContent */ }
     return "local";
   })();
   pageInfo._pbpEnsurePromise = run;
@@ -227,7 +227,7 @@ async function pbpAiVideoGrant(s) {
   const det = (typeof pbpVideoDetect === "function" && pageInfo && pageInfo.url) ? pbpVideoDetect(pageInfo.url) : null;
   if (!det) return null;
   const originPat = det.provider === "bilibili" ? PBP_BILI_ORIGIN_PATTERN : PBP_YT_ORIGIN_PATTERN;
-  try { return (await chrome.permissions.contains({ origins: [originPat] }) === true) ? det : null; } catch (_) { return null; }
+  try { return (await chrome.permissions.contains({ origins: [originPat] }) === true) ? det : null; } catch (e) { console.warn("[popup-ai] caption permission check failed:", e?.name); return null; }
 }
 
 // The ONE namespace a fast-path read may hit: the one ensurePageText would
@@ -353,7 +353,7 @@ async function _aiAwaitBookmarkLookup() {
       const cur = (typeof bookmarkLookup !== "undefined") ? bookmarkLookup?.promise : null;
       if (cur === p || !cur) return;
     }
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: bookmark lookup rejection already handled on lookup state */ }
 }
 
 // Op-liveness guard for every post-await UI/cache commit (Codex round 2,
@@ -517,7 +517,7 @@ async function _aiProbeOllamaGrant(s) {
     const pattern = _aiTargetOriginPattern({ ...s, aiProvider: "ollama" });
     _aiOllamaGranted = !!pattern
       && (await chrome.permissions.contains({ origins: [pattern] })) === true;
-  } catch (_) { _aiOllamaGranted = false; }
+  } catch (e) { console.warn("[popup-ai] Ollama permission check failed:", e?.name); _aiOllamaGranted = false; }
 }
 
 // Find first provider OTHER than `current` that the user actually set up, by
@@ -640,7 +640,7 @@ function _aiEndpointHost(s) {
   try {
     const pattern = _aiTargetOriginPattern(s);
     return pattern ? new URL(pattern.replace(/\/\*$/, "")).host : "";
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: malformed endpoint pattern omits host label */ return ""; }
 }
 
 let _aiErrorHideTimer = null;
@@ -1295,7 +1295,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source, resultMe
         const mine = halfOf(both, kind);
         if (mine != null) return mine;
       }
-    } catch (_) { /* combined in-flight failed */ }
+    } catch (_) { /* swallow-ok: opportunistic combined call failed; dedicated single-task call runs below */ }
     // Codex r2 M4: the combined attempt already ran - whatever its
     // outcome, falling through re-entered the opportunistic branch and
     // fired a SECOND combined call (reproduced: 2x combined + 1x single

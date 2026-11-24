@@ -107,7 +107,7 @@ function pbpConnectionHealthMap(raw) {
 function pbpRecordConnectionHealth(id, ok, rawCode) {
   if (!pbpConnectionHealthIdOk(id)) return Promise.resolve(false);
   const code = /^[a-z0-9_:-]{1,48}$/.test(String(rawCode || "")) ? String(rawCode) : "failed";
-  const run = _connectionHealthWriteTail.catch(() => {}).then(async () => {
+  const run = _connectionHealthWriteTail.catch(() => { /* swallow-ok: recover previous write tail rejection */ }).then(async () => {
     try {
       const stored = await chrome.storage.local.get(PBP_CONNECTION_HEALTH_KEY);
       const map = pbpConnectionHealthMap(stored[PBP_CONNECTION_HEALTH_KEY]);
@@ -132,7 +132,7 @@ function pbpRecordConnectionHealth(id, ok, rawCode) {
 // tail, so it cannot interleave with a concurrent record and lose either.
 // Resolves true when a record was removed.
 function pbpForgetConnectionHealth(id) {
-  const run = _connectionHealthWriteTail.catch(() => {}).then(async () => {
+  const run = _connectionHealthWriteTail.catch(() => { /* swallow-ok: recover previous write tail rejection */ }).then(async () => {
     try {
       const stored = await chrome.storage.local.get(PBP_CONNECTION_HEALTH_KEY);
       const map = pbpConnectionHealthMap(stored[PBP_CONNECTION_HEALTH_KEY]);
@@ -222,7 +222,7 @@ function _pbpConnectionHealthDate(ts) {
     return new Intl.DateTimeFormat(typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : undefined, {
       dateStyle: "short", timeStyle: "short",
     }).format(new Date(ts));
-  } catch (_) { return new Date(ts).toLocaleString(); }
+  } catch (_) { /* swallow-ok: unsupported Intl locale falls back to default toLocaleString */ return new Date(ts).toLocaleString(); }
 }
 
 let _pbpAiPermissionMissing = false;
@@ -493,7 +493,7 @@ function _pbpConnectionOverviewSummary(issues, { tokenMissing = false, okRows = 
   }
   if (!det || !issues || det.open || det.dataset.autoOpened) return;
   let remembered;
-  try { remembered = (JSON.parse(localStorage.getItem("pp-acc")) || {})["connection-overview"]; } catch (_) {}
+  try { remembered = (JSON.parse(localStorage.getItem("pp-acc")) || {})["connection-overview"]; } catch (_) { /* swallow-ok: corrupt or unavailable localStorage disclosure state */ }
   if (typeof remembered === "boolean") return;
   det.dataset.autoOpened = "1";
   _pbpAccProgrammaticOpen = true;
@@ -878,7 +878,7 @@ async function pbpBuildSanitizedDiagnostics() {
   const knownBatchErrors = new Set(["cancelled", "interrupted", "account_changed", "not_logged_in"]);
   const batchError = !progress?.error ? null : (knownBatchErrors.has(progress.error) ? progress.error : "failed");
   const [identity, aiHost, driveApi, ankiHost, eudicHost, localBytes, syncBytes, sessionBytes,
-    storageEst, aiCacheStats, ocrDocsStats] = await Promise.all([
+    storageEst, aiCacheStats, ocrDocsStats, recentErrors] = await Promise.all([
     contains({ permissions: ["identity"] }),
     aiPattern ? contains({ origins: [aiPattern] }) : Promise.resolve(null),
     contains({ origins: ["https://www.googleapis.com/*"] }),
@@ -889,6 +889,7 @@ async function pbpBuildSanitizedDiagnostics() {
     storageEstimate(),
     typeof pbpAiCacheStats === "function" ? pbpAiCacheStats() : Promise.resolve(null),
     typeof pbpOcrDocsMeasure === "function" ? pbpOcrDocsMeasure() : Promise.resolve(null),
+    typeof pbpReadDiagErrors === "function" ? pbpReadDiagErrors() : Promise.resolve([]),
   ]);
   return {
     schemaVersion: 1,
@@ -935,6 +936,7 @@ async function pbpBuildSanitizedDiagnostics() {
         error: batchError,
       } : null,
       connectionHealth: health,
+      recentErrors,
     },
   };
 }
@@ -982,7 +984,7 @@ function pbpExactOriginPermissionSnapshot(origins) {
           url.hostname && !url.hostname.includes("*") &&
           !url.username && !url.password && url.pathname === "/*" &&
           !url.search && !url.hash && !exact.includes(pattern)) exact.push(pattern);
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: non-URL permission pattern skipped */ }
   }
   return exact;
 }
@@ -993,17 +995,17 @@ async function pbpRevokeLegacyAllSitesPermission(permissionApi) {
   const snapshot = pbpExactOriginPermissionSnapshot(granted && granted.origins);
   await permissionApi.remove({ origins: [wildcard] });
   if (snapshot.length) {
-    try { await permissionApi.request({ origins: snapshot }); } catch (_) {}
+    try { await permissionApi.request({ origins: snapshot }); } catch (e) { console.warn("[options] permission re-request failed:", e?.name); }
   }
 
   const missing = [];
   for (const origin of snapshot) {
     try {
       if (!(await permissionApi.contains({ origins: [origin] }))) missing.push(origin);
-    } catch (_) { missing.push(origin); }
+    } catch (_) { /* swallow-ok: failed contains check treats origin as missing */ missing.push(origin); }
   }
   let wildcardAbsent = false;
-  try { wildcardAbsent = !(await permissionApi.contains({ origins: [wildcard] })); } catch (_) {}
+  try { wildcardAbsent = !(await permissionApi.contains({ origins: [wildcard] })); } catch (e) { console.warn("[options] wildcard contains check failed:", e?.name); }
   if (!wildcardAbsent) missing.push(wildcard);
   return { ok: wildcardAbsent && missing.length === 0, missing, wildcardAbsent };
 }
@@ -1175,7 +1177,8 @@ async function pbpRefreshSyncLocalFallbackStatus() {
   let local;
   try {
     local = await chrome.storage.local.get(["optSyncEnabled", ...PBP_LARGE_FALLBACK_KEYS]);
-  } catch (_) {
+  } catch (e) {
+    console.warn("[options] fallback status read failed:", e?.name);
     return [];
   }
   const run = ++pbpCloudHintRun;
@@ -1187,7 +1190,7 @@ async function pbpRefreshSyncLocalFallbackStatus() {
     status.hidden = true;
     status.textContent = "";
     status.className = "sync-local-only";
-    pbpCloudHintProbe = pbpMaybeShowCloudSettingsHint(status, run).catch(() => false);
+    pbpCloudHintProbe = pbpMaybeShowCloudSettingsHint(status, run).catch((e) => { console.warn("[options] cloud settings probe failed:", e?.name); return false; });
     return [];
   }
   const fields = pbpDetectLargeLocalFallbacks(local);
@@ -1204,7 +1207,8 @@ async function pbpMaybeShowCloudSettingsHint(status, run) {
   let local;
   try {
     local = await chrome.storage.local.get(freshKeys.concat(PBP_THEME_CONTENT_KEYS));
-  } catch (_) {
+  } catch (e) {
+    console.warn("[options] fresh-device probe read failed:", e?.name);
     return false;
   }
   // A device somebody has already made their own is not the first-run case.
@@ -1216,7 +1220,7 @@ async function pbpMaybeShowCloudSettingsHint(status, run) {
   const fresh = freshKeys.every((key) => {
     if (!Object.prototype.hasOwnProperty.call(local, key)) return true;
     try { return JSON.stringify(local[key]) === JSON.stringify(SETTINGS_DEFAULTS[key]); }
-    catch (_) { return false; }
+    catch (_) { /* swallow-ok: unserializable stored value treated as non-default */ return false; }
   }) && !PBP_THEME_CONTENT_KEYS.some((key) => pbpThemeContentPresent(local[key]));
   if (!fresh) return false;
   const available = await pbpCloudSettingsAvailable();
@@ -1245,7 +1249,7 @@ function pbpArmCloudHintSyncRetest() {
   pbpCloudHintRetestArmed = true;
   const retest = (_changes, area) => {
     if (area !== "sync") return;
-    try { onChanged.removeListener(retest); } catch (_) {}
+    try { onChanged.removeListener(retest); } catch (_) { /* swallow-ok: best-effort listener removal */ }
     // Chain onto the probe that refresh starts, so a holder of
     // pbpCloudHintProbe waits for the retest's verdict rather than for the
     // storage read that precedes it. That refresh can also return without
@@ -1255,7 +1259,7 @@ function pbpArmCloudHintSyncRetest() {
     // detected", so check identity first and never leave the chain unguarded.
     const chain = pbpRefreshSyncLocalFallbackStatus()
       .then(() => (pbpCloudHintProbe === chain ? false : pbpCloudHintProbe))
-      .catch(() => false);
+      .catch((e) => { console.warn("[options] sync fallback retest failed:", e?.name); return false; });
     pbpCloudHintProbe = chain;
   };
   onChanged.addListener(retest);
@@ -1315,7 +1319,7 @@ function pbpQueueOptionsSave(state, save) {
   // Return the real outcome so the caller can report it, while keeping the
   // stored queue tail fulfilled so one unexpected exception cannot poison all
   // later saves or a bulk-import drain.
-  state.chain = run.catch(() => {});
+  state.chain = run.catch(() => { /* swallow-ok: keep save queue tail alive; caller handles returned run promise */ });
   return run;
 }
 
@@ -1737,7 +1741,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       let state;
       try {
         state = await pbpReadSecretSyncState({ includeGlobalWhenSyncOff: true, persistInferredState: false });
-      } catch (_) {
+      } catch (e) {
+        console.warn("[options] tag-gov sync state read failed:", e?.name);
         state = null;
       }
       // The device's own service is a local key; the chosen one lives in the settings area.
@@ -1817,7 +1822,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         warn.appendChild(document.createTextNode(" "));
         warn.appendChild(a);
       }
-    }).catch(() => {});
+    }).catch((e) => console.warn("[options] bundle warning auth read failed:", e?.name));
   });
 
   // ---- Tab switching ----
@@ -1981,7 +1986,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           failed: ttsStats?.failed === true,
         },
       } : null;
-    } catch (_) { measured = null; }
+    } catch (e) {
+      console.warn("[options] storage panel measurement failed:", e?.name);
+      if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "options", op: "storage_measure", code: "storage", errorName: e?.name });
+      measured = null;
+    }
     host.textContent = "";
     if (!measured) {
       const p = document.createElement("p");
@@ -2569,7 +2578,12 @@ document.addEventListener("DOMContentLoaded", async () => {
               if (resp.status === 401) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestBadToken"); }
               else if (!resp.ok) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestDown"); }
               else { testStatus.classList.add("ok"); testStatus.textContent = t("mdSendTestOk"); }
-            } catch (_) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestDown"); }
+            } catch (e) {
+              console.warn("[options] export target connectivity test failed:", e?.name);
+              if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "options", op: "export_target_test", code: "network", errorName: e?.name });
+              testStatus.classList.add("err");
+              testStatus.textContent = t("mdSendTestDown");
+            }
           } finally {
             testBtn.disabled = false;
             testBtn.removeAttribute("aria-busy");
@@ -2873,8 +2887,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // read at render = no open->collapse flash; same class as pp-i18n-* / pp-options-fields).
   const PP_ACC_KEY = "pp-acc";
   let pbpAccRestoring = true;
-  function pbpAccState() { try { return JSON.parse(localStorage.getItem(PP_ACC_KEY)) || {}; } catch (_) { return {}; } }
-  function pbpAccSet(key, open) { const m = pbpAccState(); m[key] = open; try { localStorage.setItem(PP_ACC_KEY, JSON.stringify(m)); } catch (_) {} }
+  function pbpAccState() { try { return JSON.parse(localStorage.getItem(PP_ACC_KEY)) || {}; } catch (_) { /* swallow-ok: corrupt or unavailable localStorage disclosure state */ return {}; } }
+  function pbpAccSet(key, open) { const m = pbpAccState(); m[key] = open; try { localStorage.setItem(PP_ACC_KEY, JSON.stringify(m)); } catch (_) { /* swallow-ok: localStorage unavailable */ } }
   // Apply persisted open/closed to keyed native details (an unknown key leaves
   // the HTML default alone).
   function pbpAccRestore(root) {
@@ -2938,7 +2952,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // banner + 7-day undo it used to show were removed once all undo windows had expired.
   // The v2 theme-storage migration's one-time "upgraded" banner + 7-day undo were
   // removed (every undo window had long expired). Reclaim their now-dead local keys.
-  chrome.storage.local.remove(["_migrationBackup", "_migrationBannerDismissed"]).catch(() => {});
+  chrome.storage.local.remove(["_migrationBackup", "_migrationBannerDismissed"]).catch((e) => console.warn("[options] legacy migration cleanup failed:", e?.name));
 
   migrationV2: {
     // Earlier builds wrote themePresetKey/_migrationV2 straight to
@@ -2962,7 +2976,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             s.themePresetKey = stray.themePresetKey;
           }
         }
-      } catch (_) {}
+      } catch (e) { console.warn("[options] stray sync themePresetKey migration failed:", e?.name); }
     }
     let migrated = false;
     try {
@@ -2976,7 +2990,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         chrome.storage.sync.get({ _migrationV2: false }),
       ]);
       migrated = localFlags._migrationV2 === true || syncFlags._migrationV2 === true;
-    } catch (_) {}
+    } catch (e) { console.warn("[options] migrationV2 flag read failed:", e?.name); }
     const oldCSSFromSync = await syncGetLarge("customCSS", "");
     let oldCSS = oldCSSFromSync;
     if (!oldCSS) {
@@ -3482,14 +3496,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (sharingHint && service === "linkding") sharingHint.hidden = !ready;
       if (initial && ready && !lastConnectStatus) {
         let host = "";
-        try { host = new URL(connection.baseUrl).host; } catch (_) { /* unreadable address: no status */ }
+        try { host = new URL(connection.baseUrl).host; } catch (_) { /* swallow-ok: unreadable server URL suppresses host status */ }
         if (host) setConnectStatus("ok", () => t("bookmarkConnectedHost", host));
       }
     };
     syncConnectionState({ initial: true }).catch(error => console.warn("[bookmark-connect] state read failed:", error?.name, error?.message));
     chrome.storage.onChanged?.addListener((changes, area) => {
       if ((area === "sync" || area === "local") && (changes[service + "Token"] || changes.optSyncEnabled || changes.syncApiKeys)) {
-        syncConnectionState().catch(() => {});
+        syncConnectionState().catch((error) => console.warn("[bookmark-connect] state refresh failed:", error?.name));
       }
     });
     disconnectButton.addEventListener("click", () => {
@@ -3837,7 +3851,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       includeGlobalWhenSyncOff: true,
       persistInferredState: false,
     });
-  } catch (_) {
+  } catch (e) {
+    console.warn("[options] initial sync state read failed:", e?.name);
     const localState = await chrome.storage.local.get({ optSyncEnabled: false });
     initialSyncState = { optSyncEnabled: !!localState.optSyncEnabled, syncApiKeys: false };
   }
@@ -3893,7 +3908,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await pauseOptionsAutoSave();
     const pendingSave = await saveAll();
     if (!pendingSave.ok) {
-      const actual = await chrome.storage.local.get({ optSyncEnabled: !enabling }).catch(() => ({ optSyncEnabled: !enabling }));
+      const actual = await chrome.storage.local.get({ optSyncEnabled: !enabling }).catch((e) => { console.warn("[options] optSyncEnabled rollback read failed:", e?.name); return { optSyncEnabled: !enabling }; });
       syncToggle.checked = !!actual.optSyncEnabled;
       if (syncKeysToggle) syncKeysToggle.disabled = !actual.optSyncEnabled && !syncKeysToggle.checked;
       resumeOptionsAutoSave();
@@ -4057,7 +4072,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (e) {
       // Migration failed — revert toggle and abort
       console.error("sync migration failed:", e);
-      const actual = await chrome.storage.local.get({ optSyncEnabled: !enabling }).catch(() => ({ optSyncEnabled: !enabling }));
+      if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "options", op: "sync_migrate", code: "storage", errorName: e?.name });
+      const actual = await chrome.storage.local.get({ optSyncEnabled: !enabling }).catch((err) => { console.warn("[options] optSyncEnabled rollback read failed:", err?.name); return { optSyncEnabled: !enabling }; });
       syncToggle.checked = !!actual.optSyncEnabled;
       if (syncKeysToggle) syncKeysToggle.disabled = !actual.optSyncEnabled && !syncKeysToggle.checked;
       const errEl = $id("opt-sync-error");
@@ -4151,7 +4167,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Reflect the authoritative account-wide marker; never infer a rollback
       // from the stale checkbox direction.
       const actual = await pbpReadSecretSyncState({ includeGlobalWhenSyncOff: true })
-        .catch(() => ({ optSyncEnabled: true, syncApiKeys: !enabling }));
+        .catch((err) => { console.warn("[options] syncApiKeys rollback state read failed:", err?.name); return { optSyncEnabled: true, syncApiKeys: !enabling }; });
       syncKeysToggle.checked = !!actual.syncApiKeys;
       syncKeysToggle.disabled = !actual.optSyncEnabled && !actual.syncApiKeys;
       const errEl = $id("opt-sync-error");
@@ -4233,7 +4249,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           localStorage.setItem("pp-i18n-msgs", JSON.stringify(await _r.json()));
         }
       }
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: i18n mirror pre-seed before reload is best effort */ }
     setTimeout(() => location.reload(), 140);
     // Same watchdog as the sync toggle above: a refused reload would otherwise
     // strand this page invisible with auto-save suspended for good.
@@ -4514,7 +4530,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else if (btn) {
         btn.disabled = false;
       }
-    } catch (_) {}
+    } catch (e) { console.warn("[options] batch permission status check failed:", e?.name); }
   })();
 
   $id("batch-revoke-perm")?.addEventListener("click", async (e) => {
@@ -4560,7 +4576,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   (async () => {
     if (!s.waybackArchiveEnabled) return;
     let has = false;
-    try { has = await chrome.permissions.contains({ origins: ["https://web.archive.org/*"] }); } catch (_) {}
+    try { has = await chrome.permissions.contains({ origins: ["https://web.archive.org/*"] }); } catch (e) { console.warn("[options] wayback permission check failed:", e?.name); }
     const statusEl = $id("wayback-perm-status");
     if (!has && statusEl) statusEl.textContent = t("waybackPermDenied");
   })();
@@ -4612,7 +4628,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (kept.length) await chrome.storage.local.set({ _waybackLog: kept });
         else await chrome.storage.local.remove("_waybackLog");
       }
-    } catch (_) {}
+    } catch (e) {
+      console.warn("[options] wayback log clear failed:", e?.name);
+      if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "options", op: "wayback_clear", code: "storage", errorName: e?.name });
+    }
     await renderWaybackLog();
   });
 
@@ -4885,7 +4904,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           // Reader pre-paint mirror for "open video pages in dark" (read by
           // md-preview-theme-early.js; same origin, so this page can seed it).
           if ("mdVideoDarkScheme" in settingsDelta) {
-            try { localStorage.setItem("md-preview-video-dark", data.mdVideoDarkScheme ? "1" : "0"); } catch (_) {}
+            try { localStorage.setItem("md-preview-video-dark", data.mdVideoDarkScheme ? "1" : "0"); } catch (_) { /* swallow-ok: localStorage mirror write optional */ }
           }
           if ("deepseekApiKey" in settingsDelta) {
             _savedDeepseekKeyWriteSeq++;
@@ -5781,7 +5800,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     };
     localStorage.setItem("pp-options-fields", JSON.stringify(mirror));
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: localStorage field mirror write optional */ }
 
   // ---- Tag governance event listeners ----
   initTagGovEntityRepair();
@@ -6472,7 +6491,7 @@ document.addEventListener("click", (ev) => {
     // Dismiss = acknowledged: drop the persisted record so it stops reappearing.
     getTagGovAuth(owner).then((auth) => {
       if (auth) return chrome.storage.local.remove(pbpAccountStorageKey("_tagGovLastRun", owner));
-    }).catch(() => {});
+    }).catch((e) => console.warn("[options] tag-gov dismiss clear failed:", e?.name));
   }
 });
 // Bookmarks that need manual attention, accumulated across the queued batches of one
@@ -6614,7 +6633,7 @@ async function runTagGovOps(ops, expectedAccount = "") {
       }
     })
   );
-  _tagGovBatchChain = run.catch(() => {});
+  _tagGovBatchChain = run.catch(() => { /* swallow-ok: keep tag-gov batch queue tail alive */ });
   return run;
 }
 
@@ -6648,7 +6667,7 @@ async function _tagGovTailRefresh(expectedAccount) {
       skipped: _tagGovRunTotals.skipped,
       problems: _tagGovProblems.slice(0, TAG_GOV_PROBLEMS_CAP)
     } });
-  } catch (_) {}
+  } catch (e) { console.warn("[options] tag-gov last-run persist failed:", e?.name); }
   if (!(await getTagGovAuth(expectedAccount))) return;
   const fresh = await loadTagCounts(true, expectedAccount);
   if (!(await getTagGovAuth(expectedAccount))) return;
@@ -6706,7 +6725,7 @@ async function _runTagGovBatch(ops, expectedAccount) {
       break;
     }
     try { await requireTagGovAuth(expectedAccount); }
-    catch (_) { aborted = true; break; }
+    catch (_) { /* swallow-ok: account changed or logged out mid-run stops batch cleanly */ aborted = true; break; }
     const op = ops[i];
     // Bar = completed ops + fractional progress inside the current op. The old
     // (i + 1) / ops.length formula filled the bar at the START of each op — a
@@ -7403,7 +7422,7 @@ async function renderWaybackLog() {
     const urlEl = document.createElement("a");
     urlEl.className = "wayback-log-url";
     let urlText = "";
-    try { urlText = entry.url || ""; } catch (_) { urlText = ""; }
+    try { urlText = entry.url || ""; } catch (_) { /* swallow-ok: malformed wayback log entry */ urlText = ""; }
     urlEl.title = urlText;
     if (urlText) {
       urlEl.href = "https://web.archive.org/web/*/" + urlText;
@@ -7500,7 +7519,10 @@ async function renderWaybackLog() {
         // fixed 2.5s timer re-rendered long before the 10-30s archive timeout
         // and made this button look dead.
         btn.disabled = true;
-        try { await chrome.runtime.sendMessage({ type: "archive_url", url: entry.url, force: true }); } catch (_) {}
+        try { await chrome.runtime.sendMessage({ type: "archive_url", url: entry.url, force: true }); } catch (e) {
+          console.warn("[options] archive_url retry failed:", e?.name);
+          if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "options", op: "wayback_retry", code: "send_failed", errorName: e?.name });
+        }
         renderWaybackLog();
       });
       row.appendChild(btn);

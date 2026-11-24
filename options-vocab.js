@@ -127,6 +127,7 @@ function _pbpVocabDriveDate(value) {
       dateStyle: "medium", timeStyle: "short"
     }).format(new Date(value));
   } catch (_) {
+    /* swallow-ok: unsupported Intl locale falls back to default toLocaleString */
     return new Date(value).toLocaleString();
   }
 }
@@ -143,6 +144,7 @@ function _pbpVocabNum(value) {
     const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : undefined;
     return n.toLocaleString(locale);
   } catch (_) {
+    /* swallow-ok: unsupported Intl locale falls back to default number format */
     return n.toLocaleString();
   }
 }
@@ -169,6 +171,7 @@ function _pbpVocabDriveAvailable() {
   try {
     return pbpVocabDriveOAuthActive(chrome.runtime.getManifest());
   } catch (_) {
+    /* swallow-ok: getManifest unavailable in isolated test realm */
     return false;
   }
 }
@@ -582,7 +585,7 @@ async function _pbpVocabDriveSend(type, force, gen, actionSeq, sourceButton, foc
       ? preferred : (moveFocus && sourceButton && !sourceButton.hidden ? sourceButton : null);
     if (target && !target.hidden) {
       try { target.focus({ preventScroll: true }); }
-      catch (_) { target.focus(); }
+      catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ target.focus(); }
     }
     // Connect and Sync now both run a full sync; Disconnect touches no words.
     // Last successful sync is minute-precise, so without this flash two
@@ -626,7 +629,7 @@ async function _pbpVocabDriveRepaintAfterDenial(gen, actionSeq, owner, denied) {
     const target = !refocus ? null : !button.hidden ? button : (sync && !sync.hidden ? sync : null);
     if (target) {
       try { target.focus({ preventScroll: true }); }
-      catch (_) { target.focus(); }
+      catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ target.focus(); }
     }
   } catch (error) {
     console.warn("[drive] status re-read after a refused permission failed:", error?.name, error?.message);
@@ -1118,7 +1121,7 @@ function _pbpPackWire() {
   const del = $id("dict-pack-delete");
   if (!open || !imp || !file) return;
   open.addEventListener("click", () => {
-    try { chrome.tabs.create({ url: "https://www.mdbg.net/chinese/dictionary?page=cc-cedict" }); } catch (_) {}
+    try { chrome.tabs.create({ url: "https://www.mdbg.net/chinese/dictionary?page=cc-cedict" }); } catch (e) { console.warn("[options-vocab] tabs.create failed:", e?.name); }
   });
   imp.addEventListener("click", () => file.click());
   const runPackImport = async (f) => {
@@ -1390,13 +1393,13 @@ function _pbpMultiPackLock(busy) {
 }
 function _pbpMultiPackLanguage(code) {
   try { return new Intl.DisplayNames([uiLangToBCP47()], {type:"language"}).of(code) || code; }
-  catch (_) { return code; }
+  catch (_) { /* swallow-ok: unsupported language code echoes raw tag */ return code; }
 }
 function _pbpMultiPackLink(raw) {
   try {
     const u = new URL(raw);
     return ["https:", "http:"].includes(u.protocol) && !u.username && !u.password ? u.href : "";
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: malformed dictionary homepage URL omitted */ return ""; }
 }
 async function _pbpMultiPackRefresh() {
   const list = $id("multi-pack-list");
@@ -1600,7 +1603,7 @@ function _pbpMultiPackWire() {
     const channel=new BroadcastChannel("pbp-dict-packs");
     channel.onmessage=refresh;
     window.addEventListener("pagehide", ()=>channel.close(), {once:true});
-  } catch (_) { /* Focus refresh remains available without BroadcastChannel. */ }
+  } catch (_) { /* swallow-ok: focus refresh remains available without BroadcastChannel */ }
   _pbpMultiPackRefresh();
 }
 _pbpMultiPackWire();

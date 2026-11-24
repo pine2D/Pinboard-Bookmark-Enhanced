@@ -170,6 +170,7 @@ function pbpAnkiBuildRequest(action, params, key) {
 function pbpAnkiParseResult(text) {
   let data;
   try { data = JSON.parse(String(text == null ? "" : text)); } catch (_) {
+    /* swallow-ok: malformed JSON mapped to structured transport error */
     return { ok: false, result: null, error: "malformed response", transport: true };
   }
   if (!data || typeof data !== "object") return { ok: false, result: null, error: "malformed response", transport: true };
@@ -241,7 +242,11 @@ async function pbpAnkiSendRows(rows, opts) {
   const out = { stage: "", added: 0, skipped: 0, failed: 0, failedTerms: [], error: null };
   let notes;
   try { notes = rows.map((r) => pbpAnkiNoteFromRow(r, deck, format)); }
-  catch (_) {
+  catch (e) {
+    console.warn("[anki] row validation failed:", e?.name);
+    if (typeof pbpRecordDiagError === "function") {
+      pbpRecordDiagError({ surface: "sync", op: "anki_input", code: "invalid", errorName: e?.name });
+    }
     out.stage = "input";
     out.error = null;
     return out;

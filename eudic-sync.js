@@ -59,7 +59,7 @@ function pbpEudicParseResult(status, text) {
   try {
     const data = JSON.parse(raw);
     if (data && typeof data.message === "string") message = data.message;
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: non-JSON Eudic error body keeps raw text */ }
   if (status === 201) { // the documented success status; nothing else counts
     const m = /导入数量\s*[:：]\s*(\d+)/.exec(message);
     return { ok: true, imported: m ? Number(m[1]) : null, message };

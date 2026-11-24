@@ -31,7 +31,7 @@ function batchAiPermissionOrigins(validTabs, s) {
         const u = new URL(tab.url);
         return u.protocol === "https:" ||
           (u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname));
-      } catch (_) { return false; }
+      } catch (_) { /* swallow-ok: non-URL tab skipped */ return false; }
     };
     for (const tab of validTabs.filter(requestable)) {
       origins.push(new URL(tab.url).origin + "/*");
@@ -297,7 +297,7 @@ function setupTabSet() {
           renderBatchProgress(bp, startAuth.account);
           return;
         }
-      } catch (_) {}
+      } catch (e) { console.warn("[popup-batch] liveness read failed:", e?.name); }
 
       batchBtn.disabled = true;
       setBtnIcon(batchBtn, "pin", t("batchSaving"));
@@ -470,7 +470,7 @@ function wireBatchProgress() {
     if (area === "local" && changes.batch_progress) {
       readBatchAccount().then(({ account }) => {
         if (account) renderBatchProgress(changes.batch_progress.newValue, account);
-      }).catch(() => {});
+      }).catch((e) => console.warn("[popup-batch] live progress account read failed:", e?.name));
     }
   });
   // Reopen restore: show a fresh running batch or a completion that happened
@@ -481,7 +481,7 @@ function wireBatchProgress() {
     if (bp?.account === account && (batchIsRunning(bp, now, BATCH_STALE_TTL) || freshDone)) {
       renderBatchProgress(bp, account);
     }
-  }).catch(() => {});
+  }).catch((e) => console.warn("[popup-batch] initial progress restore failed:", e?.name));
 }
 
 // ---- Tag Presets ----

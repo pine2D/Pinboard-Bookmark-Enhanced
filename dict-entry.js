@@ -47,7 +47,7 @@ function _pbpDictEntryText(value, max, allowEmpty = false) {
 function _pbpDictEntryTerm(value) { return value.normalize("NFC").trim().replace(/\s+/g, " "); }
 function _pbpDictEntryLang(value) {
   if (typeof value !== "string" || value.length > 80) return "";
-  try { return Intl.getCanonicalLocales(value || "und")[0] || ""; } catch (_) { return ""; }
+  try { return Intl.getCanonicalLocales(value || "und")[0] || ""; } catch (_) { /* swallow-ok: invalid BCP-47 tag degrades to empty */ return ""; }
 }
 
 function _pbpDictLanguageNameKey(value) {
@@ -59,7 +59,7 @@ function _pbpDictLanguageDisplayName(name, candidate) {
   const base = new Intl.Locale(code).language;
   const locales = ["en", code, base, globalThis.document?.documentElement?.lang,
     ...(globalThis.navigator?.languages || [])].filter(Boolean);
-  try { locales.push(globalThis.chrome?.i18n?.getUILanguage?.()); } catch (_) { /* Optional UI hint. */ }
+  try { locales.push(globalThis.chrome?.i18n?.getUILanguage?.()); } catch (_) { /* swallow-ok: optional UI locale hint */ }
   // Compare exact names supplied by the platform, never the fallback echo of
   // an unknown code. Generic names keep their generic script/region identity.
   for (const tag of [...new Set([code, base])]) {
@@ -68,7 +68,7 @@ function _pbpDictLanguageDisplayName(name, candidate) {
         const label = new Intl.DisplayNames([locale], { type: "language", fallback: "none" }).of(tag);
         if (label && _pbpDictLanguageNameKey(label) !== _pbpDictLanguageNameKey(tag) &&
             _pbpDictLanguageNameKey(label) === key) return tag;
-      } catch (_) { /* A custom language or UI locale may be unsupported. */ }
+      } catch (_) { /* swallow-ok: custom language or UI locale unsupported by Intl.DisplayNames */ }
     }
   }
   return "";
@@ -235,7 +235,7 @@ function _pbpDictResponseJson(text, max, wrapper) {
   const fence = raw.match(/^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i);
   if (fence) raw = fence[1].trim();
   let value;
-  try { value = JSON.parse(raw); } catch (_) { return fail("response_json"); }
+  try { value = JSON.parse(raw); } catch (_) { /* swallow-ok: malformed model JSON converted to response_json error */ return fail("response_json"); }
   if (value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 1) {
     const key = Object.keys(value)[0];
     if ((key === wrapper || key === "result") && value[key] && typeof value[key] === "object" && !Array.isArray(value[key])) value = value[key];
@@ -432,7 +432,7 @@ function _pbpDictExplicitLanguageScript(tag) {
       if (locale.region && ["TW", "HK", "MO"].includes(locale.region)) return "Hant";
       if (locale.region && ["CN", "SG"].includes(locale.region)) return "Hans";
     }
-  } catch (_) { /* Invalid tags cannot establish a script. */ }
+  } catch (_) { /* swallow-ok: invalid locale tags cannot establish an explicit script */ }
   return "";
 }
 // ISO 15924 codes a language is normally written in. Composite CJK codes
@@ -440,14 +440,14 @@ function _pbpDictExplicitLanguageScript(tag) {
 function _pbpDictLanguageScripts(tag) {
   if (typeof tag !== "string" || !tag) return [];
   let locale;
-  try { locale = new Intl.Locale(tag.replace(/_/g, "-")); } catch (_) { return []; }
+  try { locale = new Intl.Locale(tag.replace(/_/g, "-")); } catch (_) { /* swallow-ok: invalid locale tag yields no scripts */ return []; }
   if (locale.language === "und") return [];
   let script = _pbpDictExplicitLanguageScript(locale.toString());
-  if (!script) { try { script = locale.maximize().script || ""; } catch (_) { script = ""; } }
+  if (!script) { try { script = locale.maximize().script || ""; } catch (_) { /* swallow-ok: unmaximizable locale yields empty script */ script = ""; } }
   const composite = { Hans: ["Hani"], Hant: ["Hani"], Jpan: ["Hani", "Hira", "Kana"], Kore: ["Hang", "Hani"], Hrkt: ["Hira", "Kana"] }[script];
   if (composite) return composite;
   if (!script) return [];
-  try { new RegExp("\\p{Script=" + script + "}", "u"); return [script]; } catch (_) { return []; }
+  try { new RegExp("\\p{Script=" + script + "}", "u"); return [script]; } catch (_) { /* swallow-ok: unsupported Unicode script property */ return []; }
 }
 // Detection sample only: unquoted source words in a script the target never
 // uses (kana inside Chinese) tip the statistical detector to the source
@@ -505,7 +505,7 @@ function _pbpDictExplanationScriptCheck(text, target, declaredLanguage = "") {
     (["en", "es", "de", "fr", "it", "pt", "pl", "nl", "cs", "vi", "tr"].includes(base) ? /\p{Script=Latin}/gu : null);
   const explicitScript = _pbpDictExplicitLanguageScript(wanted);
   if (explicitScript && !["Hans", "Hant", "Jpan", "Kore"].includes(explicitScript)) {
-    try { expectedScript = new RegExp("\\p{Script=" + explicitScript + "}", "gu"); } catch (_) { /* Composite/unknown script. */ }
+    try { expectedScript = new RegExp("\\p{Script=" + explicitScript + "}", "gu"); } catch (_) { /* swallow-ok: composite or unsupported Unicode script property */ }
   }
   const withoutMentions = text.replace(/"[^"\n]{1,100}"|“[^”\n]{1,100}”|‘[^’\n]{1,100}’|「[^」\n]{1,100}」|『[^』\n]{1,100}』|（[^）\n]{1,100}）|\([^\)\n]{1,100}\)/gu,
     mention => /[.!?。！？]/u.test(mention) || (mention.match(/[\p{L}\p{M}]+/gu) || []).length > 4 ? mention : " ");
@@ -626,7 +626,13 @@ async function _pbpDictEntryRead(request, key) {
   try {
     const entry = pbpDictEntryParse(JSON.stringify(value.entry), request);
     return { entry, provider: value.provider, model: value.model, generatedAt: value.generatedAt, cached: true, cacheSaved: true };
-  } catch (_) { return null; } // Invalid cached data is a miss, never trusted output.
+  } catch (e) {
+    console.warn("[dict-entry] cached entry failed validation:", e?.name);
+    if (typeof pbpRecordDiagError === "function") {
+      pbpRecordDiagError({ surface: "dict", op: "entry_cache_validate", code: "invalid", errorName: e?.name });
+    }
+    return null;
+  } // Invalid cached data is a miss, never trusted output.
 }
 
 async function pbpDictEntryRead(input = {}) {

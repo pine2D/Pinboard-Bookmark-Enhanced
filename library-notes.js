@@ -9,7 +9,7 @@
 // not shared.js is also loaded.
 function _pbpNotesEntryBytes(key, rec) {
   if (typeof pbpEntryBytes === "function") return pbpEntryBytes(key, rec);
-  try { return key.length + JSON.stringify(rec).length; } catch (_) { return key.length; }
+  try { return key.length + JSON.stringify(rec).length; } catch (_) { /* swallow-ok: unserializable highlight falls back to key length */ return key.length; }
 }
 
 // Builds the summary row model for one pbp_hl_* storage entry, or null for
@@ -216,7 +216,7 @@ async function _pbpNotesOwner() {
   try {
     const raw = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
     scope = (raw && raw !== "ownerless") ? String(raw) : "";
-  } catch (_) { scope = ""; }
+  } catch (e) { console.warn("[library-notes] owner read failed:", e?.name); scope = ""; }
   // A newer account may already have populated the cache while this read
   // waited. Re-resolve that generation instead of restoring the old scope.
   if (revision !== _notesAuthRevision) return _pbpNotesOwner();
@@ -260,7 +260,7 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
         _pbpNotesResetListScroll(); // spec §7.6: a new owner's list starts at the top
         _notesActiveColors = new Set();
         _pbpNotesRender(true);
-        renderNotesPanel().catch(() => {});
+        renderNotesPanel().catch((e) => console.warn("[library-notes] panel rerender failed:", e?.name));
       }
     }
   });
@@ -439,7 +439,7 @@ function _pbpNotesHostname(url) {
   if (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(url)) {
     return typeof t === "function" ? t("mdOcrLocalDocBadge") : "Local OCR";
   }
-  try { return new URL(String(url || "")).hostname; } catch (_) { return ""; }
+  try { return new URL(String(url || "")).hostname; } catch (_) { /* swallow-ok: malformed URL degrades to empty hostname */ return ""; }
 }
 
 // Split `text` around case-insensitive matches of `query`; matches render in
@@ -779,7 +779,7 @@ function _pbpNotesNarrowMode() {
 // happens.
 function _pbpNotesFocus(el) {
   if (!el) return false;
-  try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); }
+  try { el.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ el.focus(); }
   return document.activeElement === el;
 }
 
@@ -821,7 +821,7 @@ function _pbpNotesBuildBackBtn() {
 // over an arbitrary stored tag and can throw on a malformed one.
 function _pbpNotesUiLang() {
   try { return typeof uiLangToBCP47 === "function" ? String(uiLangToBCP47() || "") : ""; }
-  catch (_) { return ""; }
+  catch (_) { /* swallow-ok: malformed stored UI locale tag degrades to empty */ return ""; }
 }
 
 // Page head (spec §5.3): the source title (the whole line is the link when the

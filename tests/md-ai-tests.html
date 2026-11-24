@@ -4697,7 +4697,7 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
   const RECLAIMABLE = [
     "jina_md_https://ex.com/a", "jina_md_https://ex.com/b", "cached_existing_urls",
     "cached_user_tags", "cached_suggest_https://ex.com/a",
-    "pbp_ai_usage", "pbpThinkReject", "pbpAiParamFix",
+    "pbp_ai_usage", "pbpThinkReject", "pbpAiParamFix", "pbpDiagErrors",
   ];
   // K169: out of the reclaim allowlist entirely (not in any PBP_RECLAIM_CATEGORIES
   // row) — owned solely by the archive panel's own owner-scoped Clear button, which
@@ -4844,7 +4844,7 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
       assertEq(m.jina.keys.length, 2, "two jina keys");
       assertEq(m.urls.keys.length, 1, "one url key");
       assertEq(m.tags.keys.length, 2, "cached_user_tags + one suggest");
-      assertEq(m.misc.keys.length, 3, "ai usage + think reject + param fix");
+      assertEq(m.misc.keys.length, 4, "ai usage + think reject + param fix + diag errors");
       ["jina", "urls", "tags", "misc"].forEach((c) => assert(m[c].bytes > 0, c + " bytes > 0"));
       // never-clear keys never appear in any category
       const allMeasured = [].concat(m.jina.keys, m.urls.keys, m.tags.keys, m.misc.keys);

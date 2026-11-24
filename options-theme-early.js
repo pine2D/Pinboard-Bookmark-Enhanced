@@ -95,7 +95,7 @@ if (typeof window.matchMedia === "function") {
         pbpApplyOptionsEarlyTheme(_optionsLastTheme.mode, _optionsLastTheme.presetKey, _optionsLastTheme.follow);
       }
     });
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: matchMedia listener registration optional in synthetic test DOM */ }
 }
 
 // follow undefined = legacy caller: leave the popup-owned "pp-theme-follow"
@@ -105,7 +105,7 @@ function pbpStoreOptionsThemeMirror(mode, presetKey, follow) {
     localStorage.setItem("pp-theme", mode || "auto");
     localStorage.setItem("pp-theme-preset", presetKey || "");
     if (typeof follow === "boolean") localStorage.setItem("pp-theme-follow", follow ? "1" : "0");
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: localStorage mirror write optional when storage blocked */ }
 }
 
 let _optionsMirrorMode = "auto";
@@ -115,7 +115,7 @@ try {
   _optionsMirrorMode = localStorage.getItem("pp-theme") || "auto";
   _optionsMirrorPreset = localStorage.getItem("pp-theme-preset") || "";
   _optionsMirrorFollow = localStorage.getItem("pp-theme-follow") !== "0"; // popup-owned mirror, default true
-} catch (_) {}
+} catch (_) { /* swallow-ok: localStorage mirror read optional when storage blocked */ }
 pbpApplyOptionsEarlyTheme(_optionsMirrorMode, _optionsMirrorPreset, _optionsMirrorFollow);
 
 // ---- Mirror prefill: high-frequency UI fields ----
@@ -151,7 +151,7 @@ try {
       }, { once: true });
     }
   }
-} catch (_) {}
+} catch (_) { /* swallow-ok: localStorage field prefill optional on boot */ }
 
 // Async source-of-truth read — corrects and seeds the mirror for future opens.
 if (typeof chrome !== "undefined" && chrome.storage?.local) {
@@ -166,7 +166,7 @@ if (typeof chrome !== "undefined" && chrome.storage?.local) {
   // picks the area straight from the mirror and skips the optSyncEnabled
   // round trip below; a miss falls back to the original two-hop chain.
   let _optSyncMirror = null;
-  try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
+  try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) { /* swallow-ok: localStorage mirror unavailable */ }
   (_optSyncMirror === "1" || _optSyncMirror === "0"
     ? Promise.resolve({ optSyncEnabled: _optSyncMirror === "1" })
     : chrome.storage.local.get({ optSyncEnabled: false })
@@ -182,6 +182,7 @@ if (typeof chrome !== "undefined" && chrome.storage?.local) {
     pbpApplyOptionsEarlyTheme(mode, presetKey, follow);
     pbpReleaseLibraryGate();
   }).catch(() => {
+    /* swallow-ok: storage unavailable on boot; localStorage mirror already applied, release gate */
     // storage unavailable: the localStorage mirror already applied; a KNOWN
     // failure must not leave Library blank until the 3s fail-open (Codex
     // 2026-08-26) -- the timer only covers a read that never settles.
@@ -215,7 +216,7 @@ if (typeof chrome !== "undefined" && chrome.storage?.local) {
         pbpStoreOptionsThemeMirror(s.optTheme || "auto", s.themePresetKey || "", follow);
         pbpApplyOptionsEarlyTheme(s.optTheme || "auto", s.themePresetKey || "", follow);
         pbpReleaseLibraryGate(); // a runtime read that superseded the boot read is the authoritative theme too
-      }).catch(() => {});
+      }).catch((e) => console.warn("[options-theme-early] live theme re-read failed:", e?.name));
     });
   }
 }

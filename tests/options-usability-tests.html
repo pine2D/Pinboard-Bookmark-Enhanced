@@ -153,6 +153,10 @@ const localData = {
   vocabDriveConnected:true,
   offlineQueue:[{ account:"alice", url:"https://secret.example/article", title:"Secret" }],
   batch_progress:{ account:"alice", runId:"run-a", running:false, done:true, i:2, total:3, error:"private raw server message" },
+  pbpDiagErrors:[
+    { ts:1700000000123, surface:"ai", op:"ai_cache", code:"idb", errorName:"InvalidStateError", status:null, message:"TOP_SECRET", url:"https://secret.example/leak", owner:"alice" },
+    { ts:1700000000456, surface:"alice", op:"TOP_SECRET", code:"Secret", errorName:"SecretError", status:401 },
+  ],
 };
 function area(data, bytes) {
   return {
@@ -1039,6 +1043,9 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       "storage.indexedDB present but not a number");
     assert(diagnostics.aiCache && diagnostics.aiCache.total === 10 && diagnostics.aiCache.pools.tr === 2,
       "aiCache pool counts missing: " + JSON.stringify(diagnostics.aiCache));
+    assert(Array.isArray(diagnostics.state.recentErrors) && diagnostics.state.recentErrors.length === 1 &&
+      diagnostics.state.recentErrors[0].op === "ai_cache" && !("message" in diagnostics.state.recentErrors[0]),
+      "recentErrors sanitization or inclusion failed: " + JSON.stringify(diagnostics.state.recentErrors));
   });
 
   await test("diagnostics never contain credentials, owners, page URLs, titles or custom endpoints", async () => {

@@ -102,7 +102,7 @@ async function getPageInfoFromTab(tabId, opts = {}) {
               info.pageText = text.substring(0, 8000);
               return info;
             }
-          } catch (_) { /* fall through to Defuddle */ }
+          } catch (_) { /* swallow-ok: site rule threw in page world; fall through to Defuddle */ }
         }
 
         // Try Defuddle for high-quality content extraction
@@ -116,12 +116,12 @@ async function getPageInfoFromTab(tabId, opts = {}) {
           if (!window.__pp_urlShimInstalled) {
             const SafeURL = /** @type {any} */ (function(u, b) {
               try { return b !== undefined ? new OriginalURL(u, b) : new OriginalURL(u); }
-              catch (_) { return new OriginalURL("about:blank"); }
+              catch (_) { /* swallow-ok: invalid relative href inside page DOM falls back to about:blank */ return new OriginalURL("about:blank"); }
             });
             SafeURL.prototype = OriginalURL.prototype;
-            try { SafeURL.createObjectURL = OriginalURL.createObjectURL.bind(OriginalURL); } catch (_) {}
-            try { SafeURL.revokeObjectURL = OriginalURL.revokeObjectURL.bind(OriginalURL); } catch (_) {}
-            try { SafeURL.canParse = OriginalURL.canParse && OriginalURL.canParse.bind(OriginalURL); } catch (_) {}
+            try { SafeURL.createObjectURL = OriginalURL.createObjectURL.bind(OriginalURL); } catch (_) { /* swallow-ok: optional URL static method bind */ }
+            try { SafeURL.revokeObjectURL = OriginalURL.revokeObjectURL.bind(OriginalURL); } catch (_) { /* swallow-ok: optional URL static method bind */ }
+            try { SafeURL.canParse = OriginalURL.canParse && OriginalURL.canParse.bind(OriginalURL); } catch (_) { /* swallow-ok: optional URL static method bind */ }
             window.URL = SafeURL;
             window.__pp_urlShimInstalled = true;
           }
@@ -141,7 +141,7 @@ async function getPageInfoFromTab(tabId, opts = {}) {
                 ev.stopPropagation && ev.stopPropagation();
                 return false;
               }
-            } catch (_) { /* never let the swallow handler itself throw */ }
+            } catch (_) { /* swallow-ok: never let the page-world swallow handler itself throw */ }
           };
           window.addEventListener("error", swallowDefuddle, true);
           window.addEventListener("unhandledrejection", swallowDefuddle, true);
@@ -171,7 +171,7 @@ async function getPageInfoFromTab(tabId, opts = {}) {
               info.pageText = headTail(text, headChars, tailChars);
               return info;
             }
-          } catch (_) { /* fall through to legacy */ }
+          } catch (_) { /* swallow-ok: Defuddle threw in page world; fall through to legacy extraction */ }
         }
 
         // Fallback: legacy innerText extraction
@@ -410,7 +410,7 @@ async function handleAIError(res, provider) {
       errorType = "model_not_found";
     }
     paramHint = _aiRejectedParam(body, detail);
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: non-JSON provider error body keeps HTTP status message */ }
   const err = /** @type {PbpCodedError} */ (new Error(msg));
   if (errorType) err.code = errorType;
   if (paramHint) err.paramHint = paramHint;
@@ -571,7 +571,7 @@ function _aiRegionalEndpoint(cfg, s) {
   const endpoint = fill(cfg.workspaceTemplate);
   try {
     if (!templateHost || new URL(endpoint).hostname !== fill(templateHost)) return "";
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: malformed workspace endpoint URL rejected */ return ""; }
   return endpoint;
 }
 
@@ -603,7 +603,7 @@ function pbpAiResolveTarget(s, providerId = (s && s.aiProvider) || "gemini") {
     try {
       const name = t(key);
       return (name && name !== key) ? name : "";
-    } catch (_) { return ""; }
+    } catch (_) { /* swallow-ok: optional t() helper threw in isolated context */ return ""; }
   };
   const customShort = () => named("provCustomShort") || "Custom";
   if (pbpAiCustomEntryIdOk(provider)) return _aiResolveCustomEntry(st, provider, customShort);
@@ -729,7 +729,7 @@ async function _aiThinkRejected(memoKey) {
     const raw = o && o[_PBP_THINK_REJECT_KEY];
     const m = raw && typeof raw === "object" ? /** @type {Record<string, any>} */ (raw) : null;
     return _aiCapabilityFresh(m?.[memoKey]) && m?.[memoKey]?.rejected === true;
-  } catch (_) { return false; }
+  } catch (e) { console.warn("[pbp-ai] think-reject memo read failed:", e?.name); return false; }
 }
 async function _aiThinkReject(memoKey) {
   try {
@@ -738,7 +738,7 @@ async function _aiThinkReject(memoKey) {
     const m = _aiCapabilityRows(o?.[_PBP_THINK_REJECT_KEY]);
     m[memoKey] = { rejected: true, expiresAt: Date.now() + _AI_CAPABILITY_TTL };
     await chrome.storage.local.set({ [_PBP_THINK_REJECT_KEY]: m });
-  } catch (_) { /* storage unavailable: skip memo, fallback still works per-call */ }
+  } catch (e) { console.warn("[pbp-ai] think-reject memo write failed:", e?.name); }
 }
 
 // ---- Body-parameter dialect: declared default + 4xx self-heal + memo (K133) ----
@@ -781,7 +781,7 @@ async function _aiParamFixGet(memoKey) {
     const o = await chrome.storage.local.get(_PBP_PARAM_FIX_KEY);
     const rec = o && o[_PBP_PARAM_FIX_KEY] && o[_PBP_PARAM_FIX_KEY][memoKey];
     return _aiCapabilityFresh(rec) ? rec : null;
-  } catch (_) { return null; }
+  } catch (e) { console.warn("[pbp-ai] param-fix memo read failed:", e?.name); return null; }
 }
 // Written the moment the server NAMES the field, not on retry success: the
 // refusal is evidence on its own, and waiting for the retry to also succeed is
@@ -794,7 +794,7 @@ async function _aiParamFixLearn(memoKey, repair) {
     const m = _aiCapabilityRows(o?.[_PBP_PARAM_FIX_KEY]);
     m[memoKey] = { ...(m[memoKey] || {}), ...repair, expiresAt: Date.now() + _AI_CAPABILITY_TTL };
     await chrome.storage.local.set({ [_PBP_PARAM_FIX_KEY]: m });
-  } catch (_) { /* storage unavailable: skip memo, self-heal still works per-call */ }
+  } catch (e) { console.warn("[pbp-ai] param-fix memo write failed:", e?.name); }
 }
 
 // One initial attempt plus at most one retry per distinct repair (token field,
@@ -905,7 +905,7 @@ function _aiMessage(key, fallback, ...args) {
   try {
     const translated = t(key, ...args);
     if (translated && translated !== key) return translated;
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: t() unavailable or threw in bare realm; use fallback */ }
   return fallback;
 }
 
@@ -985,7 +985,8 @@ function requestAIHostPermissions(s, additionalOrigins = []) {
   }
   try {
     return Promise.resolve(chrome.permissions.request({ origins })).then(Boolean, () => false);
-  } catch (_) {
+  } catch (e) {
+    console.warn("[pbp-ai] permissions.request threw:", e?.name);
     return Promise.resolve(false);
   }
 }
@@ -1020,7 +1021,7 @@ async function _ensureAIHostPermission(s) {
     if (chrome.permissions && chrome.permissions.contains) {
       has = await chrome.permissions.contains({ origins: [pattern] });
     }
-  } catch (_) {}
+  } catch (e) { console.warn("[pbp-ai] permissions.contains failed:", e?.name); }
   if (!has) {
     const err = /** @type {PbpCodedError} */ (new Error(t("aiErrorHostPermission", pattern.replace(/\/\*$/, ""))));
     err.code = "host_permission";
@@ -1747,7 +1748,7 @@ function _pbpStreamContract(protocol, opts) {
         thought = _pbpStreamThinking(protocol, obj);
         if (thought) phase("thinking");
         if (strict) collect(obj);
-      } catch (_) { if (strict) badShape(); }
+      } catch (_) { /* swallow-ok: malformed provider thinking delta; strict mode marks badShape */ if (strict) badShape(); }
       budget.thinking(thought);        // may throw the budget stop
     },
     // Counted before the text is forwarded: a delta that crosses the budget
@@ -1812,7 +1813,7 @@ function _pbpStreamControl(deadlineMs, callerSignal) {
   const internal = new AbortController();
   let deadlineAt = 0, timer = null, expired = false, rejectExpiry = null;
   const expiry = new Promise((_, reject) => { rejectExpiry = reject; });
-  expiry.catch(() => {});
+  expiry.catch(() => { /* swallow-ok: prevent unhandled rejection when stream settles before deadline */ });
   const fire = () => {
     if (expired) return;
     expired = true;
@@ -1847,7 +1848,7 @@ function _pbpStreamControl(deadlineMs, callerSignal) {
     settle(promise) {
       if (!deadlineAt) return promise;
       overdue();
-      return Promise.race([expiry, promise]).catch(() => {});
+      return Promise.race([expiry, promise]).catch(() => { /* swallow-ok: stream cleanup settle waits up to deadline without failing */ });
     },
     dispose() { clearTimeout(timer); }
   };
@@ -1956,7 +1957,7 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
       (typeof navigator !== "undefined" && navigator.onLine === false));
     if (offline) {
       let offlineMsg = "";
-      try { offlineMsg = t("pinboardErrorOffline"); } catch (_) { offlineMsg = ""; }
+      try { offlineMsg = t("pinboardErrorOffline"); } catch (_) { /* swallow-ok: t() unavailable in bare realm */ offlineMsg = ""; }
       if (offlineMsg) {
         const netErr = /** @type {PbpCodedError} */ (new Error(offlineMsg));
         netErr.code = "network";
@@ -1971,7 +1972,7 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     // the stream is already aborted -- the sync try/catch alone left an
     // orphaned rejection ("Uncaught (in promise) AbortError:
     // BodyStreamBuffer was aborted") on every popover close mid-stream.
-    if (reader) { try { reader.cancel().catch(() => {}); } catch (_) {} }
+    if (reader) { try { reader.cancel().catch(() => { /* swallow-ok: cancelling an aborted body stream rejects with AbortError */ }); } catch (_) { /* swallow-ok: synchronous reader.cancel failure during cleanup */ } }
   }
 }
 
@@ -1986,7 +1987,7 @@ function _pbpSseConsumer(extractDelta, onText, onRaw, onParseError) {
     for (const ev of events) {
       if (ev === "[DONE]") continue;
       let obj;
-      try { obj = JSON.parse(ev); } catch (_) { if (onParseError) onParseError(); continue; }
+      try { obj = JSON.parse(ev); } catch (_) { /* swallow-ok: non-JSON SSE frame reported via onParseError */ if (onParseError) onParseError(); continue; }
       if (onRaw) onRaw(obj);            // T4: opportunistic usage side-channel (per parsed chunk)
       const d = extractDelta(obj);
       if (d) onText(d);
@@ -2007,7 +2008,7 @@ function _pbpUsageSink(extractUsage, opts) {
   return {
     onRaw(obj) {
       let u;
-      try { u = extractUsage(obj); } catch (_) { u = null; }
+      try { u = extractUsage(obj); } catch (_) { /* swallow-ok: optional usage side-channel must never abort stream */ u = null; }
       if (!u) return;
       if (u.inTok != null) { acc.inTok = u.inTok; saw = true; }
       if (u.outTok != null) { acc.outTok = u.outTok; saw = true; }
@@ -2016,7 +2017,7 @@ function _pbpUsageSink(extractUsage, opts) {
       if (saw && opts && typeof opts.onUsage === "function") {
         // Side channel must never break the primary result: a throwing
         // consumer callback must not reject the surrounding stream promise.
-        try { opts.onUsage({ inTok: acc.inTok || 0, outTok: acc.outTok || 0 }); } catch (_) {}
+        try { opts.onUsage({ inTok: acc.inTok || 0, outTok: acc.outTok || 0 }); } catch (e) { console.warn("[pbp-ai] onUsage callback failed:", e?.name); }
       }
     }
   };
@@ -2184,7 +2185,7 @@ async function _streamOllama(s, prompt, opts, onDelta) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       let obj;
-      try { obj = JSON.parse(trimmed); } catch (_) { contract.onParseError(); continue; }
+      try { obj = JSON.parse(trimmed); } catch (_) { /* swallow-ok: malformed NDJSON line reported to stream contract */ contract.onParseError(); continue; }
       usage.onRaw(obj);                 // T4: final done:true chunk carries the counts
       contract.onRaw(obj);
       const d = _pbpOllamaDelta(obj);
@@ -2499,7 +2500,7 @@ function parseAITags(resp, separator) {
       if (!Array.isArray(arr)) continue;
       const strs = arr.filter(t => typeof t === "string");
       if (arr.length === 0 || strs.length) { tags = strs; break; }
-    } catch (_) { /* not JSON - try the next bracketed candidate */ }
+    } catch (_) { /* swallow-ok: bracketed candidate is not JSON; try next */ }
   }
   if (tags === null) {
     tags = text.split(/[,\n;，、；]/)
@@ -2559,7 +2560,7 @@ function pbpAiErrorText(err) {
   const msg = String((err && err.message) || "") || t("aiErrRequestFailed");
   // CLAUDE.md "swallowed exceptions must leave a trace": log the raw shape
   // before folding it into a product string (no keys/tokens in these fields).
-  try { console.warn("[pbp-ai] request failed:", err && err.name, err && err.status, msg); } catch (_) {}
+  try { console.warn("[pbp-ai] request failed:", err && err.name, err && err.status, msg); } catch (_) { /* swallow-ok: console logger guard */ }
   if (err && err.code) return msg;
   const status = err && err.status;
   if (status === 401 || status === 403) return t("trErrKey");
@@ -2653,7 +2654,7 @@ function getOrCreateInflight(key, factory) {
   // handles the returned chain — but this cleanup chain would surface its own
   // "Uncaught (in promise)" rejection. .catch swallows it here; the caller still
   // sees (and handles) the rejection via the returned `promise`.
-  promise.finally(() => _inflightAI.delete(key)).catch(() => {});
+  promise.finally(() => _inflightAI.delete(key)).catch(() => { /* swallow-ok: cleanup chain mirror; caller handles rejection on returned promise */ });
   return promise;
 }
 
@@ -2739,10 +2740,10 @@ function _aiCacheUrlNorm(url) {
     const p = new URL(u);
     if (!/^#[!/]/.test(p.hash)) p.hash = "";
     u = p.href;
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: non-URL cache key input keeps raw string */ }
   try {
     if (typeof stripTrackingParams === "function") u = stripTrackingParams(u).cleaned || u;
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: stripTrackingParams failure keeps unstripped URL */ }
   return u;
 }
 
@@ -2771,7 +2772,7 @@ async function getAICache(url, type, cacheDuration, source, account, s) {
   const entry = await pbpAiCacheGet(key);
   if (!entry) return null;
   if (Date.now() - entry.ts > dur) {
-    pbpAiCacheDelete(key).catch(() => {});
+    pbpAiCacheDelete(key).catch((e) => console.warn("[pbp-ai] expired cache delete failed:", e?.name));
     return null;
   }
   return entry.result;

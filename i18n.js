@@ -48,10 +48,10 @@ function initI18n() {
         try {
           _i18nMessages = JSON.parse(msgs);
           _i18nMessagesLang = lang;
-        } catch (_) {}
+        } catch (_) { /* swallow-ok: corrupt localStorage i18n mirror ignored; async refresh reloads */ }
       }
     }
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: localStorage unavailable in service worker or restricted context */ }
   _i18nReady = true;
   // Async refresh (fire-and-forget); pbpI18nReady() below exposes this same
   // promise for callers that need to await ordering.
@@ -90,7 +90,7 @@ async function _refreshI18nAsync() {
         localStorage.setItem("pp-i18n-lang", "auto");
         localStorage.removeItem("pp-i18n-msgs");
         localStorage.removeItem("pp-i18n-stamp");
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: localStorage unavailable when clearing auto-lang mirror */ }
       const changed = _i18nMessages !== null;
       if (changed) {
         _i18nMessages = null;
@@ -109,7 +109,7 @@ async function _refreshI18nAsync() {
           localStorage.getItem("pp-i18n-stamp") === optLang + "@" + chrome.runtime.getManifest().version) {
         return;
       }
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: localStorage stamp read failed; proceed to fetch locale JSON */ }
 
     // Manual language: fetch locale messages
     const url = chrome.runtime.getURL(`_locales/${optLang}/messages.json`);
@@ -132,7 +132,7 @@ async function _refreshI18nAsync() {
       localStorage.setItem("pp-i18n-msgs", JSON.stringify(msgs));
       localStorage.setItem("pp-i18n-stamp", optLang + "@" + chrome.runtime.getManifest().version);
     } catch (_) {
-      // localStorage may be full or unavailable (e.g. SW context); proceed without mirror
+      /* swallow-ok: localStorage full or unavailable in SW context; proceed without mirror */
     }
 
     // Re-apply not only on a language switch but also when the fetched messages
@@ -198,9 +198,9 @@ function t(key, ...args) {
 /** @returns {string} */
 function uiLangToBCP47() {
   let lang = null;
-  try { lang = localStorage.getItem("pp-i18n-lang"); } catch (_) {}
+  try { lang = localStorage.getItem("pp-i18n-lang"); } catch (_) { /* swallow-ok: localStorage unavailable */ }
   if (!lang || lang === "auto") {
-    try { lang = chrome.i18n.getUILanguage(); } catch (_) { lang = "en"; }
+    try { lang = chrome.i18n.getUILanguage(); } catch (_) { /* swallow-ok: chrome.i18n unavailable in bare realm */ lang = "en"; }
   }
   lang = (lang || "en").replace(/_/g, "-").toLowerCase();
   if (lang === "zh-hk" || lang === "zh-tw" || lang.startsWith("zh-hant")) return "zh-Hant";

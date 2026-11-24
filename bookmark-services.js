@@ -50,7 +50,7 @@ function pbpBookmarkWebUrl(value) {
     const url = new URL(value);
     if (!/^https?:$/.test(url.protocol) || url.username || url.password) return "";
     return url.href;
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: URL parser rejects malformed bookmark URL */ return ""; }
 }
 
 function pbpBookmarkNormalize(service, value) {

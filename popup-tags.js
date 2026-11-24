@@ -49,7 +49,7 @@ async function fetchPinboardSuggestTags(token, url) {
     if (entry && Date.now() - entry.timestamp < SUGGEST_TTL) {
       data = entry.data;
     }
-  } catch (_) {}
+  } catch (e) { console.warn("[popup-tags] suggest cache read failed:", e?.name); }
 
   if (!pbpPopupTagAccountIsCurrent(account)) return;
   if (!data) {
@@ -70,8 +70,9 @@ async function fetchPinboardSuggestTags(token, url) {
       data = await resp.json();
       if (!pbpPopupTagAccountIsCurrent(account)) return;
       const entry = pbpPopupTagCacheEnvelope(token, { data, timestamp: Date.now() });
-      if (entry) chrome.storage.local.set({ [cacheKey]: entry }).catch(() => {});
+      if (entry) chrome.storage.local.set({ [cacheKey]: entry }).catch((err) => console.warn("[popup-tags] suggest cache write failed:", err?.name));
     } catch (e) {
+      console.warn("[popup-tags] tag suggest fetch failed:", e?.name);
       if (!pbpPopupTagAccountIsCurrent(account)) return;
       // Network-level errors for the suggest endpoint typically mean Pinboard can't process
       // this URL, not that the user's network is broken — surface the same neutral message.
@@ -255,7 +256,7 @@ async function fetchAllUserTags(token) {
           return;
         }
       }
-    } catch (_) {}
+    } catch (e) { console.warn("[popup-tags] user tag cache read failed:", e?.name); }
     // No usable cache (missing / expired / prewarmed-but-too-stale): fetch once so UI is usable
   }
 
@@ -564,7 +565,7 @@ async function loadLastUsedTags() {
       _lastUsedTagsCache = entry.tags.slice();
       renderLastUsedHint();
     }
-  } catch (_) {}
+  } catch (e) { console.warn("[popup-tags] lastUsedTags read failed:", e?.name); }
 }
 
 function renderLastUsedHint() {
@@ -595,7 +596,7 @@ function saveLastUsedTags(tags, expectedAccount = "") {
   if (!entry) return;
   const key = pbpAccountStorageKey("lastUsedTags", entry.account);
   _lastUsedTagsCache = snapshot;
-  try { chrome.storage.local.set({ [key]: entry }).catch(() => {}); } catch (_) {}
+  try { chrome.storage.local.set({ [key]: entry }).catch((e) => console.warn("[popup-tags] lastUsedTags write failed:", e?.name)); } catch (e) { console.warn("[popup-tags] lastUsedTags set threw:", e?.name); }
 }
 
 function updateAc(items, input) {

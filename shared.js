@@ -1386,12 +1386,13 @@ const PBP_RECLAIM_CATEGORIES = {
   jina: { keys: [], prefixes: ["jina_md_", "deepseek_md_"] },        // Remote page extract caches (Jina Reader + DeepSeek Fetch)
   urls: { keys: ["cached_existing_urls"], prefixes: [] },           // legacy bookmark URL set residue
   tags: { keys: ["cached_user_tags"], prefixes: ["cached_suggest_"] }, // tag autocomplete caches
-  // AI usage counter + think-reject memo + param-fix memo, plus the dictionary's
+  // AI usage counter + think-reject memo + param-fix memo + local sanitized
+  // diagnostic error ring buffer (pbpDiagErrors), plus the dictionary's
   // per-owner local failure ledger (md-dict.js) and its empty-result memory
-  // (pbpDictNeg:, batch 1C). Both are local-only diagnostics/memos: outside
+  // (pbpDictNeg:, batch 1C). All are local-only diagnostics/memos: outside
   // SETTINGS_DEFAULTS, backups and Drive. The archive log/dedup map stay with
   // the archive panel's own owner-scoped Clear button.
-  misc: { keys: ["pbp_ai_usage", "pbpThinkReject", "pbpAiParamFix"], prefixes: ["pbpDictFailures:", "pbpDictNeg:"] },
+  misc: { keys: ["pbp_ai_usage", "pbpThinkReject", "pbpAiParamFix", "pbpDiagErrors"], prefixes: ["pbpDictFailures:", "pbpDictNeg:"] },
 };
 
 // When this device last wrote a manual backup file (ISO string). Local only:
@@ -2476,6 +2477,116 @@ function pbpCreateRecoveringTail() {
     tail = operation.catch(() => { /* swallow-ok: reset queue tail; caller receives and handles operation rejection */ });
     return operation;
   };
+}
+
+// ---- Local-only structured diagnostic error ring buffer ----
+// Stores at most 50 sanitized entries in chrome.storage.local["pbpDiagErrors"]
+// so failures survive SW idle termination and appear in Copy Diagnostics.
+// Constructive privacy rule: NEVER accept or store error.message, stack, URLs,
+// hostnames, emails, tokens, account names, vocabulary headwords or content.
+const PBP_DIAG_ERRORS_KEY = "pbpDiagErrors";
+const PBP_DIAG_ERRORS_CAP = 50;
+const PBP_DIAG_SURFACES = Object.freeze([
+  "background", "popup", "options", "library", "md-preview", "pinboard", "ai", "dict", "sync", "shared",
+]);
+const PBP_DIAG_SINGLE_TOKENS = Object.freeze([
+  "http", "network", "timeout", "aborted", "offline", "quota", "parse",
+  "storage", "idb", "failed", "unknown", "denied", "invalid", "conflict", "cancelled",
+]);
+const PBP_DIAG_FORBIDDEN_SUBSTR = /secret|token|auth|key|pass|cred|cookie|bearer|acct|user|owner|mail|url/;
+const PBP_DIAG_ERROR_NAMES = Object.freeze([
+  "Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError", "URIError", "EvalError", "AggregateError",
+  "DOMException", "AbortError", "TimeoutError", "QuotaExceededError", "NotAllowedError", "NotFoundError",
+  "NetworkError", "SecurityError", "InvalidStateError", "DataCloneError", "DataError", "TransactionInactiveError",
+  "ReadOnlyError", "VersionError", "ConstraintError", "UnknownError", "OperationError", "EncodingError",
+  "NotReadableError", "NotSupportedError", "InvalidModificationError", "InvalidAccessError",
+  "HierarchyRequestError", "WrongDocumentError", "InvalidCharacterError", "NoModificationAllowedError",
+  "NamespaceError", "IndexSizeError",
+]);
+const _pbpDiagWriteTail = pbpCreateRecoveringTail();
+
+function _pbpDiagToken(raw, fallback) {
+  if (typeof raw !== "string") return fallback;
+  if (PBP_DIAG_SINGLE_TOKENS.includes(raw)) return raw;
+  if (raw.length > 48 || !/^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/.test(raw)) return fallback;
+  if (PBP_DIAG_FORBIDDEN_SUBSTR.test(raw)) return fallback;
+  return raw;
+}
+
+function _pbpIsDiagRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  if (proto === null || proto === Object.prototype) return true;
+  return typeof proto === "object" && Object.getPrototypeOf(proto) === null &&
+    Object.prototype.toString.call(value) === "[object Object]";
+}
+
+function _pbpSanitizeStoredDiagError(raw) {
+  if (!_pbpIsDiagRecord(raw)) return null;
+  if (!Number.isSafeInteger(raw.ts) || raw.ts <= 0) return null;
+  if (typeof raw.surface !== "string" || (!PBP_DIAG_SURFACES.includes(raw.surface) && raw.surface !== "unknown")) return null;
+  if (typeof raw.op !== "string" || _pbpDiagToken(raw.op, "") !== raw.op) return null;
+  if (typeof raw.code !== "string" || _pbpDiagToken(raw.code, "") !== raw.code) return null;
+  if (typeof raw.errorName !== "string" || !PBP_DIAG_ERROR_NAMES.includes(raw.errorName)) return null;
+  if (raw.status !== null && raw.status !== undefined &&
+      !(Number.isInteger(raw.status) && raw.status >= 100 && raw.status <= 599)) return null;
+  return {
+    ts: raw.ts,
+    surface: raw.surface,
+    op: raw.op,
+    code: raw.code,
+    errorName: raw.errorName,
+    status: raw.status == null ? null : raw.status,
+  };
+}
+
+function pbpSanitizeDiagErrors(rawList) {
+  if (!Array.isArray(rawList)) return [];
+  const out = [];
+  for (const item of rawList) {
+    const clean = _pbpSanitizeStoredDiagError(item);
+    if (clean) out.push(clean);
+  }
+  return out.length > PBP_DIAG_ERRORS_CAP ? out.slice(-PBP_DIAG_ERRORS_CAP) : out;
+}
+
+function pbpRecordDiagError(input) {
+  if (!_pbpIsDiagRecord(input)) return Promise.resolve(null);
+  const entry = {
+    ts: Date.now(),
+    surface: typeof input.surface === "string" && PBP_DIAG_SURFACES.includes(input.surface) ? input.surface : "unknown",
+    op: _pbpDiagToken(input.op, "unknown"),
+    code: _pbpDiagToken(input.code, "failed"),
+    errorName: typeof input.errorName === "string" && PBP_DIAG_ERROR_NAMES.includes(input.errorName) ? input.errorName : "Error",
+    status: Number.isInteger(input.status) && input.status >= 100 && input.status <= 599 ? input.status : null,
+  };
+  return _pbpDiagWriteTail(async () => {
+    try {
+      if (typeof chrome === "undefined" || !chrome.storage?.local) return null;
+      const stored = await chrome.storage.local.get(PBP_DIAG_ERRORS_KEY);
+      const prev = pbpSanitizeDiagErrors(stored && stored[PBP_DIAG_ERRORS_KEY]);
+      prev.push(entry);
+      const next = prev.length > PBP_DIAG_ERRORS_CAP ? prev.slice(-PBP_DIAG_ERRORS_CAP) : prev;
+      await chrome.storage.local.set({ [PBP_DIAG_ERRORS_KEY]: next });
+      return entry;
+    } catch (_) {
+      /* swallow-ok: diagnostic ring write must never throw into or recursively log from caller catch paths */
+      return null;
+    }
+  });
+}
+
+function pbpReadDiagErrors() {
+  return _pbpDiagWriteTail(async () => {
+    try {
+      if (typeof chrome === "undefined" || !chrome.storage?.local) return [];
+      const stored = await chrome.storage.local.get(PBP_DIAG_ERRORS_KEY);
+      return pbpSanitizeDiagErrors(stored && stored[PBP_DIAG_ERRORS_KEY]);
+    } catch (_) {
+      /* swallow-ok: diagnostic ring read degrades to empty array when local storage is unavailable */
+      return [];
+    }
+  });
 }
 
 // ---- Which bookmark service this device saves to ----

@@ -76,13 +76,13 @@ function _pbpAiOpenDB() {
       const db = req.result;
       // Future schema bump: close on versionchange and drop the cached
       // promise so a long-lived preview/options page doesn't block it.
-      db.onversionchange = () => { try { db.close(); } catch (_) {} _pbpAiDbPromise = null; };
+      db.onversionchange = () => { try { db.close(); } catch (_) { /* swallow-ok: closing already-closed IDB handle on versionchange */ } _pbpAiDbPromise = null; };
       resolve(db);
     };
     req.onblocked = () => console.warn("[ai-cache] open blocked: another context still holds an older connection (onversionchange should have closed it)");
     req.onerror = () => reject(req.error);
   });
-  _pbpAiDbPromise.catch(() => { _pbpAiDbPromise = null; }); // allow retry
+  _pbpAiDbPromise.catch(() => { /* swallow-ok: clear cached promise so next call retries IDB open; caller receives rejection */ _pbpAiDbPromise = null; }); // allow retry
   return _pbpAiDbPromise;
 }
 
@@ -118,10 +118,10 @@ function _pbpAiTouch(db, key) {
     req.onsuccess = () => {
       const cur = req.result;
       if (cur) {
-        try { store.put({ key: cur.key, result: cur.result, ts: _pbpAiStoredTs(cur.key, Date.now()) }); } catch (_) {}
+        try { store.put({ key: cur.key, result: cur.result, ts: _pbpAiStoredTs(cur.key, Date.now()) }); } catch (_) { /* swallow-ok: advisory LRU timestamp touch may race transaction close */ }
       }
     };
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: advisory LRU read-touch degrades silently when IDB is unavailable */ }
 }
 
 async function pbpAiCacheGet(key) {
@@ -160,7 +160,10 @@ async function pbpAiCacheGet(key) {
 // keys the account name and page URL -- exactly what the leave-a-trace rule
 // bars.
 function _pbpAiWarn(op, key, error) {
-  try { console.warn("[pbp-ai-cache] " + op + " failed pool=" + _pbpAiPoolForKey(key) + ":", (error && error.name) || "", (error && error.message) || ""); } catch (_) {}
+  try { console.warn("[pbp-ai-cache] " + op + " failed pool=" + _pbpAiPoolForKey(key) + ":", (error && error.name) || "", (error && error.message) || ""); } catch (_) { /* swallow-ok: diagnostic logger itself must never throw */ }
+  if (typeof pbpRecordDiagError === "function") {
+    pbpRecordDiagError({ surface: "ai", op: "ai_cache", code: "idb", errorName: error && error.name });
+  }
 }
 
 function _pbpAiIsDict2Key(key) {
@@ -353,7 +356,7 @@ async function _pbpAiWriteAndPrune(key, makeResult, ts, readExisting) {
       const write = (previous) => {
         let result;
         try { result = makeResult(previous); }
-        catch (_) { try { tx.abort(); } catch (_) {} return; }
+        catch (_) { /* swallow-ok: caller updater threw; abort transaction cleanly */ try { tx.abort(); } catch (_2) { /* swallow-ok: transaction may already be inactive */ } return; }
         const putReq = store.put({ key, result, ts: _pbpAiStoredTs(key, ts) });
         putReq.onsuccess = () => _pbpAiPruneWrittenPool(store, key);
       };
@@ -476,12 +479,12 @@ function pbpAiPageUrlNorm(url) {
     const parsed = new URL(normalized);
     parsed.hash = "";
     normalized = parsed.href;
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: non-URL input keeps raw string */ }
   try {
     if (typeof stripTrackingParams === "function") {
       normalized = stripTrackingParams(normalized, {}).cleaned || normalized;
     }
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: stripTrackingParams failure keeps unstripped URL */ }
   return normalized;
 }
 

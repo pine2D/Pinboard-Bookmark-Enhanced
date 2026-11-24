@@ -14,7 +14,7 @@ function pbpLibAskSafeUrl(value) {
   try {
     const url = new URL(value);
     return /^https?:$/.test(url.protocol) && !url.username && !url.password ? url.href : "";
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: non-URL source link rejected */ return ""; }
 }
 function pbpLibAskExternalUrl(value) {
   if (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(value)) return "";

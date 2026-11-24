@@ -404,3 +404,24 @@ declare function pbpBuildBackupSnapshot(
   },
 ): Record<string, any>;
 declare function pbpCountBackupSecrets(data: unknown): number;
+
+interface PbpDiagErrorEntry {
+  ts: number;
+  surface: string;
+  op: string;
+  code: string;
+  errorName: string;
+  status: number | null;
+}
+interface PbpDiagErrorInput {
+  surface?: string;
+  op?: string;
+  code?: string;
+  errorName?: unknown;
+  status?: unknown;
+}
+declare const PBP_DIAG_ERRORS_KEY: "pbpDiagErrors";
+declare const PBP_DIAG_ERRORS_CAP: 50;
+declare function pbpSanitizeDiagErrors(rawList: unknown): PbpDiagErrorEntry[];
+declare function pbpRecordDiagError(input: PbpDiagErrorInput): Promise<PbpDiagErrorEntry | null>;
+declare function pbpReadDiagErrors(): Promise<PbpDiagErrorEntry[]>;

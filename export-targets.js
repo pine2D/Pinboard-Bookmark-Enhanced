@@ -68,7 +68,7 @@ function pbpNotionParseParentId(input) {
   const bare = raw.replace(/-/g, "");
   if (/^[0-9a-f]{32}$/i.test(bare)) return _pbpNotionDashUuid(bare);
   let path = "";
-  try { path = new URL(raw).pathname; } catch (_) { return ""; }
+  try { path = new URL(raw).pathname; } catch (_) { /* swallow-ok: non-URL Notion database input rejected */ return ""; }
   const seg = path.split("/").filter(Boolean).pop() || "";
   const tail = seg.split("-").pop() || "";
   return /^[0-9a-f]{32}$/i.test(tail) ? _pbpNotionDashUuid(tail) : "";

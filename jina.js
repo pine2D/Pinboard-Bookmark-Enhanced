@@ -9,7 +9,7 @@ async function _ensureJinaHostPermission() {
     if (chrome.permissions && chrome.permissions.contains) {
       has = (await chrome.permissions.contains({ origins: [PBP_JINA_ORIGIN_PATTERN] })) === true;
     }
-  } catch (_) {}
+  } catch (e) { console.warn("[jina] permissions.contains failed:", e?.name); }
   if (!has) {
     const err = /** @type {Error & { code?: string }} */ (new Error("Jina host permission required"));
     err.code = "host_permission";
@@ -33,7 +33,10 @@ async function fetchJinaMarkdown(url, options = {}) {
           return { ...cached.result, fromCache: true };
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      console.warn("[jina] cache read failed:", e?.name);
+      if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "background", op: "jina_cache_read", code: "storage", errorName: e?.name });
+    }
   }
 
   try {
@@ -68,7 +71,10 @@ async function fetchJinaMarkdown(url, options = {}) {
     if (resolveCacheMs(cacheDuration) > 0) {
       try {
         await chrome.storage.local.set({ [cacheKey]: { result, timestamp: Date.now() } });
-      } catch (_) {}
+      } catch (e) {
+        console.warn("[jina] cache write failed:", e?.name);
+        if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "background", op: "jina_cache_write", code: "storage", errorName: e?.name });
+      }
     }
 
     return { ...result, fromCache: false };

@@ -623,7 +623,9 @@ function _pbpVocabBuildNoteEditor(w) {
       }
       else if (!refreshed) _pbpVocabFlashStatus(false, t("vocabRefreshFailed"));
       else _pbpVocabFlashStatus(true, t("vocabNoteSaved"));
-    } catch (_) {
+    } catch (e) {
+      console.warn("[library-vocab] note save failed:", e?.name);
+      if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "library", op: "vocab_note_save", code: "failed", errorName: e?.name });
       if (owner) { await _pbpVocabReloadAfterMutation(owner, gen); restoreSelection(); }
       if (gen === _vocabRenderGen) _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
     } finally {
@@ -685,7 +687,7 @@ function _pbpVocabSyncNoteMore(input) {
       document.body.classList.remove("lib-narrow-detail");
       _pbpVocabRenderDetail(null);
       if (row && row.isConnected) {
-        try { row.focus({ preventScroll: true }); } catch (_) { row.focus(); }
+        try { row.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ row.focus(); }
       } else {
         _pbpVocabFocusStable();
       }
@@ -744,7 +746,7 @@ function _pbpVocabToggleGroupEditor(open, moveFocus = true) {
   if (!moveFocus) return;
   const target = open ? editor.querySelector('.vocab-group-unit > input[type="text"]') : btn;
   if (target) {
-    try { target.focus({ preventScroll: true }); } catch (_) { target.focus(); }
+    try { target.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ target.focus(); }
   }
 }
 
@@ -1040,7 +1042,7 @@ function _pbpVocabRenderDetail(w, enterNarrow, reconcileOnly = false) {
       meta.className = "vocab-context-meta";
       let site = isLocalDoc ? t("mdOcrLocalDocBadge") : "";
       if (safeHref) {
-        try { site = new URL(safeHref).hostname.replace(/^www\./, ""); } catch (_) {}
+        try { site = new URL(safeHref).hostname.replace(/^www\./, ""); } catch (_) { /* swallow-ok: non-URL context href omits hostname chip */ }
       }
       const day = typeof pbpLibFormatDay === "function" ? pbpLibFormatDay(c.createdAt) : "";
       for (const part of [site, day]) {
@@ -1358,7 +1360,7 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   if (parent.signal.aborted) child.abort();
   else {
     parent.signal.addEventListener("abort", onParentAbort, { once: true });
-    _pbpVocabDictChildCleanup = () => { try { parent.signal.removeEventListener("abort", onParentAbort); } catch (_) {} };
+    _pbpVocabDictChildCleanup = () => { try { parent.signal.removeEventListener("abort", onParentAbort); } catch (_) { /* swallow-ok: best-effort abort listener cleanup */ } };
   }
   const signal = child.signal;
 
@@ -1661,7 +1663,7 @@ function _pbpVocabSyncLookupPlaceholder() {
 function _pbpVocabFocusLookupLang() {
   const target = $id("vocab-lookup-lang-btn") || $id("vocab-lookup-lang");
   if (target) {
-    try { target.focus({ preventScroll: true }); } catch (_) { target.focus(); }
+    try { target.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ target.focus(); }
   }
   const ref = $id("vocab-ref");
   if (ref) ref.scrollIntoView({ block: "nearest" });
@@ -1914,7 +1916,7 @@ function _pbpVocabFreeLookup() {
   if (!term) {
     const w = _pbpVocabDetailWordId ? _vocabRows.find((row) => row.id === _pbpVocabDetailWordId) : null;
     if (w) _pbpVocabRelookup(w);
-    else { try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); } }
+    else { try { input.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ input.focus(); } }
     return;
   }
   _pbpVocabLookupOther(term, sel.value || _vocabLookupLang);
@@ -2000,7 +2002,7 @@ function _pbpVocabFocusNarrowBack() {
   if (!_pbpVocabNarrowMode()) return;
   const back = $id("vocab-detail-back");
   if (!back) return;
-  try { back.focus({ preventScroll: true }); } catch (_) { back.focus(); }
+  try { back.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ back.focus(); }
 }
 
 // Where the vocabulary status sentence lives. #vocab-status is markup inside
@@ -2255,7 +2257,7 @@ function _pbpVocabSetLoading(loading) {
 function _pbpVocabFocusStable() {
   const search = $id("vocab-search");
   if (!search || search.disabled || search.closest("[hidden], [inert]")) return false;
-  try { search.focus({ preventScroll: true }); } catch (_) { search.focus(); }
+  try { search.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ search.focus(); }
   return document.activeElement === search;
 }
 
@@ -2269,7 +2271,7 @@ function _pbpVocabFocusBatch(...ids) {
   for (const id of ids) {
     const el = $id(id);
     if (!el || el.disabled || el.closest("[hidden], [inert]") || !el.getClientRects().length) continue;
-    try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); }
+    try { el.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ el.focus(); }
     if (document.activeElement === el) return true;
   }
   return _pbpVocabFocusStable();
@@ -2324,7 +2326,9 @@ function _pbpVocabDeleteRow(w, anchor, renderOwner) {
         _pbpVocabFocusStable();
         if (!ok) _pbpVocabFlashStatus(false, t("dictDeleteFailed"));
         else if (!refreshed) _pbpVocabFlashStatus(false, t("vocabRefreshFailed"));
-      } catch (_) {
+      } catch (e) {
+        console.warn("[library-vocab] word delete failed:", e?.name);
+        if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "library", op: "vocab_delete", code: "failed", errorName: e?.name });
         if (owner) await _pbpVocabReloadAfterMutation(owner, gen);
         else if (gen === _vocabRenderGen) {
           _pbpVocabClearVisibleState();
@@ -2853,7 +2857,7 @@ function _pbpVocabReconcileDetail() {
   if (document.activeElement && document.activeElement !== document.body) return;
   const next = focusTargets.map(find).find((el) => el && !el.hidden && el.getClientRects().length);
   if (next) {
-    try { next.focus({ preventScroll: true }); } catch (_) { next.focus(); }
+    try { next.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ next.focus(); }
   } else if (_pbpVocabNarrowMode()) {
     _pbpVocabFocusNarrowBack();
   } else {
@@ -2921,11 +2925,13 @@ async function _pbpVocabReloadAfterMutation(expectedOwner, requestedGen, broadca
     if (broadcast) {
       try {
         const pending = chrome.runtime.sendMessage({ type: "PBP_VOCAB_SYNCED", owner: expectedOwner });
-        if (pending && typeof pending.catch === "function") pending.catch(() => {});
-      } catch (_) {}
+        if (pending && typeof pending.catch === "function") pending.catch(() => { /* swallow-ok: no receiving listener when SW or peer tabs are closed */ });
+      } catch (_) { /* swallow-ok: synchronous sendMessage throw when extension runtime is unavailable */ }
     }
     return true;
-  } catch (_) {
+  } catch (e) {
+    console.warn("[library-vocab] reload after mutation failed:", e?.name);
+    if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "library", op: "vocab_reload", code: "idb", errorName: e?.name });
     if (gen !== _vocabRenderGen) return false;
     _pbpVocabClearVisibleState();
     _pbpVocabRenderDetail(null, false, true); // I1: the clear never touched the detail pane
@@ -2971,7 +2977,9 @@ async function renderVocabPanel() {
       }
       return;
     }
-  } catch (_) {
+  } catch (e) {
+    console.warn("[library-vocab] render read failed:", e?.name);
+    if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "library", op: "vocab_render", code: "idb", errorName: e?.name });
     // Fail-closed: a rerender triggered by an account switch that then fails
     // to read must NOT leave the previous account's rows on screen (isolation
     // invariant) -- clear the list and say the read failed.
@@ -3124,7 +3132,9 @@ function _pbpVocabBatchDeleteSelected() {
           return;
         }
         _pbpVocabFlashStatus(true, t("vocabBatchDeleted", String(ids.length)));
-      } catch (_) {
+      } catch (e) {
+        console.warn("[library-vocab] batch delete failed:", e?.name);
+        if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "library", op: "vocab_batch_delete", code: "failed", errorName: e?.name });
         if (owner) await _pbpVocabReloadAfterMutation(owner, gen);
         else if (gen === _vocabRenderGen) {
           _pbpVocabClearVisibleState();
@@ -3184,7 +3194,9 @@ async function _pbpVocabApplyGroupChange(adding) {
     input.value = "";
     refocus = true;
     _pbpVocabFlashStatus(true, t(adding ? "vocabBatchGrouped" : "vocabBatchUngrouped", String(affected), group));
-  } catch (_) {
+  } catch (e) {
+    console.warn("[library-vocab] batch group edit failed:", e?.name);
+    if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "library", op: "vocab_batch_group", code: "failed", errorName: e?.name });
     if (owner) { await _pbpVocabReloadAfterMutation(owner, gen); restoreSelection(); }
     else if (gen === _vocabRenderGen) {
       _pbpVocabClearVisibleState();
@@ -3228,7 +3240,9 @@ async function _pbpVocabApplyStatusChange(known) {
     _pbpVocabFlashStatus(true, t(known
       ? pbpLibCountKey(n, "vocabBatchKnownDoneOne", "vocabBatchKnownDone")
       : pbpLibCountKey(n, "vocabBatchLearningDoneOne", "vocabBatchLearningDone"), String(n)));
-  } catch (_) {
+  } catch (e) {
+    console.warn("[library-vocab] batch status edit failed:", e?.name);
+    if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "library", op: "vocab_batch_status", code: "failed", errorName: e?.name });
     if (owner) { await _pbpVocabReloadAfterMutation(owner, gen); restoreSelection(); }
     else if (gen === _vocabRenderGen) {
       _pbpVocabClearVisibleState();
@@ -3368,7 +3382,7 @@ function _pbpVocabOpenLookupPane() {
   if (ref) ref.scrollIntoView({ block: "start" });
   const input = $id("vocab-lookup-input");
   if (!input) return;
-  try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
+  try { input.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ input.focus(); }
 }
 for (const id of ["vocab-lookup-narrow", "vocab-signed-out-lookup"]) {
   const button = $id(id);
@@ -3427,7 +3441,7 @@ function _pbpVocabSelectAllVisible() {
   _vocabLastSelectedId = null;
   _pbpVocabSyncSelectionUi();
   const clear = $id("vocab-clear-selection");
-  if (clear && _vocabSelected.size) { try { clear.focus({ preventScroll: true }); } catch (_) { clear.focus(); } }
+  if (clear && _vocabSelected.size) { try { clear.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ clear.focus(); } }
 }
 const _vocabClearBtn = $id("vocab-clear-selection");
 // The batch row (with the button just pressed) hides the moment the
@@ -3435,7 +3449,7 @@ const _vocabClearBtn = $id("vocab-clear-selection");
 // back in its place, instead of letting it fall to <body>.
 function _pbpVocabFocusCountRowSelectAll() {
   const allBtn = $id("vocab-select-all");
-  if (allBtn) { try { allBtn.focus({ preventScroll: true }); } catch (_) { allBtn.focus(); } }
+  if (allBtn) { try { allBtn.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ allBtn.focus(); } }
 }
 if (_vocabClearBtn) _vocabClearBtn.addEventListener("click", () => {
   _pbpVocabClearSelection();
@@ -3502,7 +3516,7 @@ function _pbpVocabCloseExportMenu(restoreFocus) {
   session.anchor.setAttribute("aria-expanded", "false");
   session.menu.remove();
   if (restoreFocus && session.anchor.isConnected) {
-    try { session.anchor.focus({ preventScroll: true }); } catch (_) { session.anchor.focus(); }
+    try { session.anchor.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ session.anchor.focus(); }
   }
 }
 // The send runs from the menu item's own click, with nothing awaited first:
@@ -3563,7 +3577,7 @@ async function _pbpVocabOpenExportMenu(anchor) {
   // it takes) -- the same rule the settings button follows. Read before the
   // menu shows, so the item never pops in under the pointer.
   let eudic = false;
-  try { eudic = await pbpVocabEudicReady(); } catch (_) {}
+  try { eudic = await pbpVocabEudicReady(); } catch (e) { console.warn("[library-vocab] Eudic readiness check failed:", e?.name); }
   if (_vocabExportSession !== session) return;
   if (eudic) menu.append(_pbpVocabExportItem(t("dictEudicSend"), "send", () => _pbpVocabRunExport("eudic")));
   const settings = document.createElement("a");
@@ -3642,7 +3656,7 @@ if (_vocabLoadMore) _vocabLoadMore.addEventListener("click", () => {
   const head = appended ? appended.querySelector(".notes-card-head") : null;
   if (!head) { _pbpVocabFocusStable(); return; }
   _pbpVocabSetRowTabStop(head);
-  try { head.focus({ preventScroll: true }); } catch (_) { head.focus(); }
+  try { head.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ head.focus(); }
 });
 // Grid navigation. Bound on the container, so it survives every row rebuild
 // and stays scoped to the list: Home/End must not reach the toolbar's search
@@ -3708,7 +3722,7 @@ function _pbpVocabFocusRow(id) {
     .find((card) => card.dataset.vocabId === id)?.querySelector(".notes-card-head");
   if (!head) return false;
   _pbpVocabSetRowTabStop(head);
-  try { head.focus({ preventScroll: true }); } catch (_) { head.focus(); }
+  try { head.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ head.focus(); }
   return document.activeElement === head;
 }
 

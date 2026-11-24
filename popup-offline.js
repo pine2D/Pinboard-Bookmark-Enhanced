@@ -174,7 +174,7 @@
       const meta = document.createElement("div");
       meta.className = "offline-queue-meta";
       let host = "";
-      try { host = new URL(item.url).hostname.replace(/^www\./, ""); } catch (_) {}
+      try { host = new URL(item.url).hostname.replace(/^www\./, ""); } catch (_) { /* swallow-ok: malformed queued URL omits hostname chip */ }
       meta.textContent = [sourceLabel(item, current), host, relTime(item.queuedAt)].filter(Boolean).join(" · ");
 
       body.appendChild(title);
@@ -276,7 +276,7 @@
     const service = pbpBookmarkAccountService(pbpOfflineQueueAccount(item));
     const result = { reason: failure.code, ...(Number.isInteger(failure.status) ? { httpStatus: failure.status } : {}) };
     if (failure.code === "tag_too_long") {
-      try { result.tag = pbpLinkdingOverlongTag(pbpBookmarkParseTags(item.tags)); } catch (_) { /* unparsable tags: the copy shows "?" */ }
+      try { result.tag = pbpLinkdingOverlongTag(pbpBookmarkParseTags(item.tags)); } catch (_) { /* swallow-ok: unparsable tags fall back to "?" placeholder in message */ }
     }
     if (failure.code === "too_long" && service !== "pinboard") result.limit = pbpBookmarkLimits(service).title;
     return retryFailureMessage(result, service);
@@ -356,7 +356,9 @@
       }
       // Success — background has removed this item; refresh list
       await refreshBar();
-    } catch (_) {
+    } catch (e) {
+      console.warn("[popup-offline] retry item failed:", e?.name);
+      if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "popup", op: "offline_retry", code: "send_failed", errorName: e?.name });
       heldFocus = null;
       btn.disabled = false;
       if (focusHeld()) btn.focus({ preventScroll: true });

@@ -64,7 +64,7 @@ const PBP_POPUP_BOOKMARK_SERVICES = ["pinboard", "karakeep", "linkding"];
     if (opens >= PBP_KBD_LEARN_OPENS) return;
     localStorage.setItem("pp-kbd-hint-opens", String(opens + 1));
     document.documentElement.classList.add("pp-kbd-learn");
-  } catch (_) { /* storage blocked: hints stay behind Alt */ }
+  } catch (_) { /* swallow-ok: localStorage blocked; kbd hints stay behind Alt */ }
 })();
 
 // B4: tab data prefill — populate only public URL/title fields.
@@ -84,7 +84,7 @@ const PBP_POPUP_BOOKMARK_SERVICES = ["pinboard", "karakeep", "linkding"];
       if (u && !u.value) u.value = m.url;
       if (ti && !ti.value) ti.value = m.title || "";
     }, { once: true });
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: localStorage tab prefill optional on boot */ }
 })();
 
 // Async source-of-truth read — corrects mirror if stale, populates on first run.
@@ -96,7 +96,7 @@ const PBP_POPUP_BOOKMARK_SERVICES = ["pinboard", "karakeep", "linkding"];
 // first. A miss (first run, cleared site data, private mode) falls back to the
 // original two-hop chain unchanged.
 let _optSyncMirror = null;
-try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
+try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) { /* swallow-ok: localStorage mirror unavailable */ }
 // The service this device uses is bookmarkServiceActive, always in local; the
 // settings-area bookmarkService is only the chosen one (shared.js
 // PBP_BOOKMARK_ACTIVE_KEY). Both ride on a local read the chain already makes,
@@ -124,7 +124,7 @@ try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
     localStorage.setItem("pp-theme-preset", s.themePresetKey || "");
     localStorage.setItem("pp-theme-follow", s.optPopupFollowTheme === false ? "0" : "1");
     localStorage.setItem("pp-popup-width", String(s.popupWidth || 550));
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: localStorage mirror write optional when storage blocked */ }
   if (s.bookmarkService !== undefined) pbpPopupApplyBookmarkService(s.bookmarkService);
 
   // Re-apply in case the mirror was stale. Compute the target first and write
@@ -158,7 +158,7 @@ try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
 
   const w = Math.max(420, Math.min(720, Number(s.popupWidth) || 550));
   root.style.setProperty("--pp-popup-width", w + "px");
-}).catch(() => { /* storage unavailable: localStorage mirror already applied */ });
+}).catch(() => { /* swallow-ok: storage unavailable; localStorage mirror already applied */ });
 
 // The bookmark service attribute and its mirror, from the service this device uses.
 // popup.js calls it too, with the settings it renders the form from.
@@ -173,5 +173,5 @@ function pbpPopupApplyBookmarkService(value) {
   try {
     if (service) localStorage.setItem("pp-bookmark-service", service);
     else localStorage.removeItem("pp-bookmark-service");
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: localStorage mirror write optional when storage blocked */ }
 }

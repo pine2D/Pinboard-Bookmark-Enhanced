@@ -456,7 +456,7 @@ function _pbpPackOpenDB() {
       const db = req.result;
       // Close on versionchange and drop the cached promise so a long-lived
       // options tab doesn't block another tab's upgrade.
-      db.onversionchange = () => { try { db.close(); } catch (_) {} _pbpPackDbPromise = null; };
+      db.onversionchange = () => { try { db.close(); } catch (_) { /* swallow-ok: closing already-closed IDB handle on versionchange */ } _pbpPackDbPromise = null; };
       resolve(db);
     };
     // Two distinct failures. onblocked: our upgrade is waiting on another
@@ -490,7 +490,7 @@ function _pbpPackTx(db, mode, fn, stores) {
     // pack no longer ready or queryable. Abort so the caller's error means the
     // store is untouched. Rejecting with `e` rather than the abort error keeps
     // the original cause (onabort is not wired up yet at this point anyway).
-    try { out = fn(tx); } catch (e) { try { tx.abort(); } catch (_) {} reject(e); return; }
+    try { out = fn(tx); } catch (e) { try { tx.abort(); } catch (_2) { /* swallow-ok: transaction may already be inactive */ } reject(e); return; }
     tx.oncomplete = () => resolve(out && typeof out.value === "function" ? out.value() : out);
     tx.onabort = () => reject(tx.error || new Error("pack tx aborted"));
     tx.onerror = () => reject(tx.error || new Error("pack tx failed"));
@@ -563,7 +563,7 @@ async function* _pbpPackReplay(head, it) {
     // An early exit (the entry-count guard, a failed put) must still cancel the
     // underlying stream reader. A plain `for await` over the original iterator
     // used to do this for us; going through a wrapper means doing it here.
-    try { if (typeof it.return === "function") await it.return(); } catch (_) {}
+    try { if (typeof it.return === "function") await it.return(); } catch (_) { /* swallow-ok: best-effort async iterator cleanup */ }
   }
 }
 
@@ -586,7 +586,7 @@ function _pbpPackMarkCleared(error) {
     Object.defineProperty(error, "code",
       { value: "pack_cleared", writable: true, configurable: true, enumerable: true });
     if (error.code === "pack_cleared") return error;
-  } catch (_) { /* frozen, sealed, or not an object at all */ }
+  } catch (_) { /* swallow-ok: frozen, sealed, or primitive error falls through to wrapper Error */ }
   const wrapped = /** @type {PbpCodedError} */ (new Error(error?.message || "pack import failed", { cause: error }));
   wrapped.code = "pack_cleared";
   return wrapped;
@@ -619,7 +619,7 @@ async function pbpPackImport(lineIter, onProgress, stats) {
         : lineIter;
     const probe = await _pbpPackProbeHead(it);
     if (_pbpPackProbeRejects(probe)) {
-      try { if (typeof it.return === "function") await it.return(); } catch (_) {}
+      try { if (typeof it.return === "function") await it.return(); } catch (_) { /* swallow-ok: best-effort iterator cleanup on rejected pack */ }
       // `code` is the contract with the UI: this rejection alone leaves the
       // installed pack intact, so it gets its own message.
       const err = /** @type {PbpCodedError} */ (new Error("file does not look like a CC-CEDICT release"));
@@ -863,7 +863,7 @@ function _pbpEcdictCommit(tx, records, metaRecord, onProgress) {
     }
     // Callers guarantee records.length > 0, so `last` is never null here.
     last.onsuccess = () => {
-      if (onProgress) { try { onProgress(i); } catch (_) {} }
+      if (onProgress) { try { onProgress(i); } catch (e) { console.warn("[dict-pack] onProgress callback failed:", e?.name); } }
       if (i < records.length) { queueBatch(); return; }
       // Final batch. This put MUST be queued synchronously inside this
       // callback: after any await or promise hop the transaction is inactive.
@@ -929,7 +929,7 @@ async function pbpEcdictImport(lineIter, stats, opts) {
       sinceYield += r.record.key.length + r.record.word.length + r.record.translation.length;
       if (records.length > PBP_ECDICT_MAX_ENTRIES) throw new Error("ECDICT entry count above the accepted ceiling");
       if (payloadBytes > PBP_ECDICT_MAX_PAYLOAD_BYTES) throw new Error("ECDICT payload above the accepted ceiling");
-      if (records.length % 20000 === 0 && o.onParsed) { try { o.onParsed(records.length); } catch (_) {} }
+      if (records.length % 20000 === 0 && o.onParsed) { try { o.onParsed(records.length); } catch (e) { console.warn("[dict-pack] onParsed callback failed:", e?.name); } }
     }
     // Every resource gate is checked BEFORE a transaction exists, so a rejected
     // file never touches the store.
@@ -951,7 +951,7 @@ async function pbpEcdictImport(lineIter, stats, opts) {
     // Phase marker: everything above is parsing, everything below is the one
     // transaction. Lets a harness attribute a main-thread stall to the phase
     // that can yield versus the phase that must not.
-    if (o.onPhase) { try { o.onPhase("parsed"); } catch (_) {} }
+    if (o.onPhase) { try { o.onPhase("parsed"); } catch (e) { console.warn("[dict-pack] onPhase callback failed:", e?.name); } }
     const db = await _pbpPackOpenDB();
     await _pbpPackTx(db, "readwrite", (tx) => {
       // Read before clear in the same transaction: replacements retain the
@@ -1017,7 +1017,12 @@ async function pbpEcdictLookupMany(keys) {
       const finish = () => { if (!settled) { settled = true; resolve(out); } };
       let tx;
       try { tx = db.transaction([_PBP_ECDICT_STORE, _PBP_PACK_META], "readonly"); }
-      catch (_) { finish(); return; }
+      catch (e) {
+        console.warn("[dict-pack] ECDICT lookup tx failed:", e?.name);
+        if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "dict", op: "ecdict_tx", code: "idb", errorName: e?.name });
+        finish();
+        return;
+      }
       tx.onabort = tx.onerror = finish;
       tx.oncomplete = finish;
       const metaReq = tx.objectStore(_PBP_PACK_META).get(_PBP_ECDICT_META_ID);
@@ -1031,7 +1036,11 @@ async function pbpEcdictLookupMany(keys) {
         }
       };
     });
-  } catch (_) { return out; }
+  } catch (e) {
+    console.warn("[dict-pack] ECDICT lookup failed:", e?.name);
+    if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "dict", op: "ecdict_lookup", code: "idb", errorName: e?.name });
+    return out;
+  }
 }
 
 /**
@@ -1505,7 +1514,7 @@ async function _pbpMultiCleanup(db) {
 function _pbpMultiNotify(id, action, kind) {
   const detail = { type: "changed", id, action };
   if (kind) detail.kind = kind;
-  try { const channel = new BroadcastChannel("pbp-dict-packs"); channel.postMessage(detail); channel.close(); } catch (_) {}
+  try { const channel = new BroadcastChannel("pbp-dict-packs"); channel.postMessage(detail); channel.close(); } catch (_) { /* swallow-ok: BroadcastChannel unavailable in isolated test contexts */ }
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pbp-dict-packs-changed", { detail }));
 }
 async function pbpDictPackList() {
@@ -1551,7 +1560,7 @@ function pbpYomitanImportFile(file, options = {}) {
   // queues after this install instead of being undone by its eventual commit.
   return navigator.locks.request(_PBP_MULTI_LOCK, { signal: options.signal }, async () => {
     let db, generation, activated = false;
-    const progress = payload => { if (options.onProgress) { try { options.onProgress(payload); } catch (_) {} } };
+    const progress = payload => { if (options.onProgress) { try { options.onProgress(payload); } catch (e) { console.warn("[dict-pack] Yomitan onProgress callback failed:", e?.name); } } };
     try {
       const zip = await _pbpYomitanZip(file, options.signal);
       const manifest = await _pbpYomitanManifest(await _pbpYomitanReadJson(file, zip.entries.find(e => e.kind === "index"), options.signal), options);

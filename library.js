@@ -17,11 +17,11 @@ let _pbpLibSelectHintRetired = false;
 function pbpLibSyncSelectHint(hint, rowCount, selectedCount) {
   if (!hint) return;
   if (!_pbpLibSelectHintRetired) {
-    try { _pbpLibSelectHintRetired = localStorage.getItem(PBP_LIB_SELECT_HINT_KEY) === "1"; } catch (_) {}
+    try { _pbpLibSelectHintRetired = localStorage.getItem(PBP_LIB_SELECT_HINT_KEY) === "1"; } catch (_) { /* swallow-ok: localStorage unavailable */ }
   }
   if (!_pbpLibSelectHintRetired && selectedCount > 0) {
     _pbpLibSelectHintRetired = true;
-    try { localStorage.setItem(PBP_LIB_SELECT_HINT_KEY, "1"); } catch (_) {}
+    try { localStorage.setItem(PBP_LIB_SELECT_HINT_KEY, "1"); } catch (_) { /* swallow-ok: localStorage unavailable */ }
     for (const id of ["vocab-select-hint", "notes-select-hint"]) {
       const el = $id(id);
       if (el) el.hidden = true;
@@ -40,6 +40,7 @@ function pbpLibIsMac() {
     const p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
     return /mac/i.test(p);
   } catch (_) {
+    /* swallow-ok: navigator platform access restricted in sandboxed test realm */
     return false;
   }
 }
@@ -99,7 +100,7 @@ function pbpLibRouteListKey(e) {
   // there is no row for the key to act on.
   if (!row || row.getClientRects().length === 0) return;
   e.preventDefault();
-  try { row.focus({ preventScroll: true }); } catch (_) { row.focus(); }
+  try { row.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ row.focus(); }
   if (document.activeElement !== row) return;
   row.dispatchEvent(new KeyboardEvent("keydown", { key: e.key, code: e.code, bubbles: true, cancelable: true }));
 }
@@ -180,7 +181,7 @@ function _pbpLibApplyView(view, pushHash) {
   // The keyboard-shortcut panel lists the open view's keys.
   const keys = $id("lib-keys");
   if (keys) keys.dataset.view = v;
-  try { localStorage.setItem(PBP_LIB_VIEW_KEY, v); } catch (_) {}
+  try { localStorage.setItem(PBP_LIB_VIEW_KEY, v); } catch (_) { /* swallow-ok: localStorage unavailable */ }
   if (pushHash) history.replaceState(null, "", "#" + v);
   document.dispatchEvent(new CustomEvent("pbp-lib-view", { detail: { view: v } }));
 }
@@ -191,7 +192,7 @@ function _pbpLibInitialView() {
   try {
     const remembered = localStorage.getItem(PBP_LIB_VIEW_KEY);
     if (PBP_LIB_VIEWS.includes(remembered)) return remembered;
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: localStorage unavailable */ }
   return "notes";
 }
 
@@ -342,8 +343,8 @@ function _pbpLibMessagesLang() {
   try {
     if (typeof _i18nMessages !== "undefined" && _i18nMessages &&
         typeof _i18nMessagesLang === "string" && _i18nMessagesLang) return _i18nMessagesLang;
-  } catch (_) {}
-  try { return chrome.i18n.getUILanguage() || ""; } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: lexical global check in isolated test realm */ }
+  try { return chrome.i18n.getUILanguage() || ""; } catch (_) { /* swallow-ok: chrome.i18n unavailable in bare realm */ return ""; }
 }
 function pbpLibCountKey(n, oneKey, otherKey) {
   const value = Number(n);
@@ -422,7 +423,7 @@ function pbpLibQuietCount(host) {
 // malformed stored tag, which throws -- fall back to the browser default
 // rather than losing the date.
 function _pbpLibLocale() {
-  try { return typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : undefined; } catch (_) { return undefined; }
+  try { return typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : undefined; } catch (_) { /* swallow-ok: malformed stored UI locale degrades to default */ return undefined; }
 }
 function _pbpLibDateString(date, method, opts) {
   try {
@@ -772,6 +773,7 @@ function pbpLibDriveLine(status, currentOwner) {
       const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : undefined;
       when = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(status.lastSuccessAt));
     } catch (_) {
+      /* swallow-ok: unsupported Intl locale falls back to default toLocaleString */
       when = new Date(status.lastSuccessAt).toLocaleString();
     }
     return { kind: "ok", text: t("libraryDriveSynced", when) };
