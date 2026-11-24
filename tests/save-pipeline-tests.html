@@ -1154,18 +1154,34 @@ await suite("unified save pipeline", async () => {
 
   await test("background Quick, Read Later, popup-AI, and Batch summary caches always carry captured account", async () => {
     const summaryCacheCalls = [];
-    const cacheSpies = (miss) => ({
+    const makeCacheSpies = (store = null) => ({
       getAICache: async (url, kind, duration, source, account, s) => {
         if (kind === "summary") summaryCacheCalls.push({ op: "get", account, hasSettings: !!s });
-        return miss ? null : (kind === "summary" ? "Cached summary" : ["cached-tag"]);
+        if (store) return store.has(`${kind}:${url}:${account}`) ? store.get(`${kind}:${url}:${account}`) : null;
+        return null;
       },
       setAICache: async (url, kind, value, duration, source, account, s) => {
-        if (kind === "summary") summaryCacheCalls.push({ op: "set", account, hasSettings: !!s });
+        if (kind === "summary") summaryCacheCalls.push({ op: "set", account, hasSettings: !!s, value });
+        if (store) store.set(`${kind}:${url}:${account}`, value);
       },
     });
+    const assertRunSummaryReadAndWrite = (label, fromIdx, expectedValue) => {
+      const slice = summaryCacheCalls.slice(fromIdx);
+      const gets = slice.filter((c) => c.op === "get");
+      const sets = slice.filter((c) => c.op === "set");
+      assert(gets.length >= 1, label + " missed summary cache read: " + JSON.stringify(slice));
+      equal(sets.length, 1, label + " must write summary cache exactly once: " + JSON.stringify(slice));
+      equal(sets[0].value, expectedValue, label + " wrote wrong summary value");
+      assert(slice.every((c) => c.account === "alice"), label + " lost captured account: " + JSON.stringify(slice));
+      assert(slice.every((c) => c.hasSettings), label + " lost settings snapshot: " + JSON.stringify(slice));
+    };
     // 1. Quick Save + Read Later (single + combined)
     for (const toread of [false, true]) {
       for (const both of [false, true]) {
+        const label = (toread ? "Read Later " : "Quick Save ") + (both ? "combined" : "single");
+        const liveStore = !both ? new Map() : null;
+        let aiCalls = 0;
+        const fromIdx = summaryCacheCalls.length;
         const h = await createBackgroundSaveHarness({
           cachedSettings: {
             pinboardToken: "alice:token", bgSaveMode: "merge", optPrivateDefault: false, optPrivateIncognito: false,
@@ -1174,20 +1190,26 @@ await suite("unified save pipeline", async () => {
           deps: {
             hasAIKey: () => true,
             getPageInfoFromTab: async () => ({ pageText: "article body" }),
-            callAI: async () => "AI summary",
+            callAI: async () => { aiCalls++; return "AI summary"; },
             parseAICombined: () => ({ tags: ["t"], summary: "Combined summary" }),
             parseAITags: () => ["t"],
             refineTags: (t) => t,
             buildCombinedPrompt: () => "c",
             buildSummaryPrompt: () => "s",
-            ...cacheSpies(true),
+            ...makeCacheSpies(liveStore),
           },
         });
         await runBackgroundSave(h, { toread });
+        assertRunSummaryReadAndWrite(label, fromIdx, both ? "Combined summary" : "AI summary");
+        if (liveStore) {
+          await runBackgroundSave(h, { toread });
+          equal(aiCalls, 1, label + " second run must reuse written summary cache without paying for AI again");
+        }
       }
     }
     // 2. pbpRunPopupAiCall (worker-executed popup paid call, combined + single)
     for (const mode of ["single", "combined"]) {
+      const fromIdx = summaryCacheCalls.length;
       const sw = await acquireCallerSw();
       sw.win.getCurrentBookmarkAuth = async () => ({ account: "alice", token: "alice:token", epoch: 0 });
       sw.win.loadSettings = async () => ({ ...SETTINGS_DEFAULTS, pinboardToken: "alice:token" });
@@ -1195,15 +1217,22 @@ await suite("unified save pipeline", async () => {
       sw.win.parseAICombined = () => ({ tags: ["t"], summary: "Popup combined summary" });
       sw.win.parseAITags = () => ["t"];
       sw.win.refineTags = (t) => t;
-      Object.assign(sw.win, cacheSpies(true));
+      Object.assign(sw.win, makeCacheSpies());
       const res = await sw.win.pbpRunPopupAiCall({
         account: "alice", url: BASE_INTENT.url, prompt: "p", inflightKey: "k-" + mode, kind: "summary", mode,
       });
       equal(res.ok, true, "popup AI summary call succeeded: " + mode);
+      const slice = summaryCacheCalls.slice(fromIdx);
+      const sets = slice.filter((c) => c.op === "set");
+      equal(sets.length, 1, "popup AI " + mode + " must write summary cache once");
+      equal(sets[0].value, mode === "combined" ? "Popup combined summary" : "Popup summary", "popup AI " + mode + " summary value");
+      assert(slice.every((c) => c.account === "alice" && c.hasSettings), "popup AI " + mode + " cache account/settings");
     }
     // 3. Batch Save (single + combined)
     for (const both of [false, true]) {
-      const swCacheSpies = cacheSpies(true);
+      const label = "Batch " + (both ? "combined" : "single");
+      const fromIdx = summaryCacheCalls.length;
+      const swCacheSpies = makeCacheSpies();
       const b = await createBatchSaveHarness({
         settings: { batchAiTags: both, batchAiSummary: true },
         hasAIKey: true,
@@ -1214,10 +1243,8 @@ await suite("unified save pipeline", async () => {
       sw.win.getAICache = swCacheSpies.getAICache;
       sw.win.setAICache = swCacheSpies.setAICache;
       await b.handleBatchSave(batchTabs(1));
+      assertRunSummaryReadAndWrite(label, fromIdx, both ? "  Combined\n summary  " : "AI summary");
     }
-    assert(summaryCacheCalls.length >= 10, "expected summary cache reads and writes across all 4 entry points");
-    assert(summaryCacheCalls.every((c) => c.account === "alice"), "summary cache call lost captured account: " + JSON.stringify(summaryCacheCalls));
-    assert(summaryCacheCalls.every((c) => c.hasSettings), "summary cache call lost settings snapshot");
   });
 
   await test("delivery create emits explicit replace, shared, and read-later values", async () => {

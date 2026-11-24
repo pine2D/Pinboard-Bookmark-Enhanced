@@ -6,213 +6,122 @@
 </style></head>
 <body>
 <div id="results"></div>
-<div id="fixture" style="display:none">
-  <!-- popup panel controls -->
-  <input type="radio" name="popup-width-preset" value="450">
-  <input type="radio" name="popup-width-preset" value="550">
-  <input type="radio" name="popup-width-preset" value="650">
-  <input type="radio" name="popup-width-preset" value="custom">
-  <input type="number" id="opt-popup-width-custom" value="700">
-  <input type="checkbox" id="opt-urlclean-enabled">
-  <input type="checkbox" id="opt-urlclean-on-open">
-  <input type="checkbox" id="opt-urlclean-on-paste">
-  <input type="checkbox" id="opt-urlclean-aggressive">
-  <textarea id="opt-urlclean-custom">utm_other</textarea>
-  <textarea id="opt-urlclean-exclude">tag</textarea>
-</div>
-<script>
-function pass(name){const d=document.createElement("div");d.className="case pass";d.textContent="OK "+name;document.getElementById("results").appendChild(d);}
-function fail(name,msg){const d=document.createElement("div");d.className="case fail";d.textContent="X "+name+" :: "+msg;document.getElementById("results").appendChild(d);}
-function test(name,fn){try{fn();pass(name);}catch(e){fail(name,e.message);}}
-
-// $id shim (options.js uses shared.js's $id; tests run standalone)
-const $id = (id) => document.getElementById(id);
-
-// ---- copy of applyPanelReset under test (kept in sync with options.js) ----
-// In real options.js this is exported via window.__PBP_applyPanelReset; here we
-// paste the same body so the test runs without chrome/IIFE scaffolding.
-function applyPanelReset(def, qsa) {
-  for (const [id, val] of Object.entries(def.fields || {})) {
-    const el = $id(id); if (!el) continue;
-    if (el.type === "checkbox" || el.type === "radio") el.checked = val;
-    else el.value = val;
-  }
-  for (const [name, val] of Object.entries(def.radios || {})) {
-    const r = qsa(`input[name="${name}"][value="${val}"]`)[0];
-    if (r) r.checked = true;
-  }
-  for (const group of Object.values(def.nested || {})) {
-    for (const [id, dflt] of Object.entries(group)) {
-      const el = $id(id); if (!el) continue;
-      if (el.type === "checkbox") el.checked = !!dflt;
-      else el.value = Array.isArray(dflt) ? dflt.join("\n") : dflt;
-    }
-  }
-}
-const qsa = (sel) => Array.from(document.querySelectorAll(sel));
-
-test("radio group resets to named default value", () => {
-  $id("opt-popup-width-custom"); // ensure fixture present
-  document.querySelector('input[name="popup-width-preset"][value="450"]').checked = true;
-  applyPanelReset({ radios: { "popup-width-preset": "550" } }, qsa);
-  const sel = document.querySelector('input[name="popup-width-preset"]:checked');
-  if (!sel || sel.value !== "550") throw new Error("expected 550 checked, got " + (sel && sel.value));
-});
-test("nested urlClean checkboxes reset to defaults", () => {
-  $id("opt-urlclean-enabled").checked = false;
-  $id("opt-urlclean-on-open").checked = false;
-  applyPanelReset({ nested: { urlClean: {
-    "opt-urlclean-enabled": true, "opt-urlclean-on-open": true,
-    "opt-urlclean-on-paste": true, "opt-urlclean-aggressive": false,
-    "opt-urlclean-custom": [], "opt-urlclean-exclude": []
-  } } }, qsa);
-  if (!$id("opt-urlclean-enabled").checked) throw new Error("enabled should reset to true");
-  if (!$id("opt-urlclean-on-open").checked) throw new Error("on-open should reset to true");
-  if ($id("opt-urlclean-aggressive").checked) throw new Error("aggressive should reset to false");
-});
-test("nested urlClean array textareas reset to empty string", () => {
-  applyPanelReset({ nested: { urlClean: {
-    "opt-urlclean-custom": [], "opt-urlclean-exclude": []
-  } } }, qsa);
-  if ($id("opt-urlclean-custom").value !== "") throw new Error("custom textarea should be empty, got " + JSON.stringify($id("opt-urlclean-custom").value));
-  if ($id("opt-urlclean-exclude").value !== "") throw new Error("exclude textarea should be empty");
-});
-test("popup-width-custom field resets via def.fields", () => {
-  $id("opt-popup-width-custom").value = "700";
-  applyPanelReset({ fields: { "opt-popup-width-custom": "550" } }, qsa);
-  if ($id("opt-popup-width-custom").value !== "550") throw new Error("custom width should reset to 550");
-});
-
-// ---- C2: PANEL_DEFAULTS.popup shape assertions ----
-// Encode the expected target shape; in real options.js this will be exported as
-// window.__PBP_PANEL_DEFAULTS.popup after C2 implementation.
-const POPUP_DEF = {
-  fields: {
-    "opt-check-bookmark-status": true, "opt-auto-close": true, "offline-queue-enabled": true,
-    "opt-show-search": false, "opt-show-recent": false, "opt-show-badge": false,
-    "opt-show-suggest-tags": true, "opt-show-ai-summary": true, "opt-show-ai-tags": true,
-    "opt-show-quick-links": true, "opt-show-quick-row": true,
-    "opt-popup-width-custom": "550"
-  },
-  radios: { "popup-width-preset": "550" },
-  nested: { urlClean: {
-    "opt-urlclean-enabled": true, "opt-urlclean-on-open": true, "opt-urlclean-on-paste": true,
-    "opt-urlclean-aggressive": false, "opt-urlclean-custom": [], "opt-urlclean-exclude": []
-  } }
-};
-test("popup def covers popup-width radio group", () => {
-  if (!POPUP_DEF.radios || POPUP_DEF.radios["popup-width-preset"] !== "550")
-    throw new Error("popup-width-preset default must be 550");
-});
-test("popup def covers all 6 urlClean controls", () => {
-  const ids = Object.keys(POPUP_DEF.nested.urlClean);
-  for (const need of ["opt-urlclean-enabled","opt-urlclean-on-open","opt-urlclean-on-paste",
-                      "opt-urlclean-aggressive","opt-urlclean-custom","opt-urlclean-exclude"])
-    if (!ids.includes(need)) throw new Error("missing urlClean control: " + need);
-});
-test("applyPanelReset on popup def clears tracking params + restores width", () => {
-  document.querySelector('input[name="popup-width-preset"][value="450"]').checked = true;
-  $id("opt-urlclean-custom").value = "utm_other\nfoo";
-  applyPanelReset(POPUP_DEF, qsa);
-  if (document.querySelector('input[name="popup-width-preset"]:checked').value !== "550")
-    throw new Error("width not reset to 550");
-  if ($id("opt-urlclean-custom").value !== "") throw new Error("custom params not cleared");
-});
-
-// ---- C3: bookmarks panel resets tag-sync-mode radio ----
-</script>
-<div id="fixture-bookmarks" style="display:none">
-  <input type="radio" name="tag-sync-mode" value="cached">
-  <input type="radio" name="tag-sync-mode" value="fresh">
-  <input type="radio" name="tag-sync-mode" value="prewarmed">
-</div>
-<script>
-test("bookmarks def resets tag-sync-mode to cached", () => {
-  document.querySelector('input[name="tag-sync-mode"][value="prewarmed"]').checked = true;
-  applyPanelReset({ radios: { "tag-sync-mode": "cached" } }, qsa);
-  const sel = document.querySelector('input[name="tag-sync-mode"]:checked');
-  if (!sel || sel.value !== "cached") throw new Error("tag-sync-mode not reset to cached, got " + (sel && sel.value));
-});
-// ---- C4: AI panel resets ai-content-source radio + opt-ai-tag-lang select ----
-</script>
-<div id="fixture-ai" style="display:none">
-  <input type="checkbox" id="opt-ai-use-transcript">
-  <input type="radio" name="ai-content-source" value="local">
-  <input type="radio" name="ai-content-source" value="jina">
-  <select id="opt-ai-tag-lang"><option value="auto"></option><option value="en"></option><option value="ja"></option></select>
-</div>
-<script>
-test("ai def resets opt-ai-use-transcript to checked (T7.13)", () => {
-  const box = document.getElementById("opt-ai-use-transcript");
-  box.checked = false;
-  applyPanelReset({ fields: { "opt-ai-use-transcript": true } }, qsa);
-  if (!box.checked) throw new Error("opt-ai-use-transcript not reset to checked");
-});
-test("ai def resets ai-content-source to local", () => {
-  document.querySelector('input[name="ai-content-source"][value="jina"]').checked = true;
-  applyPanelReset({ radios: { "ai-content-source": "local" } }, qsa);
-  const sel = document.querySelector('input[name="ai-content-source"]:checked');
-  if (!sel || sel.value !== "local") throw new Error("content-source not reset to local, got " + (sel && sel.value));
-});
-test("ai def resets opt-ai-tag-lang to en", () => {
-  $id("opt-ai-tag-lang").value = "ja";
-  applyPanelReset({ fields: { "opt-ai-tag-lang": "en" } }, qsa);
-  if ($id("opt-ai-tag-lang").value !== "en") throw new Error("tag-lang not reset to en, got " + $id("opt-ai-tag-lang").value);
-});
-// ---- C5: appearance panel clears custom-overlay CSS and resets tag-sort toggle ----
-</script>
-<div id="fixture-appearance" style="display:none">
-  <textarea id="opt-custom-css">body { display:none }</textarea>
-  <input type="checkbox" id="opt-tag-sort-by-pop">
-</div>
-<script>
-// opt-tag-sort-by-pop is NOT part of the real appearance def (options.js) --
-// it lives on the tags panel (PANEL_DEFAULTS.tags). This copy used to include
-// it (drift caught by K168's structural check below); TAGS_DEF is the correct
-// home for the reset-to-on assertion.
-const APPEARANCE_DEF = {
-  fields: {
-    "opt-theme": "auto", "opt-popup-follow-theme": true, "opt-custom-font": "",
-    "opt-custom-css": ""
-  }
-};
-const TAGS_DEF = { fields: { "opt-tag-sort-by-pop": true } };
-test("appearance def clears custom-overlay CSS", () => {
-  $id("opt-custom-css").value = "body { display:none }";
-  applyPanelReset(APPEARANCE_DEF, qsa);
-  if ($id("opt-custom-css").value !== "") throw new Error("custom CSS not cleared, got " + JSON.stringify($id("opt-custom-css").value));
-});
-test("tags def resets tag-sort-by-pop to on", () => {
-  $id("opt-tag-sort-by-pop").checked = false;
-  applyPanelReset(TAGS_DEF, qsa);
-  if (!$id("opt-tag-sort-by-pop").checked) throw new Error("tag-sort toggle not reset to on");
-});
-// NOTE: the "shipped PANEL_DEFAULTS coverage" assertion (reading
-// window.__PBP_PANEL_DEFAULTS) belongs to Task C6, which loads the real
-// shipped defaults; it cannot run in this bare page (no options.js context).
-</script>
-
-<!-- ---- K168: reset-authored whitelist must resolve against the real
-     PANEL_DEFAULTS/RESET_AUTHORED_IDS in options.js, not a hand copy (the
-     opt-tag-sort-by-pop drift above is exactly the failure mode this guards
-     against). This page has no options.js execution context (its whole body
-     lives inside a DOMContentLoaded closure that expects the real
-     options.html DOM + chrome APIs), so instead of evaluating the file it
-     fetches the source text and extracts just the two self-contained literal
-     declarations by brace/bracket matching, then evals each literal in
-     isolation. PANEL_DEFAULTS.appearance.after is an uninvoked arrow function
-     referencing applyPreset(), which is fine to eval as long as it is never
-     called. -->
 <script src="fixtures/chrome-mock.js"></script>
 <script src="fixtures/sw-realm.js"></script>
 <script>
+let passCount = 0, failCount = 0;
+function pass(name){passCount++;const d=document.createElement("div");d.className="case pass";d.textContent="OK "+name;document.getElementById("results").appendChild(d);}
+function fail(name,msg){failCount++;const d=document.createElement("div");d.className="case fail";d.textContent="X "+name+" :: "+msg;document.getElementById("results").appendChild(d);}
+async function test(name,fn){try{await fn();pass(name);}catch(e){fail(name,e && e.message || String(e));}}
+
 (async () => {
   const realm = await pbpSwRealm.bootOptions();
   try {
+    const doc = realm.doc;
+    const $id = (id) => doc.getElementById(id);
+    const applyPanelReset = realm.win.__PBP_applyPanelReset;
     const panelDefaults = realm.win.__PBP_PANEL_DEFAULTS;
     const authoredIds = realm.win.__PBP_RESET_AUTHORED_IDS;
-    test("K168: reset-authored whitelist ids resolve in the real PANEL_DEFAULTS fields/nested", () => {
-      if (!panelDefaults || typeof panelDefaults !== "object") throw new Error("PANEL_DEFAULTS missing on booted options realm");
+    if (typeof applyPanelReset !== "function") throw new Error("__PBP_applyPanelReset missing on booted options realm");
+    if (!panelDefaults || typeof panelDefaults !== "object") throw new Error("__PBP_PANEL_DEFAULTS missing on booted options realm");
+
+    await test("radio group resets to named default value", () => {
+      doc.querySelector('input[name="popup-width-preset"][value="450"]').checked = true;
+      applyPanelReset(panelDefaults.popup, doc);
+      const sel = doc.querySelector('input[name="popup-width-preset"]:checked');
+      if (!sel || sel.value !== "550") throw new Error("expected 550 checked, got " + (sel && sel.value));
+    });
+
+    await test("nested urlClean checkboxes reset to defaults", () => {
+      $id("opt-urlclean-enabled").checked = false;
+      $id("opt-urlclean-on-open").checked = false;
+      $id("opt-urlclean-aggressive").checked = true;
+      applyPanelReset(panelDefaults.popup, doc);
+      if (!$id("opt-urlclean-enabled").checked) throw new Error("enabled should reset to true");
+      if (!$id("opt-urlclean-on-open").checked) throw new Error("on-open should reset to true");
+      if ($id("opt-urlclean-aggressive").checked) throw new Error("aggressive should reset to false");
+    });
+
+    await test("nested urlClean array textareas reset to empty string", () => {
+      $id("opt-urlclean-custom").value = "utm_other";
+      $id("opt-urlclean-exclude").value = "tag";
+      applyPanelReset(panelDefaults.popup, doc);
+      if ($id("opt-urlclean-custom").value !== "") throw new Error("custom textarea should be empty, got " + JSON.stringify($id("opt-urlclean-custom").value));
+      if ($id("opt-urlclean-exclude").value !== "") throw new Error("exclude textarea should be empty");
+    });
+
+    await test("popup-width-custom field resets via def.fields", () => {
+      $id("opt-popup-width-custom").value = "700";
+      applyPanelReset(panelDefaults.popup, doc);
+      if ($id("opt-popup-width-custom").value !== "") throw new Error("custom width should reset to empty string, got " + JSON.stringify($id("opt-popup-width-custom").value));
+    });
+
+    await test("popup def covers popup-width radio group", () => {
+      if (!panelDefaults.popup?.radios || panelDefaults.popup.radios["popup-width-preset"] !== "550")
+        throw new Error("popup-width-preset default must be 550");
+    });
+
+    await test("popup def covers all 6 urlClean controls", () => {
+      const ids = Object.keys(panelDefaults.popup?.nested?.urlClean || {});
+      for (const need of ["opt-urlclean-enabled","opt-urlclean-on-open","opt-urlclean-on-paste",
+                          "opt-urlclean-aggressive","opt-urlclean-custom","opt-urlclean-exclude"])
+        if (!ids.includes(need)) throw new Error("missing urlClean control: " + need);
+    });
+
+    await test("applyPanelReset on popup def clears tracking params + restores width", () => {
+      doc.querySelector('input[name="popup-width-preset"][value="450"]').checked = true;
+      $id("opt-urlclean-custom").value = "utm_other\nfoo";
+      applyPanelReset(panelDefaults.popup, doc);
+      if (doc.querySelector('input[name="popup-width-preset"]:checked').value !== "550")
+        throw new Error("width not reset to 550");
+      if ($id("opt-urlclean-custom").value !== "") throw new Error("custom params not cleared");
+    });
+
+    await test("bookmarks def resets tag-sync-mode to cached", () => {
+      doc.querySelector('input[name="tag-sync-mode"][value="prewarmed"]').checked = true;
+      applyPanelReset(panelDefaults.bookmarks, doc);
+      const sel = doc.querySelector('input[name="tag-sync-mode"]:checked');
+      if (!sel || sel.value !== "cached") throw new Error("tag-sync-mode not reset to cached, got " + (sel && sel.value));
+    });
+
+    await test("ai-behavior def resets opt-ai-use-transcript to checked (T7.13)", () => {
+      const box = $id("opt-ai-use-transcript");
+      box.checked = false;
+      applyPanelReset(panelDefaults["ai-behavior"], doc);
+      if (!box.checked) throw new Error("opt-ai-use-transcript not reset to checked");
+    });
+
+    await test("ai-behavior def resets ai-content-source to local", () => {
+      doc.querySelector('input[name="ai-content-source"][value="jina"]').checked = true;
+      applyPanelReset(panelDefaults["ai-behavior"], doc);
+      const sel = doc.querySelector('input[name="ai-content-source"]:checked');
+      if (!sel || sel.value !== "local") throw new Error("content-source not reset to local, got " + (sel && sel.value));
+    });
+
+    await test("ai-behavior def resets opt-ai-tag-lang to en and ai def keeps API keys", () => {
+      $id("opt-ai-tag-lang").value = "ja";
+      $id("opt-ai-provider").value = "openai";
+      $id("opt-openai-key").value = "sk-keep-me";
+      applyPanelReset(panelDefaults["ai-behavior"], doc);
+      applyPanelReset(panelDefaults.ai, doc);
+      if ($id("opt-ai-tag-lang").value !== "en") throw new Error("tag-lang not reset to en, got " + $id("opt-ai-tag-lang").value);
+      if ($id("opt-ai-provider").value !== "gemini") throw new Error("ai provider not reset to gemini, got " + $id("opt-ai-provider").value);
+      if ($id("opt-openai-key").value !== "sk-keep-me") throw new Error("ai reset wiped skipped secret key");
+    });
+
+    await test("appearance def clears custom-overlay CSS", () => {
+      $id("opt-custom-css").value = "body { display:none }";
+      applyPanelReset(panelDefaults.appearance, doc);
+      if ($id("opt-custom-css").value !== "") throw new Error("custom CSS not cleared, got " + JSON.stringify($id("opt-custom-css").value));
+    });
+
+    await test("tags def resets tag-sort-by-pop to on", () => {
+      $id("opt-tag-sort-by-pop").checked = false;
+      applyPanelReset(panelDefaults.tags, doc);
+      if (!$id("opt-tag-sort-by-pop").checked) throw new Error("tag-sort toggle not reset to on");
+    });
+
+    await test("K168: reset-authored whitelist ids resolve in the real PANEL_DEFAULTS fields/nested", () => {
       if (!Array.isArray(authoredIds) || !authoredIds.length) throw new Error("RESET_AUTHORED_IDS missing or empty");
       const known = new Set();
       for (const def of Object.values(panelDefaults)) {
@@ -226,9 +135,11 @@ test("tags def resets tag-sort-by-pop to on", () => {
     });
   } finally {
     realm.dispose();
+    document.title = (failCount ? "FAIL" : "PASS") + " Options Reset Tests";
   }
 })().catch((error) => {
-  fail("K168: reset-authored whitelist ids resolve in the real PANEL_DEFAULTS fields/nested", error && error.message || String(error));
+  fail("Options Reset Tests bootstrap", error && error.message || String(error));
+  document.title = "FAIL Options Reset Tests";
 });
 </script>
 </body></html>

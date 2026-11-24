@@ -1064,8 +1064,8 @@ async function runDictLookupChainTests() {
   window.pbpAiCacheGet = async (key) => cache.has(key) ? { result: cache.get(key) } : null;
   window.pbpAiCacheSet = async (key, result) => { cache.set(key, result); };
   _pbpDictHasPerm = async () => true;
-  const realOnLineDesc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator), "onLine")
-    || Object.getOwnPropertyDescriptor(navigator, "onLine");
+  const hadOwnOnLine = Object.prototype.hasOwnProperty.call(navigator, "onLine");
+  const realOwnOnLineDesc = hadOwnOnLine ? Object.getOwnPropertyDescriptor(navigator, "onLine") : null;
   Object.defineProperty(navigator, "onLine", { configurable: true, get: () => true });
   const dataFor = (word) => ({ ...FDA_SAMPLE, word, source: { ...FDA_SAMPLE.source, url: "https://en.wiktionary.org/wiki/" + encodeURIComponent(word) } });
   try {
@@ -1118,9 +1118,10 @@ async function runDictLookupChainTests() {
     assert(slot.textContent.includes("dictNoEntry") && slot.querySelector("a").href === "https://en.wiktionary.org/wiki/ghost%20word",
       "all semantic misses end as no-entry with an encoded fixed-domain fallback");
   } finally {
-    delete navigator.onLine;
-    if (realOnLineDesc && Object.prototype.hasOwnProperty.call(navigator, "onLine")) {
-      Object.defineProperty(navigator, "onLine", realOnLineDesc);
+    if (hadOwnOnLine && realOwnOnLineDesc) {
+      Object.defineProperty(navigator, "onLine", realOwnOnLineDesc);
+    } else {
+      delete navigator.onLine;
     }
     _pbpDictHasPerm = realPerm;
     _pbpDictFetch = realFetch;

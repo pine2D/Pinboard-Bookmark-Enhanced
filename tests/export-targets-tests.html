@@ -513,6 +513,7 @@ async function runOptionsTestButtonDeadlineTests() {
 
   const capturedSignals = [];
   const capturedUrls = [];
+  const timeoutDurations = [];
   const realm = await pbpSwRealm.bootOptions({
     mock: {
       userGesture: true,
@@ -527,13 +528,26 @@ async function runOptionsTestButtonDeadlineTests() {
         },
       },
     },
-    fetch: async (input, init) => {
+    beforeScripts(win) {
+      const origTimeout = win.AbortSignal.timeout.bind(win.AbortSignal);
+      win.AbortSignal.timeout = (ms) => {
+        timeoutDurations.push(ms);
+        return origTimeout(ms === 20000 ? 25 : ms);
+      };
+    },
+    fetch: (input, init) => {
       const href = String(input || "");
       const m = href.match(/\/(_locales\/[^/]+\/messages\.json)$/);
       if (m) return fetch("../" + m[1]);
       capturedUrls.push(href);
-      capturedSignals.push(init && init.signal);
-      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      const signal = init && init.signal;
+      capturedSignals.push(signal);
+      return new Promise((_, reject) => {
+        if (!signal) return;
+        const onAbort = () => reject(signal.reason || new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+        if (signal.aborted) onAbort();
+        else signal.addEventListener("abort", onAbort, { once: true });
+      });
     },
   });
   try {
@@ -542,12 +556,15 @@ async function runOptionsTestButtonDeadlineTests() {
     assert(!!githubCard && !!testBtn, "options renders the GitHub Gist card and its Test button");
     const testStatus = testBtn.nextElementSibling;
     testBtn.click();
-    await new Promise((r) => setTimeout(r, 40));
+    const deadline = performance.now() + 1000;
+    while (testBtn.disabled && performance.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 15));
+    }
 
     assert(capturedUrls.includes("https://api.github.com/user"),
       "handler still calls row.precheckRequest the same way as the send path (md-export-send.js)");
-    assert(capturedSignals.length >= 1 && capturedSignals[0] && typeof capturedSignals[0].aborted === "boolean",
-      "K49: the precheck fetch carries an AbortSignal deadline so a hung endpoint cannot leave the button stuck");
+    assert(timeoutDurations[0] === 20000 && capturedSignals[0]?.aborted === true && capturedSignals[0]?.reason?.name === "TimeoutError",
+      "K49: the precheck fetch passes AbortSignal.timeout(20000) and aborts a hung endpoint with TimeoutError");
     assert(testStatus.classList.contains("err") && testStatus.textContent === realm.win.t("mdSendTestDown"),
       "K49: a TimeoutError thrown by the 20s deadline renders mdSendTestDown with .err");
     assert(testBtn.disabled === false && !testBtn.hasAttribute("aria-busy"),

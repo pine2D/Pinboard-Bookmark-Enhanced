@@ -403,89 +403,180 @@ test("linkding reconnect reuses the connection ID only for the same URL and toke
 });
 
 // Exercise the real worker save/replay pipeline with raw server fixtures.
-let workerSource;
+let _sharedWorkerRealmPromise = null;
+async function getSharedWorkerRealm() {
+  if (_sharedWorkerRealmPromise) return _sharedWorkerRealmPromise;
+  _sharedWorkerRealmPromise = (async () => {
+    const sw = await pbpSwRealm.boot();
+    sw.win.console.warn = (...args) => console.warn(...args);
+    sw.win.console.error = (...args) => console.error(...args);
+    sw.win.Date.now = () => Date.now();
+    const real = {
+      submitSaveIntent: sw.win.submitSaveIntent,
+      submitPopupSaveIntent: sw.win.submitPopupSaveIntent,
+      sendOfflineItem: sw.win.sendOfflineItem,
+      fetchExistingBookmark: sw.win.fetchExistingBookmark,
+      pbpCheckOverlongTitle: sw.win.pbpCheckOverlongTitle,
+      pbpVerifyBookmarkConnection: sw.win.pbpVerifyBookmarkConnection,
+      processOfflineQueue: sw.win.processOfflineQueue,
+      retryOfflineItem: sw.win.retryOfflineItem,
+      pbpOfflinePauseOnCredentialChange: sw.win.pbpOfflinePauseOnCredentialChange,
+      pbpReadOfflineQueuePause: sw.win.pbpReadOfflineQueuePause,
+      pbpBookmarkClient: sw.win.pbpBookmarkClient,
+      mutateOfflineQueue: sw.win.mutateOfflineQueue,
+      pbpReadTagVocab: sw.win.pbpReadTagVocab,
+      pbpLoadTagVocab: sw.win.pbpLoadTagVocab,
+      saveFromBackground: sw.win.saveFromBackground,
+      handleBatchSave: sw.win.handleBatchSave,
+      pbpStatusCacheFormPosts: sw.win.pbpStatusCacheFormPosts,
+    };
+    return { sw, real };
+  })();
+  return _sharedWorkerRealmPromise;
+}
+
 async function workerHarness(service, replies, options = {}) {
-  workerSource ||= await (await fetch("../background.js")).text();
-  const start = workerSource.indexOf("const PBP_SAVE_MODES");
-  const end = workerSource.indexOf("// ---- P1: Shared save function ----", start);
+  const { sw, real } = await getSharedWorkerRealm();
   const settings = {...SETTINGS_DEFAULTS, bookmarkService:service, pinboardToken:"", offlineQueueEnabled:true,
     [service + "Url"]:"https://bookmarks.example/base/", [service + "Token"]:JSON.stringify({v:1,baseUrl:"https://bookmarks.example/base/",token:"fixture-secret",connectionId:"connection1",userId:"user1"})};
   const state = {settings, epoch:0, permitted:true, calls:[], queue:[], local:{}, sends:0, cache:new Map(), sideEffects:[], notifications:[], ...options};
   const auth = async () => ({...pbpBookmarkConnection(settings), epoch:state.epoch});
-  const deps = {
-    console, t:key=>key, statusCache:state.cache,
-    loadSettings:async()=>({...settings}), getCurrentBookmarkAuth:auth,
-    pbpCaptureBookmarkAuth:value=>({...pbpBookmarkConnection(typeof value === "object" ? value : {pinboardToken:value}),epoch:state.epoch}),
-    pbpBookmarkAuthIsCurrent:a=>!!a?.account && a.epoch===state.epoch,
-    pbpReadFreshBookmarkAuthForAccount:async account=>{const a=await auth();return a.account===account?a:null;},
-    pbpStatusCacheGet:(url,a)=>state.cache.get(url)?.account===a.account?state.cache.get(url):null,
-    pbpStatusCacheSet:(url,a,data)=>{if(a.epoch!==state.epoch)return false;state.cache.set(url,{...data,account:a.account});return true;},
-    pbpStatusCacheDelete:url=>state.cache.delete(url),
-    PBP_TAG_VOCAB_STALE_CEILING, pbpTagVocabIndex, pbpTagGroupKey, pbpAlignTagName,
-    setIcon:()=>{}, updateBadge:async()=>{}, pbpWaybackArchive:async(url,settings,options)=>state.sideEffects.push({type:"wayback",options}),
-    persistSettings:async patch=>{Object.assign(settings,patch);return {ok:true};},
-    pinboardFetch:async()=>{throw new Error("unexpected Pinboard request");},
-    pbpCreateBookmarkServiceClient:config=>pbpCreateBookmarkServiceClient({...config,fetchImpl:async(url, init)=>{
-      state.calls.push({url,...init,body:init.body?JSON.parse(init.body):undefined});
-      if (state.beforeResponse) await state.beforeResponse();
-      const next=replies.shift(); if(next instanceof Error)throw next;
-      if(!next)throw new Error("unexpected API request");
-      if(next instanceof Response||typeof next.type==="string")return next;
-      return new Response(next[0]===204?null:JSON.stringify(next[1]),{status:next[0],headers:{"Content-Type":"application/json"}});
-    }}),
-    // noteActivity runs once per replay attempt, so it counts sendOfflineItem calls.
-    noteActivity:()=>{state.sends++;},
-    // tabs: what tabs.query answers; sendMessage records each message to
-    // another extension and fails with state.sendMessageError when set, or
-    // never answers with state.sendMessageHang.
-    chrome:{permissions:{contains:async()=>state.permitted},tabs:{query:async()=>state.tabs||[]},
-      runtime:{sendMessage:async(...args)=>{(state.messages||=[]).push(args);if(state.sendMessageHang)return new Promise(()=>{});if(state.sendMessageError)throw state.sendMessageError;}},storage:{local:{
-      // Generic key-value store; offlineQueue stays mirrored in state.queue.
-      get:async keys=>{(state.reads||=[]).push(...(typeof keys==="string"||Array.isArray(keys)?[].concat(keys):keys==null?["<all>"]:Object.keys(keys)));
-        const all={...state.local,offlineQueue:state.queue};if(keys==null)return all;
-        if(typeof keys==="object"&&!Array.isArray(keys))return Object.fromEntries(Object.keys(keys).map(k=>[k,all[k]!==undefined?all[k]:keys[k]]));
-        return Object.fromEntries([].concat(keys).filter(k=>all[k]!==undefined).map(k=>[k,all[k]]));},
-      set:async value=>{for(const [k,v] of Object.entries(value)){if(k==="offlineQueue")state.queue=v;else state.local[k]=v;}},
-      remove:async keys=>{for(const k of [].concat(keys)){if(k==="offlineQueue")state.queue=[];else delete state.local[k];}}
-    }}}
+  const harnessChrome = {
+    ...sw.mock.chrome,
+    permissions:{
+      ...sw.mock.chrome.permissions,
+      contains:async()=>state.permitted,
+    },
+    tabs:{
+      ...sw.mock.chrome.tabs,
+      query:async()=>state.tabs||[],
+    },
+    runtime:{
+      ...sw.mock.chrome.runtime,
+      sendMessage:async(...args)=>{(state.messages||=[]).push(args);if(state.sendMessageHang)return new Promise(()=>{});if(state.sendMessageError)throw state.sendMessageError;},
+    },
+    storage:{
+      ...sw.mock.chrome.storage,
+      local:{
+        // Generic key-value store; offlineQueue stays mirrored in state.queue.
+        get:async keys=>{(state.reads||=[]).push(...(typeof keys==="string"||Array.isArray(keys)?[].concat(keys):keys==null?["<all>"]:Object.keys(keys)));
+          const all={...state.local,offlineQueue:state.queue};if(keys==null)return all;
+          if(typeof keys==="object"&&!Array.isArray(keys))return Object.fromEntries(Object.keys(keys).map(k=>[k,all[k]!==undefined?all[k]:keys[k]]));
+          return Object.fromEntries([].concat(keys).filter(k=>all[k]!==undefined).map(k=>[k,all[k]]));},
+        set:async value=>{for(const [k,v] of Object.entries(value)){if(k==="offlineQueue")state.queue=v;else state.local[k]=v;}},
+        remove:async keys=>{for(const k of [].concat(keys)){if(k==="offlineQueue")state.queue=[];else delete state.local[k];}},
+      },
+    },
   };
-  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,submitPopupSaveIntent,sendOfflineItem,fetchExistingBookmark,pbpCheckOverlongTitle,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient,mutateOfflineQueue,pbpReadTagVocab,pbpLoadTagVocab};")(...Object.values(deps));
-  return {...api,state,auth,chrome:deps.chrome};
+
+  const installWorkerEnv = () => {
+    sw.win.t = key => key;
+    sw.win.loadSettings = async () => ({ ...settings });
+    sw.win.getCurrentBookmarkAuth = auth;
+    sw.win.pbpCaptureBookmarkAuth = value => ({ ...pbpBookmarkConnection(typeof value === "object" ? value : { pinboardToken: value }), epoch: state.epoch });
+    sw.win.pbpBookmarkAuthIsCurrent = a => !!a?.account && a.epoch === state.epoch;
+    sw.win.pbpReadFreshBookmarkAuthForAccount = async account => { const a = await auth(); return a.account === account ? a : null; };
+    sw.win.pbpStatusCacheGet = (url, a) => state.cache.get(url)?.account === a.account ? state.cache.get(url) : null;
+    sw.win.pbpStatusCacheSet = (url, a, data) => { if (a.epoch !== state.epoch) return false; state.cache.set(url, { ...data, account: a.account }); return true; };
+    sw.win.pbpStatusCacheDelete = url => state.cache.delete(url);
+    sw.win.setIcon = () => {};
+    sw.win.updateBadge = async () => {};
+    sw.win.pbpWaybackArchive = async (url, _settings, wbOpts) => state.sideEffects.push({ type: "wayback", options: wbOpts });
+    sw.win.persistSettings = async patch => { Object.assign(settings, patch); return { ok: true }; };
+    sw.win.pinboardFetch = async () => { throw new Error("unexpected Pinboard request"); };
+    sw.win.pbpCreateBookmarkServiceClient = config => pbpCreateBookmarkServiceClient({ ...config, fetchImpl: async (url, init) => {
+      state.calls.push({ url, ...init, body: init.body ? JSON.parse(init.body) : undefined });
+      if (state.beforeResponse) await state.beforeResponse();
+      const next = replies.shift(); if (next instanceof Error) throw next;
+      if (!next) throw new Error("unexpected API request");
+      if (next instanceof Response || typeof next.type === "string") return next;
+      return new Response(next[0] === 204 ? null : JSON.stringify(next[1]), { status: next[0], headers: { "Content-Type": "application/json" } });
+    } });
+    // noteActivity runs once per replay attempt, so it counts sendOfflineItem calls.
+    sw.win.noteActivity = () => { state.sends++; };
+    sw.win.chrome = harnessChrome;
+    sw.win.submitSaveIntent = real.submitSaveIntent;
+    sw.win.fetchExistingBookmark = real.fetchExistingBookmark;
+    sw.win.pbpCheckOverlongTitle = real.pbpCheckOverlongTitle;
+    sw.win.pbpLoadTagVocab = real.pbpLoadTagVocab;
+    sw.win.processOfflineQueue = real.processOfflineQueue;
+  };
+
+  const runInWorker = (fn) => {
+    installWorkerEnv();
+    return fn();
+  };
+
+  return {
+    submitSaveIntent: (...args) => runInWorker(() => real.submitSaveIntent(...args)),
+    submitPopupSaveIntent: (...args) => runInWorker(() => real.submitPopupSaveIntent(...args)),
+    sendOfflineItem: (...args) => runInWorker(() => real.sendOfflineItem(...args)),
+    fetchExistingBookmark: (...args) => runInWorker(() => real.fetchExistingBookmark(...args)),
+    pbpCheckOverlongTitle: (...args) => runInWorker(() => real.pbpCheckOverlongTitle(...args)),
+    verifyConnection: (...args) => runInWorker(() => real.pbpVerifyBookmarkConnection(...args)),
+    processOfflineQueue: (...args) => runInWorker(() => real.processOfflineQueue(...args)),
+    retryOfflineItem: (...args) => runInWorker(() => real.retryOfflineItem(...args)),
+    pbpOfflinePauseOnCredentialChange: (...args) => runInWorker(() => real.pbpOfflinePauseOnCredentialChange(...args)),
+    readPause: (...args) => runInWorker(() => real.pbpReadOfflineQueuePause(...args)),
+    client: (...args) => runInWorker(() => real.pbpBookmarkClient(...args)),
+    mutateOfflineQueue: (...args) => runInWorker(() => real.mutateOfflineQueue(...args)),
+    pbpReadTagVocab: (...args) => runInWorker(() => real.pbpReadTagVocab(...args)),
+    pbpLoadTagVocab: (...args) => runInWorker(() => real.pbpLoadTagVocab(...args)),
+    state,
+    auth,
+    chrome: harnessChrome,
+    _installWorkerEnv: installWorkerEnv,
+  };
 }
 const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"work",private:true,toread:false};
 // The real quick-save and Batch producers from background.js, handing their
 // intents and delivery options to a worker harness. Every summary is fresh, as
 // when the AI cache has nothing (left) for the page.
 async function producers(h, {autoNotes, summary, settings: overrides = {}, realVocab = false}) {
-  workerSource ||= await (await fetch("../background.js")).text();
-  const slice = (from, to) => {
-    const start = workerSource.indexOf(from), end = workerSource.indexOf(to, start);
-    if (start < 0 || end <= start) throw new Error("producer source not found: " + from);
-    return workerSource.slice(start, end);
-  };
+  const { sw, real } = await getSharedWorkerRealm();
   const settings = {...h.state.settings, bgSaveMode:"merge", _defaultTags:"", _autoNotes:true, _blockquote:false, _aiTags:false, _aiSummary:true,
     batchAiSummary:true, batchAiTags:false, optBatchTagEnabled:false, batchSkipExisting:false, waybackArchiveBatch:false, ...overrides};
-  const deps = {
-    loadSettings:async()=>({...settings}), getCurrentBookmarkAuth:h.auth, submitSaveIntent:(...args)=>h.submitSaveIntent(...args),
-    fetchExistingBookmark:(...args)=>h.fetchExistingBookmark(...args), pbpCheckOverlongTitle:(...args)=>h.pbpCheckOverlongTitle(...args),
-    hasAIKey:()=>true, buildAutoNotes:()=>autoNotes,
-    getAICache:async()=>null, setAICache:async()=>{}, callAI:async()=>{h.state.aiCalls=(h.state.aiCalls||0)+1;return summary;}, buildSummaryPrompt:()=>"summary prompt",
-    getPageInfoFromTab:async()=>{h.state.extractions=(h.state.extractions||0)+1;return {pageText:"article body"};},
-    pbpLoadTagVocab:realVocab ? h.pbpLoadTagVocab : async account=>({account,timestamp:undefined,counts:null,index:null}),
-    pbpServiceEffectivePrivate:()=>true, pbpNotesDescription:()=>"", pbpPageInfoReadable:info=>!!info&&info._pbpUnavailable!==true&&["","text/html","application/xhtml+xml"].includes(String(info.contentType||"").split(";")[0].trim()),
-    showNotification:(...args)=>h.state.notifications.push(args), t:(key,...args)=>args.length?key+":"+args.join(":"):key,
-    pbpI18nReady:async()=>{}, processOfflineQueue:async()=>{}, updateBadge:async()=>{},
-    _newBatchRunId:()=>"run-1", _removeBatchRecordIfOwned:async()=>true, _writeBatchProgress:async row=>{(h.state.progress||=[]).push(row);},
-    chrome:realVocab ? h.chrome : {permissions:h.chrome.permissions,storage:{local:{get:async()=>({}),set:async()=>{}}}},
+  const producerChrome = realVocab
+    ? h.chrome
+    : { ...sw.mock.chrome, permissions: h.chrome.permissions, storage: { ...sw.mock.chrome.storage, local: { get: async () => ({}), set: async () => {}, remove: async () => {} } } };
+  const callHarness = (fn) => Promise.resolve().then(fn).finally(applyProducerEnv);
+  function applyProducerEnv() {
+    sw.win.loadSettings = async () => ({ ...settings });
+    sw.win.getCurrentBookmarkAuth = h.auth;
+    sw.win.submitSaveIntent = (...args) => callHarness(() => h.submitSaveIntent(...args));
+    sw.win.fetchExistingBookmark = (...args) => callHarness(() => h.fetchExistingBookmark(...args));
+    sw.win.pbpCheckOverlongTitle = (...args) => callHarness(() => h.pbpCheckOverlongTitle(...args));
+    sw.win.hasAIKey = () => true;
+    sw.win.buildAutoNotes = () => autoNotes;
+    sw.win.getAICache = async () => null;
+    sw.win.setAICache = async () => {};
+    sw.win.callAI = async () => { h.state.aiCalls = (h.state.aiCalls || 0) + 1; return summary; };
+    sw.win.buildSummaryPrompt = () => "summary prompt";
+    sw.win.getPageInfoFromTab = async () => { h.state.extractions = (h.state.extractions || 0) + 1; return { pageText: "article body" }; };
+    sw.win.pbpLoadTagVocab = realVocab ? ((...args) => callHarness(() => h.pbpLoadTagVocab(...args))) : async account => ({ account, timestamp: undefined, counts: null, index: null });
+    sw.win.pbpServiceEffectivePrivate = () => true;
+    sw.win.pbpNotesDescription = () => "";
+    sw.win.pbpPageInfoReadable = info => !!info && info._pbpUnavailable !== true && ["", "text/html", "application/xhtml+xml"].includes(String(info.contentType || "").split(";")[0].trim());
+    sw.win.showNotification = (...args) => h.state.notifications.push(args);
+    sw.win.t = (key, ...args) => args.length ? key + ":" + args.join(":") : key;
+    sw.win.pbpI18nReady = async () => {};
+    sw.win.processOfflineQueue = async () => {};
+    sw.win.updateBadge = async () => {};
+    sw.win._newBatchRunId = () => "run-1";
+    sw.win._removeBatchRecordIfOwned = async () => true;
+    sw.win._writeBatchProgress = async row => { (h.state.progress ||= []).push(row); };
+    sw.win.chrome = producerChrome;
+  }
+  const runProducer = async (fn) => {
+    h._installWorkerEnv();
+    sw.set("_batchRunning", false);
+    applyProducerEnv();
+    return fn();
   };
-  const api = new Function(...Object.keys(deps), "let _batchRunning = false;\n"
-    + slice("async function saveFromBackground", "// Helper: resolve prefix-specific settings")
-    + slice("function handleBatchSave", "// ===================== Tab Set")
-    + ";return {saveFromBackground,handleBatchSave};")(...Object.values(deps));
   const tab = {id:9, url:pageUrl, title:"Title", incognito:false};
   return {
-    quickSave:(overrides={})=>api.saveFromBackground({url:pageUrl, title:"Title", tab, notifyId:"qs", notifyTitle:"Quick saved", notifyCategory:"quickSave", ...overrides}),
-    batchSave:(tabs=[tab])=>api.handleBatchSave(tabs),
+    quickSave:(overrides={})=>runProducer(()=>real.saveFromBackground({url:pageUrl, title:"Title", tab, notifyId:"qs", notifyTitle:"Quick saved", notifyCategory:"quickSave", ...overrides})),
+    batchSave:(tabs=[tab])=>runProducer(()=>real.handleBatchSave(tabs)),
   };
 }
 // Karakeep notes are plain text, so its summary block is a paragraph of its
@@ -731,10 +822,8 @@ test("the loaded state follows linkding's last-modified stamp and the fields an 
   ok(KK_LOADED.startsWith(PBP_BOOKMARK_VERSION_FORM+"[") && LD_LOADED.startsWith(PBP_BOOKMARK_VERSION_FORM+"["), "the loaded state does not carry its form");
 });
 test("a form loads a self-hosted bookmark from the cache only with a state of the current form", async()=>{
-  workerSource ||= await (await fetch("../background.js")).text();
-  const start = workerSource.indexOf("function pbpStatusCacheFormPosts("), end = workerSource.indexOf("\n}\n", start) + 3;
-  ok(start >= 0 && end > start, "pbpStatusCacheFormPosts not found");
-  const formPosts = new Function("CACHE_TTL", "PBP_BOOKMARK_VERSION_FORM", workerSource.slice(start, end) + ";return pbpStatusCacheFormPosts;")(300000, PBP_BOOKMARK_VERSION_FORM);
+  const { real } = await getSharedWorkerRealm();
+  const formPosts = real.pbpStatusCacheFormPosts;
   const cached = version => ({timestamp:Date.now(), posts:[{href:pageUrl, ...(version !== undefined ? {version} : {})}]});
   const karakeep = {service:"karakeep"};
   ok(formPosts(cached(KK_LOADED), karakeep), "a current state was read again");

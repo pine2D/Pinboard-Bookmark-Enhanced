@@ -16,27 +16,18 @@ const deferred = () => {
 };
 const tick = () => new Promise(r => setTimeout(r, 0));
 async function settle() { for (let i = 0; i < 5; i++) await tick(); }
-async function fixture({ realRuntime = false } = {}) {
-  let _includeAsk = false;
-  let _expAskEl = null;
-  const state = {
-    settings: { exportTargets: { github: { enabled: true, token: "first" } } },
-    flags: { optSyncEnabled: false, syncApiKeys: false },
-    markdown: "Fixture body",
-    get includeAsk() { return _includeAsk; },
-    set includeAsk(v) {
-      _includeAsk = !!v;
-      if (_expAskEl) _expAskEl.setAttribute("aria-pressed", _includeAsk ? "true" : "false");
-    },
-    askSnapshot: { url: "https://fixture.test/article", account: "qa", title: "Fixture", rounds: [{ q: "Question", a: "Answer" }], count: 1 },
-    sendGuardWaits: [], ownerReads: [], askReads: [], requests: [], networkWaits: [], copied: [],
-    composed: [], reads: [], lastReads: [], listeners: [], sends: [], sendWaits: [], permissionWaits: [], lastWrites: [], optionsTabs: []
-  };
+const _sharedSendRealms = { mock: null, real: null };
+async function getSharedSendRealm(realRuntime) {
+  const slot = realRuntime ? "real" : "mock";
+  if (_sharedSendRealms[slot]) return _sharedSendRealms[slot];
+  let activeState = null;
+  const onChangedListeners = [];
   const fetchFixture = async (input, opts) => {
     const url = String(input || "");
     const m = url.match(/\/(_locales\/[^/]+\/messages\.json)$/);
     if (m) return fetch("../" + m[1]);
-    if (!realRuntime) throw new Error("unexpected fetch in non-realRuntime Send-to fixture: " + url);
+    const state = activeState;
+    if (!realRuntime || !state) throw new Error("unexpected fetch in non-realRuntime Send-to fixture: " + url);
     state.requests.push({ url, ...opts });
     if (state.networkWaits[0]?.method === opts.method) return state.networkWaits.shift().wait.promise;
     if (opts.method === "GET") {
@@ -121,56 +112,86 @@ async function fixture({ realRuntime = false } = {}) {
     beforeScripts(win, mock) {
       const origAdd = mock.chrome.storage.onChanged.addListener.bind(mock.chrome.storage.onChanged);
       mock.chrome.storage.onChanged.addListener = (fn) => {
-        state.listeners.push(fn);
+        onChangedListeners.push(fn);
         return origAdd(fn);
       };
       Object.defineProperty(win.navigator, "clipboard", {
         configurable: true,
-        value: { writeText: async (body) => { state.copied.push(body); } },
+        value: { writeText: async (body) => { if (activeState) activeState.copied.push(body); } },
       });
     },
   });
 
   const w = realm.win;
   const d = realm.doc;
-  _expAskEl = d.getElementById("exp-include-ask");
-  if (_expAskEl) _expAskEl.setAttribute("aria-pressed", _includeAsk ? "true" : "false");
   w.t = (key) => (key === "mdSendTo" ? "Send to {name}" : key);
   const gearHtml = realm.get("PBP_ICONS.gear");
-  w.pbpViewMarkdown = () => state.markdown;
-  w.pbpAskExportSnapshot = async () => (state.askReads.length ? state.askReads.shift().promise : structuredClone(state.askSnapshot));
-  w.pbpPersonalLibraryAccount = async () => (state.ownerReads.length ? (await state.ownerReads.shift().promise).personalLibraryAccount : "qa");
-  w.pbpReadBookmarkConnection = async () => ({ account: String(state.settings.pinboardToken || "qa:key").split(":")[0] });
-  w.pbpReadSettingsWithSecrets = async (defaults) => {
-    if (defaults && Object.hasOwn(defaults, "pinboardToken") && state.ownerReads.length) return state.ownerReads.shift().promise;
-    return state.reads.length ? state.reads.shift().promise : ({ pinboardToken: "qa:key", ...structuredClone(state.settings) });
-  };
-  w.pbpReadSecretSyncState = async () => ({ ...state.flags });
-  w.pbpSettingsAreaName = async () => (state.flags.optSyncEnabled ? "sync" : "local");
-  w.pbpGetLastTarget = async () => (state.lastReads.length ? state.lastReads.shift().promise : "github");
-  w.pbpSetLastTarget = async () => (state.lastWrites.length ? state.lastWrites.shift().promise : undefined);
-  w.pbpOpenOptionsTab = (tab) => state.optionsTabs.push(tab);
   const realCompose = w.composeExport;
-  w.composeExport = (body, meta, opts) => { state.composed.push(opts); return realCompose ? realCompose(body, meta, opts) : body; };
+  w.pbpViewMarkdown = () => activeState ? activeState.markdown : "Fixture body";
+  w.pbpAskExportSnapshot = async () => (activeState.askReads.length ? activeState.askReads.shift().promise : structuredClone(activeState.askSnapshot));
+  w.pbpPersonalLibraryAccount = async () => (activeState.ownerReads.length ? (await activeState.ownerReads.shift().promise).personalLibraryAccount : "qa");
+  w.pbpReadBookmarkConnection = async () => ({ account: String(activeState.settings.pinboardToken || "qa:key").split(":")[0] });
+  w.pbpReadSettingsWithSecrets = async (defaults) => {
+    if (!activeState) return { pinboardToken: "qa:key", exportTargets: { github: { enabled: true, token: "first" } } };
+    if (defaults && Object.hasOwn(defaults, "pinboardToken") && activeState.ownerReads.length) return activeState.ownerReads.shift().promise;
+    return activeState.reads.length ? activeState.reads.shift().promise : ({ pinboardToken: "qa:key", ...structuredClone(activeState.settings) });
+  };
+  w.pbpReadSecretSyncState = async () => ({ ...activeState.flags });
+  w.pbpSettingsAreaName = async () => (activeState.flags.optSyncEnabled ? "sync" : "local");
+  w.pbpGetLastTarget = async () => (activeState.lastReads.length ? activeState.lastReads.shift().promise : "github");
+  w.pbpSetLastTarget = async () => (activeState.lastWrites.length ? activeState.lastWrites.shift().promise : undefined);
+  w.pbpOpenOptionsTab = (tab) => activeState.optionsTabs.push(tab);
+  w.composeExport = (body, meta, opts) => { if (activeState) activeState.composed.push(opts); return realCompose ? realCompose(body, meta, opts) : body; };
+  if (!realRuntime) {
+    w.pbpRequestTargetPermission = async () => (activeState.permissionWaits.length ? activeState.permissionWaits.shift().promise : true);
+    w.pbpSendToTarget = async (id, ctx, options) => {
+      if (activeState.sendGuardWaits.length) await activeState.sendGuardWaits.shift().promise;
+      if (!await options.isCurrent()) return { ok: false, error: "context_changed" };
+      activeState.sends.push({ id, ctx });
+      return activeState.sendWaits.length ? activeState.sendWaits.shift().promise : { ok: true, fellBack: false };
+    };
+  }
   const expImgPol = d.getElementById("exp-image-policy");
   if (expImgPol) expImgPol.value = "embed";
   const expFrontmatter = d.getElementById("exp-frontmatter");
   if (expFrontmatter) { expFrontmatter.checked = true; expFrontmatter.setAttribute("aria-pressed", "true"); }
-  // Mark article as having math so buildExportOpts().math === true matches the fixture contract
-  const mathProbe = d.createElement("span");
-  mathProbe.className = "katex";
-  d.getElementById("rendered-view").appendChild(mathProbe);
-
-  if (!realRuntime) {
-    w.pbpRequestTargetPermission = async () => (state.permissionWaits.length ? state.permissionWaits.shift().promise : true);
-    w.pbpSendToTarget = async (id, ctx, options) => {
-      if (state.sendGuardWaits.length) await state.sendGuardWaits.shift().promise;
-      if (!await options.isCurrent()) return { ok: false, error: "context_changed" };
-      state.sends.push({ id, ctx });
-      return state.sendWaits.length ? state.sendWaits.shift().promise : { ok: true, fellBack: false };
-    };
+  if (!d.querySelector("#rendered-view .katex")) {
+    const mathProbe = d.createElement("span");
+    mathProbe.className = "katex";
+    d.getElementById("rendered-view").appendChild(mathProbe);
   }
 
+  return (_sharedSendRealms[slot] = {
+    realm,
+    w,
+    d,
+    gearHtml,
+    onChangedListeners,
+    setActiveState: (s) => { activeState = s; },
+  });
+}
+
+async function fixture({ realRuntime = false } = {}) {
+  const env = await getSharedSendRealm(realRuntime);
+  const { w, d, gearHtml, onChangedListeners, setActiveState } = env;
+  let _includeAsk = false;
+  const _expAskEl = d.getElementById("exp-include-ask");
+  if (_expAskEl) _expAskEl.setAttribute("aria-pressed", "false");
+  const state = {
+    settings: { exportTargets: { github: { enabled: true, token: "first" } } },
+    flags: { optSyncEnabled: false, syncApiKeys: false },
+    markdown: "Fixture body",
+    get includeAsk() { return _includeAsk; },
+    set includeAsk(v) {
+      _includeAsk = !!v;
+      if (_expAskEl) _expAskEl.setAttribute("aria-pressed", _includeAsk ? "true" : "false");
+    },
+    askSnapshot: { url: "https://fixture.test/article", account: "qa", title: "Fixture", rounds: [{ q: "Question", a: "Answer" }], count: 1 },
+    sendGuardWaits: [], ownerReads: [], askReads: [], requests: [], networkWaits: [], copied: [],
+    composed: [], reads: [], lastReads: [], listeners: onChangedListeners, sends: [], sendWaits: [], permissionWaits: [], lastWrites: [], optionsTabs: []
+  };
+  setActiveState(state);
+  w.__PBP_readerTestHooks.resetSendMenuForTest();
   await w.__PBP_readerTestHooks.setupSendMenu();
 
   return {
@@ -181,10 +202,13 @@ async function fixture({ realRuntime = false } = {}) {
     d,
     click: () => d.getElementById("send-primary").click(),
     changed: async (changes, area = "local") => {
-      await Promise.all(state.listeners.map(fn => fn(changes, area)));
+      await Promise.all(onChangedListeners.map(fn => fn(changes, area)));
       await settle();
     },
-    close: () => { realm.dispose(); realm.iframe.remove(); },
+    close: () => {
+      w.__PBP_readerTestHooks.resetSendMenuForTest();
+      setActiveState(null);
+    },
   };
 }
 let pass = 0, fail = 0;

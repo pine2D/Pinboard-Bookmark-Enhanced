@@ -4865,6 +4865,17 @@ const _pbpReaderBoot = (async function () {
   if (typeof window !== "undefined" && location.protocol !== "chrome-extension:") {
     window.__PBP_readerTestHooks = {
       setupSendMenu: () => setupSendMenu(),
+      resetSendMenuForTest: () => {
+        if (_sendMenuCtl) { _sendMenuCtl.abort(); _sendMenuCtl = null; }
+        _sendInFlight = false;
+        clearTimeout(sendStatusTimer);
+        sendStatusTimer = undefined;
+        const p = document.getElementById("send-primary");
+        if (p) { clearTimeout(p._copyTimer); p._copyOrig = null; p.classList.remove("sending", "copied"); }
+        const st = document.getElementById("send-status");
+        if (st) { st.hidden = true; st.textContent = ""; st.classList.remove("error"); }
+        Object.assign(exportSettings, { exportTargets: {}, obsidianEnabled: false, obsidianVault: "", obsidianFolder: "" });
+      },
       captureExportJob,
       prepareExportAsk,
       bumpArticleRevision: () => { _articleRevision++; },

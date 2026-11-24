@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="46"><title>Jina &amp; DeepSeek Fetch Cache Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="47"><title>Jina &amp; DeepSeek Fetch Cache Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -532,6 +532,28 @@ async function buildSuggestSweepHarness(options) {
         sw.win.console.warn = prevWarn;
       }
       if (warns.length !== 1 || !String(warns[0][0]).startsWith("[preview-sweep]") || warns[0][1] !== "TabsError") throw new Error("warns " + JSON.stringify(warns));
+    });
+
+    await acheck("popup Jina enrichment lazy-loads ensureMdConvert and populates pageInfo.pageText", async () => {
+      const pop = await pbpSwRealm.bootPopup();
+      try {
+        pop.set("pageInfo", { url: "https://example.com/jina-popup", pageText: "" });
+        pop.win.fetchJinaMarkdown = async () => ({
+          markdown: "# Jina Heading\n\nEnriched paragraph with **bold** words.",
+          fromCache: false,
+        });
+        const enriched = await pop.win.enrichPageTextIfJina({
+          aiContentSource: "jina",
+          aiCacheDuration: 60,
+          jinaApiKey: "",
+        });
+        const storedText = pop.get("pageInfo").pageText;
+        if (!enriched.includes("Jina Heading") || !enriched.includes("Enriched paragraph with bold words.") || storedText !== enriched) {
+          throw new Error("enrichPageTextIfJina did not convert or store Jina markdown: " + JSON.stringify({ enriched, storedText }));
+        }
+      } finally {
+        pop.dispose();
+      }
     });
   } finally {
     window.chrome = realChrome;

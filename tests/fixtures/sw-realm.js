@@ -13,6 +13,7 @@
 (function () {
   "use strict";
 
+  const nativeFetch = globalThis.fetch.bind(globalThis);
   const SW_DEPS = [
     "i18n.js", "shared.js", "tag-gov-save.js", "bookmark-services.js",
     "vocab-store.js", "vocab-gdrive.js", "notes-sync.js", "notes-gdrive.js",
@@ -273,7 +274,7 @@
     return async (input) => {
       const href = String(input || "");
       const m = href.match(/\/(_locales\/[^/]+\/messages\.json)$/);
-      if (m) return fetch(base + m[1]);
+      if (m) return nativeFetch(base + m[1]);
       if (href.startsWith("chrome-extension://") && href.endsWith(".png")) {
         throw new Error("icon PNG fetch disabled in unit test realm");
       }
@@ -360,7 +361,7 @@
 
   async function loadSurfaceTemplate(pageFile) {
     const base = new URL("../", document.baseURI).href;
-    const response = await fetch(base + pageFile);
+    const response = await nativeFetch(base + pageFile);
     if (!response.ok) throw new Error(`Cannot load ${pageFile}: ${response.status}`);
     const parsed = new DOMParser().parseFromString(await response.text(), "text/html");
     const styles = [...parsed.querySelectorAll('link[rel="stylesheet"][href]')]
@@ -468,13 +469,31 @@
     win.chrome = mock.chrome;
     win.fetch = options.fetch || defaultExtensionFetch("options", tpl.base);
 
-    const dclListeners = [];
+    const dclWrapped = new WeakMap();
+    const dclPending = [];
     const origAdd = doc.addEventListener.bind(doc);
+    const origRemove = doc.removeEventListener.bind(doc);
     doc.addEventListener = function (type, listener, opts) {
       if (type === "DOMContentLoaded" && typeof listener === "function") {
-        dclListeners.push({ listener, once: !!(opts && typeof opts === "object" && opts.once) });
+        let wrapped = dclWrapped.get(listener);
+        if (!wrapped) {
+          wrapped = function (ev) {
+            const ret = listener.call(this, ev);
+            if (ret && typeof ret.then === "function") dclPending.push(ret);
+            return ret;
+          };
+          dclWrapped.set(listener, wrapped);
+        }
+        return origAdd(type, wrapped, opts);
       }
       return origAdd(type, listener, opts);
+    };
+    doc.removeEventListener = function (type, listener, opts) {
+      if (type === "DOMContentLoaded" && typeof listener === "function") {
+        const wrapped = dclWrapped.get(listener);
+        if (wrapped) return origRemove(type, wrapped, opts);
+      }
+      return origRemove(type, listener, opts);
     };
 
     if (options.beforeScripts) await options.beforeScripts(win, mock, doc);
@@ -487,15 +506,17 @@
     } finally {
       delete doc.readyState;
       doc.addEventListener = origAdd;
+      doc.removeEventListener = origRemove;
     }
 
     let initialized = false;
     async function runInit() {
       if (initialized) return;
       initialized = true;
+      dclPending.length = 0;
       const ev = new win.Event("DOMContentLoaded", { bubbles: true });
-      const pending = dclListeners.map(({ listener }) => Promise.resolve().then(() => listener.call(doc, ev)));
-      await Promise.all(pending);
+      doc.dispatchEvent(ev);
+      await Promise.all(dclPending.splice(0));
     }
     if (options.autoInit !== false) await runInit();
     if (options.afterBoot) await options.afterBoot(win, mock, doc);

@@ -206,6 +206,28 @@ test('a template with a const and new RegExp(literal) are literal markers', () =
   const a = anchorsOf(`(async () => { ${LOAD} const NAME = "foo"; src.slice(src.indexOf(\`function \${NAME}(\`)); src.match(new RegExp("bar\\\\(", "g"))[0]; })();`);
   assert.deepEqual(markers(a), ['function foo(', 'bar\\(']);
 });
+test('cached source loaded via logical assignment (||=, ??=, &&=) counts anchors', () => {
+  const a = anchorsOf(`
+    let workerSource, cachedPopup;
+    const holder = { css: "init" };
+    async function load() {
+      workerSource ||= await (await fetch("../background.js")).text();
+      cachedPopup ??= await (await fetch("../popup.js")).text();
+      holder.css &&= await (await fetch("../popup.css")).text();
+      const s = workerSource.indexOf("const PBP_SAVE_MODES");
+      const e = workerSource.indexOf("// ---- end", s);
+      new Function(workerSource.slice(s, e));
+      cachedPopup.slice(cachedPopup.indexOf("function ensureMdConvert("));
+      holder.css.slice(holder.css.indexOf(".tags-input-wrap"));
+    }
+  `);
+  assert.deepEqual(a.map((x) => [x.marker.value, x.targets[0]]), [
+    ['const PBP_SAVE_MODES', 'background.js'],
+    ['// ---- end', 'background.js'],
+    ['function ensureMdConvert(', 'popup.js'],
+    ['.tags-input-wrap', 'popup.css'],
+  ]);
+});
 // ---- what does not count ----
 test('presence checks do not count', () => {
   const a = anchorsOf(`(async () => { ${LOAD} if (src.indexOf("x") === -1) throw 1; assert(src.indexOf("y") >= 0); src.includes("z"); /w/.test(src); if (src.match(/v/)) 1; assert(src.match(/u/), "m"); return src.indexOf("t") !== -1 && !src.match(/s/); })();`);

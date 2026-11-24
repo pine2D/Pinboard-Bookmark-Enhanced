@@ -341,40 +341,354 @@ export function isProductRuntimeFile(path) {
 // default locale's messages belong to all of them.
 export const SURFACE_PAGES = Object.freeze({ options: 'options.html', popup: 'popup.html', reader: 'md-preview.html' });
 const SURFACE_ALIASES = Object.freeze({ background: 'worker', worker: 'worker', options: 'options', popup: 'popup', reader: 'reader' });
+let _espree = null;
+const getEspree = () => (_espree ||= createRequire(resolve(ROOT, '.qa-scan/package.json'))('espree'));
+
+function collectPatternNames(pat, out = []) {
+  if (!pat) return out;
+  if (pat.type === 'Identifier') out.push(pat.name);
+  else if (pat.type === 'AssignmentPattern') collectPatternNames(pat.left, out);
+  else if (pat.type === 'RestElement') collectPatternNames(pat.argument, out);
+  else if (pat.type === 'ArrayPattern') for (const el of pat.elements) collectPatternNames(el, out);
+  else if (pat.type === 'ObjectPattern') for (const p of pat.properties) collectPatternNames(p.type === 'RestElement' ? p.argument : p.value, out);
+  return out;
+}
+
+function buildConstScopes(ast) {
+  const nodeScopes = new WeakMap();
+  const shadowVarUp = (scope, name) => {
+    for (let cur = scope; cur; cur = cur.parent) {
+      cur.bindings.set(name, { shadowed: true });
+      if (cur.isFnOrRoot) break;
+    }
+  };
+  const preScanStatements = (stmts, scope) => {
+    for (const stmt of stmts || []) {
+      if (!stmt) continue;
+      if (stmt.type === 'VariableDeclaration') {
+        for (const decl of stmt.declarations) {
+          if (stmt.kind === 'const' && decl.id.type === 'Identifier' && !scope.bindings.has(decl.id.name)) {
+            scope.bindings.set(decl.id.name, { init: decl.init, scope });
+          } else {
+            for (const n of collectPatternNames(decl.id)) {
+              if (stmt.kind === 'var') shadowVarUp(scope, n);
+              else scope.bindings.set(n, { shadowed: true });
+            }
+          }
+        }
+      } else if ((stmt.type === 'FunctionDeclaration' || stmt.type === 'ClassDeclaration') && stmt.id?.name) {
+        scope.bindings.set(stmt.id.name, { shadowed: true });
+      }
+    }
+  };
+  const visit = (node, parent) => {
+    if (!node || typeof node.type !== 'string') return;
+    let scope = parent;
+    if (node.type === 'Program') {
+      scope = { parent: null, bindings: new Map(), isFnOrRoot: true, cbExecParam: '' };
+      preScanStatements(node.body, scope);
+    } else if (node.type === 'BlockStatement') {
+      scope = { parent, bindings: new Map(), isFnOrRoot: false, cbExecParam: parent.cbExecParam };
+      preScanStatements(node.body, scope);
+      if (scope.cbExecParam && scope.bindings.has(scope.cbExecParam)) scope.cbExecParam = '';
+    } else if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
+      const fnName = node.id?.name || '';
+      const firstParam = node.params?.[0]?.type === 'Identifier' ? node.params[0].name : '';
+      let cbExecParam = fnName === '_cbExecuteScript' ? firstParam : (parent?.cbExecParam || '');
+      scope = { parent, bindings: new Map(), isFnOrRoot: true, cbExecParam: '' };
+      if (fnName) scope.bindings.set(fnName, { shadowed: true });
+      for (const p of node.params || []) for (const n of collectPatternNames(p)) scope.bindings.set(n, { shadowed: true });
+      if (cbExecParam && fnName !== '_cbExecuteScript' && scope.bindings.has(cbExecParam)) cbExecParam = '';
+      scope.cbExecParam = cbExecParam;
+    } else if (node.type === 'ForStatement' || node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
+      scope = { parent, bindings: new Map(), isFnOrRoot: false, cbExecParam: parent.cbExecParam };
+      const init = node.init || node.left;
+      if (init?.type === 'VariableDeclaration') preScanStatements([init], scope);
+      if (scope.cbExecParam && scope.bindings.has(scope.cbExecParam)) scope.cbExecParam = '';
+    } else if (node.type === 'CatchClause') {
+      scope = { parent, bindings: new Map(), isFnOrRoot: false, cbExecParam: parent.cbExecParam };
+      for (const n of collectPatternNames(node.param)) scope.bindings.set(n, { shadowed: true });
+      if (scope.cbExecParam && scope.bindings.has(scope.cbExecParam)) scope.cbExecParam = '';
+    } else if (node.type === 'SwitchStatement') {
+      scope = { parent, bindings: new Map(), isFnOrRoot: false, cbExecParam: parent.cbExecParam };
+      for (const c of node.cases || []) preScanStatements(c.consequent, scope);
+      if (scope.cbExecParam && scope.bindings.has(scope.cbExecParam)) scope.cbExecParam = '';
+    }
+    nodeScopes.set(node, scope);
+    for (const k of Object.keys(node)) {
+      if (k === 'loc' || k === 'range' || k === 'parent') continue;
+      const v = node[k];
+      if (Array.isArray(v)) { for (const c of v) if (c && typeof c.type === 'string') visit(c, scope); }
+      else if (v && typeof v.type === 'string') visit(v, scope);
+    }
+  };
+  visit(ast, null);
+  return nodeScopes;
+}
+
+function lookupConstBinding(name, scope) {
+  for (let cur = scope; cur; cur = cur.parent) {
+    if (cur.bindings.has(name)) {
+      const b = cur.bindings.get(name);
+      return b.shadowed ? null : b;
+    }
+  }
+  return null;
+}
+
+function isObjectFreezeCall(node) {
+  const c = node?.type === 'ChainExpression' ? node.expression : node;
+  return c?.type === 'CallExpression'
+    && c.callee?.type === 'MemberExpression'
+    && !c.callee.computed
+    && c.callee.object?.type === 'Identifier' && c.callee.object.name === 'Object'
+    && c.callee.property?.type === 'Identifier' && c.callee.property.name === 'freeze'
+    && c.arguments.length === 1;
+}
+
+function evalConstString(node, scope, seen = new Set()) {
+  if (!node) return null;
+  if (node.type === 'Literal' && typeof node.value === 'string') return node.value;
+  if (node.type === 'TemplateLiteral') {
+    let out = node.quasis[0]?.value?.cooked ?? '';
+    for (let i = 0; i < node.expressions.length; i++) {
+      const mid = evalConstString(node.expressions[i], scope, seen);
+      if (mid === null) return null;
+      out += mid + (node.quasis[i + 1]?.value?.cooked ?? '');
+    }
+    return out;
+  }
+  if (node.type === 'BinaryExpression' && node.operator === '+') {
+    const l = evalConstString(node.left, scope, seen);
+    const r = evalConstString(node.right, scope, seen);
+    return l !== null && r !== null ? l + r : null;
+  }
+  if (node.type === 'Identifier') {
+    const b = lookupConstBinding(node.name, scope);
+    if (!b || !b.init || seen.has(b)) return null;
+    const next = new Set(seen);
+    next.add(b);
+    return evalConstString(b.init, b.scope, next);
+  }
+  return null;
+}
+
+function evalConstStringList(node, scope, seen = new Set()) {
+  if (!node) return null;
+  if (isObjectFreezeCall(node)) return evalConstStringList((node.type === 'ChainExpression' ? node.expression : node).arguments[0], scope, seen);
+  if (node.type === 'ArrayExpression') {
+    const out = [];
+    for (const el of node.elements) {
+      if (!el) return null;
+      if (el.type === 'SpreadElement') {
+        const sub = evalConstStringList(el.argument, scope, seen);
+        if (!sub) return null;
+        out.push(...sub);
+      } else {
+        const s = evalConstString(el, scope, seen);
+        if (s === null) return null;
+        out.push(s);
+      }
+    }
+    return out;
+  }
+  if (node.type === 'Identifier') {
+    const b = lookupConstBinding(node.name, scope);
+    if (!b || !b.init || seen.has(b)) return null;
+    const next = new Set(seen);
+    next.add(b);
+    return evalConstStringList(b.init, b.scope, next);
+  }
+  return null;
+}
+
+function evalConstObject(node, scope, seen = new Set()) {
+  if (!node) return null;
+  if (isObjectFreezeCall(node)) return evalConstObject((node.type === 'ChainExpression' ? node.expression : node).arguments[0], scope, seen);
+  if (node.type === 'ObjectExpression') return { node, scope };
+  if (node.type === 'Identifier') {
+    const b = lookupConstBinding(node.name, scope);
+    if (!b || !b.init || seen.has(b)) return null;
+    const next = new Set(seen);
+    next.add(b);
+    return evalConstObject(b.init, b.scope, next);
+  }
+  return null;
+}
+
+function walkAstCalls(ast, nodeScopes, onCall) {
+  const visit = node => {
+    if (!node || typeof node.type !== 'string') return;
+    if (node.type === 'CallExpression') onCall(node, nodeScopes.get(node));
+    for (const k of Object.keys(node)) {
+      if (k === 'loc' || k === 'range' || k === 'parent') continue;
+      const v = node[k];
+      if (Array.isArray(v)) { for (const c of v) if (c && typeof c.type === 'string') visit(c); }
+      else if (v && typeof v.type === 'string') visit(v);
+    }
+  };
+  visit(ast);
+}
+
 const surfaceCache = new Map();
 export function surfaceFiles(dir = ROOT) {
   const key = String(dir);
-  if (surfaceCache.has(key)) return surfaceCache.get(key);
-  const read = rel => { try { return readFileSync(join(dir, rel), 'utf8'); } catch { return ''; } };
+  if (key === String(ROOT) && surfaceCache.has(key)) return surfaceCache.get(key);
+  const read = rel => { try { return readFileSync(join(dir, rel), 'utf8'); } catch { return null; } };
   const local = f => !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(f);
   const norm = f => f.replace(/^\.?\//, '');
-  const literals = text => [...text.matchAll(/["']([^"'\s]+)["']/g)].map(x => x[1]);
+  const parseJs = (text, errCode) => {
+    if (typeof text !== 'string') fail(errCode);
+    try { return getEspree().parse(text, { ecmaVersion: 'latest' }); } catch { fail(errCode); }
+  };
+  const extractExecScriptFiles = text => {
+    if (!text || !/\b(?:executeScript|_cbExecuteScript)\b/.test(text)) return [];
+    const ast = parseJs(text, 'execute_script_files_unresolved');
+    const scopes = buildConstScopes(ast);
+    const found = [];
+    const readFilesFromObj = (obj, seenObj = new Set()) => {
+      if (!obj || seenObj.has(obj.node)) fail('execute_script_files_unresolved');
+      const nextSeen = new Set(seenObj);
+      nextSeen.add(obj.node);
+      for (const prop of obj.node.properties) {
+        if (prop.type === 'SpreadElement') {
+          readFilesFromObj(evalConstObject(prop.argument, obj.scope), nextSeen);
+          continue;
+        }
+        let propName = null;
+        if (!prop.computed && prop.key.type === 'Identifier') propName = prop.key.name;
+        else if (!prop.computed && prop.key.type === 'Literal') propName = String(prop.key.value);
+        else propName = evalConstString(prop.key, obj.scope);
+        if (propName === null) fail('execute_script_files_unresolved');
+        if (propName === 'files') {
+          if (prop.kind !== 'init') fail('execute_script_files_unresolved');
+          const list = evalConstStringList(prop.value, obj.scope);
+          if (!list) fail('execute_script_files_unresolved');
+          found.push(...list);
+        }
+      }
+    };
+    walkAstCalls(ast, scopes, (expr, scope) => {
+      const callee = expr.callee?.type === 'ChainExpression' ? expr.callee.expression : expr.callee;
+      const isDirect = callee?.type === 'Identifier' && (callee.name === 'executeScript' || callee.name === '_cbExecuteScript');
+      const isMember = callee?.type === 'MemberExpression' && !callee.computed && callee.property?.type === 'Identifier' && callee.property.name === 'executeScript';
+      if (!isDirect && !isMember) return;
+      if (isMember && scope?.cbExecParam && expr.arguments[0]?.type === 'Identifier' && expr.arguments[0].name === scope.cbExecParam) return;
+      const obj = evalConstObject(expr.arguments[0], scope);
+      if (!obj) fail('execute_script_files_unresolved');
+      readFilesFromObj(obj);
+    });
+    return found;
+  };
   // Follow executeScript({ files: [...] }) one script at a time.
   const close = start => {
     const out = new Set(start.map(norm));
     const queue = [...out].filter(f => f.endsWith('.js'));
     while (queue.length) {
-      const text = read(queue.shift());
-      for (const m of text.matchAll(/\bfiles\s*:\s*\[([^\]]*)\]/g)) {
-        for (const f of literals(m[1]).filter(local).map(norm)) if (!out.has(f)) { out.add(f); if (f.endsWith('.js')) queue.push(f); }
+      const rel = queue.shift();
+      const text = read(rel);
+      for (const f of extractExecScriptFiles(text || '').filter(local).map(norm)) {
+        if (!out.has(f)) { out.add(f); if (f.endsWith('.js')) queue.push(f); }
       }
     }
     return [...out].sort();
   };
   let manifest = {};
-  try { manifest = JSON.parse(read('manifest.json')); } catch { manifest = {}; }
-  const sw = manifest.background?.service_worker || '';
+  try { manifest = JSON.parse(read('manifest.json') || '{}'); } catch { manifest = {}; }
+  const sw = manifest.background?.service_worker ? norm(manifest.background.service_worker) : '';
   const locale = manifest.default_locale ? ['_locales/' + manifest.default_locale + '/messages.json'] : [];
-  const imported = [...read(sw).matchAll(/\bimportScripts\s*\(([\s\S]*?)\)/g)].flatMap(m => literals(m[1]));
-  const out = { worker: close(['manifest.json', ...locale, ...(sw ? [sw] : []), ...imported]) };
+  const workerScripts = new Set(sw ? [sw] : []);
+  const workerQueue = sw ? [sw] : [];
+  while (workerQueue.length) {
+    const rel = workerQueue.shift();
+    const ast = parseJs(read(rel), 'worker_import_unresolved');
+    const scopes = buildConstScopes(ast);
+    walkAstCalls(ast, scopes, (expr, scope) => {
+      const callee = expr.callee?.type === 'ChainExpression' ? expr.callee.expression : expr.callee;
+      const isImport = (callee?.type === 'Identifier' && callee.name === 'importScripts')
+        || (callee?.type === 'MemberExpression' && !callee.computed && callee.property?.type === 'Identifier' && callee.property.name === 'importScripts'
+          && callee.object?.type === 'Identifier' && (callee.object.name === 'self' || callee.object.name === 'globalThis'));
+      if (!isImport) return;
+      for (const arg of expr.arguments) {
+        if (arg.type === 'SpreadElement') {
+          const list = evalConstStringList(arg.argument, scope);
+          if (!list) fail('worker_import_unresolved');
+          for (const raw of list) {
+            if (!local(raw)) continue;
+            const f = norm(raw);
+            if (!workerScripts.has(f)) { workerScripts.add(f); if (f.endsWith('.js')) workerQueue.push(f); }
+          }
+        } else {
+          const raw = evalConstString(arg, scope);
+          if (raw === null) fail('worker_import_unresolved');
+          if (!local(raw)) continue;
+          const f = norm(raw);
+          if (!workerScripts.has(f)) { workerScripts.add(f); if (f.endsWith('.js')) workerQueue.push(f); }
+        }
+      }
+    });
+  }
+  const out = { worker: close(['manifest.json', ...locale, ...workerScripts]) };
   for (const [name, page] of Object.entries(SURFACE_PAGES)) {
-    const html = read(page);
+    const html = read(page) || '';
     const scripts = [...html.matchAll(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)].map(x => x[1]);
     const styles = [...html.matchAll(/<link\b[^>]*>/gi)].filter(x => /\brel\s*=\s*["']?stylesheet/i.test(x[0])).map(x => (x[0].match(/\bhref\s*=\s*["']([^"']+)["']/i) || [])[1]).filter(Boolean);
     out[name] = close([page, ...scripts, ...styles].filter(local));
   }
-  surfaceCache.set(key, Object.freeze(out));
-  return out;
+  const frozen = Object.freeze(out);
+  if (key === String(ROOT)) surfaceCache.set(key, frozen);
+  return frozen;
+}
+
+// Enumerate every chrome-extension://<extId>/* script parsed into the MV3
+// service worker's V8 isolate via CDP Debugger.scriptParsed. Unlike static AST
+// scanning, V8 reports every script actually executed by background.js and its
+// importScripts chain regardless of how the script URL was constructed.
+export async function readWorkerLoadedScripts(ctx, worker) {
+  await worker.evaluate(() => true);
+  const workerUrl = worker.url();
+  const extPrefix = new URL('/', workerUrl).href;
+  const bcdp = await ctx.browser().newBrowserCDPSession();
+  let sessionId = '';
+  try {
+    const { targetInfos } = await bcdp.send('Target.getTargets');
+    const target = targetInfos.find(t => t.url === workerUrl && (t.type === 'service_worker' || t.type === 'worker'))
+      || targetInfos.find(t => t.url === workerUrl);
+    check(Boolean(target), 'worker_target_missing', true);
+    ({ sessionId } = await bcdp.send('Target.attachToTarget', { targetId: target.targetId, flatten: false }));
+    const loaded = new Set();
+    let nextId = 1;
+    const sendToWorker = method => new Promise((resolveMsg, rejectMsg) => {
+      const id = nextId++;
+      const timer = setTimeout(() => { bcdp.off('Target.receivedMessageFromTarget', onMsg); rejectMsg(new HarnessFailure('worker_debugger_timeout', { fatal: true })); }, 5000);
+      const onMsg = ({ sessionId: sid, message }) => {
+        if (sid !== sessionId) return;
+        let msg;
+        try { msg = JSON.parse(message); } catch { return; }
+        if (msg.method === 'Debugger.scriptParsed' && typeof msg.params?.url === 'string' && msg.params.url.startsWith(extPrefix)) {
+          const rel = msg.params.url.slice(extPrefix.length).split(/[?#]/)[0];
+          if (rel) loaded.add(rel);
+        } else if (msg.id === id) {
+          clearTimeout(timer);
+          bcdp.off('Target.receivedMessageFromTarget', onMsg);
+          if (msg.error) rejectMsg(new HarnessFailure('worker_debugger_error', { fatal: true }));
+          else resolveMsg(msg.result);
+        }
+      };
+      bcdp.on('Target.receivedMessageFromTarget', onMsg);
+      bcdp.send('Target.sendMessageToTarget', { sessionId, message: JSON.stringify({ id, method }) }).catch(err => {
+        clearTimeout(timer);
+        bcdp.off('Target.receivedMessageFromTarget', onMsg);
+        rejectMsg(err);
+      });
+    });
+    await sendToWorker('Debugger.enable');
+    await sendToWorker('Debugger.disable');
+    return [...loaded].sort();
+  } finally {
+    if (sessionId) await bcdp.send('Target.detachFromTarget', { sessionId }).catch(() => {});
+    await bcdp.detach().catch(() => {});
+  }
 }
 // The surface an extension page belongs to ('' for any other URL), and the
 // surfaces a module drove that its row leaves out. Every module reaches the
@@ -2826,6 +3140,10 @@ export class LiveRun {
     this.worker = worker;
     this.extension = 'chrome-extension://' + extId + '/';
     await worker.evaluate(() => primeSettings());
+    const workerSurfaceSet = new Set(surfaceFiles(this.extRoot).worker);
+    const loadedWorkerScripts = await readWorkerLoadedScripts(ctx, worker);
+    const swEntry = worker.url().slice(this.extension.length).split(/[?#]/)[0];
+    check(loadedWorkerScripts.includes(swEntry) && loadedWorkerScripts.every(f => workerSurfaceSet.has(f)), 'worker_surface_untracked', true);
     this.guardCfg = this.buildGuardCfg();
     this.poolSet = new Set(Object.values(this.pools).flat());
     this.routeProbe = { url: 'http://pbp-it-route-probe.invalid/' + this.runId, seen: false };

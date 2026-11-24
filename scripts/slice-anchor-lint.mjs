@@ -583,17 +583,18 @@ export function analyzeScript(code, { file = '<input>', lineOffset = 0, module =
   }
 
   // Propagate to a fixed point.
+  const ASSIGN_OPS = new Set(['=', '||=', '??=', '&&=']);
   const nodes = [];
   walk(ast, (n) => nodes.push(n));
   for (let pass = 0; pass < 12; pass++) {
     let changed = false;
     for (const n of nodes) {
       if (n.type === 'VariableDeclarator' && n.init) changed = assignPattern(n.id, T(n.init), changed);
-      else if (n.type === 'AssignmentExpression' && n.operator === '=' && n.left.type === 'MemberExpression' && n.left.object.type === 'Identifier') {
-        // sources[f] = await res.text(): the object holds source
+      else if (n.type === 'AssignmentExpression' && ASSIGN_OPS.has(n.operator) && n.left.type === 'MemberExpression' && n.left.object.type === 'Identifier') {
+        // sources[f] = await res.text() or cache.bg ||= await res.text(): the object holds source
         const r = flat(T(n.right));
         if (r) changed = assignPattern(n.left.object, { kind: 'obj', props: new Map(), any: r }, changed);
-      } else if (n.type === 'AssignmentExpression' && n.operator === '=') changed = assignPattern(n.left, T(n.right), changed);
+      } else if (n.type === 'AssignmentExpression' && ASSIGN_OPS.has(n.operator)) changed = assignPattern(n.left, T(n.right), changed);
       else if (n.type === 'AssignmentExpression' && n.operator === '+=') { const r = flat(T(n.right)); if (r) changed = assignPattern(n.left, r, changed); }
       else if (n.type === 'ForOfStatement') {
         const t = T(n.right); const item = t && (t.kind === 'arr' ? (t.any || flat(t)) : t.kind === 'obj' ? flat(t) : null);

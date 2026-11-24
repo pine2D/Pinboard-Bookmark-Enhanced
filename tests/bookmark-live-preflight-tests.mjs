@@ -366,16 +366,68 @@ try {
       const surfaces = live.surfaceFiles(root);
       const tags = (page, re) => [...readFileSync(join(root, page), 'utf8').matchAll(re)].map(x => x[1]).filter(f => !/^[a-z]+:|^\/\//i.test(f));
       const { createRequire: makeReq } = await import('node:module');
-      const espree = makeReq(join(root, '.qa-scan', 'package.json'))('espree');
-      const bgAst = espree.parse(readFileSync(join(root, 'background.js'), 'utf8'), { ecmaVersion: 'latest' });
-      const imported = [];
-      for (const stmt of bgAst.body) {
-        const expr = stmt.type === 'ExpressionStatement' ? stmt.expression : null;
-        if (expr?.type === 'CallExpression' && expr.callee.type === 'Identifier' && expr.callee.name === 'importScripts') {
-          for (const arg of expr.arguments) if (arg.type === 'Literal' && typeof arg.value === 'string') imported.push(arg.value);
+      const qaReq = makeReq(join(root, '.qa-scan', 'package.json'));
+      const { chromium } = qaReq('playwright');
+      const launchWorkerScripts = async extDir => {
+        const prof = mkdtempSync(join(dir, 'sw-surface-prof-'));
+        let ctx = null;
+        try {
+          ctx = await chromium.launchPersistentContext(prof, {
+            headless: true,
+            executablePath: chromium.executablePath(),
+            args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`, '--no-first-run', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--no-pings', '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost'],
+          });
+          const worker = ctx.serviceWorkers().find(w => w.url().startsWith('chrome-extension://'))
+            || await ctx.waitForEvent('serviceworker', { predicate: w => w.url().startsWith('chrome-extension://') });
+          const scripts = await live.readWorkerLoadedScripts(ctx, worker);
+          return { scripts, extraLoaded: await worker.evaluate(() => Boolean(self.__pbpExtraWorkerDepLoaded)) };
+        } finally {
+          if (ctx) await ctx.close().catch(() => {});
+          rmSync(prof, { recursive: true, force: true });
         }
+      };
+      const rootWorkerLoaded = await launchWorkerScripts(root);
+      assert(rootWorkerLoaded.scripts.includes('background.js') && rootWorkerLoaded.scripts.length >= 18, 'worker CDP script list: ' + rootWorkerLoaded.scripts.join(','));
+      for (const f of ['manifest.json', '_locales/en/messages.json', ...rootWorkerLoaded.scripts]) assert(surfaces.worker.includes(f), 'worker loads ' + f);
+      for (const f of rootWorkerLoaded.scripts) assert.deepEqual(route([f]).modules, ids, 'every runtime-loaded worker script routes to all modules: ' + f);
+      // Non-literal const + transitive importScripts in a temp extension copy:
+      // both static surfaceFiles() and live V8 Debugger.scriptParsed must agree.
+      {
+        const extConst = mkdtempSync(join(dir, 'ext-const-import-'));
+        for (const f of shipped) {
+          const dst = join(extConst, f);
+          mkdirSync(join(dst, '..'), { recursive: true });
+          writeFileSync(dst, readFileSync(join(root, f)));
+        }
+        writeFileSync(join(extConst, 'extra-worker-nested.js'), 'self.__pbpExtraWorkerDepLoaded = true;\n');
+        writeFileSync(join(extConst, 'extra-worker-dep.js'), 'const NESTED_WORKER_DEP = "extra-worker-nested.js";\nimportScripts(NESTED_WORKER_DEP);\n');
+        const origBg = readFileSync(join(root, 'background.js'), 'utf8');
+        writeFileSync(join(extConst, 'background.js'), 'const EXTRA_WORKER_DEP = "extra-worker-dep.js";\nimportScripts(EXTRA_WORKER_DEP);\n' + origBg);
+        const constSurfaces = live.surfaceFiles(extConst);
+        assert(constSurfaces.worker.includes('extra-worker-dep.js') && constSurfaces.worker.includes('extra-worker-nested.js'), 'const + nested importScripts tracked');
+        const constRouted = live.routeChangedFiles(['extra-worker-dep.js', 'extra-worker-nested.js'], undefined, constSurfaces);
+        assert.deepEqual(constRouted.modules, ids);
+        assert.deepEqual(constRouted.uncovered, []);
+        const constLoaded = await launchWorkerScripts(extConst);
+        assert.equal(constLoaded.extraLoaded, true);
+        assert(constLoaded.scripts.includes('extra-worker-dep.js') && constLoaded.scripts.includes('extra-worker-nested.js'));
+        for (const f of constLoaded.scripts) assert(constSurfaces.worker.includes(f), 'temp worker runtime script tracked: ' + f);
+        rmSync(extConst, { recursive: true, force: true });
       }
-      for (const f of ['manifest.json', 'background.js', '_locales/en/messages.json', ...imported]) assert(surfaces.worker.includes(f), 'worker loads ' + f);
+      // Fail closed when importScripts or executeScript({ files }) is dynamic.
+      {
+        const extDynSw = mkdtempSync(join(dir, 'ext-dyn-sw-'));
+        writeFileSync(join(extDynSw, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'x', version: '1.0', background: { service_worker: 'background.js' } }));
+        writeFileSync(join(extDynSw, 'background.js'), 'importScripts(globalThis.__dynDep || "shared.js");\n');
+        assert.throws(() => live.surfaceFiles(extDynSw), e => e.code === 'worker_import_unresolved');
+        rmSync(extDynSw, { recursive: true, force: true });
+
+        const extDynExec = mkdtempSync(join(dir, 'ext-dyn-exec-'));
+        writeFileSync(join(extDynExec, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'x', version: '1.0', background: { service_worker: 'background.js' } }));
+        writeFileSync(join(extDynExec, 'background.js'), 'chrome.scripting.executeScript({ target: { tabId: 1 }, files: [globalThis.__dynInject] });\n');
+        assert.throws(() => live.surfaceFiles(extDynExec), e => e.code === 'execute_script_files_unresolved');
+        rmSync(extDynExec, { recursive: true, force: true });
+      }
       for (const [name, page] of Object.entries(live.SURFACE_PAGES)) {
         for (const f of [page, ...tags(page, /<script\b[^>]*\bsrc="([^"]+)"/g)]) assert(surfaces[name].includes(f), name + ' loads ' + f);
       }

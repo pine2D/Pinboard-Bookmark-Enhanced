@@ -122,45 +122,52 @@ function buildAiHarness(_unused, opts) {
   let authReads = 0;
   const local = makeStore(o.local);
   const reply = o.callAI || (async () => (o.reply !== undefined ? o.reply : "ok"));
+  let activeRuns = 0;
+  let savedPrev = null;
   const runWithConfiguredSw = async (fn) => {
-    const prev = {
-      local: sw.win.chrome.storage.local,
-      loadSettings: sw.win.loadSettings,
-      getCurrentBookmarkAuth: sw.win.getCurrentBookmarkAuth,
-      callAI: sw.win.callAI,
-      setAICache: sw.win.setAICache,
-      t: sw.win.t,
-      warn: sw.win.console.warn,
-      error: sw.win.console.error,
-    };
-    sw.win.chrome.storage.local = local;
-    sw.win.loadSettings = async () => { calls.loadSettings++; return structuredClone(o.settings || {}); };
-    sw.win.getCurrentBookmarkAuth = async () => {
-      const account = accounts[Math.min(authReads++, accounts.length - 1)];
-      return { token: `${account}:token`, account, epoch: 0 };
-    };
-    sw.win.callAI = async (s, prompt, callOpts) => {
-      calls.callAI.push({ s, prompt, opts: callOpts });
-      return reply(s, prompt, callOpts);
-    };
-    sw.win.setAICache = async (...args) => {
-      calls.setAICache.push(args);
-      if (o.setAICache) return o.setAICache(...args);
-    };
-    sw.win.t = (key) => "msg:" + key;
-    sw.win.console.warn = (...a) => calls.warn.push(a);
-    sw.win.console.error = (...a) => calls.warn.push(a);
+    if (activeRuns++ === 0) {
+      savedPrev = {
+        local: sw.win.chrome.storage.local,
+        loadSettings: sw.win.loadSettings,
+        getCurrentBookmarkAuth: sw.win.getCurrentBookmarkAuth,
+        callAI: sw.win.callAI,
+        setAICache: sw.win.setAICache,
+        t: sw.win.t,
+        warn: sw.win.console.warn,
+        error: sw.win.console.error,
+      };
+      sw.win.chrome.storage.local = local;
+      sw.win.loadSettings = async () => { calls.loadSettings++; return structuredClone(o.settings || {}); };
+      sw.win.getCurrentBookmarkAuth = async () => {
+        const account = accounts[Math.min(authReads++, accounts.length - 1)];
+        return { token: `${account}:token`, account, epoch: 0 };
+      };
+      sw.win.callAI = async (s, prompt, callOpts) => {
+        calls.callAI.push({ s, prompt, opts: callOpts });
+        return reply(s, prompt, callOpts);
+      };
+      sw.win.setAICache = async (...args) => {
+        calls.setAICache.push(args);
+        if (o.setAICache) return o.setAICache(...args);
+      };
+      sw.win.t = (key) => "msg:" + key;
+      sw.win.console.warn = (...a) => calls.warn.push(a);
+      sw.win.console.error = (...a) => calls.warn.push(a);
+    }
     try {
       return await fn();
     } finally {
-      sw.win.chrome.storage.local = prev.local;
-      sw.win.loadSettings = prev.loadSettings;
-      sw.win.getCurrentBookmarkAuth = prev.getCurrentBookmarkAuth;
-      sw.win.callAI = prev.callAI;
-      sw.win.setAICache = prev.setAICache;
-      sw.win.t = prev.t;
-      sw.win.console.warn = prev.warn;
-      sw.win.console.error = prev.error;
+      if (--activeRuns === 0 && savedPrev) {
+        sw.win.chrome.storage.local = savedPrev.local;
+        sw.win.loadSettings = savedPrev.loadSettings;
+        sw.win.getCurrentBookmarkAuth = savedPrev.getCurrentBookmarkAuth;
+        sw.win.callAI = savedPrev.callAI;
+        sw.win.setAICache = savedPrev.setAICache;
+        sw.win.t = savedPrev.t;
+        sw.win.console.warn = savedPrev.warn;
+        sw.win.console.error = savedPrev.error;
+        savedPrev = null;
+      }
     }
   };
   return {
@@ -341,6 +348,7 @@ function buildRouterHarness(_unused, opts) {
   // B. dedup: the caller's key is opaque and used verbatim
   // ======================================================================
   await testCase("two messages on ONE inflight key pay for exactly one provider call", async () => {
+    const beforeCallAI = _aiSwRealm.win.callAI;
     let resolveCall;
     const gate = new Promise((r) => { resolveCall = r; });
     const h = buildAiHarness(source, {
@@ -353,7 +361,8 @@ function buildRouterHarness(_unused, opts) {
     await new Promise((r) => setTimeout(r, 10));
     resolveCall('{"summary":"S","tags":["t1"]}');
     const [ra, rb] = await Promise.all([a, b]);
-    return h.calls.callAI.length === 1 && ra.summary === "S" && rb.summary === "S" &&
+    return _aiSwRealm.win.callAI === beforeCallAI &&
+      h.calls.callAI.length === 1 && ra.summary === "S" && rb.summary === "S" &&
       ra.tags.join() === "t1" && rb.tags.join() === "t1";
   });
 
