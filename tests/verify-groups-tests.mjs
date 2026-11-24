@@ -154,6 +154,8 @@ const RUNTIME_MESSAGES_LABEL = '[runtime-messages] checking runtime message sing
 const RUNTIME_MESSAGES_COMMANDS = ['node scripts/sync-runtime-messages.mjs --check', 'node tests/runtime-messages-tests.mjs'];
 const HARD_RULES_LABEL = '[hard-rules] checking sync storage write error handling and credential literal gates + self-tests';
 const HARD_RULES_COMMANDS = ['node scripts/hard-rules-lint.mjs', 'node tests/hard-rules-lint-tests.mjs'];
+const DIAG_ERRORS_LABEL = '[diag-errors] checking sanitized local diagnostic error ring buffer and storage boundaries';
+const DIAG_ERRORS_COMMANDS = ['node tests/diag-errors-tests.mjs'];
 const REGISTERS_LABEL = "[registers] checking .claude/ registers (decisions, acceptance debt, flake ledger, store ledger, freshness ledger) + lint self-tests";
 const EXPECTED_LABELS = [OLD_LABELS[0], NEW_LABEL, ...OLD_LABELS.slice(1, afterEslintBaseline), SLICE_LABEL, ...OLD_LABELS.slice(afterEslintBaseline)]
   .map((l) => (l === REGISTERS_LABEL_OLD ? REGISTERS_LABEL : l))
@@ -162,7 +164,7 @@ const EXPECTED_LABELS = [OLD_LABELS[0], NEW_LABEL, ...OLD_LABELS.slice(1, afterE
   .flatMap((l) => (l === REGISTERS_LABEL ? [l, DOCTOR_LABEL, SENTINEL_LABEL] : [l]))
   .flatMap((l) => (l.startsWith('[ask-history]') ? [l, UPGRADE_LABEL] : [l]))
   .flatMap((l) => (l.startsWith('[script-graph]') ? [l, TYPECHECK_LABEL] : [l]))
-  .flatMap((l) => (l === '[store-descriptions] checking CWS store copy is regenerated from the READMEs' ? [l, AI_PROVIDERS_LABEL, SETTINGS_SCHEMA_LABEL, RUNTIME_MESSAGES_LABEL, HARD_RULES_LABEL] : [l]));
+  .flatMap((l) => (l === '[store-descriptions] checking CWS store copy is regenerated from the READMEs' ? [l, AI_PROVIDERS_LABEL, SETTINGS_SCHEMA_LABEL, RUNTIME_MESSAGES_LABEL, HARD_RULES_LABEL, DIAG_ERRORS_LABEL] : [l]));
 const JOURNEY_STAGES = ['bookmark-services', 'ask-history', 'upgrade-path', 'selection', 'draft', 'options-save', 'translate-stop',
   'layouts', 'journey', 'discovery', 'reader-save-export'];
 
@@ -245,6 +247,14 @@ test('the runtime-messages gate runs in the static group', () => {
 
 test('the hard-rules gate runs in the static group', () => {
   for (const c of HARD_RULES_COMMANDS) assert.ok(full.commands.some((x) => x.command === c && x.group === 'static'), `${c} must be a static gate`);
+});
+
+test('the diag-errors gate runs exactly once in the static group', () => {
+  for (const c of DIAG_ERRORS_COMMANDS) {
+    const matches = full.commands.filter((x) => x.command === c);
+    assert.equal(matches.length, 1, `${c} must appear exactly once in verify dry-run`);
+    assert.equal(matches[0].group, 'static', `${c} must be a static gate`);
+  }
 });
 
 test('the theme-platinum-render gate runs in the render group', () => {

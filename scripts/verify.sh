@@ -420,6 +420,9 @@ stage "[hard-rules] checking sync storage write error handling and credential li
 gate static node "scripts/hard-rules-lint.mjs"
 gate static node "tests/hard-rules-lint-tests.mjs"
 
+stage "[diag-errors] checking sanitized local diagnostic error ring buffer and storage boundaries"
+gate static node "tests/diag-errors-tests.mjs"
+
 stage "[hooks] checking installed git hooks still delegate to the tracked scripts"
 gate static sh "scripts/setup-hooks.sh" --check
 

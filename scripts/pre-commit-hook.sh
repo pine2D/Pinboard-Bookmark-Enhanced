@@ -55,6 +55,7 @@ ESLINT_TOOLS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/eslint-basel
 DOCTOR_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(doctor|registers-lint|docs-lint)\.mjs|tests/doctor-tests\.mjs)$')
 # Sentinel group: the weekly sentinel's workflow, its two scripts and their self-tests.
 SENTINEL_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(link-check|sentinel-report)\.mjs|tests/(link-check|sentinel-report)-tests\.mjs|\.github/workflows/sentinel\.yml)$')
+DIAG_ERRORS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(shared\.js|options\.js|jina\.js|ai\.js|dict-pack\.js|tests/diag-errors-tests\.mjs)$')
 VERIFY_GROUPS_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(verify\.sh|run-html-suites\.mjs|flake-record\.mjs)|tests/verify-groups-tests\.mjs)$')
 # Slice-anchor group: any test file, the lint, its self-test or its baseline
 # (deletions too: dropping the baseline and adding it back would reset it).
@@ -66,7 +67,7 @@ SETTINGS_SCHEMA_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(settings
 TYPECHECK_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^((vocab-store|bookmark-services|export-targets|dict-archive|ask-archive|notes-sync|vocab-gdrive|notes-gdrive|dict-archive-gdrive|ask-archive-gdrive|restore-points|options-backup|anki-connect|eudic-sync|vocab-send|wayback|jina|tag-gov|tag-gov-save|ai-cache|ai|dict-entry|dict-evidence|dict-pack|md-convert|md-epub|i18n|site-rules)\.js|scripts/(typecheck-data-layer\.mjs|jsconfig\.data-layer\.json|types/data-layer-globals\.d\.ts)|tests/typecheck-data-layer-tests\.mjs|\.qa-scan/package(-lock)?\.json)$')
 RUNTIME_MESSAGES_CHANGED=$(printf '%s\n' "$STAGED_WITH_DELETES" | grep -E '^([^/]+\.js|scripts/(runtime-messages-source|sync-runtime-messages)\.mjs|tests/runtime-messages-tests\.mjs)$')
 HARD_RULES_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '[^[:space:]]' | grep -vE '^vendor/')
-if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$READER_CONTRAST_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ] && [ -z "$SENTINEL_CHANGED" ] && [ -z "$AI_PROVIDERS_CHANGED" ] && [ -z "$SETTINGS_SCHEMA_CHANGED" ] && [ -z "$TYPECHECK_CHANGED" ] && [ -z "$RUNTIME_MESSAGES_CHANGED" ] && [ -z "$HARD_RULES_CHANGED" ]; then
+if [ -z "$CHANGED" ] && [ -z "$SLICE_CHANGED" ] && [ -z "$JS_CHANGED" ] && [ -z "$ESLINT_BASELINE_STAGED" ] && [ -z "$ESLINT_RULE_CHANGED" ] && [ -z "$ESLINT_TOOLS_CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$READER_CONTRAST_CHANGED" ] && [ -z "$AUDIT_CHANGED" ] && [ -z "$REGISTERS_CHANGED" ] && [ -z "$RULES_CHANGED" ] && [ -z "$VERIFY_GROUPS_CHANGED" ] && [ -z "$DOCTOR_CHANGED" ] && [ -z "$SENTINEL_CHANGED" ] && [ -z "$DIAG_ERRORS_CHANGED" ] && [ -z "$AI_PROVIDERS_CHANGED" ] && [ -z "$SETTINGS_SCHEMA_CHANGED" ] && [ -z "$TYPECHECK_CHANGED" ] && [ -z "$RUNTIME_MESSAGES_CHANGED" ] && [ -z "$HARD_RULES_CHANGED" ]; then
   exit 0
 fi
 
@@ -114,6 +115,15 @@ if [ -n "$SENTINEL_CHANGED" ]; then
   if ! node "$REPO_ROOT/tests/link-check-tests.mjs" || ! node "$REPO_ROOT/tests/sentinel-report-tests.mjs"; then
     echo ""
     echo "[sentinel] COMMIT BLOCKED — a sentinel self-test failed (see the message above)" >&2
+    exit 1
+  fi
+fi
+
+if [ -n "$DIAG_ERRORS_CHANGED" ]; then
+  echo "[diag-errors] checking sanitized local diagnostic error ring buffer and storage boundaries"
+  if ! node "$REPO_ROOT/tests/diag-errors-tests.mjs"; then
+    echo ""
+    echo "[diag-errors] COMMIT BLOCKED — diagnostic error buffer self-test failed (see the message above)" >&2
     exit 1
   fi
 fi

@@ -2,6 +2,17 @@
 // Pinboard Bookmark Enhanced - Jina Reader API Integration
 // ============================================================
 
+function _jinaSafeErrName(e) {
+  return typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(e) : "Error";
+}
+
+function _jinaDiagSurface(options) {
+  const explicit = options && typeof options === "object" ? options.diagSurface : undefined;
+  if (typeof pbpDetectDiagSurface === "function") return pbpDetectDiagSurface(explicit);
+  if (typeof explicit === "string" && explicit) return explicit;
+  return typeof document === "undefined" ? "background" : "shared";
+}
+
 async function _ensureJinaHostPermission() {
   if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id) return;
   let has = false;
@@ -9,7 +20,7 @@ async function _ensureJinaHostPermission() {
     if (chrome.permissions && chrome.permissions.contains) {
       has = (await chrome.permissions.contains({ origins: [PBP_JINA_ORIGIN_PATTERN] })) === true;
     }
-  } catch (e) { console.warn("[jina] permissions.contains failed:", e?.name); }
+  } catch (e) { console.warn("[jina] permissions.contains failed:", _jinaSafeErrName(e)); }
   if (!has) {
     const err = /** @type {Error & { code?: string }} */ (new Error("Jina host permission required"));
     err.code = "host_permission";
@@ -34,8 +45,11 @@ async function fetchJinaMarkdown(url, options = {}) {
         }
       }
     } catch (e) {
-      console.warn("[jina] cache read failed:", e?.name);
-      if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "background", op: "jina_cache_read", code: "storage", errorName: e?.name });
+      const errName = _jinaSafeErrName(e);
+      console.warn("[jina] cache read failed:", errName);
+      if (typeof pbpRecordDiagError === "function") {
+        pbpRecordDiagError({ surface: _jinaDiagSurface(options), op: "jina_cache_read", code: "storage", errorName: errName });
+      }
     }
   }
 
@@ -72,8 +86,11 @@ async function fetchJinaMarkdown(url, options = {}) {
       try {
         await chrome.storage.local.set({ [cacheKey]: { result, timestamp: Date.now() } });
       } catch (e) {
-        console.warn("[jina] cache write failed:", e?.name);
-        if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "background", op: "jina_cache_write", code: "storage", errorName: e?.name });
+        const errName = _jinaSafeErrName(e);
+        console.warn("[jina] cache write failed:", errName);
+        if (typeof pbpRecordDiagError === "function") {
+          pbpRecordDiagError({ surface: _jinaDiagSurface(options), op: "jina_cache_write", code: "storage", errorName: errName });
+        }
       }
     }
 
@@ -107,7 +124,7 @@ async function _ensureDeepseekFetchHostPermission() {
       has = (await chrome.permissions.contains({ origins: [PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN] })) === true;
     }
   } catch (e) {
-    console.warn("[deepseek-fetch] permission check failed:", e && e.name);
+    console.warn("[deepseek-fetch] permission check failed:", _jinaSafeErrName(e));
   }
   if (!has) {
     const err = /** @type {Error & { code?: string }} */ (new Error("DeepSeek Fetch host permission required"));
@@ -150,7 +167,11 @@ async function fetchDeepseekMarkdown(url, options = {}) {
         }
       }
     } catch (e) {
-      console.warn("[deepseek-fetch] cache read failed:", e && e.name);
+      const errName = _jinaSafeErrName(e);
+      console.warn("[deepseek-fetch] cache read failed:", errName);
+      if (typeof pbpRecordDiagError === "function") {
+        pbpRecordDiagError({ surface: _jinaDiagSurface(options), op: "deepseek_cache_read", code: "storage", errorName: errName });
+      }
     }
   }
 
@@ -207,7 +228,11 @@ async function fetchDeepseekMarkdown(url, options = {}) {
         try {
           await chrome.storage.local.set({ [cacheKey]: { result, timestamp: Date.now() } });
         } catch (e) {
-          console.warn("[deepseek-fetch] cache write failed:", e && e.name);
+          const errName = _jinaSafeErrName(e);
+          console.warn("[deepseek-fetch] cache write failed:", errName);
+          if (typeof pbpRecordDiagError === "function") {
+            pbpRecordDiagError({ surface: _jinaDiagSurface(options), op: "deepseek_cache_write", code: "storage", errorName: errName });
+          }
         }
       }
 

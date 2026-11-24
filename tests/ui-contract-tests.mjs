@@ -10807,6 +10807,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
     ["background.js", /startsWith\(chrome\.runtime\.getURL\("md-preview\.html"\)\)/, "URL prefix test in _imgFixIsPreviewUrl"],
     ["background.js", /chrome\.tabs\.query\(\{ url: chrome\.runtime\.getURL\("md-preview\.html"\) \+ "\*" \}\)/, "tabs.query match pattern (lookup only)"],
     ["background.js", /const base = chrome\.runtime\.getURL\("md-preview\.html"\);/, "orphan sweep prefix, only startsWith-tested against tab urls"],
+    ["shared.js", /path\.endsWith\("\/md-preview\.html"\)/, "pathname comparison in pbpDetectDiagSurface"],
     ["shared.js", /chrome\.tabs\.query\(\{ url: chrome\.runtime\.getURL\("md-preview\.html"\) \+ "\*" \}\)/, "tabs.query match pattern for live reader tab activation"],
   ];
   const openCall = /\b(?:tabs|windows)\s*\.\s*(?:create|update)\b|\bwindow\s*\.\s*open\b|\bopen\s*\(|\blocation\s*(?:\.\s*(?:assign|replace|href)\b|\s*=)/;

@@ -1190,6 +1190,35 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     assert(!disabledCb.checked, "clicking a disabled pick-box row must not select it (native disabled semantics)");
     const total = host.querySelector(":scope > p.hint");
     assert(total && total === host.lastElementChild, "the total .hint must stay the last child of #storage-cats, after the .pref-group");
+
+    // When chrome.storage.local.get(null) fails, local categories surface failed=1,
+    // stay unchecked + selectable, unhide #storage-retry-btn, and record storage_measure.
+    const origLocalGet = win.chrome.storage.local.get.bind(win.chrome.storage.local);
+    win.chrome.storage.local.get = async (keys) => {
+      if (keys === null) throw new win.DOMException("blocked", "InvalidStateError");
+      return origLocalGet(keys);
+    };
+    const origRS = win.history.replaceState.bind(win.history);
+    win.history.replaceState = () => {};
+    try {
+      doc.getElementById("tab-storage").click();
+      for (let i = 0; i < 40 && !host.querySelector('.storage-cat-cb[data-failed="1"]'); i++) await sleep(50);
+      const retryBtn = doc.getElementById("storage-retry-btn");
+      const failedMisc = host.querySelector('.storage-cat-cb[data-cat="misc"]');
+      assert(retryBtn && retryBtn.hidden === false, "storage-retry-btn must unhide when local.get(null) fails");
+      assert(failedMisc && failedMisc.dataset.failed === "1" && !failedMisc.disabled && !failedMisc.checked,
+        "failed misc category must stay selectable and unchecked with data-failed=1");
+      const diagRows = await win.pbpReadDiagErrors();
+      assert(diagRows.some((r) => r.surface === "options" && r.op === "storage_measure" && r.code === "storage"),
+        "storage_measure was not recorded into pbpDiagErrors on real options panel failure: " + JSON.stringify(diagRows));
+    } finally {
+      win.chrome.storage.local.get = origLocalGet;
+      const retryBtn = doc.getElementById("storage-retry-btn");
+      if (retryBtn) retryBtn.click();
+      for (let i = 0; i < 40 && host.querySelector('.storage-cat-cb[data-failed="1"]'); i++) await sleep(50);
+      await win.chrome.storage.local.remove("pbpDiagErrors");
+      win.history.replaceState = origRS;
+    }
   });
 
   // Both density tiers (stage 3c final review S3): the regression this guards

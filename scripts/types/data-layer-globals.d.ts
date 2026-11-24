@@ -422,6 +422,15 @@ interface PbpDiagErrorInput {
 }
 declare const PBP_DIAG_ERRORS_KEY: "pbpDiagErrors";
 declare const PBP_DIAG_ERRORS_CAP: 50;
+declare const PBP_DIAG_SURFACES: readonly string[];
+declare const PBP_DIAG_OPS: readonly string[];
+declare const PBP_DIAG_CODES: readonly string[];
+declare const PBP_DIAG_ERROR_NAMES: readonly string[];
+declare function pbpSafeErrorName(err: unknown): string;
+declare function pbpDetectDiagSurface(explicit?: unknown): string;
+declare function pbpMeasureLocalStorage(
+  opts?: { surface?: string },
+): Promise<Record<string, { keys: string[]; bytes: number; failed?: boolean }>>;
 declare function pbpSanitizeDiagErrors(rawList: unknown): PbpDiagErrorEntry[];
 declare function pbpRecordDiagError(input: PbpDiagErrorInput): Promise<PbpDiagErrorEntry | null>;
 declare function pbpReadDiagErrors(): Promise<PbpDiagErrorEntry[]>;

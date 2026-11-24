@@ -154,7 +154,8 @@ async function enrichPageTextIfJina(s) {
     const jinaKey = s.jinaApiKey ? deobfuscateKey(s.jinaApiKey) : "";
     const result = await fetchJinaMarkdown(pageInfo.url, {
       apiKey: jinaKey,
-      cacheDuration: s.aiCacheDuration
+      cacheDuration: s.aiCacheDuration,
+      diagSurface: "popup"
     });
     if (result.code === "host_permission") {
       const origins = _aiRequiredOriginPatterns(s, [PBP_JINA_ORIGIN_PATTERN]);
@@ -192,7 +193,8 @@ async function enrichPageTextIfDeepseek(s) {
     const deepseekKey = s.deepseekApiKey ? deobfuscateKey(s.deepseekApiKey) : "";
     const result = await fetchDeepseekMarkdown(pageInfo.url, {
       apiKey: deepseekKey,
-      cacheDuration: s.aiCacheDuration
+      cacheDuration: s.aiCacheDuration,
+      diagSurface: "popup"
     });
     if (result.code === "host_permission") {
       const origins = _aiRequiredOriginPatterns(s, [PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN]);

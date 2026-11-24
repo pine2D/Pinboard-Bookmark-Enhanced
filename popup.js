@@ -1371,11 +1371,11 @@ async function showMain(token) {
       let deepseekFallbackNotice = "";
       if (configuredEngine === "jina") {
         const jinaKey = settings.jinaApiKey ? deobfuscateKey(settings.jinaApiKey) : "";
-        result = await fetchJinaMarkdown(url, { apiKey: jinaKey, cacheDuration: settings.aiCacheDuration });
+        result = await fetchJinaMarkdown(url, { apiKey: jinaKey, cacheDuration: settings.aiCacheDuration, diagSurface: "popup" });
         if (!result.error) result._hasApiKey = !!jinaKey;
       } else if (configuredEngine === "deepseek") {
         const deepseekKey = settings.deepseekApiKey ? deobfuscateKey(settings.deepseekApiKey) : "";
-        result = await fetchDeepseekMarkdown(url, { apiKey: deepseekKey, cacheDuration: settings.aiCacheDuration });
+        result = await fetchDeepseekMarkdown(url, { apiKey: deepseekKey, cacheDuration: settings.aiCacheDuration, diagSurface: "popup" });
         if (!result.error && (!result.markdown || !result.markdown.trim())
             && !(typeof pbpVideoDetect === "function" && pbpVideoDetect(tab.url || url))) {
           result = { error: "empty" };

@@ -863,7 +863,7 @@ function _pbpEcdictCommit(tx, records, metaRecord, onProgress) {
     }
     // Callers guarantee records.length > 0, so `last` is never null here.
     last.onsuccess = () => {
-      if (onProgress) { try { onProgress(i); } catch (e) { console.warn("[dict-pack] onProgress callback failed:", e?.name); } }
+      if (onProgress) { try { onProgress(i); } catch (e) { console.warn("[dict-pack] onProgress callback failed:", _pbpPackSafeErrName(e)); } }
       if (i < records.length) { queueBatch(); return; }
       // Final batch. This put MUST be queued synchronously inside this
       // callback: after any await or promise hop the transaction is inactive.
@@ -875,6 +875,17 @@ function _pbpEcdictCommit(tx, records, metaRecord, onProgress) {
     // partial pack.
   };
   queueBatch();
+}
+
+function _pbpPackSafeErrName(e) {
+  if (typeof pbpSafeErrorName === "function") return pbpSafeErrorName(e);
+  try {
+    const n = e && e.name;
+    return typeof n === "string" && /^(?:Error|(?:Type|Range|Reference|Syntax|URI|Eval|Aggregate)Error|DOMException|(?:Abort|Timeout|QuotaExceeded|NotAllowed|NotFound|Network|Security|InvalidState|DataClone|Data|TransactionInactive|ReadOnly|Version|Constraint|Unknown|Operation|Encoding|NotReadable|NotSupported)Error)$/.test(n) ? n : "Error";
+  } catch (_) {
+    /* swallow-ok: broken error.name getter degrades to generic Error */
+    return "Error";
+  }
 }
 
 // How much text to chew through before handing the event loop back, in UTF-16
@@ -929,7 +940,7 @@ async function pbpEcdictImport(lineIter, stats, opts) {
       sinceYield += r.record.key.length + r.record.word.length + r.record.translation.length;
       if (records.length > PBP_ECDICT_MAX_ENTRIES) throw new Error("ECDICT entry count above the accepted ceiling");
       if (payloadBytes > PBP_ECDICT_MAX_PAYLOAD_BYTES) throw new Error("ECDICT payload above the accepted ceiling");
-      if (records.length % 20000 === 0 && o.onParsed) { try { o.onParsed(records.length); } catch (e) { console.warn("[dict-pack] onParsed callback failed:", e?.name); } }
+      if (records.length % 20000 === 0 && o.onParsed) { try { o.onParsed(records.length); } catch (e) { console.warn("[dict-pack] onParsed callback failed:", _pbpPackSafeErrName(e)); } }
     }
     // Every resource gate is checked BEFORE a transaction exists, so a rejected
     // file never touches the store.
@@ -951,7 +962,7 @@ async function pbpEcdictImport(lineIter, stats, opts) {
     // Phase marker: everything above is parsing, everything below is the one
     // transaction. Lets a harness attribute a main-thread stall to the phase
     // that can yield versus the phase that must not.
-    if (o.onPhase) { try { o.onPhase("parsed"); } catch (e) { console.warn("[dict-pack] onPhase callback failed:", e?.name); } }
+    if (o.onPhase) { try { o.onPhase("parsed"); } catch (e) { console.warn("[dict-pack] onPhase callback failed:", _pbpPackSafeErrName(e)); } }
     const db = await _pbpPackOpenDB();
     await _pbpPackTx(db, "readwrite", (tx) => {
       // Read before clear in the same transaction: replacements retain the
@@ -1560,7 +1571,7 @@ function pbpYomitanImportFile(file, options = {}) {
   // queues after this install instead of being undone by its eventual commit.
   return navigator.locks.request(_PBP_MULTI_LOCK, { signal: options.signal }, async () => {
     let db, generation, activated = false;
-    const progress = payload => { if (options.onProgress) { try { options.onProgress(payload); } catch (e) { console.warn("[dict-pack] Yomitan onProgress callback failed:", e?.name); } } };
+    const progress = payload => { if (options.onProgress) { try { options.onProgress(payload); } catch (e) { console.warn("[dict-pack] Yomitan onProgress callback failed:", _pbpPackSafeErrName(e)); } } };
     try {
       const zip = await _pbpYomitanZip(file, options.signal);
       const manifest = await _pbpYomitanManifest(await _pbpYomitanReadJson(file, zip.entries.find(e => e.kind === "index"), options.signal), options);

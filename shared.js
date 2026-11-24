@@ -1996,14 +1996,25 @@ function pbpEntryBytes(key, value) {
   catch (_) { /* swallow-ok: unserializable value falls back to key length for advisory byte estimate */ return key.length; }
 }
 
-// Enumerate reclaimable local storage grouped by category: { cat: { keys, bytes } }.
-// Degrades to an all-zero shape on any storage failure (never throws).
-async function pbpMeasureLocalStorage() {
+// Enumerate reclaimable local storage grouped by category: { cat: { keys, bytes, failed? } }.
+// Degrades to an all-zero failed shape on any storage failure (never throws).
+async function pbpMeasureLocalStorage(opts) {
   const out = {};
   for (const cat of Object.keys(PBP_RECLAIM_CATEGORIES)) out[cat] = { keys: [], bytes: 0 };
   let all;
   try { all = await chrome.storage.local.get(null); }
-  catch (error) { console.warn("[storage] measure failed:", error?.name, error?.message); return out; }
+  catch (error) {
+    const errName = pbpSafeErrorName(error);
+    console.warn("[storage] measure failed:", errName);
+    pbpRecordDiagError({
+      surface: pbpDetectDiagSurface(opts && typeof opts === "object" ? opts.surface : undefined),
+      op: "storage_measure",
+      code: "storage",
+      errorName: errName,
+    });
+    for (const cat of Object.keys(PBP_RECLAIM_CATEGORIES)) out[cat] = { keys: [], bytes: 0, failed: true };
+    return out;
+  }
   for (const key of Object.keys(all || {})) {
     if (pbpIsNeverClearKey(key)) continue;
     for (const cat of Object.keys(PBP_RECLAIM_CATEGORIES)) {
@@ -2122,6 +2133,7 @@ async function pbpReclaimLocalStorage(categories, opts) {
     // The caller re-renders from a fresh read rather than trusting this return
     // value as an optimistic UI update; `failed` only picks the status line.
     try { await local.remove(toRemove); } catch (e) { return fail("remove", e); }
+    if (toRemove.includes(PBP_DIAG_ERRORS_KEY)) _pbpBumpDiagClearGen(true);
   }
   return { freed, removed };
 }
@@ -2308,9 +2320,14 @@ function pbpPickDominantFrame(frames, vw, vh, pageOrigin) {
   return best && bestArea >= 0.4 * W * H ? best : "";
 }
 
-// Invalidate cache + mirror when user toggles optSyncEnabled
+// Invalidate cache + mirror when user toggles optSyncEnabled, and advance the
+// diagnostic clear generation whenever pbpDiagErrors is removed in any realm.
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && Object.prototype.hasOwnProperty.call(changes, PBP_DIAG_ERRORS_KEY) &&
+        changes[PBP_DIAG_ERRORS_KEY]?.newValue === undefined) {
+      _pbpBumpDiagClearGen(false);
+    }
     if (area === "local" && changes.optSyncEnabled) {
       _settingsStorageCache = null;
       _pbpRecentPrimitiveReadBasis.clear();
@@ -2483,17 +2500,48 @@ function pbpCreateRecoveringTail() {
 // Stores at most 50 sanitized entries in chrome.storage.local["pbpDiagErrors"]
 // so failures survive SW idle termination and appear in Copy Diagnostics.
 // Constructive privacy rule: NEVER accept or store error.message, stack, URLs,
-// hostnames, emails, tokens, account names, vocabulary headwords or content.
+// hostnames, emails, tokens, account names, vocabulary headwords or content;
+// both read and write validate against closed allowlists (PBP_DIAG_SURFACES,
+// PBP_DIAG_OPS, PBP_DIAG_CODES, PBP_DIAG_ERROR_NAMES).
 const PBP_DIAG_ERRORS_KEY = "pbpDiagErrors";
 const PBP_DIAG_ERRORS_CAP = 50;
+const PBP_DIAG_LOCK_NAME = "pbp-diag-errors";
 const PBP_DIAG_SURFACES = Object.freeze([
   "background", "popup", "options", "library", "md-preview", "pinboard", "ai", "dict", "sync", "shared",
 ]);
-const PBP_DIAG_SINGLE_TOKENS = Object.freeze([
-  "http", "network", "timeout", "aborted", "offline", "quota", "parse",
-  "storage", "idb", "failed", "unknown", "denied", "invalid", "conflict", "cancelled",
+const PBP_DIAG_OPS = Object.freeze([
+  "unknown",
+  "ai_cache",
+  "anki_input",
+  "bookmark_delete",
+  "deepseek_cache_read",
+  "deepseek_cache_write",
+  "ecdict_lookup",
+  "ecdict_tx",
+  "entry_cache_validate",
+  "export_target_test",
+  "jina_cache_read",
+  "jina_cache_write",
+  "obsidian_clip",
+  "offline_retry",
+  "reader_handoff",
+  "storage_measure",
+  "sync_migrate",
+  "vocab_batch_delete",
+  "vocab_batch_group",
+  "vocab_batch_status",
+  "vocab_delete",
+  "vocab_note_save",
+  "vocab_reload",
+  "vocab_render",
+  "wayback_clear",
+  "wayback_retry",
 ]);
-const PBP_DIAG_FORBIDDEN_SUBSTR = /secret|token|auth|key|pass|cred|cookie|bearer|acct|user|owner|mail|url/;
+const PBP_DIAG_CODES = Object.freeze([
+  "failed", "unknown", "http", "network", "timeout", "aborted", "offline",
+  "quota", "parse", "storage", "idb", "denied", "invalid", "conflict",
+  "cancelled", "send_failed",
+]);
 const PBP_DIAG_ERROR_NAMES = Object.freeze([
   "Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError", "URIError", "EvalError", "AggregateError",
   "DOMException", "AbortError", "TimeoutError", "QuotaExceededError", "NotAllowedError", "NotFoundError",
@@ -2504,13 +2552,77 @@ const PBP_DIAG_ERROR_NAMES = Object.freeze([
   "NamespaceError", "IndexSizeError",
 ]);
 const _pbpDiagWriteTail = pbpCreateRecoveringTail();
+let _pbpDiagClearGen = 0;
+let _pbpDiagChannel = null;
+try {
+  if (typeof BroadcastChannel === "function") {
+    _pbpDiagChannel = new BroadcastChannel(PBP_DIAG_LOCK_NAME);
+    _pbpDiagChannel.onmessage = (ev) => {
+      if (ev && ev.data === "clear") _pbpDiagClearGen += 1;
+    };
+    if (typeof _pbpDiagChannel.unref === "function") _pbpDiagChannel.unref();
+  }
+} catch (_) {
+  /* swallow-ok: BroadcastChannel unavailable in isolated test contexts; storage.onChanged still tracks clears */
+  _pbpDiagChannel = null;
+}
 
-function _pbpDiagToken(raw, fallback) {
-  if (typeof raw !== "string") return fallback;
-  if (PBP_DIAG_SINGLE_TOKENS.includes(raw)) return raw;
-  if (raw.length > 48 || !/^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/.test(raw)) return fallback;
-  if (PBP_DIAG_FORBIDDEN_SUBSTR.test(raw)) return fallback;
-  return raw;
+function _pbpBumpDiagClearGen(broadcast) {
+  _pbpDiagClearGen += 1;
+  if (broadcast && _pbpDiagChannel) {
+    try { _pbpDiagChannel.postMessage("clear"); }
+    catch (_) { /* swallow-ok: detached BroadcastChannel must never block local storage reclaim */ }
+  }
+}
+
+function _pbpDiagWithLock(task) {
+  const locks = globalThis.navigator?.locks;
+  if (locks && typeof locks.request === "function") {
+    let entered = false;
+    try {
+      return locks.request(PBP_DIAG_LOCK_NAME, () => {
+        entered = true;
+        return _pbpDiagWriteTail(task);
+      }).catch((err) => {
+        if (!entered) return _pbpDiagWriteTail(task);
+        throw err;
+      });
+    } catch (_) {
+      /* swallow-ok: opaque-origin test frames deny LockManager; fall back to in-realm queue */
+      return _pbpDiagWriteTail(task);
+    }
+  }
+  return _pbpDiagWriteTail(task);
+}
+
+function pbpSafeErrorName(err) {
+  if (!err || (typeof err !== "object" && typeof err !== "function")) return "Error";
+  try {
+    const name = err.name;
+    return typeof name === "string" && PBP_DIAG_ERROR_NAMES.includes(name) ? name : "Error";
+  } catch (_) {
+    /* swallow-ok: hostile or broken error.name getter degrades to generic Error token */
+    return "Error";
+  }
+}
+
+function pbpDetectDiagSurface(explicit) {
+  if (typeof explicit === "string" && PBP_DIAG_SURFACES.includes(explicit)) return explicit;
+  if (typeof document === "undefined") return "background";
+  try {
+    const path = typeof location !== "undefined" && typeof location?.pathname === "string" ? location.pathname : "";
+    if (path.endsWith("/popup.html")) return "popup";
+    if (path.endsWith("/options.html")) return "options";
+    if (path.endsWith("/library.html")) return "library";
+    if (path.endsWith("/md-preview.html")) return "md-preview";
+    if (typeof document.getElementById === "function" &&
+        (document.getElementById("storage-cats") || document.getElementById("options-search-input"))) {
+      return "options";
+    }
+  } catch (_) {
+    /* swallow-ok: restricted location/document probe degrades to shared surface */
+  }
+  return "shared";
 }
 
 function _pbpIsDiagRecord(value) {
@@ -2521,23 +2633,39 @@ function _pbpIsDiagRecord(value) {
     Object.prototype.toString.call(value) === "[object Object]";
 }
 
+function _pbpDiagOwnData(record, key) {
+  const desc = Object.getOwnPropertyDescriptor(record, key);
+  return desc && Object.prototype.hasOwnProperty.call(desc, "value") ? desc.value : undefined;
+}
+
 function _pbpSanitizeStoredDiagError(raw) {
-  if (!_pbpIsDiagRecord(raw)) return null;
-  if (!Number.isSafeInteger(raw.ts) || raw.ts <= 0) return null;
-  if (typeof raw.surface !== "string" || (!PBP_DIAG_SURFACES.includes(raw.surface) && raw.surface !== "unknown")) return null;
-  if (typeof raw.op !== "string" || _pbpDiagToken(raw.op, "") !== raw.op) return null;
-  if (typeof raw.code !== "string" || _pbpDiagToken(raw.code, "") !== raw.code) return null;
-  if (typeof raw.errorName !== "string" || !PBP_DIAG_ERROR_NAMES.includes(raw.errorName)) return null;
-  if (raw.status !== null && raw.status !== undefined &&
-      !(Number.isInteger(raw.status) && raw.status >= 100 && raw.status <= 599)) return null;
-  return {
-    ts: raw.ts,
-    surface: raw.surface,
-    op: raw.op,
-    code: raw.code,
-    errorName: raw.errorName,
-    status: raw.status == null ? null : raw.status,
-  };
+  try {
+    if (!_pbpIsDiagRecord(raw)) return null;
+    const ts = _pbpDiagOwnData(raw, "ts");
+    const surface = _pbpDiagOwnData(raw, "surface");
+    const op = _pbpDiagOwnData(raw, "op");
+    const code = _pbpDiagOwnData(raw, "code");
+    const errorName = _pbpDiagOwnData(raw, "errorName");
+    const status = _pbpDiagOwnData(raw, "status");
+    if (!Number.isSafeInteger(ts) || ts <= 0) return null;
+    if (typeof surface !== "string" || (!PBP_DIAG_SURFACES.includes(surface) && surface !== "unknown")) return null;
+    if (typeof op !== "string" || !PBP_DIAG_OPS.includes(op)) return null;
+    if (typeof code !== "string" || !PBP_DIAG_CODES.includes(code)) return null;
+    if (typeof errorName !== "string" || !PBP_DIAG_ERROR_NAMES.includes(errorName)) return null;
+    if (status !== null && status !== undefined &&
+        !(Number.isInteger(status) && status >= 100 && status <= 599)) return null;
+    return {
+      ts,
+      surface,
+      op,
+      code,
+      errorName,
+      status: status == null ? null : status,
+    };
+  } catch (_) {
+    /* swallow-ok: hostile proxy or corrupted stored entry is dropped rather than breaking diagnostics read */
+    return null;
+  }
 }
 
 function pbpSanitizeDiagErrors(rawList) {
@@ -2551,23 +2679,46 @@ function pbpSanitizeDiagErrors(rawList) {
 }
 
 function pbpRecordDiagError(input) {
-  if (!_pbpIsDiagRecord(input)) return Promise.resolve(null);
-  const entry = {
-    ts: Date.now(),
-    surface: typeof input.surface === "string" && PBP_DIAG_SURFACES.includes(input.surface) ? input.surface : "unknown",
-    op: _pbpDiagToken(input.op, "unknown"),
-    code: _pbpDiagToken(input.code, "failed"),
-    errorName: typeof input.errorName === "string" && PBP_DIAG_ERROR_NAMES.includes(input.errorName) ? input.errorName : "Error",
-    status: Number.isInteger(input.status) && input.status >= 100 && input.status <= 599 ? input.status : null,
-  };
-  return _pbpDiagWriteTail(async () => {
+  let entry;
+  try {
+    if (!_pbpIsDiagRecord(input)) return Promise.resolve(null);
+    const surfaceRaw = _pbpDiagOwnData(input, "surface");
+    const opRaw = _pbpDiagOwnData(input, "op");
+    const codeRaw = _pbpDiagOwnData(input, "code");
+    const errorNameRaw = _pbpDiagOwnData(input, "errorName");
+    const statusRaw = _pbpDiagOwnData(input, "status");
+    entry = {
+      ts: Date.now(),
+      surface: typeof surfaceRaw === "string" && PBP_DIAG_SURFACES.includes(surfaceRaw) ? surfaceRaw : "unknown",
+      op: typeof opRaw === "string" && PBP_DIAG_OPS.includes(opRaw) ? opRaw : "unknown",
+      code: typeof codeRaw === "string" && PBP_DIAG_CODES.includes(codeRaw) ? codeRaw : "failed",
+      errorName: typeof errorNameRaw === "string" && PBP_DIAG_ERROR_NAMES.includes(errorNameRaw) ? errorNameRaw : "Error",
+      status: Number.isInteger(statusRaw) && statusRaw >= 100 && statusRaw <= 599 ? statusRaw : null,
+    };
+  } catch (_) {
+    /* swallow-ok: diagnostic ring must never throw synchronously from caller catch paths */
+    return Promise.resolve(null);
+  }
+  return _pbpDiagWithLock(async () => {
     try {
       if (typeof chrome === "undefined" || !chrome.storage?.local) return null;
-      const stored = await chrome.storage.local.get(PBP_DIAG_ERRORS_KEY);
-      const prev = pbpSanitizeDiagErrors(stored && stored[PBP_DIAG_ERRORS_KEY]);
+      const local = chrome.storage.local;
+      let gen0 = _pbpDiagClearGen;
+      const stored = await local.get(PBP_DIAG_ERRORS_KEY);
+      const prev = _pbpDiagClearGen === gen0
+        ? pbpSanitizeDiagErrors(stored && stored[PBP_DIAG_ERRORS_KEY])
+        : [];
+      const hadPrev = prev.length > 0;
+      gen0 = _pbpDiagClearGen;
       prev.push(entry);
       const next = prev.length > PBP_DIAG_ERRORS_CAP ? prev.slice(-PBP_DIAG_ERRORS_CAP) : prev;
-      await chrome.storage.local.set({ [PBP_DIAG_ERRORS_KEY]: next });
+      await local.set({ [PBP_DIAG_ERRORS_KEY]: next });
+      if (_pbpDiagClearGen !== gen0 && hadPrev) {
+        const after = await local.get(PBP_DIAG_ERRORS_KEY);
+        if (after && after[PBP_DIAG_ERRORS_KEY] !== undefined) {
+          await local.set({ [PBP_DIAG_ERRORS_KEY]: [entry] });
+        }
+      }
       return entry;
     } catch (_) {
       /* swallow-ok: diagnostic ring write must never throw into or recursively log from caller catch paths */
@@ -2577,7 +2728,7 @@ function pbpRecordDiagError(input) {
 }
 
 function pbpReadDiagErrors() {
-  return _pbpDiagWriteTail(async () => {
+  return _pbpDiagWithLock(async () => {
     try {
       if (typeof chrome === "undefined" || !chrome.storage?.local) return [];
       const stored = await chrome.storage.local.get(PBP_DIAG_ERRORS_KEY);

@@ -1969,7 +1969,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     let measured = null;
     try {
       const [localStats, ocrStats, ttsStats] = await Promise.all([
-        pbpMeasureLocalStorage(),
+        pbpMeasureLocalStorage({ surface: "options" }),
         typeof pbpOcrDocsMeasure === "function" ? pbpOcrDocsMeasure() : Promise.resolve({ count: 0, bytes: 0, failed: false }),
         typeof pbpTtsCacheMeasure === "function" ? pbpTtsCacheMeasure() : Promise.resolve({ count: 0, bytes: 0, failed: false }),
       ]);
@@ -1987,8 +1987,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
       } : null;
     } catch (e) {
-      console.warn("[options] storage panel measurement failed:", e?.name);
-      if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "options", op: "storage_measure", code: "storage", errorName: e?.name });
+      const errName = typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(e) : "Error";
+      console.warn("[options] storage panel measurement failed:", errName);
+      if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "options", op: "storage_measure", code: "storage", errorName: errName });
       measured = null;
     }
     host.textContent = "";

@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="108"><title>Options Usability Tests</title>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="109"><title>Options Usability Tests</title>
 <link rel="stylesheet" href="../options.css">
 <style>body{font-family:monospace;padding:16px}.case{padding:5px}.pass{color:#176}.fail{color:#b00}</style>
 </head><body>
@@ -156,6 +156,7 @@ const localData = {
   pbpDiagErrors:[
     { ts:1700000000123, surface:"ai", op:"ai_cache", code:"idb", errorName:"InvalidStateError", status:null, message:"TOP_SECRET", url:"https://secret.example/leak", owner:"alice" },
     { ts:1700000000456, surface:"alice", op:"TOP_SECRET", code:"Secret", errorName:"SecretError", status:401 },
+    { ts:1700000000789, surface:"options", op:"green_meadow", code:"silver_maple", errorName:"Error", status:null, message:"extra" },
   ],
 };
 function area(data, bytes) {
@@ -1050,7 +1051,7 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
 
   await test("diagnostics never contain credentials, owners, page URLs, titles or custom endpoints", async () => {
     assert(diagnostics, "diagnostics unavailable");
-    for (const secret of ["TOP_SECRET", "LEAK-ME", "EUDIC-SECRET", "alice", "secret.example", "Secret", "private.example"])
+    for (const secret of ["TOP_SECRET", "LEAK-ME", "EUDIC-SECRET", "alice", "secret.example", "Secret", "private.example", "green_meadow", "silver_maple"])
       assert(!serialized.includes(secret), "leaked " + secret);
   });
 
@@ -2062,6 +2063,41 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       baselineObfuscated: obfuscateKey("sk-saved-B"),
       freshPlain: "sk-external-D",
     }) === true, "must refill when another tab/restore updated the stored key and form has no unsaved edits");
+  });
+
+  await test("Copy Diagnostics strips unregistered op/code tokens and pbpMeasureLocalStorage records get(null) failure", async () => {
+    const savedDiag = structuredClone(localData.pbpDiagErrors);
+    const origGet = chrome.storage.local.get;
+    try {
+      await pbpRecordDiagError({
+        surface: "options",
+        op: "blue_orchid",
+        code: "silver_maple",
+        errorName: "blue_orchid",
+      });
+      const diag1 = await pbpBuildSanitizedDiagnostics();
+      const s1 = JSON.stringify(diag1);
+      for (const bad of ["blue_orchid", "silver_maple", "green_meadow"]) {
+        assert(!s1.includes(bad), "Copy Diagnostics leaked unregistered token: " + bad);
+      }
+      const last1 = diag1.state.recentErrors[diag1.state.recentErrors.length - 1];
+      assert(last1.op === "unknown" && last1.code === "failed" && last1.errorName === "Error",
+        "unregistered op/code/errorName did not normalize to closed fallbacks: " + JSON.stringify(last1));
+
+      chrome.storage.local.get = async (keys) => {
+        if (keys === null) throw new DOMException("blocked", "InvalidStateError");
+        return origGet(keys);
+      };
+      const measured = await pbpMeasureLocalStorage({ surface: "options" });
+      assert(measured.misc && measured.misc.failed === true && measured.misc.keys.length === 0,
+        "failed local.get(null) should mark misc.failed=true: " + JSON.stringify(measured.misc));
+      const diag2 = await pbpBuildSanitizedDiagnostics();
+      assert(diag2.state.recentErrors.some((r) => r.surface === "options" && r.op === "storage_measure" && r.code === "storage" && r.errorName === "InvalidStateError"),
+        "storage_measure failure was not recorded into recentErrors: " + JSON.stringify(diag2.state.recentErrors));
+    } finally {
+      chrome.storage.local.get = origGet;
+      localData.pbpDiagErrors = savedDiag;
+    }
   });
 
   document.title = fail ? "FAIL Options Usability Tests" : "PASS Options Usability Tests";

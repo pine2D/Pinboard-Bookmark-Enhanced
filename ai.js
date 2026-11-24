@@ -2002,6 +2002,17 @@ function _pbpSseConsumer(extractDelta, onText, onRaw, onParseError) {
 // chunk -> last wins; Claude splits input/output across two events -> merged).
 // flush() invokes opts.onUsage exactly once after a NORMAL stream end, iff any
 // field was captured. Any extractor throw is swallowed (degrade to estimate).
+function _pbpAiSafeErrName(e) {
+  if (typeof pbpSafeErrorName === "function") return pbpSafeErrorName(e);
+  try {
+    const n = e && e.name;
+    return typeof n === "string" && /^(?:Error|(?:Type|Range|Reference|Syntax|URI|Eval|Aggregate)Error|DOMException|(?:Abort|Timeout|QuotaExceeded|NotAllowed|NotFound|Network|Security|InvalidState|DataClone|Data|Unknown|Operation|Encoding|NotReadable|NotSupported)Error)$/.test(n) ? n : "Error";
+  } catch (_) {
+    /* swallow-ok: broken error.name getter degrades to generic Error */
+    return "Error";
+  }
+}
+
 function _pbpUsageSink(extractUsage, opts) {
   const acc = { inTok: null, outTok: null };
   let saw = false;
@@ -2017,7 +2028,7 @@ function _pbpUsageSink(extractUsage, opts) {
       if (saw && opts && typeof opts.onUsage === "function") {
         // Side channel must never break the primary result: a throwing
         // consumer callback must not reject the surrounding stream promise.
-        try { opts.onUsage({ inTok: acc.inTok || 0, outTok: acc.outTok || 0 }); } catch (e) { console.warn("[pbp-ai] onUsage callback failed:", e?.name); }
+        try { opts.onUsage({ inTok: acc.inTok || 0, outTok: acc.outTok || 0 }); } catch (e) { console.warn("[pbp-ai] onUsage callback failed:", _pbpAiSafeErrName(e)); }
       }
     }
   };
