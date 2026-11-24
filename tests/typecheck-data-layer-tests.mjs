@@ -1,5 +1,5 @@
 // Self-tests for scripts/typecheck-data-layer.mjs (dev-only JSDoc + strictNullChecks
-// gate over the 19 pure data-layer, sync, backup, send, and cache files). Node only, 0 slice anchors.
+// gate over the 28 pure data-layer, sync, backup, send, cache, AI, dictionary and conversion files). Node only, 0 slice anchors.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appendFileSync, copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -42,10 +42,10 @@ function listAllFiles(dir) {
 
 test('live repository pure data-layer passes checkJs + strictNullChecks with zero errors', () => {
   // 最简单漏判反例：jsconfig 漏收某个纯数据层文件，或默认 strictNullChecks 未生效导致真实代码带空指针隐患却静默绿灯。
-  assert.equal(DATA_LAYER_FILES.length, 19);
+  assert.equal(DATA_LAYER_FILES.length, 28);
   const res = runDataLayerTypecheck({ root: ROOT });
   assert.equal(res.ok, true, res.errors.join('\n'));
-  assert.equal(res.checkedFiles, 19);
+  assert.equal(res.checkedFiles, 28);
   assert.deepEqual(res.errors, []);
 });
 
@@ -75,8 +75,8 @@ test('config invariants fail closed if strictNullChecks, noEmit or a required fi
     assert.match(emitEnabled.errors.join('\n'), /noEmit/);
     assert.deepEqual(listAllFiles(dir), beforeFiles, 'typecheck gate must never emit build artifacts');
 
-    // 3. Dropping any of the 19 checked files from files[] must fail closed.
-    for (const target of ['notes-sync.js', 'vocab-gdrive.js', 'options-backup.js']) {
+    // 3. Dropping any of the 28 checked files from files[] must fail closed.
+    for (const target of ['notes-sync.js', 'vocab-gdrive.js', 'options-backup.js', 'ai.js', 'dict-pack.js', 'md-convert.js']) {
       writeFileSync(cfgPath, JSON.stringify({
         ...baseCfg,
         files: baseCfg.files.filter((f) => !f.endsWith(target)),

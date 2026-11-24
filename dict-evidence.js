@@ -62,6 +62,7 @@ function _pbpDictEvidenceForbidden(categories) {
 function _pbpDictEvidenceGenre(categories) {
   if (_pbpDictEvidenceForbidden(categories)) return "";
   const text = _pbpDictEvidenceCategories(categories);
+  /** @type {Array<[string, RegExp]>} */
   const rules = [
     ["short-story", /(?:\b(?:short stories|short story|novellas?|Erzählungen|Kurzgeschichten|Cuentos|Nouvelles|Racconti|Contos|Рассказы)\b|(?:^|[^\p{L}])Рассказы(?=$|[^\p{L}])|短篇小說|短篇小说|短編小説|단편)/iu],
     ["novel", /(?:\b(?:novels?|Romane?|Novelas?|Romans?|Romanzi|Romances|Романы)\b|(?:^|[^\p{L}])Романы(?=$|[^\p{L}])|小說|小说|小説|소설)/iu],
@@ -227,6 +228,15 @@ function _pbpDictEvidenceEtymology(page, root, language) {
   }
   return null;
 }
+/**
+ * @param {{
+ *   term?: string;
+ *   sourceLanguage?: string;
+ *   kind?: string;
+ *   signal?: AbortSignal;
+ *   beforeRequest?: () => Promise<any>;
+ * }} [opts]
+ */
 async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, beforeRequest } = {}) {
   const language = _pbpDictEvidenceLang(sourceLanguage), origin = pbpDictEvidenceOrigin(kind, language);
   if (typeof term !== "string" || !term.trim() || term.length > 256 || typeof beforeRequest !== "function") throw _pbpDictEvidenceError("invalid_request");

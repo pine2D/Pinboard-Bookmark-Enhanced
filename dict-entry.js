@@ -23,7 +23,7 @@ const PBP_DICT_STREAM_DEADLINE_MS = 180000;
 // swallows a throwing callback (or a rejected promise it returns) with a
 // warning; the phase carries no text, and the caller drops stale phases.
 function _pbpDictStreamProgress(onStage) {
-  return ({ phase } = {}) => (typeof onStage === "function" ? onStage(phase) : undefined);
+  return (/** @type {{ phase?: string }} */ { phase } = {}) => (typeof onStage === "function" ? onStage(phase) : undefined);
 }
 // The one generation call shared by the entry and every supplement category.
 function _pbpDictGenerateStream(request, prompt, responseSchema, onStage) {
@@ -366,6 +366,7 @@ function pbpDictEntryParse(text, request, options = {}) {
       return invalid("entry_meanings_all_invalid");
     }
   }
+  /** @type {{ word: string, language: string, pronunciation: string, meanings: any[], etymology: string, relatedWords: string[], learning?: any }} */
   const result = { word: request.term, language: request.sourceLanguage, pronunciation: pronunciation.trim(), meanings,
     etymology: "", relatedWords: [] };
   try { _pbpDictEntryParseLearning(value, structured, result, invalid); }
@@ -428,8 +429,8 @@ function _pbpDictExplicitLanguageScript(tag) {
     const locale = new Intl.Locale(tag);
     if (locale.script) return locale.script;
     if (locale.language === "zh") {
-      if (["TW", "HK", "MO"].includes(locale.region)) return "Hant";
-      if (["CN", "SG"].includes(locale.region)) return "Hans";
+      if (locale.region && ["TW", "HK", "MO"].includes(locale.region)) return "Hant";
+      if (locale.region && ["CN", "SG"].includes(locale.region)) return "Hans";
     }
   } catch (_) { /* Invalid tags cannot establish a script. */ }
   return "";
@@ -656,6 +657,12 @@ async function _pbpDictEntryWithLock(request, purpose, run) {
 // onDrop(error) hears about each dropped sense or learning piece with a fixed
 // code/reason (the reader files it in the local failure ledger). onStage(phase)
 // hears the stream's thinking/streaming phases only.
+/**
+ * @param {any} request
+ * @param {string} [updateId]
+ * @param {((error: any) => void) | null} [onDrop]
+ * @param {((phase?: string) => void) | null} [onStage]
+ */
 async function _pbpDictEntryGenerate(request, updateId = "", onDrop = null, onStage = null) {
   await _pbpDictEntryGuard(request);
   const key = await _pbpDictEntryKey(request);
@@ -677,8 +684,8 @@ async function _pbpDictEntryGenerate(request, updateId = "", onDrop = null, onSt
   if (!entry.learning) {
     // Keep a valid paid basic entry when the model omitted optional enrichment.
     // Do not reclassify unstructured legacy claims as verified history.
-    entry.learning = { version: 2, formation: "", history: "", related: [], sources: [] };
-    entry.relatedWords = [];
+    entry.learning = { version: 2, formation: "", history: "", related: /** @type {any[]} */ ([]), sources: /** @type {any[]} */ ([]) };
+    entry.relatedWords = /** @type {string[]} */ ([]);
   }
   entry.learning.history = "";
   // Basic lookup never fetches history; old cached enrichments remain readable.
@@ -1112,7 +1119,8 @@ async function _pbpDictSupplementGenerate(input, request, category, profile) {
   if (typeof hasAIKey !== "function" || !hasAIKey(request.settings)) throw _pbpDictEntryError("ai_not_configured", "AI is not configured");
   if (!record.entry) throw _pbpDictEntryError("invalid_request", "Original meanings for this supplement are unavailable");
   if (category === "etymology") await stage("sources");
-  const sources = await _pbpDictSupplementSources(request, category);
+  const rawSources = await _pbpDictSupplementSources(request, category);
+  const sources = Array.isArray(rawSources) ? rawSources : [];
   // How many etymology sources a clean retrieval found (0 is a clean miss;
   // a broken retrieval threw above), for the caller's local empty-result
   // memory (plan 1C.4). It carries a count only, never source text.

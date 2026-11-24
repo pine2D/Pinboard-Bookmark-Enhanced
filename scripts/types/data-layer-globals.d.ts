@@ -1,5 +1,5 @@
 // Dev-only ambient declarations for cross-file runtime helpers consumed by the
-// 19 pure data-layer, sync, backup, send, and cache scripts checked under
+// 28 pure data-layer, sync, backup, send, cache, AI, dictionary, and conversion scripts checked under
 // scripts/jsconfig.data-layer.json.
 // Never shipped in the extension ZIP (scripts/ is excluded from release.sh).
 
@@ -8,9 +8,33 @@
 interface Window {
   __PBP_TYPO_CMP_COUNT?: () => number;
   __PBP_TYPO_CMP_INC?: () => number;
+  __pp_urlShimInstalled?: boolean;
+}
+
+interface PbpCodedError extends Error {
+  code?: string;
+  status?: number;
+  reason?: string;
+  paramHint?: string;
 }
 
 declare var __pbpTestSyncSetLarge: ((key: string, value: any) => Promise<any>) | undefined;
+declare var pbpMarkdownToPlainText: ((md: string) => string) | undefined;
+
+// ---- site-rules.js (IIFE-attached window/self globals) ----
+declare function applySiteRule(
+  doc: Document,
+  url: string,
+): {
+  id: string;
+  contentHtml?: string;
+  title?: string;
+  url: string;
+  math?: boolean;
+  forum?: boolean;
+  error?: string;
+} | null;
+declare function pbpSiteRuleText(html: string): string;
 
 interface PbpStripTrackingResult {
   cleaned: string;
@@ -61,50 +85,123 @@ interface PbpAiCustomProviderEntry {
 declare const PINBOARD_THEMES: Record<string, { name?: string; css: string; [key: string]: any }>;
 declare const ADAPTIVE_THEME_MAP: Record<string, [string, string]>;
 
-// ---- i18n.js ----
-declare function t(key: string, ...args: string[]): string;
-declare function uiLangToBCP47(): string;
+// ---- vendor/ ----
+declare class Defuddle {
+  constructor(doc: Node, options?: Record<string, any>);
+  parse(): {
+    content?: string;
+    title?: string;
+    author?: string;
+    published?: string;
+    site?: string;
+    wordCount?: number;
+    [key: string]: any;
+  };
+}
 
-// ---- ai.js ----
-declare function fetchWithTimeout(
-  url: string | URL,
-  options?: RequestInit,
-  timeoutMs?: number,
-): Promise<Response>;
+declare class TurndownService {
+  constructor(options?: Record<string, any>);
+  addRule(
+    key: string,
+    rule: {
+      filter: string | string[] | ((node: HTMLElement, options: any) => boolean);
+      replacement: (content: string, node: HTMLElement, options: any) => string;
+    },
+  ): this;
+  keep(filter: string | string[] | ((node: HTMLElement, options: any) => boolean)): this;
+  remove(filter: string | string[] | ((node: HTMLElement, options: any) => boolean)): this;
+  turndown(html: string | Node): string;
+  escape(str: string): string;
+}
 
-// ---- md-convert.js ----
-declare function applyFrontmatter(
-  md: string,
-  meta?: Record<string, any>,
-  opts?: { fields?: string[] },
-): string;
-declare function safeFilename(title?: string): string;
-declare function buildObsidianUri(opts?: {
-  action?: "new" | "daily" | string;
-  name?: string;
-  folder?: string;
-  vault?: string;
-  clipboard?: boolean;
-  append?: boolean;
-  content?: string;
-}): string;
+declare namespace marked {
+  class Renderer {
+    [key: string]: any;
+  }
+  class TextRenderer {
+    [key: string]: any;
+  }
+  namespace Parser {
+    function parseInline(tokens: any[], options?: Record<string, any>): string;
+  }
+  function lexer(src: string, options?: Record<string, any>): any[];
+  function parser(tokens: any[], options?: Record<string, any>): string;
+  function parse(src: string, options?: Record<string, any>): string;
+  function parseInline(src: string, options?: Record<string, any>): string;
+  function use(...args: Record<string, any>[]): void;
+  function walkTokens(tokens: any[], callback: (token: any) => void): void;
+}
 
-// ---- md-dict.js & dict-pack.js ----
+declare const DOMPurify: {
+  sanitize(dirty: string | Node, cfg?: Record<string, any>): string;
+  addHook(
+    entryPoint: string,
+    hookFunction: (currentNode: Element, hookEvent: any, config: any) => void,
+  ): void;
+};
+
+declare const hljs: {
+  configure(options: Record<string, any>): void;
+  getLanguage(name: string): unknown;
+  highlightElement(element: Element): void;
+  highlightAuto(code: string, languageSubset?: string[]): { language?: string; relevance: number; value: string };
+  listLanguages(): string[];
+};
+
+declare function renderMathInElement(elem: Element, options?: Record<string, any>): void;
+
+// ---- md-dict.js ----
 declare function pbpDictTsvField(v: unknown, columnIndex?: number): string;
 declare function pbpDictTsv(rows: readonly Record<string, any>[]): string;
-declare function pbpEcdictKey(word: unknown): string;
-declare function pbpEcdictSenses(translation: unknown): string[];
-declare function pbpEcdictLookupMany(
-  keys: readonly string[],
-): Promise<Map<string, Array<{ translation?: string; [key: string]: any }>>>;
-declare function pbpEcdictMeta(): Promise<{
-  state: string;
-  rung?: string;
-  decodedCrc32?: string | number;
+
+// ---- popup-ai.js ----
+declare const AI_PROVIDER_ORDER: readonly string[];
+
+// ---- background.js ----
+declare const statusCache: Map<string, any>;
+declare function getCurrentBookmarkAuth(): Promise<{
+  service: string;
+  token: string;
+  account: string;
   [key: string]: any;
-} | null>;
+}>;
+declare function runSaveDeliveryTransaction<T>(task: () => Promise<T>): Promise<T>;
+
+// ---- md-highlight.js / md-ask.js / md-mermaid.js / md-embed.js / md-preview.js ----
+declare function pbpHlComposeSection(items: readonly any[]): string;
+declare function pbpHlInlineMark(md: string, items: readonly any[], view?: string): string;
+declare function pbpAskExportNamespace(snapshot: any, occupied?: string, preferred?: string): string;
+declare function pbpAskExportMarkdown(snapshot: any, opts?: Record<string, any>): string;
+declare function pbpAskExportHtml(snapshot: any, opts?: Record<string, any>): string;
+declare function pbpMermaidApplyCached(root: ParentNode): void;
+declare function detectArticleLang(text: string): string;
+declare const PBP_EMBED_MIME_EXT: Readonly<Record<string, string>>;
+declare function pbpEmbedCanonicalUrl(u: string): string;
 
 // ---- shared.js ----
+declare const AI_TAG_CAP: number;
+declare const TAG_GUIDANCE: string;
+declare const DEFAULT_TAG_PROMPT: string;
+declare const DEFAULT_SUMMARY_PROMPT: string;
+declare const PBP_AI_PROTOCOLS: readonly ("openai" | "anthropic")[];
+declare const POSTS_ADD_URI_BUDGET: number;
+declare function pbpAiCustomEntryIdOk(id: unknown): boolean;
+declare function pbpAiEndpointNorm(url: unknown): string;
+declare function pbpAiCustomEntries(s?: Record<string, any> | null): PbpAiCustomProviderEntry[];
+declare function pbpTagGroupKey(name: unknown): string;
+declare function pbpFormatQuote(text: string, service?: string): string;
+declare function pinboardFetch(url: string, options?: RequestInit): Promise<Response>;
+declare function buildPostsAddUri(params: {
+  token: string;
+  url: string;
+  title?: string;
+  extended?: string;
+  tags?: string;
+  shared?: string;
+  toread?: string;
+  dt?: string;
+  replace?: boolean;
+}): string;
 declare const API_KEY_FIELDS: readonly string[];
 declare const PBP_AI_CUSTOM_SLOTS: readonly number[];
 declare const PBP_BACKUP_LAST_EXPORT_KEY: string;

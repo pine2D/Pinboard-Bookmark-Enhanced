@@ -418,7 +418,7 @@ function _pbpGetTurndown() {
     filter: (n) => n.nodeName === "DIV" && (n.hasAttribute("data-callout") || (n.classList && n.classList.contains("callout"))),
     replacement: (content, node) => {
       const type = (node.getAttribute("data-callout") || "note").trim().toUpperCase();
-      const clone = node.cloneNode(true);
+      const clone = /** @type {HTMLElement} */ (node.cloneNode(true));
       const titleEl = clone.querySelector(".callout-title");
       if (titleEl) titleEl.remove();
       let body;
@@ -443,7 +443,7 @@ function _pbpGetTurndown() {
       // link/picture) + optional caption". Anything else (a table with an icon
       // in a cell, paragraphs around an image, several images) keeps its whole
       // content; figcaption has no rule of its own, so its text is already in it.
-      const probe = node.cloneNode(true);
+      const probe = /** @type {HTMLElement} */ (node.cloneNode(true));
       probe.querySelectorAll("figcaption").forEach((c) => c.remove());
       const onlyPicture = probe.querySelectorAll("img").length === 1 &&
         !Array.from(probe.querySelectorAll("*")).some((e) => !/^(IMG|PICTURE|SOURCE|A)$/.test(e.nodeName)) &&
@@ -463,14 +463,14 @@ function _pbpGetTurndown() {
     filter: "li",
     replacement: (content, node) => {
       content = content.replace(/^\n+/, "").replace(/\n+$/, "\n").replace(/\n/gm, "\n    ");
-      const parent = node.parentNode;
+      const parent = node.parentElement;
       let prefix = "- ";
       if (parent && parent.nodeName === "OL") {
         const start = parseInt(parent.getAttribute("start") || "1", 10);
         const index = Array.from(parent.children).indexOf(node);
         prefix = (start + index) + ". ";
       }
-      const cb = node.querySelector("input[type=checkbox]");
+      const cb = /** @type {HTMLInputElement | null} */ (node.querySelector("input[type=checkbox]"));
       if (cb) {
         prefix += cb.checked ? "[x] " : "[ ] ";
         content = content.replace(/^\s*\[[ x]\]\s*/, "");
@@ -522,7 +522,7 @@ function _pbpAbsolutizeLinks(html, baseUrl) {
     // Figures/callout titles can discard headings; raw tables retain HTML
     // headings without IDs. Inert sentinels identify surviving heading tokens
     // without leaking into the real content or guessing by a repeated title.
-    const probe = root.cloneNode(true);
+    const probe = /** @type {HTMLElement} */ (root.cloneNode(true));
     let prefix = "PBPHEADINGMAP";
     while (html.includes(prefix)) prefix += "X";
     const originals = new Map();
@@ -628,7 +628,7 @@ function pbpB64Utf8(s) {
   const bytes = new TextEncoder().encode(String(s == null ? "" : s));
   let bin = "";
   for (let i = 0; i < bytes.length; i += 0x8000) {
-    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    bin += String.fromCharCode.apply(null, /** @type {any} */ (bytes.subarray(i, i + 0x8000)));
   }
   return btoa(bin);
 }
@@ -1634,8 +1634,13 @@ function composeExport(canonicalMd, meta, opts) {
 // (Moved/unified from md-preview.js. Was a script whitelist until B3 -- that
 // collapsed ja/ko/ru/de titles into underscore strings.)
 function safeFilename(title) {
-  const base = Array.from((title || "untitled").replace(/[\\/?%*:|"<>#\x00-\x1F]/g, "_")).slice(0, 80).join("");
-  return base || "untitled";
+  let cleaned = String(title || "")
+    .replace(/[\\/?%*:|"<>#\x00-\x1F\x7F]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "_")
+    .replace(/^\s+|[\s.]+$/g, "");
+  if (!cleaned) return "untitled";
+  if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(cleaned)) cleaned = "_" + cleaned;
+  cleaned = Array.from(cleaned).slice(0, 80).join("").replace(/[\s.]+$/g, "");
+  return cleaned || "untitled";
 }
 
 // downloadFile: Blob + transient <a download>. Click-time only (no boot cost).

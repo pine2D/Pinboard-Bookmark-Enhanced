@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="320"><title>md-convert &amp; md-epub Property Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; }
+.fail { color: #c00; font-weight: bold; }
+</style></head>
+<body>
+<h1>md-convert &amp; md-epub property/boundary tests</h1>
+<div id="summary"></div>
+<div id="results"></div>
+
+<script src="../vendor/defuddle.js"></script>
+<script src="../vendor/turndown.js"></script>
+<script src="../vendor/marked.min.js"></script>
+<script src="../vendor/purify.min.js"></script>
+<script src="../vendor/highlight.min.js"></script>
+<script src="../vendor/katex/katex.min.js"></script>
+<script src="../vendor/katex/auto-render.min.js"></script>
+<script src="../md-convert.js"></script>
+<script src="../md-embed.js"></script>
+<script src="../md-epub.js"></script>
+<script src="../site-rules.js"></script>
+<script src="../md-highlight.js"></script>
+<script>
+// Deterministic property-based / adversarial-boundary suite for md-convert.js and md-epub.js.
+// 最简单漏判反例：仅用干净 ASCII 样例测试转换链，未覆盖孤立代理对、C0 控制符、RTL 双向隔离符、
+// Zalgo 组合标记、畸形嵌套 HTML/SVG 或 YAML 分隔符注入，导致 EPUB XML 解析崩溃或导出结构击穿。
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond;
+  ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "✓" : "✗"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
+  root.appendChild(div);
+}
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const ATOMS = [
+  "\x00", "\x01", "\x07", "\x08", "\x0B", "\x0C", "\x1B[31m", "\x1F", "\x7F",
+  "\uFFFE", "\uFFFF", "\uD800", "\uDBFF", "\uDC00", "\uDFFF", "\uD83D\uDE80",
+  "e\u0301\u0308\u0327\u0336", "\u200B\u200C\u200D\uFEFF",
+  "\u202Ertl-override\u202C", "\u2066bidi-isolate\u2069", "العربية עברית 中文 日本語",
+  "---\ntitle: injected\n---\n", "```js\nunclosed", "~~~md\n$$x_1$$\n~~~",
+  "$$\\begin{align}a&=b\\\\c&=d\\end{align}$$", "$a < b & c > d$",
+  "<script>alert(1)<\/script>", "<img src=x onerror=alert(1)>",
+  "<a href=\"javascript:alert(1)\">bad</a>", "<a href=\"vbscript:msgbox(1)\">bad2</a>",
+  "<svg width='120' height='120' onload='alert(1)'><script>1<\/script><a xlink:href='https://evil.example/x'><text y='20'>lbl</text></a></svg>",
+  "<table><tr><td>unclosed<td>cell<tr><th>h</table>",
+  "| a | b |\n|---|---|\n| 1 | 2 | 3 |\n",
+  "## Heading [link](#frag) `code **bold**` ==mark==",
+  "CON", "aux.txt", "../etc/passwd", "a/b\\c:d*e?f\"g<h>i|j...",
+];
+
+function genAdversarialString(rng, minParts, maxParts) {
+  const count = minParts + Math.floor(rng() * (maxParts - minParts + 1));
+  let out = "";
+  for (let i = 0; i < count; i++) {
+    out += ATOMS[Math.floor(rng() * ATOMS.length)];
+    if (rng() < 0.35) out += (rng() < 0.5 ? "\n\n" : " ");
+  }
+  return out;
+}
+
+function readStoredZip(bytes) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const out = new Map();
+  let p = 0;
+  const dec = new TextDecoder();
+  while (p + 4 <= bytes.length && dv.getUint32(p, true) === 0x04034b50) {
+    const method = dv.getUint16(p + 8, true);
+    const crc = dv.getUint32(p + 14, true);
+    const size = dv.getUint32(p + 18, true);
+    const nameLen = dv.getUint16(p + 26, true);
+    const extraLen = dv.getUint16(p + 28, true);
+    const name = dec.decode(bytes.subarray(p + 30, p + 30 + nameLen));
+    const dataStart = p + 30 + nameLen + extraLen;
+    const data = bytes.subarray(dataStart, dataStart + size);
+    out.set(name, { method, crc, data, text: dec.decode(data) });
+    p = dataStart + size;
+  }
+  return out;
+}
+
+function assertCleanSanitizedDom(html, label) {
+  const doc = document.implementation.createHTMLDocument("");
+  const div = doc.createElement("div");
+  div.innerHTML = html;
+  const scripts = div.querySelectorAll("script, iframe, object, embed");
+  if (scripts.length > 0) return { ok: false, reason: `${label}: dangerous tag survived (${scripts[0].tagName})` };
+  for (const el of div.querySelectorAll("*")) {
+    for (const attr of el.attributes) {
+      const n = attr.name.toLowerCase();
+      const v = String(attr.value || "").trim();
+      if (n.startsWith("on")) return { ok: false, reason: `${label}: event handler ${n} survived` };
+      if ((n === "href" || n === "src" || n === "xlink:href") && /^(?:javascript|vbscript):/i.test(v)) {
+        return { ok: false, reason: `${label}: dangerous scheme in ${n}=${v}` };
+      }
+    }
+  }
+  return { ok: true, reason: "" };
+}
+
+(async () => {
+  const rng = mulberry32(0x20261124);
+
+  // 1. 60 adversarial markdown -> renderMarkdown + sanitized DOM + buildToc + readingStats
+  for (let i = 0; i < 60; i++) {
+    const sample = genAdversarialString(rng, 3, 12);
+    let html = "", toc = null, stats = null, plain = "", threw = null;
+    try {
+      html = renderMarkdown(sample);
+      toc = buildToc(sample, { minLevel: 1, maxLevel: 6 });
+      stats = readingStats(sample);
+      plain = markdownToPlainText(sample);
+    } catch (e) { threw = e; }
+    const domOk = !threw ? assertCleanSanitizedDom(html, `sample#${i}`) : { ok: false, reason: String(threw) };
+    const tocOk = !!toc && !/\(#\)/.test(toc.tocMarkdown) && toc.headings.every((h) => typeof h.slug === "string" && h.slug.length > 0);
+    const statsOk = !!stats && Number.isFinite(stats.words) && stats.words >= 0 && Number.isFinite(stats.minutes) && stats.minutes >= 1 && typeof plain === "string";
+    check(`renderMarkdown/buildToc/stats adversarial #${i}`, !threw && domOk.ok && tocOk && statsOk,
+      threw ? String(threw && threw.stack || threw) : domOk.reason || JSON.stringify({ toc, stats }));
+  }
+
+  // 2. 60 adversarial HTML -> htmlToMarkdown -> renderMarkdown + SVG sanitization
+  for (let i = 0; i < 60; i++) {
+    const body = `<article><h1>${genAdversarialString(rng, 1, 4)}</h1><div>${genAdversarialString(rng, 3, 10)}</div></article>`;
+    let md = "", rendered = "", threw = null;
+    try {
+      md = htmlToMarkdown(body, { baseUrl: "https://example.com/dir/page.html" });
+      rendered = renderMarkdown(md);
+    } catch (e) { threw = e; }
+    const domOk = !threw ? assertCleanSanitizedDom(rendered, `html#${i}`) : { ok: false, reason: String(threw) };
+    check(`htmlToMarkdown -> renderMarkdown adversarial #${i}`, !threw && typeof md === "string" && domOk.ok,
+      threw ? String(threw && threw.stack || threw) : domOk.reason);
+  }
+
+  // 3. 60 adversarial LaTeX / Markdown math normalization idempotence & non-throwing
+  for (let i = 0; i < 60; i++) {
+    const sample = genAdversarialString(rng, 2, 10);
+    let once = "", twice = "", texOnce = "", texTwice = "", threw = null;
+    try {
+      once = pbpLatexNormalize(sample);
+      twice = pbpLatexNormalize(once);
+      texOnce = pbpMarkdownMathAsTex(once);
+      texTwice = pbpMarkdownMathAsTex(texOnce);
+    } catch (e) { threw = e; }
+    check(`pbpLatexNormalize & pbpMarkdownMathAsTex idempotence #${i}`,
+      !threw && once === twice && texOnce === texTwice,
+      threw ? String(threw) : `norm diff=${once !== twice}, tex diff=${texOnce !== texTwice}`);
+  }
+
+  // 4. 60 adversarial frontmatter + safeFilename + composeStyledHtml invariants
+  for (let i = 0; i < 60; i++) {
+    const rawTitle = genAdversarialString(rng, 1, 4);
+    const body = "Paragraph body " + i;
+    const tags = [genAdversarialString(rng, 1, 2), "tag:colon", "quote\"tag", "line\nbreak"];
+    let fm = "", fname = "", styled = "", threw = null;
+    try {
+      fm = applyFrontmatter(body, {
+        title: rawTitle,
+        url: "https://example.com/a?x=1&y=2",
+        author: genAdversarialString(rng, 1, 2),
+        published: genAdversarialString(rng, 1, 2),
+        clipped: "2026-11-24",
+        tags,
+      });
+      fname = safeFilename(rawTitle);
+      styled = composeStyledHtml(body, { title: rawTitle, url: "https://example.com" }, {});
+    } catch (e) { threw = e; }
+    // Frontmatter must open with ---\n, close with \n---\n\n before body, and never allow rawTitle/author to inject an early closing \n---\n
+    const endFenceIdx = fm.indexOf("\n---\n\n");
+    const bodyIdx = fm.lastIndexOf(body);
+    const innerYaml = endFenceIdx > 4 ? fm.slice(4, endFenceIdx) : "";
+    const noInjectedFence = fm.startsWith("---\n") && endFenceIdx > 4 && bodyIdx > endFenceIdx && !/(?:^|\n)---(?:\n|$)/.test(innerYaml);
+    let uriOk = false;
+    try { uriOk = typeof encodeURIComponent(fname) === "string" && buildObsidianUri({ name: fname, clipboard: true }).startsWith("obsidian://"); } catch (_) { uriOk = false; }
+    const safeNameOk = uriOk && typeof fname === "string" && [...fname].length > 0 && [...fname].length <= 80 &&
+      fname !== "." && fname !== ".." && !/[<>:"/\\|?*\x00-\x1f\x7f]/.test(fname) && !/[\s.]$/.test(fname) &&
+      !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(fname);
+    const styledOk = typeof styled === "string" && !/<script\b/i.test(styled);
+    check(`frontmatter/safeFilename/composeStyledHtml #${i}`, !threw && noInjectedFence && safeNameOk && styledOk,
+      threw ? String(threw) : JSON.stringify({ noInjectedFence, fname, safeNameOk }));
+  }
+
+  // 5. 60 adversarial EPUB builds -> real Blink XML/XHTML parser verification (zero <parsererror>)
+  const xmlParser = new DOMParser();
+  for (let i = 0; i < 60; i++) {
+    const md = `## ${genAdversarialString(rng, 1, 3)}\n\n${genAdversarialString(rng, 3, 8)}\n\n### !@#$\n\n![img](https://example.com/pic.png)`;
+    const meta = {
+      title: genAdversarialString(rng, 1, 3),
+      author: genAdversarialString(rng, 1, 2),
+      url: "https://example.com/test?a=1&b=2" + genAdversarialString(rng, 1, 1),
+      date: genAdversarialString(rng, 1, 1),
+      clipped: "2026-11-24",
+      lang: i % 3 === 0 ? genAdversarialString(rng, 1, 1) : "zh_CN",
+    };
+    let xmlProblem = "";
+    try {
+      const safeMeta = { ...meta, lang: pbpEpubLang(meta.lang) };
+      const blob = pbpBuildEpub({ md, meta: safeMeta });
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const entries = readStoredZip(bytes);
+      const firstKey = entries.keys().next().value;
+      if (firstKey !== "mimetype" || entries.get("mimetype")?.text !== "application/epub+zip" || entries.get("mimetype")?.method !== 0) {
+        xmlProblem = `bad mimetype entry: first=${firstKey}`;
+      }
+      for (const [name, entry] of entries) {
+        if (pbpCrc32(entry.data) !== entry.crc) {
+          xmlProblem = `${name}: CRC mismatch`;
+          break;
+        }
+        if (name.endsWith(".xml") || name.endsWith(".opf") || name.endsWith(".xhtml")) {
+          const mime = name.endsWith(".xhtml") ? "application/xhtml+xml" : "application/xml";
+          const doc = xmlParser.parseFromString(entry.text, mime);
+          const errNode = doc.querySelector("parsererror");
+          if (errNode) {
+            xmlProblem = `${name}: XML parsererror: ${errNode.textContent.slice(0, 160)}`;
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      xmlProblem = String(e && e.stack || e);
+    }
+    check(`pbpBuildEpub strict XML/CRC validity #${i}`, !xmlProblem, xmlProblem);
+  }
+
+  // 6. 20 oversized & pathological boundary inputs (64KB+ lines, deep nesting, lone surrogates)
+  const extremeCases = [
+    ["empty string", ""],
+    ["64KB unbroken word", "a".repeat(65536)],
+    ["64KB combining marks", "o" + "\u0308".repeat(4096)],
+    ["lone high surrogate", "\uD800hello\uD800"],
+    ["lone low surrogate", "\uDC00world\uDFFF"],
+    ["reversed surrogate pair", "\uDC00\uD800"],
+    ["all C0 controls", Array.from({ length: 32 }, (_, c) => String.fromCharCode(c)).join("")],
+    ["deep nested blockquotes", "> ".repeat(60) + "deep"],
+    ["1000 markdown headings", Array.from({ length: 200 }, (_, n) => `## Heading ${n}`).join("\n\n")],
+    ["unclosed fenced code block 32KB", "```python\n" + "x = 1\n".repeat(5000)],
+    ["unclosed inline math dollars", "$a + b + $c + $$d + e"],
+    ["bare LaTeX align env", "\\begin{align}\nx &= 1 \\\\\ny &= 2\n\\end{align}"],
+    ["malformed table pipes", "|h1|h2|\n|--|\n" + "|a|b|c|d|\n".repeat(100)],
+    ["SVG over 300KB ceiling dropped cleanly", `<svg width="200" height="200"><text>${"x".repeat(310000)}</text></svg>`],
+    ["SVG icon under 64px dropped cleanly", `<svg width="24" height="24"><rect width="24" height="24"/></svg>`],
+    ["nested SVG keeps outer diagram only", `<svg width="100" height="100"><svg width="80" height="80"><circle r="10"/></svg></svg>`],
+    ["HTML merged comments split cleanly", "<!--a--><!--b-->text<!---->"],
+    ["Bidi isolates in links", "[label \u202Eevil\u202C](https://example.com/\u2066path\u2069)"],
+    ["YAML frontmatter null/control strip", "---\ntitle: test\x00\x07\n---"],
+    ["EPUB strip invalid XML preserves valid astral plane", "𠀋🚀文字\x00\uFFFE\uD800end"],
+  ];
+  for (const [label, input] of extremeCases) {
+    let prob = "";
+    try {
+      const h = renderMarkdown(input);
+      const m = htmlToMarkdown(`<div>${input}</div>`, { baseUrl: "https://example.com" });
+      const l1 = pbpLatexNormalize(input);
+      const l2 = pbpLatexNormalize(l1);
+      if (l1 !== l2) prob = "pbpLatexNormalize not idempotent on " + label;
+      const stripped = pbpEpubStripXmlInvalid(input);
+      const xdoc = xmlParser.parseFromString(`<root>${pbpEpubXmlEscape(stripped)}</root>`, "application/xml");
+      if (xdoc.querySelector("parsererror")) prob = "XML escape invalid on " + label;
+      const domRes = assertCleanSanitizedDom(h, label);
+      if (!domRes.ok) prob = domRes.reason;
+      if (typeof m !== "string") prob = "htmlToMarkdown non-string";
+    } catch (e) { prob = String(e && e.stack || e); }
+    check(`extreme boundary: ${label}`, !prob, prob);
+  }
+
+  document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+  document.title = fail ? `FAIL (${fail})` : `PASS (${pass})`;
+})();
+</script>
+</body></html>

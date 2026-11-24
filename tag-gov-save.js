@@ -2,10 +2,16 @@
 // Pinboard has no conditional update API; the shared save transaction prevents
 // this extension's saves from entering the lookup-to-write window. Other clients
 // can still change a bookmark between these two server requests.
+/**
+ * @param {{ account?: string, url?: string, oldTag?: string, newTag?: string }} [opts]
+ */
 function pbpRetagPinboardPost({ account, url, oldTag, newTag } = {}) {
   return runSaveDeliveryTransaction(async () => {
     const failed = (error, httpStatus) => ({ status: httpStatus === 429 ? "rate_limited" : "failed", error, httpStatus });
-    if (![account, url, oldTag, newTag].every(value => typeof value === "string" && value)) return failed("invalid_retag_request");
+    if (typeof account !== "string" || !account || typeof url !== "string" || !url
+        || typeof oldTag !== "string" || !oldTag || typeof newTag !== "string" || !newTag) {
+      return failed("invalid_retag_request");
+    }
     const currentAuth = async () => {
       const auth = await getCurrentBookmarkAuth();
       if (auth.service !== "pinboard" || !auth.token || auth.account !== account) {

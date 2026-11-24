@@ -114,10 +114,10 @@ async function getPageInfoFromTab(tabId, opts = {}) {
           // even when our window.error listener "swallows" them post-throw.
           const OriginalURL = window.URL;
           if (!window.__pp_urlShimInstalled) {
-            const SafeURL = function(u, b) {
+            const SafeURL = /** @type {any} */ (function(u, b) {
               try { return b !== undefined ? new OriginalURL(u, b) : new OriginalURL(u); }
               catch (_) { return new OriginalURL("about:blank"); }
-            };
+            });
             SafeURL.prototype = OriginalURL.prototype;
             try { SafeURL.createObjectURL = OriginalURL.createObjectURL.bind(OriginalURL); } catch (_) {}
             try { SafeURL.revokeObjectURL = OriginalURL.revokeObjectURL.bind(OriginalURL); } catch (_) {}
@@ -405,7 +405,7 @@ async function handleAIError(res, provider) {
     }
     paramHint = _aiRejectedParam(body, detail);
   } catch (_) {}
-  const err = new Error(msg);
+  const err = /** @type {PbpCodedError} */ (new Error(msg));
   if (errorType) err.code = errorType;
   if (paramHint) err.paramHint = paramHint;
   err.status = res.status;
@@ -720,8 +720,9 @@ async function _aiThinkRejected(memoKey) {
   try {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return false;
     const o = await chrome.storage.local.get(_PBP_THINK_REJECT_KEY);
-    const m = o && o[_PBP_THINK_REJECT_KEY];
-    return _aiCapabilityFresh(m?.[memoKey]) && m[memoKey].rejected === true;
+    const raw = o && o[_PBP_THINK_REJECT_KEY];
+    const m = raw && typeof raw === "object" ? /** @type {Record<string, any>} */ (raw) : null;
+    return _aiCapabilityFresh(m?.[memoKey]) && m?.[memoKey]?.rejected === true;
   } catch (_) { return false; }
 }
 async function _aiThinkReject(memoKey) {
@@ -807,6 +808,13 @@ const _AI_DIALECT_MAX_ATTEMPTS = 4;
 // storage continuation can no longer dispatch another request. A write that
 // only records an outcome already decided (rememberAccepted) never turns that
 // outcome into a timeout. Callers that pass no control keep their exact path.
+/**
+ * @param {string} provider
+ * @param {string} model
+ * @param {any} cfg
+ * @param {(extraBody: any, dialect: any) => Promise<any>} makeCall
+ * @param {{ race: <T>(p: Promise<T>) => Promise<T>, settle: <T>(p: Promise<T>) => Promise<T> } | null} [control]
+ */
 async function _aiWithDialectFallback(provider, model, cfg, makeCall, control = null) {
   const wait = control ? promise => control.race(promise) : promise => promise;
   const keep = control ? promise => control.settle(promise) : promise => promise;
@@ -934,8 +942,8 @@ function _aiTargetErrorFor(target, s) {
     if (message) reason = _aiEndpointProblemOf(target.cfg, s);
     else message = _aiMessage("mdTargetWebhookHttpWarn", "Invalid or insecure AI endpoint. Use HTTPS, or HTTP only with localhost, 127.0.0.1, or [::1].");
   }
-  const err = new Error(message);
-  err.code = target.error;
+  const err = /** @type {PbpCodedError} */ (new Error(message));
+  err.code = target.error || undefined;
   if (reason) err.reason = reason;
   return err;
 }
@@ -953,13 +961,13 @@ function _aiRequiredOriginPatterns(s, additionalOrigins = []) {
   for (const raw of (Array.isArray(additionalOrigins) ? additionalOrigins : [additionalOrigins])) {
     const pattern = pbpEndpointOriginPattern(raw);
     if (!pattern) {
-      const err = new Error("Invalid or insecure additional AI endpoint.");
+      const err = /** @type {PbpCodedError} */ (new Error("Invalid or insecure additional AI endpoint."));
       err.code = "endpoint_invalid";
       throw err;
     }
     origins.push(pattern);
   }
-  return [...new Set(origins.filter(Boolean))];
+  return [...new Set(/** @type {string[]} */ (origins.filter(Boolean)))];
 }
 
 // Must be called from a user gesture. Pattern calculation and request() are deliberately
@@ -1008,7 +1016,7 @@ async function _ensureAIHostPermission(s) {
     }
   } catch (_) {}
   if (!has) {
-    const err = new Error(t("aiErrorHostPermission", pattern.replace(/\/\*$/, "")));
+    const err = /** @type {PbpCodedError} */ (new Error(t("aiErrorHostPermission", pattern.replace(/\/\*$/, ""))));
     err.code = "host_permission";
     throw err;
   }
@@ -1145,7 +1153,7 @@ function _aiCompletionError(code, reason, status) {
     // Client-side stop of a stream past its declared output budget.
     output_budget_exceeded: "API answer exceeded the output budget"
   };
-  const error = Object.assign(new Error(messages[code]), { code });
+  const error = /** @type {PbpCodedError} */ (Object.assign(new Error(messages[code]), { code }));
   if (reason) error.reason = reason;
   if (status !== undefined) error.status = status;
   return error;
@@ -1262,6 +1270,7 @@ async function _aiReadCompletion(res, protocol, opts) {
   let completion;
   try { completion = _aiCompletionEnvelope(data, protocol); }
   catch (error) { error.status = res.status; throw error; }
+  if (!completion) throw _aiCompletionError("invalid_response", "response_shape", res.status);
   const text = completion.text.trim();
   if (completion.state === "blocked") throw _aiCompletionError("output_refused", null, res.status);
   if ((completion.state === "truncated" || completion.state === "incomplete") && (opts.requireComplete === true || !text)) {
@@ -1860,7 +1869,8 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
   const control = opts[_PBP_STREAM_CONTROL] || null;
   const wait = control ? promise => control.race(promise) : promise => promise;
   let timedOut = false;
-  let idleTimer = null;
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let idleTimer = undefined;
   let status = 0;
   const resetIdle = control ? () => {} : () => {
     clearTimeout(idleTimer);
@@ -1942,7 +1952,7 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
       let offlineMsg = "";
       try { offlineMsg = t("pinboardErrorOffline"); } catch (_) { offlineMsg = ""; }
       if (offlineMsg) {
-        const netErr = new Error(offlineMsg);
+        const netErr = /** @type {PbpCodedError} */ (new Error(offlineMsg));
         netErr.code = "network";
         throw netErr;
       }

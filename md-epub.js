@@ -189,7 +189,7 @@ function pbpBuildEpub({ md, meta, images, ask }) {
     const canon = typeof pbpEmbedCanonicalUrl === "function" ? pbpEmbedCanonicalUrl : (u => encodeURI(u).replace(/%25/g, "%"));
     const bySrc = new Map();
     for (const el of host.querySelectorAll("img[src]")) {
-      const k = canon(el.getAttribute("src"));
+      const k = canon(el.getAttribute("src") || "");
       if (!bySrc.has(k)) bySrc.set(k, []);
       bySrc.get(k).push(el);
     }
@@ -210,7 +210,8 @@ function pbpBuildEpub({ md, meta, images, ask }) {
   // resource EPUB3 requires the content document to declare -- epubcheck fails
   // without it.
   if (host.querySelectorAll('img[src^="http"]').length) {
-    items.find(i => i.id === "content").properties = "remote-resources";
+    const contentItem = items.find(i => i.id === "content");
+    if (contentItem) contentItem.properties = "remote-resources";
   }
   // host is an HTML-namespace <div> -- XMLSerializer stamps xmlns="…xhtml" on the
   // root element; the strip regex tolerates that (and any other) attribute text.

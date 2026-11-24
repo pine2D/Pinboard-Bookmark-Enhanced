@@ -853,7 +853,9 @@
 
   // ---- arXiv (/abs/ citation_* meta card) -------------------------------
   function extractArxiv(doc, url) {
-    function metas(name) { return Array.prototype.map.call(doc.querySelectorAll('meta[name="' + name + '"]'), function (m) { return m.getAttribute("content") || ""; }).filter(Boolean); }
+    function metas(name) {
+      return Array.from(doc.querySelectorAll('meta[name="' + name + '"]'), function (m) { return m.getAttribute("content") || ""; }).filter(Boolean);
+    }
     function domText(sel) { var e = doc.querySelector(sel); return e ? e.textContent.replace(/\s+/g, " ").trim() : ""; }
     // Titles use the same TeX-escaped-accent convention as abstracts; decode
     // outside $...$ so inline math survives for KaTeX.
@@ -909,7 +911,7 @@
   function buildReplyTree(replies) {
     // Object.create(null): usernames are map keys, so "constructor"/"__proto__"
     // must miss instead of hitting Object.prototype.
-    var floorMemberToIndex = Object.create(null), lastSeenByMember = Object.create(null), nodes = [], roots = [];
+    var floorMemberToIndex = Object.create(null), lastSeenByMember = Object.create(null), /** @type {any[]} */ nodes = [], /** @type {any[]} */ roots = [];
     for (var k = 0; k < replies.length; k++) {
       var r0 = replies[k];
       nodes.push({
@@ -1021,7 +1023,7 @@
   // Build a tree from a flat list carrying explicit .depth (document/pre-order).
   // A reply at depth d attaches under the most recent earlier reply at depth d-1.
   function buildDepthTree(replies) {
-    var roots = [], stack = [];
+    /** @type {any[]} */ var roots = [], /** @type {any[]} */ stack = [];
     for (var k = 0; k < replies.length; k++) {
       var r0 = replies[k];
       var nd = { author: r0.author, bodyHtml: r0.bodyHtml, depth: r0.depth || 0, children: [] };
@@ -1074,6 +1076,7 @@
     var perPost = cfg("SO_COMMENTS_PER_POST", SO_COMMENTS_PER_POST);
     var globalCap = cfg("SO_COMMENTS_GLOBAL", SO_COMMENTS_GLOBAL);
 
+    /** @type {any[]} */
     var items = [];
     for (var i = 0; i < rows.length; i++) {
       var li = rows[i];
@@ -1092,7 +1095,7 @@
       });
     }
 
-    var topByName = Object.create(null), topByUid = Object.create(null), roots = []; // username keys — no prototype hits
+    var topByName = Object.create(null), topByUid = Object.create(null), /** @type {any[]} */ roots = []; // username keys — no prototype hits
     for (var k = 0; k < items.length; k++) {
       var c = items[k], parent = -1;
       if (c.target) {
@@ -1199,7 +1202,7 @@
   }
 
   // Expose for the injected inline func (page isolated world) + test harness.
-  var g = (typeof window !== "undefined") ? window : (typeof self !== "undefined" ? self : this);
+  var g = /** @type {any} */ (typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : self));
   g.SITE_RULES = SITE_RULES;
   g.matchRule = matchRule;
   g.applySiteRule = applySiteRule;

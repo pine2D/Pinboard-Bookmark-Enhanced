@@ -79,7 +79,8 @@ async function _refreshI18nAsync() {
     const _storage = typeof getSettingsStorage === "function"
       ? await getSettingsStorage()
       : chrome.storage.local;
-    const { optLang = "auto" } = await _storage.get({ optLang: "auto" });
+    const rawBoot = await _storage.get({ optLang: "auto" });
+    const optLang = typeof rawBoot.optLang === "string" && rawBoot.optLang ? rawBoot.optLang : "auto";
     if (generation !== _i18nRefreshGeneration) return;
 
     const prevLang = (typeof localStorage !== "undefined" ? localStorage.getItem("pp-i18n-lang") : null) || "auto";
@@ -122,7 +123,8 @@ async function _refreshI18nAsync() {
     const currentStorage = typeof getSettingsStorage === "function"
       ? await getSettingsStorage()
       : chrome.storage.local;
-    const { optLang: currentLang = "auto" } = await currentStorage.get({ optLang: "auto" });
+    const rawCurrent = await currentStorage.get({ optLang: "auto" });
+    const currentLang = typeof rawCurrent.optLang === "string" && rawCurrent.optLang ? rawCurrent.optLang : "auto";
     if (generation !== _i18nRefreshGeneration || currentLang !== optLang) return;
 
     try {

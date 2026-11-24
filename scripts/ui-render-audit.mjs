@@ -9883,6 +9883,9 @@ async function runSweep(page, sw, extBase) {
           await page.click("#tag-gov-entity-scan");
           await page.waitForSelector("#tag-gov-entity-list .tag-gov-entity-checkbox", { timeout: TIMEOUT_MS });
           await page.locator("#tag-gov-entities").scrollIntoViewIfNeeded();
+          // Park the pointer: clicking Scan and scrolling can leave a section
+          // summary under the cursor, causing headerFace to read its hover colour.
+          await page.mouse.move(0, 0);
           await page.waitForTimeout(150);
           return true;
         };

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Dev-only JSDoc + strictNullChecks gate over the 19 pure data-layer, sync,
-// backup, vocabulary-send, archive and cache files listed in DATA_LAYER_FILES.
+// Dev-only JSDoc + strictNullChecks gate over the 28 pure data-layer, sync,
+// backup, vocabulary-send, archive, cache, AI, dictionary and conversion files listed in DATA_LAYER_FILES.
 // Runs TypeScript's checkJs analyser in-memory with noEmit: true — zero build
 // step, zero emitted files, zero runtime deps.
 import { existsSync } from 'node:fs';
@@ -32,6 +32,15 @@ export const DATA_LAYER_FILES = Object.freeze([
   'jina.js',
   'tag-gov.js',
   'ai-cache.js',
+  'ai.js',
+  'dict-entry.js',
+  'dict-evidence.js',
+  'dict-pack.js',
+  'md-convert.js',
+  'md-epub.js',
+  'i18n.js',
+  'site-rules.js',
+  'tag-gov-save.js',
 ]);
 
 function loadTypeScript(qaRoot) {

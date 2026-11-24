@@ -579,7 +579,7 @@ function _pbpPackMarkCleared(error) {
       { value: "pack_cleared", writable: true, configurable: true, enumerable: true });
     if (error.code === "pack_cleared") return error;
   } catch (_) { /* frozen, sealed, or not an object at all */ }
-  const wrapped = new Error(error?.message || "pack import failed", { cause: error });
+  const wrapped = /** @type {PbpCodedError} */ (new Error(error?.message || "pack import failed", { cause: error }));
   wrapped.code = "pack_cleared";
   return wrapped;
 }
@@ -614,7 +614,7 @@ async function pbpPackImport(lineIter, onProgress, stats) {
       try { if (typeof it.return === "function") await it.return(); } catch (_) {}
       // `code` is the contract with the UI: this rejection alone leaves the
       // installed pack intact, so it gets its own message.
-      const err = new Error("file does not look like a CC-CEDICT release");
+      const err = /** @type {PbpCodedError} */ (new Error("file does not look like a CC-CEDICT release"));
       err.code = "implausible_pack";
       throw err;
     }
@@ -899,7 +899,7 @@ async function pbpEcdictImport(lineIter, stats, opts) {
         if (!idx) throw new Error("not an ECDICT csv: header missing or ambiguous");
         // Present-but-optional columns: they decide admission at R2/R3 and are
         // then discarded, so a file without them simply cannot reach those rungs.
-        const names = pbpEcdictSplitLine(line).map((n) => n.trim());
+        const names = (pbpEcdictSplitLine(String(line == null ? "" : line).replace(/^\uFEFF/, "")) || []).map((n) => n.trim());
         const ex = names.indexOf("exchange"), de = names.indexOf("definition");
         if (ex >= 0) idx.exchange = ex;
         if (de >= 0) idx.definition = de;
@@ -909,7 +909,7 @@ async function pbpEcdictImport(lineIter, stats, opts) {
       const r = pbpEcdictParseRow(line, idx, rung);
       if (r.fatal) throw new Error("not an ECDICT csv: " + r.fatal);
       if (r.malformed) { malformed++; continue; }
-      if (!r.ok) continue;
+      if (!r.ok || !r.record) continue;
       records.push(r.record);
       // Accumulated here rather than in one pass afterwards: a single trailing
       // encode of the whole payload was measured as a long task on its own.
@@ -1272,11 +1272,22 @@ function _pbpYomitanStructuredParts(value) {
   const children = node => Array.isArray(node) ? node : ["br", "img"].includes(node?.tag) || node?.content === undefined ? [] : Array.isArray(node.content) ? node.content : [node.content];
   const clean = text => text.replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   const excluded = new Set(["preamble", "backlink", "attribution", "attribution-footnote", "extra-info", "forms", "xref", "xref-glossary"]);
+  /**
+   * @param {any} node
+   * @param {(n: any) => boolean} test
+   * @param {(n: any) => boolean} [stop]
+   * @returns {any[]}
+   */
   function find(node, test, stop = () => false) {
     if (typeof node !== "object" || !node || stop(node)) return [];
     if (test(node)) return [node];
     return children(node).flatMap(child => find(child, test, stop));
   }
+  /**
+   * @param {any} node
+   * @param {(n: any) => boolean} [omit]
+   * @returns {string}
+   */
   function text(node, omit = () => false) {
     if (typeof node === "string") return node;
     if (!node || omit(node)) return "";

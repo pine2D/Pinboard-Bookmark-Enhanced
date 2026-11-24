@@ -33,6 +33,15 @@
     "../wayback.js",
     "../jina.js",
     "../tag-gov.js",
-    "../ai-cache.js"
+    "../ai-cache.js",
+    "../ai.js",
+    "../dict-entry.js",
+    "../dict-evidence.js",
+    "../dict-pack.js",
+    "../md-convert.js",
+    "../md-epub.js",
+    "../i18n.js",
+    "../site-rules.js",
+    "../tag-gov-save.js"
   ]
 }
