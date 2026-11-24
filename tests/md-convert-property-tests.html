@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="330"><title>md-convert &amp; md-epub Property Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="334"><title>md-convert &amp; md-epub Property Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
@@ -25,8 +25,7 @@ body { font-family: monospace; padding: 16px; max-width: 1000px; }
 <script src="../md-highlight.js"></script>
 <script>
 // Deterministic property-based / adversarial-boundary suite for md-convert.js and md-epub.js.
-// 最简单漏判反例：仅检查首尾围栏出现或仅遍历已存在 ZIP 条目，导致提前闭合围栏、YAML 非法控制符、
-// Win32 截断后露出的保留设备名（含 COM¹/LPT²）、前导全角空格误删或缺失正文的残缺 EPUB 全部漏过。
+// 最简单漏判反例：仅检查本地 ZIP 头、未核验中央目录/EOCD 与 OPF spine->manifest 正文双射，或放过末尾带冒号的裸 URL 与点号前带空格的旧版 Win32 设备名（如 NUL .txt / CONIN$）。
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
 function check(name, cond, detail) {
@@ -58,11 +57,11 @@ const ATOMS = [
   "$$\\begin{align}a&=b\\\\c&=d\\end{align}$$", "$a < b & c > d$",
   "<script>alert(1)<\/script>", "<img src=x onerror=alert(1)>",
   "<a href=\"javascript:alert(1)\">bad</a>", "<a href=\"vbscript:msgbox(1)\">bad2</a>",
-  "<svg width='120' height='120' onload='alert(1)'><script>1<\/script><a xlink:href='https://evil.example/x'><text y='20'>lbl</text></a></svg>",
+  "<svg width='120' height='120' onload='alert(1)'><script>1<\/script><a xlink:href='https://evil.example/x'><text y='20'>one=1</text></a></svg>",
   "<table><tr><td>unclosed<td>cell<tr><th>h</table>",
   "| a | b |\n|---|---|\n| 1 | 2 | 3 |\n",
   "## Heading [link](#frag) `code **bold**` ==mark==",
-  "## ✨", "CON", "COM¹", "LPT².md", "aux.txt", "../etc/passwd", "a/b\\c:d*e?f\"g<h>i|j...",
+  "## ✨", "## ---", "CON", "NUL .txt", "CONIN$", "COM¹", "LPT².md", "aux.txt", "../etc/passwd", "a/b\\c:d*e?f\"g<h>i|j...",
 ];
 
 function genAdversarialString(rng, minParts, maxParts) {
@@ -75,29 +74,82 @@ function genAdversarialString(rng, minParts, maxParts) {
   return out;
 }
 
+// Strict PKZIP verifier: parses Local File Headers, Central Directory File Headers,
+// and End of Central Directory (EOCD), rejecting truncated tails or header mismatches.
 function readStoredZip(bytes) {
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const out = new Map();
+  const localRecords = [];
   let p = 0;
   const dec = new TextDecoder();
   while (p + 4 <= bytes.length && dv.getUint32(p, true) === 0x04034b50) {
+    if (p + 30 > bytes.length) throw new Error("truncated ZIP local header");
     const method = dv.getUint16(p + 8, true);
     const crc = dv.getUint32(p + 14, true);
-    const size = dv.getUint32(p + 18, true);
+    const csize = dv.getUint32(p + 18, true);
+    const usize = dv.getUint32(p + 22, true);
     const nameLen = dv.getUint16(p + 26, true);
     const extraLen = dv.getUint16(p + 28, true);
-    const name = dec.decode(bytes.subarray(p + 30, p + 30 + nameLen));
     const dataStart = p + 30 + nameLen + extraLen;
-    const data = bytes.subarray(dataStart, dataStart + size);
+    if (csize !== usize || dataStart + csize > bytes.length) throw new Error("corrupt ZIP local entry bounds");
+    const name = dec.decode(bytes.subarray(p + 30, p + 30 + nameLen));
+    if (out.has(name)) throw new Error("duplicate ZIP entry: " + name);
+    const data = bytes.subarray(dataStart, dataStart + csize);
+    localRecords.push({ name, method, crc, size: csize, offset: p });
     out.set(name, { method, crc, data, text: dec.decode(data) });
-    p = dataStart + size;
+    p = dataStart + csize;
+  }
+  const cdStart = p;
+  let cdCount = 0;
+  while (p + 4 <= bytes.length && dv.getUint32(p, true) === 0x02014b50) {
+    if (p + 46 > bytes.length) throw new Error("truncated ZIP central directory header");
+    const method = dv.getUint16(p + 10, true);
+    const crc = dv.getUint32(p + 16, true);
+    const csize = dv.getUint32(p + 20, true);
+    const usize = dv.getUint32(p + 24, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    const lhOffset = dv.getUint32(p + 42, true);
+    const nextP = p + 46 + nameLen + extraLen + commentLen;
+    if (nextP > bytes.length) throw new Error("truncated ZIP central directory payload");
+    const name = dec.decode(bytes.subarray(p + 46, p + 46 + nameLen));
+    const expected = localRecords[cdCount];
+    if (!expected || expected.name !== name || expected.method !== method || expected.crc !== crc ||
+        expected.size !== csize || csize !== usize || expected.offset !== lhOffset) {
+      throw new Error(`central directory mismatch at #${cdCount} (${name})`);
+    }
+    cdCount++;
+    p = nextP;
+  }
+  const cdSize = p - cdStart;
+  if (p + 22 > bytes.length || dv.getUint32(p, true) !== 0x06054b50) {
+    throw new Error("missing or corrupt ZIP End of Central Directory (EOCD)");
+  }
+  const diskEntries = dv.getUint16(p + 8, true);
+  const totalEntries = dv.getUint16(p + 10, true);
+  const eocdCdSize = dv.getUint32(p + 12, true);
+  const eocdCdOffset = dv.getUint32(p + 16, true);
+  const commentLen = dv.getUint16(p + 20, true);
+  if (diskEntries !== localRecords.length || totalEntries !== localRecords.length || cdCount !== localRecords.length ||
+      eocdCdSize !== cdSize || eocdCdOffset !== cdStart || p + 22 + commentLen !== bytes.length) {
+    throw new Error("ZIP EOCD counts/offsets/trailing-bytes mismatch");
   }
   return out;
 }
 
-const WIN32_RESERVED_RE = /^(?:con|prn|aux|nul|(?:com|lpt)[1-9\u00b9\u00b2\u00b3])(?:\.|$)/i;
-// YAML 1.2.2 §5.1 c-printable forbids C0 (except \t \n \r), DEL (0x7F), C1 (0x80-0x9F except 0x85 NEL,
-// and unescaped 0x85/U+2028/U+2029 break single-line scalars), lone UTF-16 surrogates, and U+FFFE/U+FFFF.
+// Independent Win32 reserved-filename predicate (stem before first '.', trailing ASCII spaces trimmed),
+// never sharing the production regex.
+const WIN32_DEVICE_SET = new Set([
+  "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$",
+  "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "COM\u00B9", "COM\u00B2", "COM\u00B3",
+  "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "LPT\u00B9", "LPT\u00B2", "LPT\u00B3",
+]);
+function isWin32ReservedFilename(name) {
+  const stem = String(name || "").split(".")[0].replace(/ +$/g, "").toUpperCase();
+  return WIN32_DEVICE_SET.has(stem);
+}
+
 const YAML_RAW_FORBIDDEN_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u2028\u2029\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
 function normalizeExpectedYamlText(s) {
@@ -136,6 +188,17 @@ function parseYamlDoubleQuoted(raw) {
     }
   }
   return out;
+}
+
+function validateBareYamlScalar(val, key) {
+  if (val === "") return true;
+  if (key === "words") return /^\d+$/.test(val);
+  // Strict YAML 1.2 plain scalar check: no whitespace (incl. U+3000), no trailing ':',
+  // no ': ', no leading indicator, no flow delimiters/quotes/comments.
+  return /^[\x21-\x7E]+$/.test(val) &&
+    !/^[-\?:,\[\]\{\}#&*!|>'"%@`]/.test(val) &&
+    !/[#"'\[\]\{\},]/.test(val) &&
+    !val.endsWith(":");
 }
 
 function parseGeneratedFrontmatter(fm, expectedBody) {
@@ -178,12 +241,16 @@ function parseGeneratedFrontmatter(fm, expectedBody) {
     } else if (val.startsWith('"')) {
       map[key] = parseYamlDoubleQuoted(val);
     } else {
+      if (!validateBareYamlScalar(val, key)) {
+        return { ok: false, reason: `unsafe bare YAML scalar on ${key}: ${JSON.stringify(val)}` };
+      }
       map[key] = val;
     }
   }
   return { ok: true, map };
 }
 
+const _svgXmlParser = new DOMParser();
 function assertCleanSanitizedDom(html, label) {
   const doc = document.implementation.createHTMLDocument("");
   const div = doc.createElement("div");
@@ -202,9 +269,21 @@ function assertCleanSanitizedDom(html, label) {
     if (el.tagName === "IMG") {
       const src = el.getAttribute("src") || "";
       if (/^data:image\/svg\+xml;base64,/i.test(src)) {
-        const rawSvg = atob(src.slice(src.indexOf(",") + 1));
-        if (/<script\b|\bon[a-z]+\s*=|(?:javascript|vbscript):/i.test(rawSvg)) {
-          return { ok: false, reason: `${label}: dangerous payload survived inside data:image/svg+xml` };
+        const rawSvg = new TextDecoder().decode(Uint8Array.from(atob(src.slice(src.indexOf(",") + 1)), (c) => c.charCodeAt(0)));
+        const svgDoc = _svgXmlParser.parseFromString(rawSvg, "image/svg+xml");
+        if (svgDoc.querySelector("parsererror")) return { ok: false, reason: `${label}: invalid XML in data:image/svg+xml` };
+        if (svgDoc.querySelector("script, foreignObject, iframe, object, embed")) {
+          return { ok: false, reason: `${label}: dangerous element survived inside data:image/svg+xml` };
+        }
+        for (const svgEl of svgDoc.querySelectorAll("*")) {
+          for (const sattr of svgEl.attributes) {
+            const sn = sattr.name.toLowerCase();
+            const sv = String(sattr.value || "").trim();
+            if (sn.startsWith("on")) return { ok: false, reason: `${label}: SVG event attribute ${sn} survived` };
+            if ((sn === "href" || sn === "src" || sn === "xlink:href") && /^(?:javascript|vbscript):/i.test(sv)) {
+              return { ok: false, reason: `${label}: SVG dangerous scheme in ${sn}=${sv}` };
+            }
+          }
         }
       }
     }
@@ -239,10 +318,43 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
     return "container.xml rootfile does not point to OEBPS/content.opf";
   }
   const manifestItems = opfDoc ? [...opfDoc.querySelectorAll("manifest > item")] : [];
-  if (manifestItems.length < 3) return "content.opf manifest missing core items";
+  const byId = new Map(), seenHrefs = new Set();
   for (const item of manifestItems) {
+    const id = item.getAttribute("id") || "";
     const href = item.getAttribute("href") || "";
-    if (!href || !entries.has("OEBPS/" + href)) return `OPF manifest item missing from ZIP: OEBPS/${href}`;
+    const mediaType = item.getAttribute("media-type") || "";
+    const properties = item.getAttribute("properties") || "";
+    if (!id || !href || !mediaType) return `OPF manifest item incomplete: id=${id} href=${href}`;
+    if (byId.has(id)) return `duplicate OPF manifest id: ${id}`;
+    if (seenHrefs.has(href)) return `duplicate OPF manifest href: ${href}`;
+    if (!entries.has("OEBPS/" + href)) return `OPF manifest item missing from ZIP: OEBPS/${href}`;
+    byId.set(id, { href, mediaType, properties });
+    seenHrefs.add(href);
+  }
+  for (const zipName of entries.keys()) {
+    if (zipName.startsWith("OEBPS/") && zipName !== "OEBPS/content.opf") {
+      const rel = zipName.slice("OEBPS/".length);
+      if (!seenHrefs.has(rel)) return `ZIP OEBPS member undeclared in OPF manifest: ${zipName}`;
+    }
+  }
+  const navEntry = byId.get("nav");
+  const contentEntry = byId.get("content");
+  const cssEntry = byId.get("css");
+  if (!navEntry || navEntry.href !== "nav.xhtml" || navEntry.mediaType !== "application/xhtml+xml" || !/\bnav\b/.test(navEntry.properties)) {
+    return "OPF manifest missing canonical nav item";
+  }
+  if (!contentEntry || contentEntry.href !== "content.xhtml" || contentEntry.mediaType !== "application/xhtml+xml") {
+    return "OPF manifest missing canonical content.xhtml item";
+  }
+  if (!cssEntry || cssEntry.href !== "styles.css" || cssEntry.mediaType !== "text/css") {
+    return "OPF manifest missing canonical styles.css item";
+  }
+  const spineRefs = opfDoc ? [...opfDoc.querySelectorAll("spine > itemref")] : [];
+  if (spineRefs.length !== 1) return `expected 1 spine itemref, got ${spineRefs.length}`;
+  const spineIdref = spineRefs[0].getAttribute("idref") || "";
+  const spineTarget = byId.get(spineIdref);
+  if (!spineTarget || spineTarget.href !== "content.xhtml") {
+    return `OPF spine idref="${spineIdref}" does not resolve to content.xhtml`;
   }
   const bodyText = contentDoc && contentDoc.body ? contentDoc.body.textContent || "" : "";
   if (sentinelText && !bodyText.includes(sentinelText)) {
@@ -276,7 +388,7 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
       threw ? String(threw && threw.stack || threw) : domOk.reason || JSON.stringify({ toc, stats }));
   }
 
-  // 2. 60 adversarial HTML -> htmlToMarkdown -> renderMarkdown + decoded SVG sanitization
+  // 2. 60 adversarial HTML -> htmlToMarkdown -> renderMarkdown + decoded SVG XML sanitization
   for (let i = 0; i < 60; i++) {
     const body = `<article><h1>${genAdversarialString(rng, 1, 4)}</h1><div>${genAdversarialString(rng, 3, 10)}</div></article>`;
     let md = "", rendered = "", threw = null;
@@ -309,27 +421,36 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
     const rawTitle = genAdversarialString(rng, 1, 4);
     const rawAuthor = genAdversarialString(rng, 1, 2);
     const rawPublished = genAdversarialString(rng, 1, 2);
+    const rawUrl = i % 4 === 0 ? "https://example.org/report:" : "https://example.com/a?x=1&y=2";
+    const rawSource = i % 5 === 0 ? "本地　采集" : "jina";
     const body = "Paragraph body sentinel #" + i + "\n---\ntrailing body fence";
     const tags = [genAdversarialString(rng, 1, 2), "tag:colon", "quote\"tag", "line\nbreak"];
     let fm = "", fname = "", styled = "", threw = null, fmCheck = { ok: false, reason: "not run" }, uriOk = false;
     try {
       const rawFm = applyFrontmatter(body, {
         title: rawTitle,
-        url: "https://example.com/a?x=1&y=2",
+        url: rawUrl,
+        source: rawSource,
         author: rawAuthor,
         published: rawPublished,
         clipped: "2026-11-24",
         tags,
       });
-      // Round-trip through UTF-8 Blob bytes exactly as downloadFile() writes to disk
       fm = utf8Dec.decode(new Uint8Array(await new Blob([rawFm], { type: "text/markdown;charset=utf-8" }).arrayBuffer()));
       const expectedUtf8Body = utf8Dec.decode(utf8Enc.encode(body));
       fmCheck = parseGeneratedFrontmatter(fm, expectedUtf8Body);
       if (fmCheck.ok) {
+        const expectedPublished = /^\d{4}-\d{2}-\d{2}$/.test(rawPublished) ? rawPublished : normalizeExpectedYamlText(rawPublished);
         if (fmCheck.map.title !== normalizeExpectedYamlText(rawTitle)) {
           fmCheck = { ok: false, reason: `title round-trip mismatch: got ${JSON.stringify(fmCheck.map.title)}` };
+        } else if (fmCheck.map.url !== normalizeExpectedYamlText(rawUrl)) {
+          fmCheck = { ok: false, reason: `url round-trip mismatch: got ${JSON.stringify(fmCheck.map.url)}` };
+        } else if (fmCheck.map.source !== normalizeExpectedYamlText(rawSource)) {
+          fmCheck = { ok: false, reason: `source round-trip mismatch: got ${JSON.stringify(fmCheck.map.source)}` };
         } else if (rawAuthor && fmCheck.map.author !== normalizeExpectedYamlText(rawAuthor)) {
           fmCheck = { ok: false, reason: `author round-trip mismatch: got ${JSON.stringify(fmCheck.map.author)}` };
+        } else if (rawPublished && fmCheck.map.published !== expectedPublished) {
+          fmCheck = { ok: false, reason: `published round-trip mismatch: got ${JSON.stringify(fmCheck.map.published)}` };
         } else if (JSON.stringify(fmCheck.map.tags) !== JSON.stringify(tags.map(normalizeExpectedYamlText))) {
           fmCheck = { ok: false, reason: `tags round-trip mismatch: got ${JSON.stringify(fmCheck.map.tags)}` };
         }
@@ -350,13 +471,13 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
       fname !== "." && fname !== ".." &&
       !/[<>:"/\\|?*\x00-\x1f\x7f]/.test(fname) &&
       !/[\s.]$/.test(fname) &&
-      !WIN32_RESERVED_RE.test(fname);
+      !isWin32ReservedFilename(fname);
     const styledOk = typeof styled === "string" && !/<script\b/i.test(styled);
     check(`frontmatter/safeFilename/composeStyledHtml #${i}`, !threw && fmCheck.ok && safeNameOk && styledOk,
       threw ? String(threw && threw.stack || threw) : (!fmCheck.ok ? fmCheck.reason : JSON.stringify({ fname, byteLen, safeNameOk, uriOk })));
   }
 
-  // 5. 60 adversarial EPUB builds -> required-member + OPF manifest + Blink XML/XHTML + rendered body verification
+  // 5. 60 adversarial EPUB builds -> Central Directory/EOCD + OPF manifest/spine bijection + Blink XML/XHTML + rendered body
   const xmlParser = new DOMParser();
   for (let i = 0; i < 60; i++) {
     const sentinel = `EPUB_SENTINEL_${i}`;
@@ -426,7 +547,7 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
     check(`extreme boundary: ${label}`, !prob, prob);
   }
 
-  // 7. 10 targeted regression & negative-control invariants
+  // 7. 14 targeted regression & negative-control invariants
   {
     const truncatedDev = safeFilename("CON" + " ".repeat(77) + "甲");
     check("safeFilename blocks Win32 device name exposed after 80-char truncation and stays idempotent",
@@ -434,8 +555,16 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
 
     const supNames = ["COM\u00B9", "LPT\u00B2.md", "lpt\u00B3.txt"].map(safeFilename);
     check("safeFilename blocks Win32 superscript device names COM¹/LPT²/LPT³",
-      supNames.every((n) => n.startsWith("_") && !WIN32_RESERVED_RE.test(n) && safeFilename(n) === n),
+      supNames.every((n) => n.startsWith("_") && !isWin32ReservedFilename(n) && safeFilename(n) === n),
       JSON.stringify(supNames));
+
+    const legacySpaceDev = safeFilename("NUL .txt");
+    const conIn = safeFilename("CONIN$");
+    const conOut = safeFilename("CONOUT$.md");
+    check("safeFilename blocks legacy Win32 space-before-dot NUL .txt and CONIN$/CONOUT$",
+      legacySpaceDev === "_NUL .txt" && conIn === "_CONIN$" && conOut === "_CONOUT$.md" &&
+      [legacySpaceDev, conIn, conOut].every((n) => !isWin32ReservedFilename(n) && safeFilename(n) === n),
+      JSON.stringify([legacySpaceDev, conIn, conOut]));
 
     const fwTitle = safeFilename("　序章");
     const plainTitle = safeFilename("序章");
@@ -475,13 +604,35 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
       parsedCtrlFm.map.tags[0] === "a\x00b" && parsedCtrlFm.map.tags[1] === "c\u2029d",
       JSON.stringify(parsedCtrlFm));
 
-    const symMd = "## ✨\n\nSparkle text.\n\n## !@#$\n\nPunct text.\n\n## Real Heading\n\nBody.";
+    const colonUrlFm = applyFrontmatter("Body", {
+      title: "Report",
+      url: "https://example.org/report:",
+      source: "本地　采集",
+      published: "Spring 2026:",
+    });
+    const parsedColonFm = parseGeneratedFrontmatter(colonUrlFm, "Body");
+    check("applyFrontmatter quotes trailing-colon URLs and full-width-space sources for valid YAML",
+      parsedColonFm.ok && colonUrlFm.includes('url: "https://example.org/report:"') &&
+      colonUrlFm.includes('source: "本地　采集"') && parsedColonFm.map.published === "Spring 2026:",
+      colonUrlFm);
+
+    const symMd = "## ✨\n\nSparkle.\n\n## ---\n\nDashes.\n\n## ***\n\nStars.\n\n## +\n\nPlus.\n\n## Real Heading\n\nBody.";
     const symToc = buildToc(symMd, { minLevel: 2, maxLevel: 4 });
     const symExport = composeExport(symMd, { url: "https://example.com" }, { includeToc: true });
-    check("buildToc & composeExport omit broken (#) links and bogus -1 slugs on symbol-only headings",
+    const symTocDoc = document.implementation.createHTMLDocument("");
+    symTocDoc.body.innerHTML = renderMarkdown(symToc.tocMarkdown);
+    const symLis = [...symTocDoc.querySelectorAll("ul > li")].map((li) => li.textContent.trim());
+    check("buildToc & composeExport render literal TOC list items for ## --- / ## *** / ## + without <hr> or (#)",
       !/\(#\)/.test(symToc.tocMarkdown) && !/\(#\)/.test(symExport) &&
-      symToc.headings[0].slug === "" && symToc.headings[1].slug === "" && symToc.headings[2].slug === "real-heading",
-      JSON.stringify(symToc));
+      !symTocDoc.querySelector("hr") &&
+      JSON.stringify(symLis) === JSON.stringify(["✨", "---", "***", "+", "Real Heading"]),
+      JSON.stringify({ toc: symToc.tocMarkdown, symLis }));
+
+    const svgTextMd = htmlToMarkdown('<div><svg width="120" height="120" viewBox="0 0 120 120"><text x="10" y="20">one=1</text></svg></div>', { baseUrl: "https://example.com" });
+    const svgTextHtml = renderMarkdown(svgTextMd);
+    const svgTextDom = assertCleanSanitizedDom(svgTextHtml, "svg-one-eq-1");
+    check("SVG diagram containing literal text one=1 survives HTML->Markdown->DOM and passes XML attribute audit",
+      svgTextMd.includes("data:image/svg+xml;base64,") && svgTextDom.ok, svgTextDom.reason);
 
     const emptyStats = readingStats("\x0b\x0c\x0b   \n\n");
     const nonEmptyStats = readingStats("Hello 中文");
@@ -494,9 +645,20 @@ function validateEpubArchive(entries, xmlParser, sentinelText) {
     check("negative control: Blink XHTML parser flags unclosed tags with parsererror",
       !!brokenXmlDoc.querySelector("parsererror"));
 
-    const guttedEntries = new Map([["mimetype", { method: 0, crc: pbpCrc32(utf8Enc.encode("application/epub+zip")), data: utf8Enc.encode("application/epub+zip"), text: "application/epub+zip" }]]);
-    check("negative control: validateEpubArchive rejects gutted mimetype-only archive",
-      validateEpubArchive(guttedEntries, xmlParser, "x").includes("missing required EPUB member"));
+    const validBlob = pbpBuildEpub({ md: "## H\n\nGOOD_SENTINEL", meta: { title: "T", url: "https://example.com", lang: "en", clipped: "2026-11-24" } });
+    const validBytes = new Uint8Array(await validBlob.arrayBuffer());
+    let truncCaught = false;
+    try { readStoredZip(validBytes.subarray(0, validBytes.length - 10)); } catch (_) { truncCaught = true; }
+    check("negative control: readStoredZip rejects EPUB with truncated Central Directory / EOCD", truncCaught);
+
+    const tamperedEntries = readStoredZip(validBytes);
+    const origOpf = tamperedEntries.get("OEBPS/content.opf");
+    const badOpfText = origOpf.text.replace('id="content" href="content.xhtml"', 'id="orphan" href="styles.css"');
+    const badOpfBytes = utf8Enc.encode(badOpfText);
+    tamperedEntries.set("OEBPS/content.opf", { method: 0, crc: pbpCrc32(badOpfBytes), data: badOpfBytes, text: badOpfText });
+    const orphanProblem = validateEpubArchive(tamperedEntries, xmlParser, "GOOD_SENTINEL");
+    check("negative control: validateEpubArchive rejects OPF with duplicate href / missing content manifest / dangling spine",
+      !!orphanProblem && (orphanProblem.includes("duplicate") || orphanProblem.includes("content.xhtml")), orphanProblem);
   }
 
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;

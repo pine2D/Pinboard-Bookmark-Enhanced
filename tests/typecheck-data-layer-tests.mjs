@@ -130,8 +130,11 @@ test('strictNullChecks and cross-file ambient signatures catch null dereferences
         '  const meta = await pbpEcdictMeta();',
         '  const unguardedMeta = meta.state;',
         '  const badFetchArity = fetchWithTimeout();',
-        '  const badRenderer = (new marked.Renderer()).nonExistentHook;',
-        '  return [badObsidian, unguardedMeta, badFetchArity, badRenderer];',
+        '  const renderer = new marked.Renderer();',
+        '  const okDef = renderer.def({ type: "def" });',
+        '  const unguardedParser = renderer.parser.parse([]);',
+        '  const badRenderer = renderer.nonExistentHook;',
+        '  return [badObsidian, unguardedMeta, badFetchArity, okDef, unguardedParser, badRenderer];',
         '}',
       ].join('\n'),
     );
@@ -162,6 +165,14 @@ test('strictNullChecks and cross-file ambient signatures catch null dereferences
     assert.ok(
       res.errors.some((line) => line.includes('nonExistentHook') && line.includes('TS2339')),
       `expected unknown-property diagnostic TS2339 on marked.Renderer, got:\n${res.errors.join('\n')}`,
+    );
+    assert.ok(
+      res.errors.some((line) => line.includes('renderer.parser') && (line.includes('TS18048') || line.includes('TS2532'))),
+      `expected possibly-undefined diagnostic on (new marked.Renderer()).parser, got:\n${res.errors.join('\n')}`,
+    );
+    assert.ok(
+      !res.errors.some((line) => line.includes('renderer.def')),
+      `marked.Renderer.prototype.def must be recognized without error, got:\n${res.errors.join('\n')}`,
     );
     assert.ok(
       res.codes.includes(2554),

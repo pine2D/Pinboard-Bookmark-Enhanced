@@ -745,7 +745,7 @@ function _configureMarked() {
   // marked v13+ passes the heading TOKEN (not positional text/level/raw); render
   // the inline content via this.parser.parseInline and slug the raw token.text.
   renderer.heading = function (token) {
-    const text = this.parser.parseInline(token.tokens);
+    const text = this.parser ? this.parser.parseInline(token.tokens) : (token.text || "");
     let id = slugify(token.text);
     // Same -1/-2 dedup rule as buildToc (below), so a TOC anchor built there
     // always resolves to a real heading id here even when headings repeat.
@@ -1222,7 +1222,18 @@ function applyFrontmatter(md, meta, opts) {
   meta = meta || {};
   opts = opts || {};
   const fields = opts.fields || ["title", "url", "date", "tags", "source"];
-  const bareSafe = (v) => !v || !/[\x00-\x20\x7F-\x9F\u2028\u2029\uD800-\uDFFF\uFFFE\uFFFF#"']/.test(String(v));
+  // YAML 1.2 §7.3.3 plain scalar safety: ASCII printable non-whitespace only, must not
+  // start with a YAML indicator, must not end with ":" (nested key indicator) or contain
+  // ": ", flow brackets/commas, quotes, "#", or YAML 1.1/1.2 boolean/null/numeric literals.
+  const bareSafe = (v) => {
+    if (!v) return true;
+    const s = String(v);
+    return /^[\x21-\x7E]+$/.test(s) &&
+      !/^[-\?:,\[\]\{\}#&*!|>'"%@`]/.test(s) &&
+      !/[#"'\[\]\{\},]/.test(s) &&
+      !s.endsWith(":") &&
+      !/^(?:true|false|null|yes|no|on|off|~|[+-]?(?:\d|\.\d))$/i.test(s);
+  };
   const lines = ["---"];
   for (const f of fields) {
     if (f === "title") lines.push("title: " + yamlString(meta.title || ""));
@@ -1569,7 +1580,11 @@ function buildToc(md, opts) {
     const indent = "  ".repeat(h.level - minLevel);
     const label = h._label || h.text;
     delete h._label;
-    return indent + "- " + (h.slug ? "[" + label + "](#" + h.slug + ")" : label);
+    if (h.slug) return indent + "- [" + label + "](#" + h.slug + ")";
+    const plainItem = /^[-+*_>#]/.test(label)
+      ? "\\" + label
+      : label.replace(/^(\d+)([.)])/, "$1\\$2");
+    return indent + "- " + plainItem;
   }).join("\n");
   return { tocMarkdown: "## Contents\n" + body, headings };
 }
@@ -1648,7 +1663,10 @@ function composeExport(canonicalMd, meta, opts) {
 // latin, ...) passes through untouched; cap at 80 code points; empty -> "untitled".
 // (Moved/unified from md-preview.js. Was a script whitelist until B3 -- that
 // collapsed ja/ko/ru/de titles into underscore strings.)
-const _PBP_WIN32_RESERVED_RE = /^(?:con|prn|aux|nul|(?:com|lpt)[1-9\u00b9\u00b2\u00b3])(?:\.|$)/i;
+// Covers DOS/Win32 reserved device names (CON, PRN, AUX, NUL, CONIN$, CONOUT$,
+// COM1-9 / COM¹²³, LPT1-9 / LPT¹²³), including legacy Windows 10 stem parsing where
+// ASCII spaces before the first "." ("NUL .txt") still resolve to the device.
+const _PBP_WIN32_RESERVED_RE = /^(?:con|prn|aux|nul|conin\$|conout\$|(?:com|lpt)[1-9\u00b9\u00b2\u00b3])(?:[ ]*(?:\.|$))/i;
 function _pbpTruncateFilename(str, maxChars, maxBytes) {
   const enc = new TextEncoder();
   let out = "", count = 0, used = 0;

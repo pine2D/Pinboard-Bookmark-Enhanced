@@ -116,7 +116,7 @@ declare class TurndownService {
 
 declare namespace marked {
   class Renderer {
-    parser: {
+    parser?: {
       parse(tokens: any[]): string;
       parseInline(tokens: any[]): string;
     };
@@ -124,6 +124,7 @@ declare namespace marked {
     code(token: any): string;
     blockquote(token: any): string;
     html(token: any): string;
+    def(token: any): string;
     heading(token: any): string;
     hr(token: any): string;
     list(token: any): string;
