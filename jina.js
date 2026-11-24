@@ -7,9 +7,20 @@ function _jinaSafeErrName(e) {
 }
 
 function _jinaDiagSurface(options) {
-  const explicit = options && typeof options === "object" ? options.diagSurface : undefined;
-  if (typeof pbpDetectDiagSurface === "function") return pbpDetectDiagSurface(explicit);
-  if (typeof explicit === "string" && explicit) return explicit;
+  try {
+    let explicit;
+    if (options && typeof options === "object") {
+      const desc = Object.getOwnPropertyDescriptor(options, "diagSurface");
+      explicit = desc && Object.prototype.hasOwnProperty.call(desc, "value") ? desc.value : undefined;
+    }
+    if (typeof pbpDetectDiagSurface === "function") return pbpDetectDiagSurface(explicit);
+    if (typeof explicit === "string" && explicit) return explicit;
+  } catch (_) {
+    /* swallow-ok: hostile options getter or proxy degrades to automatic surface detection */
+    if (typeof pbpDetectDiagSurface === "function") {
+      try { return pbpDetectDiagSurface(); } catch (_2) { /* swallow-ok: fallback to document check */ }
+    }
+  }
   return typeof document === "undefined" ? "background" : "shared";
 }
 

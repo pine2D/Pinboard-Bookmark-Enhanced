@@ -10,15 +10,40 @@ const SHARED_SRC = readFileSync(new URL("../shared.js", import.meta.url), "utf8"
 const JINA_SRC = readFileSync(new URL("../jina.js", import.meta.url), "utf8");
 const AI_SRC = readFileSync(new URL("../ai.js", import.meta.url), "utf8");
 
+// Models the browser's origin-wide Web Locks manager, including automatic lock
+// release when a client context closes/terminates mid-callback.
 function createOriginCoordinator() {
   const queues = new Map();
   return {
-    request(name, optionsOrCallback, maybeCallback) {
-      const cb = typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback;
-      const prev = queues.get(name) || Promise.resolve();
-      const run = prev.then(() => cb({ name, mode: "exclusive" }));
-      queues.set(name, run.catch(() => {}));
-      return run;
+    createClientLocks() {
+      const clientAbort = new Set();
+      return {
+        closeClient() {
+          for (const release of clientAbort) release();
+          clientAbort.clear();
+        },
+        locks: {
+          request(name, optionsOrCallback, maybeCallback) {
+            const cb = typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback;
+            const prev = queues.get(name) || Promise.resolve();
+            let releaseEarly;
+            const earlyPromise = new Promise((r) => { releaseEarly = r; });
+            clientAbort.add(releaseEarly);
+            let resultPromise;
+            const holder = prev.then(async () => {
+              resultPromise = Promise.resolve().then(() => cb({ name, mode: "exclusive" }));
+              await Promise.race([
+                resultPromise.catch(() => {}),
+                earlyPromise,
+              ]);
+            });
+            queues.set(name, holder.catch(() => {}));
+            return prev.then(() => resultPromise).finally(() => {
+              clientAbort.delete(releaseEarly);
+            });
+          },
+        },
+      };
     },
   };
 }
@@ -26,13 +51,19 @@ function createOriginCoordinator() {
 function createOriginHarness(initialLocal = {}, opts = {}) {
   const store = structuredClone(initialLocal);
   const listeners = new Set();
-  const locks = opts.noWebLocks ? undefined : createOriginCoordinator();
+  const coordinator = opts.noWebLocks ? null : createOriginCoordinator();
 
   function makePageContext(pageOpts = {}) {
     const warns = [];
+    let closed = false;
+    const state = {
+      failGet: !!pageOpts.failGet,
+      failSet: !!pageOpts.failSet,
+    };
     const local = {
       async get(keys) {
-        if (pageOpts.failGet || opts.failGet) {
+        if (closed) throw new DOMException("context closed", "InvalidStateError");
+        if (state.failGet || opts.failGet) {
           throw new DOMException("storage read blocked", "InvalidStateError");
         }
         if (keys == null) return structuredClone(store);
@@ -46,7 +77,8 @@ function createOriginHarness(initialLocal = {}, opts = {}) {
       },
       async set(patch) {
         if (pageOpts.beforeSet) await pageOpts.beforeSet(patch);
-        if (pageOpts.failSet || opts.failSet) {
+        if (closed) throw new DOMException("context closed", "InvalidStateError");
+        if (state.failSet || opts.failSet) {
           throw new DOMException("quota full", "QuotaExceededError");
         }
         if (opts.setDelayMs) await new Promise((r) => setTimeout(r, opts.setDelayMs));
@@ -59,8 +91,10 @@ function createOriginHarness(initialLocal = {}, opts = {}) {
         }
         for (const fn of listeners) fn(structuredClone(changes), "local");
         if (pageOpts.afterSet) await pageOpts.afterSet(patch);
+        if (closed) return new Promise(() => {});
       },
       async remove(keys) {
+        if (closed) throw new DOMException("context closed", "InvalidStateError");
         const changes = {};
         for (const k of [].concat(keys)) {
           if (Object.prototype.hasOwnProperty.call(store, k)) {
@@ -74,6 +108,10 @@ function createOriginHarness(initialLocal = {}, opts = {}) {
         }
       },
       async getKeys() {
+        if (closed) throw new DOMException("context closed", "InvalidStateError");
+        if (state.failGet || opts.failGet) {
+          throw new DOMException("storage getKeys blocked", "InvalidStateError");
+        }
         return Object.keys(store);
       },
       async getBytesInUse() {
@@ -81,7 +119,23 @@ function createOriginHarness(initialLocal = {}, opts = {}) {
       },
     };
 
-    const nav = locks ? { locks } : {};
+    const clientLockHandle = coordinator && !pageOpts.throwingLocksGetter
+      ? coordinator.createClientLocks()
+      : null;
+    const nav = {};
+    if (pageOpts.throwingLocksGetter) {
+      Object.defineProperty(nav, "locks", {
+        get() { throw new DOMException("Access to Locks API denied", "SecurityError"); },
+      });
+    } else if (clientLockHandle) {
+      nav.locks = clientLockHandle.locks;
+    }
+
+    const onChangedListener = (changes, area) => {
+      if (!closed && listenerRef) listenerRef(changes, area);
+    };
+    let listenerRef = null;
+
     const sandbox = {
       console: {
         warn(...args) { warns.push(args); },
@@ -126,7 +180,10 @@ function createOriginHarness(initialLocal = {}, opts = {}) {
           sync: local,
           session: local,
           onChanged: {
-            addListener(fn) { listeners.add(fn); },
+            addListener(fn) {
+              listenerRef = fn;
+              listeners.add(onChangedListener);
+            },
           },
         },
         permissions: {
@@ -150,7 +207,18 @@ function createOriginHarness(initialLocal = {}, opts = {}) {
       "({ PBP_DIAG_ERRORS_KEY, PBP_DIAG_ERRORS_CAP, PBP_DIAG_OPS, PBP_DIAG_CODES, PBP_DIAG_SURFACES, PBP_DIAG_ERROR_NAMES, PBP_RECLAIM_CATEGORIES, SETTINGS_DEFAULTS })",
       ctx,
     );
-    return { ctx, local, warns, consts };
+    return {
+      ctx,
+      local,
+      state,
+      warns,
+      consts,
+      closePage() {
+        closed = true;
+        listeners.delete(onChangedListener);
+        if (clientLockHandle) clientLockHandle.closeClient();
+      },
+    };
   }
 
   const primary = makePageContext(opts.pageOpts || {});
@@ -285,85 +353,98 @@ test("pbpDiagErrors: two independent extension pages concurrently writing never 
   }
 });
 
-test("pbpDiagErrors: pbpReclaimLocalStorage(['misc']) during an in-flight append never resurrects cleared history", async () => {
+test("pbpDiagErrors: shared Web Lock serializes reclaim with writer close, double clears, and post-clear writes", async () => {
   const origin = createOriginHarness();
-  let releaseGate;
-  let notifyPaused;
-  const pausedAtSet = new Promise((r) => { notifyPaused = r; });
-  const setGate = new Promise((r) => { releaseGate = r; });
-  let armed = false;
 
-  const pageA = origin.makePageContext({
+  // Case 1: Popup A reads H, writes [H, N] to storage, and closes right as its write lands
+  // while Settings B's pbpReclaimLocalStorage(["misc"]) is queued on the lock -> B sweeps [H, N].
+  let notifyWrote;
+  const wroteToDisk = new Promise((r) => { notifyWrote = r; });
+  let closeOnWrite = false;
+  let popupA;
+  popupA = origin.makePageContext({
     pathname: "/popup.html",
-    async beforeSet() {
-      if (armed) {
-        armed = false;
-        notifyPaused();
-        await setGate;
+    async afterSet() {
+      if (closeOnWrite) {
+        closeOnWrite = false;
+        popupA.closePage();
+        notifyWrote();
       }
     },
   });
-  const pageB = origin.makePageContext({ pathname: "/options.html" });
+  const optionsB = origin.makePageContext({ pathname: "/options.html" });
+  const pageC = origin.makePageContext({ pathname: "/library.html" });
 
-  await pageA.ctx.pbpRecordDiagError({
+  await popupA.ctx.pbpRecordDiagError({
     surface: "popup",
     op: "bookmark_delete",
     code: "network",
     errorName: "TypeError",
   });
-  assert.equal((await pageB.ctx.pbpReadDiagErrors()).length, 1);
+  assert.equal((await optionsB.ctx.pbpReadDiagErrors()).length, 1);
 
-  armed = true;
-  const pendingAppend = pageA.ctx.pbpRecordDiagError({
-    surface: "options",
-    op: "storage_measure",
-    code: "storage",
-    errorName: "InvalidStateError",
+  closeOnWrite = true;
+  void popupA.ctx.pbpRecordDiagError({
+    surface: "popup",
+    op: "obsidian_clip",
+    code: "denied",
+    errorName: "NotAllowedError",
   });
-  await pausedAtSet;
-
-  const reclaimed = plain(await pageB.ctx.pbpReclaimLocalStorage(["misc"]));
-  assert.equal(reclaimed.removed.misc.keys.includes("pbpDiagErrors"), true);
+  const pendingReclaim = optionsB.ctx.pbpReclaimLocalStorage(["misc"]);
+  await wroteToDisk;
+  const reclaimed1 = plain(await pendingReclaim);
+  assert.equal(reclaimed1.removed.misc.keys.includes("pbpDiagErrors"), true);
   assert.equal("pbpDiagErrors" in origin.store, false);
+  assert.deepEqual(plain(await optionsB.ctx.pbpReadDiagErrors()), []);
 
-  releaseGate();
-  await pendingAppend;
-
-  const afterRows = plain(await pageB.ctx.pbpReadDiagErrors());
-  assert.equal(afterRows.some((r) => r.op === "bookmark_delete"), false, "cleared bookmark_delete history must never reappear");
-  assert.deepEqual(afterRows.map((r) => r.op), ["storage_measure"]);
-
-  // Second interleaving: reclaim runs AFTER underlying set wrote, while set's post-return is still pending -> stays empty.
-  let releaseAfterSet;
-  let notifyAfterSet;
-  const reachedAfterSet = new Promise((r) => { notifyAfterSet = r; });
-  const afterSetGate = new Promise((r) => { releaseAfterSet = r; });
-  let armAfter = true;
-  const pageC = origin.makePageContext({
-    pathname: "/library.html",
-    async afterSet() {
-      if (armAfter) {
-        armAfter = false;
-        notifyAfterSet();
-        await afterSetGate;
-      }
-    },
-  });
-  const pendingC = pageC.ctx.pbpRecordDiagError({
-    surface: "library",
-    op: "vocab_delete",
-    code: "failed",
-    errorName: "Error",
-  });
-  await reachedAfterSet;
-  await pageB.ctx.pbpReclaimLocalStorage(["misc"]);
-  releaseAfterSet();
-  await pendingC;
+  // Case 2: Double clear around concurrent appends never resurrects H or N, and
+  // subsequent post-clear writes X (221) + Y (222) both survive intact.
+  const popupA2 = origin.makePageContext({ pathname: "/popup.html" });
+  await popupA2.ctx.pbpRecordDiagError({ surface: "popup", op: "bookmark_delete", code: "network" });
+  const [, , reclaim2] = await Promise.all([
+    optionsB.ctx.pbpReclaimLocalStorage(["misc"]),
+    popupA2.ctx.pbpRecordDiagError({ surface: "popup", op: "reader_handoff", code: "storage" }),
+    pageC.ctx.pbpReclaimLocalStorage(["misc"]),
+  ]);
+  assert.ok(reclaim2);
   assert.equal("pbpDiagErrors" in origin.store, false);
-  assert.deepEqual(plain(await pageB.ctx.pbpReadDiagErrors()), []);
+  assert.deepEqual(plain(await optionsB.ctx.pbpReadDiagErrors()), []);
+
+  await pageC.ctx.pbpRecordDiagError({ surface: "library", op: "vocab_delete", code: "failed", status: 221 });
+  await popupA2.ctx.pbpRecordDiagError({ surface: "popup", op: "offline_retry", code: "send_failed", status: 222 });
+  const postClear = plain(await optionsB.ctx.pbpReadDiagErrors());
+  assert.deepEqual(postClear.map((r) => r.status), [221, 222]);
 });
 
-test("pbpDiagErrors: hostile getters, proxies, tampered rows, and throwing callback error names never throw or leak", async () => {
+test("pbpDiagErrors: storage get/set failures degrade to null/[] without poisoning subsequent writes", async () => {
+  const origin = createOriginHarness({
+    pbpDiagErrors: [
+      { ts: 1700000000100, surface: "ai", op: "ai_cache", code: "idb", errorName: "Error", status: null },
+    ],
+  });
+  const page = origin.makePageContext({ pathname: "/options.html", failGet: true, failSet: true });
+
+  // 1. Keyed get failure: both record and read degrade cleanly without rejecting.
+  assert.equal(await page.ctx.pbpRecordDiagError({ surface: "ai", op: "ai_cache", code: "idb" }), null);
+  assert.deepEqual(plain(await page.ctx.pbpReadDiagErrors()), []);
+
+  // 2. Write-only failure (get works, set fails): record returns null, existing row remains readable.
+  page.state.failGet = false;
+  page.state.failSet = true;
+  assert.equal(await page.ctx.pbpRecordDiagError({ surface: "options", op: "sync_migrate", code: "storage" }), null);
+  const existing = plain(await page.ctx.pbpReadDiagErrors());
+  assert.equal(existing.length, 1);
+  assert.equal(existing[0].op, "ai_cache");
+
+  // 3. Subsequent write after storage recovers succeeds and preserves queue liveness.
+  page.state.failSet = false;
+  const recovered = plain(await page.ctx.pbpRecordDiagError({ surface: "options", op: "wayback_clear", code: "storage" }));
+  assert.ok(recovered && recovered.op === "wayback_clear");
+  const afterRecovery = plain(await page.ctx.pbpReadDiagErrors());
+  assert.deepEqual(afterRecovery.map((r) => r.op), ["ai_cache", "wayback_clear"]);
+});
+
+test("pbpDiagErrors: hostile getters, revoked proxies, throwing navigator.locks, and callback error names never throw or leak", async () => {
   const { ctx, makePageContext } = createOriginHarness({
     pbpDiagErrors: [
       null,
@@ -381,7 +462,35 @@ test("pbpDiagErrors: hostile getters, proxies, tampered rows, and throwing callb
   assert.equal(rows[1].op, "wayback_clear");
   assert.equal(rows[1].status, 504);
 
-  // Accessor property that changes across reads or throws synchronously:
+  // pbpSanitizeDiagErrors on an array with a throwing element getter and on a revoked Proxy:
+  const poisonedArray = [
+    { ts: 1700000000011, surface: "popup", op: "bookmark_delete", code: "network", errorName: "Error", status: null },
+    null,
+    { ts: 1700000000012, surface: "options", op: "storage_measure", code: "storage", errorName: "Error", status: null },
+  ];
+  Object.defineProperty(poisonedArray, 1, {
+    get() { throw new TypeError("slot getter exploded"); },
+  });
+  const sanitizedPoisoned = plain(ctx.pbpSanitizeDiagErrors(poisonedArray));
+  assert.deepEqual(sanitizedPoisoned.map((r) => r.op), ["bookmark_delete", "storage_measure"]);
+
+  const revocable = Proxy.revocable([], {});
+  revocable.revoke();
+  assert.deepEqual(plain(ctx.pbpSanitizeDiagErrors(revocable.proxy)), []);
+
+  // Host where reading navigator.locks itself throws SecurityError synchronously:
+  const restrictedHost = makePageContext({ pathname: "/popup.html", throwingLocksGetter: true });
+  const restrictedEntry = plain(await restrictedHost.ctx.pbpRecordDiagError({
+    surface: "popup",
+    op: "obsidian_clip",
+    code: "denied",
+    errorName: "SecurityError",
+  }));
+  assert.ok(restrictedEntry && restrictedEntry.op === "obsidian_clip");
+  const restrictedRead = plain(await restrictedHost.ctx.pbpReadDiagErrors());
+  assert.equal(restrictedRead[restrictedRead.length - 1].op, "obsidian_clip");
+
+  // Accessor property on input record:
   let statusReads = 599;
   const mutatingInput = {
     surface: "popup",
@@ -394,16 +503,13 @@ test("pbpDiagErrors: hostile getters, proxies, tampered rows, and throwing callb
     },
   };
   const fromGetter = plain(await ctx.pbpRecordDiagError(mutatingInput));
-  assert.equal(fromGetter.status, null, "getter property must not be invoked or stored as out-of-range status");
-  const readBack = plain(await ctx.pbpReadDiagErrors());
-  assert.equal(readBack[readBack.length - 1].op, "bookmark_delete");
-  assert.equal(readBack[readBack.length - 1].status, null);
+  assert.equal(fromGetter.status, null);
+  assert.equal(statusReads, 599, "accessor getter must never be invoked");
 
   const throwingGetter = {
     surface: "popup",
     get op() { throw new Error("getter exploded"); },
   };
-  // Must NOT throw synchronously and must still record fallback "unknown" safely
   const fromThrowingProp = plain(await ctx.pbpRecordDiagError(throwingGetter));
   assert.equal(fromThrowingProp.op, "unknown");
 
@@ -452,7 +558,7 @@ test("pbpDiagErrors: hostile getters, proxies, tampered rows, and throwing callb
   assert.equal(sinkThrowingName, true);
 });
 
-test("pbpDiagErrors: Jina cache surface attribution and pbpMeasureLocalStorage failure reporting", async () => {
+test("pbpDiagErrors: Jina cache surface attribution and pbpMeasureLocalStorage survive throwing surface getters", async () => {
   const origin = createOriginHarness();
   let failNextRead = false;
   const popupPage = origin.makePageContext({
@@ -476,21 +582,28 @@ test("pbpDiagErrors: Jina cache surface attribution and pbpMeasureLocalStorage f
   };
 
   failNextRead = true;
-  const jinaRes = plain(await popupPage.ctx.fetchJinaMarkdown("https://example.com/a", { cacheDuration: 0 }));
+  const jinaOpts = {
+    cacheDuration: 0,
+    get diagSurface() { throw new TypeError("diagSurface getter exploded"); },
+  };
+  const jinaRes = plain(await popupPage.ctx.fetchJinaMarkdown("https://example.com/a", jinaOpts));
   assert.equal(jinaRes.markdown, "# Hello");
   let rows = plain(await popupPage.ctx.pbpReadDiagErrors());
   assert.equal(rows.length, 1);
   assert.equal(rows[0].surface, "popup");
   assert.equal(rows[0].op, "jina_cache_read");
 
-  // pbpMeasureLocalStorage when get(null) throws: marks failed: true and records storage_measure
+  // pbpMeasureLocalStorage when get(null) throws AND opts.surface is a throwing getter:
   const optPage = origin.makePageContext({ pathname: "/options.html" });
   const origOptGet = optPage.local.get;
   optPage.local.get = async (keys) => {
     if (keys === null) throw new DOMException("read null failed", "NotReadableError");
     return origOptGet(keys);
   };
-  const measured = plain(await optPage.ctx.pbpMeasureLocalStorage());
+  const measureOpts = {
+    get surface() { throw new TypeError("surface getter exploded"); },
+  };
+  const measured = plain(await optPage.ctx.pbpMeasureLocalStorage(measureOpts));
   assert.equal(measured.misc.failed, true);
   assert.equal(measured.jina.failed, true);
   assert.deepEqual(measured.misc.keys, []);

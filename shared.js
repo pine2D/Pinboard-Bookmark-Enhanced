@@ -2007,7 +2007,7 @@ async function pbpMeasureLocalStorage(opts) {
     const errName = pbpSafeErrorName(error);
     console.warn("[storage] measure failed:", errName);
     pbpRecordDiagError({
-      surface: pbpDetectDiagSurface(opts && typeof opts === "object" ? opts.surface : undefined),
+      surface: pbpDetectDiagSurface(opts),
       op: "storage_measure",
       code: "storage",
       errorName: errName,
@@ -2063,79 +2063,89 @@ async function pbpReclaimLocalStorage(categories, opts) {
     wanted.set(cat, PBP_RECLAIM_CATEGORIES[cat]);
   }
   if (!wanted.size) return { freed: 0, removed: {} };
-  // Every storage failure below lands here: logged (never the values, only the
-  // platform error) and reported as failed, never as an empty success.
-  const fail = (step, err) => {
-    if (err) console.warn("[storage] reclaim " + step + " failed:", err?.name, err?.message);
-    return { freed: 0, removed: {}, failed: true };
-  };
-  let local;
-  try { local = chrome.storage.local; } catch (e) { return fail("access", e); }
-  if (!local) return fail("access");
-  // Fresh enumeration, always -- the caller's hint is not an enumeration source.
-  let names = null;
-  let values = null;
-  if (typeof local.getKeys === "function") {
-    try {
-      const listed = await local.getKeys();
-      if (Array.isArray(listed)) names = listed;
-    } catch (error) {
-      console.warn("[storage] getKeys fallback to get(null):", error?.name, error?.message);
-      names = null;
-    } // transient failure -> take the get(null) path below
-  }
-  if (!names) {
-    try { values = await local.get(null); } catch (e) { return fail("read", e); }
-    values = values || {};
-    names = Object.keys(values);
-  }
-  const hinted = opts && Array.isArray(opts.keys)
-    ? opts.keys.filter((k) => typeof k === "string") : [];
-  const pool = hinted.length ? Array.from(new Set(names.concat(hinted))) : names;
-  const removed = {};
-  for (const cat of wanted.keys()) removed[cat] = { keys: [], bytes: 0 };
-  const catOf = new Map();
-  for (const key of pool) {
-    if (pbpIsNeverClearKey(key)) continue; // second-line guard
-    for (const [cat, def] of wanted) {
-      if (pbpKeyMatchesCategory(key, def)) { catOf.set(key, cat); break; } // a key belongs to at most one category
+  const runReclaim = async () => {
+    // Every storage failure below lands here: logged (never the values, only the
+    // platform error) and reported as failed, never as an empty success.
+    const fail = (step, err) => {
+      if (err) console.warn("[storage] reclaim " + step + " failed:", pbpSafeErrorName(err));
+      return { freed: 0, removed: {}, failed: true };
+    };
+    let local;
+    try { local = chrome.storage.local; } catch (e) { return fail("access", e); }
+    if (!local) return fail("access");
+    // Fresh enumeration, always -- the caller's hint is not an enumeration source.
+    let names = null;
+    let values = null;
+    if (typeof local.getKeys === "function") {
+      try {
+        const listed = await local.getKeys();
+        if (Array.isArray(listed)) names = listed;
+      } catch (error) {
+        console.warn("[storage] getKeys fallback to get(null):", pbpSafeErrorName(error));
+        names = null;
+      } // transient failure -> take the get(null) path below
     }
-  }
-  // Every degrade path in this function returns the SAME shape,
-  // { freed: 0, removed: {} } -- including here, where `removed` already
-  // holds one empty { keys: [], bytes: 0 } row per requested category. That
-  // partially-built map is deliberately NOT what gets returned: this is a
-  // degrade path (nothing was actually measured/removed), and a second,
-  // different "empty" shape for `removed` would be a trap for the first
-  // caller that starts reading removed's contents instead of just freed.
-  if (!catOf.size) return { freed: 0, removed: {} };
-  const candidates = [...catOf.keys()];
-  if (!values) {
-    // getKeys path: this is the ONLY value read, and it is scoped to the keys
-    // that are about to be deleted.
-    try { values = await local.get(candidates); } catch (e) { return fail("read", e); }
-    values = values || {};
-  }
-  const toRemove = [];
-  let freed = 0;
-  for (const key of candidates) {
-    // Not backed by the fresh read (stale hint, or a concurrent delete): not
-    // ours to remove, and not ours to count as freed.
-    if (!Object.prototype.hasOwnProperty.call(values, key)) continue;
-    const bytes = pbpEntryBytes(key, values[key]);
-    const row = removed[catOf.get(key)];
-    row.keys.push(key);
-    row.bytes += bytes;
-    freed += bytes;
-    toRemove.push(key);
-  }
-  if (toRemove.length) {
-    // The caller re-renders from a fresh read rather than trusting this return
-    // value as an optimistic UI update; `failed` only picks the status line.
-    try { await local.remove(toRemove); } catch (e) { return fail("remove", e); }
-    if (toRemove.includes(PBP_DIAG_ERRORS_KEY)) _pbpBumpDiagClearGen(true);
-  }
-  return { freed, removed };
+    if (!names) {
+      try { values = await local.get(null); } catch (e) { return fail("read", e); }
+      values = values || {};
+      names = Object.keys(values);
+    }
+    let hinted = [];
+    try {
+      const rawKeys = opts && typeof opts === "object" ? opts.keys : null;
+      if (Array.isArray(rawKeys)) hinted = rawKeys.filter((k) => typeof k === "string");
+    } catch (_) {
+      /* swallow-ok: malformed caller key hint is advisory only */
+    }
+    const pool = hinted.length ? Array.from(new Set(names.concat(hinted))) : names;
+    const removed = {};
+    for (const cat of wanted.keys()) removed[cat] = { keys: [], bytes: 0 };
+    const catOf = new Map();
+    for (const key of pool) {
+      if (pbpIsNeverClearKey(key)) continue; // second-line guard
+      for (const [cat, def] of wanted) {
+        if (pbpKeyMatchesCategory(key, def)) { catOf.set(key, cat); break; } // a key belongs to at most one category
+      }
+    }
+    // Every degrade path in this function returns the SAME shape,
+    // { freed: 0, removed: {} } -- including here, where `removed` already
+    // holds one empty { keys: [], bytes: 0 } row per requested category. That
+    // partially-built map is deliberately NOT what gets returned: this is a
+    // degrade path (nothing was actually measured/removed), and a second,
+    // different "empty" shape for `removed` would be a trap for the first
+    // caller that starts reading removed's contents instead of just freed.
+    if (!catOf.size) return { freed: 0, removed: {} };
+    const candidates = [...catOf.keys()];
+    if (!values) {
+      // getKeys path: this is the ONLY value read, and it is scoped to the keys
+      // that are about to be deleted.
+      try { values = await local.get(candidates); } catch (e) { return fail("read", e); }
+      values = values || {};
+    }
+    const toRemove = [];
+    let freed = 0;
+    for (const key of candidates) {
+      // Not backed by the fresh read (stale hint, or a concurrent delete): not
+      // ours to remove, and not ours to count as freed.
+      if (!Object.prototype.hasOwnProperty.call(values, key)) continue;
+      const bytes = pbpEntryBytes(key, values[key]);
+      const row = removed[catOf.get(key)];
+      row.keys.push(key);
+      row.bytes += bytes;
+      freed += bytes;
+      toRemove.push(key);
+    }
+    if (toRemove.length) {
+      // The caller re-renders from a fresh read rather than trusting this return
+      // value as an optimistic UI update; `failed` only picks the status line.
+      try { await local.remove(toRemove); } catch (e) { return fail("remove", e); }
+    }
+    return { freed, removed };
+  };
+  // Share the origin-wide diagnostic Web Lock whenever "misc" (which includes
+  // pbpDiagErrors) is reclaimed, so enumeration + removal serialize atomically
+  // with pbpRecordDiagError / pbpReadDiagErrors across every page and worker.
+  return wanted.has("misc") ? _pbpDiagWithLock(runReclaim) : runReclaim();
 }
 
 // Human-readable byte size (B / KB / MB) for the storage panel.
@@ -2320,14 +2330,9 @@ function pbpPickDominantFrame(frames, vw, vh, pageOrigin) {
   return best && bestArea >= 0.4 * W * H ? best : "";
 }
 
-// Invalidate cache + mirror when user toggles optSyncEnabled, and advance the
-// diagnostic clear generation whenever pbpDiagErrors is removed in any realm.
+// Invalidate cache + mirror when user toggles optSyncEnabled
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && Object.prototype.hasOwnProperty.call(changes, PBP_DIAG_ERRORS_KEY) &&
-        changes[PBP_DIAG_ERRORS_KEY]?.newValue === undefined) {
-      _pbpBumpDiagClearGen(false);
-    }
     if (area === "local" && changes.optSyncEnabled) {
       _settingsStorageCache = null;
       _pbpRecentPrimitiveReadBasis.clear();
@@ -2552,45 +2557,24 @@ const PBP_DIAG_ERROR_NAMES = Object.freeze([
   "NamespaceError", "IndexSizeError",
 ]);
 const _pbpDiagWriteTail = pbpCreateRecoveringTail();
-let _pbpDiagClearGen = 0;
-let _pbpDiagChannel = null;
-try {
-  if (typeof BroadcastChannel === "function") {
-    _pbpDiagChannel = new BroadcastChannel(PBP_DIAG_LOCK_NAME);
-    _pbpDiagChannel.onmessage = (ev) => {
-      if (ev && ev.data === "clear") _pbpDiagClearGen += 1;
-    };
-    if (typeof _pbpDiagChannel.unref === "function") _pbpDiagChannel.unref();
-  }
-} catch (_) {
-  /* swallow-ok: BroadcastChannel unavailable in isolated test contexts; storage.onChanged still tracks clears */
-  _pbpDiagChannel = null;
-}
-
-function _pbpBumpDiagClearGen(broadcast) {
-  _pbpDiagClearGen += 1;
-  if (broadcast && _pbpDiagChannel) {
-    try { _pbpDiagChannel.postMessage("clear"); }
-    catch (_) { /* swallow-ok: detached BroadcastChannel must never block local storage reclaim */ }
-  }
-}
 
 function _pbpDiagWithLock(task) {
-  const locks = globalThis.navigator?.locks;
-  if (locks && typeof locks.request === "function") {
-    let entered = false;
-    try {
-      return locks.request(PBP_DIAG_LOCK_NAME, () => {
+  let entered = false;
+  try {
+    const hasExtRuntime = typeof chrome !== "undefined" && Boolean(chrome && chrome.runtime && chrome.runtime.id);
+    const locks = hasExtRuntime && typeof navigator !== "undefined" && navigator ? navigator.locks : null;
+    if (locks && typeof locks.request === "function") {
+      return Promise.resolve(locks.request(PBP_DIAG_LOCK_NAME, () => {
         entered = true;
         return _pbpDiagWriteTail(task);
-      }).catch((err) => {
+      })).catch((err) => {
         if (!entered) return _pbpDiagWriteTail(task);
         throw err;
       });
-    } catch (_) {
-      /* swallow-ok: opaque-origin test frames deny LockManager; fall back to in-realm queue */
-      return _pbpDiagWriteTail(task);
     }
+  } catch (_) {
+    /* swallow-ok: restricted hosts or opaque frames may throw SecurityError reading or calling navigator.locks */
+    if (!entered) return _pbpDiagWriteTail(task);
   }
   return _pbpDiagWriteTail(task);
 }
@@ -2607,7 +2591,17 @@ function pbpSafeErrorName(err) {
 }
 
 function pbpDetectDiagSurface(explicit) {
-  if (typeof explicit === "string" && PBP_DIAG_SURFACES.includes(explicit)) return explicit;
+  try {
+    if (typeof explicit === "string" && PBP_DIAG_SURFACES.includes(explicit)) return explicit;
+    if (explicit && typeof explicit === "object") {
+      const desc = Object.getOwnPropertyDescriptor(explicit, "surface") ||
+        Object.getOwnPropertyDescriptor(explicit, "diagSurface");
+      const v = desc && Object.prototype.hasOwnProperty.call(desc, "value") ? desc.value : undefined;
+      if (typeof v === "string" && PBP_DIAG_SURFACES.includes(v)) return v;
+    }
+  } catch (_) {
+    /* swallow-ok: hostile options proxy or getter falls back to automatic surface detection */
+  }
   if (typeof document === "undefined") return "background";
   try {
     const path = typeof location !== "undefined" && typeof location?.pathname === "string" ? location.pathname : "";
@@ -2669,13 +2663,27 @@ function _pbpSanitizeStoredDiagError(raw) {
 }
 
 function pbpSanitizeDiagErrors(rawList) {
-  if (!Array.isArray(rawList)) return [];
-  const out = [];
-  for (const item of rawList) {
-    const clean = _pbpSanitizeStoredDiagError(item);
-    if (clean) out.push(clean);
+  try {
+    if (!Array.isArray(rawList)) return [];
+    const len = rawList.length;
+    const out = [];
+    for (let i = 0; i < len; i++) {
+      let item;
+      try {
+        const desc = Object.getOwnPropertyDescriptor(rawList, i);
+        item = desc && Object.prototype.hasOwnProperty.call(desc, "value") ? desc.value : undefined;
+      } catch (_) {
+        /* swallow-ok: skip unreadable or hostile slot while keeping valid sibling entries */
+        continue;
+      }
+      const clean = _pbpSanitizeStoredDiagError(item);
+      if (clean) out.push(clean);
+    }
+    return out.length > PBP_DIAG_ERRORS_CAP ? out.slice(-PBP_DIAG_ERRORS_CAP) : out;
+  } catch (_) {
+    /* swallow-ok: revoked proxy or corrupted container degrades to empty diagnostic list */
+    return [];
   }
-  return out.length > PBP_DIAG_ERRORS_CAP ? out.slice(-PBP_DIAG_ERRORS_CAP) : out;
 }
 
 function pbpRecordDiagError(input) {
@@ -2703,22 +2711,11 @@ function pbpRecordDiagError(input) {
     try {
       if (typeof chrome === "undefined" || !chrome.storage?.local) return null;
       const local = chrome.storage.local;
-      let gen0 = _pbpDiagClearGen;
       const stored = await local.get(PBP_DIAG_ERRORS_KEY);
-      const prev = _pbpDiagClearGen === gen0
-        ? pbpSanitizeDiagErrors(stored && stored[PBP_DIAG_ERRORS_KEY])
-        : [];
-      const hadPrev = prev.length > 0;
-      gen0 = _pbpDiagClearGen;
+      const prev = pbpSanitizeDiagErrors(stored && stored[PBP_DIAG_ERRORS_KEY]);
       prev.push(entry);
       const next = prev.length > PBP_DIAG_ERRORS_CAP ? prev.slice(-PBP_DIAG_ERRORS_CAP) : prev;
       await local.set({ [PBP_DIAG_ERRORS_KEY]: next });
-      if (_pbpDiagClearGen !== gen0 && hadPrev) {
-        const after = await local.get(PBP_DIAG_ERRORS_KEY);
-        if (after && after[PBP_DIAG_ERRORS_KEY] !== undefined) {
-          await local.set({ [PBP_DIAG_ERRORS_KEY]: [entry] });
-        }
-      }
       return entry;
     } catch (_) {
       /* swallow-ok: diagnostic ring write must never throw into or recursively log from caller catch paths */
