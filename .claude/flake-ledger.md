@@ -30,3 +30,4 @@
 | 2026-11-24 | tests/reader-history-tests.html：点击历史行打开标签并关闭弹层 | 四路并行 V8 覆盖率采样负载下 tabs.create 断言早于 pop.hidePopover 完成 1 个微任务，串行重跑 14/14 通过 | 已根治 43eb40a2 | - |
 | 2026-11-24 | tests/settings-persist-tests.html：E7d 并发编辑保存排队收敛 | 四路并行 V8 覆盖率采样负载下超出 30 帧 rAF 轮询窗口（约 500ms），串行重跑 614/614 通过 | 未处理 | - |
 | 2026-11-25 | tests/reader-history-tests.html：点击历史行打开标签并关闭弹层 | 全量 verify 四路并行下 popup #jina-md-history-btn 在 tabs.create 后尚未完成 pbpReaderHistoryRecord 入锁与 pop.hidePopover 即断言关闭 | 已根治 43eb40a2 | - |
+| 2026-11-25 | render-audit 分片 0：md-preview dict-entry-negative 记忆标记 | 同分片前置 library/dict-entry-paid-negative 遗留同账号 pbpDictNeg:* 键，使后续 md-preview/dict-entry-negative 探针在 pbpDictNegRecord 异步落盘前提前放行重查 | 已根治 f8832b4b | - |
