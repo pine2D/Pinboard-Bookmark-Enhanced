@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="124"><title>Save Pipeline Tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="125"><title>Save Pipeline Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
 h2 { margin-top: 24px; font-size: 16px; }
@@ -86,6 +86,7 @@ let _callerSwState = null;
 
 async function bootManagedSw() {
   const sw = await pbpSwRealm.boot();
+  for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
   sw.dispose();
   const orig = {};
   for (const key of SW_OVERRIDE_KEYS) orig[key] = sw.win[key];
@@ -726,7 +727,7 @@ await suite("unified save pipeline", async () => {
       ...sw.mock.chrome,
       storage: { ...sw.mock.chrome.storage, local: {
         get: async () => ({ [key]: slot }),
-        set: async (values) => { slot = values[key]; },
+        set: async (values) => { if (Object.hasOwn(values, key)) slot = values[key]; },
       } },
     };
     sw.win.extractForPreview = async ({ engine }) => ({
@@ -757,7 +758,7 @@ await suite("unified save pipeline", async () => {
         ...(handed === undefined ? {} : { bookmarkUrl: handed }) };
       sw.win.chrome = {
         ...sw.mock.chrome,
-        storage: { ...sw.mock.chrome.storage, local: { get: async () => ({ [key]: slot }), set: async (values) => { slot = values[key]; } } },
+        storage: { ...sw.mock.chrome.storage, local: { get: async () => ({ [key]: slot }), set: async (values) => { if (Object.hasOwn(values, key)) slot = values[key]; } } },
       };
       sw.win.extractForPreview = async ({ engine }) => ({ source: engine, markdown: "# rebuilt", contentHtml: "", title: "Rebuilt", url: canonical });
       const result = await new Promise((resolve) => {
@@ -783,7 +784,7 @@ await suite("unified save pipeline", async () => {
       let slot = { url: page, tabId: 9, sourceTabUrl: page, account: "alice", tags: [], description: "" };
       sw.win.chrome = {
         ...sw.mock.chrome,
-        storage: { ...sw.mock.chrome.storage, local: { get: async () => ({ [key]: slot }), set: async (v) => { slot = v[key]; log.push("write"); } } },
+        storage: { ...sw.mock.chrome.storage, local: { get: async () => ({ [key]: slot }), set: async (v) => { if (Object.hasOwn(v, key)) { slot = v[key]; log.push("write"); } } } },
         permissions: { contains: async ({ origins }) => { log.push("contains:" + origins[0]); return granted; } },
       };
       sw.win.extractForPreview = async () => { log.push("extract"); return { source: "local", contentHtml: "<p>x</p>", markdown: "", title: "T", url: page }; };
@@ -806,6 +807,77 @@ await suite("unified save pipeline", async () => {
     equal(ok.res.ok, true);
     equal(ok.log.join(","), "contains:https://laohuangniu.net/*,reload,extract,write",
       "order must be grant check -> reload -> extract -> write");
+  });
+
+  await test("reextractMarkdown refuses to overwrite a slot superseded during extraction and locks post-extract commit", async () => {
+    const key = "md_preview_data_race-slot";
+    const page = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+    const sw = await acquireCallerSw();
+    let slot = { pending: true, url: page, tabId: 7, account: "alice", tags: [], description: "", ts: 1000 };
+    sw.win.chrome = {
+      ...sw.mock.chrome,
+      storage: {
+        ...sw.mock.chrome.storage,
+        local: {
+          get: async () => ({ [key]: structuredClone(slot) }),
+          set: async (v) => { if (Object.hasOwn(v, key)) slot = structuredClone(v[key]); },
+        },
+      },
+    };
+    sw.win.extractForPreview = async () => {
+      // Simulate duplicated Tab B committing an AI-punctuated transcript while Tab A's re-extract was running.
+      slot = {
+        url: page, tabId: 7, account: "alice", tags: [], description: "",
+        markdown: "# Tab B Saved Transcript", videoTranscript: true, videoAiPunct: true,
+        nonce: "nonce-tab-b", ts: 2000,
+      };
+      return { source: "jina", markdown: "# Stale Tab A Extract", contentHtml: "", title: "Video", url: page };
+    };
+    const superseded = await new Promise((resolve) => sw.win.handleRuntimeMessage({
+      type: "reextractMarkdown", url: page, tabId: 7, engine: "jina", k: "race-slot",
+      slotNonce: "nonce-tab-a", initialSlotNonce: "", pageLoadTs: 1001,
+    }, extSender(sw, "md-preview.html?k=race-slot"), resolve));
+    equal(superseded.ok, false, "superseded reextractMarkdown must not report ok");
+    equal(superseded.error, "slot_changed");
+    equal(slot.markdown, "# Tab B Saved Transcript", "stale reextractMarkdown overwrote Tab B's transcript");
+    equal(slot.nonce, "nonce-tab-b");
+    equal(slot.videoAiPunct, true);
+
+    // Also verify Web Lock exclusion during post-extract get+set when slot is unchanged.
+    slot = { pending: true, url: page, tabId: 7, account: "alice", tags: [], description: "", ts: 3000 };
+    let keyGets = 0;
+    let releasePostRead = null;
+    const postReadEntered = new Promise((r) => {
+      sw.win.chrome.storage.local.get = async (k) => {
+        if (k === key && ++keyGets === 2) {
+          r();
+          await new Promise((res) => { releasePostRead = res; });
+        }
+        return k === key ? { [key]: structuredClone(slot) } : {};
+      };
+    });
+    sw.win.extractForPreview = async () => ({ source: "jina", markdown: "# Fresh Extract", contentHtml: "", title: "Video", url: page });
+    const pReextract = new Promise((resolve) => sw.win.handleRuntimeMessage({
+      type: "reextractMarkdown", url: page, tabId: 7, engine: "jina", k: "race-slot",
+      slotNonce: "nonce-tab-a", initialSlotNonce: "", pageLoadTs: 3001,
+    }, extSender(sw, "md-preview.html?k=race-slot"), resolve));
+    let contenderEntered = false;
+    let pContender = Promise.resolve();
+    try {
+      await postReadEntered;
+      const lockState = await navigator.locks.query();
+      assert((lockState.held || []).some((l) => l.name === "pbp-preview-slot:" + key), "reextractMarkdown must hold pbp-preview-slot Web Lock during post-extract check+set");
+      pContender = window.pbpWithPreviewSlotLock(key, async () => { contenderEntered = true; });
+      await new Promise((r) => setTimeout(r, 15));
+      equal(contenderEntered, false, "concurrent slot writer entered while reextractMarkdown held the slot lock");
+    } finally {
+      if (releasePostRead) releasePostRead();
+    }
+    const okRes = await pReextract;
+    await pContender;
+    equal(okRes.ok, true);
+    equal(contenderEntered, true);
+    equal(slot.nonce, "nonce-tab-a");
   });
 
   await test("preview opener and restore payloads carry account, tags, and description", async () => {

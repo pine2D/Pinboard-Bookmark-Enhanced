@@ -631,7 +631,8 @@ async function _pbpHlLoadStrict(url) {
     const d = await chrome.storage.local.get(key);
     const rec = d && d[key];
     if (rec === undefined) return [];
-    if (!rec || typeof rec !== "object" || Array.isArray(rec) || !Array.isArray(rec.items)) {
+    if (!rec || typeof rec !== "object" || Array.isArray(rec) || !Array.isArray(rec.items) ||
+        rec.items.some((it) => !it || typeof it !== "object" || Array.isArray(it))) {
       // Shape only -- never the record's contents, which are reading notes.
       console.warn("[hl] stored highlight record has an unusable shape; refusing to overwrite it",
         Array.isArray(rec) ? "array" : typeof rec);
@@ -2531,13 +2532,13 @@ async function _pbpHlSwitchColor(color) {
   let gone = false;
   let unchanged = false;
   const ok = await _pbpHlCommit((stored) => {
-    const item = stored.find((it) => it.id === pendingId);
+    const item = stored.find((it) => it && it.id === pendingId);
     // Deleted elsewhere (library.html, another reader tab): abandon the edit.
     // Re-inserting the item to carry a colour change is how a deleted
     // highlight comes back from the dead.
     if (!item) { gone = true; return null; }
     if (item.color === color) { unchanged = true; return null; }
-    return stored.map((it) => (it.id === pendingId ? { ...it, color } : it));
+    return stored.map((it) => (it && it.id === pendingId ? { ...it, color } : it));
   }, btn);
   if (!ok) {
     if (unchanged) return;
@@ -2587,7 +2588,6 @@ function _pbpHlCommitNote() {
   const baseNote = _pbpHlCardBaseNote || "";
   const draftOwner = _pbpHlOwner;
   const draftUrl = _pbpHlState.url;
-  const draftOwnerRev = _pbpHlOwnerRevision;
   const draftKey = _pbpHlDraftKey(draftOwner, draftUrl, pendingId);
   const saveBtn = card && card.querySelector(".hl-card-save");
   _pbpHlNoteDirty = false;
@@ -2595,8 +2595,29 @@ function _pbpHlCommitNote() {
   // list's note-excerpt line does need to reflect the edit.
   let mergedNote = nextNote;
   let gone = false;
-  const pending = _pbpHlCommit((stored) => {
-    const item = stored.find((it) => it.id === pendingId);
+  let pending = null;
+  const markDraftFailed = () => {
+    const curDraft = _pbpHlUnsavedNotes.get(draftKey);
+    const ownsDraftSlot = !curDraft || curDraft.pending === pending;
+    const ownerMovedAway = !_pbpHlOwnerPending && _pbpHlOwner !== draftOwner;
+    if (gone || ownerMovedAway) {
+      if (ownsDraftSlot) _pbpHlUnsavedNotes.delete(draftKey);
+      if (gone) _pbpHlToast(t("hlGoneElsewhere"), saveBtn);
+      return false;
+    }
+    if (ownsDraftSlot) {
+      _pbpHlUnsavedNotes.set(draftKey, { note: nextNote, baseNote, dirty: true, pending: null });
+    }
+    if (_pbpHlCardItemId === pendingId && !_pbpHlOwnerPending && _pbpHlOwner === draftOwner) {
+      _pbpHlNoteDirty = true; // a write failure is retryable, an abandoned edit is not
+      _pbpHlCardBaseNote = baseNote;
+      const currentNote = _pbpHlCard && _pbpHlCard.querySelector(".hl-card-note");
+      if (currentNote && ownsDraftSlot && currentNote.value !== nextNote) currentNote.value = nextNote;
+    }
+    return false;
+  };
+  pending = _pbpHlCommit((stored) => {
+    const item = stored.find((it) => it && it.id === pendingId);
     // Deleted elsewhere while this note was being typed: drop the edit rather
     // than re-inserting the item to carry it (the resurrection bug).
     if (!item) { gone = true; return null; }
@@ -2616,27 +2637,11 @@ function _pbpHlCommitNote() {
         mergedNote = pbpHlAppendNoteText(mergedNote, oldNote);
       }
     }
-    return stored.map((it) => (it.id === pendingId ? { ...it, note: mergedNote } : it));
+    return stored.map((it) => (it && it.id === pendingId ? { ...it, note: mergedNote } : it));
   }, saveBtn).then((ok) => {
+    if (!ok) return markDraftFailed();
     const curDraft = _pbpHlUnsavedNotes.get(draftKey);
     const ownsDraftSlot = !curDraft || curDraft.pending === pending;
-    if (!ok) {
-      if (gone || _pbpHlOwnerPending || draftOwnerRev !== _pbpHlOwnerRevision) {
-        if (ownsDraftSlot) _pbpHlUnsavedNotes.delete(draftKey);
-        if (gone) _pbpHlToast(t("hlGoneElsewhere"), saveBtn);
-        return false;
-      }
-      if (ownsDraftSlot) {
-        _pbpHlUnsavedNotes.set(draftKey, { note: nextNote, baseNote, dirty: true, pending: null });
-      }
-      if (_pbpHlCardItemId === pendingId) {
-        _pbpHlNoteDirty = true; // a write failure is retryable, an abandoned edit is not
-        _pbpHlCardBaseNote = baseNote;
-        const currentNote = _pbpHlCard && _pbpHlCard.querySelector(".hl-card-note");
-        if (currentNote && ownsDraftSlot && currentNote.value !== nextNote) currentNote.value = nextNote;
-      }
-      return false;
-    }
     if (ownsDraftSlot) _pbpHlUnsavedNotes.delete(draftKey);
     _pbpHlNotebookRender();
     // The merge protects only the save it ran in unless the CARD adopts its
@@ -2658,6 +2663,9 @@ function _pbpHlCommitNote() {
       _pbpHlCardBaseNote = synced ? mergedNote : nextNote;
     }
     return true;
+  }).catch((_diagErr) => {
+    console.warn("[md-highlight] note commit rejected:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");
+    return markDraftFailed();
   });
   if (!_pbpHlOwnerPending) {
     _pbpHlUnsavedNotes.set(draftKey, { note: nextNote, baseNote, dirty: false, pending });
@@ -2682,9 +2690,9 @@ async function _pbpHlDeleteItem(id, btn) {
   // first) is an idempotent no-op, NOT a failure -- the user's intent is
   // exactly the state storage is already in.
   const ok = await _pbpHlCommit((stored) => {
-    const removed = stored.find((it) => it.id === id);
+    const removed = stored.find((it) => it && it.id === id);
     if (removed) removedN = Number(removed.n) || 0;
-    return stored.filter((it) => it.id !== id);
+    return stored.filter((it) => it && it.id !== id);
   }, btn);
   if (!ok) return false;
   if (_pbpHlState) _pbpHlUnsavedNotes.delete(_pbpHlDraftKey(_pbpHlOwner, _pbpHlState.url, id));

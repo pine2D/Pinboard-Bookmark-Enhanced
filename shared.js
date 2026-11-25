@@ -2511,6 +2511,36 @@ function pbpCreateRecoveringTail() {
 const PBP_DIAG_ERRORS_KEY = "pbpDiagErrors";
 const PBP_DIAG_ERRORS_CAP = 50;
 const PBP_DIAG_LOCK_NAME = "pbp-diag-errors";
+const _pbpPreviewSlotChains = new Map();
+
+function pbpWithPreviewSlotLock(slotKey, work) {
+  const key = "pbp-preview-slot:" + String(slotKey || "md_preview_data");
+  let localEnqueued = false;
+  const enqueueLocal = () => {
+    if (localEnqueued) return _pbpPreviewSlotChains.get(key);
+    localEnqueued = true;
+    const prev = _pbpPreviewSlotChains.get(key) || Promise.resolve();
+    const run = prev.then(work, work);
+    const tail = run.catch(() => { /* swallow-ok: keep per-slot fallback queue alive after handled rejection */ });
+    _pbpPreviewSlotChains.set(key, tail);
+    tail.then(() => { if (_pbpPreviewSlotChains.get(key) === tail) _pbpPreviewSlotChains.delete(key); });
+    return run;
+  };
+  const locks = typeof navigator !== "undefined" && navigator && navigator.locks;
+  if (!locks || typeof locks.request !== "function") return enqueueLocal();
+  let entered = false;
+  const wrapped = () => { entered = true; return work(); };
+  try {
+    return Promise.resolve(locks.request(key, { mode: "exclusive" }, wrapped))
+      .catch((err) => {
+        if (entered) throw err;
+        return enqueueLocal();
+      });
+  } catch (_) {
+    /* swallow-ok: unavailable Web Locks degrades to in-realm per-slot queue */
+    return enqueueLocal();
+  }
+}
 const PBP_DIAG_SURFACES = Object.freeze([
   "background", "popup", "options", "library", "md-preview", "pinboard", "ai", "dict", "sync", "shared",
 ]);

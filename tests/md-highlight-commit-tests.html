@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="288"><title>md-highlight commit tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="292"><title>md-highlight commit tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1100px; }
 h2 { margin-top: 24px; font-size: 15px; }
@@ -1825,6 +1825,60 @@ function selectionRange(n, start, end) {
       await flush();
       check("clicking Save on the restored draft commits it once storage recovers",
         STORE[KEY].items.find((it) => it.id === "h-alpha").note === "Second unsaved draft");
+
+      // Same-account optSyncEnabled toggle mid-save: owner revision bumps while owner remains acct_alice.
+      const savedOwnerNow = OWNER_NOW;
+      OWNER_NOW = "acct_alice";
+      await _pbpHlRefreshOwner();
+      const aliceRec = baseRecord();
+      aliceRec.items[0].owner = "acct_alice";
+      aliceRec.items[0].note = "Alice base";
+      setQuiet(KEY, aliceRec);
+      _pbpHlRawItems = structuredClone(aliceRec.items);
+      _pbpHlState.items = pbpHlVisibleItems(_pbpHlRawItems, _pbpHlOwner);
+      pbpHlRestore(); _pbpHlNotebookRender();
+
+      _realOpenCard("h-alpha");
+      noteEl.value = "Alice draft across sync flip";
+      noteEl.dispatchEvent(new Event("input", { bubbles: true }));
+      ON_GET = (k) => {
+        if (k === KEY) {
+          ON_GET = null;
+          _fire("optSyncEnabled", false, true);
+        }
+      };
+      realCard.querySelector(".hl-card-save").click();
+      await flush();
+      if (realCard.matches(":popover-open")) realCard.hidePopover();
+      await tick();
+      _realOpenCard("h-alpha");
+      check("same-owner optSyncEnabled refresh during save preserves unsaved draft on reopen",
+        noteEl.value === "Alice draft across sync flip");
+      realCard.querySelector(".hl-card-save").click();
+      await flush();
+      check("retrying Save after same-owner optSyncEnabled refresh persists the draft",
+        STORE[KEY].items.find((it) => it.id === "h-alpha").note === "Alice draft across sync flip");
+
+      // Corrupted null item in stored.items during track-switch commit: draft remains dirty and retryable once storage heals.
+      noteEl.value = "Alice draft after malformed slot";
+      noteEl.dispatchEvent(new Event("input", { bubbles: true }));
+      const goodBackup = structuredClone(STORE[KEY]);
+      setQuiet(KEY, { ...goodBackup, items: [null, ...goodBackup.items] });
+      const swapDetail2 = Object.freeze({ revision: 100, reason: "video-track-switch", url: PAGE_URL, title: "Fixture", forum: false, account: "acct_alice" });
+      document.dispatchEvent(new CustomEvent("pbp:article-will-replace", { detail: swapDetail2 }));
+      document.dispatchEvent(new CustomEvent("pbp:article-replaced", { detail: swapDetail2 }));
+      await flush();
+      setQuiet(KEY, goodBackup);
+      _realOpenCard("h-alpha");
+      check("reopening after malformed stored items preserves draft and dirty state",
+        noteEl.value === "Alice draft after malformed slot" && _pbpHlNoteDirty === true);
+      realCard.querySelector(".hl-card-save").click();
+      await flush();
+      check("direct Save click after malformed-slot recovery commits the preserved draft",
+        STORE[KEY].items.find((it) => it.id === "h-alpha").note === "Alice draft after malformed slot");
+
+      OWNER_NOW = savedOwnerNow;
+      await _pbpHlRefreshOwner();
       if (realCard.matches(":popover-open")) realCard.hidePopover();
       realCard.remove();
       await tick();

@@ -770,7 +770,10 @@ async function _pbpOcrOpenDocInReader(doc, handoff = {}, openInNewTab = false) {
   const resolvedTitle = (typeof handoff.title === "string" && handoff.title.trim())
     ? handoff.title.trim()
     : (_pbpOcrTitleFromFileName(doc.fileName) || t("mdPreviewUntitled"));
-  await chrome.storage.local.set({
+  const ocrSlotNonce = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+    ? crypto.randomUUID()
+    : String(Date.now()) + "-" + String(Math.random()).slice(2);
+  const writeSlot = () => chrome.storage.local.set({
     [slotKey]: {
       markdown: doc.markdown,
       title: resolvedTitle,
@@ -788,9 +791,12 @@ async function _pbpOcrOpenDocInReader(doc, handoff = {}, openInNewTab = false) {
       account,
       tags: isLocal ? [] : (Array.isArray(handoff.tags) ? handoff.tags : []),
       description: isLocal ? "" : (typeof handoff.description === "string" ? handoff.description : ""),
+      nonce: ocrSlotNonce,
       ts: Date.now(),
     },
   });
+  if (typeof pbpWithPreviewSlotLock === "function") await pbpWithPreviewSlotLock(slotKey, writeSlot);
+  else await writeSlot();
   const askQ = (() => {
     if (!sameDocAsSlot) return "";
     try {

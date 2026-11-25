@@ -1563,25 +1563,13 @@ const _pbpReaderBoot = (async function () {
   const _initialSlotNonce = (info && typeof info.nonce === "string") ? info.nonce : "";
   let _slotLockChain = Promise.resolve();
   function _pbpWithPreviewSlotLock(work) {
+    if (typeof pbpWithPreviewSlotLock === "function") return pbpWithPreviewSlotLock(MP_KEY, work);
     const enqueueLocal = () => {
       const run = _slotLockChain.then(work, work);
       _slotLockChain = run.catch(() => { /* swallow-ok: keep same-page slot lock queue alive after handled rejection */ });
       return run;
     };
-    const locks = typeof navigator !== "undefined" && navigator && navigator.locks;
-    if (!locks || typeof locks.request !== "function") return enqueueLocal();
-    let entered = false;
-    const wrapped = () => { entered = true; return work(); };
-    try {
-      return Promise.resolve(locks.request("pbp-preview-slot:" + MP_KEY, { mode: "exclusive" }, wrapped))
-        .catch((err) => {
-          if (entered) throw err;
-          return enqueueLocal();
-        });
-    } catch (_) {
-      /* swallow-ok: unavailable Web Locks degrades to same-page serialized slot queue */
-      return enqueueLocal();
-    }
+    return enqueueLocal();
   }
   function _isStrangerSlotRecord(cur) {
     if (!cur || typeof cur.nonce !== "string" || cur.nonce === _pageNonce) return false;
@@ -2162,6 +2150,7 @@ const _pbpReaderBoot = (async function () {
           pr = await chrome.runtime.sendMessage({
             type: "reextractMarkdown", tabId: srcTabId, url, engine, sourceTabUrl,
             account: bookmarkAccount, tags, description: bookmarkNotes, k,
+            slotNonce: _pageNonce, initialSlotNonce: _initialSlotNonce, pageLoadTs: _pageLoadTs,
             frame: !!(opts && opts.frame), // embedded-frame pass, only from grantFrameAndRetry
             frameOrigin: (opts && typeof opts.frameOrigin === "string") ? opts.frameOrigin : ""
           });
@@ -2371,27 +2360,36 @@ const _pbpReaderBoot = (async function () {
     if (_isLocalOcr || _isReopenedOnlineOcr || _isOnlineOcrCandidate) {
       const _cachedOcr = typeof pbpOcrDocsGet === "function" ? await pbpOcrDocsGet(url) : null;
       if (_cachedOcr && _cachedOcr.markdown) {
-        await chrome.storage.local.set({
-          [MP_KEY]: {
-            markdown: _cachedOcr.markdown,
-            title: title || _cachedOcr.fileName || "",
-            url,
-            baseUrl: _isLocalOcr ? "" : baseUrl,
-            sourceTabUrl,
-            ...handedBookmarkUrl,
-            ocrFileName: _cachedOcr.fileName || ocrFileName,
-            source: "deepseek-ocr",
-            engine: "local",
-            site: _isLocalOcr ? (_cachedOcr.fileName || site) : site,
-            sourceIncognito,
-            bookmarkDraft: _isLocalOcr ? null : bookmarkDraft,
-            account: bookmarkAccount,
-            tags: _isLocalOcr ? [] : tags,
-            description: _isLocalOcr ? "" : bookmarkNotes,
-            ts: Date.now(),
-            nonce: _pageNonce
-          }
-        });
+        try {
+          await _pbpWithPreviewSlotLock(async () => {
+            const curOcr = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
+            if (!_isStrangerSlotRecord(curOcr)) {
+              await chrome.storage.local.set({
+                [MP_KEY]: {
+                  markdown: _cachedOcr.markdown,
+                  title: title || _cachedOcr.fileName || "",
+                  url,
+                  baseUrl: _isLocalOcr ? "" : baseUrl,
+                  sourceTabUrl,
+                  ...handedBookmarkUrl,
+                  ocrFileName: _cachedOcr.fileName || ocrFileName,
+                  source: "deepseek-ocr",
+                  engine: "local",
+                  site: _isLocalOcr ? (_cachedOcr.fileName || site) : site,
+                  sourceIncognito,
+                  bookmarkDraft: _isLocalOcr ? null : bookmarkDraft,
+                  account: bookmarkAccount,
+                  tags: _isLocalOcr ? [] : tags,
+                  description: _isLocalOcr ? "" : bookmarkNotes,
+                  ts: Date.now(),
+                  nonce: _pageNonce
+                }
+              });
+            }
+          });
+        } catch (e) {
+          console.warn("[md-preview] cached OCR slot restore failed:", (e && e.name) || "", (e && e.message) || e);
+        }
         location.reload();
         return;
       }
@@ -3204,7 +3202,8 @@ const _pbpReaderBoot = (async function () {
           r = await chrome.runtime.sendMessage({
             type: "reextractMarkdown",
             tabId: srcTabId, url: srcUrlForSwitch, engine: e, sourceTabUrl,
-            account: bookmarkAccount, tags, description: bookmarkNotes, k
+            account: bookmarkAccount, tags, description: bookmarkNotes, k,
+            slotNonce: _pageNonce, initialSlotNonce: _initialSlotNonce, pageLoadTs: _pageLoadTs
           });
         } catch (_diagErr) { console.warn("[md-preview] engine switch message failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  r = { ok: false, error: "network" }; }
         if (r && r.ok) { location.reload(); return; }
@@ -3753,7 +3752,8 @@ const _pbpReaderBoot = (async function () {
       try {
         pr = await chrome.runtime.sendMessage({
           type: "reextractMarkdown", tabId: srcTabId, url, engine: "local", sourceTabUrl,
-          account: bookmarkAccount, tags, description: bookmarkNotes, k, reloadSource: true
+          account: bookmarkAccount, tags, description: bookmarkNotes, k, reloadSource: true,
+          slotNonce: _pageNonce, initialSlotNonce: _initialSlotNonce, pageLoadTs: _pageLoadTs
         });
       } catch (_diagErr) { console.warn("[md-preview] image refresh message failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  pr = { ok: false, error: "network" }; }
       if (pr && pr.ok) { location.reload(); return; }
@@ -4861,14 +4861,18 @@ const _pbpReaderBoot = (async function () {
         }
       } catch (error) {
         if (_sig.aborted) return;
-        console.warn("[export] send preparation failed:", error?.name, error?.message);
-        if (typeof pbpRecordDiagError === "function") {
-          pbpRecordDiagError({
-            surface: "md-preview",
-            op: "export_send",
-            code: "failed",
-            errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(error) : "Error",
-          });
+        const isExpectedGuard = error?.message === "export-ask-empty"
+          || /(?:context|history)-changed/.test(error?.message || "");
+        if (!isExpectedGuard) {
+          console.warn("[export] send preparation failed:", error?.name, error?.message);
+          if (typeof pbpRecordDiagError === "function") {
+            pbpRecordDiagError({
+              surface: "md-preview",
+              op: "export_send",
+              code: "failed",
+              errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(error) : "Error",
+            });
+          }
         }
         showSendStatus(exportErrorText(error), true);
         if (!_sig.aborted) setPrimary(id);

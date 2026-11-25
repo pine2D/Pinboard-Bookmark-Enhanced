@@ -156,7 +156,7 @@ async function pbpSendToTarget(id, ctx, options = {}) {
         if (ok) {
           return { ok: true, fellBack: false, error: null, url: (json && (json.html_url || json.url)) || null };
         }
-        return await apiFail("api-failed");
+        return await apiFail("api-failed", resp.status);
       } catch (error) { await assertCurrent(); console.warn("[pbp-send] request failed:", error?.name, error?.message); return await apiFail("api-down"); }
     }
 

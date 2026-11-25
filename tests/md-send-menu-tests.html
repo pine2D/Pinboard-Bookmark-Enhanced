@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="39"><title>Reader Send-to lifecycle tests</title></head><body>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="42"><title>Reader Send-to lifecycle tests</title></head><body>
 <h1>Reader Send-to lifecycle tests</h1><div id="results"></div>
 <script src="../shared.js"></script>
 <script src="../vendor/marked.min.js"></script>
@@ -577,22 +577,34 @@ async function test(name, fn, options) {
       await new Promise(r => setTimeout(r, 5));
       const raceNew = await pbpSwRealm.bootReader(shareChrome);
       try {
+        // Mutation-proof lock check: pause raceNew inside its ownership get(slotKey) and verify
+        // (1) browser Web Lock "pbp-preview-slot:md_preview_data_fixture" is held, and
+        // (2) raceOld's ownership get(slotKey) cannot start until raceNew's set completes.
         const baseGet = sharedMock.chrome.storage.local.get.bind(sharedMock.chrome.storage.local);
-        let pausedFirstCommitRead = false;
-        let notifyFirstRead = null;
-        const firstReadEntered = new Promise(r => { notifyFirstRead = r; });
-        sharedMock.chrome.storage.local.get = async (keys) => {
-          const ans = await baseGet(keys);
-          if (!pausedFirstCommitRead && keys === slotKey) {
-            pausedFirstCommitRead = true;
-            notifyFirstRead();
-            await new Promise(r => setTimeout(r, 20));
-          }
-          return ans;
-        };
+        let slotGetsDuringCommit = 0;
+        let releaseNewRead = null;
+        const newReadEntered = new Promise(r => {
+          sharedMock.chrome.storage.local.get = async (keys) => {
+            if (keys === slotKey) {
+              slotGetsDuringCommit++;
+              if (slotGetsDuringCommit === 1) {
+                const ans = await baseGet(keys);
+                r();
+                await new Promise(res => { releaseNewRead = res; });
+                return ans;
+              }
+            }
+            return baseGet(keys);
+          };
+        });
         const pNew = raceNew.win.pbpVideoCommitTranscript("# Newer Tab Transcript\n\nNew cue.", "Video Fixture", { aiPunct: true, reason: "video-ai-punctuation" });
-        await firstReadEntered;
+        await newReadEntered;
         const pOld = raceOld.win.pbpVideoCommitTranscript("# Older Tab Transcript\n\nOld cue.", "Video Fixture", { aiPunct: false, reason: "video-track-switch" });
+        await new Promise(r => setTimeout(r, 15));
+        const locksNow = await navigator.locks.query();
+        assert((locksNow.held || []).some(l => l.name === "pbp-preview-slot:" + slotKey), "pbpVideoCommitTranscript did not hold pbp-preview-slot Web Lock");
+        assert(slotGetsDuringCommit === 1, "older tab entered slot ownership read while newer tab held the slot lock (slotGets=" + slotGetsDuringCommit + ")");
+        releaseNewRead();
         const [rNew, rOld] = await Promise.all([pNew, pOld]);
         sharedMock.chrome.storage.local.get = baseGet;
         assert(rNew === true && rOld === false, "expected newer tab true and older tab false, got " + rNew + "/" + rOld);
@@ -606,6 +618,125 @@ async function test(name, fn, options) {
       tabA.iframe.remove();
       tabB.iframe.remove();
     }
+  }, { realRuntime: true });
+  await test("cached OCR restore in two tabs sharing a slot refuses to overwrite newer OCR payload", async () => {
+    const slotKey = "md_preview_data_fixture";
+    const pdfUrl = "https://fixture.test/paper.pdf";
+    const sharedMock = pbpChromeMock.create({
+      storage: {
+        local: {
+          [slotKey]: {
+            pending: true,
+            ocrCachedReopen: true,
+            url: pdfUrl,
+            title: "Paper",
+            source: "deepseek-ocr",
+            engine: "local",
+            account: "",
+            tags: [],
+            description: "",
+            ts: 1000,
+          },
+        },
+      },
+    });
+    sharedMock.onSendMessage(async (msg) => {
+      if (msg && msg.type === "reextractMarkdown") return { ok: false, error: "empty_extract" };
+      return { ok: true };
+    });
+    let releaseSlowOcr = null;
+    let notifySlowOcr = null;
+    const slowOcrStarted = new Promise(r => { notifySlowOcr = r; });
+    const makeAsyncSharedChrome = (win, ocrFn) => ({
+      ...sharedMock.chrome,
+      storage: {
+        ...sharedMock.chrome.storage,
+        local: {
+          ...sharedMock.chrome.storage.local,
+          get: (keys, cb) => {
+            if (typeof win.pbpOcrDocsGet === "function" && win.pbpOcrDocsGet !== ocrFn) {
+              win.pbpOcrDocsGet = ocrFn;
+            }
+            return typeof cb === "function"
+              ? sharedMock.chrome.storage.local.get(keys, cb)
+              : new Promise(r => setTimeout(r, 0)).then(() => sharedMock.chrome.storage.local.get(keys));
+          },
+        },
+      },
+    });
+    const slowOcrFn = async () => {
+      notifySlowOcr();
+      await new Promise(res => { releaseSlowOcr = res; });
+      return { markdown: "# Old Cached OCR", fileName: "old.pdf" };
+    };
+    const fastOcrFn = async () => ({ markdown: "# Fresh Cached OCR", fileName: "fresh.pdf" });
+    const tabA = await pbpSwRealm.bootReader({
+      awaitBoot: false,
+      onReload() {},
+      beforeScripts(win) { win.chrome = makeAsyncSharedChrome(win, slowOcrFn); },
+    });
+    const bootPromiseA = tabA.win.__pbpReaderBootPromise;
+    await slowOcrStarted;
+    const tabB = await pbpSwRealm.bootReader({
+      awaitBoot: false,
+      onReload() {},
+      beforeScripts(win) { win.chrome = makeAsyncSharedChrome(win, fastOcrFn); },
+    });
+    const bootPromiseB = tabB.win.__pbpReaderBootPromise;
+    await bootPromiseB;
+    try {
+      const afterB = (await sharedMock.chrome.storage.local.get(slotKey))[slotKey];
+      assert(afterB && afterB.markdown === "# Fresh Cached OCR" && typeof afterB.nonce === "string", "Tab B should commit fresh OCR markdown");
+      releaseSlowOcr();
+      await bootPromiseA;
+      const finalSlot = (await sharedMock.chrome.storage.local.get(slotKey))[slotKey];
+      assert(finalSlot.markdown === "# Fresh Cached OCR" && finalSlot.nonce === afterB.nonce, "Delayed Tab A OCR restore overwrote Tab B's newer OCR slot");
+    } finally {
+      tabA.iframe.remove();
+      tabB.iframe.remove();
+    }
+  }, { realRuntime: true });
+  await test("pre-send context cancellations do not record export_send failed or evict real HTTP 503 diagnostics", async f => {
+    await f.w.chrome.storage.local.remove("pbpDiagErrors");
+    const postWait = deferred(); f.state.networkWaits.push({ method: "POST", wait: postWait });
+    f.click(); await settle();
+    postWait.resolve({ ok: false, status: 503, json: async () => ({}) });
+    await settle();
+    const initialDiag = await f.w.pbpReadDiagErrors();
+    assert(initialDiag.length === 1 && initialDiag[0].status === 503, "expected initial 503 diagnostic");
+
+    const origReq = f.w.pbpRequestTargetPermission;
+    let cancelPermWait = null;
+    f.w.pbpRequestTargetPermission = () => {
+      cancelPermWait = deferred();
+      return cancelPermWait.promise;
+    };
+    try {
+      for (let i = 0; i < 52; i++) {
+        f.click();
+        await tick();
+        f.retireArticle();
+        cancelPermWait.resolve(true);
+        await settle();
+        assert(f.d.getElementById("send-status").textContent === "mdExportContextChanged", "expected context changed UI feedback on cancel #" + i);
+      }
+    } finally {
+      f.w.pbpRequestTargetPermission = origReq;
+    }
+    const finalDiag = await f.w.pbpReadDiagErrors();
+    assert(finalDiag.length === 1 && finalDiag[0].code === "http" && finalDiag[0].status === 503,
+      "pre-send cancellations polluted or evicted real 503 diagnostic: " + JSON.stringify(finalDiag));
+  }, { realRuntime: true });
+  await test("GitHub HTTP 201 missing resource id records export_send http diagnostic with status 201", async f => {
+    await f.w.chrome.storage.local.remove("pbpDiagErrors");
+    const postWait = deferred(); f.state.networkWaits.push({ method: "POST", wait: postWait });
+    f.click(); await settle();
+    postWait.resolve({ ok: true, status: 201, json: async () => ({ html_url: "https://fixture.test/no-id" }) });
+    await settle();
+    assert(f.d.getElementById("send-status").textContent === "mdSendApiFailed", "expected mdSendApiFailed when id is missing");
+    const entries = await f.w.pbpReadDiagErrors();
+    assert(entries.length === 1 && entries[0].code === "http" && entries[0].status === 201,
+      "expected code=http and status=201, got " + JSON.stringify(entries));
   }, { realRuntime: true });
   document.title = (fail ? "FAIL" : "PASS") + " Reader Send-to lifecycle tests";
 })().catch(e => { const row = document.createElement("div"); row.className = "fail"; row.textContent = e.stack; document.getElementById("results").appendChild(row); });

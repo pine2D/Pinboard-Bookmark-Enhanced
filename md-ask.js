@@ -915,7 +915,7 @@ function _pbpAskArchiveStatus() {
         _pbpAskHistRestored = false;
         await _pbpAskHistRestore().catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
       } else {
-        for (const item of pending) await _pbpAskPersistArchive(item).catch(() => { /* swallow-ok: _pbpAskPersistArchive logs archive write failures internally and retains pending retry state */ });
+        for (const item of pending) await _pbpAskPersistArchive(item).catch(() => { /* swallow-ok: failed item stays in _pbpAskUnpersisted so _pbpAskArchiveStatus keeps the error banner and retry button active */ });
       }
       _pbpAskArchiveStatus();
       if (keyboard && (!document.activeElement || document.activeElement === document.body || document.activeElement === retry)) {
@@ -2488,6 +2488,7 @@ async function _pbpAskExportOwnerCurrent(account, revision, articleRevision, sna
     }
     return current();
   } catch (error) {
+    if (error?.message === "ask-history-changed") return false;
     console.warn("[pbp-ask] export owner read failed:", error?.name, error?.message);
     return false;
   }

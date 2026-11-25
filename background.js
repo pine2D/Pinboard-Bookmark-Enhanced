@@ -5469,12 +5469,26 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     // fresh payload from the SAME slot it owns. No k = pre-update tab → fall
     // back to the legacy global key.
     const key = k ? "md_preview_data_" + k : "md_preview_data";
+    const callerNonce = typeof message.slotNonce === "string" ? message.slotNonce : "";
+    const callerInitNonce = typeof message.initialSlotNonce === "string" ? message.initialSlotNonce : "";
+    const callerLoadTs = Number.isFinite(message.pageLoadTs) ? Number(message.pageLoadTs) : 0;
+    const isStrangerForCaller = (rec) => {
+      if (!callerNonce || !rec || typeof rec.nonce !== "string" || rec.nonce === callerNonce) return false;
+      if ((rec.ts || 0) > callerLoadTs) return true;
+      return rec.nonce !== callerInitNonce;
+    };
     (async () => {
       const stored = (await chrome.storage.local.get(key))[key];
       if (!stored || stored.url !== url || stored.tabId !== tabId) {
         sendResponse({ ok: false, error: "bad_request" });
         return;
       }
+      if (isStrangerForCaller(stored)) {
+        sendResponse({ ok: false, error: "slot_changed" });
+        return;
+      }
+      const startNonce = typeof stored.nonce === "string" ? stored.nonce : "";
+      const startTs = Number.isFinite(stored.ts) ? Number(stored.ts) : 0;
       // The storage slot is the preview's immutable ownership record. Message
       // fields are mutable and must never be allowed to replace account metadata.
       const owner = {
@@ -5540,28 +5554,40 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         sendResponse(out.frameOrigin ? { ok: false, error: out.error, frameOrigin: out.frameOrigin } : { ok: false, error: out.error });
         return;
       }
-      const latest = (await chrome.storage.local.get(key))[key];
-      if (!latest || latest.url !== url || latest.tabId !== tabId
-          || (typeof latest.account === "string" ? latest.account : "") !== owner.account) {
-        sendResponse({ ok: false, error: "account_changed" });
-        return;
-      }
-      await chrome.storage.local.set({
-        [key]: {
-          // baseUrl resolves relative links/images: for a frame pass it is the
-          // FRAME's own URL (out.baseUrl), never the top page's (Codex 2026-08-26).
-          ...out, baseUrl: out.baseUrl || out.url || url, tabId, sourceTabUrl: tabUrl,
-          account: owner.account,
-          tags: owner.tags,
-          description: owner.description,
-          sourceIncognito: owner.sourceIncognito,
-          ...(owner.bookmarkDraft ? { bookmarkDraft: owner.bookmarkDraft } : {}),
-          // A Jina pass rewrites url; the bookmark address stays the handoff's.
-          ...(typeof owner.bookmarkUrl === "string" ? { bookmarkUrl: owner.bookmarkUrl } : {}),
-          ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
+      const writeRes = await pbpWithPreviewSlotLock(key, async () => {
+        const latest = (await chrome.storage.local.get(key))[key];
+        if (!latest || latest.url !== url || latest.tabId !== tabId
+            || (typeof latest.account === "string" ? latest.account : "") !== owner.account) {
+          return { ok: false, error: "account_changed" };
         }
+        const latestNonce = typeof latest.nonce === "string" ? latest.nonce : "";
+        const latestTs = Number.isFinite(latest.ts) ? Number(latest.ts) : 0;
+        const ownedByCaller = Boolean(callerNonce && latestNonce === callerNonce);
+        if (isStrangerForCaller(latest)
+            || (!ownedByCaller && latestNonce !== startNonce)
+            || (!ownedByCaller && latestTs > startTs)) {
+          return { ok: false, error: "slot_changed" };
+        }
+        const nextNonce = callerNonce || startNonce;
+        await chrome.storage.local.set({
+          [key]: {
+            // baseUrl resolves relative links/images: for a frame pass it is the
+            // FRAME's own URL (out.baseUrl), never the top page's (Codex 2026-08-26).
+            ...out, baseUrl: out.baseUrl || out.url || url, tabId, sourceTabUrl: tabUrl,
+            account: owner.account,
+            tags: owner.tags,
+            description: owner.description,
+            sourceIncognito: owner.sourceIncognito,
+            ...(owner.bookmarkDraft ? { bookmarkDraft: owner.bookmarkDraft } : {}),
+            // A Jina pass rewrites url; the bookmark address stays the handoff's.
+            ...(typeof owner.bookmarkUrl === "string" ? { bookmarkUrl: owner.bookmarkUrl } : {}),
+            ...(nextNonce ? { nonce: nextNonce } : {}),
+            ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
+          }
+        });
+        return { ok: true };
       });
-      sendResponse({ ok: true });
+      sendResponse(writeRes);
     })()
       .catch(e => sendResponse({ ok: false, error: e.message }));
     return true;
