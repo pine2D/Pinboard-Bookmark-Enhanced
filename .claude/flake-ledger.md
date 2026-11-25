@@ -27,5 +27,6 @@
 | 2026-11-18 | reader-save-export：Ask 导出夹具的个人库身份 | 启动时尚未完成的初始化覆盖了夹具的 qa 身份，读取 Ask 档案报 account_changed；串行建立夹具后双窗口导出通过 | 已根治 535ad4ae | - |
 | 2026-11-18 | tests/ai-cache-tests.html：空池并发写入精确容量 | 页面一次停在 20/32，下一项并发写入两个缓存池；独立运行时全部 32 项通过，首次停顿原因未确定 | 已根治 96102ee4 | - |
 | 2026-11-24 | render-audit 分片 0：tag-gov-entity-scan 标题面色 | 首次运行点击扫描并滚动后鼠标留在重排后的小节 summary 上，headerFace 测得悬停色 rgb(32, 94, 166) 而非 rgb(16, 15, 15)，重跑通过 | 已根治 f6461c98 | - |
-| 2026-11-24 | tests/reader-history-tests.html：点击历史行打开标签并关闭弹层 | 四路并行 V8 覆盖率采样负载下 tabs.create 断言早于 pop.hidePopover 完成 1 个微任务，串行重跑 14/14 通过 | 未处理 | - |
+| 2026-11-24 | tests/reader-history-tests.html：点击历史行打开标签并关闭弹层 | 四路并行 V8 覆盖率采样负载下 tabs.create 断言早于 pop.hidePopover 完成 1 个微任务，串行重跑 14/14 通过 | 已根治 43eb40a2 | - |
 | 2026-11-24 | tests/settings-persist-tests.html：E7d 并发编辑保存排队收敛 | 四路并行 V8 覆盖率采样负载下超出 30 帧 rAF 轮询窗口（约 500ms），串行重跑 614/614 通过 | 未处理 | - |
+| 2026-11-25 | tests/reader-history-tests.html：点击历史行打开标签并关闭弹层 | 全量 verify 四路并行下 popup #jina-md-history-btn 在 tabs.create 后尚未完成 pbpReaderHistoryRecord 入锁与 pop.hidePopover 即断言关闭 | 已根治 43eb40a2 | - |
