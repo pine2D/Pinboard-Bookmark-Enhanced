@@ -3574,6 +3574,12 @@ async function _pbpVocabOpenExportMenu(anchor) {
   if (_vocabExportSession?.anchor === anchor) { _pbpVocabCloseExportMenu(true); return; }
   _pbpVocabCloseExportMenu(false);
   if (_vocabExportBusy || anchor.disabled) return;
+  const isAnchorVisible = () => (typeof pbpIsVisibleFocusTarget === "function"
+    ? pbpIsVisibleFocusTarget(anchor)
+    : (anchor.isConnected && !anchor.disabled && !anchor.closest("[hidden], [inert]")));
+  const anchorVisibleAtOpen = isAnchorVisible();
+  const focusAtOpen = document.activeElement;
+  const openPopoversAtOpen = new Set(document.querySelectorAll("[popover]:popover-open"));
   const menu = document.createElement("div");
   menu.className = "listbox-pop vocab-export-menu";
   menu.setAttribute("popover", "auto");
@@ -3611,13 +3617,12 @@ async function _pbpVocabOpenExportMenu(anchor) {
     pendingCtl.abort();
   }
   if (_vocabExportSession !== session) return;
-  const anchorVisible = typeof pbpIsVisibleFocusTarget === "function"
-    ? pbpIsVisibleFocusTarget(anchor)
-    : (anchor.isConnected && !anchor.disabled && !anchor.closest("[hidden], [inert]"));
+  const viewHidden = !!$id("view-vocab")?.hidden;
+  const anchorBecameHidden = !anchor.isConnected || anchor.disabled || viewHidden || (anchorVisibleAtOpen && !isAnchorVisible());
   const aeAfterWait = document.activeElement;
-  const focusMovedAway = !!(aeAfterWait && aeAfterWait !== anchor && aeAfterWait !== document.body && aeAfterWait !== document.documentElement);
-  const otherPopoverOpened = !!document.querySelector("[popover]:popover-open");
-  if (_vocabExportBusy || !anchorVisible || focusMovedAway || otherPopoverOpened) {
+  const focusMovedAway = !!(aeAfterWait && aeAfterWait !== focusAtOpen && aeAfterWait !== anchor && aeAfterWait !== document.body && aeAfterWait !== document.documentElement);
+  const otherPopoverOpened = [...document.querySelectorAll("[popover]:popover-open")].some((p) => !openPopoversAtOpen.has(p));
+  if (_vocabExportBusy || anchorBecameHidden || focusMovedAway || otherPopoverOpened) {
     _pbpVocabCloseExportMenu(false);
     return;
   }

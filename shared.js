@@ -2720,8 +2720,11 @@ function pbpSanitizeDiagErrors(rawList) {
 
 function pbpRecordDiagError(input) {
   let entry;
+  let local;
   try {
     if (!_pbpIsDiagRecord(input)) return Promise.resolve(null);
+    local = typeof chrome !== "undefined" ? chrome?.storage?.local : null;
+    if (!local) return Promise.resolve(null);
     const surfaceRaw = _pbpDiagOwnData(input, "surface");
     const opRaw = _pbpDiagOwnData(input, "op");
     const codeRaw = _pbpDiagOwnData(input, "code");
@@ -2741,8 +2744,6 @@ function pbpRecordDiagError(input) {
   }
   return _pbpDiagWithLock(async () => {
     try {
-      if (typeof chrome === "undefined" || !chrome.storage?.local) return null;
-      const local = chrome.storage.local;
       const stored = await local.get(PBP_DIAG_ERRORS_KEY);
       const prev = pbpSanitizeDiagErrors(stored && stored[PBP_DIAG_ERRORS_KEY]);
       prev.push(entry);
