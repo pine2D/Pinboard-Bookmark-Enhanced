@@ -3530,6 +3530,7 @@ function _pbpVocabRunExport(kind) {
   const anchor = $id("vocab-export-open");
   if (_vocabExportBusy) return;
   _pbpVocabCloseExportMenu(true);
+  const restoreAnchorAfterBusy = !!anchor && document.activeElement === anchor;
   const run = kind === "anki" ? pbpVocabSendToAnki : kind === "eudic" ? pbpVocabSendToEudic : pbpVocabExportTsv;
   const sending = kind === "anki" ? "dictAnkiSending" : kind === "eudic" ? "dictEudicSending" : "";
   _vocabExportBusy = true;
@@ -3548,6 +3549,15 @@ function _pbpVocabRunExport(kind) {
   }).finally(() => {
     _vocabExportBusy = false;
     if (anchor) { anchor.removeAttribute("aria-busy"); anchor.disabled = !_vocabRows.length; }
+    const vocabViewActive = !$id("view-vocab")?.hidden;
+    const ae = document.activeElement;
+    if (restoreAnchorAfterBusy && vocabViewActive && (!ae || ae === document.body || ae === document.documentElement)) {
+      if (typeof pbpRestoreSurfaceFocus === "function") {
+        pbpRestoreSurfaceFocus([anchor, $id("vocab-search"), document.querySelector('.lib-tab[aria-selected="true"]')], null);
+      } else if (anchor && !anchor.disabled && anchor.isConnected) {
+        try { anchor.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ anchor.focus(); }
+      }
+    }
   });
 }
 function _pbpVocabExportItem(label, icon, onClick) {
@@ -3583,6 +3593,15 @@ async function _pbpVocabOpenExportMenu(anchor) {
   let eudic = false;
   try { eudic = await pbpVocabEudicReady(); } catch (e) { console.warn("[library-vocab] Eudic readiness check failed:", e?.name); }
   if (_vocabExportSession !== session) return;
+  const anchorVisible = typeof pbpIsVisibleFocusTarget === "function"
+    ? pbpIsVisibleFocusTarget(anchor)
+    : (anchor.isConnected && !anchor.disabled && !anchor.closest("[hidden], [inert]"));
+  const aeAfterWait = document.activeElement;
+  const focusMovedAway = !!(aeAfterWait && aeAfterWait !== anchor && aeAfterWait !== document.body && aeAfterWait !== document.documentElement);
+  if (_vocabExportBusy || !anchorVisible || focusMovedAway) {
+    _pbpVocabCloseExportMenu(false);
+    return;
+  }
   if (eudic) menu.append(_pbpVocabExportItem(t("dictEudicSend"), "send", () => _pbpVocabRunExport("eudic")));
   const settings = document.createElement("a");
   settings.className = "listbox-opt vocab-export-choice";
@@ -3638,12 +3657,12 @@ if (_vocabExportOpen) {
   });
 }
 window.addEventListener("scroll", (e) => {
-  if (_vocabExportSession && _vocabExportSession.menu.isConnected && !_vocabExportSession.menu.contains(e.target)) {
+  if (_vocabExportSession && !_vocabExportSession.menu.contains(e.target)) {
     _pbpVocabCloseExportMenu(_vocabExportSession.menu.contains(document.activeElement));
   }
 }, true);
 window.addEventListener("resize", () => {
-  if (_vocabExportSession && _vocabExportSession.menu.isConnected) {
+  if (_vocabExportSession) {
     _pbpVocabCloseExportMenu(_vocabExportSession.menu.contains(document.activeElement));
   }
 });
@@ -3788,6 +3807,7 @@ if (_vocabMarkLearning) _vocabMarkLearning.addEventListener("click", () => _pbpV
 let _vocabViewShown = false;
 document.addEventListener("pbp-lib-view", (e) => {
   if (e.detail.view !== "vocab") {
+    _pbpVocabCloseExportMenu(false);
     if (typeof pbpDictStopSpeak === "function") pbpDictStopSpeak();
     _vocabViewShown = false;
     return;

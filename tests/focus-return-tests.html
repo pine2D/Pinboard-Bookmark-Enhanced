@@ -424,7 +424,7 @@
         await waitFor(() => win.getComputedStyle(narrowBtn).display !== "none", "narrow filter button visible at 700px");
 
         narrowBtn.focus();
-        filterSet.showPopover({ source: narrowBtn });
+        narrowBtn.click();
         await waitFor(() => filterSet.matches(":popover-open"), "#vocab-filter-set open");
         groupBtn.focus();
         groupBtn.click();
@@ -441,9 +441,9 @@
         await waitFor(() => !filterSet.matches(":popover-open"), "#vocab-filter-set Escape close");
         assertValidActiveFocus(doc, "library narrow filter Escape", narrowBtn);
 
-        // Reopen narrow filter, focus inside, then widen to 2600px (20vw = 520px index pane) so production ResizeObserver auto-closes #vocab-filter-set
+        // Reopen narrow filter via button click, focus inside, then widen to 2600px (20vw = 520px index pane) so production ResizeObserver auto-closes #vocab-filter-set
         narrowBtn.focus();
-        filterSet.showPopover({ source: narrowBtn });
+        narrowBtn.click();
         await waitFor(() => filterSet.matches(":popover-open"), "#vocab-filter-set reopen");
         groupBtn.focus();
         sizeIframe(libraryRealm, 2600, 760);
@@ -494,6 +494,54 @@
         win.dispatchEvent(new win.Event("resize"));
         await waitFor(() => !doc.querySelector(".vocab-export-menu"), "vocab export menu external-focus resize close");
         assertValidActiveFocus(doc, "library export menu preserves external focus", searchInput);
+
+        // Selecting TSV export restores focus to #vocab-export-open once busy state clears
+        const origExportTsv = win.pbpVocabExportTsv;
+        win.pbpVocabExportTsv = async () => new Promise((r) => setTimeout(() => r(true), 25));
+        try {
+          exportBtn.focus();
+          exportBtn.click();
+          const tsvMenu = await waitFor(() => {
+            const m = doc.querySelector(".vocab-export-menu:popover-open");
+            return m && m.contains(doc.activeElement) ? m : null;
+          }, "vocab export menu open for TSV run");
+          tsvMenu.querySelector(".vocab-export-choice").click();
+          await waitFor(
+            () => !exportBtn.disabled && !exportBtn.hasAttribute("aria-busy"),
+            "vocab TSV export busy state cleared"
+          );
+          assertValidActiveFocus(doc, "library export TSV restores focus after busy", exportBtn);
+        } finally {
+          win.pbpVocabExportTsv = origExportTsv;
+        }
+
+        // Delayed pbpVocabEudicReady during resize + view switch to Notes must never mount menu or steal #notes-filter focus
+        const origEudicReady = win.pbpVocabEudicReady;
+        let releaseEudicReady = null;
+        let eudicEntered = false;
+        win.pbpVocabEudicReady = () => new Promise((r) => {
+          eudicEntered = true;
+          releaseEudicReady = r;
+        });
+        try {
+          exportBtn.focus();
+          exportBtn.click();
+          await waitFor(() => eudicEntered, "pbpVocabEudicReady entered");
+          win.dispatchEvent(new win.Event("resize"));
+          doc.getElementById("lib-tab-notes").click();
+          await waitFor(() => !doc.getElementById("view-notes").hidden, "switched to #view-notes while Eudic check pending");
+          const notesFilter = doc.getElementById("notes-filter");
+          notesFilter.focus();
+          releaseEudicReady(true);
+          await settle(6);
+          assert(!doc.querySelector(".vocab-export-menu"), "late vocab export menu must not mount after switching to Notes");
+          assert(exportBtn.getAttribute("aria-expanded") === "false", "cancelled vocab export open must reset aria-expanded=false");
+          assertValidActiveFocus(doc, "late vocab export menu never steals #notes-filter focus", notesFilter);
+        } finally {
+          win.pbpVocabEudicReady = origEudicReady;
+          doc.getElementById("lib-tab-vocab").click();
+          await waitFor(() => !doc.getElementById("view-vocab").hidden, "return to #view-vocab");
+        }
       });
 
       // 10. Library: #view-notes .notes-color-menu (Escape + scroll + resize + external focus preservation)
@@ -896,7 +944,11 @@
         noteBox.dispatchEvent(new win.Event("input", { bubbles: true }));
         saveBtn.focus();
         saveBtn.click();
-        await settle(6);
+        await waitFor(async () => {
+          const all = await win.chrome.storage.local.get(null);
+          const entry = Object.entries(all).find(([k]) => k.startsWith("pbp_hl_") && k !== "pbp_hl_last_color");
+          return entry && Array.isArray(entry[1]?.items) && entry[1].items.some((it) => it && it.note === "Updated focus-return note");
+        }, "highlight note persisted by .hl-card-save");
         assertValidActiveFocus(doc, "reader #pb-hl-card Save button", saveBtn);
 
         delBtn.focus();
