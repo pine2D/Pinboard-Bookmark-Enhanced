@@ -437,7 +437,11 @@ export async function openDictEntryState(page, state) {
     await page.evaluate(async () => {
       // Cleared the way Options stores an emptied key field: an absent
       // default would be refilled by the service worker's storage-warm prime
-      // at any moment, rerunning the lookup mid-state.
+      // at any moment, rerunning the lookup mid-state. Also clear prior
+      // surface sweeps' pbpDictNeg:* rows (e.g. library/dict-entry-paid-negative
+      // in the same shard profile) so the stored check below observes THIS
+      // clean miss committing rather than an earlier category's key.
+      await chrome.storage.local.remove(Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('pbpDictNeg:')));
       await chrome.storage.local.set({ openaiApiKey: '' });
       if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) _pbpExplainSettings.openaiApiKey = '';
       window._auditDictEntry.cache.clear();
@@ -454,8 +458,11 @@ export async function openDictEntryState(page, state) {
       await find.click();
       await page.locator('.xp-dict-examples .xp-dict-usage-feedback[data-state="neutral"]').waitFor();
       const stored = await page.evaluate(async () => {
-        for (let i = 0; i < 40; i++) {
-          if (Object.keys(await chrome.storage.local.get(null)).some(key => key.startsWith('pbpDictNeg:'))) return true;
+        for (let i = 0; i < 60; i++) {
+          const all = await chrome.storage.local.get(null);
+          if (Object.entries(all).some(([key, val]) => key.startsWith('pbpDictNeg:') && val && typeof val === 'object' && Object.keys(val).length > 0)) {
+            return true;
+          }
           await new Promise(resolve => setTimeout(resolve, 50));
         }
         return false;
