@@ -291,7 +291,7 @@ function _echoClearAll() {
   _echoRanges.clear();
   _echoCounts.clear();
   _echoTotal = 0;
-  try { CSS.highlights.delete("pbp-vocab-echo"); } catch (_) {}
+  try { CSS.highlights.delete("pbp-vocab-echo"); } catch (_) { /* swallow-ok: CSS Custom Highlight API unavailable or unsupported in current engine */ }
   _echoHl = null;
 }
 
@@ -399,7 +399,7 @@ async function _echoScanBlock(key) {
       h.priority = -1; // below user highlights (0) and search layers (1..3)
       CSS.highlights.set("pbp-vocab-echo", h);
       _echoHl = h;
-    } catch (_) { return; }
+    } catch (_) { /* swallow-ok: CSS Custom Highlight API unavailable or unsupported in current engine */  return; }
   }
   const n = Number(key.slice(1));
   const found = [];
@@ -413,7 +413,7 @@ async function _echoScanBlock(key) {
     const last = stream.nodes.find((part) => part.start < m.end && part.end >= m.end);
     if (!first || !last) continue;
     const r = new Range();
-    try { r.setStart(first.node, m.start - first.start); r.setEnd(last.node, m.end - last.start); } catch (_) { continue; }
+    try { r.setStart(first.node, m.start - first.start); r.setEnd(last.node, m.end - last.start); } catch (_) { /* swallow-ok: live DOM Selection or Range boundary may invalidate across layout mutations */  continue; }
     found.push({ range: r, key: m.key, id: m.id, language: m.language, n });
     _echoCounts.set(m.id, (_echoCounts.get(m.id) || 0) + 1);
     _echoTotal++;
@@ -493,13 +493,13 @@ async function _echoRestart() {
   // credential listener re-dispatches the owner (a read that throws counts as
   // a mismatch; showing another account's vocabulary is the worse outcome).
   if (typeof pbpVocabCurrentOwner === "function") {
-    const live = await pbpVocabCurrentOwner().catch(() => null);
+    const live = await pbpVocabCurrentOwner().catch(() => /* swallow-ok: fail-closed vocabulary owner or store read degrades to safe sentinel */ null);
     // A newer generation already owns this module's state; it decides what the
     // term set and the observer hold, not this stale continuation.
     if (epoch !== _echoEpoch || owner !== _echoOwner || !_echoEnabled) return;
     if (live !== owner) { _echoBailClosed(); return; }
   }
-  const rows = await (typeof pbpVocabAll === "function" ? pbpVocabAll(owner).catch(() => []) : []);
+  const rows = await (typeof pbpVocabAll === "function" ? pbpVocabAll(owner).catch(() => /* swallow-ok: fail-closed vocabulary owner or store read degrades to safe sentinel */ []) : []);
   if (epoch !== _echoEpoch || owner !== _echoOwner || !_echoEnabled) return;
   // The source article is sampled once by md-dict. Reliable-only, with no
   // Latin-script or UI-locale fallback; inline and translated lang still win.
@@ -625,7 +625,7 @@ function _echoHitAt(caret) {
       try {
         if (it.range.collapsed) continue;
         if (it.range.isPointInRange(caret.startContainer, caret.startOffset)) return it;
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: live DOM Selection or Range boundary may invalidate across layout mutations */ }
     }
   }
   return null;
@@ -643,7 +643,7 @@ function _echoOnClick(e) {
   try {
     if (typeof window.pbpHlItemIdAtRange === "function"
         && window.pbpHlItemIdAtRange(caret)) return; // real highlight wins
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ }
   const hit = _echoHitAt(caret);
   if (!hit || typeof window.pbpExplainOpenForItem !== "function") return;
   e.preventDefault();
@@ -704,7 +704,7 @@ function _echoOnArticle(detail) {
     if (readSeq !== _echoReadSeq || owner !== _echoOwner) return;
     _echoEnabled = on;
     if (on) _echoRestart();
-  }).catch(() => {});
+  }).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
 }
 
 document.addEventListener("pbp:rendered", (e) => _echoOnArticle((e && e.detail) || null));
@@ -759,6 +759,6 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
       if (readSeq !== _echoReadSeq) return;
       _echoEnabled = on;
       if (on) _echoRestart();
-    }).catch(() => {});
+    }).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
   });
 }

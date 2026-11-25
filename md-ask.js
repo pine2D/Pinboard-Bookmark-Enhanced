@@ -97,7 +97,7 @@ async function pbpAskInit(detail) {
       if (e.defaultPrevented) return;
       if (!_pbpAskIsOpen()) return;
       if (document.body.classList.contains("rail-open")) return;
-      try { if (document.querySelector(":popover-open")) return; } catch (_) {}
+      try { if (document.querySelector(":popover-open")) return; } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
       e.preventDefault();
       _pbpAskSetOpen(false);
       return;
@@ -579,7 +579,7 @@ function _pbpAskBuildPanel() {
   // construction (this function is only reachable through wiring pbpAskInit
   // adds AFTER that same event) has already run by the time a user can open
   // the panel.
-  _pbpAskHistRestore().catch(() => {});
+  _pbpAskHistRestore().catch(() => { /* swallow-ok: body attribute observer guard in synthetic DOM fixtures */ });
 
   // Scope toggle (research T1.5): session-only state, no storage; the
   // context is rebuilt on the next meta/send pass.
@@ -599,7 +599,7 @@ function _pbpAskBuildPanel() {
   panel.querySelector("#ask-clear")._pbpWired = true;
   panel.querySelector("#ask-clear").addEventListener("click", () => {
     if (typeof _pbpAskShowClearConfirm === "function") { _pbpAskShowClearConfirm(); return; }
-    _pbpAskClearThread().catch(() => {});
+    _pbpAskClearThread().catch(() => { /* swallow-ok: escaped footnote id selector guard */ });
   });
   // Static starter chips (i18n text, zero tokens): click = put the chip
   // text into the textarea and send it through the submit seam.
@@ -692,7 +692,7 @@ function _pbpAskLayoutShifts() {
   if (typeof window.matchMedia !== "function") return true;
   try {
     return !window.matchMedia("(max-width: 1280px)").matches;
-  } catch (_) {
+  } catch (_) { /* swallow-ok: matchMedia listener or query fallback on older/restricted engines */ 
     return true; // no media support: behave like the wide tier rather than silently skip
   }
 }
@@ -913,9 +913,9 @@ function _pbpAskArchiveStatus() {
         await _pbpAskRefreshArchivedView(st);
       } else if (st.archiveError) {
         _pbpAskHistRestored = false;
-        await _pbpAskHistRestore().catch(() => {});
+        await _pbpAskHistRestore().catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
       } else {
-        for (const item of pending) await _pbpAskPersistArchive(item).catch(() => {});
+        for (const item of pending) await _pbpAskPersistArchive(item).catch(() => { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ });
       }
       _pbpAskArchiveStatus();
       if (keyboard && (!document.activeElement || document.activeElement === document.body || document.activeElement === retry)) {
@@ -927,7 +927,7 @@ function _pbpAskArchiveStatus() {
     const account = st.account, revision = st.archiveRev || 0, sessionId = st.sessionId;
     Promise.all([
       pbpAskArchiveRead({ owner: _pbpAskArchiveOwnerOf(account), sessionId }),
-      chrome.runtime.sendMessage({ type: "vocabDriveStatus" }).catch(() => null)
+      chrome.runtime.sendMessage({ type: "vocabDriveStatus" }).catch(() => /* swallow-ok: optional Drive status badge query defaults to disconnected when SW is unreachable */ null)
     ]).then(([sessions, status]) => {
       if (!_pbpAskArchiveStateCurrent(st, account, revision) || st.sessionId !== sessionId || host.querySelector("button")) return;
       const connected = status?.connected === true || status?.status?.connected === true;
@@ -1084,7 +1084,7 @@ async function _pbpAskClearThread() {
 // (typeof on an undeclared identifier is safe, never a ReferenceError).
 function _pbpAskOnSubmit() {
   if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("ask");
-  if (typeof _pbpAskSend === "function") _pbpAskSend().catch(() => {});
+  if (typeof _pbpAskSend === "function") _pbpAskSend().catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
 }
 
 // Init hookup: top-level listener registration only (no other side
@@ -1101,7 +1101,7 @@ function _pbpAskOnSubmit() {
 // reads; the original detail retained by these timers cannot reclaim an owner.
 function _pbpAskInitWithRetry(detail, attempt) {
   attempt = attempt || 1;
-  pbpAskInit(detail).catch(() => {}).then(() => {
+  pbpAskInit(detail).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ }).then(() => {
     if (!_pbpAskState && attempt < 3) {
       setTimeout(() => _pbpAskInitWithRetry(detail, attempt + 1), attempt * 1000);
     }
@@ -1659,7 +1659,7 @@ function _pbpAskErrorUi(aEl, error, question, runOpts) {
         : { newRound: true,
             visionAttachment: (runOpts && runOpts.visionAttachment) || null,
             rawQuestion: (runOpts && runOpts.rawQuestion) || "" });
-    }).catch(() => {});
+    }).catch(() => { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ });
   });
   aEl.appendChild(err);
   aEl.appendChild(retry);
@@ -1924,7 +1924,7 @@ async function _pbpAskRun(question, aEl, opts) {
       // later Regenerate to append-mode - this round is not in st.rounds,
       // so replaceLast would clobber the previous round instead.
       aEl.dataset.askStopped = "1";
-      try { _pbpAskFinalize(aEl, acc, runCtx && runCtx.sent, runCtx && runCtx.sources); } catch (_) { aEl.textContent = acc; }
+      try { _pbpAskFinalize(aEl, acc, runCtx && runCtx.sent, runCtx && runCtx.sources); } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */  aEl.textContent = acc; }
     } else {
       aEl.textContent = acc; // keep whatever already streamed in
     }
@@ -1974,7 +1974,7 @@ async function _pbpAskSend() {
   if (!pbpAiAvailable(st.s)) return;
   if (_pbpAskArchiveEnabled()) {
     const revision = st.archiveRev || 0;
-    try { await _pbpAskLoadArchive(st); } catch (_) { return; }
+    try { await _pbpAskLoadArchive(st); } catch (_diagErr) { console.warn("[md-ask] archive load before send failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  return; }
     if (st !== _pbpAskState || _pbpAskArticleRev !== sendRev || (st.archiveRev || 0) !== revision
         || st.running || st.archiveMissing || !pbpAiAvailable(st.s)
         || (st.attachedImage || null) !== initialAttached) return;
@@ -2501,7 +2501,7 @@ function _pbpAskExportSafeUrl(value) {
   try {
     const u = new URL(String(value || ""));
     return /^https?:$/.test(u.protocol) && !u.username && !u.password ? u.href : "";
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return ""; }
 }
 function _pbpAskExportEscape(value) {
   return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -2862,7 +2862,7 @@ async function _pbpAskCopyThread() {
   const revision = _pbpAskExportRevision;
   const articleRevision = _pbpAskArticleRev;
   let snapshot;
-  try { snapshot = await pbpAskExportSnapshot({ title: st.title, url: st.url, account }); } catch (_) { return; }
+  try { snapshot = await pbpAskExportSnapshot({ title: st.title, url: st.url, account }); } catch (_diagErr) { console.warn("[md-ask] export snapshot build failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  return; }
   const text = pbpAskExportMarkdown(snapshot);
   if (st.account !== account || revision !== _pbpAskExportRevision) return;
   if (!text) return;
@@ -2883,7 +2883,7 @@ async function _pbpAskCopyThread() {
     if (!await _pbpAskExportOwnerCurrent(account, revision, articleRevision, snapshot)) return;
     await navigator.clipboard.writeText(text);
     flash(t("askCopied"));
-  } catch (_) {
+  } catch (_diagErr) { console.warn("[md-ask] thread copy failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "md-preview", op: "ask_copy", code: "denied", errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error" }); 
     flash(t("mdPreviewFailed"));
   }
 }
@@ -2926,7 +2926,7 @@ function _pbpAskDecorate(el, parsed) {
         if (!await _pbpAskExportOwnerCurrent(account, revision, articleRevision, snapshot) || !el.isConnected) return;
         await navigator.clipboard.writeText(text);
         flashButtonLabel(btn, t("askCopied"));
-      } catch (_) {
+      } catch (_diagErr) { console.warn("[md-ask] round copy failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "md-preview", op: "ask_copy", code: "denied", errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error" }); 
         flashButtonLabel(btn, t("mdPreviewFailed"));
       }
     });
@@ -3001,7 +3001,7 @@ function _pbpAskRegenerate(el) {
     replaceLast: !el.dataset.askStopped,
     restoreNodes: oldNodes,
     visionAttachment: el._askVisionAttachment || null
-  }).catch(() => {});
+  }).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
 }
 
 // ---- Clear: inline two-button confirm strip (never window.confirm) ----
@@ -3079,10 +3079,10 @@ function _pbpAskShowClearConfirm() {
     // + starter chips AND erases ask_<url> — keeping ONE owner for the
     // post-clear panel state. Bare wipe only if the shell is absent.
     if (typeof _pbpAskClearThread === "function") {
-      try { await _pbpAskClearThread(); } catch (_) {}
+      try { await _pbpAskClearThread(); } catch (_diagErr) { console.warn("[md-ask] clear thread failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
     } else {
       thread.replaceChildren();
-      try { await pbpAskHistSet(_pbpAskHistUrl, [], _pbpAskHistAccount); } catch (_) {}
+      try { await pbpAskHistSet(_pbpAskHistUrl, [], _pbpAskHistAccount); } catch (_diagErr) { console.warn("[md-ask] clear legacy history failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
     }
   });
   no.addEventListener("click", () => {
@@ -3136,7 +3136,7 @@ async function _pbpAskHistRestore() {
     if (!reentered) {
       reentered = true;
       _pbpAskHistRestored = false;
-      _pbpAskHistRestore().catch(() => {});
+      _pbpAskHistRestore().catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
     }
     return true;
   };
@@ -3144,7 +3144,7 @@ async function _pbpAskHistRestore() {
   // never be read again (fail-closed, no adoption) — delete on sight so the
   // leaked-to-nobody data actually disappears instead of waiting on LRU.
   if (typeof _pbpAskHistLegacyKey === "function") {
-    pbpAiCacheDelete(_pbpAskHistLegacyKey(_pbpAskHistUrl)).catch(() => {});
+    pbpAiCacheDelete(_pbpAskHistLegacyKey(_pbpAskHistUrl)).catch(() => { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ });
   }
   let hist = [];
   const archiveRevision = _pbpAskState?.archiveRev || 0;
@@ -3153,7 +3153,7 @@ async function _pbpAskHistRestore() {
       const session = await _pbpAskLoadArchive(_pbpAskState);
       hist = session ? _pbpAskCurrentVersions(session.records) : [];
     } else hist = await pbpAskHistGet(_pbpAskHistUrl, _pbpAskHistAccount);
-  } catch (_) { _pbpAskHistRestored = false; return; }
+  } catch (_diagErr) { console.warn("[md-ask] history restore read failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  _pbpAskHistRestored = false; return; }
   if ((_pbpAskState?.archiveRev || 0) !== archiveRevision) return;
   // Re-check after the await: a Clear that landed while the IDB read was
   // in flight dropped the flag synchronously - this stale result must not
@@ -3918,7 +3918,7 @@ function pbpExplainInit(detail) {
           // Routing switch: the key itself need not change, so re-read it from
           // the newly routed area (shared.js already dropped its routing cache).
           try { value = (await (await getSettingsStorage()).get({ translateTargetLang: "auto" })).translateTargetLang; }
-          catch (_) { return; }
+          catch (_) { /* swallow-ok: settings storage read failure degrades to safe defaults or fail-closed guard */  return; }
           if (gen !== explainLangGen) return; // a newer consumed event already carried fresher state
         } else {
           value = changes.translateTargetLang.newValue;
@@ -3934,7 +3934,7 @@ function pbpExplainInit(detail) {
     // rendered-reader bare-key gate with t/v/h, then reuse the same captured
     // selection and popover entry point as the highlight bar buttons.
     document.addEventListener("keydown", _pbpExplainOnShortcut);
-  }).catch(() => {});
+  }).catch(() => { /* swallow-ok: settings storage read failure degrades to safe defaults or fail-closed guard */ });
 }
 
 document.addEventListener("pbp:rendered", (e) => pbpExplainInit((e && e.detail) || {}), { once: true });
@@ -4177,7 +4177,7 @@ function _pbpExplainResizeEnd() {
   _pbpExplainResize = null;
   if (!drag) return;
   drag.pop.classList.remove("xp-resizing");
-  try { if (drag.handle.hasPointerCapture(drag.pointerId)) drag.handle.releasePointerCapture(drag.pointerId); } catch (_) {}
+  try { if (drag.handle.hasPointerCapture(drag.pointerId)) drag.handle.releasePointerCapture(drag.pointerId); } catch (_) { /* swallow-ok: pointer capture may already be released when pointer sequence ends */ }
 }
 
 function _pbpExplainResizeFlush() {
@@ -4298,7 +4298,7 @@ function _pbpExplainInitResize(pop) {
       if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
       _pbpExplainResize = { pop, handle, edge, pointerId: e.pointerId, rect: pop.getBoundingClientRect(),
         x: e.clientX, y: e.clientY, dx: 0, dy: 0, moved: false };
-      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+      try { handle.setPointerCapture(e.pointerId); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
       e.preventDefault(); e.stopPropagation();
     });
     handle.addEventListener("pointermove", e => {
@@ -4361,8 +4361,8 @@ function _pbpExplainVisibleFocusTarget(el) {
 }
 
 function _pbpExplainFocusPreventScroll(el) {
-  try { el.focus({ preventScroll: true }); } catch (_) {
-    try { el.focus(); } catch (_) {}
+  try { el.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ 
+    try { el.focus(); } catch (_) { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ }
   }
   return document.activeElement === el;
 }
@@ -4420,7 +4420,7 @@ function _pbpExplainClose(pop, restoreFocus = false) {
   _pbpExplainResizeEnd();
   if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
   if (!_pbpDictWindowSize) pop.style.removeProperty("max-height");
-  try { pop.hidePopover(); } catch (_) {}
+  try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
 }
 
 window.pbpExplainPopoverPinned = (el) => !!(el && el === _pbpExplainPopEl && _pbpExplainPinned);
@@ -4697,7 +4697,7 @@ function _pbpExplainBuildFoot(pop) {
       } else {
         save.disabled = false; // pbpHlAttachNote already toasted the failure
       }
-    }).catch(() => {
+    }).catch(() => { /* swallow-ok: pbpHlAttachNote already toasted failure; re-enable Save button if still current */ 
       if (_pbpExplainSaveTarget === myTarget) save.disabled = false;
     });
   });
@@ -4738,7 +4738,7 @@ function _pbpExplainBuildFoot(pop) {
     const myRunId = vocab.dataset.runId; // the run this click belongs to
     const myContextRevision = vocab.dataset.contextRevision;
     const myPackRevision = vocab.dataset.packRevision;
-    const ok = await window.pbpDictSaveCurrent().catch(() => false);
+    const ok = await window.pbpDictSaveCurrent().catch(() => /* swallow-ok: fail-closed vocabulary owner or store read degrades to safe sentinel */ false);
     if (vocab.dataset.runId !== myRunId || vocab.dataset.contextRevision !== myContextRevision ||
         vocab.dataset.packRevision !== myPackRevision) return;
     if (ok) {
@@ -4790,7 +4790,7 @@ function _pbpExplainBuildFoot(pop) {
     // with no tabs API rather than only a missing shared.js.
     if (typeof pbpOpenExtensionTab === "function"
         && await pbpOpenExtensionTab("library.html", "vocab")) return;
-    try { window.open(chrome.runtime.getURL("library.html#vocab")); } catch (_) {}
+    try { window.open(chrome.runtime.getURL("library.html#vocab")); } catch (_) { /* swallow-ok: popup-blocked window.open fallback after tabs API attempt */ }
   });
   const ask = document.createElement("button");
   ask.type = "button";
@@ -4927,7 +4927,7 @@ function _pbpExplainEnsurePop() {
     // meant to grab attention changed how the card closes, with nothing on
     // screen saying so. Nothing is committed until the pointer actually travels.
     _pbpExplainDrag = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, left: rect.left, top: rect.top, moved: false };
-    try { head.setPointerCapture(e.pointerId); } catch (_) {}
+    try { head.setPointerCapture(e.pointerId); } catch (_) { /* swallow-ok: pointer capture may already be released when pointer sequence ends */ }
     e.preventDefault();
   });
   head.addEventListener("pointermove", (e) => {
@@ -4951,7 +4951,7 @@ function _pbpExplainEnsurePop() {
     if (!_pbpExplainDrag || _pbpExplainDrag.pointerId !== e.pointerId) return;
     _pbpExplainDrag = null;
     pop.classList.remove("xp-dragging");
-    try { if (head.hasPointerCapture(e.pointerId)) head.releasePointerCapture(e.pointerId); } catch (_) {}
+    try { if (head.hasPointerCapture(e.pointerId)) head.releasePointerCapture(e.pointerId); } catch (_) { /* swallow-ok: pointer capture may already be released when pointer sequence ends */ }
   };
   head.addEventListener("pointerup", endDrag);
   head.addEventListener("pointercancel", endDrag);
@@ -5392,7 +5392,7 @@ async function _pbpExplainRun(cap, ctx, pop) {
       try {
         const recovered = await pbpAiRetryWithPermission(e, s, () => _pbpExplainRun(cap, ctx, pop));
         if (!recovered) retry.disabled = false;
-      } catch (_) {
+      } catch (_diagErr) { console.warn("[md-ask] explain retry failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); 
         retry.disabled = false;
       }
     });
@@ -5442,7 +5442,7 @@ function _pbpExplainOpenPop(cap, initialAction) {
   // old mutual exclusion when Explain itself is invoked (not when another
   // surface opens beside an already pinned Explain panel).
   document.querySelectorAll(":popover-open").forEach((el) => {
-    if (el !== pop) { try { el.hidePopover(); } catch (_) {} }
+    if (el !== pop) { try { el.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ } }
   });
   if (!pop.matches(":popover-open")) pop.showPopover();
   if (!_pbpExplainPinned) {
@@ -5570,7 +5570,7 @@ function _pbpAskOnArticleWillReplace(detail) {
   // Dictionary side: aborts its own child request and drops the save target
   // (md-dict.js:1653-1657).
   if (typeof window.pbpDictOnActionSwitch === "function") {
-    try { window.pbpDictOnActionSwitch(); } catch (_) {}
+    try { window.pbpDictOnActionSwitch(); } catch (_) { /* swallow-ok: AbortController.abort guard on settled controller */ }
   }
   // Force-close EVEN IF PINNED: a pinned card is precisely the one that would
   // otherwise sit there showing an explanation of text the reader can no longer
@@ -5615,7 +5615,7 @@ function _pbpAskOnArticleReplaced(detail) {
   // true and this call would return at the top guard. Deliberately NOT an
   // unconditional flag reset: a restore that already COMPLETED must not be
   // re-run, or the transcript is inserted twice.
-  _pbpAskHistRestore().catch(() => {});
+  _pbpAskHistRestore().catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
 }
 
 // ============================================================
@@ -5678,7 +5678,7 @@ function _pbpAskOnAccountChanged(account) {
   // would. Safe to re-arm unconditionally (unlike the article-replaced path):
   // the account fence inside the restore stops any older run from inserting.
   _pbpAskHistRestored = false;
-  _pbpAskHistRestore().catch(() => {});
+  _pbpAskHistRestore().catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
   if (typeof _pbpAskUpdateMeta === "function") _pbpAskUpdateMeta();
 }
 

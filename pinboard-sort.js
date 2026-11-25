@@ -86,7 +86,7 @@
       const prefs = await chrome.runtime.sendMessage({ type: "get_site_prefs" });
       if (prefs && typeof prefs === "object" && !prefs.error) return prefs.tagSortByPopEnabled !== false;
       return true;
-    } catch (_) {
+    } catch (_) { /* swallow-ok: content script defaults sort toggle on when extension runtime is unreachable */ 
       return true;
     }
   }
@@ -192,7 +192,7 @@
     try {
       const m = chrome.i18n && chrome.i18n.getMessage("popSortTitle");
       if (m) popTitle = m;
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: content script keeps English fallback tooltip when i18n is unavailable */ }
     a.title = popTitle;
     return a;
   }
@@ -249,7 +249,7 @@
     injectStyle();
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      try { onToggle(mc, link); } catch (_) { /* never break the host page */ }
+      try { onToggle(mc, link); } catch (_) { /* swallow-ok: content script isolates sort UI errors so host pinboard.in page never breaks */  /* never break the host page */ }
     });
     // Enter already arrives as a click on an anchor; Space does not, and its
     // default would scroll the page instead of toggling. role="button" promises
@@ -257,7 +257,7 @@
     link.addEventListener("keydown", (e) => {
       if (e.key !== " " && e.key !== "Spacebar") return;
       e.preventDefault();
-      try { onToggle(mc, link); } catch (_) { /* never break the host page */ }
+      try { onToggle(mc, link); } catch (_) { /* swallow-ok: content script isolates sort UI errors so host pinboard.in page never breaks */  /* never break the host page */ }
     });
   }
 
@@ -267,7 +267,7 @@
       if (!(await readEnabled())) return;
       const mc = document.getElementById("main_column");
       if (mc) inject(mc);
-    } catch (_) { /* never break the host page */ }
+    } catch (_) { /* swallow-ok: content script isolates sort UI errors so host pinboard.in page never breaks */  /* never break the host page */ }
   }
 
   main();

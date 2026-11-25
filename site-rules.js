@@ -88,7 +88,7 @@
       if (!candidate) return; // present-but-empty/whitespace or absent: no write, no fallthrough
 
       var u;
-      try { u = new URL(candidate, baseHref); } catch (_) { return; }
+      try { u = new URL(candidate, baseHref); } catch (_) { /* swallow-ok: malformed candidate or page URL is skipped by pure site-rule helper */  return; }
       if (u.protocol !== "http:" && u.protocol !== "https:") return;
       img.setAttribute("src", u.href);
       count++;
@@ -142,10 +142,10 @@
       }
       if (described < 2 || !best || best.w < 600) return;
       var resolved;
-      try { resolved = new URL(best.url, baseHref || undefined).href; } catch (_) { return; }
+      try { resolved = new URL(best.url, baseHref || undefined).href; } catch (_) { /* swallow-ok: malformed candidate or page URL is skipped by pure site-rule helper */  return; }
       if (!/^https?:$/.test(new URL(resolved).protocol)) return;
       var current;
-      try { current = new URL(trimmed, baseHref || undefined).href; } catch (_) { current = trimmed; }
+      try { current = new URL(trimmed, baseHref || undefined).href; } catch (_) { /* swallow-ok: malformed candidate or page URL is skipped by pure site-rule helper */  current = trimmed; }
       if (resolved === current) return;
       img.setAttribute("src", resolved);
       count++;
@@ -192,7 +192,7 @@
       if (!el) return {};
       var data = JSON.parse(el.textContent || "{}");
       return (data.initialState && data.initialState.entities) || {};
-    } catch (_) { return {}; }
+    } catch (_) { /* swallow-ok: malformed embedded page state JSON degrades to empty entity map */  return {}; }
   }
 
   // Also encodes double quotes: escapeHtml output lands inside double-quoted
@@ -208,7 +208,7 @@
     try {
       var u = new URL(href, base);
       return /^(https?:)$/.test(u.protocol) && !u.username && !u.password ? u.href : "";
-    } catch (_) { return ""; }
+    } catch (_) { /* swallow-ok: malformed candidate or page URL is skipped by pure site-rule helper */  return ""; }
   }
 
   // Structured math is evidence; a dollar in prose or code is not. The same
@@ -872,7 +872,7 @@
     // citation_* can describe the unversioned work even on a v1 page. The
     // address identifies what was read, including old archive/NNNNNNN IDs.
     var addressed = "";
-    try { addressed = (new URL(url).pathname.match(/^\/abs\/((?:\d{4}\.\d{4,5}|[a-z][a-z.-]*\/\d{7})(?:v\d+)?)\/?$/i) || [])[1] || ""; } catch (_) {}
+    try { addressed = (new URL(url).pathname.match(/^\/abs\/((?:\d{4}\.\d{4,5}|[a-z][a-z.-]*\/\d{7})(?:v\d+)?)\/?$/i) || [])[1] || ""; } catch (_) { /* swallow-ok: malformed candidate or page URL is skipped by pure site-rule helper */ }
     if (addressed) id = addressed;
     var date = metas("citation_date")[0] || domText(".dateline").replace(/[\[\]]/g, "").trim();
     var subjects = domText(".subjects");
@@ -1148,10 +1148,10 @@
   function matchRule(m, doc, url) {
     if (!m) return false;
     var hostname;
-    try { hostname = new URL(url).hostname; } catch (_) { return false; }
+    try { hostname = new URL(url).hostname; } catch (_) { /* swallow-ok: malformed candidate or page URL is skipped by pure site-rule helper */  return false; }
     if (m.host && !hostMatches(m.host, hostname)) return false;       // cheap first
     if (m.url && !m.url.test(url)) return false;                       // then regex
-    if (typeof m.test === "function") { try { if (!m.test(doc, url)) return false; } catch (_) { return false; } }
+    if (typeof m.test === "function") { try { if (!m.test(doc, url)) return false; } catch (_) { /* swallow-ok: malformed candidate or page URL is skipped by pure site-rule helper */  return false; } }
     return true;
   }
 
@@ -1191,7 +1191,7 @@
       var rule = SITE_RULES[i];
       if (!matchRule(rule.match, doc, url)) continue;
       var out = null;
-      try { out = rule.extract(doc, url); } catch (_) { out = null; }
+      try { out = rule.extract(doc, url); } catch (_) { /* swallow-ok: site-rule extractor error falls back to generic Defuddle extraction */  out = null; }
       if (out && out.error) return { id: rule.id, error: out.error, url: url };
       if (out && out.contentHtml) {
         return { id: rule.id, contentHtml: out.contentHtml, title: out.title || doc.title || "", url: url, math: !!out.math || pbpContentHasMath(out.contentHtml), forum: !!rule.forum };
@@ -1244,5 +1244,5 @@ function pbpPreDefuddleNormalize(root) {
       pre.appendChild(code);
       d.replaceWith(pre);
     });
-  } catch (_) { /* a normalize step must never fail extraction */ }
+  } catch (_) { /* swallow-ok: DOM code-block normalization step must never abort page extraction */  /* a normalize step must never fail extraction */ }
 }

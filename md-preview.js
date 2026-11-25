@@ -109,7 +109,7 @@ function pbpOriginalOpenHref(openUrl) {
   try {
     const u = new URL(openUrl);
     return (u.protocol === "https:" || u.protocol === "http:") ? u.href : "";
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return ""; }
 }
 // Which way out leads on the extraction-failure page. One rule, so the same
 // failure always offers the same first step:
@@ -284,7 +284,7 @@ async function pbpRequestEngineHostPermission(engine) {
   const originPattern = engine === "deepseek" ? PBP_DEEPSEEK_FETCH_ORIGIN_PATTERN : PBP_JINA_ORIGIN_PATTERN;
   try {
     return (await chrome.permissions.request({ origins: [originPattern] })) === true;
-  } catch (_) {
+  } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ 
     return false;
   }
 }
@@ -545,7 +545,7 @@ function fillPreviewUrl(url, fallbackLabel) {
     if (idx < 0) throw new Error("hostname not found in raw url");
     host = u.hostname;
     rest = url.slice(idx + u.hostname.length);
-  } catch (_) {
+  } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ 
     host = "";
   }
   if (host) {
@@ -664,7 +664,7 @@ function _pbpRailPersist(key, collapsed) {
     const cur = (r && typeof r[PBP_RAIL_STORAGE_KEY] === "object" && r[PBP_RAIL_STORAGE_KEY]) || {};
     const next = Object.assign({}, cur, { [key]: collapsed });
     await chrome.storage.local.set({ [PBP_RAIL_STORAGE_KEY]: next });
-  }).catch(() => {});
+  }).catch(() => { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ });
 }
 
 // Installs a collapsible header on sectionEl. opts: {label: string|Element,
@@ -793,7 +793,7 @@ function pbpRailCollapsible(sectionEl, key, opts) {
       if (overridden) return; // a click or expand()/collapse() already set the authoritative state -- don't fight it
       const merged = pbpRailCollapseState(r && r[PBP_RAIL_STORAGE_KEY], { [key]: !!opts.defaultCollapsed });
       if (merged[key] !== collapsed) setState(merged[key], false, true);
-    }).catch(() => {});
+    }).catch(() => { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ });
   }
 
   return {
@@ -839,7 +839,7 @@ function pbpApplyColorScheme(mode) {
     const darkLink = document.getElementById("hljs-dark-link");
     if (lightLink) lightLink.media = r.lightMedia;
     if (darkLink) darkLink.media = r.darkMedia;
-  } catch (_) { /* degrade: leave the system-following CSS default in place */ }
+  } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */  /* degrade: leave the system-following CSS default in place */ }
 }
 
 // Reader light/dark model (theme model 2026-08-25): the per-device override
@@ -907,7 +907,7 @@ function pbpReaderSchemeApply() {
   // default, global optTheme), and because pbpMermaidIsDark reads the
   // colorScheme this line just wrote. typeof guard: the file:// test page
   // loads md-preview.js without md-mermaid.js.
-  if (typeof pbpMermaidRetheme === "function") pbpMermaidRetheme(document).catch(() => {});
+  if (typeof pbpMermaidRetheme === "function") pbpMermaidRetheme(document).catch(() => { /* swallow-ok: Mermaid render or retheme failure keeps existing fence or prior SVG */ });
 }
 // The payload has been judged: from here on body.video-mode alone says
 // whether this is a video page. Called at every point that decides it, after
@@ -924,8 +924,8 @@ function pbpReaderSchemeVideoSettled() {
 window.pbpReaderSchemeGet = function () { return _pbpScheme.override; };
 window.pbpReaderSchemeSet = function (mode) {
   _pbpScheme.override = mode === "light" || mode === "dark" ? mode : "auto";
-  try { localStorage.setItem("md-preview-scheme", _pbpScheme.override); } catch (_) {}
-  try { chrome.storage.local.set({ pbp_color_scheme: _pbpScheme.override }).catch(() => {}); } catch (_) {}
+  try { localStorage.setItem("md-preview-scheme", _pbpScheme.override); } catch (_) { /* swallow-ok: localStorage FOUC mirror unavailable in restricted contexts */ }
+  try { chrome.storage.local.set({ pbp_color_scheme: _pbpScheme.override }).catch(() => { /* swallow-ok: localStorage FOUC mirror unavailable in restricted contexts */ }); } catch (_) { /* swallow-ok: localStorage FOUC mirror unavailable in restricted contexts */ }
   pbpReaderSchemeApply();
 };
 
@@ -1400,9 +1400,9 @@ const _pbpReaderBoot = (async function () {
       localStorage.setItem("md-preview-video-dark", _pbpScheme.videoDark ? "1" : "0");
       localStorage.setItem("pp-theme-preset", _pbpScheme.presetKey);
       localStorage.setItem("pp-theme-follow", _pbpScheme.follow ? "1" : "0");
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: localStorage FOUC mirror unavailable in restricted contexts */ }
     pbpReaderSchemeApply();
-  } catch (_) { /* degrade: leave whatever md-preview-theme-early.js (or the CSS default) set */ }
+  } catch (_) { /* swallow-ok: localStorage FOUC mirror unavailable in restricted contexts */  /* degrade: leave whatever md-preview-theme-early.js (or the CSS default) set */ }
   if (chrome.storage.onChanged) {
     let schemeGen = 0;
     chrome.storage.onChanged.addListener(async (changes, area) => {
@@ -1436,7 +1436,7 @@ const _pbpReaderBoot = (async function () {
           _pbpScheme.presetKey = s.themePresetKey || "";
           _pbpScheme.follow = s.optPopupFollowTheme !== false;
           touched = true;
-        } catch (_) {}
+        } catch (_) { /* swallow-ok: settings storage read failure degrades to safe defaults or fail-closed guard */ }
       } else if (themed) {
         if (changes.optTheme) { _pbpScheme.optTheme = changes.optTheme.newValue; touched = true; }
         if (changes.mdVideoDarkScheme) { _pbpScheme.videoDark = changes.mdVideoDarkScheme.newValue === true; touched = true; }
@@ -1448,7 +1448,7 @@ const _pbpReaderBoot = (async function () {
         localStorage.setItem("md-preview-video-dark", _pbpScheme.videoDark ? "1" : "0");
         localStorage.setItem("pp-theme-preset", _pbpScheme.presetKey);
         localStorage.setItem("pp-theme-follow", _pbpScheme.follow ? "1" : "0");
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: localStorage FOUC mirror unavailable in restricted contexts */ }
       pbpReaderSchemeApply();
     });
   }
@@ -1458,7 +1458,7 @@ const _pbpReaderBoot = (async function () {
   // (the body is still empty then) instead of being wired into each site.
   try {
     new MutationObserver(pbpReaderSchemeApply).observe(document.body, { attributes: true, attributeFilter: ["class"] });
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: body attribute observer guard in synthetic DOM fixtures */ }
 
   // Per-tab token key: the opener (popup / shortcut) minted ?k=<uuid> and wrote the
   // payload to md_preview_data_<uuid>, so this tab reads ONLY its own slot and can't
@@ -1881,7 +1881,7 @@ const _pbpReaderBoot = (async function () {
           console.warn("[pbp-video] commit refused: another preview page wrote this slot after we loaded");
           return false;
         }
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
       try {
         await chrome.storage.local.set({
           [MP_KEY]: {
@@ -1959,7 +1959,7 @@ const _pbpReaderBoot = (async function () {
       document.body.classList.add("video-mode");
       // Warm the lazy video module in parallel with extraction — by the time
       // the mount points below await it, the fetch is usually done.
-      ensureVideoModule().catch(() => {});
+      ensureVideoModule().catch(() => { /* swallow-ok: speculative video module preload; actual mount awaits and logs on failure */ });
     }
     pbpReaderSchemeVideoSettled();
 
@@ -2080,7 +2080,7 @@ const _pbpReaderBoot = (async function () {
       let granted = false;
       try {
         granted = await chrome.permissions.request({ origins: [frameOrigin + "/*"] });
-      } catch (_) { granted = false; }
+      } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */  granted = false; }
       finally { inFlight = false; }
       if (!granted) return;
       // The origin rides along so the Service Worker binds the frame pass to
@@ -2119,7 +2119,7 @@ const _pbpReaderBoot = (async function () {
             frame: !!(opts && opts.frame), // embedded-frame pass, only from grantFrameAndRetry
             frameOrigin: (opts && typeof opts.frameOrigin === "string") ? opts.frameOrigin : ""
           });
-        } catch (_) { pr = { ok: false, error: "network" }; }
+        } catch (_diagErr) { console.warn("[md-preview] reextract message failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  pr = { ok: false, error: "network" }; }
       }
       // inFlight stays HELD past this point (audit B4): the old release here
       // let a .src-seg retry or engine switch run concurrently with the
@@ -2141,11 +2141,11 @@ const _pbpReaderBoot = (async function () {
         // True origin form only (URL parse + origin === input): no wildcard,
         // path, query or credentials can ride into the permission request.
         try { const u = new URL(pr.frameOrigin); return (u.protocol === "https:" && u.origin === pr.frameOrigin) ? u.origin : ""; }
-        catch (_) { return ""; }
+        catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return ""; }
       })();
       if (frameOrigin) {
         let host = frameOrigin;
-        try { host = new URL(frameOrigin).host; } catch (_) {}
+        try { host = new URL(frameOrigin).host; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
         renderErrorState(t("mdPreviewFrameHint", host), () => grantFrameAndRetry(attemptedEngine, frameOrigin), true, null, url);
       } else if (
         _pbpReaderHasDeepseekKey &&
@@ -2287,7 +2287,7 @@ const _pbpReaderBoot = (async function () {
       } else {
         inFlight = false;
       }
-      try { await ensureVideoModule(); } catch (_) {}
+      try { await ensureVideoModule(); } catch (_diagErr) { console.warn("[md-preview] video module load failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
       if (typeof pbpVideoInit === "function") pbpVideoInit({ pageUrl: sourceTabUrl || url, title: title, tabId: srcTabId, account: libraryOwner });
       else console.warn("[pbp-video] mount unavailable: md-video.js failed to load");
       applyAvailability(attemptedEngine);
@@ -2528,7 +2528,7 @@ const _pbpReaderBoot = (async function () {
       // the load on the same detect preserves the old behavior exactly while
       // sparing non-video empty pages the 340KB parse.
       if (typeof pbpVideoDetect === "function" && pbpVideoDetect(sourceTabUrl || url)) {
-        try { await ensureVideoModule(); } catch (_) {}
+        try { await ensureVideoModule(); } catch (_diagErr) { console.warn("[md-preview] video module load failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
         if (typeof pbpVideoInit === "function") pbpVideoInit({ pageUrl: sourceTabUrl || url, title: title, tabId: srcTabId, account: libraryOwner });
         else console.warn("[pbp-video] mount unavailable: md-video.js failed to load");
       }
@@ -2619,7 +2619,7 @@ const _pbpReaderBoot = (async function () {
     if (!(cur0 && typeof cur0.nonce === "string" && cur0.nonce !== _pageNonce && (cur0.ts || 0) > _pageLoadTs)) {
       await chrome.storage.local.set({ [MP_KEY]: _restoreRecord });
     }
-  } catch (_) { /* degrade to current behavior: next reload hits the empty state */ }
+  } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */  /* degrade to current behavior: next reload hits the empty state */ }
   if (!sourceIncognito && typeof pbpReaderHistoryRecord === "function") {
     void pbpReaderHistoryRecord({
       url, sourceTabUrl, title: title || "", site: site || "",
@@ -2654,7 +2654,7 @@ const _pbpReaderBoot = (async function () {
   let exportSettings = EXPORT_SETTINGS_DEFAULTS;
   try {
     exportSettings = await pbpReadSettingsWithSecrets(EXPORT_SETTINGS_DEFAULTS);
-  } catch (_) {
+  } catch (_) { /* swallow-ok: settings storage read failure degrades to safe defaults or fail-closed guard */ 
     // degrade to defaults; article rendering remains usable
   }
   const expFrontmatter = document.getElementById("exp-frontmatter");
@@ -2721,7 +2721,7 @@ const _pbpReaderBoot = (async function () {
       if (trimmedAuthor) meta.author = trimmedAuthor.slice(0, 200);
       let resolvedSite = (isLocalDoc && typeof PBP_LOCAL_DOC_HOST === "string" && site.trim() === PBP_LOCAL_DOC_HOST) ? "" : site.trim();
       if (!resolvedSite && !isLocalDoc) {
-        try { resolvedSite = new URL(url).hostname; } catch (_) { resolvedSite = ""; }
+        try { resolvedSite = new URL(url).hostname; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  resolvedSite = ""; }
       }
       if (resolvedSite) meta.site = resolvedSite.slice(0, 200);
       const publishedDate = publishedIso(published);
@@ -2752,7 +2752,7 @@ const _pbpReaderBoot = (async function () {
             meta.punctuation_tier = window.pbpVideoDoc.aiPunct === true ? "ai"
               : (sess.wasUnpunct === true ? "heuristic" : "source");
           }
-        } catch (_) { /* metadata is garnish -- never block an export */ }
+        } catch (_) { /* swallow-ok: optional video metadata garnish never blocks export */  /* metadata is garnish -- never block an export */ }
       }
     }
     return meta;
@@ -3069,10 +3069,10 @@ const _pbpReaderBoot = (async function () {
     // Only the origins we still have to FETCH need host access -- a full cache
     // hit exports with zero prompts and zero network (the bytes are already in
     // page memory; no new origin access happens).
-    const neededOrigins = [...new Set(toFetch.map((u) => { try { return new URL(u).origin; } catch (_) { return ""; } }).filter(Boolean))];
+    const neededOrigins = [...new Set(toFetch.map((u) => { try { return new URL(u).origin; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return ""; } }).filter(Boolean))];
     let granted = false;
     if (neededOrigins.length) {
-      try { granted = await chrome.permissions.request({ origins: neededOrigins.map(o => o + "/*") }); } catch (_) {}
+      try { granted = await chrome.permissions.request({ origins: neededOrigins.map(o => o + "/*") }); } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
     }
     const fetched = granted ? await pbpEmbedFetchAll(toFetch, embedLimits, embedBudget) : new Map();
     // Hotlink retry (hotlink round): images that failed the plain extension
@@ -3156,7 +3156,7 @@ const _pbpReaderBoot = (async function () {
             tabId: srcTabId, url: srcUrlForSwitch, engine: e, sourceTabUrl,
             account: bookmarkAccount, tags, description: bookmarkNotes, k
           });
-        } catch (_) { r = { ok: false, error: "network" }; }
+        } catch (_diagErr) { console.warn("[md-preview] engine switch message failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  r = { ok: false, error: "network" }; }
         if (r && r.ok) { location.reload(); return; }
         if ((e === "jina" || e === "deepseek") && r && r.error === "host_permission") enginePermissionMissing.add(e);
         // failure: keep current content, restore the control
@@ -3295,7 +3295,7 @@ const _pbpReaderBoot = (async function () {
     if (source === "jina" || source === "deepseek" || source === "deepseek-ocr" || !srcTabId) return false;
     if (typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(sourceTabUrl)) return false;
     if (window.pbpVideoDoc && window.pbpVideoDoc.committed === true) return false;
-    try { return new URL(sourceTabUrl).protocol === "https:"; } catch (_) { return false; }
+    try { return new URL(sourceTabUrl).protocol === "https:"; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return false; }
   }
 
   // Per-URL admission against the page ceilings. NOT a global "capped" latch:
@@ -3312,10 +3312,10 @@ const _pbpReaderBoot = (async function () {
   function imgFixAdmits(url) {
     if (imgFixAttempted + imgFixFailed.size >= PBP_EMBED_LIMITS.maxImages) return false;
     let o = "";
-    try { o = new URL(url).origin; } catch (_) { return false; }
+    try { o = new URL(url).origin; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return false; }
     if (imgFixOriginsSeen.has(o)) return true;
     const pending = new Set();
-    for (const u of imgFixFailed.keys()) { try { pending.add(new URL(u).origin); } catch (_) {} }
+    for (const u of imgFixFailed.keys()) { try { pending.add(new URL(u).origin); } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ } }
     pending.add(o);
     const fresh = [...pending].filter((x) => !imgFixOriginsSeen.has(x)).length;
     return imgFixOriginsSeen.size + fresh <= PBP_EMBED_LIMITS.maxOrigins;
@@ -3325,7 +3325,7 @@ const _pbpReaderBoot = (async function () {
     try {
       const p = new URL(sourceTabUrl || baseUrl);
       return (p.protocol === "https:" || p.protocol === "http:") ? p.origin : "";
-    } catch (_) { return ""; }
+    } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return ""; }
   })();
   function imgFixApply(img, entry, url) {
     img.dataset.pbpImgFixed = "1";
@@ -3480,7 +3480,7 @@ const _pbpReaderBoot = (async function () {
     target = target || renderedView;
     const borrowed = !target.hasAttribute("tabindex");
     if (borrowed) target.setAttribute("tabindex", "-1");
-    try { target.focus({ preventScroll: true }); } catch (_) {}
+    try { target.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ }
     if (borrowed) {
       target.addEventListener("blur", () => target.removeAttribute("tabindex"), { once: true });
     }
@@ -3550,11 +3550,11 @@ const _pbpReaderBoot = (async function () {
     imgFixRowsSync(); // every in-place button goes disabled for the whole run
     let ok = 0;
     try {
-      const origins = [...new Set(urls.map((u) => { try { return new URL(u).origin; } catch (_) { return ""; } }).filter(Boolean))];
+      const origins = [...new Set(urls.map((u) => { try { return new URL(u).origin; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return ""; } }).filter(Boolean))];
       if (viaGesture) {
         let granted = false;
         // First await in the direct click chain (same contract as resolveEmbed).
-        try { granted = await chrome.permissions.request({ origins: origins.map((o) => o + "/*") }); } catch (_) {}
+        try { granted = await chrome.permissions.request({ origins: origins.map((o) => o + "/*") }); } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
         if (!granted) return;
       }
       origins.forEach((o) => imgFixOriginsSeen.add(o));
@@ -3659,10 +3659,10 @@ const _pbpReaderBoot = (async function () {
     // stays queued and gets its own pass -- behind the button if its origin is
     // ungranted.
     const batch = [...imgFixFailed.keys()];
-    const origins = [...new Set(batch.map((u) => { try { return new URL(u).origin; } catch (_) { return ""; } }).filter(Boolean))];
+    const origins = [...new Set(batch.map((u) => { try { return new URL(u).origin; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return ""; } }).filter(Boolean))];
     if (!origins.length) return;
     for (const o of origins) {
-      const has = await chrome.permissions.contains({ origins: [o + "/*"] }).catch(() => false);
+      const has = await chrome.permissions.contains({ origins: [o + "/*"] }).catch(() => /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ false);
       if (!has) return; // any ungranted origin -> stay behind the button (never auto-request)
     }
     imgFixRun(false, batch);
@@ -3688,7 +3688,7 @@ const _pbpReaderBoot = (async function () {
     const btn = e.target.closest && e.target.closest(".pbp-img-refresh-btn");
     if (!btn || btn.getAttribute("aria-disabled") === "true" || imgRefreshRunning || !imgFixCanRefresh()) return;
     let origin = "";
-    try { origin = new URL(sourceTabUrl).origin; } catch (_) { return; }
+    try { origin = new URL(sourceTabUrl).origin; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return; }
     imgRefreshRunning = true;
     imgRefreshError = "";
     imgFixRowsSync();
@@ -3698,14 +3698,14 @@ const _pbpReaderBoot = (async function () {
       // navigation), so re-extracting needs this exact origin granted; asked
       // only here, from the user's click (root CLAUDE.md first-grant rule).
       let granted = false;
-      try { granted = await chrome.permissions.request({ origins: [origin + "/*"] }); } catch (_) {}
+      try { granted = await chrome.permissions.request({ origins: [origin + "/*"] }); } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ }
       if (!granted) return;
       try {
         pr = await chrome.runtime.sendMessage({
           type: "reextractMarkdown", tabId: srcTabId, url, engine: "local", sourceTabUrl,
           account: bookmarkAccount, tags, description: bookmarkNotes, k, reloadSource: true
         });
-      } catch (_) { pr = { ok: false, error: "network" }; }
+      } catch (_diagErr) { console.warn("[md-preview] image refresh message failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  pr = { ok: false, error: "network" }; }
       if (pr && pr.ok) { location.reload(); return; }
       imgRefreshError = pr && pr.error === "host_permission" ? t("mdImgFixUnfixable") : friendlyEngineErr(pr);
     } finally {
@@ -3853,7 +3853,7 @@ const _pbpReaderBoot = (async function () {
     if (typeof pbpMermaidEnhance === "function" && renderedView.querySelector("pre > code.language-mermaid")) {
       requestAnimationFrame(() => {
         if (rev !== _articleRevision) return;
-        pbpMermaidEnhance(renderedView).catch(() => {});
+        pbpMermaidEnhance(renderedView).catch(() => { /* swallow-ok: Mermaid render or retheme failure keeps existing fence or prior SVG */ });
       });
     }
     // Math rendering — ONLY for LaTeX-bearing content (info.math, e.g. arXiv). Gating on
@@ -3870,7 +3870,7 @@ const _pbpReaderBoot = (async function () {
                 delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }],
                 throwOnError: false
               }));
-            } catch (_) { /* leave $...$ source visible on failure */ }
+            } catch (_) { /* swallow-ok: math rendering or stylesheet load failure leaves raw TeX readable */  /* leave $...$ source visible on failure */ }
           }
         });
       });
@@ -3889,7 +3889,7 @@ const _pbpReaderBoot = (async function () {
   // that leaving only the typeof guard here silently dropped the player and
   // caption panel for every ordinary video preview.
   if (typeof pbpVideoDetect === "function" && pbpVideoDetect(sourceTabUrl || url)) {
-    ensureVideoModule().catch(() => {}).then(() => {
+    ensureVideoModule().catch((_diagErr) => { console.warn("[md-preview] video module load failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }).then(() => {
       if (typeof pbpVideoInit === "function") pbpVideoInit({ pageUrl: sourceTabUrl || url, title: title, tabId: srcTabId, account: libraryOwner });
       else console.warn("[pbp-video] mount unavailable: md-video.js failed to load");
     });
@@ -4197,7 +4197,7 @@ const _pbpReaderBoot = (async function () {
     if (window.scrollY <= window.innerHeight) {
       // Back inside the first screen: nothing worth restoring, and any
       // earlier deeper-scroll record is now stale -- drop it.
-      pbpAiCacheDelete(key).catch(() => {});
+      pbpAiCacheDelete(key).catch(() => { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ });
       return;
     }
     if (pbpReaderScrollNearEnd(document.documentElement.scrollHeight, window.innerHeight, window.scrollY)) {
@@ -4213,7 +4213,7 @@ const _pbpReaderBoot = (async function () {
       // scroll memory at all -- intentional, not a bug. Below ~3 viewports
       // the remaining content is cheap to re-find by eye, so the record has
       // little value either way.
-      pbpAiCacheDelete(key).catch(() => {});
+      pbpAiCacheDelete(key).catch(() => { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ });
       return;
     }
     const blocks = pbpScrollMapBlocks(); // force-index if empty, same defensive call the Raw/Rendered toggle above already makes
@@ -4222,7 +4222,7 @@ const _pbpReaderBoot = (async function () {
     const anchor = typeof pbpReaderPickScrollAnchor === "function" ? pbpReaderPickScrollAnchor(rects) : null;
     if (!anchor) return;
     const ts = Date.now();
-    pbpAiCacheSet(key, { n: anchor.n, frac: anchor.frac, ts }, ts).catch(() => {});
+    pbpAiCacheSet(key, { n: anchor.n, frac: anchor.frac, ts }, ts).catch(() => { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ });
   }
 
   window.addEventListener("scroll", () => {
@@ -4250,7 +4250,7 @@ const _pbpReaderBoot = (async function () {
       let entry;
       try {
         entry = await pbpAiCacheGet(key);
-      } catch (_) {
+      } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ 
         return;
       }
       const rec = entry && entry.result;
@@ -4595,7 +4595,7 @@ const _pbpReaderBoot = (async function () {
       const _fresh = await pbpReadSettingsWithSecrets({ exportTargets: {}, obsidianEnabled: false, obsidianVault: "", obsidianFolder: "" });
       if (_sig.aborted) return;
       Object.assign(exportSettings, _fresh);
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: settings storage read failure degrades to safe defaults or fail-closed guard */ }
     if (_sig.aborted) return;
 
     // Resolve enabled targets. Back-compat: if exportTargets is empty but the
@@ -4628,7 +4628,7 @@ const _pbpReaderBoot = (async function () {
         // href comes from a network JSON response and lands in a privileged
         // extension page — only allow https: (blocks a javascript:/data: sink).
         let safe = "";
-        try { if (new URL(url).protocol === "https:") safe = url; } catch (_) {}
+        try { if (new URL(url).protocol === "https:") safe = url; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
         if (safe) {
           hasLink = true;
           if (msg) sendStatus.appendChild(document.createTextNode(" "));
@@ -4738,7 +4738,7 @@ const _pbpReaderBoot = (async function () {
             const current = await exportJobOwnerCurrent(job);
             return !_sig.aborted && current;
           } });
-        } catch (_) {
+        } catch (_diagErr) { console.warn("[md-preview] export target send threw:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "md-preview", op: "export_send", code: "send_failed", errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error" }); 
           res = { ok: false, fellBack: false, error: "" };
         }
         if (_sig.aborted) return;
@@ -4931,7 +4931,7 @@ async function copyToClipboard(text, btn) {
     setLabel(t("jinaCopied"));
     btn.classList.add("copied");
     announce(t("jinaCopied"));
-  } catch (_) {
+  } catch (_diagErr) { console.warn("[md-preview] markdown copy failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "md-preview", op: "reader_copy", code: "denied", errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error" }); 
     setLabel(t("mdPreviewFailed"));
     announce(t("mdPreviewFailed"));
   }
@@ -4977,9 +4977,9 @@ async function loadHljsCss() {
   try {
     const light = await (await fetch(chrome.runtime.getURL("vendor/hljs-github.min.css"))).text();
     let dark = "";
-    try { dark = await (await fetch(chrome.runtime.getURL("vendor/hljs-github-dark.min.css"))).text(); } catch (_) {}
+    try { dark = await (await fetch(chrome.runtime.getURL("vendor/hljs-github-dark.min.css"))).text(); } catch (_) { /* swallow-ok: syntax highlight or stylesheet failure leaves plain code block readable */ }
     return light + (dark ? "\n@media (prefers-color-scheme:dark){\n" + dark + "\n}\n" : "");
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: math rendering or stylesheet load failure leaves raw TeX readable */  return ""; }
 }
 
 // Same pattern as loadHljsCss: inline the vendored KaTeX stylesheet so a math
@@ -4994,7 +4994,7 @@ async function loadKatexCss() {
   if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.getURL) return "";
   try {
     return await (await fetch(chrome.runtime.getURL("vendor/katex/katex.min.css"))).text();
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: math rendering or stylesheet load failure leaves raw TeX readable */  return ""; }
 }
 
 // ---- Rail drawer (narrow viewports) ----
@@ -5016,7 +5016,7 @@ function setupDrawer() {
     const out = Array.from(rail.querySelectorAll(FOCUSABLE_SEL));
     for (const pop of document.querySelectorAll("[popover]")) {
       let open = false;
-      try { open = pop.matches(":popover-open"); } catch (_) { /* no :popover-open */ }
+      try { open = pop.matches(":popover-open"); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */  /* no :popover-open */ }
       if (open && !rail.contains(pop)) out.push(...pop.querySelectorAll(FOCUSABLE_SEL));
     }
     return out.filter((el) => el.offsetParent !== null && !el.disabled);
@@ -5123,7 +5123,7 @@ function pbpFocusArticleTarget(target) {
   // video workspace parked on the timeline view otherwise scrolls a hidden
   // element (audit U6 -- md-video.js's listener existed with no dispatch
   // site). Covers TOC, Ask citations and highlight jumps in one place.
-  try { document.dispatchEvent(new CustomEvent("pbp:ensure-article-visible")); } catch (_) {}
+  try { document.dispatchEvent(new CustomEvent("pbp:ensure-article-visible")); } catch (_) { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ }
   pbpRailDrawerClose();
   if (!target.hasAttribute("tabindex")) target.tabIndex = -1;
   target.focus({ preventScroll: true });

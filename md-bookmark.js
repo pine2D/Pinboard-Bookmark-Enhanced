@@ -418,7 +418,7 @@
       try {
         mine = tagNames(id("tags").value);
         merged = pbpRebaseLoadedTags(typeof shown.tags === "string" ? tagNames(shown.tags) : null, mine, tagNames(latest.tags));
-      } catch (_) {
+      } catch (_) { /* swallow-ok: unclosed quote in live tag draft keeps user input unmerged until fixed */ 
         // A tag line Apply cannot read yet: it stays as typed, and this
         // version is not taken as the base, so the Apply after the fix
         // stops once more and makes the tag change on the newest tags.
@@ -547,7 +547,7 @@
     if (action === "edit" && draft) {
       if (state.quotedTags === true) {
         try { pbpBookmarkParseTags(draft.tags); }
-        catch (_) { editorStatusKey = "readerBookmarkTagsQuoteError"; paint(); return; }
+        catch (_) { /* swallow-ok: unclosed quote in live tag draft keeps user input unmerged until fixed */  editorStatusKey = "readerBookmarkTagsQuoteError"; paint(); return; }
       }
       const service = pbpBookmarkAccountService(context.bookmarkAccount);
       const limits = pbpBookmarkLimits(service);

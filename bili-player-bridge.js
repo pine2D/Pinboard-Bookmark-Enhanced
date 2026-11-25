@@ -47,7 +47,7 @@
   // fallback element, which mirrors the media element API this uses.
   const media = () => document.querySelector("video, bwp-video");
   const stateOf = (m) => m.ended ? 0 : (m.paused ? 2 : (m.readyState < 3 ? 3 : 1));
-  const post = (msg) => { try { window.parent.postMessage(msg, EXT_ORIGIN); } catch (_) {} };
+  const post = (msg) => { try { window.parent.postMessage(msg, EXT_ORIGIN); } catch (_) { /* swallow-ok: detached or cross-origin parent frame ignores postMessage */ } };
   function postTime() {
     const m = bind();
     if (!m) return;
@@ -76,7 +76,7 @@
     if (performance.now() - lastPlayAt > 1500) return; // not the resume jump: leave it alone
     seekGuard.tries++;
     selfSeek = true;
-    try { m.currentTime = seekGuard.target; } catch (_) { selfSeek = false; }
+    try { m.currentTime = seekGuard.target; } catch (_) { /* swallow-ok: unready media element rejects currentTime seek; reset selfSeek guard */  selfSeek = false; }
   }
   function applyRequestedRate(m) {
     if (requestedRate === null) return;
@@ -162,7 +162,7 @@
           const target = Math.max(0, s);
           seekGuard = { target: target, until: performance.now() + 3000, tries: 0 };
           selfSeek = true;
-          try { m.currentTime = target; } catch (_) { selfSeek = false; }
+          try { m.currentTime = target; } catch (_) { /* swallow-ok: unready media element rejects currentTime seek; reset selfSeek guard */  selfSeek = false; }
           postTime();
         }
         break;
@@ -170,10 +170,10 @@
       case "playVideo": {
         // A rejected play() (autoplay policy) leaves the element paused; the
         // report after it tells the reader the truth instead of a claim.
-        try { const p = m.play(); if (p && typeof p.catch === "function") p.catch(() => postTime()); } catch (_) {}
+        try { const p = m.play(); if (p && typeof p.catch === "function") p.catch(() => /* swallow-ok: autoplay policy or unready media element may reject play() synchronously */ postTime()); } catch (_) { /* swallow-ok: autoplay policy or unready media element may reject play() synchronously */ }
         break;
       }
-      case "pauseVideo": { try { m.pause(); } catch (_) {} break; }
+      case "pauseVideo": { try { m.pause(); } catch (_) { /* swallow-ok: autoplay policy or unready media element may reject play() synchronously */ } break; }
       default: break; // closed verb set: anything else is ignored
     }
   });

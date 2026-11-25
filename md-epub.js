@@ -74,7 +74,7 @@ function pbpEpubXmlEscape(s) {
 // caller's candidate can be a free-text translation-target label (e.g. "Classical
 // Chinese") or empty -- canonicalize via Intl, falling back to "und" (unknown).
 function pbpEpubLang(candidate) {
-  try { return Intl.getCanonicalLocales(candidate)[0] || "und"; } catch (_) { return "und"; }
+  try { return Intl.getCanonicalLocales(candidate)[0] || "und"; } catch (_) { /* swallow-ok: free-form or unsupported BCP 47 tag falls back to raw label or und */  return "und"; }
 }
 
 function pbpEpubContainerXml() {
@@ -161,7 +161,7 @@ function pbpBuildEpub({ md, meta, images, ask }) {
   // light-theme data-URI figures (data URLs in img are EPUB-3.3-legal and
   // need no manifest entry). typeof-guarded for the md-convert test harness.
   if (typeof pbpMermaidApplyCached === "function") {
-    try { pbpMermaidApplyCached(host); } catch (_) { /* fence stays */ }
+    try { pbpMermaidApplyCached(host); } catch (_) { /* swallow-ok: Mermaid render or retheme failure keeps existing fence or prior SVG */  /* fence stays */ }
   }
   // nav 数据源 = 渲染后 DOM 的真实 id（含 marked 的 -1/-2 去重），不是 buildToc slug。
   // 选全部 h2-h4；缺 id / 空 id（纯标点标题 slugify 为空、raw HTML 标题无 id）

@@ -115,7 +115,7 @@ async function pbpMermaidEnhance(root) {
     let entry;
     try { entry = await _pbpMermaidRender((code.textContent || "").trim(), dark); }
     catch (e) {
-      try { console.warn("mermaid render skipped:", e && e.name, e && e.message); } catch (_) {}
+      try { console.warn("mermaid render skipped:", e && e.name, e && e.message); } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
       continue;                  // degrade: the fence stays visible as a code block
     }
     const fig = document.createElement("figure");
@@ -144,7 +144,7 @@ async function pbpMermaidRetheme(root) {
       const entry = await _pbpMermaidRender((code.textContent || "").trim(), dark);
       const img = fig.querySelector("img");
       if (img) { img.src = entry.dataUri; if (entry.w && entry.h) { img.width = entry.w; img.height = entry.h; } }
-    } catch (_) { /* keep the previous theme's render */ }
+    } catch (_) { /* swallow-ok: Mermaid render or retheme failure keeps existing fence or prior SVG */  /* keep the previous theme's render */ }
   }
 }
 
@@ -159,15 +159,15 @@ async function pbpMermaidRetheme(root) {
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if ((area !== "sync" && area !== "local") || !changes.optTheme) return;
-    pbpMermaidRetheme(document).catch(() => {});
+    pbpMermaidRetheme(document).catch(() => { /* swallow-ok: Mermaid render or retheme failure keeps existing fence or prior SVG */ });
   });
 }
 if (typeof window !== "undefined" && window.matchMedia) {
   try {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-      pbpMermaidRetheme(document).catch(() => {});
+      pbpMermaidRetheme(document).catch(() => { /* swallow-ok: Mermaid render or retheme failure keeps existing fence or prior SVG */ });
     });
-  } catch (_) { /* older engines: no live OS-flip re-render */ }
+  } catch (_) { /* swallow-ok: Mermaid render or retheme failure keeps existing fence or prior SVG */  /* older engines: no live OS-flip re-render */ }
 }
 
 // ---- Export substitution (Download .html / EPUB) ----
@@ -198,6 +198,6 @@ function pbpMermaidApplyCached(root) {
 // fences just stay fenced in the export).
 async function pbpMermaidWarmExport(root) {
   for (const code of pbpMermaidBlocks(root || document)) {
-    try { await _pbpMermaidRender((code.textContent || "").trim(), false); } catch (_) {}
+    try { await _pbpMermaidRender((code.textContent || "").trim(), false); } catch (_) { /* swallow-ok: Mermaid render or retheme failure keeps existing fence or prior SVG */ }
   }
 }

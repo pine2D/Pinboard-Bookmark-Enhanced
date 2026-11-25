@@ -51,7 +51,7 @@ async function pbpVocabSendZhMap(words) {
     if (w.lemma) keys.push(w.lemma);
   }
   if (!keys.length) return new Map();
-  try { return await pbpEcdictLookupMany(keys); } catch (_) { return new Map(); }
+  try { return await pbpEcdictLookupMany(keys); } catch (_diagErr) { console.warn("[vocab-send] ECDICT batch lookup failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  return new Map(); }
 }
 
 function pbpVocabSendZhFor(w, zhMap) {
@@ -180,7 +180,7 @@ async function pbpVocabSendEcdictTag() {
     return meta && meta.state === "ready"
       ? "ECDICT " + (meta.rung || "") + " " + String(meta.decodedCrc32 || "").slice(0, 8)
       : "";
-  } catch (_) { return ""; }
+  } catch (_diagErr) { console.warn("[vocab-send] ECDICT meta read failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  return ""; }
 }
 
 // A just-edited setting may still sit in the options page's debounced
@@ -206,7 +206,7 @@ async function pbpVocabEudicReady() {
     if (typeof pbpEudicPartition !== "function") return false;
     const rows = await pbpVocabAll(await pbpVocabCurrentOwner());
     return pbpEudicPartition(rows).byLang.size > 0;
-  } catch (_) {
+  } catch (_diagErr) { console.warn("[vocab-send] Eudic readiness read failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); 
     return false;
   }
 }

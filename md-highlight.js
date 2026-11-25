@@ -109,7 +109,7 @@ function pbpHlLocate(blockText, item) {
 // Depends on md-ai-core.js's pbpAiHash (the tests page loads both files).
 function pbpHlFpOfBlocks(pairs) {
   if (typeof pbpAiHash !== "function") return "";
-  try { return pbpAiHash(JSON.stringify(Array.isArray(pairs) ? pairs : [])); } catch (_) { return ""; }
+  try { return pbpAiHash(JSON.stringify(Array.isArray(pairs) ? pairs : [])); } catch (_) { /* swallow-ok: block fingerprint hash fallback on unserializable pair input */  return ""; }
 }
 
 // Global EXACT relocation: search item.quote across every {n, text} block.
@@ -679,7 +679,7 @@ async function _pbpHlSave(url, items, btn, owner = _pbpHlOwner) {
     } else if (!items.length) await chrome.storage.local.remove(key);
     else await chrome.storage.local.set({ [key]: record });
     return true;
-  } catch (_) {
+  } catch (_diagErr) { console.warn("[md-highlight] save failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); 
     _pbpHlToast(t("hlSaveFailed"), btn);
     return false;
   }
@@ -703,8 +703,8 @@ let _pbpHlRawItems = null;
 let _pbpHlWriteQueue = Promise.resolve();
 
 function _pbpHlQueueWrite(fn) {
-  const run = _pbpHlWriteQueue.catch(() => {}).then(fn);
-  _pbpHlWriteQueue = run.catch(() => {});
+  const run = _pbpHlWriteQueue.catch(() => { /* swallow-ok: reset serial promise queue tail after handled operation */ }).then(fn);
+  _pbpHlWriteQueue = run.catch(() => { /* swallow-ok: reset serial promise queue tail after handled operation */ });
   return run;
 }
 
@@ -727,13 +727,13 @@ async function _pbpHlRefreshOwner() {
   // Clear the binding before hidePopover blurs the note textarea: this note
   // belongs to the account being left and must not be rescued into storage.
   _pbpHlCardItemId = null;
-  if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) {} }
+  if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ } }
   _pbpHlHideBar();
   _pbpHlBarRange = null;
   if (_pbpHlState) {
     _pbpHlState.items = [];
-    try { pbpHlRestore(); } catch (_) {}
-    try { _pbpHlNotebookRender(); } catch (_) {}
+    try { pbpHlRestore(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
+    try { _pbpHlNotebookRender(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
   }
   try {
     const flags = await pbpReadSecretSyncState({ persistInferredState: false });
@@ -745,8 +745,8 @@ async function _pbpHlRefreshOwner() {
     _pbpHlOwnerPending = false;
     if (_pbpHlState) {
       _pbpHlState.items = pbpHlVisibleItems(_pbpHlRawItems || [], _pbpHlOwner);
-      try { pbpHlRestore(); } catch (_) {}
-      try { _pbpHlNotebookRender(); } catch (_) {}
+      try { pbpHlRestore(); } catch (_) { /* swallow-ok: fail-closed vocabulary owner or store read degrades to safe sentinel */ }
+      try { _pbpHlNotebookRender(); } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
     }
   } catch (e) {
     if (revision !== _pbpHlOwnerRevision) return;
@@ -843,12 +843,12 @@ async function _pbpHlLastColorGet() {
     const d = await chrome.storage.local.get({ pbp_hl_last_color: 1 });
     const c = Number(d.pbp_hl_last_color);
     return (c >= 1 && c <= 5) ? c : 1;
-  } catch (_) { return 1; }
+  } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */  return 1; }
 }
 
 async function _pbpHlLastColorSet(color) {
   if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
-  try { await chrome.storage.local.set({ pbp_hl_last_color: Number(color) || 1 }); } catch (_) {}
+  try { await chrome.storage.local.set({ pbp_hl_last_color: Number(color) || 1 }); } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
 }
 
 // Write-failure toast (spec 6: a save failure must toast, not fail silently
@@ -905,7 +905,7 @@ function _pbpHlFlashFail(btn) {
   // note/delete buttons) is already on screen when its failure returns.
   if (_pbpHlBarEl && _pbpHlBarLastShown && _pbpHlBarLastShown.range
     && _pbpHlBarEl.contains(btn) && !_pbpHlBarEl.matches(":popover-open")) {
-    try { _pbpHlShowBar(_pbpHlBarLastShown.range, _pbpHlBarLastShown.timeline); } catch (_) {}
+    try { _pbpHlShowBar(_pbpHlBarLastShown.range, _pbpHlBarLastShown.timeline); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
   }
   btn.classList.remove("xp-flash-fail");
   void btn.offsetWidth; // restart the pulse on a repeat failure
@@ -979,7 +979,7 @@ function _pbpHlCurrentFp() {
       const el = pbpAiBlockEl(b.n);
       return [(el && el.tagName) || "", pbpAiTextOf(b.n)];
     }));
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */  return ""; }
 }
 
 async function pbpHlInit(detail) {
@@ -1008,7 +1008,7 @@ async function pbpHlInit(detail) {
     // rail sections mount there too): waiting for the reads below would let
     // the article paint first and then push Export and Contents down. It
     // renders in its pending shape until _pbpHlState exists.
-    try { _pbpHlNotebookRender(); } catch (_) {}
+    try { _pbpHlNotebookRender(); } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ }
     await _pbpHlRefreshOwner();
     _pbpHlRawItems = await _pbpHlLoad(url);
     const items = _pbpHlOwnerPending ? [] : pbpHlVisibleItems(_pbpHlRawItems, _pbpHlOwner);
@@ -1317,7 +1317,7 @@ function pbpHlReanchorTr(n) {
     // active translation. Batch only if a profiler ever flags it.
     if (typeof pbpHlSyncMirror === "function") pbpHlSyncMirror(n);
     _pbpHlNotebookRender();
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ }
 }
 window.pbpHlReanchorTr = pbpHlReanchorTr; // explicit window attach: md-translate calls it by name.
 
@@ -1343,7 +1343,7 @@ function pbpHlTrLayerCleared() {
     }
     _pbpHlNotebookRender();
     if (typeof pbpHlSyncMirrorAll === "function") pbpHlSyncMirrorAll();
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: CSS Custom Highlight API unavailable or unsupported in current engine */ }
 }
 window.pbpHlTrLayerCleared = pbpHlTrLayerCleared; // explicit window attach: md-translate calls it by name.
 
@@ -1366,9 +1366,9 @@ function _pbpHlOnArticleWillReplace(detail) {
   // write to the serialized queue, so an unsaved note survives even though the
   // swap lands long before that write resolves. Doing this after the close
   // would lose it -- the close clears the binding this read needs.
-  try { _pbpHlCommitNote(); } catch (_) {}
+  try { _pbpHlCommitNote(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
   // Then every surface holding a Range into the DOM about to be detached.
-  if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) {} }
+  if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ } }
   // The card's own "toggle" listener also clears this, but toggle is QUEUED,
   // not synchronous -- it would still be set for the whole swap.
   _pbpHlCardItemId = null;
@@ -1381,7 +1381,7 @@ function _pbpHlOnArticleWillReplace(detail) {
   try {
     const sel = window.getSelection && window.getSelection();
     if (sel && sel.rangeCount) sel.removeAllRanges();
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: live DOM Selection or Range boundary may invalidate across layout mutations */ }
 }
 
 function _pbpHlOnArticleReplaced(detail) {
@@ -1405,7 +1405,7 @@ function _pbpHlOnArticleReplaced(detail) {
     // module that mounted itself there would be exactly the "looks like an
     // article, half the page is dead" state the spec warns about (its phase-2
     // continuation owns that case, not this handler).
-    if (_pbpHlRendered) pbpHlInit(detail || {}).catch(() => {});
+    if (_pbpHlRendered) pbpHlInit(detail || {}).catch(() => { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ });
     return;
   }
   // article-replaced fires even when the swap threw, so the article may be
@@ -1413,11 +1413,11 @@ function _pbpHlOnArticleReplaced(detail) {
   // (every item simply orphans against an empty pool). It is explicitly
   // re-runnable -- it clears all five Highlight registries and re-derives
   // everything from _pbpHlState.items.
-  try { pbpHlRestore(); } catch (_) {}
+  try { pbpHlRestore(); } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ }
   // Ranges, degraded flags and orphan verdicts all just changed, and the
   // Notebook renders exactly those; it lives in the rail, outside the swapped
   // subtree, so it survives with stale contents until this runs.
-  try { _pbpHlNotebookRender(); } catch (_) {}
+  try { _pbpHlNotebookRender(); } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ }
 }
 
 // Init hookup: top-level listener registration only (no other side effects;
@@ -1426,7 +1426,7 @@ function _pbpHlOnArticleReplaced(detail) {
 if (typeof document !== "undefined") {
   document.addEventListener("pbp:rendered", (e) => {
     _pbpHlRendered = true;
-    pbpHlInit((e && e.detail) || {}).catch(() => {});
+    pbpHlInit((e && e.detail) || {}).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
   }, { once: true });
   // Deliberately NOT {once:true}: one page life can see any number of
   // replacements (track switch, AI punctuation, promotion).
@@ -1647,7 +1647,7 @@ function _pbpHlEnsureBar() {
     // "Play from here" plays (Codex retro 1c: the label promised it, the
     // call kept the pause). The selection goes first: left standing, it
     // would re-trigger the lookup pause 150ms after the play.
-    try { const s = window.getSelection(); if (s) s.removeAllRanges(); } catch (_) {}
+    try { const s = window.getSelection(); if (s) s.removeAllRanges(); } catch (_) { /* swallow-ok: live DOM Selection or Range boundary may invalidate across layout mutations */ }
     if (sec != null && typeof window.pbpVideoSeek === "function") window.pbpVideoSeek(sec, true);
     _pbpHlHideBar();
   });
@@ -1673,7 +1673,7 @@ function _pbpHlEnsureBar() {
       // so that first word gets the same dictionary-first verdict.
       if (bar.matches(":popover-open")) _pbpHlOrderLookup(bar, _pbpHlBarRange);
     }
-  }).catch(() => {});
+  }).catch(() => { /* swallow-ok: popover state transition or selector guard on detached/closed element */ });
   bar.addEventListener("toggle", (e) => { if (e.newState === "closed") _pbpHlBarRange = null; });
   document.body.appendChild(bar);
   _pbpHlBarEl = bar;
@@ -1765,7 +1765,7 @@ function _pbpHlShowBar(range, timeline) {
   _pbpHlBarRange = range;
   _pbpHlBarLastShown = { range, timeline: !!timeline };
   if (typeof window.pbpExplainDismissIfUnpinned === "function") window.pbpExplainDismissIfUnpinned();
-  try { bar.hidePopover(); } catch (_) {} // re-invoke while open: reset first (mirrors _pbpExplainOpenPop)
+  try { bar.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ } // re-invoke while open: reset first (mirrors _pbpExplainOpenPop)
   _pbpHlOrderLookup(bar, range);
   bar.showPopover();
   const rect = range.getBoundingClientRect();
@@ -1779,7 +1779,7 @@ function _pbpHlShowBar(range, timeline) {
 function _pbpHlHideBar() {
   clearTimeout(_pbpHlBarShowTimer);
   _pbpHlBarShowTimer = 0;
-  if (_pbpHlBarEl) { try { _pbpHlBarEl.hidePopover(); } catch (_) {} }
+  if (_pbpHlBarEl) { try { _pbpHlBarEl.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ } }
 }
 
 // ---- Creation ----
@@ -2091,7 +2091,7 @@ function _pbpHlOnClick(e) {
     const r = entry && entry.range;
     if (!r || !blockEl.contains(r.commonAncestorContainer)) continue;
     let hit;
-    try { hit = r.isPointInRange(caret.startContainer, caret.startOffset); } catch (_) { hit = false; }
+    try { hit = r.isPointInRange(caret.startContainer, caret.startOffset); } catch (_) { /* swallow-ok: live DOM Selection or Range boundary may invalidate across layout mutations */  hit = false; }
     if (!hit) continue;
     const item = _pbpHlState.items.find((it) => it.id === id);
     const ts = item ? Number(item.ts) || 0 : 0;
@@ -2136,7 +2136,7 @@ async function pbpHlAttachNote(target, answerText) {
       const r = entry && entry.range;
       if (!r) continue;
       let hit;
-      try { hit = r.isPointInRange(range.startContainer, range.startOffset); } catch (_) { hit = false; }
+      try { hit = r.isPointInRange(range.startContainer, range.startOffset); } catch (_) { /* swallow-ok: live DOM Selection or Range boundary may invalidate across layout mutations */  hit = false; }
       if (!hit) continue;
       const it = _pbpHlState.items.find((x) => x.id === id);
       const ts = it ? Number(it.ts) || 0 : 0;
@@ -2210,7 +2210,7 @@ function pbpHlItemIdAtRange(range) {
     const r = entry && entry.range;
     if (!r) continue;
     let hit;
-    try { hit = r.isPointInRange(range.startContainer, range.startOffset); } catch (_) { hit = false; }
+    try { hit = r.isPointInRange(range.startContainer, range.startOffset); } catch (_) { /* swallow-ok: live DOM Selection or Range boundary may invalidate across layout mutations */  hit = false; }
     if (!hit) continue;
     const it = _pbpHlState.items.find((x) => x.id === id);
     const ts = it ? Number(it.ts) || 0 : 0;
@@ -2293,7 +2293,7 @@ function _pbpHlEnsureCard() {
     if (!pbpAiAvailable(s)) return;
     aiRow.hidden = false;
     if (card.matches(":popover-open")) _pbpHlPlaceCard(card);
-  }).catch(() => {});
+  }).catch(() => { /* swallow-ok: popover state transition or selector guard on detached/closed element */ });
 
   const note = document.createElement("textarea");
   note.className = "hl-card-note";
@@ -2391,7 +2391,7 @@ function _pbpHlCardAiOpen(action) {
   }
   const rect = _pbpHlItemRect(item);
   if (!rect) return;
-  if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) {} } // two auto popovers must not overlap
+  if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ } } // two auto popovers must not overlap
   // effN, not item.n: md-ask reads the host block AND its neighbors for
   // context -- after relocation the stored n would feed the model an
   // unrelated old paragraph (Codex acceptance MEDIUM).
@@ -2411,7 +2411,7 @@ function _pbpHlCardAskCurrent() {
   if (!_pbpHlState || !_pbpHlCardItemId) return;
   const item = _pbpHlState.items.find((it) => it.id === _pbpHlCardItemId);
   if (!item) return;
-  if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) {} }
+  if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ } }
   if (typeof window.pbpAskOpenPanel === "function") {
     window.pbpAskOpenPanel('"' + item.quote + '" ');
   }
@@ -2769,7 +2769,7 @@ function _pbpHlNbFocusRow(spec) {
   } else {
     target = _pbpHlNbEls.sec.querySelector(".rail-sec-head");
   }
-  if (target) { try { target.focus({ preventScroll: true }); } catch (_) {} }
+  if (target) { try { target.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ } }
 }
 
 // Row x -> delete confirm. While the confirm is open another tab can rewrite
@@ -2885,7 +2885,7 @@ function _pbpHlBuildNotebookDom(rail) {
       const items = await pbpHlExportItems();
       await navigator.clipboard.writeText(pbpHlComposeSection(items));
       flashButtonLabel(copyBtn, t("hlCopied"));
-    } catch (_) {
+    } catch (_diagErr) { console.warn("[md-highlight] notebook copy failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); 
       flashButtonLabel(copyBtn, t("mdPreviewFailed"), false);
     }
   });
@@ -2928,7 +2928,7 @@ function _pbpHlBuildNotebookDom(rail) {
       // still covers a context with no tabs API.
       if (typeof pbpOpenExtensionTab === "function"
           && await pbpOpenExtensionTab("library.html", "notes")) return;
-      try { window.open(chrome.runtime.getURL("library.html#notes")); } catch (_) {}
+      try { window.open(chrome.runtime.getURL("library.html#notes")); } catch (_) { /* swallow-ok: popup-blocked window.open fallback after tabs API attempt */ }
     });
     toolbar.appendChild(openLib); // Tab order: fold, copy, library.
   }

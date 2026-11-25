@@ -208,7 +208,7 @@ function pbpAiMdOf(n) {
   let md;
   try {
     md = htmlToMarkdown(clone.outerHTML).trim();
-  } catch (_) {
+  } catch (_) { /* swallow-ok: Turndown conversion error falls back to plain textContent */ 
     md = (clone.textContent || "").trim();
   }
   _pbpAiMdCache[key] = md;
@@ -237,7 +237,7 @@ function pbpAiTextOfKatex(n) {
       const clone = el.cloneNode(true);
       _pbpAiKatexPrepass(clone);
       text = clone.textContent || "";
-    } catch (_) { /* degrade: keep the plain pbpAiTextOf(n) assigned above */ }
+    } catch (_) { /* swallow-ok: math rendering or stylesheet load failure leaves raw TeX readable */  /* degrade: keep the plain pbpAiTextOf(n) assigned above */ }
   }
   _pbpAiTextKatexCache[key] = text;
   return text;
@@ -406,9 +406,9 @@ function pbpAiMakeStreamJsonParser(onItem) {
       const id = Number(m[1]);
       if (seen.has(id)) continue;
       let textVal;
-      try { textVal = JSON.parse('"' + m[2] + '"'); } catch (_) { continue; }
+      try { textVal = JSON.parse('"' + m[2] + '"'); } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */  continue; }
       seen.add(id);
-      try { onItem({ id, text: textVal }); } catch (_) {}
+      try { onItem({ id, text: textVal }); } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */ }
     }
   }
   return {
@@ -427,9 +427,9 @@ function pbpAiMakeStreamJsonParser(onItem) {
             const id = Number(it && it.id);
             if (!Number.isInteger(id) || seen.has(id) || typeof (it && it.text) !== "string") continue;
             seen.add(id);
-            try { onItem({ id, text: it.text }); } catch (_) {}
+            try { onItem({ id, text: it.text }); } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */ }
           }
-        } catch (_) {}
+        } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */ }
       }
       return { seenIds: new Set(seen) };
     }
@@ -763,7 +763,7 @@ async function pbpAiRetryWithPermission(error, settings, retry) {
       granted = Array.isArray(error.additionalOrigins) && error.additionalOrigins.length
         ? await requestAIHostPermissions(settings, error.additionalOrigins)
         : await requestAIHostPermissions(settings);
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ }
     if (!granted) return false;
   }
   await retry();
@@ -791,10 +791,10 @@ function pbpAiCacheUrlNorm(url) {
     const p = new URL(u);
     if (!/^#[!/]/.test(p.hash)) p.hash = "";
     u = p.href;
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
   try {
     if (typeof stripTrackingParams === "function") u = stripTrackingParams(u).cleaned || u;
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
   return u;
 }
 // One read-side rescue for entries written BEFORE the three families below
@@ -1027,6 +1027,6 @@ function pbpAiBumpCounter(name) {
         u[name] = (u[name] || 0) + 1;
         return chrome.storage.local.set({ pbp_ai_usage: u });
       })
-      .catch(() => {});
-  } catch (_) {}
+      .catch(() => { /* swallow-ok: advisory local AI usage counter write is best-effort */ });
+  } catch (_) { /* swallow-ok: advisory local AI usage counter write is best-effort */ }
 }

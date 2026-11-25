@@ -21,7 +21,7 @@ const PBP_ADAPTIVE_THEME_MAP = {
 // fade in. localStorage is readable here (content script runs in pinboard.in
 // origin); shared.js's chrome.storage mirror is async and unavailable that early.
 let _pbpHasTheme = false;
-try { _pbpHasTheme = localStorage.getItem("pbp_has_theme") === "1"; } catch (_) {}
+try { _pbpHasTheme = localStorage.getItem("pbp_has_theme") === "1"; } catch (_) { /* swallow-ok: document_start content script degrades cleanly when site localStorage is blocked */ }
 // Paint the last rendered background underneath the cloak. Hiding the page
 // without one showed the browser's default canvas -- white -- for up to 400ms
 // and then hard cut to the theme, so the eight-plus dark presets flashed white
@@ -49,7 +49,7 @@ try {
     const cached = localStorage.getItem(key) || "";
     if (PBP_CLOAK_BG_RE.test(cached)) { _pbpCloakBg = cached; break; }
   }
-} catch (_) {}
+} catch (_) { /* swallow-ok: document_start content script degrades cleanly when site localStorage is blocked */ }
 let _pbpCloak = null;
 if (_pbpHasTheme) {
   _pbpCloak = document.createElement("style");
@@ -81,7 +81,7 @@ if (_pbpHasTheme) {
       try {
         chrome.runtime.sendMessage({ type: "get_site_prefs" })
           .then((resp) => settle(resp && typeof resp === "object" && !resp.error ? resp : null), () => settle(null));
-      } catch (_) { settle(null); }
+      } catch (_) { /* swallow-ok: cold or unreachable SW settles site prefs to null so 400ms cloak unblocks */  settle(null); }
       // A cold SW can take a moment; the 400ms cloak guard below already
       // bounds the visual cost — this bound only keeps the promise from
       // hanging forever if the channel dies.
@@ -167,7 +167,7 @@ if (_pbpHasTheme) {
 
     // Persist cheap synchronous evidence for NEXT cold load's cloak gate.
     const _pbpThemed = !!(data.themePresetKey || data.customFont || overlay);
-    try { localStorage.setItem("pbp_has_theme", _pbpThemed ? "1" : "0"); } catch (_) {}
+    try { localStorage.setItem("pbp_has_theme", _pbpThemed ? "1" : "0"); } catch (_) { /* swallow-ok: document_start content script degrades cleanly when site localStorage is blocked */ }
 
     // Cache the background this load actually rendered, for the NEXT cold
     // load's cloak. Deferred to `load` because at document_start the page's own
@@ -191,7 +191,7 @@ if (_pbpHasTheme) {
         if (PBP_CLOAK_BG_RE.test(bg) && bg !== "rgba(0, 0, 0, 0)") {
           localStorage.setItem(pbpCloakBgKey(isDark), bg);
         }
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: document_start content script degrades cleanly when site localStorage is blocked */ }
     };
     if (document.readyState === "complete") cacheCloakBg();
     else window.addEventListener("load", cacheCloakBg, { once: true });
@@ -210,7 +210,7 @@ if (_pbpHasTheme) {
         if (document.readyState === "complete") cacheCloakBg();
       });
     }
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: document_start content script degrades cleanly when site localStorage is blocked */ }
 
   uncloak();
 })();

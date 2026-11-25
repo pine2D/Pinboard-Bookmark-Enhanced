@@ -373,7 +373,7 @@ function _pbpGetTurndown() {
       // single pipe-safe line (GFM table cells can't span multiple lines).
       const cellMd = (c) => {
         let md;
-        try { md = td.turndown(c.innerHTML); } catch (_) { md = c.textContent || ""; }
+        try { md = td.turndown(c.innerHTML); } catch (_) { /* swallow-ok: Turndown conversion error falls back to plain textContent */  md = c.textContent || ""; }
         return md.replace(/\n+/g, " ").replace(/\|/g, "\\|").trim();
       };
       // GFM needs a header separator, but synthesizing one for a table that
@@ -397,7 +397,7 @@ function _pbpGetTurndown() {
       });
       const capEl = node.querySelector(":scope > caption");
       let capMd = "";
-      if (capEl) { try { capMd = td.turndown(capEl.innerHTML); } catch (_) { capMd = capEl.textContent || ""; } capMd = capMd.replace(/\s+/g, " ").trim(); }
+      if (capEl) { try { capMd = td.turndown(capEl.innerHTML); } catch (_) { /* swallow-ok: Turndown conversion error falls back to plain textContent */  capMd = capEl.textContent || ""; } capMd = capMd.replace(/\s+/g, " ").trim(); }
       return "\n\n" + (capMd ? capMd + "\n\n" : "") + out.join("\n") + "\n\n";
     }
   });
@@ -422,7 +422,7 @@ function _pbpGetTurndown() {
       const titleEl = clone.querySelector(".callout-title");
       if (titleEl) titleEl.remove();
       let body;
-      try { body = td.turndown(clone.innerHTML); } catch (_) { body = clone.textContent || ""; }
+      try { body = td.turndown(clone.innerHTML); } catch (_) { /* swallow-ok: Turndown conversion error falls back to plain textContent */  body = clone.textContent || ""; }
       body = body.replace(/^\n+/, "").replace(/\n+$/, "").trim();
       const quoted = body ? body.split("\n").map((l) => (l.length ? "> " + l : ">")).join("\n") : ">";
       return "\n\n> [!" + type + "]\n" + quoted + "\n\n";
@@ -503,7 +503,7 @@ function _pbpAbsolutizeLinks(html, baseUrl) {
   const links = Array.from(root.querySelectorAll("a[href]"));
   const isHeadingLink = a => !!a.closest("h1,h2,h3,h4,h5,h6");
   const resolve = a => {
-    try { a.setAttribute("href", new URL(a.getAttribute("href"), baseUrl).href); touched = true; } catch (_) { /* keep original */ }
+    try { a.setAttribute("href", new URL(a.getAttribute("href"), baseUrl).href); touched = true; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  /* keep original */ }
   };
   // Normalize links INSIDE headings first: URLs are part of marked's raw
   // heading token and therefore of the existing slug contract. Resolving
@@ -552,7 +552,7 @@ function _pbpAbsolutizeLinks(html, baseUrl) {
     if (!href || /^[a-z][a-z0-9+.-]*:/i.test(href)) return;
     if (href.startsWith("#")) {
       let id = href.slice(1);
-      try { id = decodeURIComponent(id); } catch (_) {}
+      try { id = decodeURIComponent(id); } catch (_) { /* swallow-ok: malformed percent-encoding keeps raw fragment identifier */ }
       if (sourceIds.has(id)) {
         a.setAttribute("href", "#" + sourceIds.get(id)); touched = true; return;
       }
@@ -642,7 +642,7 @@ function _pbpInlineSvgToImg(root) {
     const dims = _pbpSvgDims(svg);
     if (!dims || Math.min(dims.w, dims.h) < PBP_SVG_MIN_SIDE) return; // icon/unsized: existing drop behavior
     let xml;
-    try { xml = _pbpSanitizeSvgForImage(svg, dims); } catch (_) { return; }
+    try { xml = _pbpSanitizeSvgForImage(svg, dims); } catch (_) { /* swallow-ok: unrenderable inline SVG falls back to default drop behavior */  return; }
     if (!xml || xml.length > PBP_SVG_MAX_BYTES) return;
     const titleEl = svg.querySelector(":scope > title");
     const label = (svg.getAttribute("aria-label") || (titleEl && titleEl.textContent) || "diagram")
@@ -1060,7 +1060,7 @@ function _pbpTagLongUntaggedBlock(block) {
   try {
     const guess = hljs.highlightAuto(text.slice(0, PBP_HLJS_LONGBLOCK_PREFIX));
     if (guess && guess.language) block.classList.add("language-" + guess.language);
-  } catch (_) {
+  } catch (_) { /* swallow-ok: syntax highlight or stylesheet failure leaves plain code block readable */ 
     // Leave the block untagged — falls through to the existing full-text
     // auto-detect path below, same as before this change.
   }
@@ -1078,7 +1078,7 @@ function highlightCodeBlocks(root) {
     _pbpTagLongUntaggedBlock(block);
     try {
       hljs.highlightElement(block);
-    } catch (_) {
+    } catch (_) { /* swallow-ok: syntax highlight or stylesheet failure leaves plain code block readable */ 
       // A single malformed block must not abort the rest of the page.
     }
   });
@@ -1107,7 +1107,7 @@ function highlightCodeBlocksChunked(root) {
       _pbpTagLongUntaggedBlock(block);
       try {
         hljs.highlightElement(block);
-      } catch (_) {
+      } catch (_) { /* swallow-ok: syntax highlight or stylesheet failure leaves plain code block readable */ 
         // A single malformed block must not abort the rest of the page.
       }
     }
@@ -1275,7 +1275,7 @@ function applyFrontmatter(md, meta, opts) {
 // popup's ensureMdConvert loads it only when conversion is requested.
 function pbpExportImageUrl(src, baseUrl) {
   if (!src || !baseUrl || /^[a-z][a-z0-9+.-]*:/i.test(src)) return src;
-  try { return new URL(src, baseUrl).href; } catch (_) { return src; }
+  try { return new URL(src, baseUrl).href; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return src; }
 }
 
 function _pbpImageDecode(text) {
@@ -2126,7 +2126,7 @@ function composeStyledHtml(canonicalMd, meta, opts) {
         throwOnError: false
       });
       article = tmp.innerHTML;
-    } catch (_) { /* leave $...$ source untouched on failure */ }
+    } catch (_) { /* swallow-ok: math rendering or stylesheet load failure leaves raw TeX readable */  /* leave $...$ source untouched on failure */ }
   }
   // B1: substitute mermaid fences already rendered on the preview page with
   // their cached light-theme data-URI figures. typeof-guarded — the popup
@@ -2134,7 +2134,7 @@ function composeStyledHtml(canonicalMd, meta, opts) {
   if (typeof pbpMermaidApplyCached === "function") {
     const tmp = _pbpConvertScratchDiv();
     tmp.innerHTML = article;
-    try { pbpMermaidApplyCached(tmp); article = tmp.innerHTML; } catch (_) { /* fence stays */ }
+    try { pbpMermaidApplyCached(tmp); article = tmp.innerHTML; } catch (_) { /* swallow-ok: Mermaid render or retheme failure keeps existing fence or prior SVG */  /* fence stays */ }
   }
   let header = "";
   if (opts.frontmatter) {

@@ -180,7 +180,7 @@ async function pbpWaybackArchive(url, settings, opts) {
         await _pbpWaybackLog(url, "permDenied", account);
         return;
       }
-    } catch (_) {
+    } catch (_diagErr) { console.warn("[wayback] permission check failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); 
       await _pbpWaybackLog(url, "permDenied", account);
       return;
     }
@@ -222,7 +222,7 @@ async function pbpWaybackArchive(url, settings, opts) {
           } else {
             outcome = "requested";
           }
-        } catch (_) {
+        } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */ 
           outcome = "requested";
         }
       } else {

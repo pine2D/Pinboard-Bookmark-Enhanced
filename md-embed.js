@@ -11,7 +11,7 @@ function pbpEmbedScan(md, baseUrl) {
     if (/^data:/i.test(abs)) return image.raw;
     if (/^blob:/i.test(abs)) { blobs.push(abs); return image.raw; }
     let origin = "";
-    try { origin = new URL(abs).origin; } catch (_) { kept.push(abs); return image.raw; }
+    try { origin = new URL(abs).origin; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  kept.push(abs); return image.raw; }
     if (!/^https:/i.test(abs)
         || candidates.length >= PBP_EMBED_LIMITS.maxImages
         || (!origins.includes(origin) && origins.length >= PBP_EMBED_LIMITS.maxOrigins)) {
@@ -32,7 +32,7 @@ function pbpEmbedScan(md, baseUrl) {
 // 再经 URL 序列化归一。解析不了的（如 IPv6 方括号 host 被 encodeURI 破坏）原值
 // 兜底——两侧同函数同兜底，仍然一致。
 function pbpEmbedCanonicalUrl(u) {
-  try { return new URL(encodeURI(u).replace(/%25/g, "%")).href; } catch (_) { return u; }
+  try { return new URL(encodeURI(u).replace(/%25/g, "%")).href; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return u; }
 }
 
 // Signed, time-limited image URL (2026-10-19, a video poster on
@@ -47,7 +47,7 @@ const PBP_SIGNED_URL_PARAMS = new Set(["auth_key", "expires", "x-amz-signature",
   "__token__", "hdnts", "hdnea", "oe"]);
 function pbpImgUrlLooksSigned(u) {
   let p;
-  try { p = new URL(u); } catch (_) { return false; }
+  try { p = new URL(u); } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return false; }
   if (p.protocol !== "https:") return false;
   for (const k of p.searchParams.keys()) if (PBP_SIGNED_URL_PARAMS.has(k.toLowerCase())) return true;
   return false;
@@ -73,7 +73,7 @@ function pbpEmbedBrokenCount(md, baseUrl, observed) {
   const hits = new Set();
   for (const u of scan.candidates.concat(scan.kept)) {
     let abs = u;
-    try { abs = new URL(u, baseUrl || undefined).href; } catch (_) {}
+    try { abs = new URL(u, baseUrl || undefined).href; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
     // marked 会对它输出的 href 做 encodeURI（见 md-epub.js 同款处理），浏览器侧
     // 记录的 key 可能是 markdown 原文的编码变体，三种键形都试。
     if (observed.has(u) || observed.has(abs) || observed.has(encodeURI(u))) hits.add(abs);
@@ -235,7 +235,7 @@ function _pbpImgFixDomains(urls) {
     try {
       const p = new URL(u);
       if (p.protocol === "https:") domains.add(p.hostname);
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
   }
   return [...domains];
 }
@@ -250,7 +250,7 @@ function _pbpImgFixDomains(urls) {
 // case's cleanup (confirm-review 3). Fire-and-forget: a failure only leaves a
 // rule that the tab-close sweep will collect anyway.
 if (typeof window !== "undefined" && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-  try { chrome.runtime.sendMessage({ type: "imgFixResetTab" })?.catch?.(() => {}); } catch (_) {}
+  try { chrome.runtime.sendMessage({ type: "imgFixResetTab" })?.catch?.(() => { /* swallow-ok: DNR referer session rule message degrades cleanly; SW tab-close sweep owns cleanup */ }); } catch (_) { /* swallow-ok: DNR referer session rule message degrades cleanly; SW tab-close sweep owns cleanup */ }
 }
 
 if (typeof window !== "undefined" && typeof chrome !== "undefined" && chrome.runtime) {
@@ -260,8 +260,8 @@ if (typeof window !== "undefined" && typeof chrome !== "undefined" && chrome.run
     // SW's own tabs.onRemoved / navigation sweeps are the actual guarantee.
     try {
       chrome.runtime.sendMessage({ type: "imgFixRemoveReferer", ruleIds: [..._pbpImgFixLiveRuleIds] })
-        ?.catch?.(() => {});
-    } catch (_) {}
+        ?.catch?.(() => { /* swallow-ok: DNR referer session rule message degrades cleanly; SW tab-close sweep owns cleanup */ });
+    } catch (_) { /* swallow-ok: DNR referer session rule message degrades cleanly; SW tab-close sweep owns cleanup */ }
   });
 }
 
@@ -271,7 +271,7 @@ async function pbpImgFixWithReferer(urls, refererOrigin, limits = PBP_EMBED_LIMI
   try {
     const p = new URL(refererOrigin);
     if (p.protocol === "https:" || p.protocol === "http:") origin = p.origin;
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
   if (!domains.length || !origin) return new Map();
   if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) return new Map();
   // The SW allocates a globally-unique id AND derives the tab scope from
@@ -282,13 +282,13 @@ async function pbpImgFixWithReferer(urls, refererOrigin, limits = PBP_EMBED_LIMI
     const resp = await chrome.runtime.sendMessage({ type: "imgFixInstallReferer", domains, origin });
     if (!resp || !resp.ok || typeof resp.ruleId !== "number") return new Map();
     ruleId = resp.ruleId;
-  } catch (_) { return new Map(); }
+  } catch (_) { /* swallow-ok: DNR referer session rule message degrades cleanly; SW tab-close sweep owns cleanup */  return new Map(); }
   _pbpImgFixLiveRuleIds.add(ruleId);
   try {
     // cacheMode:"reload" is load-bearing here -- see _pbpEmbedFetchOne.
     return await pbpEmbedFetchAll(urls, { ...limits, cacheMode: "reload" }, sharedBudget);
   } finally {
     _pbpImgFixLiveRuleIds.delete(ruleId);
-    try { await chrome.runtime.sendMessage({ type: "imgFixRemoveReferer", ruleIds: [ruleId] }); } catch (_) {}
+    try { await chrome.runtime.sendMessage({ type: "imgFixRemoveReferer", ruleIds: [ruleId] }); } catch (_) { /* swallow-ok: DNR referer session rule message degrades cleanly; SW tab-close sweep owns cleanup */ }
   }
 }

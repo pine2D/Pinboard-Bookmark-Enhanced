@@ -12,11 +12,11 @@ async function pbpGetLastTarget() {
   try {
     const o = await chrome.storage.local.get(_PBP_LAST_TARGET_KEY);
     return (o && o[_PBP_LAST_TARGET_KEY]) || null;
-  } catch (_) { return null; }
+  } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */  return null; }
 }
 
 async function pbpSetLastTarget(id) {
-  try { await chrome.storage.local.set({ [_PBP_LAST_TARGET_KEY]: id }); } catch (_) {}
+  try { await chrome.storage.local.set({ [_PBP_LAST_TARGET_KEY]: id }); } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
 }
 
 // Call only from a direct user gesture. Requesting an already-active exact
@@ -29,7 +29,7 @@ async function pbpRequestTargetPermission(id, cfg) {
   if (missing) return true;
   const origin = (typeof row.origin === "function") ? row.origin(cfg || {}) : row.origin;
   if (!origin) return false;
-  try { return (await chrome.permissions.request({ origins: [origin] })) === true; } catch (_) { return false; }
+  try { return (await chrome.permissions.request({ origins: [origin] })) === true; } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */  return false; }
 }
 
 // Send one clip to a target. Returns { ok, fellBack, error }. Never throws.
@@ -80,7 +80,7 @@ async function pbpSendToTarget(id, ctx, options = {}) {
       const apiFail = async (errCode) => {
         let copied = true;
         await assertCurrent();
-        try { await navigator.clipboard.writeText(pbpBuildFileBody(id, meta, rawBody)); } catch (_) { copied = false; }
+        try { await navigator.clipboard.writeText(pbpBuildFileBody(id, meta, rawBody)); } catch (_diagErr) { console.warn("[export-send] fallback clipboard write failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  copied = false; }
         await assertCurrent();
         return { ok: false, fellBack: false, error: (copied || errCode === "api-insecure") ? errCode : "" };
       };
@@ -113,7 +113,7 @@ async function pbpSendToTarget(id, ctx, options = {}) {
           await assertCurrent();
           await fetch(prq.url, { method: prq.method, headers: prq.headers, body: prq.body, redirect: "error" });
           await assertCurrent();
-        } catch (_) { await assertCurrent(); }
+        } catch (_) { /* swallow-ok: best-effort precheck probe error falls through to primary target request */  await assertCurrent(); }
       }
       // Send. buildRequest gets the body with the row's frontmatter policy
       // applied (inline keeps YAML, strip drops it) — same shaping as the
@@ -145,7 +145,7 @@ async function pbpSendToTarget(id, ctx, options = {}) {
         // "request failed".
         if (id === "notion" && (resp.status === 404 || resp.status === 403)) return await apiFail("api-notion-share");
         if (!resp.ok) return await apiFail("api-failed");
-        const json = await resp.json().catch(() => null);
+        const json = await resp.json().catch(() => /* swallow-ok: malformed or partial JSON payload degrades to fallback value */ null);
         await assertCurrent();
         // Success: row-defined (webhook = any 2xx, since it returns no id) else
         // the id/uuid heuristic (gist returns id). url = the created resource's
@@ -164,7 +164,7 @@ async function pbpSendToTarget(id, ctx, options = {}) {
         const fileBody = pbpBuildFileBody(id, meta, rawBody);
         let copied = true;
         await assertCurrent();
-        try { await navigator.clipboard.writeText(fileBody); } catch (_) { copied = false; }
+        try { await navigator.clipboard.writeText(fileBody); } catch (_diagErr) { console.warn("[export-send] target clipboard write failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  copied = false; }
         await assertCurrent();
         // If the clipboard write failed, opening the app would create an EMPTY
         // note while claiming success — report failure instead (no data loss).
@@ -189,7 +189,7 @@ async function pbpSendToTarget(id, ctx, options = {}) {
         const fileBody = pbpBuildFileBody(id, meta, rawBody);
         let copied = true;
         await assertCurrent();
-        try { await navigator.clipboard.writeText(fileBody); } catch (_) { copied = false; }
+        try { await navigator.clipboard.writeText(fileBody); } catch (_diagErr) { console.warn("[export-send] copy-open clipboard write failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  copied = false; }
         await assertCurrent();
         // If the clipboard write failed, opening the app would land the user in an
         // EMPTY note with nothing to paste while claiming "full text copied" --

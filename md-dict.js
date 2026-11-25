@@ -43,7 +43,7 @@ function pbpDictLanguageLabel(code, locale) {
     const names = new Intl.DisplayNames([String(locale || "en").replace("_", "-")], { type: "language", fallback: "none" });
     const label = names.of(String(code).replace(/_/g, "-"));
     return label && label.toLowerCase() !== primary ? label : "";
-  } catch (_) { return ""; }
+  } catch (_) { /* swallow-ok: free-form or unsupported BCP 47 tag falls back to raw label or und */  return ""; }
 }
 
 function pbpDictDefinitionLang(norm) {
@@ -93,7 +93,7 @@ function pbpDictDefinitionLanguage(preference, uiLanguage) {
     const lang = Intl.getCanonicalLocales(requested)[0];
     const name = new Intl.DisplayNames(["en"], { type: "language", fallback: "none" }).of(lang);
     if (name && lang !== "und" && lang !== "mul" && lang !== "zxx") return { name, lang };
-  } catch (_) { /* A user-entered name need not be a language code. */ }
+  } catch (_) { /* swallow-ok: free-form or unsupported BCP 47 tag falls back to raw label or und */  /* A user-entered name need not be a language code. */ }
   return { name: requested, lang: "und" };
 }
 
@@ -181,7 +181,7 @@ function pbpDictScriptCompatible(primary, selText, languageTag = primary) {
   try {
     const script = new Intl.Locale(String(languageTag).replace(/_/g, "-")).maximize().script;
     return !!script && new RegExp("\\p{Script=" + script + "}", "u").test(s);
-  } catch (_) { return false; }
+  } catch (_) { /* swallow-ok: invalid user regex syntax is handled as non-matching search input */  return false; }
 }
 function pbpDictAcceptLang(code, selText, supported = PBP_DICT_QUERY_LANGS) {
   const p = pbpDictPrimaryLang(code);
@@ -948,7 +948,7 @@ function pbpDictSpeak(text, lang) {
 
 // ---- Dictionary slot ----------------------------------------------------
 async function _pbpDictHasPerm() {
-  try { return await chrome.permissions.contains({ origins: [PBP_DICT_ORIGIN + "/*"] }); } catch (_) { return false; }
+  try { return await chrome.permissions.contains({ origins: [PBP_DICT_ORIGIN + "/*"] }); } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */  return false; }
 }
 
 // Hand-rolled instead of AbortSignal.any: the circuit breaker needs to know
@@ -1249,7 +1249,7 @@ function _pbpDictFieldLabel(key) {
 // browser's default locale.
 function _pbpDictUiLocale() {
   try { return (typeof uiLangToBCP47 === "function" && uiLangToBCP47()) || document.documentElement.lang || undefined; }
-  catch (_) { return undefined; }
+  catch (_) { /* swallow-ok: UI locale lookup degrades to browser default undefined */  return undefined; }
 }
 
 function _pbpDictEntryDisclosure(parent, label, text, lang, open = false) {
@@ -1516,7 +1516,7 @@ try {
   const channel = new BroadcastChannel("pbp-dict-packs");
   channel.addEventListener("message", event => { if (event.data?.type === "changed") _pbpDictPacksChanged(event.data); });
   window.addEventListener("pagehide", () => channel.close(), { once: true });
-} catch (_) { /* Same-page notifications still work without BroadcastChannel. */ }
+} catch (_) { /* swallow-ok: BroadcastChannel unavailable in isolated or restricted contexts */  /* Same-page notifications still work without BroadcastChannel. */ }
 
 // dict-pack.js is NOT in md-preview.html: most users never import the pack,
 // and the reader stays lean. First zh lookup injects it once (CSP 'self').
@@ -1542,11 +1542,11 @@ async function _pbpDictCacheGet(lang, term) {
     const hit = await pbpAiCacheGet(pbpDictQueryCacheKey(lang, term));
     const rec = hit && hit.result ? hit.result : null;
     return rec && rec.senseKeep === PBP_DICT_SENSE_KEEP ? rec : null;
-  } catch (_) { return null; }
+  } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */  return null; }
 }
 
 async function _pbpDictCacheSet(lang, term, norm) {
-  try { await pbpAiCacheSet(pbpDictQueryCacheKey(lang, term), norm, Date.now()); } catch (_) {}
+  try { await pbpAiCacheSet(pbpDictQueryCacheKey(lang, term), norm, Date.now()); } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ }
 }
 
 async function _pbpDictLookupCandidate(lang, term, parentSignal, skipCache) {
@@ -1606,7 +1606,7 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
       say("");
       let granted = false;
       // FIRST await in the click chain must be the permission request.
-      try { granted = await chrome.permissions.request({ origins: [PBP_DICT_ORIGIN + "/*"] }); } catch (_) {}
+      try { granted = await chrome.permissions.request({ origins: [PBP_DICT_ORIGIN + "/*"] }); } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ }
       if (!granted) {
         btn.textContent = t("dictConnectRetry");
         say(t("dictPermissionDenied"));
@@ -1752,7 +1752,7 @@ function _pbpDictDetect(text) {
         const top = r && Array.isArray(r.languages) && r.languages[0] ? r.languages[0].language : "";
         resolve({ lang: top, reliable: !!(r && r.isReliable) });
       });
-    } catch (_) { resolve({ lang: "", reliable: false }); }
+    } catch (_) { /* swallow-ok: chrome.i18n.detectLanguage unavailable or threw; resolve empty unreliable result */  resolve({ lang: "", reliable: false }); }
   });
 }
 
@@ -2016,7 +2016,7 @@ let _pbpDictLedgerQueue = Promise.resolve();
 function _pbpDictLedgerLock(task) {
   if (globalThis.navigator?.locks?.request) return navigator.locks.request("pbp-dict-ledger", task);
   const run = _pbpDictLedgerQueue.then(task, task);
-  _pbpDictLedgerQueue = run.catch(() => {});
+  _pbpDictLedgerQueue = run.catch(() => { /* swallow-ok: reset serial promise queue tail after handled operation */ });
   return run;
 }
 // Resolves true only when the row was stored. Never throws: a ledger failure is
@@ -2272,7 +2272,7 @@ function _pbpDictEntryMount(host, opts) {
   const languageName = language => {
     const code = language.lang === "und" ? pbpDictKnownLanguageName(language.name) : language.lang;
     try { return code ? new Intl.DisplayNames([document.documentElement.lang || "en"], { type: "language" }).of(code) : language.name; }
-    catch (_) { return language.name; }
+    catch (_) { /* swallow-ok: free-form or unsupported BCP 47 tag falls back to raw label or und */  return language.name; }
   };
   // The panel's own line, for what belongs to no action (syncing, a settings
   // or account failure, a cache write that failed). The status node speaks
@@ -3392,7 +3392,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   if (ctrl.signal.aborted) child.abort();
   else {
     ctrl.signal.addEventListener("abort", onParentAbort, { once: true });
-    _pbpDictParentCleanup = () => { try { ctrl.signal.removeEventListener("abort", onParentAbort); } catch (_) {} };
+    _pbpDictParentCleanup = () => { try { ctrl.signal.removeEventListener("abort", onParentAbort); } catch (_) { /* swallow-ok: AbortSignal listener cleanup guard */ } };
   }
   const signal = child.signal;
 
@@ -3780,9 +3780,9 @@ function _pbpDictMountMeaningBar(cur, pop, box, signal) {
   cur.meaningBar = bar; cur.meaningMenu = menu;
   const host = pop.querySelector(".xp-foot") || box;
   host.prepend(bar); bar.after(menu);
-  const isOpen = () => { try { return menu.matches(":popover-open"); } catch (_) { return false; } };
+  const isOpen = () => { try { return menu.matches(":popover-open"); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */  return false; } };
   const close = (restoreFocus) => {
-    if (isOpen()) { try { menu.hidePopover(); } catch (_) {} }
+    if (isOpen()) { try { menu.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ } }
     change.setAttribute("aria-expanded", "false");
     if (restoreFocus && !change.hidden) change.focus({ preventScroll: true });
   };
@@ -3803,7 +3803,7 @@ function _pbpDictMountMeaningBar(cur, pop, box, signal) {
     if (signal.aborted || _pbpDictCurrent !== cur) return;
     if (isOpen()) { close(true); return; }
     _pbpDictSyncMeaningSelect(cur);
-    try { menu.showPopover(); } catch (_) { return; }
+    try { menu.showPopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */  return; }
     change.setAttribute("aria-expanded", "true");
     _pbpDictPlaceMeaningMenu(menu, change, pop);
     (list.querySelector('[aria-selected="true"]') || list.firstElementChild)?.focus({ preventScroll: true });
@@ -4009,17 +4009,17 @@ function _pbpDictShowSaved(pop, cur, record) {
       // live library owner in case its change event has not arrived.
       if (cur.owner !== _pbpDictOwner) { refuse(); return; }
       if (typeof pbpVocabCurrentOwner === "function") {
-        const live = await pbpVocabCurrentOwner().catch(() => null);
+        const live = await pbpVocabCurrentOwner().catch(() => /* swallow-ok: fail-closed vocabulary owner or store read degrades to safe sentinel */ null);
         if (live !== cur.owner) { refuse(); return; }
       }
-      const ok = await pbpVocabBatchSetStatus([record.id], cur.owner, next).catch(() => false);
+      const ok = await pbpVocabBatchSetStatus([record.id], cur.owner, next).catch(() => /* swallow-ok: fail-closed vocabulary owner or store read degrades to safe sentinel */ false);
       if (_pbpDictCurrent !== cur) return; // superseded: leave the new run's control alone
       if (!ok) { refuse(); return; }
       status = next;
       paint();
       try {
         document.dispatchEvent(new CustomEvent("pbp:vocab-changed", { detail: { owner: cur.owner } }));
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: cross-module CustomEvent listener isolation */ }
     } finally {
       busy = false;
     }
@@ -4054,7 +4054,7 @@ async function pbpDictSaveCurrent() {
   const target = _pbpDictSaveTarget;
   if (target && target.itemId) highlightId = target.itemId;                 // card path keeps its id
   else if (target && target.range && typeof window.pbpHlItemIdAtRange === "function") {
-    try { highlightId = window.pbpHlItemIdAtRange(target.range) || null; } catch (_) {}
+    try { highlightId = window.pbpHlItemIdAtRange(target.range) || null; } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ }
   }
   const rawHref = urlEl && urlEl.hasAttribute("href") && urlEl.getAttribute("href") !== "#" ? urlEl.href : "";
   let articleUrl = pbpDictSafeUrl(_pbpDictArticleUrl || rawHref);
@@ -4079,12 +4079,12 @@ async function pbpDictSaveCurrent() {
         const dl = pbpDictSafeUrl(window.pbpVideoDeepLinkAt(sec));
         if (dl) articleUrl = dl;
       }
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: live DOM Selection or Range boundary may invalidate across layout mutations */ }
   }
   // The page may still hold the previous library owner while its storage
   // change event is pending. Re-read before writing to this owner's outbox.
   if (typeof pbpVocabCurrentOwner === "function") {
-    const live = await pbpVocabCurrentOwner().catch(() => null);
+    const live = await pbpVocabCurrentOwner().catch(() => /* swallow-ok: fail-closed vocabulary owner or store read degrades to safe sentinel */ null);
     if (live !== cur.owner) return false;
   }
   // A saved word keeps its definition until the reader picks one (ruling
@@ -4123,7 +4123,7 @@ async function pbpDictSaveCurrent() {
     }
     try {
       document.dispatchEvent(new CustomEvent("pbp:vocab-changed", { detail: { owner: cur.owner } }));
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: cross-module CustomEvent listener isolation */ }
     return true;
   }
   return false;

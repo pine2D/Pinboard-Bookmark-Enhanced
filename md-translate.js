@@ -145,7 +145,7 @@ function pbpTrParseGlossaryJson(full) {
   const i = s.indexOf("{"), j = s.lastIndexOf("}");
   if (i < 0 || j <= i) return out;
   let obj;
-  try { obj = JSON.parse(s.slice(i, j + 1)); } catch (_) { return out; }
+  try { obj = JSON.parse(s.slice(i, j + 1)); } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */  return out; }
   const terms = (obj && Array.isArray(obj.terms)) ? obj.terms : [];
   for (const t of terms) {
     if (!t || typeof t.term !== "string") continue;
@@ -576,7 +576,7 @@ function pbpTrWait(ms, signal, sleep) {
 async function pbpTrRunQueue(plan) {
   // Translation fills into the article; make it visible before the first
   // block lands (audit U6; no-op outside video workspaces).
-  try { document.dispatchEvent(new CustomEvent("pbp:ensure-article-visible")); } catch (_) {}
+  try { document.dispatchEvent(new CustomEvent("pbp:ensure-article-visible")); } catch (_) { /* swallow-ok: cross-module CustomEvent listener isolation */ }
   const batches = plan.batches || [];
   const targetCode = plan.targetCode || "";
   const conc = plan.concurrency || 2;
@@ -604,7 +604,7 @@ async function pbpTrRunQueue(plan) {
   const claimNext = () => {
     if (!remaining.length) return -1;
     let idx;
-    try { idx = claim(remaining.slice()); } catch (_) { idx = remaining[0]; }
+    try { idx = claim(remaining.slice()); } catch (_) { /* swallow-ok: translation queue consumer callback error must not stall worker loop */  idx = remaining[0]; }
     let at = remaining.indexOf(idx);
     if (at === -1) at = 0;
     return remaining.splice(at, 1)[0];
@@ -616,7 +616,7 @@ async function pbpTrRunQueue(plan) {
     const running = [...phases.values()];
     if (!running.length) return;
     const current = running.find(p => p.name === "translating") || running[0];
-    try { plan.onPhase?.(current.name, { done, total, ...current.details }); } catch (_) {}
+    try { plan.onPhase?.(current.name, { done, total, ...current.details }); } catch (_) { /* swallow-ok: translation queue consumer callback error must not stall worker loop */ }
   };
   const phase = (work, name, details = {}) => {
     phases.set(work, { name, details });
@@ -627,8 +627,8 @@ async function pbpTrRunQueue(plan) {
     if (filled.has(id)) return;
     filled.add(id);
     done += 1;
-    try { plan.onFill(id, text); } catch (_) {}
-    try { plan.onProgress(done, total); } catch (_) {}
+    try { plan.onFill(id, text); } catch (_) { /* swallow-ok: translation queue consumer callback error must not stall worker loop */ }
+    try { plan.onProgress(done, total); } catch (_) { /* swallow-ok: translation queue consumer callback error must not stall worker loop */ }
     reportPhase();
   };
   // `err` (optional) = the caught Error behind `message`, handed on so the
@@ -636,12 +636,12 @@ async function pbpTrRunQueue(plan) {
   // text second (the message alone no longer says which is which).
   const fail = (id, message, err) => {
     failed.push({ id, message: String(message || "translation failed") });
-    try { plan.onBlockFail(id, String(message || "translation failed"), err); } catch (_) {}
+    try { plan.onBlockFail(id, String(message || "translation failed"), err); } catch (_) { /* swallow-ok: translation queue consumer callback error must not stall worker loop */ }
     // Mirror fill()'s onProgress call so a run where every block fails (e.g. offline)
     // still repaints #tr-progress -- otherwise it freezes on the pre-run "Extracting
     // terminology..." text forever (D4-1: onProgress was fill()-only, so 0 successes
     // meant 0 repaints of the batch-start placeholder).
-    try { plan.onProgress(done, total); } catch (_) {}
+    try { plan.onProgress(done, total); } catch (_) { /* swallow-ok: translation queue consumer callback error must not stall worker loop */ }
     reportPhase();
   };
 
@@ -693,7 +693,7 @@ async function pbpTrRunQueue(plan) {
         const chars = batch.reduce((n, s) => n + String((s && s.text) || "").length, 0);
         const cjkShare = Math.round(pbpTrCjkShare(batch.map((s) => (s && s.text) || "").join("")) * 100) / 100;
         console.warn("[pbp-tr] batch truncated:", { chars, cjkShare, missing: missingIds.length, target: targetCode });
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
     }
     for (const id of missingIds) downgrade.push(byId.get(id));
   }
@@ -922,7 +922,7 @@ function _pbpTrLocalizedLangName(code, fallbackName, uiLang) {
       const out = new Intl.DisplayNames([uiLang || "en"], { type: "language" }).of(code);
       if (out && out !== code) return out;
     }
-  } catch (_) { /* invalid code / unsupported API: fall through to fallback */ }
+  } catch (_) { /* swallow-ok: free-form or unsupported BCP 47 tag falls back to raw label or und */  /* invalid code / unsupported API: fall through to fallback */ }
   return fallbackName || code;
 }
 
@@ -1190,7 +1190,7 @@ async function pbpTrInit(detail) {
         // re-read it from the newly routed area (shared.js already dropped its
         // routing cache).
         try { value = (await (await getSettingsStorage()).get({ translateTargetLang: "auto" })).translateTargetLang; }
-        catch (_) { return; }
+        catch (_) { /* swallow-ok: settings storage read failure degrades to safe defaults or fail-closed guard */  return; }
         if (gen !== trLangGen) return; // a newer consumed event already carried fresher state
       } else {
         value = changes.translateTargetLang.newValue;
@@ -1212,7 +1212,7 @@ async function pbpTrInit(detail) {
       try {
         const v = (await (await getSettingsStorage()).get({ trHotkeyConfirm: true })).trHotkeyConfirm;
         if (gen === askGen && st.s) st.s.trHotkeyConfirm = v !== false;
-      } catch (_) { /* keep the value this page already holds */ }
+      } catch (_) { /* swallow-ok: settings storage read failure degrades to safe defaults or fail-closed guard */  /* keep the value this page already holds */ }
     });
   }
 
@@ -1280,7 +1280,7 @@ async function pbpTrInit(detail) {
     return _pbpTrProbeCache(st);
   }).then(() => {
     _pbpTrApplySkips(st);
-  }).catch(() => {});
+  }).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
 }
 
 // Build st.work in rAF-yielded chunks so a long article's per-block Turndown pass
@@ -1393,7 +1393,7 @@ async function _pbpTrProbeCache(st) {
         _pbpTrShowViewToggle(st);
       }
     }
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ }
 }
 
 // T3: mark every st.work block already written in the target script as
@@ -1542,7 +1542,7 @@ function _pbpTrBuildSection(st) {
   tgtLink.addEventListener("click", () => {
     try {
       if (typeof pbpOpenOptionsTab === "function") pbpOpenOptionsTab("reader");
-    } catch (_) { /* options page unavailable: no-op */ }
+    } catch (_) { /* swallow-ok: options tab helper guard in standalone test fixtures */  /* options page unavailable: no-op */ }
   });
   tgt.appendChild(tgtLink);
   sec.appendChild(tgt);
@@ -1612,7 +1612,7 @@ function _pbpTrBuildSection(st) {
   raLab.textContent = t("trRetryAllFailed");
   retryAll.title = raLab.textContent; // the full name, should a long locale ellipsize the pill
   retryAll.appendChild(raLab);
-  retryAll.addEventListener("click", () => { _pbpTrRetryAllFailed(st).catch(() => {}); });
+  retryAll.addEventListener("click", () => { _pbpTrRetryAllFailed(st).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ }); });
   prog.insertAdjacentElement("afterend", retryAll);
 
   // Status page of the provider, under retry-all while a failure that may be
@@ -1768,7 +1768,7 @@ function _pbpTrTrigger(st) {
     // ZH-1b: a completed-but-stale (or mixed) translation re-arms the button
     // as an explicit, priced retranslate; a current one stays inert.
     if (!st.staleVerdict) return;
-    _pbpTrRetranslate(st).catch(() => {
+    _pbpTrRetranslate(st).catch((_diagErr) => { console.warn("[pbp-tr] retranslate setup failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); 
       st.running = false;
       if (_pbpTrSettlePendingLang(st)) return;
       const doneAll = st.work.every((w) => (w.n in st.trMd));
@@ -1776,7 +1776,7 @@ function _pbpTrTrigger(st) {
     });
     return;
   }
-  _pbpTrStart(st).catch(() => {
+  _pbpTrStart(st).catch((_diagErr) => { console.warn("[pbp-tr] start setup failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); 
     // Unexpected rejection (setup error etc.): never leave the UI stuck on
     // "翻译中". Reset run flag and settle to a terminal status the user can act on.
     st.running = false;
@@ -1995,7 +1995,7 @@ function _pbpTrSyncStaleNote(st) {
 // discipline as _pbpTrTrigger: never leave the UI stuck if setup throws.
 function _pbpTrStaleRetranslateClick(st) {
   if (st.running) return;
-  _pbpTrRetranslate(st).catch(() => {
+  _pbpTrRetranslate(st).catch((_diagErr) => { console.warn("[pbp-tr] stale retranslate setup failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); 
     st.running = false;
     if (_pbpTrSettlePendingLang(st)) return;
     const doneAll = st.work.every((w) => (w.n in st.trMd));
@@ -2032,7 +2032,7 @@ function _pbpTrResetTranslations(st, opts) {
   // H5 (spec 1.3): the whole translated layer just vanished -- drop every
   // tr-side highlight range + regray its Notebook rows. typeof-guarded so
   // md-translate never hard-depends on md-highlight (spec 7.2).
-  if (typeof window.pbpHlTrLayerCleared === "function") { try { window.pbpHlTrLayerCleared(); } catch (_) {} }
+  if (typeof window.pbpHlTrLayerCleared === "function") { try { window.pbpHlTrLayerCleared(); } catch (_) { /* swallow-ok: escaped footnote id selector guard */ } }
   _pbpTrSyncRetryAll();
   // keepMode (retranslate): a translated-only reader keeps their view -- the
   // cleared blocks fall back to visible originals (tr-only CSS only hides
@@ -2049,7 +2049,7 @@ function _pbpTrResetTranslations(st, opts) {
 function _pbpTrOnTargetLangSetting(st, next) {
   if (st.running) { st.pendingLangChange = next; return; }
   st.pendingLangChange = null;
-  _pbpTrApplyTargetLang(st, next).catch(() => {});
+  _pbpTrApplyTargetLang(st, next).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
 }
 
 // Apply a language switch stashed while a run was live. Call it right after
@@ -2068,7 +2068,7 @@ function _pbpTrSettlePendingLang(st) {
   if (!pending) return null;
   st.pendingLangChange = null;
   const prevCode = st.target && st.target.code;
-  const applied = _pbpTrApplyTargetLang(st, pending).catch(() => {});
+  const applied = _pbpTrApplyTargetLang(st, pending).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
   if ((st.target && st.target.code) === prevCode) return null;
   return applied;
 }
@@ -2169,7 +2169,7 @@ async function _pbpTrExtractGlossary(st, signal = st.ctrl && st.ctrl.signal) {
         onUsage: (u) => { if (st.rev === revision && st.usage) { st.usage.inTok += u.inTok; st.usage.outTok += u.outTok; } }
       }, () => {});
       return pbpTrParseGlossaryJson(raw);
-    } catch (_) { return null; }
+    } catch (_) { /* swallow-ok: single glossary chunk failure returns null so remaining chunks still merge */  return null; }
   });
   // All chunks failed/aborted -> null (a FAILURE the caller must not cache, per the
   // contract). At least one succeeded (even with zero terms) -> the merged map (a
@@ -2210,10 +2210,10 @@ async function _pbpTrEnsureGlossary(st, signal = st.ctrl && st.ctrl.signal) {
         if (prog) prog.textContent = t("trExtracting");
         auto = await _pbpTrExtractGlossary(st, signal);
         if (!current()) return null;
-        if (auto) { try { await pbpTrGlossaryCacheSet(st.url, st.target.code, st.modelKey, auto, st.account); } catch (_) {} }
+        if (auto) { try { await pbpTrGlossaryCacheSet(st.url, st.target.code, st.modelKey, auto, st.account); } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ } }
       }
     }
-  } catch (_) { auto = null; }
+  } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */  auto = null; }
   // A replacement cleared the old glossary while the cache/extraction was
   // pending. Never seed the new article or persist late aborted output.
   if (!current()) return null;
@@ -2308,7 +2308,7 @@ async function _pbpTrStart(st) {
       ? pbpNormalizeExtractEngine(segEngine)
       : (segEngine === "jina" ? "jina" : "local");
     summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, await _pbpTrSummaryAccount(), st.s)) || "";
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ }
   if (st.rev !== runRev) return;
   const prog0 = document.getElementById("tr-progress");
   if (prog0) prog0.textContent = t("trTranslating");
@@ -2469,7 +2469,7 @@ async function _pbpTrStart(st) {
   // Never clear a new run's flags/buffers or consume its replace semantics.
   if (st.rev !== runRev) {
     if (Object.keys(newly).length) {
-      try { await pbpTrCacheSet(cacheKey.url, cacheKey.lang, cacheKey.model, newly, cacheKey.account); } catch (_) {}
+      try { await pbpTrCacheSet(cacheKey.url, cacheKey.lang, cacheKey.model, newly, cacheKey.account); } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ }
     }
     return;
   }
@@ -2483,7 +2483,7 @@ async function _pbpTrStart(st) {
       if (st.rev !== runRev) return;
       st.wroteOk = true;
       st.replaceRun = false;
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ }
   }
   if (st.rev !== runRev) return;
   // Review blocker #1: everything in the flush buffer is now on disk via the
@@ -2553,7 +2553,7 @@ async function _pbpTrStart(st) {
   // start of the run; persist the FINAL mode (unless the user switched back to
   // Original mid-run, in which case there is nothing translated to remember).
   if (st.mode !== "original") {
-    pbpTrViewSet(st.url, { mode: st.mode, lang: st.target.code }, st.account).catch(() => {});
+    pbpTrViewSet(st.url, { mode: st.mode, lang: st.target.code }, st.account).catch(() => { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ });
   }
 }
 
@@ -2610,11 +2610,11 @@ function _pbpTrFlushCache(st) {
   try { p = Promise.resolve(setFn(url, lang, model, batch, account, meta, replace)); }
   catch (e) {
     st.flushInflight = false;
-    try { console.warn("tr flush failed:", e && e.name, e && e.message); } catch (_) {}
+    try { console.warn("tr flush failed:", e && e.name, e && e.message); } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
     return;
   }
   p.then(() => { if (!current()) return; st.wroteOk = true; if (replace) st.replaceRun = false; })
-    .catch((e) => { try { console.warn("tr flush failed:", e && e.name, e && e.message); } catch (_) {} })
+    .catch((e) => { try { console.warn("tr flush failed:", e && e.name, e && e.message); } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ } })
     .finally(() => { if (current()) st.flushInflight = false; });
 }
 
@@ -2697,19 +2697,19 @@ function _pbpTrFill(st, w, shieldedTranslation) {
           delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }],
           throwOnError: false
         });
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: math rendering or stylesheet load failure leaves raw TeX readable */ }
       // H5 controller fix (Task 1 review finding): this deferred KaTeX pass
       // rewrites .pb-tr text nodes AFTER the reanchor hook above already ran,
       // silently detaching tr-side highlight ranges on math-bearing blocks.
       // Re-run the same typeof-guarded reanchor once KaTeX has finished.
-      if (typeof window.pbpHlReanchorTr === "function") { try { window.pbpHlReanchorTr(w.n); } catch (_) {} }
+      if (typeof window.pbpHlReanchorTr === "function") { try { window.pbpHlReanchorTr(w.n); } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ } }
     });
   }
   // H5 (spec 1.3): the .pb-tr for block w.n was just (re)built in the current
   // target language -- let md-highlight re-anchor any translated-side
   // highlights on it. typeof-guarded so md-translate never hard-depends on
   // md-highlight (spec 7.2).
-  if (typeof window.pbpHlReanchorTr === "function") { try { window.pbpHlReanchorTr(w.n); } catch (_) {} }
+  if (typeof window.pbpHlReanchorTr === "function") { try { window.pbpHlReanchorTr(w.n); } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ } }
 }
 
 // Error pill text, split into the two lines the reader should see: `reason` is
@@ -2807,7 +2807,7 @@ function _pbpTrBuildErrCard(st, w) {
   lab.textContent = t("trRetryBlock");
   act.appendChild(lab);
   card.appendChild(act);
-  act.addEventListener("click", () => { _pbpTrRetryBlock(st, w, card).catch(() => {}); });
+  act.addEventListener("click", () => { _pbpTrRetryBlock(st, w, card).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ }); });
   return card;
 }
 
@@ -2900,7 +2900,7 @@ async function _pbpTrTranslateBlock(st, w, signal, lang = st.target.code, langNa
       ? pbpNormalizeExtractEngine(segEngine)
       : (segEngine === "jina" ? "jina" : "local");
     summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, await _pbpTrSummaryAccount(), st.s)) || "";
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ }
   const out = [];
   let failedParts = 0;
   for (let i = 0; i < split.chunks.length; i++) {
@@ -3013,7 +3013,7 @@ async function _pbpTrRetryBlock(st, w, btn) {
       one[w.hash] = result.text;
       // st.runMeta may be undefined (retry without a prior run this session);
       // a meta-less write keeps the stored meta untouched (D5 semantics).
-      try { await pbpTrCacheSet(st.url, lang, st.modelKey, one, st.account, st.runMeta); } catch (_) {}
+      try { await pbpTrCacheSet(st.url, lang, st.modelKey, one, st.account, st.runMeta); } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ }
     }
     _pbpTrShowViewToggle(st);
     if (st.work.every((x) => x.n in st.trMd)) _pbpTrSetStatus(st, "done");
@@ -3450,7 +3450,7 @@ function _pbpTrSetMode(st, mode, persist) {
   const timelineProjects = document.body.classList.contains("video-mode") && rv && rv.hidden
     && !!document.querySelector(".pbv-col-study .pbv-list .pbv-row--tr");
   if (!timelineProjects) {
-    try { document.dispatchEvent(new CustomEvent("pbp:ensure-article-visible")); } catch (_) {}
+    try { document.dispatchEvent(new CustomEvent("pbp:ensure-article-visible")); } catch (_) { /* swallow-ok: cross-module CustomEvent listener isolation */ }
   }
   const anchor = _pbpTrCaptureViewAnchor();
   const focusHandoff = _pbpTrCaptureFocusHandoff(mode);
@@ -3472,20 +3472,20 @@ function _pbpTrSetMode(st, mode, persist) {
     try {
       transition = document.startViewTransition(apply);
       st.viewTransition = transition;
-      transition.finished.catch(() => {}).finally(() => {
+      transition.finished.catch(() => { /* swallow-ok: View Transition abortion or unsupported engine falls back to direct DOM apply */ }).finally(() => {
         if (st.viewTransition === transition) {
           st.viewTransition = null;
           root.classList.remove("pbp-tr-view-transition");
         }
       });
-    } catch (_) {
+    } catch (_) { /* swallow-ok: View Transition abortion or unsupported engine falls back to direct DOM apply */ 
       root.classList.remove("pbp-tr-view-transition");
       apply();
     }
   } else {
     apply();
   }
-  if (persist) pbpTrViewSet(st.url, { mode, lang: st.target.code }, st.account).catch(() => {});
+  if (persist) pbpTrViewSet(st.url, { mode, lang: st.target.code }, st.account).catch(() => { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ });
 }
 
 // TOC text swap (spec 4.4: translated-only view follows translated heading
@@ -3578,7 +3578,7 @@ function _pbpTrOnArticleReplaced(detail) {
     // pbpTrInit's own `if (!view || _pbpTrState) return` makes the retry a
     // no-op once state exists, so it re-runs the full gate chain against the
     // NEW article and nothing more; it never auto-translates.
-    pbpTrInit(detail || {}).catch(() => {});
+    pbpTrInit(detail || {}).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
     return;
   }
   // Failure containment: article-replaced fires even when the swap threw, so
@@ -3620,7 +3620,7 @@ function _pbpTrOnArticleReplaced(detail) {
   }).then(() => {
     if (st.rev !== rev) return;
     _pbpTrApplySkips(st);
-  }).catch(() => {});
+  }).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
 }
 
 // Live Pinboard account switch (md-preview.js's credential listener, same
@@ -3657,7 +3657,7 @@ function _pbpTrOnAccountChanged(account) {
 // the tests page loads this file on file:// and never fires the event).
 if (typeof document !== "undefined") {
   document.addEventListener("pbp:rendered", (e) => {
-    pbpTrInit((e && e.detail) || {}).catch(() => {});
+    pbpTrInit((e && e.detail) || {}).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
   }, { once: true });
   // Deliberately NOT {once:true}: an article can be replaced any number of
   // times in one page life (track switch, AI punctuation, promotion).

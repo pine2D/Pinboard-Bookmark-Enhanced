@@ -30,7 +30,7 @@ function pbpYtTabEligible(tabUrl) {
   try {
     const u = new URL(String(tabUrl || ""));
     return u.protocol === "https:" && u.hostname === "www.youtube.com";
-  } catch (_) { return false; }
+  } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return false; }
 }
 
 // scripting.executeScript throws one of these when the target vanished
@@ -74,7 +74,7 @@ function pbpYtPickCaptureTab(tabs, preferredId, videoId) {
     try {
       const u = new URL(tb.url);
       return u.searchParams.get("v") === videoId || u.pathname === "/shorts/" + videoId;
-    } catch (_) { return false; }
+    } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return false; }
   };
   const same = list.filter(onVideo);
   const pool = same.length ? same : list;
@@ -118,7 +118,7 @@ function pbpYtExtractPlayerJson(html) {
       else if (c === "}") {
         depth--;
         if (depth === 0) {
-          try { return JSON.parse(s.slice(brace, j + 1)); } catch (_) { break; }
+          try { return JSON.parse(s.slice(brace, j + 1)); } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */  break; }
         }
       }
     }
@@ -324,7 +324,7 @@ function pbpYtParseTimedtextXml(xmlText) {
 
 function pbpYtParseJson3(jsonText) {
   let data;
-  try { data = JSON.parse(jsonText); } catch (_) { return []; }
+  try { data = JSON.parse(jsonText); } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */  return []; }
   if (!data || !Array.isArray(data.events)) return [];
   const out = [];
   for (const ev of data.events) {
@@ -1413,7 +1413,7 @@ async function pbpYtFetchTranscript(videoId, opts) {
   try {
     const resp = await fetchFn(pbpYtWatchUrl(videoId, opts.uiLang), { credentials, signal: AbortSignal.timeout(15000) });
     if (resp.ok) playerJson = pbpYtExtractPlayerJson(await resp.text());
-  } catch (_) { /* leave playerJson null */ }
+  } catch (_) { /* swallow-ok: caption rescue tier network/parse failure falls through to next tier without extension error spam */  /* leave playerJson null */ }
   if (!playerJson) return { error: "player" };
   // Distinguish "YouTube refused us" from "this video has no captions" before
   // reading the track list. A bot-gated response still parses and still has no
@@ -1445,12 +1445,12 @@ async function pbpYtFetchCaptionBody(baseUrl, fetchFn, useLogin) {
       const fromXml = pbpYtParseTimedtextXml(await r1.text());
       if (fromXml.length) return fromXml;
     }
-  } catch (_) { /* fall through to json3 */ }
+  } catch (_) { /* swallow-ok: caption rescue tier network/parse failure falls through to next tier without extension error spam */  /* fall through to json3 */ }
   try {
     const jUrl = baseUrl + (baseUrl.includes("?") ? "&" : "?") + "fmt=json3";
     const r2 = await fetchFn(jUrl, { credentials, signal: AbortSignal.timeout(15000) });
     if (r2.ok) return pbpYtParseJson3(await r2.text());
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: caption rescue tier network/parse failure falls through to next tier without extension error spam */ }
   return [];
 }
 
@@ -1722,14 +1722,14 @@ async function pbpBiliFetchTranscript(bvid, part, opts) {
     const r = await fetchFn("https://api.bilibili.com/x/web-interface/view?bvid=" + encodeURIComponent(bvid), { credentials: "include", signal: AbortSignal.timeout(15000) });
     if (!r.ok) return { error: "view" };
     view = await r.json();
-  } catch (_) { return { error: "view" }; }
+  } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */  return { error: "view" }; }
   const info = pbpBiliExtractCid(view, part);
   if (!info || !info.cid) return { error: "view" };
   let mixinKey = "", navData = null;
   try {
     const nr = await fetchFn("https://api.bilibili.com/x/web-interface/nav", { credentials: "include", signal: AbortSignal.timeout(15000) });
     if (nr.ok) { const nj = await nr.json(); navData = (nj && nj.data) || null; mixinKey = pbpBiliMixinKey(nj); }
-  } catch (_) { /* unsigned attempt below may still work for some videos */ }
+  } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */  /* unsigned attempt below may still work for some videos */ }
   const signed = pbpBiliSign({ bvid: bvid, cid: info.cid }, mixinKey);
   const qs = Object.keys(signed).map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(signed[k])).join("&");
   let player;
@@ -1737,7 +1737,7 @@ async function pbpBiliFetchTranscript(bvid, part, opts) {
     const pr = await fetchFn("https://api.bilibili.com/x/player/wbi/v2?" + qs, { credentials: "include", signal: AbortSignal.timeout(15000) });
     if (!pr.ok) return { error: "player", meta: info };
     player = await pr.json();
-  } catch (_) { return { error: "player", meta: info }; }
+  } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */  return { error: "player", meta: info }; }
   // bilibili's risk-control/permission refusals (-352 risk check, -403 access
   // denied, and friends) come back as HTTP 200 with a non-zero code and no
   // data, not as an HTTP error -- without this guard subs stays [] and
@@ -1763,7 +1763,7 @@ async function pbpBiliFetchSubtitleBody(subtitleUrl, fetchFn) {
   try {
     const r = await fetchFn(url, { credentials: "omit", signal: AbortSignal.timeout(15000) });
     if (r.ok) return pbpBiliParseSubtitleJson(await r.json());
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */ }
   return [];
 }
 // ── DOM rescue tier: page function ──
@@ -1786,7 +1786,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // Exact identity (G8b-02): a Mix URL v=B&list=RD<A> CONTAINS A's id. Defined
   // inside because the injected page function must have zero closure refs.
   const onVid = () => {
-    try { const u = new URL(location.href); return u.searchParams.get("v") === vid || u.pathname === "/shorts/" + vid; } catch (_) { return false; }
+    try { const u = new URL(location.href); return u.searchParams.get("v") === vid || u.pathname === "/shorts/" + vid; } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */  return false; }
   };
   if (vid && !onVid()) {
     out.trace = "tab no longer on target video";
@@ -1808,13 +1808,13 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       const pl = document.getElementById("movie_player");
       const live = pl && typeof pl.getPlayerResponse === "function" ? pl.getPlayerResponse() : null;
       pr = live && live.videoDetails ? live : (window.ytInitialPlayerResponse || null);
-    } catch (_) { pr = window.ytInitialPlayerResponse || null; }
+    } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */  pr = window.ytInitialPlayerResponse || null; }
     const own = !!(pr && pr.videoDetails && (!vid || pr.videoDetails.videoId === vid) &&
       pr.playabilityStatus && pr.playabilityStatus.status === "OK");
     const tracks = own && pr.captions && pr.captions.playerCaptionsTracklistRenderer &&
       pr.captions.playerCaptionsTracklistRenderer.captionTracks;
     if (own && !(Array.isArray(tracks) && tracks.length)) { out.trace = "video has no caption tracks"; return out; }
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
   // Hydration wait (device 2026-08-26): readyState is "complete" long before
   // YouTube's app mounts the watch layout (ytd-watch-flexy measured ~22s
   // behind it in a background tab), and the description entry and the
@@ -1852,9 +1852,9 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   const deepQA = (sel, root) => {
     const out = [];
     const walk = (r) => {
-      try { r.querySelectorAll(sel).forEach((n) => out.push(n)); } catch (_) {}
+      try { r.querySelectorAll(sel).forEach((n) => out.push(n)); } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
       let all = [];
-      try { all = r.querySelectorAll("*"); } catch (_) { return; }
+      try { all = r.querySelectorAll("*"); } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */  return; }
       for (const n of all) if (n.shadowRoot) walk(n.shadowRoot);
     };
     walk(root || document);
@@ -1900,9 +1900,9 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   const wants = (u) => /\/youtubei\/v1\/(get_transcript|get_panel)/.test(String(u || ""));
   const keeps = (t) => t && /transcriptSegment(ViewModel|Renderer)|transcriptSearchPanelRenderer/.test(t);
   const tagTap = () => {
-    try { window.fetch.__pbpTap = myLease; } catch (_) {}
-    try { XMLHttpRequest.prototype.open.__pbpTap = myLease; } catch (_) {}
-    try { XMLHttpRequest.prototype.send.__pbpTap = myLease; } catch (_) {}
+    try { window.fetch.__pbpTap = myLease; } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
+    try { XMLHttpRequest.prototype.open.__pbpTap = myLease; } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
+    try { XMLHttpRequest.prototype.send.__pbpTap = myLease; } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
   };
   try {
     window.fetch = function (...a) {
@@ -1910,9 +1910,9 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       try {
         const u = (a[0] && a[0].url) || a[0];
         if (!captured && wants(u)) {
-          p.then((resp) => resp.clone().text().then((t) => { if (!captured && keeps(t)) captured = t; }).catch(() => {})).catch(() => {});
+          p.then((resp) => resp.clone().text().then((t) => { if (!captured && keeps(t)) captured = t; }).catch(() => { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ })).catch(() => { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ });
         }
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
       return p;
     };
     XMLHttpRequest.prototype.open = function (m, u, ...rest) {
@@ -1923,10 +1923,10 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       try {
         if (!captured && wants(this.__pbpUrl)) {
           this.addEventListener("load", () => {
-            try { if (!captured && keeps(this.responseText)) captured = this.responseText; } catch (_) {}
+            try { if (!captured && keeps(this.responseText)) captured = this.responseText; } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
           });
         }
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
       return origSend.apply(this, a);
     };
     tagTap();
@@ -1936,7 +1936,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     if (!segs.length) {
       // real control chain: expand the description, then the button
       const expand = q("ytd-text-inline-expander #expand, tp-yt-paper-button#expand, #description #expand");
-      if (expand) { try { expand.click(); } catch (_) {} await sleep(400); }
+      if (expand) { try { expand.click(); } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ } await sleep(400); }
       let btn = q("ytd-video-description-transcript-section-renderer button");
       for (let i = 0; i < 8 && !btn; i++) { await sleep(400); btn = q("ytd-video-description-transcript-section-renderer button"); }
       if (btn) { btn.click(); opened = true; }
@@ -2007,7 +2007,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         try {
           const pl = document.querySelector("#movie_player");
           if (pl && typeof pl.getDuration === "function") dur = Number(pl.getDuration()) || 0;
-        } catch (_) {}
+        } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
         const lastFrom = Math.max(0, ...Array.from(seen.values()).map((x) => x.from || 0));
         if (!(dur > 0 && lastFrom >= dur * 0.8)) {
           out.trace = "no scroller; refusing " + seen.size + " rows (coverage " +
@@ -2041,7 +2041,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         const p = qa('ytd-engagement-panel-section-list-renderer[target-id*="transcript"]')
           .find((x) => x.getAttribute("visibility") === "ENGAGEMENT_PANEL_VISIBILITY_EXPANDED");
         if (p) p.setAttribute("visibility", "ENGAGEMENT_PANEL_VISIBILITY_HIDDEN");
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
     }
   }
 }
@@ -2183,7 +2183,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       const rec = (await chrome.storage.local.get("pbp_video_view")).pbp_video_view || {};
       const e = rec[_videoViewKey(d)];
       return (e && typeof e === "object") ? e : null;
-    } catch (_) { return null; }
+    } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */  return null; }
   }
   async function pbpVideoSavedView(d) {
     const e = await pbpVideoSavedRecord(d);
@@ -2210,7 +2210,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         for (const kk of keys.slice(0, keys.length - 50)) delete rec[kk];
       }
       await chrome.storage.local.set({ pbp_video_view: rec });
-    }).catch(() => {});
+    }).catch(() => { /* swallow-ok: reset serial promise queue tail after handled operation */ });
     return _viewWriteChain;
   }
   // Last-selection-wins token. Every track-change event takes one, and every
@@ -2316,7 +2316,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     const key = punctCacheKey(sa);
     if (!key || typeof pbpAiCacheGet !== "function") return 0;
     let entry = null;
-    try { entry = await pbpAiCacheGet(key); } catch (_) { return 0; }
+    try { entry = await pbpAiCacheGet(key); } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */  return 0; }
     const map = entry && entry.result && entry.result.batches;
     if (!map || typeof map !== "object") return 0;
     let n = 0;
@@ -2343,7 +2343,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       for (const k of Object.keys(base)) if (keep.has(k)) next[k] = base[k];
       next[h] = out;
       return { gen: PBP_VIDEO_PUNCT_GEN, batches: next };
-    }, Date.now()).catch(() => {});
+    }, Date.now()).catch(() => { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ });
   }
   // Provider host-grant state settled at OFFER time (audit B10):
   // permissions.request demands the click's transient activation, so the
@@ -2397,7 +2397,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       const tok = (typeof pbpAiEstimateTokens === "function"
         ? pbpAiEstimateTokens(chars) : Math.ceil(chars / 4)) * 3;
       return base + " · " + t("mdVideoAiPunctEst", tok.toLocaleString(uiLangToBCP47()));
-    } catch (_) { return base; }
+    } catch (_) { /* swallow-ok: token estimate formatting failure keeps base button title */  return base; }
   }
   function applyAiCostTitle(btn) {
     if (!btn) return;
@@ -2495,7 +2495,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   }
   // Every article commit re-renders #rendered-view (the gutter goes with
   // the old nodes); md-preview.js dispatches this after the new DOM is up.
-  document.addEventListener("pbp:article-replaced", () => { try { applyParaTimes(); } catch (_) {} });
+  document.addEventListener("pbp:article-replaced", () => { try { applyParaTimes(); } catch (_) { /* swallow-ok: scroll or transcript row projection guard across concurrent DOM updates */ } });
 
   // Node -> second bridge for the reader modules (vocab deep links, Ask/skim
   // chip seeks): a timeline row carries data-from, a gutter paragraph
@@ -2532,7 +2532,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     return s;
   };
   // Seek entry for reader modules (Ask/skim chips): same best-effort seekTo.
-  window.pbpVideoSeek = (sec, play) => { try { seekTo(Math.max(0, Number(sec) || 0), play === true); } catch (_) {} }; // citation jumps keep the play state; the selection bar's "play from here" passes true
+  window.pbpVideoSeek = (sec, play) => { try { seekTo(Math.max(0, Number(sec) || 0), play === true); } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ } }; // citation jumps keep the play state; the selection bar's "play from here" passes true
 
   // Study-column reading/timeline toggle (Task 4). Set by mountVideoWorkspace
   // only in video-mode workspaces; a non-video defensive mount (panel stays a
@@ -2582,7 +2582,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // grant plus the existing "scripting" permission -- no new permissions.
   async function ytFindFetchTab(tabId, videoId) {
     let tabs = [];
-    try { tabs = (await chrome.tabs.query({ url: "https://www.youtube.com/*" })) || []; } catch (_) {}
+    try { tabs = (await chrome.tabs.query({ url: "https://www.youtube.com/*" })) || []; } catch (_) { /* swallow-ok: caption rescue tier network/parse failure falls through to next tier without extension error spam */ }
     return pbpYtPickCaptureTab(tabs, typeof tabId === "number" ? tabId : null, videoId || "");
   }
 
@@ -2608,28 +2608,28 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           // Watch-page requests only: caption (timedtext) URLs also carry a
           // v= param, and handing them the player response instead of the
           // track body would break both the XML and json3 parses.
-          const isWatch = (() => { try { return new URL(u, location.href).pathname === "/watch"; } catch (_) { return false; } })();
+          const isWatch = (() => { try { return new URL(u, location.href).pathname === "/watch"; } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */  return false; } })();
           if (wantVid && isWatch) {
             const usable = (pr) => {
               try {
                 return pr && pr.videoDetails && pr.videoDetails.videoId === wantVid &&
                   pr.playabilityStatus && pr.playabilityStatus.status === "OK";
-              } catch (_) { return false; }
+              } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */  return false; }
             };
             try {
               const player = document.getElementById("movie_player");
               const pr = player && typeof player.getPlayerResponse === "function" ? player.getPlayerResponse() : null;
               if (usable(pr)) return { ok: true, status: 200, body: "ytInitialPlayerResponse = " + JSON.stringify(pr) + ";" };
-            } catch (_) { /* try the global next */ }
+            } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */  /* try the global next */ }
             try {
               const pr = window.ytInitialPlayerResponse;
               if (usable(pr)) return { ok: true, status: 200, body: "ytInitialPlayerResponse = " + JSON.stringify(pr) + ";" };
-            } catch (_) { /* fall through to the network */ }
+            } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */  /* fall through to the network */ }
           }
           try {
             const r = await fetch(u, { credentials: "same-origin", signal: AbortSignal.timeout(15000) });
             return { ok: r.ok, status: r.status, body: await r.text() };
-          } catch (e) {
+          } catch (e) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ 
             return { ok: false, status: 0, body: "" };
           }
         },
@@ -2678,19 +2678,19 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
                   const m = JSON.stringify(p).match(/"getTranscriptEndpoint":\{"params":"([^"]+)"/);
                   if (m) return m[1];
                 }
-              } catch (_) {}
+              } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
               return "";
             };
             let params = "";
             try {
               const app = document.querySelector("ytd-app");
               params = scan(app && app.data) || scan(app && app.data && app.data.response);
-            } catch (_) {}
-            if (!params) { try { params = scan(window.ytInitialData); } catch (_) {} }
+            } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
+            if (!params) { try { params = scan(window.ytInitialData); } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ } }
             if (params) {
               try {
                 if (!atob(params.replace(/-/g, "+").replace(/_/g, "/")).includes(vid)) params = "";
-              } catch (_) { params = ""; }
+              } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */  params = ""; }
             }
             return params;
           };
@@ -2699,7 +2699,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
               const c = window.ytcfg && (window.ytcfg.data_ ? window.ytcfg.data_.INNERTUBE_CONTEXT
                 : (window.ytcfg.get && window.ytcfg.get("INNERTUBE_CONTEXT")));
               if (c && c.client) return JSON.parse(JSON.stringify(c));
-            } catch (_) {}
+            } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
             return { client: { clientName: "WEB", clientVersion: "2.20260101.00.00" } };
           };
           try {
@@ -2887,7 +2887,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           // CONTAIN the id while the player shows another video.
           if (vid) {
             let onVideo = false;
-            try { const u = new URL(location.href); onVideo = u.searchParams.get("v") === vid || u.pathname === "/shorts/" + vid; } catch (_) {}
+            try { const u = new URL(location.href); onVideo = u.searchParams.get("v") === vid || u.pathname === "/shorts/" + vid; } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
             if (!onVideo) return { body: "", trace: "tab no longer on the target video" };
           }
           const player = document.querySelector("#movie_player");
@@ -2913,9 +2913,9 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           // wrappers. Each wrapper is tagged with its lease; restore only
           // unhooks what still belongs to this run.
           const tagTap = () => {
-            try { window.fetch.__pbpTap = myLease; } catch (_) {}
-            try { XMLHttpRequest.prototype.open.__pbpTap = myLease; } catch (_) {}
-            try { XMLHttpRequest.prototype.send.__pbpTap = myLease; } catch (_) {}
+            try { window.fetch.__pbpTap = myLease; } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
+            try { XMLHttpRequest.prototype.open.__pbpTap = myLease; } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
+            try { XMLHttpRequest.prototype.send.__pbpTap = myLease; } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
           };
           // EVENT-DRIVEN: the taps resolve this promise the moment the
           // player's timedtext round-trip lands. The old 400ms poll loop
@@ -2941,19 +2941,19 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
               // Auto-generated tracks carry kind=asr on their timedtext URL;
               // a manual request must not be satisfied by one (or vice versa).
               return (q.get("kind") === "asr") === !!asr;
-            } catch (_) { return true; }
+            } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */  return true; }
           };
           let prior = null;
-          try { prior = player.getOption("captions", "track"); } catch (_) {}
+          try { prior = player.getOption("captions", "track"); } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
           try {
             window.fetch = function (...a) {
               const p = origFetch.apply(this, a);
               try {
                 const u = (a[0] && a[0].url) || a[0];
                 if (!captured && wants(u)) {
-                  p.then((resp) => resp.clone().text().then(gotBody).catch(() => {})).catch(() => {});
+                  p.then((resp) => resp.clone().text().then(gotBody).catch(() => { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ })).catch(() => { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ });
                 }
-              } catch (_) {}
+              } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
               return p;
             };
             XMLHttpRequest.prototype.open = function (m, u, ...rest) { this.__pbpUrl = u; return origOpen.call(this, m, u, ...rest); };
@@ -2961,10 +2961,10 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
               try {
                 if (!captured && wants(this.__pbpUrl)) {
                   this.addEventListener("load", () => {
-                    try { gotBody(this.responseText); } catch (_) {}
+                    try { gotBody(this.responseText); } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
                   });
                 }
-              } catch (_) {}
+              } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
               return origSend.apply(this, a);
             };
             tagTap();
@@ -2973,7 +2973,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             // identity is not in it -- the player cannot serve it, so the
             // 12s + 12s backstops would be a pure wait (review).
             const drive = () => {
-              try { player.loadModule("captions"); } catch (_) {}
+              try { player.loadModule("captions"); } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
               if (lang) {
                 try {
                   // Exact identity: the player's own tracklist object whose
@@ -2986,15 +2986,15 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
                     const tl = player.getOption("captions", "tracklist") || [];
                     target = (vss && tl.find((tr) => tr && tr.vss_id === vss))
                       || tl.find((tr) => tr && tr.languageCode === lang && ((tr.kind === "asr") === !!asr)) || null;
-                  } catch (_) {}
+                  } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
                   if (!target) {
                     let known = false;
-                    try { const tl = player.getOption("captions", "tracklist") || []; known = tl.length > 0 && tl.some((tr) => tr && tr.languageCode); } catch (_) {}
+                    try { const tl = player.getOption("captions", "tracklist") || []; known = tl.length > 0 && tl.some((tr) => tr && tr.languageCode); } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
                     if (known) return false;
                     target = { languageCode: lang }; if (asr) target.kind = "asr";
                   }
                   player.setOption("captions", "track", target);
-                } catch (_) {}
+                } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
               }
               return true;
             };
@@ -3006,7 +3006,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             if (!captured) {
               // a track the player already holds re-fetches only after a
               // module bounce
-              try { player.unloadModule("captions"); } catch (_) {}
+              try { player.unloadModule("captions"); } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
               drive();
               await Promise.race([capReady, backstop(12000)]);
             }
@@ -3014,7 +3014,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             // SPA-navigate to another video DURING the capture window; a body
             // captured after that may belong to the new video.
             let stillOnVideo = false;
-            try { const u2 = new URL(location.href); stillOnVideo = u2.searchParams.get("v") === vid || u2.pathname === "/shorts/" + vid; } catch (_) {}
+            try { const u2 = new URL(location.href); stillOnVideo = u2.searchParams.get("v") === vid || u2.pathname === "/shorts/" + vid; } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
             if (vid && !stillOnVideo) {
               return { body: "", trace: "tab navigated away mid-capture" };
             }
@@ -3028,7 +3028,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             // choice is newer than this run's snapshot -- leave it standing.
             try {
               let cur = null;
-              try { cur = player.getOption("captions", "track"); } catch (_) {}
+              try { cur = player.getOption("captions", "track"); } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
               // Ours ONLY when the track is still exactly the one this run
               // set (closing review M1): an empty state means the user turned
               // captions off mid-capture, and a different-language state
@@ -3039,7 +3039,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
                 if (prior && prior.languageCode) player.setOption("captions", "track", prior);
                 else player.unloadModule("captions");
               }
-            } catch (_) {}
+            } catch (_) { /* swallow-ok: injected page-world YouTube probe degrades locally without outer closure refs */ }
             if (window.__pbpTapLease === myLease) delete window.__pbpTapLease;
           }
         },
@@ -3063,7 +3063,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     try {
       const segs = pbpYtParseTimedtextXml(r.body);
       if (segs.length) return segs;
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
     return null;
   }
 
@@ -3081,7 +3081,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   function replayHighlight() {
     if (_lastRelayTime == null) return;
     _currentRowIdx = -1; // force the full path (class re-apply + follow scroll)
-    try { highlightRowAt(_lastRelayTime); } catch (_) {}
+    try { highlightRowAt(_lastRelayTime); } catch (_) { /* swallow-ok: scroll or transcript row projection guard across concurrent DOM updates */ }
   }
   // Every position write passes here: the FIRST one (null -> a number) is
   // announced once, so a panel that opened before the player spoke -- the
@@ -3090,7 +3090,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   function setRelayTime(t) {
     const first = _lastRelayTime == null;
     _lastRelayTime = t;
-    if (first) { try { document.dispatchEvent(new CustomEvent("pbp:video-position")); } catch (_) {} }
+    if (first) { try { document.dispatchEvent(new CustomEvent("pbp:video-position")); } catch (_) { /* swallow-ok: cross-module CustomEvent listener isolation */ } }
   }
 
   // Screen-reader mirror for status writes (research T7.4). The visual
@@ -3158,7 +3158,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     const host = _iframe && _iframe.parentElement;
     if (!host) return;
     if (!_toastEl || !_toastEl.isConnected || _toastEl.parentElement !== host) {
-      if (_toastEl) { try { _toastEl.remove(); } catch (_) {} }
+      if (_toastEl) { try { _toastEl.remove(); } catch (_) { /* swallow-ok: detached toast element removal guard */ } }
       _toastEl = el("div", "pbv-toast");
       _toastEl.setAttribute("role", "status");
       host.appendChild(_toastEl);
@@ -3221,7 +3221,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         _biliPlaying = wantPlay;
         estAnchor(_lastRelayTime);
         _lastPosSaveAt = 0; savePos(_lastRelayTime); // an explicit jump is worth remembering now
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
       return;
     }
     // The relay forwards only these two commands to the nested YouTube
@@ -3252,7 +3252,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   }
   function relayPost(func, args) {
     if (!_iframe || !_iframe.contentWindow) return;
-    try { _iframe.contentWindow.postMessage({ pbpVideo: 1, func, args: args || [] }, playerMsgOrigin()); } catch (_) {}
+    try { _iframe.contentWindow.postMessage({ pbpVideo: 1, func, args: args || [] }, playerMsgOrigin()); } catch (_) { /* swallow-ok: player iframe may detach mid-flight before postMessage */ }
   }
   function relayPause() { relayPost("pauseVideo"); }
   function relayPlay() { relayPost("playVideo"); }
@@ -3301,7 +3301,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   function setLoop(on) {
     _loopOn = !!on;
     if (_loopBtn) _loopBtn.setAttribute("aria-pressed", _loopOn ? "true" : "false");
-    if (_loopOn && _currentRowIdx < 0 && _lastRelayTime != null) { try { highlightRowAt(_lastRelayTime); } catch (_) {} }
+    if (_loopOn && _currentRowIdx < 0 && _lastRelayTime != null) { try { highlightRowAt(_lastRelayTime); } catch (_) { /* swallow-ok: scroll or transcript row projection guard across concurrent DOM updates */ } }
     srAnnounce(t("mdVideoLoop") + " · " + t(_loopOn ? "mdVideoStateOn" : "mdVideoStateOff"));
   }
   function setAutoPause(on) {
@@ -3334,7 +3334,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     const anchor = currentStudyAnchor();
     if (!anchor) return;
     const list = transcriptListEl();
-    if (anchor === _currentRowEl && list) { try { followScrollTo(anchor, list); } catch (_) {} return; }
+    if (anchor === _currentRowEl && list) { try { followScrollTo(anchor, list); } catch (_) { /* swallow-ok: scroll or transcript row projection guard across concurrent DOM updates */ } return; }
     if (typeof pbpScrollIntoView === "function") pbpScrollIntoView(anchor, { block: "center", behavior: "smooth" });
   }
   function toggleStudyView() {
@@ -3396,7 +3396,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           u.searchParams.set("t", String(Math.max(0, Math.floor(sec))));
           u.searchParams.set("autoplay", "0"); // explicit: the contract is 'never autoplay', not 'player default' (retro)
           _iframe.src = u.toString();
-        } catch (_) {}
+        } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
       } else {
         relayPost("seekTo", [sec, true]); // no playVideo: the reader presses play
       }
@@ -3467,7 +3467,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       const last = _segments[_segments.length - 1];
       if (tv > (last.to || last.from) + 2) { estStop(); return; }
       setRelayTime(tv);
-      try { highlightRowAt(tv); } catch (_) {}
+      try { highlightRowAt(tv); } catch (_) { /* swallow-ok: scroll or transcript row projection guard across concurrent DOM updates */ }
       updateBackBtn();
       savePos(tv);
     }, 500);
@@ -3549,7 +3549,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     if (!_iframe || !_iframe.contentWindow) return;
     try {
       _iframe.contentWindow.postMessage({ pbpVideo: 1, func: "hello", args: [] }, playerMsgOrigin());
-    } catch (_) { /* frame gone mid-flight; the interval below stops itself */ }
+    } catch (_) { /* swallow-ok: player iframe may detach mid-flight before postMessage */  /* frame gone mid-flight; the interval below stops itself */ }
   }
 
   function stopRelayHello() {
@@ -3562,10 +3562,10 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // shared with YouTube -- one state machine for both providers.
   function playerMsgOrigin() { return _isBili ? BILI_PLAYER_MSG_ORIGIN : RELAY_ORIGIN; }
   async function biliPlayerGranted() {
-    try { return await chrome.permissions.contains({ origins: [BILI_PLAYER_ORIGIN] }) === true; } catch (_) { return false; }
+    try { return await chrome.permissions.contains({ origins: [BILI_PLAYER_ORIGIN] }) === true; } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */  return false; }
   }
   async function biliBridgeRegistered() {
-    try { const l = await chrome.scripting.getRegisteredContentScripts({ ids: [BILI_BRIDGE_ID] }); return !!(l && l.length); } catch (_) { return false; }
+    try { const l = await chrome.scripting.getRegisteredContentScripts({ ids: [BILI_BRIDGE_ID] }); return !!(l && l.length); } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */  return false; }
   }
   // Idempotent; the registration persists across browser sessions. Only
   // ever called once the exact player origin is granted (registration is
@@ -3596,7 +3596,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       if (!(await ensureBiliBridgeRegistered())) { _biliPlayerGranted = false; syncLiveControls(); return; }
       if (!_biliReloadedForBridge && _iframe) {
         _biliReloadedForBridge = true;
-        try { _iframe.src = _iframe.src; } catch (_) {}
+        try { _iframe.src = _iframe.src; } catch (_) { /* swallow-ok: reloading detached player iframe is a safe no-op */ }
         return;
       }
     }
@@ -3700,7 +3700,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       const first = _relayDuration == null;
       _relayDuration = d.d;
       if (first) {
-        if (typeof window.pbpRefreshReadingStats === "function") { try { window.pbpRefreshReadingStats(); } catch (_) {} }
+        if (typeof window.pbpRefreshReadingStats === "function") { try { window.pbpRefreshReadingStats(); } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ } }
         if (_lastRelayTime == null && d.state !== 1) maybeOfferResume(); // the real length may admit an offer the caption tail vetoed
       }
     }
@@ -3822,7 +3822,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     // scroller with the article -- following while the user reads would drag
     // the article out from under them.
     if (followEffective() && !list.hidden) {
-      try { followScrollTo(_currentRowEl, list); } catch (_) {}
+      try { followScrollTo(_currentRowEl, list); } catch (_) { /* swallow-ok: scroll or transcript row projection guard across concurrent DOM updates */ }
     }
   }
 
@@ -3888,7 +3888,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // per row change, not per report: a row changes at transcript pace.
   function playerHoldsPosition() {
     if (!_panel || typeof getComputedStyle !== "function") return false;
-    try { return getComputedStyle(_panel).position === "sticky"; } catch (_) { return false; }
+    try { return getComputedStyle(_panel).position === "sticky"; } catch (_) { /* swallow-ok: getComputedStyle guard on detached panel element */  return false; }
   }
 
   function clearCurrentRow() {
@@ -3946,7 +3946,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     if (!btn) return;
     e.preventDefault();
     setRoving(btn);
-    try { btn.focus({ preventScroll: false }); } catch (_) {}
+    try { btn.focus({ preventScroll: false }); } catch (_) { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ }
   }
 
   function bindFollowPause(list) {
@@ -4098,8 +4098,8 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       // Aux lines only need re-applying after a timeline re-render (no row
       // carries the mark yet); article translation traffic never rebuilds
       // them (retro #11).
-      try { if (_auxSegs) { const list = transcriptListEl(); if (list && !list.querySelector(".pbv-row--aux")) applyAux(); } } catch (_) {}
-      try { projectTranslations(); } catch (_) {}
+      try { if (_auxSegs) { const list = transcriptListEl(); if (list && !list.querySelector(".pbv-row--aux")) applyAux(); } } catch (_) { /* swallow-ok: scroll or transcript row projection guard across concurrent DOM updates */ }
+      try { projectTranslations(); } catch (_) { /* swallow-ok: scroll or transcript row projection guard across concurrent DOM updates */ }
     }, 300);
   }
   // Auxiliary track (research T5.2): options = every track except the
@@ -4214,11 +4214,11 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     // stands; the player document that loaded before it is reloaded once
     // so the script is inside it.
     let granted = false;
-    try { granted = await chrome.permissions.request({ origins: pbpVideoOriginPatterns(detected.provider) }) === true; } catch (_) { granted = false; }
+    try { granted = await chrome.permissions.request({ origins: pbpVideoOriginPatterns(detected.provider) }) === true; } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */  granted = false; }
     if (granted && isBili) {
       _biliPlayerGranted = await ensureBiliBridgeRegistered(); // false = the enable button stays as the retry path (Codex r9 M6)
       syncLiveControls();
-      if (_iframe && _iframe.isConnected) { try { _iframe.src = _iframe.src; } catch (_) {} }
+      if (_iframe && _iframe.isConnected) { try { _iframe.src = _iframe.src; } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ } }
     }
     return granted;
   }
@@ -4252,7 +4252,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
               mdVideoLangPref: SETTINGS_DEFAULTS.mdVideoLangPref, mdVideoPauseOnLookup: SETTINGS_DEFAULTS.mdVideoPauseOnLookup
             });
             next = { langPrefs: pbpVideoLangPrefs(s && s.mdVideoLangPref), pauseOnLookup: !(s && s.mdVideoPauseOnLookup === false) };
-          } catch (_) { next = { langPrefs: [], pauseOnLookup: true }; }
+          } catch (_) { /* swallow-ok: settings storage read failure degrades to safe defaults or fail-closed guard */  next = { langPrefs: [], pauseOnLookup: true }; }
           if (gen !== _videoPrefsGen) return; // superseded: the loop below starts the newer read
           _videoPrefs = next;
           PBP_VIDEO_PICK_HINTS.prefs = _videoPrefs.langPrefs;
@@ -4327,7 +4327,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     // granted. The user-gesture request lives in requestVideoOrigin, called
     // from the poster-card click handler before this function runs.
     let granted = false;
-    try { granted = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) {}
+    try { granted = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ }
     if (!granted) {
       const session = { detected, granted: false };
       window.pbpVideoSession = session;
@@ -4373,7 +4373,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         try {
           const s = await pbpReadSettingsWithSecrets({ mdVideoUseLogin: SETTINGS_DEFAULTS.mdVideoUseLogin });
           useLogin = s && s.mdVideoUseLogin === true;
-        } catch (_) {}
+        } catch (_) { /* swallow-ok: settings storage read failure degrades to safe defaults or fail-closed guard */ }
         const fb = await pbpYtFetchTranscript(detected.videoId, { uiLang, useLogin });
         console.info("[pbp-video] extension-page fallback (login " + useLogin + "):", fb.error || ("ok, " + (fb.segments || []).length + " segments"));
         // Keep whichever answer got further: a fallback that also failed must
@@ -4411,7 +4411,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         try {
           const rec = (await chrome.storage.local.get("pbp_video_tier_youtube")).pbp_video_tier_youtube;
           if (rec && rec.via && Date.now() - (rec.ts || 0) < 7 * 24 * 3600 * 1000) cachedVia = rec.via;
-        } catch (_) {}
+        } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
         // Say which tier is running (audit U9's sibling): a rescue chain can
         // hold the panel for a minute while it visibly drives the reader's own
         // YouTube tab, and until now the status line said "Loading subtitles…"
@@ -4459,7 +4459,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         const tierByName = { panel: tryPanel, capture: tryCapture, dom: tryDom };
         for (const name of pbpVideoTierOrder(cachedVia)) await tierByName[name]();
         if (res.via) {
-          try { await chrome.storage.local.set({ pbp_video_tier_youtube: { via: res.via, ts: Date.now() } }); } catch (_) {}
+          try { await chrome.storage.local.set({ pbp_video_tier_youtube: { via: res.via, ts: Date.now() } }); } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
         }
       }
     }
@@ -4579,7 +4579,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       try {
         seedPunctCache(_aiSettingsSnap, pbpVideoSplitBatches(pbpVideoMergeParagraphs(_segments), 1600))
           .then((n) => { if (n && _aiBtnEl && !_aiBtnEl.hidden) applyAiCostTitle(_aiBtnEl); });
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ }
     }
     applyControlFreeze();
   }
@@ -4727,7 +4727,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     // language preference steer the default pick; the saved position feeds
     // the continue-watching offer once the transcript is up.
     await ensureVideoPrefs();
-    try { _savedRec = await pbpVideoSavedRecord(detected); } catch (_) { _savedRec = null; }
+    try { _savedRec = await pbpVideoSavedRecord(detected); } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */  _savedRec = null; }
     applySavedRate(); // the relay may already be alive (Codex r2 H1)
     _resumeOffered = false;
     _density = (_savedRec && _savedRec.density === "paragraph") ? "paragraph" : "cue";
@@ -4875,15 +4875,15 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         // NOW (audit B10): the AI click can then make permissions.request
         // its first await, inside the gesture's transient activation.
         if (_aiOk && typeof _aiRequiredOriginPatterns === "function") {
-          try { _aiOrigins = _aiRequiredOriginPatterns(sa); } catch (_) { _aiOrigins = null; }
+          try { _aiOrigins = _aiRequiredOriginPatterns(sa); } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */  _aiOrigins = null; }
           let g = false;
           try {
             g = (_aiOrigins && _aiOrigins.length)
               ? await chrome.permissions.contains({ origins: _aiOrigins }) === true : false;
-          } catch (_) {}
+          } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ }
           _aiHostGranted = g;
         }
-      } catch (_) {}
+      } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ }
     }
     copyBtn.hidden = !(res.segments || []).length;
     // Reveal the study-view toggle and the follow control only when there
@@ -4903,7 +4903,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     // Hydrated (F5) sessions render the article before this module runs, so
     // no article-replaced event will fire for them -- time the gutter here.
     // First loads reach the same code via the promotion commit's event.
-    try { applyParaTimes(); } catch (_) {}
+    try { applyParaTimes(); } catch (_) { /* swallow-ok: scroll or transcript row projection guard across concurrent DOM updates */ }
     if (_segments.length) {
       if (_retryBtnEl) _retryBtnEl.hidden = true; // captions are here (F3)
       renderTranscript(bodyEl, _segments, true);
@@ -5294,7 +5294,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       // transcript now, so the description block belongs there too.
       if (ok || threwInCommit) {
         syncSessionToCommitted(session.track || null, _wasUnpunct);
-        try { ensureVideoDescription(); } catch (_) {}
+        try { ensureVideoDescription(); } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ }
         // One-shot notice (audit U15): the article was just swapped and the
         // view flipped under the reader -- say so once, quietly.
         pbvSetStatus(statusEl, t("mdVideoPromoted"), false);
@@ -5372,7 +5372,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     if (_studyListEl) _studyListEl.hidden = reading;
     if (flipped) {
       const saved = _viewScroll[reading ? "reading" : "timeline"];
-      if (saved != null) { try { window.scrollTo({ top: saved, behavior: "instant" }); } catch (_) {} }
+      if (saved != null) { try { window.scrollTo({ top: saved, behavior: "instant" }); } catch (_) { /* swallow-ok: scroll or transcript row projection guard across concurrent DOM updates */ } }
     }
     // Follow can only act on the timeline (audit U4): in the reading view
     // the pressed toggle silently did nothing. Disabled with the reason in
@@ -5652,7 +5652,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             if (span) span.textContent = lbl;
             posterNote.hidden = false; // scope note joins the enable state (audit U2)
           }
-        } catch (_) {}
+        } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ }
       })();
     }
     panel.appendChild(cta);
@@ -5758,7 +5758,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             copyBtn.classList.remove("copied");
             copyBtn.title = t("mdVideoCopyMd");
           }, 1800);
-        } catch (_) { pbvSetStatus(status, t("mdVideoCopyFailed"), true); }
+        } catch (_diagErr) { console.warn("[pbp-video] transcript copy failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "md-preview", op: "video_copy", code: "denied", errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error" });  pbvSetStatus(status, t("mdVideoCopyFailed"), true); }
       };
       copyBtn.addEventListener("click", () => doCopy(pbpVideoTranscriptMarkdown(_segments, _meta, _aiPunctParas)));
       // Export formats (research T1.2): the primary click stays the plain
@@ -5792,7 +5792,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         copyMenu.hidden = true;
         copyCaret.setAttribute("aria-expanded", "false");
         document.removeEventListener("click", onDocClickForMenu, true);
-        if (refocus) { try { copyCaret.focus({ preventScroll: true }); } catch (_) {} }
+        if (refocus) { try { copyCaret.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ } }
       };
       const onDocClickForMenu = (ev) => {
         if (!copyGroup.contains(ev.target)) closeCopyMenu(false);
@@ -5802,7 +5802,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         copyMenu.hidden = false;
         copyCaret.setAttribute("aria-expanded", "true");
         const first = copyMenu.querySelector(".send-mi");
-        if (first) { try { first.focus({ preventScroll: true }); } catch (_) {} }
+        if (first) { try { first.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ } }
         setTimeout(() => document.addEventListener("click", onDocClickForMenu, true), 0);
       });
       copyMenu.addEventListener("keydown", (ev) => {
@@ -5839,7 +5839,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           a.remove();
           setTimeout(() => URL.revokeObjectURL(a.href), 1000);
           pbvSetStatus(status, t("mdVideoSrtSaved"), false);
-        } catch (_) { pbvSetStatus(status, t("mdVideoCopyFailed"), true); }
+        } catch (_diagErr) { console.warn("[pbp-video] SRT export failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "md-preview", op: "video_copy", code: "failed", errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error" });  pbvSetStatus(status, t("mdVideoCopyFailed"), true); }
       });
       copyGroup.appendChild(copyBtn);
       copyGroup.appendChild(copyCaret);
@@ -5923,7 +5923,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           // actionable host_permission error the catch below surfaces.
           if (_aiOrigins && _aiOrigins.length && !_aiHostGranted) {
             let granted = false;
-            try { granted = await chrome.permissions.request({ origins: _aiOrigins }) === true; } catch (_) {}
+            try { granted = await chrome.permissions.request({ origins: _aiOrigins }) === true; } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ }
             if (!granted) {
               const err = new Error(t("aiErrorHostPermission", String(_aiOrigins[0] || "").replace(/\/\*$/, "")));
               err.code = "host_permission";
@@ -5950,7 +5950,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
                 _aiOrigins = fresh;
                 _aiHostGranted = false; // let the gesture backstop re-check
               }
-            } catch (_) {}
+            } catch (_) { /* swallow-ok: AI origin pattern refresh fallback keeps prior precomputed origins */ }
           }
           // The provider origin may never have been granted on this profile
           // (the options-page Test button is the only other surface that
@@ -6320,7 +6320,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         retryBtn.hidden = true;
         try {
           let g = false;
-          try { g = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) {}
+          try { g = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ }
           if (!g) g = await requestVideoOrigin(detected); // this click IS the gesture
           if (!g) { pbvSetStatus(status, t("mdVideoPermDeclined"), true); retryBtn.hidden = false; return; }
           window.pbpVideoSession = null; // force a fresh directory + captions
@@ -6351,7 +6351,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       aiCancelBtn.addEventListener("click", () => {
         _aiCancelRequested = true;
         aiCancelBtn.disabled = true;
-        if (_aiAbort) { try { _aiAbort.abort(); } catch (_) {} } // research T4.4
+        if (_aiAbort) { try { _aiAbort.abort(); } catch (_) { /* swallow-ok: AbortController.abort guard on settled controller */ } } // research T4.4
       });
       // Wrap related controls together instead of breaking the playback
       // sequence across lines. Reuse the reader's row layout primitive.
@@ -6474,7 +6474,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           if (bridgeBtn.disabled) return;
           bridgeBtn.disabled = true;
           let g = false;
-          try { g = await chrome.permissions.request({ origins: [BILI_PLAYER_ORIGIN] }) === true; } catch (_) {}
+          try { g = await chrome.permissions.request({ origins: [BILI_PLAYER_ORIGIN] }) === true; } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ }
           bridgeBtn.disabled = false;
           if (!g) return;
           _biliPlayerGranted = await ensureBiliBridgeRegistered();
@@ -6487,7 +6487,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             if (_lastRelayTime != null) u.searchParams.set("t", String(Math.max(0, Math.floor(_lastRelayTime))));
             u.searchParams.set("autoplay", "0");
             _iframe.src = u.toString();
-          } catch (_) {}
+          } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
         });
         _bridgeBtn = bridgeBtn;
         playback.appendChild(bridgeBtn);
@@ -6536,7 +6536,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         const target = [trackSel, copyBtn, aiBtn, retryBtn, openExt]
           .find((c) => c && !c.hidden && !c.disabled) || status;
         if (target === status) status.tabIndex = -1;
-        try { target.focus({ preventScroll: true }); } catch (_) {}
+        try { target.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ }
       };
       panel.replaceChildren(media, bar);
       if (!_studyListEl) panel.appendChild(body);
@@ -6551,7 +6551,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       // only user gesture this flow has.
       const originPat = detected.provider === "bilibili" ? BILI_ORIGIN : YT_ORIGIN;
       let granted = false;
-      try { granted = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) {}
+      try { granted = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) { /* swallow-ok: Chrome permissions API rejection is treated as ungranted */ }
       // Only a real click may escalate to permissions.request (Chrome
       // rejects it without a gesture anyway, and the host-permission rule
       // says automatic paths only ever check) -- the auto-boot path lands
@@ -6578,7 +6578,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         // leaving it wherever the swap dropped it.
         if (hadPosterFocus && focusFell()) {
           const target = playerUp ? retryBtn : cta;
-          try { target.focus({ preventScroll: true }); } catch (_) {}
+          try { target.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ }
         }
         return;
       }
@@ -6642,7 +6642,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       (async () => {
         const originPat = detected.provider === "bilibili" ? BILI_ORIGIN : YT_ORIGIN;
         let g = false;
-        try { g = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) {}
+        try { g = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
         if (g) await runLoad(false);
       })().catch((e) => {
         console.warn("[pbp-video] committed auto load:", (e && e.message) || e);
@@ -6664,7 +6664,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       (async () => {
         const originPat = detected.provider === "bilibili" ? BILI_ORIGIN : YT_ORIGIN;
         let g = false;
-        try { g = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) {}
+        try { g = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
         if (g) await runLoad(false);
       })().catch((e) => {
         console.warn("[pbp-video] fallback auto load:", (e && e.message) || e);

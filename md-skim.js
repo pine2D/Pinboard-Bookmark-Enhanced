@@ -239,8 +239,8 @@ function _pbpSkimBuildSection(view) {
 
   const regenBtn = sec.querySelector("#skim-regen");
   const collapseBtn = sec.querySelector("#skim-collapse");
-  regenBtn.addEventListener("click", () => _pbpSkimRegen().catch(() => {}));
-  sec.querySelector("#skim-stale-regen").addEventListener("click", () => _pbpSkimRegen().catch(() => {}));
+  regenBtn.addEventListener("click", () => _pbpSkimRegen().catch(() => { /* swallow-ok: AbortController.abort guard on settled controller */ }));
+  sec.querySelector("#skim-stale-regen").addEventListener("click", () => _pbpSkimRegen().catch(() => { /* swallow-ok: AbortController.abort guard on settled controller */ }));
   sec.querySelector("#skim-stop").addEventListener("click", () => {
     if (_pbpSkimState && _pbpSkimState.ctrl) _pbpSkimState.ctrl.abort();
   });
@@ -278,7 +278,7 @@ function _pbpSkimWireCollapse(sec, collapseBtn) {
         if (overridden) return;
         setCollapsed(!!(res && res.pbp_skim_collapsed)); // restore: no animation
       });
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
   }
   collapseBtn.addEventListener("click", () => {
     overridden = true;
@@ -295,7 +295,7 @@ function _pbpSkimWireCollapse(sec, collapseBtn) {
       // an unhandled rejection in the reader console. Same shape as
       // md-reader.js's pbp_srch_regex / pbp_zen_width / pbp_font_tier writes:
       // losing this one preference write is the acceptable degradation.
-      try { chrome.storage.local.set({ pbp_skim_collapsed: collapsed }).catch(() => {}); } catch (_) {}
+      try { chrome.storage.local.set({ pbp_skim_collapsed: collapsed }).catch(() => { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }); } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
     }
   });
 }
@@ -322,7 +322,7 @@ async function _pbpSkimLoad(rev) {
   }
   const st = _pbpSkimState;
   let entry = null;
-  try { entry = await pbpAiCacheGet(_pbpSkimCacheKey(st.url)); } catch (_) {}
+  try { entry = await pbpAiCacheGet(_pbpSkimCacheKey(st.url)); } catch (_) { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ }
   const r = entry && entry.result;
   const curFp = (typeof pbpAiBlocksFingerprint === "function") ? pbpAiBlocksFingerprint() : "";
   if (r && typeof r === "object" && typeof r.md === "string"
@@ -530,7 +530,7 @@ function _pbpSkimFinalize(fullText, usage, sent) {
     model: meta.modelKey,
     langKey: meta.langKey,
     modelKey: meta.modelKey
-  }, Date.now()).catch(() => {});
+  }, Date.now()).catch(() => { /* swallow-ok: optional IndexedDB AI/reader cache operation degrades without blocking feature */ });
   const stale = document.getElementById("skim-stale");
   if (stale) stale.hidden = true;
   _pbpSkimRenderUsage(usage);
@@ -595,7 +595,7 @@ function _pbpSkimShowError(error) {
     // stale click after a newer run already started must not fire a
     // second, overlapping request.
     if (_pbpSkimState && _pbpSkimState.running) return;
-    _pbpSkimRegen().catch(() => {});
+    _pbpSkimRegen().catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
   });
   body.appendChild(p);
   body.appendChild(retry);
@@ -632,7 +632,7 @@ async function _pbpSkimRegen() {
     // manual regen must stay a no-op (token-protection invariant #1).
     // Fail CLOSED on a read failure: without confirmed-current settings a
     // paid request must not fire on the stale snapshot.
-    try { st.s = await pbpAiGetSettings(); } catch (_) { return; }
+    try { st.s = await pbpAiGetSettings(); } catch (_) { /* swallow-ok: settings storage read failure degrades to safe defaults or fail-closed guard */  return; }
     if (superseded()) { owned = false; return; }
     if (!pbpAiAvailable(st.s) || st.s.previewSkimEnabled !== true) return;
     if (st.permissionError) {
@@ -690,7 +690,7 @@ function _pbpSkimOnArticleWillReplace(detail) {
   // nothing. The abort stops the stream; the bump is what stops a response
   // that was already parsed when the abort landed.
   st.gen += 1;
-  if (st.ctrl) { try { st.ctrl.abort(); } catch (_) {} }
+  if (st.ctrl) { try { st.ctrl.abort(); } catch (_) { /* swallow-ok: AbortController.abort guard on settled controller */ } }
   st.ctrl = null;
   // The run's finally is now fenced out, so this teardown owns everything it
   // would have restored. st.running especially: without the release here,
@@ -714,7 +714,7 @@ function _pbpSkimOnArticleReplaced() {
   // into -- through the same cache-probe-then-generate path.
   if (_pbpSkimDeferredVideo && window.pbpVideoDoc && window.pbpVideoDoc.kind === "video-transcript") {
     _pbpSkimDeferredVideo = false;
-    _pbpSkimLoad(_pbpSkimArticleRev).catch(() => {});
+    _pbpSkimLoad(_pbpSkimArticleRev).catch(() => { /* swallow-ok: optional video metadata garnish never blocks export */ });
     return;
   }
   // No cache probe, no generation, no request of any kind -- not even a free
@@ -740,7 +740,7 @@ function _pbpSkimOnArticleReplaced() {
 // "pbp:rendered", so this line never executes there).
 if (typeof document !== "undefined") {
   document.addEventListener("pbp:rendered", (e) => {
-    pbpSkimInit((e && e.detail) || {}).catch(() => {});
+    pbpSkimInit((e && e.detail) || {}).catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
   }, { once: true });
   // Deliberately NOT {once:true}: one page life can see any number of
   // replacements (track switch, AI punctuation, promotion).

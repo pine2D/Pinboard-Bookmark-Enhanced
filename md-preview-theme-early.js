@@ -88,7 +88,7 @@
       var darkLink = document.getElementById(DARK_LINK_ID);
       if (lightLink) lightLink.media = r.lightMedia;
       if (darkLink) darkLink.media = r.darkMedia;
-    } catch (_) { /* degrade: leave the system-following CSS default in place */ }
+    } catch (_) { /* swallow-ok: highlight stylesheet media swap degrades to system-following CSS default */  /* degrade: leave the system-following CSS default in place */ }
   }
 
   // 1) Synchronous localStorage mirrors -- instant, before first paint.
@@ -105,7 +105,7 @@
       )
     );
     applyWidth(localStorage.getItem(WIDTH_KEY));
-  } catch (_) { /* localStorage unavailable (rare); CSS default (auto) already applies */ }
+  } catch (_) { /* swallow-ok: localStorage FOUC mirror unavailable in restricted contexts */  /* localStorage unavailable (rare); CSS default (auto) already applies */ }
 
   // 2) Async source-of-truth read -- corrects the mirrors if stale, seeds them
   //    on first run. Mirrors popup-theme-early.js's async tail exactly, plus
@@ -127,7 +127,7 @@
   var override = "auto";
   var zenWidth = 720;
   var _optSyncMirror = null;
-  try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
+  try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) { /* swallow-ok: localStorage FOUC mirror unavailable in restricted contexts */ }
 
   var _settingsDefaults = { optTheme: "auto", mdVideoDarkScheme: false, themePresetKey: "", optPopupFollowTheme: true };
   var _firstHop;
@@ -168,8 +168,8 @@
       localStorage.setItem(SHARED_PRESET_KEY, presetKey);
       localStorage.setItem(SHARED_FOLLOW_KEY, follow ? "1" : "0");
       localStorage.setItem(WIDTH_KEY, String(zenWidth));
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: localStorage FOUC mirror unavailable in restricted contexts */ }
     apply(resolveReader(mode, override, videoDark), resolveChrome(presetKey, follow));
     applyWidth(zenWidth);
-  }).catch(function () { /* storage unavailable: localStorage mirrors already applied */ });
+  }).catch(function () { /* swallow-ok: localStorage FOUC mirror unavailable in restricted contexts */  /* storage unavailable: localStorage mirrors already applied */ });
 })();

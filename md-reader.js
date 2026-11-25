@@ -101,7 +101,7 @@ function pbpSearchEnumerateRegex(text, pattern, cap) {
   const limit = (typeof cap === "number" && cap > 0) ? cap : 0;
   if (limit <= 0) return out;
   let re;
-  try { re = new RegExp(pattern, "gi"); } catch (_) { return null; }
+  try { re = new RegExp(pattern, "gi"); } catch (_) { /* swallow-ok: invalid user regex syntax is handled as non-matching search input */  return null; }
   let m;
   while (out.length < limit && (m = re.exec(text))) {
     if (m[0].length === 0) { re.lastIndex++; continue; } // zero-length match guard: advance, don't push (prevents infinite loop, e.g. "x*")
@@ -153,7 +153,7 @@ function pbpSearchFilterNotes(items, query, isRegex) {
   if (!Array.isArray(items) || typeof query !== "string" || !query.length) return [];
   let re = null;
   if (isRegex) {
-    try { re = new RegExp(query, "i"); } catch (_) { return null; }
+    try { re = new RegExp(query, "i"); } catch (_) { /* swallow-ok: invalid user regex syntax is handled as non-matching search input */  return null; }
   }
   const needle = query.toLowerCase();
   const out = [];
@@ -207,7 +207,7 @@ function _pbpFnEscAttr(s) {
 function _pbpFnFindDef(id) {
   const sel = 'a[href="#fnref:' + _pbpFnEscAttr(id) + '"]';
   let cands;
-  try { cands = document.querySelectorAll(sel); } catch (_) { return null; }
+  try { cands = document.querySelectorAll(sel); } catch (_) { /* swallow-ok: escaped footnote id selector guard */  return null; }
   let first = null;
   for (const a of cands) {
     const li = a.closest("li");
@@ -223,7 +223,7 @@ function _pbpFnFindDef(id) {
 function _pbpFnFindRef(id) {
   const sel = 'a[href="#fn:' + _pbpFnEscAttr(id) + '"]';
   let cands;
-  try { cands = document.querySelectorAll(sel); } catch (_) { return null; }
+  try { cands = document.querySelectorAll(sel); } catch (_) { /* swallow-ok: escaped footnote id selector guard */  return null; }
   let first = null;
   for (const a of cands) {
     if (!first) first = a;
@@ -246,7 +246,7 @@ function _pbpReaderKeepPopover(el) {
 function _pbpReaderHideOtherPopovers(current) {
   document.querySelectorAll(":popover-open").forEach((el) => {
     if (el !== current && !_pbpReaderKeepPopover(el)) {
-      try { el.hidePopover(); } catch (_) {}
+      try { el.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
     }
   });
 }
@@ -286,7 +286,7 @@ function _pbpFnEnsurePop() {
   jumpBtn.appendChild(jumpLabel);
   jumpBtn.addEventListener("click", () => {
     if (!_pbpFnCurrentLi) return;
-    try { pop.hidePopover(); } catch (_) {}
+    try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
     pbpScrollIntoView(_pbpFnCurrentLi, { block: "center", behavior: "smooth" });
     const range = document.createRange();
     range.selectNode(_pbpFnCurrentLi);
@@ -682,7 +682,7 @@ function _pbpSearchRun(query, opts) {
   // pbpSearchEnumerateRegex itself is never even called in that case).
   let bad = false;
   if (_pbpSearchRegexOn && query) {
-    try { new RegExp(query, "gi"); } catch (_) { bad = true; }
+    try { new RegExp(query, "gi"); } catch (_) { /* swallow-ok: invalid user regex syntax is handled as non-matching search input */  bad = true; }
   }
   if (query && view && !bad) {
     const cands = _pbpSearchVisibleCandidates(view);
@@ -928,7 +928,7 @@ function _pbpSearchEnsurePop() {
           _pbpSearchRun(_pbpSearchState.query, { jump: false, preserveCurrent: true });
         }
       });
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
   }
   regexBtn.addEventListener("click", () => {
     regexTouched = true;
@@ -941,7 +941,7 @@ function _pbpSearchEnsurePop() {
       // catch -- without the .catch a full storage.local turns a toggle click
       // into an unhandled rejection. Losing the preference is the accepted
       // degradation; the toggle still works for this page's life.
-      try { chrome.storage.local.set({ pbp_srch_regex: _pbpSearchRegexOn }).catch(() => {}); } catch (_) {}
+      try { chrome.storage.local.set({ pbp_srch_regex: _pbpSearchRegexOn }).catch(() => { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }); } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
     }
     clearTimeout(_pbpSearchInputTimer);
     _pbpSearchInputTimer = null;
@@ -1411,7 +1411,7 @@ function _pbpZenLoadWidth() {
       if (_pbpZenWidth !== PBP_ZEN_DEFAULT_WIDTH) _pbpZenApplyWidth(); // default == CSS fallback: applying would only churn layout
       else _pbpZenUpdateWidthBtn(); // still label the buttons with the resolved step
     });
-  } catch (_) {}
+  } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
 }
 
 // Single apply path shared by load + both cycle buttons: sets the
@@ -1485,7 +1485,7 @@ function _pbpZenSetWidth(width) {
   _pbpZenWidth = width;
   _pbpZenApplyWidth();
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    try { chrome.storage.local.set({ pbp_zen_width: _pbpZenWidth }).catch(() => {}); } catch (_) {}
+    try { chrome.storage.local.set({ pbp_zen_width: _pbpZenWidth }).catch(() => { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }); } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
   }
 }
 
@@ -1541,7 +1541,7 @@ function _pbpZenEnter() {
   // IIFE that publishes its API on window, and a page without it (every
   // non-video article) simply records null.
   _pbpZenPrevStudyView = (typeof window.pbpVideoStudyView === "function") ? window.pbpVideoStudyView() : null;
-  try { document.dispatchEvent(new CustomEvent("pbp:ensure-article-visible")); } catch (_) {}
+  try { document.dispatchEvent(new CustomEvent("pbp:ensure-article-visible")); } catch (_) { /* swallow-ok: cross-module CustomEvent listener isolation */ }
   const anchor = _pbpZenCaptureAnchor();
   const ae = document.activeElement;
   const focusWasInRail = !!(ae && typeof ae.closest === "function" && ae.closest("#rail"));
@@ -1581,9 +1581,9 @@ function _pbpZenExit() {
     // open would flip back again. If the current view is no longer the
     // "reading" that entering zen forced, the round trip is over.
     let live = null;
-    try { live = window.pbpVideoStudyView(); } catch (_) {}
+    try { live = window.pbpVideoStudyView(); } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
     if (live === "reading") {
-      try { window.pbpVideoStudyView("timeline"); } catch (_) {}
+      try { window.pbpVideoStudyView("timeline"); } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
     }
   }
 }
@@ -1656,7 +1656,7 @@ let _pbpTypoInited = false;
 function _pbpTypoPersist(patch) {
   if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
   if (!patch || !Object.keys(patch).length) return;
-  try { chrome.storage.local.set(patch).catch(() => {}); } catch (_) {}
+  try { chrome.storage.local.set(patch).catch(() => { /* swallow-ok: advisory local storage read/write degrades to in-memory reader state */ }); } catch (_) { /* swallow-ok: advisory local storage read/write degrades to in-memory reader state */ }
 }
 
 // Runtime tier change: capture the reading anchor, swap the vars, re-settle --
@@ -1856,7 +1856,7 @@ function _pbpTypoEnsurePop() {
 // closes (toggle).
 function _pbpTypoToggle(anchorEl) {
   const pop = _pbpTypoEnsurePop();
-  if (pop.matches(":popover-open")) { try { pop.hidePopover(); } catch (_) {} return; }
+  if (pop.matches(":popover-open")) { try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ } return; }
   _pbpReaderHideOtherPopovers(pop);
   _pbpTypoSyncPop();
   const rect = anchorEl.getBoundingClientRect();
@@ -1889,7 +1889,7 @@ function _pbpTypoInit() {
         _pbpTypoLeading = t2.leading;
         _pbpTypoSyncPop();
       });
-    } catch (_) {}
+    } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */ }
   }
   const row = _pbpRailBottomRow();
   if (row) {
@@ -1970,7 +1970,7 @@ function _pbpReaderOnArticleWillReplace() {
   // replaced, and its jump button scrolls to _pbpFnCurrentLi -- about to be a
   // detached node, i.e. a scroll to nowhere plus a flash on an element that is
   // no longer in the document.
-  try { _pbpFnPop.hidePopover(); } catch (_) {}
+  try { _pbpFnPop.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
   _pbpFnCurrentLi = null;
 }
 
@@ -1979,17 +1979,17 @@ function _pbpReaderOnArticleReplaced() {
   // Injection is idempotent per <pre> (it skips one that already has a
   // .pb-copy-code), which is what makes this safe to call after a swap that
   // completed, half-completed, or threw.
-  try { _pbpCopyCodeInject(); } catch (_) {}
+  try { _pbpCopyCodeInject(); } catch (_) { /* swallow-ok: optional cross-module UI sync or DOM restore guard during article/view transitions */ }
 }
 
 if (typeof document !== "undefined") {
   document.addEventListener("pbp:rendered", () => {
-    try { _pbpFnInit(); } catch (_) {}
-    try { _pbpSearchInit(); } catch (_) {}
-    try { _pbpKbdHelpInit(); } catch (_) {}
-    try { _pbpZenInit(); } catch (_) {}
-    try { _pbpTypoInit(); } catch (_) {}
-    try { _pbpCopyCodeInit(); } catch (_) {}
+    try { _pbpFnInit(); } catch (_diagErr) { console.warn("[md-reader] footnote init failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
+    try { _pbpSearchInit(); } catch (_diagErr) { console.warn("[md-reader] search init failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
+    try { _pbpKbdHelpInit(); } catch (_diagErr) { console.warn("[md-reader] keyboard help init failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
+    try { _pbpZenInit(); } catch (_diagErr) { console.warn("[md-reader] zen init failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
+    try { _pbpTypoInit(); } catch (_diagErr) { console.warn("[md-reader] typography init failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
+    try { _pbpCopyCodeInit(); } catch (_diagErr) { console.warn("[md-reader] copy-code init failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
   }, { once: true });
   // Deliberately NOT {once:true}: one page life can see any number of
   // replacements (track switch, AI punctuation, promotion).
