@@ -747,6 +747,25 @@ async function _pbpOcrRequestOriginsOnGesture(origins) {
   return { ok: true };
 }
 
+async function _pbpOcrReadSlotSnapshot() {
+  const info = typeof window !== "undefined" && typeof window._pbpReaderSlotInfo === "function"
+    ? window._pbpReaderSlotInfo()
+    : null;
+  if (!info || !info.slotKey || typeof chrome === "undefined" || !chrome.storage?.local) return null;
+  try {
+    const cur = (await chrome.storage.local.get(info.slotKey))[info.slotKey];
+    return {
+      hasSlotSnap: true,
+      startSlotNonce: typeof cur?.nonce === "string" ? cur.nonce : "",
+      startSlotTs: Number.isFinite(cur?.ts) ? Number(cur.ts) : 0,
+      callerSlotNonce: typeof info.pageNonce === "string" ? info.pageNonce : "",
+    };
+  } catch (_) {
+    // swallow-ok: slot snapshot read failure degrades to reader load-time metadata
+    return null;
+  }
+}
+
 async function _pbpOcrOpenDocInReader(doc, handoff = {}, openInNewTab = false) {
   if (!doc || !doc.markdown || typeof chrome === "undefined" || !chrome.storage?.local) return false;
   const isLocal = typeof pbpIsLocalDocUrl === "function" && pbpIsLocalDocUrl(doc.url);
@@ -754,13 +773,11 @@ async function _pbpOcrOpenDocInReader(doc, handoff = {}, openInNewTab = false) {
     try { return new URLSearchParams(location.search).get("k") || ""; }
     catch (_) { /* swallow-ok: fallback to fresh UUID */ return ""; }
   })();
+  const freshKey = () => ((typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+    ? crypto.randomUUID()
+    : String(Date.now()) + "-" + String(Math.random()).slice(2));
   const sameDocAsSlot = Boolean(!openInNewTab && currentKey && typeof handoff.expectedUrl === "string" && handoff.expectedUrl === doc.url);
-  const k = sameDocAsSlot
-    ? currentKey
-    : ((typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
-      ? crypto.randomUUID()
-      : String(Date.now()) + "-" + String(Math.random()).slice(2));
-  const slotKey = "md_preview_data_" + k;
+  let k = sameDocAsSlot ? currentKey : freshKey();
   let account = typeof handoff.account === "string" ? handoff.account : "";
   if (!account && typeof pbpReadBookmarkConnection === "function") {
     try { account = (await pbpReadBookmarkConnection()).account || ""; }
@@ -770,33 +787,63 @@ async function _pbpOcrOpenDocInReader(doc, handoff = {}, openInNewTab = false) {
   const resolvedTitle = (typeof handoff.title === "string" && handoff.title.trim())
     ? handoff.title.trim()
     : (_pbpOcrTitleFromFileName(doc.fileName) || t("mdPreviewUntitled"));
-  const ocrSlotNonce = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
-    ? crypto.randomUUID()
-    : String(Date.now()) + "-" + String(Math.random()).slice(2);
-  const writeSlot = () => chrome.storage.local.set({
-    [slotKey]: {
-      markdown: doc.markdown,
-      title: resolvedTitle,
-      url: doc.url,
-      baseUrl: isLocal ? "" : doc.url,
-      sourceTabUrl: isLocal ? doc.url : (handoff.sourceTabUrl || doc.url),
-      bookmarkUrl: isLocal ? "" : (handoff.bookmarkUrl || doc.url),
-      ocrFileName: doc.fileName || "",
-      ocrCacheSaved: doc.cacheSaved !== false,
-      source: "deepseek-ocr",
-      engine: "local",
-      site: isLocal ? (doc.fileName || "") : (handoff.site || ""),
-      sourceIncognito,
-      bookmarkDraft: isLocal ? null : (handoff.bookmarkDraft || null),
-      account,
-      tags: isLocal ? [] : (Array.isArray(handoff.tags) ? handoff.tags : []),
-      description: isLocal ? "" : (typeof handoff.description === "string" ? handoff.description : ""),
-      nonce: ocrSlotNonce,
-      ts: Date.now(),
-    },
+  const ocrSlotNonce = freshKey();
+  const buildSlotRecord = (tsVal) => ({
+    markdown: doc.markdown,
+    title: resolvedTitle,
+    url: doc.url,
+    baseUrl: isLocal ? "" : doc.url,
+    sourceTabUrl: isLocal ? doc.url : (handoff.sourceTabUrl || doc.url),
+    bookmarkUrl: isLocal ? "" : (handoff.bookmarkUrl || doc.url),
+    ocrFileName: doc.fileName || "",
+    ocrCacheSaved: doc.cacheSaved !== false,
+    source: "deepseek-ocr",
+    engine: "local",
+    site: isLocal ? (doc.fileName || "") : (handoff.site || ""),
+    sourceIncognito,
+    bookmarkDraft: isLocal ? null : (handoff.bookmarkDraft || null),
+    account,
+    tags: isLocal ? [] : (Array.isArray(handoff.tags) ? handoff.tags : []),
+    description: isLocal ? "" : (typeof handoff.description === "string" ? handoff.description : ""),
+    nonce: ocrSlotNonce,
+    ts: tsVal,
   });
-  if (typeof pbpWithPreviewSlotLock === "function") await pbpWithPreviewSlotLock(slotKey, writeSlot);
-  else await writeSlot();
+  if (sameDocAsSlot) {
+    const currentSlotKey = "md_preview_data_" + currentKey;
+    const readerInfo = typeof window !== "undefined" && typeof window._pbpReaderSlotInfo === "function"
+      ? window._pbpReaderSlotInfo()
+      : null;
+    const commitSameSlot = async () => {
+      const cur = (await chrome.storage.local.get(currentSlotKey))[currentSlotKey];
+      const curTs = Number.isFinite(cur?.ts) ? Number(cur.ts) : 0;
+      const curNonce = typeof cur?.nonce === "string" ? cur.nonce : "";
+      let superseded = false;
+      if (handoff.hasSlotSnap === true) {
+        const startTs = Number.isFinite(handoff.startSlotTs) ? Number(handoff.startSlotTs) : 0;
+        const startNonce = typeof handoff.startSlotNonce === "string" ? handoff.startSlotNonce : "";
+        const callerNonce = typeof handoff.callerSlotNonce === "string" ? handoff.callerSlotNonce : "";
+        superseded = curTs > startTs || (curNonce !== startNonce && (!callerNonce || curNonce !== callerNonce));
+      } else if (readerInfo) {
+        const loadTs = Number.isFinite(readerInfo.pageLoadTs) ? Number(readerInfo.pageLoadTs) : 0;
+        const pageNonce = typeof readerInfo.pageNonce === "string" ? readerInfo.pageNonce : "";
+        const initNonce = typeof readerInfo.initialSlotNonce === "string" ? readerInfo.initialSlotNonce : "";
+        superseded = curTs > loadTs || Boolean(curNonce && curNonce !== pageNonce && curNonce !== initNonce);
+      }
+      if (superseded) {
+        k = freshKey();
+        await chrome.storage.local.set({ ["md_preview_data_" + k]: buildSlotRecord(Date.now()) });
+        return;
+      }
+      await chrome.storage.local.set({ [currentSlotKey]: buildSlotRecord(Math.max(Date.now(), curTs + 1)) });
+    };
+    if (typeof pbpWithPreviewSlotLock === "function") await pbpWithPreviewSlotLock(currentSlotKey, commitSameSlot);
+    else await commitSameSlot();
+  } else {
+    const slotKey = "md_preview_data_" + k;
+    const writeNewSlot = () => chrome.storage.local.set({ [slotKey]: buildSlotRecord(Date.now()) });
+    if (typeof pbpWithPreviewSlotLock === "function") await pbpWithPreviewSlotLock(slotKey, writeNewSlot);
+    else await writeNewSlot();
+  }
   const askQ = (() => {
     if (!sameDocAsSlot) return "";
     try {
@@ -1089,6 +1136,8 @@ function pbpOcrRenderPanel(opts = {}) {
         return;
       }
 
+      const startSlotSnap = await _pbpOcrReadSlotSnapshot();
+      if (ac.signal.aborted || !wrap.isConnected) return;
       const purpose = richInput.checked ? "rich_layout_recognition" : "text_recognition";
       let uploadBytes = null;
       let uploadName = "";
@@ -1127,6 +1176,7 @@ function pbpOcrRenderPanel(opts = {}) {
         return;
       }
       await _pbpOcrOpenDocInReader(res.doc, {
+        ...(startSlotSnap || {}),
         expectedUrl: mode === "online" ? onlineUrl : (typeof opts.expectedUrl === "string" ? opts.expectedUrl : ""),
         title: mode === "online" ? (opts.title || _pbpOcrTitleFromFileName(res.doc.fileName)) : _pbpOcrTitleFromFileName(res.doc.fileName),
         sourceTabUrl: mode === "online" ? (opts.sourceTabUrl || onlineUrl) : res.doc.url,

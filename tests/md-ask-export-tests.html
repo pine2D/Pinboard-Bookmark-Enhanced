@@ -216,6 +216,27 @@ await test('mid-flight external Clear during single-round copy aborts without re
       assert(copies===0,'clipboard must not be called when history cleared mid-flight');
       const diag=await pbpReadDiagErrors();
       assert(diag.length===0,'concurrent external Clear must not record ask_copy denied: '+JSON.stringify(diag));
+
+      // Also verify ask-archive account_changed during first-migration read neither copies nor logs ask_copy storage.
+      const origArchiveMigrate=window.pbpAskArchiveMigrate;
+      const origArchiveRead=window.pbpAskArchiveRead;
+      const origOwnerScope=window.pbpDictOwnerScope;
+      window.pbpAskHistGet=saved.pbpAskHistGet;
+      window.pbpDictOwnerScope=acc=>'acct_'+(acc||'default');
+      window.pbpAskArchiveMigrate=async()=>{const err=new Error('account_changed');err.code='account_changed';throw err;};
+      window.pbpAskArchiveRead=async()=>[];
+      try{
+        answer.querySelector('.ask-copy-btn').click();
+        await _pbpAskCopyThread();
+        await new Promise(resolve=>setTimeout(resolve,60));
+        assert(copies===0,'account_changed during archive migration must not write clipboard');
+        const diag2=await pbpReadDiagErrors();
+        assert(diag2.length===0,'account_changed during archive migration must not record ask_copy storage: '+JSON.stringify(diag2));
+      }finally{
+        window.pbpAskArchiveMigrate=origArchiveMigrate;
+        window.pbpAskArchiveRead=origArchiveRead;
+        window.pbpDictOwnerScope=origOwnerScope;
+      }
     }finally{
       Object.assign(window,saved);
       if(descriptor)Object.defineProperty(navigator,'clipboard',descriptor);else delete navigator.clipboard;

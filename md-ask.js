@@ -2526,13 +2526,20 @@ async function pbpAskExportSnapshot({ url, account, title } = {}) {
     const matching = st && st.account === account && pbpAiCacheUrlNorm(st.url) === pbpAiCacheUrlNorm(url);
     if (matching && st.temporary) records = st.records || [];
     else {
-      await pbpAskArchiveMigrate({ owner: _pbpAskArchiveOwnerOf(account), url, title: String(title || ""),
-        records: await pbpAskHistGet(url, account), isCurrent: () => revision === _pbpAskExportRevision });
-      const sessions = await pbpAskArchiveRead({ owner: _pbpAskArchiveOwnerOf(account), url,
-        ...(matching && st.sessionId ? { sessionId: st.sessionId } : {}) });
-      const session = sessions[0];
-      archiveSessionId = matching ? st.sessionId : session?.id || "";
-      records = session ? _pbpAskCurrentVersions(session.records) : [];
+      try {
+        await pbpAskArchiveMigrate({ owner: _pbpAskArchiveOwnerOf(account), url, title: String(title || ""),
+          records: await pbpAskHistGet(url, account), isCurrent: () => revision === _pbpAskExportRevision });
+        const sessions = await pbpAskArchiveRead({ owner: _pbpAskArchiveOwnerOf(account), url,
+          ...(matching && st.sessionId ? { sessionId: st.sessionId } : {}) });
+        const session = sessions[0];
+        archiveSessionId = matching ? st.sessionId : session?.id || "";
+        records = session ? _pbpAskCurrentVersions(session.records) : [];
+      } catch (err) {
+        if (err && (err.code === "account_changed" || err.message === "account_changed")) {
+          throw new Error("ask-history-changed");
+        }
+        throw err;
+      }
     }
   } else records = url && !_pbpAskClearing.has(historyKey) ? await pbpAskHistGet(url, account) : [];
   // Clear/account changes while the read was pending must not resurrect data.

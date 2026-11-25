@@ -5489,6 +5489,8 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       }
       const startNonce = typeof stored.nonce === "string" ? stored.nonce : "";
       const startTs = Number.isFinite(stored.ts) ? Number(stored.ts) : 0;
+      const startVideoTranscript = stored.videoTranscript === true;
+      const startVideoAiPunct = stored.videoAiPunct === true;
       // The storage slot is the preview's immutable ownership record. Message
       // fields are mutable and must never be allowed to replace account metadata.
       const owner = {
@@ -5565,7 +5567,8 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         const ownedByCaller = Boolean(callerNonce && latestNonce === callerNonce);
         if (isStrangerForCaller(latest)
             || (!ownedByCaller && latestNonce !== startNonce)
-            || (!ownedByCaller && latestTs > startTs)) {
+            || latestTs > startTs
+            || (latest.videoTranscript === true && (!startVideoTranscript || (latest.videoAiPunct === true && !startVideoAiPunct)))) {
           return { ok: false, error: "slot_changed" };
         }
         const nextNonce = callerNonce || startNonce;
@@ -5582,7 +5585,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
             // A Jina pass rewrites url; the bookmark address stays the handoff's.
             ...(typeof owner.bookmarkUrl === "string" ? { bookmarkUrl: owner.bookmarkUrl } : {}),
             ...(nextNonce ? { nonce: nextNonce } : {}),
-            ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
+            ts: Math.max(Date.now(), latestTs + 1) // sweep grace (see pbpSweepPreviewOrphans)
           }
         });
         return { ok: true };

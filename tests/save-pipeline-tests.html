@@ -843,6 +843,26 @@ await suite("unified save pipeline", async () => {
     equal(slot.nonce, "nonce-tab-b");
     equal(slot.videoAiPunct, true);
 
+    // Same-tab race: callerNonce matches latest.nonce, but the same tab committed a punctuated
+    // video transcript (bumping ts / videoTranscript / videoAiPunct) while reextractMarkdown ran.
+    slot = { restore: true, url: page, tabId: 7, account: "alice", tags: [], description: "", nonce: "nonce-same-tab", ts: 2500 };
+    sw.win.extractForPreview = async () => {
+      slot = {
+        url: page, tabId: 7, account: "alice", tags: [], description: "",
+        markdown: "# Same Tab Punctuated Transcript", videoTranscript: true, videoAiPunct: true,
+        nonce: "nonce-same-tab", ts: 2501,
+      };
+      return { source: "local", markdown: "# Stale Same Tab Extract", contentHtml: "", title: "Video", url: page };
+    };
+    const sameTabSuperseded = await new Promise((resolve) => sw.win.handleRuntimeMessage({
+      type: "reextractMarkdown", url: page, tabId: 7, engine: "local", k: "race-slot",
+      slotNonce: "nonce-same-tab", initialSlotNonce: "nonce-same-tab", pageLoadTs: 2500,
+    }, extSender(sw, "md-preview.html?k=race-slot"), resolve));
+    equal(sameTabSuperseded.ok, false, "same-tab stale reextractMarkdown must not overwrite newer transcript");
+    equal(sameTabSuperseded.error, "slot_changed");
+    equal(slot.markdown, "# Same Tab Punctuated Transcript");
+    equal(slot.videoAiPunct, true);
+
     // Also verify Web Lock exclusion during post-extract get+set when slot is unchanged.
     slot = { pending: true, url: page, tabId: 7, account: "alice", tags: [], description: "", ts: 3000 };
     let keyGets = 0;

@@ -154,6 +154,7 @@ function pbpEngineErrText(r, engine) {
   if (code === "deepseek_key_missing") return t("deepseekFetchKeyMissing");
   if (code === "deepseek_auth") return t("deepseekFetchAuthFailed");
   if (code === "invalid_url") return t("mdEngineDeepseekInvalidUrl");
+  if (code === "slot_changed") return t("mdEngineExtractFailed") + " (" + t("optReloadPage") + ")";
   return t("mdEngineExtractFailed");
 }
 function renderErrorState(message, retryFn, permissionRequired, alt, openUrl, primary) {
@@ -1576,6 +1577,12 @@ const _pbpReaderBoot = (async function () {
     if ((cur.ts || 0) > _pageLoadTs) return true;
     return cur.nonce !== _initialSlotNonce;
   }
+  window._pbpReaderSlotInfo = () => ({
+    slotKey: MP_KEY,
+    pageNonce: _pageNonce,
+    initialSlotNonce: _initialSlotNonce,
+    pageLoadTs: _pageLoadTs,
+  });
   if (info && (info.pending || info.restore)) {
     document.body.classList.add("md-shell");
   }
@@ -1926,7 +1933,8 @@ const _pbpReaderBoot = (async function () {
               // from the payload, so a transcript that dropped it lost all four
               // export fields and its lang on the next F5.
               author, published, site, image, lang: info.lang || "",
-              sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description: bookmarkNotes, ts: Date.now(),
+              sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description: bookmarkNotes,
+              ts: Math.max(Date.now(), (Number.isFinite(cur?.ts) ? Number(cur.ts) : 0) + 1),
               nonce: _pageNonce
             }
           });
@@ -2360,38 +2368,50 @@ const _pbpReaderBoot = (async function () {
     if (_isLocalOcr || _isReopenedOnlineOcr || _isOnlineOcrCandidate) {
       const _cachedOcr = typeof pbpOcrDocsGet === "function" ? await pbpOcrDocsGet(url) : null;
       if (_cachedOcr && _cachedOcr.markdown) {
+        let slotRestored = false;
+        let restoreWriteFailed = false;
         try {
           await _pbpWithPreviewSlotLock(async () => {
             const curOcr = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
-            if (!_isStrangerSlotRecord(curOcr)) {
-              await chrome.storage.local.set({
-                [MP_KEY]: {
-                  markdown: _cachedOcr.markdown,
-                  title: title || _cachedOcr.fileName || "",
-                  url,
-                  baseUrl: _isLocalOcr ? "" : baseUrl,
-                  sourceTabUrl,
-                  ...handedBookmarkUrl,
-                  ocrFileName: _cachedOcr.fileName || ocrFileName,
-                  source: "deepseek-ocr",
-                  engine: "local",
-                  site: _isLocalOcr ? (_cachedOcr.fileName || site) : site,
-                  sourceIncognito,
-                  bookmarkDraft: _isLocalOcr ? null : bookmarkDraft,
-                  account: bookmarkAccount,
-                  tags: _isLocalOcr ? [] : tags,
-                  description: _isLocalOcr ? "" : bookmarkNotes,
-                  ts: Date.now(),
-                  nonce: _pageNonce
-                }
-              });
+            if (_isStrangerSlotRecord(curOcr)) {
+              slotRestored = Boolean(curOcr && !curOcr.pending && !curOcr.restore);
+              return;
             }
+            await chrome.storage.local.set({
+              [MP_KEY]: {
+                markdown: _cachedOcr.markdown,
+                title: title || _cachedOcr.fileName || "",
+                url,
+                baseUrl: _isLocalOcr ? "" : baseUrl,
+                sourceTabUrl,
+                ...handedBookmarkUrl,
+                ocrFileName: _cachedOcr.fileName || ocrFileName,
+                source: "deepseek-ocr",
+                engine: "local",
+                site: _isLocalOcr ? (_cachedOcr.fileName || site) : site,
+                sourceIncognito,
+                bookmarkDraft: _isLocalOcr ? null : bookmarkDraft,
+                account: bookmarkAccount,
+                tags: _isLocalOcr ? [] : tags,
+                description: _isLocalOcr ? "" : bookmarkNotes,
+                ts: Math.max(Date.now(), (Number.isFinite(curOcr?.ts) ? Number(curOcr.ts) : 0) + 1),
+                nonce: _pageNonce
+              }
+            });
+            slotRestored = true;
           });
         } catch (e) {
+          restoreWriteFailed = true;
           console.warn("[md-preview] cached OCR slot restore failed:", (e && e.name) || "", (e && e.message) || e);
         }
-        location.reload();
-        return;
+        if (slotRestored) {
+          location.reload();
+          return;
+        }
+        if (restoreWriteFailed) {
+          renderErrorState(t("mdPreviewFailed"), () => { location.reload(); }, false, null, _isLocalOcr ? "" : url);
+          return;
+        }
       }
       if (_isLocalOcr && typeof pbpOcrRenderPanel === "function") {
         pbpOcrRenderPanel({ mode: "local", leadText: t("mdOcrEvictedLead"), sourceIncognito, expectedUrl: url });
@@ -2907,9 +2927,20 @@ const _pbpReaderBoot = (async function () {
       if (job.askOnly && !job.opts.ask.count) throw new Error("export-ask-empty");
     }
   }
+  const EXPORT_CONTEXT_CANCEL_CODES = new Set([
+    "export-context-changed",
+    "highlights-context-changed",
+    "ask-history-changed",
+    "account_changed",
+  ]);
+  function isExportContextCancelError(error) {
+    const code = typeof error?.code === "string" ? error.code : "";
+    const msg = typeof error?.message === "string" ? error.message : "";
+    return EXPORT_CONTEXT_CANCEL_CODES.has(code) || EXPORT_CONTEXT_CANCEL_CODES.has(msg);
+  }
   function exportErrorText(error) {
     return t(error?.message === "export-ask-empty" ? "mdExportAskEmpty"
-      : /(?:context|history)-changed/.test(error?.message || "") ? "mdExportContextChanged" : "mdPreviewFailed");
+      : isExportContextCancelError(error) ? "mdExportContextChanged" : "mdPreviewFailed");
   }
   // Every Markdown TEXT exit (Copy, Download .md, Send-to) goes through here.
   // rawMath hands formulas out as plain TeX for Obsidian/Pandoc; the HTML and
@@ -4861,8 +4892,7 @@ const _pbpReaderBoot = (async function () {
         }
       } catch (error) {
         if (_sig.aborted) return;
-        const isExpectedGuard = error?.message === "export-ask-empty"
-          || /(?:context|history)-changed/.test(error?.message || "");
+        const isExpectedGuard = error?.message === "export-ask-empty" || isExportContextCancelError(error);
         if (!isExpectedGuard) {
           console.warn("[export] send preparation failed:", error?.name, error?.message);
           if (typeof pbpRecordDiagError === "function") {
