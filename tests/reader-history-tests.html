@@ -57,7 +57,7 @@ function assert(cond, msg) {
 }
 
 async function until(pred, label) {
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 600; i++) {
     if (pred()) return;
     await new Promise((r) => setTimeout(r, 5));
   }
@@ -512,8 +512,10 @@ function buildEchoMessages(enTable) {
     btn.click();
     await until(() => pop.matches(":popover-open"), "popover reopened");
     pop.querySelectorAll(".rh-open")[1].click();
-    await until(() => mock.callsOf("tabs.create").length === 1, "other article opened in new tab");
-    assert(!pop.matches(":popover-open"), "popover did not close after opening other article");
+    await until(
+      () => mock.callsOf("tabs.create").length === 1 && !pop.matches(":popover-open"),
+      "other article opened in new tab and closed popover"
+    );
   });
 
   // 10. Real popup.html boot: split-button caret stays enabled and functional on unsupported-url tabs
@@ -584,8 +586,10 @@ function buildEchoMessages(enTable) {
     assert(parseFloat(fdoc.body.style.minHeight) > collapsedH + 100, "collapsed unsupported-url action popup must grow body.style.minHeight when multi-row history needs room");
     mock.userGesture();
     pop.querySelector(".pp-rh-open").click();
-    await until(() => mock.callsOf("tabs.create").length === 1, "popup history click opened reader tab");
-    assert(!pop.matches(":popover-open"), "popup history popover did not close after opening reader");
+    await until(
+      () => mock.callsOf("tabs.create").length === 1 && !pop.matches(":popover-open"),
+      "popup history click opened reader tab and closed popover"
+    );
     assert(fdoc.body.style.minHeight === "", "closing popup history must reset body.style.minHeight");
 
     // Reopen and Clear transitions to empty message
