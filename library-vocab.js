@@ -3514,10 +3514,14 @@ function _pbpVocabCloseExportMenu(restoreFocus) {
   if (!session) return;
   _vocabExportSession = null;
   session.anchor.setAttribute("aria-expanded", "false");
-  session.menu.remove();
-  if (restoreFocus && session.anchor.isConnected) {
-    try { session.anchor.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ session.anchor.focus(); }
+  if (restoreFocus) {
+    if (typeof pbpRestoreSurfaceFocus === "function") {
+      pbpRestoreSurfaceFocus([session.anchor, $id("vocab-search"), document.querySelector('.lib-tab[aria-selected="true"]')], session.menu);
+    } else if (session.anchor.isConnected) {
+      try { session.anchor.focus({ preventScroll: true }); } catch (_) { /* swallow-ok: fallback for environments rejecting focus options */ session.anchor.focus(); }
+    }
   }
+  session.menu.remove();
 }
 // The send runs from the menu item's own click, with nothing awaited first:
 // the Anki and Eudic paths open a permission prompt that needs that click's
@@ -3634,12 +3638,14 @@ if (_vocabExportOpen) {
   });
 }
 window.addEventListener("scroll", (e) => {
-  if (_vocabExportSession && !_vocabExportSession.menu.contains(e.target)) {
+  if (_vocabExportSession && _vocabExportSession.menu.isConnected && !_vocabExportSession.menu.contains(e.target)) {
     _pbpVocabCloseExportMenu(_vocabExportSession.menu.contains(document.activeElement));
   }
 }, true);
 window.addEventListener("resize", () => {
-  if (_vocabExportSession) _pbpVocabCloseExportMenu(_vocabExportSession.menu.contains(document.activeElement));
+  if (_vocabExportSession && _vocabExportSession.menu.isConnected) {
+    _pbpVocabCloseExportMenu(_vocabExportSession.menu.contains(document.activeElement));
+  }
 });
 const _vocabLoadMore = $id("vocab-load-more");
 if (_vocabLoadMore) _vocabLoadMore.addEventListener("click", () => {

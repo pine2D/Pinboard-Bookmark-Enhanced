@@ -6688,9 +6688,10 @@ function pbpRestoreSurfaceFocus(candidates, container) {
   return false;
 }
 
-function pbpBindPopoverFocusReturn(pop, getFallbacks) {
+function pbpBindPopoverFocusReturn(pop, getFallbacks, opts = null) {
   if (!pop || pop.dataset.pbpFocusReturnBound === "1") return;
   pop.dataset.pbpFocusReturnBound = "1";
+  const captureOpener = !opts || opts.captureOpener !== false;
   let opener = null;
   let needsRestore = false;
   const resolveCandidates = () => {
@@ -6704,9 +6705,9 @@ function pbpBindPopoverFocusReturn(pop, getFallbacks) {
     const ae = doc.activeElement;
     if (event.newState === "open") {
       needsRestore = false;
-      if (ae && ae !== doc.body && ae !== doc.documentElement && !pop.contains(ae)) {
-        opener = ae;
-      }
+      opener = (captureOpener && ae && ae !== doc.body && ae !== doc.documentElement && !pop.contains(ae))
+        ? ae
+        : null;
       return;
     }
     if (event.newState === "closed") {

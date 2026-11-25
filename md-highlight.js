@@ -1680,10 +1680,15 @@ function _pbpHlEnsureBar() {
   }).catch(() => { /* swallow-ok: popover state transition or selector guard on detached/closed element */ });
   bar.addEventListener("toggle", (e) => { if (e.newState === "closed") _pbpHlBarRange = null; });
   if (typeof pbpBindPopoverFocusReturn === "function") {
-    pbpBindPopoverFocusReturn(bar, () => [
-      document.getElementById("rendered-view"),
-      document.getElementById("skip-link"),
-    ]);
+    pbpBindPopoverFocusReturn(bar, () => {
+      const n = _pbpHlBarRange && _pbpHlBarRange.startContainer;
+      const host = (n && typeof pbpStudyHost === "function") ? pbpStudyHost(n) : null;
+      return [
+        host,
+        document.getElementById("rendered-view"),
+        document.getElementById("skip-link"),
+      ];
+    }, { captureOpener: false });
   }
   document.body.appendChild(bar);
   _pbpHlBarEl = bar;

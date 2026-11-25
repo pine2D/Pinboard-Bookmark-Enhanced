@@ -4748,19 +4748,36 @@ const _pbpReaderBoot = (async function () {
     primary._copyOrig = null;
     primary.classList.remove("copied");
     primary.title = "";
+    const menuHadFocusBeforeRebuild = !menu.hasAttribute("hidden") && menu.contains(document.activeElement);
+    const caretHadFocusBeforeRebuild = document.activeElement === caret;
+    const exportSummary = split.closest("details")?.querySelector("summary") || null;
     caret.removeAttribute("hidden");
+    if (menuHadFocusBeforeRebuild && enabledIds.length) {
+      if (typeof pbpRestoreSurfaceFocus === "function") {
+        pbpRestoreSurfaceFocus([caret, primary, exportSummary, document.getElementById("rendered-view")], menu);
+      } else {
+        caret.focus({ preventScroll: true });
+      }
+    }
     menu.setAttribute("hidden", "");
     caret.setAttribute("aria-expanded", "false");
 
     if (!enabledIds.length) {
       delete primary.dataset.targetId;
+      caret.setAttribute("hidden", "");
+      if (menuHadFocusBeforeRebuild || caretHadFocusBeforeRebuild) {
+        if (typeof pbpRestoreSurfaceFocus === "function") {
+          pbpRestoreSurfaceFocus([primary, document.getElementById("btn-copy-md"), exportSummary, document.getElementById("rendered-view")], menu);
+        } else {
+          primary.focus({ preventScroll: true });
+        }
+      }
       menu.innerHTML = "";
       split.classList.add("send-empty");
       // The label names what the click does (opens Settings), so the gear and
       // "Set up…" replace the "Send to…" that promised a menu this state lacks.
       primaryIc.innerHTML = (typeof PBP_ICONS !== "undefined" && PBP_ICONS.gear) || "";
       primaryLabel.textContent = t("mdSendSetupEllipsis");
-      caret.setAttribute("hidden", "");
       primary.title = t("mdSendNoneConfigured");
       primary.addEventListener("click", () => pbpOpenOptionsTab("markdown"), { signal: _sig });
       return;
@@ -5131,6 +5148,9 @@ function setupDrawer() {
   const main = document.querySelector("main");
   if (!toggle || !scrim || !rail) return;
   let lastFocus = null;
+  let toggleFocused = false;
+  toggle.addEventListener("focusin", () => { toggleFocused = true; });
+  document.addEventListener("focusin", (ev) => { if (ev.target !== toggle) toggleFocused = false; });
   // Popovers opened from the rail (the Aa typography panel) live on <body>,
   // outside #rail: they join the cycle right after the rail, otherwise the
   // wrap-around below keeps their controls unreachable by keyboard.
@@ -5202,10 +5222,23 @@ function setupDrawer() {
     }
   });
   window.matchMedia("(max-width: 1000px)").addEventListener("change", (e) => {
-    const toggleWasFocused = !e.matches && document.activeElement === toggle;
+    const drawerWasOpen = !e.matches && isOpen();
+    const toggleLostFocus = !e.matches && (toggleFocused || document.activeElement === toggle);
     if (!e.matches) pbpRailDrawerClose();
-    if (toggleWasFocused && typeof pbpRestoreSurfaceFocus === "function") {
-      pbpRestoreSurfaceFocus([document.getElementById("btn-rendered"), document.getElementById("rendered-view"), document.getElementById("skip-link")], null);
+    if (!e.matches && (drawerWasOpen || toggleLostFocus) && typeof pbpRestoreSurfaceFocus === "function") {
+      const ae = document.activeElement;
+      const validNow = typeof pbpIsVisibleFocusTarget === "function" ? pbpIsVisibleFocusTarget(ae) : Boolean(ae && ae !== document.body && ae !== toggle);
+      if (!validNow) {
+        toggleFocused = false;
+        pbpRestoreSurfaceFocus([
+          focusables()[0],
+          document.getElementById("btn-rendered"),
+          document.getElementById("rail-history-btn"),
+          document.getElementById("rail-settings-btn"),
+          document.getElementById("rendered-view"),
+          document.getElementById("skip-link"),
+        ], null);
+      }
     }
   });
 }

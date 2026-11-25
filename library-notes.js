@@ -1867,13 +1867,23 @@ function _pbpNotesCloseColorMenu(restoreFocus) {
   if (!session) return;
   _notesColorSession = null;
   session.anchor.setAttribute("aria-expanded", "false");
+  if (restoreFocus) {
+    if (typeof pbpRestoreSurfaceFocus === "function") {
+      pbpRestoreSurfaceFocus([session.anchor, $id("notes-filter"), document.querySelector('.lib-tab[aria-selected="true"]')], session.menu);
+    } else if (session.anchor.isConnected) {
+      _pbpNotesFocus(session.anchor);
+    }
+  }
   session.menu.remove();
-  if (restoreFocus && session.anchor.isConnected) _pbpNotesFocus(session.anchor);
 }
 window.addEventListener("scroll", (e) => {
-  if (_notesColorSession && !_notesColorSession.menu.contains(e.target)) _pbpNotesCloseColorMenu(false);
+  if (_notesColorSession && !_notesColorSession.menu.contains(e.target)) {
+    _pbpNotesCloseColorMenu(_notesColorSession.menu.contains(document.activeElement));
+  }
 }, true);
-window.addEventListener("resize", () => _pbpNotesCloseColorMenu(false));
+window.addEventListener("resize", () => {
+  if (_notesColorSession) _pbpNotesCloseColorMenu(_notesColorSession.menu.contains(document.activeElement));
+});
 
 function _pbpNotesOpenColorMenu(hit, anchor) {
   if (_notesColorSession?.anchor === anchor) { _pbpNotesCloseColorMenu(true); return; }

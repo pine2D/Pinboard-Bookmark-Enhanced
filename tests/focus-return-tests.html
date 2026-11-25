@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <meta name="pbp-expected-count" content="14" />
+  <meta name="pbp-expected-count" content="15" />
   <title>Cross-surface focus-return regression tests</title>
 </head>
 <body>
@@ -21,8 +21,23 @@
       if (!cond) throw new Error(msg || "assertion failed");
     };
     const tick = () => new Promise((r) => setTimeout(r, 0));
-    async function settle(n = 6) {
+    async function settle(n = 4) {
       for (let i = 0; i < n; i++) await tick();
+    }
+    async function waitFor(predicate, label = "condition", timeoutMs = 5000) {
+      const deadline = performance.now() + timeoutMs;
+      let lastErr = null;
+      while (performance.now() <= deadline) {
+        try {
+          const val = await predicate();
+          if (val) return val;
+        } catch (err) {
+          lastErr = err;
+        }
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      const suffix = lastErr && lastErr.message ? `: ${lastErr.message}` : "";
+      throw new Error(`${label} timed out after ${timeoutMs}ms${suffix}`);
     }
 
     async function test(name, fn) {
@@ -44,7 +59,9 @@
       realm.iframe.style.cssText = `width:${width}px;height:${height}px;border:0;position:fixed;left:0;top:0;visibility:visible;`;
     }
 
-    function pressEscape(win, doc) {
+    // Pure keydown Escape for JS-managed overlays (listbox, confirm, menus, drawer, ask panel)
+    // so nested layers prove real keyboard containment without synthetic hidePopover() interference.
+    function dispatchEscapeKey(win, doc) {
       const ev = new win.KeyboardEvent("keydown", {
         key: "Escape",
         code: "Escape",
@@ -53,6 +70,12 @@
       });
       const target = doc.activeElement || doc.body;
       target.dispatchEvent(ev);
+      return ev;
+    }
+
+    // Native UA popover="auto" light-dismiss simulation (untrusted KeyboardEvent does not trigger UA CloseWatcher).
+    function dismissAutoPopoverEscape(win, doc) {
+      const ev = dispatchEscapeKey(win, doc);
       if (!ev.defaultPrevented) {
         const openAuto = [...doc.querySelectorAll('[popover="auto"]:popover-open, [popover=""]:popover-open')];
         if (openAuto.length) {
@@ -80,7 +103,7 @@
     // Ensure host container is laid out onscreen so checkVisibility(), getClientRects(), and rAF run unthrottled.
     const styleHost = () => {
       const host = document.getElementById("pbp-sw-realms");
-      if (host) host.style.cssText = "position:fixed;left:0;top:0;width:1200px;height:800px;opacity:0.01;pointer-events:none;overflow:visible;";
+      if (host) host.style.cssText = "position:fixed;left:0;top:0;width:2600px;height:820px;opacity:0.01;pointer-events:none;overflow:visible;";
     };
 
     // 1. Shared focus-return helpers
@@ -106,7 +129,7 @@
       wrap.append(hiddenBtn, disabledBtn, inertBox, landmark, nextBtn);
       document.body.appendChild(wrap);
       try {
-        document.body.focus();
+        document.activeElement?.blur();
         const ok = pbpRestoreSurfaceFocus([hiddenBtn, disabledBtn, inertBtn, landmark], null);
         assert(ok === true, "pbpRestoreSurfaceFocus should land on visible landmark");
         assertValidActiveFocus(document, "shared landmark fallback", landmark);
@@ -118,20 +141,21 @@
       }
     });
 
-    // 2. Popup: #jina-md-history-pop (Escape + toggle close)
-    await test("popup: Reader history popover returns focus to #jina-md-history-btn on Escape and toggle close", async () => {
+    // 2. Popup: #jina-md-history-pop (real pbp_reader_history key + 160ms async read delay + Escape + toggle close)
+    await test("popup: Reader history popover renders pbp_reader_history under async delay and returns focus to #jina-md-history-btn", async () => {
       const realm = await pbpSwRealm.bootPopup({
         withStyles: true,
         mock: {
           storage: {
             local: {
               pinboardToken: obfuscateKey("alice:0123456789ABCDEF"),
-              pbpReaderHistory: [{
+              pbp_reader_history: [{
                 url: "https://example.com/a",
+                sourceTabUrl: "https://example.com/a",
                 title: "Article A",
                 site: "example.com",
                 engine: "local",
-                ts: Date.now() - 1000,
+                openedAt: Date.now() - 1000,
               }],
             },
           },
@@ -146,28 +170,47 @@
         const btn = doc.getElementById("jina-md-history-btn");
         assert(btn, "missing #jina-md-history-btn");
 
-        // Close via Escape after focusing inside popover
+        // Inject a 160ms delay on the first pbp_reader_history read to simulate 4-page concurrency contention.
+        const origGet = win.chrome.storage.local.get.bind(win.chrome.storage.local);
+        let delayedOnce = false;
+        win.chrome.storage.local.get = async (keys, ...rest) => {
+          const touchesHistory = !delayedOnce && (
+            keys === "pbp_reader_history"
+            || (Array.isArray(keys) && keys.includes("pbp_reader_history"))
+          );
+          if (touchesHistory) {
+            delayedOnce = true;
+            await new Promise((r) => setTimeout(r, 160));
+          }
+          return origGet(keys, ...rest);
+        };
+
+        // Close via Escape after focusing the seeded "Article A" history row
         btn.focus();
         btn.click();
-        await settle(8);
-        const pop = doc.getElementById("jina-md-history-pop");
-        assert(pop && pop.matches(":popover-open"), "popup history popover did not open");
-        const rowBtn = pop.querySelector("button") || pop;
-        rowBtn.focus();
-        assert(pop.contains(doc.activeElement), "focus should enter popup history popover");
-        pressEscape(win, doc);
-        await settle(4);
-        assert(!pop.matches(":popover-open"), "Escape did not close popup history popover");
+        const pop = await waitFor(() => {
+          const p = doc.getElementById("jina-md-history-pop");
+          return p && p.matches(":popover-open") ? p : null;
+        }, "popup history popover open");
+        assert(delayedOnce, "expected popup history open to read pbp_reader_history");
+        const seededRow = await waitFor(
+          () => [...pop.querySelectorAll('[role="listitem"] button, button')].find((b) => (b.textContent || "").includes("Article A")),
+          "seeded Article A row in popup history"
+        );
+        seededRow.focus();
+        assertValidActiveFocus(doc, "popup history seeded row focus", seededRow);
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !pop.matches(":popover-open"), "popup history Escape close");
         assertValidActiveFocus(doc, "popup history Escape", btn);
 
-        // Reopen, focus inside, and close via button toggle / hidePopover
+        // Reopen, focus seeded row, and close via button toggle
         btn.click();
-        await settle(8);
-        assert(pop.matches(":popover-open"), "popup history popover did not reopen");
-        (pop.querySelector("button") || pop).focus();
+        await waitFor(() => pop.matches(":popover-open"), "popup history reopen");
+        const reopenedRow = [...pop.querySelectorAll("button")].find((b) => (b.textContent || "").includes("Article A"));
+        assert(reopenedRow, "missing seeded Article A row on reopen");
+        reopenedRow.focus();
         btn.click();
-        await settle(4);
-        assert(!pop.matches(":popover-open"), "button click did not close popup history popover");
+        await waitFor(() => !pop.matches(":popover-open"), "popup history button toggle close");
         assertValidActiveFocus(doc, "popup history toggle close", btn);
       } finally {
         realm.dispose({ removeIframe: true });
@@ -187,19 +230,18 @@
 
         logoutBtn.focus();
         win.showConfirmPopover(logoutBtn, { msg: "Log out?", yesText: "Log out", noText: "Cancel" });
-        const pop1 = doc.querySelector(".confirm-popover");
-        assert(pop1, "confirm popover did not mount in popup");
+        const pop1 = await waitFor(() => doc.querySelector(".confirm-popover:not(.is-closing)"), "popup confirm open");
         pop1.querySelector(".confirm-no").focus();
-        pressEscape(win, doc);
-        await settle(4);
+        dispatchEscapeKey(win, doc);
+        await waitFor(() => doc.activeElement === logoutBtn, "popup confirm Escape focus return");
         assertValidActiveFocus(doc, "popup confirm Escape", logoutBtn);
 
         logoutBtn.focus();
         win.showConfirmPopover(logoutBtn, { msg: "Log out?", yesText: "Log out", noText: "Cancel" });
-        const pop2 = doc.querySelector(".confirm-popover:not(.is-closing)");
+        const pop2 = await waitFor(() => doc.querySelector(".confirm-popover:not(.is-closing)"), "popup confirm reopen");
         pop2.querySelector(".confirm-no").focus();
         pop2.querySelector(".confirm-no").click();
-        await settle(4);
+        await waitFor(() => doc.activeElement === logoutBtn, "popup confirm Cancel focus return");
         assertValidActiveFocus(doc, "popup confirm Cancel", logoutBtn);
 
         // Hidden opener + hidden anchor falls back to visible control instead of body
@@ -208,11 +250,11 @@
         doc.getElementById("main-section").appendChild(tempBtn);
         tempBtn.focus();
         win.showConfirmPopover(tempBtn, { msg: "Delete?", yesText: "Delete", noText: "Cancel", fallbackFocus: submitBtn });
-        const pop3 = doc.querySelector(".confirm-popover:not(.is-closing)");
+        const pop3 = await waitFor(() => doc.querySelector(".confirm-popover:not(.is-closing)"), "popup confirm hidden-opener open");
         pop3.querySelector(".confirm-no").focus();
         tempBtn.hidden = true;
         pop3.querySelector(".confirm-no").click();
-        await settle(4);
+        await waitFor(() => doc.activeElement === submitBtn, "popup confirm hidden-opener fallback");
         assertValidActiveFocus(doc, "popup confirm hidden-opener fallback", submitBtn);
       } finally {
         realm.dispose({ removeIframe: true });
@@ -236,31 +278,30 @@
       await test("options: Save-as-theme popover returns focus to #save-custom-theme on Escape and Cancel", async () => {
         const { win, doc } = optionsRealm;
         doc.getElementById("tab-appearance").click();
-        await settle(4);
         const cssBox = doc.getElementById("opt-custom-css");
+        const saveThemeBtn = doc.getElementById("save-custom-theme");
+        await waitFor(() => cssBox && saveThemeBtn, "options appearance controls ready");
         cssBox.value = "body { line-height: 1.5; }";
         cssBox.dispatchEvent(new win.Event("input", { bubbles: true }));
-        const saveThemeBtn = doc.getElementById("save-custom-theme");
-        assert(saveThemeBtn && !saveThemeBtn.disabled, "#save-custom-theme should enable when custom CSS is non-empty");
+        await waitFor(() => !saveThemeBtn.disabled, "#save-custom-theme enabled");
 
         saveThemeBtn.focus();
         saveThemeBtn.click();
-        await settle(4);
-        let pop = doc.querySelector(".theme-name-popover:not(.is-closing)");
-        assert(pop && pop.contains(doc.activeElement), "Save-as-theme input should receive focus on open");
-        pressEscape(win, doc);
-        await settle(4);
+        let pop = await waitFor(() => {
+          const el = doc.querySelector(".theme-name-popover:not(.is-closing)");
+          return el && el.contains(doc.activeElement) ? el : null;
+        }, "Save-as-theme popover open and focused");
+        dispatchEscapeKey(win, doc);
+        await waitFor(() => doc.activeElement === saveThemeBtn, "options theme-name Escape focus return");
         assertValidActiveFocus(doc, "options theme-name Escape", saveThemeBtn);
-        await new Promise((r) => setTimeout(r, 175));
+        await waitFor(() => !doc.querySelector(".theme-name-popover"), "Save-as-theme exit animation complete");
 
         saveThemeBtn.focus();
         saveThemeBtn.click();
-        await settle(4);
-        pop = doc.querySelector(".theme-name-popover:not(.is-closing)");
-        assert(pop, "Save-as-theme popover did not reopen");
+        pop = await waitFor(() => doc.querySelector(".theme-name-popover:not(.is-closing)"), "Save-as-theme reopen");
         pop.querySelector(".tnp-cancel").focus();
         pop.querySelector(".tnp-cancel").click();
-        await settle(4);
+        await waitFor(() => doc.activeElement === saveThemeBtn, "options theme-name Cancel focus return");
         assertValidActiveFocus(doc, "options theme-name Cancel", saveThemeBtn);
       });
 
@@ -268,25 +309,19 @@
       await test("options: listbox combobox keeps focus on #opt-ai-provider-btn across Escape and toggle close", async () => {
         const { win, doc } = optionsRealm;
         doc.getElementById("tab-ai").click();
-        await settle(4);
-        const btn = doc.getElementById("opt-ai-provider-btn");
-        assert(btn, "expected enhanced #opt-ai-provider-btn");
+        const btn = await waitFor(() => doc.getElementById("opt-ai-provider-btn"), "#opt-ai-provider-btn enhanced");
 
         btn.focus();
         btn.click();
-        await settle(2);
-        assert(btn.getAttribute("aria-expanded") === "true", "listbox should expand on click");
-        pressEscape(win, doc);
-        await settle(2);
-        assert(btn.getAttribute("aria-expanded") === "false", "Escape should collapse listbox");
+        await waitFor(() => btn.getAttribute("aria-expanded") === "true", "options listbox expand");
+        dispatchEscapeKey(win, doc);
+        await waitFor(() => btn.getAttribute("aria-expanded") === "false", "options listbox Escape collapse");
         assertValidActiveFocus(doc, "options listbox Escape", btn);
 
         btn.click();
-        await settle(2);
-        assert(btn.getAttribute("aria-expanded") === "true", "listbox should re-expand");
+        await waitFor(() => btn.getAttribute("aria-expanded") === "true", "options listbox re-expand");
         btn.click();
-        await settle(2);
-        assert(btn.getAttribute("aria-expanded") === "false", "second click should collapse listbox");
+        await waitFor(() => btn.getAttribute("aria-expanded") === "false", "options listbox toggle collapse");
         assertValidActiveFocus(doc, "options listbox toggle", btn);
       });
 
@@ -296,28 +331,25 @@
         const resetBtn = doc.getElementById("reset-panel-btn");
         resetBtn.focus();
         resetBtn.click();
-        await settle(4);
-        let pop = doc.querySelector(".confirm-popover:not(.is-closing)");
-        assert(pop, "reset-tab confirm popover did not open");
+        let pop = await waitFor(() => doc.querySelector(".confirm-popover:not(.is-closing)"), "options reset confirm open");
         pop.querySelector(".confirm-no").focus();
-        pressEscape(win, doc);
-        await settle(4);
+        dispatchEscapeKey(win, doc);
+        await waitFor(() => doc.activeElement === resetBtn, "options reset confirm Escape");
         assertValidActiveFocus(doc, "options reset confirm Escape", resetBtn);
 
         resetBtn.focus();
         resetBtn.click();
-        await settle(4);
-        pop = doc.querySelector(".confirm-popover:not(.is-closing)");
+        pop = await waitFor(() => doc.querySelector(".confirm-popover:not(.is-closing)"), "options reset confirm reopen");
         pop.querySelector(".confirm-no").focus();
         pop.querySelector(".confirm-no").click();
-        await settle(4);
+        await waitFor(() => doc.activeElement === resetBtn, "options reset confirm Cancel");
         assertValidActiveFocus(doc, "options reset confirm Cancel", resetBtn);
       });
     } finally {
       optionsRealm.dispose({ removeIframe: true });
     }
 
-    // Shared Library realm for tests 7–9
+    // Shared Library realm for tests 7–10
     const libraryRealm = await pbpSwRealm.bootLibrary({
       withStyles: true,
       search: "#vocab",
@@ -337,8 +369,7 @@
       },
     });
     styleHost();
-    sizeIframe(libraryRealm, 1100, 760);
-    await settle(10);
+    sizeIframe(libraryRealm, 1200, 760);
 
     try {
       // Seed one vocabulary word so #vocab-export-open and filter controls are active
@@ -350,7 +381,10 @@
         sourceUrl: "https://example.com/focus",
       });
       libraryRealm.doc.dispatchEvent(new libraryRealm.win.CustomEvent("pbp-lib-view", { detail: { view: "vocab" } }));
-      await settle(12);
+      await waitFor(
+        () => libraryRealm.doc.getElementById("vocab-export-open") && !libraryRealm.doc.getElementById("vocab-export-open").disabled,
+        "library vocab export button enabled"
+      );
 
       // 7. Library: #lib-keys keyboard shortcuts popover (button + "?" hotkey)
       await test("library: #lib-keys returns focus to #lib-keys-open when opened by click or '?' hotkey", async () => {
@@ -362,104 +396,186 @@
         // Open via click, move focus inside, close via Escape
         openBtn.focus();
         keysPop.showPopover({ source: openBtn });
-        await settle(3);
+        await waitFor(() => keysPop.matches(":popover-open"), "#lib-keys open");
         keysPop.tabIndex = -1;
         keysPop.focus();
-        pressEscape(win, doc);
-        await settle(4);
-        assert(!keysPop.matches(":popover-open"), "#lib-keys should close on Escape");
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !keysPop.matches(":popover-open"), "#lib-keys Escape close");
         assertValidActiveFocus(doc, "library #lib-keys click+Escape", openBtn);
 
         // Open via '?' hotkey starting from document.body, then close via Escape
         doc.activeElement?.blur();
         doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: "?", bubbles: true, cancelable: true }));
-        await settle(4);
-        assert(keysPop.matches(":popover-open"), "'?' hotkey should open #lib-keys");
-        pressEscape(win, doc);
-        await settle(4);
-        assert(!keysPop.matches(":popover-open"), "Escape should close '?' #lib-keys");
+        await waitFor(() => keysPop.matches(":popover-open"), "'?' hotkey opens #lib-keys");
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !keysPop.matches(":popover-open"), "'?' #lib-keys Escape close");
         assertValidActiveFocus(doc, "library #lib-keys '?'+Escape", openBtn);
       });
 
-      // 8. Library: narrow #vocab-filter-set popover + float listbox + widen-while-open fallback
-      await test("library: narrow #vocab-filter-set and float listbox return focus on Escape and viewport widen", async () => {
+      // 8. Library: narrow #vocab-filter-set popover + nested float listbox + real ResizeObserver widen close
+      await test("library: narrow #vocab-filter-set contains nested listbox Escape and auto-closes with valid focus on widen", async () => {
         const { win, doc } = libraryRealm;
-        sizeIframe(libraryRealm, 700, 760);
-        await settle(8);
-        const pane = doc.getElementById("vocab-list-pane");
-        if (pane && typeof pane._pbpHeaderFit === "function") pane._pbpHeaderFit();
-        await settle(4);
-
         const narrowBtn = doc.getElementById("vocab-filter-narrow");
         const filterSet = doc.getElementById("vocab-filter-set");
         const groupBtn = doc.getElementById("vocab-group-filter-btn");
         assert(narrowBtn && filterSet && groupBtn, "missing narrow filter controls");
 
+        sizeIframe(libraryRealm, 700, 760);
+        await waitFor(() => win.getComputedStyle(narrowBtn).display !== "none", "narrow filter button visible at 700px");
+
         narrowBtn.focus();
         filterSet.showPopover({ source: narrowBtn });
-        await settle(4);
+        await waitFor(() => filterSet.matches(":popover-open"), "#vocab-filter-set open");
         groupBtn.focus();
         groupBtn.click();
-        await settle(3);
-        assert(groupBtn.getAttribute("aria-expanded") === "true", "float group listbox should open inside filter popover");
+        await waitFor(() => groupBtn.getAttribute("aria-expanded") === "true", "float group listbox open");
 
-        // First Escape closes float listbox and keeps focus on groupBtn
-        pressEscape(win, doc);
-        await settle(3);
-        assert(groupBtn.getAttribute("aria-expanded") === "false", "Escape should close float group listbox");
+        // Pure keydown Escape closes ONLY the nested float listbox; #vocab-filter-set stays open
+        dispatchEscapeKey(win, doc);
+        await waitFor(() => groupBtn.getAttribute("aria-expanded") === "false", "float listbox Escape close");
+        assert(filterSet.matches(":popover-open"), "nested listbox Escape must keep #vocab-filter-set open");
         assertValidActiveFocus(doc, "library float listbox Escape", groupBtn);
 
         // Second Escape closes #vocab-filter-set and restores focus to #vocab-filter-narrow
-        pressEscape(win, doc);
-        await settle(4);
-        assert(!filterSet.matches(":popover-open"), "Escape should close #vocab-filter-set");
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !filterSet.matches(":popover-open"), "#vocab-filter-set Escape close");
         assertValidActiveFocus(doc, "library narrow filter Escape", narrowBtn);
 
-        // Reopen narrow filter, focus inside, then widen to 1100px so #vocab-filter-narrow hides
+        // Reopen narrow filter, focus inside, then widen to 2600px (20vw = 520px index pane) so production ResizeObserver auto-closes #vocab-filter-set
         narrowBtn.focus();
         filterSet.showPopover({ source: narrowBtn });
-        await settle(4);
+        await waitFor(() => filterSet.matches(":popover-open"), "#vocab-filter-set reopen");
         groupBtn.focus();
-        sizeIframe(libraryRealm, 1100, 760);
-        if (pane && typeof pane._pbpHeaderFit === "function") pane._pbpHeaderFit(600);
-        if (filterSet.matches(":popover-open")) filterSet.hidePopover();
-        await settle(6);
-        assertValidActiveFocus(doc, "library filter widen-while-open fallback");
+        sizeIframe(libraryRealm, 2600, 760);
+        await waitFor(() => !filterSet.matches(":popover-open"), "production ResizeObserver auto-closes #vocab-filter-set on widen");
+        assert(win.getComputedStyle(narrowBtn).display === "none", "#vocab-filter-narrow should be hidden in wide header fit");
+        const landed = assertValidActiveFocus(doc, "library filter widen-while-open fallback");
+        assert(
+          landed === groupBtn || landed === doc.getElementById("vocab-search"),
+          `expected widen focus on inline filter or #vocab-search, got #${landed.id || landed.className}`
+        );
+        sizeIframe(libraryRealm, 1200, 760);
+        await new Promise((r) => win.requestAnimationFrame(() => setTimeout(r, 0)));
       });
 
-      // 9. Library: #vocab-export-open menu & Notes color menu
-      await test("library: vocabulary export menu returns focus to #vocab-export-open on Escape and resize", async () => {
+      // 9. Library: #vocab-export-open menu
+      await test("library: vocabulary export menu returns focus to #vocab-export-open on Escape, scroll, and resize", async () => {
         const { win, doc } = libraryRealm;
         const exportBtn = doc.getElementById("vocab-export-open");
+        const searchInput = doc.getElementById("vocab-search");
         assert(exportBtn && !exportBtn.disabled, "expected enabled #vocab-export-open");
 
         exportBtn.focus();
         exportBtn.click();
-        await settle(6);
-        let menu = doc.querySelector(".vocab-export-menu:popover-open");
-        assert(menu && menu.contains(doc.activeElement), "export menu should open and focus first item");
-        pressEscape(win, doc);
-        await settle(4);
-        assert(!doc.querySelector(".vocab-export-menu:popover-open"), "Escape should close export menu");
+        let menu = await waitFor(() => {
+          const m = doc.querySelector(".vocab-export-menu:popover-open");
+          return m && m.contains(doc.activeElement) ? m : null;
+        }, "vocab export menu open");
+        dispatchEscapeKey(win, doc);
+        await waitFor(() => !doc.querySelector(".vocab-export-menu:popover-open"), "vocab export menu Escape close");
         assertValidActiveFocus(doc, "library export menu Escape", exportBtn);
 
         // Reopen and trigger window resize while focus is inside the menu
         exportBtn.focus();
         exportBtn.click();
-        await settle(6);
-        menu = doc.querySelector(".vocab-export-menu:popover-open");
-        assert(menu && menu.contains(doc.activeElement), "export menu should reopen");
+        menu = await waitFor(() => {
+          const m = doc.querySelector(".vocab-export-menu:popover-open");
+          return m && m.contains(doc.activeElement) ? m : null;
+        }, "vocab export menu reopen");
         win.dispatchEvent(new win.Event("resize"));
-        await settle(4);
+        await waitFor(() => !doc.querySelector(".vocab-export-menu"), "vocab export menu resize close");
         assertValidActiveFocus(doc, "library export menu resize close", exportBtn);
+
+        // Reopen, move focus intentionally to #vocab-search, then resize -> preserve #vocab-search focus
+        exportBtn.focus();
+        exportBtn.click();
+        await waitFor(() => doc.querySelector(".vocab-export-menu:popover-open"), "vocab export menu reopen for external focus");
+        searchInput.focus();
+        win.dispatchEvent(new win.Event("resize"));
+        await waitFor(() => !doc.querySelector(".vocab-export-menu"), "vocab export menu external-focus resize close");
+        assertValidActiveFocus(doc, "library export menu preserves external focus", searchInput);
+      });
+
+      // 10. Library: #view-notes .notes-color-menu (Escape + scroll + resize + external focus preservation)
+      await test("library: notes excerpt color menu returns focus to .notes-excerpt-color on Escape, scroll, and resize", async () => {
+        const { win, doc } = libraryRealm;
+        const itemOwner = vocabOwner && vocabOwner !== "ownerless" ? String(vocabOwner) : "";
+        await win.chrome.storage.local.set({
+          pbp_hl_focus_notes: {
+            url: "https://example.com/notes-focus",
+            title: "Notes Focus Article",
+            items: [{
+              id: "hl-note-1",
+              quote: "Highlighted excerpt for color menu focus restoration.",
+              note: "Initial note",
+              color: 2,
+              n: 1,
+              ts: Date.now(),
+              owner: itemOwner,
+            }],
+          },
+        });
+        doc.getElementById("lib-tab-notes").click();
+        const hitBtn = await waitFor(() => doc.querySelector("#notes-list .notes-hit-btn"), "notes list row rendered");
+        hitBtn.click();
+        const colorBtn = await waitFor(() => doc.querySelector("#notes-detail .notes-excerpt-color"), "notes detail .notes-excerpt-color rendered");
+        const detailPane = doc.getElementById("notes-detail-pane") || doc.getElementById("notes-detail");
+        const notesFilter = doc.getElementById("notes-filter");
+
+        // (a) Escape
+        colorBtn.focus();
+        colorBtn.click();
+        await waitFor(() => {
+          const m = doc.querySelector(".notes-color-menu:popover-open");
+          return m && m.contains(doc.activeElement) ? m : null;
+        }, "notes color menu open (Escape)");
+        dispatchEscapeKey(win, doc);
+        await waitFor(() => !doc.querySelector(".notes-color-menu"), "notes color menu Escape close");
+        assertValidActiveFocus(doc, "notes color menu Escape", colorBtn);
+
+        // (b) Scroll detail pane while focus is inside .notes-color-menu
+        colorBtn.focus();
+        colorBtn.click();
+        await waitFor(() => {
+          const m = doc.querySelector(".notes-color-menu:popover-open");
+          return m && m.contains(doc.activeElement) ? m : null;
+        }, "notes color menu open (scroll)");
+        detailPane.dispatchEvent(new win.Event("scroll"));
+        await waitFor(() => !doc.querySelector(".notes-color-menu"), "notes color menu scroll close");
+        assertValidActiveFocus(doc, "notes color menu scroll close", colorBtn);
+
+        // (c) Window resize (1200 -> 1190) while focus is inside .notes-color-menu
+        colorBtn.focus();
+        colorBtn.click();
+        await waitFor(() => {
+          const m = doc.querySelector(".notes-color-menu:popover-open");
+          return m && m.contains(doc.activeElement) ? m : null;
+        }, "notes color menu open (resize)");
+        sizeIframe(libraryRealm, 1190, 760);
+        win.dispatchEvent(new win.Event("resize"));
+        await waitFor(() => !doc.querySelector(".notes-color-menu"), "notes color menu resize close");
+        assertValidActiveFocus(doc, "notes color menu resize close", colorBtn);
+
+        // (d) Focus moved outside menu to #notes-filter before resize -> keep #notes-filter focused
+        colorBtn.focus();
+        colorBtn.click();
+        await waitFor(() => doc.querySelector(".notes-color-menu:popover-open"), "notes color menu open (external focus)");
+        notesFilter.focus();
+        win.dispatchEvent(new win.Event("resize"));
+        await waitFor(() => !doc.querySelector(".notes-color-menu"), "notes color menu external-focus resize close");
+        assertValidActiveFocus(doc, "notes color menu preserves #notes-filter focus", notesFilter);
       });
     } finally {
       libraryRealm.dispose({ removeIframe: true });
     }
 
-    // Shared Reader realm for tests 10–14
+    // Shared Reader realm for tests 11–15
     const readerSlotKey = "md_preview_data_focus";
     const articleUrl = "https://example.com/focus-article";
+    const initialExportTargets = {
+      webhook: { enabled: true, url: "https://hooks.example.com/test" },
+      obsidian: { enabled: true },
+    };
     const readerRealm = await pbpSwRealm.bootReader({
       withStyles: true,
       search: "?k=focus",
@@ -472,16 +588,14 @@
             aiProvider: "openai",
             openaiApiKey: obfuscateKey("sk-focus-test"),
             deepseekApiKey: obfuscateKey("sk-ocr-focus"),
-            exportTargets: {
-              webhook: { enabled: true, url: "https://hooks.example.com/test" },
-              obsidian: { enabled: true },
-            },
-            pbpReaderHistory: [{
+            exportTargets: initialExportTargets,
+            pbp_reader_history: [{
               url: "https://example.com/prev",
+              sourceTabUrl: "https://example.com/prev",
               title: "Previous Article",
               site: "example.com",
               engine: "local",
-              ts: Date.now() - 5000,
+              openedAt: Date.now() - 5000,
             }],
             [readerSlotKey]: {
               url: articleUrl,
@@ -504,95 +618,147 @@
     });
     styleHost();
     sizeIframe(readerRealm, 1180, 780);
-    await settle(15);
+    await waitFor(
+      () => readerRealm.doc.querySelector('#rendered-view a[href^="#fn:"]'),
+      "reader article rendered"
+    );
 
     try {
-      // 10. Reader: mobile #rail drawer (<= 1000px)
-      await test("md-preview: mobile #rail drawer returns focus to #rail-toggle on Escape and scrim click", async () => {
+      // 11. Reader: mobile #rail drawer (<= 1000px, Escape + scrim + widen while #rail-toggle focused)
+      await test("md-preview: mobile #rail drawer returns focus on Escape, scrim click, and viewport widen while #rail-toggle holds focus", async () => {
         const { win, doc } = readerRealm;
         sizeIframe(readerRealm, 820, 780);
         try {
-          await settle(6);
           const toggle = doc.getElementById("rail-toggle");
           const scrim = doc.getElementById("rail-scrim");
           const rail = doc.getElementById("rail");
           assert(toggle && scrim && rail, "missing rail drawer elements");
+          await waitFor(() => win.getComputedStyle(toggle).display !== "none", "#rail-toggle visible at 820px");
 
           toggle.focus();
           toggle.click();
-          await new Promise((r) => win.requestAnimationFrame(() => win.requestAnimationFrame(r)));
-          await settle(6);
-          assert(doc.body.classList.contains("rail-open") && rail.contains(doc.activeElement),
-            `drawer should open and move focus inside #rail (open=${doc.body.classList.contains("rail-open")}, ae=${doc.activeElement?.id || doc.activeElement?.tagName})`);
+          await waitFor(
+            () => doc.body.classList.contains("rail-open") && rail.contains(doc.activeElement),
+            "drawer opens and moves focus inside #rail"
+          );
 
-          pressEscape(win, doc);
-          await settle(4);
-          assert(!doc.body.classList.contains("rail-open"), "Escape should close mobile drawer");
+          dispatchEscapeKey(win, doc);
+          await waitFor(() => !doc.body.classList.contains("rail-open"), "drawer Escape close");
           assertValidActiveFocus(doc, "reader drawer Escape", toggle);
 
           toggle.focus();
           toggle.click();
-          await new Promise((r) => win.requestAnimationFrame(() => win.requestAnimationFrame(r)));
-          await settle(6);
+          await waitFor(
+            () => doc.body.classList.contains("rail-open") && rail.contains(doc.activeElement),
+            "drawer reopens for scrim close"
+          );
           scrim.click();
-          await settle(4);
-          assert(!doc.body.classList.contains("rail-open"), "scrim click should close mobile drawer");
+          await waitFor(() => !doc.body.classList.contains("rail-open"), "drawer scrim close");
           assertValidActiveFocus(doc, "reader drawer scrim click", toggle);
+
+          // Open drawer, move focus onto #rail-toggle inside .rail-ident, then widen to 1200px
+          toggle.focus();
+          toggle.click();
+          await waitFor(
+            () => doc.body.classList.contains("rail-open") && rail.contains(doc.activeElement),
+            "drawer reopens for widen test"
+          );
+          toggle.focus();
+          assertValidActiveFocus(doc, "focus placed on #rail-toggle inside open drawer", toggle);
+          sizeIframe(readerRealm, 1200, 780);
+          await waitFor(
+            () => !doc.body.classList.contains("rail-open") && win.getComputedStyle(toggle).display === "none",
+            "widen past 1000px closes drawer and hides #rail-toggle"
+          );
+          assertValidActiveFocus(doc, "reader drawer widen while #rail-toggle focused");
         } finally {
           sizeIframe(readerRealm, 1180, 780);
-          await settle(6);
+          await settle(4);
         }
       });
 
-      // 11. Reader: #rail-history-pop & #send-menu
-      await test("md-preview: #rail-history-pop and #send-menu return focus on Escape and toggle close", async () => {
+      // 12. Reader: #rail-history-pop (seeded Previous Article) & #send-menu (Escape, toggle, live storage refresh)
+      await test("md-preview: #rail-history-pop and #send-menu restore focus across Escape, toggle, and live exportTargets refresh", async () => {
         const { win, doc } = readerRealm;
         const histBtn = doc.getElementById("rail-history-btn");
+        assert(histBtn, "missing #rail-history-btn");
         histBtn.focus();
         histBtn.click();
-        await settle(8);
-        const histPop = doc.getElementById("rail-history-pop");
-        assert(histPop && histPop.matches(":popover-open"), "#rail-history-pop should open");
-        (histPop.querySelector("button") || histPop).focus();
-        pressEscape(win, doc);
-        await settle(4);
-        assert(!histPop.matches(":popover-open"), "Escape should close #rail-history-pop");
+        const histPop = await waitFor(() => {
+          const p = doc.getElementById("rail-history-pop");
+          return p && p.matches(":popover-open") ? p : null;
+        }, "#rail-history-pop open");
+        const prevRow = await waitFor(
+          () => [...histPop.querySelectorAll('[role="listitem"] button, button')].find((b) => (b.textContent || "").includes("Previous Article")),
+          "seeded Previous Article row in #rail-history-pop"
+        );
+        prevRow.focus();
+        assertValidActiveFocus(doc, "reader history seeded row focus", prevRow);
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !histPop.matches(":popover-open"), "#rail-history-pop Escape close");
         assertValidActiveFocus(doc, "reader history Escape", histBtn);
 
         histBtn.click();
-        await settle(8);
-        (histPop.querySelector("button") || histPop).focus();
+        await waitFor(() => histPop.matches(":popover-open"), "#rail-history-pop reopen");
+        const prevRow2 = [...histPop.querySelectorAll("button")].find((b) => (b.textContent || "").includes("Previous Article"));
+        assert(prevRow2, "missing Previous Article row on reopen");
+        prevRow2.focus();
         histPop.hidePopover();
-        await settle(4);
+        await waitFor(() => !histPop.matches(":popover-open"), "#rail-history-pop hidePopover close");
         assertValidActiveFocus(doc, "reader history hidePopover", histBtn);
 
-        const expToggle = doc.querySelector('#export-section [aria-expanded="false"]');
-        if (expToggle) {
-          expToggle.click();
-          await settle(3);
-        }
+        const expDetails = doc.getElementById("export-section")?.closest("details") || doc.querySelector("#export-section details");
+        if (expDetails && !expDetails.open) expDetails.open = true;
+        const expToggle = doc.querySelector('#export-section [aria-expanded="false"]:not(#send-caret)');
+        if (expToggle) expToggle.click();
+
+        const primary = doc.getElementById("send-primary");
         const caret = doc.getElementById("send-caret");
         const menu = doc.getElementById("send-menu");
-        assert(caret && menu && !caret.closest("[hidden]"), "expected visible #send-caret");
+        await waitFor(() => caret && menu && !caret.hasAttribute("hidden"), "visible #send-caret ready");
+
         caret.focus();
         caret.click();
-        await settle(3);
-        assert(!menu.hasAttribute("hidden") && menu.contains(doc.activeElement), "#send-menu should open and focus first item");
-        pressEscape(win, doc);
-        await settle(3);
-        assert(menu.hasAttribute("hidden"), "Escape should close #send-menu");
+        await waitFor(() => !menu.hasAttribute("hidden") && menu.contains(doc.activeElement), "#send-menu open");
+        dispatchEscapeKey(win, doc);
+        await waitFor(() => menu.hasAttribute("hidden"), "#send-menu Escape close");
         assertValidActiveFocus(doc, "reader #send-menu Escape", caret);
 
         caret.click();
-        await settle(3);
-        assert(menu.contains(doc.activeElement), "#send-menu should reopen and focus item");
+        await waitFor(() => !menu.hasAttribute("hidden") && menu.contains(doc.activeElement), "#send-menu reopen");
         caret.click();
-        await settle(3);
-        assert(menu.hasAttribute("hidden"), "clicking #send-caret should close #send-menu");
+        await waitFor(() => menu.hasAttribute("hidden"), "#send-menu caret toggle close");
         assertValidActiveFocus(doc, "reader #send-menu caret toggle", caret);
+
+        // Live settings refresh while focus is on .send-mi: 2 targets -> 1 target -> focus lands on #send-caret
+        caret.click();
+        await waitFor(() => !menu.hasAttribute("hidden") && menu.contains(doc.activeElement), "#send-menu open before 1-target refresh");
+        await win.chrome.storage.local.set({
+          exportTargets: { obsidian: { enabled: true } },
+        });
+        await waitFor(
+          () => menu.hasAttribute("hidden") && caret.getAttribute("aria-expanded") === "false",
+          "#send-menu rebuilt after 1-target storage change"
+        );
+        assertValidActiveFocus(doc, "reader #send-menu live refresh (1 target)", caret);
+
+        // Live settings refresh while focus is on .send-mi: 1 target -> 0 targets -> #send-caret hides, focus lands on #send-primary
+        caret.click();
+        await waitFor(() => !menu.hasAttribute("hidden") && menu.contains(doc.activeElement), "#send-menu open before 0-target refresh");
+        await win.chrome.storage.local.set({
+          exportTargets: {},
+        });
+        await waitFor(
+          () => menu.hasAttribute("hidden") && caret.hasAttribute("hidden"),
+          "#send-menu rebuilt and #send-caret hidden after 0-target storage change"
+        );
+        assertValidActiveFocus(doc, "reader #send-menu live refresh (0 targets)", primary);
+
+        await win.chrome.storage.local.set({ exportTargets: initialExportTargets });
+        await waitFor(() => !caret.hasAttribute("hidden"), "restore initial exportTargets");
       });
 
-      // 12. Reader: #search-pop, #kbd-help-pop, #typo-pop, #fn-pop (md-reader.js)
+      // 13. Reader: #search-pop, #kbd-help-pop, #typo-pop, #fn-pop (md-reader.js)
       await test("md-preview: #search-pop, #kbd-help-pop, #typo-pop, and #fn-pop restore focus on Escape and close controls", async () => {
         const { win, doc } = readerRealm;
         const searchBtn = doc.getElementById("rail-search-btn");
@@ -603,48 +769,49 @@
         // #search-pop via '/' from body -> close via #search-close button AND via Escape
         doc.activeElement?.blur();
         doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true }));
-        await settle(4);
-        const searchPop = doc.getElementById("search-pop");
-        assert(searchPop && searchPop.matches(":popover-open") && searchPop.contains(doc.activeElement), "#search-pop should open and focus input");
+        const searchPop = await waitFor(() => {
+          const p = doc.getElementById("search-pop");
+          return p && p.matches(":popover-open") && p.contains(doc.activeElement) ? p : null;
+        }, "#search-pop open");
         doc.getElementById("search-close").click();
-        await settle(4);
-        assert(!searchPop.matches(":popover-open"), "#search-close should hide #search-pop");
+        await waitFor(() => !searchPop.matches(":popover-open"), "#search-pop close button");
         assertValidActiveFocus(doc, "reader #search-pop close button", searchBtn);
 
         searchBtn.focus();
         searchBtn.click();
-        await settle(4);
-        pressEscape(win, doc);
-        await settle(4);
+        await waitFor(() => searchPop.matches(":popover-open"), "#search-pop reopen");
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !searchPop.matches(":popover-open"), "#search-pop Escape close");
         assertValidActiveFocus(doc, "reader #search-pop Escape", searchBtn);
 
         // #kbd-help-pop via '?' from body -> close via Escape
         doc.activeElement?.blur();
         doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: "?", bubbles: true, cancelable: true }));
-        await settle(4);
-        const kbdPop = doc.getElementById("kbd-help-pop");
-        assert(kbdPop && kbdPop.matches(":popover-open"), "'?' should open #kbd-help-pop");
-        pressEscape(win, doc);
-        await settle(4);
-        assert(!kbdPop.matches(":popover-open"), "Escape should close #kbd-help-pop");
+        const kbdPop = await waitFor(() => {
+          const p = doc.getElementById("kbd-help-pop");
+          return p && p.matches(":popover-open") ? p : null;
+        }, "#kbd-help-pop open");
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !kbdPop.matches(":popover-open"), "#kbd-help-pop Escape close");
         assertValidActiveFocus(doc, "reader #kbd-help-pop Escape", kbdBtn);
 
         // #typo-pop: focus button inside popover, close via Escape and toggle
         typoBtn.focus();
         typoBtn.click();
-        await settle(4);
-        const typoPop = doc.getElementById("typo-pop");
-        assert(typoPop && typoPop.matches(":popover-open"), "#typo-pop should open");
+        const typoPop = await waitFor(() => {
+          const p = doc.getElementById("typo-pop");
+          return p && p.matches(":popover-open") ? p : null;
+        }, "#typo-pop open");
         typoPop.querySelector("button").focus();
-        pressEscape(win, doc);
-        await settle(4);
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !typoPop.matches(":popover-open"), "#typo-pop Escape close");
         assertValidActiveFocus(doc, "reader #typo-pop Escape", typoBtn);
 
         typoBtn.click();
-        await settle(4);
+        await waitFor(() => typoPop.matches(":popover-open"), "#typo-pop reopen");
         typoPop.querySelector("button").focus();
         typoBtn.click();
-        await settle(4);
+        await waitFor(() => !typoPop.matches(":popover-open"), "#typo-pop toggle close");
         assertValidActiveFocus(doc, "reader #typo-pop toggle close", typoBtn);
 
         // #fn-pop: click footnote ref, focus jump button, close via Escape & via jump button
@@ -652,61 +819,96 @@
         assert(fnRef, "expected rendered footnote reference link");
         fnRef.focus();
         fnRef.click();
-        await settle(4);
-        const fnPop = doc.getElementById("fn-pop");
-        assert(fnPop && fnPop.matches(":popover-open"), "#fn-pop should open");
+        const fnPop = await waitFor(() => {
+          const p = doc.getElementById("fn-pop");
+          return p && p.matches(":popover-open") ? p : null;
+        }, "#fn-pop open");
         fnPop.querySelector(".fn-pop-jump").focus();
-        pressEscape(win, doc);
-        await settle(4);
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !fnPop.matches(":popover-open"), "#fn-pop Escape close");
         assertValidActiveFocus(doc, "reader #fn-pop Escape", fnRef);
 
         fnRef.focus();
         fnRef.click();
-        await settle(4);
+        await waitFor(() => fnPop.matches(":popover-open"), "#fn-pop reopen");
         const jumpBtn = fnPop.querySelector(".fn-pop-jump");
         jumpBtn.focus();
         jumpBtn.click();
-        await settle(4);
-        assert(!fnPop.matches(":popover-open"), "jump button should close #fn-pop");
+        await waitFor(() => !fnPop.matches(":popover-open"), "#fn-pop jump button close");
         assertValidActiveFocus(doc, "reader #fn-pop jump button");
       });
 
-      // 13. Reader: #pb-hl-card (md-highlight.js) & #ocr-drop-pop (md-ocr.js)
-      await test("md-preview: #pb-hl-card and #ocr-drop-pop never drop focus to document.body on Escape or Cancel", async () => {
+      // 14. Reader: #pb-hl-bar, #pb-hl-card (Escape + Save + Delete confirm), and #ocr-drop-pop
+      await test("md-preview: #pb-hl-bar, #pb-hl-card, and #ocr-drop-pop restore focus across selection Escape, Save, Delete, and Cancel", async () => {
         const { win, doc } = readerRealm;
+        const renderedView = doc.getElementById("rendered-view");
         const p = doc.querySelector("#rendered-view p");
         assert(p && p.firstChild, "expected paragraph text node for highlight");
-        const r = doc.createRange();
-        r.setStart(p.firstChild, 0);
-        r.setEnd(p.firstChild, 9);
-        const sel = win.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(r);
-        doc.body.focus();
-        doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: "n", bubbles: true, cancelable: true }));
-        await settle(10);
 
-        const card = doc.getElementById("pb-hl-card");
-        assert(card && card.matches(":popover-open") && card.contains(doc.activeElement), "'n' hotkey should create highlight and focus #pb-hl-card note");
-        pressEscape(win, doc);
-        await settle(6);
-        assert(!card.matches(":popover-open"), "Escape should close #pb-hl-card");
+        // (a) #pb-hl-bar via real selection + mouseup -> focus swatch -> Escape -> #rendered-view
+        const selectParagraphHead = () => {
+          const r = doc.createRange();
+          r.setStart(p.firstChild, 0);
+          r.setEnd(p.firstChild, 9);
+          const sel = win.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(r);
+          return r;
+        };
+        selectParagraphHead();
+        p.dispatchEvent(new win.MouseEvent("mouseup", { button: 0, bubbles: true, cancelable: true }));
+        const bar = await waitFor(() => {
+          const b = doc.getElementById("pb-hl-bar");
+          return b && b.matches(":popover-open") ? b : null;
+        }, "#pb-hl-bar open on selection mouseup");
+        const barBtn = bar.querySelector("button");
+        assert(barBtn, "expected swatch button inside #pb-hl-bar");
+        barBtn.focus();
+        assertValidActiveFocus(doc, "reader #pb-hl-bar swatch focus", barBtn);
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !bar.matches(":popover-open"), "#pb-hl-bar Escape close");
+        assertValidActiveFocus(doc, "reader #pb-hl-bar Escape", renderedView);
+
+        // (b) Create highlight via 'n' -> #pb-hl-card Escape
+        selectParagraphHead();
+        doc.activeElement?.blur();
+        doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: "n", bubbles: true, cancelable: true }));
+        const card = await waitFor(() => {
+          const c = doc.getElementById("pb-hl-card");
+          return c && c.matches(":popover-open") && c.contains(doc.activeElement) ? c : null;
+        }, "#pb-hl-card open via 'n'");
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !card.matches(":popover-open"), "#pb-hl-card Escape close");
         assertValidActiveFocus(doc, "reader #pb-hl-card Escape");
 
-        // Reopen from Notebook button if rendered, else via mark click, then close via Save
-        const nbItem = doc.querySelector("#nb-list button, .hl-item-body, .nb-row button");
-        if (nbItem) {
-          nbItem.focus();
-          nbItem.click();
-          await settle(6);
-          if (card.matches(":popover-open")) {
-            card.querySelector(".hl-card-save").click();
-            await settle(6);
-            assertValidActiveFocus(doc, "reader #pb-hl-card Save");
-          }
-        }
+        // (c) Unconditionally reopen #pb-hl-card with Notebook row focused -> test Save AND Delete confirm close
+        const hlRow = await waitFor(() => doc.querySelector("#hl-list li.hl-item"), "Notebook #hl-list li.hl-item rendered");
+        const nbMainBtn = hlRow.querySelector(".hl-item-main");
+        assert(nbMainBtn && hlRow.dataset.hlId, "expected .hl-item-main and data-hl-id in #hl-list");
+        nbMainBtn.focus();
+        win._pbpHlOpenCard(hlRow.dataset.hlId);
+        await waitFor(() => card.matches(":popover-open") && card.contains(doc.activeElement), "#pb-hl-card reopen for Save and Delete");
+        const noteBox = card.querySelector(".hl-card-note");
+        const saveBtn = card.querySelector(".hl-card-save");
+        const delBtn = card.querySelector(".hl-card-delete");
+        assert(noteBox && saveBtn && delBtn, "expected note, save, and delete controls in #pb-hl-card");
+        noteBox.value = "Updated focus-return note";
+        noteBox.dispatchEvent(new win.Event("input", { bubbles: true }));
+        saveBtn.focus();
+        saveBtn.click();
+        await settle(6);
+        assertValidActiveFocus(doc, "reader #pb-hl-card Save button", saveBtn);
 
-        // #ocr-drop-pop: drop a valid PNG and dismiss via Escape and Cancel button
+        delBtn.focus();
+        delBtn.click();
+        const delConfirm = await waitFor(() => doc.querySelector(".confirm-popover:not(.is-closing)"), "#pb-hl-card delete confirm open");
+        const yesBtn = delConfirm.querySelector(".confirm-yes");
+        yesBtn.focus();
+        yesBtn.click();
+        await waitFor(() => !card.matches(":popover-open"), "#pb-hl-card closes after delete confirm");
+        assertValidActiveFocus(doc, "reader #pb-hl-card Delete confirm", renderedView);
+
+        // (d) #ocr-drop-pop: drop a valid PNG and dismiss via Escape and Cancel button
         await win.pbpOcrRefreshConfig();
         const pngMagic = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
         const pngFile = new win.File([pngMagic], "slide.png", { type: "image/png" });
@@ -716,28 +918,27 @@
           const ev = new win.DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt });
           doc.body.dispatchEvent(ev);
         };
-        doc.body.focus();
+        doc.activeElement?.blur();
         dispatchDrop();
-        await settle(4);
-        const dropPop = doc.getElementById("ocr-drop-pop");
-        assert(dropPop && dropPop.matches(":popover-open"), "file drop should open #ocr-drop-pop");
+        const dropPop = await waitFor(() => {
+          const p = doc.getElementById("ocr-drop-pop");
+          return p && p.matches(":popover-open") ? p : null;
+        }, "#ocr-drop-pop open");
         dropPop.querySelector("button").focus();
-        pressEscape(win, doc);
-        await settle(4);
-        assert(!dropPop.matches(":popover-open"), "Escape should close #ocr-drop-pop");
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !dropPop.matches(":popover-open"), "#ocr-drop-pop Escape close");
         assertValidActiveFocus(doc, "reader #ocr-drop-pop Escape");
 
         dispatchDrop();
-        await settle(4);
+        await waitFor(() => dropPop.matches(":popover-open"), "#ocr-drop-pop reopen");
         const cancelBtn = [...dropPop.querySelectorAll("button")].pop();
         cancelBtn.focus();
         cancelBtn.click();
-        await settle(4);
-        assert(!dropPop.matches(":popover-open"), "Cancel should close #ocr-drop-pop");
+        await waitFor(() => !dropPop.matches(":popover-open"), "#ocr-drop-pop Cancel close");
         assertValidActiveFocus(doc, "reader #ocr-drop-pop Cancel");
       });
 
-      // 14. Reader: #ask-panel & #explain-pop (md-ask.js)
+      // 15. Reader: #ask-panel & #explain-pop (md-ask.js)
       await test("md-preview: #ask-panel and #explain-pop restore focus on Escape and close button", async () => {
         const { win, doc } = readerRealm;
         const askOpen = doc.getElementById("ask-open");
@@ -745,22 +946,21 @@
 
         askOpen.focus();
         askOpen.click();
-        await settle(8);
-        const askPanel = doc.getElementById("ask-panel");
-        assert(askPanel && !askPanel.hidden && askPanel.contains(doc.activeElement), "#ask-panel should open and focus inside");
+        const askPanel = await waitFor(() => {
+          const p = doc.getElementById("ask-panel");
+          return p && !p.hidden && p.contains(doc.activeElement) ? p : null;
+        }, "#ask-panel open");
         const askClose = doc.getElementById("ask-close") || askPanel.querySelector(".ask-close");
         assert(askClose, "expected #ask-panel close button");
         askClose.click();
-        await settle(4);
-        assert(askPanel.hidden, "close button should hide #ask-panel");
+        await waitFor(() => askPanel.hidden, "#ask-panel close button");
         assertValidActiveFocus(doc, "reader #ask-panel close button", askOpen);
 
         askOpen.focus();
         askOpen.click();
-        await settle(6);
-        pressEscape(win, doc);
-        await settle(4);
-        assert(askPanel.hidden, "Escape should hide #ask-panel");
+        await waitFor(() => !askPanel.hidden && askPanel.contains(doc.activeElement), "#ask-panel reopen");
+        dispatchEscapeKey(win, doc);
+        await waitFor(() => askPanel.hidden, "#ask-panel Escape close");
         assertValidActiveFocus(doc, "reader #ask-panel Escape", askOpen);
 
         // #explain-pop via pbpExplainOpenForItem
@@ -771,24 +971,23 @@
           return new Response("data: [DONE]\n\n", { status: 200, headers: { "content-type": "text/event-stream" } });
         };
         const blockRect = doc.querySelector("#rendered-view p").getBoundingClientRect();
-        doc.body.focus();
+        doc.activeElement?.blur();
         win.pbpExplainOpenForItem({ text: "highlightable", n: 1, itemId: "focus-1", rect: blockRect, action: "explain", lang: "en" });
-        await settle(6);
-        const explainPop = doc.getElementById("explain-pop");
-        assert(explainPop && explainPop.matches(":popover-open"), "#explain-pop should open");
+        const explainPop = await waitFor(() => {
+          const p = doc.getElementById("explain-pop");
+          return p && p.matches(":popover-open") ? p : null;
+        }, "#explain-pop open");
         explainPop.querySelector(".xp-pin").focus();
-        pressEscape(win, doc);
-        await settle(4);
-        assert(!explainPop.matches(":popover-open"), "Escape should close #explain-pop");
+        dismissAutoPopoverEscape(win, doc);
+        await waitFor(() => !explainPop.matches(":popover-open"), "#explain-pop Escape close");
         assertValidActiveFocus(doc, "reader #explain-pop Escape");
 
         win.pbpExplainOpenForItem({ text: "highlightable", n: 1, itemId: "focus-2", rect: blockRect, action: "explain", lang: "en" });
-        await settle(6);
+        await waitFor(() => explainPop.matches(":popover-open"), "#explain-pop reopen");
         const xpClose = explainPop.querySelector(".xp-close");
         xpClose.focus();
         xpClose.click();
-        await settle(4);
-        assert(!explainPop.matches(":popover-open"), ".xp-close should close #explain-pop");
+        await waitFor(() => !explainPop.matches(":popover-open"), "#explain-pop .xp-close close");
         assertValidActiveFocus(doc, "reader #explain-pop .xp-close");
       });
     } finally {
@@ -799,9 +998,9 @@
   })().catch((e) => {
     const row = document.createElement("div");
     row.className = "fail";
-    row.textContent = e && e.stack ? e.stack : String(e);
+    row.textContent = "FATAL: " + (e && e.stack ? e.stack : String(e));
     document.getElementById("results").appendChild(row);
-    document.title = "FAIL focus-return-tests";
+    document.title = "FAIL (0/1)";
   });
   </script>
 </body>
