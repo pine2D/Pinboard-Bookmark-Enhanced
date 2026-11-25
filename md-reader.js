@@ -234,6 +234,7 @@ function _pbpFnFindRef(id) {
 
 let _pbpFnPop = null;
 let _pbpFnCurrentLi = null;
+let _pbpFnAnchorEl = null;
 
 // Manual explain-pop may coexist with another reader popover only while the
 // user has pinned it. Every loose popover keeps the previous mutual-exclusion
@@ -285,16 +286,21 @@ function _pbpFnEnsurePop() {
   jumpLabel.className = "fn-pop-jump-label";
   jumpBtn.appendChild(jumpLabel);
   jumpBtn.addEventListener("click", () => {
-    if (!_pbpFnCurrentLi) return;
+    const targetLi = _pbpFnCurrentLi;
+    if (!targetLi) return;
     try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
-    pbpScrollIntoView(_pbpFnCurrentLi, { block: "center", behavior: "smooth" });
+    if (typeof pbpFocusSurfaceElement === "function") pbpFocusSurfaceElement(targetLi);
+    pbpScrollIntoView(targetLi, { block: "center", behavior: "smooth" });
     const range = document.createRange();
-    range.selectNode(_pbpFnCurrentLi);
-    if (typeof _pbpAskFlash === "function") _pbpAskFlash(range, _pbpFnCurrentLi);
+    range.selectNode(targetLi);
+    if (typeof _pbpAskFlash === "function") _pbpAskFlash(range, targetLi);
   });
   foot.appendChild(jumpBtn);
   pop.appendChild(foot);
 
+  if (typeof pbpBindPopoverFocusReturn === "function") {
+    pbpBindPopoverFocusReturn(pop, () => [_pbpFnAnchorEl, document.getElementById("rendered-view"), document.getElementById("skip-link")]);
+  }
   document.body.appendChild(pop);
   _pbpFnPop = pop;
   return pop;
@@ -305,6 +311,7 @@ function _pbpFnEnsurePop() {
 // element's current rect. anchorEl is only used for positioning;
 // content always comes from li, never from anchorEl (spec sec.3).
 function _pbpFnOpenPop(li, anchorEl) {
+  _pbpFnAnchorEl = anchorEl || null;
   const pop = _pbpFnEnsurePop();
   _pbpFnApplyPopI18n(pop);
   const body = pop.querySelector(".fn-pop-body");
@@ -994,6 +1001,13 @@ function _pbpSearchEnsurePop() {
   pop.addEventListener("toggle", (e) => {
     if (e.newState === "closed") _pbpSearchTeardown();
   });
+  if (typeof pbpBindPopoverFocusReturn === "function") {
+    pbpBindPopoverFocusReturn(pop, () => [
+      document.getElementById("rail-search-btn"),
+      document.getElementById("rendered-view"),
+      document.getElementById("skip-link"),
+    ]);
+  }
   document.body.appendChild(pop);
   _pbpSearchPopEl = pop;
   return pop;
@@ -1125,6 +1139,7 @@ function _pbpKbdHelpEnsurePop() {
   // it with "?" announces "Keyboard shortcuts, dialog" instead of nothing.
   pop.setAttribute("role", "dialog");
   pop.setAttribute("aria-labelledby", "kbd-help-title");
+  pop.tabIndex = -1;
   const title = document.createElement("div");
   title.className = "kbd-help-title";
   title.id = "kbd-help-title";
@@ -1134,6 +1149,13 @@ function _pbpKbdHelpEnsurePop() {
   list.className = "kbd-help-list";
   _pbpKbdHelpFillList(list);
   pop.appendChild(list);
+  if (typeof pbpBindPopoverFocusReturn === "function") {
+    pbpBindPopoverFocusReturn(pop, () => [
+      document.getElementById("rail-kbd-help-btn"),
+      document.getElementById("rendered-view"),
+      document.getElementById("skip-link"),
+    ]);
+  }
   document.body.appendChild(pop);
   _pbpKbdHelpPopEl = pop;
   return pop;
@@ -1202,6 +1224,9 @@ function _pbpKbdHelpOpen() {
   if (lst) _pbpKbdHelpFillList(lst);
   _pbpReaderHideOtherPopovers(pop);
   if (!pop.matches(":popover-open")) pop.showPopover();
+  if (!document.activeElement || document.activeElement === document.body) {
+    pop.focus({ preventScroll: true });
+  }
 }
 
 // "?" hotkey: same typing/modifier gate pattern as the bare-letter hotkeys,
@@ -1846,10 +1871,21 @@ function _pbpTypoEnsurePop() {
   schemeRow.appendChild(schemeSeg);
   pop.appendChild(schemeRow);
 
+  if (typeof pbpBindPopoverFocusReturn === "function") {
+    pbpBindPopoverFocusReturn(pop, () => [
+      _pbpTypoAnchorEl,
+      document.getElementById("rail-typo-btn"),
+      document.getElementById("zen-typo-btn"),
+      document.getElementById("rendered-view"),
+      document.getElementById("skip-link"),
+    ]);
+  }
   document.body.appendChild(pop);
   _pbpTypoPopEl = pop;
   return pop;
 }
+
+let _pbpTypoAnchorEl = null;
 
 // Open next to whichever "Aa" was clicked -- same mutual exclusion +
 // measure-then-place flow as _pbpFnOpenPop; clicking the same entry again
@@ -1857,6 +1893,7 @@ function _pbpTypoEnsurePop() {
 function _pbpTypoToggle(anchorEl) {
   const pop = _pbpTypoEnsurePop();
   if (pop.matches(":popover-open")) { try { pop.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ } return; }
+  _pbpTypoAnchorEl = anchorEl || null;
   _pbpReaderHideOtherPopovers(pop);
   _pbpTypoSyncPop();
   const rect = anchorEl.getBoundingClientRect();

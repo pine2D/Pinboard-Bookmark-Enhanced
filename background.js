@@ -4140,7 +4140,7 @@ async function pbpDisconnectVocabDrive() {
   await chrome.storage.local.set({ [PBP_VOCAB_DRIVE_CONNECTED_KEY]: false });
   await chrome.storage.local.remove(PBP_DRIVE_CONNECTION_ACCOUNT_KEY);
   await pbpClearDriveAlarms();
-  // Local and immediate (Chrome 87+, manifest minimum 123). The former silent
+  // Local and immediate (Chrome 87+, manifest minimum 131). The former silent
   // getAuthToken -> removeCachedAuthToken pair needed the OAuth endpoint and
   // hung while it was unreachable (spec §3.5). The namespace exists only while
   // the optional identity grant does, so this runs before permissions.remove;
@@ -4464,7 +4464,7 @@ async function sweepSuggestCache() {
     // Chrome >=130 getKeys() lists keys without deserializing values, so the
     // sweep reads only the two cache families instead of the whole local area
     // (highlights, vocab, previews) while a popup cold-open may share the
-    // backend. Chrome 123-129 (no getKeys) fall back to get(null).
+    // backend. Storage mocks without getKeys fall back to get(null).
     let all;
     if (typeof chrome.storage.local.getKeys === "function") {
       const keys = (await chrome.storage.local.getKeys())
@@ -5221,7 +5221,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     // same way the background quick-save path already does (notifySaveFailure).
     // "queued"/"skipped"/"saved" never notify here: queued is covered by the
     // offline-queue row on next popup open, and the other two are not
-    // failures. minimum_chrome_version is 123, so getContexts (Chrome 116+)
+    // failures. minimum_chrome_version is 131, so getContexts (Chrome 116+)
     // needs no feature-detection fallback.
     submitPopupSaveIntent(message.intent, message.account, message.summaryRange, message.singleFileTab, message.expectedVersion)
       .then(async (result) => {

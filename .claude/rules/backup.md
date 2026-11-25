@@ -1,6 +1,7 @@
 ---
 paths:
   - "options-backup.js"
+  - "export-targets.js"
   - "restore-points.js"
 ---
 

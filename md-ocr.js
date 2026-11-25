@@ -1244,6 +1244,14 @@ function _pbpOcrOpenDropDialogOnArticle(file) {
     pop.setAttribute("popover", "auto");
     pop.setAttribute("role", "dialog");
     pop.setAttribute("aria-label", t("mdOcrPanelTitleLocal"));
+    if (typeof pbpBindPopoverFocusReturn === "function") {
+      pbpBindPopoverFocusReturn(pop, () => [
+        document.getElementById("rail-ocr-btn"),
+        document.getElementById("btn-import-ocr"),
+        document.getElementById("rendered-view"),
+        document.getElementById("skip-link"),
+      ]);
+    }
     pop.addEventListener("toggle", (e) => {
       if (e.newState !== "open" && _pbpOcrDropActiveAbort) {
         _pbpOcrDropActiveAbort.abort("closed");
@@ -1366,6 +1374,10 @@ function _pbpOcrOpenDropDialogOnArticle(file) {
   pop.replaceChildren(head, errBar, nameEl, sizeEl, richField, paidEl, row);
   if (typeof _pbpReaderHideOtherPopovers === "function") _pbpReaderHideOtherPopovers(pop);
   try { pop.showPopover(); } catch (_) { /* swallow-ok: fallback if popover API unsupported */ }
+  const initialFocus = !runBtn.disabled ? runBtn : cancelBtn;
+  if (initialFocus && (!document.activeElement || document.activeElement === document.body)) {
+    initialFocus.focus({ preventScroll: true });
+  }
 }
 
 function pbpOcrInstallReaderHooks() {

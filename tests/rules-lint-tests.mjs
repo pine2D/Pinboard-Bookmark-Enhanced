@@ -410,3 +410,15 @@ test('C: a count mismatch names the lines it found', () => {
   const e = errorsOf(files, { claims: CLAIMS });
   assert.ok(has(e, /PRODUCT\.md.*找到 2 处（行 2、3），预期 1 处/), e.join('\n'));
 });
+
+test('uncovered root runtime files produce a NOTE when omitted and zero NOTES on the live repository', () => {
+  const withUncovered = run(base({ 'stray-runtime.js': 'const z = 1;\n' }));
+  assert.deepEqual(withUncovered.errors, []);
+  assert.ok(has(withUncovered.notes, /stray-runtime\.js/), withUncovered.notes.join('\n'));
+
+  const liveRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const r = spawnSync(process.execPath, [SCRIPT, '--root', liveRoot], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(r.stdout, /^NOTE /m, `live repository still has uncovered root runtime files:\n${r.stdout}`);
+  assert.match(r.stdout, /PASS rules-lint/);
+});

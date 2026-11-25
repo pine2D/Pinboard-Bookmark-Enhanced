@@ -21,6 +21,8 @@ paths:
   - "md-ocr.js"
   - "md-speech.js"
   - "md-vocab-echo.js"
+  - "jina.js"
+  - "site-rules.js"
   - "md-preview-theme-early.js"
   - "tests/md-preview-contrast-tests.mjs"
 ---

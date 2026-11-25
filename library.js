@@ -118,7 +118,13 @@ function pbpLibOnPageKey(e) {
     e.preventDefault();
     // Through the button, so the panel opens exactly as a click opens it
     // (placement, aria-expanded); already open stays open, as in the reader.
-    if (!keys.matches(":popover-open")) open.click();
+    if (!keys.matches(":popover-open")) {
+      open.click();
+      if (keys.matches(":popover-open") && (!document.activeElement || document.activeElement === document.body)) {
+        keys.tabIndex = -1;
+        keys.focus({ preventScroll: true });
+      }
+    }
     return;
   }
   if (pbpLibActiveView() === "ask") {
@@ -464,6 +470,16 @@ function pbpLibSameDay(a, b) {
 function pbpLibWireFilterPopover(set, button, indexEl) {
   if (!set || !button || set.dataset.wired) return;
   set.dataset.wired = "1";
+  if (typeof pbpBindPopoverFocusReturn === "function") {
+    pbpBindPopoverFocusReturn(set, () => [
+      button,
+      $id("vocab-group-filter-btn"),
+      $id("vocab-search"),
+      $id("notes-filter"),
+      $id("ask-library-search"),
+      document.querySelector('.lib-tab[aria-selected="true"]'),
+    ]);
+  }
   set.addEventListener("toggle", (e) => {
     if (e.newState === "open") {
       button.setAttribute("aria-expanded", "true");

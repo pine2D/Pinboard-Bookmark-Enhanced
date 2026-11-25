@@ -296,7 +296,7 @@ async function _pbpNotesScan() {
       // the pbp_hl_ records. get(null) deserialized the ENTIRE local area
       // (incl. MB-scale jina_md_ page caches) on every view activation AND
       // every alt-tab back to this tab (visibilitychange re-mounts the view).
-      // min_chrome is 123, so the get(null) fallback below stays.
+      // min_chrome is 131 >= 130; the get(null) fallback below stays for partial storage mocks.
       const keys = (await chrome.storage.local.getKeys())
         .filter((k) => k.startsWith("pbp_hl_") && k !== "pbp_hl_last_color");
       all = keys.length ? await chrome.storage.local.get(keys) : {};
@@ -1924,7 +1924,7 @@ function _pbpNotesOpenColorMenu(hit, anchor) {
       buttons[next].focus({ preventScroll: true });
     }
   });
-  menu.addEventListener("toggle", (e) => {
+  menu.addEventListener("beforetoggle", (e) => {
     if (e.newState === "closed" && _notesColorSession === session) {
       const focusInside = menu.contains(document.activeElement);
       _pbpNotesCloseColorMenu(focusInside);

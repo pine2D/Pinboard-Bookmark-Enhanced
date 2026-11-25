@@ -5674,6 +5674,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     pop.appendChild(inp);
     pop.appendChild(overwriteMsg);
     pop.appendChild(actions);
+    const opener = document.activeElement;
     wrap.appendChild(pop);
 
     inp.focus();
@@ -5681,6 +5682,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     function dismiss() {
       document.removeEventListener("keydown", onEscGlobal);
       if (pop.classList.contains("is-closing")) return;
+      if (typeof pbpRestoreSurfaceFocus === "function") {
+        pbpRestoreSurfaceFocus([opener, $id("save-custom-theme"), $id("tab-appearance")], pop);
+      }
+      if (pop.contains(document.activeElement)) document.activeElement.blur();
       // Exit fade mirrors .confirm-popover; instant when the CSS recipe can't
       // run (no motion-ready yet, or reduced motion) so removal never lags.
       if (!document.documentElement.classList.contains("motion-ready")
@@ -5688,6 +5693,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         pop.remove();
         return;
       }
+      pop.inert = true;
       pop.classList.add("is-closing");
       setTimeout(() => pop.remove(), 150);
     }

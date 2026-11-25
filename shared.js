@@ -1436,8 +1436,8 @@ function pbpIsHighlightBackupKey(key) {
 // manual export and restore points (restore-points.js) share this read so the
 // two cannot drift. Chrome 130+ lists keys without deserializing values, then
 // fetches only the highlight records, instead of get(null) deserializing the
-// entire local area (jina_md_ page caches included). min_chrome is 123 < 130,
-// so the get(null) fallback stays. pbp_hl_last_color is kept here (it is a
+// entire local area (jina_md_ page caches included). min_chrome is 131 >= 130,
+// and the get(null) fallback stays for partial storage mocks. pbp_hl_last_color is kept here (it is a
 // pbp_hl_ key); callers decide whether they want it.
 async function pbpReadHighlightBackupSource() {
   if (typeof chrome.storage.local.getKeys === "function") {
@@ -2042,8 +2042,8 @@ async function pbpMeasureLocalStorage(opts) {
 // Enumeration differs in COST only, never in outcome: on Chrome 130+ getKeys()
 // lists key NAMES without deserialising anything, so only the candidates about
 // to be deleted are read back -- an MB-scale jina_md_ page cache stays out of JS
-// when the user clears just "tags". min_chrome is 123, so the get(null) fallback
-// (which hands back every value) stays for 123-129 and pays the same full read
+// when the user clears just "tags". min_chrome is 131 >= 130; the get(null) fallback
+// (which hands back every value) stays for partial storage mocks and pays the same full read
 // it always did. Byte figures are pbpEntryBytes on both paths, so the two shapes
 // report identical numbers. Same precedent as library-notes.js's highlight scan.
 //
@@ -5835,11 +5835,13 @@ function showConfirmPopover(anchor, opts) {
     if (positionFrame) cancelAnimationFrame(positionFrame);
     positionFrame = 0;
     if (restoreFocus) {
-      if (opener?.isConnected && typeof opener.focus === "function") opener.focus({ preventScroll: true });
-      // A refreshed list may have replaced the opener, or it may no longer
-      // accept focus. Try the anchor when it is still a usable destination.
-      if (pop.contains(document.activeElement) && anchor !== opener && anchor.isConnected
-          && !pop.contains(anchor) && typeof anchor.focus === "function") anchor.focus({ preventScroll: true });
+      pbpRestoreSurfaceFocus([
+        opener,
+        anchor,
+        opts?.fallbackFocus,
+        panelEl?.querySelector?.("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"),
+        document.querySelector("main, [role='main'], .container"),
+      ], pop);
     }
     // inert does not synchronously release focus in every Chrome path.
     // Never hide a focused descendant during the exit animation, including
@@ -6636,15 +6638,106 @@ async function pbpOcrDocsClear() {
 // tabs are never recorded.
 // Both history popovers outlive their rows. Escape belongs to the open layer,
 // including when a pointer opened it and focus is still on the trigger.
+function pbpIsVisibleFocusTarget(el) {
+  if (!el || el.nodeType !== 1) return false;
+  const doc = el.ownerDocument || document;
+  if (el === doc.body || el === doc.documentElement || !el.isConnected || typeof el.focus !== "function") return false;
+  if (el.disabled === true) return false;
+  if (typeof el.closest === "function" && el.closest("[hidden], [inert]")) return false;
+  const win = doc.defaultView || window;
+  const style = win.getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse") return false;
+  if (typeof el.checkVisibility === "function" && !el.checkVisibility()) return false;
+  return el.getClientRects().length > 0;
+}
+
+function pbpFocusSurfaceElement(el) {
+  if (!pbpIsVisibleFocusTarget(el)) return false;
+  const doc = el.ownerDocument || document;
+  const nativelyFocusable = /^(?:A|BUTTON|INPUT|SELECT|TEXTAREA|SUMMARY)$/.test(el.tagName || "") || el.isContentEditable;
+  const borrowed = !nativelyFocusable && !el.hasAttribute("tabindex");
+  if (borrowed) el.setAttribute("tabindex", "-1");
+  try {
+    el.focus({ preventScroll: true });
+  } catch (_) {
+    /* swallow-ok: fallback to plain focus when options are unsupported */
+    try { el.focus(); } catch (_2) { /* swallow-ok: best-effort focus call */ }
+  }
+  const focused = doc.activeElement === el;
+  if (borrowed) {
+    if (focused) el.addEventListener("blur", () => el.removeAttribute("tabindex"), { once: true });
+    else el.removeAttribute("tabindex");
+  }
+  return focused;
+}
+
+function pbpRestoreSurfaceFocus(candidates, container) {
+  const doc = (container && container.ownerDocument) || document;
+  const ae = doc.activeElement;
+  const shouldRestore = !container
+    || container.contains(ae)
+    || !ae
+    || ae === doc.body
+    || ae === doc.documentElement;
+  if (!shouldRestore) return false;
+  const list = Array.isArray(candidates) ? candidates : [candidates];
+  for (const cand of list) {
+    if (!cand || (container && container.contains(cand))) continue;
+    if (pbpFocusSurfaceElement(cand)) return true;
+  }
+  return false;
+}
+
+function pbpBindPopoverFocusReturn(pop, getFallbacks) {
+  if (!pop || pop.dataset.pbpFocusReturnBound === "1") return;
+  pop.dataset.pbpFocusReturnBound = "1";
+  let opener = null;
+  let needsRestore = false;
+  const resolveCandidates = () => {
+    const extra = typeof getFallbacks === "function"
+      ? getFallbacks()
+      : (Array.isArray(getFallbacks) ? getFallbacks : [getFallbacks]);
+    return [opener, ...(Array.isArray(extra) ? extra : [extra])];
+  };
+  pop.addEventListener("beforetoggle", (event) => {
+    const doc = pop.ownerDocument || document;
+    const ae = doc.activeElement;
+    if (event.newState === "open") {
+      needsRestore = false;
+      if (ae && ae !== doc.body && ae !== doc.documentElement && !pop.contains(ae)) {
+        opener = ae;
+      }
+      return;
+    }
+    if (event.newState === "closed") {
+      needsRestore = pop.contains(ae) || !ae || ae === doc.body || ae === doc.documentElement;
+      if (needsRestore) {
+        pbpRestoreSurfaceFocus(resolveCandidates(), pop);
+      }
+    }
+  });
+  pop.addEventListener("toggle", (event) => {
+    if (event.newState !== "closed") return;
+    const doc = pop.ownerDocument || document;
+    const ae = doc.activeElement;
+    if (needsRestore && (!ae || ae === doc.body || ae === doc.documentElement || pop.contains(ae) || !pbpIsVisibleFocusTarget(ae))) {
+      pbpRestoreSurfaceFocus(resolveCandidates(), pop);
+    }
+    needsRestore = false;
+    opener = null;
+  });
+}
+
 function pbpBindReaderHistoryDismiss(pop, opener) {
   pop.tabIndex = -1;
+  pbpBindPopoverFocusReturn(pop, () => [opener]);
   const onKey = (event) => {
     if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || event.keyCode === 229
         || _activeConfirmPopover || !pop.matches(":popover-open")) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     pop.hidePopover();
-    opener.focus({ preventScroll: true });
+    pbpRestoreSurfaceFocus([opener], pop);
   };
   pop.addEventListener("beforetoggle", (event) => {
     if (event.newState === "open") document.addEventListener("keydown", onKey, true);

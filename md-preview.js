@@ -4914,7 +4914,16 @@ const _pbpReaderBoot = (async function () {
 
     primary.addEventListener("click", () => { if (primary.dataset.targetId) doSend(primary.dataset.targetId); }, { signal: _sig });
 
-    function closeMenu() { menu.setAttribute("hidden", ""); caret.setAttribute("aria-expanded", "false"); }
+    function closeMenu() {
+      const hadFocus = menu.contains(document.activeElement);
+      if (hadFocus && typeof pbpRestoreSurfaceFocus === "function") {
+        pbpRestoreSurfaceFocus([caret, primary], menu);
+      } else if (hadFocus) {
+        caret.focus({ preventScroll: true });
+      }
+      menu.setAttribute("hidden", "");
+      caret.setAttribute("aria-expanded", "false");
+    }
     function openMenu() {
       menu.removeAttribute("hidden");
       caret.setAttribute("aria-expanded", "true");
@@ -5133,7 +5142,7 @@ function setupDrawer() {
       try { open = pop.matches(":popover-open"); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */  /* no :popover-open */ }
       if (open && !rail.contains(pop)) out.push(...pop.querySelectorAll(FOCUSABLE_SEL));
     }
-    return out.filter((el) => el.offsetParent !== null && !el.disabled);
+    return out.filter((el) => el.offsetParent !== null && (typeof el.checkVisibility !== "function" || el.checkVisibility()) && !el.disabled);
   };
   const isOpen = () => document.body.classList.contains("rail-open");
   const setOpen = (open) => {
@@ -5159,14 +5168,20 @@ function setupDrawer() {
         // would open an aria-modal drawer with focus still on the hamburger
         // outside it. Same visibility test focusables() uses.
         const rendered = document.getElementById("btn-rendered");
-        ((rendered && rendered.offsetParent !== null)
+        ((rendered && rendered.offsetParent !== null && (typeof rendered.checkVisibility !== "function" || rendered.checkVisibility()))
           ? rendered
           : (focusables()[0] || rail)).focus();
       }));
     } else {
+      const hadFocus = rail.contains(document.activeElement) || !document.activeElement || document.activeElement === document.body;
       pbpRailDrawerClose();
-      if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
-      else toggle.focus();
+      if (hadFocus && typeof pbpRestoreSurfaceFocus === "function") {
+        pbpRestoreSurfaceFocus([lastFocus, toggle, document.getElementById("rendered-view"), document.getElementById("skip-link")], null);
+      } else if (lastFocus && typeof lastFocus.focus === "function") {
+        lastFocus.focus();
+      } else {
+        toggle.focus();
+      }
     }
   };
   toggle.addEventListener("click", () => setOpen(!isOpen()));
@@ -5187,7 +5202,11 @@ function setupDrawer() {
     }
   });
   window.matchMedia("(max-width: 1000px)").addEventListener("change", (e) => {
+    const toggleWasFocused = !e.matches && document.activeElement === toggle;
     if (!e.matches) pbpRailDrawerClose();
+    if (toggleWasFocused && typeof pbpRestoreSurfaceFocus === "function") {
+      pbpRestoreSurfaceFocus([document.getElementById("btn-rendered"), document.getElementById("rendered-view"), document.getElementById("skip-link")], null);
+    }
   });
 }
 

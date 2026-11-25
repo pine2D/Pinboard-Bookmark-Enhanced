@@ -1679,6 +1679,12 @@ function _pbpHlEnsureBar() {
     }
   }).catch(() => { /* swallow-ok: popover state transition or selector guard on detached/closed element */ });
   bar.addEventListener("toggle", (e) => { if (e.newState === "closed") _pbpHlBarRange = null; });
+  if (typeof pbpBindPopoverFocusReturn === "function") {
+    pbpBindPopoverFocusReturn(bar, () => [
+      document.getElementById("rendered-view"),
+      document.getElementById("skip-link"),
+    ]);
+  }
   document.body.appendChild(bar);
   _pbpHlBarEl = bar;
   return bar;
@@ -2339,6 +2345,13 @@ function _pbpHlEnsureCard() {
   foot.appendChild(save);
   card.appendChild(foot);
 
+  if (typeof pbpBindPopoverFocusReturn === "function") {
+    pbpBindPopoverFocusReturn(card, () => [
+      _pbpHlCardOpener,
+      document.getElementById("rendered-view"),
+      document.getElementById("skip-link"),
+    ]);
+  }
   card.addEventListener("toggle", (e) => {
     if (e.newState === "closed") {
       if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("hl-note");
@@ -2346,6 +2359,7 @@ function _pbpHlEnsureCard() {
         try { _pbpHlCommitNote(); } catch (_diagErr) { console.warn("[md-highlight] close note commit threw:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
       }
       _pbpHlCardItemId = null;
+      _pbpHlCardOpener = null;
     }
   });
   document.body.appendChild(card);
@@ -2498,6 +2512,10 @@ function _pbpHlOpenCard(id) {
   _pbpHlCardBaseNote = draftEntry ? draftEntry.baseNote : noteEl.value;
   _pbpHlNoteDirty = Boolean(draftEntry && draftEntry.dirty);
 
+  const prevAe = document.activeElement;
+  if (prevAe && prevAe !== document.body && !card.contains(prevAe) && (!_pbpHlBarEl || !_pbpHlBarEl.contains(prevAe))) {
+    _pbpHlCardOpener = prevAe;
+  }
   if (typeof window.pbpExplainDismissIfUnpinned === "function") window.pbpExplainDismissIfUnpinned();
   if (!card.matches(":popover-open")) card.showPopover();
   // Position AFTER showPopover so offsetHeight is real (measure-then-place
@@ -2512,6 +2530,7 @@ function _pbpHlOpenCard(id) {
 // The anchor rect of the open card, kept so a late height change (the AI row
 // settling on first open) can re-place it against the same highlight.
 let _pbpHlCardAnchor = null;
+let _pbpHlCardOpener = null;
 function _pbpHlPlaceCard(card) {
   const rect = _pbpHlCardAnchor;
   if (!rect) return;

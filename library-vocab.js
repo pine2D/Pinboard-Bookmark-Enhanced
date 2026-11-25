@@ -3613,7 +3613,7 @@ async function _pbpVocabOpenExportMenu(anchor) {
       items[next].focus({ preventScroll: true });
     }
   });
-  menu.addEventListener("toggle", (e) => {
+  menu.addEventListener("beforetoggle", (e) => {
     if (e.newState === "closed" && _vocabExportSession === session) {
       _pbpVocabCloseExportMenu(menu.contains(document.activeElement));
     }
@@ -3634,9 +3634,13 @@ if (_vocabExportOpen) {
   });
 }
 window.addEventListener("scroll", (e) => {
-  if (_vocabExportSession && !_vocabExportSession.menu.contains(e.target)) _pbpVocabCloseExportMenu(false);
+  if (_vocabExportSession && !_vocabExportSession.menu.contains(e.target)) {
+    _pbpVocabCloseExportMenu(_vocabExportSession.menu.contains(document.activeElement));
+  }
 }, true);
-window.addEventListener("resize", () => _pbpVocabCloseExportMenu(false));
+window.addEventListener("resize", () => {
+  if (_vocabExportSession) _pbpVocabCloseExportMenu(_vocabExportSession.menu.contains(document.activeElement));
+});
 const _vocabLoadMore = $id("vocab-load-more");
 if (_vocabLoadMore) _vocabLoadMore.addEventListener("click", () => {
   const list = $id("vocab-list");

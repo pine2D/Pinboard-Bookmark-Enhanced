@@ -396,6 +396,12 @@
     return _optionsTemplate;
   }
 
+  let _libraryTemplate = null;
+  async function loadLibraryTemplate() {
+    if (!_libraryTemplate) _libraryTemplate = await loadSurfaceTemplate("library.html");
+    return _libraryTemplate;
+  }
+
   let _readerTemplate = null;
   async function loadReaderTemplate() {
     if (!_readerTemplate) _readerTemplate = await loadSurfaceTemplate("md-preview.html");
@@ -436,6 +442,9 @@
     const iframe = await createEmptyIframe(options.search || "");
     const win = iframe.contentWindow;
     const doc = iframe.contentDocument;
+    if (options.withStyles) {
+      for (const st of tpl.styles) await loadStylesheet(doc, st.href, st.media);
+    }
     doc.body.innerHTML = tpl.bodyHtml;
 
     let onReload = options.onReload || null;
@@ -581,5 +590,81 @@
     });
   }
 
-  globalThis.pbpSwRealm = { SW_DEPS, boot, bootPopup, bootOptions, bootReader, loadRealmScripts, loadScript };
+  async function bootLibrary(options = {}) {
+    const tpl = await loadLibraryTemplate();
+    const iframe = await createEmptyIframe(options.search || "");
+    const win = iframe.contentWindow;
+    const doc = iframe.contentDocument;
+    if (options.withStyles) {
+      for (const st of tpl.styles) await loadStylesheet(doc, st.href, st.media);
+    }
+    doc.body.innerHTML = tpl.bodyHtml;
+
+    let onReload = options.onReload || null;
+    wireReloadTrap(win, () => onReload);
+
+    const mock = globalThis.pbpChromeMock.create(options.mock || {});
+    win.chrome = mock.chrome;
+    win.fetch = options.fetch || defaultExtensionFetch("library", tpl.base);
+
+    const dclWrapped = new WeakMap();
+    const dclPending = [];
+    const origAdd = doc.addEventListener.bind(doc);
+    const origRemove = doc.removeEventListener.bind(doc);
+    doc.addEventListener = function (type, listener, opts) {
+      if (type === "DOMContentLoaded" && typeof listener === "function") {
+        let wrapped = dclWrapped.get(listener);
+        if (!wrapped) {
+          wrapped = function (ev) {
+            const ret = listener.call(this, ev);
+            if (ret && typeof ret.then === "function") dclPending.push(ret);
+            return ret;
+          };
+          dclWrapped.set(listener, wrapped);
+        }
+        return origAdd(type, wrapped, opts);
+      }
+      return origAdd(type, listener, opts);
+    };
+    doc.removeEventListener = function (type, listener, opts) {
+      if (type === "DOMContentLoaded" && typeof listener === "function") {
+        const wrapped = dclWrapped.get(listener);
+        if (wrapped) origRemove(type, wrapped, opts);
+      }
+      return origRemove(type, listener, opts);
+    };
+
+    if (options.beforeScripts) await options.beforeScripts(win, mock, doc);
+    if (options.withEarlyTheme !== false) {
+      for (const src of tpl.earlySources) await loadScript(doc, src);
+    }
+    Object.defineProperty(doc, "readyState", { configurable: true, value: "interactive" });
+    try {
+      for (const src of tpl.sources) await loadScript(doc, src);
+    } finally {
+      delete doc.readyState;
+    }
+
+    let initialized = false;
+    async function runInit() {
+      if (initialized) return;
+      initialized = true;
+      doc.addEventListener = origAdd;
+      dclPending.length = 0;
+      const ev = new win.Event("DOMContentLoaded", { bubbles: true });
+      doc.dispatchEvent(ev);
+      await Promise.all(dclPending.splice(0));
+    }
+    if (options.autoInit !== false) await runInit();
+    if (options.afterBoot) await options.afterBoot(win, mock, doc);
+
+    return realmHandle(win, doc, mock, {
+      iframe,
+      runInit,
+      resetBody() { doc.body.innerHTML = tpl.bodyHtml; },
+      setOnReload(fn) { onReload = fn; },
+    });
+  }
+
+  globalThis.pbpSwRealm = { SW_DEPS, boot, bootPopup, bootOptions, bootLibrary, bootReader, loadRealmScripts, loadScript };
 })();
