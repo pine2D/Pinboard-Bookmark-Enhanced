@@ -239,8 +239,8 @@ function _pbpSkimBuildSection(view) {
 
   const regenBtn = sec.querySelector("#skim-regen");
   const collapseBtn = sec.querySelector("#skim-collapse");
-  regenBtn.addEventListener("click", () => _pbpSkimRegen().catch(() => { /* swallow-ok: AbortController.abort guard on settled controller */ }));
-  sec.querySelector("#skim-stale-regen").addEventListener("click", () => _pbpSkimRegen().catch(() => { /* swallow-ok: AbortController.abort guard on settled controller */ }));
+  regenBtn.addEventListener("click", () => _pbpSkimRegen().catch(() => { /* swallow-ok: _pbpSkimRegen surfaces generation errors inside the skim status bar */ }));
+  sec.querySelector("#skim-stale-regen").addEventListener("click", () => _pbpSkimRegen().catch(() => { /* swallow-ok: _pbpSkimRegen surfaces generation errors inside the skim status bar */ }));
   sec.querySelector("#skim-stop").addEventListener("click", () => {
     if (_pbpSkimState && _pbpSkimState.ctrl) _pbpSkimState.ctrl.abort();
   });
@@ -714,7 +714,7 @@ function _pbpSkimOnArticleReplaced() {
   // into -- through the same cache-probe-then-generate path.
   if (_pbpSkimDeferredVideo && window.pbpVideoDoc && window.pbpVideoDoc.kind === "video-transcript") {
     _pbpSkimDeferredVideo = false;
-    _pbpSkimLoad(_pbpSkimArticleRev).catch(() => { /* swallow-ok: optional video metadata garnish never blocks export */ });
+    _pbpSkimLoad(_pbpSkimArticleRev).catch(() => { /* swallow-ok: deferred video skim auto-load renders its own inline error state on failure */ });
     return;
   }
   // No cache probe, no generation, no request of any kind -- not even a free

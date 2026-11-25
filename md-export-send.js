@@ -77,12 +77,14 @@ async function pbpSendToTarget(id, ctx, options = {}) {
       // "Send failed" text -- the same degrade the sibling viaClipboard path
       // uses a few lines below when its own clipboard write fails. The
       // api-insecure message makes no clipboard claim, so it stays actionable.
-      const apiFail = async (errCode) => {
+      const apiFail = async (errCode, httpStatus) => {
         let copied = true;
         await assertCurrent();
         try { await navigator.clipboard.writeText(pbpBuildFileBody(id, meta, rawBody)); } catch (_diagErr) { console.warn("[export-send] fallback clipboard write failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  copied = false; }
         await assertCurrent();
-        return { ok: false, fellBack: false, error: (copied || errCode === "api-insecure") ? errCode : "" };
+        const out = { ok: false, fellBack: false, error: (copied || errCode === "api-insecure") ? errCode : "" };
+        if (Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599) out.status = httpStatus;
+        return out;
       };
       // Execution is contains-only. The direct click path may request first,
       // but this second gate also protects background/retry callers and later
@@ -101,8 +103,8 @@ async function pbpSendToTarget(id, ctx, options = {}) {
           await assertCurrent();
           const presp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body, redirect: "error", signal: AbortSignal.timeout(20000) });
           await assertCurrent();
-          if (presp.status === 401) return await apiFail("api-token");
-          if (!presp.ok) return await apiFail("api-down");
+          if (presp.status === 401) return await apiFail("api-token", presp.status);
+          if (!presp.ok) return await apiFail("api-down", presp.status);
         } catch (error) { await assertCurrent(); console.warn("[pbp-send] precheck failed:", error?.name, error?.message); return await apiFail("api-down"); }
       }
       // Best-effort pre-request (e.g. create the target container/page).
@@ -130,21 +132,21 @@ async function pbpSendToTarget(id, ctx, options = {}) {
         await assertCurrent();
         const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body, redirect: "error", signal: AbortSignal.timeout(20000) });
         await assertCurrent();
-        if (resp.status === 401) return await apiFail("api-token");
+        if (resp.status === 401) return await apiFail("api-token", resp.status);
         // GitHub-only: a token can pass the /user precheck (401 never fires)
         // yet have POST /gists answer 403/404 because it lacks gist write
         // access (classic PAT without the `gist` scope; fine-grained support
         // is unverified -- registry comment, export-targets.js). Reuse the
         // "api-token" code so the user is sent to check the token in Settings
         // instead of a dead-end "request failed".
-        if (id === "github" && (resp.status === 403 || resp.status === 404)) return await apiFail("api-token");
+        if (id === "github" && (resp.status === 403 || resp.status === 404)) return await apiFail("api-token", resp.status);
         // Notion-only: 404 object_not_found (and 403 restricted_resource) on
         // POST /pages almost always means the parent page was never shared
         // with the integration -- the single most common Notion setup
         // mistake. Surface dedicated guidance instead of a dead-end
         // "request failed".
-        if (id === "notion" && (resp.status === 404 || resp.status === 403)) return await apiFail("api-notion-share");
-        if (!resp.ok) return await apiFail("api-failed");
+        if (id === "notion" && (resp.status === 404 || resp.status === 403)) return await apiFail("api-notion-share", resp.status);
+        if (!resp.ok) return await apiFail("api-failed", resp.status);
         const json = await resp.json().catch(() => /* swallow-ok: malformed or partial JSON payload degrades to fallback value */ null);
         await assertCurrent();
         // Success: row-defined (webhook = any 2xx, since it returns no id) else

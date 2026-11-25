@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="43"><title>Ask export tests</title></head><body>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="44"><title>Ask export tests</title></head><body>
 <div id="results"></div><div id="summary"></div>
 <script src="../shared.js"></script>
 <script src="../vendor/marked.min.js"></script><script src="../vendor/purify.min.js"></script>
@@ -166,6 +166,62 @@ await test('per-answer copy rejects its completed record after external Clear',a
       await realAskHistory.set(state.url,[],state.account);document.dispatchEvent(new CustomEvent('pbp:ask-history-external',{detail:{type:'clear',url:state.url,account:state.account}}));
       answer.querySelector('.ask-copy-btn').click();await new Promise(resolve=>setTimeout(resolve,60));assert(copies===1,'deleted completed record reached clipboard');
     }finally{Object.assign(window,saved);if(descriptor)Object.defineProperty(navigator,'clipboard',descriptor);else delete navigator.clipboard;await realAskHistory.set(state.url,[],state.account);}
+  });
+});
+await test('mid-flight external Clear during single-round copy aborts without recording ask_copy denied',async()=>{
+  const savedChrome=window.chrome;
+  const localBag=Object.create(null);
+  window.chrome={
+    runtime:{id:'test-ext-id'},
+    storage:{
+      local:{
+        get:async(keys)=>{
+          if(typeof keys==='string')return keys in localBag?{[keys]:structuredClone(localBag[keys])}:{};
+          if(keys&&typeof keys==='object'&&!Array.isArray(keys)){const out={};for(const k of Object.keys(keys))out[k]=k in localBag?structuredClone(localBag[k]):keys[k];return out;}
+          return structuredClone(localBag);
+        },
+        set:async(obj)=>{for(const [k,v] of Object.entries(obj))localBag[k]=structuredClone(v);},
+        remove:async(keys)=>{for(const k of [].concat(keys))delete localBag[k];},
+      },
+    },
+  };
+  await withAskRunnerFixture(async({answer,state})=>{
+    const names=['pbpReadSettingsWithSecrets','pbpPinboardAccountFromToken','flashButtonLabel','pbpAskHistGet'];
+    const saved=Object.fromEntries(names.map(n=>[n,window[n]]));
+    const descriptor=Object.getOwnPropertyDescriptor(navigator,'clipboard');
+    const record={q:'race question',a:'Completed answer',ts:9,model:'test-model'};
+    let copies=0;
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{copies++;}}});
+    window.pbpReadSettingsWithSecrets=async()=>({personalLibraryAccount:'alice'});
+    window.pbpPinboardAccountFromToken=token=>token.split(':')[0];
+    window.flashButtonLabel=()=>{};
+    let releaseRead;
+    const readStarted=new Promise(r=>{
+      window.pbpAskHistGet=async(u,acc)=>{
+        r();
+        await new Promise(res=>{releaseRead=res;});
+        return realAskHistory.get(u,acc);
+      };
+    });
+    try{
+      await realAskHistory.set(state.url,[record],state.account);
+      answer._askExportRecord=record;
+      _pbpAskFinalize(answer,record.a);
+      answer.querySelector('.ask-copy-btn').click();
+      await readStarted;
+      await realAskHistory.set(state.url,[],state.account);
+      document.dispatchEvent(new CustomEvent('pbp:ask-history-external',{detail:{type:'clear',url:state.url,account:state.account}}));
+      releaseRead();
+      await new Promise(resolve=>setTimeout(resolve,80));
+      assert(copies===0,'clipboard must not be called when history cleared mid-flight');
+      const diag=await pbpReadDiagErrors();
+      assert(diag.length===0,'concurrent external Clear must not record ask_copy denied: '+JSON.stringify(diag));
+    }finally{
+      Object.assign(window,saved);
+      if(descriptor)Object.defineProperty(navigator,'clipboard',descriptor);else delete navigator.clipboard;
+      await realAskHistory.set(state.url,[],state.account);
+      window.chrome=savedChrome;
+    }
   });
 });
 const originalClipboard=Object.getOwnPropertyDescriptor(navigator,'clipboard');

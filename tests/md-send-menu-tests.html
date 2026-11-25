@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="35"><title>Reader Send-to lifecycle tests</title></head><body>
+<html><head><meta charset="utf-8"><meta name="pbp-expected-count" content="39"><title>Reader Send-to lifecycle tests</title></head><body>
 <h1>Reader Send-to lifecycle tests</h1><div id="results"></div>
 <script src="../shared.js"></script>
 <script src="../vendor/marked.min.js"></script>
@@ -117,7 +117,12 @@ async function getSharedSendRealm(realRuntime) {
       };
       Object.defineProperty(win.navigator, "clipboard", {
         configurable: true,
-        value: { writeText: async (body) => { if (activeState) activeState.copied.push(body); } },
+        value: {
+          writeText: async (body) => {
+            if (activeState && activeState.clipboardError) throw activeState.clipboardError;
+            if (activeState) activeState.copied.push(body);
+          },
+        },
       });
     },
   });
@@ -197,6 +202,8 @@ async function fixture({ realRuntime = false } = {}) {
   return {
     refresh: () => w.__PBP_readerTestHooks.setupSendMenu(),
     retireArticle: () => w.__PBP_readerTestHooks.bumpArticleRevision(),
+    w,
+    realm: env.realm,
     gearHtml,
     state,
     d,
@@ -474,6 +481,132 @@ async function test(name, fn, options) {
       assert(f.d.getElementById("send-status").textContent === "mdExportContextChanged", "missing context feedback");
     }, { realRuntime: true });
   }
+  await test("GitHub HTTP 500 records sanitized export_send http_error diagnostic with status 500", async f => {
+    await f.w.chrome.storage.local.remove("pbpDiagErrors");
+    f.state.markdown = "SECRET_PRIVATE_BODY_TOKEN";
+    const wait = deferred(); f.state.networkWaits.push({ method: "POST", wait });
+    f.click(); await settle();
+    wait.resolve({ ok: false, status: 500, json: async () => ({ message: "https://secret.example/internal" }) });
+    await settle();
+    assert(f.d.getElementById("send-status").textContent === "mdSendApiFailed", "expected mdSendApiFailed status");
+    const entries = await f.w.pbpReadDiagErrors();
+    assert(entries.length === 1, "expected 1 export_send diagnostic, got " + entries.length);
+    assert(entries[0].surface === "md-preview" && entries[0].op === "export_send" && entries[0].code === "http" && entries[0].status === 500, "unexpected diagnostic shape: " + JSON.stringify(entries[0]));
+    const raw = JSON.stringify(entries);
+    assert(!raw.includes("SECRET_PRIVATE_BODY_TOKEN") && !raw.includes("fixture.test") && !raw.includes("secret.example"), "private payload or URL leaked into diagnostic ring");
+  }, { realRuntime: true });
+  await test("Obsidian clipboard denial records sanitized export_send send_failed diagnostic", async f => {
+    await f.w.chrome.storage.local.remove("pbpDiagErrors");
+    f.state.settings = { exportTargets: { obsidian: { enabled: true, vault: "PrivateVault" } } };
+    f.state.lastReads.push({ promise: Promise.resolve("obsidian") });
+    f.state.clipboardError = new DOMException("Clipboard write blocked https://private.example/doc", "NotAllowedError");
+    await f.refresh();
+    f.click(); await settle();
+    assert(f.d.getElementById("send-status").textContent === "mdSendFailed", "expected mdSendFailed status");
+    const entries = await f.w.pbpReadDiagErrors();
+    assert(entries.length === 1 && entries[0].op === "export_send" && entries[0].code === "send_failed", "expected send_failed diagnostic, got " + JSON.stringify(entries));
+    assert(!JSON.stringify(entries).includes("PrivateVault") && !JSON.stringify(entries).includes("private.example"), "vault or URL leaked into diagnostic ring");
+  }, { realRuntime: true });
+  await test("owner switch cancellation during send records zero export_send diagnostics", async f => {
+    await f.w.chrome.storage.local.remove("pbpDiagErrors");
+    const wait = deferred(); f.state.networkWaits.push({ method: "GET", wait });
+    f.click(); await settle();
+    f.state.settings.pinboardToken = "bob:new";
+    wait.resolve({ ok: true, status: 200 }); await settle();
+    assert(f.d.getElementById("send-status").textContent === "mdExportContextChanged", "expected context changed status");
+    const entries = await f.w.pbpReadDiagErrors();
+    assert(entries.length === 0, "cancellation recorded spurious export_send diagnostic: " + JSON.stringify(entries));
+  }, { realRuntime: true });
+  await test("same-slot pbpVideoCommitTranscript refuses overwrite on ownership read failure and concurrent writer race", async () => {
+    const slotKey = "md_preview_data_fixture";
+    const sharedMock = pbpChromeMock.create({
+      storage: {
+        local: {
+          [slotKey]: {
+            url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            title: "Video Fixture",
+            markdown: "Initial description",
+            contentHtml: "",
+            source: "local",
+            account: "qa",
+            tags: [],
+            description: "",
+            ts: 1000,
+          },
+        },
+      },
+    });
+    const shareChrome = { beforeScripts(win) { win.chrome = sharedMock.chrome; } };
+    const tabA = await pbpSwRealm.bootReader(shareChrome);
+    await new Promise(r => setTimeout(r, 5));
+    const tabB = await pbpSwRealm.bootReader(shareChrome);
+    try {
+      const okB = await tabB.win.pbpVideoCommitTranscript("# Tab B AI Transcript\n\nCue B.", "Video Fixture", { aiPunct: true, reason: "video-ai-punctuation" });
+      assert(okB === true, "Tab B commit should succeed");
+      const savedB = (await sharedMock.chrome.storage.local.get(slotKey))[slotKey];
+      assert(savedB && savedB.videoAiPunct === true && savedB.markdown.includes("Tab B AI Transcript"), "Tab B transcript missing");
+
+      // Probe 1: Tab A's ownership read fails once -> must fail closed, never overwrite Tab B's slot.
+      const origGet = sharedMock.chrome.storage.local.get.bind(sharedMock.chrome.storage.local);
+      let failOnce = true;
+      sharedMock.chrome.storage.local.get = async (keys) => {
+        if (failOnce && keys === slotKey) { failOnce = false; throw new Error("transient IPC failure"); }
+        return origGet(keys);
+      };
+      const resReadFail = await tabA.win.pbpVideoCommitTranscript("# Tab A Stale Track\n\nCue A.", "Video Fixture", { reason: "video-track-switch" });
+      sharedMock.chrome.storage.local.get = origGet;
+      const afterReadFail = (await sharedMock.chrome.storage.local.get(slotKey))[slotKey];
+      assert(resReadFail === false, "Tab A commit must return false when ownership read fails");
+      assert(afterReadFail.nonce === savedB.nonce && afterReadFail.videoAiPunct === true && afterReadFail.markdown.includes("Tab B AI Transcript"), "Tab A overwrote Tab B on ownership read failure");
+
+      // Probe 2: Two fresh duplicated tabs race concurrently on the same slot; the older tab started first must not clobber the newer tab's commit.
+      await sharedMock.chrome.storage.local.set({
+        [slotKey]: {
+          url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+          title: "Video Fixture",
+          markdown: "Fresh description",
+          contentHtml: "",
+          source: "local",
+          account: "qa",
+          tags: [],
+          description: "",
+          ts: Date.now(),
+        },
+      });
+      const raceOld = await pbpSwRealm.bootReader(shareChrome);
+      await new Promise(r => setTimeout(r, 5));
+      const raceNew = await pbpSwRealm.bootReader(shareChrome);
+      try {
+        const baseGet = sharedMock.chrome.storage.local.get.bind(sharedMock.chrome.storage.local);
+        let pausedFirstCommitRead = false;
+        let notifyFirstRead = null;
+        const firstReadEntered = new Promise(r => { notifyFirstRead = r; });
+        sharedMock.chrome.storage.local.get = async (keys) => {
+          const ans = await baseGet(keys);
+          if (!pausedFirstCommitRead && keys === slotKey) {
+            pausedFirstCommitRead = true;
+            notifyFirstRead();
+            await new Promise(r => setTimeout(r, 20));
+          }
+          return ans;
+        };
+        const pNew = raceNew.win.pbpVideoCommitTranscript("# Newer Tab Transcript\n\nNew cue.", "Video Fixture", { aiPunct: true, reason: "video-ai-punctuation" });
+        await firstReadEntered;
+        const pOld = raceOld.win.pbpVideoCommitTranscript("# Older Tab Transcript\n\nOld cue.", "Video Fixture", { aiPunct: false, reason: "video-track-switch" });
+        const [rNew, rOld] = await Promise.all([pNew, pOld]);
+        sharedMock.chrome.storage.local.get = baseGet;
+        assert(rNew === true && rOld === false, "expected newer tab true and older tab false, got " + rNew + "/" + rOld);
+        const finalRec = (await sharedMock.chrome.storage.local.get(slotKey))[slotKey];
+        assert(finalRec.videoAiPunct === true && finalRec.markdown.includes("Newer Tab Transcript"), "concurrent older tab clobbered newer tab's transcript");
+      } finally {
+        raceOld.iframe.remove();
+        raceNew.iframe.remove();
+      }
+    } finally {
+      tabA.iframe.remove();
+      tabB.iframe.remove();
+    }
+  }, { realRuntime: true });
   document.title = (fail ? "FAIL" : "PASS") + " Reader Send-to lifecycle tests";
 })().catch(e => { const row = document.createElement("div"); row.className = "fail"; row.textContent = e.stack; document.getElementById("results").appendChild(row); });
 </script></body></html>

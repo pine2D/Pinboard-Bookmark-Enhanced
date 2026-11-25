@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="284"><title>md-highlight commit tests</title>
+<html><head><meta charset="UTF-8"><meta name="pbp-expected-count" content="288"><title>md-highlight commit tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1100px; }
 h2 { margin-top: 24px; font-size: 15px; }
@@ -259,6 +259,7 @@ async function boot(rec) {
 
 // The edit card's own DOM is not this suite's contract; _pbpHlOpenCard is
 // stubbed so failure branches that reposition it stay inert.
+const _realOpenCard = window._pbpHlOpenCard;
 window._pbpHlOpenCard = () => {};
 
 // Minimal card: only the two nodes the note commit path reads.
@@ -1777,6 +1778,63 @@ function selectionRange(n, start, end) {
     check("a newer confirm replacing this one keeps focus in the newer confirm",
       !!newer && newer.contains(document.activeElement), desc(document.activeElement));
     pbpDismissActiveConfirm(); other.remove(); await tick();
+  }
+
+  section("(14) unsaved note draft survives article replacement write failure and retries cleanly");
+  {
+    const tick = () => new Promise((r) => setTimeout(r, 0));
+    const savedCard = _pbpHlCard;
+    const savedOpenCard = window._pbpHlOpenCard;
+    const savedAiGetSettings = window.pbpAiGetSettings;
+    const savedAiAvailable = window.pbpAiAvailable;
+    window.pbpAiGetSettings = async () => ({});
+    window.pbpAiAvailable = () => false;
+    window._pbpHlOpenCard = _realOpenCard;
+    _pbpHlCard = null;
+    try {
+      await boot(baseRecord()); pbpHlRestore(); _pbpHlNotebookRender();
+      _realOpenCard("h-alpha");
+      const realCard = document.getElementById("pb-hl-card");
+      const noteEl = realCard.querySelector(".hl-card-note");
+      noteEl.value = "First saved note";
+      noteEl.dispatchEvent(new Event("input", { bubbles: true }));
+      realCard.querySelector(".hl-card-save").click();
+      await flush();
+      check("fixture: initial note edit persisted to storage",
+        STORE[KEY].items.find((it) => it.id === "h-alpha").note === "First saved note");
+
+      // Edit note again, then switch subtitle track while storage write fails with quota error.
+      noteEl.value = "Second unsaved draft";
+      noteEl.dispatchEvent(new Event("input", { bubbles: true }));
+      ON_SET = () => { throw new Error("QUOTA_BYTES quota exceeded"); };
+      const swapDetail = Object.freeze({ revision: 99, reason: "video-track-switch", url: PAGE_URL, title: "Fixture", forum: false, account: "" });
+      document.dispatchEvent(new CustomEvent("pbp:article-will-replace", { detail: swapDetail }));
+      document.dispatchEvent(new CustomEvent("pbp:article-replaced", { detail: swapDetail }));
+      await flush();
+      ON_SET = null;
+
+      check("failed write during track switch leaves stored note at previous value",
+        STORE[KEY].items.find((it) => it.id === "h-alpha").note === "First saved note");
+
+      // Reopen the same highlight card: draft must still be present and retryable.
+      _realOpenCard("h-alpha");
+      check("reopening the highlight card after failed pre-swap write restores the unsaved draft",
+        noteEl.value === "Second unsaved draft");
+
+      realCard.querySelector(".hl-card-save").click();
+      await flush();
+      check("clicking Save on the restored draft commits it once storage recovers",
+        STORE[KEY].items.find((it) => it.id === "h-alpha").note === "Second unsaved draft");
+      if (realCard.matches(":popover-open")) realCard.hidePopover();
+      realCard.remove();
+      await tick();
+    } finally {
+      ON_SET = null;
+      _pbpHlCard = savedCard;
+      window._pbpHlOpenCard = savedOpenCard;
+      window.pbpAiGetSettings = savedAiGetSettings;
+      window.pbpAiAvailable = savedAiAvailable;
+    }
   }
 
   document.getElementById("summary").textContent =

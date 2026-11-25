@@ -1560,6 +1560,34 @@ const _pbpReaderBoot = (async function () {
     try { localStorage.setItem("md-preview-width", "720"); } catch (_) { /* swallow-ok: pre-paint width mirror is best-effort */ }
   }
   const info = data[MP_KEY];
+  const _initialSlotNonce = (info && typeof info.nonce === "string") ? info.nonce : "";
+  let _slotLockChain = Promise.resolve();
+  function _pbpWithPreviewSlotLock(work) {
+    const enqueueLocal = () => {
+      const run = _slotLockChain.then(work, work);
+      _slotLockChain = run.catch(() => { /* swallow-ok: keep same-page slot lock queue alive after handled rejection */ });
+      return run;
+    };
+    const locks = typeof navigator !== "undefined" && navigator && navigator.locks;
+    if (!locks || typeof locks.request !== "function") return enqueueLocal();
+    let entered = false;
+    const wrapped = () => { entered = true; return work(); };
+    try {
+      return Promise.resolve(locks.request("pbp-preview-slot:" + MP_KEY, { mode: "exclusive" }, wrapped))
+        .catch((err) => {
+          if (entered) throw err;
+          return enqueueLocal();
+        });
+    } catch (_) {
+      /* swallow-ok: unavailable Web Locks degrades to same-page serialized slot queue */
+      return enqueueLocal();
+    }
+  }
+  function _isStrangerSlotRecord(cur) {
+    if (!cur || typeof cur.nonce !== "string" || cur.nonce === _pageNonce) return false;
+    if ((cur.ts || 0) > _pageLoadTs) return true;
+    return cur.nonce !== _initialSlotNonce;
+  }
   if (info && (info.pending || info.restore)) {
     document.body.classList.add("md-shell");
   }
@@ -1652,7 +1680,12 @@ const _pbpReaderBoot = (async function () {
   if (bookmarkAccount !== initialConnection.account) {
     bookmarkAccount = initialConnection.account;
     tags = []; bookmarkNotes = ""; bookmarkDraft = null; bookmarkDescription = "";
-    await chrome.storage.local.set({[MP_KEY]:{...info,account:bookmarkAccount,tags,description:bookmarkNotes,bookmarkDraft}});
+    await _pbpWithPreviewSlotLock(async () => {
+      const curInit = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
+      if (!_isStrangerSlotRecord(curInit)) {
+        await chrome.storage.local.set({[MP_KEY]:{...(curInit || info),account:bookmarkAccount,tags,description:bookmarkNotes,bookmarkDraft}});
+      }
+    });
   }
   // X4: raw metadata transported by popup.js/background.js's widened
   // extraction payload. Gated by buildMeta()'s exportSettings.mdExportExtendedMeta
@@ -1685,9 +1718,12 @@ const _pbpReaderBoot = (async function () {
           bookmarkAccount = connection.account;
           tags = []; bookmarkNotes = ""; bookmarkDraft = null; bookmarkDescription = "";
           const key = k ? "md_preview_data_" + k : "md_preview_data";
-          const stored = (await chrome.storage.local.get(key))[key];
+          await _pbpWithPreviewSlotLock(async () => {
+            const stored = (await chrome.storage.local.get(key))[key];
+            if (gen !== accountGen) return;
+            if (stored) await chrome.storage.local.set({[key]:{...stored,account:bookmarkAccount,tags:[],description:"",bookmarkDraft:null}});
+          });
           if (gen !== accountGen) return;
-          if (stored) await chrome.storage.local.set({[key]:{...stored,account:bookmarkAccount,tags:[],description:"",bookmarkDraft:null}});
           document.dispatchEvent(new CustomEvent("pbp:bookmark-account-changed", {detail:{url,bookmarkUrl,title,account:bookmarkAccount}}));
         } else if (bookmarkAccount && pbpBookmarkSettingsChanged(changes)) {
           // Same account, other connection settings (gateway, rotated token):
@@ -1875,37 +1911,45 @@ const _pbpReaderBoot = (async function () {
       // page loaded, that page owns the slot now -- overwriting it would
       // clobber its article and fork what an F5 restores. This page keeps
       // its in-memory article; only the persistence is refused.
-      try {
-        const cur = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
-        if (cur && typeof cur.nonce === "string" && cur.nonce !== _pageNonce && (cur.ts || 0) > _pageLoadTs) {
+      const slotSaved = await _pbpWithPreviewSlotLock(async () => {
+        let cur;
+        try {
+          cur = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
+        } catch (e) {
+          console.warn("[pbp-video] commit refused: slot ownership read failed:", (e && e.name) || "", (e && e.message) || e);
+          return false;
+        }
+        if (_isStrangerSlotRecord(cur)) {
           console.warn("[pbp-video] commit refused: another preview page wrote this slot after we loaded");
           return false;
         }
-      } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
-      try {
-        await chrome.storage.local.set({
-          [MP_KEY]: {
-            markdown: md, title: title || fallbackTitle || "",
-            videoTranscript: true,
-            videoAiPunct: aiPunct,
-            videoState: o.videoState,
-            videoDescriptionMd: descMd,
-            url, baseUrl, sourceTabUrl, tabId: srcTabId,
-            source: pbpNormalizeExtractEngine(source),
-            // The article's own metadata from the handoff (byline, date, hero
-            // image, page language): exports and the reading language read it
-            // from the payload, so a transcript that dropped it lost all four
-            // export fields and its lang on the next F5.
-            author, published, site, image, lang: info.lang || "",
-            sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description: bookmarkNotes, ts: Date.now(),
-            nonce: _pageNonce
-          }
-        });
-      } catch (e) {
-        // quota / corrupt area -- keep the panel as-is; Copy still works
-        console.warn("[pbp-video] commit rejected: storage write failed:", (e && e.name) || "", (e && e.message) || e);
-        return false;
-      }
+        try {
+          await chrome.storage.local.set({
+            [MP_KEY]: {
+              markdown: md, title: title || fallbackTitle || "",
+              videoTranscript: true,
+              videoAiPunct: aiPunct,
+              videoState: o.videoState,
+              videoDescriptionMd: descMd,
+              url, baseUrl, sourceTabUrl, tabId: srcTabId,
+              source: pbpNormalizeExtractEngine(source),
+              // The article's own metadata from the handoff (byline, date, hero
+              // image, page language): exports and the reading language read it
+              // from the payload, so a transcript that dropped it lost all four
+              // export fields and its lang on the next F5.
+              author, published, site, image, lang: info.lang || "",
+              sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description: bookmarkNotes, ts: Date.now(),
+              nonce: _pageNonce
+            }
+          });
+          return true;
+        } catch (e) {
+          // quota / corrupt area -- keep the panel as-is; Copy still works
+          console.warn("[pbp-video] commit rejected: storage write failed:", (e && e.name) || "", (e && e.message) || e);
+          return false;
+        }
+      });
+      if (!slotSaved) return false;
       // The video panel reads this doc synchronously (AI-button suppression,
       // the collapsed description, the committed auto-load branch), so it must
       // describe the article that is about to be on screen -- and must match
@@ -2051,10 +2095,12 @@ const _pbpReaderBoot = (async function () {
         srcTabId = current.id;
         sourceTabUrl = current.url;
         try {
-          const curSlot = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
-          if (!(curSlot && typeof curSlot.nonce === "string" && curSlot.nonce !== _pageNonce && (curSlot.ts || 0) > _pageLoadTs)) {
-            await chrome.storage.local.set({ [MP_KEY]: { ...(curSlot || info), tabId: srcTabId, sourceTabUrl } });
-          }
+          await _pbpWithPreviewSlotLock(async () => {
+            const curSlot = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
+            if (!_isStrangerSlotRecord(curSlot)) {
+              await chrome.storage.local.set({ [MP_KEY]: { ...(curSlot || info), tabId: srcTabId, sourceTabUrl } });
+            }
+          });
         } catch (e) {
           console.warn("[reader-history] slot source tab update failed:", e?.name, e?.message);
         }
@@ -2265,14 +2311,16 @@ const _pbpReaderBoot = (async function () {
         try {
           // Stranger check (closing review H1): another page's newer record
           // owns the slot -- reload into IT instead of overwriting it.
-          const cur1 = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
-          if (!(cur1 && typeof cur1.nonce === "string" && cur1.nonce !== _pageNonce && (cur1.ts || 0) > _pageLoadTs)) {
-            await chrome.storage.local.set({ [MP_KEY]: {
-              markdown: "", title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
-              source: pbpNormalizeExtractEngine(attemptedEngine),
-              sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description: bookmarkNotes, ts: Date.now(), nonce: _pageNonce
-            } });
-          }
+          await _pbpWithPreviewSlotLock(async () => {
+            const cur1 = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
+            if (!_isStrangerSlotRecord(cur1)) {
+              await chrome.storage.local.set({ [MP_KEY]: {
+                markdown: "", title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
+                source: pbpNormalizeExtractEngine(attemptedEngine),
+                sourceIncognito, ...handedBookmarkUrl, bookmarkDraft, account: bookmarkAccount, tags, description: bookmarkNotes, ts: Date.now(), nonce: _pageNonce
+              } });
+            }
+          });
           location.reload();
           return;
         } catch (e) {
@@ -2287,7 +2335,7 @@ const _pbpReaderBoot = (async function () {
       } else {
         inFlight = false;
       }
-      try { await ensureVideoModule(); } catch (_diagErr) { console.warn("[md-preview] video module load failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
+      try { await ensureVideoModule(); } catch (_) { /* swallow-ok: load failure is reported once by the pbpVideoInit availability check below */ }
       if (typeof pbpVideoInit === "function") pbpVideoInit({ pageUrl: sourceTabUrl || url, title: title, tabId: srcTabId, account: libraryOwner });
       else console.warn("[pbp-video] mount unavailable: md-video.js failed to load");
       applyAvailability(attemptedEngine);
@@ -2528,7 +2576,7 @@ const _pbpReaderBoot = (async function () {
       // the load on the same detect preserves the old behavior exactly while
       // sparing non-video empty pages the 340KB parse.
       if (typeof pbpVideoDetect === "function" && pbpVideoDetect(sourceTabUrl || url)) {
-        try { await ensureVideoModule(); } catch (_diagErr) { console.warn("[md-preview] video module load failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
+        try { await ensureVideoModule(); } catch (_) { /* swallow-ok: load failure is reported once by the pbpVideoInit availability check below */ }
         if (typeof pbpVideoInit === "function") pbpVideoInit({ pageUrl: sourceTabUrl || url, title: title, tabId: srcTabId, account: libraryOwner });
         else console.warn("[pbp-video] mount unavailable: md-video.js failed to load");
       }
@@ -2615,10 +2663,12 @@ const _pbpReaderBoot = (async function () {
     // Same-slot stranger check as the committer (closing review H1): a
     // duplicated tab's commit landing during THIS page's first milliseconds
     // must not be overwritten by our restore record.
-    const cur0 = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
-    if (!(cur0 && typeof cur0.nonce === "string" && cur0.nonce !== _pageNonce && (cur0.ts || 0) > _pageLoadTs)) {
-      await chrome.storage.local.set({ [MP_KEY]: _restoreRecord });
-    }
+    await _pbpWithPreviewSlotLock(async () => {
+      const cur0 = (await chrome.storage.local.get(MP_KEY))[MP_KEY];
+      if (!_isStrangerSlotRecord(cur0)) {
+        await chrome.storage.local.set({ [MP_KEY]: _restoreRecord });
+      }
+    });
   } catch (_) { /* swallow-ok: advisory local UI state/preference persistence degrades without interrupting reader */  /* degrade to current behavior: next reload hits the empty state */ }
   if (!sourceIncognito && typeof pbpReaderHistoryRecord === "function") {
     void pbpReaderHistoryRecord({
@@ -3072,7 +3122,7 @@ const _pbpReaderBoot = (async function () {
     const neededOrigins = [...new Set(toFetch.map((u) => { try { return new URL(u).origin; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return ""; } }).filter(Boolean))];
     let granted = false;
     if (neededOrigins.length) {
-      try { granted = await chrome.permissions.request({ origins: neededOrigins.map(o => o + "/*") }); } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
+      try { granted = await chrome.permissions.request({ origins: neededOrigins.map(o => o + "/*") }); } catch (_) { /* swallow-ok: rejected or unavailable host permission request leaves granted=false */ }
     }
     const fetched = granted ? await pbpEmbedFetchAll(toFetch, embedLimits, embedBudget) : new Map();
     // Hotlink retry (hotlink round): images that failed the plain extension
@@ -3554,7 +3604,7 @@ const _pbpReaderBoot = (async function () {
       if (viaGesture) {
         let granted = false;
         // First await in the direct click chain (same contract as resolveEmbed).
-        try { granted = await chrome.permissions.request({ origins: origins.map((o) => o + "/*") }); } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ }
+        try { granted = await chrome.permissions.request({ origins: origins.map((o) => o + "/*") }); } catch (_) { /* swallow-ok: rejected or unavailable host permission request leaves granted=false */ }
         if (!granted) return;
       }
       origins.forEach((o) => imgFixOriginsSeen.add(o));
@@ -3662,7 +3712,7 @@ const _pbpReaderBoot = (async function () {
     const origins = [...new Set(batch.map((u) => { try { return new URL(u).origin; } catch (_) { /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */  return ""; } }).filter(Boolean))];
     if (!origins.length) return;
     for (const o of origins) {
-      const has = await chrome.permissions.contains({ origins: [o + "/*"] }).catch(() => /* swallow-ok: untrusted or relative URL string fails URL parse cleanly */ false);
+      const has = await chrome.permissions.contains({ origins: [o + "/*"] }).catch(() => /* swallow-ok: failed host permission query treats origin as ungranted */ false);
       if (!has) return; // any ungranted origin -> stay behind the button (never auto-request)
     }
     imgFixRun(false, batch);
@@ -3889,7 +3939,7 @@ const _pbpReaderBoot = (async function () {
   // that leaving only the typeof guard here silently dropped the player and
   // caption panel for every ordinary video preview.
   if (typeof pbpVideoDetect === "function" && pbpVideoDetect(sourceTabUrl || url)) {
-    ensureVideoModule().catch((_diagErr) => { console.warn("[md-preview] video module load failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }).then(() => {
+    ensureVideoModule().catch(() => { /* swallow-ok: load failure is reported once by the pbpVideoInit availability check below */ }).then(() => {
       if (typeof pbpVideoInit === "function") pbpVideoInit({ pageUrl: sourceTabUrl || url, title: title, tabId: srcTabId, account: libraryOwner });
       else console.warn("[pbp-video] mount unavailable: md-video.js failed to load");
     });
@@ -4729,6 +4779,7 @@ const _pbpReaderBoot = (async function () {
         primary.classList.add("sending");
         primaryLabel.textContent = t("mdSending");
         let res;
+        let sendThrewErr = null;
         try {
           res = await pbpSendToTarget(id, { meta, rawBody: _sendBody, cfg }, { isCurrent: async () => {
             // A settings refresh invalidates the captured destination as well
@@ -4738,10 +4789,31 @@ const _pbpReaderBoot = (async function () {
             const current = await exportJobOwnerCurrent(job);
             return !_sig.aborted && current;
           } });
-        } catch (_diagErr) { console.warn("[md-preview] export target send threw:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "md-preview", op: "export_send", code: "send_failed", errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error" }); 
+        } catch (_diagErr) {
+          sendThrewErr = _diagErr;
+          console.warn("[md-preview] export target send threw:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");
           res = { ok: false, fellBack: false, error: "" };
         }
         if (_sig.aborted) return;
+        if (!res.ok && res.error !== "context_changed" && typeof pbpRecordDiagError === "function") {
+          const errCode = typeof res.error === "string" && res.error.startsWith("missing:") ? "invalid"
+            : res.error === "open-blocked" ? "open_blocked"
+            : res.error === "api-perm" ? "denied"
+            : res.error === "api-insecure" ? "invalid"
+            : res.error === "api-down" ? "network"
+            : res.error === "api-token" ? "auth"
+            : res.error === "api-notion-share" ? "denied"
+            : res.error === "api-failed" ? "http"
+            : "send_failed";
+          const diagPayload = {
+            surface: "md-preview",
+            op: "export_send",
+            code: errCode,
+            errorName: sendThrewErr && typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(sendThrewErr) : "Error",
+          };
+          if (Number.isInteger(res.status) && res.status >= 100 && res.status <= 599) diagPayload.status = res.status;
+          pbpRecordDiagError(diagPayload);
+        }
         primary.classList.remove("sending");
         if (!_sig.aborted) setPrimary(id);
         if (res.ok && !res.fellBack) {
@@ -4790,6 +4862,14 @@ const _pbpReaderBoot = (async function () {
       } catch (error) {
         if (_sig.aborted) return;
         console.warn("[export] send preparation failed:", error?.name, error?.message);
+        if (typeof pbpRecordDiagError === "function") {
+          pbpRecordDiagError({
+            surface: "md-preview",
+            op: "export_send",
+            code: "failed",
+            errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(error) : "Error",
+          });
+        }
         showSendStatus(exportErrorText(error), true);
         if (!_sig.aborted) setPrimary(id);
       } finally {
@@ -5123,7 +5203,7 @@ function pbpFocusArticleTarget(target) {
   // video workspace parked on the timeline view otherwise scrolls a hidden
   // element (audit U6 -- md-video.js's listener existed with no dispatch
   // site). Covers TOC, Ask citations and highlight jumps in one place.
-  try { document.dispatchEvent(new CustomEvent("pbp:ensure-article-visible")); } catch (_) { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ }
+  try { document.dispatchEvent(new CustomEvent("pbp:ensure-article-visible")); } catch (_) { /* swallow-ok: optional article-visibility event dispatch in partial DOM fixtures */ }
   pbpRailDrawerClose();
   if (!target.hasAttribute("tabindex")) target.tabIndex = -1;
   target.focus({ preventScroll: true });

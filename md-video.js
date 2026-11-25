@@ -3063,7 +3063,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     try {
       const segs = pbpYtParseTimedtextXml(r.body);
       if (segs.length) return segs;
-    } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
+    } catch (_) { /* swallow-ok: fallback timedtext XML parse returns null when captured payload is neither json3 nor XML */ }
     return null;
   }
 
@@ -6642,7 +6642,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       (async () => {
         const originPat = detected.provider === "bilibili" ? BILI_ORIGIN : YT_ORIGIN;
         let g = false;
-        try { g = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
+        try { g = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) { /* swallow-ok: failed host permission query leaves auto-load off and keeps manual poster CTA */ }
         if (g) await runLoad(false);
       })().catch((e) => {
         console.warn("[pbp-video] committed auto load:", (e && e.message) || e);
@@ -6664,7 +6664,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       (async () => {
         const originPat = detected.provider === "bilibili" ? BILI_ORIGIN : YT_ORIGIN;
         let g = false;
-        try { g = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
+        try { g = await chrome.permissions.contains({ origins: [originPat] }) === true; } catch (_) { /* swallow-ok: failed host permission query leaves auto-load off and keeps manual poster CTA */ }
         if (g) await runLoad(false);
       })().catch((e) => {
         console.warn("[pbp-video] fallback auto load:", (e && e.message) || e);

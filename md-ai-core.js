@@ -408,7 +408,7 @@ function pbpAiMakeStreamJsonParser(onItem) {
       let textVal;
       try { textVal = JSON.parse('"' + m[2] + '"'); } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */  continue; }
       seen.add(id);
-      try { onItem({ id, text: textVal }); } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */ }
+      try { onItem({ id, text: textVal }); } catch (_) { /* swallow-ok: isolate stream parser loop from throwing consumer callback (see pbpTrRunQueue warn budget) */ }
     }
   }
   return {
@@ -427,7 +427,7 @@ function pbpAiMakeStreamJsonParser(onItem) {
             const id = Number(it && it.id);
             if (!Number.isInteger(id) || seen.has(id) || typeof (it && it.text) !== "string") continue;
             seen.add(id);
-            try { onItem({ id, text: it.text }); } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */ }
+            try { onItem({ id, text: it.text }); } catch (_) { /* swallow-ok: isolate final batch sweep from throwing consumer callback */ }
           }
         } catch (_) { /* swallow-ok: malformed or partial JSON payload degrades to fallback value */ }
       }

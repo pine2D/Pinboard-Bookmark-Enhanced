@@ -2032,7 +2032,7 @@ function _pbpTrResetTranslations(st, opts) {
   // H5 (spec 1.3): the whole translated layer just vanished -- drop every
   // tr-side highlight range + regray its Notebook rows. typeof-guarded so
   // md-translate never hard-depends on md-highlight (spec 7.2).
-  if (typeof window.pbpHlTrLayerCleared === "function") { try { window.pbpHlTrLayerCleared(); } catch (_) { /* swallow-ok: escaped footnote id selector guard */ } }
+  if (typeof window.pbpHlTrLayerCleared === "function") { try { window.pbpHlTrLayerCleared(); } catch (_) { /* swallow-ok: optional highlight mirror teardown guard when CSS Highlight API is unavailable */ } }
   _pbpTrSyncRetryAll();
   // keepMode (retranslate): a translated-only reader keeps their view -- the
   // cleared blocks fall back to visible originals (tr-only CSS only hides

@@ -732,8 +732,8 @@ async function _pbpHlRefreshOwner() {
   _pbpHlBarRange = null;
   if (_pbpHlState) {
     _pbpHlState.items = [];
-    try { pbpHlRestore(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
-    try { _pbpHlNotebookRender(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
+    try { pbpHlRestore(); } catch (_) { /* swallow-ok: clearing highlights during owner switch tolerates partial DOM state */ }
+    try { _pbpHlNotebookRender(); } catch (_) { /* swallow-ok: clearing notebook list during owner switch tolerates partial DOM state */ }
   }
   try {
     const flags = await pbpReadSecretSyncState({ persistInferredState: false });
@@ -743,10 +743,13 @@ async function _pbpHlRefreshOwner() {
     if (revision !== _pbpHlOwnerRevision) return;
     _pbpHlOwner = (raw && raw !== "ownerless") ? String(raw) : "";
     _pbpHlOwnerPending = false;
+    for (const dk of [..._pbpHlUnsavedNotes.keys()]) {
+      if (!dk.startsWith(_pbpHlOwner + "\u0000")) _pbpHlUnsavedNotes.delete(dk);
+    }
     if (_pbpHlState) {
       _pbpHlState.items = pbpHlVisibleItems(_pbpHlRawItems || [], _pbpHlOwner);
-      try { pbpHlRestore(); } catch (_) { /* swallow-ok: fail-closed vocabulary owner or store read degrades to safe sentinel */ }
-      try { _pbpHlNotebookRender(); } catch (_) { /* swallow-ok: console.warn guard in restricted test contexts */ }
+      try { pbpHlRestore(); } catch (_) { /* swallow-ok: highlight restore after owner refresh tolerates partial DOM state */ }
+      try { _pbpHlNotebookRender(); } catch (_) { /* swallow-ok: notebook render after owner refresh tolerates partial DOM state */ }
     }
   } catch (e) {
     if (revision !== _pbpHlOwnerRevision) return;
@@ -1366,7 +1369,7 @@ function _pbpHlOnArticleWillReplace(detail) {
   // write to the serialized queue, so an unsaved note survives even though the
   // swap lands long before that write resolves. Doing this after the close
   // would lose it -- the close clears the binding this read needs.
-  try { _pbpHlCommitNote(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ }
+  try { _pbpHlCommitNote(); } catch (_diagErr) { console.warn("[md-highlight] pre-swap note commit threw:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
   // Then every surface holding a Range into the DOM about to be detached.
   if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) { /* swallow-ok: popover state transition or selector guard on detached/closed element */ } }
   // The card's own "toggle" listener also clears this, but toggle is QUEUED,
@@ -2293,7 +2296,7 @@ function _pbpHlEnsureCard() {
     if (!pbpAiAvailable(s)) return;
     aiRow.hidden = false;
     if (card.matches(":popover-open")) _pbpHlPlaceCard(card);
-  }).catch(() => { /* swallow-ok: popover state transition or selector guard on detached/closed element */ });
+  }).catch(() => { /* swallow-ok: AI availability probe failure simply leaves optional card AI row hidden */ });
 
   const note = document.createElement("textarea");
   note.className = "hl-card-note";
@@ -2338,6 +2341,9 @@ function _pbpHlEnsureCard() {
   card.addEventListener("toggle", (e) => {
     if (e.newState === "closed") {
       if (typeof window.pbpSpeechCancelTarget === "function") window.pbpSpeechCancelTarget("hl-note");
+      if (_pbpHlNoteDirty && _pbpHlCardItemId && !_pbpHlOwnerPending) {
+        try { _pbpHlCommitNote(); } catch (_diagErr) { console.warn("[md-highlight] close note commit threw:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); }
+      }
       _pbpHlCardItemId = null;
     }
   });
@@ -2486,9 +2492,10 @@ function _pbpHlOpenCard(id) {
   degradedEl.hidden = !degraded;
   degradedEl.textContent = degraded ? t("hlDegraded") : "";
   const noteEl = card.querySelector(".hl-card-note");
-  noteEl.value = item.note || ""; // textContent-equivalent for a form control's value
-  _pbpHlCardBaseNote = noteEl.value;
-  _pbpHlNoteDirty = false;
+  const draftEntry = !_pbpHlOwnerPending ? _pbpHlUnsavedNotes.get(_pbpHlDraftKey(_pbpHlOwner, _pbpHlState.url, id)) : null;
+  noteEl.value = draftEntry ? draftEntry.note : (item.note || ""); // textContent-equivalent for a form control's value
+  _pbpHlCardBaseNote = draftEntry ? draftEntry.baseNote : noteEl.value;
+  _pbpHlNoteDirty = Boolean(draftEntry && draftEntry.dirty);
 
   if (typeof window.pbpExplainDismissIfUnpinned === "function") window.pbpExplainDismissIfUnpinned();
   if (!card.matches(":popover-open")) card.showPopover();
@@ -2549,8 +2556,24 @@ async function _pbpHlSwitchColor(color) {
 
 let _pbpHlNoteDirty = false;
 let _pbpHlPendingNoteCommit = null;
+const _pbpHlUnsavedNotes = new Map();
+function _pbpHlDraftKey(owner, url, id) {
+  return String(owner || "") + "\u0000" + String(url || "") + "\u0000" + String(id || "");
+}
 document.addEventListener("input", (e) => {
-  if (e.target && e.target.classList && e.target.classList.contains("hl-card-note")) _pbpHlNoteDirty = true;
+  if (e.target && e.target.classList && e.target.classList.contains("hl-card-note")) {
+    _pbpHlNoteDirty = true;
+    if (_pbpHlCardItemId && _pbpHlState && !_pbpHlOwnerPending) {
+      const dk = _pbpHlDraftKey(_pbpHlOwner, _pbpHlState.url, _pbpHlCardItemId);
+      const prev = _pbpHlUnsavedNotes.get(dk);
+      _pbpHlUnsavedNotes.set(dk, {
+        note: e.target.value,
+        baseNote: prev ? prev.baseNote : (_pbpHlCardBaseNote || ""),
+        dirty: true,
+        pending: null,
+      });
+    }
+  }
 });
 
 // Blur AND explicit Save button both route here (spec: "note textarea(失焦或保存钮落存储)").
@@ -2562,6 +2585,10 @@ function _pbpHlCommitNote() {
   if (!noteEl) return;
   const nextNote = noteEl.value;
   const baseNote = _pbpHlCardBaseNote || "";
+  const draftOwner = _pbpHlOwner;
+  const draftUrl = _pbpHlState.url;
+  const draftOwnerRev = _pbpHlOwnerRevision;
+  const draftKey = _pbpHlDraftKey(draftOwner, draftUrl, pendingId);
   const saveBtn = card && card.querySelector(".hl-card-save");
   _pbpHlNoteDirty = false;
   // no pbpHlRestore -- notes never touch the Range/Highlight, but the
@@ -2591,13 +2618,26 @@ function _pbpHlCommitNote() {
     }
     return stored.map((it) => (it.id === pendingId ? { ...it, note: mergedNote } : it));
   }, saveBtn).then((ok) => {
+    const curDraft = _pbpHlUnsavedNotes.get(draftKey);
+    const ownsDraftSlot = !curDraft || curDraft.pending === pending;
     if (!ok) {
-      if (gone) { _pbpHlToast(t("hlGoneElsewhere"), saveBtn); return false; }
-      _pbpHlNoteDirty = true; // a write failure is retryable, an abandoned edit is not
-      const currentNote = _pbpHlCard && _pbpHlCard.querySelector(".hl-card-note");
-      if (_pbpHlCardItemId === pendingId && currentNote && currentNote.value === nextNote) _pbpHlOpenCard(pendingId);
+      if (gone || _pbpHlOwnerPending || draftOwnerRev !== _pbpHlOwnerRevision) {
+        if (ownsDraftSlot) _pbpHlUnsavedNotes.delete(draftKey);
+        if (gone) _pbpHlToast(t("hlGoneElsewhere"), saveBtn);
+        return false;
+      }
+      if (ownsDraftSlot) {
+        _pbpHlUnsavedNotes.set(draftKey, { note: nextNote, baseNote, dirty: true, pending: null });
+      }
+      if (_pbpHlCardItemId === pendingId) {
+        _pbpHlNoteDirty = true; // a write failure is retryable, an abandoned edit is not
+        _pbpHlCardBaseNote = baseNote;
+        const currentNote = _pbpHlCard && _pbpHlCard.querySelector(".hl-card-note");
+        if (currentNote && ownsDraftSlot && currentNote.value !== nextNote) currentNote.value = nextNote;
+      }
       return false;
     }
+    if (ownsDraftSlot) _pbpHlUnsavedNotes.delete(draftKey);
     _pbpHlNotebookRender();
     // The merge protects only the save it ran in unless the CARD adopts its
     // result too: leave the textarea showing the pre-merge text while the base
@@ -2619,6 +2659,9 @@ function _pbpHlCommitNote() {
     }
     return true;
   });
+  if (!_pbpHlOwnerPending) {
+    _pbpHlUnsavedNotes.set(draftKey, { note: nextNote, baseNote, dirty: false, pending });
+  }
   _pbpHlPendingNoteCommit = pending;
   const clearPending = () => { if (_pbpHlPendingNoteCommit === pending) _pbpHlPendingNoteCommit = null; };
   pending.then(clearPending, clearPending);
@@ -2644,6 +2687,7 @@ async function _pbpHlDeleteItem(id, btn) {
     return stored.filter((it) => it.id !== id);
   }, btn);
   if (!ok) return false;
+  if (_pbpHlState) _pbpHlUnsavedNotes.delete(_pbpHlDraftKey(_pbpHlOwner, _pbpHlState.url, id));
   if (removedN && typeof pbpHlSyncMirror === "function") pbpHlSyncMirror(removedN); // H5 (spec 1.5)
   if (typeof pbpHlRestore === "function") pbpHlRestore();
   _pbpHlNotebookRender();

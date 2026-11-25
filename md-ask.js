@@ -579,7 +579,7 @@ function _pbpAskBuildPanel() {
   // construction (this function is only reachable through wiring pbpAskInit
   // adds AFTER that same event) has already run by the time a user can open
   // the panel.
-  _pbpAskHistRestore().catch(() => { /* swallow-ok: body attribute observer guard in synthetic DOM fixtures */ });
+  _pbpAskHistRestore().catch(() => { /* swallow-ok: _pbpAskHistRestore logs storage read failures internally and resets restore state */ });
 
   // Scope toggle (research T1.5): session-only state, no storage; the
   // context is rebuilt on the next meta/send pass.
@@ -599,7 +599,7 @@ function _pbpAskBuildPanel() {
   panel.querySelector("#ask-clear")._pbpWired = true;
   panel.querySelector("#ask-clear").addEventListener("click", () => {
     if (typeof _pbpAskShowClearConfirm === "function") { _pbpAskShowClearConfirm(); return; }
-    _pbpAskClearThread().catch(() => { /* swallow-ok: escaped footnote id selector guard */ });
+    _pbpAskClearThread().catch(() => { /* swallow-ok: _pbpAskClearThread logs clear failures internally and renders #ask-clear-error */ });
   });
   // Static starter chips (i18n text, zero tokens): click = put the chip
   // text into the textarea and send it through the submit seam.
@@ -915,7 +915,7 @@ function _pbpAskArchiveStatus() {
         _pbpAskHistRestored = false;
         await _pbpAskHistRestore().catch(() => { /* swallow-ok: callee manages its own UI error state and owner fences; suppress duplicate unhandled rejection */ });
       } else {
-        for (const item of pending) await _pbpAskPersistArchive(item).catch(() => { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ });
+        for (const item of pending) await _pbpAskPersistArchive(item).catch(() => { /* swallow-ok: _pbpAskPersistArchive logs archive write failures internally and retains pending retry state */ });
       }
       _pbpAskArchiveStatus();
       if (keyboard && (!document.activeElement || document.activeElement === document.body || document.activeElement === retry)) {
@@ -1659,7 +1659,7 @@ function _pbpAskErrorUi(aEl, error, question, runOpts) {
         : { newRound: true,
             visionAttachment: (runOpts && runOpts.visionAttachment) || null,
             rawQuestion: (runOpts && runOpts.rawQuestion) || "" });
-    }).catch(() => { /* swallow-ok: focus call on detached or non-focusable element is best-effort */ });
+    }).catch(() => { /* swallow-ok: _pbpAskRun manages its own streaming error bar and retry UI */ });
   });
   aEl.appendChild(err);
   aEl.appendChild(retry);
@@ -2862,7 +2862,14 @@ async function _pbpAskCopyThread() {
   const revision = _pbpAskExportRevision;
   const articleRevision = _pbpAskArticleRev;
   let snapshot;
-  try { snapshot = await pbpAskExportSnapshot({ title: st.title, url: st.url, account }); } catch (_diagErr) { console.warn("[md-ask] export snapshot build failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");  return; }
+  try {
+    snapshot = await pbpAskExportSnapshot({ title: st.title, url: st.url, account });
+  } catch (_diagErr) {
+    if (_diagErr && _diagErr.message === "ask-history-changed") return;
+    console.warn("[md-ask] export snapshot build failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");
+    if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "md-preview", op: "ask_copy", code: "storage", errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error" });
+    return;
+  }
   const text = pbpAskExportMarkdown(snapshot);
   if (st.account !== account || revision !== _pbpAskExportRevision) return;
   if (!text) return;
@@ -2908,25 +2915,35 @@ function _pbpAskDecorate(el, parsed) {
     label.textContent = t("askCopyAnswer");
     btn.appendChild(label);
     btn.addEventListener("click", async () => {
-      try {
-        const st = _pbpAskState;
-        if (!el.isConnected || !st) return;
-        const account = st.account, revision = _pbpAskExportRevision, articleRevision = _pbpAskArticleRev;
-        const record = el._askExportRecord || { q: "", a: parsed.body, cites: parsed.cites };
-        let snapshot;
-        if (el._askExportRecord) {
+      const st = _pbpAskState;
+      if (!el.isConnected || !st) return;
+      const account = st.account, revision = _pbpAskExportRevision, articleRevision = _pbpAskArticleRev;
+      const record = el._askExportRecord || { q: "", a: parsed.body, cites: parsed.cites };
+      let snapshot;
+      if (el._askExportRecord) {
+        try {
           snapshot = await pbpAskExportSnapshot({ url: st.url, account, title: st.title });
-          const present = snapshot.rounds.some((r) => r.q === record.q && r.a === record.a
-            && r.ts === (Number.isFinite(record.ts) ? record.ts : null) && r.model === String(record.model || ""));
-          if (!present) return; // an external Clear may leave this old bubble visible
+        } catch (_diagErr) {
+          if (_diagErr && _diagErr.message === "ask-history-changed") return;
+          console.warn("[md-ask] round snapshot build failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");
+          if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "md-preview", op: "ask_copy", code: "storage", errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error" });
+          flashButtonLabel(btn, t("mdPreviewFailed"));
+          return;
         }
-        const currentHash = typeof pbpAiBlocksFingerprint === "function" && pbpAiBlocks().length ? pbpAiBlocksFingerprint() : "";
-        const sourceChanged = !!(record.blocksHash && currentHash && record.blocksHash !== currentHash);
-        const text = pbpAskExportMarkdown({ url: st.url, rounds: [{ ...record, sourceChanged }] });
-        if (!await _pbpAskExportOwnerCurrent(account, revision, articleRevision, snapshot) || !el.isConnected) return;
+        const present = snapshot.rounds.some((r) => r.q === record.q && r.a === record.a
+          && r.ts === (Number.isFinite(record.ts) ? record.ts : null) && r.model === String(record.model || ""));
+        if (!present) return; // an external Clear may leave this old bubble visible
+      }
+      const currentHash = typeof pbpAiBlocksFingerprint === "function" && pbpAiBlocks().length ? pbpAiBlocksFingerprint() : "";
+      const sourceChanged = !!(record.blocksHash && currentHash && record.blocksHash !== currentHash);
+      const text = pbpAskExportMarkdown({ url: st.url, rounds: [{ ...record, sourceChanged }] });
+      if (!await _pbpAskExportOwnerCurrent(account, revision, articleRevision, snapshot) || !el.isConnected) return;
+      try {
         await navigator.clipboard.writeText(text);
         flashButtonLabel(btn, t("askCopied"));
-      } catch (_diagErr) { console.warn("[md-ask] round copy failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error"); if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "md-preview", op: "ask_copy", code: "denied", errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error" }); 
+      } catch (_diagErr) {
+        console.warn("[md-ask] round copy failed:", typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error");
+        if (typeof pbpRecordDiagError === "function") pbpRecordDiagError({ surface: "md-preview", op: "ask_copy", code: "denied", errorName: typeof pbpSafeErrorName === "function" ? pbpSafeErrorName(_diagErr) : "Error" });
         flashButtonLabel(btn, t("mdPreviewFailed"));
       }
     });

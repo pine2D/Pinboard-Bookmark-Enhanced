@@ -2549,7 +2549,7 @@ const PBP_DIAG_OPS = Object.freeze([
 const PBP_DIAG_CODES = Object.freeze([
   "failed", "unknown", "http", "network", "timeout", "aborted", "offline",
   "quota", "parse", "storage", "idb", "denied", "invalid", "conflict",
-  "cancelled", "send_failed",
+  "cancelled", "send_failed", "auth", "open_blocked",
 ]);
 const PBP_DIAG_ERROR_NAMES = Object.freeze([
   "Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError", "URIError", "EvalError", "AggregateError",
