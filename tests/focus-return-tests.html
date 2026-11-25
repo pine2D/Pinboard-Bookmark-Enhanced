@@ -527,6 +527,17 @@
           exportBtn.focus();
           exportBtn.click();
           await waitFor(() => eudicEntered, "pbpVocabEudicReady entered");
+          dispatchEscapeKey(win, doc);
+          assert(exportBtn.getAttribute("aria-expanded") === "false", "Escape during pending Eudic read cancels session");
+          releaseEudicReady(true);
+          await settle(4);
+          assert(!doc.querySelector(".vocab-export-menu"), "Escape-cancelled pending menu must not mount later");
+          assertValidActiveFocus(doc, "Escape during pending vocab export read keeps #vocab-export-open focused", exportBtn);
+
+          eudicEntered = false;
+          exportBtn.focus();
+          exportBtn.click();
+          await waitFor(() => eudicEntered, "pbpVocabEudicReady re-entered");
           win.dispatchEvent(new win.Event("resize"));
           doc.getElementById("lib-tab-notes").click();
           await waitFor(() => !doc.getElementById("view-notes").hidden, "switched to #view-notes while Eudic check pending");
@@ -940,14 +951,15 @@
         const saveBtn = card.querySelector(".hl-card-save");
         const delBtn = card.querySelector(".hl-card-delete");
         assert(noteBox && saveBtn && delBtn, "expected note, save, and delete controls in #pb-hl-card");
+        const targetHlKey = win._pbpHlKey(articleUrl);
+        const targetHlId = hlRow.dataset.hlId;
         noteBox.value = "Updated focus-return note";
         noteBox.dispatchEvent(new win.Event("input", { bubbles: true }));
         saveBtn.focus();
         saveBtn.click();
         await waitFor(async () => {
-          const all = await win.chrome.storage.local.get(null);
-          const entry = Object.entries(all).find(([k]) => k.startsWith("pbp_hl_") && k !== "pbp_hl_last_color");
-          return entry && Array.isArray(entry[1]?.items) && entry[1].items.some((it) => it && it.note === "Updated focus-return note");
+          const rec = (await win.chrome.storage.local.get(targetHlKey))[targetHlKey];
+          return rec && Array.isArray(rec.items) && rec.items.some((it) => it && it.id === targetHlId && it.note === "Updated focus-return note");
         }, "highlight note persisted by .hl-card-save");
         assertValidActiveFocus(doc, "reader #pb-hl-card Save button", saveBtn);
 

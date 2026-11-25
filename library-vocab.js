@@ -3591,14 +3591,33 @@ async function _pbpVocabOpenExportMenu(anchor) {
   // it takes) -- the same rule the settings button follows. Read before the
   // menu shows, so the item never pops in under the pointer.
   let eudic = false;
-  try { eudic = await pbpVocabEudicReady(); } catch (e) { console.warn("[library-vocab] Eudic readiness check failed:", e?.name); }
+  const pendingCtl = new AbortController();
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && _vocabExportSession === session) {
+      e.preventDefault();
+      _pbpVocabCloseExportMenu(document.activeElement === anchor);
+    }
+  }, { capture: true, signal: pendingCtl.signal });
+  document.addEventListener("pointerdown", (e) => {
+    if (_vocabExportSession === session && !(e.target instanceof Node && anchor.contains(e.target))) {
+      _pbpVocabCloseExportMenu(false);
+    }
+  }, { capture: true, signal: pendingCtl.signal });
+  try {
+    eudic = await pbpVocabEudicReady();
+  } catch (e) {
+    console.warn("[library-vocab] Eudic readiness check failed:", e?.name);
+  } finally {
+    pendingCtl.abort();
+  }
   if (_vocabExportSession !== session) return;
   const anchorVisible = typeof pbpIsVisibleFocusTarget === "function"
     ? pbpIsVisibleFocusTarget(anchor)
     : (anchor.isConnected && !anchor.disabled && !anchor.closest("[hidden], [inert]"));
   const aeAfterWait = document.activeElement;
   const focusMovedAway = !!(aeAfterWait && aeAfterWait !== anchor && aeAfterWait !== document.body && aeAfterWait !== document.documentElement);
-  if (_vocabExportBusy || !anchorVisible || focusMovedAway) {
+  const otherPopoverOpened = !!document.querySelector("[popover]:popover-open");
+  if (_vocabExportBusy || !anchorVisible || focusMovedAway || otherPopoverOpened) {
     _pbpVocabCloseExportMenu(false);
     return;
   }
