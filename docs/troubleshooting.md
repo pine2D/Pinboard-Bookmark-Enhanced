@@ -5,7 +5,7 @@ title: Troubleshooting
 
 # Troubleshooting: Bookmark Enhanced
 
-**Last updated:** 2026-11-14
+**Last updated:** 2026-11-26
 
 ## 1. Exporting non-secret diagnostics first
 
@@ -44,6 +44,8 @@ Before changing settings or reporting a bug, open **Settings > Backup & Diagnost
 - **Eudic**: Generate a personal API token from Eudic (`my.eudic.net`), select a target wordbook in Settings, and click **Test** to grant host access.
 
 ## 7. Unpacked ZIP upgrades and data recovery
+
+Bookmark Enhanced v3.5 requires Chrome 131 or later. If you use Chrome 123 through 130 with v3.4, update Chrome before installing v3.5.
 
 - **Upgrading an unpacked install safely**: Unzip the new release over the **same folder path** you originally loaded in `chrome://extensions/`, then click the reload icon on the extension card. Removing the extension or loading a new folder path assigns a new extension ID and isolates your previous IndexedDB and `chrome.storage.local` data.
 - **Restoring personal library data**: Bookmark Enhanced automatically records a local restore point (`pbp-restore-points`, up to 5 per personal library) before backup imports, before batch/article deletions in the Library, and on the first startup after an extension version update. Open **Settings > Backup & Diagnostics** to inspect or restore a local restore point, or import a manual JSON backup file.
